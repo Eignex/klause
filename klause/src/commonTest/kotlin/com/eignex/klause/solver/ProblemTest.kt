@@ -11,7 +11,7 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.ir.ProblemSpec
+import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.pipeline.FactorOwner
 import com.eignex.klause.solver.pipeline.IntVariableOwner
@@ -100,24 +100,22 @@ class ProblemTest {
     }
 
     @Test
-    fun `materializing a model keeps its open bounds separate from search domains`() {
+    fun `canonical problem keeps open bounds without a search domain`() {
         val openUpper = Bits(1).also { it.set(0) }
-        val model = ProblemSpec(
+        val problem = Problem(
             numBoolVars = 0,
             intBounds = IntBounds.fromModelBounds(longArrayOf(3), longArrayOf(0), null, openUpper),
             factors = emptyArray(),
         )
 
-        val problem = model.materialize(arrayOf(IntDomain(3, 8)))
-
-        assertEquals(8, problem.requireFiniteIntDomains()[0].max)
+        assertEquals(null, problem.intDomainOrNull(0))
         assertFalse(problem.intBounds.hasUpper(0))
     }
 
     @Test
-    fun `a problem spec classifies linear open columns before search materialization`() {
+    fun `a canonical problem classifies linear open columns before planning`() {
         val openUpper = Bits(1).also { it.set(0) }
-        val spec = ProblemSpec(
+        val spec = Problem(
             numBoolVars = 0,
             intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(0), null, openUpper),
             factors = arrayOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 4)),
@@ -129,7 +127,7 @@ class ProblemTest {
     @Test
     fun `component plan keeps open theory columns unmaterialized`() {
         val openUpper = Bits(3).also { it.set(1) }
-        val spec = ProblemSpec(
+        val spec = Problem(
             numBoolVars = 0,
             intBounds = IntBounds.fromModelBounds(longArrayOf(0, 0, 0), longArrayOf(3, 0, 3), null, openUpper),
             factors = arrayOf(
@@ -139,7 +137,6 @@ class ProblemTest {
         )
 
         val plan = spec.componentPlan()
-        val problem = plan.materialize(spec, mapOf(0 to IntDomain(0, 3), 2 to IntDomain(0, 3)))
         val cp = plan.cpProjection(spec, mapOf(0 to IntDomain(0, 3), 2 to IntDomain(0, 3)))
 
         assertEquals(IntVariableOwner.CP, plan.intOwner(0))
@@ -147,14 +144,11 @@ class ProblemTest {
         assertEquals(FactorOwner.CP, plan.factorOwner(0))
         assertEquals(FactorOwner.THEORY, plan.factorOwner(1))
         assertEquals(ProblemPipeline.DIFFERENCE_THEORY, plan.theoryPipeline)
-        assertEquals(IntDomain(0, 3), problem.intDomainOrNull(0))
-        assertEquals(null, problem.intDomainOrNull(1))
         assertEquals(
             IntColumn.Bounded(lower = 0, upper = null),
-            problem.intColumns.column(1),
+            spec.intColumns.column(1),
             "a theory column carries the source bounds, open side included",
         )
-        assertFailsWith<IllegalArgumentException> { problem.requireFiniteIntDomains() }
         assertEquals(2, cp.problem.numIntVars)
         assertEquals(0, cp.cpId(0))
         assertEquals(-1, cp.cpId(1))
@@ -166,7 +160,7 @@ class ProblemTest {
         // The reified real atom reasons over its integer column's bounds, so it enumerates nothing —
         // but no theory lane takes it once its coefficients are not exactly representable, which
         // leaves CP holding the factor and therefore the column.
-        val spec = ProblemSpec(
+        val spec = Problem(
             numBoolVars = 1,
             intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(10), null, null),
             factors = arrayOf(
@@ -194,7 +188,7 @@ class ProblemTest {
     @Test
     fun `an open column reached only by a factor CP must hold is unroutable rather than fatal`() {
         val openUpper = Bits(1).also { it.set(0) }
-        val spec = ProblemSpec(
+        val spec = Problem(
             numBoolVars = 1,
             intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(0), null, openUpper),
             factors = arrayOf(
@@ -226,7 +220,7 @@ class ProblemTest {
         // A CP-only factor over an open column: the route and the plan are two doors onto one model, and
         // which door a frontend used must not decide whether it gets a verdict or a crash.
         val openUpper = Bits(2).also { it.set(1) }
-        val spec = ProblemSpec(
+        val spec = Problem(
             numBoolVars = 0,
             intBounds = IntBounds.fromModelBounds(longArrayOf(0, 0), longArrayOf(9, 0), null, openUpper),
             factors = arrayOf(AllDifferent(intArrayOf(0, 1), domainMin = 0, domainSize = 10)),
@@ -234,23 +228,30 @@ class ProblemTest {
 
         assertEquals(ProblemPipeline.UNSUPPORTED_OPEN, spec.sourceRoute())
         assertEquals(ProblemPipeline.UNSUPPORTED_OPEN, spec.componentPlan().theoryPipeline)
+        assertIs<SourceProblemRoute.UnsupportedOpen>(spec.pipelineRoute())
+        assertEquals(null, spec.intDomainOrNull(1))
     }
 
     @Test
-    fun `pipeline route materializes finite models and prepares open theory requests`() {
-        val finite = ProblemSpec(
+    fun `bounded and open routes retain their component plans`() {
+        val finite = Problem(
             numBoolVars = 0,
             intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(1), null, null),
             factors = emptyArray(),
         )
         val openUpper = Bits(1).also { it.set(0) }
-        val open = ProblemSpec(
+        val open = Problem(
             numBoolVars = 0,
             intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(0), null, openUpper),
             factors = emptyArray(),
         )
 
-        assertIs<SourceProblemRoute.Finite>(finite.pipelineRoute())
-        assertIs<SourceProblemRoute.OpenTheory>(open.pipelineRoute())
+        val finiteRoute = assertIs<SourceProblemRoute.Finite>(finite.pipelineRoute())
+        val openRoute = assertIs<SourceProblemRoute.OpenTheory>(open.pipelineRoute())
+
+        assertIs<BakedProblem>(finiteRoute.problem)
+        assertEquals(ProblemPipeline.FINITE_CP, finiteRoute.componentPlan.theoryPipeline)
+        assertEquals(ProblemPipeline.DIFFERENCE_THEORY, openRoute.request.componentPlan.theoryPipeline)
+        assertEquals(null, openRoute.request.model.intDomainOrNull(0))
     }
 }

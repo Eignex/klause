@@ -4,7 +4,7 @@ import com.eignex.klause.util.Bits
 import com.eignex.klause.util.EmptyDoubleArray
 
 /**
- * Immutable solver-side problem. Variables come in two id spaces:
+ * Immutable logical model and the canonical source of solver projections. Variables come in two id spaces:
  *  - Boolean vars: ids `[0, numBoolVars)`, packed bits in [com.eignex.klause.solver.Assignment].
  *  - Integer vars: ids `[0, numIntVars)`, raw [Int] values in [com.eignex.klause.solver.Assignment].
  *
@@ -69,7 +69,7 @@ open class Problem(
     packedOpenIntLo: Bits? = null,
     /** Packed open upper sides retained across internal problem rebuilds. */
     packedOpenIntHi: Bits? = null,
-    /** Source-model bounds, when this finite problem was materialized from a [ProblemSpec]. */
+    /** Source-model bounds, when this finite problem was materialized from a [Problem]. */
     modelBounds: IntBounds? = null,
 ) {
     /** Finite CP domain capability of [v], or `null` when a theory owns the column. */
@@ -137,6 +137,41 @@ open class Problem(
             }
         }
     }
+
+    /**
+     * Build a canonical source model from its declared integer bounds.
+     *
+     * Every integer column stays symbolic until a [com.eignex.klause.solver.pipeline.ComponentPlan]
+     * assigns ownership. Finite engines receive a separate materialized or baked projection.
+     */
+    constructor(
+        numBoolVars: Int,
+        intBounds: IntBounds,
+        factors: Array<Factor>,
+        impliedFactorMask: BooleanArray? = null,
+        hasSymmetryBreaking: Boolean = false,
+        numRealVars: Int = 0,
+        realLower: DoubleArray = EmptyDoubleArray,
+        realUpper: DoubleArray = EmptyDoubleArray,
+    ) : this(
+        numBoolVars = numBoolVars,
+        numIntVars = intBounds.size,
+        intColumns = MixedIntColumns(
+            Array(intBounds.size) { variable ->
+                IntColumn.Bounded(
+                    lower = if (intBounds.hasLower(variable)) intBounds.lower(variable) else null,
+                    upper = if (intBounds.hasUpper(variable)) intBounds.upper(variable) else null,
+                )
+            },
+        ),
+        factors = factors,
+        impliedFactorMask = impliedFactorMask,
+        hasSymmetryBreaking = hasSymmetryBreaking,
+        numRealVars = numRealVars,
+        realLower = realLower,
+        realUpper = realUpper,
+        modelBounds = intBounds,
+    )
 
     /**
      * Convenience overload taking factors as a [List]. Internally stored as an [Array] for

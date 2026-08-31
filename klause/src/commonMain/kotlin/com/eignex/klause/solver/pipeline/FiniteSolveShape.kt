@@ -1,15 +1,15 @@
 package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.formats.flatzinc.FlatZincSearchHints
-import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.DefinitionalSweep
+import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective
 
 /** Source-independent finite model data consumed by the solver pipeline. */
 class FiniteSolveShape(
-    /** Finite-domain problem to solve, or null until an open source model is materialized. */
-    val problem: Problem?,
+    /** Finite, root-propagated projection accepted by the finite pipeline. */
+    val problem: BakedProblem,
     /** Whether the request optimizes an objective. */
     val optimize: Boolean,
     /** Whether the source objective is a maximization. */
@@ -24,7 +24,9 @@ class FiniteSolveShape(
     val definitionalSweep: DefinitionalSweep?,
     /** Source-provided search hints, decoded by the pipeline for the fixed route. */
     val searchHints: FlatZincSearchHints? = null,
+    /** Component ownership selected from the canonical source model. */
+    val componentPlan: ComponentPlan = problem.componentPlan(preferFinite = true),
 ) {
-    /** Finite problem, rejecting an open source model before materialization. */
-    val finiteProblem: Problem get() = requireNotNull(problem) { "open model was not materialized" }
+    /** Finite problem consumed by finite orchestration. */
+    val finiteProblem: BakedProblem get() = problem
 }

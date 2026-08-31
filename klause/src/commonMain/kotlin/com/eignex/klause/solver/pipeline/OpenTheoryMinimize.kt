@@ -3,7 +3,7 @@ package com.eignex.klause.solver.pipeline
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.LinearOp
-import com.eignex.klause.ir.ProblemSpec
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.pipeline.ProblemPipeline
 import com.eignex.klause.solver.pipeline.componentPlan
@@ -64,13 +64,13 @@ sealed interface OpenTheoryOptimum {
  * Neither depends on that row's constant, so re-bounding reuses both instead of re-reading every factor
  * per improvement.
  */
-class OpenTheoryMinimizer(model: ProblemSpec, objective: LinearObjective) {
+class OpenTheoryMinimizer(model: Problem, objective: LinearObjective) {
 
     private val objective = objective
     private val terms: IntArray
     private val coefficients: LongArray
-    private val source: ProblemSpec
-    private val base: ProblemSpec
+    private val source: Problem
+    private val base: Problem
     private val route: ProblemPipeline
 
     init {
@@ -165,7 +165,7 @@ class OpenTheoryMinimizer(model: ProblemSpec, objective: LinearObjective) {
         return Linear(terms, wideCoeffs, LinearOp.LE, rhs)
     }
 
-    private fun ProblemSpec.withRow(row: Factor): ProblemSpec = ProblemSpec(
+    private fun Problem.withRow(row: Factor): Problem = Problem(
         numBoolVars = numBoolVars,
         intBounds = intBounds,
         factors = factors + row,

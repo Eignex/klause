@@ -1,19 +1,25 @@
 package com.eignex.klause.solver.pipeline
 
-import com.eignex.klause.ir.ProblemSpec
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.solver.objective.LinearObjective
 
 /** A complete open-model solve request selected by the orchestration layer. */
-class OpenTheoryRequest(
+class OpenTheoryRequest internal constructor(
     /** Source model whose complete theory route is selected by this pipeline. */
-    val model: ProblemSpec,
+    val model: Problem,
     /** Null requests satisfiability; a value requests optimization. */
     val objective: LinearObjective? = null,
     /** Whether [objective] is maximized rather than minimized. */
     val maximize: Boolean = false,
+    /** Source decomposition selected once for this request. */
+    internal val componentPlan: ComponentPlan,
 ) {
-    /** Source decomposition selected once for a satisfiability solve. */
-    internal val componentPlan: ComponentPlan = model.componentPlan()
+    /** Build a request and select its source decomposition. */
+    constructor(
+        model: Problem,
+        objective: LinearObjective? = null,
+        maximize: Boolean = false,
+    ) : this(model, objective, maximize, model.componentPlan())
 
     /** Complete open-theory route selected for [model]. */
     val route: ProblemPipeline get() = componentPlan.theoryPipeline

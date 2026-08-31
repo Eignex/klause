@@ -1,7 +1,7 @@
 package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.ir.IntDomain
-import com.eignex.klause.ir.ProblemSpec
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.presolve.OpenPresolveResult
 import com.eignex.klause.presolve.presolveOpen
 import com.eignex.klause.solver.Sample
@@ -90,11 +90,11 @@ sealed interface OpenTheoryResult {
 /**
  * Selects and executes the complete theory route for an open source model.
  *
- * Route selection happens once from `ProblemSpec.componentPlan()`. Frontends consume this uniform result
+ * Route selection happens once from `Problem.componentPlan()`. Frontends consume this uniform result
  * rather than importing or dispatching to individual theory implementations.
  */
 class OpenTheoryEngine internal constructor(
-    model: ProblemSpec,
+    model: Problem,
     route: ProblemPipeline,
     // Selecting the plan reads every factor and builds the theory fragment, which on a large model is
     // most of what a short budget has. Select it once and hand the same plan to every solve.
@@ -103,7 +103,7 @@ class OpenTheoryEngine internal constructor(
     private val model = model
     private val route = route
 
-    constructor(model: ProblemSpec, route: ProblemPipeline) : this(model, route, model.componentPlan())
+    constructor(model: Problem, route: ProblemPipeline) : this(model, route, model.componentPlan())
 
     init {
         require(route != ProblemPipeline.FINITE_CP && route != ProblemPipeline.UNSUPPORTED_OPEN) {
@@ -196,7 +196,7 @@ class OpenTheoryEngine internal constructor(
      * model's plan is [ProblemPipeline.FINITE_CP] with no theory component at all; adopting that here
      * would leave nothing to decide with. Routing such a model to the finite lane is the caller's to do.
      */
-    private fun adopt(presolved: OpenPresolveResult.Tightened): Pair<ProblemSpec, ComponentPlan> =
+    private fun adopt(presolved: OpenPresolveResult.Tightened): Pair<Problem, ComponentPlan> =
         if (presolved.closedSides == 0) model to plan else presolved.spec to plan
 
     private fun unknown(

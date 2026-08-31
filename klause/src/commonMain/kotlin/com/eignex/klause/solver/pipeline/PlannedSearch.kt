@@ -2,10 +2,9 @@ package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.IntDomain
-import com.eignex.klause.ir.ProblemSpec
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.CpSearchComponent
 import com.eignex.klause.propagation.PropagationSession
-import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.search.ClauseSearchComponent
 import com.eignex.klause.solver.search.SearchComponent
 import com.eignex.klause.solver.search.SearchComponentSet
@@ -26,7 +25,7 @@ class PlannedSearch internal constructor(
 
 /** Builds the selected search components. */
 fun ComponentPlan.search(
-    spec: ProblemSpec,
+    spec: Problem,
     cpDomains: Map<Int, IntDomain>,
     maxChecks: Long = Long.MAX_VALUE,
     cancellation: Cancellation = Cancellation.Never,
@@ -36,7 +35,7 @@ fun ComponentPlan.search(
     val cp = if (hasCpComponent) {
         val projection = cpProjection(spec, cpDomains)
         CpSearchComponent(
-            PropagationSession(projection.problem.bake(), cancellation),
+            PropagationSession(projection.problem, cancellation),
             IntArray(projection.problem.numIntVars) { projection.sourceId(it) },
         ).also(components::add)
     } else {

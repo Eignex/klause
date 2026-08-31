@@ -1,7 +1,7 @@
 package com.eignex.klause.theory
 
 import com.eignex.klause.ir.IntBounds
-import com.eignex.klause.ir.ProblemSpec
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchComponent
@@ -17,13 +17,13 @@ class TheorySearchComponentTest {
 
     @Test
     fun `theory check reads shared integer bounds without a CP domain`() {
-        val model = ProblemSpec(
+        val model = Problem(
             numBoolVars = 0,
             intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(10), null, null),
             factors = emptyArray(),
         )
         val theory = object : Theory<Long> {
-            override val model: ProblemSpec = model
+            override val model: Problem = model
 
             override fun check(bools: BooleanArray, context: TheoryContext): TheoryCheck<Long> =
                 TheoryCheck.Sat(checkNotNull(context.intUpperBound(0)))
@@ -43,13 +43,13 @@ class TheorySearchComponentTest {
 
     @Test
     fun `adapter refutes a complete shared Boolean assignment during propagation`() {
-        val model = ProblemSpec(
+        val model = Problem(
             numBoolVars = 1,
             intBounds = IntBounds.fromModelBounds(longArrayOf(), longArrayOf(), null, null),
             factors = emptyArray(),
         )
         val theory = object : Theory<Unit> {
-            override val model: ProblemSpec = model
+            override val model: Problem = model
 
             override fun check(bools: BooleanArray, context: TheoryContext): TheoryCheck<Unit> =
                 if (bools[0]) TheoryCheck.Infeasible(SearchExplanation(intArrayOf(1))) else TheoryCheck.Sat(Unit)

@@ -2,7 +2,7 @@ package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.ir.IntBounds
-import com.eignex.klause.ir.ProblemSpec
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.solver.pipeline.ProblemPipeline
 import com.eignex.klause.solver.pipeline.componentPlan
 import com.eignex.klause.util.Bits
@@ -14,9 +14,9 @@ import kotlin.test.assertNull
 
 class UnplaceableColumnTest {
 
-    private fun withAllDifferentOverOpenColumn(): ProblemSpec {
+    private fun withAllDifferentOverOpenColumn(): Problem {
         val openHi = Bits(2).also { it.set(1) }
-        return ProblemSpec(
+        return Problem(
             numBoolVars = 0,
             intBounds = IntBounds.fromModelBounds(longArrayOf(0, 0), longArrayOf(5, 0), null, openHi),
             factors = arrayOf(AllDifferent(vars = intArrayOf(0, 1), domainMin = 0, domainSize = 6)),
@@ -35,7 +35,7 @@ class UnplaceableColumnTest {
 
     @Test
     fun `a routable model names nothing`() {
-        val model = ProblemSpec(
+        val model = Problem(
             numBoolVars = 0,
             intBounds = IntBounds.fromModelBounds(longArrayOf(0, 0), longArrayOf(5, 5), null, null),
             factors = arrayOf(AllDifferent(vars = intArrayOf(0, 1), domainMin = 0, domainSize = 6)),

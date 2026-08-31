@@ -3,13 +3,13 @@ package com.eignex.klause.theory.qflra
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
 import com.eignex.klause.ir.LinearOp
-import com.eignex.klause.ir.ProblemSpec
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.engine.LpBuilder
 import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.Relation
 import com.eignex.klause.lp.engine.Sense
 
-internal class QfLraSystem(private val model: ProblemSpec) {
+internal class QfLraSystem(private val model: Problem) {
     fun build(bools: BooleanArray): QfLraLeaf {
         val builder = LpBuilder()
         val positive = IntArray(model.numRealVars)

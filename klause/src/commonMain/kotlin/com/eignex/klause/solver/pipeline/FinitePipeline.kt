@@ -1,11 +1,11 @@
 package com.eignex.klause.solver.pipeline
 
-import com.eignex.klause.ir.Problem
 import com.eignex.klause.portfolio.EngineMix
 import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.presolve.PresolvePipeline
 import com.eignex.klause.propagation.BakedProblem
+import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.PresolveStats
@@ -15,7 +15,7 @@ import kotlin.time.Duration
 /** Inputs the finite orchestration layer needs before selecting and constructing an engine. */
 class FinitePipelineRequest(
     /** Source finite model to prepare. */
-    val problem: Problem,
+    val problem: BakedProblem,
     /** Finite route selected by the caller. */
     val engine: FiniteEngine,
     /** Objective to preserve through presolve, or null for satisfiability. */
@@ -35,7 +35,7 @@ class FinitePipelineRequest(
 /** The finite model handed from policy to a concrete search engine. */
 class FinitePipelinePreparation(
     /** Prepared model to hand to the selected engine. */
-    val problem: Problem,
+    val problem: BakedProblem,
     /** Objective re-fitted to [problem], or null for satisfiability. */
     val objective: LinearObjective?,
     /** Lifts a prepared-model assignment to the source model. */
@@ -72,12 +72,13 @@ object FinitePipeline {
             request.cancellation,
             request.presolveBudget,
         )
+        val prepared = if (outcome.changed) outcome.problem.bake(request.cancellation) else request.problem
         return FinitePipelinePreparation(
-            problem = if (outcome.changed) outcome.problem else request.problem,
+            problem = prepared,
             objective = outcome.objective ?: request.objective,
             reconstruct = outcome.reconstruct,
             presolve = outcome.stats.takeIf { outcome.changed },
-            constructionBakeElapsed = (request.problem as? BakedProblem)?.bakeElapsed ?: Duration.ZERO,
+            constructionBakeElapsed = request.problem.bakeElapsed,
         )
     }
 }

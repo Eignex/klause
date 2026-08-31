@@ -2,7 +2,6 @@ package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.ir.ProblemSpec
 import com.eignex.klause.solver.pipeline.isTheoryOwnable
 
 /** Partition integer variables by whether finite-domain search must branch on them. */
@@ -32,9 +31,6 @@ class VariablePartition(private val searchRequired: BooleanArray) {
  * search set never changes what another factor declares, and one pass is already the closure.
  */
 fun Problem.variablePartition(): VariablePartition = variablePartition(numIntVars, factors, numRealVars != 0)
-
-/** Classify a source [ProblemSpec] before any finite CP domains are materialized. */
-fun ProblemSpec.variablePartition(): VariablePartition = variablePartition(numIntVars, factors, numRealVars != 0)
 
 private fun variablePartition(numIntVars: Int, factors: Array<Factor>, hasRealColumns: Boolean): VariablePartition {
     val searchRequired = BooleanArray(numIntVars)

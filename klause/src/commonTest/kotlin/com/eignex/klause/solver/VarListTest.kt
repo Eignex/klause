@@ -10,7 +10,7 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.MixedVars
 import com.eignex.klause.ir.NoVars
-import com.eignex.klause.ir.ProblemSpec
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.SpanIntVars
 import com.eignex.klause.solver.pipeline.variablePartition
 import kotlin.test.Test
@@ -88,7 +88,7 @@ class VarListTest {
 
     @Test
     fun `the partition marks exactly the columns some factor enumerates`() {
-        val spec = ProblemSpec(
+        val spec = Problem(
             numBoolVars = 0,
             intBounds = IntBounds.fromModelBounds(longArrayOf(0, 0, 0), longArrayOf(9, 9, 9), null, null),
             factors = arrayOf(

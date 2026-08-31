@@ -1,6 +1,6 @@
 package com.eignex.klause.solver.pipeline
 
-import com.eignex.klause.ir.ProblemSpec
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.solver.search.SearchIntValue
 import com.eignex.klause.solver.search.SearchRealValue
 import com.eignex.klause.solver.search.TheoryComponent
@@ -10,7 +10,7 @@ import com.eignex.klause.theory.qflra.ExactLiraSearchComponent
 import com.eignex.klause.theory.qflra.ExactLraSolver
 
 /** Builds the theory component selected by this plan. */
-internal fun ComponentPlan.theoryComponent(spec: ProblemSpec): TheoryComponent? {
+internal fun ComponentPlan.theoryComponent(spec: Problem): TheoryComponent? {
     val fragment = theoryFragment(spec)
     return when (theoryPipeline) {
         ProblemPipeline.DIFFERENCE_THEORY -> DifferenceSearchComponent.withRootBounds(

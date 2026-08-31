@@ -9,7 +9,7 @@ import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
-import com.eignex.klause.ir.ProblemSpec
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.pipeline.FactorOwner
 import com.eignex.klause.solver.pipeline.componentPlan
@@ -26,7 +26,7 @@ class PlannedSearchTest {
     @Test
     fun `planned hybrid search builds CP and theory components without theory domains`() {
         val openUpper = Bits(3).also { it.set(1) }
-        val model = ProblemSpec(
+        val model = Problem(
             numBoolVars = 0,
             intBounds = IntBounds.fromModelBounds(longArrayOf(0, 0, 0), longArrayOf(3, 0, 3), null, openUpper),
             factors = arrayOf(
@@ -48,7 +48,7 @@ class PlannedSearchTest {
 
     @Test
     fun `planned pure real search uses the shared Boolean engine`() {
-        val model = ProblemSpec(
+        val model = Problem(
             numBoolVars = 1,
             intBounds = IntBounds.fromModelBounds(longArrayOf(), longArrayOf(), null, null),
             factors = arrayOf(
@@ -77,7 +77,7 @@ class PlannedSearchTest {
 
     @Test
     fun `shared engine branches a finite global constraint and assembles its model`() {
-        val model = ProblemSpec(
+        val model = Problem(
             numBoolVars = 0,
             intBounds = IntBounds.fromModelBounds(longArrayOf(0, 0), longArrayOf(3, 3), null, null),
             factors = arrayOf(AllDifferent(intArrayOf(0, 1), domainMin = 0, domainSize = 4)),
@@ -95,7 +95,7 @@ class PlannedSearchTest {
     @Test
     fun `shared engine combines CP branching with a symbolic theory`() {
         val openUpper = Bits(3).also { it.set(1) }
-        val model = ProblemSpec(
+        val model = Problem(
             numBoolVars = 0,
             intBounds = IntBounds.fromModelBounds(longArrayOf(0, 0, 0), longArrayOf(3, 0, 3), null, openUpper),
             factors = arrayOf(
@@ -115,7 +115,7 @@ class PlannedSearchTest {
     @Test
     fun `hybrid theory rows receive CP-owned values through the shared trail`() {
         val openUpper = Bits(3).also { it.set(2) }
-        val model = ProblemSpec(
+        val model = Problem(
             numBoolVars = 0,
             intBounds = IntBounds.fromModelBounds(longArrayOf(0, 0, 0), longArrayOf(1, 1, 0), null, openUpper),
             factors = arrayOf(
@@ -138,7 +138,7 @@ class PlannedSearchTest {
 
     @Test
     fun `hybrid QF LIRA rows receive CP-owned values through the shared trail`() {
-        val model = ProblemSpec(
+        val model = Problem(
             numBoolVars = 0,
             intBounds = IntBounds.fromModelBounds(longArrayOf(0, 1), longArrayOf(1, 1), null, null),
             factors = arrayOf(
@@ -162,7 +162,7 @@ class PlannedSearchTest {
     @Test
     fun `hybrid root conflict is reported through the shared component session`() {
         val openUpper = Bits(3).also { it.set(1) }
-        val model = ProblemSpec(
+        val model = Problem(
             numBoolVars = 0,
             intBounds = IntBounds.fromModelBounds(longArrayOf(0, 0, 0), longArrayOf(3, 0, 3), null, openUpper),
             factors = arrayOf(
@@ -209,7 +209,7 @@ class PlannedSearchTest {
     private fun differenceHybridDomains(): Map<Int, IntDomain> =
         mapOf(HYBRID_X to IntDomain(0, 7), HYBRID_Z to IntDomain(0, 7))
 
-    private fun differenceHybridFixture(fixZAtSeven: Boolean = false): ProblemSpec {
+    private fun differenceHybridFixture(fixZAtSeven: Boolean = false): Problem {
         val openLower = Bits(3).also { it.set(HYBRID_Y) }
         val openUpper = Bits(3).also { it.set(HYBRID_Y) }
         val factors = ArrayList<Factor>().apply {
@@ -223,7 +223,7 @@ class PlannedSearchTest {
             add(Linear(intArrayOf(1, -1), intArrayOf(HYBRID_X, HYBRID_Y), LinearOp.EQ, 7))
             if (fixZAtSeven) add(Linear(intArrayOf(1), intArrayOf(HYBRID_Z), LinearOp.EQ, 7))
         }
-        return ProblemSpec(
+        return Problem(
             numBoolVars = 1,
             intBounds = IntBounds.fromModelBounds(
                 longArrayOf(0, 0, 0),
