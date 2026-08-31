@@ -9,6 +9,7 @@ import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.ProblemSpec
 import com.eignex.klause.solver.pipeline.sourceRoute
+import com.eignex.klause.solver.result.OpenTheoryWorkSink
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchDecision
@@ -495,5 +496,33 @@ class OpenTheoryEngineTest {
         assertIs<ComponentResult.Consistent>(session.initialize())
         assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(0)))
         assertNull(session.branchAlternatives())
+    }
+
+    @Test
+    fun `General LIA cached feasibility retains row visit accounting`() {
+        val open = Bits(2).also {
+            it.set(0)
+            it.set(1)
+        }
+        val model = ProblemSpec(
+            numBoolVars = 0,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(0, 0), longArrayOf(0, 0), open, open),
+            factors = arrayOf(
+                Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 0),
+                Linear(intArrayOf(1), intArrayOf(1), LinearOp.LE, 0),
+            ),
+        )
+        val work = OpenTheoryWorkSink()
+        val session = SearchSession(listOf(GeneralLiaSearchComponent(model)))
+        session.attachOpenTheoryWork(work)
+
+        assertIs<ComponentResult.Consistent>(session.initialize())
+        val first = requireNotNull(session.branchAlternatives())
+        assertEquals(2, first.size)
+        assertIs<ComponentResult.Consistent>(session.push(first.first()))
+        val second = requireNotNull(session.branchAlternatives())
+
+        assertEquals(2, second.size)
+        assertEquals(14L, work.snapshot().openLiaRowVisits)
     }
 }
