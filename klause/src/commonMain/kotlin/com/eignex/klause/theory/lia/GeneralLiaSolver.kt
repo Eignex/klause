@@ -519,8 +519,8 @@ class GeneralLiaSearchComponent(
     /**
      * A restart returns to the root without calling [initialize], so the per-factor cache would
      * otherwise survive across what is logically an unrelated search state. The cache is a pure
-     * function of [bools] and [domains], so a stale entry cannot itself be wrong — but clearing it
-     * here removes the need for that argument to keep holding across future changes.
+     * function of [bools] and [domainsByLevel], so a stale entry cannot itself be wrong — but
+     * clearing it here removes the need for that argument to keep holding across future changes.
      */
     override fun onRestart(context: SearchContext) {
         clearFactorCache()
