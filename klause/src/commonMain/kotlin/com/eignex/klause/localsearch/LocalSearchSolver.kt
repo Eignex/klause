@@ -336,6 +336,16 @@ class LocalSearchSolver(
             // Use the unwrapped restart policy so an adaptive one is detected past a sweep wrapper.
             val roundFeedback = RoundFeedback.of(strategy, configuredRestart)
 
+            // A restart transition consumes one unit of the maxFlips/maxInstructions allowance, same as
+            // an applied move (see [LocalSearchParams.maxInstructions]).
+            fun countedRestart(anchor: Sample?) {
+                restarts.restart(state, bestSoFar = anchor)
+                moves++
+                flipsSinceYield++
+                restartCount++
+                flipsSinceRestart = 0
+            }
+
             try {
                 while (flipsSinceYield < maxFlips) {
                     if (cancelCountdown-- <= 0) {
@@ -361,32 +371,20 @@ class LocalSearchSolver(
                         warm?.captureFrom(state)
                         yield(snap)
                         flipsSinceYield = 0
-                        restarts.restart(state, bestSoFar = null)
-                        moves++
-                        flipsSinceYield++
-                        restartCount++
+                        countedRestart(null)
                         bestCost = state.cost
                         bestSnap = state.assignment.snapshot()
-                        flipsSinceRestart = 0
                         continue
                     }
                     if (restarts.shouldRestart(flipsSinceRestart)) {
-                        restarts.restart(state, bestSoFar = bestSnap)
-                        moves++
-                        flipsSinceYield++
-                        restartCount++
-                        flipsSinceRestart = 0
+                        countedRestart(bestSnap)
                         roundFeedback?.endRound()
                         continue
                     }
                     val costBefore = state.cost
                     val move = strategy.pickMove(state)
                     if (move == null) {
-                        restarts.restart(state, bestSoFar = bestSnap)
-                        moves++
-                        flipsSinceYield++
-                        restartCount++
-                        flipsSinceRestart = 0
+                        countedRestart(bestSnap)
                         roundFeedback?.endRound()
                         continue
                     }

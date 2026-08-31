@@ -73,8 +73,10 @@ class SequentialPortfolio(
      * bounded by nodes pauses at the same point in the same tree every time. The whole-solve deadline
      * still applies, so this cannot overrun it.
      *
-     * Local-search arms use [baseSliceFlips], a counted engine step, because they start a fresh search
-     * per segment rather than pausing one.
+     * Local-search and ALNS arms ([PortfolioWorker.acceptsInstructionBudget]) use [baseSliceFlips], a
+     * counted engine step, because they start a fresh search per segment rather than pausing one; ALNS
+     * spends the allowance across its own outer destroy/repair loop instead of one inner solve (see
+     * [com.eignex.klause.meta.alns.Alns]'s class KDoc).
      */
     private val baseSliceNodes: Long = 5_000,
     /** Cap on a single resumable segment's node budget. */
@@ -94,8 +96,8 @@ class SequentialPortfolio(
      * the bound-guided re-exploration the pre-resume per-segment cold restart gave (which resume's single
      * persistent trail had traded away, regressing value on plateau-prone instances like `cargo`), while
      * keeping resume's fast initial convergence (it only fires after a plateau) and clause retention.
-     * `0` disables re-seeding (pure resume). Only resumable (backtrack) arms are affected; LS arms
-     * already run a fresh warm-started slice each segment.
+     * `0` disables re-seeding (pure resume). Only resumable (backtrack) arms are affected; LS and ALNS
+     * arms already run a fresh warm-started slice (or destroy/repair loop) each segment.
      */
     private val reseedStaleThreshold: Int = 3,
 ) : PortfolioExecutor {
@@ -116,6 +118,26 @@ class SequentialPortfolio(
     private fun sliceToken(global: Cancellation, sliceMillis: Long): Cancellation =
         Cancellation.until(TimeSource.Monotonic.markNow() + sliceMillis.milliseconds) or global
 
+    /** The cancellation token bounding one arm's segment. A counted-work arm
+     *  ([PortfolioWorker.acceptsInstructionBudget]) runs unclocked once scheduling has settled — its own
+     *  instruction budget paces it, and a wall-clock cap on top would reintroduce the machine-speed
+     *  dependence node/flip counting exists to remove. The forced warmup probe is the one exception: its
+     *  whole point is a short, wall-clock-bounded taste of every arm before the bandit takes over (see
+     *  [warmupSliceMillis]), so it stays clock-sliced even for a counted-work arm — otherwise an
+     *  expensive-per-step LS arm scheduled early could burn most of a tight deadline on its own warmup
+     *  turn before every other arm gets its guaranteed probe. */
+    private fun segmentToken(
+        worker: PortfolioWorker,
+        warming: Boolean,
+        cancellation: Cancellation,
+        sliceMs: Long,
+    ): Cancellation =
+        if (worker.acceptsInstructionBudget && !warming) cancellation else sliceToken(cancellation, sliceMs)
+
+    /** Geometric post-warmup growth shared by every slice axis (millis/nodes/flips): grow by
+     *  [sliceGrowth], never past [cap]. */
+    private fun grow(current: Long, cap: Long): Long = (current * sliceGrowth).toLong().coerceAtMost(cap)
+
     /**
      * Satisfaction: run arms in bandit-chosen segments until one returns a definitive Sat/Unsat
      * (a complete backtrack arm proves Unsat; a slice-truncated arm yields Unknown and the loop
@@ -131,7 +153,7 @@ class SequentialPortfolio(
             val arm = if (warming) segment else bandit.choose()
             val worker = workers[arm]
             val sliceMs = if (warming) warmupSliceMillis else slice
-            val token = if (worker.acceptsInstructionBudget) cancellation else sliceToken(cancellation, sliceMs)
+            val token = segmentToken(worker, warming, cancellation, sliceMs)
             val r = runCatching { worker.solve(token, sliceFlips) }.getOrNull()
             if (r != null) stats = stats.mergedWith(r.stats)
             val definitive = r is SolveResult.Sat || r is SolveResult.Unsat
@@ -142,8 +164,8 @@ class SequentialPortfolio(
                 else -> Unit
             }
             if (!warming) {
-                slice = (slice * sliceGrowth).toLong().coerceAtMost(maxSliceMillis)
-                sliceFlips = (sliceFlips * sliceGrowth).toLong().coerceAtMost(maxSliceFlips)
+                slice = grow(slice, maxSliceMillis)
+                sliceFlips = grow(sliceFlips, maxSliceFlips)
             }
             segment++
         }
@@ -221,12 +243,9 @@ class SequentialPortfolio(
                 }.getOrNull()
             } else {
                 // Local-search segments restart from the shared incumbent but are bounded by their own
-                // counted work. The whole-solve deadline remains the outer cancellation terminator.
-                val armToken = if (worker.acceptsInstructionBudget) {
-                    cancellation
-                } else {
-                    sliceToken(cancellation, sliceMs)
-                }
+                // counted work post-warmup; the whole-solve deadline remains the outer cancellation
+                // terminator. The forced warmup probe stays clock-sliced (see [segmentToken]).
+                val armToken = segmentToken(worker, warming, cancellation, sliceMs)
                 runCatching {
                     for (r in worker.improvements(
                         readBound,
@@ -275,9 +294,9 @@ class SequentialPortfolio(
                 return PortfolioReduction.terminal(best, bound, dirty = false, foldArms(perArm))
             }
             if (!warming) {
-                slice = (slice * sliceGrowth).toLong().coerceAtMost(maxSliceMillis)
-                sliceNodes = (sliceNodes * sliceGrowth).toLong().coerceAtMost(maxSliceNodes)
-                sliceFlips = (sliceFlips * sliceGrowth).toLong().coerceAtMost(maxSliceFlips)
+                slice = grow(slice, maxSliceMillis)
+                sliceNodes = grow(sliceNodes, maxSliceNodes)
+                sliceFlips = grow(sliceFlips, maxSliceFlips)
             }
             segment++
         }

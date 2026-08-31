@@ -490,6 +490,46 @@ class AlnsTest {
     }
 
     @Test
+    fun `maxInstructions caps the outer loop below maxIterations`() {
+        val factor = Cardinality.exactlyOne(
+            intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true), Lit.make(3, true)),
+        )
+        val problem = Problem(4, 0, emptyArray(), listOf(factor))
+        val objective = LinearObjective(boolWeights = longArrayOf(10L, 5L, 8L, 3L))
+        val alns = Alns(
+            inner = LocalSearchSolver(problem.bake()),
+            destroyOperators = listOf(DestroyOperator.Random),
+            repairOperators = listOf(InnerLsRepair()),
+            minDestroyFraction = 0.5,
+            maxDestroyFraction = 0.5,
+            maxIterations = 8,
+            flipsPerIteration = 50L,
+        )
+        alns.minimize(objective, LocalSearchParams(maxFlips = 200L, maxInstructions = 120L, randomSeed = 1L))
+        assertEquals(3, alns.iterationLog.size, "120 / 50-per-iteration budget must stop the loop after 3 iterations")
+    }
+
+    @Test
+    fun `a null maxInstructions leaves the loop bounded only by maxIterations`() {
+        val factor = Cardinality.exactlyOne(
+            intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true), Lit.make(3, true)),
+        )
+        val problem = Problem(4, 0, emptyArray(), listOf(factor))
+        val objective = LinearObjective(boolWeights = longArrayOf(10L, 5L, 8L, 3L))
+        val alns = Alns(
+            inner = LocalSearchSolver(problem.bake()),
+            destroyOperators = listOf(DestroyOperator.Random),
+            repairOperators = listOf(InnerLsRepair()),
+            minDestroyFraction = 0.5,
+            maxDestroyFraction = 0.5,
+            maxIterations = 5,
+            flipsPerIteration = 50L,
+        )
+        alns.minimize(objective, LocalSearchParams(maxFlips = 200L, randomSeed = 1L))
+        assertEquals(5, alns.iterationLog.size, "with no instruction budget maxIterations remains the only cap")
+    }
+
+    @Test
     fun `alns with noisy greedy repair still reaches the optimum`() {
         val factor = Cardinality.exactlyOne(
             intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true), Lit.make(3, true)),

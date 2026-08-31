@@ -51,6 +51,13 @@ import kotlin.random.Random
  *
  * Specialised to [LocalSearchParams] so we can override `maxFlips` per iteration; the
  * generic-over-`P` version would need a `SolverParams.withMaxFlips` extension point.
+ *
+ * [LocalSearchParams.maxInstructions], when set, also bounds the outer destroy/repair loop: each
+ * iteration is charged [flipsPerIteration] units — the allowance handed to that iteration's repair —
+ * mirroring [com.eignex.klause.localsearch.LocalSearchSolver]'s counted restart (one transition, one
+ * unit, regardless of the work it actually did). The loop stops at the first of [maxIterations],
+ * the instruction budget, or [LocalSearchParams.cancellation]; the last iteration's own `maxFlips` is
+ * clipped to whatever budget remains so a segment can't overshoot by a whole `flipsPerIteration`.
  */
 internal class Alns(
     val inner: Optimizer<LocalSearchParams>,
@@ -163,12 +170,6 @@ internal class Alns(
             evaluate = { scoring.evaluate(it) },
         )
 
-        val perIterParams = params.copy(
-            maxFlips = flipsPerIteration,
-            // Each iteration's RNG seed varies via the bandit's RNG; explicit null lets the
-            // inner solver draw its own per-call seed.
-            randomSeed = null,
-        )
         // Persistent CP-repair handle: one session + LP reused across fragments, re-seeded per
         // neighbourhood, so learned clauses and the LP warm start carry between repairs. Only when a
         // backtrack engine is supplied; closed at the end of the run.
@@ -176,9 +177,32 @@ internal class Alns(
             backtrackParams?.let { bp -> bt.openRepair(objective, bp) }
         }
 
+        // Counted-work allowance for the whole outer loop (see class KDoc); null leaves the loop bounded
+        // only by [maxIterations] and cancellation, as before this seam existed.
+        val instructionBudget = params.maxInstructions
+        var instructionsUsed = 0L
+
         var iter = 0
-        while (iter < maxIterations) {
+        while (iter < maxIterations && (instructionBudget == null || instructionsUsed < instructionBudget)) {
             if (params.cancellation()) break
+            // This iteration's repair allowance: flipsPerIteration, clipped to whatever budget remains
+            // so the last counted iteration can't overshoot by a whole flipsPerIteration.
+            val iterFlips = if (instructionBudget != null) {
+                minOf(flipsPerIteration, instructionBudget - instructionsUsed)
+            } else {
+                flipsPerIteration
+            }
+            val perIterParams = params.copy(
+                maxFlips = iterFlips,
+                // Each iteration's RNG seed varies via the bandit's RNG; explicit null lets the
+                // inner solver draw its own per-call seed.
+                randomSeed = null,
+            )
+            // Charge the iteration's allowance up front — a destroy that frees nothing, or a repair
+            // that rejects, still consumed the bandit picks and (for a repair op that ran) whatever
+            // portion of iterFlips it used; charging the declared unit keeps counting deterministic
+            // and independent of what happened inside, same as LocalSearchSolver's counted restart.
+            instructionsUsed += iterFlips
             pooledImporter.poll(bestObj)?.let { (sample, obj) ->
                 bestSample = sample
                 bestObj = obj
