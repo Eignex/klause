@@ -441,9 +441,10 @@ internal interface OutputProtocol {
      *  parser treats a `%`-prefixed line as a comment, so it is mode-agnostic; the default renders it
      *  and modes need not override. [objective] is the exact model-oriented discrete value. When a
      *  continuous column carries cost, [continuousObjective] carries the whole model-oriented value;
-     *  its absence means the exact discrete value is the whole objective. */
+     *  its absence means the exact discrete value is the whole objective. A non-finite value has no
+     *  decimal form, so it is omitted rather than printed — read back as "no continuous channel". */
     fun onImprovement(arm: String, objective: Long, continuousObjective: Double? = null, elapsedMs: Long) {
-        val continuous = continuousObjective?.let { " continuousObjective=$it" }.orEmpty()
+        val continuous = continuousObjective?.takeIf(Double::isFinite)?.let { " continuousObjective=$it" }.orEmpty()
         println("%%%klause-arm: label=$arm objective=$objective$continuous time=$elapsedMs")
     }
 }

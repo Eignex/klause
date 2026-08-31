@@ -393,22 +393,20 @@ internal object SolverInvocation {
         )
     }
 
-    /** Parse a `%%%klause-arm:` body. `objective` is always the exact discrete `Long` channel;
-     *  `continuousObjective`, when present, is the whole objective because a continuous column carries
-     *  cost. The fields are independent so a zero continuous whole value is never confused with an
-     *  omitted continuous channel. */
+    /** Parse a `%%%klause-arm:` body. `label`, `objective` (the exact discrete `Long` channel), and
+     *  `time` are required — a line missing or malformed on any of those is unusable and the whole
+     *  entry is dropped. `continuousObjective` is optional (the whole objective when a continuous
+     *  column carries cost) and independent of the required fields: a malformed or non-finite value
+     *  degrades to "no continuous channel" rather than discarding an otherwise-valid entry. */
     private fun parseArm(body: String): Attribution? {
         val kv = body.trim().split(' ').mapNotNull {
             it.split('=', limit = 2).takeIf { p -> p.size == 2 }?.let { p -> p[0] to p[1] }
         }.toMap()
         val label = kv["label"] ?: return null
         val exactObjective = kv["objective"]?.toLongOrNull() ?: return null
-        val continuousObjective = kv["continuousObjective"]?.let { value ->
-            value.toDoubleOrNull()?.takeIf(Double::isFinite) ?: return null
-        }
+        val continuousObjective = kv["continuousObjective"]?.toDoubleOrNull()?.takeIf(Double::isFinite)
         return Attribution(
             label = label,
-            objective = exactObjective.toDouble(),
             exactObjective = exactObjective.toString(),
             continuousObjective = continuousObjective,
             elapsedMs = kv["time"]?.toLongOrNull() ?: return null,
@@ -449,11 +447,13 @@ internal object SolverInvocation {
 /** One strict global improvement, parsed off a klause portfolio's `%%%klause-arm:` line. The exact
  *  model-oriented discrete value is [exactObjective], encoded as decimal text so JSON never rounds a
  *  value past 2^53. [continuousObjective] is the whole model-oriented objective when a continuous
- *  column carries cost; it is null only for an exact discrete objective. [objective] is retained for
- *  decoding and serving pre-two-channel records and must not be used where exactness matters.
+ *  column carries cost; it is null only for an exact discrete objective. [objective] decodes
+ *  pre-two-channel records and must not be used where exactness matters, nor written by new code.
  *
- * The ordered list across a solve is the per-arm credit signal: every entry is a strict global
- * improvement, so its last arm holds the final best incumbent. */
+ * The list across a solve is the per-arm credit signal, in arrival order — **not** improvement order:
+ * a concurrent portfolio's shared-bound CAS and its attribution-emit lock are separate critical
+ * sections, so a worse incumbent's line can print after a better one's under thread scheduling. Find
+ * the best-holder with [SolveMetric.best], never `.last()`. */
 @Serializable
 internal data class Attribution(
     val label: String,

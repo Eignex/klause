@@ -72,7 +72,30 @@ class SolverInvocationTest {
     }
 
     @Test
-    fun `calibration timing uses the final strict improvement across objective channels`() {
+    fun `calibration timing finds the best-valued incumbent even when attribution arrives out of order`() {
+        // A concurrent portfolio's shared-bound CAS and its attribution-emit lock are separate critical
+        // sections, so a worse incumbent's line can print after a better one's (klause.portfolio.
+        // Portfolio.fold) — the middle entry here is the true best, not the last.
+        val r = SolverInvocation.Result(
+            feasible = true,
+            objective = null,
+            timeToBestMs = 100,
+            proven = false,
+            stats = emptyMap(),
+            attribution = listOf(
+                Attribution("first", exactObjective = "5", elapsedMs = 10),
+                Attribution("true-best", exactObjective = "-3", elapsedMs = 20),
+                Attribution("late-but-worse", exactObjective = "2", elapsedMs = 30),
+            ),
+            rawOutput = "",
+            command = "",
+        )
+
+        assertEquals(10L to 20L, SolveMetric.timings(r, maximize = false))
+    }
+
+    @Test
+    fun `calibration timing compares on the continuous channel once any entry carries one`() {
         val r = SolverInvocation.Result(
             feasible = true,
             objective = null,
@@ -88,6 +111,6 @@ class SolverInvocationTest {
             command = "",
         )
 
-        assertEquals(10L to 30L, SolveMetric.timings(r))
+        assertEquals(10L to 30L, SolveMetric.timings(r, maximize = false))
     }
 }

@@ -233,7 +233,7 @@ internal object SolveMetric {
         sha: String?,
         r: SolverInvocation.Result,
     ): SolveRecord {
-        val (firstFeasibleMs, bestMs) = timings(r)
+        val (firstFeasibleMs, bestMs) = timings(r, entry.maximize)
         return SolveRecord(
             problem = entry.name,
             solver = solverId,
@@ -262,15 +262,32 @@ internal object SolveMetric {
      * lines (parsed into [SolverInvocation.Result.attribution]), but the MiniZinc `----------` stream
      * is flushed once at termination — so the separator-based timings collapse to ~budget. When the
      * attribution stream is present, recover the truth from it: the first incumbent is the first
-     * feasible solution and the final strict improvement is the best incumbent. This uses the ordered
-     * stream rather than a floating-point comparison, so continuous objectives and exact values past
-     * 2^53 do not change calibration timing. Reference solvers carry no attribution, so fall back to
-     * their (correctly streamed) separator timings.
+     * feasible solution and the best-valued incumbent is the time-to-best. The stream is arrival-order,
+     * not improvement order — a concurrent portfolio's shared-bound CAS and its attribution-emit lock
+     * are separate critical sections (see `Portfolio.fold`), so a worse incumbent's line can print after
+     * a better one's under thread scheduling — so this searches every entry by value rather than
+     * trusting the last one. Reference solvers carry no attribution, so fall back to their (correctly
+     * streamed) separator timings.
      */
-    internal fun timings(r: SolverInvocation.Result): Pair<Long?, Long?> {
+    internal fun timings(r: SolverInvocation.Result, maximize: Boolean): Pair<Long?, Long?> {
         if (r.attribution.isEmpty()) return r.timeToFirstFeasibleMs to r.timeToBestMs
         val firstFeasibleMs = r.attribution.first().elapsedMs
-        return firstFeasibleMs to r.attribution.last().elapsedMs
+        return firstFeasibleMs to best(r.attribution, maximize).elapsedMs
+    }
+
+    /** The best-valued entry in [attribution], direction-aware — also the best-holder for per-arm credit
+     *  (see `BenchCli.portfolioWinners`), for the same reason: arrival order is not improvement order.
+     *  Every entry in one run shares the same objective channel ([Attribution.continuousObjective] is a
+     *  property of the whole model, not the arm), so once any entry carries one, every entry does —
+     *  compare on it (the whole model-oriented value). Otherwise compare on [Attribution.exactObjective]
+     *  as a [Long], lossless past 2^53. */
+    internal fun best(attribution: List<Attribution>, maximize: Boolean): Attribution {
+        val sign = if (maximize) 1 else -1
+        return if (attribution.any { it.continuousObjective != null }) {
+            attribution.maxByOrNull { sign * (it.continuousObjective ?: 0.0) } ?: attribution.last()
+        } else {
+            attribution.maxByOrNull { sign * (it.exactObjective?.toLongOrNull() ?: 0L) } ?: attribution.last()
+        }
     }
 
     private fun errorRecord(
