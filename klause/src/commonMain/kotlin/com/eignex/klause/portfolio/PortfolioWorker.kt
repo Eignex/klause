@@ -90,9 +90,12 @@ class PortfolioWorker private constructor(
          * portfolio incumbent assignment into the params for [improvements] (e.g.
          * `{ p, sample -> p.copy(initialAssignment = sample) }` for local search); pass null for
          * engines with no warm-start seam (backtrack, which only consumes the shared bound).
-         * [withInstructionBudget] installs a counted per-segment allowance. Local search maps it to
-         * [com.eignex.klause.localsearch.LocalSearchParams.maxInstructions]; engines without a
-         * deterministic segment counter leave it null and retain their own execution path.
+         * [withInstructionBudget] installs a counted per-segment allowance. Local search and ALNS
+         * (both [com.eignex.klause.localsearch.LocalSearchParams]-based) map it to
+         * [com.eignex.klause.localsearch.LocalSearchParams.maxInstructions] — ALNS spends it against
+         * its own outer destroy/repair loop rather than a single inner solve (see
+         * [com.eignex.klause.meta.alns.Alns]'s class KDoc). Engines without a deterministic segment
+         * counter leave it null and retain their own execution path.
          */
         fun <P : SolverParams> of(
             label: String,
@@ -108,6 +111,14 @@ class PortfolioWorker private constructor(
             // backend overrides it covariantly to return its own P; the cast is sound.
             @Suppress("UNCHECKED_CAST")
             fun withCancel(c: Cancellation): P = params.withCancellation(c) as P
+
+            // Apply the counted-segment allowance when both the caller supplied one and this engine
+            // exposes the seam for it; a no-op otherwise (engines without a deterministic segment
+            // counter, or a call with no budget for this segment).
+            fun withInstructions(p: P, maxInstructions: Long?): P {
+                val budget = withInstructionBudget
+                return if (maxInstructions != null && budget != null) budget(p, maxInstructions) else p
+            }
             // A pause/resume handle is available only for an optimising worker over a ResumableOptimizer
             // engine (backtrack). The handle owns its own per-slice cancellation, so only the bound
             // supplier is wired here; warm-start is irrelevant (the live session carries the search).
@@ -125,20 +136,13 @@ class PortfolioWorker private constructor(
                 label = label,
                 armId = armId,
                 solveFn = { c, maxInstructions ->
-                    var p = withCancel(c)
-                    if (maxInstructions != null && withInstructionBudget != null) {
-                        p = withInstructionBudget(p, maxInstructions)
-                    }
-                    session.solve(p)
+                    session.solve(withInstructions(withCancel(c), maxInstructions))
                 },
                 improvementsFn = { readBound, warmStart, c, maxInstructions ->
                     val obj = requireNotNull(objective) {
                         "PortfolioWorker '$label' was built without an objective; cannot stream improvements"
                     }
-                    var p = withCancel(c)
-                    if (maxInstructions != null && withInstructionBudget != null) {
-                        p = withInstructionBudget(p, maxInstructions)
-                    }
+                    var p = withInstructions(withCancel(c), maxInstructions)
                     p = withBound?.invoke(p, readBound) ?: p
                     if (warmStart != null && withWarmStart != null) p = withWarmStart(p, warmStart)
                     session.improvements(obj, p)

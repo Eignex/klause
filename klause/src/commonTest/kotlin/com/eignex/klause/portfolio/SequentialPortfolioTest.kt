@@ -122,25 +122,39 @@ class SequentialPortfolioTest {
         assertEquals(3.0, assertIs<MinimizeResult.Optimal>(r).objectiveValue)
     }
 
+    // The LS arm runs first during warmup; the complete arm then exhausts and ends the portfolio,
+    // exposing the LS segment counters.
+    private fun mixedWorkers(problem: Problem, objective: LinearObjective): List<PortfolioWorker> = listOf(
+        lsArm(problem, objective),
+        PortfolioWorker.of(
+            "bt",
+            1,
+            BacktrackSolver(problem.bake()).session(),
+            BacktrackParams(randomSeed = 1L),
+            objective = objective,
+            withBound = { p, supplier -> p.copy(objectiveBoundSupplier = supplier) },
+        ),
+    )
+
     @Test
-    fun `mixed sequential runs report identical counted work`() {
-        // The LS arm runs first during warmup; the complete arm then exhausts and ends the portfolio,
-        // exposing the LS segment counters.
+    fun `mixed sequential run bounds LS work to its counted segment allowance`() {
         val problem = Problem(0, 0, emptyArray(), emptyArray())
         val objective = LinearObjective()
-        fun workers() = listOf(
-            lsArm(problem, objective),
-            PortfolioWorker.of(
-                "bt",
-                1,
-                BacktrackSolver(problem.bake()).session(),
-                BacktrackParams(randomSeed = 1L),
-                objective = objective,
-                withBound = { p, supplier -> p.copy(objectiveBoundSupplier = supplier) },
-            ),
-        )
+        val r = SequentialPortfolio.exp3(
+            mixedWorkers(problem, objective),
+            baseSliceFlips = 7L,
+        ).use { it.minimize() }
+
+        val best = assertIs<MinimizeResult.Optimal>(r)
+        assertEquals(7.0, best.stats.ls.moves.sum, "LS work must stop at its counted segment allowance")
+    }
+
+    @Test
+    fun `mixed sequential runs reproduce their counted work`() {
+        val problem = Problem(0, 0, emptyArray(), emptyArray())
+        val objective = LinearObjective()
         fun run() = SequentialPortfolio.exp3(
-            workers(),
+            mixedWorkers(problem, objective),
             baseSliceFlips = 7L,
         ).use { it.minimize() }
 
@@ -149,7 +163,6 @@ class SequentialPortfolioTest {
 
         assertIs<MinimizeResult.Optimal>(first)
         assertIs<MinimizeResult.Optimal>(second)
-        assertEquals(7.0, first.stats.ls.moves.sum, "LS work must stop at its counted segment allowance")
         assertEquals(first.stats.ls.moves, second.stats.ls.moves, "mixed runs must reproduce LS work")
         assertEquals(first.stats.search.nodes, second.stats.search.nodes, "mixed runs must reproduce CP work")
     }
