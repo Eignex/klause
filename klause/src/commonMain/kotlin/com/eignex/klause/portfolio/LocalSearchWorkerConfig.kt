@@ -81,6 +81,9 @@ internal class LocalSearchWorkerConfig(val recipe: LocalSearchRecipe) : WorkerCo
             params,
             objective = objective,
             withWarmStart = { p, sample -> p.copy(initialAssignment = sample) },
+            withInstructionBudget = { p, limit ->
+                p.copy(maxInstructions = minOf(p.maxInstructions ?: Long.MAX_VALUE, limit))
+            },
         )
     }
 

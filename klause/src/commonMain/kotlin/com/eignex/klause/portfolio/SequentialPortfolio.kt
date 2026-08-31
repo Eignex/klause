@@ -25,8 +25,8 @@ import kotlin.time.TimeSource
  *
  * An **arm** is a [PortfolioWorker] — the same heterogeneous unit the concurrent portfolio uses,
  * built by the same [PortfolioBuilder] — so the arm set is exactly one of the named scenarios
- * (`mixed` / `localSearchOnly` / `backtrackOnly`). A segment runs one arm for a growing time
- * slice; across segments the shared incumbent bound prunes backtrack arms (their
+ * (`mixed` / `localSearchOnly` / `backtrackOnly`). An arm with a deterministic work counter runs
+ * one growing counted segment; across segments the shared incumbent bound prunes backtrack arms (their
  * `objectiveBoundSupplier`) and the incumbent assignment warm-starts LS arms (their
  * `initialAssignment` seam, threaded through [PortfolioWorker.improvements]'s `warmStart`).
  *
@@ -57,7 +57,7 @@ class SequentialPortfolio(
     val workers: List<PortfolioWorker>,
     /** kumulant arm-selection policy; see [exp3] for the default non-stationary choice. */
     private val bandit: UnivariateBandit,
-    /** First post-warmup time slice; subsequent slices grow by [sliceGrowth] up to [maxSliceMillis]. */
+    /** First post-warmup time slice for arms without a counted segment budget. */
     private val baseSliceMillis: Long = 2_000,
     /** Cap on a single segment's time slice. */
     private val maxSliceMillis: Long = 60_000,
@@ -73,12 +73,16 @@ class SequentialPortfolio(
      * bounded by nodes pauses at the same point in the same tree every time. The whole-solve deadline
      * still applies, so this cannot overrun it.
      *
-     * Local-search arms keep the millisecond schedule: they run a fresh search per segment rather than
-     * pausing one, so a node budget has nothing to count.
+     * Local-search arms use [baseSliceFlips], a counted engine step, because they start a fresh search
+     * per segment rather than pausing one.
      */
     private val baseSliceNodes: Long = 5_000,
     /** Cap on a single resumable segment's node budget. */
     private val maxSliceNodes: Long = 150_000,
+    /** First local-search segment's work allowance; later segments grow by [sliceGrowth]. */
+    private val baseSliceFlips: Long = 5_000,
+    /** Cap on a local-search segment's work allowance. */
+    private val maxSliceFlips: Long = 150_000,
     /** Round-robin warmup slice: each arm is forced once for this long before the bandit takes
      *  over, so a short deadline can't leave a winning arm at zero budget (EXP3 starvation). */
     private val warmupSliceMillis: Long = 1_000,
@@ -103,6 +107,7 @@ class SequentialPortfolio(
         require(warmupSliceMillis > 0) { "warmupSliceMillis must be > 0" }
         require(reseedStaleThreshold >= 0) { "reseedStaleThreshold must be ≥ 0" }
         require(baseSliceNodes > 0 && maxSliceNodes >= baseSliceNodes) { "invalid node slice bounds" }
+        require(baseSliceFlips > 0 && maxSliceFlips >= baseSliceFlips) { "invalid flip slice bounds" }
     }
 
     /** A per-segment cancellation that fires when the slice elapses or the global token fires. Built from
@@ -119,12 +124,15 @@ class SequentialPortfolio(
     override fun solve(cancellation: Cancellation): SolveResult {
         var stats = SolveStats.EMPTY
         var slice = baseSliceMillis
+        var sliceFlips = baseSliceFlips
         var segment = 0
         while (!cancellation()) {
             val warming = segment < workers.size
             val arm = if (warming) segment else bandit.choose()
+            val worker = workers[arm]
             val sliceMs = if (warming) warmupSliceMillis else slice
-            val r = runCatching { workers[arm].solve(sliceToken(cancellation, sliceMs)) }.getOrNull()
+            val token = if (worker.acceptsInstructionBudget) cancellation else sliceToken(cancellation, sliceMs)
+            val r = runCatching { worker.solve(token, sliceFlips) }.getOrNull()
             if (r != null) stats = stats.mergedWith(r.stats)
             val definitive = r is SolveResult.Sat || r is SolveResult.Unsat
             bandit.update(arm, if (definitive) 1.0 else 0.0)
@@ -133,7 +141,10 @@ class SequentialPortfolio(
                 is SolveResult.Unsat -> return r.copy(stats = stats)
                 else -> Unit
             }
-            if (!warming) slice = (slice * sliceGrowth).toLong().coerceAtMost(maxSliceMillis)
+            if (!warming) {
+                slice = (slice * sliceGrowth).toLong().coerceAtMost(maxSliceMillis)
+                sliceFlips = (sliceFlips * sliceGrowth).toLong().coerceAtMost(maxSliceFlips)
+            }
             segment++
         }
         return SolveResult.Unknown(TerminationReason.Cancelled, stats)
@@ -158,6 +169,7 @@ class SequentialPortfolio(
         var rewardScale = 0.0
         var slice = baseSliceMillis
         var sliceNodes = baseSliceNodes
+        var sliceFlips = baseSliceFlips
         var segment = 0
         val start = TimeSource.Monotonic.markNow()
         // The label of the arm running the current segment — single-threaded, so it is unambiguous
@@ -205,17 +217,23 @@ class SequentialPortfolio(
                 // Resume the arm's search for this slice; a terminal verdict means it finished, null
                 // means the slice elapsed (search paused, state retained for the next reschedule).
                 terminal = runCatching {
-                    handle.runSlice(cancellation, sliceMs, sliceNodes) { accept(it) }
+                    handle.runSlice(cancellation, Long.MAX_VALUE, sliceNodes) { accept(it) }
                 }.getOrNull()
             } else {
-                // A non-resumable arm runs a fresh search per segment rather than pausing one, so it
-                // cannot take a node budget. Under node slicing it therefore gets no per-segment
-                // deadline: a wall-clock one here would decide where this arm stops, and every counter
-                // the run reports follows from that. Its own node allowance still bounds it, and the
-                // whole-solve deadline still applies.
-                val armToken = sliceToken(cancellation, sliceMs)
+                // Local-search segments restart from the shared incumbent but are bounded by their own
+                // counted work. The whole-solve deadline remains the outer cancellation terminator.
+                val armToken = if (worker.acceptsInstructionBudget) {
+                    cancellation
+                } else {
+                    sliceToken(cancellation, sliceMs)
+                }
                 runCatching {
-                    for (r in worker.improvements(readBound, armToken, warmStart = best)) {
+                    for (r in worker.improvements(
+                        readBound,
+                        armToken,
+                        warmStart = best,
+                        maxInstructions = sliceFlips,
+                    )) {
                         terminal = r
                         if (r is MinimizeResult.WithSample) accept(r)
                     }
@@ -259,6 +277,7 @@ class SequentialPortfolio(
             if (!warming) {
                 slice = (slice * sliceGrowth).toLong().coerceAtMost(maxSliceMillis)
                 sliceNodes = (sliceNodes * sliceGrowth).toLong().coerceAtMost(maxSliceNodes)
+                sliceFlips = (sliceFlips * sliceGrowth).toLong().coerceAtMost(maxSliceFlips)
             }
             segment++
         }
@@ -291,6 +310,7 @@ class SequentialPortfolio(
             warmupSliceMillis: Long = 1_000,
             reseedStaleThreshold: Int = 3,
             baseSliceNodes: Long = 5_000,
+            baseSliceFlips: Long = 5_000,
         ): SequentialPortfolio = withBandit(
             workers,
             Exp3Bandit(workers.size, eta, gamma, Random(seed)),
@@ -300,6 +320,7 @@ class SequentialPortfolio(
             warmupSliceMillis,
             reseedStaleThreshold,
             baseSliceNodes,
+            baseSliceFlips,
         )
 
         /** UCB1 arm selection (stationary, deterministic given the seed) — the alternative to
@@ -313,6 +334,8 @@ class SequentialPortfolio(
             sliceGrowth: Double = 1.5,
             warmupSliceMillis: Long = 1_000,
             reseedStaleThreshold: Int = 3,
+            baseSliceNodes: Long = 5_000,
+            baseSliceFlips: Long = 5_000,
         ): SequentialPortfolio = withBandit(
             workers,
             MultiArmedBandit(workers.size, UCB1(alpha = alpha), Random(seed)),
@@ -321,6 +344,8 @@ class SequentialPortfolio(
             sliceGrowth,
             warmupSliceMillis,
             reseedStaleThreshold,
+            baseSliceNodes,
+            baseSliceFlips,
         )
 
         private fun withBandit(
@@ -332,6 +357,7 @@ class SequentialPortfolio(
             warmupSliceMillis: Long,
             reseedStaleThreshold: Int,
             baseSliceNodes: Long = 5_000,
+            baseSliceFlips: Long = 5_000,
         ): SequentialPortfolio = SequentialPortfolio(
             workers = workers,
             bandit = bandit,
@@ -341,6 +367,7 @@ class SequentialPortfolio(
             warmupSliceMillis = warmupSliceMillis,
             reseedStaleThreshold = reseedStaleThreshold,
             baseSliceNodes = baseSliceNodes,
+            baseSliceFlips = baseSliceFlips,
         )
     }
 }

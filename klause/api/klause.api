@@ -7094,24 +7094,26 @@ public final class com/eignex/klause/portfolio/PortfolioStrategy$RaceFirstFeasib
 public final class com/eignex/klause/portfolio/PortfolioWorker : java/lang/AutoCloseable {
 	public static final field Companion Lcom/eignex/klause/portfolio/PortfolioWorker$Companion;
 	public fun close ()V
+	public final fun getAcceptsInstructionBudget ()Z
 	public final fun getArmId ()I
 	public final fun getLabel ()Ljava/lang/String;
-	public final fun improvements (Lkotlin/jvm/functions/Function0;Lcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/solver/Sample;)Lkotlin/sequences/Sequence;
-	public static synthetic fun improvements$default (Lcom/eignex/klause/portfolio/PortfolioWorker;Lkotlin/jvm/functions/Function0;Lcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/solver/Sample;ILjava/lang/Object;)Lkotlin/sequences/Sequence;
+	public final fun improvements (Lkotlin/jvm/functions/Function0;Lcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/solver/Sample;Ljava/lang/Long;)Lkotlin/sequences/Sequence;
+	public static synthetic fun improvements$default (Lcom/eignex/klause/portfolio/PortfolioWorker;Lkotlin/jvm/functions/Function0;Lcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/solver/Sample;Ljava/lang/Long;ILjava/lang/Object;)Lkotlin/sequences/Sequence;
 	public final fun newResumableSearch (Lkotlin/jvm/functions/Function0;)Lcom/eignex/klause/solver/ResumableSearch;
 	public final fun samples (Lcom/eignex/klause/util/Cancellation;)Lkotlin/sequences/Sequence;
-	public final fun solve (Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/solver/SolveResult;
+	public final fun solve (Lcom/eignex/klause/util/Cancellation;Ljava/lang/Long;)Lcom/eignex/klause/solver/SolveResult;
+	public static synthetic fun solve$default (Lcom/eignex/klause/portfolio/PortfolioWorker;Lcom/eignex/klause/util/Cancellation;Ljava/lang/Long;ILjava/lang/Object;)Lcom/eignex/klause/solver/SolveResult;
 }
 
 public final class com/eignex/klause/portfolio/PortfolioWorker$Companion {
-	public final fun of (Ljava/lang/String;ILcom/eignex/klause/solver/Session;Lcom/eignex/klause/solver/SolverParams;Lcom/eignex/klause/solver/objective/LinearObjective;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function2;)Lcom/eignex/klause/portfolio/PortfolioWorker;
-	public static synthetic fun of$default (Lcom/eignex/klause/portfolio/PortfolioWorker$Companion;Ljava/lang/String;ILcom/eignex/klause/solver/Session;Lcom/eignex/klause/solver/SolverParams;Lcom/eignex/klause/solver/objective/LinearObjective;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function2;ILjava/lang/Object;)Lcom/eignex/klause/portfolio/PortfolioWorker;
+	public final fun of (Ljava/lang/String;ILcom/eignex/klause/solver/Session;Lcom/eignex/klause/solver/SolverParams;Lcom/eignex/klause/solver/objective/LinearObjective;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function2;)Lcom/eignex/klause/portfolio/PortfolioWorker;
+	public static synthetic fun of$default (Lcom/eignex/klause/portfolio/PortfolioWorker$Companion;Ljava/lang/String;ILcom/eignex/klause/solver/Session;Lcom/eignex/klause/solver/SolverParams;Lcom/eignex/klause/solver/objective/LinearObjective;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function2;ILjava/lang/Object;)Lcom/eignex/klause/portfolio/PortfolioWorker;
 }
 
 public final class com/eignex/klause/portfolio/SequentialPortfolio : com/eignex/klause/portfolio/PortfolioExecutor {
 	public static final field Companion Lcom/eignex/klause/portfolio/SequentialPortfolio$Companion;
-	public fun <init> (Ljava/util/List;Lcom/eignex/kumulant/bandit/UnivariateBandit;JJDJJJI)V
-	public synthetic fun <init> (Ljava/util/List;Lcom/eignex/kumulant/bandit/UnivariateBandit;JJDJJJIILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Ljava/util/List;Lcom/eignex/kumulant/bandit/UnivariateBandit;JJDJJJJJI)V
+	public synthetic fun <init> (Ljava/util/List;Lcom/eignex/kumulant/bandit/UnivariateBandit;JJDJJJJJIILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public fun close ()V
 	public final fun getWorkers ()Ljava/util/List;
 	public fun minimize (Lcom/eignex/klause/util/Cancellation;Lkotlin/jvm/functions/Function1;)Lcom/eignex/klause/solver/result/MinimizeResult;
@@ -7119,10 +7121,10 @@ public final class com/eignex/klause/portfolio/SequentialPortfolio : com/eignex/
 }
 
 public final class com/eignex/klause/portfolio/SequentialPortfolio$Companion {
-	public final fun exp3 (Ljava/util/List;JDDJJDJIJ)Lcom/eignex/klause/portfolio/SequentialPortfolio;
-	public static synthetic fun exp3$default (Lcom/eignex/klause/portfolio/SequentialPortfolio$Companion;Ljava/util/List;JDDJJDJIJILjava/lang/Object;)Lcom/eignex/klause/portfolio/SequentialPortfolio;
-	public final fun ucb1 (Ljava/util/List;JDJJDJI)Lcom/eignex/klause/portfolio/SequentialPortfolio;
-	public static synthetic fun ucb1$default (Lcom/eignex/klause/portfolio/SequentialPortfolio$Companion;Ljava/util/List;JDJJDJIILjava/lang/Object;)Lcom/eignex/klause/portfolio/SequentialPortfolio;
+	public final fun exp3 (Ljava/util/List;JDDJJDJIJJ)Lcom/eignex/klause/portfolio/SequentialPortfolio;
+	public static synthetic fun exp3$default (Lcom/eignex/klause/portfolio/SequentialPortfolio$Companion;Ljava/util/List;JDDJJDJIJJILjava/lang/Object;)Lcom/eignex/klause/portfolio/SequentialPortfolio;
+	public final fun ucb1 (Ljava/util/List;JDJJDJIJJ)Lcom/eignex/klause/portfolio/SequentialPortfolio;
+	public static synthetic fun ucb1$default (Lcom/eignex/klause/portfolio/SequentialPortfolio$Companion;Ljava/util/List;JDJJDJIJJILjava/lang/Object;)Lcom/eignex/klause/portfolio/SequentialPortfolio;
 }
 
 public final class com/eignex/klause/presolve/AffinePivotOrder : java/lang/Enum {

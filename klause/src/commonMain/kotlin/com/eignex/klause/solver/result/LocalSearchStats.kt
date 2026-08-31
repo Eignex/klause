@@ -9,7 +9,7 @@ import com.eignex.kumulant.stat.summary.SumResult
  * The LS engine's restart count folds into [SearchStats.restarts] (the shared restart field), not here.
  */
 data class LocalSearchStats(
-    /** Moves applied (bool flips / int sets / compounds + restart work) — the LS analogue of nodes. */
+    /** Work steps (bool flips / int sets / compounds + one unit per restart) — the LS analogue of nodes. */
     val moves: SumResult = ZERO_COUNT,
     /** Descents that hit a local optimum / plateau and restarted — the thrash indicator against [moves]. */
     val stalls: SumResult = ZERO_COUNT,

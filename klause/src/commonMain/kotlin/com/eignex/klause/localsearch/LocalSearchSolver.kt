@@ -362,6 +362,8 @@ class LocalSearchSolver(
                         yield(snap)
                         flipsSinceYield = 0
                         restarts.restart(state, bestSoFar = null)
+                        moves++
+                        flipsSinceYield++
                         restartCount++
                         bestCost = state.cost
                         bestSnap = state.assignment.snapshot()
@@ -370,6 +372,8 @@ class LocalSearchSolver(
                     }
                     if (restarts.shouldRestart(flipsSinceRestart)) {
                         restarts.restart(state, bestSoFar = bestSnap)
+                        moves++
+                        flipsSinceYield++
                         restartCount++
                         flipsSinceRestart = 0
                         roundFeedback?.endRound()
@@ -379,6 +383,8 @@ class LocalSearchSolver(
                     val move = strategy.pickMove(state)
                     if (move == null) {
                         restarts.restart(state, bestSoFar = bestSnap)
+                        moves++
+                        flipsSinceYield++
                         restartCount++
                         flipsSinceRestart = 0
                         roundFeedback?.endRound()

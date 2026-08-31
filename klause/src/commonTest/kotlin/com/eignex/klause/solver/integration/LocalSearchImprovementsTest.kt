@@ -114,6 +114,20 @@ class LocalSearchImprovementsTest {
     }
 
     @Test
+    fun `instruction budget bounds constant-objective optimization work`() {
+        // A constant objective has no improving incumbent after its first one. The counted allowance
+        // must still end the segment.
+        val problem = Problem(0, 0, emptyArray(), emptyArray())
+        val result = LocalSearchSolver(problem.bake()).minimize(
+            LinearObjective(),
+            LocalSearchParams(maxFlips = Long.MAX_VALUE, maxInstructions = 7L, randomSeed = 0L),
+        )
+
+        val best = assertIs<MinimizeResult.BestFound>(result)
+        assertEquals(7.0, best.stats.ls.moves.sum, "the instruction budget bounds the whole segment")
+    }
+
+    @Test
     fun `solve populates moves and a feasible incumbent`() {
         val factor = Cardinality.exactlyOne(
             intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true), Lit.make(3, true)),
