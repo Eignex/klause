@@ -358,6 +358,23 @@ class CliModeTest {
     }
 
     @Test
+    fun `portfolio telemetry carries exact discrete and whole continuous objectives`() {
+        val output = MpsOutput()
+
+        val out = capture {
+            output.onImprovement("integer", 9_007_199_254_740_993L, elapsedMs = 10)
+            output.onImprovement("continuous", 0L, continuousObjective = 60.0, elapsedMs = 20)
+            output.onImprovement("mixed-min", -3L, continuousObjective = -63.5, elapsedMs = 30)
+            output.onImprovement("mixed-max", 3L, continuousObjective = 63.5, elapsedMs = 40)
+        }
+
+        assertTrue("label=integer objective=9007199254740993 time=10" in out, out)
+        assertTrue("label=continuous objective=0 continuousObjective=60.0 time=20" in out, out)
+        assertTrue("label=mixed-min objective=-3 continuousObjective=-63.5 time=30" in out, out)
+        assertTrue("label=mixed-max objective=3 continuousObjective=63.5 time=40" in out, out)
+    }
+
+    @Test
     fun `an exhausted inner MPS constraint approximation is qualified`() {
         val output = MpsOutput(hasInnerConstraintApproximation = true)
 
