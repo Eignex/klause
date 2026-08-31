@@ -10751,6 +10751,7 @@ final class com.eignex.klause.theory.lia/GeneralLiaSearchComponent : com.eignex.
     final fun contributeModel(com.eignex.klause.solver.search/SearchModel, com.eignex.klause.solver.search/SearchContext) // com.eignex.klause.theory.lia/GeneralLiaSearchComponent.contributeModel|contributeModel(com.eignex.klause.solver.search.SearchModel;com.eignex.klause.solver.search.SearchContext){}[0]
     final fun initialize(com.eignex.klause.solver.search/SearchContext): com.eignex.klause.solver.search/ComponentResult // com.eignex.klause.theory.lia/GeneralLiaSearchComponent.initialize|initialize(com.eignex.klause.solver.search.SearchContext){}[0]
     final fun nextBranch(com.eignex.klause.solver.search/SearchContext): kotlin.collections/List<com.eignex.klause.solver.search/SearchDecision>? // com.eignex.klause.theory.lia/GeneralLiaSearchComponent.nextBranch|nextBranch(com.eignex.klause.solver.search.SearchContext){}[0]
+    final fun onRestart(com.eignex.klause.solver.search/SearchContext) // com.eignex.klause.theory.lia/GeneralLiaSearchComponent.onRestart|onRestart(com.eignex.klause.solver.search.SearchContext){}[0]
     final fun retract(kotlin/Int) // com.eignex.klause.theory.lia/GeneralLiaSearchComponent.retract|retract(kotlin.Int){}[0]
 }
 
