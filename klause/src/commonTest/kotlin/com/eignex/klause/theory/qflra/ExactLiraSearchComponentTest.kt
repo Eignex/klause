@@ -2,6 +2,7 @@ package com.eignex.klause.theory.qflra
 
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
+import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
@@ -76,6 +77,38 @@ class ExactLiraSearchComponentTest {
         assertIs<ComponentResult.Indeterminate>(session.initialize())
     }
 
+    @Test
+    fun `affine ray remains indeterminate when strict rows exhaust the split budget`() {
+        val model = Problem(
+            numBoolVars = 3,
+            intBounds = openBounds(2),
+            factors = arrayOf(
+                ReifiedLinear(0, intArrayOf(2, -2), intArrayOf(0, 1), LinearOp.EQ, 1),
+                ReifiedRealLinear(
+                    aux = 1,
+                    vars = intArrayOf(),
+                    intCoeffs = doubleArrayOf(),
+                    realVars = intArrayOf(0),
+                    realCoeffs = doubleArrayOf(1.0),
+                    op = LinearOp.GE,
+                    bound = 0.0,
+                    strict = true,
+                ),
+            ),
+            numRealVars = 1,
+            realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
+            realUpper = doubleArrayOf(Double.POSITIVE_INFINITY),
+        )
+        val session = SearchSession(listOf(ExactLiraSearchComponent(model)), maxChecks = 2)
+
+        assertIs<ComponentResult.Consistent>(session.initialize())
+        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, positive = true))))
+
+        assertIs<ComponentResult.Indeterminate>(
+            session.push(SearchDecision.Bool(Lit.make(0, positive = true))),
+        )
+    }
+
     private fun partialModel(): Problem = Problem(
         numBoolVars = 2,
         intBounds = openBounds(),
@@ -85,8 +118,8 @@ class ExactLiraSearchComponentTest {
         ),
     )
 
-    private fun openBounds(): IntBounds {
-        val open = Bits(1).also { it.set(0) }
-        return IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(0), open, open)
+    private fun openBounds(size: Int = 1): IntBounds {
+        val open = Bits(size).also { bits -> repeat(size, bits::set) }
+        return IntBounds.fromModelBounds(LongArray(size), LongArray(size), open, open)
     }
 }
