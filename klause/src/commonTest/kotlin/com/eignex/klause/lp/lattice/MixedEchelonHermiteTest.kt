@@ -42,7 +42,10 @@ class MixedEchelonHermiteTest {
         val transform = mixedEchelonHermite(sparseRows(longArrayOf(2, 3)), emptyList(), 2).transform
         val source = apply(transform, vec(5, -7))
 
-        assertEquals(listOf(BigInteger.fromLong(5), BigInteger.fromLong(-7)), apply(transform.inverse(), source).toList())
+        assertEquals(
+            listOf(BigInteger.fromLong(5), BigInteger.fromLong(-7)),
+            apply(transform.inverse(), source).toList(),
+        )
     }
 
     @Test

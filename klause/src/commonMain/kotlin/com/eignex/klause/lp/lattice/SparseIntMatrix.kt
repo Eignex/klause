@@ -104,7 +104,9 @@ internal class UnimodularTransform(val size: Int) {
         for (operation in operations.asReversed()) {
             when (operation) {
                 is UnimodularColumnOperation.Swap -> result.swap(operation.x, operation.y)
+
                 is UnimodularColumnOperation.Negate -> result.negate(operation.column)
+
                 is UnimodularColumnOperation.AddMultiple -> {
                     result.addMultiple(operation.target, operation.source, operation.factor.negate())
                 }
