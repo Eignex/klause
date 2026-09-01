@@ -355,17 +355,19 @@ internal fun exactDoubleBoundedSplit(
 }
 
 private fun ExactRationalInequality.homogeneousOverSplit(variables: Int, rhs: BigFraction): ExactRationalInequality {
-    val splitColumns = IntArray(2 * columns.size)
-    val splitCoefficients = ArrayList<BigFraction>(2 * columns.size)
+    val splitTerms = ArrayList<Pair<Int, BigFraction>>(2 * columns.size)
     for (index in columns.indices) {
         val variable = columns[index]
         require(variable in 0 until variables) { "exact row column $variable is outside 0 until $variables" }
-        splitColumns[2 * index] = variable
-        splitColumns[2 * index + 1] = variables + variable
-        splitCoefficients.add(coefficients[index])
-        splitCoefficients.add(coefficients[index].negated())
+        splitTerms.add(variable to coefficients[index])
+        splitTerms.add(variables + variable to coefficients[index].negated())
     }
-    return ExactRationalInequality(splitColumns, splitCoefficients, rhs)
+    splitTerms.sortBy { it.first }
+    return ExactRationalInequality(
+        splitTerms.map { it.first }.toIntArray(),
+        splitTerms.map { it.second },
+        rhs,
+    )
 }
 
 internal fun rationalFeasible(
