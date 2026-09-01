@@ -47,7 +47,11 @@ class FinitePipelinePreparation(
     val presolve: PresolveStats?,
     /** Time spent baking the source problem before this preparation began. */
     val constructionBakeElapsed: Duration = Duration.ZERO,
-)
+) {
+    internal fun executableProblem(): BakedProblem = requireNotNull(problem as? BakedProblem) {
+        "a nonterminal finite preparation must produce a BakedProblem"
+    }
+}
 
 /** Owns finite-route presolve policy before a concrete engine is constructed. */
 object FinitePipeline {

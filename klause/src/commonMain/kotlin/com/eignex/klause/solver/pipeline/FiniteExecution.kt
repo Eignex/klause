@@ -6,7 +6,6 @@ import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.backtrack.toBacktrackParams
 import com.eignex.klause.formats.flatzinc.FlatZincSearchHints
-import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.localsearch.strategy.LocalSearchRecipe
 import com.eignex.klause.lp.bounding.LpConfig
@@ -16,7 +15,7 @@ import com.eignex.klause.portfolio.Kind
 import com.eignex.klause.portfolio.LocalSearchCatalog
 import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.presolve.PresolveConfig
-import com.eignex.klause.propagation.bake
+import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.objective.IncrementalObjective
@@ -154,7 +153,7 @@ enum class FiniteSolveVerdict {
 /** One finite solve request after a frontend has translated its flags and source-model annotations. */
 internal class FiniteExecutionRequest(
     /** Prepared finite model to solve. */
-    val problem: Problem,
+    val problem: BakedProblem,
     /** Finite engine route selected by the frontend. */
     val engine: FiniteEngine,
     /** Whether to minimize [objective]. */
@@ -304,7 +303,7 @@ fun FinitePipeline.solve(request: FiniteSolveRequest, callbacks: FiniteSolveCall
     }
     val execution = execute(
         FiniteExecutionRequest(
-            problem = preparation.problem,
+            problem = preparation.executableProblem(),
             engine = request.engine,
             optimize = request.shape.optimize,
             objective = preparation.objective,
@@ -386,7 +385,7 @@ private fun executeFixed(request: FiniteExecutionRequest, callbacks: FiniteExecu
             onEvent = request.onEvent,
         ),
     )
-    val solver = BacktrackSolver(request.problem.bake())
+    val solver = BacktrackSolver(request.problem)
     if (plan.dryRun) return FiniteExecutionResult.DryRun("solver dry-run:", solver.describe(plan.params).lines())
 
     val start = TimeSource.Monotonic.markNow()
@@ -628,12 +627,12 @@ private fun localSearchDryRun(pool: List<() -> LocalSearchRecipe>?): FiniteExecu
 }
 
 private fun backtrackDryRun(
-    problem: Problem,
+    problem: BakedProblem,
     pool: List<() -> BacktrackRecipe>?,
     kind: Kind,
 ): FiniteExecutionResult.DryRun {
     val recipes = pool?.map { it() } ?: BacktrackCatalog.ranked(kind)
-    val solver = BacktrackSolver(problem.bake())
+    val solver = BacktrackSolver(problem)
     return FiniteExecutionResult.DryRun(
         heading = "solver dry-run: ${recipes.size} backtrack arm(s)",
         lines = buildList {
