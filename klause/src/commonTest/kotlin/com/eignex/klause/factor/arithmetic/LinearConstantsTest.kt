@@ -107,6 +107,67 @@ class LinearConstantsTest {
     }
 
     @Test
+    fun `factor rows retain exact finite constants and reification`() {
+        val unconditional = Linear(longArrayOf(Long.MAX_VALUE), intArrayOf(2), LinearOp.LE, Long.MAX_VALUE)
+        val reified = ReifiedLinear(4, longArrayOf(-7), intArrayOf(3), LinearOp.GE, 9)
+
+        val plainRow = assertIs<FactorRow.Doubles>(unconditional.linearRow())
+        val reifiedRow = assertIs<FactorRow.Doubles>(reified.linearRow())
+
+        assertEquals(FactorRow.ALWAYS, plainRow.activator)
+        assertEquals(Long.MAX_VALUE, checkNotNull(plainRow.integerCoeffs)[0])
+        assertEquals(Long.MAX_VALUE, plainRow.integerBound)
+        assertEquals(4, reifiedRow.activator)
+        assertEquals(-7L, checkNotNull(reifiedRow.integerCoeffs)[0])
+        assertEquals(9L, reifiedRow.integerBound)
+    }
+
+    @Test
+    fun `factor rows distinguish strict real and wide constants`() {
+        val strictReal = Linear(
+            intVars = intArrayOf(0),
+            intCoeffs = doubleArrayOf(0.5),
+            realVars = intArrayOf(1),
+            realCoeffs = doubleArrayOf(1.0),
+            op = LinearOp.LE,
+            bound = 2.5,
+            strict = true,
+        )
+        val huge = BigInteger.fromLong(Long.MAX_VALUE) * 4
+        val wide = Linear(intArrayOf(0), arrayOf(huge), LinearOp.LE, huge)
+
+        val realRow = assertIs<FactorRow.Doubles>(strictReal.linearRow())
+        val wideRow = assertIs<FactorRow.Wide>(wide.linearRow())
+
+        assertTrue(realRow.strict)
+        assertEquals(huge, wideRow.coefficients[0])
+        assertEquals(huge, wideRow.bound)
+    }
+
+    @Test
+    fun `nonlinear factors expose no factor row`() {
+        assertNull(Product(0, 1, 2).linearRow())
+    }
+
+    @Test
+    fun `factor rows require an atomic exact integer payload`() {
+        assertFailsWith<IllegalArgumentException> {
+            FactorRow.Doubles(
+                intVars = intArrayOf(0),
+                intCoeffs = doubleArrayOf(1.0),
+                realVars = IntArray(0),
+                realCoeffs = DoubleArray(0),
+                op = LinearOp.LE,
+                bound = 1.0,
+                strict = false,
+                activator = FactorRow.ALWAYS,
+                integerCoeffs = longArrayOf(1L),
+                integerBound = null,
+            )
+        }
+    }
+
+    @Test
     fun `a real form with no continuous term is refused rather than read as an integer row`() {
         // The real constructors pass empty integer terms for the shape they do not use; without a
         // continuous term the row would fall through to the integer shape and read those as its own.

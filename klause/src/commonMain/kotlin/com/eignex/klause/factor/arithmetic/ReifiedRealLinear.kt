@@ -13,9 +13,8 @@ import com.eignex.klause.ir.materializeKey
 /**
  * A reified real linear atom `aux ⟺ (Σ intCoeffs·vars + Σ realCoeffs·realVars ⟨op⟩ bound)` — the
  * real-atom half of boolean structure over linear real arithmetic. [aux] is an ordinary CP Boolean
- * the search branches on; the row itself carries a continuous term, so it has no CP propagator or
- * local-search invariant (like a real-bearing [Linear]) and its two directions are enforced by the
- * LP relaxation:
+ * the search branches on; the row is LP-only, so it has no CP propagator or local-search invariant and
+ * its two directions are enforced by the LP relaxation:
  *
  *  - The LP relaxation consults the build's live pin of [aux]: pinned true emits the atom's row, pinned
  *    false emits its exact complement (`¬(a ≤ b) ⟺ a > b`, strictness flipping through the
@@ -35,7 +34,7 @@ class ReifiedRealLinear(
     val vars: IntArray,
     /** Double coefficient of each integer term (index-aligned with [vars]). */
     val intCoeffs: DoubleArray,
-    /** LP-only real variable ids of the row's continuous terms. */
+    /** LP-only real variable ids of the row's continuous terms, possibly empty for a real-valued int row. */
     val realVars: IntArray,
     /** Double coefficient of each real term (index-aligned with [realVars]). */
     val realCoeffs: DoubleArray,
@@ -51,7 +50,6 @@ class ReifiedRealLinear(
         require(op == LinearOp.LE || op == LinearOp.GE) { "reified real atom must be an inequality" }
         require(vars.size == intCoeffs.size) { "int vars/coeffs length mismatch" }
         require(realVars.size == realCoeffs.size) { "real vars/coeffs length mismatch" }
-        require(realVars.isNotEmpty()) { "a real atom needs a continuous term" }
     }
 
     override val exactTheoryOwnable: Boolean get() = bound.isFinite() &&

@@ -1,24 +1,24 @@
 package com.eignex.klause.lp
 
-import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
+import com.eignex.klause.factor.arithmetic.FactorRow
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 
-internal fun ReifiedRealLinear.emitLpRelaxation(builder: RelaxationBuilder) {
-    val pin = builder.liveBool(aux) ?: return
-    val cols = IntArray(vars.size + realVars.size)
+internal fun FactorRow.Doubles.emitReifiedRealLpRelaxation(builder: RelaxationBuilder) {
+    val pin = builder.liveBool(activator) ?: return
+    val cols = IntArray(intVars.size + realVars.size)
     val coeffs = DoubleArray(cols.size)
-    for (i in vars.indices) {
-        cols[i] = builder.intColumn(vars[i])
+    for (i in intVars.indices) {
+        cols[i] = builder.intColumn(intVars[i])
         coeffs[i] = intCoeffs[i]
     }
     for (j in realVars.indices) {
         val c = builder.realColumn(realVars[j])
         if (c < 0) return
-        cols[vars.size + j] = c
-        coeffs[vars.size + j] = realCoeffs[j]
+        cols[intVars.size + j] = c
+        coeffs[intVars.size + j] = realCoeffs[j]
     }
-    val premise = intArrayOf(Lit.make(aux, pin))
+    val premise = intArrayOf(Lit.make(activator, pin))
     if (pin) {
         builder.realRow(cols, coeffs, op, bound, strict, premise)
     } else {
