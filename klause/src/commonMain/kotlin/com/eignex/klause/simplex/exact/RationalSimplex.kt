@@ -55,6 +55,15 @@ internal class BigRationalOutcome(
     val tableau: List<BigRationalTableauRow>? = null,
 )
 
+/** Exact outcome of minimizing a linear activity over an [ExactSimplexModel]. */
+internal class BigRationalOptimizationOutcome(
+    val feasibility: RationalFeasibility,
+    /** The exact infimum when [feasibility] is [RationalFeasibility.FEASIBLE]. */
+    val infimum: BigFraction? = null,
+    /** True when the activity descends along an open cone direction. */
+    val unbounded: Boolean = false,
+)
+
 /** One final exact simplex row, expressed in the original structural/slack column space. */
 internal class BigRationalTableauRow(
     val basic: Int,
@@ -286,6 +295,65 @@ internal fun exactBoundedRows(
     return bounded
 }
 
+/** One source row together with the finite lower activity that makes it double-bounded. */
+internal class ExactDoubleBoundedRow(val index: Int, val inequality: ExactRationalInequality, val lower: BigFraction)
+
+/** Exact Double-Bounded Reduction split before its mixed-echelon/Hermite column transformation. */
+internal sealed interface ExactDoubleBoundedSplit {
+    data object Infeasible : ExactDoubleBoundedSplit
+
+    data object Unknown : ExactDoubleBoundedSplit
+
+    class Split(val bounded: List<ExactDoubleBoundedRow>, val unbounded: List<Int>) : ExactDoubleBoundedSplit
+}
+
+/**
+ * Construct the Double-Bounded Reduction split for an exact rational inequality system.
+ *
+ * The homogeneous cone first identifies precisely the rows with finite lower activity. Each of those
+ * activities is then minimized over the original system, yielding the explicit `lower <= a*x <= rhs`
+ * row required by the bounded branch-and-bound phase. Rows without a finite lower activity are retained
+ * by index as the absolutely unbounded lane used later for mixed witness extension. No result is exposed
+ * if cancellation interrupts either phase.
+ */
+internal fun exactDoubleBoundedSplit(
+    rows: List<ExactRationalInequality>,
+    variables: Int,
+    cancellation: Cancellation = Cancellation.Never,
+): ExactDoubleBoundedSplit {
+    val bounded = exactBoundedRows(rows, variables, cancellation) ?: return ExactDoubleBoundedSplit.Unknown
+    val splitRows = rows.map { row -> row.homogeneousOverSplit(variables, row.rhs) }
+    val model = ExactRationalFeasibilityModel(2 * variables, splitRows)
+    val result = ArrayList<ExactDoubleBoundedRow>()
+    val unbounded = ArrayList<Int>()
+    for (index in rows.indices) {
+        if (cancellation()) return ExactDoubleBoundedSplit.Unknown
+        if (!bounded[index]) {
+            unbounded.add(index)
+            continue
+        }
+        val costs = MutableList(2 * variables) { BigFraction.ZERO }
+        val row = rows[index]
+        for (entry in row.columns.indices) {
+            val column = row.columns[entry]
+            costs[column] = row.coefficients[entry]
+            costs[variables + column] = row.coefficients[entry].negated()
+        }
+        val minimum = bigRationalMinimum(model, costs, cancellation)
+        when (minimum.feasibility) {
+            RationalFeasibility.INFEASIBLE -> return ExactDoubleBoundedSplit.Infeasible
+
+            RationalFeasibility.UNKNOWN -> return ExactDoubleBoundedSplit.Unknown
+
+            RationalFeasibility.FEASIBLE -> {
+                if (minimum.unbounded) return ExactDoubleBoundedSplit.Unknown
+                result.add(ExactDoubleBoundedRow(index, row, checkNotNull(minimum.infimum)))
+            }
+        }
+    }
+    return ExactDoubleBoundedSplit.Split(result, unbounded)
+}
+
 private fun ExactRationalInequality.homogeneousOverSplit(variables: Int, rhs: BigFraction): ExactRationalInequality {
     val splitColumns = IntArray(2 * columns.size)
     val splitCoefficients = ArrayList<BigFraction>(2 * columns.size)
@@ -348,6 +416,62 @@ internal fun bigRationalOutcome(
         val enter = state.selectEnteringColumn(row)
         if (enter < 0) return BigRationalOutcome(RationalFeasibility.INFEASIBLE)
         state.pivot(row, enter)
+        pivots++
+    }
+}
+
+/**
+ * Minimize a structural-column activity in arbitrary-precision arithmetic.
+ *
+ * The feasibility phase is the same Bland-style bounded-variable simplex used by
+ * [bigRationalOutcome].  Once it has a feasible basis, primal pivots choose the least-index improving
+ * non-basic column and the least-index tied blocker.  This is the exact optimization primitive needed
+ * by Double-Bounded Reduction to materialize a row's finite lower activity, rather than replacing it
+ * with an arbitrary witness radius.  Strict rows are optimized over their closure: their infimum is a
+ * valid lower activity even when strictness prevents it from being attained.
+ */
+internal fun bigRationalMinimum(
+    model: ExactSimplexModel,
+    costs: List<BigFraction>,
+    cancellation: Cancellation = Cancellation.Never,
+    maxPivots: Int = Int.MAX_VALUE,
+): BigRationalOptimizationOutcome {
+    require(costs.size == model.n) { "exact objective has ${costs.size} columns, expected ${model.n}" }
+    val state = buildState(BigFracOps, model) ?: return BigRationalOptimizationOutcome(RationalFeasibility.UNKNOWN)
+    var pivots = 0
+    while (true) {
+        if (cancellation.isCancelled() || pivots >= maxPivots) {
+            return BigRationalOptimizationOutcome(RationalFeasibility.UNKNOWN)
+        }
+        state.refreshBasicValues()
+        val row = state.selectViolatedRow()
+        if (row < 0) break
+        val enter = state.selectEnteringColumn(row)
+        if (enter < 0) return BigRationalOptimizationOutcome(RationalFeasibility.INFEASIBLE)
+        state.pivot(row, enter)
+        pivots++
+    }
+    while (true) {
+        if (cancellation.isCancelled() || pivots >= maxPivots) {
+            return BigRationalOptimizationOutcome(RationalFeasibility.UNKNOWN)
+        }
+        state.refreshBasicValues()
+        val enter = state.selectImprovingColumn(costs)
+        if (enter < 0) {
+            return BigRationalOptimizationOutcome(
+                RationalFeasibility.FEASIBLE,
+                state.objectiveValue(costs),
+            )
+        }
+        val blocker = state.selectObjectiveBlocker(enter)
+        if (blocker == null) {
+            return BigRationalOptimizationOutcome(RationalFeasibility.FEASIBLE, unbounded = true)
+        }
+        if (blocker.row < 0) {
+            state.flipNonbasicBound(enter)
+        } else {
+            state.pivotAtBound(blocker.row, enter, blocker.upper)
+        }
         pivots++
     }
 }
@@ -609,6 +733,88 @@ private class SimplexState<F>(
         if (targetUpper && uppers[leave] != null) addUpperCol(leave)
     }
 
+    /** Exact primal-simplex entering choice for a minimization objective on structural columns. */
+    fun selectImprovingColumn(costs: List<BigFraction>): Int {
+        require(ops === BigFracOps) { "exact objective pivots require arbitrary-precision fractions" }
+        @Suppress("UNCHECKED_CAST")
+        fun fraction(value: F): BigFraction = value as BigFraction
+        for (column in 0 until model.numVars) {
+            if (inBasisRow[column] >= 0) continue
+            var reduced = if (column < model.n) costs[column] else BigFraction.ZERO
+            for (row in tab.columnRows(column)) {
+                val basic = basis[row]
+                if (basic >= model.n) continue
+                reduced -= costs[basic] * fraction(tab.get(row, column))
+            }
+            if ((!atUpper[column] && reduced < BigFraction.ZERO) || (atUpper[column] && reduced > BigFraction.ZERO)) {
+                return column
+            }
+        }
+        return -1
+    }
+
+    /** The first exact blocker when [enter] moves from its current bound in its improving direction. */
+    fun selectObjectiveBlocker(enter: Int): ObjectiveBlocker? {
+        require(ops === BigFracOps) { "exact objective pivots require arbitrary-precision fractions" }
+        @Suppress("UNCHECKED_CAST")
+        fun fraction(value: F): BigFraction = value as BigFraction
+        val direction = if (atUpper[enter]) BigFraction.MINUS_ONE else BigFraction.ONE
+        var best: BigFraction? = uppers[enter]?.let(::fraction)
+        var blocker = if (best == null) null else ObjectiveBlocker(row = -1, upper = !atUpper[enter])
+        for (row in tab.columnRows(enter)) {
+            val slope = BigFraction.MINUS_ONE * fraction(tab.get(row, enter)) * direction
+            if (slope.isZero) continue
+            val upper = uppers[basis[row]]?.let(::fraction)
+            val candidate: BigFraction
+            val hitsUpper: Boolean
+            if (slope > BigFraction.ZERO) {
+                if (upper == null) continue
+                candidate = (upper - fraction(basicA[row])) * slope.reciprocal()
+                hitsUpper = true
+            } else {
+                candidate = fraction(basicA[row]) * (BigFraction.MINUS_ONE * slope).reciprocal()
+                hitsUpper = false
+            }
+            if (candidate < BigFraction.ZERO) continue
+            if (
+                best == null || candidate < best ||
+                (candidate == best && blocker != null && (blocker.row < 0 || basis[row] < basis[blocker.row]))
+            ) {
+                best = candidate
+                blocker = ObjectiveBlocker(row, hitsUpper)
+            }
+        }
+        return blocker
+    }
+
+    fun pivotAtBound(row: Int, enter: Int, upper: Boolean) {
+        targetUpper = upper
+        pivot(row, enter)
+    }
+
+    fun flipNonbasicBound(column: Int) {
+        check(inBasisRow[column] < 0) { "only a non-basic column has a bound to flip" }
+        atUpper[column] = !atUpper[column]
+        if (atUpper[column]) addUpperCol(column) else removeUpperCol(column)
+    }
+
+    fun objectiveValue(costs: List<BigFraction>): BigFraction {
+        require(ops === BigFracOps) { "exact objective values require arbitrary-precision fractions" }
+        @Suppress("UNCHECKED_CAST")
+        fun fraction(value: F): BigFraction = value as BigFraction
+        var value = BigFraction.ZERO
+        for (column in 0 until model.n) {
+            val row = inBasisRow[column]
+            val x = when {
+                row >= 0 -> fraction(basicA[row])
+                atUpper[column] -> fraction(uppers[column] ?: ops.zero)
+                else -> BigFraction.ZERO
+            }
+            value += costs[column] * x
+        }
+        return value
+    }
+
     private fun deltaSignum(a: F, d: F): Int {
         val sa = ops.signum(a)
         return if (sa != 0) sa else ops.signum(d)
@@ -627,6 +833,8 @@ private class SimplexState<F>(
         upperCols.truncateTo(upperCols.size - 1)
     }
 }
+
+private class ObjectiveBlocker(val row: Int, val upper: Boolean)
 
 /**
  * Row-major sparse storage for the feasibility tableau: per row the column indices in strictly

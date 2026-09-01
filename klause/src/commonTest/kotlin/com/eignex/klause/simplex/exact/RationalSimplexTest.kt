@@ -64,6 +64,82 @@ class RationalSimplexTest {
     }
 
     @Test
+    fun `minimizes an exact activity without a probe bound`() {
+        val model = ExactRationalFeasibilityModel(
+            n = 2,
+            rows = listOf(
+                ExactRationalInequality(
+                    intArrayOf(0, 1),
+                    listOf(BigFraction.ONE, BigFraction.MINUS_ONE),
+                    BigFraction.ofLong(5),
+                ),
+                ExactRationalInequality(
+                    intArrayOf(0, 1),
+                    listOf(BigFraction.MINUS_ONE, BigFraction.ONE),
+                    BigFraction.ofLong(-2),
+                ),
+            ),
+        )
+
+        val outcome = bigRationalMinimum(model, listOf(BigFraction.ONE, BigFraction.MINUS_ONE))
+
+        assertEquals(RationalFeasibility.FEASIBLE, outcome.feasibility)
+        assertEquals(BigFraction.ofLong(2), outcome.infimum)
+        assertTrue(!outcome.unbounded)
+    }
+
+    @Test
+    fun `reports an open exact objective direction as unbounded`() {
+        val model = ExactRationalFeasibilityModel(
+            n = 2,
+            rows = listOf(
+                ExactRationalInequality(
+                    intArrayOf(0, 1),
+                    listOf(BigFraction.ONE, BigFraction.MINUS_ONE),
+                    BigFraction.ofLong(5),
+                ),
+            ),
+        )
+
+        val outcome = bigRationalMinimum(model, listOf(BigFraction.ONE, BigFraction.MINUS_ONE))
+
+        assertEquals(RationalFeasibility.FEASIBLE, outcome.feasibility)
+        assertTrue(outcome.unbounded)
+        assertEquals(null, outcome.infimum)
+    }
+
+    @Test
+    fun `builds exact double-bounded rows and retains the unbounded lane`() {
+        val rows = listOf(
+            ExactRationalInequality(
+                intArrayOf(0),
+                listOf(BigFraction.ONE),
+                BigFraction.ofLong(5),
+            ),
+            ExactRationalInequality(
+                intArrayOf(0),
+                listOf(BigFraction.MINUS_ONE),
+                BigFraction.ofLong(-2),
+            ),
+            ExactRationalInequality(
+                intArrayOf(1),
+                listOf(BigFraction.ONE),
+                BigFraction.ONE,
+            ),
+        )
+
+        val split = exactDoubleBoundedSplit(rows, variables = 2)
+
+        split as ExactDoubleBoundedSplit.Split
+        assertEquals(listOf(0, 1), split.bounded.map(ExactDoubleBoundedRow::index))
+        assertEquals(
+            listOf(BigFraction.ofLong(2), BigFraction.ofLong(-5)),
+            split.bounded.map(ExactDoubleBoundedRow::lower),
+        )
+        assertEquals(listOf(2), split.unbounded)
+    }
+
+    @Test
     fun `decides a coupled system with non-dyadic coefficients`() {
         // x/3 + y/3 = 1 and x + y <= 2 conflict (x + y must be 3); doubles of 1/3 are exact rationals.
         val third = 1.0 / 3.0
