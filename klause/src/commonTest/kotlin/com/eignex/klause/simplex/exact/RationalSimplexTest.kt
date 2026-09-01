@@ -160,6 +160,49 @@ class RationalSimplexTest {
     }
 
     @Test
+    fun `rounds an exact mixed unit cube without a witness box`() {
+        val rows = listOf(
+            ExactRationalInequality(
+                intArrayOf(0, 1),
+                listOf(BigFraction.ONE, BigFraction.MINUS_ONE),
+                BigFraction.ofLong(3),
+                strict = true,
+            ),
+            ExactRationalInequality(
+                intArrayOf(1),
+                listOf(BigFraction.MINUS_ONE),
+                BigFraction.ofLong(-1000000),
+            ),
+        )
+
+        val witness = checkNotNull(exactMixedUnitCubeSolution(rows, realColumns = 1, integerColumns = 1))
+
+        assertTrue(witness[1].den == BigInteger.ONE)
+        assertTrue(witness[1].num >= BigInteger.fromInt(1000000))
+        assertTrue(witness[0] - witness[1] < BigFraction.ofLong(3))
+    }
+
+    @Test
+    fun `keeps a strict real row inside a mixed unit cube`() {
+        val witness = checkNotNull(
+            exactMixedUnitCubeSolution(
+                listOf(
+                    ExactRationalInequality(
+                        intArrayOf(0),
+                        listOf(BigFraction.MINUS_ONE),
+                        BigFraction.ZERO,
+                        strict = true,
+                    ),
+                ),
+                realColumns = 1,
+                integerColumns = 2,
+            ),
+        )
+
+        assertTrue(witness[0] > BigFraction.ZERO)
+    }
+
+    @Test
     fun `decides a coupled system with non-dyadic coefficients`() {
         // x/3 + y/3 = 1 and x + y <= 2 conflict (x + y must be 3); doubles of 1/3 are exact rationals.
         val third = 1.0 / 3.0

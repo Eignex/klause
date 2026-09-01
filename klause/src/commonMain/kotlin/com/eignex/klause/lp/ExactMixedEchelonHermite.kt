@@ -5,6 +5,7 @@ import com.eignex.klause.lp.lattice.UnimodularTransform
 import com.eignex.klause.lp.lattice.hermiteNormalForm
 import com.eignex.klause.lp.lattice.sparseIntRow
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.simplex.exact.ExactRationalInequality
 import com.eignex.klause.util.Cancellation
 import com.ionspin.kotlin.bignum.integer.BigInteger
 
@@ -13,6 +14,7 @@ internal class ExactMixedBoundedRow(
     val coefficients: Map<Int, BigFraction>,
     val lower: BigFraction,
     val upper: BigFraction,
+    val upperStrict: Boolean = false,
 ) {
     init {
         require(lower <= upper) { "exact mixed row has crossed bounds" }
@@ -44,6 +46,30 @@ internal class ExactMixedEchelonHermite(
             (0 until integerColumns).mapNotNull { source ->
                 integerInverse[integer, source].takeUnless { it.isZero() }?.let { source to it }
             }.toMap(),
+        )
+    }
+
+    /** True for a transformed coordinate constrained by the double-bounded rows. */
+    fun boundedColumn(column: Int): Boolean = rows.any { !(it.coefficients[column] ?: BigFraction.ZERO).isZero }
+
+    /** Apply the mixed column transformation to a source row. */
+    fun transform(row: ExactRationalInequality): ExactRationalInequality {
+        val coefficients = HashMap<Int, BigFraction>()
+        for (entry in row.columns.indices) {
+            val source = row.columns[entry]
+            val coefficient = row.coefficients[entry]
+            for (transformed in 0 until realColumns + integerColumns) {
+                val value = transform.column(transformed)[source] ?: continue
+                val next = (coefficients[transformed] ?: BigFraction.ZERO) + coefficient * value
+                if (next.isZero) coefficients.remove(transformed) else coefficients[transformed] = next
+            }
+        }
+        val ordered = coefficients.entries.sortedBy { it.key }
+        return ExactRationalInequality(
+            ordered.map { it.key }.toIntArray(),
+            ordered.map { it.value },
+            row.rhs,
+            row.strict,
         )
     }
 }
@@ -144,7 +170,9 @@ internal fun exactMixedEchelonHermite(
     cancellation: Cancellation = Cancellation.Never,
 ): ExactMixedEchelonHermite? {
     val columns = realColumns + integerColumns
-    val rows = source.map { row -> MutableMixedRow(HashMap(row.coefficients), row.lower, row.upper) }.toMutableList()
+    val rows = source.map { row ->
+        MutableMixedRow(HashMap(row.coefficients), row.lower, row.upper, row.upperStrict)
+    }.toMutableList()
     val transform = ExactMixedTransform(columns)
     var pivot = 0
     while (pivot < realColumns) {
@@ -178,7 +206,7 @@ internal fun exactMixedEchelonHermite(
     composeIntegerTransform(transform, hermite.v, realColumns, integerColumns)
     for (index in rows.indices) rows[index].replaceIntegerTail(hermite.h[index], realColumns)
     return ExactMixedEchelonHermite(
-        rows.map { row -> ExactMixedBoundedRow(row.coefficients, row.lower, row.upper) },
+        rows.map { row -> ExactMixedBoundedRow(row.coefficients, row.lower, row.upper, row.upperStrict) },
         realColumns,
         integerColumns,
         transform,
@@ -190,6 +218,7 @@ private class MutableMixedRow(
     val coefficients: MutableMap<Int, BigFraction>,
     var lower: BigFraction,
     var upper: BigFraction,
+    val upperStrict: Boolean,
 ) {
     operator fun get(column: Int): BigFraction = coefficients[column] ?: BigFraction.ZERO
 

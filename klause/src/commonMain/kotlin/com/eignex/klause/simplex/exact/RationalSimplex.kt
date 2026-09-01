@@ -322,7 +322,7 @@ internal fun exactDoubleBoundedSplit(
     cancellation: Cancellation = Cancellation.Never,
 ): ExactDoubleBoundedSplit {
     val bounded = exactBoundedRows(rows, variables, cancellation) ?: return ExactDoubleBoundedSplit.Unknown
-    val splitRows = rows.map { row -> row.homogeneousOverSplit(variables, row.rhs) }
+    val splitRows = rows.map { row -> row.homogeneousOverSplit(variables, row.rhs, row.strict) }
     val model = ExactRationalFeasibilityModel(2 * variables, splitRows)
     val result = ArrayList<ExactDoubleBoundedRow>()
     val unbounded = ArrayList<Int>()
@@ -354,7 +354,79 @@ internal fun exactDoubleBoundedSplit(
     return ExactDoubleBoundedSplit.Split(result, unbounded)
 }
 
-private fun ExactRationalInequality.homogeneousOverSplit(variables: Int, rhs: BigFraction): ExactRationalInequality {
+/**
+ * Construct a mixed witness for an absolutely unbounded system.
+ *
+ * The rational columns are kept at the exact centre returned by simplex.  Every integer column is
+ * rounded from a centre whose row right-hand side has been reduced by half that row's integer
+ * one-norm.  The unit cube around the centre therefore remains inside every row.  Strict rows keep
+ * their strict endpoint, so rounding cannot turn a valid strict centre into a boundary point.
+ *
+ * For the split systems produced by Double-Bounded Reduction, Lemma 22 of Bromberger's reduction
+ * supplies exactly the absolute-unboundedness premise.  A null result is consequently reserved for
+ * cancellation or an interrupted exact solve; callers must not substitute a finite search box.
+ */
+internal fun exactMixedUnitCubeSolution(
+    rows: List<ExactRationalInequality>,
+    realColumns: Int,
+    integerColumns: Int,
+    cancellation: Cancellation = Cancellation.Never,
+): List<BigFraction>? {
+    val variables = realColumns + integerColumns
+    val shifted = rows.map { row ->
+        var integerNorm = BigFraction.ZERO
+        for (index in row.columns.indices) {
+            if (row.columns[index] >= realColumns) {
+                val coefficient = row.coefficients[index]
+                integerNorm += if (coefficient < BigFraction.ZERO) coefficient.negated() else coefficient
+            }
+        }
+        ExactRationalInequality(
+            row.columns,
+            row.coefficients,
+            row.rhs - integerNorm * BigFracOps.half,
+            row.strict,
+        )
+    }
+    val outcome = bigRationalOutcome(
+        ExactRationalFeasibilityModel(
+            2 * variables,
+            shifted.map { row -> row.homogeneousOverSplit(variables, row.rhs, row.strict) },
+        ),
+        cancellation,
+        Int.MAX_VALUE,
+    )
+    if (outcome.feasibility != RationalFeasibility.FEASIBLE || cancellation()) return null
+    val centre = checkNotNull(outcome.witness)
+    val candidate = List(variables) { column ->
+        val value = centre[column] - centre[variables + column]
+        if (column < realColumns) {
+            value
+        } else {
+            (value + BigFracOps.half).floorExact().let {
+                BigFraction.of(it, BigInteger.ONE)
+            }
+        }
+    }
+    return candidate.takeIf { candidate -> candidate.satisfiesExactRows(rows) }
+}
+
+private fun BigFraction.floorExact(): BigInteger {
+    val quotient = num / den
+    return if (num < BigInteger.ZERO && num % den != BigInteger.ZERO) quotient - BigInteger.ONE else quotient
+}
+
+private fun List<BigFraction>.satisfiesExactRows(rows: List<ExactRationalInequality>): Boolean = rows.all { row ->
+    var activity = BigFraction.ZERO
+    for (index in row.columns.indices) activity += this[row.columns[index]] * row.coefficients[index]
+    if (row.strict) activity < row.rhs else activity <= row.rhs
+}
+
+private fun ExactRationalInequality.homogeneousOverSplit(
+    variables: Int,
+    rhs: BigFraction,
+    strict: Boolean = false,
+): ExactRationalInequality {
     val splitTerms = ArrayList<Pair<Int, BigFraction>>(2 * columns.size)
     for (index in columns.indices) {
         val variable = columns[index]
@@ -367,6 +439,7 @@ private fun ExactRationalInequality.homogeneousOverSplit(variables: Int, rhs: Bi
         splitTerms.map { it.first }.toIntArray(),
         splitTerms.map { it.second },
         rhs,
+        strict,
     )
 }
 
