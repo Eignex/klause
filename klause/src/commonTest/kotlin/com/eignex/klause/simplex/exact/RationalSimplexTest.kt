@@ -3,6 +3,7 @@ package com.eignex.klause.simplex.exact
 import com.eignex.klause.lp.engine.LpBuilder
 import com.eignex.klause.lp.engine.Relation
 import com.eignex.klause.lp.engine.Sense
+import com.ionspin.kotlin.bignum.integer.BigInteger
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -25,6 +26,41 @@ class RationalSimplexTest {
         val x = b.addRealVar(0.0, 1.0, cost = 0.0)
         b.addRealRow(intArrayOf(x), doubleArrayOf(2.0), Relation.EQ, 3.0)
         assertEquals(RationalFeasibility.INFEASIBLE, rationalFeasible(b.build(Sense.MINIMIZE)))
+    }
+
+    @Test
+    fun `keeps arbitrary precision rows out of the floating relaxation`() {
+        val large = BigInteger.ONE shl 160
+        val model = ExactRationalFeasibilityModel(
+            n = 1,
+            rows = listOf(
+                ExactRationalInequality(
+                    columns = intArrayOf(0),
+                    coefficients = listOf(BigFraction.of(large, BigInteger.ONE)),
+                    rhs = BigFraction.of(large, BigInteger.ONE),
+                ),
+            ),
+        )
+
+        val outcome = bigRationalOutcome(model)
+
+        assertEquals(RationalFeasibility.FEASIBLE, outcome.feasibility)
+        assertEquals(BigFraction.ZERO, outcome.witness!![0])
+    }
+
+    @Test
+    fun `classifies bounded rows from the exact homogeneous cone`() {
+        val rows = listOf(
+            ExactRationalInequality(intArrayOf(0), listOf(BigFraction.ONE), BigFraction.ZERO),
+            ExactRationalInequality(intArrayOf(0), listOf(BigFraction.MINUS_ONE), BigFraction.ZERO),
+            ExactRationalInequality(intArrayOf(1), listOf(BigFraction.ONE), BigFraction.ZERO),
+        )
+
+        val bounded = exactBoundedRows(rows, variables = 2)
+
+        assertTrue(bounded!![0])
+        assertTrue(bounded[1])
+        assertTrue(!bounded[2])
     }
 
     @Test
