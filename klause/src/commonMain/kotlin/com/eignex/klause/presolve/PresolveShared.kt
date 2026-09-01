@@ -110,7 +110,8 @@ internal object PresolveShared {
      *  presolve steps — it reads each domain's endpoints only, never enumerating values. */
     fun maxIntSpan(problem: Problem): Long {
         var widest = 0L
-        for (d in problem.requireFiniteIntDomains()) {
+        for (v in 0 until problem.numIntVars) {
+            val d = problem.finiteIntDomain(v)
             val span = d.max - d.min
             widest = maxOf(widest, if (span < 0L) Long.MAX_VALUE else span)
         }

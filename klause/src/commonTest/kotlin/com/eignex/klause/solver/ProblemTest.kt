@@ -27,6 +27,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class ProblemTest {
@@ -249,9 +250,32 @@ class ProblemTest {
         val finiteRoute = assertIs<SourceProblemRoute.Finite>(finite.pipelineRoute())
         val openRoute = assertIs<SourceProblemRoute.OpenTheory>(open.pipelineRoute())
 
-        assertIs<BakedProblem>(finiteRoute.problem)
+        assertSame(finite, finiteRoute.problem)
+        assertFalse(finiteRoute.problem is BakedProblem)
         assertEquals(ProblemPipeline.FINITE_CP, finiteRoute.componentPlan.theoryPipeline)
         assertEquals(ProblemPipeline.DIFFERENCE_THEORY, openRoute.request.componentPlan.theoryPipeline)
         assertEquals(null, openRoute.request.model.intDomainOrNull(0))
+    }
+
+    @Test
+    fun `routing a wide bounded model does not run its root bake`() {
+        val problem = Problem(
+            numBoolVars = 0,
+            intBounds = IntBounds.fromModelBounds(
+                longArrayOf(0, 0),
+                longArrayOf(1_000_000_000, 1_000_000_000),
+                null,
+                null,
+            ),
+            factors = arrayOf(
+                Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.LE, -1),
+                Linear(intArrayOf(1, -1), intArrayOf(1, 0), LinearOp.LE, -1),
+            ),
+        )
+
+        val route = assertIs<SourceProblemRoute.Finite>(problem.pipelineRoute())
+
+        assertSame(problem, route.problem)
+        assertFalse(route.problem is BakedProblem)
     }
 }

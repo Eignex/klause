@@ -1,6 +1,7 @@
 package com.eignex.klause.presolve
 
 import com.eignex.klause.factor.bool.internals.maximalAmoCliques
+import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.presolve.linear.AffineSingletons
 import com.eignex.klause.presolve.linear.CoefficientStrengthening
@@ -27,6 +28,12 @@ object Presolve {
      *  pseudo-Boolean constraints. */
     fun strengthenCoefficients(problem: Problem, cancellation: Cancellation = Cancellation.Never): PassDelta =
         CoefficientStrengthening.strengthenCoefficients(problem, cancellation)
+
+    internal fun strengthenCoefficients(
+        problem: Problem,
+        cancellation: Cancellation,
+        domains: Array<IntDomain>,
+    ): PassDelta = CoefficientStrengthening.strengthenCoefficients(problem, cancellation, domains)
 
     /** One-shot GF(2) elimination over all xor factors. */
     fun deriveXorUnits(problem: Problem): PassDelta = XorUnits.deriveXorUnits(problem)

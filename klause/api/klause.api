@@ -8491,7 +8491,6 @@ public final class com/eignex/klause/solver/objective/SingleIntObjective {
 public final class com/eignex/klause/solver/pipeline/ComponentPlan {
 	public final fun cpProjection (Lcom/eignex/klause/ir/Problem;Ljava/util/Map;)Lcom/eignex/klause/solver/pipeline/CpProblemProjection;
 	public final fun factorOwner (I)Lcom/eignex/klause/solver/pipeline/FactorOwner;
-	public final fun finiteProjection (Lcom/eignex/klause/ir/Problem;Ljava/util/Map;)Lcom/eignex/klause/propagation/BakedProblem;
 	public final fun getCpIntVars ()[I
 	public final fun getHasCpComponent ()Z
 	public final fun getHasTheoryComponent ()Z
@@ -8576,25 +8575,26 @@ public final class com/eignex/klause/solver/pipeline/FinitePipeline {
 }
 
 public final class com/eignex/klause/solver/pipeline/FinitePipelinePreparation {
-	public synthetic fun <init> (Lcom/eignex/klause/propagation/BakedProblem;Lcom/eignex/klause/solver/objective/LinearObjective;Lkotlin/jvm/functions/Function1;Lcom/eignex/klause/solver/result/PresolveStats;JILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public synthetic fun <init> (Lcom/eignex/klause/propagation/BakedProblem;Lcom/eignex/klause/solver/objective/LinearObjective;Lkotlin/jvm/functions/Function1;Lcom/eignex/klause/solver/result/PresolveStats;JLkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/objective/LinearObjective;Lkotlin/jvm/functions/Function1;Lcom/eignex/klause/solver/result/PresolveStats;JILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/objective/LinearObjective;Lkotlin/jvm/functions/Function1;Lcom/eignex/klause/solver/result/PresolveStats;JLkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun getConstructionBakeElapsed-UwyO8pc ()J
 	public final fun getObjective ()Lcom/eignex/klause/solver/objective/LinearObjective;
 	public final fun getPresolve ()Lcom/eignex/klause/solver/result/PresolveStats;
-	public final fun getProblem ()Lcom/eignex/klause/propagation/BakedProblem;
+	public final fun getProblem ()Lcom/eignex/klause/ir/Problem;
 	public final fun getReconstruct ()Lkotlin/jvm/functions/Function1;
 }
 
 public final class com/eignex/klause/solver/pipeline/FinitePipelineRequest {
-	public fun <init> (Lcom/eignex/klause/propagation/BakedProblem;Lcom/eignex/klause/solver/pipeline/FiniteEngine;Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/presolve/PresolveConfig;ZZLcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/presolve/PresolveBudget;)V
-	public synthetic fun <init> (Lcom/eignex/klause/propagation/BakedProblem;Lcom/eignex/klause/solver/pipeline/FiniteEngine;Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/presolve/PresolveConfig;ZZLcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/presolve/PresolveBudget;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/pipeline/FiniteEngine;Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/presolve/PresolveConfig;ZZLcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/presolve/PresolveBudget;Lcom/eignex/klause/solver/pipeline/ComponentPlan;)V
+	public synthetic fun <init> (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/pipeline/FiniteEngine;Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/presolve/PresolveConfig;ZZLcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/presolve/PresolveBudget;Lcom/eignex/klause/solver/pipeline/ComponentPlan;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun getCancellation ()Lcom/eignex/klause/util/Cancellation;
+	public final fun getComponentPlan ()Lcom/eignex/klause/solver/pipeline/ComponentPlan;
 	public final fun getEngine ()Lcom/eignex/klause/solver/pipeline/FiniteEngine;
 	public final fun getExplicitPresolveConfig ()Z
 	public final fun getObjective ()Lcom/eignex/klause/solver/objective/LinearObjective;
 	public final fun getPresolveBudget ()Lcom/eignex/klause/presolve/PresolveBudget;
 	public final fun getPresolveConfig ()Lcom/eignex/klause/presolve/PresolveConfig;
-	public final fun getProblem ()Lcom/eignex/klause/propagation/BakedProblem;
+	public final fun getProblem ()Lcom/eignex/klause/ir/Problem;
 	public final fun getSolutionSetSensitive ()Z
 }
 
@@ -8676,17 +8676,17 @@ public final class com/eignex/klause/solver/pipeline/FiniteSolveResult {
 }
 
 public final class com/eignex/klause/solver/pipeline/FiniteSolveShape {
-	public fun <init> (Lcom/eignex/klause/propagation/BakedProblem;ZZLcom/eignex/klause/solver/objective/IncrementalObjective;Lcom/eignex/klause/solver/objective/LinearObjective;Ljava/lang/Integer;Lcom/eignex/klause/localsearch/DefinitionalSweep;Lcom/eignex/klause/formats/flatzinc/FlatZincSearchHints;Lcom/eignex/klause/solver/pipeline/ComponentPlan;)V
-	public synthetic fun <init> (Lcom/eignex/klause/propagation/BakedProblem;ZZLcom/eignex/klause/solver/objective/IncrementalObjective;Lcom/eignex/klause/solver/objective/LinearObjective;Ljava/lang/Integer;Lcom/eignex/klause/localsearch/DefinitionalSweep;Lcom/eignex/klause/formats/flatzinc/FlatZincSearchHints;Lcom/eignex/klause/solver/pipeline/ComponentPlan;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/eignex/klause/ir/Problem;ZZLcom/eignex/klause/solver/objective/IncrementalObjective;Lcom/eignex/klause/solver/objective/LinearObjective;Ljava/lang/Integer;Lcom/eignex/klause/localsearch/DefinitionalSweep;Lcom/eignex/klause/formats/flatzinc/FlatZincSearchHints;Lcom/eignex/klause/solver/pipeline/ComponentPlan;)V
+	public synthetic fun <init> (Lcom/eignex/klause/ir/Problem;ZZLcom/eignex/klause/solver/objective/IncrementalObjective;Lcom/eignex/klause/solver/objective/LinearObjective;Ljava/lang/Integer;Lcom/eignex/klause/localsearch/DefinitionalSweep;Lcom/eignex/klause/formats/flatzinc/FlatZincSearchHints;Lcom/eignex/klause/solver/pipeline/ComponentPlan;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun getComponentPlan ()Lcom/eignex/klause/solver/pipeline/ComponentPlan;
 	public final fun getDefinitionalSweep ()Lcom/eignex/klause/localsearch/DefinitionalSweep;
-	public final fun getFiniteProblem ()Lcom/eignex/klause/propagation/BakedProblem;
+	public final fun getFiniteProblem ()Lcom/eignex/klause/ir/Problem;
 	public final fun getLinearObjective ()Lcom/eignex/klause/solver/objective/LinearObjective;
 	public final fun getLocalSearchObjective ()Lcom/eignex/klause/solver/objective/IncrementalObjective;
 	public final fun getMaximize ()Z
 	public final fun getObjectiveIntVar ()Ljava/lang/Integer;
 	public final fun getOptimize ()Z
-	public final fun getProblem ()Lcom/eignex/klause/propagation/BakedProblem;
+	public final fun getProblem ()Lcom/eignex/klause/ir/Problem;
 	public final fun getSearchHints ()Lcom/eignex/klause/formats/flatzinc/FlatZincSearchHints;
 }
 
@@ -9029,14 +9029,14 @@ public abstract interface class com/eignex/klause/solver/pipeline/SourceProblemR
 }
 
 public final class com/eignex/klause/solver/pipeline/SourceProblemRoute$Finite : com/eignex/klause/solver/pipeline/SourceProblemRoute {
-	public fun <init> (Lcom/eignex/klause/propagation/BakedProblem;Lcom/eignex/klause/solver/pipeline/ComponentPlan;)V
-	public final fun component1 ()Lcom/eignex/klause/propagation/BakedProblem;
+	public fun <init> (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/pipeline/ComponentPlan;)V
+	public final fun component1 ()Lcom/eignex/klause/ir/Problem;
 	public final fun component2 ()Lcom/eignex/klause/solver/pipeline/ComponentPlan;
-	public final fun copy (Lcom/eignex/klause/propagation/BakedProblem;Lcom/eignex/klause/solver/pipeline/ComponentPlan;)Lcom/eignex/klause/solver/pipeline/SourceProblemRoute$Finite;
-	public static synthetic fun copy$default (Lcom/eignex/klause/solver/pipeline/SourceProblemRoute$Finite;Lcom/eignex/klause/propagation/BakedProblem;Lcom/eignex/klause/solver/pipeline/ComponentPlan;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/SourceProblemRoute$Finite;
+	public final fun copy (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/pipeline/ComponentPlan;)Lcom/eignex/klause/solver/pipeline/SourceProblemRoute$Finite;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/pipeline/SourceProblemRoute$Finite;Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/pipeline/ComponentPlan;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/SourceProblemRoute$Finite;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getComponentPlan ()Lcom/eignex/klause/solver/pipeline/ComponentPlan;
-	public final fun getProblem ()Lcom/eignex/klause/propagation/BakedProblem;
+	public final fun getProblem ()Lcom/eignex/klause/ir/Problem;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 }

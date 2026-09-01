@@ -1,9 +1,7 @@
 package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.ir.Factor
-import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.pipeline.componentPlan
 import com.eignex.klause.theory.qflra.supportsExactLra
@@ -33,10 +31,10 @@ enum class ProblemPipeline {
 
 /** A source model prepared for the finite or complete open-theory pipeline. */
 sealed interface SourceProblemRoute {
-    /** A fully bounded source model materialized for finite-domain search. */
+    /** A fully bounded source model selected for deferred finite-domain preparation. */
     data class Finite(
-        /** The materialized finite-domain model. */
-        val problem: BakedProblem,
+        /** Canonical logical model retained until deferred finite preparation. */
+        val problem: Problem,
         /** Component ownership selected from the same canonical source model. */
         val componentPlan: ComponentPlan,
     ) : SourceProblemRoute
@@ -57,7 +55,7 @@ sealed interface SourceProblemRoute {
 /**
  * Select a pipeline once for this source model.
  *
- * Finite source ranges materialize their declared bounds for CP. Open models carry a complete theory
+ * Finite source ranges defer their root-propagated CP projection. Open models carry a complete theory
  * request when one exists; callers only need to render its uniform assignment surface. A frontend that
  * supports exact pure-real solving sets [routePureRealToTheory] to select that lane instead of finite CP.
  */
@@ -70,11 +68,7 @@ fun Problem.pipelineRoute(
     val preferFinite = finiteIntegerRanges && (!routePureRealToTheory || !supportsExactLra())
     val plan = componentPlan(preferFinite)
     if (plan.theoryPipeline == ProblemPipeline.FINITE_CP) {
-        if (this is BakedProblem) return SourceProblemRoute.Finite(this, plan)
-        val domains = plan.cpIntVars.associateWith { variable ->
-            intDomainOrNull(variable) ?: IntDomain(intBounds.lower(variable), intBounds.upper(variable))
-        }
-        return SourceProblemRoute.Finite(plan.finiteProjection(this, domains), plan)
+        return SourceProblemRoute.Finite(this, plan)
     }
     val request = OpenTheoryRequest(this, objective, maximize, plan)
     return if (request.route == ProblemPipeline.UNSUPPORTED_OPEN || request.route == ProblemPipeline.FINITE_CP) {

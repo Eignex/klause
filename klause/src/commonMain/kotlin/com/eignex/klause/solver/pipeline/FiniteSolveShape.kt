@@ -1,15 +1,15 @@
 package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.formats.flatzinc.FlatZincSearchHints
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.DefinitionalSweep
-import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective
 
 /** Source-independent finite model data consumed by the solver pipeline. */
 class FiniteSolveShape(
-    /** Finite, root-propagated projection accepted by the finite pipeline. */
-    val problem: BakedProblem,
+    /** Canonical logical model accepted by deferred finite preparation. */
+    val problem: Problem,
     /** Whether the request optimizes an objective. */
     val optimize: Boolean,
     /** Whether the source objective is a maximization. */
@@ -27,6 +27,6 @@ class FiniteSolveShape(
     /** Component ownership selected from the canonical source model. */
     val componentPlan: ComponentPlan = problem.componentPlan(preferFinite = true),
 ) {
-    /** Finite problem consumed by finite orchestration. */
-    val finiteProblem: BakedProblem get() = problem
+    /** Canonical bounded problem consumed by finite orchestration. */
+    val finiteProblem: Problem get() = problem
 }

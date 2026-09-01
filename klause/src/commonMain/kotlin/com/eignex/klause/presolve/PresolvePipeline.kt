@@ -3,7 +3,7 @@ package com.eignex.klause.presolve
 import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.bounding.LpPlan
-import com.eignex.klause.propagation.bake
+import com.eignex.klause.propagation.bakeFiniteBounds
 import com.eignex.klause.propagation.difference.withDifferenceSystem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
@@ -80,7 +80,11 @@ object PresolvePipeline {
         // it is caught in O(factors). The bake would otherwise narrow it toward the empty domain one step
         // per round — O(span) on a wide clamped domain — before any pass runs.
         val strengthenInfeasible = config.resolved(PresolvePass.STRENGTHEN_COEFFICIENTS, context) &&
-            Presolve.strengthenCoefficients(problem).infeasible
+            Presolve.strengthenCoefficients(
+                problem,
+                cancellation,
+                problem.finiteIntDomains(),
+            ).infeasible
 
         // On a genuinely wide integer domain, the LP relaxation proves global infeasibility (e.g. a
         // difference cycle `x < y ∧ y < x`) in O(one LP solve) — before [RootBaker.reseed]'s bound
@@ -108,7 +112,7 @@ object PresolvePipeline {
         // directly-constructed (already-baked) problem, so this is where a front-end's deferred base bake
         // actually happens, after the O(one-LP) pre-bake infeasibility/OBBT that must precede it.
         val bakeStart = TimeSource.Monotonic.markNow()
-        val baked = if (preBakeInfeasible) problem else prebaked.bake(cancellation)
+        val baked = if (preBakeInfeasible) problem else prebaked.bakeFiniteBounds(cancellation)
         val seeded = if (preBakeInfeasible) problem else RootBaker.reseed(baked, bakeConfig)
         val bakeElapsed = bakeStart.elapsedNow()
         val reconstructs = ArrayList<(Sample) -> Sample>() // in application order; round 1 first

@@ -35,7 +35,11 @@ internal object CoefficientStrengthening {
      * Exact (feasible-set-preserving) and it tightens the LP relaxation the bound participates in.
      * Other factor types pass through untouched.
      */
-    fun strengthenCoefficients(problem: Problem, cancellation: Cancellation = Cancellation.Never): PassDelta {
+    fun strengthenCoefficients(
+        problem: Problem,
+        cancellation: Cancellation = Cancellation.Never,
+        domains: Array<IntDomain> = problem.requireFiniteIntDomains(),
+    ): PassDelta {
         val dropped = IntArrayList()
         val added = ArrayList<Factor>()
         var infeasible = false
@@ -48,7 +52,7 @@ internal object CoefficientStrengthening {
             val factor = factors[i]
             // An equality whose coefficient GCD does not divide its bound can never hold; replace it by
             // an explicit contradiction (the original is redundant once the problem is infeasible).
-            val contradiction = equalityContradiction(factor, problem.requireFiniteIntDomains())
+            val contradiction = equalityContradiction(factor, domains)
             if (contradiction != null) {
                 dropped.add(i)
                 added.addAll(contradiction)
@@ -57,7 +61,7 @@ internal object CoefficientStrengthening {
             }
             val rewritten = when {
                 factor is Linear && factor.integerConstants != null ->
-                    strengthenLinear(factor, problem.requireFiniteIntDomains())
+                    strengthenLinear(factor, domains)
 
                 factor is PseudoBoolean -> strengthenPb(factor)
 

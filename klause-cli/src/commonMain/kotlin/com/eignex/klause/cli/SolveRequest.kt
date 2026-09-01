@@ -3,7 +3,6 @@ package com.eignex.klause.cli
 import com.eignex.klause.formats.flatzinc.FlatZincSearchHints
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.DefinitionalSweep
-import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective
@@ -75,7 +74,7 @@ internal class Solvable(
     )
 
     /** Finite CP problem. */
-    val problem: BakedProblem? get() = finite?.problem
+    val problem: Problem? get() = finite?.problem
     val optimize: Boolean get() = finite?.optimize ?: false
     val maximize: Boolean get() = finite?.maximize ?: false
     val lsObjective: IncrementalObjective? get() = finite?.localSearchObjective
@@ -84,7 +83,7 @@ internal class Solvable(
     val definitionalSweep: DefinitionalSweep? get() = finite?.definitionalSweep
     val searchHints: FlatZincSearchHints? get() = finite?.searchHints
     val finiteShape: FiniteSolveShape get() = requireNotNull(finite) { "open model was not materialized" }
-    val finiteProblem: BakedProblem get() = requireNotNull(problem) { "open model was not materialized" }
+    val finiteProblem: Problem get() = requireNotNull(problem) { "open model was not materialized" }
 }
 
 private fun Problem.finiteSolveShape(
