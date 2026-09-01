@@ -425,10 +425,7 @@ private fun FactorRow.truthUnder(bools: IntArray): Boolean? = if (activator == F
 private sealed interface ExactLiraReduction {
     data object Infeasible : ExactLiraReduction
 
-    class Bounded(
-        val system: ExactMixedEchelonHermite,
-        val bounds: ExactMixedTriangularBounds,
-    ) : ExactLiraReduction
+    class Bounded(val system: ExactMixedEchelonHermite, val bounds: ExactMixedTriangularBounds) : ExactLiraReduction
 
     data object NoConclusion : ExactLiraReduction
 }
@@ -481,7 +478,14 @@ private class ExactLiraReductionCache(private val model: Problem) {
                     ExactLiraReduction.NoConclusion
                 } else {
                     val bounds = exactMixedTriangularBounds(transformed)
-                    if (bounds.inconsistent) ExactLiraReduction.Infeasible else ExactLiraReduction.Bounded(transformed, bounds)
+                    if (bounds.inconsistent) {
+                        ExactLiraReduction.Infeasible
+                    } else {
+                        ExactLiraReduction.Bounded(
+                            transformed,
+                            bounds,
+                        )
+                    }
                 }
             }
         }
