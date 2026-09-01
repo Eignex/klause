@@ -45,6 +45,21 @@ class OpenTheoryEngineTest {
     }
 
     @Test
+    fun `open route replans after a source factor rewrite`() {
+        val open = Bits(3).also { bits -> repeat(3) { bits.set(it) } }
+        val model = Problem(
+            numBoolVars = 0,
+            intBounds = IntBounds.fromModelBounds(LongArray(3), LongArray(3), open, open.copy()),
+            factors = arrayOf(
+                Linear(longArrayOf(1, -1, -1), intArrayOf(0, 1, 2), LinearOp.EQ, 0),
+                Linear(longArrayOf(1, 1), intArrayOf(1, 2), LinearOp.LE, 4),
+            ),
+        )
+
+        assertIs<OpenTheoryResult.Sat>(OpenTheoryEngine(model, sourceRoute(model)).solve())
+    }
+
+    @Test
     fun `open route distinguishes external cancellation from a wall timeout`() {
         val openUpper = Bits(1).also { it.set(0) }
         val model = Problem(

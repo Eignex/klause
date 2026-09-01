@@ -11,7 +11,7 @@ private const val PRESOLVE_ABORT_FRACTION = 0.001
 internal object PresolveRoundEngine {
 
     /** The changes made by one bounded pass schedule. */
-    class Result(val fired: List<PresolvePass>, val reconstructs: List<(Sample) -> Sample>)
+    class Result(val fired: List<PresolvePass>, val reconstructs: List<(Sample) -> Sample>, val infeasible: Boolean)
 
     /** Drive [passes] to their bounded fixpoint through the supplied host operations. */
     fun run(
@@ -30,6 +30,7 @@ internal object PresolveRoundEngine {
         val ranAtVersion = HashMap<PresolvePass, Int>()
         val fired = LinkedHashSet<PresolvePass>()
         val exhausted = HashSet<PresolvePass>()
+        var infeasible = false
         var round = 0
         var roundStartComplexity = complexity()
         while (round < maxRounds && !cancellation()) {
@@ -45,6 +46,11 @@ internal object PresolveRoundEngine {
                 val sliced = budget?.let { ctx.withCancellation(sliceOf(it, cancellation, eligible)) } ?: ctx
                 eligible--
                 val delta = pass.apply(input, sliced)
+                if (delta.infeasible) {
+                    fired.add(pass)
+                    infeasible = true
+                    break
+                }
                 if (!delta.isEmpty) {
                     delta.reconstruct?.let(reconstructs::add)
                     applyDelta(delta)
@@ -55,13 +61,14 @@ internal object PresolveRoundEngine {
                 }
                 afterPass(pass)
             }
+            if (infeasible) break
             if (!ranAny) break
             round++
             val reduced = roundStartComplexity - complexity()
             if (reduced > 0 && reduced.toDouble() < PRESOLVE_ABORT_FRACTION * roundStartComplexity) break
             roundStartComplexity = complexity()
         }
-        return Result(fired.toList(), reconstructs)
+        return Result(fired.toList(), reconstructs, infeasible)
     }
 
     /** Compose pass reconstruction functions in reverse application order. */

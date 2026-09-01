@@ -1,7 +1,6 @@
 package com.eignex.klause.presolve.linear
 
 import com.eignex.klause.factor.arithmetic.Linear
-import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.bool.PseudoBoolean
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
@@ -28,8 +27,7 @@ internal object CoefficientStrengthening {
      *  - `Σ aⱼxⱼ ≤ b`  ⟺  `Σ (aⱼ/g)xⱼ ≤ ⌊b/g⌋`
      *  - `Σ aⱼxⱼ ≥ b`  ⟺  `Σ (aⱼ/g)xⱼ ≥ ⌈b/g⌉`
      *  - `Σ aⱼxⱼ = b`: divisible ⟹ `Σ (aⱼ/g)xⱼ = b/g`; otherwise the left-hand side is always a
-     *    multiple of `g` while `b` is not, so the equality is **infeasible** — it is replaced by a
-     *    contradiction the bake propagation reports as `Unsat` (see [equalityContradiction]).
+     *    multiple of `g` while `b` is not, so the equality is **infeasible**.
      *  - `Σ aⱼxⱼ ≠ b`: divisible ⟹ divide; otherwise the constraint is always true and is dropped.
      *
      * Exact (feasible-set-preserving) and it tightens the LP relaxation the bound participates in.
@@ -38,7 +36,7 @@ internal object CoefficientStrengthening {
     fun strengthenCoefficients(
         problem: Problem,
         cancellation: Cancellation = Cancellation.Never,
-        domains: Array<IntDomain> = problem.requireFiniteIntDomains(),
+        domains: Array<IntDomain>? = null,
     ): PassDelta {
         val dropped = IntArrayList()
         val added = ArrayList<Factor>()
@@ -50,14 +48,9 @@ internal object CoefficientStrengthening {
             // partial pass is sound (each rewrite is feasible-set-preserving; the rest stay unstrengthened).
             if ((i and STRENGTHEN_CANCEL_POLL_MASK) == 0 && cancellation()) break
             val factor = factors[i]
-            // An equality whose coefficient GCD does not divide its bound can never hold; replace it by
-            // an explicit contradiction (the original is redundant once the problem is infeasible).
-            val contradiction = equalityContradiction(factor, domains)
-            if (contradiction != null) {
-                dropped.add(i)
-                added.addAll(contradiction)
+            if (indivisibleEquality(factor)) {
                 infeasible = true
-                continue
+                break
             }
             val rewritten = when {
                 factor is Linear && factor.integerConstants != null ->
@@ -74,35 +67,27 @@ internal object CoefficientStrengthening {
                 if (rewritten != null) added.add(rewritten)
             }
         }
-        if (dropped.isEmpty()) return PassDelta()
+        if (dropped.isEmpty()) return PassDelta(infeasible = infeasible)
         return PassDelta(dropped.toIntArray(), added, infeasible = infeasible)
     }
 
     /** Poll the cancellation once per this many strengthened factors (power-of-two mask for a cheap test). */
     private const val STRENGTHEN_CANCEL_POLL_MASK = 0x3FF
 
-    /** The factors that make the model infeasible when [factor] is an equality whose coefficient GCD
-     *  `g > 1` does not divide its bound, else `null`. Such an equality `Σ coeffs·x = b` has a
-     *  left-hand side that is always a multiple of `g`, so it can never equal a non-multiple `b`.
-     *  Replacing the original by a contradiction is sound — an infeasible problem has no solutions
-     *  regardless of which constraint witnesses the conflict. */
-    private fun equalityContradiction(factor: Factor, domains: Array<IntDomain>): List<Factor>? = when (factor) {
+    /** Whether [factor] has an integer equality its coefficient GCD refutes without finite domains. */
+    private fun indivisibleEquality(factor: Factor): Boolean = when (factor) {
         is Linear -> factor.integerConstants.let { row ->
             if (row != null && factor.op == LinearOp.EQ && indivisible(row.coeffs, row.bound)) {
-                intContradiction(factor.vars[0], domains)
+                true
             } else {
-                null
+                false
             }
         }
 
         is PseudoBoolean ->
-            if (factor.op == PbOp.EQ && indivisible(factor.weights, factor.bound)) {
-                boolContradiction(factor.literals[0])
-            } else {
-                null
-            }
+            factor.op == PbOp.EQ && indivisible(factor.weights, factor.bound)
 
-        else -> null
+        else -> false
     }
 
     /** Whether `gcd(|coeffs|) > 1` fails to divide [bound] — the modular obstruction that makes an
@@ -110,22 +95,6 @@ internal object CoefficientStrengthening {
     private fun indivisible(coeffs: LongArray, bound: Long): Boolean {
         val g = PresolveShared.gcdOf(coeffs)
         return g > 1L && bound.mod(g) != 0L
-    }
-
-    /** Two equalities pinning integer variable [v] to consecutive values — jointly unsatisfiable, so
-     *  the bake propagation reports `Unsat`. */
-    private fun intContradiction(v: Int, domains: Array<IntDomain>): List<Factor> {
-        val c = if (domains[v].min < Long.MAX_VALUE) domains[v].min else domains[v].min - 1
-        return listOf(
-            Linear(longArrayOf(1), intArrayOf(v), LinearOp.EQ, c),
-            Linear(longArrayOf(1), intArrayOf(v), LinearOp.EQ, c + 1),
-        )
-    }
-
-    /** A contradictory unit-clause pair on [lit]'s variable — jointly unsatisfiable. */
-    private fun boolContradiction(lit: Int): List<Factor> {
-        val v = Lit.variable(lit)
-        return listOf(Clause(intArrayOf(Lit.make(v, true))), Clause(intArrayOf(Lit.make(v, false))))
     }
 
     /** Relation common to [LinearOp] and [PbOp] so the bound rewrite is written once. */
@@ -149,7 +118,7 @@ internal object CoefficientStrengthening {
         Rel.NE -> if (bound.mod(g) == 0L) Reduced.Bound(bound / g) else Reduced.Drop
     }
 
-    private fun strengthenLinear(factor: Linear, domains: Array<IntDomain>): Factor? {
+    private fun strengthenLinear(factor: Linear, domains: Array<IntDomain>?): Factor? {
         val row = factor.integerConstants ?: return factor
         val g = PresolveShared.gcdOf(row.coeffs)
         val gcdReduced: Linear = if (g <= 1L) {
@@ -168,7 +137,7 @@ internal object CoefficientStrengthening {
                 Reduced.Unchanged -> factor
             }
         }
-        return liftLinear(gcdReduced, domains)
+        return domains?.let { liftLinear(gcdReduced, it) } ?: gcdReduced
     }
 
     /**
