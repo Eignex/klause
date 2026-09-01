@@ -15,7 +15,9 @@ import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertIs
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
@@ -99,7 +101,28 @@ class FinitePipelineTest {
         assertTrue(preparation.presolve?.infeasible == true)
         assertSame(problem, preparation.problem)
         assertFalse(preparation.problem is BakedProblem)
+        assertFailsWith<IllegalArgumentException> { preparation.executableProblem() }
         assertTrue(cancellationPolls > 0)
+    }
+
+    @Test
+    fun `a source model crosses the baked boundary before finite execution`() {
+        val problem = Problem(
+            numBoolVars = 0,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(2), null, null),
+            factors = emptyArray(),
+        )
+
+        val preparation = FinitePipeline.prepare(
+            FinitePipelineRequest(
+                problem = problem,
+                engine = FiniteEngine.BACKTRACK,
+                presolveConfig = PresolveConfig.NONE,
+            ),
+        )
+
+        assertFalse(problem is BakedProblem)
+        assertIs<BakedProblem>(preparation.executableProblem())
     }
 
     @Test
