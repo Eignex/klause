@@ -3,6 +3,7 @@ package com.eignex.klause.presolve
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.presolve.PresolveShared.withPassDelta
+import com.eignex.klause.presolve.PresolveShared.withSourcePassDelta
 import com.eignex.klause.presolve.structural.RedundantConstraints.SubsumeIncremental
 import com.eignex.klause.presolve.structural.RedundantConstraints.SubsumeMemo
 import com.eignex.klause.propagation.PropagationResult
@@ -53,6 +54,44 @@ private fun complexity(problem: Problem): Long {
 
 /** Runs enabled problem-transform passes to a bounded fixpoint. */
 object Presolver {
+
+    /**
+     * Run the factor-only part of presolve over a canonical source model.
+     *
+     * Source passes may inspect declared bounds and factors, but cannot create finite domains, use
+     * propagation, or otherwise cross the deferred baking boundary. The shared round engine keeps their
+     * scheduling and cancellation semantics aligned with the finite lane.
+     */
+    internal fun runSource(
+        problem: Problem,
+        config: PresolveConfig,
+        context: PresolveContext = PresolveContext.EMPTY,
+        cancellation: Cancellation = Cancellation.Never,
+    ): Presolved {
+        val passes = config.problemPasses(context, PresolvePass.Capability.SOURCE)
+        if (passes.isEmpty() || config.emphasis.maxRounds == 0) return Presolved(problem, { it })
+        val ctx = context.withCancellation(cancellation).withPresolveBudget(context.presolveBudget)
+        val host = object : RoundHost {
+            var current = problem
+
+            override fun passInput(): Problem = current
+
+            override fun passContext(pass: PresolvePass): PresolveContext = ctx
+
+            override fun applyDelta(delta: PassDelta) {
+                current = current.withSourcePassDelta(delta)
+            }
+
+            override fun complexity(): Long = current.factors.size.toLong()
+        }
+        val rounds = runRounds(passes, config.emphasis.maxRounds, cancellation, host, ctx.presolveBudget)
+        return Presolved(
+            host.current,
+            composeReconstructs(rounds.reconstructs),
+            rounds.fired,
+            rounds.infeasible,
+        )
+    }
 
     /** Apply [config]'s passes to [problem] under [context], returning the transformed problem and a
      *  reconstruct mapping its solutions back to the original. [cancellation] is polled between passes
@@ -114,7 +153,7 @@ object Presolver {
             host.current,
             composeReconstructs(rounds.reconstructs),
             rounds.fired,
-            host.current.baked is PropagationResult.Unsat,
+            rounds.infeasible || host.current.baked is PropagationResult.Unsat,
         )
     }
 
@@ -202,7 +241,7 @@ object Presolver {
             session.materialize(),
             composeReconstructs(rounds.reconstructs),
             rounds.fired,
-            session.infeasible,
+            rounds.infeasible || session.infeasible,
         )
     }
 
@@ -230,7 +269,11 @@ object Presolver {
 
     /** What a [runRounds] run produced: the passes that changed the problem (first-fire order) and
      *  the per-pass reconstructs in application order. */
-    private class RoundResult(val fired: List<PresolvePass>, val reconstructs: List<(Sample) -> Sample>)
+    private class RoundResult(
+        val fired: List<PresolvePass>,
+        val reconstructs: List<(Sample) -> Sample>,
+        val infeasible: Boolean,
+    )
 
     /**
      * The fixpoint scheduler shared by [run] and [runIncremental], order-identical for
@@ -258,7 +301,7 @@ object Presolver {
         host::applyDelta,
         host::afterPass,
         host::complexity,
-    ).let { RoundResult(it.fired, it.reconstructs) }
+    ).let { RoundResult(it.fired, it.reconstructs, it.infeasible) }
 
     /** Compose per-pass reconstructs (application order) into the single solution-mapping function,
      *  applied in reverse so a final-problem solution maps all the way back to the original. */

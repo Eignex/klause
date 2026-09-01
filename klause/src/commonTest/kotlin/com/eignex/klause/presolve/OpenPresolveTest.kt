@@ -98,6 +98,26 @@ class OpenPresolveTest {
     }
 
     @Test
+    fun `source-safe factor passes run before open bound tightening`() {
+        // z = x + y lets the aggregate pass replace x + y <= 4 with z <= 4 without requiring a
+        // finite CP domain for any column. The rewritten row then closes z's upper side.
+        val spec = fullyOpen(
+            3,
+            row(0 to 1L, 1 to -1L, 2 to -1L, op = LinearOp.EQ, bound = 0L),
+            row(1 to 1L, 2 to 1L, op = LinearOp.LE, bound = 4L),
+        )
+
+        val result = assertIs<OpenPresolveResult.Tightened>(spec.presolveOpen())
+
+        assertTrue(result.factorsChanged, "the source aggregate must be retained")
+        assertEquals(1, result.closedSides)
+        val aggregate = assertIs<Linear>(result.spec.factors.last())
+        assertTrue(aggregate.vars.contentEquals(intArrayOf(0)))
+        assertEquals(4L, aggregate.integerConstants!!.bound)
+        assertEquals(4L, result.spec.intBounds.upper(0))
+    }
+
+    @Test
     fun `inequalities that no bound crosses are refuted by the relaxation`() {
         // x + y <= 5 with x + y >= 10. Every column is open, so no interval propagation moves a bound
         // and no pair ever crosses; the contradiction is only visible to a dual ray.

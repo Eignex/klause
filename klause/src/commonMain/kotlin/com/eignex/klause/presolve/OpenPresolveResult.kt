@@ -23,7 +23,10 @@ sealed interface OpenPresolveResult {
      * @property spec the same model over tighter bounds; every other part of it is carried through.
      * @property closedSides how many open sides the phase proved a bound for.
      */
-    class Tightened(val spec: Problem, val closedSides: Int) : OpenPresolveResult
+    class Tightened(val spec: Problem, val closedSides: Int) : OpenPresolveResult {
+        /** Whether source-safe presolve rewrote factors and invalidated factor ownership. */
+        internal var factorsChanged: Boolean = false
+    }
 
     /**
      * The model has no solution.
@@ -37,9 +40,9 @@ sealed interface OpenPresolveResult {
 /**
  * Presolve a model whose integer sides are open, by proving bounds for them.
  *
- * The finite lane's presolve cannot run here: its passes read finite CP domains, and an open column has
- * none. What an open model can be given is the tightening that closes its sides — optimization-based
- * bound tightening over the unconditional linear rows, behind a feasibility-based interval prefilter.
+ * Source-safe factor passes run here, while finite-domain and root-propagation passes remain behind a
+ * finite projection. The open-specific part closes sides with optimization-based bound tightening over
+ * the unconditional linear rows, behind a feasibility-based interval prefilter.
  *
  * Ahead of that runs an exact refutation over the same rows, in arithmetic that does not wrap. It answers
  * only in the refuting direction, so it costs a bounded pass and can only ever add a verdict.
@@ -57,17 +60,23 @@ sealed interface OpenPresolveResult {
  * through leaves the bounds it had already proved — every one of them sound on its own.
  */
 fun Problem.presolveOpen(cancellation: Cancellation = Cancellation.Never): OpenPresolveResult {
-    val columns = numIntVars
-    if (columns == 0) return OpenPresolveResult.Tightened(this, closedSides = 0)
+    val source = PresolvePipeline.prepareSource(this, cancellation = cancellation)
+    if (source.infeasible) return OpenPresolveResult.Refuted
+    val problem = source.problem
+    val factorsChanged = problem !== this
+    val columns = problem.numIntVars
+    if (columns == 0) return tightened(problem, closedSides = 0, factorsChanged)
     val declared = Array(columns) { v ->
         OpenIntBounds(
-            if (intBounds.hasLower(v)) intBounds.lower(v) else null,
-            if (intBounds.hasUpper(v)) intBounds.upper(v) else null,
+            if (problem.intBounds.hasLower(v)) problem.intBounds.lower(v) else null,
+            if (problem.intBounds.hasUpper(v)) problem.intBounds.upper(v) else null,
         )
     }
-    if (declared.none { it.lo == null || it.hi == null }) return OpenPresolveResult.Tightened(this, closedSides = 0)
+    if (declared.none { it.lo == null || it.hi == null }) {
+        return tightened(problem, closedSides = 0, factorsChanged)
+    }
 
-    val rows = openPresolveRows()
+    val rows = problem.openPresolveRows()
     val intRows = rows.filter { it.realVars.isEmpty() }
     // Exact arithmetic refutes ahead of the tightening below, which reads the same rows in `Long` and
     // `Double`. A coefficient times an open bound is the product that leaves 64 bits, so the systems
@@ -81,8 +90,8 @@ fun Problem.presolveOpen(cancellation: Cancellation = Cancellation.Never): OpenP
         intRows,
         cancellation = cancellation,
         realConstraints = rows.filter { it.realVars.isNotEmpty() },
-        realLower = realLower,
-        realUpper = realUpper,
+        realLower = problem.realLower,
+        realUpper = problem.realUpper,
     )
     if (tightened.refuted) return OpenPresolveResult.Refuted
 
@@ -95,9 +104,12 @@ fun Problem.presolveOpen(cancellation: Cancellation = Cancellation.Never): OpenP
         if (declared[v].lo == null && bounds[v].lo != null) closed++
         if (declared[v].hi == null && bounds[v].hi != null) closed++
     }
-    if (closed == 0) return OpenPresolveResult.Tightened(this, closedSides = 0)
-    return OpenPresolveResult.Tightened(withBounds(bounds), closedSides = closed)
+    if (closed == 0) return tightened(problem, closedSides = 0, factorsChanged)
+    return tightened(problem.withBounds(bounds), closedSides = closed, factorsChanged)
 }
+
+private fun tightened(problem: Problem, closedSides: Int, factorsChanged: Boolean): OpenPresolveResult.Tightened =
+    OpenPresolveResult.Tightened(problem, closedSides).also { it.factorsChanged = factorsChanged }
 
 /** Unconditional integer rows plus the integer rows a root unit clause asserts. */
 private fun Problem.openPresolveRows(): List<Linear> {

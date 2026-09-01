@@ -13,6 +13,44 @@ import com.eignex.klause.util.IntHashSet
 /** Small math and problem-rebuild helpers shared across the presolve passes. */
 internal object PresolveShared {
 
+    /** Apply a factor-only [delta] while retaining the canonical source representation. */
+    fun Problem.withSourcePassDelta(delta: PassDelta): Problem {
+        require(delta.domains == null && delta.reconstruct == null) {
+            "source presolve may only rewrite factors"
+        }
+        if (delta.isEmpty) return this
+        val dropped = if (delta.droppedIndices.isEmpty()) {
+            null
+        } else {
+            IntHashSet().apply { for (index in delta.droppedIndices) add(index) }
+        }
+        val capacity = factors.size - delta.droppedIndices.size + delta.addedFactors.size
+        val kept = ArrayList<Factor>(capacity)
+        val implied = impliedFactorMask?.let { ArrayList<Boolean>(capacity) }
+        for (index in factors.indices) {
+            if (dropped == null || index !in dropped) {
+                kept.add(factors[index])
+                implied?.add(impliedFactorMask[index])
+            }
+        }
+        for (factor in delta.addedFactors) {
+            kept.add(factor)
+            implied?.add(false)
+        }
+        return Problem(
+            numBoolVars = numBoolVars,
+            numIntVars = numIntVars,
+            intColumns = intColumns,
+            factors = kept.toTypedArray(),
+            impliedFactorMask = implied?.toBooleanArray(),
+            hasSymmetryBreaking = hasSymmetryBreaking,
+            numRealVars = numRealVars,
+            realLower = realLower,
+            realUpper = realUpper,
+            modelBounds = intBounds,
+        )
+    }
+
     /**
      * Materialize the problem that results from applying [delta] to [this] — the fresh-path counterpart
      * of [PresolveSession.applyDelta]. The next factor list is [this]'s factors with [PassDelta.droppedIndices]

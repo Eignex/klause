@@ -99,7 +99,15 @@ class PresolveConfig(
 
     /** Problem-transform passes enabled for [context], in priority order. */
     fun problemPasses(context: PresolveContext): List<PresolvePass> =
-        PresolvePass.entries.filter { it.stage == PresolvePass.Stage.PROBLEM && resolved(it, context) }
+        problemPasses(context, PresolvePass.Capability.FINITE)
+
+    /** Problem-transform passes enabled for [context] and available [capability], in priority order. */
+    internal fun problemPasses(context: PresolveContext, capability: PresolvePass.Capability): List<PresolvePass> =
+        PresolvePass.entries.filter {
+            it.stage == PresolvePass.Stage.PROBLEM &&
+                capability.supports(it.capability) &&
+                resolved(it, context)
+        }
 
     /** Disable solution-set-collapsing passes for a pure local-search route. */
     fun forLocalSearch(): PresolveConfig = PresolveConfig(

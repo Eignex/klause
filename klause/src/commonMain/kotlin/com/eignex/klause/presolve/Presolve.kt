@@ -27,6 +27,10 @@ object Presolve {
     /** GCD coefficient strengthening for [com.eignex.klause.factor.arithmetic.Linear] and
      *  pseudo-Boolean constraints. */
     fun strengthenCoefficients(problem: Problem, cancellation: Cancellation = Cancellation.Never): PassDelta =
+        CoefficientStrengthening.strengthenCoefficients(problem, cancellation, problem.requireFiniteIntDomains())
+
+    /** The source-safe GCD part of coefficient strengthening, before finite domains exist. */
+    internal fun strengthenSourceCoefficients(problem: Problem, cancellation: Cancellation): PassDelta =
         CoefficientStrengthening.strengthenCoefficients(problem, cancellation)
 
     internal fun strengthenCoefficients(

@@ -130,7 +130,7 @@ class OpenTheoryEngine internal constructor(
         // Presolve the open sides before the theory sees them. A proved bound narrows the box the theory
         // searches; a refutation here is over the genuinely open ranges, so it refutes the unbounded model
         // rather than an invented box, and is reportable as unsat.
-        val (model, plan) = when (val presolved = presolveOpen(cancellation)) {
+        val (model, plan, route) = when (val presolved = presolveOpen(cancellation)) {
             OpenPresolveResult.Refuted -> return OpenTheoryResult.Unsat(stats.finish(state))
             is OpenPresolveResult.Tightened -> adopt(presolved)
         }
@@ -165,7 +165,7 @@ class OpenTheoryEngine internal constructor(
         )
         return when (val result = planned.session.solve(model.numBoolVars, solveParams)) {
             is SearchResult.Satisfied -> OpenTheoryResult.Sat(
-                assignment(result.model, checkNotNull(planned.theory)),
+                assignment(result.model, checkNotNull(planned.theory), route),
                 stats.finish(state, planned.session),
             )
 
@@ -187,17 +187,25 @@ class OpenTheoryEngine internal constructor(
     /**
      * The model and plan to decide with, given what the tightening proved.
      *
-     * The tighter bounds are always adopted; the plan selected from the declared ones is kept. Ownership
-     * is per column and a bound that shrank cannot change it — a theory that could hold an open column
-     * can hold a narrower one — so the original plan stays valid over the tighter model, and the theory
-     * simply searches a smaller box.
+     * The tighter bounds are always adopted. Bound-only preparation keeps the source plan: ownership is
+     * per column and a theory that could hold an open column can hold a narrower one. Factor rewrites
+     * invalidate its factor-indexed ownership table, so those rebuild the plan from the prepared model.
      *
-     * Re-planning is deliberately not done. Closing every open side makes the model finite, and a finite
-     * model's plan is [ProblemPipeline.FINITE_CP] with no theory component at all; adopting that here
-     * would leave nothing to decide with. Routing such a model to the finite lane is the caller's to do.
+     * Re-planning keeps `preferFinite = false`. Closing every open side must not erase the complete theory
+     * component selected for this invocation; routing a newly finite model to the finite lane remains the
+     * caller's policy decision.
      */
-    private fun adopt(presolved: OpenPresolveResult.Tightened): Pair<Problem, ComponentPlan> =
-        if (presolved.closedSides == 0) model to plan else presolved.spec to plan
+    private fun adopt(presolved: OpenPresolveResult.Tightened): Triple<Problem, ComponentPlan, ProblemPipeline> {
+        if (!presolved.factorsChanged) return Triple(presolved.spec, plan, route)
+        val replanned = presolved.spec.componentPlan()
+        require(
+            replanned.theoryPipeline != ProblemPipeline.FINITE_CP &&
+                replanned.theoryPipeline != ProblemPipeline.UNSUPPORTED_OPEN,
+        ) {
+            "source presolve left the model without an open-theory route"
+        }
+        return Triple(presolved.spec, replanned, replanned.theoryPipeline)
+    }
 
     private fun unknown(
         timedOut: Boolean,
@@ -240,6 +248,7 @@ class OpenTheoryEngine internal constructor(
     private fun assignment(
         model: com.eignex.klause.solver.search.AssembledSearchModel,
         component: Any,
+        route: ProblemPipeline,
     ): OpenTheoryAssignment = when (route) {
         ProblemPipeline.DIFFERENCE_THEORY -> OpenTheoryAssignment.Difference(
             checkNotNull(model.valueOf<Sample>(component)),

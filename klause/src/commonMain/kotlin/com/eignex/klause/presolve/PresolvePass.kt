@@ -16,6 +16,8 @@ private const val IMPLICATION_GRAPH_MAX_CANDIDATES = 2_048
  * @property stage [Stage.PROBLEM] passes are run by the [Presolver] round engine; [Stage.CONSTRUCTION]
  *  passes (SAC probing) are folded into `Problem.baked` at build time; [Stage.EXTERNAL] passes (the LP
  *  harvest) run in the CLI's presolve↔harvest fixpoint — both are only read via [PresolveConfig.resolved].
+ * @property capability the least input representation the pass needs. [Capability.SOURCE] passes may run
+ *  before a finite projection is materialized; [Capability.FINITE] passes require finite-domain state.
  * @property timing cost tier — a [PresolveEmphasis] enables a set of tiers.
  * @property preservesSolutionSet whether the pass leaves the model's solution **set and count**
  *  exactly intact (true), or may alter them (false) — by collapsing the set (e.g. symmetry breaking,
@@ -35,15 +37,26 @@ private const val IMPLICATION_GRAPH_MAX_CANDIDATES = 2_048
 enum class PresolvePass(
     val id: String,
     val stage: Stage,
+    internal val capability: Capability,
     val timing: PresolveTiming,
     val preservesSolutionSet: Boolean,
     val autoEligible: Boolean,
     val skipAfterEmpty: Boolean = false,
 ) {
     /** GCD + bounded-integer coefficient strengthening. */
-    STRENGTHEN_COEFFICIENTS("strengthen", Stage.PROBLEM, PresolveTiming.FAST, true, autoEligible = true) {
-        override fun apply(problem: Problem, ctx: PresolveContext) =
-            Presolve.strengthenCoefficients(problem, ctx.cancellation)
+    STRENGTHEN_COEFFICIENTS(
+        "strengthen",
+        Stage.PROBLEM,
+        Capability.SOURCE,
+        PresolveTiming.FAST,
+        true,
+        autoEligible = true,
+    ) {
+        override fun apply(problem: Problem, ctx: PresolveContext) = if (problem.hasFiniteIntDomains) {
+            Presolve.strengthenCoefficients(problem, ctx.cancellation, problem.requireFiniteIntDomains())
+        } else {
+            Presolve.strengthenSourceCoefficients(problem, ctx.cancellation)
+        }
     },
 
     /** Per-variable modular (Diophantine) bound tightening for integer equalities: `Σ aᵢxᵢ = b` confines
@@ -51,6 +64,7 @@ enum class PresolvePass(
     REDUCE_DIOPHANTINE(
         "diophantine",
         Stage.PROBLEM,
+        Capability.FINITE,
         PresolveTiming.FAST,
         preservesSolutionSet = true,
         autoEligible = true,
@@ -62,6 +76,7 @@ enum class PresolvePass(
     DERIVE_XOR_UNITS(
         "xor-units",
         Stage.PROBLEM,
+        Capability.SOURCE,
         PresolveTiming.FAST,
         true,
         autoEligible = true,
@@ -74,7 +89,14 @@ enum class PresolvePass(
      *  and lower bound that meet (`l = u`) collapse into an equality (which affine elimination then
      *  pivots on), and one that crosses (`l > u`) proves infeasibility. Solution-set exact; runs before
      *  [ELIMINATE_AFFINE_SINGLETONS] so the equalities it mints are available the same round. */
-    FUSE_LINEAR_BOUNDS("fuse-bounds", Stage.PROBLEM, PresolveTiming.FAST, true, autoEligible = true) {
+    FUSE_LINEAR_BOUNDS(
+        "fuse-bounds",
+        Stage.PROBLEM,
+        Capability.SOURCE,
+        PresolveTiming.FAST,
+        true,
+        autoEligible = true,
+    ) {
         override fun apply(problem: Problem, ctx: PresolveContext) = Presolve.fuseLinearBounds(problem)
     },
 
@@ -86,6 +108,7 @@ enum class PresolvePass(
     ELIMINATE_AFFINE_SINGLETONS(
         "affine",
         Stage.PROBLEM,
+        Capability.FINITE,
         PresolveTiming.FAST,
         preservesSolutionSet = false,
         autoEligible = true,
@@ -108,6 +131,7 @@ enum class PresolvePass(
     AGGREGATE_SUB_SUMS(
         "aggregate",
         Stage.PROBLEM,
+        Capability.SOURCE,
         PresolveTiming.MEDIUM,
         preservesSolutionSet = true,
         autoEligible = true,
@@ -118,7 +142,7 @@ enum class PresolvePass(
     /** Constraint subsumption / redundant-constraint removal — drops duplicate factors and
      *  dominated linear inequalities. Runs after the simplifying passes so proportional rows are
      *  already GCD-normalised. */
-    REMOVE_REDUNDANT("subsume", Stage.PROBLEM, PresolveTiming.FAST, true, autoEligible = true) {
+    REMOVE_REDUNDANT("subsume", Stage.PROBLEM, Capability.FINITE, PresolveTiming.FAST, true, autoEligible = true) {
         override fun apply(problem: Problem, ctx: PresolveContext) = RedundantConstraints.removeRedundantConstraints(
             problem,
             ctx.subsumeIncremental as? SubsumeIncremental,
@@ -132,6 +156,7 @@ enum class PresolvePass(
     REDUCE_STRUCTURAL(
         "structural",
         Stage.PROBLEM,
+        Capability.FINITE,
         PresolveTiming.FAST,
         preservesSolutionSet = true,
         autoEligible = true,
@@ -147,6 +172,7 @@ enum class PresolvePass(
     FOLD_COMPARISON_CLAUSES(
         "comparison-clause",
         Stage.PROBLEM,
+        Capability.FINITE,
         PresolveTiming.FAST,
         preservesSolutionSet = false,
         autoEligible = true,
@@ -162,6 +188,7 @@ enum class PresolvePass(
     MERGE_DUPLICATE_COLUMNS(
         "dup-columns",
         Stage.PROBLEM,
+        Capability.FINITE,
         PresolveTiming.FAST,
         preservesSolutionSet = false,
         autoEligible = true,
@@ -177,6 +204,7 @@ enum class PresolvePass(
     PROJECT_SINGLETON_INEQUALITIES(
         "singleton-column",
         Stage.PROBLEM,
+        Capability.FINITE,
         PresolveTiming.FAST,
         preservesSolutionSet = false,
         autoEligible = true,
@@ -189,6 +217,7 @@ enum class PresolvePass(
     BREAK_SYMMETRIES(
         "symmetry",
         Stage.PROBLEM,
+        Capability.FINITE,
         PresolveTiming.MEDIUM,
         preservesSolutionSet = false,
         autoEligible = true,
@@ -208,6 +237,7 @@ enum class PresolvePass(
     VALUE_PRECEDENCE(
         "value-precede",
         Stage.PROBLEM,
+        Capability.FINITE,
         PresolveTiming.MEDIUM,
         preservesSolutionSet = false,
         autoEligible = false,
@@ -219,7 +249,14 @@ enum class PresolvePass(
     /** Dual fixing / dominated-variable reductions — pins a variable to a bound when the
      *  objective and constraint structure guarantee an optimum there. Solution-set altering, so
      *  auto-disabled for solution-set-sensitive queries. */
-    DUAL_FIX("dual-fix", Stage.PROBLEM, PresolveTiming.MEDIUM, preservesSolutionSet = false, autoEligible = true) {
+    DUAL_FIX(
+        "dual-fix",
+        Stage.PROBLEM,
+        Capability.FINITE,
+        PresolveTiming.MEDIUM,
+        preservesSolutionSet = false,
+        autoEligible = true,
+    ) {
         override fun apply(problem: Problem, ctx: PresolveContext) =
             Presolve.fixDominatedVariables(problem, ctx.objectiveIntCoeffs, ctx.objectiveBoolCoeffs)
     },
@@ -229,21 +266,36 @@ enum class PresolvePass(
     PROBE_FAILED_LITERALS(
         "probe-failed-literals",
         Stage.CONSTRUCTION,
+        Capability.FINITE,
         PresolveTiming.EXHAUSTIVE,
         true,
         autoEligible = true,
     ),
 
     /** Construction-time bound SAC. */
-    PROBE_INT_BOUNDS("probe-int-bounds", Stage.CONSTRUCTION, PresolveTiming.EXHAUSTIVE, true, autoEligible = true),
+    PROBE_INT_BOUNDS(
+        "probe-int-bounds",
+        Stage.CONSTRUCTION,
+        Capability.FINITE,
+        PresolveTiming.EXHAUSTIVE,
+        true,
+        autoEligible = true,
+    ),
 
     /** Construction-time interior-hole SAC; implies [PROBE_INT_BOUNDS]. */
-    PROBE_INT_HOLES("probe-int-holes", Stage.CONSTRUCTION, PresolveTiming.EXHAUSTIVE, true, autoEligible = true),
+    PROBE_INT_HOLES(
+        "probe-int-holes",
+        Stage.CONSTRUCTION,
+        Capability.FINITE,
+        PresolveTiming.EXHAUSTIVE,
+        true,
+        autoEligible = true,
+    ),
 
     /** Probing to fixpoint: tentatively pin each free Boolean, propagate, and keep only the
      *  deductions that hold in every solution — failed literals (emitted as unit clauses) and
      *  common-bound tightenings. Solution-preserving, so it needs no objective-variable exclusion. */
-    PROBE("probe", Stage.PROBLEM, PresolveTiming.EXHAUSTIVE, true, autoEligible = true) {
+    PROBE("probe", Stage.PROBLEM, Capability.FINITE, PresolveTiming.EXHAUSTIVE, true, autoEligible = true) {
         override fun apply(problem: Problem, ctx: PresolveContext) =
             Presolve.probe(problem, PROBE_PASS_MAX_CANDIDATES, Cancellation.Never)
     },
@@ -256,6 +308,7 @@ enum class PresolvePass(
     IMPLICATION_GRAPH(
         "impl-graph",
         Stage.PROBLEM,
+        Capability.FINITE,
         PresolveTiming.EXHAUSTIVE,
         preservesSolutionSet = false,
         autoEligible = true,
@@ -275,6 +328,7 @@ enum class PresolvePass(
     ELIMINATE_BOOL_VARS(
         "bve",
         Stage.PROBLEM,
+        Capability.FINITE,
         PresolveTiming.EXHAUSTIVE,
         preservesSolutionSet = false,
         autoEligible = true,
@@ -289,6 +343,7 @@ enum class PresolvePass(
     ELIMINATE_BLOCKED_CLAUSES(
         "bce",
         Stage.PROBLEM,
+        Capability.FINITE,
         PresolveTiming.EXHAUSTIVE,
         preservesSolutionSet = false,
         autoEligible = true,
@@ -303,6 +358,7 @@ enum class PresolvePass(
     MERGE_AMO_CLIQUES(
         "amo-clique",
         Stage.PROBLEM,
+        Capability.FINITE,
         PresolveTiming.MEDIUM,
         preservesSolutionSet = true,
         autoEligible = true,
@@ -322,6 +378,7 @@ enum class PresolvePass(
     SUBSTITUTE_BINARY_COLUMNS(
         "binary-columns",
         Stage.EXTERNAL,
+        Capability.FINITE,
         PresolveTiming.FAST,
         preservesSolutionSet = true,
         autoEligible = true,
@@ -338,6 +395,7 @@ enum class PresolvePass(
     LP_HARVEST(
         "lp-harvest",
         Stage.EXTERNAL,
+        Capability.FINITE,
         PresolveTiming.EXHAUSTIVE,
         preservesSolutionSet = true,
         autoEligible = true,
@@ -351,6 +409,7 @@ enum class PresolvePass(
     POST_DIFFERENCE_SYSTEM(
         "difference-system",
         Stage.EXTERNAL,
+        Capability.FINITE,
         PresolveTiming.FAST,
         preservesSolutionSet = true,
         autoEligible = true,
@@ -376,6 +435,19 @@ enum class PresolvePass(
         /** Run outside [Presolver.run] — by the CLI's presolve↔LP-harvest fixpoint, which alone bridges
          *  to the backtrack-layer LP engine; this enum only carries the config toggle. */
         EXTERNAL,
+    }
+
+    /** Data a pass needs from its input model. */
+    internal enum class Capability {
+        /** Declared bounds and factors only; safe before a finite projection exists. */
+        SOURCE,
+
+        /** Finite CP domains or root-propagation state. */
+        FINITE,
+        ;
+
+        /** Whether this input capability satisfies [required]. */
+        fun supports(required: Capability): Boolean = this == FINITE || required == SOURCE
     }
 
     /** Lookup by serializable [id] and the id listing for spec parsing / errors. */

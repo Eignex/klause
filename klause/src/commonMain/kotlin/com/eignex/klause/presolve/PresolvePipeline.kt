@@ -3,6 +3,7 @@ package com.eignex.klause.presolve
 import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.bounding.LpPlan
+import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.bakeFiniteBounds
 import com.eignex.klause.propagation.difference.withDifferenceSystem
 import com.eignex.klause.solver.Sample
@@ -48,6 +49,25 @@ class PresolveOutcome(
 object PresolvePipeline {
 
     /**
+     * Apply source-safe presolve before either finite materialization or open-theory preparation.
+     *
+     * This is intentionally limited to [PresolvePass.Capability.SOURCE]. Passes that inspect finite
+     * domains or root deductions stay on the finite side of the deferred bake boundary.
+     */
+    internal fun prepareSource(
+        problem: Problem,
+        config: PresolveConfig = PresolveConfig.DEFAULT,
+        linearObjective: LinearObjective? = null,
+        solutionSetSensitive: Boolean = false,
+        cancellation: Cancellation = Cancellation.Never,
+        presolveBudget: PresolveBudget? = null,
+    ): Presolved {
+        val context = PresolveContext.of(linearObjective, solutionSetSensitive, problem.hasSymmetryBreaking)
+            .withPresolveBudget(presolveBudget)
+        return Presolver.runSource(problem, config, context, cancellation)
+    }
+
+    /**
      * Run presolve over [problem] with [config], resolving effort against [linearObjective] and
      * [solutionSetSensitive]. [cancellation] caps every pass and LP solve.
      */
@@ -59,10 +79,23 @@ object PresolvePipeline {
         cancellation: Cancellation = Cancellation.Never,
         presolveBudget: PresolveBudget? = null,
     ): PresolveOutcome {
+        val source = if (problem is BakedProblem) {
+            Presolved(problem, { it })
+        } else {
+            prepareSource(
+                problem,
+                config,
+                linearObjective,
+                solutionSetSensitive,
+                cancellation,
+                presolveBudget,
+            )
+        }
+        val sourceProblem = source.problem
         // Root-bake probing (failed-literal / SAC) runs in the presolve lane via [RootBaker]: resolve it
         // from the config once and thread it through the context so every rebuild re-derives it.
         val bakeConfig = BakeConfig.from(config)
-        val context = PresolveContext.of(linearObjective, solutionSetSensitive, problem.hasSymmetryBreaking)
+        val context = PresolveContext.of(linearObjective, solutionSetSensitive, sourceProblem.hasSymmetryBreaking)
             .withBakeConfig(bakeConfig)
             .withPresolveBudget(presolveBudget)
         // LP-relaxation harvest: fold the LP's proven domain tightenings, redundant-row removals and
@@ -79,12 +112,7 @@ object PresolvePipeline {
         // gcd-indivisible equality is infeasible regardless of the (possibly very wide) variable bounds, so
         // it is caught in O(factors). The bake would otherwise narrow it toward the empty domain one step
         // per round — O(span) on a wide clamped domain — before any pass runs.
-        val strengthenInfeasible = config.resolved(PresolvePass.STRENGTHEN_COEFFICIENTS, context) &&
-            Presolve.strengthenCoefficients(
-                problem,
-                cancellation,
-                problem.finiteIntDomains(),
-            ).infeasible
+        val strengthenInfeasible = source.infeasible
 
         // On a genuinely wide integer domain, the LP relaxation proves global infeasibility (e.g. a
         // difference cycle `x < y ∧ y < x`) in O(one LP solve) — before [RootBaker.reseed]'s bound
@@ -92,9 +120,14 @@ object PresolvePipeline {
         // relaxation straight from the declared domains (no bake fixpoint) and certifies infeasibility via
         // an exact Farkas ray; a true result contains every integer solution, so it is the same verdict the
         // bake would reach. Gated on span so small models never pay the LP.
-        val wideSpan = Presolve.maxIntSpan(problem) > KlauseConfig.current.largeSpanThreshold
+        val wideSpan = Presolve.maxIntSpan(sourceProblem) > KlauseConfig.current.largeSpanThreshold
         val lpInfeasible = !strengthenInfeasible && wideSpan &&
-            lpRootInfeasible(problem, objective, LpPlan(bounding = true), preBakeSlice(cancellation, presolveBudget))
+            lpRootInfeasible(
+                sourceProblem,
+                objective,
+                LpPlan(bounding = true),
+                preBakeSlice(cancellation, presolveBudget),
+            )
         val preBakeInfeasible = strengthenInfeasible || lpInfeasible
 
         // On a wide but feasible domain the LP still can't be skipped like the infeasible case, but its
@@ -103,20 +136,22 @@ object PresolvePipeline {
         // one step per round (O(span)). Solution-set-preserving, so it is sound before the bake. Gated on
         // span so small models never pay the OBBT; skipped when already proven infeasible.
         val prebaked = if (!preBakeInfeasible && wideSpan) {
-            lpRootBounds(problem, objective, LpPlan(bounding = true), preBakeSlice(cancellation, presolveBudget))
+            lpRootBounds(sourceProblem, objective, LpPlan(bounding = true), preBakeSlice(cancellation, presolveBudget))
         } else {
-            problem
+            sourceProblem
         }
 
         // Step 0: run the deferred base bake — fold the root propagation into the domains. A no-op for a
         // directly-constructed (already-baked) problem, so this is where a front-end's deferred base bake
         // actually happens, after the O(one-LP) pre-bake infeasibility/OBBT that must precede it.
         val bakeStart = TimeSource.Monotonic.markNow()
-        val baked = if (preBakeInfeasible) problem else prebaked.bakeFiniteBounds(cancellation)
-        val seeded = if (preBakeInfeasible) problem else RootBaker.reseed(baked, bakeConfig)
+        val baked = if (preBakeInfeasible) sourceProblem else prebaked.bakeFiniteBounds(cancellation)
+        val seeded = if (preBakeInfeasible) sourceProblem else RootBaker.reseed(baked, bakeConfig)
         val bakeElapsed = bakeStart.elapsedNow()
-        val reconstructs = ArrayList<(Sample) -> Sample>() // in application order; round 1 first
+        val reconstructs = ArrayList<(Sample) -> Sample>() // in application order; source preparation first
+        reconstructs.add(source.reconstruct)
         val firedPasses = LinkedHashSet<String>() // pass ids that fired, across all rounds, in first-fire order
+        source.passesFired.forEach { firedPasses.add(it.id) }
         // Pseudo-Boolean lane substitution: a `{0, 1}` integer column becomes a Boolean literal and the rows
         // over such columns become clause / cardinality / pseudo-Boolean factors. It runs ahead of the round
         // engine, on the bake's committed domains — that is what makes the `{0, 1}` columns visible — so
@@ -162,7 +197,7 @@ object PresolvePipeline {
         // === [problem]) nor the probing reseed ([seeded] === [baked]) tightened anything beyond that base
         // fold, report no change and let the caller keep its raw problem — preserving object identity for a
         // genuine no-op presolve, exactly as an already-baked input did before the bake became a fresh type.
-        val onlyBaseBake = current === seeded && prebaked === problem && seeded === baked
+        val onlyBaseBake = current === seeded && prebaked === sourceProblem && seeded === baked
         // The joint difference system is appended here rather than by a round pass: it mentions every
         // variable its edges touch, so between rounds it would hold those variables against affine
         // elimination. After the fixpoint there is no pass left to block.
@@ -172,7 +207,9 @@ object PresolvePipeline {
         } else {
             reduced
         }
-        if ((current === problem || onlyBaseBake) && !infeasible && posted === reduced) {
+        if ((current === sourceProblem || onlyBaseBake) && sourceProblem === problem && !infeasible &&
+            posted === reduced
+        ) {
             // The step-0 bake still ran, and reporting it as zero leaves its cost folded into the phase
             // total. That mis-attribution lands on exactly the runs anyone would investigate, since
             // "presolve changed nothing" is what makes a run interesting in the first place.
