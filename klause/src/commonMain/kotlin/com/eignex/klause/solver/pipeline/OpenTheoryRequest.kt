@@ -1,7 +1,10 @@
 package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.presolve.PresolveBudget
+import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.util.Cancellation
 
 /** A complete open-model solve request selected by the orchestration layer. */
 class OpenTheoryRequest internal constructor(
@@ -13,6 +16,14 @@ class OpenTheoryRequest internal constructor(
     val maximize: Boolean = false,
     /** Source decomposition selected once for this request. */
     internal val componentPlan: ComponentPlan,
+    /** Source-safe presolve configuration. */
+    internal val presolveConfig: PresolveConfig = PresolveConfig.DEFAULT,
+    /** Whether source preparation must preserve the complete solution set. */
+    internal val solutionSetSensitive: Boolean = false,
+    /** Cancellation token for source preparation. */
+    internal val presolveCancellation: Cancellation = Cancellation.Never,
+    /** Optional preparation allowance shared with source passes. */
+    internal val presolveBudget: PresolveBudget? = null,
 ) {
     /** Build a request and select its source decomposition. */
     constructor(
@@ -23,6 +34,23 @@ class OpenTheoryRequest internal constructor(
 
     /** Complete open-theory route selected for [model]. */
     val route: ProblemPipeline get() = componentPlan.theoryPipeline
+
+    /** Return this request with the caller's resolved source-preparation policy. */
+    fun withPresolve(
+        config: PresolveConfig,
+        solutionSetSensitive: Boolean = false,
+        cancellation: Cancellation = Cancellation.Never,
+        budget: PresolveBudget? = null,
+    ): OpenTheoryRequest = OpenTheoryRequest(
+        model,
+        objective,
+        maximize,
+        componentPlan,
+        config,
+        solutionSetSensitive,
+        cancellation,
+        budget,
+    )
 }
 
 /** The common execution result for a complete open-model request. */
@@ -47,11 +75,28 @@ object OpenTheoryPipeline {
         val objective = request.objective
         if (objective == null) {
             return OpenTheoryExecution.Satisfy(
-                OpenTheoryEngine(request.model, request.route, request.componentPlan).solve(params),
+                OpenTheoryEngine(
+                    request.model,
+                    request.route,
+                    request.componentPlan,
+                    request.presolveConfig,
+                    request.solutionSetSensitive,
+                    request.presolveCancellation,
+                    request.presolveBudget,
+                ).solve(params),
             )
         }
         val driven = if (request.maximize) objective.negated() else objective
-        return OpenTheoryExecution.Optimize(OpenTheoryMinimizer(request.model, driven).minimize(params))
+        return OpenTheoryExecution.Optimize(
+            OpenTheoryMinimizer(
+                request.model,
+                driven,
+                request.presolveConfig,
+                request.solutionSetSensitive,
+                request.presolveCancellation,
+                request.presolveBudget,
+            ).minimize(params),
+        )
     }
 }
 

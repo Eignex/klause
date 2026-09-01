@@ -4,11 +4,14 @@ import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.presolve.PresolveBudget
+import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.pipeline.ProblemPipeline
 import com.eignex.klause.solver.pipeline.componentPlan
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
+import com.eignex.klause.util.Cancellation
 import com.ionspin.kotlin.bignum.integer.BigInteger
 
 /**
@@ -64,7 +67,23 @@ sealed interface OpenTheoryOptimum {
  * Neither depends on that row's constant, so re-bounding reuses both instead of re-reading every factor
  * per improvement.
  */
-class OpenTheoryMinimizer(model: Problem, objective: LinearObjective) {
+class OpenTheoryMinimizer internal constructor(
+    model: Problem,
+    objective: LinearObjective,
+    private val presolveConfig: PresolveConfig = PresolveConfig.DEFAULT,
+    private val solutionSetSensitive: Boolean = false,
+    private val presolveCancellation: Cancellation = Cancellation.Never,
+    private val presolveBudget: PresolveBudget? = null,
+) {
+
+    constructor(model: Problem, objective: LinearObjective) : this(
+        model,
+        objective,
+        PresolveConfig.DEFAULT,
+        false,
+        Cancellation.Never,
+        null,
+    )
 
     private val objective = objective
     private val terms: IntArray
@@ -109,7 +128,15 @@ class OpenTheoryMinimizer(model: Problem, objective: LinearObjective) {
         var best: BigInteger? = null
         var spec = base
         while (true) {
-            val result = OpenTheoryEngine(spec, route, plan).solve(params, state)
+            val result = OpenTheoryEngine(
+                spec,
+                route,
+                plan,
+                presolveConfig,
+                solutionSetSensitive,
+                presolveCancellation,
+                presolveBudget,
+            ).solve(params, state)
             when (result) {
                 is OpenTheoryResult.Sat -> {
                     // Nothing to improve on a constant objective: the first witness is already optimal,

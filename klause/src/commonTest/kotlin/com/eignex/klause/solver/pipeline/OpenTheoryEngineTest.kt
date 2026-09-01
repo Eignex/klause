@@ -9,6 +9,7 @@ import com.eignex.klause.formats.smtlib.SmtLib
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.solver.pipeline.sourceRoute
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.search.SearchSession
@@ -57,6 +58,38 @@ class OpenTheoryEngineTest {
         )
 
         assertIs<OpenTheoryResult.Sat>(OpenTheoryEngine(model, sourceRoute(model)).solve())
+    }
+
+    @Test
+    fun `source normalization records the replanned theory backend`() {
+        val openUpper = Bits(2).also { bits -> repeat(2) { bits.set(it) } }
+        val model = Problem(
+            numBoolVars = 0,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(0, 0), LongArray(2), null, openUpper),
+            factors = arrayOf(Linear(longArrayOf(2, 4), intArrayOf(0, 1), LinearOp.NE, 3)),
+        )
+
+        assertEquals(ProblemPipeline.EXACT_LIRA, sourceRoute(model))
+        val result = assertIs<OpenTheoryResult.Sat>(OpenTheoryEngine(model, sourceRoute(model)).solve())
+
+        assertIs<OpenTheoryAssignment.Difference>(result.assignment)
+        assertEquals("difference-theory", result.stats.run.backend)
+    }
+
+    @Test
+    fun `disabled open presolve retains the requested theory route`() {
+        val openUpper = Bits(2).also { bits -> repeat(2) { bits.set(it) } }
+        val model = Problem(
+            numBoolVars = 0,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(0, 0), LongArray(2), null, openUpper),
+            factors = arrayOf(Linear(longArrayOf(2, 4), intArrayOf(0, 1), LinearOp.NE, 3)),
+        )
+
+        val execution = OpenTheoryPipeline.execute(OpenTheoryRequest(model).withPresolve(PresolveConfig.NONE))
+        val result = assertIs<OpenTheoryResult.Sat>(assertIs<OpenTheoryExecution.Satisfy>(execution).result)
+
+        assertIs<OpenTheoryAssignment.ExactLira>(result.assignment)
+        assertEquals("exact-lira", result.stats.run.backend)
     }
 
     @Test

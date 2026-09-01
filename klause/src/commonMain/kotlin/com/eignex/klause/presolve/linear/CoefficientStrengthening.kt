@@ -137,7 +137,7 @@ internal object CoefficientStrengthening {
                 Reduced.Unchanged -> factor
             }
         }
-        return domains?.let { liftLinear(gcdReduced, it) } ?: gcdReduced
+        return if (domains == null) gcdReduced else liftLinear(gcdReduced, domains)
     }
 
     /**

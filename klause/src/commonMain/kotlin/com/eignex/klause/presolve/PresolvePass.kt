@@ -52,11 +52,10 @@ enum class PresolvePass(
         true,
         autoEligible = true,
     ) {
-        override fun apply(problem: Problem, ctx: PresolveContext) = if (problem.hasFiniteIntDomains) {
-            Presolve.strengthenCoefficients(problem, ctx.cancellation, problem.requireFiniteIntDomains())
-        } else {
-            Presolve.strengthenSourceCoefficients(problem, ctx.cancellation)
-        }
+        override fun apply(problem: Problem, ctx: PresolveContext) = Presolve.strengthenCoefficients(
+            problem,
+            ctx.cancellation,
+        )
     },
 
     /** Per-variable modular (Diophantine) bound tightening for integer equalities: `Σ aᵢxᵢ = b` confines

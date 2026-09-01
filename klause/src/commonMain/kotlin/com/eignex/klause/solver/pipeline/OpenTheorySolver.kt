@@ -3,6 +3,8 @@ package com.eignex.klause.solver.pipeline
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.presolve.OpenPresolveResult
+import com.eignex.klause.presolve.PresolveBudget
+import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.presolve.presolveOpen
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.pipeline.ComponentPlan
@@ -99,11 +101,40 @@ class OpenTheoryEngine internal constructor(
     // Selecting the plan reads every factor and builds the theory fragment, which on a large model is
     // most of what a short budget has. Select it once and hand the same plan to every solve.
     private val plan: ComponentPlan,
+    private val presolveConfig: PresolveConfig,
+    private val solutionSetSensitive: Boolean,
+    private val presolveCancellation: Cancellation,
+    private val presolveBudget: PresolveBudget?,
 ) {
     private val model = model
     private val route = route
 
-    constructor(model: Problem, route: ProblemPipeline) : this(model, route, model.componentPlan())
+    constructor(model: Problem, route: ProblemPipeline) : this(
+        model,
+        route,
+        model.componentPlan(),
+        PresolveConfig.DEFAULT,
+        false,
+        Cancellation.Never,
+        null,
+    )
+
+    internal constructor(
+        model: Problem,
+        route: ProblemPipeline,
+        presolveConfig: PresolveConfig,
+        solutionSetSensitive: Boolean,
+        presolveCancellation: Cancellation,
+        presolveBudget: PresolveBudget?,
+    ) : this(
+        model,
+        route,
+        model.componentPlan(),
+        presolveConfig,
+        solutionSetSensitive,
+        presolveCancellation,
+        presolveBudget,
+    )
 
     init {
         require(route != ProblemPipeline.FINITE_CP && route != ProblemPipeline.UNSUPPORTED_OPEN) {
@@ -134,6 +165,7 @@ class OpenTheoryEngine internal constructor(
             OpenPresolveResult.Refuted -> return OpenTheoryResult.Unsat(stats.finish(state))
             is OpenPresolveResult.Tightened -> adopt(presolved)
         }
+        stats.backend = route.backendName()
         val cpDomains = plan.cpIntVars.associateWith { column ->
             IntDomain(model.intBounds.lower(column), model.intBounds.upper(column))
         }
@@ -182,7 +214,12 @@ class OpenTheoryEngine internal constructor(
     }
 
     /** Tighten the open sides under [cancellation]; see [com.eignex.klause.presolve.presolveOpen]. */
-    private fun presolveOpen(cancellation: Cancellation): OpenPresolveResult = model.presolveOpen(cancellation)
+    private fun presolveOpen(cancellation: Cancellation): OpenPresolveResult = model.presolveOpen(
+        presolveConfig,
+        cancellation = Cancellation { presolveCancellation() || cancellation() },
+        presolveBudget = presolveBudget,
+        solutionSetSensitive = solutionSetSensitive,
+    )
 
     /**
      * The model and plan to decide with, given what the tightening proved.

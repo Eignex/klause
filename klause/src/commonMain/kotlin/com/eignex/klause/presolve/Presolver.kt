@@ -70,7 +70,8 @@ object Presolver {
     ): Presolved {
         val passes = config.problemPasses(context, PresolvePass.Capability.SOURCE)
         if (passes.isEmpty() || config.emphasis.maxRounds == 0) return Presolved(problem, { it })
-        val ctx = context.withCancellation(cancellation).withPresolveBudget(context.presolveBudget)
+        val ctx = context.withCancellation(cancellation)
+            .withPresolveBudget(context.presolveBudget)
         val host = object : RoundHost {
             var current = problem
 
@@ -84,7 +85,19 @@ object Presolver {
 
             override fun complexity(): Long = current.factors.size.toLong()
         }
-        val rounds = runRounds(passes, config.emphasis.maxRounds, cancellation, host, ctx.presolveBudget)
+        val rounds = runRounds(
+            passes,
+            config.emphasis.maxRounds,
+            cancellation,
+            host,
+            ctx.presolveBudget,
+        ) { pass, input, passContext ->
+            if (pass == PresolvePass.STRENGTHEN_COEFFICIENTS) {
+                Presolve.strengthenSourceCoefficients(input, passContext.cancellation)
+            } else {
+                pass.apply(input, passContext)
+            }
+        }
         return Presolved(
             host.current,
             composeReconstructs(rounds.reconstructs),
@@ -291,6 +304,9 @@ object Presolver {
         cancellation: Cancellation,
         host: RoundHost,
         budget: PresolveBudget? = null,
+        applyPass: (PresolvePass, Problem, PresolveContext) -> PassDelta = { pass, input, context ->
+            pass.apply(input, context)
+        },
     ): RoundResult = PresolveRoundEngine.run(
         passes,
         maxRounds,
@@ -298,6 +314,7 @@ object Presolver {
         budget,
         host::passInput,
         host::passContext,
+        applyPass,
         host::applyDelta,
         host::afterPass,
         host::complexity,
