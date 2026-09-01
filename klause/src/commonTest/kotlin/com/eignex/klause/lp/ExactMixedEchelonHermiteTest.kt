@@ -1,8 +1,10 @@
 package com.eignex.klause.lp
 
 import com.eignex.klause.simplex.exact.BigFraction
+import com.ionspin.kotlin.bignum.integer.BigInteger
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 class ExactMixedEchelonHermiteTest {
 
@@ -37,6 +39,20 @@ class ExactMixedEchelonHermiteTest {
         assertEquals(source[1].lower * factor, reduced.rows[1].lower)
         assertEquals(source[1].upper * factor, reduced.rows[1].upper)
         assertEquals(activity(source[1], recovered) * factor, activity(reduced.rows[1], transformed))
+    }
+
+    @Test
+    fun `forward substitution detects an affine integer contradiction behind a real pivot`() {
+        val source = listOf(
+            row(mapOf(0 to 1, 1 to 2, 2 to -2), lower = 1, upper = 1),
+            row(mapOf(0 to 1), lower = 0, upper = 0),
+        )
+
+        val reduced = checkNotNull(exactMixedEchelonHermite(source, realColumns = 1, integerColumns = 2))
+        val bounds = exactMixedTriangularBounds(reduced)
+
+        assertTrue(bounds.inconsistent)
+        assertEquals(BigInteger.ONE, bounds.realLower[0]?.num)
     }
 
     private fun row(coefficients: Map<Int, Long>, lower: Long, upper: Long): ExactMixedBoundedRow =
