@@ -42,6 +42,23 @@ class ExactMixedEchelonHermiteTest {
     }
 
     @Test
+    fun `expresses transformed integer coordinates in source integers`() {
+        val source = listOf(row(mapOf(0 to 2, 1 to 3), lower = 0, upper = 0))
+        val reduced = checkNotNull(exactMixedEchelonHermite(source, realColumns = 0, integerColumns = 2))
+        val transformed = listOf(BigFraction.ofLong(5), BigFraction.ofLong(-7))
+        val recovered = reduced.recover(transformed)
+
+        for (integer in 0 until 2) {
+            val value = reduced.transformedIntegerCoefficients(integer).let { row ->
+                row.index.indices.fold(BigFraction.ZERO) { sum, index ->
+                    sum + BigFraction.of(row.value[index], BigInteger.ONE) * recovered[row.index[index]]
+                }
+            }
+            assertEquals(transformed[integer], value)
+        }
+    }
+
+    @Test
     fun `forward substitution detects an affine integer contradiction behind a real pivot`() {
         val source = listOf(
             row(mapOf(0 to 1, 1 to 2, 2 to -2), lower = 1, upper = 1),

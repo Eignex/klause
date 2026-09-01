@@ -31,8 +31,21 @@ internal class ExactMixedEchelonHermite(
     val realColumns: Int,
     val integerColumns: Int,
     private val transform: ExactMixedTransform,
+    private val integerTransform: UnimodularTransform,
 ) {
+    private val integerInverse = integerTransform.inverse()
+
     fun recover(values: List<BigFraction>): List<BigFraction> = transform.recover(values)
+
+    /** Integer source coefficients of one transformed integer coordinate. */
+    fun transformedIntegerCoefficients(integer: Int): SparseIntRow {
+        require(integer in 0 until integerColumns)
+        return sparseIntRow(
+            (0 until integerColumns).mapNotNull { source ->
+                integerInverse[integer, source].takeUnless { it.isZero() }?.let { source to it }
+            }.toMap(),
+        )
+    }
 }
 
 /** Exact ranges implied by a mixed lower-triangular double-bounded system. */
@@ -169,6 +182,7 @@ internal fun exactMixedEchelonHermite(
         realColumns,
         integerColumns,
         transform,
+        hermite.v,
     )
 }
 
