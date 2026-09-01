@@ -7171,9 +7171,13 @@ public final class com/eignex/klause/presolve/OpenPresolveResult$Refuted : com/e
 }
 
 public final class com/eignex/klause/presolve/OpenPresolveResult$Tightened : com/eignex/klause/presolve/OpenPresolveResult {
+	public static final field Companion Lcom/eignex/klause/presolve/OpenPresolveResult$Tightened$Companion;
 	public fun <init> (Lcom/eignex/klause/ir/Problem;I)V
 	public final fun getClosedSides ()I
 	public final fun getSpec ()Lcom/eignex/klause/ir/Problem;
+}
+
+public final class com/eignex/klause/presolve/OpenPresolveResult$Tightened$Companion {
 }
 
 public final class com/eignex/klause/presolve/OpenPresolveResultKt {
@@ -8911,6 +8915,8 @@ public final class com/eignex/klause/solver/pipeline/OpenTheoryRequest {
 	public final fun getModel ()Lcom/eignex/klause/ir/Problem;
 	public final fun getObjective ()Lcom/eignex/klause/solver/objective/LinearObjective;
 	public final fun getRoute ()Lcom/eignex/klause/solver/pipeline/ProblemPipeline;
+	public final fun withPresolve (Lcom/eignex/klause/presolve/PresolveConfig;ZLcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/presolve/PresolveBudget;)Lcom/eignex/klause/solver/pipeline/OpenTheoryRequest;
+	public static synthetic fun withPresolve$default (Lcom/eignex/klause/solver/pipeline/OpenTheoryRequest;Lcom/eignex/klause/presolve/PresolveConfig;ZLcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/presolve/PresolveBudget;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/OpenTheoryRequest;
 }
 
 public abstract interface class com/eignex/klause/solver/pipeline/OpenTheoryResult {

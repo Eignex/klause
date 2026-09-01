@@ -12,6 +12,7 @@ import com.eignex.klause.lp.longOrNull
 import com.eignex.klause.lp.openLpInfeasible
 import com.eignex.klause.lp.structuralIntBounds
 import com.eignex.klause.lp.tightenOpenIntBounds
+import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.Bits
 import com.eignex.klause.util.Cancellation
 
@@ -22,10 +23,21 @@ sealed interface OpenPresolveResult {
      *
      * @property spec the same model over tighter bounds; every other part of it is carried through.
      * @property closedSides how many open sides the phase proved a bound for.
+     * @property factorsChanged whether source-safe presolve rewrote factors and invalidated factor ownership.
      */
-    class Tightened(val spec: Problem, val closedSides: Int) : OpenPresolveResult {
-        /** Whether source-safe presolve rewrote factors and invalidated factor ownership. */
-        internal var factorsChanged: Boolean = false
+    class Tightened private constructor(
+        val spec: Problem,
+        val closedSides: Int,
+        internal val factorsChanged: Boolean = false,
+    ) : OpenPresolveResult {
+        constructor(spec: Problem, closedSides: Int) : this(spec, closedSides, false)
+
+        /** Internal constructors for preparation outcomes. */
+        companion object {
+            /** Build a result that carries a source factor rewrite. */
+            internal fun of(spec: Problem, closedSides: Int, factorsChanged: Boolean): Tightened =
+                Tightened(spec, closedSides, factorsChanged)
+        }
     }
 
     /**
@@ -59,8 +71,26 @@ sealed interface OpenPresolveResult {
  * [cancellation] is polled between variables and threaded into each LP solve, so a budget spent partway
  * through leaves the bounds it had already proved — every one of them sound on its own.
  */
-fun Problem.presolveOpen(cancellation: Cancellation = Cancellation.Never): OpenPresolveResult {
-    val source = PresolvePipeline.prepareSource(this, cancellation = cancellation)
+fun Problem.presolveOpen(cancellation: Cancellation = Cancellation.Never): OpenPresolveResult =
+    presolveOpen(PresolveConfig.DEFAULT, null, false, cancellation, null)
+
+/** Internal open preparation with the caller's resolved source-presolve policy. */
+internal fun Problem.presolveOpen(
+    config: PresolveConfig = PresolveConfig.DEFAULT,
+    linearObjective: LinearObjective? = null,
+    solutionSetSensitive: Boolean = false,
+    cancellation: Cancellation = Cancellation.Never,
+    presolveBudget: PresolveBudget? = null,
+): OpenPresolveResult {
+    val preparationCancellation = Cancellation { cancellation() || presolveBudget?.remaining() == 0L }
+    val source = PresolvePipeline.prepareSource(
+        this,
+        config,
+        linearObjective,
+        solutionSetSensitive,
+        preparationCancellation,
+        presolveBudget,
+    )
     if (source.infeasible) return OpenPresolveResult.Refuted
     val problem = source.problem
     val factorsChanged = problem !== this
@@ -81,21 +111,21 @@ fun Problem.presolveOpen(cancellation: Cancellation = Cancellation.Never): OpenP
     // Exact arithmetic refutes ahead of the tightening below, which reads the same rows in `Long` and
     // `Double`. A coefficient times an open bound is the product that leaves 64 bits, so the systems
     // whose forced values are largest are the ones only this pass reaches.
-    if (exactBoundsInfeasible(declared, intRows, cancellation)) return OpenPresolveResult.Refuted
+    if (exactBoundsInfeasible(declared, intRows, preparationCancellation)) return OpenPresolveResult.Refuted
     // Then the relaxation over the same open ranges. A Farkas ray reaches the systems no bound ever
     // crosses, which is what both the pass above and the tightening below need to conclude anything.
-    if (openLpInfeasible(declared, intRows, cancellation)) return OpenPresolveResult.Refuted
+    if (openLpInfeasible(declared, intRows, preparationCancellation)) return OpenPresolveResult.Refuted
     val tightened = tightenOpenIntBounds(
         declared,
         intRows,
-        cancellation = cancellation,
+        cancellation = preparationCancellation,
         realConstraints = rows.filter { it.realVars.isNotEmpty() },
         realLower = problem.realLower,
         realUpper = problem.realUpper,
     )
     if (tightened.refuted) return OpenPresolveResult.Refuted
 
-    val bounds = fillFromStructure(tightened.bounds, intRows, cancellation)
+    val bounds = fillFromStructure(tightened.bounds, intRows, preparationCancellation)
     // Both a tightened and a structural bound are necessary conditions on their column, so a pair that
     // crosses has no integer point between them — over the open ranges, not inside a box.
     if (bounds.any { crossed(it) }) return OpenPresolveResult.Refuted
@@ -109,7 +139,7 @@ fun Problem.presolveOpen(cancellation: Cancellation = Cancellation.Never): OpenP
 }
 
 private fun tightened(problem: Problem, closedSides: Int, factorsChanged: Boolean): OpenPresolveResult.Tightened =
-    OpenPresolveResult.Tightened(problem, closedSides).also { it.factorsChanged = factorsChanged }
+    OpenPresolveResult.Tightened.of(problem, closedSides, factorsChanged)
 
 /** Unconditional integer rows plus the integer rows a root unit clause asserts. */
 private fun Problem.openPresolveRows(): List<Linear> {

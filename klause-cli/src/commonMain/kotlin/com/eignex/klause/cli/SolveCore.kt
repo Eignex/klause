@@ -69,6 +69,7 @@ internal object SolveCore {
         // engine: an engine-local check leaves the driver re-entering arms that cancel at their first
         // poll, which burns the whole deadline and overshoots the cap several times over.
         val (deadline, deadlineCancel) = deadlineCancellation(common)
+        val (presolveCancel, presolveBudget) = presolveAllowance(common, deadlineCancel, deadline)
         when (val pipeline = rawSolvable.pipeline) {
             is SolvablePipeline.OpenTheory -> {
                 val nodeLimit = takeOpenNodeLimit(common)
@@ -85,7 +86,11 @@ internal object SolveCore {
                     cancellation = deadlineCancel,
                     timeout = deadlineCancel,
                 )
-                val request = pipeline.request
+                val request = pipeline.request.withPresolve(
+                    config,
+                    cancellation = presolveCancel,
+                    budget = presolveBudget,
+                )
                 val objective = request.objective
                 if (objective != null) {
                     output.begin(optimize = true, maximize = request.maximize)
@@ -131,7 +136,6 @@ internal object SolveCore {
         }
         val nodeBudget = takeNodeBudget(common)
         val cancel = nodeBudget?.let { deadlineCancel or Cancellation { it.exhausted() } } ?: deadlineCancel
-        val (presolveCancel, presolveBudget) = presolveAllowance(common, cancel, deadline)
         // `-p N` is MiniZinc-standard parallelism = the **core** count. The portfolio engines
         // (cp/mixed/ls) run sequentially at `-p1` and as a parallel pool at `-pN`. The one naked
         // engine (fixed) is inherently single-core.

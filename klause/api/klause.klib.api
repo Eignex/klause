@@ -2048,6 +2048,8 @@ sealed interface com.eignex.klause.presolve/OpenPresolveResult { // com.eignex.k
             final fun <get-closedSides>(): kotlin/Int // com.eignex.klause.presolve/OpenPresolveResult.Tightened.closedSides.<get-closedSides>|<get-closedSides>(){}[0]
         final val spec // com.eignex.klause.presolve/OpenPresolveResult.Tightened.spec|{}spec[0]
             final fun <get-spec>(): com.eignex.klause.ir/Problem // com.eignex.klause.presolve/OpenPresolveResult.Tightened.spec.<get-spec>|<get-spec>(){}[0]
+
+        final object Companion // com.eignex.klause.presolve/OpenPresolveResult.Tightened.Companion|null[0]
     }
 
     final object Refuted : com.eignex.klause.presolve/OpenPresolveResult { // com.eignex.klause.presolve/OpenPresolveResult.Refuted|null[0]
@@ -9921,6 +9923,8 @@ final class com.eignex.klause.solver.pipeline/OpenTheoryRequest { // com.eignex.
         final fun <get-objective>(): com.eignex.klause.solver.objective/LinearObjective? // com.eignex.klause.solver.pipeline/OpenTheoryRequest.objective.<get-objective>|<get-objective>(){}[0]
     final val route // com.eignex.klause.solver.pipeline/OpenTheoryRequest.route|{}route[0]
         final fun <get-route>(): com.eignex.klause.solver.pipeline/ProblemPipeline // com.eignex.klause.solver.pipeline/OpenTheoryRequest.route.<get-route>|<get-route>(){}[0]
+
+    final fun withPresolve(com.eignex.klause.presolve/PresolveConfig, kotlin/Boolean = ..., com.eignex.klause.util/Cancellation = ..., com.eignex.klause.presolve/PresolveBudget? = ...): com.eignex.klause.solver.pipeline/OpenTheoryRequest // com.eignex.klause.solver.pipeline/OpenTheoryRequest.withPresolve|withPresolve(com.eignex.klause.presolve.PresolveConfig;kotlin.Boolean;com.eignex.klause.util.Cancellation;com.eignex.klause.presolve.PresolveBudget?){}[0]
 }
 
 final class com.eignex.klause.solver.pipeline/OznApplier { // com.eignex.klause.solver.pipeline/OznApplier|null[0]

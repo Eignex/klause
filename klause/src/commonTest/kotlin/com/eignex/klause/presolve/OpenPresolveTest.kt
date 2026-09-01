@@ -11,6 +11,7 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.util.Bits
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
@@ -115,6 +116,20 @@ class OpenPresolveTest {
         assertTrue(aggregate.vars.contentEquals(intArrayOf(0)))
         assertEquals(4L, aggregate.integerConstants!!.bound)
         assertEquals(4L, result.spec.intBounds.upper(0))
+    }
+
+    @Test
+    fun `disabled presolve leaves source factors untouched`() {
+        val spec = fullyOpen(
+            3,
+            row(0 to 1L, 1 to -1L, 2 to -1L, op = LinearOp.EQ, bound = 0L),
+            row(1 to 1L, 2 to 1L, op = LinearOp.LE, bound = 4L),
+        )
+
+        val result = assertIs<OpenPresolveResult.Tightened>(spec.presolveOpen(PresolveConfig.NONE))
+
+        assertFalse(result.factorsChanged)
+        assertEquals(spec.factors.size, result.spec.factors.size)
     }
 
     @Test

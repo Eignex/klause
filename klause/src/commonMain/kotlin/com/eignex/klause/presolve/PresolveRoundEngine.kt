@@ -21,6 +21,7 @@ internal object PresolveRoundEngine {
         budget: PresolveBudget?,
         passInput: () -> Problem,
         passContext: (PresolvePass) -> PresolveContext,
+        applyPass: (PresolvePass, Problem, PresolveContext) -> PassDelta,
         applyDelta: (PassDelta) -> Unit,
         afterPass: (PresolvePass) -> Unit,
         complexity: () -> Long,
@@ -45,7 +46,7 @@ internal object PresolveRoundEngine {
                 val ctx = passContext(pass)
                 val sliced = budget?.let { ctx.withCancellation(sliceOf(it, cancellation, eligible)) } ?: ctx
                 eligible--
-                val delta = pass.apply(input, sliced)
+                val delta = applyPass(pass, input, sliced)
                 if (delta.infeasible) {
                     fired.add(pass)
                     infeasible = true
