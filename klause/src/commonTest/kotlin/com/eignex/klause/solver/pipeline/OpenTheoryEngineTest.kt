@@ -226,6 +226,29 @@ class OpenTheoryEngineTest {
     }
 
     @Test
+    fun `double bounded coordinates extend to an unbounded arbitrary precision witness`() {
+        val parsed = SmtLib.parse(
+            """
+                (set-logic QF_LIA)
+                (declare-const x Int) (declare-const y Int)
+                (assert (= (- x y) 0))
+                (assert (>= y 100000000000000000000))
+                (check-sat)
+            """.trimIndent(),
+        )
+
+        val result = OpenTheoryEngine(parsed.model, sourceRoute(parsed.model)).solve()
+
+        val ints = assertIs<OpenTheoryAssignment.ExactLira>(
+            assertIs<OpenTheoryResult.Sat>(result).assignment,
+        ).assignment.ints
+        val x = ints[parsed.intVarNames.getValue("x")]
+        val y = ints[parsed.intVarNames.getValue("y")]
+        assertEquals(y, x)
+        assertTrue(y >= BigInteger.parseString("100000000000000000000"))
+    }
+
+    @Test
     fun `a finite global alongside an open column routes and answers`() {
         // The chain collapses to an Element, which needs finite domains, while `r` stays open. A
         // whole-model classifier calls that unroutable; ownership per column gives CP the Element and
@@ -351,10 +374,9 @@ class OpenTheoryEngineTest {
     }
 
     @Test
-    fun `a cancelled exact LIRA run reports unknown rather than encoding its whole witness box`() {
-        // Every branch bound carries the witness box's magnitude, and the exact system decomposes each
-        // into base-2^40 digits, one column and row per digit. A stop has to be seen inside that
-        // decomposition, not after it: on an open mixed model the box runs to millions of bits.
+    fun `a cancelled exact LIRA run reports unknown before reduction work`() {
+        // The open model has no finite root box. A stop must be observed before the exact reduction
+        // classifies row directions or materializes its transformed system.
         val parsed = SmtLib.parse(
             """
                 (set-logic QF_LIRA)
