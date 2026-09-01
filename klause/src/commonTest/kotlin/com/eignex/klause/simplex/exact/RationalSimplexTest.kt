@@ -140,6 +140,26 @@ class RationalSimplexTest {
     }
 
     @Test
+    fun `splits coupled rows with ordered positive and negative columns`() {
+        val rows = listOf(
+            ExactRationalInequality(
+                intArrayOf(0, 1),
+                listOf(BigFraction.ONE, BigFraction.ONE),
+                BigFraction.ZERO,
+            ),
+            ExactRationalInequality(
+                intArrayOf(0, 1),
+                listOf(BigFraction.MINUS_ONE, BigFraction.MINUS_ONE),
+                BigFraction.ZERO,
+            ),
+        )
+
+        val split = exactDoubleBoundedSplit(rows, variables = 2)
+
+        assertTrue(split is ExactDoubleBoundedSplit.Split)
+    }
+
+    @Test
     fun `decides a coupled system with non-dyadic coefficients`() {
         // x/3 + y/3 = 1 and x + y <= 2 conflict (x + y must be 3); doubles of 1/3 are exact rationals.
         val third = 1.0 / 3.0
