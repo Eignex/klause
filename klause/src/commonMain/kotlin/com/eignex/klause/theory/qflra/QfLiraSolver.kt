@@ -16,6 +16,8 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.ExactMixedBoundedRow
+import com.eignex.klause.lp.ExactMixedEchelonHermite
+import com.eignex.klause.lp.ExactMixedTriangularBounds
 import com.eignex.klause.lp.engine.LpBuilder
 import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.Relation
@@ -211,11 +213,13 @@ class ExactLiraSearchComponent(
                 decision(current.withDirection(disequality, LinearOp.LE)),
             )
         }
-        if (reduction.reduce(bools, current, Cancellation(context::cancelled)) == ExactLiraReduction.Infeasible) {
+        val reduced = reduction.reduce(bools, current, Cancellation(context::cancelled))
+        if (reduced == ExactLiraReduction.Infeasible) {
             outcome = ComponentCheck.Infeasible()
             return null
         }
-        val leaf = QfLiraSystem(model).build(bools, current, Cancellation(context::cancelled))
+        val effective = (reduced as? ExactLiraReduction.Bounded)?.let(current::withReductionBounds) ?: current
+        val leaf = QfLiraSystem(model).build(bools, effective, Cancellation(context::cancelled))
         if (leaf == null) {
             outcome = ComponentCheck.Indeterminate
             return null
@@ -237,8 +241,8 @@ class ExactLiraSearchComponent(
         val witness = checkNotNull(simplex.witness)
         leaf.gmiCut(
             simplex.tableau,
-        )?.takeUnless { candidate -> current.cuts.any { it.sameAs(candidate) } }?.let { cut ->
-            return listOf(decision(current.withCut(cut)))
+        )?.takeUnless { candidate -> effective.cuts.any { it.sameAs(candidate) } }?.let { cut ->
+            return listOf(decision(effective.withCut(cut)))
         }
         val split = leaf.integerPositive.indices.firstOrNull { integer ->
             !leaf.value(witness, leaf.integerPositive[integer], leaf.integerNegative[integer]).isInteger()
@@ -247,8 +251,8 @@ class ExactLiraSearchComponent(
             val value = leaf.value(witness, leaf.integerPositive[split], leaf.integerNegative[split])
             val floor = value.floor()
             return listOf(
-                decision(current.withBranch(IntegerBranch(split, lower = floor + BigInteger.ONE))),
-                decision(current.withBranch(IntegerBranch(split, upper = floor))),
+                decision(effective.withBranch(IntegerBranch(split, lower = floor + BigInteger.ONE))),
+                decision(effective.withBranch(IntegerBranch(split, upper = floor))),
             )
         }
         assignment = ExactLiraAssignment(
@@ -329,8 +333,10 @@ private class ExactIntegerSearch(
                 stack.addLast(node.withDirection(disequality, LinearOp.LE))
                 continue
             }
-            if (reduction.reduce(bools, node, cancellation) == ExactLiraReduction.Infeasible) continue
-            val leaf = QfLiraSystem(model).build(bools, node, cancellation) ?: return IntegerSearchResult.Cancelled
+            val reduced = reduction.reduce(bools, node, cancellation)
+            if (reduced == ExactLiraReduction.Infeasible) continue
+            val effective = (reduced as? ExactLiraReduction.Bounded)?.let(node::withReductionBounds) ?: node
+            val leaf = QfLiraSystem(model).build(bools, effective, cancellation) ?: return IntegerSearchResult.Cancelled
             val outcome = bigRationalOutcome(leaf.model, cancellation, Int.MAX_VALUE)
             when (outcome.feasibility) {
                 RationalFeasibility.INFEASIBLE -> Unit
@@ -340,9 +346,9 @@ private class ExactIntegerSearch(
                 RationalFeasibility.FEASIBLE -> {
                     val values = checkNotNull(outcome.witness)
                     leaf.gmiCut(outcome.tableau)?.takeUnless { candidate ->
-                        node.cuts.any { existing -> existing.sameAs(candidate) }
+                        effective.cuts.any { existing -> existing.sameAs(candidate) }
                     }?.let { cut ->
-                        stack.addLast(node.withCut(cut))
+                        stack.addLast(effective.withCut(cut))
                         continue
                     }
                     val split = leaf.integerPositive.indices.firstOrNull { integer ->
@@ -375,8 +381,8 @@ private class ExactIntegerSearch(
                     }
                     val value = leaf.value(values, leaf.integerPositive[split], leaf.integerNegative[split])
                     val floor = value.floor()
-                    stack.addLast(node.withBranch(IntegerBranch(split, lower = floor + BigInteger.ONE)))
-                    stack.addLast(node.withBranch(IntegerBranch(split, upper = floor)))
+                    stack.addLast(effective.withBranch(IntegerBranch(split, lower = floor + BigInteger.ONE)))
+                    stack.addLast(effective.withBranch(IntegerBranch(split, upper = floor)))
                 }
             }
         }
@@ -418,6 +424,11 @@ private fun FactorRow.truthUnder(bools: IntArray): Boolean? = if (activator == F
 /** The bounded transformed system proves this Boolean/disjunction leaf impossible. */
 private sealed interface ExactLiraReduction {
     data object Infeasible : ExactLiraReduction
+
+    class Bounded(
+        val system: ExactMixedEchelonHermite,
+        val bounds: ExactMixedTriangularBounds,
+    ) : ExactLiraReduction
 
     data object NoConclusion : ExactLiraReduction
 }
@@ -466,10 +477,11 @@ private class ExactLiraReductionCache(private val model: Problem) {
                     integerColumns = model.numIntVars,
                     cancellation = cancellation,
                 )
-                if (transformed != null && exactMixedTriangularBounds(transformed).inconsistent) {
-                    ExactLiraReduction.Infeasible
-                } else {
+                if (transformed == null) {
                     ExactLiraReduction.NoConclusion
+                } else {
+                    val bounds = exactMixedTriangularBounds(transformed)
+                    if (bounds.inconsistent) ExactLiraReduction.Infeasible else ExactLiraReduction.Bounded(transformed, bounds)
                 }
             }
         }
@@ -625,13 +637,27 @@ private data class ExactLiraReductionKey(
 
 private data class IntegerBranch(val variable: Int, val lower: BigInteger? = null, val upper: BigInteger? = null)
 
+private data class IntegerLinearBranch(
+    val variables: IntArray,
+    val coefficients: Array<BigInteger>,
+    val lower: BigInteger? = null,
+    val upper: BigInteger? = null,
+) {
+    fun sameShape(other: IntegerLinearBranch): Boolean =
+        variables.contentEquals(other.variables) && coefficients.contentEquals(other.coefficients)
+}
+
 private data class SearchNode(
     val branches: List<IntegerBranch> = emptyList(),
+    val transformedBranches: List<IntegerLinearBranch> = emptyList(),
     val comparisonChoices: Map<Int, Int> = emptyMap(),
     val disequalityDirections: Map<Int, LinearOp> = emptyMap(),
     val cuts: List<ExactGmiCut> = emptyList(),
 ) {
     fun withBranch(branch: IntegerBranch): SearchNode = copy(branches = branches + branch)
+
+    fun withTransformedBranch(branch: IntegerLinearBranch): SearchNode =
+        copy(transformedBranches = transformedBranches + branch)
 
     fun withComparison(factor: Int, literal: Int): SearchNode =
         copy(comparisonChoices = comparisonChoices + (factor to literal))
@@ -663,6 +689,19 @@ private data class SearchNode(
         }
         return -1
     }
+}
+
+private fun SearchNode.withReductionBounds(reduction: ExactLiraReduction.Bounded): SearchNode {
+    var bounded = this
+    for (integer in 0 until reduction.system.integerColumns) {
+        val lower = reduction.bounds.integerLower[integer]
+        val upper = reduction.bounds.integerUpper[integer]
+        if (lower == null && upper == null) continue
+        val coefficients = reduction.system.transformedIntegerCoefficients(integer)
+        val branch = IntegerLinearBranch(coefficients.index, coefficients.value, lower, upper)
+        if (bounded.transformedBranches.none { it.sameShape(branch) }) bounded = bounded.withTransformedBranch(branch)
+    }
+    return bounded
 }
 
 private fun SearchNode.withPublishedBounds(
@@ -738,6 +777,39 @@ private class QfLiraSystem(private val model: Problem) {
                 if (!constants.addBound(
                         intsPositive[branch.variable],
                         intsNegative[branch.variable],
+                        Relation.LE,
+                        branch.upper,
+                    )
+                ) {
+                    return null
+                }
+            }
+        }
+        for (branch in node.transformedBranches) {
+            if (cancellation()) return null
+            if (branch.lower != null) {
+                if (!addIntegerCombinationBound(
+                        builder,
+                        intsPositive,
+                        intsNegative,
+                        constants,
+                        branch.variables,
+                        Array(branch.coefficients.size) { index -> branch.coefficients[index].negate() },
+                        Relation.LE,
+                        branch.lower.negate(),
+                    )
+                ) {
+                    return null
+                }
+            }
+            if (branch.upper != null) {
+                if (!addIntegerCombinationBound(
+                        builder,
+                        intsPositive,
+                        intsNegative,
+                        constants,
+                        branch.variables,
+                        branch.coefficients,
                         Relation.LE,
                         branch.upper,
                     )
@@ -903,6 +975,31 @@ private class QfLiraSystem(private val model: Problem) {
         }
         if (!constants.appendConstant(-rhs, columns, values)) return false
         builder.addRealRow(columns.toIntArray(), values.toDoubleArray(), relation(relation), 0.0)
+        return true
+    }
+
+    private fun addIntegerCombinationBound(
+        builder: LpBuilder,
+        positive: IntArray,
+        negative: IntArray,
+        constants: BigConstantEncoder,
+        variables: IntArray,
+        coefficients: Array<BigInteger>,
+        relation: Relation,
+        bound: BigInteger,
+    ): Boolean {
+        val columns = ArrayList<Int>()
+        val values = ArrayList<Double>()
+        for (index in variables.indices) {
+            if (!constants.appendProduct(coefficients[index], positive[variables[index]], columns, values, 1.0)) {
+                return false
+            }
+            if (!constants.appendProduct(coefficients[index], negative[variables[index]], columns, values, -1.0)) {
+                return false
+            }
+        }
+        if (!constants.appendConstant(-bound, columns, values)) return false
+        builder.addRealRow(columns.toIntArray(), values.toDoubleArray(), relation, 0.0)
         return true
     }
 
