@@ -60,6 +60,7 @@ internal fun sparseIntRow(entries: Map<Int, BigInteger>): SparseIntRow {
  */
 internal class UnimodularTransform(val size: Int) {
     private val columns = arrayOfNulls<MutableMap<Int, BigInteger>>(size)
+    private val operations = ArrayList<UnimodularColumnOperation>()
 
     private fun column(j: Int): MutableMap<Int, BigInteger> = columns[j] ?: HashMap<Int, BigInteger>(2)
         .also {
@@ -76,11 +77,13 @@ internal class UnimodularTransform(val size: Int) {
         val cy = column(y)
         columns[x] = cy
         columns[y] = cx
+        operations.add(UnimodularColumnOperation.Swap(x, y))
     }
 
     fun negate(j: Int) {
         val c = column(j)
         for (row in c.keys.toList()) c[row] = -c.getValue(row)
+        operations.add(UnimodularColumnOperation.Negate(j))
     }
 
     /** `column(target) += factor · column(source)`. */
@@ -92,6 +95,22 @@ internal class UnimodularTransform(val size: Int) {
             val next = (dst[row] ?: BigInteger.ZERO) + factor * v
             if (next.isZero()) dst.remove(row) else dst[row] = next
         }
+        operations.add(UnimodularColumnOperation.AddMultiple(target, source, factor))
+    }
+
+    /** The inverse unimodular map, suitable for expressing transformed integer coordinates in source ones. */
+    fun inverse(): UnimodularTransform {
+        val result = UnimodularTransform(size)
+        for (operation in operations.asReversed()) {
+            when (operation) {
+                is UnimodularColumnOperation.Swap -> result.swap(operation.x, operation.y)
+                is UnimodularColumnOperation.Negate -> result.negate(operation.column)
+                is UnimodularColumnOperation.AddMultiple -> {
+                    result.addMultiple(operation.target, operation.source, operation.factor.negate())
+                }
+            }
+        }
+        return result
     }
 
     /** Visit every non-zero `V(row, col)` once, without materialising the untouched identity columns. */
@@ -108,6 +127,14 @@ internal class UnimodularTransform(val size: Int) {
 
     /** Stored non-zeros, counting an untouched identity column as the one entry it stands for. */
     val nonZeroCount: Int get() = (0 until size).sumOf { columns[it]?.size ?: 1 }
+}
+
+private sealed interface UnimodularColumnOperation {
+    data class Swap(val x: Int, val y: Int) : UnimodularColumnOperation
+
+    data class Negate(val column: Int) : UnimodularColumnOperation
+
+    data class AddMultiple(val target: Int, val source: Int, val factor: BigInteger) : UnimodularColumnOperation
 }
 
 /**

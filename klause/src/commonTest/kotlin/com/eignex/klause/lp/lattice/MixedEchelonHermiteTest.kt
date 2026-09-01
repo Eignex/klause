@@ -23,12 +23,26 @@ class MixedEchelonHermiteTest {
         return acc
     }
 
+    private fun apply(transform: UnimodularTransform, point: Array<BigInteger>): Array<BigInteger> {
+        val result = Array(point.size) { BigInteger.ZERO }
+        transform.forEachEntry { row, column, value -> result[row] += value * point[column] }
+        return result
+    }
+
     @Test
     fun `the transform is unimodular so the lattice is preserved`() {
         val r = mixedEchelonHermite(sparseRows(longArrayOf(2, 3)), emptyList(), 2)
         val v = r.transform
         val d = v[0, 0] * v[1, 1] - v[0, 1] * v[1, 0]
         assertTrue(d == BigInteger.ONE || d == BigInteger.ONE.negate(), "det V must be +-1, was $d")
+    }
+
+    @Test
+    fun `the inverse transform recovers transformed integer coordinates`() {
+        val transform = mixedEchelonHermite(sparseRows(longArrayOf(2, 3)), emptyList(), 2).transform
+        val source = apply(transform, vec(5, -7))
+
+        assertEquals(listOf(BigInteger.fromLong(5), BigInteger.fromLong(-7)), apply(transform.inverse(), source).toList())
     }
 
     @Test
