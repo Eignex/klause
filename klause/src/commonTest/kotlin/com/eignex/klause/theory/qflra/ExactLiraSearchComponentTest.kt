@@ -11,6 +11,8 @@ import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchSession
+import com.eignex.klause.theory.TheoryCheck
+import com.eignex.klause.theory.TheoryContext
 import com.eignex.klause.util.Bits
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
@@ -109,6 +111,36 @@ class ExactLiraSearchComponentTest {
         )
     }
 
+    @Test
+    fun `exact solver rejects an unconditional integer equality beyond double precision`() {
+        val model = Problem(
+            numBoolVars = 0,
+            intBounds = openBounds(),
+            factors = arrayOf(
+                Linear(longArrayOf(9_007_199_254_740_993L), intArrayOf(0), LinearOp.EQ, 9_007_199_254_740_992L),
+            ),
+        )
+        assertIs<TheoryCheck.Infeasible>(ExactLiraSolver(model).check(BooleanArray(0), exactContext()))
+    }
+
+    @Test
+    fun `exact solver rejects a decided reified integer equality beyond double precision`() {
+        val model = Problem(
+            numBoolVars = 1,
+            intBounds = openBounds(),
+            factors = arrayOf(
+                ReifiedLinear(
+                    0,
+                    longArrayOf(9_007_199_254_740_993L),
+                    intArrayOf(0),
+                    LinearOp.EQ,
+                    9_007_199_254_740_992L,
+                ),
+            ),
+        )
+        assertIs<TheoryCheck.Infeasible>(ExactLiraSolver(model).check(booleanArrayOf(true), exactContext()))
+    }
+
     private fun partialModel(): Problem = Problem(
         numBoolVars = 2,
         intBounds = openBounds(),
@@ -121,5 +153,11 @@ class ExactLiraSearchComponentTest {
     private fun openBounds(size: Int = 1): IntBounds {
         val open = Bits(size).also { bits -> repeat(size, bits::set) }
         return IntBounds.fromModelBounds(LongArray(size), LongArray(size), open, open)
+    }
+
+    private fun exactContext(): TheoryContext = object : TheoryContext {
+        override fun consumeCheck(): Boolean = true
+
+        override fun cancelled(): Boolean = false
     }
 }

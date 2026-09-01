@@ -548,11 +548,18 @@ private class ExactLiraReductionCache(private val model: Problem) {
 
             is FactorRow.Doubles -> {
                 val terms = HashMap<Int, BigFraction>()
-                for (index in row.intVars.indices) {
-                    terms.add(
-                        model.numRealVars + row.intVars[index],
-                        requireNotNull(BigFraction.ofDouble(row.intCoeffs[index])),
-                    )
+                val integerCoeffs = row.integerCoeffs
+                if (integerCoeffs != null) {
+                    for (index in row.intVars.indices) {
+                        terms.add(model.numRealVars + row.intVars[index], BigFraction.ofLong(integerCoeffs[index]))
+                    }
+                } else {
+                    for (index in row.intVars.indices) {
+                        terms.add(
+                            model.numRealVars + row.intVars[index],
+                            requireNotNull(BigFraction.ofDouble(row.intCoeffs[index])),
+                        )
+                    }
                 }
                 for (index in row.realVars.indices) {
                     terms.add(row.realVars[index], requireNotNull(BigFraction.ofDouble(row.realCoeffs[index])))
@@ -561,7 +568,7 @@ private class ExactLiraReductionCache(private val model: Problem) {
                     rows,
                     terms,
                     actualOp,
-                    requireNotNull(BigFraction.ofDouble(row.bound)),
+                    row.integerBound?.let(BigFraction::ofLong) ?: requireNotNull(BigFraction.ofDouble(row.bound)),
                     actualStrict,
                     direction,
                     row.realVars.isNotEmpty(),
