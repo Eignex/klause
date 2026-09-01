@@ -1207,6 +1207,7 @@ sealed interface com.eignex.klause.factor.arithmetic/FactorRow { // com.eignex.k
 
     final class Doubles : com.eignex.klause.factor.arithmetic/FactorRow { // com.eignex.klause.factor.arithmetic/FactorRow.Doubles|null[0]
         constructor <init>(kotlin/IntArray, kotlin/DoubleArray, kotlin/IntArray, kotlin/DoubleArray, com.eignex.klause.ir/LinearOp, kotlin/Double, kotlin/Boolean, kotlin/Int) // com.eignex.klause.factor.arithmetic/FactorRow.Doubles.<init>|<init>(kotlin.IntArray;kotlin.DoubleArray;kotlin.IntArray;kotlin.DoubleArray;com.eignex.klause.ir.LinearOp;kotlin.Double;kotlin.Boolean;kotlin.Int){}[0]
+        constructor <init>(kotlin/IntArray, kotlin/DoubleArray, kotlin/IntArray, kotlin/DoubleArray, com.eignex.klause.ir/LinearOp, kotlin/Double, kotlin/Boolean, kotlin/Int, kotlin/LongArray?, kotlin/Long?) // com.eignex.klause.factor.arithmetic/FactorRow.Doubles.<init>|<init>(kotlin.IntArray;kotlin.DoubleArray;kotlin.IntArray;kotlin.DoubleArray;com.eignex.klause.ir.LinearOp;kotlin.Double;kotlin.Boolean;kotlin.Int;kotlin.LongArray?;kotlin.Long?){}[0]
 
         final val activator // com.eignex.klause.factor.arithmetic/FactorRow.Doubles.activator|{}activator[0]
             final fun <get-activator>(): kotlin/Int // com.eignex.klause.factor.arithmetic/FactorRow.Doubles.activator.<get-activator>|<get-activator>(){}[0]
@@ -1216,6 +1217,10 @@ sealed interface com.eignex.klause.factor.arithmetic/FactorRow { // com.eignex.k
             final fun <get-intCoeffs>(): kotlin/DoubleArray // com.eignex.klause.factor.arithmetic/FactorRow.Doubles.intCoeffs.<get-intCoeffs>|<get-intCoeffs>(){}[0]
         final val intVars // com.eignex.klause.factor.arithmetic/FactorRow.Doubles.intVars|{}intVars[0]
             final fun <get-intVars>(): kotlin/IntArray // com.eignex.klause.factor.arithmetic/FactorRow.Doubles.intVars.<get-intVars>|<get-intVars>(){}[0]
+        final val integerBound // com.eignex.klause.factor.arithmetic/FactorRow.Doubles.integerBound|{}integerBound[0]
+            final fun <get-integerBound>(): kotlin/Long? // com.eignex.klause.factor.arithmetic/FactorRow.Doubles.integerBound.<get-integerBound>|<get-integerBound>(){}[0]
+        final val integerCoeffs // com.eignex.klause.factor.arithmetic/FactorRow.Doubles.integerCoeffs|{}integerCoeffs[0]
+            final fun <get-integerCoeffs>(): kotlin/LongArray? // com.eignex.klause.factor.arithmetic/FactorRow.Doubles.integerCoeffs.<get-integerCoeffs>|<get-integerCoeffs>(){}[0]
         final val op // com.eignex.klause.factor.arithmetic/FactorRow.Doubles.op|{}op[0]
             final fun <get-op>(): com.eignex.klause.ir/LinearOp // com.eignex.klause.factor.arithmetic/FactorRow.Doubles.op.<get-op>|<get-op>(){}[0]
         final val realCoeffs // com.eignex.klause.factor.arithmetic/FactorRow.Doubles.realCoeffs|{}realCoeffs[0]

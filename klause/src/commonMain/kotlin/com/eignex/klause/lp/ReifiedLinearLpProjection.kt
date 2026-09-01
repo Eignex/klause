@@ -1,7 +1,6 @@
 package com.eignex.klause.lp
 
-import com.eignex.klause.factor.arithmetic.IntegerConstants
-import com.eignex.klause.factor.arithmetic.ReifiedLinear
+import com.eignex.klause.factor.arithmetic.FactorRow
 import com.eignex.klause.factor.arithmetic.internals.predecessorOrNull
 import com.eignex.klause.factor.arithmetic.internals.successorOrNull
 import com.eignex.klause.ir.LinearOp
@@ -10,10 +9,9 @@ import com.eignex.klause.util.addExact
 import com.eignex.klause.util.mulExact
 import com.eignex.klause.util.subExact
 
-internal fun ReifiedLinear.emitLpRelaxation(builder: RelaxationBuilder) {
-    // A wide reified row is excluded from the LP relaxation entirely — no 64-bit reading of it may
-    // enter the LP; its wide propagator is the sole enforcer.
-    val row = integerConstants ?: return
+internal fun FactorRow.Doubles.emitReifiedIntegerLpRelaxation(builder: RelaxationBuilder) {
+    val coeffs = integerCoeffs ?: return
+    val row = IntegerRow(coeffs, requireNotNull(integerBound))
     try {
         if (emitExactBinaryEquality(builder, row)) return
         emitBigMRows(builder, row)
@@ -23,16 +21,16 @@ internal fun ReifiedLinear.emitLpRelaxation(builder: RelaxationBuilder) {
 }
 
 /** Exact convex-hull rows for `aux ⇔ (c·v == bound)` when `v` has a two-value declared domain. */
-private fun ReifiedLinear.emitExactBinaryEquality(builder: RelaxationBuilder, row: IntegerConstants): Boolean {
-    if (op != LinearOp.EQ || vars.size != 1) return false
-    val c = row.coeff(0)
+private fun FactorRow.Doubles.emitExactBinaryEquality(builder: RelaxationBuilder, row: IntegerRow): Boolean {
+    if (op != LinearOp.EQ || intVars.size != 1) return false
+    val c = row.coeffs[0]
     if (c == 0L) return false
-    val dec = builder.declaredDomain(vars[0])
+    val dec = builder.declaredDomain(intVars[0])
     if (dec.valueCount != 2L) return false
     val loValue = mulExact(c, dec.min)
     val hiValue = mulExact(c, dec.max)
-    val vCol = builder.intColumn(vars[0])
-    val auxCol = builder.boolColumn(auxBoolVar)
+    val vCol = builder.intColumn(intVars[0])
+    val auxCol = builder.boolColumn(activator)
     when (row.bound) {
         hiValue -> builder.row(
             intArrayOf(vCol, auxCol),
@@ -53,15 +51,15 @@ private fun ReifiedLinear.emitExactBinaryEquality(builder: RelaxationBuilder, ro
     return true
 }
 
-private fun ReifiedLinear.emitBigMRows(builder: RelaxationBuilder, row: IntegerConstants) {
+private fun FactorRow.Doubles.emitBigMRows(builder: RelaxationBuilder, row: IntegerRow) {
     var lMin = 0L
     var lMax = 0L
     var lMinD = 0L
     var lMaxD = 0L
-    for (k in vars.indices) {
-        val c = row.coeff(k)
-        val dom = builder.liveDomain(vars[k])
-        val dec = builder.declaredDomain(vars[k])
+    for (k in intVars.indices) {
+        val c = row.coeffs[k]
+        val dom = builder.liveDomain(intVars[k])
+        val dec = builder.declaredDomain(intVars[k])
         if (c >= 0L) {
             lMin = addExact(lMin, mulExact(c, dom.min))
             lMax = addExact(lMax, mulExact(c, dom.max))
@@ -74,18 +72,18 @@ private fun ReifiedLinear.emitBigMRows(builder: RelaxationBuilder, row: IntegerC
             lMaxD = addExact(lMaxD, mulExact(c, dec.min))
         }
     }
-    val a = builder.boolColumn(auxBoolVar)
+    val a = builder.boolColumn(activator)
     val b = row.bound
 
     fun emit(auxCoeff: Long, rowOp: LinearOp, rhs: Long, global: Boolean, maxSide: Boolean) {
-        val cols = IntArray(vars.size + 1)
-        val vals = LongArray(vars.size + 1)
-        for (k in vars.indices) {
-            cols[k] = builder.intColumn(vars[k])
-            vals[k] = row.coeff(k)
+        val cols = IntArray(intVars.size + 1)
+        val vals = LongArray(intVars.size + 1)
+        for (k in intVars.indices) {
+            cols[k] = builder.intColumn(intVars[k])
+            vals[k] = row.coeffs[k]
         }
-        cols[vars.size] = a
-        vals[vars.size] = auxCoeff
+        cols[intVars.size] = a
+        vals[intVars.size] = auxCoeff
         builder.bigMRow(cols, vals, rowOp, rhs, global, maxSide)
     }
 
@@ -123,3 +121,5 @@ private fun ReifiedLinear.emitBigMRows(builder: RelaxationBuilder, row: IntegerC
         }
     }
 }
+
+private class IntegerRow(val coeffs: LongArray, val bound: Long)

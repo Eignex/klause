@@ -48,7 +48,35 @@ sealed interface FactorRow {
         val bound: Double,
         override val strict: Boolean,
         override val activator: Int,
-    ) : FactorRow
+        /**
+         * Exact integer coefficients when this is a discrete row. The double view remains available to
+         * exact/open consumers, while a finite LP must retain these values for its integer rows.
+         */
+        val integerCoeffs: LongArray?,
+        /** Exact integer bound when [integerCoeffs] is present. */
+        val integerBound: Long?,
+    ) : FactorRow {
+
+        constructor(
+            intVars: IntArray,
+            intCoeffs: DoubleArray,
+            realVars: IntArray,
+            realCoeffs: DoubleArray,
+            op: LinearOp,
+            bound: Double,
+            strict: Boolean,
+            activator: Int,
+        ) : this(intVars, intCoeffs, realVars, realCoeffs, op, bound, strict, activator, null, null)
+
+        init {
+            require((integerCoeffs == null) == (integerBound == null)) {
+                "exact integer coefficients and bound must be present together"
+            }
+            require(integerCoeffs == null || integerCoeffs.size == intVars.size) {
+                "exact integer coeff/var length mismatch"
+            }
+        }
+    }
 
     /** A row whose constants exceed 64 bits and are carried exactly. */
     class Wide(
@@ -97,6 +125,8 @@ fun Factor.linearRow(): FactorRow? = when (this) {
             c.bound.toDouble(),
             strict = false,
             activator = FactorRow.ALWAYS,
+            integerCoeffs = c.coeffs,
+            integerBound = c.bound,
         )
 
         is RealConstants -> FactorRow.Doubles(
@@ -129,6 +159,8 @@ fun Factor.linearRow(): FactorRow? = when (this) {
             c.bound.toDouble(),
             strict = false,
             activator = auxBoolVar,
+            integerCoeffs = c.coeffs,
+            integerBound = c.bound,
         )
     }
 

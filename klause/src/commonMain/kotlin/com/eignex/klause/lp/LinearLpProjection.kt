@@ -1,68 +1,51 @@
 package com.eignex.klause.lp
 
-import com.eignex.klause.factor.arithmetic.IntegerConstants
+import com.eignex.klause.factor.arithmetic.FactorRow
 import com.eignex.klause.factor.arithmetic.Linear
-import com.eignex.klause.factor.arithmetic.RealConstants
-import com.eignex.klause.factor.arithmetic.WideConstants
+import com.eignex.klause.factor.arithmetic.linearRow
+import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.LinearOp
 import com.ionspin.kotlin.bignum.integer.BigInteger
 import kotlin.math.nextDown
 import kotlin.math.nextUp
 
 internal class LinearLpProjection {
-    private val wideRoundings = HashMap<Linear, WideRoundingResult>()
+    private val wideRoundings = HashMap<Factor, WideRoundingResult>()
 
-    private fun wideRounding(linear: Linear, constants: WideConstants): WideRounding? =
-        wideRoundings.getOrPut(linear) { WideRoundingResult(computeWideRounding(constants)) }.rounding
+    internal val cachedWideRoundingCount: Int get() = wideRoundings.size
 
-    internal fun emitWide(linear: Linear, builder: RelaxationBuilder, constants: WideConstants) {
-        if (linear.op != LinearOp.LE && linear.op != LinearOp.EQ) return
-        linear.emitWideOuterRows(builder, wideRounding(linear, constants))
+    private fun wideRounding(source: Factor, row: FactorRow.Wide): WideRounding? =
+        wideRoundings.getOrPut(source) { WideRoundingResult(computeWideRounding(row)) }.rounding
+
+    internal fun emitWide(source: Factor, row: FactorRow.Wide, builder: RelaxationBuilder) {
+        if (row.op != LinearOp.LE && row.op != LinearOp.EQ) return
+        row.emitWideOuterRows(builder, wideRounding(source, row))
     }
 }
 
 internal fun Linear.emitLpRelaxation(builder: RelaxationBuilder, projection: LinearLpProjection? = null) {
-    when (val c = constants) {
-        is WideConstants -> if (projection == null) {
-            if (op == LinearOp.LE || op == LinearOp.EQ) emitWideOuterRows(builder, computeWideRounding(c))
-        } else {
-            projection.emitWide(this, builder, c)
-        }
-
-        is IntegerConstants -> builder.linearRow(op, vars, c.coeffs, c.bound)
-
-        is RealConstants -> {
-            val cols = IntArray(vars.size + realVars.size)
-            val dcoeffs = DoubleArray(cols.size)
-            for (i in vars.indices) {
-                cols[i] = builder.intColumn(vars[i])
-                dcoeffs[i] = c.intCoefficients.at(i)
-            }
-            for (j in realVars.indices) {
-                cols[vars.size + j] = builder.realColumn(realVars[j])
-                dcoeffs[vars.size + j] = c.realCoefficients.at(j)
-            }
-            builder.realRow(cols, dcoeffs, op, c.bound, c.strict)
-        }
-    }
+    linearRow()?.emitLpRelaxation(builder, projection, this)
 }
 
 /** Emit a wide row as directionally-rounded double outer-relaxation rows. */
-private fun Linear.emitWideOuterRows(builder: RelaxationBuilder, rounded: WideRounding?) {
+internal fun FactorRow.Wide.emitWideLpRelaxation(builder: RelaxationBuilder) =
+    emitWideOuterRows(builder, computeWideRounding(this))
+
+private fun FactorRow.Wide.emitWideOuterRows(builder: RelaxationBuilder, rounded: WideRounding?) {
     rounded ?: return
-    for (i in vars.indices) {
-        val dom = builder.declaredDomain(vars[i])
+    for (i in intVars.indices) {
+        val dom = builder.declaredDomain(intVars[i])
         if (dom.min < 0L && dom.max > 0L && dom.min == Long.MIN_VALUE) return
     }
-    val plusCol = IntArray(vars.size) { -1 }
-    val minusCol = IntArray(vars.size) { -1 }
-    for (i in vars.indices) {
-        val dom = builder.declaredDomain(vars[i])
+    val plusCol = IntArray(intVars.size) { -1 }
+    val minusCol = IntArray(intVars.size) { -1 }
+    for (i in intVars.indices) {
+        val dom = builder.declaredDomain(intVars[i])
         if (dom.min < 0L && dom.max > 0L) {
             val cp = builder.auxColumn(0L, dom.max)
             val cm = builder.auxColumn(0L, -dom.min)
             builder.realRow(
-                intArrayOf(builder.intColumn(vars[i]), cp, cm),
+                intArrayOf(builder.intColumn(intVars[i]), cp, cm),
                 doubleArrayOf(1.0, -1.0, 1.0),
                 LinearOp.EQ,
                 0.0,
@@ -76,7 +59,7 @@ private fun Linear.emitWideOuterRows(builder: RelaxationBuilder, rounded: WideRo
     if (op == LinearOp.EQ) emitWideOuterRow(builder, rounded, ge = true, plusCol, minusCol)
 }
 
-private fun Linear.emitWideOuterRow(
+private fun FactorRow.Wide.emitWideOuterRow(
     builder: RelaxationBuilder,
     rounded: WideRounding,
     ge: Boolean,
@@ -84,11 +67,11 @@ private fun Linear.emitWideOuterRow(
     minusCol: IntArray,
 ) {
     var straddle = 0
-    for (i in vars.indices) if (plusCol[i] >= 0) straddle++
-    val cols = IntArray(vars.size + straddle)
+    for (i in intVars.indices) if (plusCol[i] >= 0) straddle++
+    val cols = IntArray(intVars.size + straddle)
     val dcoeffs = DoubleArray(cols.size)
     var w = 0
-    for (i in vars.indices) {
+    for (i in intVars.indices) {
         if (plusCol[i] >= 0) {
             cols[w] = plusCol[i]
             dcoeffs[w] = if (ge) rounded.ceilCoeffs[i] else rounded.floorCoeffs[i]
@@ -97,9 +80,9 @@ private fun Linear.emitWideOuterRow(
             dcoeffs[w] = if (ge) -rounded.floorCoeffs[i] else -rounded.ceilCoeffs[i]
             w++
         } else {
-            val dom = builder.declaredDomain(vars[i])
+            val dom = builder.declaredDomain(intVars[i])
             val roundDown = (dom.min >= 0L) != ge
-            cols[w] = builder.intColumn(vars[i])
+            cols[w] = builder.intColumn(intVars[i])
             dcoeffs[w] = if (roundDown) rounded.floorCoeffs[i] else rounded.ceilCoeffs[i]
             w++
         }
@@ -117,9 +100,9 @@ private class WideRounding(
     val ceilBound: Double,
 )
 
-private fun computeWideRounding(constants: WideConstants): WideRounding? {
-    val exactBound = constants.bound
-    val exactCoeffs = constants.coefficients.toTypedArray()
+private fun computeWideRounding(row: FactorRow.Wide): WideRounding? {
+    val exactBound = row.bound
+    val exactCoeffs = row.coefficients
     if (!fitsDouble(exactBound) || !exactCoeffs.all { fitsDouble(it) }) return null
     return WideRounding(
         DoubleArray(exactCoeffs.size) { floorToDouble(exactCoeffs[it]) },

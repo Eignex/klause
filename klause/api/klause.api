@@ -1034,10 +1034,13 @@ public final class com/eignex/klause/factor/arithmetic/FactorRow$Companion {
 
 public final class com/eignex/klause/factor/arithmetic/FactorRow$Doubles : com/eignex/klause/factor/arithmetic/FactorRow {
 	public fun <init> ([I[D[I[DLcom/eignex/klause/ir/LinearOp;DZI)V
+	public fun <init> ([I[D[I[DLcom/eignex/klause/ir/LinearOp;DZI[JLjava/lang/Long;)V
 	public fun getActivator ()I
 	public final fun getBound ()D
 	public final fun getIntCoeffs ()[D
 	public fun getIntVars ()[I
+	public final fun getIntegerBound ()Ljava/lang/Long;
+	public final fun getIntegerCoeffs ()[J
 	public fun getOp ()Lcom/eignex/klause/ir/LinearOp;
 	public final fun getRealCoeffs ()[D
 	public fun getRealVars ()[I
