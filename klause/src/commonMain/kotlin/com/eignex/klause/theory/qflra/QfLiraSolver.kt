@@ -15,14 +15,20 @@ import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.lp.ExactMixedBoundedRow
 import com.eignex.klause.lp.engine.LpBuilder
 import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.Relation
 import com.eignex.klause.lp.engine.Sense
+import com.eignex.klause.lp.exactMixedEchelonHermite
+import com.eignex.klause.lp.exactMixedTriangularBounds
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.BigRationalTableauRow
+import com.eignex.klause.simplex.exact.ExactDoubleBoundedSplit
+import com.eignex.klause.simplex.exact.ExactRationalInequality
 import com.eignex.klause.simplex.exact.RationalFeasibility
 import com.eignex.klause.simplex.exact.bigRationalOutcome
+import com.eignex.klause.simplex.exact.exactDoubleBoundedSplit
 import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchBrancher
@@ -105,6 +111,7 @@ class ExactLiraSearchComponent(
             IntegerBranch(integer, lower = -witnessBound, upper = witnessBound)
         },
     )
+    private val reduction = ExactLiraReductionCache(model)
     private val nodesByLevel = MutableIntObjectMap<SearchNode>()
     private var node = root
     private var assignment: ExactLiraAssignment? = null
@@ -204,6 +211,10 @@ class ExactLiraSearchComponent(
                 decision(current.withDirection(disequality, LinearOp.LE)),
             )
         }
+        if (reduction.reduce(bools, current, Cancellation(context::cancelled)) == ExactLiraReduction.Infeasible) {
+            outcome = ComponentCheck.Infeasible()
+            return null
+        }
         val leaf = QfLiraSystem(model).build(bools, current, Cancellation(context::cancelled))
         if (leaf == null) {
             outcome = ComponentCheck.Indeterminate
@@ -289,6 +300,8 @@ private class ExactIntegerSearch(
     private val upperBound: (Int) -> Long?,
     private val emitAssignment: Boolean,
 ) {
+    private val reduction = ExactLiraReductionCache(model)
+
     fun run(): IntegerSearchResult {
         val stack = ArrayDeque<SearchNode>()
         stack.addLast(
@@ -316,6 +329,7 @@ private class ExactIntegerSearch(
                 stack.addLast(node.withDirection(disequality, LinearOp.LE))
                 continue
             }
+            if (reduction.reduce(bools, node, cancellation) == ExactLiraReduction.Infeasible) continue
             val leaf = QfLiraSystem(model).build(bools, node, cancellation) ?: return IntegerSearchResult.Cancelled
             val outcome = bigRationalOutcome(leaf.model, cancellation, Int.MAX_VALUE)
             when (outcome.feasibility) {
@@ -400,6 +414,214 @@ private fun FactorRow.truthUnder(bools: IntArray): Boolean? = if (activator == F
         else -> null
     }
 }
+
+/** The bounded transformed system proves this Boolean/disjunction leaf impossible. */
+private sealed interface ExactLiraReduction {
+    data object Infeasible : ExactLiraReduction
+
+    data object NoConclusion : ExactLiraReduction
+}
+
+/**
+ * Cache the Boolean-leaf Double-Bounded Reduction artefact across integer branch-and-bound nodes.
+ *
+ * Integer branch bounds and cutting planes are deliberately not part of this key: this preflight only
+ * refutes the source leaf, while the subsequent simplex still accounts for branch-local constraints.
+ */
+private class ExactLiraReductionCache(private val model: Problem) {
+    private val results = HashMap<ExactLiraReductionKey, ExactLiraReduction>()
+
+    fun reduce(bools: IntArray, node: SearchNode, cancellation: Cancellation): ExactLiraReduction {
+        val key = ExactLiraReductionKey(
+            bools.toList(),
+            node.comparisonChoices.entries.sortedBy { it.key }.map { it.key to it.value },
+            node.disequalityDirections.entries.sortedBy { it.key }.map { it.key to it.value },
+        )
+        results[key]?.let { return it }
+        val rows = sourceRows(bools, node) ?: return ExactLiraReduction.NoConclusion
+        val result = when (
+            val split = exactDoubleBoundedSplit(
+                rows,
+                model.numRealVars + model.numIntVars,
+                cancellation,
+            )
+        ) {
+            ExactDoubleBoundedSplit.Infeasible -> ExactLiraReduction.Infeasible
+
+            ExactDoubleBoundedSplit.Unknown -> ExactLiraReduction.NoConclusion
+
+            is ExactDoubleBoundedSplit.Split -> {
+                val bounded = split.bounded.map { row ->
+                    ExactMixedBoundedRow(
+                        row.inequality.columns.indices.associate { index ->
+                            row.inequality.columns[index] to row.inequality.coefficients[index]
+                        },
+                        row.lower,
+                        row.inequality.rhs,
+                    )
+                }
+                val transformed = exactMixedEchelonHermite(
+                    bounded,
+                    realColumns = model.numRealVars,
+                    integerColumns = model.numIntVars,
+                    cancellation = cancellation,
+                )
+                if (transformed != null && exactMixedTriangularBounds(transformed).inconsistent) {
+                    ExactLiraReduction.Infeasible
+                } else {
+                    ExactLiraReduction.NoConclusion
+                }
+            }
+        }
+        if (!cancellation()) results[key] = result
+        return result
+    }
+
+    private fun sourceRows(bools: IntArray, node: SearchNode): List<ExactRationalInequality>? {
+        val rows = ArrayList<ExactRationalInequality>()
+        fun add(terms: Map<Int, BigFraction>, rhs: BigFraction, strict: Boolean = false) {
+            val ordered = terms.entries.filter { !it.value.isZero }.sortedBy { it.key }
+            rows.add(
+                ExactRationalInequality(ordered.map { it.key }.toIntArray(), ordered.map { it.value }, rhs, strict),
+            )
+        }
+        fun addLower(column: Int, lower: BigInteger) {
+            add(mapOf(column to BigFraction.MINUS_ONE), BigFraction.of(-lower, BigInteger.ONE))
+        }
+        fun addUpper(column: Int, upper: BigInteger) {
+            add(mapOf(column to BigFraction.ONE), BigFraction.of(upper, BigInteger.ONE))
+        }
+        for (integer in 0 until model.numIntVars) {
+            val column = model.numRealVars + integer
+            model.intBounds.lowerAsBigInteger(integer)?.let { addLower(column, it) }
+            model.intBounds.upperAsBigInteger(integer)?.let { addUpper(column, it) }
+        }
+        for (real in 0 until model.numRealVars) {
+            model.realLower[real].takeIf(Double::isFinite)?.let { lower ->
+                add(mapOf(real to BigFraction.MINUS_ONE), requireNotNull(BigFraction.ofDouble(lower)).negated())
+            }
+            model.realUpper[real].takeIf(Double::isFinite)?.let { upper ->
+                add(mapOf(real to BigFraction.ONE), requireNotNull(BigFraction.ofDouble(upper)))
+            }
+        }
+        for ((index, factor) in model.factors.withIndex()) {
+            when (factor) {
+                is ComparisonClause -> {
+                    val literal = node.comparisonChoices[index] ?: return null
+                    addComparison(rows, factor, literal, node.disequalityDirections[index])
+                }
+
+                else -> {
+                    val row = factor.linearRow() ?: continue
+                    val truth = row.truthUnder(bools) ?: continue
+                    addFactorRow(rows, row, truth, node.disequalityDirections[index])
+                }
+            }
+        }
+        return rows
+    }
+
+    private fun addComparison(
+        rows: MutableList<ExactRationalInequality>,
+        clause: ComparisonClause,
+        literal: Int,
+        direction: LinearOp?,
+    ) {
+        val terms = mapOf(model.numRealVars + clause.vars[literal] to BigFraction.ONE)
+        val bound = BigFraction.ofLong(clause.consts[literal])
+        addRelation(rows, terms, clause.ops[literal], bound, strict = false, direction, hasReals = false)
+    }
+
+    private fun addFactorRow(
+        rows: MutableList<ExactRationalInequality>,
+        row: FactorRow,
+        truth: Boolean,
+        direction: LinearOp?,
+    ) {
+        val actualOp = if (truth) row.op else row.op.complemented()
+        val actualStrict = if (truth) row.strict else !row.strict
+        when (row) {
+            is FactorRow.Wide -> {
+                val terms = HashMap<Int, BigFraction>()
+                for (index in row.intVars.indices) {
+                    terms.add(
+                        model.numRealVars + row.intVars[index],
+                        BigFraction.of(row.coefficients[index], BigInteger.ONE),
+                    )
+                }
+                addRelation(rows, terms, actualOp, BigFraction.of(row.bound, BigInteger.ONE), false, direction, false)
+            }
+
+            is FactorRow.Doubles -> {
+                val terms = HashMap<Int, BigFraction>()
+                for (index in row.intVars.indices) {
+                    terms.add(
+                        model.numRealVars + row.intVars[index],
+                        requireNotNull(BigFraction.ofDouble(row.intCoeffs[index])),
+                    )
+                }
+                for (index in row.realVars.indices) {
+                    terms.add(row.realVars[index], requireNotNull(BigFraction.ofDouble(row.realCoeffs[index])))
+                }
+                addRelation(
+                    rows,
+                    terms,
+                    actualOp,
+                    requireNotNull(BigFraction.ofDouble(row.bound)),
+                    actualStrict,
+                    direction,
+                    row.realVars.isNotEmpty(),
+                )
+            }
+        }
+    }
+
+    private fun addRelation(
+        rows: MutableList<ExactRationalInequality>,
+        terms: Map<Int, BigFraction>,
+        op: LinearOp,
+        bound: BigFraction,
+        strict: Boolean,
+        direction: LinearOp?,
+        hasReals: Boolean,
+    ) {
+        fun add(terms: Map<Int, BigFraction>, bound: BigFraction, strict: Boolean) {
+            val ordered = terms.entries.filter { !it.value.isZero }.sortedBy { it.key }
+            rows.add(
+                ExactRationalInequality(ordered.map { it.key }.toIntArray(), ordered.map { it.value }, bound, strict),
+            )
+        }
+        fun negate(): Map<Int, BigFraction> = terms.mapValues { (_, value) -> value.negated() }
+        when (op) {
+            LinearOp.LE -> add(terms, bound, strict)
+
+            LinearOp.GE -> add(negate(), bound.negated(), strict)
+
+            LinearOp.EQ -> {
+                add(terms, bound, false)
+                add(negate(), bound.negated(), false)
+            }
+
+            LinearOp.NE -> when (requireNotNull(direction) { "exact disequality direction is missing" }) {
+                LinearOp.LE -> add(terms, if (hasReals) bound else bound - BigFraction.ONE, hasReals)
+
+                LinearOp.GE -> add(
+                    negate(),
+                    if (hasReals) bound.negated() else bound.negated() - BigFraction.ONE,
+                    hasReals,
+                )
+
+                else -> error("exact disequality direction must be an inequality")
+            }
+        }
+    }
+}
+
+private data class ExactLiraReductionKey(
+    val bools: List<Int>,
+    val comparisons: List<Pair<Int, Int>>,
+    val directions: List<Pair<Int, LinearOp>>,
+)
 
 private data class IntegerBranch(val variable: Int, val lower: BigInteger? = null, val upper: BigInteger? = null)
 

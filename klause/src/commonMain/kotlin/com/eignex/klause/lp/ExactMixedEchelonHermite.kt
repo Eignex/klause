@@ -35,6 +35,87 @@ internal class ExactMixedEchelonHermite(
     fun recover(values: List<BigFraction>): List<BigFraction> = transform.recover(values)
 }
 
+/** Exact ranges implied by a mixed lower-triangular double-bounded system. */
+internal class ExactMixedTriangularBounds(
+    val realLower: Array<BigFraction?>,
+    val realUpper: Array<BigFraction?>,
+    val integerLower: Array<BigInteger?>,
+    val integerUpper: Array<BigInteger?>,
+) {
+    val inconsistent: Boolean = integerLower.indices.any { index ->
+        val lower = integerLower[index]
+        val upper = integerUpper[index]
+        lower != null && upper != null && lower > upper
+    }
+}
+
+/**
+ * Forward-substitute the transformed double-bounded rows into exact rational and integer ranges.
+ *
+ * Rational pivot columns retain rational bounds. Integer pivot columns use inward rounded division, so
+ * an empty integer interval is an exact refutation rather than a relaxation artefact. A zero column is
+ * deliberately left open: it belongs to the DBR extension lane and is not searched by the bounded phase.
+ */
+internal fun exactMixedTriangularBounds(system: ExactMixedEchelonHermite): ExactMixedTriangularBounds {
+    val realLower = arrayOfNulls<BigFraction>(system.realColumns)
+    val realUpper = arrayOfNulls<BigFraction>(system.realColumns)
+    val integerLower = arrayOfNulls<BigInteger>(system.integerColumns)
+    val integerUpper = arrayOfNulls<BigInteger>(system.integerColumns)
+    for (row in system.rows) {
+        val pivot = row.coefficients.keys.maxOrNull() ?: continue
+        var restLower: BigFraction? = BigFraction.ZERO
+        var restUpper: BigFraction? = BigFraction.ZERO
+        for ((column, coefficient) in row.coefficients) {
+            if (column >= pivot) continue
+            val (lower, upper) = if (column < system.realColumns) {
+                realLower[column] to realUpper[column]
+            } else {
+                val integer = column - system.realColumns
+                integerLower[integer]?.let { BigFraction.of(it, BigInteger.ONE) } to
+                    integerUpper[integer]?.let { BigFraction.of(it, BigInteger.ONE) }
+            }
+            val termLower = if (coefficient > BigFraction.ZERO) lower?.times(coefficient) else upper?.times(coefficient)
+            val termUpper = if (coefficient > BigFraction.ZERO) upper?.times(coefficient) else lower?.times(coefficient)
+            restLower = if (restLower == null || termLower == null) null else restLower + termLower
+            restUpper = if (restUpper == null || termUpper == null) null else restUpper + termUpper
+        }
+        val productLower = restUpper?.let { row.lower - it }
+        val productUpper = restLower?.let { row.upper - it }
+        val coefficient = checkNotNull(row.coefficients[pivot])
+        if (pivot < system.realColumns) {
+            val (lower, upper) = divideRange(productLower, productUpper, coefficient)
+            realLower[pivot] = lower
+            realUpper[pivot] = upper
+        } else {
+            val (lower, upper) = divideRange(productLower, productUpper, coefficient)
+            val integer = pivot - system.realColumns
+            integerLower[integer] = lower?.ceil()
+            integerUpper[integer] = upper?.floor()
+        }
+    }
+    return ExactMixedTriangularBounds(realLower, realUpper, integerLower, integerUpper)
+}
+
+private fun divideRange(
+    lower: BigFraction?,
+    upper: BigFraction?,
+    coefficient: BigFraction,
+): Pair<BigFraction?, BigFraction?> = if (coefficient > BigFraction.ZERO) {
+    lower?.times(coefficient.reciprocal()) to upper?.times(coefficient.reciprocal())
+} else {
+    upper?.times(coefficient.reciprocal()) to lower?.times(coefficient.reciprocal())
+}
+
+private fun BigFraction.floor(): BigInteger {
+    val quotient = num / den
+    return if (num < BigInteger.ZERO && num % den != BigInteger.ZERO) quotient - BigInteger.ONE else quotient
+}
+
+private fun BigFraction.ceil(): BigInteger {
+    val quotient = num / den
+    return if (num > BigInteger.ZERO && num % den != BigInteger.ZERO) quotient + BigInteger.ONE else quotient
+}
+
 /**
  * Transform a double-bounded mixed system to an echelon rational block and a Hermite integer tail.
  *

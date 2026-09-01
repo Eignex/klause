@@ -78,7 +78,7 @@ class ExactLiraSearchComponentTest {
     }
 
     @Test
-    fun `affine ray remains indeterminate when strict rows exhaust the split budget`() {
+    fun `strict affine ray is refuted without exhausting the split budget`() {
         val model = Problem(
             numBoolVars = 3,
             intBounds = openBounds(2),
@@ -104,7 +104,7 @@ class ExactLiraSearchComponentTest {
         assertIs<ComponentResult.Consistent>(session.initialize())
         assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, positive = true))))
 
-        assertIs<ComponentResult.Indeterminate>(
+        assertIs<ComponentResult.Conflict>(
             session.push(SearchDecision.Bool(Lit.make(0, positive = true))),
         )
     }
