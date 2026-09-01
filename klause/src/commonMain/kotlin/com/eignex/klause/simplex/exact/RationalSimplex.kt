@@ -141,6 +141,15 @@ internal interface ExactSimplexModel {
     val probeClampedHi: BooleanArray
     val doubleView: ExactSimplexDoubleView?
 
+    /**
+     * Optional arbitrary-precision input view.  The ordinary LP engine provides either its compact
+     * integer columns or a double view; reduction kernels use this view when a source coefficient or
+     * bound does not fit either representation.  It deliberately lives at the exact-simplex boundary
+     * so callers do not have to smuggle big coefficients through a floating point relaxation.
+     */
+    val bigView: ExactSimplexBigView?
+        get() = null
+
     fun forEachExactColumn(j: Int, action: (row: Int, value: Long) -> Unit)
 
     fun loShiftD(j: Int): Double
@@ -154,6 +163,141 @@ internal interface ExactSimplexDoubleView {
     val rhs: DoubleArray
     val upper: DoubleArray
     val hasUpper: BooleanArray
+}
+
+/** Arbitrary-precision counterpart of [ExactSimplexDoubleView]. */
+internal class ExactSimplexBigView(
+    val colPtr: IntArray,
+    val rowIdx: IntArray,
+    val colVal: List<BigFraction>,
+    val rhs: List<BigFraction>,
+    val upper: List<BigFraction?>,
+)
+
+/** One exact `a*x <= rhs` row for the unshifted non-negative simplex form. */
+internal class ExactRationalInequality(
+    val columns: IntArray,
+    val coefficients: List<BigFraction>,
+    val rhs: BigFraction,
+    val strict: Boolean = false,
+) {
+    init {
+        require(columns.size == coefficients.size) { "exact row columns and coefficients differ in size" }
+        for (index in 1 until columns.size) {
+            require(columns[index - 1] < columns[index]) { "exact row columns must be strictly ascending" }
+        }
+    }
+}
+
+/**
+ * Exact arbitrary-precision feasibility model with non-negative structural columns.
+ *
+ * Free source variables are represented by callers as a positive and a negative column.  Keeping this
+ * representation explicit makes homogeneous direction tests exact even for coefficients larger than a
+ * machine word, and avoids introducing a numeric probe while classifying bounded rows.
+ */
+internal class ExactRationalFeasibilityModel(
+    override val n: Int,
+    rows: List<ExactRationalInequality>,
+    structuralUpper: List<BigFraction?> = List(n) { null },
+) : ExactSimplexModel {
+    override val m: Int = rows.size
+    override val numVars: Int = n + m
+    override val rhs: LongArray = LongArray(m)
+    override val upper: LongArray = LongArray(numVars)
+    override val hasUpper: BooleanArray = BooleanArray(numVars)
+    override val rowStrict: BooleanArray = BooleanArray(m) { rows[it].strict }
+    override val probeClampedLo: BooleanArray = BooleanArray(n)
+    override val probeClampedHi: BooleanArray = BooleanArray(n)
+    override val doubleView: ExactSimplexDoubleView? = null
+
+    override val bigView: ExactSimplexBigView
+
+    init {
+        require(structuralUpper.size == n) { "exact structural upper bounds differ from variable count" }
+        val counts = IntArray(n)
+        for (row in rows) {
+            for (column in row.columns) {
+                require(column in 0 until n) { "exact row column $column is outside 0 until $n" }
+                counts[column]++
+            }
+        }
+        val colPtr = IntArray(n + 1)
+        for (column in 0 until n) colPtr[column + 1] = colPtr[column] + counts[column]
+        val next = colPtr.copyOf()
+        val rowIdx = IntArray(colPtr[n])
+        val colVal = MutableList(colPtr[n]) { BigFraction.ZERO }
+        for ((rowIndex, row) in rows.withIndex()) {
+            for (entry in row.columns.indices) {
+                val at = next[row.columns[entry]]++
+                rowIdx[at] = rowIndex
+                colVal[at] = row.coefficients[entry]
+            }
+        }
+        bigView = ExactSimplexBigView(
+            colPtr,
+            rowIdx,
+            colVal,
+            rows.map(ExactRationalInequality::rhs),
+            structuralUpper + List(m) { null },
+        )
+    }
+
+    override fun forEachExactColumn(j: Int, action: (row: Int, value: Long) -> Unit) = Unit
+
+    override fun loShiftD(j: Int): Double = 0.0
+}
+
+/**
+ * Classify the row directions that are bounded by an exact homogeneous cone.
+ *
+ * A row `a*x <= b` has a finite lower activity bound precisely when the recession cone contains no
+ * direction `d` with `a*d < 0`.  Since the cone is rational and homogeneous, such a direction exists
+ * exactly when `A*d <= 0` together with `a*d <= -1` is feasible.  The test therefore needs no numeric
+ * search radius and remains valid for coefficients and rational literals of arbitrary precision.
+ *
+ * Strictness is intentionally ignored here: it changes feasible offsets, not the recession cone.  A
+ * `null` result means cancellation or an interrupted exact simplex run; callers must keep the source
+ * system rather than treating an undecided direction as bounded.
+ */
+internal fun exactBoundedRows(
+    rows: List<ExactRationalInequality>,
+    variables: Int,
+    cancellation: Cancellation = Cancellation.Never,
+): BooleanArray? {
+    val bounded = BooleanArray(rows.size)
+    for (target in rows.indices) {
+        if (cancellation()) return null
+        val coneRows = ArrayList<ExactRationalInequality>(rows.size + 1)
+        for (row in rows) coneRows.add(row.homogeneousOverSplit(variables, BigFraction.ZERO))
+        coneRows.add(rows[target].homogeneousOverSplit(variables, BigFraction.MINUS_ONE))
+        when (
+            bigRationalOutcome(
+                ExactRationalFeasibilityModel(2 * variables, coneRows),
+                cancellation,
+                Int.MAX_VALUE,
+            ).feasibility
+        ) {
+            RationalFeasibility.INFEASIBLE -> bounded[target] = true
+            RationalFeasibility.FEASIBLE -> Unit
+            RationalFeasibility.UNKNOWN -> return null
+        }
+    }
+    return bounded
+}
+
+private fun ExactRationalInequality.homogeneousOverSplit(variables: Int, rhs: BigFraction): ExactRationalInequality {
+    val splitColumns = IntArray(2 * columns.size)
+    val splitCoefficients = ArrayList<BigFraction>(2 * columns.size)
+    for (index in columns.indices) {
+        val variable = columns[index]
+        require(variable in 0 until variables) { "exact row column $variable is outside 0 until $variables" }
+        splitColumns[2 * index] = variable
+        splitColumns[2 * index + 1] = variables + variable
+        splitCoefficients.add(coefficients[index])
+        splitCoefficients.add(coefficients[index].negated())
+    }
+    return ExactRationalInequality(splitColumns, splitCoefficients, rhs)
 }
 
 internal fun rationalFeasible(
@@ -251,15 +395,26 @@ private fun unknownOutcome(): RationalOutcome = RationalOutcome(RationalFeasibil
 private fun <F> buildState(ops: FracOps<F>, model: ExactSimplexModel): SimplexState<F>? {
     val m = model.m
     val dv = model.doubleView
+    val bv = model.bigView
     val tab = SparseTableau(ops, m, model.numVars)
     val counts = IntArray(m)
-    if (dv != null) {
+    if (bv != null) {
+        for (j in 0 until model.n) for (p in bv.colPtr[j] until bv.colPtr[j + 1]) counts[bv.rowIdx[p]]++
+    } else if (dv != null) {
         for (j in 0 until model.n) for (p in dv.colPtr[j] until dv.colPtr[j + 1]) counts[dv.rowIdx[p]]++
     } else {
         for (j in 0 until model.n) model.forEachExactColumn(j) { i, _ -> counts[i]++ }
     }
     for (i in 0 until m) tab.reserveRow(i, counts[i] + 1)
-    if (dv != null) {
+    if (bv != null) {
+        if (ops !== BigFracOps) return null
+        for (j in 0 until model.n) {
+            for (p in bv.colPtr[j] until bv.colPtr[j + 1]) {
+                @Suppress("UNCHECKED_CAST")
+                tab.append(bv.rowIdx[p], j, bv.colVal[p] as F)
+            }
+        }
+    } else if (dv != null) {
         for (j in 0 until model.n) {
             for (p in dv.colPtr[j] until dv.colPtr[j + 1]) {
                 tab.append(dv.rowIdx[p], j, ops.ofDouble(dv.colVal[p]) ?: return null)
@@ -275,11 +430,28 @@ private fun <F> buildState(ops: FracOps<F>, model: ExactSimplexModel): SimplexSt
     val rhsA = MutableList(m) { ops.zero }
     val rhsD = MutableList(m) { ops.zero }
     for (i in 0 until m) {
-        rhsA[i] = if (dv != null) ops.ofDouble(dv.rhs[i]) ?: return null else ops.ofLong(model.rhs[i])
+        rhsA[i] = when {
+            bv != null -> {
+                if (ops !== BigFracOps) return null
+                @Suppress("UNCHECKED_CAST")
+                bv.rhs[i] as F
+            }
+
+            dv != null -> ops.ofDouble(dv.rhs[i]) ?: return null
+
+            else -> ops.ofLong(model.rhs[i])
+        }
         if (model.rowStrict[i]) rhsD[i] = ops.minusOne
     }
     val uppers = MutableList<F?>(model.numVars) { null }
     for (j in 0 until model.numVars) {
+        if (bv != null) {
+            if (ops !== BigFracOps) return null
+            @Suppress("UNCHECKED_CAST")
+            val upper = bv.upper[j] as F?
+            uppers[j] = upper
+            continue
+        }
         if (!model.hasUpper[j]) continue
         uppers[j] = if (dv != null) ops.ofDouble(dv.upper[j]) ?: return null else ops.ofLong(model.upper[j])
     }
