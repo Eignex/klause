@@ -207,7 +207,7 @@ internal interface RelaxationDomains {
  *  and every Boolean free. Reads endpoints only, so building a relaxation from it never triggers the
  *  O(domain span) bake fixpoint a [PropagationSession] runs on construction. */
 internal class RootDomains(private val problem: Problem) : RelaxationDomains {
-    override fun intDomain(varId: Int): IntDomain = problem.requireFiniteIntDomains()[varId]
+    override fun intDomain(varId: Int): IntDomain = problem.finiteIntDomain(varId)
     override fun boolValue(varId: Int): Boolean? = null
     override val honorsOpenSides: Boolean get() = true
 }

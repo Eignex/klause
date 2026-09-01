@@ -62,24 +62,12 @@ class ComponentPlan internal constructor(
     val hasTheoryComponent: Boolean get() =
         intOwners.any { it == IntVariableOwner.THEORY } || factorOwners.any { it == FactorOwner.THEORY }
 
-    /** Build the full finite, root-propagated projection selected for a bounded route. */
-    fun finiteProjection(spec: Problem, cpDomains: Map<Int, IntDomain>): BakedProblem {
+    /** Verify that this plan can hand the whole canonical model to finite preparation. */
+    internal fun requireFullFiniteProjection(spec: Problem) {
         require(!hasTheoryComponent && cpIntVars.size == spec.numIntVars) {
             "a full finite projection requires every integer column to be CP-owned"
         }
         requireBelongsTo(spec)
-        return BakedProblem(
-            numBoolVars = spec.numBoolVars,
-            numIntVars = spec.numIntVars,
-            intDomains = sourceDomains(cpDomains, cpIntVars),
-            factors = spec.factors,
-            impliedFactorMask = spec.impliedFactorMask,
-            hasSymmetryBreaking = spec.hasSymmetryBreaking,
-            numRealVars = spec.numRealVars,
-            realLower = spec.realLower,
-            realUpper = spec.realUpper,
-            modelBounds = spec.intBounds,
-        )
     }
 
     /** Build the compact finite problem owned by the CP component. */

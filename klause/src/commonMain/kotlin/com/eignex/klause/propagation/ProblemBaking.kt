@@ -1,7 +1,6 @@
 package com.eignex.klause.propagation
 
 import com.eignex.klause.ir.Factor
-import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.util.Cancellation
 
@@ -49,12 +48,7 @@ fun Problem.bake(cancellation: Cancellation = Cancellation.Never): BakedProblem 
  */
 fun Problem.bakeFiniteBounds(cancellation: Cancellation = Cancellation.Never): BakedProblem {
     if (this is BakedProblem) return this
-    val domains = intColumns.allFiniteOrNull() ?: Array(numIntVars) { variable ->
-        require(intBounds.hasLower(variable) && intBounds.hasUpper(variable)) {
-            "integer column $variable is open and needs an explicit finite search domain"
-        }
-        IntDomain(intBounds.lower(variable), intBounds.upper(variable))
-    }
+    val domains = finiteIntDomains()
     return BakedProblem(
         numBoolVars = numBoolVars,
         numIntVars = numIntVars,

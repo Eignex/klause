@@ -91,7 +91,7 @@ fun lpRootBounds(
     )
     val shaved = engine.rootLpBoundsNoBake(cancellation)
     if (shaved.isEmpty()) return problem
-    val domains = problem.requireFiniteIntDomains().copyOf()
+    val domains = problem.finiteIntDomains()
     for (sb in shaved) domains[sb.varId] = domains[sb.varId].withMinAtLeast(sb.lo).withMaxAtMost(sb.hi)
     return Problem(
         numBoolVars = problem.numBoolVars,

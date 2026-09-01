@@ -83,6 +83,18 @@ open class Problem(
         "finite CP state requested for a problem with symbolic integer columns"
     }
 
+    /** Finite declared domain of [v], materialized from model bounds when no CP domain exists yet. */
+    internal fun finiteIntDomain(v: Int): IntDomain = intDomainOrNull(v) ?: run {
+        require(intBounds.hasLower(v) && intBounds.hasUpper(v)) {
+            "integer column $v has an open side and cannot enter finite preparation"
+        }
+        IntDomain(intBounds.lower(v), intBounds.upper(v))
+    }
+
+    /** Finite declared domains without running root propagation. */
+    internal fun finiteIntDomains(): Array<IntDomain> =
+        intColumns.allFiniteOrNull()?.copyOf() ?: Array(numIntVars, ::finiteIntDomain)
+
     /**
      * Model-level bounds of the integer columns. Unlike [requireFiniteIntDomains], either side may be absent when
      * the finite search domain was closed by an invented fallback bound. Consumers that reason over

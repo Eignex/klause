@@ -2331,16 +2331,16 @@ sealed interface com.eignex.klause.solver.pipeline/OpenTheoryResult { // com.eig
 
 sealed interface com.eignex.klause.solver.pipeline/SourceProblemRoute { // com.eignex.klause.solver.pipeline/SourceProblemRoute|null[0]
     final class Finite : com.eignex.klause.solver.pipeline/SourceProblemRoute { // com.eignex.klause.solver.pipeline/SourceProblemRoute.Finite|null[0]
-        constructor <init>(com.eignex.klause.propagation/BakedProblem, com.eignex.klause.solver.pipeline/ComponentPlan) // com.eignex.klause.solver.pipeline/SourceProblemRoute.Finite.<init>|<init>(com.eignex.klause.propagation.BakedProblem;com.eignex.klause.solver.pipeline.ComponentPlan){}[0]
+        constructor <init>(com.eignex.klause.ir/Problem, com.eignex.klause.solver.pipeline/ComponentPlan) // com.eignex.klause.solver.pipeline/SourceProblemRoute.Finite.<init>|<init>(com.eignex.klause.ir.Problem;com.eignex.klause.solver.pipeline.ComponentPlan){}[0]
 
         final val componentPlan // com.eignex.klause.solver.pipeline/SourceProblemRoute.Finite.componentPlan|{}componentPlan[0]
             final fun <get-componentPlan>(): com.eignex.klause.solver.pipeline/ComponentPlan // com.eignex.klause.solver.pipeline/SourceProblemRoute.Finite.componentPlan.<get-componentPlan>|<get-componentPlan>(){}[0]
         final val problem // com.eignex.klause.solver.pipeline/SourceProblemRoute.Finite.problem|{}problem[0]
-            final fun <get-problem>(): com.eignex.klause.propagation/BakedProblem // com.eignex.klause.solver.pipeline/SourceProblemRoute.Finite.problem.<get-problem>|<get-problem>(){}[0]
+            final fun <get-problem>(): com.eignex.klause.ir/Problem // com.eignex.klause.solver.pipeline/SourceProblemRoute.Finite.problem.<get-problem>|<get-problem>(){}[0]
 
-        final fun component1(): com.eignex.klause.propagation/BakedProblem // com.eignex.klause.solver.pipeline/SourceProblemRoute.Finite.component1|component1(){}[0]
+        final fun component1(): com.eignex.klause.ir/Problem // com.eignex.klause.solver.pipeline/SourceProblemRoute.Finite.component1|component1(){}[0]
         final fun component2(): com.eignex.klause.solver.pipeline/ComponentPlan // com.eignex.klause.solver.pipeline/SourceProblemRoute.Finite.component2|component2(){}[0]
-        final fun copy(com.eignex.klause.propagation/BakedProblem = ..., com.eignex.klause.solver.pipeline/ComponentPlan = ...): com.eignex.klause.solver.pipeline/SourceProblemRoute.Finite // com.eignex.klause.solver.pipeline/SourceProblemRoute.Finite.copy|copy(com.eignex.klause.propagation.BakedProblem;com.eignex.klause.solver.pipeline.ComponentPlan){}[0]
+        final fun copy(com.eignex.klause.ir/Problem = ..., com.eignex.klause.solver.pipeline/ComponentPlan = ...): com.eignex.klause.solver.pipeline/SourceProblemRoute.Finite // com.eignex.klause.solver.pipeline/SourceProblemRoute.Finite.copy|copy(com.eignex.klause.ir.Problem;com.eignex.klause.solver.pipeline.ComponentPlan){}[0]
         final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.pipeline/SourceProblemRoute.Finite.equals|equals(kotlin.Any?){}[0]
         final fun hashCode(): kotlin/Int // com.eignex.klause.solver.pipeline/SourceProblemRoute.Finite.hashCode|hashCode(){}[0]
         final fun toString(): kotlin/String // com.eignex.klause.solver.pipeline/SourceProblemRoute.Finite.toString|toString(){}[0]
@@ -9664,7 +9664,6 @@ final class com.eignex.klause.solver.pipeline/ComponentPlan { // com.eignex.klau
 
     final fun cpProjection(com.eignex.klause.ir/Problem, kotlin.collections/Map<kotlin/Int, com.eignex.klause.ir/IntDomain>): com.eignex.klause.solver.pipeline/CpProblemProjection // com.eignex.klause.solver.pipeline/ComponentPlan.cpProjection|cpProjection(com.eignex.klause.ir.Problem;kotlin.collections.Map<kotlin.Int,com.eignex.klause.ir.IntDomain>){}[0]
     final fun factorOwner(kotlin/Int): com.eignex.klause.solver.pipeline/FactorOwner // com.eignex.klause.solver.pipeline/ComponentPlan.factorOwner|factorOwner(kotlin.Int){}[0]
-    final fun finiteProjection(com.eignex.klause.ir/Problem, kotlin.collections/Map<kotlin/Int, com.eignex.klause.ir/IntDomain>): com.eignex.klause.propagation/BakedProblem // com.eignex.klause.solver.pipeline/ComponentPlan.finiteProjection|finiteProjection(com.eignex.klause.ir.Problem;kotlin.collections.Map<kotlin.Int,com.eignex.klause.ir.IntDomain>){}[0]
     final fun intOwner(kotlin/Int): com.eignex.klause.solver.pipeline/IntVariableOwner // com.eignex.klause.solver.pipeline/ComponentPlan.intOwner|intOwner(kotlin.Int){}[0]
     final fun theoryFragment(com.eignex.klause.ir/Problem): com.eignex.klause.ir/Problem // com.eignex.klause.solver.pipeline/ComponentPlan.theoryFragment|theoryFragment(com.eignex.klause.ir.Problem){}[0]
 }
@@ -9689,7 +9688,7 @@ final class com.eignex.klause.solver.pipeline/EngineParams { // com.eignex.klaus
 }
 
 final class com.eignex.klause.solver.pipeline/FinitePipelinePreparation { // com.eignex.klause.solver.pipeline/FinitePipelinePreparation|null[0]
-    constructor <init>(com.eignex.klause.propagation/BakedProblem, com.eignex.klause.solver.objective/LinearObjective?, kotlin/Function1<com.eignex.klause.solver/Sample, com.eignex.klause.solver/Sample>, com.eignex.klause.solver.result/PresolveStats?, kotlin.time/Duration = ...) // com.eignex.klause.solver.pipeline/FinitePipelinePreparation.<init>|<init>(com.eignex.klause.propagation.BakedProblem;com.eignex.klause.solver.objective.LinearObjective?;kotlin.Function1<com.eignex.klause.solver.Sample,com.eignex.klause.solver.Sample>;com.eignex.klause.solver.result.PresolveStats?;kotlin.time.Duration){}[0]
+    constructor <init>(com.eignex.klause.ir/Problem, com.eignex.klause.solver.objective/LinearObjective?, kotlin/Function1<com.eignex.klause.solver/Sample, com.eignex.klause.solver/Sample>, com.eignex.klause.solver.result/PresolveStats?, kotlin.time/Duration = ...) // com.eignex.klause.solver.pipeline/FinitePipelinePreparation.<init>|<init>(com.eignex.klause.ir.Problem;com.eignex.klause.solver.objective.LinearObjective?;kotlin.Function1<com.eignex.klause.solver.Sample,com.eignex.klause.solver.Sample>;com.eignex.klause.solver.result.PresolveStats?;kotlin.time.Duration){}[0]
 
     final val constructionBakeElapsed // com.eignex.klause.solver.pipeline/FinitePipelinePreparation.constructionBakeElapsed|{}constructionBakeElapsed[0]
         final fun <get-constructionBakeElapsed>(): kotlin.time/Duration // com.eignex.klause.solver.pipeline/FinitePipelinePreparation.constructionBakeElapsed.<get-constructionBakeElapsed>|<get-constructionBakeElapsed>(){}[0]
@@ -9698,16 +9697,18 @@ final class com.eignex.klause.solver.pipeline/FinitePipelinePreparation { // com
     final val presolve // com.eignex.klause.solver.pipeline/FinitePipelinePreparation.presolve|{}presolve[0]
         final fun <get-presolve>(): com.eignex.klause.solver.result/PresolveStats? // com.eignex.klause.solver.pipeline/FinitePipelinePreparation.presolve.<get-presolve>|<get-presolve>(){}[0]
     final val problem // com.eignex.klause.solver.pipeline/FinitePipelinePreparation.problem|{}problem[0]
-        final fun <get-problem>(): com.eignex.klause.propagation/BakedProblem // com.eignex.klause.solver.pipeline/FinitePipelinePreparation.problem.<get-problem>|<get-problem>(){}[0]
+        final fun <get-problem>(): com.eignex.klause.ir/Problem // com.eignex.klause.solver.pipeline/FinitePipelinePreparation.problem.<get-problem>|<get-problem>(){}[0]
     final val reconstruct // com.eignex.klause.solver.pipeline/FinitePipelinePreparation.reconstruct|{}reconstruct[0]
         final fun <get-reconstruct>(): kotlin/Function1<com.eignex.klause.solver/Sample, com.eignex.klause.solver/Sample> // com.eignex.klause.solver.pipeline/FinitePipelinePreparation.reconstruct.<get-reconstruct>|<get-reconstruct>(){}[0]
 }
 
 final class com.eignex.klause.solver.pipeline/FinitePipelineRequest { // com.eignex.klause.solver.pipeline/FinitePipelineRequest|null[0]
-    constructor <init>(com.eignex.klause.propagation/BakedProblem, com.eignex.klause.solver.pipeline/FiniteEngine, com.eignex.klause.solver.objective/LinearObjective? = ..., com.eignex.klause.presolve/PresolveConfig = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., com.eignex.klause.util/Cancellation = ..., com.eignex.klause.presolve/PresolveBudget? = ...) // com.eignex.klause.solver.pipeline/FinitePipelineRequest.<init>|<init>(com.eignex.klause.propagation.BakedProblem;com.eignex.klause.solver.pipeline.FiniteEngine;com.eignex.klause.solver.objective.LinearObjective?;com.eignex.klause.presolve.PresolveConfig;kotlin.Boolean;kotlin.Boolean;com.eignex.klause.util.Cancellation;com.eignex.klause.presolve.PresolveBudget?){}[0]
+    constructor <init>(com.eignex.klause.ir/Problem, com.eignex.klause.solver.pipeline/FiniteEngine, com.eignex.klause.solver.objective/LinearObjective? = ..., com.eignex.klause.presolve/PresolveConfig = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., com.eignex.klause.util/Cancellation = ..., com.eignex.klause.presolve/PresolveBudget? = ..., com.eignex.klause.solver.pipeline/ComponentPlan = ...) // com.eignex.klause.solver.pipeline/FinitePipelineRequest.<init>|<init>(com.eignex.klause.ir.Problem;com.eignex.klause.solver.pipeline.FiniteEngine;com.eignex.klause.solver.objective.LinearObjective?;com.eignex.klause.presolve.PresolveConfig;kotlin.Boolean;kotlin.Boolean;com.eignex.klause.util.Cancellation;com.eignex.klause.presolve.PresolveBudget?;com.eignex.klause.solver.pipeline.ComponentPlan){}[0]
 
     final val cancellation // com.eignex.klause.solver.pipeline/FinitePipelineRequest.cancellation|{}cancellation[0]
         final fun <get-cancellation>(): com.eignex.klause.util/Cancellation // com.eignex.klause.solver.pipeline/FinitePipelineRequest.cancellation.<get-cancellation>|<get-cancellation>(){}[0]
+    final val componentPlan // com.eignex.klause.solver.pipeline/FinitePipelineRequest.componentPlan|{}componentPlan[0]
+        final fun <get-componentPlan>(): com.eignex.klause.solver.pipeline/ComponentPlan // com.eignex.klause.solver.pipeline/FinitePipelineRequest.componentPlan.<get-componentPlan>|<get-componentPlan>(){}[0]
     final val engine // com.eignex.klause.solver.pipeline/FinitePipelineRequest.engine|{}engine[0]
         final fun <get-engine>(): com.eignex.klause.solver.pipeline/FiniteEngine // com.eignex.klause.solver.pipeline/FinitePipelineRequest.engine.<get-engine>|<get-engine>(){}[0]
     final val explicitPresolveConfig // com.eignex.klause.solver.pipeline/FinitePipelineRequest.explicitPresolveConfig|{}explicitPresolveConfig[0]
@@ -9719,7 +9720,7 @@ final class com.eignex.klause.solver.pipeline/FinitePipelineRequest { // com.eig
     final val presolveConfig // com.eignex.klause.solver.pipeline/FinitePipelineRequest.presolveConfig|{}presolveConfig[0]
         final fun <get-presolveConfig>(): com.eignex.klause.presolve/PresolveConfig // com.eignex.klause.solver.pipeline/FinitePipelineRequest.presolveConfig.<get-presolveConfig>|<get-presolveConfig>(){}[0]
     final val problem // com.eignex.klause.solver.pipeline/FinitePipelineRequest.problem|{}problem[0]
-        final fun <get-problem>(): com.eignex.klause.propagation/BakedProblem // com.eignex.klause.solver.pipeline/FinitePipelineRequest.problem.<get-problem>|<get-problem>(){}[0]
+        final fun <get-problem>(): com.eignex.klause.ir/Problem // com.eignex.klause.solver.pipeline/FinitePipelineRequest.problem.<get-problem>|<get-problem>(){}[0]
     final val solutionSetSensitive // com.eignex.klause.solver.pipeline/FinitePipelineRequest.solutionSetSensitive|{}solutionSetSensitive[0]
         final fun <get-solutionSetSensitive>(): kotlin/Boolean // com.eignex.klause.solver.pipeline/FinitePipelineRequest.solutionSetSensitive.<get-solutionSetSensitive>|<get-solutionSetSensitive>(){}[0]
 }
@@ -9805,14 +9806,14 @@ final class com.eignex.klause.solver.pipeline/FiniteSolveResult { // com.eignex.
 }
 
 final class com.eignex.klause.solver.pipeline/FiniteSolveShape { // com.eignex.klause.solver.pipeline/FiniteSolveShape|null[0]
-    constructor <init>(com.eignex.klause.propagation/BakedProblem, kotlin/Boolean, kotlin/Boolean, com.eignex.klause.solver.objective/IncrementalObjective?, com.eignex.klause.solver.objective/LinearObjective?, kotlin/Int?, com.eignex.klause.localsearch/DefinitionalSweep?, com.eignex.klause.formats.flatzinc/FlatZincSearchHints? = ..., com.eignex.klause.solver.pipeline/ComponentPlan = ...) // com.eignex.klause.solver.pipeline/FiniteSolveShape.<init>|<init>(com.eignex.klause.propagation.BakedProblem;kotlin.Boolean;kotlin.Boolean;com.eignex.klause.solver.objective.IncrementalObjective?;com.eignex.klause.solver.objective.LinearObjective?;kotlin.Int?;com.eignex.klause.localsearch.DefinitionalSweep?;com.eignex.klause.formats.flatzinc.FlatZincSearchHints?;com.eignex.klause.solver.pipeline.ComponentPlan){}[0]
+    constructor <init>(com.eignex.klause.ir/Problem, kotlin/Boolean, kotlin/Boolean, com.eignex.klause.solver.objective/IncrementalObjective?, com.eignex.klause.solver.objective/LinearObjective?, kotlin/Int?, com.eignex.klause.localsearch/DefinitionalSweep?, com.eignex.klause.formats.flatzinc/FlatZincSearchHints? = ..., com.eignex.klause.solver.pipeline/ComponentPlan = ...) // com.eignex.klause.solver.pipeline/FiniteSolveShape.<init>|<init>(com.eignex.klause.ir.Problem;kotlin.Boolean;kotlin.Boolean;com.eignex.klause.solver.objective.IncrementalObjective?;com.eignex.klause.solver.objective.LinearObjective?;kotlin.Int?;com.eignex.klause.localsearch.DefinitionalSweep?;com.eignex.klause.formats.flatzinc.FlatZincSearchHints?;com.eignex.klause.solver.pipeline.ComponentPlan){}[0]
 
     final val componentPlan // com.eignex.klause.solver.pipeline/FiniteSolveShape.componentPlan|{}componentPlan[0]
         final fun <get-componentPlan>(): com.eignex.klause.solver.pipeline/ComponentPlan // com.eignex.klause.solver.pipeline/FiniteSolveShape.componentPlan.<get-componentPlan>|<get-componentPlan>(){}[0]
     final val definitionalSweep // com.eignex.klause.solver.pipeline/FiniteSolveShape.definitionalSweep|{}definitionalSweep[0]
         final fun <get-definitionalSweep>(): com.eignex.klause.localsearch/DefinitionalSweep? // com.eignex.klause.solver.pipeline/FiniteSolveShape.definitionalSweep.<get-definitionalSweep>|<get-definitionalSweep>(){}[0]
     final val finiteProblem // com.eignex.klause.solver.pipeline/FiniteSolveShape.finiteProblem|{}finiteProblem[0]
-        final fun <get-finiteProblem>(): com.eignex.klause.propagation/BakedProblem // com.eignex.klause.solver.pipeline/FiniteSolveShape.finiteProblem.<get-finiteProblem>|<get-finiteProblem>(){}[0]
+        final fun <get-finiteProblem>(): com.eignex.klause.ir/Problem // com.eignex.klause.solver.pipeline/FiniteSolveShape.finiteProblem.<get-finiteProblem>|<get-finiteProblem>(){}[0]
     final val linearObjective // com.eignex.klause.solver.pipeline/FiniteSolveShape.linearObjective|{}linearObjective[0]
         final fun <get-linearObjective>(): com.eignex.klause.solver.objective/LinearObjective? // com.eignex.klause.solver.pipeline/FiniteSolveShape.linearObjective.<get-linearObjective>|<get-linearObjective>(){}[0]
     final val localSearchObjective // com.eignex.klause.solver.pipeline/FiniteSolveShape.localSearchObjective|{}localSearchObjective[0]
@@ -9824,7 +9825,7 @@ final class com.eignex.klause.solver.pipeline/FiniteSolveShape { // com.eignex.k
     final val optimize // com.eignex.klause.solver.pipeline/FiniteSolveShape.optimize|{}optimize[0]
         final fun <get-optimize>(): kotlin/Boolean // com.eignex.klause.solver.pipeline/FiniteSolveShape.optimize.<get-optimize>|<get-optimize>(){}[0]
     final val problem // com.eignex.klause.solver.pipeline/FiniteSolveShape.problem|{}problem[0]
-        final fun <get-problem>(): com.eignex.klause.propagation/BakedProblem // com.eignex.klause.solver.pipeline/FiniteSolveShape.problem.<get-problem>|<get-problem>(){}[0]
+        final fun <get-problem>(): com.eignex.klause.ir/Problem // com.eignex.klause.solver.pipeline/FiniteSolveShape.problem.<get-problem>|<get-problem>(){}[0]
     final val searchHints // com.eignex.klause.solver.pipeline/FiniteSolveShape.searchHints|{}searchHints[0]
         final fun <get-searchHints>(): com.eignex.klause.formats.flatzinc/FlatZincSearchHints? // com.eignex.klause.solver.pipeline/FiniteSolveShape.searchHints.<get-searchHints>|<get-searchHints>(){}[0]
 }

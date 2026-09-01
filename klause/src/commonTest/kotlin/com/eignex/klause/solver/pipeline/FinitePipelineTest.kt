@@ -2,16 +2,20 @@ package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.ir.Factor
+import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.portfolio.EngineMix
 import com.eignex.klause.presolve.PresolveConfig
+import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
@@ -63,6 +67,39 @@ class FinitePipelineTest {
         )
 
         assertEquals(problem.bakeElapsed, preparation.constructionBakeElapsed)
+    }
+
+    @Test
+    fun `pre-bake strengthening short-circuits a wide model with solve cancellation`() {
+        val problem = Problem(
+            numBoolVars = 0,
+            intBounds = IntBounds.fromModelBounds(
+                longArrayOf(0, 0),
+                longArrayOf(1_000_000_000, 1_000_000_000),
+                null,
+                null,
+            ),
+            factors = arrayOf<Factor>(
+                Linear(longArrayOf(2, 4), intArrayOf(0, 1), LinearOp.EQ, 3),
+            ),
+        )
+        var cancellationPolls = 0
+
+        val preparation = FinitePipeline.prepare(
+            FinitePipelineRequest(
+                problem = problem,
+                engine = FiniteEngine.BACKTRACK,
+                cancellation = Cancellation {
+                    cancellationPolls++
+                    false
+                },
+            ),
+        )
+
+        assertTrue(preparation.presolve?.infeasible == true)
+        assertSame(problem, preparation.problem)
+        assertFalse(preparation.problem is BakedProblem)
+        assertTrue(cancellationPolls > 0)
     }
 
     @Test

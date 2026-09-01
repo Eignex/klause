@@ -228,7 +228,7 @@ internal fun LpEngine.rootLpBoundsNoBake(token: Cancellation): List<ShavedBound>
     var done = 0
     for (v in widestFirst(n)) {
         if (done >= OBBT_MAX_VARS || token()) break
-        val d = problem.requireFiniteIntDomains()[v]
+        val d = problem.finiteIntDomain(v)
         if (d.min >= d.max) continue
         done++
         val coeffs = LongArray(n).also { it[v] = 1L }
@@ -250,9 +250,9 @@ internal fun LpEngine.rootLpBoundsNoBake(token: Cancellation): List<ShavedBound>
  * first — it is the most open there is.
  */
 private fun LpEngine.widestFirst(n: Int): List<Int> =
-    (0 until n).filter { problem.requireFiniteIntDomains()[it].min < problem.requireFiniteIntDomains()[it].max }
+    (0 until n).filter { problem.finiteIntDomain(it).min < problem.finiteIntDomain(it).max }
         .sortedByDescending {
-            val d = problem.requireFiniteIntDomains()[it]
+            val d = problem.finiteIntDomain(it)
             val width = d.max - d.min
             if (width < 0L) Long.MAX_VALUE else width
         }

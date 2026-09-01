@@ -277,6 +277,7 @@ fun FinitePipeline.solve(request: FiniteSolveRequest, callbacks: FiniteSolveCall
     val preparation = prepare(
         FinitePipelineRequest(
             problem = request.shape.finiteProblem,
+            componentPlan = request.shape.componentPlan,
             engine = request.engine,
             objective = request.shape.linearObjective,
             presolveConfig = request.presolveConfig,
