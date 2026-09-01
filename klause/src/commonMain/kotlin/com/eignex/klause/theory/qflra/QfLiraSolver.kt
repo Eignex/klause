@@ -13,6 +13,7 @@ import com.eignex.klause.factor.arithmetic.linearRow
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.engine.LpBuilder
 import com.eignex.klause.lp.engine.LpModel
@@ -27,6 +28,7 @@ import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchBrancher
 import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchDecision
+import com.eignex.klause.solver.search.SearchExplanation
 import com.eignex.klause.solver.search.SearchModel
 import com.eignex.klause.solver.search.SearchTheoryDecision
 import com.eignex.klause.solver.search.TheoryComponent
@@ -65,101 +67,20 @@ class ExactLiraSolver(override val model: Problem) : Theory<ExactLiraAssignment>
     override fun check(bools: BooleanArray, context: TheoryContext): TheoryCheck<ExactLiraAssignment> {
         val cancellation = Cancellation(context::cancelled)
         return when (
-            val result = IntegerSearch(
-                bools,
-                cancellation,
-                context::consumeCheck,
-                context::intLowerBound,
-                context::intUpperBound,
+            val result = ExactIntegerSearch(
+                model = model,
+                bools = bools.toStates(),
+                witnessBound = witnessBound,
+                cancellation = cancellation,
+                consumeLeaf = context::consumeCheck,
+                lowerBound = context::intLowerBound,
+                upperBound = context::intUpperBound,
+                emitAssignment = true,
             ).run()
         ) {
-            is IntegerSearchResult.Found -> TheoryCheck.Sat(result.assignment)
+            is IntegerSearchResult.Found -> TheoryCheck.Sat(checkNotNull(result.assignment))
             IntegerSearchResult.Infeasible -> TheoryCheck.Infeasible()
             IntegerSearchResult.Cancelled, IntegerSearchResult.Budget -> TheoryCheck.Cancelled
-        }
-    }
-
-    private inner class IntegerSearch(
-        private val bools: BooleanArray,
-        private val cancellation: Cancellation,
-        private val consumeLeaf: () -> Boolean,
-        private val lowerBound: (Int) -> Long?,
-        private val upperBound: (Int) -> Long?,
-    ) {
-        fun run(): IntegerSearchResult {
-            val stack = ArrayDeque<SearchNode>()
-            stack.addLast(
-                SearchNode(
-                    branches = List(model.numIntVars) { integer ->
-                        IntegerBranch(integer, lower = -witnessBound, upper = witnessBound)
-                    },
-                ).withPublishedBounds(model.numIntVars, lowerBound, upperBound),
-            )
-            while (stack.isNotEmpty()) {
-                if (!consumeLeaf()) return IntegerSearchResult.Budget
-                if (cancellation()) return IntegerSearchResult.Cancelled
-                val node = stack.removeLast()
-                val comparison = node.nextComparison(model)
-                if (comparison >= 0) {
-                    val clause = model.factors[comparison] as ComparisonClause
-                    for (literal in clause.vars.indices.reversed()) {
-                        stack.addLast(node.withComparison(comparison, literal))
-                    }
-                    continue
-                }
-                val disequality = node.nextDisequality(model, bools)
-                if (disequality >= 0) {
-                    stack.addLast(node.withDirection(disequality, LinearOp.GE))
-                    stack.addLast(node.withDirection(disequality, LinearOp.LE))
-                    continue
-                }
-                val leaf = QfLiraSystem(model).build(bools, node, cancellation) ?: return IntegerSearchResult.Cancelled
-                val outcome = bigRationalOutcome(leaf.model, cancellation, Int.MAX_VALUE)
-                when (outcome.feasibility) {
-                    RationalFeasibility.INFEASIBLE -> Unit
-
-                    RationalFeasibility.UNKNOWN -> return IntegerSearchResult.Cancelled
-
-                    RationalFeasibility.FEASIBLE -> {
-                        val values = checkNotNull(outcome.witness)
-                        leaf.gmiCut(outcome.tableau)?.takeUnless { candidate ->
-                            node.cuts.any { existing -> existing.sameAs(candidate) }
-                        }?.let { cut ->
-                            stack.addLast(node.withCut(cut))
-                            continue
-                        }
-                        val split = leaf.integerPositive.indices.firstOrNull { integer ->
-                            !leaf.value(
-                                values,
-                                leaf.integerPositive[integer],
-                                leaf.integerNegative[integer],
-                            ).isInteger()
-                        }
-                        if (split == null) {
-                            return IntegerSearchResult.Found(
-                                ExactLiraAssignment(
-                                    bools.copyOf(),
-                                    Array(model.numIntVars) { integer ->
-                                        leaf.value(
-                                            values,
-                                            leaf.integerPositive[integer],
-                                            leaf.integerNegative[integer],
-                                        ).num
-                                    },
-                                    List(model.numRealVars) { real ->
-                                        leaf.value(values, leaf.realPositive[real], leaf.realNegative[real])
-                                    },
-                                ),
-                            )
-                        }
-                        val value = leaf.value(values, leaf.integerPositive[split], leaf.integerNegative[split])
-                        val floor = value.floor()
-                        stack.addLast(node.withBranch(IntegerBranch(split, lower = floor + BigInteger.ONE)))
-                        stack.addLast(node.withBranch(IntegerBranch(split, upper = floor)))
-                    }
-                }
-            }
-            return IntegerSearchResult.Infeasible
         }
     }
 }
@@ -173,6 +94,12 @@ class ExactLiraSearchComponent(
     private val witnessBound = requireNotNull(model.liraWitnessBound())
     private val bools = IntArray(model.numBoolVars) { UNASSIGNED }
     private val boolLevels = IntArray(model.numBoolVars) { -1 }
+    private val exactActivators = BooleanArray(model.numBoolVars).also { activators ->
+        for (factor in model.factors) {
+            val activator = factor.linearRow()?.activator ?: continue
+            if (activator != FactorRow.ALWAYS) activators[activator] = true
+        }
+    }
     private val root = SearchNode(
         branches = List(model.numIntVars) { integer ->
             IntegerBranch(integer, lower = -witnessBound, upper = witnessBound)
@@ -182,6 +109,7 @@ class ExactLiraSearchComponent(
     private var node = root
     private var assignment: ExactLiraAssignment? = null
     private var outcome: ComponentCheck? = null
+    private var partialDirty = true
 
     init {
         require(
@@ -190,12 +118,15 @@ class ExactLiraSearchComponent(
         nodesByLevel.put(0, root)
     }
 
+    override fun initialize(context: SearchContext): ComponentResult = propagate(context)
+
     override fun assert(decision: SearchDecision, context: SearchContext): ComponentResult {
         when (decision) {
             is SearchDecision.Bool -> {
                 val variable = decision.literal ushr 1
                 bools[variable] = if (decision.literal and 1 == 0) TRUE else FALSE
                 boolLevels[variable] = context.decisionLevel
+                if (exactActivators[variable]) partialDirty = true
             }
 
             is SearchDecision.Theory -> (decision.decision as? ExactLiraDecision)?.let { branch ->
@@ -210,17 +141,41 @@ class ExactLiraSearchComponent(
         return ComponentResult.Consistent
     }
 
+    override fun propagate(context: SearchContext): ComponentResult {
+        if (!partialDirty || bools.none { it == UNASSIGNED }) return ComponentResult.Consistent
+        partialDirty = false
+        if (!hasActiveExactConstraint()) return ComponentResult.Consistent
+        val result = ExactIntegerSearch(
+            model = model,
+            bools = bools,
+            witnessBound = witnessBound,
+            cancellation = Cancellation(context::cancelled),
+            consumeLeaf = context::consumeCheck,
+            lowerBound = { null },
+            upperBound = { null },
+            emitAssignment = false,
+        ).run()
+        return when (result) {
+            is IntegerSearchResult.Found -> ComponentResult.Consistent
+            IntegerSearchResult.Infeasible -> ComponentResult.Conflict(partialExplanation())
+            IntegerSearchResult.Cancelled, IntegerSearchResult.Budget -> ComponentResult.Indeterminate
+        }
+    }
+
     override fun retract(decisionLevel: Int) {
+        var exactRowChanged = false
         for (variable in bools.indices) {
             if (boolLevels[variable] > decisionLevel) {
                 bools[variable] = UNASSIGNED
                 boolLevels[variable] = -1
+                if (exactActivators[variable]) exactRowChanged = true
             }
         }
         nodesByLevel.removeKeysAbove(decisionLevel)
         node = nodesByLevel.valueAtMaxKey() ?: root
         assignment = null
         outcome = null
+        if (exactRowChanged) partialDirty = true
     }
 
     override fun nextBranch(context: SearchContext): List<SearchDecision>? {
@@ -229,7 +184,7 @@ class ExactLiraSearchComponent(
             outcome = ComponentCheck.Indeterminate
             return null
         }
-        val values = BooleanArray(bools.size) { bools[it] == TRUE }
+        val values = bools.toCompleteValues()
         val current = node.withPublishedBounds(
             model.numIntVars,
             context::intLowerBound,
@@ -242,14 +197,14 @@ class ExactLiraSearchComponent(
                 decision(current.withComparison(comparison, literal))
             }
         }
-        val disequality = current.nextDisequality(model, values)
+        val disequality = current.nextDisequality(model, bools)
         if (disequality >= 0) {
             return listOf(
                 decision(current.withDirection(disequality, LinearOp.GE)),
                 decision(current.withDirection(disequality, LinearOp.LE)),
             )
         }
-        val leaf = QfLiraSystem(model).build(values, current, Cancellation(context::cancelled))
+        val leaf = QfLiraSystem(model).build(bools, current, Cancellation(context::cancelled))
         if (leaf == null) {
             outcome = ComponentCheck.Indeterminate
             return null
@@ -307,18 +262,143 @@ class ExactLiraSearchComponent(
 
     private fun decision(node: SearchNode): SearchDecision = SearchDecision.Theory(ExactLiraDecision(node))
 
-    private companion object {
-        const val UNASSIGNED = -1
-        const val FALSE = 0
-        const val TRUE = 1
+    private fun hasActiveExactConstraint(): Boolean = model.factors.any { factor ->
+        if (factor is ComparisonClause) return@any true
+        val row = factor.linearRow() ?: return@any false
+        row.activator == FactorRow.ALWAYS || bools[row.activator] != UNASSIGNED
+    }
+
+    private fun partialExplanation(): SearchExplanation = SearchExplanation(
+        bools.indices.mapNotNull { variable ->
+            when (bools[variable]) {
+                TRUE -> Lit.make(variable, positive = false)
+                FALSE -> Lit.make(variable, positive = true)
+                else -> null
+            }
+        }.toIntArray(),
+    )
+}
+
+private class ExactIntegerSearch(
+    private val model: Problem,
+    private val bools: IntArray,
+    private val witnessBound: BigInteger,
+    private val cancellation: Cancellation,
+    private val consumeLeaf: () -> Boolean,
+    private val lowerBound: (Int) -> Long?,
+    private val upperBound: (Int) -> Long?,
+    private val emitAssignment: Boolean,
+) {
+    fun run(): IntegerSearchResult {
+        val stack = ArrayDeque<SearchNode>()
+        stack.addLast(
+            SearchNode(
+                branches = List(model.numIntVars) { integer ->
+                    IntegerBranch(integer, lower = -witnessBound, upper = witnessBound)
+                },
+            ).withPublishedBounds(model.numIntVars, lowerBound, upperBound),
+        )
+        while (stack.isNotEmpty()) {
+            if (!consumeLeaf()) return IntegerSearchResult.Budget
+            if (cancellation()) return IntegerSearchResult.Cancelled
+            val node = stack.removeLast()
+            val comparison = node.nextComparison(model)
+            if (comparison >= 0) {
+                val clause = model.factors[comparison] as ComparisonClause
+                for (literal in clause.vars.indices.reversed()) {
+                    stack.addLast(node.withComparison(comparison, literal))
+                }
+                continue
+            }
+            val disequality = node.nextDisequality(model, bools)
+            if (disequality >= 0) {
+                stack.addLast(node.withDirection(disequality, LinearOp.GE))
+                stack.addLast(node.withDirection(disequality, LinearOp.LE))
+                continue
+            }
+            val leaf = QfLiraSystem(model).build(bools, node, cancellation) ?: return IntegerSearchResult.Cancelled
+            val outcome = bigRationalOutcome(leaf.model, cancellation, Int.MAX_VALUE)
+            when (outcome.feasibility) {
+                RationalFeasibility.INFEASIBLE -> Unit
+
+                RationalFeasibility.UNKNOWN -> return IntegerSearchResult.Cancelled
+
+                RationalFeasibility.FEASIBLE -> {
+                    val values = checkNotNull(outcome.witness)
+                    leaf.gmiCut(outcome.tableau)?.takeUnless { candidate ->
+                        node.cuts.any { existing -> existing.sameAs(candidate) }
+                    }?.let { cut ->
+                        stack.addLast(node.withCut(cut))
+                        continue
+                    }
+                    val split = leaf.integerPositive.indices.firstOrNull { integer ->
+                        !leaf.value(
+                            values,
+                            leaf.integerPositive[integer],
+                            leaf.integerNegative[integer],
+                        ).isInteger()
+                    }
+                    if (split == null) {
+                        return IntegerSearchResult.Found(
+                            if (emitAssignment) {
+                                ExactLiraAssignment(
+                                    bools.toCompleteValues(),
+                                    Array(model.numIntVars) { integer ->
+                                        leaf.value(
+                                            values,
+                                            leaf.integerPositive[integer],
+                                            leaf.integerNegative[integer],
+                                        ).num
+                                    },
+                                    List(model.numRealVars) { real ->
+                                        leaf.value(values, leaf.realPositive[real], leaf.realNegative[real])
+                                    },
+                                )
+                            } else {
+                                null
+                            },
+                        )
+                    }
+                    val value = leaf.value(values, leaf.integerPositive[split], leaf.integerNegative[split])
+                    val floor = value.floor()
+                    stack.addLast(node.withBranch(IntegerBranch(split, lower = floor + BigInteger.ONE)))
+                    stack.addLast(node.withBranch(IntegerBranch(split, upper = floor)))
+                }
+            }
+        }
+        return IntegerSearchResult.Infeasible
     }
 }
 
 private sealed interface IntegerSearchResult {
-    data class Found(val assignment: ExactLiraAssignment) : IntegerSearchResult
+    data class Found(val assignment: ExactLiraAssignment?) : IntegerSearchResult
     data object Infeasible : IntegerSearchResult
     data object Cancelled : IntegerSearchResult
     data object Budget : IntegerSearchResult
+}
+
+private const val UNASSIGNED = -1
+private const val FALSE = 0
+private const val TRUE = 1
+
+private fun BooleanArray.toStates(): IntArray = IntArray(size) { if (this[it]) TRUE else FALSE }
+
+private fun IntArray.toCompleteValues(): BooleanArray = BooleanArray(size) { variable ->
+    when (this[variable]) {
+        TRUE -> true
+        FALSE -> false
+        else -> error("exact LIRA witness requested before Boolean assignment was complete")
+    }
+}
+
+private fun FactorRow.truthUnder(bools: IntArray): Boolean? = if (activator == FactorRow.ALWAYS) {
+    true
+} else {
+    when (bools[activator]) {
+        TRUE -> true
+        FALSE -> false
+        else -> null
+    }
 }
 
 private data class IntegerBranch(val variable: Int, val lower: BigInteger? = null, val upper: BigInteger? = null)
@@ -346,7 +426,7 @@ private data class SearchNode(
         return -1
     }
 
-    fun nextDisequality(model: Problem, bools: BooleanArray): Int {
+    fun nextDisequality(model: Problem, bools: IntArray): Int {
         for (index in model.factors.indices) {
             if (index in disequalityDirections) continue
             val comparison = model.factors[index] as? ComparisonClause
@@ -356,7 +436,7 @@ private data class SearchNode(
                 continue
             }
             val row = model.factors[index].linearRow() ?: continue
-            val truth = row.activator == FactorRow.ALWAYS || bools[row.activator]
+            val truth = row.truthUnder(bools) ?: continue
             if ((if (truth) row.op else row.op.complemented()) == LinearOp.NE) return index
         }
         return -1
@@ -382,7 +462,7 @@ private fun SearchNode.withPublishedBounds(
 private data class ExactLiraDecision(val node: SearchNode) : SearchTheoryDecision
 
 private class QfLiraSystem(private val model: Problem) {
-    fun build(bools: BooleanArray, node: SearchNode, cancellation: Cancellation): QfLiraLeaf? {
+    fun build(bools: IntArray, node: SearchNode, cancellation: Cancellation): QfLiraLeaf? {
         val builder = LpBuilder()
         // Split every source column as p - n. Both halves use true open-above columns rather than
         // the LP probe box: an exact infeasibility proof must never rest on an invented frontier.
@@ -467,7 +547,7 @@ private class QfLiraSystem(private val model: Problem) {
                 continue
             }
             val row = factor.linearRow() ?: continue
-            val truth = row.activator == FactorRow.ALWAYS || bools[row.activator]
+            val truth = row.truthUnder(bools) ?: continue
             val direction = node.disequalityDirections[index]
             when (row) {
                 is FactorRow.Wide -> if (!addWide(

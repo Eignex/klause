@@ -10710,7 +10710,9 @@ final class com.eignex.klause.theory.qflra/ExactLiraSearchComponent : com.eignex
     final fun assert(com.eignex.klause.solver.search/SearchDecision, com.eignex.klause.solver.search/SearchContext): com.eignex.klause.solver.search/ComponentResult // com.eignex.klause.theory.qflra/ExactLiraSearchComponent.assert|assert(com.eignex.klause.solver.search.SearchDecision;com.eignex.klause.solver.search.SearchContext){}[0]
     final fun check(com.eignex.klause.solver.search/SearchContext): com.eignex.klause.solver.search/ComponentCheck // com.eignex.klause.theory.qflra/ExactLiraSearchComponent.check|check(com.eignex.klause.solver.search.SearchContext){}[0]
     final fun contributeModel(com.eignex.klause.solver.search/SearchModel, com.eignex.klause.solver.search/SearchContext) // com.eignex.klause.theory.qflra/ExactLiraSearchComponent.contributeModel|contributeModel(com.eignex.klause.solver.search.SearchModel;com.eignex.klause.solver.search.SearchContext){}[0]
+    final fun initialize(com.eignex.klause.solver.search/SearchContext): com.eignex.klause.solver.search/ComponentResult // com.eignex.klause.theory.qflra/ExactLiraSearchComponent.initialize|initialize(com.eignex.klause.solver.search.SearchContext){}[0]
     final fun nextBranch(com.eignex.klause.solver.search/SearchContext): kotlin.collections/List<com.eignex.klause.solver.search/SearchDecision>? // com.eignex.klause.theory.qflra/ExactLiraSearchComponent.nextBranch|nextBranch(com.eignex.klause.solver.search.SearchContext){}[0]
+    final fun propagate(com.eignex.klause.solver.search/SearchContext): com.eignex.klause.solver.search/ComponentResult // com.eignex.klause.theory.qflra/ExactLiraSearchComponent.propagate|propagate(com.eignex.klause.solver.search.SearchContext){}[0]
     final fun retract(kotlin/Int) // com.eignex.klause.theory.qflra/ExactLiraSearchComponent.retract|retract(kotlin.Int){}[0]
 }
 
