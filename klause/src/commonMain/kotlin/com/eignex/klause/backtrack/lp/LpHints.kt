@@ -1,8 +1,8 @@
 package com.eignex.klause.backtrack.lp
 
-import com.eignex.klause.backtrack.selector.VarRef
 import com.eignex.klause.lp.bounding.LpHintSink
 import com.eignex.klause.lp.relaxation.LpRelaxation
+import com.eignex.klause.solver.search.VarRef
 import kotlin.math.abs
 import kotlin.math.floor
 import kotlin.math.min

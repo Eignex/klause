@@ -2,6 +2,7 @@ package com.eignex.klause.backtrack.selector
 
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
+import com.eignex.klause.solver.search.VarRef
 import com.eignex.klause.util.IndexedMaxHeap
 import com.eignex.klause.util.IntArrayList
 import kotlin.random.Random

@@ -7,12 +7,12 @@ import com.eignex.klause.backtrack.selector.MaxRegret
 import com.eignex.klause.backtrack.selector.SmallestDomain
 import com.eignex.klause.backtrack.selector.SmallestLowerBound
 import com.eignex.klause.backtrack.selector.ValueSelector
-import com.eignex.klause.backtrack.selector.VarRef
 import com.eignex.klause.backtrack.selector.VariableSelector
 import com.eignex.klause.ir.values
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.search.VarRef
 import kotlin.random.Random
 
 /**

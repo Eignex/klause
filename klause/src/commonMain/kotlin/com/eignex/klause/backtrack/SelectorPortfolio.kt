@@ -1,11 +1,11 @@
 package com.eignex.klause.backtrack
 
 import com.eignex.klause.backtrack.selector.ValueSelector
-import com.eignex.klause.backtrack.selector.VarRef
 import com.eignex.klause.backtrack.selector.VariableSelector
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.search.VarRef
 import com.eignex.kumulant.bandit.univariate.MultiArmedBandit
 import com.eignex.kumulant.bandit.univariate.UCB1
 import kotlin.random.Random

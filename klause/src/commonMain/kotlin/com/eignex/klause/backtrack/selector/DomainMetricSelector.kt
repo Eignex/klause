@@ -2,6 +2,7 @@ package com.eignex.klause.backtrack.selector
 
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.propagation.PropagationSession
+import com.eignex.klause.solver.search.VarRef
 
 /**
  * The shared scan behind the four domain-metric variable selectors ([SmallestDomain],

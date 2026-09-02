@@ -3,28 +3,30 @@ package com.eignex.klause.backtrack.selector
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.search.VarRef
+import com.eignex.klause.solver.search.VariableBranching
 import com.eignex.klause.util.IndexedMaxHeap
 import com.eignex.klause.util.IntArrayList
 import kotlin.random.Random
 
 /**
- * Picks the next variable to branch on. Returns `null` when every variable is determined.
+ * Picks the next variable to branch on over finite domains. Returns `null` when every variable is
+ * determined.
  *
- * The optional notification hooks ([onConflict], [onCommit], [onRestart]) let activity-,
- * conflict-, or weight-driven heuristics (VSIDS, dom/wdeg, last-conflict, impact-based)
- * accumulate state across the search without smuggling listeners through the engine.
- * Pure heuristics (random, smallest-domain, input-order) ignore them via the defaults.
+ * This is [VariableBranching] over the finite substrate, plus the hooks only that substrate can
+ * deliver: a CP witness at a solution, the propagation engine's reason set at a conflict, and the
+ * singletons a fixpoint forced. Heuristics that need none of them — activity- and conflict-driven ones
+ * — are written against [com.eignex.klause.solver.search.BranchingState] instead and reach this lane
+ * through [asSelector], so they serve theory traversals too.
  */
-interface VariableSelector {
+interface VariableSelector : VariableBranching<PropagationSession> {
     /** Pick the next variable to branch on, or null when all are determined. */
-    fun pick(session: PropagationSession, rng: Random): VarRef?
+    @Suppress("PARAMETER_NAME_CHANGED_ON_OVERRIDE")
+    override fun pick(session: PropagationSession, rng: Random): VarRef?
 
     /** A fresh, unshared instance for one solve: stateless selectors return this, stateful ones
      *  rebuild from their config so no per-search state leaks across reuse. */
-    fun fresh(): VariableSelector
-
-    /** Called once per propagation conflict at `varRef`; bump activity / failure weight. */
-    fun onConflict(varRef: VarRef) {}
+    override fun fresh(): VariableSelector
 
     /** Called once per SAT leaf reached by the search. Solution-guided heuristics snapshot
      *  the assignment here so they can bias future picks toward it. Default no-op. */
@@ -36,14 +38,13 @@ interface VariableSelector {
      * factor ids) the propagation engine assembled. VSIDS reads `conflictBools` /
      * `conflictInts`; dom/wdeg reads `conflictFactors`; impact-style heuristics could read
      * `conflictLevels` to score depth. Default forwards to [onConflict] (varRef only) so
-     * pure / activity-agnostic heuristics ignore the extra info transparently.
+     * pure / activity-agnostic heuristics ignore the extra info transparently. A heuristic written
+     * against the neutral view receives the variable half as a
+     * [com.eignex.klause.solver.search.BranchingConflict] through [asSelector].
      */
     fun onConflict(varRef: VarRef, unsat: PropagationResult.Unsat) {
         onConflict(varRef)
     }
-
-    /** Called once per successful pin of `varRef`; useful for phase-saving-like state. */
-    fun onCommit(varRef: VarRef) {}
 
     /**
      * Called after every successful propagation step (pin + fixpoint). [implied] carries
@@ -52,20 +53,6 @@ interface VariableSelector {
      * agnostic heuristics ignore. Default no-op.
      */
     fun onPropagation(implied: PropagationResult.Implied) {}
-
-    /** Called when the engine restarts (Luby / geometric); decay activity or reset
-     *  per-run counters here. */
-    fun onRestart() {}
-
-    /** True if this heuristic wants per-variable [onUnassign] callbacks on every backtrack.
-     *  Off by default so heuristics that don't need them pay nothing — the engine only
-     *  installs the (per-revert) unassign listener when some heuristic opts in. */
-    val tracksUnassign: Boolean get() = false
-
-    /** Called for each variable made free again by a backtrack, when [tracksUnassign] is true.
-     *  VSIDS removes assigned variables from its order heap on pick and re-inserts them here,
-     *  keeping pick O(log n) instead of O(trail-depth · log n). Default no-op. */
-    fun onUnassign(varRef: VarRef) {}
 }
 
 /**

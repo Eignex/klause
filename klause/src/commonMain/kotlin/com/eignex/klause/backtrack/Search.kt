@@ -1,6 +1,5 @@
 package com.eignex.klause.backtrack
 
-import com.eignex.klause.backtrack.selector.VarRef
 import com.eignex.klause.backtrack.selector.boundsMidpoint
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
@@ -40,6 +39,7 @@ import com.eignex.klause.solver.search.SearchRunLifecycle
 import com.eignex.klause.solver.search.SearchRunObserver
 import com.eignex.klause.solver.search.SearchSolveParams
 import com.eignex.klause.solver.search.SearchTraversalPolicy
+import com.eignex.klause.solver.search.VarRef
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntHashSet
 import kotlin.random.Random

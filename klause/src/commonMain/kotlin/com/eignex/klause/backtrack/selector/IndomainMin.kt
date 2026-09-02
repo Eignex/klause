@@ -1,6 +1,7 @@
 package com.eignex.klause.backtrack.selector
 
 import com.eignex.klause.propagation.PropagationSession
+import com.eignex.klause.solver.search.VarRef
 import kotlin.random.Random
 
 /** Smallest value first (a.k.a. `indomain_min`). For bools: `false` then `true`. */

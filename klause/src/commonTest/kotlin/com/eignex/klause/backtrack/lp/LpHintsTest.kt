@@ -1,6 +1,5 @@
 package com.eignex.klause.backtrack.lp
 
-import com.eignex.klause.backtrack.selector.VarRef
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
@@ -9,6 +8,7 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.search.VarRef
 import kotlin.test.Test
 import kotlin.test.assertEquals
 

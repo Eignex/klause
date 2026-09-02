@@ -1,8 +1,8 @@
-package com.eignex.klause.backtrack.selector
+package com.eignex.klause.solver.search
 
 /**
- * Which variable [com.eignex.klause.backtrack.BacktrackSolver] is branching on. Independent of
- * value selection so var and value strategies can be combined freely (mirroring MiniZinc's
+ * Which variable a search is branching on. Independent of value selection so var and value
+ * strategies can be combined freely (mirroring MiniZinc's
  * `int_search(vars, var_strategy, value_strategy, complete)`).
  */
 sealed interface VarRef {

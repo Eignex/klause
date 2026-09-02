@@ -1,8 +1,8 @@
 package com.eignex.klause.backtrack.lp
 
-import com.eignex.klause.backtrack.selector.VarRef
 import com.eignex.klause.lp.bounding.LpEngine
 import com.eignex.klause.propagation.PropagationSession
+import com.eignex.klause.solver.search.VarRef
 
 /**
  * Reduced-cost-average branching: pick the unassigned variable with the highest LP branch score

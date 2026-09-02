@@ -1,6 +1,7 @@
 package com.eignex.klause.backtrack.selector
 
 import com.eignex.klause.propagation.PropagationSession
+import com.eignex.klause.solver.search.VarRef
 import kotlin.random.Random
 
 /** First unpinned bool, else first int with domain size > 1, in variable-id order. */

@@ -121,7 +121,11 @@ finite decision nodes on a finite route and open-theory decisions, checks, and L
 open route. `--param open-hint-flips=N` spends N local-search flips, once per request, on an
 unverified first-branch order over the model's shared clauses; it is off unless asked for, changes
 only which side of a Boolean split is tried first, and reports under `-s` (`openHint*`) what it drew
-and how many splits it went on to order.
+and how many splits it went on to order. `--param open-branching=activity|source-order` chooses which
+Boolean the traversal splits: `source-order` (the default) walks the variables in model order,
+`activity` follows conflict activity over the shared session. Only the Boolean skeleton is branched
+either way — the theory decides the arithmetic residual at each leaf. Activity order settles no
+additional instance on the measured corpus, so it is opt-in.
 
 MiniZinc-mode-only flags:
 
