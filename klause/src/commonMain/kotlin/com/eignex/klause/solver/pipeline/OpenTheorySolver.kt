@@ -9,12 +9,14 @@ import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.presolve.closeOpenBounds
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.pipeline.ProblemPipeline
+import com.eignex.klause.solver.result.OpenHintStats
 import com.eignex.klause.solver.result.OpenTheoryClauseStats
 import com.eignex.klause.solver.result.OpenTheoryWorkSink
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.search.ComponentResult
+import com.eignex.klause.solver.search.SearchCandidateHints
 import com.eignex.klause.solver.search.SearchLearnedDbParams
 import com.eignex.klause.solver.search.SearchRestart
 import com.eignex.klause.solver.search.SearchResult
@@ -218,7 +220,10 @@ class OpenTheoryEngine internal constructor(
             maxDecisions = state.remainingDecisions(),
             restart = params.sharedRestart?.let(SearchRestart::Every) ?: SearchRestart.Never,
         )
-        return when (val result = planned.session.solve(model.numBoolVars, solveParams)) {
+        // Drawn here rather than beside the plan, so a root that propagation already refuted never pays
+        // for a proposal no traversal would have read.
+        val hints = state.candidateHints(plan, model, cancellation)
+        return when (val result = planned.session.solve(model.numBoolVars, solveParams, hints)) {
             is SearchResult.Satisfied -> OpenTheoryResult.Sat(
                 assignment(result.model, checkNotNull(planned.theory), route),
                 stats.finish(state, planned.session),
@@ -275,6 +280,7 @@ class OpenTheoryEngine internal constructor(
         state.capture(session)
         openTheory = state.work.snapshot()
         openTheoryClauses = state.clauses
+        openHints = state.hints
         stop()
         return snapshot()
     }
@@ -309,11 +315,40 @@ internal fun ProblemPipeline.backendName(): String = when (this) {
 }
 
 /** Solve-wide controls and telemetry shared by every feasibility round of one open optimization. */
-internal class OpenTheorySolveState(params: TheoryParams) {
+internal class OpenTheorySolveState(private val params: TheoryParams) {
     val work = OpenTheoryWorkSink(params.openWorkLimit)
     private val maxDecisions = params.maxDecisions
     var clauses = OpenTheoryClauseStats()
         private set
+
+    /** What the request's hint draw produced and cost, empty until one is drawn. */
+    var hints = OpenHintStats()
+        private set
+
+    private var drawn: SearchCandidateHints? = null
+
+    /**
+     * The request's one unverified branch-order hint, drawn from [plan] over [model] on first use.
+     *
+     * Drawn once for the whole request. Every feasibility round of one descent shares the plan's clauses
+     * — only the bound row moves, and no clause states it — so a redraw per round would spend the
+     * allowance again to reach the same proposal. A draw that proposed nothing is remembered as nothing
+     * and is not retried either, since retrying is what a spent or cancelled allowance has already
+     * answered.
+     */
+    fun candidateHints(plan: ComponentPlan, model: Problem, cancellation: Cancellation): SearchCandidateHints {
+        drawn?.let { return it }
+        val flips = params.openHintFlips ?: return SearchCandidateHints.None.also { drawn = it }
+        val draw = plan.openBooleanDraw(model, OpenCandidateParams(maxFlips = flips, cancellation = cancellation))
+        val candidate = draw.candidate
+        hints = OpenHintStats(
+            draws = 1,
+            applied = if (candidate == null) 0 else 1,
+            hintedVars = candidate?.boolVars?.size?.toLong() ?: 0,
+            moves = draw.moves,
+        )
+        return (candidate?.hints() ?: SearchCandidateHints.None).also { drawn = it }
+    }
 
     fun remainingDecisions(): Long {
         val workStats = work.snapshot()

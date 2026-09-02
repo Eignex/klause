@@ -9202,24 +9202,26 @@ public final class com/eignex/klause/solver/pipeline/SourceProblemRoute$Unsuppor
 
 public final class com/eignex/klause/solver/pipeline/TheoryParams {
 	public fun <init> ()V
-	public fun <init> (JJJLjava/lang/Long;Ljava/lang/Integer;ILcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/util/Cancellation;)V
-	public synthetic fun <init> (JJJLjava/lang/Long;Ljava/lang/Integer;ILcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/util/Cancellation;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (JJJLjava/lang/Long;Ljava/lang/Integer;ILjava/lang/Long;Lcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/util/Cancellation;)V
+	public synthetic fun <init> (JJJLjava/lang/Long;Ljava/lang/Integer;ILjava/lang/Long;Lcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/util/Cancellation;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()J
 	public final fun component2 ()J
 	public final fun component3 ()J
 	public final fun component4 ()Ljava/lang/Long;
 	public final fun component5 ()Ljava/lang/Integer;
 	public final fun component6 ()I
-	public final fun component7 ()Lcom/eignex/klause/util/Cancellation;
+	public final fun component7 ()Ljava/lang/Long;
 	public final fun component8 ()Lcom/eignex/klause/util/Cancellation;
-	public final fun copy (JJJLjava/lang/Long;Ljava/lang/Integer;ILcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/solver/pipeline/TheoryParams;
-	public static synthetic fun copy$default (Lcom/eignex/klause/solver/pipeline/TheoryParams;JJJLjava/lang/Long;Ljava/lang/Integer;ILcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/util/Cancellation;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/TheoryParams;
+	public final fun component9 ()Lcom/eignex/klause/util/Cancellation;
+	public final fun copy (JJJLjava/lang/Long;Ljava/lang/Integer;ILjava/lang/Long;Lcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/solver/pipeline/TheoryParams;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/pipeline/TheoryParams;JJJLjava/lang/Long;Ljava/lang/Integer;ILjava/lang/Long;Lcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/util/Cancellation;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/TheoryParams;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getCancellation ()Lcom/eignex/klause/util/Cancellation;
 	public final fun getLbdGlue ()I
 	public final fun getMaxDecisions ()J
 	public final fun getMaxLearnedClauses ()Ljava/lang/Integer;
 	public final fun getMaxLeaves ()J
+	public final fun getOpenHintFlips ()Ljava/lang/Long;
 	public final fun getOpenWorkLimit ()J
 	public final fun getSharedRestart ()Ljava/lang/Long;
 	public final fun getTimeout ()Lcom/eignex/klause/util/Cancellation;
@@ -9495,6 +9497,26 @@ public abstract interface class com/eignex/klause/solver/result/MinimizeResult$W
 public final class com/eignex/klause/solver/result/MinimizeResult$WithSample$DefaultImpls {
 	public static fun getAssignment (Lcom/eignex/klause/solver/result/MinimizeResult$WithSample;)Lcom/eignex/klause/solver/Sample;
 	public static fun getObjectiveValue (Lcom/eignex/klause/solver/result/MinimizeResult$WithSample;)Ljava/lang/Double;
+}
+
+public final class com/eignex/klause/solver/result/OpenHintStats {
+	public fun <init> ()V
+	public fun <init> (JJJJ)V
+	public synthetic fun <init> (JJJJILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()J
+	public final fun component2 ()J
+	public final fun component3 ()J
+	public final fun component4 ()J
+	public final fun copy (JJJJ)Lcom/eignex/klause/solver/result/OpenHintStats;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/result/OpenHintStats;JJJJILjava/lang/Object;)Lcom/eignex/klause/solver/result/OpenHintStats;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getApplied ()J
+	public final fun getDraws ()J
+	public final fun getHintedVars ()J
+	public final fun getMoves ()J
+	public fun hashCode ()I
+	public final fun mergedWith (Lcom/eignex/klause/solver/result/OpenHintStats;)Lcom/eignex/klause/solver/result/OpenHintStats;
+	public fun toString ()Ljava/lang/String;
 }
 
 public final class com/eignex/klause/solver/result/OpenTheoryClauseStats {
@@ -9780,9 +9802,10 @@ public final class com/eignex/klause/solver/result/SearchStats {
 public final class com/eignex/klause/solver/result/SolveStats {
 	public static final field Companion Lcom/eignex/klause/solver/result/SolveStats$Companion;
 	public fun <init> ()V
-	public fun <init> (Lcom/eignex/klause/solver/result/RunStats;Lcom/eignex/klause/solver/result/SearchStats;Lcom/eignex/klause/solver/result/ConflictAnalysisStats;Lcom/eignex/klause/solver/result/LpStats;Lcom/eignex/klause/solver/result/SchedulingStats;Lcom/eignex/klause/solver/result/LocalSearchStats;Lcom/eignex/klause/solver/result/OpenTheoryWorkStats;Lcom/eignex/klause/solver/result/OpenTheoryClauseStats;Lcom/eignex/klause/solver/result/PresolveStats;)V
-	public synthetic fun <init> (Lcom/eignex/klause/solver/result/RunStats;Lcom/eignex/klause/solver/result/SearchStats;Lcom/eignex/klause/solver/result/ConflictAnalysisStats;Lcom/eignex/klause/solver/result/LpStats;Lcom/eignex/klause/solver/result/SchedulingStats;Lcom/eignex/klause/solver/result/LocalSearchStats;Lcom/eignex/klause/solver/result/OpenTheoryWorkStats;Lcom/eignex/klause/solver/result/OpenTheoryClauseStats;Lcom/eignex/klause/solver/result/PresolveStats;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/eignex/klause/solver/result/RunStats;Lcom/eignex/klause/solver/result/SearchStats;Lcom/eignex/klause/solver/result/ConflictAnalysisStats;Lcom/eignex/klause/solver/result/LpStats;Lcom/eignex/klause/solver/result/SchedulingStats;Lcom/eignex/klause/solver/result/LocalSearchStats;Lcom/eignex/klause/solver/result/OpenTheoryWorkStats;Lcom/eignex/klause/solver/result/OpenTheoryClauseStats;Lcom/eignex/klause/solver/result/OpenHintStats;Lcom/eignex/klause/solver/result/PresolveStats;)V
+	public synthetic fun <init> (Lcom/eignex/klause/solver/result/RunStats;Lcom/eignex/klause/solver/result/SearchStats;Lcom/eignex/klause/solver/result/ConflictAnalysisStats;Lcom/eignex/klause/solver/result/LpStats;Lcom/eignex/klause/solver/result/SchedulingStats;Lcom/eignex/klause/solver/result/LocalSearchStats;Lcom/eignex/klause/solver/result/OpenTheoryWorkStats;Lcom/eignex/klause/solver/result/OpenTheoryClauseStats;Lcom/eignex/klause/solver/result/OpenHintStats;Lcom/eignex/klause/solver/result/PresolveStats;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Lcom/eignex/klause/solver/result/RunStats;
+	public final fun component10 ()Lcom/eignex/klause/solver/result/PresolveStats;
 	public final fun component2 ()Lcom/eignex/klause/solver/result/SearchStats;
 	public final fun component3 ()Lcom/eignex/klause/solver/result/ConflictAnalysisStats;
 	public final fun component4 ()Lcom/eignex/klause/solver/result/LpStats;
@@ -9790,13 +9813,14 @@ public final class com/eignex/klause/solver/result/SolveStats {
 	public final fun component6 ()Lcom/eignex/klause/solver/result/LocalSearchStats;
 	public final fun component7 ()Lcom/eignex/klause/solver/result/OpenTheoryWorkStats;
 	public final fun component8 ()Lcom/eignex/klause/solver/result/OpenTheoryClauseStats;
-	public final fun component9 ()Lcom/eignex/klause/solver/result/PresolveStats;
-	public final fun copy (Lcom/eignex/klause/solver/result/RunStats;Lcom/eignex/klause/solver/result/SearchStats;Lcom/eignex/klause/solver/result/ConflictAnalysisStats;Lcom/eignex/klause/solver/result/LpStats;Lcom/eignex/klause/solver/result/SchedulingStats;Lcom/eignex/klause/solver/result/LocalSearchStats;Lcom/eignex/klause/solver/result/OpenTheoryWorkStats;Lcom/eignex/klause/solver/result/OpenTheoryClauseStats;Lcom/eignex/klause/solver/result/PresolveStats;)Lcom/eignex/klause/solver/result/SolveStats;
-	public static synthetic fun copy$default (Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/result/RunStats;Lcom/eignex/klause/solver/result/SearchStats;Lcom/eignex/klause/solver/result/ConflictAnalysisStats;Lcom/eignex/klause/solver/result/LpStats;Lcom/eignex/klause/solver/result/SchedulingStats;Lcom/eignex/klause/solver/result/LocalSearchStats;Lcom/eignex/klause/solver/result/OpenTheoryWorkStats;Lcom/eignex/klause/solver/result/OpenTheoryClauseStats;Lcom/eignex/klause/solver/result/PresolveStats;ILjava/lang/Object;)Lcom/eignex/klause/solver/result/SolveStats;
+	public final fun component9 ()Lcom/eignex/klause/solver/result/OpenHintStats;
+	public final fun copy (Lcom/eignex/klause/solver/result/RunStats;Lcom/eignex/klause/solver/result/SearchStats;Lcom/eignex/klause/solver/result/ConflictAnalysisStats;Lcom/eignex/klause/solver/result/LpStats;Lcom/eignex/klause/solver/result/SchedulingStats;Lcom/eignex/klause/solver/result/LocalSearchStats;Lcom/eignex/klause/solver/result/OpenTheoryWorkStats;Lcom/eignex/klause/solver/result/OpenTheoryClauseStats;Lcom/eignex/klause/solver/result/OpenHintStats;Lcom/eignex/klause/solver/result/PresolveStats;)Lcom/eignex/klause/solver/result/SolveStats;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/result/RunStats;Lcom/eignex/klause/solver/result/SearchStats;Lcom/eignex/klause/solver/result/ConflictAnalysisStats;Lcom/eignex/klause/solver/result/LpStats;Lcom/eignex/klause/solver/result/SchedulingStats;Lcom/eignex/klause/solver/result/LocalSearchStats;Lcom/eignex/klause/solver/result/OpenTheoryWorkStats;Lcom/eignex/klause/solver/result/OpenTheoryClauseStats;Lcom/eignex/klause/solver/result/OpenHintStats;Lcom/eignex/klause/solver/result/PresolveStats;ILjava/lang/Object;)Lcom/eignex/klause/solver/result/SolveStats;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getCa ()Lcom/eignex/klause/solver/result/ConflictAnalysisStats;
 	public final fun getLp ()Lcom/eignex/klause/solver/result/LpStats;
 	public final fun getLs ()Lcom/eignex/klause/solver/result/LocalSearchStats;
+	public final fun getOpenHints ()Lcom/eignex/klause/solver/result/OpenHintStats;
 	public final fun getOpenTheory ()Lcom/eignex/klause/solver/result/OpenTheoryWorkStats;
 	public final fun getOpenTheoryClauses ()Lcom/eignex/klause/solver/result/OpenTheoryClauseStats;
 	public final fun getPresolve ()Lcom/eignex/klause/solver/result/PresolveStats;
@@ -10666,8 +10690,8 @@ public final class com/eignex/klause/solver/search/SearchSession : com/eignex/kl
 	public final fun reasonFor (I)Lcom/eignex/klause/solver/search/SearchExplanation;
 	public final fun resetRootFacts ()V
 	public final fun restart ()Lcom/eignex/klause/solver/search/ComponentResult;
-	public final fun solve (ILcom/eignex/klause/solver/search/SearchSolveParams;)Lcom/eignex/klause/solver/search/SearchResult;
-	public static synthetic fun solve$default (Lcom/eignex/klause/solver/search/SearchSession;ILcom/eignex/klause/solver/search/SearchSolveParams;ILjava/lang/Object;)Lcom/eignex/klause/solver/search/SearchResult;
+	public final fun solve (ILcom/eignex/klause/solver/search/SearchSolveParams;Lcom/eignex/klause/solver/search/SearchCandidateHints;)Lcom/eignex/klause/solver/search/SearchResult;
+	public static synthetic fun solve$default (Lcom/eignex/klause/solver/search/SearchSession;ILcom/eignex/klause/solver/search/SearchSolveParams;Lcom/eignex/klause/solver/search/SearchCandidateHints;ILjava/lang/Object;)Lcom/eignex/klause/solver/search/SearchResult;
 	public final fun solveBoolean (I)Lcom/eignex/klause/solver/search/BooleanSearchResult;
 	public fun truth (I)Ljava/lang/Boolean;
 }

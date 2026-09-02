@@ -83,6 +83,7 @@ internal object SolveCore {
                     sharedRestart = takeOpenLongParam(common, "shared-restart", nonNegative = false),
                     maxLearnedClauses = takeOpenIntParam(common, "max-learned", nonNegative = true),
                     lbdGlue = takeOpenIntParam(common, "lbd-glue", nonNegative = true) ?: 2,
+                    openHintFlips = takeOpenLongParam(common, "open-hint-flips", nonNegative = true),
                     cancellation = deadlineCancel,
                     timeout = deadlineCancel,
                 )

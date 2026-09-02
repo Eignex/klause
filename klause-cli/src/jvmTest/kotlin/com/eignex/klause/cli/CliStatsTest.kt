@@ -2,6 +2,7 @@ package com.eignex.klause.cli
 
 import com.eignex.klause.solver.result.LocalSearchStats
 import com.eignex.klause.solver.result.LpStats
+import com.eignex.klause.solver.result.OpenHintStats
 import com.eignex.klause.solver.result.PresolveStats
 import com.eignex.klause.solver.result.RunStats
 import com.eignex.klause.solver.result.SchedulingStats
@@ -178,5 +179,35 @@ class CliStatsTest {
         val stats = SolveStats(run = RunStats(backend = "mixed"), ls = LocalSearchStats(moves = SumResult(42.0)))
         assertTrue(lsStatPairs(stats).isNotEmpty())
         assertEquals("42", lsStatPairs(stats).toMap()["lsMoves"])
+    }
+
+    @Test
+    fun `an open solve that drew no hint emits no hint keys`() {
+        val keys = openTheoryStatPairs(SolveStats(run = RunStats(backend = "exact-lira"))).toMap().keys
+        assertTrue(keys.none { it.startsWith("openHint") }, "hint keys without a draw: $keys")
+    }
+
+    @Test
+    fun `a drawn hint reports what it covered and cost`() {
+        val stats = SolveStats(
+            run = RunStats(backend = "exact-lira"),
+            openHints = OpenHintStats(draws = 1, applied = 1, hintedVars = 4, moves = 37),
+        )
+        val m = openTheoryStatPairs(stats).toMap()
+        assertEquals("1", m["openHintDraws"])
+        assertEquals("1", m["openHintApplied"])
+        assertEquals("4", m["openHintVars"])
+        assertEquals("37", m["openHintMoves"])
+    }
+
+    @Test
+    fun `a draw that proposed nothing still reports its cost`() {
+        val stats = SolveStats(
+            run = RunStats(backend = "exact-lira"),
+            openHints = OpenHintStats(draws = 1, applied = 0, hintedVars = 0, moves = 20_000),
+        )
+        val m = openTheoryStatPairs(stats).toMap()
+        assertEquals("0", m["openHintApplied"])
+        assertEquals("20000", m["openHintMoves"])
     }
 }

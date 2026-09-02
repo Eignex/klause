@@ -120,6 +120,7 @@ internal class SmtLibOutput : BufferedBestOutput() {
             "openWork", "openLearned", "openRelearned",
             "openRestarts", "openReductions", "openDropped", "openRetained", "openPeakRetained",
             "openLearnedWatchVisits",
+            "openHintDraws", "openHintApplied", "openHintVars", "openHintMoves",
         )
     }
 }

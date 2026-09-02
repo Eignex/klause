@@ -102,7 +102,7 @@ class OpenBooleanCandidateTest {
         val model = differenceModel()
         val plan = model.componentPlan()
 
-        val candidate = assertNotNull(plan.openBooleanCandidate(model))
+        val candidate = assertNotNull(plan.openBooleanDraw(model).candidate)
 
         assertEquals(ProblemPipeline.DIFFERENCE_THEORY, plan.theoryPipeline)
         assertTrue(satisfiesSharedClauses(model, candidate))
@@ -113,7 +113,7 @@ class OpenBooleanCandidateTest {
         val model = exactLraModel()
         val plan = model.componentPlan()
 
-        val candidate = assertNotNull(plan.openBooleanCandidate(model))
+        val candidate = assertNotNull(plan.openBooleanDraw(model).candidate)
 
         assertEquals(ProblemPipeline.EXACT_LRA, plan.theoryPipeline)
         assertTrue(satisfiesSharedClauses(model, candidate))
@@ -124,7 +124,7 @@ class OpenBooleanCandidateTest {
         val model = exactLiraModel()
         val plan = model.componentPlan()
 
-        val candidate = assertNotNull(plan.openBooleanCandidate(model))
+        val candidate = assertNotNull(plan.openBooleanDraw(model).candidate)
 
         assertEquals(ProblemPipeline.EXACT_LIRA, plan.theoryPipeline)
         assertTrue(satisfiesSharedClauses(model, candidate))
@@ -135,7 +135,7 @@ class OpenBooleanCandidateTest {
         val model = hybridModel()
         val plan = model.componentPlan()
 
-        val candidate = assertNotNull(plan.openBooleanCandidate(model))
+        val candidate = assertNotNull(plan.openBooleanDraw(model).candidate)
 
         assertTrue(plan.hasCpComponent && plan.hasTheoryComponent)
         assertContentEquals(intArrayOf(0, 1, 2), candidate.boolVars)
@@ -162,8 +162,8 @@ class OpenBooleanCandidateTest {
         val model = differenceModel()
         val plan = model.componentPlan()
 
-        val first = assertNotNull(plan.openBooleanCandidate(model))
-        val second = assertNotNull(plan.openBooleanCandidate(model))
+        val first = assertNotNull(plan.openBooleanDraw(model).candidate)
+        val second = assertNotNull(plan.openBooleanDraw(model).candidate)
 
         assertContentEquals(first.boolVars, second.boolVars)
         assertContentEquals(first.values.toList(), second.values.toList())
@@ -178,26 +178,26 @@ class OpenBooleanCandidateTest {
             factors = arrayOf(Linear(longArrayOf(1, -1), intArrayOf(0, 1), LinearOp.LE, 3)),
         )
 
-        assertNull(model.componentPlan().openBooleanCandidate(model))
+        assertNull(model.componentPlan().openBooleanDraw(model).candidate)
     }
 
     @Test
     fun `a zero allowance proposes nothing`() {
         val model = differenceModel()
 
-        val candidate = model.componentPlan()
-            .openBooleanCandidate(model, OpenCandidateParams(maxFlips = 0))
+        val draw = model.componentPlan()
+            .openBooleanDraw(model, OpenCandidateParams(maxFlips = 0))
 
-        assertNull(candidate)
+        assertNull(draw.candidate)
     }
 
     @Test
     fun `a cancelled draw proposes nothing`() {
         val model = differenceModel()
 
-        val candidate = model.componentPlan()
-            .openBooleanCandidate(model, OpenCandidateParams(cancellation = Cancellation { true }))
+        val draw = model.componentPlan()
+            .openBooleanDraw(model, OpenCandidateParams(cancellation = Cancellation { true }))
 
-        assertNull(candidate)
+        assertNull(draw.candidate)
     }
 }

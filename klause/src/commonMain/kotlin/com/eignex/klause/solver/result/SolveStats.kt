@@ -68,6 +68,8 @@ data class SolveStats(
     val openTheory: OpenTheoryWorkStats = OpenTheoryWorkStats(),
     /** Shared learned-clause telemetry for an open-theory solve. */
     val openTheoryClauses: OpenTheoryClauseStats = OpenTheoryClauseStats(),
+    /** Unverified open-model branch-order hint accounting. */
+    val openHints: OpenHintStats = OpenHintStats(),
     /** Presolve outcome, set by whoever ran presolve — the CLI for a lane handed a prepared model, the
      *  backend itself for one that prepares its own (null when presolve was off / a no-op).
      *  Surfaced under `-s` as a terse summary — see [PresolveStats]. */
@@ -97,6 +99,7 @@ data class SolveStats(
                 openTheory.openWork + other.openTheory.openWork,
             ),
             openTheoryClauses = openTheoryClauses.mergedWith(other.openTheoryClauses),
+            openHints = openHints.mergedWith(other.openHints),
             presolve = presolve ?: other.presolve,
         )
     }
@@ -126,6 +129,7 @@ internal class SolveStatsSink(var backend: String) {
     val ls: LocalSearchStatsSink = LocalSearchStatsSink()
     var openTheory: OpenTheoryWorkStats = OpenTheoryWorkStats()
     var openTheoryClauses: OpenTheoryClauseStats = OpenTheoryClauseStats()
+    var openHints: OpenHintStats = OpenHintStats()
 
     /** What presolve did, for a backend that runs it itself rather than being handed a prepared model. */
     var presolve: PresolveStats? = null
@@ -166,6 +170,7 @@ internal class SolveStatsSink(var backend: String) {
             ls = ls.snapshot(),
             openTheory = openTheory,
             openTheoryClauses = openTheoryClauses,
+            openHints = openHints,
             presolve = presolve,
         )
     }

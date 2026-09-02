@@ -10125,7 +10125,7 @@ final class com.eignex.klause.solver.pipeline/PortfolioPlanRequest { // com.eign
 }
 
 final class com.eignex.klause.solver.pipeline/TheoryParams { // com.eignex.klause.solver.pipeline/TheoryParams|null[0]
-    constructor <init>(kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long? = ..., kotlin/Int? = ..., kotlin/Int = ..., com.eignex.klause.util/Cancellation = ..., com.eignex.klause.util/Cancellation = ...) // com.eignex.klause.solver.pipeline/TheoryParams.<init>|<init>(kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long?;kotlin.Int?;kotlin.Int;com.eignex.klause.util.Cancellation;com.eignex.klause.util.Cancellation){}[0]
+    constructor <init>(kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long? = ..., kotlin/Int? = ..., kotlin/Int = ..., kotlin/Long? = ..., com.eignex.klause.util/Cancellation = ..., com.eignex.klause.util/Cancellation = ...) // com.eignex.klause.solver.pipeline/TheoryParams.<init>|<init>(kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long?;kotlin.Int?;kotlin.Int;kotlin.Long?;com.eignex.klause.util.Cancellation;com.eignex.klause.util.Cancellation){}[0]
 
     final val cancellation // com.eignex.klause.solver.pipeline/TheoryParams.cancellation|{}cancellation[0]
         final fun <get-cancellation>(): com.eignex.klause.util/Cancellation // com.eignex.klause.solver.pipeline/TheoryParams.cancellation.<get-cancellation>|<get-cancellation>(){}[0]
@@ -10137,6 +10137,8 @@ final class com.eignex.klause.solver.pipeline/TheoryParams { // com.eignex.klaus
         final fun <get-maxLearnedClauses>(): kotlin/Int? // com.eignex.klause.solver.pipeline/TheoryParams.maxLearnedClauses.<get-maxLearnedClauses>|<get-maxLearnedClauses>(){}[0]
     final val maxLeaves // com.eignex.klause.solver.pipeline/TheoryParams.maxLeaves|{}maxLeaves[0]
         final fun <get-maxLeaves>(): kotlin/Long // com.eignex.klause.solver.pipeline/TheoryParams.maxLeaves.<get-maxLeaves>|<get-maxLeaves>(){}[0]
+    final val openHintFlips // com.eignex.klause.solver.pipeline/TheoryParams.openHintFlips|{}openHintFlips[0]
+        final fun <get-openHintFlips>(): kotlin/Long? // com.eignex.klause.solver.pipeline/TheoryParams.openHintFlips.<get-openHintFlips>|<get-openHintFlips>(){}[0]
     final val openWorkLimit // com.eignex.klause.solver.pipeline/TheoryParams.openWorkLimit|{}openWorkLimit[0]
         final fun <get-openWorkLimit>(): kotlin/Long // com.eignex.klause.solver.pipeline/TheoryParams.openWorkLimit.<get-openWorkLimit>|<get-openWorkLimit>(){}[0]
     final val sharedRestart // com.eignex.klause.solver.pipeline/TheoryParams.sharedRestart|{}sharedRestart[0]
@@ -10150,9 +10152,10 @@ final class com.eignex.klause.solver.pipeline/TheoryParams { // com.eignex.klaus
     final fun component4(): kotlin/Long? // com.eignex.klause.solver.pipeline/TheoryParams.component4|component4(){}[0]
     final fun component5(): kotlin/Int? // com.eignex.klause.solver.pipeline/TheoryParams.component5|component5(){}[0]
     final fun component6(): kotlin/Int // com.eignex.klause.solver.pipeline/TheoryParams.component6|component6(){}[0]
-    final fun component7(): com.eignex.klause.util/Cancellation // com.eignex.klause.solver.pipeline/TheoryParams.component7|component7(){}[0]
+    final fun component7(): kotlin/Long? // com.eignex.klause.solver.pipeline/TheoryParams.component7|component7(){}[0]
     final fun component8(): com.eignex.klause.util/Cancellation // com.eignex.klause.solver.pipeline/TheoryParams.component8|component8(){}[0]
-    final fun copy(kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long? = ..., kotlin/Int? = ..., kotlin/Int = ..., com.eignex.klause.util/Cancellation = ..., com.eignex.klause.util/Cancellation = ...): com.eignex.klause.solver.pipeline/TheoryParams // com.eignex.klause.solver.pipeline/TheoryParams.copy|copy(kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long?;kotlin.Int?;kotlin.Int;com.eignex.klause.util.Cancellation;com.eignex.klause.util.Cancellation){}[0]
+    final fun component9(): com.eignex.klause.util/Cancellation // com.eignex.klause.solver.pipeline/TheoryParams.component9|component9(){}[0]
+    final fun copy(kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long? = ..., kotlin/Int? = ..., kotlin/Int = ..., kotlin/Long? = ..., com.eignex.klause.util/Cancellation = ..., com.eignex.klause.util/Cancellation = ...): com.eignex.klause.solver.pipeline/TheoryParams // com.eignex.klause.solver.pipeline/TheoryParams.copy|copy(kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long?;kotlin.Int?;kotlin.Int;kotlin.Long?;com.eignex.klause.util.Cancellation;com.eignex.klause.util.Cancellation){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.pipeline/TheoryParams.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.eignex.klause.solver.pipeline/TheoryParams.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.eignex.klause.solver.pipeline/TheoryParams.toString|toString(){}[0]
@@ -10329,6 +10332,29 @@ final class com.eignex.klause.solver.result/LpStats { // com.eignex.klause.solve
     final fun toString(): kotlin/String // com.eignex.klause.solver.result/LpStats.toString|toString(){}[0]
 }
 
+final class com.eignex.klause.solver.result/OpenHintStats { // com.eignex.klause.solver.result/OpenHintStats|null[0]
+    constructor <init>(kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ...) // com.eignex.klause.solver.result/OpenHintStats.<init>|<init>(kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long){}[0]
+
+    final val applied // com.eignex.klause.solver.result/OpenHintStats.applied|{}applied[0]
+        final fun <get-applied>(): kotlin/Long // com.eignex.klause.solver.result/OpenHintStats.applied.<get-applied>|<get-applied>(){}[0]
+    final val draws // com.eignex.klause.solver.result/OpenHintStats.draws|{}draws[0]
+        final fun <get-draws>(): kotlin/Long // com.eignex.klause.solver.result/OpenHintStats.draws.<get-draws>|<get-draws>(){}[0]
+    final val hintedVars // com.eignex.klause.solver.result/OpenHintStats.hintedVars|{}hintedVars[0]
+        final fun <get-hintedVars>(): kotlin/Long // com.eignex.klause.solver.result/OpenHintStats.hintedVars.<get-hintedVars>|<get-hintedVars>(){}[0]
+    final val moves // com.eignex.klause.solver.result/OpenHintStats.moves|{}moves[0]
+        final fun <get-moves>(): kotlin/Long // com.eignex.klause.solver.result/OpenHintStats.moves.<get-moves>|<get-moves>(){}[0]
+
+    final fun component1(): kotlin/Long // com.eignex.klause.solver.result/OpenHintStats.component1|component1(){}[0]
+    final fun component2(): kotlin/Long // com.eignex.klause.solver.result/OpenHintStats.component2|component2(){}[0]
+    final fun component3(): kotlin/Long // com.eignex.klause.solver.result/OpenHintStats.component3|component3(){}[0]
+    final fun component4(): kotlin/Long // com.eignex.klause.solver.result/OpenHintStats.component4|component4(){}[0]
+    final fun copy(kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ...): com.eignex.klause.solver.result/OpenHintStats // com.eignex.klause.solver.result/OpenHintStats.copy|copy(kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.result/OpenHintStats.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.eignex.klause.solver.result/OpenHintStats.hashCode|hashCode(){}[0]
+    final fun mergedWith(com.eignex.klause.solver.result/OpenHintStats): com.eignex.klause.solver.result/OpenHintStats // com.eignex.klause.solver.result/OpenHintStats.mergedWith|mergedWith(com.eignex.klause.solver.result.OpenHintStats){}[0]
+    final fun toString(): kotlin/String // com.eignex.klause.solver.result/OpenHintStats.toString|toString(){}[0]
+}
+
 final class com.eignex.klause.solver.result/OpenTheoryClauseStats { // com.eignex.klause.solver.result/OpenTheoryClauseStats|null[0]
     constructor <init>(kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ...) // com.eignex.klause.solver.result/OpenTheoryClauseStats.<init>|<init>(kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long){}[0]
 
@@ -10501,7 +10527,7 @@ final class com.eignex.klause.solver.result/SearchStats { // com.eignex.klause.s
 }
 
 final class com.eignex.klause.solver.result/SolveStats { // com.eignex.klause.solver.result/SolveStats|null[0]
-    constructor <init>(com.eignex.klause.solver.result/RunStats = ..., com.eignex.klause.solver.result/SearchStats = ..., com.eignex.klause.solver.result/ConflictAnalysisStats = ..., com.eignex.klause.solver.result/LpStats = ..., com.eignex.klause.solver.result/SchedulingStats = ..., com.eignex.klause.solver.result/LocalSearchStats = ..., com.eignex.klause.solver.result/OpenTheoryWorkStats = ..., com.eignex.klause.solver.result/OpenTheoryClauseStats = ..., com.eignex.klause.solver.result/PresolveStats? = ...) // com.eignex.klause.solver.result/SolveStats.<init>|<init>(com.eignex.klause.solver.result.RunStats;com.eignex.klause.solver.result.SearchStats;com.eignex.klause.solver.result.ConflictAnalysisStats;com.eignex.klause.solver.result.LpStats;com.eignex.klause.solver.result.SchedulingStats;com.eignex.klause.solver.result.LocalSearchStats;com.eignex.klause.solver.result.OpenTheoryWorkStats;com.eignex.klause.solver.result.OpenTheoryClauseStats;com.eignex.klause.solver.result.PresolveStats?){}[0]
+    constructor <init>(com.eignex.klause.solver.result/RunStats = ..., com.eignex.klause.solver.result/SearchStats = ..., com.eignex.klause.solver.result/ConflictAnalysisStats = ..., com.eignex.klause.solver.result/LpStats = ..., com.eignex.klause.solver.result/SchedulingStats = ..., com.eignex.klause.solver.result/LocalSearchStats = ..., com.eignex.klause.solver.result/OpenTheoryWorkStats = ..., com.eignex.klause.solver.result/OpenTheoryClauseStats = ..., com.eignex.klause.solver.result/OpenHintStats = ..., com.eignex.klause.solver.result/PresolveStats? = ...) // com.eignex.klause.solver.result/SolveStats.<init>|<init>(com.eignex.klause.solver.result.RunStats;com.eignex.klause.solver.result.SearchStats;com.eignex.klause.solver.result.ConflictAnalysisStats;com.eignex.klause.solver.result.LpStats;com.eignex.klause.solver.result.SchedulingStats;com.eignex.klause.solver.result.LocalSearchStats;com.eignex.klause.solver.result.OpenTheoryWorkStats;com.eignex.klause.solver.result.OpenTheoryClauseStats;com.eignex.klause.solver.result.OpenHintStats;com.eignex.klause.solver.result.PresolveStats?){}[0]
 
     final val ca // com.eignex.klause.solver.result/SolveStats.ca|{}ca[0]
         final fun <get-ca>(): com.eignex.klause.solver.result/ConflictAnalysisStats // com.eignex.klause.solver.result/SolveStats.ca.<get-ca>|<get-ca>(){}[0]
@@ -10509,6 +10535,8 @@ final class com.eignex.klause.solver.result/SolveStats { // com.eignex.klause.so
         final fun <get-lp>(): com.eignex.klause.solver.result/LpStats // com.eignex.klause.solver.result/SolveStats.lp.<get-lp>|<get-lp>(){}[0]
     final val ls // com.eignex.klause.solver.result/SolveStats.ls|{}ls[0]
         final fun <get-ls>(): com.eignex.klause.solver.result/LocalSearchStats // com.eignex.klause.solver.result/SolveStats.ls.<get-ls>|<get-ls>(){}[0]
+    final val openHints // com.eignex.klause.solver.result/SolveStats.openHints|{}openHints[0]
+        final fun <get-openHints>(): com.eignex.klause.solver.result/OpenHintStats // com.eignex.klause.solver.result/SolveStats.openHints.<get-openHints>|<get-openHints>(){}[0]
     final val openTheory // com.eignex.klause.solver.result/SolveStats.openTheory|{}openTheory[0]
         final fun <get-openTheory>(): com.eignex.klause.solver.result/OpenTheoryWorkStats // com.eignex.klause.solver.result/SolveStats.openTheory.<get-openTheory>|<get-openTheory>(){}[0]
     final val openTheoryClauses // com.eignex.klause.solver.result/SolveStats.openTheoryClauses|{}openTheoryClauses[0]
@@ -10523,6 +10551,7 @@ final class com.eignex.klause.solver.result/SolveStats { // com.eignex.klause.so
         final fun <get-search>(): com.eignex.klause.solver.result/SearchStats // com.eignex.klause.solver.result/SolveStats.search.<get-search>|<get-search>(){}[0]
 
     final fun component1(): com.eignex.klause.solver.result/RunStats // com.eignex.klause.solver.result/SolveStats.component1|component1(){}[0]
+    final fun component10(): com.eignex.klause.solver.result/PresolveStats? // com.eignex.klause.solver.result/SolveStats.component10|component10(){}[0]
     final fun component2(): com.eignex.klause.solver.result/SearchStats // com.eignex.klause.solver.result/SolveStats.component2|component2(){}[0]
     final fun component3(): com.eignex.klause.solver.result/ConflictAnalysisStats // com.eignex.klause.solver.result/SolveStats.component3|component3(){}[0]
     final fun component4(): com.eignex.klause.solver.result/LpStats // com.eignex.klause.solver.result/SolveStats.component4|component4(){}[0]
@@ -10530,8 +10559,8 @@ final class com.eignex.klause.solver.result/SolveStats { // com.eignex.klause.so
     final fun component6(): com.eignex.klause.solver.result/LocalSearchStats // com.eignex.klause.solver.result/SolveStats.component6|component6(){}[0]
     final fun component7(): com.eignex.klause.solver.result/OpenTheoryWorkStats // com.eignex.klause.solver.result/SolveStats.component7|component7(){}[0]
     final fun component8(): com.eignex.klause.solver.result/OpenTheoryClauseStats // com.eignex.klause.solver.result/SolveStats.component8|component8(){}[0]
-    final fun component9(): com.eignex.klause.solver.result/PresolveStats? // com.eignex.klause.solver.result/SolveStats.component9|component9(){}[0]
-    final fun copy(com.eignex.klause.solver.result/RunStats = ..., com.eignex.klause.solver.result/SearchStats = ..., com.eignex.klause.solver.result/ConflictAnalysisStats = ..., com.eignex.klause.solver.result/LpStats = ..., com.eignex.klause.solver.result/SchedulingStats = ..., com.eignex.klause.solver.result/LocalSearchStats = ..., com.eignex.klause.solver.result/OpenTheoryWorkStats = ..., com.eignex.klause.solver.result/OpenTheoryClauseStats = ..., com.eignex.klause.solver.result/PresolveStats? = ...): com.eignex.klause.solver.result/SolveStats // com.eignex.klause.solver.result/SolveStats.copy|copy(com.eignex.klause.solver.result.RunStats;com.eignex.klause.solver.result.SearchStats;com.eignex.klause.solver.result.ConflictAnalysisStats;com.eignex.klause.solver.result.LpStats;com.eignex.klause.solver.result.SchedulingStats;com.eignex.klause.solver.result.LocalSearchStats;com.eignex.klause.solver.result.OpenTheoryWorkStats;com.eignex.klause.solver.result.OpenTheoryClauseStats;com.eignex.klause.solver.result.PresolveStats?){}[0]
+    final fun component9(): com.eignex.klause.solver.result/OpenHintStats // com.eignex.klause.solver.result/SolveStats.component9|component9(){}[0]
+    final fun copy(com.eignex.klause.solver.result/RunStats = ..., com.eignex.klause.solver.result/SearchStats = ..., com.eignex.klause.solver.result/ConflictAnalysisStats = ..., com.eignex.klause.solver.result/LpStats = ..., com.eignex.klause.solver.result/SchedulingStats = ..., com.eignex.klause.solver.result/LocalSearchStats = ..., com.eignex.klause.solver.result/OpenTheoryWorkStats = ..., com.eignex.klause.solver.result/OpenTheoryClauseStats = ..., com.eignex.klause.solver.result/OpenHintStats = ..., com.eignex.klause.solver.result/PresolveStats? = ...): com.eignex.klause.solver.result/SolveStats // com.eignex.klause.solver.result/SolveStats.copy|copy(com.eignex.klause.solver.result.RunStats;com.eignex.klause.solver.result.SearchStats;com.eignex.klause.solver.result.ConflictAnalysisStats;com.eignex.klause.solver.result.LpStats;com.eignex.klause.solver.result.SchedulingStats;com.eignex.klause.solver.result.LocalSearchStats;com.eignex.klause.solver.result.OpenTheoryWorkStats;com.eignex.klause.solver.result.OpenTheoryClauseStats;com.eignex.klause.solver.result.OpenHintStats;com.eignex.klause.solver.result.PresolveStats?){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.result/SolveStats.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.eignex.klause.solver.result/SolveStats.hashCode|hashCode(){}[0]
     final fun mergedWith(com.eignex.klause.solver.result/SolveStats): com.eignex.klause.solver.result/SolveStats // com.eignex.klause.solver.result/SolveStats.mergedWith|mergedWith(com.eignex.klause.solver.result.SolveStats){}[0]
@@ -10717,7 +10746,7 @@ final class com.eignex.klause.solver.search/SearchSession : com.eignex.klause.so
     final fun reasonFor(kotlin/Int): com.eignex.klause.solver.search/SearchExplanation? // com.eignex.klause.solver.search/SearchSession.reasonFor|reasonFor(kotlin.Int){}[0]
     final fun resetRootFacts() // com.eignex.klause.solver.search/SearchSession.resetRootFacts|resetRootFacts(){}[0]
     final fun restart(): com.eignex.klause.solver.search/ComponentResult // com.eignex.klause.solver.search/SearchSession.restart|restart(){}[0]
-    final fun solve(kotlin/Int, com.eignex.klause.solver.search/SearchSolveParams = ...): com.eignex.klause.solver.search/SearchResult // com.eignex.klause.solver.search/SearchSession.solve|solve(kotlin.Int;com.eignex.klause.solver.search.SearchSolveParams){}[0]
+    final fun solve(kotlin/Int, com.eignex.klause.solver.search/SearchSolveParams = ..., com.eignex.klause.solver.search/SearchCandidateHints = ...): com.eignex.klause.solver.search/SearchResult // com.eignex.klause.solver.search/SearchSession.solve|solve(kotlin.Int;com.eignex.klause.solver.search.SearchSolveParams;com.eignex.klause.solver.search.SearchCandidateHints){}[0]
     final fun solveBoolean(kotlin/Int): com.eignex.klause.solver.search/BooleanSearchResult // com.eignex.klause.solver.search/SearchSession.solveBoolean|solveBoolean(kotlin.Int){}[0]
     final fun truth(kotlin/Int): kotlin/Boolean? // com.eignex.klause.solver.search/SearchSession.truth|truth(kotlin.Int){}[0]
 }

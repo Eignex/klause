@@ -499,9 +499,16 @@ class SearchSession(
      * Boolean variables are selected first for compatibility with the existing SAT and theory
      * fragments. Once they are assigned, a [SearchBrancher] may split its remaining local state.
      * A component with no branch is expected to decide its residual in [SearchComponent.check].
+     *
+     * [candidateHints] steer which side of a Boolean split is tried first and nothing else, so the
+     * verdict is the one this traversal would have reached without them.
      */
-    fun solve(numBoolVars: Int, params: SearchSolveParams = SearchSolveParams()): SearchResult {
-        val run = openRun(numBoolVars, params)
+    fun solve(
+        numBoolVars: Int,
+        params: SearchSolveParams = SearchSolveParams(),
+        candidateHints: SearchCandidateHints = SearchCandidateHints.None,
+    ): SearchResult {
+        val run = openRun(numBoolVars, params, candidateHints = candidateHints)
         return when (val event = run.next()) {
             is SearchRunEvent.Satisfied -> SearchResult.Satisfied(event.model)
             SearchRunEvent.Exhausted -> SearchResult.Exhausted

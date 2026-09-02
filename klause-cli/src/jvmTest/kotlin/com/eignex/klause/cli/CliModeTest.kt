@@ -113,6 +113,34 @@ class CliModeTest {
     }
 
     @Test
+    fun `an open theory hint allowance is off unless asked for and reports what it drew`() {
+        val smt = File.createTempFile("clihint", ".smt2").apply {
+            writeText(
+                """
+                (declare-const x Int)
+                (declare-const p Bool)
+                (declare-const q Bool)
+                (assert (>= x 5))
+                (assert (or p q))
+                (check-sat)
+                """.trimIndent(),
+            )
+            deleteOnExit()
+        }
+
+        val plain = capture { assertEquals(0, runCli(arrayOf("-s", smt.absolutePath))) }
+        val hinted = capture {
+            assertEquals(0, runCli(arrayOf("-s", "--param", "open-hint-flips=1000", smt.absolutePath)))
+        }
+
+        assertTrue(plain.lines().firstOrNull() == "sat", plain)
+        assertTrue("openHint" !in plain, plain)
+        assertTrue(hinted.lines().firstOrNull() == "sat", hinted)
+        assertTrue("; openHintDraws=1" in hinted, hinted)
+        assertTrue("; openHintApplied=1" in hinted, hinted)
+    }
+
+    @Test
     fun `an open theory shared decision limit names the cause and prints counters`() {
         val smt = File.createTempFile("clidecisions", ".smt2").apply {
             writeText(
