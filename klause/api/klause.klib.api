@@ -9897,6 +9897,39 @@ final class com.eignex.klause.solver.pipeline/LsResolution { // com.eignex.klaus
         final fun <get-pool>(): kotlin.collections/List<kotlin/Function0<com.eignex.klause.localsearch.strategy/LocalSearchRecipe>>? // com.eignex.klause.solver.pipeline/LsResolution.pool.<get-pool>|<get-pool>(){}[0]
 }
 
+final class com.eignex.klause.solver.pipeline/OpenBooleanCandidate { // com.eignex.klause.solver.pipeline/OpenBooleanCandidate|null[0]
+    final val boolVars // com.eignex.klause.solver.pipeline/OpenBooleanCandidate.boolVars|{}boolVars[0]
+        final fun <get-boolVars>(): kotlin/IntArray // com.eignex.klause.solver.pipeline/OpenBooleanCandidate.boolVars.<get-boolVars>|<get-boolVars>(){}[0]
+    final val values // com.eignex.klause.solver.pipeline/OpenBooleanCandidate.values|{}values[0]
+        final fun <get-values>(): kotlin/BooleanArray // com.eignex.klause.solver.pipeline/OpenBooleanCandidate.values.<get-values>|<get-values>(){}[0]
+}
+
+final class com.eignex.klause.solver.pipeline/OpenBooleanSkeleton { // com.eignex.klause.solver.pipeline/OpenBooleanSkeleton|null[0]
+    final val boolVars // com.eignex.klause.solver.pipeline/OpenBooleanSkeleton.boolVars|{}boolVars[0]
+        final fun <get-boolVars>(): kotlin/IntArray // com.eignex.klause.solver.pipeline/OpenBooleanSkeleton.boolVars.<get-boolVars>|<get-boolVars>(){}[0]
+    final val problem // com.eignex.klause.solver.pipeline/OpenBooleanSkeleton.problem|{}problem[0]
+        final fun <get-problem>(): com.eignex.klause.propagation/BakedProblem // com.eignex.klause.solver.pipeline/OpenBooleanSkeleton.problem.<get-problem>|<get-problem>(){}[0]
+}
+
+final class com.eignex.klause.solver.pipeline/OpenCandidateParams { // com.eignex.klause.solver.pipeline/OpenCandidateParams|null[0]
+    constructor <init>(kotlin/Long = ..., kotlin/Long = ..., com.eignex.klause.util/Cancellation = ...) // com.eignex.klause.solver.pipeline/OpenCandidateParams.<init>|<init>(kotlin.Long;kotlin.Long;com.eignex.klause.util.Cancellation){}[0]
+
+    final val cancellation // com.eignex.klause.solver.pipeline/OpenCandidateParams.cancellation|{}cancellation[0]
+        final fun <get-cancellation>(): com.eignex.klause.util/Cancellation // com.eignex.klause.solver.pipeline/OpenCandidateParams.cancellation.<get-cancellation>|<get-cancellation>(){}[0]
+    final val maxFlips // com.eignex.klause.solver.pipeline/OpenCandidateParams.maxFlips|{}maxFlips[0]
+        final fun <get-maxFlips>(): kotlin/Long // com.eignex.klause.solver.pipeline/OpenCandidateParams.maxFlips.<get-maxFlips>|<get-maxFlips>(){}[0]
+    final val randomSeed // com.eignex.klause.solver.pipeline/OpenCandidateParams.randomSeed|{}randomSeed[0]
+        final fun <get-randomSeed>(): kotlin/Long // com.eignex.klause.solver.pipeline/OpenCandidateParams.randomSeed.<get-randomSeed>|<get-randomSeed>(){}[0]
+
+    final fun component1(): kotlin/Long // com.eignex.klause.solver.pipeline/OpenCandidateParams.component1|component1(){}[0]
+    final fun component2(): kotlin/Long // com.eignex.klause.solver.pipeline/OpenCandidateParams.component2|component2(){}[0]
+    final fun component3(): com.eignex.klause.util/Cancellation // com.eignex.klause.solver.pipeline/OpenCandidateParams.component3|component3(){}[0]
+    final fun copy(kotlin/Long = ..., kotlin/Long = ..., com.eignex.klause.util/Cancellation = ...): com.eignex.klause.solver.pipeline/OpenCandidateParams // com.eignex.klause.solver.pipeline/OpenCandidateParams.copy|copy(kotlin.Long;kotlin.Long;com.eignex.klause.util.Cancellation){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.pipeline/OpenCandidateParams.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.eignex.klause.solver.pipeline/OpenCandidateParams.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.eignex.klause.solver.pipeline/OpenCandidateParams.toString|toString(){}[0]
+}
+
 final class com.eignex.klause.solver.pipeline/OpenTheoryEngine { // com.eignex.klause.solver.pipeline/OpenTheoryEngine|null[0]
     constructor <init>(com.eignex.klause.ir/Problem, com.eignex.klause.solver.pipeline/ProblemPipeline) // com.eignex.klause.solver.pipeline/OpenTheoryEngine.<init>|<init>(com.eignex.klause.ir.Problem;com.eignex.klause.solver.pipeline.ProblemPipeline){}[0]
 
@@ -11409,6 +11442,8 @@ final fun (com.eignex.klause.schema/FloatTerm).com.eignex.klause.schema/times(ko
 final fun (com.eignex.klause.schema/FloatTerm).com.eignex.klause.schema/times(kotlin/Int): com.eignex.klause.schema/FloatExpr // com.eignex.klause.schema/times|times@com.eignex.klause.schema.FloatTerm(kotlin.Int){}[0]
 final fun (com.eignex.klause.schema/FloatTerm).com.eignex.klause.schema/unaryMinus(): com.eignex.klause.schema/FloatExpr // com.eignex.klause.schema/unaryMinus|unaryMinus@com.eignex.klause.schema.FloatTerm(){}[0]
 final fun (com.eignex.klause.schema/VariableSchema).com.eignex.klause.compile/compile(com.eignex.klause.config/KlauseConfig = ...): com.eignex.klause.compile/CompiledSchema // com.eignex.klause.compile/compile|compile@com.eignex.klause.schema.VariableSchema(com.eignex.klause.config.KlauseConfig){}[0]
+final fun (com.eignex.klause.solver.pipeline/ComponentPlan).com.eignex.klause.solver.pipeline/booleanSkeleton(com.eignex.klause.ir/Problem, com.eignex.klause.util/Cancellation = ...): com.eignex.klause.solver.pipeline/OpenBooleanSkeleton? // com.eignex.klause.solver.pipeline/booleanSkeleton|booleanSkeleton@com.eignex.klause.solver.pipeline.ComponentPlan(com.eignex.klause.ir.Problem;com.eignex.klause.util.Cancellation){}[0]
+final fun (com.eignex.klause.solver.pipeline/ComponentPlan).com.eignex.klause.solver.pipeline/openBooleanCandidate(com.eignex.klause.ir/Problem, com.eignex.klause.solver.pipeline/OpenCandidateParams = ...): com.eignex.klause.solver.pipeline/OpenBooleanCandidate? // com.eignex.klause.solver.pipeline/openBooleanCandidate|openBooleanCandidate@com.eignex.klause.solver.pipeline.ComponentPlan(com.eignex.klause.ir.Problem;com.eignex.klause.solver.pipeline.OpenCandidateParams){}[0]
 final fun (com.eignex.klause.solver.pipeline/ComponentPlan).com.eignex.klause.solver.pipeline/search(com.eignex.klause.ir/Problem, kotlin.collections/Map<kotlin/Int, com.eignex.klause.ir/IntDomain>, kotlin/Long = ..., com.eignex.klause.util/Cancellation = ..., com.eignex.klause.solver.search/SearchLearnedDbParams = ...): com.eignex.klause.solver.pipeline/PlannedSearch // com.eignex.klause.solver.pipeline/search|search@com.eignex.klause.solver.pipeline.ComponentPlan(com.eignex.klause.ir.Problem;kotlin.collections.Map<kotlin.Int,com.eignex.klause.ir.IntDomain>;kotlin.Long;com.eignex.klause.util.Cancellation;com.eignex.klause.solver.search.SearchLearnedDbParams){}[0]
 final fun (com.eignex.klause.solver.pipeline/FinitePipeline).com.eignex.klause.solver.pipeline/backtrackSolver(com.eignex.klause.propagation/BakedProblem): com.eignex.klause.backtrack/BacktrackSolver // com.eignex.klause.solver.pipeline/backtrackSolver|backtrackSolver@com.eignex.klause.solver.pipeline.FinitePipeline(com.eignex.klause.propagation.BakedProblem){}[0]
 final fun (com.eignex.klause.solver.pipeline/FinitePipeline).com.eignex.klause.solver.pipeline/planFixedBacktrack(com.eignex.klause.solver.pipeline/FixedBacktrackPlanRequest): com.eignex.klause.solver.pipeline/FixedBacktrackPlan // com.eignex.klause.solver.pipeline/planFixedBacktrack|planFixedBacktrack@com.eignex.klause.solver.pipeline.FinitePipeline(com.eignex.klause.solver.pipeline.FixedBacktrackPlanRequest){}[0]
