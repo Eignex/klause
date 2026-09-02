@@ -6,7 +6,6 @@ import com.eignex.klause.backtrack.selector.IndomainRandom
 import com.eignex.klause.backtrack.selector.InputOrder
 import com.eignex.klause.backtrack.selector.RandomVariable
 import com.eignex.klause.backtrack.selector.SmallestDomain
-import com.eignex.klause.backtrack.selector.VarRef
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
@@ -14,6 +13,7 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
+import com.eignex.klause.solver.search.VarRef
 import com.eignex.kumulant.bandit.univariate.MultiArmedBandit
 import com.eignex.kumulant.bandit.univariate.UCB1
 import kotlin.test.Test

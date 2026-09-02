@@ -5,7 +5,6 @@ import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.backtrack.selector.IndomainMin
 import com.eignex.klause.backtrack.selector.InputOrder
 import com.eignex.klause.backtrack.selector.ValueSelector
-import com.eignex.klause.backtrack.selector.VarRef
 import com.eignex.klause.backtrack.selector.VariableSelector
 import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.bool.Clause
@@ -15,6 +14,7 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.search.VarRef
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals

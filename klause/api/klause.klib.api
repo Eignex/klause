@@ -446,6 +446,23 @@ final enum class com.eignex.klause.solver.pipeline/IntVariableOwner : kotlin/Enu
     final fun values(): kotlin/Array<com.eignex.klause.solver.pipeline/IntVariableOwner> // com.eignex.klause.solver.pipeline/IntVariableOwner.values|values#static(){}[0]
 }
 
+final enum class com.eignex.klause.solver.pipeline/OpenBranching : kotlin/Enum<com.eignex.klause.solver.pipeline/OpenBranching> { // com.eignex.klause.solver.pipeline/OpenBranching|null[0]
+    enum entry Activity // com.eignex.klause.solver.pipeline/OpenBranching.Activity|null[0]
+    enum entry SourceOrder // com.eignex.klause.solver.pipeline/OpenBranching.SourceOrder|null[0]
+
+    final val entries // com.eignex.klause.solver.pipeline/OpenBranching.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<com.eignex.klause.solver.pipeline/OpenBranching> // com.eignex.klause.solver.pipeline/OpenBranching.entries.<get-entries>|<get-entries>#static(){}[0]
+    final val id // com.eignex.klause.solver.pipeline/OpenBranching.id|{}id[0]
+        final fun <get-id>(): kotlin/String // com.eignex.klause.solver.pipeline/OpenBranching.id.<get-id>|<get-id>(){}[0]
+
+    final fun valueOf(kotlin/String): com.eignex.klause.solver.pipeline/OpenBranching // com.eignex.klause.solver.pipeline/OpenBranching.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<com.eignex.klause.solver.pipeline/OpenBranching> // com.eignex.klause.solver.pipeline/OpenBranching.values|values#static(){}[0]
+
+    final object Companion { // com.eignex.klause.solver.pipeline/OpenBranching.Companion|null[0]
+        final fun of(kotlin/String): com.eignex.klause.solver.pipeline/OpenBranching? // com.eignex.klause.solver.pipeline/OpenBranching.Companion.of|of(kotlin.String){}[0]
+    }
+}
+
 final enum class com.eignex.klause.solver.pipeline/ProblemPipeline : kotlin/Enum<com.eignex.klause.solver.pipeline/ProblemPipeline> { // com.eignex.klause.solver.pipeline/ProblemPipeline|null[0]
     enum entry DIFFERENCE_THEORY // com.eignex.klause.solver.pipeline/ProblemPipeline.DIFFERENCE_THEORY|null[0]
     enum entry EXACT_LIRA // com.eignex.klause.solver.pipeline/ProblemPipeline.EXACT_LIRA|null[0]
@@ -666,6 +683,10 @@ abstract fun interface com.eignex.klause.solver.search/SearchDecisionBudget { //
     }
 }
 
+abstract fun interface com.eignex.klause.solver.search/SearchUnassignListener { // com.eignex.klause.solver.search/SearchUnassignListener|null[0]
+    abstract fun onUnassign(kotlin/Int) // com.eignex.klause.solver.search/SearchUnassignListener.onUnassign|onUnassign(kotlin.Int){}[0]
+}
+
 abstract fun interface com.eignex.klause.util/Cancellation { // com.eignex.klause.util/Cancellation|null[0]
     abstract fun isCancelled(): kotlin/Boolean // com.eignex.klause.util/Cancellation.isCancelled|isCancelled(){}[0]
     open fun and(com.eignex.klause.util/Cancellation): com.eignex.klause.util/Cancellation // com.eignex.klause.util/Cancellation.and|and(com.eignex.klause.util.Cancellation){}[0]
@@ -731,6 +752,19 @@ abstract interface <#A: com.eignex.klause.solver/SolverParams> com.eignex.klause
     open fun session(): com.eignex.klause.solver/Session<#A> // com.eignex.klause.solver/Solver.session|session(){}[0]
 }
 
+abstract interface <#A: kotlin/Any?> com.eignex.klause.solver.search/VariableBranching { // com.eignex.klause.solver.search/VariableBranching|null[0]
+    open val tracksUnassign // com.eignex.klause.solver.search/VariableBranching.tracksUnassign|{}tracksUnassign[0]
+        open fun <get-tracksUnassign>(): kotlin/Boolean // com.eignex.klause.solver.search/VariableBranching.tracksUnassign.<get-tracksUnassign>|<get-tracksUnassign>(){}[0]
+
+    abstract fun fresh(): com.eignex.klause.solver.search/VariableBranching<#A> // com.eignex.klause.solver.search/VariableBranching.fresh|fresh(){}[0]
+    abstract fun pick(#A, kotlin.random/Random): com.eignex.klause.solver.search/VarRef? // com.eignex.klause.solver.search/VariableBranching.pick|pick(1:0;kotlin.random.Random){}[0]
+    open fun onCommit(com.eignex.klause.solver.search/VarRef) // com.eignex.klause.solver.search/VariableBranching.onCommit|onCommit(com.eignex.klause.solver.search.VarRef){}[0]
+    open fun onConflict(com.eignex.klause.solver.search/VarRef) // com.eignex.klause.solver.search/VariableBranching.onConflict|onConflict(com.eignex.klause.solver.search.VarRef){}[0]
+    open fun onConflict(com.eignex.klause.solver.search/VarRef?, com.eignex.klause.solver.search/BranchingConflict) // com.eignex.klause.solver.search/VariableBranching.onConflict|onConflict(com.eignex.klause.solver.search.VarRef?;com.eignex.klause.solver.search.BranchingConflict){}[0]
+    open fun onRestart() // com.eignex.klause.solver.search/VariableBranching.onRestart|onRestart(){}[0]
+    open fun onUnassign(com.eignex.klause.solver.search/VarRef) // com.eignex.klause.solver.search/VariableBranching.onUnassign|onUnassign(com.eignex.klause.solver.search.VarRef){}[0]
+}
+
 abstract interface <#A: out kotlin/Any?> com.eignex.klause.theory/Theory { // com.eignex.klause.theory/Theory|null[0]
     abstract val model // com.eignex.klause.theory/Theory.model|{}model[0]
         abstract fun <get-model>(): com.eignex.klause.ir/Problem // com.eignex.klause.theory/Theory.model.<get-model>|<get-model>(){}[0]
@@ -740,26 +774,19 @@ abstract interface <#A: out kotlin/Any?> com.eignex.klause.theory/Theory { // co
 
 abstract interface com.eignex.klause.backtrack.selector/ValueSelector { // com.eignex.klause.backtrack.selector/ValueSelector|null[0]
     abstract fun fresh(): com.eignex.klause.backtrack.selector/ValueSelector // com.eignex.klause.backtrack.selector/ValueSelector.fresh|fresh(){}[0]
-    abstract fun values(com.eignex.klause.propagation/PropagationSession, com.eignex.klause.backtrack.selector/VarRef, kotlin.random/Random): kotlin.sequences/Sequence<kotlin/Long> // com.eignex.klause.backtrack.selector/ValueSelector.values|values(com.eignex.klause.propagation.PropagationSession;com.eignex.klause.backtrack.selector.VarRef;kotlin.random.Random){}[0]
-    open fun onCommit(com.eignex.klause.backtrack.selector/VarRef, kotlin/Long) // com.eignex.klause.backtrack.selector/ValueSelector.onCommit|onCommit(com.eignex.klause.backtrack.selector.VarRef;kotlin.Long){}[0]
-    open fun onConflict(com.eignex.klause.backtrack.selector/VarRef, kotlin/Long) // com.eignex.klause.backtrack.selector/ValueSelector.onConflict|onConflict(com.eignex.klause.backtrack.selector.VarRef;kotlin.Long){}[0]
+    abstract fun values(com.eignex.klause.propagation/PropagationSession, com.eignex.klause.solver.search/VarRef, kotlin.random/Random): kotlin.sequences/Sequence<kotlin/Long> // com.eignex.klause.backtrack.selector/ValueSelector.values|values(com.eignex.klause.propagation.PropagationSession;com.eignex.klause.solver.search.VarRef;kotlin.random.Random){}[0]
+    open fun onCommit(com.eignex.klause.solver.search/VarRef, kotlin/Long) // com.eignex.klause.backtrack.selector/ValueSelector.onCommit|onCommit(com.eignex.klause.solver.search.VarRef;kotlin.Long){}[0]
+    open fun onConflict(com.eignex.klause.solver.search/VarRef, kotlin/Long) // com.eignex.klause.backtrack.selector/ValueSelector.onConflict|onConflict(com.eignex.klause.solver.search.VarRef;kotlin.Long){}[0]
     open fun onRestart() // com.eignex.klause.backtrack.selector/ValueSelector.onRestart|onRestart(){}[0]
     open fun onSolution(com.eignex.klause.solver/Sample) // com.eignex.klause.backtrack.selector/ValueSelector.onSolution|onSolution(com.eignex.klause.solver.Sample){}[0]
 }
 
-abstract interface com.eignex.klause.backtrack.selector/VariableSelector { // com.eignex.klause.backtrack.selector/VariableSelector|null[0]
-    open val tracksUnassign // com.eignex.klause.backtrack.selector/VariableSelector.tracksUnassign|{}tracksUnassign[0]
-        open fun <get-tracksUnassign>(): kotlin/Boolean // com.eignex.klause.backtrack.selector/VariableSelector.tracksUnassign.<get-tracksUnassign>|<get-tracksUnassign>(){}[0]
-
+abstract interface com.eignex.klause.backtrack.selector/VariableSelector : com.eignex.klause.solver.search/VariableBranching<com.eignex.klause.propagation/PropagationSession> { // com.eignex.klause.backtrack.selector/VariableSelector|null[0]
     abstract fun fresh(): com.eignex.klause.backtrack.selector/VariableSelector // com.eignex.klause.backtrack.selector/VariableSelector.fresh|fresh(){}[0]
-    abstract fun pick(com.eignex.klause.propagation/PropagationSession, kotlin.random/Random): com.eignex.klause.backtrack.selector/VarRef? // com.eignex.klause.backtrack.selector/VariableSelector.pick|pick(com.eignex.klause.propagation.PropagationSession;kotlin.random.Random){}[0]
-    open fun onCommit(com.eignex.klause.backtrack.selector/VarRef) // com.eignex.klause.backtrack.selector/VariableSelector.onCommit|onCommit(com.eignex.klause.backtrack.selector.VarRef){}[0]
-    open fun onConflict(com.eignex.klause.backtrack.selector/VarRef) // com.eignex.klause.backtrack.selector/VariableSelector.onConflict|onConflict(com.eignex.klause.backtrack.selector.VarRef){}[0]
-    open fun onConflict(com.eignex.klause.backtrack.selector/VarRef, com.eignex.klause.propagation/PropagationResult.Unsat) // com.eignex.klause.backtrack.selector/VariableSelector.onConflict|onConflict(com.eignex.klause.backtrack.selector.VarRef;com.eignex.klause.propagation.PropagationResult.Unsat){}[0]
+    abstract fun pick(com.eignex.klause.propagation/PropagationSession, kotlin.random/Random): com.eignex.klause.solver.search/VarRef? // com.eignex.klause.backtrack.selector/VariableSelector.pick|pick(com.eignex.klause.propagation.PropagationSession;kotlin.random.Random){}[0]
+    open fun onConflict(com.eignex.klause.solver.search/VarRef, com.eignex.klause.propagation/PropagationResult.Unsat) // com.eignex.klause.backtrack.selector/VariableSelector.onConflict|onConflict(com.eignex.klause.solver.search.VarRef;com.eignex.klause.propagation.PropagationResult.Unsat){}[0]
     open fun onPropagation(com.eignex.klause.propagation/PropagationResult.Implied) // com.eignex.klause.backtrack.selector/VariableSelector.onPropagation|onPropagation(com.eignex.klause.propagation.PropagationResult.Implied){}[0]
-    open fun onRestart() // com.eignex.klause.backtrack.selector/VariableSelector.onRestart|onRestart(){}[0]
     open fun onSolution(com.eignex.klause.solver/Sample) // com.eignex.klause.backtrack.selector/VariableSelector.onSolution|onSolution(com.eignex.klause.solver.Sample){}[0]
-    open fun onUnassign(com.eignex.klause.backtrack.selector/VarRef) // com.eignex.klause.backtrack.selector/VariableSelector.onUnassign|onUnassign(com.eignex.klause.backtrack.selector.VarRef){}[0]
 }
 
 abstract interface com.eignex.klause.factor/ReifiedFactor : com.eignex.klause.ir/Factor { // com.eignex.klause.factor/ReifiedFactor|null[0]
@@ -989,6 +1016,16 @@ abstract interface com.eignex.klause.solver.objective/IncrementalObjective : com
 abstract interface com.eignex.klause.solver.objective/Objective { // com.eignex.klause.solver.objective/Objective|null[0]
     abstract fun evaluate(com.eignex.klause.solver/Sample): kotlin/Double // com.eignex.klause.solver.objective/Objective.evaluate|evaluate(com.eignex.klause.solver.Sample){}[0]
     open fun evaluate(com.eignex.klause.solver/Assignment): kotlin/Double // com.eignex.klause.solver.objective/Objective.evaluate|evaluate(com.eignex.klause.solver.Assignment){}[0]
+}
+
+abstract interface com.eignex.klause.solver.search/BranchingState { // com.eignex.klause.solver.search/BranchingState|null[0]
+    abstract val numBoolVars // com.eignex.klause.solver.search/BranchingState.numBoolVars|{}numBoolVars[0]
+        abstract fun <get-numBoolVars>(): kotlin/Int // com.eignex.klause.solver.search/BranchingState.numBoolVars.<get-numBoolVars>|<get-numBoolVars>(){}[0]
+    abstract val numIntVars // com.eignex.klause.solver.search/BranchingState.numIntVars|{}numIntVars[0]
+        abstract fun <get-numIntVars>(): kotlin/Int // com.eignex.klause.solver.search/BranchingState.numIntVars.<get-numIntVars>|<get-numIntVars>(){}[0]
+
+    abstract fun boolValue(kotlin/Int): kotlin/Boolean? // com.eignex.klause.solver.search/BranchingState.boolValue|boolValue(kotlin.Int){}[0]
+    abstract fun intFixed(kotlin/Int): kotlin/Boolean // com.eignex.klause.solver.search/BranchingState.intFixed|intFixed(kotlin.Int){}[0]
 }
 
 abstract interface com.eignex.klause.solver.search/SearchBrancher : com.eignex.klause.solver.search/SearchComponent { // com.eignex.klause.solver.search/SearchBrancher|null[0]
@@ -1264,37 +1301,6 @@ sealed interface <#A: out kotlin/Any?> com.eignex.klause.theory/TheoryCheck { //
         final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.theory/TheoryCheck.Cancelled.equals|equals(kotlin.Any?){}[0]
         final fun hashCode(): kotlin/Int // com.eignex.klause.theory/TheoryCheck.Cancelled.hashCode|hashCode(){}[0]
         final fun toString(): kotlin/String // com.eignex.klause.theory/TheoryCheck.Cancelled.toString|toString(){}[0]
-    }
-}
-
-sealed interface com.eignex.klause.backtrack.selector/VarRef { // com.eignex.klause.backtrack.selector/VarRef|null[0]
-    abstract val varId // com.eignex.klause.backtrack.selector/VarRef.varId|{}varId[0]
-        abstract fun <get-varId>(): kotlin/Int // com.eignex.klause.backtrack.selector/VarRef.varId.<get-varId>|<get-varId>(){}[0]
-
-    final class Bool : com.eignex.klause.backtrack.selector/VarRef { // com.eignex.klause.backtrack.selector/VarRef.Bool|null[0]
-        constructor <init>(kotlin/Int) // com.eignex.klause.backtrack.selector/VarRef.Bool.<init>|<init>(kotlin.Int){}[0]
-
-        final val varId // com.eignex.klause.backtrack.selector/VarRef.Bool.varId|{}varId[0]
-            final fun <get-varId>(): kotlin/Int // com.eignex.klause.backtrack.selector/VarRef.Bool.varId.<get-varId>|<get-varId>(){}[0]
-
-        final fun component1(): kotlin/Int // com.eignex.klause.backtrack.selector/VarRef.Bool.component1|component1(){}[0]
-        final fun copy(kotlin/Int = ...): com.eignex.klause.backtrack.selector/VarRef.Bool // com.eignex.klause.backtrack.selector/VarRef.Bool.copy|copy(kotlin.Int){}[0]
-        final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.backtrack.selector/VarRef.Bool.equals|equals(kotlin.Any?){}[0]
-        final fun hashCode(): kotlin/Int // com.eignex.klause.backtrack.selector/VarRef.Bool.hashCode|hashCode(){}[0]
-        final fun toString(): kotlin/String // com.eignex.klause.backtrack.selector/VarRef.Bool.toString|toString(){}[0]
-    }
-
-    final class IntVar : com.eignex.klause.backtrack.selector/VarRef { // com.eignex.klause.backtrack.selector/VarRef.IntVar|null[0]
-        constructor <init>(kotlin/Int) // com.eignex.klause.backtrack.selector/VarRef.IntVar.<init>|<init>(kotlin.Int){}[0]
-
-        final val varId // com.eignex.klause.backtrack.selector/VarRef.IntVar.varId|{}varId[0]
-            final fun <get-varId>(): kotlin/Int // com.eignex.klause.backtrack.selector/VarRef.IntVar.varId.<get-varId>|<get-varId>(){}[0]
-
-        final fun component1(): kotlin/Int // com.eignex.klause.backtrack.selector/VarRef.IntVar.component1|component1(){}[0]
-        final fun copy(kotlin/Int = ...): com.eignex.klause.backtrack.selector/VarRef.IntVar // com.eignex.klause.backtrack.selector/VarRef.IntVar.copy|copy(kotlin.Int){}[0]
-        final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.backtrack.selector/VarRef.IntVar.equals|equals(kotlin.Any?){}[0]
-        final fun hashCode(): kotlin/Int // com.eignex.klause.backtrack.selector/VarRef.IntVar.hashCode|hashCode(){}[0]
-        final fun toString(): kotlin/String // com.eignex.klause.backtrack.selector/VarRef.IntVar.toString|toString(){}[0]
     }
 }
 
@@ -3152,6 +3158,37 @@ sealed interface com.eignex.klause.solver.search/SearchRunEvent { // com.eignex.
     }
 }
 
+sealed interface com.eignex.klause.solver.search/VarRef { // com.eignex.klause.solver.search/VarRef|null[0]
+    abstract val varId // com.eignex.klause.solver.search/VarRef.varId|{}varId[0]
+        abstract fun <get-varId>(): kotlin/Int // com.eignex.klause.solver.search/VarRef.varId.<get-varId>|<get-varId>(){}[0]
+
+    final class Bool : com.eignex.klause.solver.search/VarRef { // com.eignex.klause.solver.search/VarRef.Bool|null[0]
+        constructor <init>(kotlin/Int) // com.eignex.klause.solver.search/VarRef.Bool.<init>|<init>(kotlin.Int){}[0]
+
+        final val varId // com.eignex.klause.solver.search/VarRef.Bool.varId|{}varId[0]
+            final fun <get-varId>(): kotlin/Int // com.eignex.klause.solver.search/VarRef.Bool.varId.<get-varId>|<get-varId>(){}[0]
+
+        final fun component1(): kotlin/Int // com.eignex.klause.solver.search/VarRef.Bool.component1|component1(){}[0]
+        final fun copy(kotlin/Int = ...): com.eignex.klause.solver.search/VarRef.Bool // com.eignex.klause.solver.search/VarRef.Bool.copy|copy(kotlin.Int){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.search/VarRef.Bool.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.eignex.klause.solver.search/VarRef.Bool.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.eignex.klause.solver.search/VarRef.Bool.toString|toString(){}[0]
+    }
+
+    final class IntVar : com.eignex.klause.solver.search/VarRef { // com.eignex.klause.solver.search/VarRef.IntVar|null[0]
+        constructor <init>(kotlin/Int) // com.eignex.klause.solver.search/VarRef.IntVar.<init>|<init>(kotlin.Int){}[0]
+
+        final val varId // com.eignex.klause.solver.search/VarRef.IntVar.varId|{}varId[0]
+            final fun <get-varId>(): kotlin/Int // com.eignex.klause.solver.search/VarRef.IntVar.varId.<get-varId>|<get-varId>(){}[0]
+
+        final fun component1(): kotlin/Int // com.eignex.klause.solver.search/VarRef.IntVar.component1|component1(){}[0]
+        final fun copy(kotlin/Int = ...): com.eignex.klause.solver.search/VarRef.IntVar // com.eignex.klause.solver.search/VarRef.IntVar.copy|copy(kotlin.Int){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.search/VarRef.IntVar.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.eignex.klause.solver.search/VarRef.IntVar.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.eignex.klause.solver.search/VarRef.IntVar.toString|toString(){}[0]
+    }
+}
+
 sealed interface com.eignex.klause.solver/ConstList { // com.eignex.klause.solver/ConstList|null[0]
     abstract val size // com.eignex.klause.solver/ConstList.size|{}size[0]
         abstract fun <get-size>(): kotlin/Int // com.eignex.klause.solver/ConstList.size.<get-size>|<get-size>(){}[0]
@@ -3302,10 +3339,10 @@ final class com.eignex.klause.backtrack.selector/Chb : com.eignex.klause.backtra
     constructor <init>(kotlin/Double = ..., kotlin/Double = ..., kotlin/Double = ..., kotlin/Double = ..., kotlin/Double = ...) // com.eignex.klause.backtrack.selector/Chb.<init>|<init>(kotlin.Double;kotlin.Double;kotlin.Double;kotlin.Double;kotlin.Double){}[0]
 
     final fun fresh(): com.eignex.klause.backtrack.selector/Chb // com.eignex.klause.backtrack.selector/Chb.fresh|fresh(){}[0]
-    final fun onCommit(com.eignex.klause.backtrack.selector/VarRef) // com.eignex.klause.backtrack.selector/Chb.onCommit|onCommit(com.eignex.klause.backtrack.selector.VarRef){}[0]
-    final fun onConflict(com.eignex.klause.backtrack.selector/VarRef, com.eignex.klause.propagation/PropagationResult.Unsat) // com.eignex.klause.backtrack.selector/Chb.onConflict|onConflict(com.eignex.klause.backtrack.selector.VarRef;com.eignex.klause.propagation.PropagationResult.Unsat){}[0]
+    final fun onCommit(com.eignex.klause.solver.search/VarRef) // com.eignex.klause.backtrack.selector/Chb.onCommit|onCommit(com.eignex.klause.solver.search.VarRef){}[0]
+    final fun onConflict(com.eignex.klause.solver.search/VarRef, com.eignex.klause.propagation/PropagationResult.Unsat) // com.eignex.klause.backtrack.selector/Chb.onConflict|onConflict(com.eignex.klause.solver.search.VarRef;com.eignex.klause.propagation.PropagationResult.Unsat){}[0]
     final fun onPropagation(com.eignex.klause.propagation/PropagationResult.Implied) // com.eignex.klause.backtrack.selector/Chb.onPropagation|onPropagation(com.eignex.klause.propagation.PropagationResult.Implied){}[0]
-    final fun pick(com.eignex.klause.propagation/PropagationSession, kotlin.random/Random): com.eignex.klause.backtrack.selector/VarRef? // com.eignex.klause.backtrack.selector/Chb.pick|pick(com.eignex.klause.propagation.PropagationSession;kotlin.random.Random){}[0]
+    final fun pick(com.eignex.klause.propagation/PropagationSession, kotlin.random/Random): com.eignex.klause.solver.search/VarRef? // com.eignex.klause.backtrack.selector/Chb.pick|pick(com.eignex.klause.propagation.PropagationSession;kotlin.random.Random){}[0]
 }
 
 final class com.eignex.klause.backtrack.selector/LastConflict : com.eignex.klause.backtrack.selector/VariableSelector { // com.eignex.klause.backtrack.selector/LastConflict|null[0]
@@ -3315,24 +3352,24 @@ final class com.eignex.klause.backtrack.selector/LastConflict : com.eignex.klaus
         final fun <get-tracksUnassign>(): kotlin/Boolean // com.eignex.klause.backtrack.selector/LastConflict.tracksUnassign.<get-tracksUnassign>|<get-tracksUnassign>(){}[0]
 
     final fun fresh(): com.eignex.klause.backtrack.selector/LastConflict // com.eignex.klause.backtrack.selector/LastConflict.fresh|fresh(){}[0]
-    final fun onCommit(com.eignex.klause.backtrack.selector/VarRef) // com.eignex.klause.backtrack.selector/LastConflict.onCommit|onCommit(com.eignex.klause.backtrack.selector.VarRef){}[0]
-    final fun onConflict(com.eignex.klause.backtrack.selector/VarRef) // com.eignex.klause.backtrack.selector/LastConflict.onConflict|onConflict(com.eignex.klause.backtrack.selector.VarRef){}[0]
-    final fun onConflict(com.eignex.klause.backtrack.selector/VarRef, com.eignex.klause.propagation/PropagationResult.Unsat) // com.eignex.klause.backtrack.selector/LastConflict.onConflict|onConflict(com.eignex.klause.backtrack.selector.VarRef;com.eignex.klause.propagation.PropagationResult.Unsat){}[0]
+    final fun onCommit(com.eignex.klause.solver.search/VarRef) // com.eignex.klause.backtrack.selector/LastConflict.onCommit|onCommit(com.eignex.klause.solver.search.VarRef){}[0]
+    final fun onConflict(com.eignex.klause.solver.search/VarRef) // com.eignex.klause.backtrack.selector/LastConflict.onConflict|onConflict(com.eignex.klause.solver.search.VarRef){}[0]
+    final fun onConflict(com.eignex.klause.solver.search/VarRef, com.eignex.klause.propagation/PropagationResult.Unsat) // com.eignex.klause.backtrack.selector/LastConflict.onConflict|onConflict(com.eignex.klause.solver.search.VarRef;com.eignex.klause.propagation.PropagationResult.Unsat){}[0]
     final fun onPropagation(com.eignex.klause.propagation/PropagationResult.Implied) // com.eignex.klause.backtrack.selector/LastConflict.onPropagation|onPropagation(com.eignex.klause.propagation.PropagationResult.Implied){}[0]
     final fun onRestart() // com.eignex.klause.backtrack.selector/LastConflict.onRestart|onRestart(){}[0]
     final fun onSolution(com.eignex.klause.solver/Sample) // com.eignex.klause.backtrack.selector/LastConflict.onSolution|onSolution(com.eignex.klause.solver.Sample){}[0]
-    final fun onUnassign(com.eignex.klause.backtrack.selector/VarRef) // com.eignex.klause.backtrack.selector/LastConflict.onUnassign|onUnassign(com.eignex.klause.backtrack.selector.VarRef){}[0]
-    final fun pick(com.eignex.klause.propagation/PropagationSession, kotlin.random/Random): com.eignex.klause.backtrack.selector/VarRef? // com.eignex.klause.backtrack.selector/LastConflict.pick|pick(com.eignex.klause.propagation.PropagationSession;kotlin.random.Random){}[0]
+    final fun onUnassign(com.eignex.klause.solver.search/VarRef) // com.eignex.klause.backtrack.selector/LastConflict.onUnassign|onUnassign(com.eignex.klause.solver.search.VarRef){}[0]
+    final fun pick(com.eignex.klause.propagation/PropagationSession, kotlin.random/Random): com.eignex.klause.solver.search/VarRef? // com.eignex.klause.backtrack.selector/LastConflict.pick|pick(com.eignex.klause.propagation.PropagationSession;kotlin.random.Random){}[0]
 }
 
 final class com.eignex.klause.backtrack.selector/RegressionVariableSelector : com.eignex.klause.backtrack.selector/VariableSelector { // com.eignex.klause.backtrack.selector/RegressionVariableSelector|null[0]
     final fun fresh(): com.eignex.klause.backtrack.selector/RegressionVariableSelector // com.eignex.klause.backtrack.selector/RegressionVariableSelector.fresh|fresh(){}[0]
-    final fun onConflict(com.eignex.klause.backtrack.selector/VarRef) // com.eignex.klause.backtrack.selector/RegressionVariableSelector.onConflict|onConflict(com.eignex.klause.backtrack.selector.VarRef){}[0]
-    final fun onConflict(com.eignex.klause.backtrack.selector/VarRef, com.eignex.klause.propagation/PropagationResult.Unsat) // com.eignex.klause.backtrack.selector/RegressionVariableSelector.onConflict|onConflict(com.eignex.klause.backtrack.selector.VarRef;com.eignex.klause.propagation.PropagationResult.Unsat){}[0]
+    final fun onConflict(com.eignex.klause.solver.search/VarRef) // com.eignex.klause.backtrack.selector/RegressionVariableSelector.onConflict|onConflict(com.eignex.klause.solver.search.VarRef){}[0]
+    final fun onConflict(com.eignex.klause.solver.search/VarRef, com.eignex.klause.propagation/PropagationResult.Unsat) // com.eignex.klause.backtrack.selector/RegressionVariableSelector.onConflict|onConflict(com.eignex.klause.solver.search.VarRef;com.eignex.klause.propagation.PropagationResult.Unsat){}[0]
     final fun onPropagation(com.eignex.klause.propagation/PropagationResult.Implied) // com.eignex.klause.backtrack.selector/RegressionVariableSelector.onPropagation|onPropagation(com.eignex.klause.propagation.PropagationResult.Implied){}[0]
     final fun onRestart() // com.eignex.klause.backtrack.selector/RegressionVariableSelector.onRestart|onRestart(){}[0]
     final fun onSolution(com.eignex.klause.solver/Sample) // com.eignex.klause.backtrack.selector/RegressionVariableSelector.onSolution|onSolution(com.eignex.klause.solver.Sample){}[0]
-    final fun pick(com.eignex.klause.propagation/PropagationSession, kotlin.random/Random): com.eignex.klause.backtrack.selector/VarRef? // com.eignex.klause.backtrack.selector/RegressionVariableSelector.pick|pick(com.eignex.klause.propagation.PropagationSession;kotlin.random.Random){}[0]
+    final fun pick(com.eignex.klause.propagation/PropagationSession, kotlin.random/Random): com.eignex.klause.solver.search/VarRef? // com.eignex.klause.backtrack.selector/RegressionVariableSelector.pick|pick(com.eignex.klause.propagation.PropagationSession;kotlin.random.Random){}[0]
 
     final object Companion { // com.eignex.klause.backtrack.selector/RegressionVariableSelector.Companion|null[0]
         final const val FEATURE_SIZE // com.eignex.klause.backtrack.selector/RegressionVariableSelector.Companion.FEATURE_SIZE|{}FEATURE_SIZE[0]
@@ -3346,23 +3383,11 @@ final class com.eignex.klause.backtrack.selector/SolutionGuided : com.eignex.kla
     constructor <init>(com.eignex.klause.backtrack.selector/ValueSelector) // com.eignex.klause.backtrack.selector/SolutionGuided.<init>|<init>(com.eignex.klause.backtrack.selector.ValueSelector){}[0]
 
     final fun fresh(): com.eignex.klause.backtrack.selector/SolutionGuided // com.eignex.klause.backtrack.selector/SolutionGuided.fresh|fresh(){}[0]
-    final fun onCommit(com.eignex.klause.backtrack.selector/VarRef, kotlin/Long) // com.eignex.klause.backtrack.selector/SolutionGuided.onCommit|onCommit(com.eignex.klause.backtrack.selector.VarRef;kotlin.Long){}[0]
-    final fun onConflict(com.eignex.klause.backtrack.selector/VarRef, kotlin/Long) // com.eignex.klause.backtrack.selector/SolutionGuided.onConflict|onConflict(com.eignex.klause.backtrack.selector.VarRef;kotlin.Long){}[0]
+    final fun onCommit(com.eignex.klause.solver.search/VarRef, kotlin/Long) // com.eignex.klause.backtrack.selector/SolutionGuided.onCommit|onCommit(com.eignex.klause.solver.search.VarRef;kotlin.Long){}[0]
+    final fun onConflict(com.eignex.klause.solver.search/VarRef, kotlin/Long) // com.eignex.klause.backtrack.selector/SolutionGuided.onConflict|onConflict(com.eignex.klause.solver.search.VarRef;kotlin.Long){}[0]
     final fun onRestart() // com.eignex.klause.backtrack.selector/SolutionGuided.onRestart|onRestart(){}[0]
     final fun onSolution(com.eignex.klause.solver/Sample) // com.eignex.klause.backtrack.selector/SolutionGuided.onSolution|onSolution(com.eignex.klause.solver.Sample){}[0]
-    final fun values(com.eignex.klause.propagation/PropagationSession, com.eignex.klause.backtrack.selector/VarRef, kotlin.random/Random): kotlin.sequences/Sequence<kotlin/Long> // com.eignex.klause.backtrack.selector/SolutionGuided.values|values(com.eignex.klause.propagation.PropagationSession;com.eignex.klause.backtrack.selector.VarRef;kotlin.random.Random){}[0]
-}
-
-final class com.eignex.klause.backtrack.selector/Vsids : com.eignex.klause.backtrack.selector/VariableSelector { // com.eignex.klause.backtrack.selector/Vsids|null[0]
-    constructor <init>(kotlin/Double = ..., kotlin/Double = ...) // com.eignex.klause.backtrack.selector/Vsids.<init>|<init>(kotlin.Double;kotlin.Double){}[0]
-
-    final val tracksUnassign // com.eignex.klause.backtrack.selector/Vsids.tracksUnassign|{}tracksUnassign[0]
-        final fun <get-tracksUnassign>(): kotlin/Boolean // com.eignex.klause.backtrack.selector/Vsids.tracksUnassign.<get-tracksUnassign>|<get-tracksUnassign>(){}[0]
-
-    final fun fresh(): com.eignex.klause.backtrack.selector/Vsids // com.eignex.klause.backtrack.selector/Vsids.fresh|fresh(){}[0]
-    final fun onConflict(com.eignex.klause.backtrack.selector/VarRef, com.eignex.klause.propagation/PropagationResult.Unsat) // com.eignex.klause.backtrack.selector/Vsids.onConflict|onConflict(com.eignex.klause.backtrack.selector.VarRef;com.eignex.klause.propagation.PropagationResult.Unsat){}[0]
-    final fun onUnassign(com.eignex.klause.backtrack.selector/VarRef) // com.eignex.klause.backtrack.selector/Vsids.onUnassign|onUnassign(com.eignex.klause.backtrack.selector.VarRef){}[0]
-    final fun pick(com.eignex.klause.propagation/PropagationSession, kotlin.random/Random): com.eignex.klause.backtrack.selector/VarRef? // com.eignex.klause.backtrack.selector/Vsids.pick|pick(com.eignex.klause.propagation.PropagationSession;kotlin.random.Random){}[0]
+    final fun values(com.eignex.klause.propagation/PropagationSession, com.eignex.klause.solver.search/VarRef, kotlin.random/Random): kotlin.sequences/Sequence<kotlin/Long> // com.eignex.klause.backtrack.selector/SolutionGuided.values|values(com.eignex.klause.propagation.PropagationSession;com.eignex.klause.solver.search.VarRef;kotlin.random.Random){}[0]
 }
 
 final class com.eignex.klause.backtrack/BacktrackParams : com.eignex.klause.solver/SolverParams { // com.eignex.klause.backtrack/BacktrackParams|null[0]
@@ -3583,11 +3608,11 @@ final class com.eignex.klause.backtrack/TieredValueSelector : com.eignex.klause.
         final fun <get-tiers>(): kotlin.collections/List<com.eignex.klause.backtrack/SearchTier> // com.eignex.klause.backtrack/TieredValueSelector.tiers.<get-tiers>|<get-tiers>(){}[0]
 
     final fun fresh(): com.eignex.klause.backtrack/TieredValueSelector // com.eignex.klause.backtrack/TieredValueSelector.fresh|fresh(){}[0]
-    final fun onCommit(com.eignex.klause.backtrack.selector/VarRef, kotlin/Long) // com.eignex.klause.backtrack/TieredValueSelector.onCommit|onCommit(com.eignex.klause.backtrack.selector.VarRef;kotlin.Long){}[0]
-    final fun onConflict(com.eignex.klause.backtrack.selector/VarRef, kotlin/Long) // com.eignex.klause.backtrack/TieredValueSelector.onConflict|onConflict(com.eignex.klause.backtrack.selector.VarRef;kotlin.Long){}[0]
+    final fun onCommit(com.eignex.klause.solver.search/VarRef, kotlin/Long) // com.eignex.klause.backtrack/TieredValueSelector.onCommit|onCommit(com.eignex.klause.solver.search.VarRef;kotlin.Long){}[0]
+    final fun onConflict(com.eignex.klause.solver.search/VarRef, kotlin/Long) // com.eignex.klause.backtrack/TieredValueSelector.onConflict|onConflict(com.eignex.klause.solver.search.VarRef;kotlin.Long){}[0]
     final fun onRestart() // com.eignex.klause.backtrack/TieredValueSelector.onRestart|onRestart(){}[0]
     final fun onSolution(com.eignex.klause.solver/Sample) // com.eignex.klause.backtrack/TieredValueSelector.onSolution|onSolution(com.eignex.klause.solver.Sample){}[0]
-    final fun values(com.eignex.klause.propagation/PropagationSession, com.eignex.klause.backtrack.selector/VarRef, kotlin.random/Random): kotlin.sequences/Sequence<kotlin/Long> // com.eignex.klause.backtrack/TieredValueSelector.values|values(com.eignex.klause.propagation.PropagationSession;com.eignex.klause.backtrack.selector.VarRef;kotlin.random.Random){}[0]
+    final fun values(com.eignex.klause.propagation/PropagationSession, com.eignex.klause.solver.search/VarRef, kotlin.random/Random): kotlin.sequences/Sequence<kotlin/Long> // com.eignex.klause.backtrack/TieredValueSelector.values|values(com.eignex.klause.propagation.PropagationSession;com.eignex.klause.solver.search.VarRef;kotlin.random.Random){}[0]
 }
 
 final class com.eignex.klause.backtrack/TieredVariableSelector : com.eignex.klause.backtrack.selector/VariableSelector { // com.eignex.klause.backtrack/TieredVariableSelector|null[0]
@@ -3599,13 +3624,13 @@ final class com.eignex.klause.backtrack/TieredVariableSelector : com.eignex.klau
         final fun <get-tiers>(): kotlin.collections/List<com.eignex.klause.backtrack/SearchTier> // com.eignex.klause.backtrack/TieredVariableSelector.tiers.<get-tiers>|<get-tiers>(){}[0]
 
     final fun fresh(): com.eignex.klause.backtrack/TieredVariableSelector // com.eignex.klause.backtrack/TieredVariableSelector.fresh|fresh(){}[0]
-    final fun onCommit(com.eignex.klause.backtrack.selector/VarRef) // com.eignex.klause.backtrack/TieredVariableSelector.onCommit|onCommit(com.eignex.klause.backtrack.selector.VarRef){}[0]
-    final fun onConflict(com.eignex.klause.backtrack.selector/VarRef) // com.eignex.klause.backtrack/TieredVariableSelector.onConflict|onConflict(com.eignex.klause.backtrack.selector.VarRef){}[0]
-    final fun onConflict(com.eignex.klause.backtrack.selector/VarRef, com.eignex.klause.propagation/PropagationResult.Unsat) // com.eignex.klause.backtrack/TieredVariableSelector.onConflict|onConflict(com.eignex.klause.backtrack.selector.VarRef;com.eignex.klause.propagation.PropagationResult.Unsat){}[0]
+    final fun onCommit(com.eignex.klause.solver.search/VarRef) // com.eignex.klause.backtrack/TieredVariableSelector.onCommit|onCommit(com.eignex.klause.solver.search.VarRef){}[0]
+    final fun onConflict(com.eignex.klause.solver.search/VarRef) // com.eignex.klause.backtrack/TieredVariableSelector.onConflict|onConflict(com.eignex.klause.solver.search.VarRef){}[0]
+    final fun onConflict(com.eignex.klause.solver.search/VarRef, com.eignex.klause.propagation/PropagationResult.Unsat) // com.eignex.klause.backtrack/TieredVariableSelector.onConflict|onConflict(com.eignex.klause.solver.search.VarRef;com.eignex.klause.propagation.PropagationResult.Unsat){}[0]
     final fun onPropagation(com.eignex.klause.propagation/PropagationResult.Implied) // com.eignex.klause.backtrack/TieredVariableSelector.onPropagation|onPropagation(com.eignex.klause.propagation.PropagationResult.Implied){}[0]
     final fun onRestart() // com.eignex.klause.backtrack/TieredVariableSelector.onRestart|onRestart(){}[0]
     final fun onSolution(com.eignex.klause.solver/Sample) // com.eignex.klause.backtrack/TieredVariableSelector.onSolution|onSolution(com.eignex.klause.solver.Sample){}[0]
-    final fun pick(com.eignex.klause.propagation/PropagationSession, kotlin.random/Random): com.eignex.klause.backtrack.selector/VarRef? // com.eignex.klause.backtrack/TieredVariableSelector.pick|pick(com.eignex.klause.propagation.PropagationSession;kotlin.random.Random){}[0]
+    final fun pick(com.eignex.klause.propagation/PropagationSession, kotlin.random/Random): com.eignex.klause.solver.search/VarRef? // com.eignex.klause.backtrack/TieredVariableSelector.pick|pick(com.eignex.klause.propagation.PropagationSession;kotlin.random.Random){}[0]
 }
 
 final class com.eignex.klause.brute/BruteForceParams : com.eignex.klause.solver/SolverParams { // com.eignex.klause.brute/BruteForceParams|null[0]
@@ -10125,7 +10150,7 @@ final class com.eignex.klause.solver.pipeline/PortfolioPlanRequest { // com.eign
 }
 
 final class com.eignex.klause.solver.pipeline/TheoryParams { // com.eignex.klause.solver.pipeline/TheoryParams|null[0]
-    constructor <init>(kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long? = ..., kotlin/Int? = ..., kotlin/Int = ..., kotlin/Long? = ..., com.eignex.klause.util/Cancellation = ..., com.eignex.klause.util/Cancellation = ...) // com.eignex.klause.solver.pipeline/TheoryParams.<init>|<init>(kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long?;kotlin.Int?;kotlin.Int;kotlin.Long?;com.eignex.klause.util.Cancellation;com.eignex.klause.util.Cancellation){}[0]
+    constructor <init>(kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long? = ..., kotlin/Int? = ..., kotlin/Int = ..., kotlin/Long? = ..., com.eignex.klause.solver.pipeline/OpenBranching = ..., com.eignex.klause.util/Cancellation = ..., com.eignex.klause.util/Cancellation = ...) // com.eignex.klause.solver.pipeline/TheoryParams.<init>|<init>(kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long?;kotlin.Int?;kotlin.Int;kotlin.Long?;com.eignex.klause.solver.pipeline.OpenBranching;com.eignex.klause.util.Cancellation;com.eignex.klause.util.Cancellation){}[0]
 
     final val cancellation // com.eignex.klause.solver.pipeline/TheoryParams.cancellation|{}cancellation[0]
         final fun <get-cancellation>(): com.eignex.klause.util/Cancellation // com.eignex.klause.solver.pipeline/TheoryParams.cancellation.<get-cancellation>|<get-cancellation>(){}[0]
@@ -10137,6 +10162,8 @@ final class com.eignex.klause.solver.pipeline/TheoryParams { // com.eignex.klaus
         final fun <get-maxLearnedClauses>(): kotlin/Int? // com.eignex.klause.solver.pipeline/TheoryParams.maxLearnedClauses.<get-maxLearnedClauses>|<get-maxLearnedClauses>(){}[0]
     final val maxLeaves // com.eignex.klause.solver.pipeline/TheoryParams.maxLeaves|{}maxLeaves[0]
         final fun <get-maxLeaves>(): kotlin/Long // com.eignex.klause.solver.pipeline/TheoryParams.maxLeaves.<get-maxLeaves>|<get-maxLeaves>(){}[0]
+    final val openBranching // com.eignex.klause.solver.pipeline/TheoryParams.openBranching|{}openBranching[0]
+        final fun <get-openBranching>(): com.eignex.klause.solver.pipeline/OpenBranching // com.eignex.klause.solver.pipeline/TheoryParams.openBranching.<get-openBranching>|<get-openBranching>(){}[0]
     final val openHintFlips // com.eignex.klause.solver.pipeline/TheoryParams.openHintFlips|{}openHintFlips[0]
         final fun <get-openHintFlips>(): kotlin/Long? // com.eignex.klause.solver.pipeline/TheoryParams.openHintFlips.<get-openHintFlips>|<get-openHintFlips>(){}[0]
     final val openWorkLimit // com.eignex.klause.solver.pipeline/TheoryParams.openWorkLimit|{}openWorkLimit[0]
@@ -10147,15 +10174,16 @@ final class com.eignex.klause.solver.pipeline/TheoryParams { // com.eignex.klaus
         final fun <get-timeout>(): com.eignex.klause.util/Cancellation // com.eignex.klause.solver.pipeline/TheoryParams.timeout.<get-timeout>|<get-timeout>(){}[0]
 
     final fun component1(): kotlin/Long // com.eignex.klause.solver.pipeline/TheoryParams.component1|component1(){}[0]
+    final fun component10(): com.eignex.klause.util/Cancellation // com.eignex.klause.solver.pipeline/TheoryParams.component10|component10(){}[0]
     final fun component2(): kotlin/Long // com.eignex.klause.solver.pipeline/TheoryParams.component2|component2(){}[0]
     final fun component3(): kotlin/Long // com.eignex.klause.solver.pipeline/TheoryParams.component3|component3(){}[0]
     final fun component4(): kotlin/Long? // com.eignex.klause.solver.pipeline/TheoryParams.component4|component4(){}[0]
     final fun component5(): kotlin/Int? // com.eignex.klause.solver.pipeline/TheoryParams.component5|component5(){}[0]
     final fun component6(): kotlin/Int // com.eignex.klause.solver.pipeline/TheoryParams.component6|component6(){}[0]
     final fun component7(): kotlin/Long? // com.eignex.klause.solver.pipeline/TheoryParams.component7|component7(){}[0]
-    final fun component8(): com.eignex.klause.util/Cancellation // com.eignex.klause.solver.pipeline/TheoryParams.component8|component8(){}[0]
+    final fun component8(): com.eignex.klause.solver.pipeline/OpenBranching // com.eignex.klause.solver.pipeline/TheoryParams.component8|component8(){}[0]
     final fun component9(): com.eignex.klause.util/Cancellation // com.eignex.klause.solver.pipeline/TheoryParams.component9|component9(){}[0]
-    final fun copy(kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long? = ..., kotlin/Int? = ..., kotlin/Int = ..., kotlin/Long? = ..., com.eignex.klause.util/Cancellation = ..., com.eignex.klause.util/Cancellation = ...): com.eignex.klause.solver.pipeline/TheoryParams // com.eignex.klause.solver.pipeline/TheoryParams.copy|copy(kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long?;kotlin.Int?;kotlin.Int;kotlin.Long?;com.eignex.klause.util.Cancellation;com.eignex.klause.util.Cancellation){}[0]
+    final fun copy(kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long? = ..., kotlin/Int? = ..., kotlin/Int = ..., kotlin/Long? = ..., com.eignex.klause.solver.pipeline/OpenBranching = ..., com.eignex.klause.util/Cancellation = ..., com.eignex.klause.util/Cancellation = ...): com.eignex.klause.solver.pipeline/TheoryParams // com.eignex.klause.solver.pipeline/TheoryParams.copy|copy(kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long?;kotlin.Int?;kotlin.Int;kotlin.Long?;com.eignex.klause.solver.pipeline.OpenBranching;com.eignex.klause.util.Cancellation;com.eignex.klause.util.Cancellation){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.pipeline/TheoryParams.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.eignex.klause.solver.pipeline/TheoryParams.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.eignex.klause.solver.pipeline/TheoryParams.toString|toString(){}[0]
@@ -10604,6 +10632,20 @@ final class com.eignex.klause.solver.search/AssembledSearchModel { // com.eignex
     final fun <#A1: kotlin/Any> valueOf(kotlin/Any): #A1? // com.eignex.klause.solver.search/AssembledSearchModel.valueOf|valueOf(kotlin.Any){0§<kotlin.Any>}[0]
 }
 
+final class com.eignex.klause.solver.search/BranchingConflict { // com.eignex.klause.solver.search/BranchingConflict|null[0]
+    constructor <init>(kotlin/IntArray = ..., kotlin/IntArray = ...) // com.eignex.klause.solver.search/BranchingConflict.<init>|<init>(kotlin.IntArray;kotlin.IntArray){}[0]
+
+    final val bools // com.eignex.klause.solver.search/BranchingConflict.bools|{}bools[0]
+        final fun <get-bools>(): kotlin/IntArray // com.eignex.klause.solver.search/BranchingConflict.bools.<get-bools>|<get-bools>(){}[0]
+    final val ints // com.eignex.klause.solver.search/BranchingConflict.ints|{}ints[0]
+        final fun <get-ints>(): kotlin/IntArray // com.eignex.klause.solver.search/BranchingConflict.ints.<get-ints>|<get-ints>(){}[0]
+
+    final object Companion { // com.eignex.klause.solver.search/BranchingConflict.Companion|null[0]
+        final val Empty // com.eignex.klause.solver.search/BranchingConflict.Companion.Empty|{}Empty[0]
+            final fun <get-Empty>(): com.eignex.klause.solver.search/BranchingConflict // com.eignex.klause.solver.search/BranchingConflict.Companion.Empty.<get-Empty>|<get-Empty>(){}[0]
+    }
+}
+
 final class com.eignex.klause.solver.search/ClauseSearchComponent : com.eignex.klause.solver.search/ClauseWatchHost, com.eignex.klause.solver.search/SearchComponent { // com.eignex.klause.solver.search/ClauseSearchComponent|null[0]
     constructor <init>(kotlin.collections/Iterable<com.eignex.klause.factor.bool/Clause>) // com.eignex.klause.solver.search/ClauseSearchComponent.<init>|<init>(kotlin.collections.Iterable<com.eignex.klause.factor.bool.Clause>){}[0]
 
@@ -10615,6 +10657,16 @@ final class com.eignex.klause.solver.search/ClauseSearchComponent : com.eignex.k
     final fun propagate(com.eignex.klause.solver.search/SearchContext): com.eignex.klause.solver.search/ComponentResult // com.eignex.klause.solver.search/ClauseSearchComponent.propagate|propagate(com.eignex.klause.solver.search.SearchContext){}[0]
     final fun retract(kotlin/Int) // com.eignex.klause.solver.search/ClauseSearchComponent.retract|retract(kotlin.Int){}[0]
     final fun truth(kotlin/Int): kotlin/Boolean? // com.eignex.klause.solver.search/ClauseSearchComponent.truth|truth(kotlin.Int){}[0]
+}
+
+final class com.eignex.klause.solver.search/HeuristicBooleanBranching : com.eignex.klause.solver.search/BooleanBranching, com.eignex.klause.solver.search/SearchRunObserver, com.eignex.klause.solver.search/SearchUnassignListener { // com.eignex.klause.solver.search/HeuristicBooleanBranching|null[0]
+    constructor <init>(com.eignex.klause.solver.search/VariableBranching<com.eignex.klause.solver.search/BranchingState>, kotlin/Int, kotlin.random/Random = ...) // com.eignex.klause.solver.search/HeuristicBooleanBranching.<init>|<init>(com.eignex.klause.solver.search.VariableBranching<com.eignex.klause.solver.search.BranchingState>;kotlin.Int;kotlin.random.Random){}[0]
+
+    final fun alternatives(com.eignex.klause.solver.search/SearchContext): kotlin.collections/List<com.eignex.klause.solver.search/SearchDecision>? // com.eignex.klause.solver.search/HeuristicBooleanBranching.alternatives|alternatives(com.eignex.klause.solver.search.SearchContext){}[0]
+    final fun onConflict(com.eignex.klause.solver.search/SearchDecision?) // com.eignex.klause.solver.search/HeuristicBooleanBranching.onConflict|onConflict(com.eignex.klause.solver.search.SearchDecision?){}[0]
+    final fun onLearnedConflict(com.eignex.klause.solver.search/SearchLearnedConflict) // com.eignex.klause.solver.search/HeuristicBooleanBranching.onLearnedConflict|onLearnedConflict(com.eignex.klause.solver.search.SearchLearnedConflict){}[0]
+    final fun onRestart(kotlin/Long) // com.eignex.klause.solver.search/HeuristicBooleanBranching.onRestart|onRestart(kotlin.Long){}[0]
+    final fun onUnassign(kotlin/Int) // com.eignex.klause.solver.search/HeuristicBooleanBranching.onUnassign|onUnassign(kotlin.Int){}[0]
 }
 
 final class com.eignex.klause.solver.search/HintedBooleanBranching : com.eignex.klause.solver.search/BooleanBranching { // com.eignex.klause.solver.search/HintedBooleanBranching|null[0]
@@ -10749,7 +10801,7 @@ final class com.eignex.klause.solver.search/SearchSession : com.eignex.klause.so
     final fun reasonFor(kotlin/Int): com.eignex.klause.solver.search/SearchExplanation? // com.eignex.klause.solver.search/SearchSession.reasonFor|reasonFor(kotlin.Int){}[0]
     final fun resetRootFacts() // com.eignex.klause.solver.search/SearchSession.resetRootFacts|resetRootFacts(){}[0]
     final fun restart(): com.eignex.klause.solver.search/ComponentResult // com.eignex.klause.solver.search/SearchSession.restart|restart(){}[0]
-    final fun solve(kotlin/Int, com.eignex.klause.solver.search/SearchSolveParams = ..., com.eignex.klause.solver.search/SearchCandidateHints = ...): com.eignex.klause.solver.search/SearchResult // com.eignex.klause.solver.search/SearchSession.solve|solve(kotlin.Int;com.eignex.klause.solver.search.SearchSolveParams;com.eignex.klause.solver.search.SearchCandidateHints){}[0]
+    final fun solve(kotlin/Int, com.eignex.klause.solver.search/SearchSolveParams = ..., com.eignex.klause.solver.search/SearchCandidateHints = ..., com.eignex.klause.solver.search/BooleanBranching = ..., com.eignex.klause.solver.search/SearchRunObserver = ...): com.eignex.klause.solver.search/SearchResult // com.eignex.klause.solver.search/SearchSession.solve|solve(kotlin.Int;com.eignex.klause.solver.search.SearchSolveParams;com.eignex.klause.solver.search.SearchCandidateHints;com.eignex.klause.solver.search.BooleanBranching;com.eignex.klause.solver.search.SearchRunObserver){}[0]
     final fun solveBoolean(kotlin/Int): com.eignex.klause.solver.search/BooleanSearchResult // com.eignex.klause.solver.search/SearchSession.solveBoolean|solveBoolean(kotlin.Int){}[0]
     final fun truth(kotlin/Int): kotlin/Boolean? // com.eignex.klause.solver.search/SearchSession.truth|truth(kotlin.Int){}[0]
 }
@@ -10768,6 +10820,18 @@ final class com.eignex.klause.solver.search/SearchSolveParams { // com.eignex.kl
     final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.search/SearchSolveParams.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.eignex.klause.solver.search/SearchSolveParams.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.eignex.klause.solver.search/SearchSolveParams.toString|toString(){}[0]
+}
+
+final class com.eignex.klause.solver.search/Vsids : com.eignex.klause.solver.search/VariableBranching<com.eignex.klause.solver.search/BranchingState> { // com.eignex.klause.solver.search/Vsids|null[0]
+    constructor <init>(kotlin/Double = ..., kotlin/Double = ...) // com.eignex.klause.solver.search/Vsids.<init>|<init>(kotlin.Double;kotlin.Double){}[0]
+
+    final val tracksUnassign // com.eignex.klause.solver.search/Vsids.tracksUnassign|{}tracksUnassign[0]
+        final fun <get-tracksUnassign>(): kotlin/Boolean // com.eignex.klause.solver.search/Vsids.tracksUnassign.<get-tracksUnassign>|<get-tracksUnassign>(){}[0]
+
+    final fun fresh(): com.eignex.klause.solver.search/Vsids // com.eignex.klause.solver.search/Vsids.fresh|fresh(){}[0]
+    final fun onConflict(com.eignex.klause.solver.search/VarRef?, com.eignex.klause.solver.search/BranchingConflict) // com.eignex.klause.solver.search/Vsids.onConflict|onConflict(com.eignex.klause.solver.search.VarRef?;com.eignex.klause.solver.search.BranchingConflict){}[0]
+    final fun onUnassign(com.eignex.klause.solver.search/VarRef) // com.eignex.klause.solver.search/Vsids.onUnassign|onUnassign(com.eignex.klause.solver.search.VarRef){}[0]
+    final fun pick(com.eignex.klause.solver.search/BranchingState, kotlin.random/Random): com.eignex.klause.solver.search/VarRef? // com.eignex.klause.solver.search/Vsids.pick|pick(com.eignex.klause.solver.search.BranchingState;kotlin.random.Random){}[0]
 }
 
 final class com.eignex.klause.solver/Assignment { // com.eignex.klause.solver/Assignment|null[0]
@@ -11207,52 +11271,52 @@ sealed class com.eignex.klause.solver.pipeline/PortfolioPlan { // com.eignex.kla
 
 final object com.eignex.klause.backtrack.selector/DomainMaxRegret : com.eignex.klause.backtrack.selector/VariableSelector { // com.eignex.klause.backtrack.selector/DomainMaxRegret|null[0]
     final fun fresh(): com.eignex.klause.backtrack.selector/DomainMaxRegret // com.eignex.klause.backtrack.selector/DomainMaxRegret.fresh|fresh(){}[0]
-    final fun pick(com.eignex.klause.propagation/PropagationSession, kotlin.random/Random): com.eignex.klause.backtrack.selector/VarRef? // com.eignex.klause.backtrack.selector/DomainMaxRegret.pick|pick(com.eignex.klause.propagation.PropagationSession;kotlin.random.Random){}[0]
+    final fun pick(com.eignex.klause.propagation/PropagationSession, kotlin.random/Random): com.eignex.klause.solver.search/VarRef? // com.eignex.klause.backtrack.selector/DomainMaxRegret.pick|pick(com.eignex.klause.propagation.PropagationSession;kotlin.random.Random){}[0]
 }
 
 final object com.eignex.klause.backtrack.selector/IndomainMax : com.eignex.klause.backtrack.selector/ValueSelector { // com.eignex.klause.backtrack.selector/IndomainMax|null[0]
     final fun fresh(): com.eignex.klause.backtrack.selector/IndomainMax // com.eignex.klause.backtrack.selector/IndomainMax.fresh|fresh(){}[0]
-    final fun values(com.eignex.klause.propagation/PropagationSession, com.eignex.klause.backtrack.selector/VarRef, kotlin.random/Random): kotlin.sequences/Sequence<kotlin/Long> // com.eignex.klause.backtrack.selector/IndomainMax.values|values(com.eignex.klause.propagation.PropagationSession;com.eignex.klause.backtrack.selector.VarRef;kotlin.random.Random){}[0]
+    final fun values(com.eignex.klause.propagation/PropagationSession, com.eignex.klause.solver.search/VarRef, kotlin.random/Random): kotlin.sequences/Sequence<kotlin/Long> // com.eignex.klause.backtrack.selector/IndomainMax.values|values(com.eignex.klause.propagation.PropagationSession;com.eignex.klause.solver.search.VarRef;kotlin.random.Random){}[0]
 }
 
 final object com.eignex.klause.backtrack.selector/IndomainMedian : com.eignex.klause.backtrack.selector/ValueSelector { // com.eignex.klause.backtrack.selector/IndomainMedian|null[0]
     final fun fresh(): com.eignex.klause.backtrack.selector/IndomainMedian // com.eignex.klause.backtrack.selector/IndomainMedian.fresh|fresh(){}[0]
-    final fun values(com.eignex.klause.propagation/PropagationSession, com.eignex.klause.backtrack.selector/VarRef, kotlin.random/Random): kotlin.sequences/Sequence<kotlin/Long> // com.eignex.klause.backtrack.selector/IndomainMedian.values|values(com.eignex.klause.propagation.PropagationSession;com.eignex.klause.backtrack.selector.VarRef;kotlin.random.Random){}[0]
+    final fun values(com.eignex.klause.propagation/PropagationSession, com.eignex.klause.solver.search/VarRef, kotlin.random/Random): kotlin.sequences/Sequence<kotlin/Long> // com.eignex.klause.backtrack.selector/IndomainMedian.values|values(com.eignex.klause.propagation.PropagationSession;com.eignex.klause.solver.search.VarRef;kotlin.random.Random){}[0]
 }
 
 final object com.eignex.klause.backtrack.selector/IndomainMiddle : com.eignex.klause.backtrack.selector/ValueSelector { // com.eignex.klause.backtrack.selector/IndomainMiddle|null[0]
     final fun fresh(): com.eignex.klause.backtrack.selector/IndomainMiddle // com.eignex.klause.backtrack.selector/IndomainMiddle.fresh|fresh(){}[0]
-    final fun values(com.eignex.klause.propagation/PropagationSession, com.eignex.klause.backtrack.selector/VarRef, kotlin.random/Random): kotlin.sequences/Sequence<kotlin/Long> // com.eignex.klause.backtrack.selector/IndomainMiddle.values|values(com.eignex.klause.propagation.PropagationSession;com.eignex.klause.backtrack.selector.VarRef;kotlin.random.Random){}[0]
+    final fun values(com.eignex.klause.propagation/PropagationSession, com.eignex.klause.solver.search/VarRef, kotlin.random/Random): kotlin.sequences/Sequence<kotlin/Long> // com.eignex.klause.backtrack.selector/IndomainMiddle.values|values(com.eignex.klause.propagation.PropagationSession;com.eignex.klause.solver.search.VarRef;kotlin.random.Random){}[0]
 }
 
 final object com.eignex.klause.backtrack.selector/IndomainMin : com.eignex.klause.backtrack.selector/ValueSelector { // com.eignex.klause.backtrack.selector/IndomainMin|null[0]
     final fun fresh(): com.eignex.klause.backtrack.selector/IndomainMin // com.eignex.klause.backtrack.selector/IndomainMin.fresh|fresh(){}[0]
-    final fun values(com.eignex.klause.propagation/PropagationSession, com.eignex.klause.backtrack.selector/VarRef, kotlin.random/Random): kotlin.sequences/Sequence<kotlin/Long> // com.eignex.klause.backtrack.selector/IndomainMin.values|values(com.eignex.klause.propagation.PropagationSession;com.eignex.klause.backtrack.selector.VarRef;kotlin.random.Random){}[0]
+    final fun values(com.eignex.klause.propagation/PropagationSession, com.eignex.klause.solver.search/VarRef, kotlin.random/Random): kotlin.sequences/Sequence<kotlin/Long> // com.eignex.klause.backtrack.selector/IndomainMin.values|values(com.eignex.klause.propagation.PropagationSession;com.eignex.klause.solver.search.VarRef;kotlin.random.Random){}[0]
 }
 
 final object com.eignex.klause.backtrack.selector/IndomainRandom : com.eignex.klause.backtrack.selector/ValueSelector { // com.eignex.klause.backtrack.selector/IndomainRandom|null[0]
     final fun fresh(): com.eignex.klause.backtrack.selector/IndomainRandom // com.eignex.klause.backtrack.selector/IndomainRandom.fresh|fresh(){}[0]
-    final fun values(com.eignex.klause.propagation/PropagationSession, com.eignex.klause.backtrack.selector/VarRef, kotlin.random/Random): kotlin.sequences/Sequence<kotlin/Long> // com.eignex.klause.backtrack.selector/IndomainRandom.values|values(com.eignex.klause.propagation.PropagationSession;com.eignex.klause.backtrack.selector.VarRef;kotlin.random.Random){}[0]
+    final fun values(com.eignex.klause.propagation/PropagationSession, com.eignex.klause.solver.search/VarRef, kotlin.random/Random): kotlin.sequences/Sequence<kotlin/Long> // com.eignex.klause.backtrack.selector/IndomainRandom.values|values(com.eignex.klause.propagation.PropagationSession;com.eignex.klause.solver.search.VarRef;kotlin.random.Random){}[0]
 }
 
 final object com.eignex.klause.backtrack.selector/IndomainSplit : com.eignex.klause.backtrack.selector/ValueSelector { // com.eignex.klause.backtrack.selector/IndomainSplit|null[0]
     final fun fresh(): com.eignex.klause.backtrack.selector/IndomainSplit // com.eignex.klause.backtrack.selector/IndomainSplit.fresh|fresh(){}[0]
-    final fun values(com.eignex.klause.propagation/PropagationSession, com.eignex.klause.backtrack.selector/VarRef, kotlin.random/Random): kotlin.sequences/Sequence<kotlin/Long> // com.eignex.klause.backtrack.selector/IndomainSplit.values|values(com.eignex.klause.propagation.PropagationSession;com.eignex.klause.backtrack.selector.VarRef;kotlin.random.Random){}[0]
+    final fun values(com.eignex.klause.propagation/PropagationSession, com.eignex.klause.solver.search/VarRef, kotlin.random/Random): kotlin.sequences/Sequence<kotlin/Long> // com.eignex.klause.backtrack.selector/IndomainSplit.values|values(com.eignex.klause.propagation.PropagationSession;com.eignex.klause.solver.search.VarRef;kotlin.random.Random){}[0]
 }
 
 final object com.eignex.klause.backtrack.selector/InputOrder : com.eignex.klause.backtrack.selector/VariableSelector { // com.eignex.klause.backtrack.selector/InputOrder|null[0]
     final fun fresh(): com.eignex.klause.backtrack.selector/InputOrder // com.eignex.klause.backtrack.selector/InputOrder.fresh|fresh(){}[0]
-    final fun pick(com.eignex.klause.propagation/PropagationSession, kotlin.random/Random): com.eignex.klause.backtrack.selector/VarRef? // com.eignex.klause.backtrack.selector/InputOrder.pick|pick(com.eignex.klause.propagation.PropagationSession;kotlin.random.Random){}[0]
+    final fun pick(com.eignex.klause.propagation/PropagationSession, kotlin.random/Random): com.eignex.klause.solver.search/VarRef? // com.eignex.klause.backtrack.selector/InputOrder.pick|pick(com.eignex.klause.propagation.PropagationSession;kotlin.random.Random){}[0]
 }
 
 final object com.eignex.klause.backtrack.selector/LargestDomain : com.eignex.klause.backtrack.selector/VariableSelector { // com.eignex.klause.backtrack.selector/LargestDomain|null[0]
     final fun fresh(): com.eignex.klause.backtrack.selector/LargestDomain // com.eignex.klause.backtrack.selector/LargestDomain.fresh|fresh(){}[0]
-    final fun pick(com.eignex.klause.propagation/PropagationSession, kotlin.random/Random): com.eignex.klause.backtrack.selector/VarRef? // com.eignex.klause.backtrack.selector/LargestDomain.pick|pick(com.eignex.klause.propagation.PropagationSession;kotlin.random.Random){}[0]
+    final fun pick(com.eignex.klause.propagation/PropagationSession, kotlin.random/Random): com.eignex.klause.solver.search/VarRef? // com.eignex.klause.backtrack.selector/LargestDomain.pick|pick(com.eignex.klause.propagation.PropagationSession;kotlin.random.Random){}[0]
 }
 
 final object com.eignex.klause.backtrack.selector/LargestUpperBound : com.eignex.klause.backtrack.selector/VariableSelector { // com.eignex.klause.backtrack.selector/LargestUpperBound|null[0]
     final fun fresh(): com.eignex.klause.backtrack.selector/LargestUpperBound // com.eignex.klause.backtrack.selector/LargestUpperBound.fresh|fresh(){}[0]
-    final fun pick(com.eignex.klause.propagation/PropagationSession, kotlin.random/Random): com.eignex.klause.backtrack.selector/VarRef? // com.eignex.klause.backtrack.selector/LargestUpperBound.pick|pick(com.eignex.klause.propagation.PropagationSession;kotlin.random.Random){}[0]
+    final fun pick(com.eignex.klause.propagation/PropagationSession, kotlin.random/Random): com.eignex.klause.solver.search/VarRef? // com.eignex.klause.backtrack.selector/LargestUpperBound.pick|pick(com.eignex.klause.propagation.PropagationSession;kotlin.random.Random){}[0]
 }
 
 final object com.eignex.klause.backtrack.selector/ProbingSelectors { // com.eignex.klause.backtrack.selector/ProbingSelectors|null[0]
@@ -11263,17 +11327,17 @@ final object com.eignex.klause.backtrack.selector/ProbingSelectors { // com.eign
 
 final object com.eignex.klause.backtrack.selector/RandomVariable : com.eignex.klause.backtrack.selector/VariableSelector { // com.eignex.klause.backtrack.selector/RandomVariable|null[0]
     final fun fresh(): com.eignex.klause.backtrack.selector/RandomVariable // com.eignex.klause.backtrack.selector/RandomVariable.fresh|fresh(){}[0]
-    final fun pick(com.eignex.klause.propagation/PropagationSession, kotlin.random/Random): com.eignex.klause.backtrack.selector/VarRef? // com.eignex.klause.backtrack.selector/RandomVariable.pick|pick(com.eignex.klause.propagation.PropagationSession;kotlin.random.Random){}[0]
+    final fun pick(com.eignex.klause.propagation/PropagationSession, kotlin.random/Random): com.eignex.klause.solver.search/VarRef? // com.eignex.klause.backtrack.selector/RandomVariable.pick|pick(com.eignex.klause.propagation.PropagationSession;kotlin.random.Random){}[0]
 }
 
 final object com.eignex.klause.backtrack.selector/SmallestDomain : com.eignex.klause.backtrack.selector/VariableSelector { // com.eignex.klause.backtrack.selector/SmallestDomain|null[0]
     final fun fresh(): com.eignex.klause.backtrack.selector/SmallestDomain // com.eignex.klause.backtrack.selector/SmallestDomain.fresh|fresh(){}[0]
-    final fun pick(com.eignex.klause.propagation/PropagationSession, kotlin.random/Random): com.eignex.klause.backtrack.selector/VarRef? // com.eignex.klause.backtrack.selector/SmallestDomain.pick|pick(com.eignex.klause.propagation.PropagationSession;kotlin.random.Random){}[0]
+    final fun pick(com.eignex.klause.propagation/PropagationSession, kotlin.random/Random): com.eignex.klause.solver.search/VarRef? // com.eignex.klause.backtrack.selector/SmallestDomain.pick|pick(com.eignex.klause.propagation.PropagationSession;kotlin.random.Random){}[0]
 }
 
 final object com.eignex.klause.backtrack.selector/SmallestLowerBound : com.eignex.klause.backtrack.selector/VariableSelector { // com.eignex.klause.backtrack.selector/SmallestLowerBound|null[0]
     final fun fresh(): com.eignex.klause.backtrack.selector/SmallestLowerBound // com.eignex.klause.backtrack.selector/SmallestLowerBound.fresh|fresh(){}[0]
-    final fun pick(com.eignex.klause.propagation/PropagationSession, kotlin.random/Random): com.eignex.klause.backtrack.selector/VarRef? // com.eignex.klause.backtrack.selector/SmallestLowerBound.pick|pick(com.eignex.klause.propagation.PropagationSession;kotlin.random.Random){}[0]
+    final fun pick(com.eignex.klause.propagation/PropagationSession, kotlin.random/Random): com.eignex.klause.solver.search/VarRef? // com.eignex.klause.backtrack.selector/SmallestLowerBound.pick|pick(com.eignex.klause.propagation.PropagationSession;kotlin.random.Random){}[0]
 }
 
 final object com.eignex.klause.backtrack/BacktrackPresets { // com.eignex.klause.backtrack/BacktrackPresets|null[0]
@@ -11609,6 +11673,7 @@ final fun (com.eignex.klause.solver.pipeline/FinitePipeline).com.eignex.klause.s
 final fun (com.eignex.klause.solver.pipeline/FinitePipeline).com.eignex.klause.solver.pipeline/planPortfolio(com.eignex.klause.solver.pipeline/PortfolioPlanRequest): com.eignex.klause.solver.pipeline/PortfolioPlan // com.eignex.klause.solver.pipeline/planPortfolio|planPortfolio@com.eignex.klause.solver.pipeline.FinitePipeline(com.eignex.klause.solver.pipeline.PortfolioPlanRequest){}[0]
 final fun (com.eignex.klause.solver.pipeline/FinitePipeline).com.eignex.klause.solver.pipeline/portfolioExecutor(com.eignex.klause.propagation/BakedProblem, com.eignex.klause.portfolio/PortfolioScenario, com.eignex.klause.solver.objective/LinearObjective?, com.eignex.klause.solver.objective/IncrementalObjective?, com.eignex.klause.localsearch/DefinitionalSweep?, kotlin/Function2<kotlin/String, com.eignex.klause.solver.result/SearchEvent, kotlin/Unit>?): com.eignex.klause.portfolio/PortfolioExecutor // com.eignex.klause.solver.pipeline/portfolioExecutor|portfolioExecutor@com.eignex.klause.solver.pipeline.FinitePipeline(com.eignex.klause.propagation.BakedProblem;com.eignex.klause.portfolio.PortfolioScenario;com.eignex.klause.solver.objective.LinearObjective?;com.eignex.klause.solver.objective.IncrementalObjective?;com.eignex.klause.localsearch.DefinitionalSweep?;kotlin.Function2<kotlin.String,com.eignex.klause.solver.result.SearchEvent,kotlin.Unit>?){}[0]
 final fun (com.eignex.klause.solver.pipeline/FinitePipeline).com.eignex.klause.solver.pipeline/solve(com.eignex.klause.solver.pipeline/FiniteSolveRequest, com.eignex.klause.solver.pipeline/FiniteSolveCallbacks): com.eignex.klause.solver.pipeline/FiniteSolveResult // com.eignex.klause.solver.pipeline/solve|solve@com.eignex.klause.solver.pipeline.FinitePipeline(com.eignex.klause.solver.pipeline.FiniteSolveRequest;com.eignex.klause.solver.pipeline.FiniteSolveCallbacks){}[0]
+final fun (com.eignex.klause.solver.search/VariableBranching<com.eignex.klause.solver.search/BranchingState>).com.eignex.klause.backtrack.selector/asSelector(): com.eignex.klause.backtrack.selector/VariableSelector // com.eignex.klause.backtrack.selector/asSelector|asSelector@com.eignex.klause.solver.search.VariableBranching<com.eignex.klause.solver.search.BranchingState>(){}[0]
 final fun (com.eignex.klause.solver/ConstList).com.eignex.klause.solver/longsOrNull(): com.eignex.klause.solver/LongConstList? // com.eignex.klause.solver/longsOrNull|longsOrNull@com.eignex.klause.solver.ConstList(){}[0]
 final fun (com.eignex.klause.util/CharSource).com.eignex.klause.util/lineSequence(): kotlin.sequences/Sequence<kotlin/String> // com.eignex.klause.util/lineSequence|lineSequence@com.eignex.klause.util.CharSource(){}[0]
 final fun (com.eignex.klause.util/CharSource).com.eignex.klause.util/readText(): kotlin/String // com.eignex.klause.util/readText|readText@com.eignex.klause.util.CharSource(){}[0]
@@ -11628,6 +11693,7 @@ final fun (kotlin/Int).com.eignex.klause.schema/times(com.eignex.klause.model/In
 final fun (kotlin/Int).com.eignex.klause.schema/times(com.eignex.klause.schema/FloatTerm): com.eignex.klause.schema/FloatExpr // com.eignex.klause.schema/times|times@kotlin.Int(com.eignex.klause.schema.FloatTerm){}[0]
 final fun (kotlin/String).com.eignex.klause.schema/inSet(com.eignex.klause.model/SetTerm): com.eignex.klause.model/BoolExpr // com.eignex.klause.schema/inSet|inSet@kotlin.String(com.eignex.klause.model.SetTerm){}[0]
 final fun <#A: com.eignex.klause.solver/SolverParams> (com.eignex.klause.solver/Solver<#A>).com.eignex.klause.solver.result/satisfyUnderAssumptions(com.eignex.klause.propagation/Assumptions, #A, kotlin/Boolean = ...): com.eignex.klause.solver.result/SatisfyResult // com.eignex.klause.solver.result/satisfyUnderAssumptions|satisfyUnderAssumptions@com.eignex.klause.solver.Solver<0:0>(com.eignex.klause.propagation.Assumptions;0:0;kotlin.Boolean){0§<com.eignex.klause.solver.SolverParams>}[0]
+final fun com.eignex.klause.backtrack.selector/Vsids(kotlin/Double = ..., kotlin/Double = ...): com.eignex.klause.backtrack.selector/VariableSelector // com.eignex.klause.backtrack.selector/Vsids|Vsids(kotlin.Double;kotlin.Double){}[0]
 final fun com.eignex.klause.config/klausePropertyKey(kotlin/String): kotlin/String // com.eignex.klause.config/klausePropertyKey|klausePropertyKey(kotlin.String){}[0]
 final fun com.eignex.klause.config/propertyKnob(): kotlin.properties/PropertyDelegateProvider<kotlin/Any?, kotlin.properties/ReadOnlyProperty<kotlin/Any?, kotlin/String>> // com.eignex.klause.config/propertyKnob|propertyKnob(){}[0]
 final fun com.eignex.klause.factor.scheduling.internals/applyCumulativeCapacityDelta(com.eignex.klause.factor.scheduling.internals/CumulativeLsState, kotlin/Long) // com.eignex.klause.factor.scheduling.internals/applyCumulativeCapacityDelta|applyCumulativeCapacityDelta(com.eignex.klause.factor.scheduling.internals.CumulativeLsState;kotlin.Long){}[0]

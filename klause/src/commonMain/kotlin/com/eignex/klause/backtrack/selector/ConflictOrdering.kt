@@ -3,6 +3,7 @@ package com.eignex.klause.backtrack.selector
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.search.VarRef
 import com.eignex.klause.util.EmptyLongArray
 import kotlin.random.Random
 

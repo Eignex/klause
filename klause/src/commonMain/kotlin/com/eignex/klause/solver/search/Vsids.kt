@@ -1,8 +1,5 @@
-package com.eignex.klause.backtrack.selector
+package com.eignex.klause.solver.search
 
-import com.eignex.klause.propagation.PropagationResult
-import com.eignex.klause.propagation.PropagationResult.Unsat
-import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.util.IndexedMaxHeap
 import kotlin.random.Random
 
@@ -18,16 +15,16 @@ import kotlin.random.Random
  * (bools precede ints). Activities persist across [onRestart] — that's the whole point of
  * VSIDS, learning carries over.
  *
- * Attribution is coarse: the engine's [Unsat] carries the *decision variables* at conflict
- * levels, not every variable on the propagation-reason path. Bumping decision variables only
- * still gives a useful signal — consistently better than random / smallest-domain on hard
- * instances — and a richer reason set would reach this heuristic through [onConflict]
- * unchanged.
+ * Written against [BranchingState], so the same activities drive a finite CP traversal and a theory
+ * traversal. Attribution quality is the substrate's: a shared Boolean analyzer names every variable of
+ * the asserting clause, while the finite engine names the decision variables at the conflicting levels
+ * — coarser, but still consistently better than random or smallest-domain on hard instances.
  *
  * Default `decay = 0.95`. Lower decay (e.g., 0.8) makes the heuristic more
  * aggressive about following recent conflicts; higher (e.g., 0.99) is more conservative.
  */
-class Vsids(private val decay: Double = 0.95, private val rescaleThreshold: Double = 1e100) : VariableSelector {
+class Vsids(private val decay: Double = 0.95, private val rescaleThreshold: Double = 1e100) :
+    VariableBranching<BranchingState> {
 
     override fun fresh() = Vsids(decay, rescaleThreshold)
 
@@ -44,12 +41,12 @@ class Vsids(private val decay: Double = 0.95, private val rescaleThreshold: Doub
     private var numBoolCached: Int = 0
     private var numIntCached: Int = 0
 
-    // Identity of the session pick() last ran against. pick() removes assigned vars from the
+    // Identity of the state pick() last ran against. pick() removes assigned vars from the
     // heap and relies on onUnassign (per backtrack) to re-insert them; a solve that ends on a
     // leaf or timeout leaves the heap partial. When the same Vsids instance is reused for a
-    // fresh session (optimisation B&B, repeated solves), re-offer every removed var on the
+    // fresh search (optimisation B&B, repeated solves), re-offer every removed var on the
     // first pick — keeping their stored activities so VSIDS stays warm across iterations.
-    private var lastSession: PropagationSession? = null
+    private var lastState: BranchingState? = null
 
     private fun ensureSized(numBool: Int, numInt: Int) {
         if (heap != null && numBoolCached == numBool && numIntCached == numInt) return
@@ -62,12 +59,11 @@ class Vsids(private val decay: Double = 0.95, private val rescaleThreshold: Doub
 
     override val tracksUnassign: Boolean get() = true
 
-    override fun pick(session: PropagationSession, rng: Random): VarRef? {
-        val problem = session.problem
-        ensureSized(problem.numBoolVars, problem.numIntVars)
+    override fun pick(state: BranchingState, rng: Random): VarRef? {
+        ensureSized(state.numBoolVars, state.numIntVars)
         val h = requireNotNull(heap)
-        if (session !== lastSession) {
-            lastSession = session
+        if (state !== lastState) {
+            lastState = state
             val total = numBoolCached + numIntCached
             for (id in 0 until total) if (!h.contains(id)) h.restore(id)
         }
@@ -85,10 +81,10 @@ class Vsids(private val decay: Double = 0.95, private val rescaleThreshold: Doub
             while (h.size > 0) {
                 val id = h.extractMax()
                 if (id < numBoolCached) {
-                    if (session.boolValue(id) == null) return VarRef.Bool(id)
+                    if (state.boolValue(id) == null) return VarRef.Bool(id)
                 } else {
                     val intId = id - numBoolCached
-                    if (!session.intDomain(intId).isFixed) {
+                    if (!state.intFixed(intId)) {
                         h.restore(id)
                         return VarRef.IntVar(intId)
                     }
@@ -98,18 +94,18 @@ class Vsids(private val decay: Double = 0.95, private val rescaleThreshold: Doub
             // [onUnassign] on backtrack) can strand an open variable out of the heap if a re-add is
             // missed across a restart/backtrack. Reporting `null` then would tell the engine "all
             // assigned" and let it commit an incomplete assignment as a solution. Before that, rescan
-            // the live domains and re-offer every still-open variable; retry so the max-activity one
+            // the live variables and re-offer every still-open one; retry so the max-activity one
             // wins. Runs only when the heap empties (a candidate leaf), so the O(log n) fast path is
             // untouched — `null` now provably means every variable is determined.
             var refilled = false
             for (v in 0 until numBoolCached) {
-                if (session.boolValue(v) == null && !h.contains(v)) {
+                if (state.boolValue(v) == null && !h.contains(v)) {
                     h.restore(v)
                     refilled = true
                 }
             }
             for (v in 0 until numIntCached) {
-                if (!session.intDomain(v).isFixed && !h.contains(numBoolCached + v)) {
+                if (!state.intFixed(v) && !h.contains(numBoolCached + v)) {
                     h.restore(numBoolCached + v)
                     refilled = true
                 }
@@ -127,15 +123,16 @@ class Vsids(private val decay: Double = 0.95, private val rescaleThreshold: Doub
         if (!h.contains(id)) h.restore(id)
     }
 
-    override fun onConflict(varRef: VarRef, unsat: PropagationResult.Unsat) {
+    override fun onConflict(varRef: VarRef?, conflict: BranchingConflict) {
         val h = heap ?: return
-        // Bump every decision variable in the conflict reason set, plus the failed
-        // decision itself (in case it isn't already in the set — typically it is).
-        for (b in unsat.conflictBools) bumpBool(h, b)
-        for (i in unsat.conflictInts) bumpInt(h, i)
+        // Bump every variable the substrate implicated, plus the failed decision itself (in case it
+        // isn't already in the set — typically it is).
+        for (b in conflict.bools) bumpBool(h, b)
+        for (i in conflict.ints) bumpInt(h, i)
         when (varRef) {
             is VarRef.Bool -> bumpBool(h, varRef.varId)
             is VarRef.IntVar -> bumpInt(h, varRef.varId)
+            null -> Unit
         }
         // Grow the increment for the next conflict — implicit multiplicative decay of
         // every prior activity by `decay`, without touching the keys.

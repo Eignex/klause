@@ -4,6 +4,7 @@ import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.search.VarRef
 import kotlin.math.abs
 import kotlin.random.Random
 

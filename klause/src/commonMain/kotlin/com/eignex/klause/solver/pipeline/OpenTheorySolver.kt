@@ -15,12 +15,16 @@ import com.eignex.klause.solver.result.OpenTheoryWorkSink
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.solver.result.TerminationReason
+import com.eignex.klause.solver.search.BooleanBranching
 import com.eignex.klause.solver.search.ComponentResult
+import com.eignex.klause.solver.search.HeuristicBooleanBranching
 import com.eignex.klause.solver.search.SearchCandidateHints
 import com.eignex.klause.solver.search.SearchLearnedDbParams
 import com.eignex.klause.solver.search.SearchRestart
 import com.eignex.klause.solver.search.SearchResult
+import com.eignex.klause.solver.search.SearchRunObserver
 import com.eignex.klause.solver.search.SearchSolveParams
+import com.eignex.klause.solver.search.Vsids
 import com.eignex.klause.theory.qflra.ExactLiraAssignment
 import com.eignex.klause.theory.qflra.ExactLraAssignment
 import com.eignex.klause.util.Cancellation
@@ -223,7 +227,18 @@ class OpenTheoryEngine internal constructor(
         // Drawn here rather than beside the plan, so a root that propagation already refuted never pays
         // for a proposal no traversal would have read.
         val hints = state.candidateHints(plan, model, cancellation)
-        return when (val result = planned.session.solve(model.numBoolVars, solveParams, hints)) {
+        val branching = when (params.openBranching) {
+            OpenBranching.SourceOrder -> BooleanBranching.SourceOrder(model.numBoolVars)
+            OpenBranching.Activity -> HeuristicBooleanBranching(Vsids(), model.numBoolVars)
+        }
+        val result = planned.session.solve(
+            model.numBoolVars,
+            solveParams,
+            hints,
+            branching,
+            branching as? SearchRunObserver ?: SearchRunObserver.None,
+        )
+        return when (result) {
             is SearchResult.Satisfied -> OpenTheoryResult.Sat(
                 assignment(result.model, checkNotNull(planned.theory), route),
                 stats.finish(state, planned.session),

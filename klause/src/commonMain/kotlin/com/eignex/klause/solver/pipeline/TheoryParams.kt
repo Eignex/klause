@@ -2,6 +2,25 @@ package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.util.Cancellation
 
+/** Which Boolean branching a complete open-model traversal uses. */
+enum class OpenBranching(
+    /** Identifier accepted by the `open-branching` engine param. */
+    val id: String,
+) {
+    /** Static source order, false before true. */
+    SourceOrder("source-order"),
+
+    /** Conflict-activity order over the shared session. */
+    Activity("activity"),
+    ;
+
+    /** Resolution from the identifier the engine param carries. */
+    companion object {
+        /** The branching named [id], or null when no branching carries that name. */
+        fun of(id: String): OpenBranching? = entries.firstOrNull { it.id == id }
+    }
+}
+
 /** Cooperative limits shared by complete open-model theories. */
 data class TheoryParams(
     /** Legacy maximum theory-check allowance; this is not a complete leaf count. */
@@ -25,6 +44,16 @@ data class TheoryParams(
      * separates the producer's own cost from the proposal's effect.
      */
     val openHintFlips: Long? = null,
+    /**
+     * Boolean branching for each feasibility traversal.
+     *
+     * Only the Boolean skeleton is branched here, so this is the whole variable-order lever the open
+     * route has; the theory decides the arithmetic residual at a leaf either way. Source order is the
+     * default because activity order settles no additional instance on the measured corpus: it moves
+     * the work a traversal does without moving the verdict, since the rows that remain open are
+     * bounded by the cost of each theory check rather than by the branch that reached it.
+     */
+    val openBranching: OpenBranching = OpenBranching.SourceOrder,
     /** Wall-clock timeout token, kept separate from external cancellation for result reporting. */
     val timeout: Cancellation = Cancellation.Never,
     /** Cooperative cancellation token. */

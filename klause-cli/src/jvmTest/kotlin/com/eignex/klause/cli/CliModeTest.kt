@@ -113,6 +113,40 @@ class CliModeTest {
     }
 
     @Test
+    fun `both open branchings reach the same verdict and an unknown one is refused`() {
+        val smt = File.createTempFile("clibranching", ".smt2").apply {
+            writeText(
+                """
+                (declare-const x Int)
+                (declare-const p Bool)
+                (declare-const q Bool)
+                (assert (>= x 5))
+                (assert (or p q))
+                (assert (or (not p) (not q)))
+                (check-sat)
+                """.trimIndent(),
+            )
+            deleteOnExit()
+        }
+
+        val activity = capture {
+            assertEquals(0, runCli(arrayOf("--param", "open-branching=activity", smt.absolutePath)))
+        }
+        val sourceOrder = capture {
+            assertEquals(0, runCli(arrayOf("--param", "open-branching=source-order", smt.absolutePath)))
+        }
+        var code = -1
+        val err = captureErr {
+            code = runCli(arrayOf("--param", "open-branching=nope", smt.absolutePath))
+        }
+
+        assertEquals("sat", activity.lines().firstOrNull(), activity)
+        assertEquals("sat", sourceOrder.lines().firstOrNull(), sourceOrder)
+        assertEquals(2, code, err)
+        assertTrue("open-branching" in err, err)
+    }
+
+    @Test
     fun `an open theory hint allowance is off unless asked for and reports what it drew`() {
         val smt = File.createTempFile("clihint", ".smt2").apply {
             writeText(

@@ -49,6 +49,7 @@ class SearchSession(
     /** Component whose deduction produced the current conflict, or null when the shared engine did. */
     private var conflictOwner: SearchComponent? = null
     private var lastPushCreatedLevel = false
+    private var unassignListener: SearchUnassignListener? = null
     private var checks = 0L
     private var checksExhausted = false
     private var decisionsExhausted = false
@@ -238,6 +239,16 @@ class SearchSession(
         return propagate()
     }
 
+    /**
+     * Report every Boolean variable a retraction frees to [listener], or to nobody when it is null.
+     *
+     * A branching that indexes only the unassigned variables needs the freeing signal to re-offer them;
+     * one that rescans the assignment on every pick does not, and pays nothing for this.
+     */
+    internal fun observeUnassignments(listener: SearchUnassignListener?) {
+        unassignListener = listener
+    }
+
     /** Retract all decisions above [decisionLevel] in reverse trail order. */
     fun popTo(decisionLevel: Int) {
         retractTo(decisionLevel)
@@ -254,6 +265,7 @@ class SearchSession(
                 boolLevels.remove(variable)
                 boolReasons.remove(variable)
                 boolPublisher.remove(variable)
+                unassignListener?.onUnassign(variable)
             }
             valuesAtLevel.removeAt(level)
             priorIntFactsAtLevel.removeAt(level).forEach { variable, fact ->
@@ -502,13 +514,24 @@ class SearchSession(
      *
      * [candidateHints] steer which side of a Boolean split is tried first and nothing else, so the
      * verdict is the one this traversal would have reached without them.
+     *
+     * [booleanBranching] chooses which Boolean is split. A heuristic one also observes the traversal,
+     * so it is passed as [observer] as well.
      */
     fun solve(
         numBoolVars: Int,
         params: SearchSolveParams = SearchSolveParams(),
         candidateHints: SearchCandidateHints = SearchCandidateHints.None,
+        booleanBranching: BooleanBranching = BooleanBranching.SourceOrder(numBoolVars),
+        observer: SearchRunObserver = SearchRunObserver.None,
     ): SearchResult {
-        val run = openRun(numBoolVars, params, candidateHints = candidateHints)
+        val run = openRun(
+            numBoolVars,
+            params,
+            booleanBranching = booleanBranching,
+            observer = observer,
+            candidateHints = candidateHints,
+        )
         return when (val event = run.next()) {
             is SearchRunEvent.Satisfied -> SearchResult.Satisfied(event.model)
             SearchRunEvent.Exhausted -> SearchResult.Exhausted
@@ -531,6 +554,7 @@ class SearchSession(
         candidateHints: SearchCandidateHints = SearchCandidateHints.None,
     ): SearchRun {
         decisionsExhausted = false
+        observeUnassignments(booleanBranching as? SearchUnassignListener)
         return SearchRun(
             this,
             params,

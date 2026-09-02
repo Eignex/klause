@@ -16,6 +16,7 @@ import com.eignex.klause.solver.pipeline.FiniteSolveOutcome
 import com.eignex.klause.solver.pipeline.FiniteSolveRequest
 import com.eignex.klause.solver.pipeline.FiniteSolveVerdict
 import com.eignex.klause.solver.pipeline.NODE_LIMIT_KEY
+import com.eignex.klause.solver.pipeline.OpenBranching
 import com.eignex.klause.solver.pipeline.OpenTheoryExecution
 import com.eignex.klause.solver.pipeline.OpenTheoryOptimum
 import com.eignex.klause.solver.pipeline.OpenTheoryPipeline
@@ -84,6 +85,7 @@ internal object SolveCore {
                     maxLearnedClauses = takeOpenIntParam(common, "max-learned", nonNegative = true),
                     lbdGlue = takeOpenIntParam(common, "lbd-glue", nonNegative = true) ?: 2,
                     openHintFlips = takeOpenLongParam(common, "open-hint-flips", nonNegative = true),
+                    openBranching = takeOpenBranching(common) ?: TheoryParams().openBranching,
                     cancellation = deadlineCancel,
                     timeout = deadlineCancel,
                 )
@@ -223,6 +225,17 @@ internal object SolveCore {
             )
         }
         return value
+    }
+
+    /** Consume the open route's Boolean branching selection. */
+    private fun takeOpenBranching(common: CommonOptions): OpenBranching? {
+        val entry = common.engineParams.firstOrNull { it.startsWith("open-branching=") } ?: return null
+        common.engineParams.remove(entry)
+        val raw = entry.substringAfter('=')
+        return OpenBranching.of(raw) ?: usageError(
+            "engine param `open-branching` expects one of ${OpenBranching.entries.joinToString(", ") { it.id }}, " +
+                "got `$raw`",
+        )
     }
 
     private fun takeOpenIntParam(common: CommonOptions, key: String, nonNegative: Boolean): Int? =

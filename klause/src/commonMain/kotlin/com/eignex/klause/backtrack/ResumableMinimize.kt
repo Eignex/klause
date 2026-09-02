@@ -7,7 +7,6 @@ import com.eignex.klause.backtrack.lp.lpFeasibilityPump
 import com.eignex.klause.backtrack.lp.lpRoundingProbe
 import com.eignex.klause.backtrack.selector.IndomainBest
 import com.eignex.klause.backtrack.selector.SolutionGuided
-import com.eignex.klause.backtrack.selector.VarRef
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
@@ -57,6 +56,7 @@ import com.eignex.klause.solver.search.SearchRunEvent
 import com.eignex.klause.solver.search.SearchRunLifecycle
 import com.eignex.klause.solver.search.SearchSolveParams
 import com.eignex.klause.solver.search.SearchTraversalPolicy
+import com.eignex.klause.solver.search.VarRef
 import com.eignex.klause.util.Cancellation
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TimeSource

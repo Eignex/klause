@@ -6,6 +6,7 @@ import com.eignex.klause.ir.values
 import com.eignex.klause.propagation.PropagationResult.Unsat
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.search.VarRef
 import com.eignex.klause.util.EmptyLongArray
 import com.eignex.klause.util.LongHashSet
 import kotlin.math.ln
