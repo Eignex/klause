@@ -49,6 +49,34 @@ internal fun OpenBooleanCandidate.hints(): SearchCandidateHints =
     SearchCandidateHints.ofLiterals(IntArray(boolVars.size) { Lit.make(boolVars[it], values[it]) })
 
 /**
+ * A hint that draws its proposal only once [minSplits] splits have consulted it.
+ *
+ * The producer costs work before the traversal can use anything, and a model whose Boolean columns
+ * propagation settles reaches almost no split at all — so drawing up front spends the allowance exactly
+ * where no branch order could have paid for it. Deferring makes the search prove it is branching-bound
+ * first: the shared branching consults a hint once per two-polarity Boolean split and only then, so the
+ * consultations are the evidence. Nothing is refused for its size, and a search that never reaches the
+ * threshold simply never pays.
+ *
+ * The first [minSplits] splits keep the default order, which is what a hint that had not been drawn yet
+ * would have given them anyway.
+ */
+internal class DeferredCandidateHints(private val minSplits: Long, private val draw: () -> SearchCandidateHints) :
+    SearchCandidateHints {
+
+    private var splits = 0L
+    private var drawn: SearchCandidateHints? = null
+
+    override fun preferredBool(variable: Int): Boolean? {
+        drawn?.let { return it.preferredBool(variable) }
+        if (++splits < minSplits) return null
+        val hints = draw()
+        drawn = hints
+        return hints.preferredBool(variable)
+    }
+}
+
+/**
  * A hint that counts the splits it decided the first branch of.
  *
  * Drawing a proposal and steering a traversal are different things: propagation may fix every hinted

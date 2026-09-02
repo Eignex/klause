@@ -163,12 +163,31 @@ class CliModeTest {
         }
 
         val plain = capture { assertEquals(0, runCli(arrayOf("-s", smt.absolutePath))) }
-        val hinted = capture {
+        // The default split threshold outlasts this model's whole search, so asking for a hint is not
+        // enough to spend one.
+        val deferred = capture {
             assertEquals(0, runCli(arrayOf("-s", "--param", "open-hint-flips=1000", smt.absolutePath)))
+        }
+        val hinted = capture {
+            assertEquals(
+                0,
+                runCli(
+                    arrayOf(
+                        "-s",
+                        "--param",
+                        "open-hint-flips=1000",
+                        "--param",
+                        "open-hint-min-splits=1",
+                        smt.absolutePath,
+                    ),
+                ),
+            )
         }
 
         assertTrue(plain.lines().firstOrNull() == "sat", plain)
         assertTrue("openHint" !in plain, plain)
+        assertTrue(deferred.lines().firstOrNull() == "sat", deferred)
+        assertTrue("openHint" !in deferred, deferred)
         assertTrue(hinted.lines().firstOrNull() == "sat", hinted)
         assertTrue("; openHintDraws=1" in hinted, hinted)
         assertTrue("; openHintProduced=1" in hinted, hinted)

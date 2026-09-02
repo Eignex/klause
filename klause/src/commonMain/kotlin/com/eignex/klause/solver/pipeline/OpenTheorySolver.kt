@@ -341,20 +341,28 @@ internal class OpenTheorySolveState(private val params: TheoryParams) {
 
     private var drawStats = OpenHintStats()
     private var steering: CountingCandidateHints? = null
-    private var drawn: SearchCandidateHints? = null
+    private var deferred: SearchCandidateHints? = null
 
     /**
-     * The request's one unverified branch-order hint, drawn from [plan] over [model] on first use.
+     * The request's one unverified branch-order hint, deferred until enough splits have asked for it.
      *
-     * Drawn once for the whole request. Every feasibility round of one descent shares the plan's clauses
-     * — only the bound row moves, and no clause states it — so a redraw per round would spend the
-     * allowance again to reach the same proposal. A draw that proposed nothing is remembered as nothing
-     * and is not retried either, since retrying is what a spent or cancelled allowance has already
-     * answered.
+     * Drawn at most once for the whole request. Every feasibility round of one descent shares the plan's
+     * clauses — only the bound row moves, and no clause states it — so a redraw per round would spend
+     * the allowance again to reach the same proposal. A draw that proposed nothing is remembered as
+     * nothing and is not retried either, since retrying is what a spent or cancelled allowance has
+     * already answered. The deferral carries across rounds with it, so a descent whose rounds each
+     * branch a little accumulates toward one draw rather than restarting the count.
      */
     fun candidateHints(plan: ComponentPlan, model: Problem, cancellation: Cancellation): SearchCandidateHints {
-        drawn?.let { return it }
-        val flips = params.openHintFlips ?: return SearchCandidateHints.None.also { drawn = it }
+        deferred?.let { return it }
+        params.openHintFlips ?: return SearchCandidateHints.None.also { deferred = it }
+        return DeferredCandidateHints(params.openHintMinSplits) { draw(plan, model, cancellation) }
+            .also { deferred = it }
+    }
+
+    /** Spend the allowance once the traversal has shown it branches. */
+    private fun draw(plan: ComponentPlan, model: Problem, cancellation: Cancellation): SearchCandidateHints {
+        val flips = params.openHintFlips ?: return SearchCandidateHints.None
         val result = plan.openBooleanDraw(model, OpenCandidateParams(maxFlips = flips, cancellation = cancellation))
         val candidate = result.candidate
         drawStats = OpenHintStats(
@@ -367,9 +375,7 @@ internal class OpenTheorySolveState(private val params: TheoryParams) {
         // readable after every round of a descent has consulted it.
         val counting = candidate?.let { CountingCandidateHints(it.hints()) }
         steering = counting
-        val hint: SearchCandidateHints = counting ?: SearchCandidateHints.None
-        drawn = hint
-        return hint
+        return counting ?: SearchCandidateHints.None
     }
 
     fun remainingDecisions(): Long {

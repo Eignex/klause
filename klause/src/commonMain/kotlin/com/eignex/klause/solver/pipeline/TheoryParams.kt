@@ -21,6 +21,15 @@ enum class OpenBranching(
     }
 }
 
+/**
+ * Splits a hint waits for by default before it is drawn.
+ *
+ * Chosen from the gap in the measured corpus rather than tuned: the instances that branch reach
+ * thousands of splits, the ones the theory dominates reach tens, so anything inside that gap separates
+ * them and the exact value is not load-bearing.
+ */
+private const val DEFAULT_HINT_MIN_SPLITS = 128L
+
 /** Cooperative limits shared by complete open-model theories. */
 data class TheoryParams(
     /** Legacy maximum theory-check allowance; this is not a complete leaf count. */
@@ -54,6 +63,15 @@ data class TheoryParams(
      * bounded by the cost of each theory check rather than by the branch that reached it.
      */
     val openBranching: OpenBranching = OpenBranching.SourceOrder,
+    /**
+     * Splits that must consult the hint before its allowance is spent drawing one.
+     *
+     * A model whose Boolean columns propagation settles reaches almost no split, so a hint drawn up
+     * front there costs its whole allowance where no branch order could have paid for it. Waiting makes
+     * the search show it is branching-bound first. One means draw at the first split; a threshold past
+     * any split the search reaches means never draw at all.
+     */
+    val openHintMinSplits: Long = DEFAULT_HINT_MIN_SPLITS,
     /** Wall-clock timeout token, kept separate from external cancellation for result reporting. */
     val timeout: Cancellation = Cancellation.Never,
     /** Cooperative cancellation token. */
@@ -65,5 +83,6 @@ data class TheoryParams(
         require(maxLearnedClauses == null || maxLearnedClauses >= 0) { "learned clause cap must not be negative" }
         require(lbdGlue >= 0) { "glue threshold must not be negative" }
         require(openHintFlips == null || openHintFlips >= 0) { "hint allowance must not be negative" }
+        require(openHintMinSplits >= 1) { "hint split threshold must be positive" }
     }
 }

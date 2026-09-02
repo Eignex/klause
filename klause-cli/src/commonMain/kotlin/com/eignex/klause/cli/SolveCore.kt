@@ -86,6 +86,8 @@ internal object SolveCore {
                     lbdGlue = takeOpenIntParam(common, "lbd-glue", nonNegative = true) ?: 2,
                     openHintFlips = takeOpenLongParam(common, "open-hint-flips", nonNegative = true),
                     openBranching = takeOpenBranching(common) ?: TheoryParams().openBranching,
+                    openHintMinSplits = takeOpenLongParam(common, "open-hint-min-splits", nonNegative = false)
+                        ?: TheoryParams().openHintMinSplits,
                     cancellation = deadlineCancel,
                     timeout = deadlineCancel,
                 )
