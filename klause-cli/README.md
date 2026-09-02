@@ -118,7 +118,10 @@ Solver-control flags are common to **every** mode:
 Open-theory input (open SMT-LIB or MPS) is selected by the model route, not by `-e`: it always uses
 the complete theory solver. `--param node-limit=N` is a deterministic solve-wide budget: it counts
 finite decision nodes on a finite route and open-theory decisions, checks, and LIA row visits on an
-open route.
+open route. `--param open-hint-flips=N` spends N local-search flips, once per request, on an
+unverified first-branch order over the model's shared clauses; it is off unless asked for, changes
+only which side of a Boolean split is tried first, and reports what it drew under `-s`
+(`openHint*`).
 
 MiniZinc-mode-only flags:
 

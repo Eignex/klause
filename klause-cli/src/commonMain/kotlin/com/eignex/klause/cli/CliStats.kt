@@ -123,6 +123,19 @@ internal fun openTheoryStatPairs(stats: SolveStats): List<Pair<String, String>> 
             "openPeakRetained" to "$peakRetained",
             "openLearnedWatchVisits" to "$watchVisits",
         )
+    } + with(stats.openHints) {
+        // Only a run that drew a hint has anything to say about one, so every other open solve reports
+        // no hint block rather than a zeroed one.
+        if (draws == 0L) {
+            emptyList()
+        } else {
+            listOf(
+                "openHintDraws" to "$draws",
+                "openHintApplied" to "$applied",
+                "openHintVars" to "$hintedVars",
+                "openHintMoves" to "$moves",
+            )
+        }
     }
 }
 

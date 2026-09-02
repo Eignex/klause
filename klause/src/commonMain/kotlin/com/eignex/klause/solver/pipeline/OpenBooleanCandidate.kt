@@ -1,12 +1,15 @@
 package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.localsearch.LocalSearchSolver
 import com.eignex.klause.localsearch.strategy.ProbSat
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.solver.SolveResult
+import com.eignex.klause.solver.search.SearchCandidateHints
 import com.eignex.klause.util.Cancellation
 
 /** Local-search work allowance spent on one candidate draw. */
@@ -41,7 +44,29 @@ internal class OpenBooleanCandidate(
     val values: BooleanArray,
 )
 
-/** Bounded, deterministic settings for [ComponentPlan.openBooleanCandidate]. */
+/** This proposal as unverified branch-order steering, the only thing a search may do with it. */
+internal fun OpenBooleanCandidate.hints(): SearchCandidateHints =
+    SearchCandidateHints.ofLiterals(IntArray(boolVars.size) { Lit.make(boolVars[it], values[it]) })
+
+/**
+ * What one draw from a plan's shared clauses produced, and the local-search work it spent.
+ *
+ * The cost is reported whether or not a proposal came out of it, since a draw that reached none is
+ * overhead the traversal never gets back — exactly the part a measurement of the producer must see.
+ */
+internal class OpenBooleanDraw(
+    /** The proposal, or null when the draw reached none. */
+    val candidate: OpenBooleanCandidate?,
+    /** Local-search moves the draw spent. */
+    val moves: Long,
+) {
+    internal companion object {
+        /** The draw of a plan with no shared clause to draw from, which spends nothing. */
+        val NOTHING: OpenBooleanDraw = OpenBooleanDraw(null, 0)
+    }
+}
+
+/** Bounded, deterministic settings for [ComponentPlan.openBooleanDraw]. */
 internal data class OpenCandidateParams(
     /** Local-search work allowance; a zero allowance produces nothing. */
     val maxFlips: Long = DEFAULT_CANDIDATE_FLIPS,
@@ -88,28 +113,31 @@ internal fun ComponentPlan.booleanSkeleton(
 }
 
 /**
- * Draw one unverified Boolean proposal from this plan's shared clauses, or null when there is nothing to
- * propose — no shared clause, no assignment reached within [params], or a cancelled draw.
+ * Draw one unverified Boolean proposal from this plan's shared clauses, proposing nothing when there is
+ * nothing to propose — no shared clause, no assignment reached within [params], or a cancelled draw.
  *
  * The recipe is probSAT: the skeleton is a pure clause model, so a break-driven walk is the arm that fits
  * it, and a fixed seed under a fixed allowance makes the draw reproducible. Root propagation ruling the
  * skeleton out is one more way to have nothing to propose, not a refutation of [source] — the clauses are
  * only part of the model.
  */
-internal fun ComponentPlan.openBooleanCandidate(
+internal fun ComponentPlan.openBooleanDraw(
     source: Problem,
     params: OpenCandidateParams = OpenCandidateParams(),
-): OpenBooleanCandidate? {
-    val skeleton = booleanSkeleton(source, params.cancellation) ?: return null
-    val sample = LocalSearchSolver(skeleton.problem, strategy = ProbSat.adaptive())
-        .samples(
-            LocalSearchParams(
-                maxFlips = params.maxFlips,
-                randomSeed = params.randomSeed,
-                cancellation = params.cancellation,
-            ),
-        )
-        .firstOrNull() ?: return null
+): OpenBooleanDraw {
+    val skeleton = booleanSkeleton(source, params.cancellation) ?: return OpenBooleanDraw.NOTHING
+    val drawn = LocalSearchSolver(skeleton.problem, strategy = ProbSat.adaptive()).solve(
+        LocalSearchParams(
+            maxFlips = params.maxFlips,
+            randomSeed = params.randomSeed,
+            cancellation = params.cancellation,
+        ),
+    )
+    val moves = drawn.stats.ls.moves.sum.toLong()
+    val sample = (drawn as? SolveResult.Sat)?.assignment ?: return OpenBooleanDraw(null, moves)
     val vars = skeleton.boolVars
-    return OpenBooleanCandidate(vars, BooleanArray(vars.size) { sample.bools[vars[it]] })
+    return OpenBooleanDraw(
+        OpenBooleanCandidate(vars, BooleanArray(vars.size) { sample.bools[vars[it]] }),
+        moves,
+    )
 }
