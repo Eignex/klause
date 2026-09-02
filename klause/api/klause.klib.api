@@ -2163,8 +2163,6 @@ sealed interface com.eignex.klause.presolve/OpenPresolveResult { // com.eignex.k
             final fun <get-closedSides>(): kotlin/Int // com.eignex.klause.presolve/OpenPresolveResult.Tightened.closedSides.<get-closedSides>|<get-closedSides>(){}[0]
         final val spec // com.eignex.klause.presolve/OpenPresolveResult.Tightened.spec|{}spec[0]
             final fun <get-spec>(): com.eignex.klause.ir/Problem // com.eignex.klause.presolve/OpenPresolveResult.Tightened.spec.<get-spec>|<get-spec>(){}[0]
-
-        final object Companion // com.eignex.klause.presolve/OpenPresolveResult.Tightened.Companion|null[0]
     }
 
     final object Refuted : com.eignex.klause.presolve/OpenPresolveResult { // com.eignex.klause.presolve/OpenPresolveResult.Refuted|null[0]

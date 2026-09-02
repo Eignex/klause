@@ -23,22 +23,8 @@ sealed interface OpenPresolveResult {
      *
      * @property spec the same model over tighter bounds; every other part of it is carried through.
      * @property closedSides how many open sides the phase proved a bound for.
-     * @property factorsChanged whether source-safe presolve rewrote factors and invalidated factor ownership.
      */
-    class Tightened private constructor(
-        val spec: Problem,
-        val closedSides: Int,
-        internal val factorsChanged: Boolean = false,
-    ) : OpenPresolveResult {
-        constructor(spec: Problem, closedSides: Int) : this(spec, closedSides, false)
-
-        /** Internal constructors for preparation outcomes. */
-        companion object {
-            /** Build a result that carries a source factor rewrite. */
-            internal fun of(spec: Problem, closedSides: Int, factorsChanged: Boolean): Tightened =
-                Tightened(spec, closedSides, factorsChanged)
-        }
-    }
+    class Tightened(val spec: Problem, val closedSides: Int) : OpenPresolveResult
 
     /**
      * The model has no solution.
@@ -50,26 +36,10 @@ sealed interface OpenPresolveResult {
 }
 
 /**
- * Presolve a model whose integer sides are open, by proving bounds for them.
+ * Presolve a model whose integer sides are open: source-safe factor passes, then [closeOpenBounds].
  *
- * Source-safe factor passes run here, while finite-domain and root-propagation passes remain behind a
- * finite projection. The open-specific part closes sides with optimization-based bound tightening over
- * the unconditional linear rows, behind a feasibility-based interval prefilter.
- *
- * Ahead of that runs an exact refutation over the same rows, in arithmetic that does not wrap. It answers
- * only in the refuting direction, so it costs a bounded pass and can only ever add a verdict.
- *
- * Behind it, each side the tightening leaves open is offered what the equality structure implies
- * ([structuralIntBounds]), which reaches the columns a `Long`/`Double` relaxation cannot represent. Both
- * kinds of bound are the model's own, so closing a side with either keeps it equisatisfiable — the
- * property that lets a later `unsat` be reported as one.
- *
- * Unconditional [Linear] rows and rows whose reifying Boolean is fixed by a unit clause participate. A
- * wide row carries no `Long` reading, so it is skipped: the phase then proves fewer bounds, never a
- * wrong one.
- *
- * [cancellation] is polled between variables and threaded into each LP solve, so a budget spent partway
- * through leaves the bounds it had already proved — every one of them sound on its own.
+ * The two are separable, and callers that route from the prepared model run them apart — the factor
+ * passes decide which lane owns what, so they have to finish before ownership is selected.
  */
 fun Problem.presolveOpen(cancellation: Cancellation = Cancellation.Never): OpenPresolveResult =
     presolveOpen(PresolveConfig.DEFAULT, null, false, cancellation, null)
@@ -92,10 +62,37 @@ internal fun Problem.presolveOpen(
         presolveBudget,
     )
     if (source.infeasible) return OpenPresolveResult.Refuted
-    val problem = source.problem
-    val factorsChanged = problem !== this
+    return source.problem.closeOpenBounds(preparationCancellation)
+}
+
+/**
+ * Close what the model's own rows prove about its open integer sides.
+ *
+ * Runs on a model source-safe preparation has already produced, and only ever narrows bounds: the factor
+ * set it reads is the one the caller's component plan was selected from, and stays so.
+ *
+ * Sides close by optimization-based bound tightening over the unconditional linear rows, behind a
+ * feasibility-based interval prefilter.
+ *
+ * Ahead of that runs an exact refutation over the same rows, in arithmetic that does not wrap. It answers
+ * only in the refuting direction, so it costs a bounded pass and can only ever add a verdict.
+ *
+ * Behind it, each side the tightening leaves open is offered what the equality structure implies
+ * ([structuralIntBounds]), which reaches the columns a `Long`/`Double` relaxation cannot represent. Both
+ * kinds of bound are the model's own, so closing a side with either keeps it equisatisfiable — the
+ * property that lets a later `unsat` be reported as one.
+ *
+ * Unconditional [Linear] rows and rows whose reifying Boolean is fixed by a unit clause participate. A
+ * wide row carries no `Long` reading, so it is skipped: the phase then proves fewer bounds, never a
+ * wrong one.
+ *
+ * [cancellation] is polled between variables and threaded into each LP solve, so a budget spent partway
+ * through leaves the bounds it had already proved — every one of them sound on its own.
+ */
+internal fun Problem.closeOpenBounds(cancellation: Cancellation = Cancellation.Never): OpenPresolveResult {
+    val problem = this
     val columns = problem.numIntVars
-    if (columns == 0) return tightened(problem, closedSides = 0, factorsChanged)
+    if (columns == 0) return OpenPresolveResult.Tightened(problem, closedSides = 0)
     val declared = Array(columns) { v ->
         OpenIntBounds(
             if (problem.intBounds.hasLower(v)) problem.intBounds.lower(v) else null,
@@ -103,7 +100,7 @@ internal fun Problem.presolveOpen(
         )
     }
     if (declared.none { it.lo == null || it.hi == null }) {
-        return tightened(problem, closedSides = 0, factorsChanged)
+        return OpenPresolveResult.Tightened(problem, closedSides = 0)
     }
 
     val rows = problem.openPresolveRows()
@@ -111,21 +108,21 @@ internal fun Problem.presolveOpen(
     // Exact arithmetic refutes ahead of the tightening below, which reads the same rows in `Long` and
     // `Double`. A coefficient times an open bound is the product that leaves 64 bits, so the systems
     // whose forced values are largest are the ones only this pass reaches.
-    if (exactBoundsInfeasible(declared, intRows, preparationCancellation)) return OpenPresolveResult.Refuted
+    if (exactBoundsInfeasible(declared, intRows, cancellation)) return OpenPresolveResult.Refuted
     // Then the relaxation over the same open ranges. A Farkas ray reaches the systems no bound ever
     // crosses, which is what both the pass above and the tightening below need to conclude anything.
-    if (openLpInfeasible(declared, intRows, preparationCancellation)) return OpenPresolveResult.Refuted
+    if (openLpInfeasible(declared, intRows, cancellation)) return OpenPresolveResult.Refuted
     val tightened = tightenOpenIntBounds(
         declared,
         intRows,
-        cancellation = preparationCancellation,
+        cancellation = cancellation,
         realConstraints = rows.filter { it.realVars.isNotEmpty() },
         realLower = problem.realLower,
         realUpper = problem.realUpper,
     )
     if (tightened.refuted) return OpenPresolveResult.Refuted
 
-    val bounds = fillFromStructure(tightened.bounds, intRows, preparationCancellation)
+    val bounds = fillFromStructure(tightened.bounds, intRows, cancellation)
     // Both a tightened and a structural bound are necessary conditions on their column, so a pair that
     // crosses has no integer point between them — over the open ranges, not inside a box.
     if (bounds.any { crossed(it) }) return OpenPresolveResult.Refuted
@@ -134,12 +131,9 @@ internal fun Problem.presolveOpen(
         if (declared[v].lo == null && bounds[v].lo != null) closed++
         if (declared[v].hi == null && bounds[v].hi != null) closed++
     }
-    if (closed == 0) return tightened(problem, closedSides = 0, factorsChanged)
-    return tightened(problem.withBounds(bounds), closedSides = closed, factorsChanged)
+    if (closed == 0) return OpenPresolveResult.Tightened(problem, closedSides = 0)
+    return OpenPresolveResult.Tightened(problem.withBounds(bounds), closedSides = closed)
 }
-
-private fun tightened(problem: Problem, closedSides: Int, factorsChanged: Boolean): OpenPresolveResult.Tightened =
-    OpenPresolveResult.Tightened.of(problem, closedSides, factorsChanged)
 
 /** Unconditional integer rows plus the integer rows a root unit clause asserts. */
 private fun Problem.openPresolveRows(): List<Linear> {
