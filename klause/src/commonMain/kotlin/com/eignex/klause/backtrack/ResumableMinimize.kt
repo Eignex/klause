@@ -27,7 +27,11 @@ import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.baked
 import com.eignex.klause.solver.ResumableSearch
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.incumbent.Candidate
 import com.eignex.klause.solver.incumbent.IncumbentSubscription
+import com.eignex.klause.solver.incumbent.Publication
+import com.eignex.klause.solver.incumbent.Verification
+import com.eignex.klause.solver.incumbent.bound
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SearchEvent
@@ -64,6 +68,14 @@ internal sealed interface StepEvent {
     data class Terminal(val result: MinimizeResult) : StepEvent
     data object Paused : StepEvent
 }
+
+/**
+ * Cap on one LP proposal's composed verification, composed with the run's own token rather than
+ * standing in for it — verification must stop at a cancellation or a slice boundary like everything
+ * else the engine does. This bounds the case that token cannot: a solve with budget left to spare
+ * whose fixpoint over a fully-fixed assignment runs away inside one propagator.
+ */
+private val LP_VERIFY_BUDGET = 100.milliseconds
 
 /**
  * The optimize driver: branch-and-bound minimisation over the shared [SearchRun]. A thin wrapper that
@@ -149,8 +161,12 @@ internal class ResumableMinimize(
     private fun sliceExpired(): Boolean =
         if (sliceNodeEnd >= 0L) sink.search.nodeCount >= sliceNodeEnd else sliceEnd?.hasPassedNow() ?: false
 
-    private var best: Sample? = null
-    private var bestObj: Double = Double.POSITIVE_INFINITY
+    // The run's single verified incumbent. Every producer offers into it and none of them writes the
+    // best directly, so one admission rule and one strict-improvement test decide what stands — and the
+    // version the exchange stamps tells the offering producer whether *it* installed the improvement.
+    // Replaced wholesale by [rebind], whose fragment incumbent starts empty again.
+    private var incumbents = minimizingSampleExchange(problem)
+    private val bestObj: Double get() = incumbents.bound()
     private val singleObj = objective.singleIntObjective()
     private var objVarBest: Long? = null
     private val externalShared = params.objectiveBoundSupplier != null
@@ -290,8 +306,7 @@ internal class ResumableMinimize(
         run.reset()
         inprocessing?.reset()
         firstRun = true
-        best = null
-        bestObj = Double.POSITIVE_INFINITY
+        incumbents = minimizingSampleExchange(problem)
         objVarBest = null
         lastObjBoundAsserted = null
         lastBoolCutoffRhs = null
@@ -333,14 +348,14 @@ internal class ResumableMinimize(
     private fun terminalExhausted(core: UnsatCore?): MinimizeResult {
         sink.stop()
         val stats = sink.snapshot()
-        val b = best
+        val b = incumbents.current()
         return when {
             externalShared && b != null ->
-                MinimizeResult.BestFound(b, bestObj, TerminationReason.SearchExhausted, stats)
+                MinimizeResult.BestFound(b.assignment, b.objective, TerminationReason.SearchExhausted, stats)
 
             externalShared -> MinimizeResult.Unknown(TerminationReason.SearchExhausted, stats)
 
-            b != null -> MinimizeResult.Optimal(b, bestObj, stats)
+            b != null -> MinimizeResult.Optimal(b.assignment, b.objective, stats)
 
             // No incumbent, but a leaf's continuous LP was uncertifiable — the tree is not provably
             // all-infeasible, so report `unknown` rather than an unsound Infeasible.
@@ -354,9 +369,9 @@ internal class ResumableMinimize(
         sink.stop()
         sink.timedOut = true
         val stats = sink.snapshot()
-        val b = best
+        val b = incumbents.current()
         return if (b != null) {
-            MinimizeResult.BestFound(b, bestObj, TerminationReason.BudgetExhausted, stats)
+            MinimizeResult.BestFound(b.assignment, b.objective, TerminationReason.BudgetExhausted, stats)
         } else {
             MinimizeResult.Unknown(TerminationReason.BudgetExhausted, stats)
         }
@@ -442,17 +457,11 @@ internal class ResumableMinimize(
         return session.addLearnedPb(pbWeights, pbLits, degree, lbd = 1, permanent = true) is PropagationResult.Unsat
     }
 
-    /** Fold [sample] (objective [o]) into the incumbent when it strictly improves the best; fires
-     *  inline telemetry and returns the incumbent to surface, or null when it isn't an improvement. */
+    /** Offer [sample] (objective [o]) to [incumbents]; fires inline telemetry and returns the incumbent
+     *  to surface when this call installed it, else null. Admission — a finite score, and the certified
+     *  continuous values only a leaf's residual LP can attach — is [sampleAdmission]'s to decide. */
     private fun recordIfImproving(sample: Sample, o: Double): MinimizeResult.WithSample? {
-        // A real-variable problem's incumbent must carry the continuous values a leaf's residual LP
-        // validated and attached; a sample without them came from a heuristic that neither solved nor
-        // certified the reals, so it is neither complete nor sound to surface. Reject it (only the leaf
-        // verdict produces a valid real-var incumbent).
-        if (problem.numRealVars > 0 && sample.reals.size < problem.numRealVars) return null
-        if (o >= bestObj) return null
-        bestObj = o
-        best = sample
+        if (incumbents.offer(sample, o) !is Publication.Installed) return null
         if (singleObj != null) objVarBest = sample.ints[singleObj.varId]
         params.improvedSolutionSink?.invoke(sample, o)
         params.onEvent?.invoke(SearchEvent.Incumbent(o))
@@ -461,6 +470,25 @@ internal class ResumableMinimize(
         // reporting nothing — search and LP alike. Snapshotting mid-search is sound: it reads elapsed time
         // live rather than requiring the sink to have been stopped.
         return MinimizeResult.BestFound(sample, o, TerminationReason.BudgetExhausted, sink.snapshot())
+    }
+
+    /**
+     * Publish an LP primal heuristic's [proposal]: the LP heuristics propose from the relaxation's view
+     * of the model, so what they hand back is untrusted here however carefully they built it, and
+     * [ComposedSampleVerifier] re-derives its feasibility and its objective from the whole factor set
+     * before the exchange weighs it. Null unless this call installed a new incumbent — a refuted
+     * proposal is one bad rounding and an undecided one a fixpoint the budget cut short, and neither says
+     * anything about the model, so both simply leave the search to find its own first solution.
+     *
+     * Verification runs under the run's token capped by [LP_VERIFY_BUDGET], so a cancellation or a
+     * slice boundary stops it where it stops the rest of the engine.
+     */
+    private fun publishLpProposal(proposal: Sample): MinimizeResult.WithSample? {
+        val budget = params.cancellation or Cancellation.after(LP_VERIFY_BUDGET)
+        val verifier = ComposedSampleVerifier(problem, objective, budget)
+        val verdict = verifier.verify(Candidate(proposal, objective.evaluate(proposal)))
+        val accepted = (verdict as? Verification.Accepted)?.candidate ?: return null
+        return recordIfImproving(accepted.assignment, accepted.objective)
     }
 
     /**
@@ -516,7 +544,8 @@ internal class ResumableMinimize(
         // These primal heuristics seed an integer incumbent from the LP/rounding without solving the
         // residual real LP, so their sample carries no continuous values and is not certified real-
         // feasible. With LP-only continuous variables only the leaf verdict may surface a
-        // solution (it validates the reals and attaches them); skip the heuristics there.
+        // solution (it validates the reals and attaches them); skip the heuristics there rather than
+        // spend the root budget on proposals [publishLpProposal] would refuse anyway.
         if (problem.numRealVars == 0) {
             // LP-rounding primal heuristic: seed an incumbent before search so the bound prunes and
             // reduced-cost fixing bite from the first node.
@@ -524,14 +553,11 @@ internal class ResumableMinimize(
                 // Single-shot rounding first; if it can't land a feasible point, pump toward one.
                 val seed = lpEngine.lpRoundingProbe(objective, rootToken)
                     ?: lpEngine.lpFeasibilityPump(objective, rootToken)
-                if (seed != null) recordIfImproving(seed, objective.evaluate(seed))?.let { return it }
+                if (seed != null) publishLpProposal(seed)?.let { return it }
             }
-            // Best-bound tree-search primal subsolver: dive best-first for an incumbent. Pure heuristic —
-            // the returned assignment is propagation-feasible and re-evaluated here.
+            // Best-bound tree-search primal subsolver: dive best-first for an incumbent.
             if (lpEngine.params.lpPlan.lbTreeSearch && lpEngine.lpRelaxer != null) {
-                lpEngine.lbTreeSearch(objective, rootToken)?.let { seed ->
-                    recordIfImproving(seed, objective.evaluate(seed))?.let { return it }
-                }
+                lpEngine.lbTreeSearch(objective, rootToken)?.let { seed -> publishLpProposal(seed)?.let { return it } }
             }
         }
         return null

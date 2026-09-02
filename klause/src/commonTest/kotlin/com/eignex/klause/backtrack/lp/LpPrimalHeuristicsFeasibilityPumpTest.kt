@@ -16,9 +16,9 @@ import kotlin.test.Test
 import kotlin.test.assertTrue
 
 /**
- * [lpFeasibilityPump] must return only feasible incumbents — every returned assignment satisfies all
- * Linear factors — since the caller records it without re-checking feasibility. Checked by brute force
- * over random 0/1 covering/packing problems.
+ * [lpFeasibilityPump] must propose only feasible assignments — every returned assignment satisfies all
+ * Linear factors — so its proposals survive the caller's verification instead of being thrown away.
+ * Checked by brute force over random 0/1 covering/packing problems.
  */
 class LpPrimalHeuristicsFeasibilityPumpTest {
 
