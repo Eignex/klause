@@ -17,7 +17,6 @@ import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.Optimizer
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.incumbent.IncumbentExchange
-import com.eignex.klause.solver.incumbent.IncumbentSource
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.TerminationReason
@@ -27,6 +26,8 @@ import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
+import kotlin.test.assertNotSame
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class AlnsTest {
@@ -40,6 +41,54 @@ class AlnsTest {
         InnerLsRepair(label = "deep", flipsOverride = 250L),
         GreedyConstructionRepair(),
         GreedyConstructionRepair(noise = 0.1),
+    )
+
+    /** The four cheapest weights of [SELECT_WEIGHTS] — the [selectProblem] optimum, so no repair can
+     *  strictly improve on it and an adopted copy of it stays the run's reported best. */
+    private fun selectOptimum(): Sample {
+        val cheapest = SELECT_WEIGHTS.indices.sortedBy { SELECT_WEIGHTS[it] }.take(SELECT_MIN).toSet()
+        return Sample(BooleanArray(SELECT_WEIGHTS.size) { it in cheapest }, LongArray(0))
+    }
+
+    /** Pick ≥ [SELECT_MIN] of 12 weighted booleans, minimising the picked weights. Wide enough that a
+     *  starved run lands far from the optimum, so a published one is worth importing. */
+    private fun selectProblem(): BakedProblem = Problem(
+        numBoolVars = SELECT_WEIGHTS.size,
+        numIntVars = 0,
+        intDomains = emptyArray(),
+        factors = arrayOf<Factor>(
+            Cardinality(
+                IntArray(SELECT_WEIGHTS.size) { Lit.make(it, true) },
+                min = SELECT_MIN,
+                max = SELECT_WEIGHTS.size,
+            ),
+        ),
+    ).bake()
+
+    private fun selectAlns(exchange: IncumbentExchange<Sample, Double>) = Alns(
+        inner = LocalSearchSolver(selectProblem()),
+        repairOperators = scaledRepairOperators,
+        minDestroyFraction = 0.5,
+        maxDestroyFraction = 0.5,
+        maxIterations = 4,
+        flipsPerIteration = 50L,
+        acceptance = AcceptanceCriterion.BetterOrEqual,
+        pooledIncumbents = exchange,
+    )
+
+    private val selectObjective = LinearObjective(boolWeights = SELECT_WEIGHTS)
+
+    private fun selectExchangeHolding(sample: Sample) = IncumbentExchange.minimizing<Sample>()
+        .apply { offer(sample, selectObjective.evaluate(sample)) }
+
+    /** Warm-start every variable on and allow a single flip: the bootstrap incumbent is then the worst
+     *  feasible selection, so a published optimum is unambiguously better than anything this run reached
+     *  by itself and an adoption is visible in the reported assignment's identity. The per-iteration
+     *  repairs keep their own [Alns.flipsPerIteration] budget. */
+    private fun starvedBootstrap() = LocalSearchParams(
+        maxFlips = 1L,
+        randomSeed = 1L,
+        initialAssignment = Sample(BooleanArray(SELECT_WEIGHTS.size) { true }, LongArray(0)),
     )
 
     @Test
@@ -157,52 +206,43 @@ class AlnsTest {
     }
 
     @Test
-    fun `alns publishes its accepted incumbents to the sink`() {
+    fun `alns offers its accepted incumbents to the shared exchange`() {
         val factor = Cardinality.exactlyOne(
             intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true), Lit.make(3, true)),
         )
         val problem = Problem(4, 0, emptyArray(), listOf(factor))
         val objective = LinearObjective(boolWeights = longArrayOf(10L, 5L, 8L, 3L))
-        val published = mutableListOf<Pair<Sample, Double>>()
+        val exchange = IncumbentExchange.minimizing<Sample>()
         val alns = Alns(
             inner = LocalSearchSolver(problem.bake()),
             minDestroyFraction = 0.5,
             maxDestroyFraction = 0.5,
             maxIterations = 8,
             acceptance = AcceptanceCriterion.BetterOrEqual,
-            improvedSolutionSink = { sample, obj -> published.add(sample to obj) },
+            pooledIncumbents = exchange,
         )
         val sample = alns.minimize(objective, LocalSearchParams(maxFlips = 200L, randomSeed = 1L)).assignment
         assertNotNull(sample)
-        assertTrue(published.isNotEmpty(), "at least the initial incumbent must be published")
-        assertEquals(objective.evaluate(sample), published.minOf { it.second }, "best published equals the result")
+        val standing = assertNotNull(exchange.current(), "at least the initial incumbent must be installed")
+        assertEquals(objective.evaluate(sample), standing.objective, "the exchange holds the run's best")
     }
 
     @Test
-    fun `alns adopts a better pooled solution before destroying`() {
-        val factor = Cardinality.exactlyOne(
-            intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true), Lit.make(3, true)),
-        )
-        val problem = Problem(4, 0, emptyArray(), listOf(factor))
-        val objective = LinearObjective(boolWeights = longArrayOf(10L, 5L, 8L, 3L))
-        var polls = 0
-        val optimal = Sample(booleanArrayOf(false, false, false, true), LongArray(0))
-        val exchange = IncumbentExchange.minimizing<Sample>().apply { offer(optimal, objective.evaluate(optimal)) }
-        val alns = Alns(
-            inner = LocalSearchSolver(problem.bake()),
-            minDestroyFraction = 0.5,
-            maxDestroyFraction = 0.5,
-            maxIterations = 8,
-            acceptance = AcceptanceCriterion.BetterOrEqual,
-            pooledIncumbents = IncumbentSource {
-                polls++
-                exchange.current()
-            },
-        )
-        val sample = alns.minimize(objective, LocalSearchParams(maxFlips = 200L, randomSeed = 1L)).assignment
+    fun `alns adopts a better published solution before destroying`() {
+        val optimal = selectOptimum()
+        val exchange = selectExchangeHolding(optimal)
+        val sample = selectAlns(exchange).minimize(selectObjective, starvedBootstrap()).assignment
+        assertSame(optimal, sample, "the published optimum, not a locally-found equal, is the reported best")
+    }
+
+    @Test
+    fun `alns does not import a published solution under assumption pins`() {
+        val optimal = selectOptimum()
+        val exchange = selectExchangeHolding(optimal)
+        val params = starvedBootstrap().copy(assumptions = Assumptions(bools = SELECT_DEAREST.associateWith { true }))
+        val sample = selectAlns(exchange).minimize(selectObjective, params).assignment
         assertNotNull(sample)
-        assertTrue(polls > 0, "the exchange must be consulted each iteration")
-        assertEquals(3.0, objective.evaluate(sample), "the pooled optimum is adopted as the incumbent")
+        assertNotSame(optimal, sample, "a foreign full assignment may violate the pins, so none is imported")
     }
 
     @Test
@@ -554,5 +594,14 @@ class AlnsTest {
             objective.evaluate(sample),
             "insertion noise diversifies but repair stays feasible and optimal",
         )
+    }
+
+    private companion object {
+        val SELECT_WEIGHTS = longArrayOf(7L, 3L, 5L, 9L, 1L, 8L, 2L, 6L, 12L, 4L, 11L, 10L)
+        const val SELECT_MIN = 4
+
+        /** The four dearest weights of [SELECT_WEIGHTS]; pinning them true is a selection the published
+         *  optimum (those four false) cannot satisfy. */
+        val SELECT_DEAREST = listOf(8, 10, 11, 3)
     }
 }

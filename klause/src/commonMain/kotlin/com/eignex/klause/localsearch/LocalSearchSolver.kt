@@ -448,19 +448,20 @@ class LocalSearchSolver(
         val maxFlips = minOf(params.maxFlips, params.maxInstructions ?: Long.MAX_VALUE)
         var cancelled = false
 
-        // Cross-engine solution flow: before a restart, adopt a fresher-and-better pooled assignment
-        // as the incumbent so the restart anchors on a peer arm's solution. Purely heuristic — the anchor
-        // only seeds the next descent — and skipped under assumption pins a foreign assignment may violate.
-        val pooledImporter = PooledSolutionImporter(
-            source = params.pooledIncumbents,
-            enabled = effectiveAssumptions.isEmpty,
+        // Cross-engine solution flow: publish each improvement into the shared exchange, and before a
+        // restart adopt a fresher-and-better published assignment as the incumbent so the restart anchors
+        // on a peer arm's solution. Purely heuristic in that direction — the anchor only seeds the next
+        // descent — and skipped under assumption pins a foreign assignment may violate.
+        val pooled = PooledIncumbents(
+            exchange = params.pooledIncumbents,
+            importEnabled = effectiveAssumptions.isEmpty,
             evaluate = { objective.evaluate(it) },
         )
 
         // The anchor for a restart: refresh from the pool first, then prefer the incumbent, falling back
         // to [fallback] (a best-cost-infeasible snapshot) when no feasible incumbent exists yet.
         fun restartAnchor(fallback: Sample?): Sample? {
-            pooledImporter.poll(bestObj)?.let { (sample, obj) ->
+            pooled.poll(bestObj)?.let { (sample, obj) ->
                 bestObj = obj
                 bestSample = sample
             }
@@ -535,7 +536,7 @@ class LocalSearchSolver(
                     bestSample = snap
                     bestFoundAtMs = sink.elapsedMs()
                     params.onEvent?.invoke(SearchEvent.Incumbent(obj))
-                    params.improvedSolutionSink?.invoke(snap, obj)
+                    pooled.publish(snap, obj)
                     yield(MinimizeResult.BestFound(snap, obj, TerminationReason.BudgetExhausted))
                 }
                 // Explicit feasible-phase dispatch — exhaustive, no else: every strategy declares its
