@@ -628,6 +628,21 @@ abstract fun interface com.eignex.klause.solver.search/BooleanBranching { // com
     }
 }
 
+abstract fun interface com.eignex.klause.solver.search/SearchCandidateHints { // com.eignex.klause.solver.search/SearchCandidateHints|null[0]
+    abstract fun preferredBool(kotlin/Int): kotlin/Boolean? // com.eignex.klause.solver.search/SearchCandidateHints.preferredBool|preferredBool(kotlin.Int){}[0]
+
+    final object Companion { // com.eignex.klause.solver.search/SearchCandidateHints.Companion|null[0]
+        final fun ofLiterals(kotlin/IntArray): com.eignex.klause.solver.search/SearchCandidateHints // com.eignex.klause.solver.search/SearchCandidateHints.Companion.ofLiterals|ofLiterals(kotlin.IntArray){}[0]
+    }
+
+    final object None : com.eignex.klause.solver.search/SearchCandidateHints { // com.eignex.klause.solver.search/SearchCandidateHints.None|null[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.search/SearchCandidateHints.None.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.eignex.klause.solver.search/SearchCandidateHints.None.hashCode|hashCode(){}[0]
+        final fun preferredBool(kotlin/Int): kotlin/Boolean? // com.eignex.klause.solver.search/SearchCandidateHints.None.preferredBool|preferredBool(kotlin.Int){}[0]
+        final fun toString(): kotlin/String // com.eignex.klause.solver.search/SearchCandidateHints.None.toString|toString(){}[0]
+    }
+}
+
 abstract fun interface com.eignex.klause.solver.search/SearchDecisionBudget { // com.eignex.klause.solver.search/SearchDecisionBudget|null[0]
     abstract fun consume(): kotlin/Boolean // com.eignex.klause.solver.search/SearchDecisionBudget.consume|consume(){}[0]
 
@@ -10430,6 +10445,12 @@ final class com.eignex.klause.solver.search/ClauseSearchComponent : com.eignex.k
     final fun truth(kotlin/Int): kotlin/Boolean? // com.eignex.klause.solver.search/ClauseSearchComponent.truth|truth(kotlin.Int){}[0]
 }
 
+final class com.eignex.klause.solver.search/HintedBooleanBranching : com.eignex.klause.solver.search/BooleanBranching { // com.eignex.klause.solver.search/HintedBooleanBranching|null[0]
+    constructor <init>(com.eignex.klause.solver.search/BooleanBranching, com.eignex.klause.solver.search/SearchCandidateHints) // com.eignex.klause.solver.search/HintedBooleanBranching.<init>|<init>(com.eignex.klause.solver.search.BooleanBranching;com.eignex.klause.solver.search.SearchCandidateHints){}[0]
+
+    final fun alternatives(com.eignex.klause.solver.search/SearchContext): kotlin.collections/List<com.eignex.klause.solver.search/SearchDecision>? // com.eignex.klause.solver.search/HintedBooleanBranching.alternatives|alternatives(com.eignex.klause.solver.search.SearchContext){}[0]
+}
+
 final class com.eignex.klause.solver.search/SearchBoolValue : com.eignex.klause.solver.search/SearchValueKey { // com.eignex.klause.solver.search/SearchBoolValue|null[0]
     constructor <init>(kotlin/Int) // com.eignex.klause.solver.search/SearchBoolValue.<init>|<init>(kotlin.Int){}[0]
 
@@ -10547,7 +10568,7 @@ final class com.eignex.klause.solver.search/SearchSession : com.eignex.klause.so
     final fun learnedClauseStats(): com.eignex.klause.solver.result/OpenTheoryClauseStats // com.eignex.klause.solver.search/SearchSession.learnedClauseStats|learnedClauseStats(){}[0]
     final fun levelOf(kotlin/Int): kotlin/Int // com.eignex.klause.solver.search/SearchSession.levelOf|levelOf(kotlin.Int){}[0]
     final fun model(): com.eignex.klause.solver.search/AssembledSearchModel // com.eignex.klause.solver.search/SearchSession.model|model(){}[0]
-    final fun openRun(kotlin/Int, com.eignex.klause.solver.search/SearchSolveParams = ..., com.eignex.klause.solver.search/BooleanBranching = ..., com.eignex.klause.solver.search/SearchDecisionBudget = ..., com.eignex.klause.solver.search/SearchRunObserver = ..., com.eignex.klause.solver.search/SearchModelContinuation = ..., com.eignex.klause.solver.search/SearchModelPolicy = ..., com.eignex.klause.solver.search/SearchNodePolicy = ..., com.eignex.klause.solver.search/SearchRunLifecycle = ...): com.eignex.klause.solver.search/SearchRun // com.eignex.klause.solver.search/SearchSession.openRun|openRun(kotlin.Int;com.eignex.klause.solver.search.SearchSolveParams;com.eignex.klause.solver.search.BooleanBranching;com.eignex.klause.solver.search.SearchDecisionBudget;com.eignex.klause.solver.search.SearchRunObserver;com.eignex.klause.solver.search.SearchModelContinuation;com.eignex.klause.solver.search.SearchModelPolicy;com.eignex.klause.solver.search.SearchNodePolicy;com.eignex.klause.solver.search.SearchRunLifecycle){}[0]
+    final fun openRun(kotlin/Int, com.eignex.klause.solver.search/SearchSolveParams = ..., com.eignex.klause.solver.search/BooleanBranching = ..., com.eignex.klause.solver.search/SearchDecisionBudget = ..., com.eignex.klause.solver.search/SearchRunObserver = ..., com.eignex.klause.solver.search/SearchModelContinuation = ..., com.eignex.klause.solver.search/SearchModelPolicy = ..., com.eignex.klause.solver.search/SearchNodePolicy = ..., com.eignex.klause.solver.search/SearchRunLifecycle = ..., com.eignex.klause.solver.search/SearchCandidateHints = ...): com.eignex.klause.solver.search/SearchRun // com.eignex.klause.solver.search/SearchSession.openRun|openRun(kotlin.Int;com.eignex.klause.solver.search.SearchSolveParams;com.eignex.klause.solver.search.BooleanBranching;com.eignex.klause.solver.search.SearchDecisionBudget;com.eignex.klause.solver.search.SearchRunObserver;com.eignex.klause.solver.search.SearchModelContinuation;com.eignex.klause.solver.search.SearchModelPolicy;com.eignex.klause.solver.search.SearchNodePolicy;com.eignex.klause.solver.search.SearchRunLifecycle;com.eignex.klause.solver.search.SearchCandidateHints){}[0]
     final fun popTo(kotlin/Int) // com.eignex.klause.solver.search/SearchSession.popTo|popTo(kotlin.Int){}[0]
     final fun propagate(): com.eignex.klause.solver.search/ComponentResult // com.eignex.klause.solver.search/SearchSession.propagate|propagate(){}[0]
     final fun publish(com.eignex.klause.solver.search/SearchDecision): com.eignex.klause.solver.search/ComponentResult // com.eignex.klause.solver.search/SearchSession.publish|publish(com.eignex.klause.solver.search.SearchDecision){}[0]

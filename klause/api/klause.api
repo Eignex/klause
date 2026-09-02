@@ -9841,6 +9841,11 @@ public final class com/eignex/klause/solver/search/ComponentResult$Indeterminate
 	public fun toString ()Ljava/lang/String;
 }
 
+public final class com/eignex/klause/solver/search/HintedBooleanBranching : com/eignex/klause/solver/search/BooleanBranching {
+	public fun <init> (Lcom/eignex/klause/solver/search/BooleanBranching;Lcom/eignex/klause/solver/search/SearchCandidateHints;)V
+	public fun alternatives (Lcom/eignex/klause/solver/search/SearchContext;)Ljava/util/List;
+}
+
 public final class com/eignex/klause/solver/search/SearchBoolValue : com/eignex/klause/solver/search/SearchValueKey {
 	public fun <init> (I)V
 	public final fun component1 ()I
@@ -9877,6 +9882,23 @@ public final class com/eignex/klause/solver/search/SearchCancellationPoller {
 	public final fun rearm ()V
 	public final fun reset ()V
 	public final fun setFixedCadence (Z)V
+}
+
+public abstract interface class com/eignex/klause/solver/search/SearchCandidateHints {
+	public static final field Companion Lcom/eignex/klause/solver/search/SearchCandidateHints$Companion;
+	public abstract fun preferredBool (I)Ljava/lang/Boolean;
+}
+
+public final class com/eignex/klause/solver/search/SearchCandidateHints$Companion {
+	public final fun ofLiterals ([I)Lcom/eignex/klause/solver/search/SearchCandidateHints;
+}
+
+public final class com/eignex/klause/solver/search/SearchCandidateHints$None : com/eignex/klause/solver/search/SearchCandidateHints {
+	public static final field INSTANCE Lcom/eignex/klause/solver/search/SearchCandidateHints$None;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun preferredBool (I)Ljava/lang/Boolean;
+	public fun toString ()Ljava/lang/String;
 }
 
 public abstract interface class com/eignex/klause/solver/search/SearchComponent {
@@ -10506,8 +10528,8 @@ public final class com/eignex/klause/solver/search/SearchSession : com/eignex/kl
 	public final fun learnedClauseStats ()Lcom/eignex/klause/solver/result/OpenTheoryClauseStats;
 	public fun levelOf (I)I
 	public final fun model ()Lcom/eignex/klause/solver/search/AssembledSearchModel;
-	public final fun openRun (ILcom/eignex/klause/solver/search/SearchSolveParams;Lcom/eignex/klause/solver/search/BooleanBranching;Lcom/eignex/klause/solver/search/SearchDecisionBudget;Lcom/eignex/klause/solver/search/SearchRunObserver;Lcom/eignex/klause/solver/search/SearchModelContinuation;Lcom/eignex/klause/solver/search/SearchModelPolicy;Lcom/eignex/klause/solver/search/SearchNodePolicy;Lcom/eignex/klause/solver/search/SearchRunLifecycle;)Lcom/eignex/klause/solver/search/SearchRun;
-	public static synthetic fun openRun$default (Lcom/eignex/klause/solver/search/SearchSession;ILcom/eignex/klause/solver/search/SearchSolveParams;Lcom/eignex/klause/solver/search/BooleanBranching;Lcom/eignex/klause/solver/search/SearchDecisionBudget;Lcom/eignex/klause/solver/search/SearchRunObserver;Lcom/eignex/klause/solver/search/SearchModelContinuation;Lcom/eignex/klause/solver/search/SearchModelPolicy;Lcom/eignex/klause/solver/search/SearchNodePolicy;Lcom/eignex/klause/solver/search/SearchRunLifecycle;ILjava/lang/Object;)Lcom/eignex/klause/solver/search/SearchRun;
+	public final fun openRun (ILcom/eignex/klause/solver/search/SearchSolveParams;Lcom/eignex/klause/solver/search/BooleanBranching;Lcom/eignex/klause/solver/search/SearchDecisionBudget;Lcom/eignex/klause/solver/search/SearchRunObserver;Lcom/eignex/klause/solver/search/SearchModelContinuation;Lcom/eignex/klause/solver/search/SearchModelPolicy;Lcom/eignex/klause/solver/search/SearchNodePolicy;Lcom/eignex/klause/solver/search/SearchRunLifecycle;Lcom/eignex/klause/solver/search/SearchCandidateHints;)Lcom/eignex/klause/solver/search/SearchRun;
+	public static synthetic fun openRun$default (Lcom/eignex/klause/solver/search/SearchSession;ILcom/eignex/klause/solver/search/SearchSolveParams;Lcom/eignex/klause/solver/search/BooleanBranching;Lcom/eignex/klause/solver/search/SearchDecisionBudget;Lcom/eignex/klause/solver/search/SearchRunObserver;Lcom/eignex/klause/solver/search/SearchModelContinuation;Lcom/eignex/klause/solver/search/SearchModelPolicy;Lcom/eignex/klause/solver/search/SearchNodePolicy;Lcom/eignex/klause/solver/search/SearchRunLifecycle;Lcom/eignex/klause/solver/search/SearchCandidateHints;ILjava/lang/Object;)Lcom/eignex/klause/solver/search/SearchRun;
 	public final fun popTo (I)V
 	public final fun propagate ()Lcom/eignex/klause/solver/search/ComponentResult;
 	public fun publish (I)Lcom/eignex/klause/solver/search/ComponentResult;

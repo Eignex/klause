@@ -521,12 +521,13 @@ class SearchSession(
         modelPolicy: SearchModelPolicy = SearchModelPolicy.SurfaceAll,
         nodePolicy: SearchNodePolicy = SearchNodePolicy.ExpandAll,
         lifecycle: SearchRunLifecycle = SearchRunLifecycle.None,
+        candidateHints: SearchCandidateHints = SearchCandidateHints.None,
     ): SearchRun {
         decisionsExhausted = false
         return SearchRun(
             this,
             params,
-            booleanBranching,
+            booleanBranching.preferring(candidateHints),
             decisionBudget,
             observer,
             modelContinuation,
@@ -547,6 +548,7 @@ class SearchSession(
         modelPolicy = policy.modelPolicy,
         nodePolicy = policy.nodePolicy,
         lifecycle = policy.lifecycle,
+        candidateHints = policy.candidateHints,
     )
 
     internal fun blockModelAtRoot(model: AssembledSearchModel): ComponentResult {
