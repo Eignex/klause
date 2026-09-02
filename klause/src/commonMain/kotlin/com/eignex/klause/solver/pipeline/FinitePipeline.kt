@@ -31,7 +31,12 @@ class FinitePipelineRequest(
     val cancellation: Cancellation = Cancellation.Never,
     /** Optional budget allocated to the presolve phase. */
     val presolveBudget: PresolveBudget? = null,
-    /** Component ownership selected from [problem] during routing. */
+    /**
+     * Component ownership selected from the untransformed [problem] during routing.
+     *
+     * Preparation re-selects it whenever a source pass rewrote factors, so this is the plan for the model
+     * as the frontend handed it over, not necessarily the one the engine is built from.
+     */
     val componentPlan: ComponentPlan = problem.componentPlan(preferFinite = true),
 )
 
@@ -66,21 +71,38 @@ object FinitePipeline {
 
     /** Apply finite-route presolve policy and return the model ready for engine construction. */
     fun prepare(request: FinitePipelineRequest): FinitePipelinePreparation {
-        request.componentPlan.requireFullFiniteProjection(request.problem)
         val config = if (request.engine.pureLocalSearch && !request.explicitPresolveConfig) {
             request.presolveConfig.forLocalSearch()
         } else {
             request.presolveConfig
         }
-        val outcome = PresolvePipeline.run(
+        // Source-safe presolve is the one phase before the plan, shared with the open lane. Running it
+        // here and handing the result on is what keeps [PresolvePipeline.run] from repeating it.
+        val prepared = PresolvePipeline.prepareSource(
             request.problem,
-            request.objective,
             config,
+            request.objective,
             request.solutionSetSensitive,
             request.cancellation,
             request.presolveBudget,
         )
-        val prepared = if (outcome.stats.infeasible) {
+        // A source rewrite moves factor ownership with the factors, so the routing plan no longer indexes
+        // the model the engine is built from; an untouched model keeps the plan routing already built.
+        val plan = if (prepared.changed) {
+            prepared.problem.componentPlan(preferFinite = true)
+        } else {
+            request.componentPlan
+        }
+        plan.requireFullFiniteProjection(prepared.problem)
+        val objective = prepared.objective ?: request.objective
+        val outcome = PresolvePipeline.run(
+            prepared,
+            objective,
+            config,
+            request.solutionSetSensitive,
+            request.cancellation,
+        )
+        val finiteModel = if (outcome.stats.infeasible) {
             outcome.problem
         } else if (outcome.changed) {
             outcome.problem.bakeFiniteBounds(request.cancellation)
@@ -88,8 +110,8 @@ object FinitePipeline {
             request.problem.bakeFiniteBounds(request.cancellation)
         }
         return FinitePipelinePreparation(
-            problem = prepared,
-            objective = outcome.objective ?: request.objective,
+            problem = finiteModel,
+            objective = outcome.objective ?: objective,
             reconstruct = outcome.reconstruct,
             presolve = outcome.stats.takeIf { outcome.changed },
             constructionBakeElapsed = (request.problem as? BakedProblem)?.bakeElapsed ?: Duration.ZERO,

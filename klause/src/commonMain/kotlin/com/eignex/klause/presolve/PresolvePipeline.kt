@@ -51,8 +51,10 @@ object PresolvePipeline {
     /**
      * Apply source-safe presolve before either finite materialization or open-theory preparation.
      *
-     * This is intentionally limited to [PresolvePass.Capability.SOURCE]. Passes that inspect finite
-     * domains or root deductions stay on the finite side of the deferred bake boundary.
+     * This is the single phase every route is planned from, so it runs exactly once per solve: the
+     * bounded lane hands its result straight to [run], and the open lane routes from it. It is
+     * intentionally limited to [PresolvePass.Capability.SOURCE]. Passes that inspect finite domains or
+     * root deductions stay on the finite side of the deferred bake boundary.
      */
     internal fun prepareSource(
         problem: Problem,
@@ -61,10 +63,22 @@ object PresolvePipeline {
         solutionSetSensitive: Boolean = false,
         cancellation: Cancellation = Cancellation.Never,
         presolveBudget: PresolveBudget? = null,
-    ): Presolved {
+    ): PreparedSource {
+        // An already-baked model reached this boundary through a finite preparation that ran the phase,
+        // so running it again would re-derive the same fixpoint at full cost.
+        if (problem is BakedProblem) return PreparedSource.unchanged(problem, presolveBudget)
         val context = PresolveContext.of(linearObjective, solutionSetSensitive, problem.hasSymmetryBreaking)
             .withPresolveBudget(presolveBudget)
-        return Presolver.runSource(problem, config, context, cancellation)
+        val presolved = Presolver.runSource(problem, config, context, cancellation)
+        return PreparedSource(
+            source = problem,
+            problem = presolved.problem,
+            reconstruct = presolved.reconstruct,
+            infeasible = presolved.infeasible,
+            objective = refit(linearObjective, presolved.problem),
+            passesFired = presolved.passesFired,
+            budget = presolveBudget,
+        )
     }
 
     /**
@@ -78,20 +92,32 @@ object PresolvePipeline {
         solutionSetSensitive: Boolean,
         cancellation: Cancellation = Cancellation.Never,
         presolveBudget: PresolveBudget? = null,
+    ): PresolveOutcome = run(
+        prepareSource(problem, config, linearObjective, solutionSetSensitive, cancellation, presolveBudget),
+        linearObjective,
+        config,
+        solutionSetSensitive,
+        cancellation,
+    )
+
+    /**
+     * [run] over a source model [prepared] by an earlier call to [prepareSource].
+     *
+     * The finite lane selects its component plan from the prepared model, which means it has already run
+     * the source phase by the time it gets here. Taking the result rather than the raw model is what
+     * keeps that phase from running a second time, and it carries the allowance the phase ran under, so
+     * the rounds below spend what is left of it rather than a fresh one.
+     */
+    internal fun run(
+        prepared: PreparedSource,
+        linearObjective: LinearObjective?,
+        config: PresolveConfig,
+        solutionSetSensitive: Boolean,
+        cancellation: Cancellation = Cancellation.Never,
     ): PresolveOutcome {
-        val source = if (problem is BakedProblem) {
-            Presolved(problem, { it })
-        } else {
-            prepareSource(
-                problem,
-                config,
-                linearObjective,
-                solutionSetSensitive,
-                cancellation,
-                presolveBudget,
-            )
-        }
-        val sourceProblem = source.problem
+        val problem = prepared.source
+        val sourceProblem = prepared.problem
+        val presolveBudget = prepared.budget
         // Root-bake probing (failed-literal / SAC) runs in the presolve lane via [RootBaker]: resolve it
         // from the config once and thread it through the context so every rebuild re-derives it.
         val bakeConfig = BakeConfig.from(config)
@@ -112,7 +138,7 @@ object PresolvePipeline {
         // gcd-indivisible equality is infeasible regardless of the (possibly very wide) variable bounds, so
         // it is caught in O(factors). The bake would otherwise narrow it toward the empty domain one step
         // per round — O(span) on a wide clamped domain — before any pass runs.
-        val strengthenInfeasible = source.infeasible
+        val strengthenInfeasible = prepared.infeasible
 
         // On a genuinely wide integer domain, the LP relaxation proves global infeasibility (e.g. a
         // difference cycle `x < y ∧ y < x`) in O(one LP solve) — before [RootBaker.reseed]'s bound
@@ -149,9 +175,9 @@ object PresolvePipeline {
         val seeded = if (preBakeInfeasible) sourceProblem else RootBaker.reseed(baked, bakeConfig)
         val bakeElapsed = bakeStart.elapsedNow()
         val reconstructs = ArrayList<(Sample) -> Sample>() // in application order; source preparation first
-        reconstructs.add(source.reconstruct)
+        reconstructs.add(prepared.reconstruct)
         val firedPasses = LinkedHashSet<String>() // pass ids that fired, across all rounds, in first-fire order
-        source.passesFired.forEach { firedPasses.add(it.id) }
+        prepared.passesFired.forEach { firedPasses.add(it.id) }
         // Pseudo-Boolean lane substitution: a `{0, 1}` integer column becomes a Boolean literal and the rows
         // over such columns become clause / cardinality / pseudo-Boolean factors. It runs ahead of the round
         // engine, on the bake's committed domains — that is what makes the `{0, 1}` columns visible — so

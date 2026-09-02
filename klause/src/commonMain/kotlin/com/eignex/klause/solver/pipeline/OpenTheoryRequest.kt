@@ -14,7 +14,12 @@ class OpenTheoryRequest internal constructor(
     val objective: LinearObjective? = null,
     /** Whether [objective] is maximized rather than minimized. */
     val maximize: Boolean = false,
-    /** Source decomposition selected once for this request. */
+    /**
+     * Decomposition of the untransformed [model], which is what a frontend routes and renders by.
+     *
+     * The plan the theory executes under is selected again after source-safe preparation, from the model
+     * that phase produced — see [OpenSourcePreparation].
+     */
     internal val componentPlan: ComponentPlan,
     /** Source-safe presolve configuration. */
     internal val presolveConfig: PresolveConfig = PresolveConfig.DEFAULT,
@@ -32,7 +37,7 @@ class OpenTheoryRequest internal constructor(
         maximize: Boolean = false,
     ) : this(model, objective, maximize, model.componentPlan())
 
-    /** Complete open-theory route selected for [model]. */
+    /** Complete open-theory route [model] declares, before source-safe preparation transforms it. */
     val route: ProblemPipeline get() = componentPlan.theoryPipeline
 
     /** Return this request with the caller's resolved source-preparation policy. */
@@ -72,16 +77,20 @@ sealed interface OpenTheoryExecution {
 object OpenTheoryPipeline {
     /** Execute [request] through its selected complete theory route. */
     fun execute(request: OpenTheoryRequest, params: TheoryParams = TheoryParams()): OpenTheoryExecution {
+        // Preparation is a phase of this solve, so the solve's own stop reaches it: the request's
+        // allowance is what bounds it, and the caller's deadline is what ends it.
+        val preparation = Cancellation {
+            request.presolveCancellation() || params.cancellation() || params.timeout()
+        }
         val objective = request.objective
         if (objective == null) {
             return OpenTheoryExecution.Satisfy(
                 OpenTheoryEngine(
                     request.model,
                     request.route,
-                    request.componentPlan,
                     request.presolveConfig,
                     request.solutionSetSensitive,
-                    request.presolveCancellation,
+                    preparation,
                     request.presolveBudget,
                 ).solve(params),
             )
@@ -93,7 +102,7 @@ object OpenTheoryPipeline {
                 driven,
                 request.presolveConfig,
                 request.solutionSetSensitive,
-                request.presolveCancellation,
+                preparation,
                 request.presolveBudget,
             ).minimize(params),
         )

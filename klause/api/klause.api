@@ -7171,13 +7171,9 @@ public final class com/eignex/klause/presolve/OpenPresolveResult$Refuted : com/e
 }
 
 public final class com/eignex/klause/presolve/OpenPresolveResult$Tightened : com/eignex/klause/presolve/OpenPresolveResult {
-	public static final field Companion Lcom/eignex/klause/presolve/OpenPresolveResult$Tightened$Companion;
 	public fun <init> (Lcom/eignex/klause/ir/Problem;I)V
 	public final fun getClosedSides ()I
 	public final fun getSpec ()Lcom/eignex/klause/ir/Problem;
-}
-
-public final class com/eignex/klause/presolve/OpenPresolveResult$Tightened$Companion {
 }
 
 public final class com/eignex/klause/presolve/OpenPresolveResultKt {

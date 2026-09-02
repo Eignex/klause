@@ -6,6 +6,7 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.presolve.PresolveConfig
+import com.eignex.klause.presolve.PresolvePipeline
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.pipeline.ProblemPipeline
 import com.eignex.klause.solver.pipeline.componentPlan
@@ -63,9 +64,10 @@ sealed interface OpenTheoryOptimum {
  * optimal. So the descent needs no optimizing simplex — the route's feasibility answer carries it, and
  * the objective enters as a constraint the route already reasons about.
  *
- * The route and the ownership plan are selected once, from the model carrying an inactive bound row.
- * Neither depends on that row's constant, so re-bounding reuses both instead of re-reading every factor
- * per improvement.
+ * Source-safe preparation runs once, on the model without the bound row: the row is the descent's own,
+ * and no source pass reads its constant. The route and the ownership plan are then selected once from
+ * the prepared model carrying an inactive row, so re-bounding re-reads neither the factors nor the
+ * preparation.
  */
 class OpenTheoryMinimizer internal constructor(
     model: Problem,
@@ -89,7 +91,6 @@ class OpenTheoryMinimizer internal constructor(
     private val terms: IntArray
     private val coefficients: LongArray
     private val source: Problem
-    private val base: Problem
     private val route: ProblemPipeline
 
     init {
@@ -106,10 +107,7 @@ class OpenTheoryMinimizer internal constructor(
         terms = present.toIntArray()
         coefficients = LongArray(present.size) { objective.intCoefficients[present[it]] }
         source = model
-        // An objective weighting no column is constant, so there is nothing to descend and no row to
-        // bound it by — the model is decided as it stands and every feasible assignment is optimal.
-        base = if (terms.isEmpty()) model else model.withRow(boundRow(null))
-        route = base.componentPlan().theoryPipeline
+        route = model.boundedBy(null).componentPlan().theoryPipeline
         // The bound row is a general linear one, so a model whose rows were all differences leaves that
         // fragment by being optimized at all. Say so here rather than at the first round's engine build.
         require(route != ProblemPipeline.UNSUPPORTED_OPEN && route != ProblemPipeline.FINITE_CP) {
@@ -117,25 +115,35 @@ class OpenTheoryMinimizer internal constructor(
         }
     }
 
-    /** The route this minimizer drives, so a caller can decline before starting. */
+    /**
+     * The route the source model declares, so a caller can decline before starting.
+     *
+     * Read from the untransformed model: it is the contract a caller can check up front. The route the
+     * descent actually runs is selected again from what preparation produced.
+     */
     val theoryPipeline: ProblemPipeline get() = route
 
     /** Minimizes the objective, tightening the bound until a round refutes it. */
     fun minimize(params: TheoryParams = TheoryParams()): OpenTheoryOptimum {
-        val plan = base.componentPlan()
+        val prepared = PresolvePipeline.prepareSource(
+            source,
+            presolveConfig,
+            objective,
+            solutionSetSensitive,
+            presolveCancellation,
+            presolveBudget,
+        )
+        if (prepared.infeasible) return OpenTheoryOptimum.Infeasible(SolveStats.EMPTY)
+        val base = prepared.problem.boundedBy(null)
+        val plan = prepared.planned(base).plan
         val state = OpenTheorySolveState(params)
         var incumbent: OpenTheoryAssignment? = null
         var best: BigInteger? = null
         var spec = base
         while (true) {
             val result = OpenTheoryEngine(
-                spec,
-                route,
-                plan,
-                presolveConfig,
-                solutionSetSensitive,
+                OpenSourcePreparation.Planned(prepared, spec, plan),
                 presolveCancellation,
-                presolveBudget,
             ).solve(params, state)
             when (result) {
                 is OpenTheoryResult.Sat -> {
@@ -155,7 +163,7 @@ class OpenTheoryMinimizer internal constructor(
                     }
                     incumbent = result.assignment
                     best = value
-                    spec = source.withRow(boundRow(value - BigInteger.ONE))
+                    spec = prepared.problem.boundedBy(value - BigInteger.ONE)
                 }
 
                 is OpenTheoryResult.Unsat ->
@@ -191,6 +199,15 @@ class OpenTheoryMinimizer internal constructor(
         val wideCoeffs = Array(coefficients.size) { BigInteger.fromLong(coefficients[it]) }
         return Linear(terms, wideCoeffs, LinearOp.LE, rhs)
     }
+
+    /**
+     * This model plus the row holding the objective at or below [bound], or itself when the objective
+     * weights no column.
+     *
+     * A constant objective has nothing to descend and no row to bound it by: the model is decided as it
+     * stands and every feasible assignment is optimal.
+     */
+    private fun Problem.boundedBy(bound: BigInteger?): Problem = if (terms.isEmpty()) this else withRow(boundRow(bound))
 
     private fun Problem.withRow(row: Factor): Problem = Problem(
         numBoolVars = numBoolVars,

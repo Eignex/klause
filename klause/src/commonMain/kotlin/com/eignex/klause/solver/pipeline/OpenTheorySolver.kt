@@ -5,11 +5,9 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.presolve.OpenPresolveResult
 import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.presolve.PresolveConfig
-import com.eignex.klause.presolve.presolveOpen
+import com.eignex.klause.presolve.closeOpenBounds
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.solver.pipeline.ComponentPlan
 import com.eignex.klause.solver.pipeline.ProblemPipeline
-import com.eignex.klause.solver.pipeline.componentPlan
 import com.eignex.klause.solver.result.OpenTheoryClauseStats
 import com.eignex.klause.solver.result.OpenTheoryWorkSink
 import com.eignex.klause.solver.result.SolveStats
@@ -90,29 +88,31 @@ sealed interface OpenTheoryResult {
 }
 
 /**
- * Selects and executes the complete theory route for an open source model.
+ * Executes the complete theory route selected for a prepared open source model.
  *
- * Route selection happens once from `Problem.componentPlan()`. Frontends consume this uniform result
- * rather than importing or dispatching to individual theory implementations.
+ * The route and the ownership plan come from the prepared source, never from the model a caller handed
+ * in: source-safe preparation is the one phase ahead of them, and it may rewrite the factors ownership
+ * is indexed by. Frontends consume this uniform result rather than importing or dispatching to
+ * individual theory implementations.
  */
 class OpenTheoryEngine internal constructor(
-    model: Problem,
-    route: ProblemPipeline,
+    // The route the caller's source model declared, which is all there is to name a backend by when
+    // preparation refutes the model before a plan exists.
+    private val declaredRoute: ProblemPipeline,
     // Selecting the plan reads every factor and builds the theory fragment, which on a large model is
-    // most of what a short budget has. Select it once and hand the same plan to every solve.
-    private val plan: ComponentPlan,
-    private val presolveConfig: PresolveConfig,
-    private val solutionSetSensitive: Boolean,
-    private val presolveCancellation: Cancellation,
-    private val presolveBudget: PresolveBudget?,
+    // most of what a short budget has. Select it once and hand the same preparation to every solve.
+    private val source: OpenSourcePreparation,
+    private val preparationCancellation: Cancellation,
 ) {
-    private val model = model
-    private val route = route
-
+    /**
+     * Prepare [model]'s source, then decide it.
+     *
+     * [route] is the route the source model declares; the one the theory runs on is selected again from
+     * what preparation produced, which is the only route that can be indexed by the factors it left.
+     */
     constructor(model: Problem, route: ProblemPipeline) : this(
         model,
         route,
-        model.componentPlan(),
         PresolveConfig.DEFAULT,
         false,
         Cancellation.Never,
@@ -127,20 +127,26 @@ class OpenTheoryEngine internal constructor(
         presolveCancellation: Cancellation,
         presolveBudget: PresolveBudget?,
     ) : this(
-        model,
         route,
-        model.componentPlan(),
-        presolveConfig,
-        solutionSetSensitive,
+        model.prepareOpenSource(
+            config = presolveConfig,
+            solutionSetSensitive = solutionSetSensitive,
+            cancellation = presolveCancellation,
+            budget = presolveBudget,
+        ),
         presolveCancellation,
-        presolveBudget,
     )
 
+    /** Decide an already-prepared model under the plan selected from it. */
+    internal constructor(
+        planned: OpenSourcePreparation.Planned,
+        preparationCancellation: Cancellation,
+    ) : this(planned.route, planned, preparationCancellation)
+
     init {
-        require(route != ProblemPipeline.FINITE_CP && route != ProblemPipeline.UNSUPPORTED_OPEN) {
+        require(declaredRoute != ProblemPipeline.FINITE_CP && declaredRoute != ProblemPipeline.UNSUPPORTED_OPEN) {
             "open theory solver requires a supported open source model"
         }
-        require(plan.theoryPipeline == route) { "open theory route disagrees with component plan" }
     }
 
     /** Decides the model through its component plan. */
@@ -153,19 +159,27 @@ class OpenTheoryEngine internal constructor(
     internal fun solve(params: TheoryParams, state: OpenTheorySolveState): OpenTheoryResult {
         val work = state.work
         val cancellation = Cancellation { params.timeout() || params.cancellation() }
-        val stats = SolveStatsSink(backend = route.backendName())
+        val stats = SolveStatsSink(backend = declaredRoute.backendName())
+        stats.presolve = source.prepared.stats.takeIf { source.prepared.changed || it.infeasible }
         stats.start()
         // Building the components reads the whole model, so a budget already spent is answered before
         // that work starts rather than after it.
         if (cancellation()) return unknown(params.timeout(), stats = stats, state = state)
-        // Presolve the open sides before the theory sees them. A proved bound narrows the box the theory
+        // Source preparation runs before the route exists, so its refutation is the model's verdict.
+        val routed = when (source) {
+            is OpenSourcePreparation.Refuted -> return OpenTheoryResult.Unsat(stats.finish(state))
+            is OpenSourcePreparation.Planned -> source
+        }
+        val plan = routed.plan
+        val route = routed.route
+        stats.backend = route.backendName()
+        // Close the open sides before the theory sees them. A proved bound narrows the box the theory
         // searches; a refutation here is over the genuinely open ranges, so it refutes the unbounded model
         // rather than an invented box, and is reportable as unsat.
-        val (model, plan, route) = when (val presolved = presolveOpen(cancellation)) {
+        val model = when (val closed = routed.model.closeOpenBounds(boundCancellation(cancellation))) {
             OpenPresolveResult.Refuted -> return OpenTheoryResult.Unsat(stats.finish(state))
-            is OpenPresolveResult.Tightened -> adopt(presolved)
+            is OpenPresolveResult.Tightened -> closed.spec
         }
-        stats.backend = route.backendName()
         val cpDomains = plan.cpIntVars.associateWith { column ->
             IntDomain(model.intBounds.lower(column), model.intBounds.upper(column))
         }
@@ -213,35 +227,9 @@ class OpenTheoryEngine internal constructor(
         }
     }
 
-    /** Tighten the open sides under [cancellation]; see [com.eignex.klause.presolve.presolveOpen]. */
-    private fun presolveOpen(cancellation: Cancellation): OpenPresolveResult = model.presolveOpen(
-        presolveConfig,
-        cancellation = Cancellation { presolveCancellation() || cancellation() },
-        presolveBudget = presolveBudget,
-        solutionSetSensitive = solutionSetSensitive,
-    )
-
-    /**
-     * The model and plan to decide with, given what the tightening proved.
-     *
-     * The tighter bounds are always adopted. Bound-only preparation keeps the source plan: ownership is
-     * per column and a theory that could hold an open column can hold a narrower one. Factor rewrites
-     * invalidate its factor-indexed ownership table, so those rebuild the plan from the prepared model.
-     *
-     * Re-planning keeps `preferFinite = false`. Closing every open side must not erase the complete theory
-     * component selected for this invocation; routing a newly finite model to the finite lane remains the
-     * caller's policy decision.
-     */
-    private fun adopt(presolved: OpenPresolveResult.Tightened): Triple<Problem, ComponentPlan, ProblemPipeline> {
-        if (!presolved.factorsChanged) return Triple(presolved.spec, plan, route)
-        val replanned = presolved.spec.componentPlan()
-        require(
-            replanned.theoryPipeline != ProblemPipeline.FINITE_CP &&
-                replanned.theoryPipeline != ProblemPipeline.UNSUPPORTED_OPEN,
-        ) {
-            "source presolve left the model without an open-theory route"
-        }
-        return Triple(presolved.spec, replanned, replanned.theoryPipeline)
+    /** The bound-closing phase's allowance: what is left of preparation's, capped by the solve's own. */
+    private fun boundCancellation(cancellation: Cancellation): Cancellation = Cancellation {
+        preparationCancellation() || cancellation() || source.prepared.budget?.remaining() == 0L
     }
 
     private fun unknown(

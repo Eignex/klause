@@ -11,8 +11,8 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.util.Bits
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFalse
 import kotlin.test.assertIs
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 /**
@@ -110,7 +110,6 @@ class OpenPresolveTest {
 
         val result = assertIs<OpenPresolveResult.Tightened>(spec.presolveOpen())
 
-        assertTrue(result.factorsChanged, "the source aggregate must be retained")
         assertEquals(1, result.closedSides)
         val aggregate = assertIs<Linear>(result.spec.factors.last())
         assertTrue(aggregate.vars.contentEquals(intArrayOf(0)))
@@ -128,8 +127,7 @@ class OpenPresolveTest {
 
         val result = assertIs<OpenPresolveResult.Tightened>(spec.presolveOpen(PresolveConfig.NONE))
 
-        assertFalse(result.factorsChanged)
-        assertEquals(spec.factors.size, result.spec.factors.size)
+        assertSame(spec.factors, result.spec.factors)
     }
 
     @Test
