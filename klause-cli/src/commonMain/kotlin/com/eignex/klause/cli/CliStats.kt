@@ -131,8 +131,9 @@ internal fun openTheoryStatPairs(stats: SolveStats): List<Pair<String, String>> 
         } else {
             listOf(
                 "openHintDraws" to "$draws",
-                "openHintApplied" to "$applied",
+                "openHintProduced" to "$produced",
                 "openHintVars" to "$hintedVars",
+                "openHintSteered" to "$steeredSplits",
                 "openHintMoves" to "$moves",
             )
         }
