@@ -11,6 +11,7 @@ import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.Optimizer
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.incumbent.IncumbentSource
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.objective.Objective
 import com.eignex.klause.solver.result.MinimizeResult
@@ -103,11 +104,11 @@ internal class Alns(
      *  these into the shared solution pool so peer arms (backtrack or LS) can warm-start from them. Null
      *  disables publishing. */
     val improvedSolutionSink: ((Sample, Double) -> Unit)? = null,
-    /** Supplier of the best [Sample] any arm has published — the read counterpart of [improvedSolutionSink].
-     *  Before each iteration ALNS adopts a not-yet-seen pooled solution that beats its own incumbent, so the
-     *  next neighbourhood is destroyed from the globally-best assignment. Identity-gated; skipped when the
-     *  run carries assumption pins. Null disables it. */
-    val pooledSolutionSupplier: (() -> Sample?)? = null,
+    /** The verified incumbent any arm has published — the read counterpart of [improvedSolutionSink]. Before
+     *  each iteration ALNS adopts a not-yet-seen incumbent that beats its own, so the next neighbourhood is
+     *  destroyed from the globally-best assignment. Version-gated; skipped when the run carries assumption
+     *  pins. Null disables it. */
+    val pooledIncumbents: IncumbentSource<Sample, Double>? = null,
 ) : Optimizer<LocalSearchParams> {
 
     init {
@@ -165,7 +166,7 @@ internal class Alns(
         // Cross-engine solution flow: adopt a fresher-and-better pooled assignment as the incumbent
         // before destroying, so the next neighbourhood searches around the globally-best assignment.
         val pooledImporter = PooledSolutionImporter(
-            supplier = pooledSolutionSupplier,
+            source = pooledIncumbents,
             enabled = params.assumptions.isEmpty,
             evaluate = { scoring.evaluate(it) },
         )

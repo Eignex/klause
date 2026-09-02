@@ -6,6 +6,8 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.incumbent.IncumbentExchange
+import com.eignex.klause.solver.incumbent.IncumbentSource
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.SearchEvent
 import kotlin.test.Test
@@ -15,7 +17,7 @@ import kotlin.test.assertTrue
 
 /**
  * Solution phasing seeded from a peer arm's incumbent (#644 collaboration): the engine polls
- * [BacktrackParams.pooledSolutionSupplier] at each restart and adopts the pooled assignment as
+ * [BacktrackParams.pooledIncumbents] at each restart and adopts the pooled assignment as
  * phase hints. The hint only reorders value trials, so it must never compromise the proven optimum.
  */
 class PooledSolutionPhasingTest {
@@ -34,23 +36,27 @@ class PooledSolutionPhasingTest {
     // A feasible but deliberately suboptimal peer solution: the first three booleans (cost 15).
     private val pooledHint = Sample(BooleanArray(8) { it < 3 }, LongArray(0))
 
+    /** The shared exchange holding [pooledHint] as the standing incumbent. */
+    private fun hintExchange() = IncumbentExchange.minimizing<Sample>().apply { offer(pooledHint, 15.0) }
+
     @Test
-    fun `the pooled-solution supplier is polled once per restart`() {
+    fun `the pooled incumbent is read once per restart`() {
         var polls = 0
         var restarts = 0
+        val exchange = hintExchange()
         val params = BacktrackParams(
             solutionPhasing = true,
             lubyRestartBase = 1L,
             randomSeed = 1L,
-            pooledSolutionSupplier = {
+            pooledIncumbents = IncumbentSource {
                 polls++
-                pooledHint
+                exchange.current()
             },
             onEvent = { if (it is SearchEvent.Restart) restarts++ },
         )
         BacktrackSolver(problem().bake()).minimize(LinearObjective(boolWeights = weights), params)
         assertTrue(restarts > 0, "the search must restart for the poll to fire")
-        assertEquals(restarts, polls, "the pool is consulted exactly once per restart")
+        assertEquals(restarts, polls, "the exchange is consulted exactly once per restart")
     }
 
     @Test
@@ -60,7 +66,7 @@ class PooledSolutionPhasingTest {
             solutionPhasing = true,
             lubyRestartBase = 1L,
             randomSeed = 1L,
-            pooledSolutionSupplier = { pooledHint },
+            pooledIncumbents = hintExchange(),
         )
         val result = BacktrackSolver(problem().bake()).minimize(objective, params)
         val sample = assertNotNull(result.assignment)

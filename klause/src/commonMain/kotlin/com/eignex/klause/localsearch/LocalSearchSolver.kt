@@ -451,7 +451,7 @@ class LocalSearchSolver(
         // as the incumbent so the restart anchors on a peer arm's solution. Purely heuristic — the anchor
         // only seeds the next descent — and skipped under assumption pins a foreign assignment may violate.
         val pooledImporter = PooledSolutionImporter(
-            supplier = params.pooledSolutionSupplier,
+            source = params.pooledIncumbents,
             enabled = effectiveAssumptions.isEmpty,
             evaluate = { objective.evaluate(it) },
         )

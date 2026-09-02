@@ -6,6 +6,8 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.incumbent.IncumbentExchange
+import com.eignex.klause.solver.incumbent.IncumbentSource
 import com.eignex.klause.solver.objective.LinearObjective
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -15,7 +17,7 @@ import kotlin.test.assertTrue
 /**
  * The local-search side of bidirectional cross-engine solution flow (#644): an LS arm publishes each
  * improving incumbent to [LocalSearchParams.improvedSolutionSink] and, on restart, adopts a better
- * assignment offered by [LocalSearchParams.pooledSolutionSupplier].
+ * assignment offered by [LocalSearchParams.pooledIncumbents].
  */
 class LocalSearchPoolFlowTest {
 
@@ -58,19 +60,20 @@ class LocalSearchPoolFlowTest {
         var polls = 0
         val optimal = optimalSample()
         val objective = LinearObjective(boolWeights = weights)
+        val exchange = IncumbentExchange.minimizing<Sample>().apply { offer(optimal, objective.evaluate(optimal)) }
         val result = LocalSearchSolver(problem().bake()).minimize(
             objective,
             LocalSearchParams(
                 maxFlips = 300L,
                 randomSeed = 1L,
-                pooledSolutionSupplier = {
+                pooledIncumbents = IncumbentSource {
                     polls++
-                    optimal
+                    exchange.current()
                 },
             ),
         )
         val sample = assertNotNull(result.assignment)
-        assertTrue(polls > 0, "the pool must be consulted at each restart")
+        assertTrue(polls > 0, "the exchange must be consulted at each restart")
         assertEquals(optimum, objective.evaluate(sample), "the arm adopts (or matches) the pooled optimum")
     }
 }
