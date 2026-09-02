@@ -20,7 +20,7 @@ private const val DEFAULT_CANDIDATE_FLIPS = 20_000L
  * [Problem.numBoolVars] and carries no integer or real column at all. Theory-owned columns stay
  * symbolic — nothing here materializes a domain for one, and no arithmetic reaches the search.
  */
-class OpenBooleanSkeleton internal constructor(
+internal class OpenBooleanSkeleton(
     /** Finite Boolean-only problem holding exactly the plan's shared clauses. */
     val problem: BakedProblem,
     /** Source Boolean ids the shared clauses constrain, ascending. */
@@ -34,7 +34,7 @@ class OpenBooleanSkeleton internal constructor(
  * model were never consulted, so this is a starting point for a later search, never a verdict about the
  * model it came from.
  */
-class OpenBooleanCandidate internal constructor(
+internal class OpenBooleanCandidate(
     /** Source Boolean ids this proposal covers, ascending. */
     val boolVars: IntArray,
     /** Proposed value of the id at the same index of [boolVars]. */
@@ -42,7 +42,7 @@ class OpenBooleanCandidate internal constructor(
 )
 
 /** Bounded, deterministic settings for [ComponentPlan.openBooleanCandidate]. */
-data class OpenCandidateParams(
+internal data class OpenCandidateParams(
     /** Local-search work allowance; a zero allowance produces nothing. */
     val maxFlips: Long = DEFAULT_CANDIDATE_FLIPS,
     /** Seed of the search RNG, fixed so one skeleton and allowance always draw the same proposal. */
@@ -57,7 +57,7 @@ data class OpenCandidateParams(
  * Boolean ids are the source ids: the projection reuses the source column count and remaps nothing, so a
  * proposal drawn from it names the same variables the model does.
  */
-fun ComponentPlan.booleanSkeleton(
+internal fun ComponentPlan.booleanSkeleton(
     source: Problem,
     cancellation: Cancellation = Cancellation.Never,
 ): OpenBooleanSkeleton? {
@@ -96,7 +96,7 @@ fun ComponentPlan.booleanSkeleton(
  * skeleton out is one more way to have nothing to propose, not a refutation of [source] — the clauses are
  * only part of the model.
  */
-fun ComponentPlan.openBooleanCandidate(
+internal fun ComponentPlan.openBooleanCandidate(
     source: Problem,
     params: OpenCandidateParams = OpenCandidateParams(),
 ): OpenBooleanCandidate? {
