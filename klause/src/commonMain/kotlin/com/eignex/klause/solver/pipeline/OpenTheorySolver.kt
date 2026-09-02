@@ -321,10 +321,11 @@ internal class OpenTheorySolveState(private val params: TheoryParams) {
     var clauses = OpenTheoryClauseStats()
         private set
 
-    /** What the request's hint draw produced and cost, empty until one is drawn. */
-    var hints = OpenHintStats()
-        private set
+    /** What the request's hint draw produced, cost, and has steered so far. */
+    val hints: OpenHintStats get() = drawStats.copy(steeredSplits = steering?.steeredSplits ?: 0L)
 
+    private var drawStats = OpenHintStats()
+    private var steering: CountingCandidateHints? = null
     private var drawn: SearchCandidateHints? = null
 
     /**
@@ -339,15 +340,21 @@ internal class OpenTheorySolveState(private val params: TheoryParams) {
     fun candidateHints(plan: ComponentPlan, model: Problem, cancellation: Cancellation): SearchCandidateHints {
         drawn?.let { return it }
         val flips = params.openHintFlips ?: return SearchCandidateHints.None.also { drawn = it }
-        val draw = plan.openBooleanDraw(model, OpenCandidateParams(maxFlips = flips, cancellation = cancellation))
-        val candidate = draw.candidate
-        hints = OpenHintStats(
+        val result = plan.openBooleanDraw(model, OpenCandidateParams(maxFlips = flips, cancellation = cancellation))
+        val candidate = result.candidate
+        drawStats = OpenHintStats(
             draws = 1,
-            applied = if (candidate == null) 0 else 1,
+            produced = if (candidate == null) 0 else 1,
             hintedVars = candidate?.boolVars?.size?.toLong() ?: 0,
-            moves = draw.moves,
+            moves = result.moves,
         )
-        return (candidate?.hints() ?: SearchCandidateHints.None).also { drawn = it }
+        // Kept as the counting wrapper rather than as bare hints, so what it goes on to steer stays
+        // readable after every round of a descent has consulted it.
+        val counting = candidate?.let { CountingCandidateHints(it.hints()) }
+        steering = counting
+        val hint: SearchCandidateHints = counting ?: SearchCandidateHints.None
+        drawn = hint
+        return hint
     }
 
     fun remainingDecisions(): Long {

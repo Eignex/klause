@@ -120,8 +120,8 @@ the complete theory solver. `--param node-limit=N` is a deterministic solve-wide
 finite decision nodes on a finite route and open-theory decisions, checks, and LIA row visits on an
 open route. `--param open-hint-flips=N` spends N local-search flips, once per request, on an
 unverified first-branch order over the model's shared clauses; it is off unless asked for, changes
-only which side of a Boolean split is tried first, and reports what it drew under `-s`
-(`openHint*`).
+only which side of a Boolean split is tried first, and reports under `-s` (`openHint*`) what it drew
+and how many splits it went on to order.
 
 MiniZinc-mode-only flags:
 

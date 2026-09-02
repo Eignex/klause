@@ -137,7 +137,7 @@ class CliModeTest {
         assertTrue("openHint" !in plain, plain)
         assertTrue(hinted.lines().firstOrNull() == "sat", hinted)
         assertTrue("; openHintDraws=1" in hinted, hinted)
-        assertTrue("; openHintApplied=1" in hinted, hinted)
+        assertTrue("; openHintProduced=1" in hinted, hinted)
     }
 
     @Test

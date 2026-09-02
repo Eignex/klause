@@ -49,6 +49,23 @@ internal fun OpenBooleanCandidate.hints(): SearchCandidateHints =
     SearchCandidateHints.ofLiterals(IntArray(boolVars.size) { Lit.make(boolVars[it], values[it]) })
 
 /**
+ * A hint that counts the splits it decided the first branch of.
+ *
+ * Drawing a proposal and steering a traversal are different things: propagation may fix every hinted
+ * column before a split reaches it, so a hint covering half the model can still order nothing. The
+ * shared branching consults a hint once per two-polarity Boolean split and only then, which is what
+ * makes the consultation count the usage.
+ */
+internal class CountingCandidateHints(private val delegate: SearchCandidateHints) : SearchCandidateHints {
+
+    /** Splits whose first branch this hint selected. */
+    var steeredSplits: Long = 0L
+        private set
+
+    override fun preferredBool(variable: Int): Boolean? = delegate.preferredBool(variable)?.also { steeredSplits++ }
+}
+
+/**
  * What one draw from a plan's shared clauses produced, and the local-search work it spent.
  *
  * The cost is reported whether or not a proposal came out of it, since a draw that reached none is

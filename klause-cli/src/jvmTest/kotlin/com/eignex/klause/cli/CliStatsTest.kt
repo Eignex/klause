@@ -191,12 +191,13 @@ class CliStatsTest {
     fun `a drawn hint reports what it covered and cost`() {
         val stats = SolveStats(
             run = RunStats(backend = "exact-lira"),
-            openHints = OpenHintStats(draws = 1, applied = 1, hintedVars = 4, moves = 37),
+            openHints = OpenHintStats(draws = 1, produced = 1, hintedVars = 4, steeredSplits = 9, moves = 37),
         )
         val m = openTheoryStatPairs(stats).toMap()
         assertEquals("1", m["openHintDraws"])
-        assertEquals("1", m["openHintApplied"])
+        assertEquals("1", m["openHintProduced"])
         assertEquals("4", m["openHintVars"])
+        assertEquals("9", m["openHintSteered"])
         assertEquals("37", m["openHintMoves"])
     }
 
@@ -204,10 +205,11 @@ class CliStatsTest {
     fun `a draw that proposed nothing still reports its cost`() {
         val stats = SolveStats(
             run = RunStats(backend = "exact-lira"),
-            openHints = OpenHintStats(draws = 1, applied = 0, hintedVars = 0, moves = 20_000),
+            openHints = OpenHintStats(draws = 1, produced = 0, hintedVars = 0, moves = 20_000),
         )
         val m = openTheoryStatPairs(stats).toMap()
-        assertEquals("0", m["openHintApplied"])
+        assertEquals("0", m["openHintProduced"])
+        assertEquals("0", m["openHintSteered"])
         assertEquals("20000", m["openHintMoves"])
     }
 }

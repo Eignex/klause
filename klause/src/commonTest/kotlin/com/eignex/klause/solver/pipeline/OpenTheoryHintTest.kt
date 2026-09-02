@@ -1,8 +1,10 @@
 package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
 import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.formats.smtlib.SmtLib
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.LinearOp
@@ -62,8 +64,9 @@ class OpenTheoryHintTest {
         val sat = assertIs<OpenTheoryResult.Sat>(result)
         assertIs<OpenTheoryAssignment.Difference>(sat.assignment)
         assertTrue(satisfiesClauses(model, sat.assignment))
-        assertEquals(1L, sat.stats.openHints.applied)
+        assertEquals(1L, sat.stats.openHints.produced)
         assertEquals(3L, sat.stats.openHints.hintedVars)
+        assertTrue(sat.stats.openHints.steeredSplits > 0, "the hint ordered at least one split")
     }
 
     @Test
@@ -94,7 +97,63 @@ class OpenTheoryHintTest {
         val sat = assertIs<OpenTheoryResult.Sat>(result)
         assertIs<OpenTheoryAssignment.ExactLra>(sat.assignment)
         assertTrue(satisfiesClauses(model, sat.assignment))
-        assertEquals(1L, sat.stats.openHints.applied)
+        assertEquals(1L, sat.stats.openHints.produced)
+    }
+
+    @Test
+    fun `a hinted hybrid plan steers the shared split beside both components`() {
+        val openUpper = Bits(4).also { bits -> for (v in 2..3) bits.set(v) }
+        val model = Problem(
+            numBoolVars = 4,
+            intBounds = IntBounds.fromModelBounds(LongArray(4), longArrayOf(3, 3, 0, 0), null, openUpper),
+            factors = arrayOf(
+                AllDifferent(vars = intArrayOf(0, 1), domainMin = 0, domainSize = 4),
+                ReifiedLinear(
+                    auxBoolVar = 3,
+                    coeffs = intArrayOf(1, -1),
+                    vars = intArrayOf(2, 3),
+                    op = LinearOp.LE,
+                    bound = 5,
+                ),
+                Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
+                Clause(intArrayOf(Lit.make(0, false), Lit.make(2, true))),
+                Clause(intArrayOf(Lit.make(1, false), Lit.make(2, false))),
+            ),
+        )
+        val plan = model.componentPlan()
+
+        val result = OpenTheoryEngine(model, model.sourceRoute()).solve(hinted())
+
+        val sat = assertIs<OpenTheoryResult.Sat>(result)
+        assertTrue(plan.hasCpComponent && plan.hasTheoryComponent, "the plan owns both a CP and a theory half")
+        assertTrue(satisfiesClauses(model, sat.assignment))
+        // The hint covers only the clause columns; the finite and theory halves keep their own columns.
+        assertEquals(3L, sat.stats.openHints.hintedVars)
+        assertTrue(sat.stats.openHints.steeredSplits > 0, "the hint ordered at least one shared split")
+    }
+
+    @Test
+    fun `a hint propagation settles before any split steers nothing`() {
+        // Unit clauses leave the shared component nothing to split: root propagation fixes every hinted
+        // column, so a proposal exists and orders no branch.
+        val open = Bits(2).also { bits -> repeat(2) { bits.set(it) } }
+        val model = Problem(
+            numBoolVars = 3,
+            intBounds = IntBounds.fromModelBounds(LongArray(2), LongArray(2), open, open.copy()),
+            factors = arrayOf(
+                Linear(longArrayOf(1, -1), intArrayOf(0, 1), LinearOp.LE, 3),
+                Clause(intArrayOf(Lit.make(0, true))),
+                Clause(intArrayOf(Lit.make(1, true))),
+                Clause(intArrayOf(Lit.make(2, true))),
+            ),
+        )
+
+        val result = OpenTheoryEngine(model, ProblemPipeline.DIFFERENCE_THEORY).solve(hinted())
+
+        val sat = assertIs<OpenTheoryResult.Sat>(result)
+        assertEquals(1L, sat.stats.openHints.produced)
+        assertEquals(3L, sat.stats.openHints.hintedVars)
+        assertEquals(0L, sat.stats.openHints.steeredSplits)
     }
 
     @Test
@@ -124,7 +183,7 @@ class OpenTheoryHintTest {
         val sat = assertIs<OpenTheoryResult.Sat>(result)
         assertEquals(false, sat.assignment.boolValue(p))
         assertEquals(true, sat.assignment.boolValue(q))
-        assertEquals(1L, sat.stats.openHints.applied)
+        assertEquals(1L, sat.stats.openHints.produced)
     }
 
     @Test
@@ -143,7 +202,7 @@ class OpenTheoryHintTest {
 
         val result = OpenTheoryEngine(parsed.model, parsed.model.sourceRoute()).solve(hinted())
 
-        assertEquals(1L, assertIs<OpenTheoryResult.Unsat>(result).stats.openHints.applied)
+        assertEquals(1L, assertIs<OpenTheoryResult.Unsat>(result).stats.openHints.produced)
     }
 
     @Test
@@ -195,8 +254,9 @@ class OpenTheoryHintTest {
 
         val sat = assertIs<OpenTheoryResult.Sat>(result)
         assertEquals(1L, sat.stats.openHints.draws)
-        assertEquals(0L, sat.stats.openHints.applied)
+        assertEquals(0L, sat.stats.openHints.produced)
         assertEquals(0L, sat.stats.openHints.hintedVars)
+        assertEquals(0L, sat.stats.openHints.steeredSplits)
     }
 
     @Test
@@ -208,7 +268,8 @@ class OpenTheoryHintTest {
 
         assertNull(hints.preferredBool(0))
         assertEquals(1L, state.hints.draws)
-        assertEquals(0L, state.hints.applied)
+        assertEquals(0L, state.hints.produced)
+        assertEquals(0L, state.hints.steeredSplits)
     }
 
     @Test
