@@ -1,17 +1,24 @@
 package com.eignex.klause.localsearch
 import com.eignex.klause.compile.compile
+import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.schema.VariableSchema
 import com.eignex.klause.schema.allDifferent
 import com.eignex.klause.solver.*
+import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.result.MinimizeResult
+import com.eignex.klause.solver.result.TerminationReason
+import com.ionspin.kotlin.bignum.integer.BigInteger
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class LocalSearchSolverTest {
@@ -22,6 +29,35 @@ class LocalSearchSolverTest {
         val problem = Problem(0, 1, arrayOf(IntDomain(-wide, wide)), arrayOf<Factor>())
         val result = LocalSearchSolver(problem.bake()).solve(LocalSearchParams(maxFlips = 100, randomSeed = 1))
         assertTrue(result is SolveResult.Unknown, "expected an unsupported decline, got $result")
+    }
+
+    @Test
+    fun `minimize declines inputs local search cannot evaluate soundly`() {
+        val wideValue = 1L shl 62
+        val wideCoefficient = BigInteger.fromLong(Long.MAX_VALUE) * 4
+        val problems = listOf(
+            "wide domain" to Problem(
+                0,
+                1,
+                arrayOf(IntDomain(-wideValue, wideValue)),
+                emptyArray(),
+            ),
+            "wide factor" to Problem(
+                0,
+                1,
+                arrayOf(IntDomain(0, 1)),
+                arrayOf(Linear(intArrayOf(0), arrayOf(wideCoefficient), LinearOp.LE, wideCoefficient)),
+            ),
+        )
+        val objective = LinearObjective(intCoefficients = longArrayOf(1L))
+
+        for ((label, problem) in problems) {
+            val result = LocalSearchSolver(problem.bake())
+                .minimize(objective, LocalSearchParams(maxFlips = 100, randomSeed = 1))
+
+            val unknown = assertIs<MinimizeResult.Unknown>(result, label)
+            assertEquals(TerminationReason.Unsupported, unknown.reason, label)
+        }
     }
 
     @Test
