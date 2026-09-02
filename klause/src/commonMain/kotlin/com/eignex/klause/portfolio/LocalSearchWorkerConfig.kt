@@ -69,10 +69,13 @@ internal class LocalSearchWorkerConfig(val recipe: LocalSearchRecipe) : WorkerCo
             // no-op for the pool's weight-blind arms.
             normalizeWeightsByClass = true,
         )
-        // Bidirectional cross-engine flow: publish incumbents this arm finds and, on restart, anchor
-        // on the pool's global best — so LS and backtrack incumbents circulate both ways through the pool.
+        // Bidirectional cross-engine flow: publish incumbents this arm finds and, on restart, anchor on
+        // the verified global best — so LS and backtrack incumbents circulate both ways through the exchange.
         pools?.solutions?.let { sols ->
-            params = params.copy(improvedSolutionSink = sols::publish, pooledSolutionSupplier = sols::best)
+            params = params.copy(
+                improvedSolutionSink = { sample, objective -> sols.offer(sample, objective) },
+                pooledIncumbents = sols,
+            )
         }
         return PortfolioWorker.of(
             workerLabel,

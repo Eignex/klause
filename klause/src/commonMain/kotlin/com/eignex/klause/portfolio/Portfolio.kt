@@ -4,13 +4,15 @@ package com.eignex.klause.portfolio
 
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
+import com.eignex.klause.solver.incumbent.IncumbentExchange
+import com.eignex.klause.solver.incumbent.Publication
+import com.eignex.klause.solver.incumbent.bound
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.Cancellation
 import com.eignex.kumulant.core.Concurrency
 import com.eignex.kumulant.stream.lock
 import kotlin.concurrent.atomics.AtomicBoolean
-import kotlin.concurrent.atomics.AtomicReference
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.time.TimeSource
 
@@ -87,18 +89,18 @@ class Portfolio(
         cancellation: Cancellation,
         onImprovement: ((AttributedImprovement) -> Unit)?,
     ): MinimizeResult {
-        val incumbent = AtomicReference(Incumbent(Double.POSITIVE_INFINITY, null))
+        val incumbent = IncumbentExchange.minimizing<Sample>()
         val cancelled = AtomicBoolean(false)
         val token: Cancellation = { cancelled.load() || cancellation() }
-        fun readBound(): Double = incumbent.load().bound
+        fun readBound(): Double = incumbent.bound()
         // Workers improve concurrently; [emitLock] serialises the attribution callback so the consumer
         // (e.g. the CLI's `-s` per-arm line) never sees interleaved invocations. It is non-null exactly
         // when [onImprovement] is, so the no-callback path takes neither the lock nor the callback. Only
-        // the thread whose CAS actually installed the new global best fires it — a loser never reports.
+        // the publisher the exchange told it installed the new global best fires it — a loser never reports.
         val start = TimeSource.Monotonic.markNow()
         val emitLock = if (onImprovement != null) Concurrency.Strict.lock() else null
         fun fold(worker: PortfolioWorker, r: MinimizeResult.WithSample) {
-            if (!updateSharedBound(incumbent, r.objectiveValue, r.sample)) return
+            if (incumbent.offer(r.sample, r.objectiveValue) !is Publication.Installed) return
             val cb = onImprovement ?: return
             val lock = emitLock ?: return
             lock.withLock { cb(AttributedImprovement(worker.label, worker.armId, start.elapsedNow(), r)) }
@@ -141,20 +143,7 @@ class Portfolio(
         // The pool proves optimality only when EVERY worker exhausted its space; a worker that timed
         // out or was cancelled mid-search is dirty regardless of verdict shape.
         val anyDirty = results.any { !PortfolioReduction.isExhausted(it) }
-        val snapshot = incumbent.load()
-        return PortfolioReduction.terminal(snapshot.sample, snapshot.bound, anyDirty, stats)
-    }
-
-    /** CAS the (bound, sample) cell to [objective] when strictly better. Returns true iff *this* call
-     *  installed the new global best — the caller fires attribution only then, so a racing loser's
-     *  stale value is never reported. */
-    private fun updateSharedBound(incumbent: AtomicReference<Incumbent>, objective: Double, sample: Sample): Boolean {
-        while (true) {
-            val cur = incumbent.load()
-            if (objective >= cur.bound) return false
-            // One CAS swaps bound + sample together so a reported bound always matches its sample.
-            if (incumbent.compareAndSet(cur, Incumbent(objective, sample))) return true
-        }
+        return PortfolioReduction.terminal(incumbent.current(), anyDirty, stats)
     }
 
     /**
@@ -166,15 +155,19 @@ class Portfolio(
      */
     fun improvementsAttributed(cancellation: Cancellation = Cancellation.Never): Sequence<AttributedImprovement> {
         val start = TimeSource.Monotonic.markNow()
-        val incumbent = AtomicReference(Incumbent(Double.POSITIVE_INFINITY, null))
-        fun readBound(): Double = incumbent.load().bound
+        val incumbent = IncumbentExchange.minimizing<Sample>()
+        fun readBound(): Double = incumbent.bound()
         val token: Cancellation = { streamStop.load() || cancellation() }
         return parallelStream(
             workers.map { worker ->
                 { emit: (AttributedImprovement) -> Unit ->
                     for (r in worker.improvements(::readBound, token)) {
-                        if (r is MinimizeResult.WithSample && r.objectiveValue < readBound()) {
-                            updateSharedBound(incumbent, r.objectiveValue, r.sample)
+                        // Emit on the install, not on the offer: two workers can each beat the bound they
+                        // read, and only one of them installs. Emitting the loser too would break the
+                        // stream's monotonicity — its result is already stale when it arrives.
+                        if (r is MinimizeResult.WithSample &&
+                            incumbent.offer(r.sample, r.objectiveValue) is Publication.Installed
+                        ) {
                             emit(AttributedImprovement(worker.label, worker.armId, start.elapsedNow(), r))
                         }
                     }
@@ -204,10 +197,6 @@ class Portfolio(
         workers.forEach { runCatching { it.close() } }
     }
 }
-
-/** Immutable (bound, sample) pair published as one [AtomicReference] cell so the shared bound and
- *  the best sample are swapped together in a single CAS — they can never desync under a race. */
-private class Incumbent(val bound: Double, val sample: Sample?)
 
 /** Strategy knobs for [Portfolio]. Affects `solve` only; `samples` always fans in from every worker
  *  and `minimize` always shares the global bound (race honoured via cancellation on Optimal). */

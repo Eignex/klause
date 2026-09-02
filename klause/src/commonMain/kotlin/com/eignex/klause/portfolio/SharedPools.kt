@@ -1,10 +1,13 @@
 package com.eignex.klause.portfolio
 
+import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.incumbent.IncumbentExchange
+
 /**
  * The cross-arm sharing channels handed to every backtrack arm of one portfolio: the learned-clause
  * pool ([clauses], always on for a non-LS portfolio), the global-cut pool ([cuts], gated by
  * [PortfolioScenario.shareCuts], on by default), the objective lower-bound manager ([bounds]), the
- * globally-valid level-0 variable-bound manager ([varBounds]), and the feasible-solution pool
+ * globally-valid level-0 variable-bound manager ([varBounds]), and the verified-incumbent exchange
  * ([solutions]) — the last three present for an optimising portfolio. Each may be null when its sharing
  * does not apply; an LS-only portfolio gets no [SharedPools] at all.
  */
@@ -13,5 +16,5 @@ internal class SharedPools(
     val cuts: SharedCutPool?,
     val bounds: SharedObjectiveBound? = null,
     val varBounds: SharedVarBounds? = null,
-    val solutions: SharedSolutionPool? = null,
+    val solutions: IncumbentExchange<Sample, Double>? = null,
 )

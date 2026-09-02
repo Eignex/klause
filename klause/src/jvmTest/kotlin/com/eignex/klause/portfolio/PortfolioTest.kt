@@ -540,6 +540,40 @@ class PortfolioTest {
         assertTrue(seen.all { it.armId == byLabel[it.workerLabel] }, "arm id must match the producing worker")
     }
 
+    @Test
+    fun `the attributed improvement stream never emits a losing arm's stale incumbent`() {
+        // Identical racing arms all beat the bound they last read, so several can improve on the same
+        // incumbent; only the one whose publication installed the new global best may emit.
+        val workers = List(4) { i -> smallCopWorker("bt#$i", i) }
+        val objectives = Portfolio(workers).use { p ->
+            p.improvementsAttributed().map { assertIs<WithSample>(it.result).objectiveValue }.toList()
+        }
+        assertTrue(objectives.isNotEmpty(), "the race must stream at least one improvement")
+        assertTrue(
+            objectives.zipWithNext().all { (prev, next) -> next < prev },
+            "the stream must be strictly improving, got $objectives",
+        )
+    }
+
+    /** One backtrack arm over the tiny COP the attribution tests race. */
+    private fun smallCopWorker(label: String, armId: Int): PortfolioWorker {
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 2,
+            intDomains = arrayOf(IntDomain(0, 5), IntDomain(0, 5)),
+            factors = arrayOf<Factor>(
+                Linear(coeffs = intArrayOf(1, 1), vars = intArrayOf(0, 1), op = LinearOp.GE, bound = 3),
+            ),
+        )
+        return PortfolioWorker.of(
+            label,
+            armId,
+            BacktrackSolver(problem.bake()).session(),
+            BacktrackParams(randomSeed = 0L),
+            objective = LinearObjective(intCoefficients = longArrayOf(1L, 2L)),
+        ) { params, supplier -> params.copy(objectiveBoundSupplier = supplier) }
+    }
+
     private fun exactlyOneOver(n: Int): Problem {
         val factor = Cardinality.exactlyOne(IntArray(n) { Lit.make(it, true) })
         return Problem(n, 0, emptyArray(), listOf(factor))
