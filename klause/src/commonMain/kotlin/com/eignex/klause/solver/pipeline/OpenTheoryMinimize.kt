@@ -11,6 +11,7 @@ import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.pipeline.ProblemPipeline
 import com.eignex.klause.solver.pipeline.componentPlan
 import com.eignex.klause.solver.result.SolveStats
+import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.Cancellation
 import com.ionspin.kotlin.bignum.integer.BigInteger
@@ -125,15 +126,23 @@ class OpenTheoryMinimizer internal constructor(
 
     /** Minimizes the objective, tightening the bound until a round refutes it. */
     fun minimize(params: TheoryParams = TheoryParams()): OpenTheoryOptimum {
+        // Preparation is the descent's first phase, so the caller's stop reaches it and its own summary is
+        // what a run refuted here has to report — there is no round behind it to carry one.
+        val stats = SolveStatsSink(backend = route.backendName())
+        stats.start()
         val prepared = PresolvePipeline.prepareSource(
             source,
             presolveConfig,
             objective,
             solutionSetSensitive,
-            presolveCancellation,
+            Cancellation { presolveCancellation() || params.cancellation() || params.timeout() },
             presolveBudget,
         )
-        if (prepared.infeasible) return OpenTheoryOptimum.Infeasible(SolveStats.EMPTY)
+        if (prepared.infeasible) {
+            stats.presolve = prepared.stats
+            stats.stop()
+            return OpenTheoryOptimum.Infeasible(stats.snapshot())
+        }
         val base = prepared.problem.boundedBy(null)
         val plan = prepared.planned(base).plan
         val state = OpenTheorySolveState(params)

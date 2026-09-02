@@ -3,6 +3,7 @@ package com.eignex.klause.solver.pipeline
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.presolve.OpenPresolveResult
+import com.eignex.klause.presolve.PreparedSource
 import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.presolve.closeOpenBounds
@@ -99,13 +100,17 @@ class OpenTheoryEngine internal constructor(
     // The route the caller's source model declared, which is all there is to name a backend by when
     // preparation refutes the model before a plan exists.
     private val declaredRoute: ProblemPipeline,
-    // Selecting the plan reads every factor and builds the theory fragment, which on a large model is
-    // most of what a short budget has. Select it once and hand the same preparation to every solve.
-    private val source: OpenSourcePreparation,
+    // Preparation is a phase of the solve, so it runs inside it under the caller's stop rather than
+    // ahead of it. Its result is kept: selecting the plan reads every factor and builds the theory
+    // fragment, which on a large model is most of what a short budget has, so several feasibility
+    // rounds through one engine pay for it once.
+    private val prepareSource: (Cancellation) -> OpenSourcePreparation,
     private val preparationCancellation: Cancellation,
 ) {
+    private var preparation: OpenSourcePreparation? = null
+
     /**
-     * Prepare [model]'s source, then decide it.
+     * Decide [model], preparing its source as the solve's first phase.
      *
      * [route] is the route the source model declares; the one the theory runs on is selected again from
      * what preparation produced, which is the only route that can be indexed by the factors it left.
@@ -128,12 +133,14 @@ class OpenTheoryEngine internal constructor(
         presolveBudget: PresolveBudget?,
     ) : this(
         route,
-        model.prepareOpenSource(
-            config = presolveConfig,
-            solutionSetSensitive = solutionSetSensitive,
-            cancellation = presolveCancellation,
-            budget = presolveBudget,
-        ),
+        { cancellation ->
+            model.prepareOpenSource(
+                config = presolveConfig,
+                solutionSetSensitive = solutionSetSensitive,
+                cancellation = cancellation,
+                budget = presolveBudget,
+            )
+        },
         presolveCancellation,
     )
 
@@ -141,7 +148,7 @@ class OpenTheoryEngine internal constructor(
     internal constructor(
         planned: OpenSourcePreparation.Planned,
         preparationCancellation: Cancellation,
-    ) : this(planned.route, planned, preparationCancellation)
+    ) : this(planned.route, { planned }, preparationCancellation)
 
     init {
         require(declaredRoute != ProblemPipeline.FINITE_CP && declaredRoute != ProblemPipeline.UNSUPPORTED_OPEN) {
@@ -160,12 +167,14 @@ class OpenTheoryEngine internal constructor(
         val work = state.work
         val cancellation = Cancellation { params.timeout() || params.cancellation() }
         val stats = SolveStatsSink(backend = declaredRoute.backendName())
-        stats.presolve = source.prepared.stats.takeIf { source.prepared.changed || it.infeasible }
         stats.start()
-        // Building the components reads the whole model, so a budget already spent is answered before
-        // that work starts rather than after it.
+        // Preparation reads the whole model, so a budget already spent is answered before that work
+        // starts rather than after it.
         if (cancellation()) return unknown(params.timeout(), stats = stats, state = state)
-        // Source preparation runs before the route exists, so its refutation is the model's verdict.
+        // Preparation runs before the route exists, so its refutation is the model's verdict.
+        val source = prepare(cancellation)
+        val prepared = source.prepared
+        stats.presolve = prepared.stats.takeIf { prepared.changed || it.infeasible }
         val routed = when (source) {
             is OpenSourcePreparation.Refuted -> return OpenTheoryResult.Unsat(stats.finish(state))
             is OpenSourcePreparation.Planned -> source
@@ -176,7 +185,7 @@ class OpenTheoryEngine internal constructor(
         // Close the open sides before the theory sees them. A proved bound narrows the box the theory
         // searches; a refutation here is over the genuinely open ranges, so it refutes the unbounded model
         // rather than an invented box, and is reportable as unsat.
-        val model = when (val closed = routed.model.closeOpenBounds(boundCancellation(cancellation))) {
+        val model = when (val closed = routed.model.closeOpenBounds(boundCancellation(prepared, cancellation))) {
             OpenPresolveResult.Refuted -> return OpenTheoryResult.Unsat(stats.finish(state))
             is OpenPresolveResult.Tightened -> closed.spec
         }
@@ -227,10 +236,17 @@ class OpenTheoryEngine internal constructor(
         }
     }
 
+    /** Prepare the source under the caller's stop, once per engine. */
+    private fun prepare(cancellation: Cancellation): OpenSourcePreparation = preparation
+        ?: prepareSource(alsoStoppedBy(cancellation)).also { preparation = it }
+
     /** The bound-closing phase's allowance: what is left of preparation's, capped by the solve's own. */
-    private fun boundCancellation(cancellation: Cancellation): Cancellation = Cancellation {
-        preparationCancellation() || cancellation() || source.prepared.budget?.remaining() == 0L
-    }
+    private fun boundCancellation(prepared: PreparedSource, cancellation: Cancellation): Cancellation =
+        Cancellation { alsoStoppedBy(cancellation)() || prepared.budget?.remaining() == 0L }
+
+    /** The preparation allowance and the solve's own stop, whichever fires first. */
+    private fun alsoStoppedBy(cancellation: Cancellation): Cancellation =
+        Cancellation { preparationCancellation() || cancellation() }
 
     private fun unknown(
         timedOut: Boolean,
@@ -263,13 +279,6 @@ class OpenTheoryEngine internal constructor(
         return snapshot()
     }
 
-    private fun ProblemPipeline.backendName(): String = when (this) {
-        ProblemPipeline.DIFFERENCE_THEORY -> "difference-theory"
-        ProblemPipeline.EXACT_LRA -> "exact-lra"
-        ProblemPipeline.EXACT_LIRA -> "exact-lira"
-        ProblemPipeline.FINITE_CP, ProblemPipeline.UNSUPPORTED_OPEN -> error("not an open theory route")
-    }
-
     private fun assignment(
         model: com.eignex.klause.solver.search.AssembledSearchModel,
         component: Any,
@@ -289,6 +298,14 @@ class OpenTheoryEngine internal constructor(
 
         ProblemPipeline.FINITE_CP, ProblemPipeline.UNSUPPORTED_OPEN -> error("validated open theory route changed")
     }
+}
+
+/** The `-s` backend label for a complete open route. */
+internal fun ProblemPipeline.backendName(): String = when (this) {
+    ProblemPipeline.DIFFERENCE_THEORY -> "difference-theory"
+    ProblemPipeline.EXACT_LRA -> "exact-lra"
+    ProblemPipeline.EXACT_LIRA -> "exact-lira"
+    ProblemPipeline.FINITE_CP, ProblemPipeline.UNSUPPORTED_OPEN -> error("not an open theory route")
 }
 
 /** Solve-wide controls and telemetry shared by every feasibility round of one open optimization. */

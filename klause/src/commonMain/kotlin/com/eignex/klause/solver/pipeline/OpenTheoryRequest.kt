@@ -77,11 +77,6 @@ sealed interface OpenTheoryExecution {
 object OpenTheoryPipeline {
     /** Execute [request] through its selected complete theory route. */
     fun execute(request: OpenTheoryRequest, params: TheoryParams = TheoryParams()): OpenTheoryExecution {
-        // Preparation is a phase of this solve, so the solve's own stop reaches it: the request's
-        // allowance is what bounds it, and the caller's deadline is what ends it.
-        val preparation = Cancellation {
-            request.presolveCancellation() || params.cancellation() || params.timeout()
-        }
         val objective = request.objective
         if (objective == null) {
             return OpenTheoryExecution.Satisfy(
@@ -90,7 +85,7 @@ object OpenTheoryPipeline {
                     request.route,
                     request.presolveConfig,
                     request.solutionSetSensitive,
-                    preparation,
+                    request.presolveCancellation,
                     request.presolveBudget,
                 ).solve(params),
             )
@@ -102,7 +97,7 @@ object OpenTheoryPipeline {
                 driven,
                 request.presolveConfig,
                 request.solutionSetSensitive,
-                preparation,
+                request.presolveCancellation,
                 request.presolveBudget,
             ).minimize(params),
         )
