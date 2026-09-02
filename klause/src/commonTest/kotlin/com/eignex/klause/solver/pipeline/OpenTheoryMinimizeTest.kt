@@ -12,6 +12,7 @@ import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertNull
 import com.eignex.klause.ir.ObjectiveSense as ObjectiveDirection
 
 class OpenTheoryMinimizeTest {
@@ -21,6 +22,18 @@ class OpenTheoryMinimizeTest {
             (set-logic QF_LIA)
             $body
             (check-sat)
+        """.trimIndent(),
+    )
+
+    /** `x = y + z` over `y ∈ {0, 20}` and `z ∈ {0, 7}`, so minimizing `x` descends 27 → 20 → 7 → 0. */
+    private fun stepped() = modelOf(
+        """
+            (declare-const x Int)
+            (declare-const y Int)
+            (declare-const z Int)
+            (assert (or (= y 0) (= y 20)))
+            (assert (or (= z 0) (= z 7)))
+            (assert (= x (+ y z)))
         """.trimIndent(),
     )
 
@@ -73,7 +86,7 @@ class OpenTheoryMinimizeTest {
     }
 
     @Test
-    fun `a spent budget reports the incumbent as a bound rather than an optimum`() {
+    fun `a budget spent before the first witness bounds the optimum by nothing`() {
         val parsed = modelOf(
             """
                 (declare-const x Int)
@@ -87,6 +100,38 @@ class OpenTheoryMinimizeTest {
             .minimize(TheoryParams(cancellation = Cancellation { true }))
 
         assertIs<OpenTheoryOptimum.Bounded>(result)
+        assertNull(result.incumbent, "nothing was proved feasible")
+        assertNull(result.value)
+    }
+
+    @Test
+    fun `a proved optimum is attained by the assignment reported with it`() {
+        val parsed = stepped()
+        val x = parsed.intVarNames.getValue("x")
+        val objective = LinearObjective(intCoefficients = LongArray(parsed.model.numIntVars).also { it[x] = 1L })
+
+        val result = assertIs<OpenTheoryOptimum.Optimal>(OpenTheoryMinimizer(parsed.model, objective).minimize())
+
+        assertEquals("0", result.value.toString())
+        assertEquals("0", result.assignment.intValue(x))
+    }
+
+    @Test
+    fun `a budget spent mid-descent bounds the optimum by the standing incumbent`() {
+        // 27 is the first witness and 20 the improvement installed over it, so a bound of 20 is one the
+        // descent reached only by replacing what it already had.
+        for ((decisions, bound) in listOf(4L to "27", 20L to "20")) {
+            val parsed = stepped()
+            val x = parsed.intVarNames.getValue("x")
+            val objective = LinearObjective(intCoefficients = LongArray(parsed.model.numIntVars).also { it[x] = 1L })
+
+            val result = assertIs<OpenTheoryOptimum.Bounded>(
+                OpenTheoryMinimizer(parsed.model, objective).minimize(TheoryParams(maxDecisions = decisions)),
+            )
+
+            assertEquals(bound, result.value.toString(), "bound after $decisions decisions")
+            assertEquals(bound, result.incumbent?.intValue(x), "incumbent after $decisions decisions")
+        }
     }
 
     @Test
