@@ -194,28 +194,31 @@ public final class com/eignex/klause/backtrack/TieredValueSelector : com/eignex/
 	public synthetic fun fresh ()Lcom/eignex/klause/backtrack/selector/ValueSelector;
 	public final fun getFallback ()Lcom/eignex/klause/backtrack/selector/ValueSelector;
 	public final fun getTiers ()Ljava/util/List;
-	public fun onCommit (Lcom/eignex/klause/backtrack/selector/VarRef;J)V
-	public fun onConflict (Lcom/eignex/klause/backtrack/selector/VarRef;J)V
+	public fun onCommit (Lcom/eignex/klause/solver/search/VarRef;J)V
+	public fun onConflict (Lcom/eignex/klause/solver/search/VarRef;J)V
 	public fun onRestart ()V
 	public fun onSolution (Lcom/eignex/klause/solver/Sample;)V
-	public fun values (Lcom/eignex/klause/propagation/PropagationSession;Lcom/eignex/klause/backtrack/selector/VarRef;Lkotlin/random/Random;)Lkotlin/sequences/Sequence;
+	public fun values (Lcom/eignex/klause/propagation/PropagationSession;Lcom/eignex/klause/solver/search/VarRef;Lkotlin/random/Random;)Lkotlin/sequences/Sequence;
 }
 
 public final class com/eignex/klause/backtrack/TieredVariableSelector : com/eignex/klause/backtrack/selector/VariableSelector {
 	public fun <init> (Ljava/util/List;Lcom/eignex/klause/backtrack/selector/VariableSelector;)V
 	public fun fresh ()Lcom/eignex/klause/backtrack/TieredVariableSelector;
 	public synthetic fun fresh ()Lcom/eignex/klause/backtrack/selector/VariableSelector;
+	public synthetic fun fresh ()Lcom/eignex/klause/solver/search/VariableBranching;
 	public final fun getFallback ()Lcom/eignex/klause/backtrack/selector/VariableSelector;
 	public final fun getTiers ()Ljava/util/List;
 	public fun getTracksUnassign ()Z
-	public fun onCommit (Lcom/eignex/klause/backtrack/selector/VarRef;)V
-	public fun onConflict (Lcom/eignex/klause/backtrack/selector/VarRef;)V
-	public fun onConflict (Lcom/eignex/klause/backtrack/selector/VarRef;Lcom/eignex/klause/propagation/PropagationResult$Unsat;)V
+	public fun onCommit (Lcom/eignex/klause/solver/search/VarRef;)V
+	public fun onConflict (Lcom/eignex/klause/solver/search/VarRef;)V
+	public fun onConflict (Lcom/eignex/klause/solver/search/VarRef;Lcom/eignex/klause/propagation/PropagationResult$Unsat;)V
+	public fun onConflict (Lcom/eignex/klause/solver/search/VarRef;Lcom/eignex/klause/solver/search/BranchingConflict;)V
 	public fun onPropagation (Lcom/eignex/klause/propagation/PropagationResult$Implied;)V
 	public fun onRestart ()V
 	public fun onSolution (Lcom/eignex/klause/solver/Sample;)V
-	public fun onUnassign (Lcom/eignex/klause/backtrack/selector/VarRef;)V
-	public fun pick (Lcom/eignex/klause/propagation/PropagationSession;Lkotlin/random/Random;)Lcom/eignex/klause/backtrack/selector/VarRef;
+	public fun onUnassign (Lcom/eignex/klause/solver/search/VarRef;)V
+	public fun pick (Lcom/eignex/klause/propagation/PropagationSession;Lkotlin/random/Random;)Lcom/eignex/klause/solver/search/VarRef;
+	public synthetic fun pick (Ljava/lang/Object;Lkotlin/random/Random;)Lcom/eignex/klause/solver/search/VarRef;
 }
 
 public final class com/eignex/klause/backtrack/selector/Chb : com/eignex/klause/backtrack/selector/VariableSelector {
@@ -224,156 +227,180 @@ public final class com/eignex/klause/backtrack/selector/Chb : com/eignex/klause/
 	public synthetic fun <init> (DDDDDILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public fun fresh ()Lcom/eignex/klause/backtrack/selector/Chb;
 	public synthetic fun fresh ()Lcom/eignex/klause/backtrack/selector/VariableSelector;
+	public synthetic fun fresh ()Lcom/eignex/klause/solver/search/VariableBranching;
 	public fun getTracksUnassign ()Z
-	public fun onCommit (Lcom/eignex/klause/backtrack/selector/VarRef;)V
-	public fun onConflict (Lcom/eignex/klause/backtrack/selector/VarRef;)V
-	public fun onConflict (Lcom/eignex/klause/backtrack/selector/VarRef;Lcom/eignex/klause/propagation/PropagationResult$Unsat;)V
+	public fun onCommit (Lcom/eignex/klause/solver/search/VarRef;)V
+	public fun onConflict (Lcom/eignex/klause/solver/search/VarRef;)V
+	public fun onConflict (Lcom/eignex/klause/solver/search/VarRef;Lcom/eignex/klause/propagation/PropagationResult$Unsat;)V
+	public fun onConflict (Lcom/eignex/klause/solver/search/VarRef;Lcom/eignex/klause/solver/search/BranchingConflict;)V
 	public fun onPropagation (Lcom/eignex/klause/propagation/PropagationResult$Implied;)V
 	public fun onRestart ()V
 	public fun onSolution (Lcom/eignex/klause/solver/Sample;)V
-	public fun onUnassign (Lcom/eignex/klause/backtrack/selector/VarRef;)V
-	public fun pick (Lcom/eignex/klause/propagation/PropagationSession;Lkotlin/random/Random;)Lcom/eignex/klause/backtrack/selector/VarRef;
+	public fun onUnassign (Lcom/eignex/klause/solver/search/VarRef;)V
+	public fun pick (Lcom/eignex/klause/propagation/PropagationSession;Lkotlin/random/Random;)Lcom/eignex/klause/solver/search/VarRef;
+	public synthetic fun pick (Ljava/lang/Object;Lkotlin/random/Random;)Lcom/eignex/klause/solver/search/VarRef;
 }
 
 public final class com/eignex/klause/backtrack/selector/DomainMaxRegret : com/eignex/klause/backtrack/selector/VariableSelector {
 	public static final field INSTANCE Lcom/eignex/klause/backtrack/selector/DomainMaxRegret;
 	public fun fresh ()Lcom/eignex/klause/backtrack/selector/DomainMaxRegret;
 	public synthetic fun fresh ()Lcom/eignex/klause/backtrack/selector/VariableSelector;
+	public synthetic fun fresh ()Lcom/eignex/klause/solver/search/VariableBranching;
 	public fun getTracksUnassign ()Z
-	public fun onCommit (Lcom/eignex/klause/backtrack/selector/VarRef;)V
-	public fun onConflict (Lcom/eignex/klause/backtrack/selector/VarRef;)V
-	public fun onConflict (Lcom/eignex/klause/backtrack/selector/VarRef;Lcom/eignex/klause/propagation/PropagationResult$Unsat;)V
+	public fun onCommit (Lcom/eignex/klause/solver/search/VarRef;)V
+	public fun onConflict (Lcom/eignex/klause/solver/search/VarRef;)V
+	public fun onConflict (Lcom/eignex/klause/solver/search/VarRef;Lcom/eignex/klause/propagation/PropagationResult$Unsat;)V
+	public fun onConflict (Lcom/eignex/klause/solver/search/VarRef;Lcom/eignex/klause/solver/search/BranchingConflict;)V
 	public fun onPropagation (Lcom/eignex/klause/propagation/PropagationResult$Implied;)V
 	public fun onRestart ()V
 	public fun onSolution (Lcom/eignex/klause/solver/Sample;)V
-	public fun onUnassign (Lcom/eignex/klause/backtrack/selector/VarRef;)V
-	public fun pick (Lcom/eignex/klause/propagation/PropagationSession;Lkotlin/random/Random;)Lcom/eignex/klause/backtrack/selector/VarRef;
+	public fun onUnassign (Lcom/eignex/klause/solver/search/VarRef;)V
+	public fun pick (Lcom/eignex/klause/propagation/PropagationSession;Lkotlin/random/Random;)Lcom/eignex/klause/solver/search/VarRef;
+	public synthetic fun pick (Ljava/lang/Object;Lkotlin/random/Random;)Lcom/eignex/klause/solver/search/VarRef;
 }
 
 public final class com/eignex/klause/backtrack/selector/IndomainMax : com/eignex/klause/backtrack/selector/ValueSelector {
 	public static final field INSTANCE Lcom/eignex/klause/backtrack/selector/IndomainMax;
 	public fun fresh ()Lcom/eignex/klause/backtrack/selector/IndomainMax;
 	public synthetic fun fresh ()Lcom/eignex/klause/backtrack/selector/ValueSelector;
-	public fun onCommit (Lcom/eignex/klause/backtrack/selector/VarRef;J)V
-	public fun onConflict (Lcom/eignex/klause/backtrack/selector/VarRef;J)V
+	public fun onCommit (Lcom/eignex/klause/solver/search/VarRef;J)V
+	public fun onConflict (Lcom/eignex/klause/solver/search/VarRef;J)V
 	public fun onRestart ()V
 	public fun onSolution (Lcom/eignex/klause/solver/Sample;)V
-	public fun values (Lcom/eignex/klause/propagation/PropagationSession;Lcom/eignex/klause/backtrack/selector/VarRef;Lkotlin/random/Random;)Lkotlin/sequences/Sequence;
+	public fun values (Lcom/eignex/klause/propagation/PropagationSession;Lcom/eignex/klause/solver/search/VarRef;Lkotlin/random/Random;)Lkotlin/sequences/Sequence;
 }
 
 public final class com/eignex/klause/backtrack/selector/IndomainMedian : com/eignex/klause/backtrack/selector/ValueSelector {
 	public static final field INSTANCE Lcom/eignex/klause/backtrack/selector/IndomainMedian;
 	public fun fresh ()Lcom/eignex/klause/backtrack/selector/IndomainMedian;
 	public synthetic fun fresh ()Lcom/eignex/klause/backtrack/selector/ValueSelector;
-	public fun onCommit (Lcom/eignex/klause/backtrack/selector/VarRef;J)V
-	public fun onConflict (Lcom/eignex/klause/backtrack/selector/VarRef;J)V
+	public fun onCommit (Lcom/eignex/klause/solver/search/VarRef;J)V
+	public fun onConflict (Lcom/eignex/klause/solver/search/VarRef;J)V
 	public fun onRestart ()V
 	public fun onSolution (Lcom/eignex/klause/solver/Sample;)V
-	public fun values (Lcom/eignex/klause/propagation/PropagationSession;Lcom/eignex/klause/backtrack/selector/VarRef;Lkotlin/random/Random;)Lkotlin/sequences/Sequence;
+	public fun values (Lcom/eignex/klause/propagation/PropagationSession;Lcom/eignex/klause/solver/search/VarRef;Lkotlin/random/Random;)Lkotlin/sequences/Sequence;
 }
 
 public final class com/eignex/klause/backtrack/selector/IndomainMiddle : com/eignex/klause/backtrack/selector/ValueSelector {
 	public static final field INSTANCE Lcom/eignex/klause/backtrack/selector/IndomainMiddle;
 	public fun fresh ()Lcom/eignex/klause/backtrack/selector/IndomainMiddle;
 	public synthetic fun fresh ()Lcom/eignex/klause/backtrack/selector/ValueSelector;
-	public fun onCommit (Lcom/eignex/klause/backtrack/selector/VarRef;J)V
-	public fun onConflict (Lcom/eignex/klause/backtrack/selector/VarRef;J)V
+	public fun onCommit (Lcom/eignex/klause/solver/search/VarRef;J)V
+	public fun onConflict (Lcom/eignex/klause/solver/search/VarRef;J)V
 	public fun onRestart ()V
 	public fun onSolution (Lcom/eignex/klause/solver/Sample;)V
-	public fun values (Lcom/eignex/klause/propagation/PropagationSession;Lcom/eignex/klause/backtrack/selector/VarRef;Lkotlin/random/Random;)Lkotlin/sequences/Sequence;
+	public fun values (Lcom/eignex/klause/propagation/PropagationSession;Lcom/eignex/klause/solver/search/VarRef;Lkotlin/random/Random;)Lkotlin/sequences/Sequence;
 }
 
 public final class com/eignex/klause/backtrack/selector/IndomainMin : com/eignex/klause/backtrack/selector/ValueSelector {
 	public static final field INSTANCE Lcom/eignex/klause/backtrack/selector/IndomainMin;
 	public fun fresh ()Lcom/eignex/klause/backtrack/selector/IndomainMin;
 	public synthetic fun fresh ()Lcom/eignex/klause/backtrack/selector/ValueSelector;
-	public fun onCommit (Lcom/eignex/klause/backtrack/selector/VarRef;J)V
-	public fun onConflict (Lcom/eignex/klause/backtrack/selector/VarRef;J)V
+	public fun onCommit (Lcom/eignex/klause/solver/search/VarRef;J)V
+	public fun onConflict (Lcom/eignex/klause/solver/search/VarRef;J)V
 	public fun onRestart ()V
 	public fun onSolution (Lcom/eignex/klause/solver/Sample;)V
-	public fun values (Lcom/eignex/klause/propagation/PropagationSession;Lcom/eignex/klause/backtrack/selector/VarRef;Lkotlin/random/Random;)Lkotlin/sequences/Sequence;
+	public fun values (Lcom/eignex/klause/propagation/PropagationSession;Lcom/eignex/klause/solver/search/VarRef;Lkotlin/random/Random;)Lkotlin/sequences/Sequence;
 }
 
 public final class com/eignex/klause/backtrack/selector/IndomainRandom : com/eignex/klause/backtrack/selector/ValueSelector {
 	public static final field INSTANCE Lcom/eignex/klause/backtrack/selector/IndomainRandom;
 	public fun fresh ()Lcom/eignex/klause/backtrack/selector/IndomainRandom;
 	public synthetic fun fresh ()Lcom/eignex/klause/backtrack/selector/ValueSelector;
-	public fun onCommit (Lcom/eignex/klause/backtrack/selector/VarRef;J)V
-	public fun onConflict (Lcom/eignex/klause/backtrack/selector/VarRef;J)V
+	public fun onCommit (Lcom/eignex/klause/solver/search/VarRef;J)V
+	public fun onConflict (Lcom/eignex/klause/solver/search/VarRef;J)V
 	public fun onRestart ()V
 	public fun onSolution (Lcom/eignex/klause/solver/Sample;)V
-	public fun values (Lcom/eignex/klause/propagation/PropagationSession;Lcom/eignex/klause/backtrack/selector/VarRef;Lkotlin/random/Random;)Lkotlin/sequences/Sequence;
+	public fun values (Lcom/eignex/klause/propagation/PropagationSession;Lcom/eignex/klause/solver/search/VarRef;Lkotlin/random/Random;)Lkotlin/sequences/Sequence;
 }
 
 public final class com/eignex/klause/backtrack/selector/IndomainSplit : com/eignex/klause/backtrack/selector/ValueSelector {
 	public static final field INSTANCE Lcom/eignex/klause/backtrack/selector/IndomainSplit;
 	public fun fresh ()Lcom/eignex/klause/backtrack/selector/IndomainSplit;
 	public synthetic fun fresh ()Lcom/eignex/klause/backtrack/selector/ValueSelector;
-	public fun onCommit (Lcom/eignex/klause/backtrack/selector/VarRef;J)V
-	public fun onConflict (Lcom/eignex/klause/backtrack/selector/VarRef;J)V
+	public fun onCommit (Lcom/eignex/klause/solver/search/VarRef;J)V
+	public fun onConflict (Lcom/eignex/klause/solver/search/VarRef;J)V
 	public fun onRestart ()V
 	public fun onSolution (Lcom/eignex/klause/solver/Sample;)V
-	public fun values (Lcom/eignex/klause/propagation/PropagationSession;Lcom/eignex/klause/backtrack/selector/VarRef;Lkotlin/random/Random;)Lkotlin/sequences/Sequence;
+	public fun values (Lcom/eignex/klause/propagation/PropagationSession;Lcom/eignex/klause/solver/search/VarRef;Lkotlin/random/Random;)Lkotlin/sequences/Sequence;
 }
 
 public final class com/eignex/klause/backtrack/selector/InputOrder : com/eignex/klause/backtrack/selector/VariableSelector {
 	public static final field INSTANCE Lcom/eignex/klause/backtrack/selector/InputOrder;
 	public fun fresh ()Lcom/eignex/klause/backtrack/selector/InputOrder;
 	public synthetic fun fresh ()Lcom/eignex/klause/backtrack/selector/VariableSelector;
+	public synthetic fun fresh ()Lcom/eignex/klause/solver/search/VariableBranching;
 	public fun getTracksUnassign ()Z
-	public fun onCommit (Lcom/eignex/klause/backtrack/selector/VarRef;)V
-	public fun onConflict (Lcom/eignex/klause/backtrack/selector/VarRef;)V
-	public fun onConflict (Lcom/eignex/klause/backtrack/selector/VarRef;Lcom/eignex/klause/propagation/PropagationResult$Unsat;)V
+	public fun onCommit (Lcom/eignex/klause/solver/search/VarRef;)V
+	public fun onConflict (Lcom/eignex/klause/solver/search/VarRef;)V
+	public fun onConflict (Lcom/eignex/klause/solver/search/VarRef;Lcom/eignex/klause/propagation/PropagationResult$Unsat;)V
+	public fun onConflict (Lcom/eignex/klause/solver/search/VarRef;Lcom/eignex/klause/solver/search/BranchingConflict;)V
 	public fun onPropagation (Lcom/eignex/klause/propagation/PropagationResult$Implied;)V
 	public fun onRestart ()V
 	public fun onSolution (Lcom/eignex/klause/solver/Sample;)V
-	public fun onUnassign (Lcom/eignex/klause/backtrack/selector/VarRef;)V
-	public fun pick (Lcom/eignex/klause/propagation/PropagationSession;Lkotlin/random/Random;)Lcom/eignex/klause/backtrack/selector/VarRef;
+	public fun onUnassign (Lcom/eignex/klause/solver/search/VarRef;)V
+	public fun pick (Lcom/eignex/klause/propagation/PropagationSession;Lkotlin/random/Random;)Lcom/eignex/klause/solver/search/VarRef;
+	public synthetic fun pick (Ljava/lang/Object;Lkotlin/random/Random;)Lcom/eignex/klause/solver/search/VarRef;
 }
 
 public final class com/eignex/klause/backtrack/selector/LargestDomain : com/eignex/klause/backtrack/selector/VariableSelector {
 	public static final field INSTANCE Lcom/eignex/klause/backtrack/selector/LargestDomain;
 	public fun fresh ()Lcom/eignex/klause/backtrack/selector/LargestDomain;
 	public synthetic fun fresh ()Lcom/eignex/klause/backtrack/selector/VariableSelector;
+	public synthetic fun fresh ()Lcom/eignex/klause/solver/search/VariableBranching;
 	public fun getTracksUnassign ()Z
-	public fun onCommit (Lcom/eignex/klause/backtrack/selector/VarRef;)V
-	public fun onConflict (Lcom/eignex/klause/backtrack/selector/VarRef;)V
-	public fun onConflict (Lcom/eignex/klause/backtrack/selector/VarRef;Lcom/eignex/klause/propagation/PropagationResult$Unsat;)V
+	public fun onCommit (Lcom/eignex/klause/solver/search/VarRef;)V
+	public fun onConflict (Lcom/eignex/klause/solver/search/VarRef;)V
+	public fun onConflict (Lcom/eignex/klause/solver/search/VarRef;Lcom/eignex/klause/propagation/PropagationResult$Unsat;)V
+	public fun onConflict (Lcom/eignex/klause/solver/search/VarRef;Lcom/eignex/klause/solver/search/BranchingConflict;)V
 	public fun onPropagation (Lcom/eignex/klause/propagation/PropagationResult$Implied;)V
 	public fun onRestart ()V
 	public fun onSolution (Lcom/eignex/klause/solver/Sample;)V
-	public fun onUnassign (Lcom/eignex/klause/backtrack/selector/VarRef;)V
-	public fun pick (Lcom/eignex/klause/propagation/PropagationSession;Lkotlin/random/Random;)Lcom/eignex/klause/backtrack/selector/VarRef;
+	public fun onUnassign (Lcom/eignex/klause/solver/search/VarRef;)V
+	public fun pick (Lcom/eignex/klause/propagation/PropagationSession;Lkotlin/random/Random;)Lcom/eignex/klause/solver/search/VarRef;
+	public synthetic fun pick (Ljava/lang/Object;Lkotlin/random/Random;)Lcom/eignex/klause/solver/search/VarRef;
 }
 
 public final class com/eignex/klause/backtrack/selector/LargestUpperBound : com/eignex/klause/backtrack/selector/VariableSelector {
 	public static final field INSTANCE Lcom/eignex/klause/backtrack/selector/LargestUpperBound;
 	public fun fresh ()Lcom/eignex/klause/backtrack/selector/LargestUpperBound;
 	public synthetic fun fresh ()Lcom/eignex/klause/backtrack/selector/VariableSelector;
+	public synthetic fun fresh ()Lcom/eignex/klause/solver/search/VariableBranching;
 	public fun getTracksUnassign ()Z
-	public fun onCommit (Lcom/eignex/klause/backtrack/selector/VarRef;)V
-	public fun onConflict (Lcom/eignex/klause/backtrack/selector/VarRef;)V
-	public fun onConflict (Lcom/eignex/klause/backtrack/selector/VarRef;Lcom/eignex/klause/propagation/PropagationResult$Unsat;)V
+	public fun onCommit (Lcom/eignex/klause/solver/search/VarRef;)V
+	public fun onConflict (Lcom/eignex/klause/solver/search/VarRef;)V
+	public fun onConflict (Lcom/eignex/klause/solver/search/VarRef;Lcom/eignex/klause/propagation/PropagationResult$Unsat;)V
+	public fun onConflict (Lcom/eignex/klause/solver/search/VarRef;Lcom/eignex/klause/solver/search/BranchingConflict;)V
 	public fun onPropagation (Lcom/eignex/klause/propagation/PropagationResult$Implied;)V
 	public fun onRestart ()V
 	public fun onSolution (Lcom/eignex/klause/solver/Sample;)V
-	public fun onUnassign (Lcom/eignex/klause/backtrack/selector/VarRef;)V
-	public fun pick (Lcom/eignex/klause/propagation/PropagationSession;Lkotlin/random/Random;)Lcom/eignex/klause/backtrack/selector/VarRef;
+	public fun onUnassign (Lcom/eignex/klause/solver/search/VarRef;)V
+	public fun pick (Lcom/eignex/klause/propagation/PropagationSession;Lkotlin/random/Random;)Lcom/eignex/klause/solver/search/VarRef;
+	public synthetic fun pick (Ljava/lang/Object;Lkotlin/random/Random;)Lcom/eignex/klause/solver/search/VarRef;
 }
 
 public final class com/eignex/klause/backtrack/selector/LastConflict : com/eignex/klause/backtrack/selector/VariableSelector {
 	public fun <init> (Lcom/eignex/klause/backtrack/selector/VariableSelector;)V
 	public fun fresh ()Lcom/eignex/klause/backtrack/selector/LastConflict;
 	public synthetic fun fresh ()Lcom/eignex/klause/backtrack/selector/VariableSelector;
+	public synthetic fun fresh ()Lcom/eignex/klause/solver/search/VariableBranching;
 	public fun getTracksUnassign ()Z
-	public fun onCommit (Lcom/eignex/klause/backtrack/selector/VarRef;)V
-	public fun onConflict (Lcom/eignex/klause/backtrack/selector/VarRef;)V
-	public fun onConflict (Lcom/eignex/klause/backtrack/selector/VarRef;Lcom/eignex/klause/propagation/PropagationResult$Unsat;)V
+	public fun onCommit (Lcom/eignex/klause/solver/search/VarRef;)V
+	public fun onConflict (Lcom/eignex/klause/solver/search/VarRef;)V
+	public fun onConflict (Lcom/eignex/klause/solver/search/VarRef;Lcom/eignex/klause/propagation/PropagationResult$Unsat;)V
+	public fun onConflict (Lcom/eignex/klause/solver/search/VarRef;Lcom/eignex/klause/solver/search/BranchingConflict;)V
 	public fun onPropagation (Lcom/eignex/klause/propagation/PropagationResult$Implied;)V
 	public fun onRestart ()V
 	public fun onSolution (Lcom/eignex/klause/solver/Sample;)V
-	public fun onUnassign (Lcom/eignex/klause/backtrack/selector/VarRef;)V
-	public fun pick (Lcom/eignex/klause/propagation/PropagationSession;Lkotlin/random/Random;)Lcom/eignex/klause/backtrack/selector/VarRef;
+	public fun onUnassign (Lcom/eignex/klause/solver/search/VarRef;)V
+	public fun pick (Lcom/eignex/klause/propagation/PropagationSession;Lkotlin/random/Random;)Lcom/eignex/klause/solver/search/VarRef;
+	public synthetic fun pick (Ljava/lang/Object;Lkotlin/random/Random;)Lcom/eignex/klause/solver/search/VarRef;
+}
+
+public final class com/eignex/klause/backtrack/selector/NeutralSelectorsKt {
+	public static final fun Vsids (DD)Lcom/eignex/klause/backtrack/selector/VariableSelector;
+	public static synthetic fun Vsids$default (DDILjava/lang/Object;)Lcom/eignex/klause/backtrack/selector/VariableSelector;
+	public static final fun asSelector (Lcom/eignex/klause/solver/search/VariableBranching;)Lcom/eignex/klause/backtrack/selector/VariableSelector;
 }
 
 public final class com/eignex/klause/backtrack/selector/ProbingSelectors {
@@ -387,15 +414,18 @@ public final class com/eignex/klause/backtrack/selector/RandomVariable : com/eig
 	public static final field INSTANCE Lcom/eignex/klause/backtrack/selector/RandomVariable;
 	public fun fresh ()Lcom/eignex/klause/backtrack/selector/RandomVariable;
 	public synthetic fun fresh ()Lcom/eignex/klause/backtrack/selector/VariableSelector;
+	public synthetic fun fresh ()Lcom/eignex/klause/solver/search/VariableBranching;
 	public fun getTracksUnassign ()Z
-	public fun onCommit (Lcom/eignex/klause/backtrack/selector/VarRef;)V
-	public fun onConflict (Lcom/eignex/klause/backtrack/selector/VarRef;)V
-	public fun onConflict (Lcom/eignex/klause/backtrack/selector/VarRef;Lcom/eignex/klause/propagation/PropagationResult$Unsat;)V
+	public fun onCommit (Lcom/eignex/klause/solver/search/VarRef;)V
+	public fun onConflict (Lcom/eignex/klause/solver/search/VarRef;)V
+	public fun onConflict (Lcom/eignex/klause/solver/search/VarRef;Lcom/eignex/klause/propagation/PropagationResult$Unsat;)V
+	public fun onConflict (Lcom/eignex/klause/solver/search/VarRef;Lcom/eignex/klause/solver/search/BranchingConflict;)V
 	public fun onPropagation (Lcom/eignex/klause/propagation/PropagationResult$Implied;)V
 	public fun onRestart ()V
 	public fun onSolution (Lcom/eignex/klause/solver/Sample;)V
-	public fun onUnassign (Lcom/eignex/klause/backtrack/selector/VarRef;)V
-	public fun pick (Lcom/eignex/klause/propagation/PropagationSession;Lkotlin/random/Random;)Lcom/eignex/klause/backtrack/selector/VarRef;
+	public fun onUnassign (Lcom/eignex/klause/solver/search/VarRef;)V
+	public fun pick (Lcom/eignex/klause/propagation/PropagationSession;Lkotlin/random/Random;)Lcom/eignex/klause/solver/search/VarRef;
+	public synthetic fun pick (Ljava/lang/Object;Lkotlin/random/Random;)Lcom/eignex/klause/solver/search/VarRef;
 }
 
 public final class com/eignex/klause/backtrack/selector/RegressionVariableSelector : com/eignex/klause/backtrack/selector/VariableSelector {
@@ -403,15 +433,18 @@ public final class com/eignex/klause/backtrack/selector/RegressionVariableSelect
 	public static final field FEATURE_SIZE I
 	public fun fresh ()Lcom/eignex/klause/backtrack/selector/RegressionVariableSelector;
 	public synthetic fun fresh ()Lcom/eignex/klause/backtrack/selector/VariableSelector;
+	public synthetic fun fresh ()Lcom/eignex/klause/solver/search/VariableBranching;
 	public fun getTracksUnassign ()Z
-	public fun onCommit (Lcom/eignex/klause/backtrack/selector/VarRef;)V
-	public fun onConflict (Lcom/eignex/klause/backtrack/selector/VarRef;)V
-	public fun onConflict (Lcom/eignex/klause/backtrack/selector/VarRef;Lcom/eignex/klause/propagation/PropagationResult$Unsat;)V
+	public fun onCommit (Lcom/eignex/klause/solver/search/VarRef;)V
+	public fun onConflict (Lcom/eignex/klause/solver/search/VarRef;)V
+	public fun onConflict (Lcom/eignex/klause/solver/search/VarRef;Lcom/eignex/klause/propagation/PropagationResult$Unsat;)V
+	public fun onConflict (Lcom/eignex/klause/solver/search/VarRef;Lcom/eignex/klause/solver/search/BranchingConflict;)V
 	public fun onPropagation (Lcom/eignex/klause/propagation/PropagationResult$Implied;)V
 	public fun onRestart ()V
 	public fun onSolution (Lcom/eignex/klause/solver/Sample;)V
-	public fun onUnassign (Lcom/eignex/klause/backtrack/selector/VarRef;)V
-	public fun pick (Lcom/eignex/klause/propagation/PropagationSession;Lkotlin/random/Random;)Lcom/eignex/klause/backtrack/selector/VarRef;
+	public fun onUnassign (Lcom/eignex/klause/solver/search/VarRef;)V
+	public fun pick (Lcom/eignex/klause/propagation/PropagationSession;Lkotlin/random/Random;)Lcom/eignex/klause/solver/search/VarRef;
+	public synthetic fun pick (Ljava/lang/Object;Lkotlin/random/Random;)Lcom/eignex/klause/solver/search/VarRef;
 }
 
 public final class com/eignex/klause/backtrack/selector/RegressionVariableSelector$Companion {
@@ -423,124 +456,85 @@ public final class com/eignex/klause/backtrack/selector/SmallestDomain : com/eig
 	public static final field INSTANCE Lcom/eignex/klause/backtrack/selector/SmallestDomain;
 	public fun fresh ()Lcom/eignex/klause/backtrack/selector/SmallestDomain;
 	public synthetic fun fresh ()Lcom/eignex/klause/backtrack/selector/VariableSelector;
+	public synthetic fun fresh ()Lcom/eignex/klause/solver/search/VariableBranching;
 	public fun getTracksUnassign ()Z
-	public fun onCommit (Lcom/eignex/klause/backtrack/selector/VarRef;)V
-	public fun onConflict (Lcom/eignex/klause/backtrack/selector/VarRef;)V
-	public fun onConflict (Lcom/eignex/klause/backtrack/selector/VarRef;Lcom/eignex/klause/propagation/PropagationResult$Unsat;)V
+	public fun onCommit (Lcom/eignex/klause/solver/search/VarRef;)V
+	public fun onConflict (Lcom/eignex/klause/solver/search/VarRef;)V
+	public fun onConflict (Lcom/eignex/klause/solver/search/VarRef;Lcom/eignex/klause/propagation/PropagationResult$Unsat;)V
+	public fun onConflict (Lcom/eignex/klause/solver/search/VarRef;Lcom/eignex/klause/solver/search/BranchingConflict;)V
 	public fun onPropagation (Lcom/eignex/klause/propagation/PropagationResult$Implied;)V
 	public fun onRestart ()V
 	public fun onSolution (Lcom/eignex/klause/solver/Sample;)V
-	public fun onUnassign (Lcom/eignex/klause/backtrack/selector/VarRef;)V
-	public fun pick (Lcom/eignex/klause/propagation/PropagationSession;Lkotlin/random/Random;)Lcom/eignex/klause/backtrack/selector/VarRef;
+	public fun onUnassign (Lcom/eignex/klause/solver/search/VarRef;)V
+	public fun pick (Lcom/eignex/klause/propagation/PropagationSession;Lkotlin/random/Random;)Lcom/eignex/klause/solver/search/VarRef;
+	public synthetic fun pick (Ljava/lang/Object;Lkotlin/random/Random;)Lcom/eignex/klause/solver/search/VarRef;
 }
 
 public final class com/eignex/klause/backtrack/selector/SmallestLowerBound : com/eignex/klause/backtrack/selector/VariableSelector {
 	public static final field INSTANCE Lcom/eignex/klause/backtrack/selector/SmallestLowerBound;
 	public fun fresh ()Lcom/eignex/klause/backtrack/selector/SmallestLowerBound;
 	public synthetic fun fresh ()Lcom/eignex/klause/backtrack/selector/VariableSelector;
+	public synthetic fun fresh ()Lcom/eignex/klause/solver/search/VariableBranching;
 	public fun getTracksUnassign ()Z
-	public fun onCommit (Lcom/eignex/klause/backtrack/selector/VarRef;)V
-	public fun onConflict (Lcom/eignex/klause/backtrack/selector/VarRef;)V
-	public fun onConflict (Lcom/eignex/klause/backtrack/selector/VarRef;Lcom/eignex/klause/propagation/PropagationResult$Unsat;)V
+	public fun onCommit (Lcom/eignex/klause/solver/search/VarRef;)V
+	public fun onConflict (Lcom/eignex/klause/solver/search/VarRef;)V
+	public fun onConflict (Lcom/eignex/klause/solver/search/VarRef;Lcom/eignex/klause/propagation/PropagationResult$Unsat;)V
+	public fun onConflict (Lcom/eignex/klause/solver/search/VarRef;Lcom/eignex/klause/solver/search/BranchingConflict;)V
 	public fun onPropagation (Lcom/eignex/klause/propagation/PropagationResult$Implied;)V
 	public fun onRestart ()V
 	public fun onSolution (Lcom/eignex/klause/solver/Sample;)V
-	public fun onUnassign (Lcom/eignex/klause/backtrack/selector/VarRef;)V
-	public fun pick (Lcom/eignex/klause/propagation/PropagationSession;Lkotlin/random/Random;)Lcom/eignex/klause/backtrack/selector/VarRef;
+	public fun onUnassign (Lcom/eignex/klause/solver/search/VarRef;)V
+	public fun pick (Lcom/eignex/klause/propagation/PropagationSession;Lkotlin/random/Random;)Lcom/eignex/klause/solver/search/VarRef;
+	public synthetic fun pick (Ljava/lang/Object;Lkotlin/random/Random;)Lcom/eignex/klause/solver/search/VarRef;
 }
 
 public final class com/eignex/klause/backtrack/selector/SolutionGuided : com/eignex/klause/backtrack/selector/ValueSelector {
 	public fun <init> (Lcom/eignex/klause/backtrack/selector/ValueSelector;)V
 	public fun fresh ()Lcom/eignex/klause/backtrack/selector/SolutionGuided;
 	public synthetic fun fresh ()Lcom/eignex/klause/backtrack/selector/ValueSelector;
-	public fun onCommit (Lcom/eignex/klause/backtrack/selector/VarRef;J)V
-	public fun onConflict (Lcom/eignex/klause/backtrack/selector/VarRef;J)V
+	public fun onCommit (Lcom/eignex/klause/solver/search/VarRef;J)V
+	public fun onConflict (Lcom/eignex/klause/solver/search/VarRef;J)V
 	public fun onRestart ()V
 	public fun onSolution (Lcom/eignex/klause/solver/Sample;)V
-	public fun values (Lcom/eignex/klause/propagation/PropagationSession;Lcom/eignex/klause/backtrack/selector/VarRef;Lkotlin/random/Random;)Lkotlin/sequences/Sequence;
+	public fun values (Lcom/eignex/klause/propagation/PropagationSession;Lcom/eignex/klause/solver/search/VarRef;Lkotlin/random/Random;)Lkotlin/sequences/Sequence;
 }
 
 public abstract interface class com/eignex/klause/backtrack/selector/ValueSelector {
 	public abstract fun fresh ()Lcom/eignex/klause/backtrack/selector/ValueSelector;
-	public fun onCommit (Lcom/eignex/klause/backtrack/selector/VarRef;J)V
-	public fun onConflict (Lcom/eignex/klause/backtrack/selector/VarRef;J)V
+	public fun onCommit (Lcom/eignex/klause/solver/search/VarRef;J)V
+	public fun onConflict (Lcom/eignex/klause/solver/search/VarRef;J)V
 	public fun onRestart ()V
 	public fun onSolution (Lcom/eignex/klause/solver/Sample;)V
-	public abstract fun values (Lcom/eignex/klause/propagation/PropagationSession;Lcom/eignex/klause/backtrack/selector/VarRef;Lkotlin/random/Random;)Lkotlin/sequences/Sequence;
+	public abstract fun values (Lcom/eignex/klause/propagation/PropagationSession;Lcom/eignex/klause/solver/search/VarRef;Lkotlin/random/Random;)Lkotlin/sequences/Sequence;
 }
 
 public final class com/eignex/klause/backtrack/selector/ValueSelector$DefaultImpls {
-	public static fun onCommit (Lcom/eignex/klause/backtrack/selector/ValueSelector;Lcom/eignex/klause/backtrack/selector/VarRef;J)V
-	public static fun onConflict (Lcom/eignex/klause/backtrack/selector/ValueSelector;Lcom/eignex/klause/backtrack/selector/VarRef;J)V
+	public static fun onCommit (Lcom/eignex/klause/backtrack/selector/ValueSelector;Lcom/eignex/klause/solver/search/VarRef;J)V
+	public static fun onConflict (Lcom/eignex/klause/backtrack/selector/ValueSelector;Lcom/eignex/klause/solver/search/VarRef;J)V
 	public static fun onRestart (Lcom/eignex/klause/backtrack/selector/ValueSelector;)V
 	public static fun onSolution (Lcom/eignex/klause/backtrack/selector/ValueSelector;Lcom/eignex/klause/solver/Sample;)V
 }
 
-public abstract interface class com/eignex/klause/backtrack/selector/VarRef {
-	public abstract fun getVarId ()I
-}
-
-public final class com/eignex/klause/backtrack/selector/VarRef$Bool : com/eignex/klause/backtrack/selector/VarRef {
-	public fun <init> (I)V
-	public final fun component1 ()I
-	public final fun copy (I)Lcom/eignex/klause/backtrack/selector/VarRef$Bool;
-	public static synthetic fun copy$default (Lcom/eignex/klause/backtrack/selector/VarRef$Bool;IILjava/lang/Object;)Lcom/eignex/klause/backtrack/selector/VarRef$Bool;
-	public fun equals (Ljava/lang/Object;)Z
-	public fun getVarId ()I
-	public fun hashCode ()I
-	public fun toString ()Ljava/lang/String;
-}
-
-public final class com/eignex/klause/backtrack/selector/VarRef$IntVar : com/eignex/klause/backtrack/selector/VarRef {
-	public fun <init> (I)V
-	public final fun component1 ()I
-	public final fun copy (I)Lcom/eignex/klause/backtrack/selector/VarRef$IntVar;
-	public static synthetic fun copy$default (Lcom/eignex/klause/backtrack/selector/VarRef$IntVar;IILjava/lang/Object;)Lcom/eignex/klause/backtrack/selector/VarRef$IntVar;
-	public fun equals (Ljava/lang/Object;)Z
-	public fun getVarId ()I
-	public fun hashCode ()I
-	public fun toString ()Ljava/lang/String;
-}
-
-public abstract interface class com/eignex/klause/backtrack/selector/VariableSelector {
+public abstract interface class com/eignex/klause/backtrack/selector/VariableSelector : com/eignex/klause/solver/search/VariableBranching {
 	public abstract fun fresh ()Lcom/eignex/klause/backtrack/selector/VariableSelector;
-	public fun getTracksUnassign ()Z
-	public fun onCommit (Lcom/eignex/klause/backtrack/selector/VarRef;)V
-	public fun onConflict (Lcom/eignex/klause/backtrack/selector/VarRef;)V
-	public fun onConflict (Lcom/eignex/klause/backtrack/selector/VarRef;Lcom/eignex/klause/propagation/PropagationResult$Unsat;)V
+	public synthetic fun fresh ()Lcom/eignex/klause/solver/search/VariableBranching;
+	public fun onConflict (Lcom/eignex/klause/solver/search/VarRef;Lcom/eignex/klause/propagation/PropagationResult$Unsat;)V
 	public fun onPropagation (Lcom/eignex/klause/propagation/PropagationResult$Implied;)V
-	public fun onRestart ()V
 	public fun onSolution (Lcom/eignex/klause/solver/Sample;)V
-	public fun onUnassign (Lcom/eignex/klause/backtrack/selector/VarRef;)V
-	public abstract fun pick (Lcom/eignex/klause/propagation/PropagationSession;Lkotlin/random/Random;)Lcom/eignex/klause/backtrack/selector/VarRef;
+	public abstract fun pick (Lcom/eignex/klause/propagation/PropagationSession;Lkotlin/random/Random;)Lcom/eignex/klause/solver/search/VarRef;
+	public synthetic fun pick (Ljava/lang/Object;Lkotlin/random/Random;)Lcom/eignex/klause/solver/search/VarRef;
 }
 
 public final class com/eignex/klause/backtrack/selector/VariableSelector$DefaultImpls {
 	public static fun getTracksUnassign (Lcom/eignex/klause/backtrack/selector/VariableSelector;)Z
-	public static fun onCommit (Lcom/eignex/klause/backtrack/selector/VariableSelector;Lcom/eignex/klause/backtrack/selector/VarRef;)V
-	public static fun onConflict (Lcom/eignex/klause/backtrack/selector/VariableSelector;Lcom/eignex/klause/backtrack/selector/VarRef;)V
-	public static fun onConflict (Lcom/eignex/klause/backtrack/selector/VariableSelector;Lcom/eignex/klause/backtrack/selector/VarRef;Lcom/eignex/klause/propagation/PropagationResult$Unsat;)V
+	public static fun onCommit (Lcom/eignex/klause/backtrack/selector/VariableSelector;Lcom/eignex/klause/solver/search/VarRef;)V
+	public static fun onConflict (Lcom/eignex/klause/backtrack/selector/VariableSelector;Lcom/eignex/klause/solver/search/VarRef;)V
+	public static fun onConflict (Lcom/eignex/klause/backtrack/selector/VariableSelector;Lcom/eignex/klause/solver/search/VarRef;Lcom/eignex/klause/propagation/PropagationResult$Unsat;)V
+	public static fun onConflict (Lcom/eignex/klause/backtrack/selector/VariableSelector;Lcom/eignex/klause/solver/search/VarRef;Lcom/eignex/klause/solver/search/BranchingConflict;)V
 	public static fun onPropagation (Lcom/eignex/klause/backtrack/selector/VariableSelector;Lcom/eignex/klause/propagation/PropagationResult$Implied;)V
 	public static fun onRestart (Lcom/eignex/klause/backtrack/selector/VariableSelector;)V
 	public static fun onSolution (Lcom/eignex/klause/backtrack/selector/VariableSelector;Lcom/eignex/klause/solver/Sample;)V
-	public static fun onUnassign (Lcom/eignex/klause/backtrack/selector/VariableSelector;Lcom/eignex/klause/backtrack/selector/VarRef;)V
-}
-
-public final class com/eignex/klause/backtrack/selector/Vsids : com/eignex/klause/backtrack/selector/VariableSelector {
-	public fun <init> ()V
-	public fun <init> (DD)V
-	public synthetic fun <init> (DDILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public synthetic fun fresh ()Lcom/eignex/klause/backtrack/selector/VariableSelector;
-	public fun fresh ()Lcom/eignex/klause/backtrack/selector/Vsids;
-	public fun getTracksUnassign ()Z
-	public fun onCommit (Lcom/eignex/klause/backtrack/selector/VarRef;)V
-	public fun onConflict (Lcom/eignex/klause/backtrack/selector/VarRef;)V
-	public fun onConflict (Lcom/eignex/klause/backtrack/selector/VarRef;Lcom/eignex/klause/propagation/PropagationResult$Unsat;)V
-	public fun onPropagation (Lcom/eignex/klause/propagation/PropagationResult$Implied;)V
-	public fun onRestart ()V
-	public fun onSolution (Lcom/eignex/klause/solver/Sample;)V
-	public fun onUnassign (Lcom/eignex/klause/backtrack/selector/VarRef;)V
-	public fun pick (Lcom/eignex/klause/propagation/PropagationSession;Lkotlin/random/Random;)Lcom/eignex/klause/backtrack/selector/VarRef;
+	public static fun onUnassign (Lcom/eignex/klause/backtrack/selector/VariableSelector;Lcom/eignex/klause/solver/search/VarRef;)V
 }
 
 public final class com/eignex/klause/brute/BruteForceParams : com/eignex/klause/solver/SolverParams {
@@ -8897,6 +8891,20 @@ public final class com/eignex/klause/solver/pipeline/LsResolution {
 	public final fun getPool ()Ljava/util/List;
 }
 
+public final class com/eignex/klause/solver/pipeline/OpenBranching : java/lang/Enum {
+	public static final field Activity Lcom/eignex/klause/solver/pipeline/OpenBranching;
+	public static final field Companion Lcom/eignex/klause/solver/pipeline/OpenBranching$Companion;
+	public static final field SourceOrder Lcom/eignex/klause/solver/pipeline/OpenBranching;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public final fun getId ()Ljava/lang/String;
+	public static fun valueOf (Ljava/lang/String;)Lcom/eignex/klause/solver/pipeline/OpenBranching;
+	public static fun values ()[Lcom/eignex/klause/solver/pipeline/OpenBranching;
+}
+
+public final class com/eignex/klause/solver/pipeline/OpenBranching$Companion {
+	public final fun of (Ljava/lang/String;)Lcom/eignex/klause/solver/pipeline/OpenBranching;
+}
+
 public abstract interface class com/eignex/klause/solver/pipeline/OpenTheoryAssignment {
 	public abstract fun boolValue (I)Z
 	public abstract fun intValue (I)Ljava/lang/String;
@@ -9202,26 +9210,28 @@ public final class com/eignex/klause/solver/pipeline/SourceProblemRoute$Unsuppor
 
 public final class com/eignex/klause/solver/pipeline/TheoryParams {
 	public fun <init> ()V
-	public fun <init> (JJJLjava/lang/Long;Ljava/lang/Integer;ILjava/lang/Long;JLcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/util/Cancellation;)V
-	public synthetic fun <init> (JJJLjava/lang/Long;Ljava/lang/Integer;ILjava/lang/Long;JLcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/util/Cancellation;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (JJJLjava/lang/Long;Ljava/lang/Integer;ILjava/lang/Long;Lcom/eignex/klause/solver/pipeline/OpenBranching;JLcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/util/Cancellation;)V
+	public synthetic fun <init> (JJJLjava/lang/Long;Ljava/lang/Integer;ILjava/lang/Long;Lcom/eignex/klause/solver/pipeline/OpenBranching;JLcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/util/Cancellation;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()J
 	public final fun component10 ()Lcom/eignex/klause/util/Cancellation;
+	public final fun component11 ()Lcom/eignex/klause/util/Cancellation;
 	public final fun component2 ()J
 	public final fun component3 ()J
 	public final fun component4 ()Ljava/lang/Long;
 	public final fun component5 ()Ljava/lang/Integer;
 	public final fun component6 ()I
 	public final fun component7 ()Ljava/lang/Long;
-	public final fun component8 ()J
-	public final fun component9 ()Lcom/eignex/klause/util/Cancellation;
-	public final fun copy (JJJLjava/lang/Long;Ljava/lang/Integer;ILjava/lang/Long;JLcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/solver/pipeline/TheoryParams;
-	public static synthetic fun copy$default (Lcom/eignex/klause/solver/pipeline/TheoryParams;JJJLjava/lang/Long;Ljava/lang/Integer;ILjava/lang/Long;JLcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/util/Cancellation;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/TheoryParams;
+	public final fun component8 ()Lcom/eignex/klause/solver/pipeline/OpenBranching;
+	public final fun component9 ()J
+	public final fun copy (JJJLjava/lang/Long;Ljava/lang/Integer;ILjava/lang/Long;Lcom/eignex/klause/solver/pipeline/OpenBranching;JLcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/solver/pipeline/TheoryParams;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/pipeline/TheoryParams;JJJLjava/lang/Long;Ljava/lang/Integer;ILjava/lang/Long;Lcom/eignex/klause/solver/pipeline/OpenBranching;JLcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/util/Cancellation;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/TheoryParams;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getCancellation ()Lcom/eignex/klause/util/Cancellation;
 	public final fun getLbdGlue ()I
 	public final fun getMaxDecisions ()J
 	public final fun getMaxLearnedClauses ()Ljava/lang/Integer;
 	public final fun getMaxLeaves ()J
+	public final fun getOpenBranching ()Lcom/eignex/klause/solver/pipeline/OpenBranching;
 	public final fun getOpenHintFlips ()Ljava/lang/Long;
 	public final fun getOpenHintMinSplits ()J
 	public final fun getOpenWorkLimit ()J
@@ -9920,6 +9930,26 @@ public final class com/eignex/klause/solver/search/BooleanSearchResult$Satisfied
 	public fun toString ()Ljava/lang/String;
 }
 
+public final class com/eignex/klause/solver/search/BranchingConflict {
+	public static final field Companion Lcom/eignex/klause/solver/search/BranchingConflict$Companion;
+	public fun <init> ()V
+	public fun <init> ([I[I)V
+	public synthetic fun <init> ([I[IILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getBools ()[I
+	public final fun getInts ()[I
+}
+
+public final class com/eignex/klause/solver/search/BranchingConflict$Companion {
+	public final fun getEmpty ()Lcom/eignex/klause/solver/search/BranchingConflict;
+}
+
+public abstract interface class com/eignex/klause/solver/search/BranchingState {
+	public abstract fun boolValue (I)Ljava/lang/Boolean;
+	public abstract fun getNumBoolVars ()I
+	public abstract fun getNumIntVars ()I
+	public abstract fun intFixed (I)Z
+}
+
 public final class com/eignex/klause/solver/search/ClauseSearchComponent : com/eignex/klause/solver/search/ClauseWatchHost, com/eignex/klause/solver/search/SearchComponent {
 	public fun <init> (Ljava/lang/Iterable;)V
 	public fun assert (Lcom/eignex/klause/solver/search/SearchDecision;Lcom/eignex/klause/solver/search/SearchContext;)Lcom/eignex/klause/solver/search/ComponentResult;
@@ -9995,6 +10025,19 @@ public final class com/eignex/klause/solver/search/ComponentResult$Indeterminate
 	public fun equals (Ljava/lang/Object;)Z
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/solver/search/HeuristicBooleanBranching : com/eignex/klause/solver/search/BooleanBranching, com/eignex/klause/solver/search/SearchRunObserver, com/eignex/klause/solver/search/SearchUnassignListener {
+	public fun <init> (Lcom/eignex/klause/solver/search/VariableBranching;ILkotlin/random/Random;)V
+	public synthetic fun <init> (Lcom/eignex/klause/solver/search/VariableBranching;ILkotlin/random/Random;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun alternatives (Lcom/eignex/klause/solver/search/SearchContext;)Ljava/util/List;
+	public fun onCommit (Lcom/eignex/klause/solver/search/SearchDecision;I)V
+	public fun onConflict (Lcom/eignex/klause/solver/search/SearchDecision;)V
+	public fun onLearnedConflict (Lcom/eignex/klause/solver/search/SearchLearnedConflict;)V
+	public fun onLearnedNodeBackjump ()V
+	public fun onModel (Lcom/eignex/klause/solver/search/AssembledSearchModel;)V
+	public fun onRestart (J)V
+	public fun onUnassign (I)V
 }
 
 public final class com/eignex/klause/solver/search/HintedBooleanBranching : com/eignex/klause/solver/search/BooleanBranching {
@@ -10694,8 +10737,8 @@ public final class com/eignex/klause/solver/search/SearchSession : com/eignex/kl
 	public final fun reasonFor (I)Lcom/eignex/klause/solver/search/SearchExplanation;
 	public final fun resetRootFacts ()V
 	public final fun restart ()Lcom/eignex/klause/solver/search/ComponentResult;
-	public final fun solve (ILcom/eignex/klause/solver/search/SearchSolveParams;Lcom/eignex/klause/solver/search/SearchCandidateHints;)Lcom/eignex/klause/solver/search/SearchResult;
-	public static synthetic fun solve$default (Lcom/eignex/klause/solver/search/SearchSession;ILcom/eignex/klause/solver/search/SearchSolveParams;Lcom/eignex/klause/solver/search/SearchCandidateHints;ILjava/lang/Object;)Lcom/eignex/klause/solver/search/SearchResult;
+	public final fun solve (ILcom/eignex/klause/solver/search/SearchSolveParams;Lcom/eignex/klause/solver/search/SearchCandidateHints;Lcom/eignex/klause/solver/search/BooleanBranching;Lcom/eignex/klause/solver/search/SearchRunObserver;)Lcom/eignex/klause/solver/search/SearchResult;
+	public static synthetic fun solve$default (Lcom/eignex/klause/solver/search/SearchSession;ILcom/eignex/klause/solver/search/SearchSolveParams;Lcom/eignex/klause/solver/search/SearchCandidateHints;Lcom/eignex/klause/solver/search/BooleanBranching;Lcom/eignex/klause/solver/search/SearchRunObserver;ILjava/lang/Object;)Lcom/eignex/klause/solver/search/SearchResult;
 	public final fun solveBoolean (I)Lcom/eignex/klause/solver/search/BooleanSearchResult;
 	public fun truth (I)Ljava/lang/Boolean;
 }
@@ -10718,6 +10761,10 @@ public final class com/eignex/klause/solver/search/SearchSolveParams {
 public abstract interface class com/eignex/klause/solver/search/SearchTheoryDecision {
 }
 
+public abstract interface class com/eignex/klause/solver/search/SearchUnassignListener {
+	public abstract fun onUnassign (I)V
+}
+
 public abstract interface class com/eignex/klause/solver/search/SearchValueKey {
 }
 
@@ -10734,6 +10781,68 @@ public final class com/eignex/klause/solver/search/TheoryComponent$DefaultImpls 
 	public static fun propagate (Lcom/eignex/klause/solver/search/TheoryComponent;Lcom/eignex/klause/solver/search/SearchContext;)Lcom/eignex/klause/solver/search/ComponentResult;
 	public static fun reasonFor (Lcom/eignex/klause/solver/search/TheoryComponent;I)Lcom/eignex/klause/solver/search/SearchExplanation;
 	public static fun retract (Lcom/eignex/klause/solver/search/TheoryComponent;I)V
+}
+
+public abstract interface class com/eignex/klause/solver/search/VarRef {
+	public abstract fun getVarId ()I
+}
+
+public final class com/eignex/klause/solver/search/VarRef$Bool : com/eignex/klause/solver/search/VarRef {
+	public fun <init> (I)V
+	public final fun component1 ()I
+	public final fun copy (I)Lcom/eignex/klause/solver/search/VarRef$Bool;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/search/VarRef$Bool;IILjava/lang/Object;)Lcom/eignex/klause/solver/search/VarRef$Bool;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun getVarId ()I
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/solver/search/VarRef$IntVar : com/eignex/klause/solver/search/VarRef {
+	public fun <init> (I)V
+	public final fun component1 ()I
+	public final fun copy (I)Lcom/eignex/klause/solver/search/VarRef$IntVar;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/search/VarRef$IntVar;IILjava/lang/Object;)Lcom/eignex/klause/solver/search/VarRef$IntVar;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun getVarId ()I
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class com/eignex/klause/solver/search/VariableBranching {
+	public abstract fun fresh ()Lcom/eignex/klause/solver/search/VariableBranching;
+	public fun getTracksUnassign ()Z
+	public fun onCommit (Lcom/eignex/klause/solver/search/VarRef;)V
+	public fun onConflict (Lcom/eignex/klause/solver/search/VarRef;)V
+	public fun onConflict (Lcom/eignex/klause/solver/search/VarRef;Lcom/eignex/klause/solver/search/BranchingConflict;)V
+	public fun onRestart ()V
+	public fun onUnassign (Lcom/eignex/klause/solver/search/VarRef;)V
+	public abstract fun pick (Ljava/lang/Object;Lkotlin/random/Random;)Lcom/eignex/klause/solver/search/VarRef;
+}
+
+public final class com/eignex/klause/solver/search/VariableBranching$DefaultImpls {
+	public static fun getTracksUnassign (Lcom/eignex/klause/solver/search/VariableBranching;)Z
+	public static fun onCommit (Lcom/eignex/klause/solver/search/VariableBranching;Lcom/eignex/klause/solver/search/VarRef;)V
+	public static fun onConflict (Lcom/eignex/klause/solver/search/VariableBranching;Lcom/eignex/klause/solver/search/VarRef;)V
+	public static fun onConflict (Lcom/eignex/klause/solver/search/VariableBranching;Lcom/eignex/klause/solver/search/VarRef;Lcom/eignex/klause/solver/search/BranchingConflict;)V
+	public static fun onRestart (Lcom/eignex/klause/solver/search/VariableBranching;)V
+	public static fun onUnassign (Lcom/eignex/klause/solver/search/VariableBranching;Lcom/eignex/klause/solver/search/VarRef;)V
+}
+
+public final class com/eignex/klause/solver/search/Vsids : com/eignex/klause/solver/search/VariableBranching {
+	public fun <init> ()V
+	public fun <init> (DD)V
+	public synthetic fun <init> (DDILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun fresh ()Lcom/eignex/klause/solver/search/VariableBranching;
+	public fun fresh ()Lcom/eignex/klause/solver/search/Vsids;
+	public fun getTracksUnassign ()Z
+	public fun onCommit (Lcom/eignex/klause/solver/search/VarRef;)V
+	public fun onConflict (Lcom/eignex/klause/solver/search/VarRef;)V
+	public fun onConflict (Lcom/eignex/klause/solver/search/VarRef;Lcom/eignex/klause/solver/search/BranchingConflict;)V
+	public fun onRestart ()V
+	public fun onUnassign (Lcom/eignex/klause/solver/search/VarRef;)V
+	public fun pick (Lcom/eignex/klause/solver/search/BranchingState;Lkotlin/random/Random;)Lcom/eignex/klause/solver/search/VarRef;
+	public synthetic fun pick (Ljava/lang/Object;Lkotlin/random/Random;)Lcom/eignex/klause/solver/search/VarRef;
 }
 
 public abstract interface class com/eignex/klause/theory/Theory {
