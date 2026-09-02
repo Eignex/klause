@@ -29,7 +29,8 @@ import kotlin.random.Random
  * the relaxation is surest about propagate first and steer the rest. And when a rounding conflicts the
  * other side of the LP value is tried before giving up, recovering assignments a one-shot round drops.
  * Every variable still ends pinned to a single value, so a returned snapshot is a complete feasible
- * point (the caller does not re-check feasibility); a variable that conflicts both ways yields null.
+ * point, which the caller re-derives from the composed model before it may stand; a variable that
+ * conflicts both ways yields null.
  */
 internal fun LpEngine.lpRoundingProbe(objective: LinearObjective, cancellation: Cancellation): Sample? {
     val session = PropagationSession(problem)
