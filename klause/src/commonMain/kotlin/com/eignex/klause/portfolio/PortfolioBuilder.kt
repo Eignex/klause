@@ -2,6 +2,7 @@ package com.eignex.klause.portfolio
 
 import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.propagation.BakedProblem
+import com.eignex.klause.solver.incumbent.IncumbentExchange
 import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.SearchEvent
@@ -153,7 +154,7 @@ object PortfolioBuilder {
             cuts,
             SharedObjectiveBound(concurrency.lock()),
             SharedVarBounds(problem.numIntVars, concurrency.lock()),
-            SharedSolutionPool(lock = concurrency.lock()),
+            IncumbentExchange.minimizing(),
         )
     }
 }

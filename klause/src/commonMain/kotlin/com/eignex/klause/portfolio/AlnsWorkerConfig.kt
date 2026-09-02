@@ -80,8 +80,8 @@ internal class AlnsWorkerConfig(val profile: AlnsProfile = AlnsProfile.Default, 
             ),
             minDestroyFraction = profile.minDestroyFraction,
             maxDestroyFraction = profile.maxDestroyFraction,
-            improvedSolutionSink = solutions?.let { it::publish },
-            pooledSolutionSupplier = solutions?.let { it::best },
+            improvedSolutionSink = solutions?.let { sols -> { sample, objective -> sols.offer(sample, objective) } },
+            pooledIncumbents = solutions,
             acceptanceFor = acceptanceFactory(),
         )
         val params = LocalSearchParams(

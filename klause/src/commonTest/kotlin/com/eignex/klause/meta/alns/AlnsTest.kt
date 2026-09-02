@@ -16,6 +16,8 @@ import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.Optimizer
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.incumbent.IncumbentExchange
+import com.eignex.klause.solver.incumbent.IncumbentSource
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.TerminationReason
@@ -185,20 +187,21 @@ class AlnsTest {
         val objective = LinearObjective(boolWeights = longArrayOf(10L, 5L, 8L, 3L))
         var polls = 0
         val optimal = Sample(booleanArrayOf(false, false, false, true), LongArray(0))
+        val exchange = IncumbentExchange.minimizing<Sample>().apply { offer(optimal, objective.evaluate(optimal)) }
         val alns = Alns(
             inner = LocalSearchSolver(problem.bake()),
             minDestroyFraction = 0.5,
             maxDestroyFraction = 0.5,
             maxIterations = 8,
             acceptance = AcceptanceCriterion.BetterOrEqual,
-            pooledSolutionSupplier = {
+            pooledIncumbents = IncumbentSource {
                 polls++
-                optimal
+                exchange.current()
             },
         )
         val sample = alns.minimize(objective, LocalSearchParams(maxFlips = 200L, randomSeed = 1L)).assignment
         assertNotNull(sample)
-        assertTrue(polls > 0, "the pool must be consulted each iteration")
+        assertTrue(polls > 0, "the exchange must be consulted each iteration")
         assertEquals(3.0, objective.evaluate(sample), "the pooled optimum is adopted as the incumbent")
     }
 

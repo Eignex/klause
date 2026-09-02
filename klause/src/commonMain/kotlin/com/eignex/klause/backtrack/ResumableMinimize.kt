@@ -27,6 +27,7 @@ import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.baked
 import com.eignex.klause.solver.ResumableSearch
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.incumbent.IncumbentSubscription
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SearchEvent
@@ -206,7 +207,7 @@ internal class ResumableMinimize(
     private var rootIsExhausted = false
     private var firstRun = true
     private val inprocessing = Inprocessing.from(params)
-    private var lastPooledSolution: Sample? = null
+    private val pooledIncumbents = params.pooledIncumbents?.let { IncumbentSubscription(it) }
     private val traversal = OptimizationTraversalPolicy()
 
     // Built lazily so it binds the engine's session (created inside the engine's constructor). Its first
@@ -786,10 +787,7 @@ internal class ResumableMinimize(
             boundExchange.importGlobalVarBounds()
             forgetIfOverCap(session, params)
             inprocessing?.onRestart(session, params)
-            params.pooledSolutionSupplier?.invoke()?.takeIf { it !== lastPooledSolution }?.let { pooled ->
-                lastPooledSolution = pooled
-                brancher.importPooledSolution(pooled)
-            }
+            pooledIncumbents?.poll()?.let { brancher.importPooledSolution(it.assignment) }
             return SearchRunDisposition.Continue
         }
 

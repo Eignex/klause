@@ -2,6 +2,7 @@ package com.eignex.klause.portfolio
 
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
+import com.eignex.klause.solver.incumbent.VerifiedIncumbent
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
@@ -10,8 +11,8 @@ import com.eignex.klause.solver.result.TerminationReason
  * Pure result reductions shared by both [PortfolioExecutor] implementations — the parallel
  * `Portfolio` (jvm+native) and the single-core [SequentialPortfolio]. These are the parts of the
  * verdict/terminal/stats logic that are identical across the two executors regardless of how each
- * one gathers its workers' results (concurrent CAS incumbent vs bandit-scheduled locals). Keeping
- * them here means a change to, say, the four-way optimisation terminal shape lands in one place.
+ * one gathers its workers' results (raced threads vs bandit-scheduled segments). Keeping them here
+ * means a change to, say, the four-way optimisation terminal shape lands in one place.
  */
 internal object PortfolioReduction {
 
@@ -47,20 +48,26 @@ internal object PortfolioReduction {
     }
 
     /**
-     * The four-way optimisation terminal: given the shared incumbent ([sample] / [bound]) and
-     * whether the run stopped [dirty] (timed out or cancelled before proving the space covered,
-     * i.e. any worker not [isExhausted]), classify the outcome. Clean exhaustion with an incumbent
-     * is Optimal; clean without one is Infeasible; a dirty stop keeps the incumbent as BestFound or,
-     * with none, reports Unknown.
+     * The four-way optimisation terminal: given the run's verified [incumbent] (null when none was ever
+     * installed) and whether the run stopped [dirty] (timed out or cancelled before proving the space
+     * covered, i.e. any worker not [isExhausted]), classify the outcome. Clean exhaustion with an incumbent
+     * is Optimal; clean without one is Infeasible; a dirty stop keeps the incumbent as BestFound or, with
+     * none, reports Unknown. Taking one snapshot rather than a (sample, bound) pair is what keeps a reported
+     * bound from belonging to a different assignment than the sample reported beside it.
      */
-    fun terminal(sample: Sample?, bound: Double, dirty: Boolean, stats: SolveStats): MinimizeResult = when {
-        sample != null && dirty ->
-            MinimizeResult.BestFound(sample, bound, TerminationReason.BudgetExhausted, stats)
+    fun terminal(incumbent: VerifiedIncumbent<Sample, Double>?, dirty: Boolean, stats: SolveStats): MinimizeResult =
+        when {
+            incumbent != null && dirty -> MinimizeResult.BestFound(
+                incumbent.assignment,
+                incumbent.objective,
+                TerminationReason.BudgetExhausted,
+                stats,
+            )
 
-        sample != null -> MinimizeResult.Optimal(sample, bound, stats)
+            incumbent != null -> MinimizeResult.Optimal(incumbent.assignment, incumbent.objective, stats)
 
-        dirty -> MinimizeResult.Unknown(TerminationReason.BudgetExhausted, stats)
+            dirty -> MinimizeResult.Unknown(TerminationReason.BudgetExhausted, stats)
 
-        else -> MinimizeResult.Infeasible(stats = stats)
-    }
+            else -> MinimizeResult.Infeasible(stats = stats)
+        }
 }

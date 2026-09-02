@@ -3,6 +3,9 @@ package com.eignex.klause.portfolio
 import com.eignex.klause.solver.ResumableSearch
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
+import com.eignex.klause.solver.incumbent.IncumbentExchange
+import com.eignex.klause.solver.incumbent.Publication
+import com.eignex.klause.solver.incumbent.bound
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
@@ -186,8 +189,9 @@ class SequentialPortfolio(
         cancellation: Cancellation,
         onImprovement: ((AttributedImprovement) -> Unit)?,
     ): MinimizeResult {
-        var bound = Double.POSITIVE_INFINITY
-        var best: Sample? = null
+        // The same verified-incumbent exchange the parallel executor folds into; here there is one writer,
+        // so the strict-improvement gate is all that is being reused, not the concurrency.
+        val incumbent = IncumbentExchange.minimizing<Sample>()
         var rewardScale = 0.0
         var slice = baseSliceMillis
         var sliceNodes = baseSliceNodes
@@ -200,7 +204,7 @@ class SequentialPortfolio(
         // The arm identity of the active segment, tracked alongside [armLabel] for attribution. The
         // sequential track never replicates, so armId == the worker's position here — nothing pools.
         var armId = workers.first().armId
-        val readBound = { bound }
+        val readBound = { incumbent.bound() }
         // One resumable handle per backtrack arm, opened lazily on the arm's first segment and resumed
         // on every later one. LS arms stay null and run a fresh warm-started slice each time.
         val handles = arrayOfNulls<ResumableSearch>(workers.size)
@@ -215,9 +219,7 @@ class SequentialPortfolio(
         // Fold a strictly-improving incumbent into the shared bound + fire the telemetry callback,
         // attributing it to the arm of the active segment ([armLabel]).
         fun accept(r: MinimizeResult.WithSample) {
-            if (r.objectiveValue < bound) {
-                bound = r.objectiveValue
-                best = r.sample
+            if (incumbent.offer(r.sample, r.objectiveValue) is Publication.Installed) {
                 onImprovement?.invoke(AttributedImprovement(armLabel, armId, start.elapsedNow(), r))
             }
         }
@@ -228,8 +230,8 @@ class SequentialPortfolio(
             val warming = segment < workers.size
             val arm = if (warming) segment else bandit.choose()
             val sliceMs = if (warming) warmupSliceMillis else slice
-            val hadIncumbent = best != null
-            val before = bound
+            val hadIncumbent = incumbent.current() != null
+            val before = readBound()
             val worker = workers[arm]
             armLabel = worker.label
             armId = worker.armId
@@ -250,7 +252,7 @@ class SequentialPortfolio(
                     for (r in worker.improvements(
                         readBound,
                         armToken,
-                        warmStart = best,
+                        warmStart = incumbent.current()?.assignment,
                         maxInstructions = sliceFlips,
                     )) {
                         terminal = r
@@ -264,9 +266,9 @@ class SequentialPortfolio(
                 terminal?.let { perArm[arm] = (perArm[arm] ?: SolveStats.EMPTY).mergedWith(it.stats) }
             }
 
-            val improvement = before - bound
+            val improvement = before - readBound()
             val reward = if (!hadIncumbent) {
-                if (best != null) 1.0 else 0.0
+                if (incumbent.current() != null) 1.0 else 0.0
             } else {
                 if (improvement > rewardScale) rewardScale = improvement
                 if (rewardScale > 0.0) (improvement / rewardScale).coerceIn(0.0, 1.0) else 0.0
@@ -279,7 +281,7 @@ class SequentialPortfolio(
             // Guards keep it from disrupting productive search: only once an incumbent exists (the
             // feasibility hunt is never reset), and never on a segment that already returned a terminal
             // verdict (a completed optimality / infeasibility proof short-circuits to the return below).
-            if (handle != null && terminal == null && best != null) {
+            if (handle != null && terminal == null && incumbent.current() != null) {
                 if (improvement > 0.0) {
                     staleSegments[arm] = 0
                 } else if (reseedStaleThreshold > 0 && ++staleSegments[arm] >= reseedStaleThreshold) {
@@ -291,7 +293,7 @@ class SequentialPortfolio(
 
             // A clean segment exhaustion ends the run: any incumbent is optimal, else infeasible.
             if (PortfolioReduction.isExhausted(terminal)) {
-                return PortfolioReduction.terminal(best, bound, dirty = false, foldArms(perArm))
+                return PortfolioReduction.terminal(incumbent.current(), dirty = false, foldArms(perArm))
             }
             if (!warming) {
                 slice = grow(slice, maxSliceMillis)
@@ -301,7 +303,7 @@ class SequentialPortfolio(
             segment++
         }
         // Cancellation stopped a still-open search: keep the incumbent (BestFound) or report Unknown.
-        return PortfolioReduction.terminal(best, bound, dirty = true, foldArms(perArm))
+        return PortfolioReduction.terminal(incumbent.current(), dirty = true, foldArms(perArm))
     }
 
     /** The pool's total counters: every arm that did work, whether or not it reached a verdict. */
