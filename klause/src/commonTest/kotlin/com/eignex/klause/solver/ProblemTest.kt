@@ -6,7 +6,6 @@ import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntBounds
-import com.eignex.klause.ir.IntColumn
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
@@ -145,15 +144,55 @@ class ProblemTest {
         assertEquals(FactorOwner.CP, plan.factorOwner(0))
         assertEquals(FactorOwner.THEORY, plan.factorOwner(1))
         assertEquals(ProblemPipeline.DIFFERENCE_THEORY, plan.theoryPipeline)
-        assertEquals(
-            IntColumn.Bounded(lower = 0, upper = null),
-            spec.intColumns.column(1),
-            "a theory column carries the source bounds, open side included",
-        )
+        assertEquals(0L, spec.intBounds.lower(1))
+        assertFalse(spec.intBounds.hasUpper(1), "a theory column keeps its open side rather than a domain")
         assertEquals(2, cp.problem.numIntVars)
         assertEquals(0, cp.cpId(0))
         assertEquals(-1, cp.cpId(1))
         assertEquals(0, cp.sourceId(0))
+    }
+
+    @Test
+    fun `a source rewrite keeps a non-contiguous declaration`() {
+        val holey = IntDomain(0, 6).excludeValue(3)
+        val spec = Problem(
+            numBoolVars = 0,
+            numIntVars = 1,
+            intDomains = arrayOf(holey),
+            factors = arrayOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 5)),
+        )
+
+        val rewritten = spec.withFactors(emptyArray())
+
+        assertEquals(holey, rewritten.intDomainOrNull(0), "a rewrite states which rows it keeps, not which values")
+        assertEquals(0, rewritten.numFactors)
+    }
+
+    @Test
+    fun `a mixed plan hands the theory a fragment that keeps every declared value set`() {
+        // A CP column excluding an interior value, alongside a column left open above: the fragment is
+        // rebuilt from the source, and endpoints alone cannot say that 1 is absent from column 0.
+        val holey = IntDomain(0, 3).excludeValue(1)
+        val spec = Problem(
+            numBoolVars = 0,
+            numIntVars = 3,
+            intDomains = arrayOf(holey, IntDomain(0, 1L shl 40), holey),
+            factors = arrayOf(
+                AllDifferent(intArrayOf(0, 2), domainMin = 0, domainSize = 4),
+                Linear(intArrayOf(1), intArrayOf(1), LinearOp.LE, 4),
+            ),
+            openIntHi = booleanArrayOf(false, true, false),
+        )
+
+        val plan = spec.componentPlan()
+        val fragment = plan.theoryFragment(spec)
+
+        assertEquals(IntVariableOwner.CP, plan.intOwner(0))
+        assertEquals(IntVariableOwner.THEORY, plan.intOwner(1))
+        assertEquals(ProblemPipeline.DIFFERENCE_THEORY, plan.theoryPipeline)
+        assertEquals(holey, fragment.intDomainOrNull(0))
+        assertFalse(fragment.intBounds.hasUpper(1), "the fragment keeps the open side the theory reasons over")
+        assertEquals(1, fragment.numFactors)
     }
 
     @Test

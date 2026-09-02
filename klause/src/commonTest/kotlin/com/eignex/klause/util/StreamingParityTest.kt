@@ -10,7 +10,7 @@ import com.eignex.klause.formats.opb.toProblem
 import com.eignex.klause.formats.smtlib.SmtLib
 import com.eignex.klause.formats.xcsp3.Xcsp3
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.propagation.bakeFiniteBounds
+import com.eignex.klause.propagation.bake
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -56,7 +56,7 @@ class StreamingParityTest {
              UP BND       y              4.0
             ENDATA
         """.trimIndent() + "\n"
-        assertParity("mps", mps) { Mps.parse(it).toProblem().model.bakeFiniteBounds() }
+        assertParity("mps", mps) { Mps.parse(it).toProblem().model.bake() }
     }
 
     @Test

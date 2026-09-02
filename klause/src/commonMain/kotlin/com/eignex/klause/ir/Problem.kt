@@ -8,8 +8,11 @@ import com.eignex.klause.util.EmptyDoubleArray
  *  - Boolean vars: ids `[0, numBoolVars)`, packed bits in [com.eignex.klause.solver.Assignment].
  *  - Integer vars: ids `[0, numIntVars)`, raw [Int] values in [com.eignex.klause.solver.Assignment].
  *
- * An integer variable may have an `IntDomain` for finite CP search, or be symbolic and owned by a
- * theory component. Factors mention either or both.
+ * An integer variable declares the values it may take — a range, possibly with an explicit value set
+ * inside it ([declaredIntDomains]). Which engine owns the column is not part of the model:
+ * [com.eignex.klause.solver.pipeline.ComponentPlan] selects that once per solve, and the finite,
+ * root-propagated domains a finite engine branches on live on [com.eignex.klause.propagation.BakedProblem].
+ * Factors mention Boolean, integer, and real variables in any mix.
  * Occurrence lists are split per kind so `flip(boolVar)` and `setInt(intVar)` only walk the
  * factors mentioning that specific variable.
  *
@@ -21,8 +24,8 @@ open class Problem(
     val numBoolVars: Int,
     /** Number of integer variables; ids occupy `[0, numIntVars)`. */
     val numIntVars: Int,
-    /** Typed integer-column capabilities selected by the component plan. */
-    val intColumns: IntColumns,
+    /** Values the model declares for each integer column. */
+    val declaredIntDomains: SourceIntDomains,
     /** The constraints over the variables. */
     val factors: Array<Factor>,
     /**
@@ -45,8 +48,8 @@ open class Problem(
     /**
      * Number of LP-only continuous (real) variables; ids occupy `[0, numRealVars)` in a namespace
      * separate from the integer and Boolean ones. A real variable is present in the LP relaxation as a
-     * continuous column but absent from CP search — it has no [requireFiniteIntDomains] entry, no trail, and is never
-     * branched. The simplex resolves it at nodes and leaves (the LP-only-columns hybrid engine).
+     * continuous column but absent from CP search — it has no declared integer domain, no trail, and is
+     * never branched. The simplex resolves it at nodes and leaves (the LP-only-columns hybrid engine).
      * Zero for the pure integer/Boolean core, which every existing consumer builds.
      */
     val numRealVars: Int = 0,
@@ -54,76 +57,46 @@ open class Problem(
     val realLower: DoubleArray = EmptyDoubleArray,
     /** Upper bound of each real variable (length [numRealVars]); `Double.POSITIVE_INFINITY` for open. */
     val realUpper: DoubleArray = EmptyDoubleArray,
-    /**
-     * Integer variables whose declared domain is genuinely open on the low side, indexed by int var id;
-     * `null` (the common case) means every domain is a real declared bound.
-     *
-     * A finite-search backend may close an otherwise open source side. The resulting finite endpoint is
-     * an artefact, not a model constraint; this records its provenance so model-level consumers continue
-     * to reason over the true open range rather than the materialized domain.
-     */
-    openIntLo: BooleanArray? = null,
-    /** Integer variables genuinely open on the high side; see [openIntLo]. */
-    openIntHi: BooleanArray? = null,
-    /** Packed open lower sides retained across internal problem rebuilds. */
-    packedOpenIntLo: Bits? = null,
-    /** Packed open upper sides retained across internal problem rebuilds. */
-    packedOpenIntHi: Bits? = null,
-    /** Source-model bounds, when this finite problem was materialized from a [Problem]. */
-    modelBounds: IntBounds? = null,
 ) {
-    /** Finite CP domain capability of [v], or `null` when a theory owns the column. */
-    fun intDomainOrNull(v: Int): IntDomain? = intColumns.domainOrNull(v)
+    /**
+     * Model-level bounds of the integer columns. Either side may be absent when a finite search domain
+     * was closed by an invented fallback bound. Consumers that reason over the model rather than
+     * enumerate its values must read this state, or explicitly decline open columns, instead of treating
+     * the fallback endpoint as a constraint.
+     */
+    val intBounds: IntBounds get() = declaredIntDomains.bounds
 
-    /** True when every integer column can be handed to the finite CP engine. */
-    val hasFiniteIntDomains: Boolean get() = intColumns.allFiniteOrNull() != null
+    /** Value set declared for [v], or `null` when the model admits its whole [intBounds] range. */
+    fun intDomainOrNull(v: Int): IntDomain? = declaredIntDomains.declaredOrNull(v)
 
-    /** Return all finite CP domains, rejecting a problem that contains symbolic theory columns. */
-    fun requireFiniteIntDomains(): Array<IntDomain> = requireNotNull(intColumns.allFiniteOrNull()) {
-        "finite CP state requested for a problem with symbolic integer columns"
+    /**
+     * True when the model declares an explicit value set for every integer column.
+     *
+     * A compatibility bridge for the finite consumers that still read their domains off a raw [Problem];
+     * see [requireFiniteIntDomains].
+     */
+    val hasFiniteIntDomains: Boolean get() = declaredIntDomains.allDeclaredOrNull() != null
+
+    /**
+     * Every declared value set, rejecting a model that states bounds alone.
+     *
+     * A compatibility bridge, not the finite boundary: the finite, root-propagated domains belong to
+     * [com.eignex.klause.propagation.BakedProblem], which states them in its own type. Consumers still
+     * reading them off a raw [Problem] go through here until they take a `BakedProblem` parameter.
+     */
+    fun requireFiniteIntDomains(): Array<IntDomain> = requireNotNull(declaredIntDomains.allDeclaredOrNull()) {
+        "finite CP state requested for a problem that declares integer bounds alone"
     }
 
-    /** Finite declared domain of [v], materialized from model bounds when no CP domain exists yet. */
-    internal fun finiteIntDomain(v: Int): IntDomain = intDomainOrNull(v) ?: run {
-        require(intBounds.hasLower(v) && intBounds.hasUpper(v)) {
-            "integer column $v has an open side and cannot enter finite preparation"
-        }
-        IntDomain(intBounds.lower(v), intBounds.upper(v))
-    }
+    /** Finite declared domain of [v], materialized from model bounds when no value set is declared. */
+    internal fun finiteIntDomain(v: Int): IntDomain = declaredIntDomains.finiteDomain(v)
 
     /** Finite declared domains without running root propagation. */
-    internal fun finiteIntDomains(): Array<IntDomain> =
-        intColumns.allFiniteOrNull()?.copyOf() ?: Array(numIntVars, ::finiteIntDomain)
-
-    /**
-     * Model-level bounds of the integer columns. Unlike [requireFiniteIntDomains], either side may be absent when
-     * the finite search domain was closed by an invented fallback bound. Consumers that reason over
-     * the model rather than enumerate its values must read this state, or explicitly decline open
-     * columns, instead of treating the fallback endpoint as a constraint.
-     */
-    val intBounds: IntBounds = modelBounds ?: run {
-        require(hasFiniteIntDomains) { "symbolic integer columns require source model bounds" }
-        requireFiniteIntDomains().let { domains ->
-            IntBounds.fromFiniteBounds(
-                lowerBounds = LongArray(numIntVars) { domains[it].min },
-                upperBounds = LongArray(numIntVars) { domains[it].max },
-                openLo = openIntLo,
-                openHi = openIntHi,
-                packedOpenLo = packedOpenIntLo,
-                packedOpenHi = packedOpenIntHi,
-            )
-        }
-    }
+    internal fun finiteIntDomains(): Array<IntDomain> = declaredIntDomains.finiteDomains()
 
     init {
-        require(intColumns.size == numIntVars) {
-            "integer column count ${intColumns.size} != numIntVars $numIntVars"
-        }
-        require(openIntLo == null || openIntLo.size == numIntVars) {
-            "openIntLo size ${openIntLo?.size} != numIntVars $numIntVars"
-        }
-        require(openIntHi == null || openIntHi.size == numIntVars) {
-            "openIntHi size ${openIntHi?.size} != numIntVars $numIntVars"
+        require(declaredIntDomains.size == numIntVars) {
+            "integer column count ${declaredIntDomains.size} != numIntVars $numIntVars"
         }
         require(impliedFactorMask == null || impliedFactorMask.size == factors.size) {
             "impliedFactorMask size ${impliedFactorMask?.size} != factors size ${factors.size}"
@@ -153,8 +126,8 @@ open class Problem(
     /**
      * Build a canonical source model from its declared integer bounds.
      *
-     * Every integer column stays symbolic until a [com.eignex.klause.solver.pipeline.ComponentPlan]
-     * assigns ownership. Finite engines receive a separate materialized or baked projection.
+     * The columns admit their whole range: a model that also excludes interior values states them, and
+     * reaches this class through [declaredIntDomains] or the value-set constructors instead.
      */
     constructor(
         numBoolVars: Int,
@@ -168,27 +141,21 @@ open class Problem(
     ) : this(
         numBoolVars = numBoolVars,
         numIntVars = intBounds.size,
-        intColumns = MixedIntColumns(
-            Array(intBounds.size) { variable ->
-                IntColumn.Bounded(
-                    lower = if (intBounds.hasLower(variable)) intBounds.lower(variable) else null,
-                    upper = if (intBounds.hasUpper(variable)) intBounds.upper(variable) else null,
-                )
-            },
-        ),
+        declaredIntDomains = SourceIntDomains.ofBounds(intBounds),
         factors = factors,
         impliedFactorMask = impliedFactorMask,
         hasSymmetryBreaking = hasSymmetryBreaking,
         numRealVars = numRealVars,
         realLower = realLower,
         realUpper = realUpper,
-        modelBounds = intBounds,
     )
 
     /**
-     * Convenience overload taking factors as a [List]. Internally stored as an [Array] for
-     * tighter hot-loop iteration; callers building a [MutableList] and then constructing the
-     * problem can use this overload without converting first.
+     * Build a source model whose integer columns declare explicit value sets.
+     *
+     * [openIntLo] / [openIntHi] (or their packed forms) mark the sides of [intDomains] whose endpoint was
+     * invented to close a genuinely open declaration, so model-level consumers keep reasoning over the
+     * true open range. [modelBounds] supplies those bounds directly when a rebuild retains them.
      */
     constructor(
         numBoolVars: Int,
@@ -208,20 +175,27 @@ open class Problem(
     ) : this(
         numBoolVars = numBoolVars,
         numIntVars = numIntVars,
-        intColumns = FiniteIntColumns(intDomains),
+        declaredIntDomains = SourceIntDomains.ofDomains(
+            domains = intDomains,
+            openLo = openIntLo,
+            openHi = openIntHi,
+            packedOpenLo = packedOpenIntLo,
+            packedOpenHi = packedOpenIntHi,
+            modelBounds = modelBounds,
+        ),
         factors = factors,
         impliedFactorMask = impliedFactorMask,
         hasSymmetryBreaking = hasSymmetryBreaking,
         numRealVars = numRealVars,
         realLower = realLower,
         realUpper = realUpper,
-        openIntLo = openIntLo,
-        openIntHi = openIntHi,
-        packedOpenIntLo = packedOpenIntLo,
-        packedOpenIntHi = packedOpenIntHi,
-        modelBounds = modelBounds,
     )
 
+    /**
+     * Convenience overload taking factors as a [List]. Internally stored as an [Array] for
+     * tighter hot-loop iteration; callers building a [MutableList] and then constructing the
+     * problem can use this overload without converting first.
+     */
     constructor(
         numBoolVars: Int,
         numIntVars: Int,
@@ -240,7 +214,7 @@ open class Problem(
     ) : this(
         numBoolVars = numBoolVars,
         numIntVars = numIntVars,
-        intColumns = FiniteIntColumns(intDomains),
+        intDomains = intDomains,
         factors = Array(factors.size) { factors[it] },
         impliedFactorMask = impliedFactorMask,
         hasSymmetryBreaking = hasSymmetryBreaking,
@@ -255,19 +229,15 @@ open class Problem(
     )
 
     /**
-     * A copy with the integer domains replaced — used when deferred bounding tightens the
-     * open sides after parsing, before the problem flows into presolve. Every other structure (factors,
-     * real bounds, implied/symmetry flags) is shared. The result is a raw `Problem` whose root bake is
-     * still deferred.
+     * A copy declaring [newDomains] — used when deferred bounding narrows a wide column after parsing,
+     * before the problem flows into presolve. Every other structure (factors, real bounds,
+     * implied/symmetry flags) is shared. The result is a raw `Problem` whose root bake is still deferred.
      *
-     * [newOpenLo] / [newOpenHi] record which sides of [newDomains] the bounding invented rather than
-     * derived, so the LP relaxation can keep those columns open; `null` leaves the existing marks.
+     * [intBounds] is carried through rather than re-read off [newDomains]: an endpoint bounding invented
+     * to narrow a column is an artefact of the finite lane, so the model-level range stays what the
+     * source declared and the LP relaxation keeps reasoning over it.
      */
-    fun withIntDomains(
-        newDomains: Array<IntDomain>,
-        newOpenLo: BooleanArray? = null,
-        newOpenHi: BooleanArray? = null,
-    ): Problem = Problem(
+    fun withIntDomains(newDomains: Array<IntDomain>): Problem = Problem(
         numBoolVars = numBoolVars,
         numIntVars = numIntVars,
         intDomains = newDomains,
@@ -277,11 +247,29 @@ open class Problem(
         numRealVars = numRealVars,
         realLower = realLower,
         realUpper = realUpper,
-        openIntLo = newOpenLo,
-        openIntHi = newOpenHi,
-        packedOpenIntLo = if (newOpenLo == null) intBounds.openLowerBits else null,
-        packedOpenIntHi = if (newOpenHi == null) intBounds.openUpperBits else null,
         modelBounds = intBounds,
+    )
+
+    /**
+     * This model over [newFactors], carrying its declared columns through unchanged.
+     *
+     * The one spelling for a source rewrite that keeps the columns and changes the rows. Rebuilding from
+     * [intBounds] instead widens a column that declares a value set into its hull, which is a different
+     * model; a rewrite states which rows it keeps, not which values.
+     *
+     * [newImpliedFactorMask] is indexed by [newFactors], so a rewrite that reorders or drops rows states
+     * the mask it kept; `null` marks no row implied.
+     */
+    fun withFactors(newFactors: Array<Factor>, newImpliedFactorMask: BooleanArray? = null): Problem = Problem(
+        numBoolVars = numBoolVars,
+        numIntVars = numIntVars,
+        declaredIntDomains = declaredIntDomains,
+        factors = newFactors,
+        impliedFactorMask = newImpliedFactorMask,
+        hasSymmetryBreaking = hasSymmetryBreaking,
+        numRealVars = numRealVars,
+        realLower = realLower,
+        realUpper = realUpper,
     )
 
     /** Total number of factors. */

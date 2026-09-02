@@ -8,10 +8,11 @@ finite-CP bounding integration.
 `simplex.exact` contains exact rational simplex primitives. `theory` contains complete open-model
 decision routes, and `solver.pipeline` chooses one before a frontend enters the finite CP path.
 
-`Problem.componentPlan()` chooses one immutable ownership plan before search. `Problem` stores typed
-integer columns: `FiniteIntColumns` carry CP domains and `IntColumn.Bounded` remains theory-owned. The
-plan builds a compact remapped CP projection plus a theory fragment, so no theory variable is materialized
-as a CP domain.
+`Problem.componentPlan()` chooses one immutable ownership plan before search. `Problem` stores what its
+integer columns declare — a range, plus the value set of a column that admits less than its range
+(`SourceIntDomains`) — and says nothing about who owns them; finite search domains belong to
+`BakedProblem`. The plan builds a compact remapped CP projection plus a theory fragment, so no theory
+variable is materialized as a CP domain.
 
 `solver.search` owns the shared component contract, decision levels, branch traversal, retraction,
 clause-form learning, complete checks, restart lifecycle, decision budgets, and model assembly. A component may choose private residual state

@@ -2798,14 +2798,6 @@ public final class com/eignex/klause/ir/FactorReduction$Unchanged : com/eignex/k
 	public static final field INSTANCE Lcom/eignex/klause/ir/FactorReduction$Unchanged;
 }
 
-public final class com/eignex/klause/ir/FiniteIntColumns : com/eignex/klause/ir/IntColumns {
-	public fun <init> ([Lcom/eignex/klause/ir/IntDomain;Z)V
-	public synthetic fun <init> ([Lcom/eignex/klause/ir/IntDomain;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public fun allFiniteOrNull ()[Lcom/eignex/klause/ir/IntDomain;
-	public fun column (I)Lcom/eignex/klause/ir/IntColumn;
-	public fun getSize ()I
-}
-
 public final class com/eignex/klause/ir/IntBounds {
 	public static final field Companion Lcom/eignex/klause/ir/IntBounds$Companion;
 	public final fun getSize ()I
@@ -2820,40 +2812,6 @@ public final class com/eignex/klause/ir/IntBounds {
 }
 
 public final class com/eignex/klause/ir/IntBounds$Companion {
-}
-
-public abstract interface class com/eignex/klause/ir/IntColumn {
-}
-
-public final class com/eignex/klause/ir/IntColumn$Bounded : com/eignex/klause/ir/IntColumn {
-	public fun <init> (Ljava/lang/Long;Ljava/lang/Long;)V
-	public final fun component1 ()Ljava/lang/Long;
-	public final fun component2 ()Ljava/lang/Long;
-	public final fun copy (Ljava/lang/Long;Ljava/lang/Long;)Lcom/eignex/klause/ir/IntColumn$Bounded;
-	public static synthetic fun copy$default (Lcom/eignex/klause/ir/IntColumn$Bounded;Ljava/lang/Long;Ljava/lang/Long;ILjava/lang/Object;)Lcom/eignex/klause/ir/IntColumn$Bounded;
-	public fun equals (Ljava/lang/Object;)Z
-	public final fun getLower ()Ljava/lang/Long;
-	public final fun getUpper ()Ljava/lang/Long;
-	public fun hashCode ()I
-	public fun toString ()Ljava/lang/String;
-}
-
-public final class com/eignex/klause/ir/IntColumn$Finite : com/eignex/klause/ir/IntColumn {
-	public fun <init> (Lcom/eignex/klause/ir/IntDomain;)V
-	public final fun component1 ()Lcom/eignex/klause/ir/IntDomain;
-	public final fun copy (Lcom/eignex/klause/ir/IntDomain;)Lcom/eignex/klause/ir/IntColumn$Finite;
-	public static synthetic fun copy$default (Lcom/eignex/klause/ir/IntColumn$Finite;Lcom/eignex/klause/ir/IntDomain;ILjava/lang/Object;)Lcom/eignex/klause/ir/IntColumn$Finite;
-	public fun equals (Ljava/lang/Object;)Z
-	public final fun getDomain ()Lcom/eignex/klause/ir/IntDomain;
-	public fun hashCode ()I
-	public fun toString ()Ljava/lang/String;
-}
-
-public abstract class com/eignex/klause/ir/IntColumns {
-	public abstract fun allFiniteOrNull ()[Lcom/eignex/klause/ir/IntDomain;
-	public abstract fun column (I)Lcom/eignex/klause/ir/IntColumn;
-	public final fun domainOrNull (I)Lcom/eignex/klause/ir/IntDomain;
-	public abstract fun getSize ()I
 }
 
 public abstract interface class com/eignex/klause/ir/IntConsumer {
@@ -2974,13 +2932,6 @@ public final class com/eignex/klause/ir/Lit {
 	public final fun variable (I)I
 }
 
-public final class com/eignex/klause/ir/MixedIntColumns : com/eignex/klause/ir/IntColumns {
-	public fun <init> ([Lcom/eignex/klause/ir/IntColumn;)V
-	public fun allFiniteOrNull ()[Lcom/eignex/klause/ir/IntDomain;
-	public fun column (I)Lcom/eignex/klause/ir/IntColumn;
-	public fun getSize ()I
-}
-
 public final class com/eignex/klause/ir/MixedVars : com/eignex/klause/ir/VarList {
 	public fun <init> ()V
 	public fun <init> ([I[I[I[I)V
@@ -3011,20 +2962,20 @@ public final class com/eignex/klause/ir/ObjectiveSense : java/lang/Enum {
 }
 
 public class com/eignex/klause/ir/Problem {
-	public fun <init> (IILcom/eignex/klause/ir/IntColumns;[Lcom/eignex/klause/ir/Factor;[ZZI[D[D[Z[ZLcom/eignex/klause/util/Bits;Lcom/eignex/klause/util/Bits;Lcom/eignex/klause/ir/IntBounds;)V
-	public synthetic fun <init> (IILcom/eignex/klause/ir/IntColumns;[Lcom/eignex/klause/ir/Factor;[ZZI[D[D[Z[ZLcom/eignex/klause/util/Bits;Lcom/eignex/klause/util/Bits;Lcom/eignex/klause/ir/IntBounds;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (IILcom/eignex/klause/ir/SourceIntDomains;[Lcom/eignex/klause/ir/Factor;[ZZI[D[D)V
+	public synthetic fun <init> (IILcom/eignex/klause/ir/SourceIntDomains;[Lcom/eignex/klause/ir/Factor;[ZZI[D[DILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public fun <init> (II[Lcom/eignex/klause/ir/IntDomain;Ljava/util/List;[ZZI[D[D[Z[ZLcom/eignex/klause/util/Bits;Lcom/eignex/klause/util/Bits;Lcom/eignex/klause/ir/IntBounds;)V
 	public synthetic fun <init> (II[Lcom/eignex/klause/ir/IntDomain;Ljava/util/List;[ZZI[D[D[Z[ZLcom/eignex/klause/util/Bits;Lcom/eignex/klause/util/Bits;Lcom/eignex/klause/ir/IntBounds;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public fun <init> (II[Lcom/eignex/klause/ir/IntDomain;[Lcom/eignex/klause/ir/Factor;[ZZI[D[D[Z[ZLcom/eignex/klause/util/Bits;Lcom/eignex/klause/util/Bits;Lcom/eignex/klause/ir/IntBounds;)V
 	public synthetic fun <init> (II[Lcom/eignex/klause/ir/IntDomain;[Lcom/eignex/klause/ir/Factor;[ZZI[D[D[Z[ZLcom/eignex/klause/util/Bits;Lcom/eignex/klause/util/Bits;Lcom/eignex/klause/ir/IntBounds;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public fun <init> (ILcom/eignex/klause/ir/IntBounds;[Lcom/eignex/klause/ir/Factor;[ZZI[D[D)V
 	public synthetic fun <init> (ILcom/eignex/klause/ir/IntBounds;[Lcom/eignex/klause/ir/Factor;[ZZI[D[DILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getDeclaredIntDomains ()Lcom/eignex/klause/ir/SourceIntDomains;
 	public final fun getFactors ()[Lcom/eignex/klause/ir/Factor;
 	public final fun getHasFiniteIntDomains ()Z
 	public final fun getHasSymmetryBreaking ()Z
 	public final fun getImpliedFactorMask ()[Z
 	public final fun getIntBounds ()Lcom/eignex/klause/ir/IntBounds;
-	public final fun getIntColumns ()Lcom/eignex/klause/ir/IntColumns;
 	public final fun getNumBoolVars ()I
 	public final fun getNumFactors ()I
 	public final fun getNumIntVars ()I
@@ -3033,8 +2984,9 @@ public class com/eignex/klause/ir/Problem {
 	public final fun getRealUpper ()[D
 	public final fun intDomainOrNull (I)Lcom/eignex/klause/ir/IntDomain;
 	public final fun requireFiniteIntDomains ()[Lcom/eignex/klause/ir/IntDomain;
-	public final fun withIntDomains ([Lcom/eignex/klause/ir/IntDomain;[Z[Z)Lcom/eignex/klause/ir/Problem;
-	public static synthetic fun withIntDomains$default (Lcom/eignex/klause/ir/Problem;[Lcom/eignex/klause/ir/IntDomain;[Z[ZILjava/lang/Object;)Lcom/eignex/klause/ir/Problem;
+	public final fun withFactors ([Lcom/eignex/klause/ir/Factor;[Z)Lcom/eignex/klause/ir/Problem;
+	public static synthetic fun withFactors$default (Lcom/eignex/klause/ir/Problem;[Lcom/eignex/klause/ir/Factor;[ZILjava/lang/Object;)Lcom/eignex/klause/ir/Problem;
+	public final fun withIntDomains ([Lcom/eignex/klause/ir/IntDomain;)Lcom/eignex/klause/ir/Problem;
 }
 
 public final class com/eignex/klause/ir/RealVars : com/eignex/klause/ir/VarList {
@@ -3043,6 +2995,21 @@ public final class com/eignex/klause/ir/RealVars : com/eignex/klause/ir/VarList 
 	public fun getInts ()[I
 	public fun getReals ()[I
 	public fun getSpanInts ()[I
+}
+
+public final class com/eignex/klause/ir/SourceIntDomains {
+	public static final field Companion Lcom/eignex/klause/ir/SourceIntDomains$Companion;
+	public final fun declaredOrNull (I)Lcom/eignex/klause/ir/IntDomain;
+	public final fun finiteDomain (I)Lcom/eignex/klause/ir/IntDomain;
+	public final fun finiteDomains ()[Lcom/eignex/klause/ir/IntDomain;
+	public final fun getBounds ()Lcom/eignex/klause/ir/IntBounds;
+	public final fun getHasDeclaredDomains ()Z
+	public final fun getSize ()I
+	public final fun rebounded (Lcom/eignex/klause/ir/IntBounds;)Lcom/eignex/klause/ir/SourceIntDomains;
+}
+
+public final class com/eignex/klause/ir/SourceIntDomains$Companion {
+	public final fun ofBounds (Lcom/eignex/klause/ir/IntBounds;)Lcom/eignex/klause/ir/SourceIntDomains;
 }
 
 public final class com/eignex/klause/ir/SpanIntVars : com/eignex/klause/ir/VarList {
@@ -7472,6 +7439,8 @@ public final class com/eignex/klause/propagation/Assumptions$Companion {
 
 public final class com/eignex/klause/propagation/BakedProblem : com/eignex/klause/ir/Problem {
 	public final fun getBakeElapsed-UwyO8pc ()J
+	public final fun intDomain (I)Lcom/eignex/klause/ir/IntDomain;
+	public final fun intDomains ()[Lcom/eignex/klause/ir/IntDomain;
 }
 
 public abstract interface class com/eignex/klause/propagation/ClauseExchange {
@@ -7578,8 +7547,6 @@ public final class com/eignex/klause/propagation/NoPropagator : com/eignex/klaus
 public final class com/eignex/klause/propagation/ProblemBakingKt {
 	public static final fun bake (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/propagation/BakedProblem;
 	public static synthetic fun bake$default (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/util/Cancellation;ILjava/lang/Object;)Lcom/eignex/klause/propagation/BakedProblem;
-	public static final fun bakeFiniteBounds (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/propagation/BakedProblem;
-	public static synthetic fun bakeFiniteBounds$default (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/util/Cancellation;ILjava/lang/Object;)Lcom/eignex/klause/propagation/BakedProblem;
 	public static final fun getBaked (Lcom/eignex/klause/ir/Problem;)Lcom/eignex/klause/propagation/PropagationResult;
 	public static final fun propagate (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/propagation/Assumptions;Lcom/eignex/klause/util/Cancellation;Z)Lcom/eignex/klause/propagation/PropagationResult;
 	public static synthetic fun propagate$default (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/propagation/Assumptions;Lcom/eignex/klause/util/Cancellation;ZILjava/lang/Object;)Lcom/eignex/klause/propagation/PropagationResult;

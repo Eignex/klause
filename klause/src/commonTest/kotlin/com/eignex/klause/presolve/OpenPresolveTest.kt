@@ -5,6 +5,7 @@ import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntBounds
+import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
@@ -225,5 +226,40 @@ class OpenPresolveTest {
         )
 
         assertIs<OpenPresolveResult.Refuted>(spec.presolveOpen())
+    }
+
+    /** One column open on both sides whose declared value set is [declared]. */
+    private fun openDeclaring(declared: IntDomain, vararg factors: Factor): Problem = Problem(
+        numBoolVars = 0,
+        numIntVars = 1,
+        intDomains = arrayOf(declared),
+        factors = arrayOf(*factors),
+        openIntLo = booleanArrayOf(true),
+        openIntHi = booleanArrayOf(true),
+    )
+
+    @Test
+    fun `a proved bound intersects a declared value set rather than replacing it`() {
+        val spec = openDeclaring(
+            IntDomain(0, 6).excludeValue(2),
+            row(0 to 1L, op = LinearOp.GE, bound = 0L),
+            row(0 to 1L, op = LinearOp.LE, bound = 4L),
+        )
+
+        val result = assertIs<OpenPresolveResult.Tightened>(spec.closeOpenBounds())
+
+        assertEquals(2, result.closedSides)
+        assertEquals(IntDomain(0, 4).excludeValue(2), result.spec.intDomainOrNull(0))
+    }
+
+    @Test
+    fun `a proved range holding no declared value refutes the model`() {
+        val spec = openDeclaring(
+            IntDomain(0, 6).excludeValues(longArrayOf(1, 2, 3, 4, 5))!!,
+            row(0 to 1L, op = LinearOp.GE, bound = 2L),
+            row(0 to 1L, op = LinearOp.LE, bound = 4L),
+        )
+
+        assertIs<OpenPresolveResult.Refuted>(spec.closeOpenBounds())
     }
 }

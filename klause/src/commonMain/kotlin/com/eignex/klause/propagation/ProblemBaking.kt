@@ -19,40 +19,19 @@ val Problem.baked: PropagationResult
         )
     }
 
-/** Build the propagation-owned finite-domain projection of this model. */
-fun Problem.bake(cancellation: Cancellation = Cancellation.Never): BakedProblem {
-    if (this is BakedProblem) return this
-    require(hasFiniteIntDomains) { "only finite CP problems can be baked" }
-    return BakedProblem(
-        numBoolVars = numBoolVars,
-        numIntVars = numIntVars,
-        intDomains = Array(numIntVars) { requireFiniteIntDomains()[it] },
-        factors = factors,
-        cancellation = cancellation,
-        impliedFactorMask = impliedFactorMask,
-        hasSymmetryBreaking = hasSymmetryBreaking,
-        numRealVars = numRealVars,
-        realLower = realLower,
-        realUpper = realUpper,
-        packedOpenIntLo = intBounds.openLowerBits,
-        packedOpenIntHi = intBounds.openUpperBits,
-        modelBounds = intBounds,
-    )
-}
-
 /**
  * Build the finite, root-propagated projection of this model's declared integer domains.
  *
- * Existing finite domains retain holes. A canonical bounds-only model is accepted only when every
- * declared side is finite; no fallback endpoint is invented here.
+ * A column that declares a value set keeps it, holes included; one that declares its whole range has that
+ * range materialized. Every declared side must be closed — no fallback endpoint is invented here, because
+ * inventing one narrows the model.
  */
-fun Problem.bakeFiniteBounds(cancellation: Cancellation = Cancellation.Never): BakedProblem {
+fun Problem.bake(cancellation: Cancellation = Cancellation.Never): BakedProblem {
     if (this is BakedProblem) return this
-    val domains = finiteIntDomains()
     return BakedProblem(
         numBoolVars = numBoolVars,
         numIntVars = numIntVars,
-        intDomains = domains,
+        intDomains = finiteIntDomains(),
         factors = factors,
         cancellation = cancellation,
         impliedFactorMask = impliedFactorMask,
@@ -60,8 +39,6 @@ fun Problem.bakeFiniteBounds(cancellation: Cancellation = Cancellation.Never): B
         numRealVars = numRealVars,
         realLower = realLower,
         realUpper = realUpper,
-        packedOpenIntLo = intBounds.openLowerBits,
-        packedOpenIntHi = intBounds.openUpperBits,
         modelBounds = intBounds,
     )
 }

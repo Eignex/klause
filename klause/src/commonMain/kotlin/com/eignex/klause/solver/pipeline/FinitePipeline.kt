@@ -6,7 +6,7 @@ import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.presolve.PresolvePipeline
 import com.eignex.klause.propagation.BakedProblem
-import com.eignex.klause.propagation.bakeFiniteBounds
+import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.PresolveStats
@@ -105,9 +105,9 @@ object FinitePipeline {
         val finiteModel = if (outcome.stats.infeasible) {
             outcome.problem
         } else if (outcome.changed) {
-            outcome.problem.bakeFiniteBounds(request.cancellation)
+            outcome.problem.bake(request.cancellation)
         } else {
-            request.problem.bakeFiniteBounds(request.cancellation)
+            request.problem.bake(request.cancellation)
         }
         return FinitePipelinePreparation(
             problem = finiteModel,
