@@ -364,6 +364,9 @@ internal interface SearchTraversalPolicy {
 
     /** Restart, cancellation, and resumable boundary work. */
     val lifecycle: SearchRunLifecycle
+
+    /** Unverified branch-order steering for this traversal; the default is unsteered order. */
+    val candidateHints: SearchCandidateHints get() = SearchCandidateHints.None
 }
 
 /** Restart policy owned by the shared search engine. */
