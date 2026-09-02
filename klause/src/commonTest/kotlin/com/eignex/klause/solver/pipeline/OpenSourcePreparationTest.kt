@@ -10,11 +10,13 @@ import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.presolve.PresolvePass
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.Bits
+import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNotEquals
+import kotlin.test.assertNull
 
 /** Routing an open source model from what source-safe preparation produced, rather than from the input. */
 class OpenSourcePreparationTest {
@@ -87,6 +89,30 @@ class OpenSourcePreparationTest {
         val result = OpenTheoryMinimizer(model, objective).minimize()
 
         assertIs<OpenTheoryOptimum.Infeasible>(result)
+        assertEquals(true, result.stats.presolve?.infeasible)
+    }
+
+    @Test
+    fun `a solve stopped before it starts prepares nothing`() {
+        val model = aggregatable(openColumns = true)
+
+        val result = OpenTheoryEngine(model, model.sourceRoute())
+            .solve(TheoryParams(cancellation = Cancellation { true }))
+
+        assertIs<OpenTheoryResult.Unknown>(result)
+        assertNull(result.stats.presolve, "a run that stopped before preparing has nothing to report")
+    }
+
+    @Test
+    fun `a descent stopped before it starts prepares nothing`() {
+        val model = aggregatable(openColumns = true)
+        val objective = LinearObjective(intCoefficients = longArrayOf(1, 0, 0, 0, 0))
+
+        val result = OpenTheoryMinimizer(model, objective)
+            .minimize(TheoryParams(cancellation = Cancellation { true }))
+
+        assertIs<OpenTheoryOptimum.Bounded>(result)
+        assertNull(result.stats.presolve, "a descent that stopped before preparing has nothing to report")
     }
 
     @Test
