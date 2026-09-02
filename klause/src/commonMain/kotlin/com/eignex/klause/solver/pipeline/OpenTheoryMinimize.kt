@@ -7,6 +7,8 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.presolve.PresolvePipeline
+import com.eignex.klause.solver.incumbent.IncumbentSource
+import com.eignex.klause.solver.incumbent.Publication
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.pipeline.ProblemPipeline
 import com.eignex.klause.solver.pipeline.componentPlan
@@ -146,8 +148,9 @@ class OpenTheoryMinimizer internal constructor(
         val base = prepared.problem.boundedBy(null)
         val plan = prepared.planned(base).plan
         val state = OpenTheorySolveState(params)
-        var incumbent: OpenTheoryAssignment? = null
-        var best: BigInteger? = null
+        // One incumbent for the whole descent: every witness a round proves feasible is offered here with
+        // the value read off it, and the bound the next round refutes is whatever the offer installed.
+        val incumbents = minimizingWitnessExchange()
         var spec = base
         while (true) {
             val result = OpenTheoryEngine(
@@ -156,40 +159,58 @@ class OpenTheoryMinimizer internal constructor(
             ).solve(params, state)
             when (result) {
                 is OpenTheoryResult.Sat -> {
-                    // Nothing to improve on a constant objective: the first witness is already optimal,
-                    // and tightening below its value would exclude every assignment rather than a worse one.
-                    if (terms.isEmpty()) {
-                        return OpenTheoryOptimum.Optimal(
-                            result.assignment,
-                            BigInteger.fromLong(objective.constant),
-                            result.stats,
-                        )
-                    }
                     val value = objective.valueOf(result.assignment)
-                    // A round that does not improve would repeat forever on the same bound.
-                    if (best != null && value >= best) {
-                        return OpenTheoryOptimum.Optimal(incumbent!!, best, result.stats)
+                    when (val published = incumbents.offer(result.assignment, value)) {
+                        // A constant objective has no row to tighten: its first witness is already
+                        // optimal, and a bound below the constant would exclude every assignment rather
+                        // than a worse one.
+                        is Publication.Installed -> if (terms.isEmpty()) {
+                            return incumbents.proven(result.stats)
+                        } else {
+                            spec = prepared.problem.boundedBy(published.incumbent.objective - BigInteger.ONE)
+                        }
+
+                        // The round decided the model *plus* the row holding the objective below the
+                        // incumbent, so a witness the gate declines is one that row excluded. It refutes
+                        // no bound, which is what an optimum would take.
+                        Publication.NotImproving -> error("witness at $value does not improve its own bound")
+
+                        // The exchange trusts the route's certificate, so nothing here judges a witness.
+                        // Either outcome means a verifier reached this descent without its proofs being
+                        // revisited, and neither says anything about the model.
+                        is Publication.Rejected -> error("a trusted witness was refuted: ${published.reason}")
+
+                        is Publication.Indeterminate ->
+                            error("a trusted witness was left undecided: ${published.reason}")
                     }
-                    incumbent = result.assignment
-                    best = value
-                    spec = prepared.problem.boundedBy(value - BigInteger.ONE)
                 }
 
-                is OpenTheoryResult.Unsat ->
-                    return if (incumbent == null) {
-                        OpenTheoryOptimum.Infeasible(result.stats)
-                    } else {
-                        OpenTheoryOptimum.Optimal(incumbent, best!!, result.stats)
-                    }
+                is OpenTheoryResult.Unsat -> return incumbents.proven(result.stats)
 
-                is OpenTheoryResult.Unknown -> return OpenTheoryOptimum.Bounded(
-                    incumbent,
-                    best,
-                    result.reason,
-                    result.stats,
-                )
+                is OpenTheoryResult.Unknown -> {
+                    val standing = incumbents.current()
+                    return OpenTheoryOptimum.Bounded(
+                        standing?.assignment,
+                        standing?.objective,
+                        result.reason,
+                        result.stats,
+                    )
+                }
             }
         }
+    }
+
+    /**
+     * What the standing incumbent proves once the descent has nothing left to refute: it is optimal, or —
+     * with no witness ever installed — the model is infeasible, because the round that ended the descent
+     * refuted the model under a bound no objective reaches.
+     *
+     * Only for a descent that ended in a proof. A round the budget stopped refuted nothing, so its
+     * incumbent bounds the optimum instead of naming it.
+     */
+    private fun IncumbentSource<OpenTheoryAssignment, BigInteger>.proven(stats: SolveStats): OpenTheoryOptimum {
+        val standing = current() ?: return OpenTheoryOptimum.Infeasible(stats)
+        return OpenTheoryOptimum.Optimal(standing.assignment, standing.objective, stats)
     }
 
     /**
@@ -240,8 +261,11 @@ class OpenTheoryMinimizer internal constructor(
                 total += BigInteger.fromLong(coefficients[i]) * assignment.assignment.ints[terms[i]]
             }
 
-            is OpenTheoryAssignment.ExactLra ->
-                error("a route with no integer column cannot carry an integral objective")
+            // A real-only route has no integer column to read, which only a constant objective may ask of
+            // it: every weighted term names one.
+            is OpenTheoryAssignment.ExactLra -> check(terms.isEmpty()) {
+                "a route with no integer column cannot value an objective weighting one"
+            }
         }
         return total
     }

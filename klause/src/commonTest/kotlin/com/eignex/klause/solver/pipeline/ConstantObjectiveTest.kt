@@ -32,6 +32,27 @@ class ConstantObjectiveTest {
     }
 
     @Test
+    fun `a route with no integer column is optimal at a constant objective`() {
+        // The value comes from the constant alone, which is the only objective a real-only witness can be
+        // read for: every weighted term would name an integer column the route does not carry.
+        val parsed = SmtLib.parse(
+            """
+                (set-logic QF_LRA)
+                (declare-const y Real)
+                (assert (>= y 1.0))
+                (check-sat)
+            """.trimIndent(),
+        )
+
+        val result = assertIs<OpenTheoryOptimum.Optimal>(
+            OpenTheoryMinimizer(parsed.model, LinearObjective(constant = 4L)).minimize(),
+        )
+
+        assertEquals("4", result.value.toString())
+        assertIs<OpenTheoryAssignment.ExactLra>(result.assignment)
+    }
+
+    @Test
     fun `an infeasible model with a constant objective is infeasible rather than optimal`() {
         val parsed = SmtLib.parse(
             """
