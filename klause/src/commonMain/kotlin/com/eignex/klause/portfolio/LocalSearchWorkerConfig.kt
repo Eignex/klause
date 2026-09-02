@@ -59,7 +59,7 @@ internal class LocalSearchWorkerConfig(val recipe: LocalSearchRecipe) : WorkerCo
             seedImplicitOnRestart = recipe.seedImplicitOnRestart,
         ).apply { objectiveBound = boundHandle }.session()
         val workerLabel = "ls/$label"
-        var params = LocalSearchParams(
+        val params = LocalSearchParams(
             randomSeed = seed + index,
             costShaping = CostShaping.Linear(lambda = lsLambda),
             // The per-move gradient view of the objective, when the model provides one.
@@ -68,15 +68,10 @@ internal class LocalSearchWorkerConfig(val recipe: LocalSearchRecipe) : WorkerCo
             // Keep a single over-populated constraint kind from steering the initial descent; a
             // no-op for the pool's weight-blind arms.
             normalizeWeightsByClass = true,
+            // Bidirectional cross-engine flow: publish incumbents this arm finds and, on restart, anchor
+            // on the verified global best — so LS and backtrack incumbents circulate both ways.
+            pooledIncumbents = pools?.solutions,
         )
-        // Bidirectional cross-engine flow: publish incumbents this arm finds and, on restart, anchor on
-        // the verified global best — so LS and backtrack incumbents circulate both ways through the exchange.
-        pools?.solutions?.let { sols ->
-            params = params.copy(
-                improvedSolutionSink = { sample, objective -> sols.offer(sample, objective) },
-                pooledIncumbents = sols,
-            )
-        }
         return PortfolioWorker.of(
             workerLabel,
             armId,

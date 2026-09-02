@@ -6,12 +6,12 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.AcceptanceCriterion
 import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.localsearch.LocalSearchSession
-import com.eignex.klause.localsearch.PooledSolutionImporter
+import com.eignex.klause.localsearch.PooledIncumbents
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.Optimizer
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.solver.incumbent.IncumbentSource
+import com.eignex.klause.solver.incumbent.IncumbentExchange
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.objective.Objective
 import com.eignex.klause.solver.result.MinimizeResult
@@ -100,15 +100,13 @@ internal class Alns(
      *  LP bounding under the pin assumptions. Null on a pure-LS ALNS. */
     val backtrack: Optimizer<BacktrackParams>? = null,
     val backtrackParams: BacktrackParams? = null,
-    /** Sink for each improving incumbent this run accepts — its [Sample] and objective. A portfolio folds
-     *  these into the shared solution pool so peer arms (backtrack or LS) can warm-start from them. Null
-     *  disables publishing. */
-    val improvedSolutionSink: ((Sample, Double) -> Unit)? = null,
-    /** The verified incumbent any arm has published — the read counterpart of [improvedSolutionSink]. Before
-     *  each iteration ALNS adopts a not-yet-seen incumbent that beats its own, so the next neighbourhood is
-     *  destroyed from the globally-best assignment. Version-gated; skipped when the run carries assumption
-     *  pins. Null disables it. */
-    val pooledIncumbents: IncumbentSource<Sample, Double>? = null,
+    /** The verified-incumbent exchange this run takes part in, both ways. Every incumbent the outer loop
+     *  accepts as a new best is offered to it, and only a candidate the exchange verifies *and* finds
+     *  strictly better than the standing one is installed. Before each iteration ALNS adopts a not-yet-seen
+     *  installed incumbent that beats its own, so the next neighbourhood is destroyed from the globally-best
+     *  assignment. Version-gated; importing is skipped when the run carries assumption pins. Null leaves the
+     *  run private. */
+    val pooledIncumbents: IncumbentExchange<Sample, Double>? = null,
 ) : Optimizer<LocalSearchParams> {
 
     init {
@@ -159,17 +157,18 @@ internal class Alns(
         var bestObj = scoring.evaluate(bestSample)
         var incumbent = bestSample
         var incumbentObj = bestObj
-        improvedSolutionSink?.invoke(bestSample, bestObj)
+        // Cross-engine solution flow: offer every new best to the shared exchange, and adopt a
+        // fresher-and-better published assignment as the incumbent before destroying, so the next
+        // neighbourhood searches around the globally-best assignment.
+        val pooled = PooledIncumbents(
+            exchange = pooledIncumbents,
+            importEnabled = params.assumptions.isEmpty,
+            evaluate = { scoring.evaluate(it) },
+        )
+        pooled.publish(bestSample, bestObj)
         // Build the acceptance policy once the initial objective is known, so a simulated-annealing
         // temperature can be scaled to the problem (see [acceptanceFor]); else use the fixed policy.
         val acceptancePolicy = acceptanceFor?.invoke(bestObj) ?: acceptance
-        // Cross-engine solution flow: adopt a fresher-and-better pooled assignment as the incumbent
-        // before destroying, so the next neighbourhood searches around the globally-best assignment.
-        val pooledImporter = PooledSolutionImporter(
-            source = pooledIncumbents,
-            enabled = params.assumptions.isEmpty,
-            evaluate = { scoring.evaluate(it) },
-        )
 
         // Persistent CP-repair handle: one session + LP reused across fragments, re-seeded per
         // neighbourhood, so learned clauses and the LP warm start carry between repairs. Only when a
@@ -204,7 +203,7 @@ internal class Alns(
             // portion of iterFlips it used; charging the declared unit keeps counting deterministic
             // and independent of what happened inside, same as LocalSearchSolver's counted restart.
             instructionsUsed += iterFlips
-            pooledImporter.poll(bestObj)?.let { (sample, obj) ->
+            pooled.poll(bestObj)?.let { (sample, obj) ->
                 bestSample = sample
                 bestObj = obj
                 incumbent = sample
@@ -266,7 +265,7 @@ internal class Alns(
             if (isNewBest) {
                 bestSample = repaired
                 bestObj = repairedObj
-                improvedSolutionSink?.invoke(repaired, repairedObj)
+                pooled.publish(repaired, repairedObj)
             }
             if (accept) {
                 incumbent = repaired

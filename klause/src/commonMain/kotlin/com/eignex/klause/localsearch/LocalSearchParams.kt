@@ -4,7 +4,7 @@ import com.eignex.klause.factor.DEFAULT_VIOLATION_SOFT_CAP
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolverParams
-import com.eignex.klause.solver.incumbent.IncumbentSource
+import com.eignex.klause.solver.incumbent.IncumbentExchange
 import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.SearchEvent
@@ -70,20 +70,18 @@ data class LocalSearchParams(
      */
     val initialAssignment: Sample? = null,
     /**
-     * Sink for each improving feasible incumbent this run finds — its [Sample] and objective. A portfolio
-     * folds these into a shared solution pool so peer arms (backtrack or other LS) can warm-start from a
-     * globally-good assignment. `null` (default) disables it. Ignored by `solve` / `samples` / `enumerate`.
+     * The verified-incumbent exchange this run takes part in, both ways. Each feasible assignment that
+     * improves on this run's own best is offered to it, and only a candidate the exchange verifies *and*
+     * finds strictly better than the standing incumbent is installed — the engine proposes, the exchange
+     * decides. On each restart the search adopts a not-yet-seen installed incumbent that beats its own as
+     * the restart anchor, letting a peer arm's better assignment pull this walk toward it. Purely
+     * heuristic in that direction: LS re-derives cost and feasibility from the assignment, so a peer's
+     * solution can never make a result unsound. Importing is skipped when this run carries assumption pins
+     * (a foreign assignment may violate them); publishing is not (zero violation means every factor holds,
+     * pinned or not). A portfolio hands every arm one exchange so incumbents circulate across engines.
+     * `null` (default) leaves the run private. Ignored by `solve` / `samples` / `enumerate`.
      */
-    val improvedSolutionSink: ((Sample, Double) -> Unit)? = null,
-    /**
-     * The verified incumbent any arm has published — the read counterpart of [improvedSolutionSink]. On each
-     * restart the search adopts a not-yet-seen incumbent that beats its own as the restart anchor, letting a
-     * peer arm's better assignment pull this walk toward it. Purely heuristic: LS re-derives cost and
-     * feasibility from the assignment, so a peer's solution can never make a result unsound. Skipped when
-     * this run carries assumption pins (a foreign assignment may violate them). `null` (default) disables it.
-     * Ignored by `solve` / `samples` / `enumerate`.
-     */
-    val pooledIncumbents: IncumbentSource<Sample, Double>? = null,
+    val pooledIncumbents: IncumbentExchange<Sample, Double>? = null,
     /**
      * Soft cap for the graded violation cost (see
      * `compressViolation`). Per-factor residuals at or below this

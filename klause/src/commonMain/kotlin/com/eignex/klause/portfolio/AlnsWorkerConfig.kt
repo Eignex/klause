@@ -65,10 +65,9 @@ internal class AlnsWorkerConfig(val profile: AlnsProfile = AlnsProfile.Default, 
         // the repair learns under assumptions/an incumbent, so its permanent (objective-bound, blocking)
         // clauses and LP Farkas nogoods hold only under its pins and must not be shared.
         val repairClauses = SharedClausePool()
-        // Bidirectional cross-engine flow: publish accepted incumbents into the shared pool and, at
-        // the top of each iteration, destroy from the pool's global best — so ALNS both feeds and follows
+        // Bidirectional cross-engine flow: publish accepted incumbents into the shared exchange and, at
+        // the top of each iteration, destroy from its verified global best — so ALNS both feeds and follows
         // the incumbents backtrack and LS arms find.
-        val solutions = pools?.solutions
         val alns = Alns(
             inner = LocalSearchSolver(problem),
             repairOperators = BacktrackRepair.Defaults,
@@ -80,8 +79,7 @@ internal class AlnsWorkerConfig(val profile: AlnsProfile = AlnsProfile.Default, 
             ),
             minDestroyFraction = profile.minDestroyFraction,
             maxDestroyFraction = profile.maxDestroyFraction,
-            improvedSolutionSink = solutions?.let { sols -> { sample, objective -> sols.offer(sample, objective) } },
-            pooledIncumbents = solutions,
+            pooledIncumbents = pools?.solutions,
             acceptanceFor = acceptanceFactory(),
         )
         val params = LocalSearchParams(
