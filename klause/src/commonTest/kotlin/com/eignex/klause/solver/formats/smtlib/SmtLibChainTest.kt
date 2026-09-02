@@ -9,7 +9,6 @@ import com.eignex.klause.formats.smtlib.SmtLibProblem
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.bake
-import com.eignex.klause.propagation.bakeFiniteBounds
 import com.eignex.klause.solver.SolveResult
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
@@ -28,7 +27,7 @@ class SmtLibChainTest {
         val ORDER_OPS = listOf("<", "<=", ">", ">=")
     }
 
-    private fun SmtLibProblem.bounded(): Problem = model.bakeFiniteBounds()
+    private fun SmtLibProblem.bounded(): Problem = model.bake()
 
     /** `k` integers over `[0, size)`, with [tail] appended as the closing assertions. */
     private fun boundedInts(k: Int, size: Int, tail: String): String {
@@ -43,7 +42,7 @@ class SmtLibChainTest {
     /** Every tuple over `[0, SIZE)` for the first [VARS] variables that [text] accepts, found by pinning
      *  each variable to a singleton domain and reading the solver's verdict. */
     private fun accepted(text: String): Set<List<Long>> {
-        val parsed = SmtLib.parse(text).model.bakeFiniteBounds()
+        val parsed = SmtLib.parse(text).model.bake()
         val out = HashSet<List<Long>>()
         for (code in 0 until SIZE * SIZE * SIZE) {
             val tuple = List(VARS) { ((code / pow(SIZE, it)) % SIZE).toLong() }

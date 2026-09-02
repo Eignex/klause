@@ -132,7 +132,8 @@ internal fun Problem.closeOpenBounds(cancellation: Cancellation = Cancellation.N
         if (declared[v].hi == null && bounds[v].hi != null) closed++
     }
     if (closed == 0) return OpenPresolveResult.Tightened(problem, closedSides = 0)
-    return OpenPresolveResult.Tightened(problem.withBounds(bounds), closedSides = closed)
+    val tighter = problem.withBounds(bounds) ?: return OpenPresolveResult.Refuted
+    return OpenPresolveResult.Tightened(tighter, closedSides = closed)
 }
 
 /** Unconditional integer rows plus the integer rows a root unit clause asserts. */
@@ -197,8 +198,16 @@ private fun crossed(b: OpenIntBounds): Boolean {
     return lo > hi
 }
 
-/** This model over [bounds], carrying every other part of it through unchanged. */
-private fun Problem.withBounds(bounds: Array<OpenIntBounds>): Problem {
+/**
+ * This model over [bounds], carrying every other part of it through unchanged, or `null` when the tighter
+ * range leaves a declared value set empty.
+ *
+ * A column that declares a value set keeps it: the proved bounds intersect that set rather than replacing
+ * it, so a non-contiguous declaration does not widen back to its hull on the way through. The
+ * intersection can empty a column the endpoints alone would not have crossed, and an empty column is a
+ * refutation.
+ */
+private fun Problem.withBounds(bounds: Array<OpenIntBounds>): Problem? {
     val lower = LongArray(bounds.size)
     val upper = LongArray(bounds.size)
     var openLo: Bits? = null
@@ -209,9 +218,12 @@ private fun Problem.withBounds(bounds: Array<OpenIntBounds>): Problem {
         val hi = bounds[v].hi
         if (hi == null) (openHi ?: Bits(bounds.size).also { openHi = it }).set(v) else upper[v] = hi
     }
+    val rebounded = declaredIntDomains.rebounded(IntBounds.fromModelBounds(lower, upper, openLo, openHi))
+        ?: return null
     return Problem(
         numBoolVars = numBoolVars,
-        intBounds = IntBounds.fromModelBounds(lower, upper, openLo, openHi),
+        numIntVars = numIntVars,
+        declaredIntDomains = rebounded,
         factors = factors,
         impliedFactorMask = impliedFactorMask,
         hasSymmetryBreaking = hasSymmetryBreaking,

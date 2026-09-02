@@ -37,18 +37,7 @@ internal object PresolveShared {
             kept.add(factor)
             implied?.add(false)
         }
-        return Problem(
-            numBoolVars = numBoolVars,
-            numIntVars = numIntVars,
-            intColumns = intColumns,
-            factors = kept.toTypedArray(),
-            impliedFactorMask = implied?.toBooleanArray(),
-            hasSymmetryBreaking = hasSymmetryBreaking,
-            numRealVars = numRealVars,
-            realLower = realLower,
-            realUpper = realUpper,
-            modelBounds = intBounds,
-        )
+        return withFactors(kept.toTypedArray(), implied?.toBooleanArray())
     }
 
     /**

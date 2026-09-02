@@ -7,7 +7,6 @@ import com.eignex.klause.formats.smtlib.*
 import com.eignex.klause.formats.smtlib.SmtLib
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.propagation.bake
-import com.eignex.klause.propagation.bakeFiniteBounds
 import com.eignex.klause.solver.SolveResult
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -50,7 +49,7 @@ class SmtLibIteChainTest {
     /** The value `r` takes for each `s` in `[SEL_LO, SEL_HI]`, read off a solution with `s` pinned. */
     private fun resultPerSelector(text: String): List<Long> {
         val parsed = SmtLib.parse(text)
-        val problem = parsed.model.bakeFiniteBounds()
+        val problem = parsed.model.bake()
         val s = parsed.intVarNames.getValue("s")
         val r = parsed.intVarNames.getValue("r")
         return (SEL_LO..SEL_HI).map { v ->

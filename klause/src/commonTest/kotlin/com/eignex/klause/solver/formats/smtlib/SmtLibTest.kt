@@ -11,7 +11,6 @@ import com.eignex.klause.formats.smtlib.SmtLib
 import com.eignex.klause.formats.smtlib.SmtLibProblem
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.bake
-import com.eignex.klause.propagation.bakeFiniteBounds
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
@@ -90,7 +89,7 @@ class SmtLibTest {
         return r.assignment.ints
     }
 
-    private fun SmtLibProblem.bounded(): Problem = model.bakeFiniteBounds()
+    private fun SmtLibProblem.bounded(): Problem = model.bake()
 
     @Test
     fun `open QF LIRA returns an exact mixed witness`() {
@@ -1067,7 +1066,7 @@ class SmtLibTest {
         if (parsed.model.sourceRoute() == ProblemPipeline.EXACT_LIRA) {
             return liaSat(parsed.model).ints[parsed.intVarNames.values.first()]
         }
-        val r = BacktrackSolver(parsed.model.bakeFiniteBounds().bake()).solve(BacktrackParams())
+        val r = BacktrackSolver(parsed.model.bake().bake()).solve(BacktrackParams())
         assertTrue(r is SolveResult.Sat, "expected SAT, got $r")
         return BigInteger.fromLong(r.assignment.ints[parsed.intVarNames.values.first()])
     }

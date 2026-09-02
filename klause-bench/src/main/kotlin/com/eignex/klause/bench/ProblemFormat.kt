@@ -12,7 +12,7 @@ import com.eignex.klause.formats.opb.toProblem
 import com.eignex.klause.formats.smtlib.SmtLib
 import com.eignex.klause.formats.xcsp3.Xcsp3
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.propagation.bakeFiniteBounds
+import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.objective.toLinearObjective
 import com.eignex.klause.solver.pipeline.ProblemPipeline
@@ -121,7 +121,7 @@ private fun Problem.requireFiniteBenchModel(file: File): Problem {
     check(sourceRoute() == ProblemPipeline.FINITE_CP) {
         "${file.name}: in-process benchmarks require finite integer bounds; use the CLI theory route for open models"
     }
-    return bakeFiniteBounds()
+    return bake()
 }
 
 internal object Formats {

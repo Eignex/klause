@@ -1,10 +1,10 @@
 package com.eignex.klause.propagation
 
 import com.eignex.klause.ir.Factor
-import com.eignex.klause.ir.FiniteIntColumns
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.SourceIntDomains
 import com.eignex.klause.util.Bits
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.EmptyDoubleArray
@@ -12,11 +12,16 @@ import kotlin.time.Duration
 import kotlin.time.TimeSource
 
 /**
- * A `Problem` whose root bake is guaranteed to have run: its `Problem.requireFiniteIntDomains` carry the
- * root-propagation fold, and it is the only problem type the finite engines, the model counter,
- * sampling and the LP engine accept. Produced only by `Problem.bake` (or the presolve pipeline). A raw
- * `Problem` is the supertype, so handing an un-baked model to a solver is a compile error — the caller
- * must `Problem.bake` it first, which is where the parse-vs-solve boundary is enforced by the type system.
+ * A `Problem` whose root bake is guaranteed to have run, and the only problem type that owns finite
+ * search domains: [intDomain] carries the root-propagation fold for every integer column, which is what
+ * the finite engines, the model counter, sampling and the LP engine branch and propagate over. Produced
+ * only by `Problem.bake` (or the presolve pipeline). A raw `Problem` is the supertype, so handing an
+ * un-baked model to a solver is a compile error — the caller must `Problem.bake` it first, which is where
+ * the parse-vs-solve boundary is enforced by the type system.
+ *
+ * A finite domain here may be narrower than the column's `Problem.intBounds`, and its endpoints may have
+ * been invented to close a side the source left open. Consumers reasoning about the model rather than
+ * enumerating its values read the bounds; consumers that search read the domains.
  */
 class BakedProblem internal constructor(
     numBoolVars: Int,
@@ -39,19 +44,25 @@ class BakedProblem internal constructor(
 ) : Problem(
     numBoolVars = numBoolVars,
     numIntVars = numIntVars,
-    intColumns = FiniteIntColumns(intDomains, shared = alreadyFolded),
+    declaredIntDomains = SourceIntDomains.ofDomains(
+        domains = intDomains,
+        shared = alreadyFolded,
+        openLo = openIntLo,
+        openHi = openIntHi,
+        packedOpenLo = packedOpenIntLo,
+        packedOpenHi = packedOpenIntHi,
+        modelBounds = modelBounds,
+    ),
     factors = factors,
     impliedFactorMask = impliedFactorMask,
     hasSymmetryBreaking = hasSymmetryBreaking,
     numRealVars = numRealVars,
     realLower = realLower,
     realUpper = realUpper,
-    openIntLo = openIntLo,
-    openIntHi = openIntHi,
-    packedOpenIntLo = packedOpenIntLo,
-    packedOpenIntHi = packedOpenIntHi,
-    modelBounds = modelBounds,
 ) {
+    /** The array the root fold writes into and every finite accessor reads. */
+    internal val foldedIntDomains: Array<IntDomain> = requireFiniteIntDomains()
+
     /** Deductions established while constructing this propagation projection. */
     internal val rootDeductions: PropagationResult = rootBake(this, seedDeductions, cancellation)
 
@@ -67,6 +78,17 @@ class BakedProblem internal constructor(
             bakeElapsed = Duration.ZERO
         }
     }
+
+    /** Root-propagated finite domain of integer column [v]. */
+    fun intDomain(v: Int): IntDomain = foldedIntDomains[v]
+
+    /**
+     * Every root-propagated finite domain, in column order.
+     *
+     * Copied: this projection owns the array the fold writes into, so a consumer that keeps one gets its
+     * own. Read a single column through [intDomain] rather than copying per access.
+     */
+    fun intDomains(): Array<IntDomain> = foldedIntDomains.copyOf()
 
     internal constructor(
         numBoolVars: Int,

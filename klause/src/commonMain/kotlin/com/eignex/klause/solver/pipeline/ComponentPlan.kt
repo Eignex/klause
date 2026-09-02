@@ -118,33 +118,16 @@ class ComponentPlan internal constructor(
 
     private fun fragment(spec: Problem, keep: (FactorOwner) -> Boolean): Problem {
         requireBelongsTo(spec)
-        return Problem(
-            numBoolVars = spec.numBoolVars,
-            intBounds = spec.intBounds,
-            factors = factorOwners.indices.asSequence()
-                .filter { keep(factorOwners[it]) }
-                .map { spec.factors[it] }
-                .toList()
-                .toTypedArray(),
-            numRealVars = spec.numRealVars,
-            realLower = spec.realLower,
-            realUpper = spec.realUpper,
+        val kept = factorOwners.indices.filter { keep(factorOwners[it]) }
+        return spec.withFactors(
+            Array(kept.size) { spec.factors[kept[it]] },
+            spec.impliedFactorMask?.let { mask -> BooleanArray(kept.size) { mask[kept[it]] } },
         )
     }
 
     private fun requireBelongsTo(spec: Problem) {
         require(spec.numIntVars == intOwners.size && spec.factors.size == factorOwners.size) {
             "component plan belongs to a different source model"
-        }
-    }
-
-    private fun sourceDomains(cpDomains: Map<Int, IntDomain>, variables: IntArray): Array<IntDomain> {
-        require(cpDomains.keys.all { it in intOwners.indices && intOwners[it] == IntVariableOwner.CP }) {
-            "only CP-owned integer columns may receive finite domains"
-        }
-        return Array(variables.size) { local ->
-            val source = variables[local]
-            requireNotNull(cpDomains[source]) { "missing finite domain for CP integer column $source" }
         }
     }
 }
@@ -215,17 +198,12 @@ fun Problem.componentPlan(preferFinite: Boolean = false): ComponentPlan {
             else -> FactorOwner.CP
         }
     }
-    val theoryFragment = Problem(
-        numBoolVars = numBoolVars,
-        intBounds = intBounds,
-        factors = factorOwners.indices.asSequence()
+    val theoryFragment = withFactors(
+        factorOwners.indices.asSequence()
             .filter { factorOwners[it] != FactorOwner.CP }
             .map { factors[it] }
             .toList()
             .toTypedArray(),
-        numRealVars = numRealVars,
-        realLower = realLower,
-        realUpper = realUpper,
     )
     val route = when {
         unownedOpenColumn >= 0 -> ProblemPipeline.UNSUPPORTED_OPEN

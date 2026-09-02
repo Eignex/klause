@@ -239,14 +239,8 @@ class OpenTheoryMinimizer internal constructor(
      */
     private fun Problem.boundedBy(bound: BigInteger?): Problem = if (terms.isEmpty()) this else withRow(boundRow(bound))
 
-    private fun Problem.withRow(row: Factor): Problem = Problem(
-        numBoolVars = numBoolVars,
-        intBounds = intBounds,
-        factors = factors + row,
-        numRealVars = numRealVars,
-        realLower = realLower,
-        realUpper = realUpper,
-    )
+    private fun Problem.withRow(row: Factor): Problem =
+        withFactors(factors + row, impliedFactorMask?.let { it + false })
 
     private fun LinearObjective.valueOf(assignment: OpenTheoryAssignment): BigInteger {
         var total = BigInteger.fromLong(constant)

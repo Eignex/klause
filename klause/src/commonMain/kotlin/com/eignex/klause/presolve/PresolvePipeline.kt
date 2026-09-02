@@ -4,7 +4,7 @@ import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.bounding.LpPlan
 import com.eignex.klause.propagation.BakedProblem
-import com.eignex.klause.propagation.bakeFiniteBounds
+import com.eignex.klause.propagation.bake
 import com.eignex.klause.propagation.difference.withDifferenceSystem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
@@ -171,7 +171,7 @@ object PresolvePipeline {
         // directly-constructed (already-baked) problem, so this is where a front-end's deferred base bake
         // actually happens, after the O(one-LP) pre-bake infeasibility/OBBT that must precede it.
         val bakeStart = TimeSource.Monotonic.markNow()
-        val baked = if (preBakeInfeasible) sourceProblem else prebaked.bakeFiniteBounds(cancellation)
+        val baked = if (preBakeInfeasible) sourceProblem else prebaked.bake(cancellation)
         val seeded = if (preBakeInfeasible) sourceProblem else RootBaker.reseed(baked, bakeConfig)
         val bakeElapsed = bakeStart.elapsedNow()
         val reconstructs = ArrayList<(Sample) -> Sample>() // in application order; source preparation first
