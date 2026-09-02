@@ -25,7 +25,8 @@ class OpenTheoryHintTest {
 
     private val hintFlips = 1_000L
 
-    private fun hinted(flips: Long? = hintFlips) = TheoryParams(openHintFlips = flips)
+    private fun hinted(flips: Long? = hintFlips, minSplits: Long = 1) =
+        TheoryParams(openHintFlips = flips, openHintMinSplits = minSplits)
 
     private fun modelOf(body: String) = SmtLib.parse(
         """
@@ -133,9 +134,9 @@ class OpenTheoryHintTest {
     }
 
     @Test
-    fun `a hint propagation settles before any split steers nothing`() {
-        // Unit clauses leave the shared component nothing to split: root propagation fixes every hinted
-        // column, so a proposal exists and orders no branch.
+    fun `a model propagation settles never spends the allowance`() {
+        // Unit clauses leave the shared component nothing to split, so no split ever asks for a hint and
+        // the producer is never run — the case an up-front draw paid for and could not use.
         val open = Bits(2).also { bits -> repeat(2) { bits.set(it) } }
         val model = Problem(
             numBoolVars = 3,
@@ -151,9 +152,34 @@ class OpenTheoryHintTest {
         val result = OpenTheoryEngine(model, ProblemPipeline.DIFFERENCE_THEORY).solve(hinted())
 
         val sat = assertIs<OpenTheoryResult.Sat>(result)
-        assertEquals(1L, sat.stats.openHints.produced)
-        assertEquals(3L, sat.stats.openHints.hintedVars)
-        assertEquals(0L, sat.stats.openHints.steeredSplits)
+        assertEquals(OpenHintStats(), sat.stats.openHints)
+    }
+
+    @Test
+    fun `a threshold no split reaches never spends the allowance`() {
+        val model = clausedDifferenceModel()
+
+        val result = OpenTheoryEngine(model, ProblemPipeline.DIFFERENCE_THEORY)
+            .solve(hinted(minSplits = 10_000))
+
+        val sat = assertIs<OpenTheoryResult.Sat>(result)
+        assertEquals(OpenHintStats(), sat.stats.openHints)
+    }
+
+    @Test
+    fun `the allowance is spent only once the split threshold is reached`() {
+        val model = clausedDifferenceModel()
+        val plan = model.componentPlan()
+        val state = OpenTheorySolveState(hinted(minSplits = 3))
+        val hints = state.candidateHints(plan, model, Cancellation.Never)
+
+        hints.preferredBool(0)
+        hints.preferredBool(1)
+        val beforeThreshold = state.hints.draws
+        hints.preferredBool(2)
+
+        assertEquals(0L, beforeThreshold, "two splits leave the allowance unspent")
+        assertEquals(1L, state.hints.draws)
     }
 
     @Test
