@@ -3003,7 +3003,6 @@ public final class com/eignex/klause/ir/SourceIntDomains {
 	public final fun finiteDomain (I)Lcom/eignex/klause/ir/IntDomain;
 	public final fun finiteDomains ()[Lcom/eignex/klause/ir/IntDomain;
 	public final fun getBounds ()Lcom/eignex/klause/ir/IntBounds;
-	public final fun getHasDeclaredDomains ()Z
 	public final fun getSize ()I
 	public final fun rebounded (Lcom/eignex/klause/ir/IntBounds;)Lcom/eignex/klause/ir/SourceIntDomains;
 }
@@ -8586,6 +8585,7 @@ public final class com/eignex/klause/solver/objective/SingleIntObjective {
 
 public final class com/eignex/klause/solver/pipeline/ComponentPlan {
 	public final fun cpProjection (Lcom/eignex/klause/ir/Problem;Ljava/util/Map;)Lcom/eignex/klause/solver/pipeline/CpProblemProjection;
+	public final fun cpSourceDomains (Lcom/eignex/klause/ir/Problem;)Ljava/util/Map;
 	public final fun factorOwner (I)Lcom/eignex/klause/solver/pipeline/FactorOwner;
 	public final fun getCpIntVars ()[I
 	public final fun getHasCpComponent ()Z

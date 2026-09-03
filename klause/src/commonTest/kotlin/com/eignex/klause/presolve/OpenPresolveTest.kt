@@ -228,36 +228,52 @@ class OpenPresolveTest {
         assertIs<OpenPresolveResult.Refuted>(spec.presolveOpen())
     }
 
-    /** One column open on both sides whose declared value set is [declared]. */
-    private fun openDeclaring(declared: IntDomain, vararg factors: Factor): Problem = Problem(
+    /** Column 0 open above with the box [box]; column 1 closed, declaring [declared]. */
+    private fun openBoxAndDeclaration(box: IntDomain, declared: IntDomain, vararg factors: Factor): Problem = Problem(
         numBoolVars = 0,
-        numIntVars = 1,
-        intDomains = arrayOf(declared),
+        numIntVars = 2,
+        intDomains = arrayOf(box, declared),
         factors = arrayOf(*factors),
-        openIntLo = booleanArrayOf(true),
-        openIntHi = booleanArrayOf(true),
+        openIntHi = booleanArrayOf(true, false),
     )
 
     @Test
-    fun `a proved bound intersects a declared value set rather than replacing it`() {
-        val spec = openDeclaring(
-            IntDomain(0, 6).excludeValue(2),
-            row(0 to 1L, op = LinearOp.GE, bound = 0L),
-            row(0 to 1L, op = LinearOp.LE, bound = 4L),
+    fun `an invented box endpoint does not cap a bound proved past it`() {
+        val spec = Problem(
+            numBoolVars = 0,
+            numIntVars = 1,
+            intDomains = arrayOf(IntDomain(0, 6)),
+            factors = arrayOf(row(0 to 1L, op = LinearOp.EQ, bound = 10L)),
+            openIntHi = booleanArrayOf(true),
         )
 
         val result = assertIs<OpenPresolveResult.Tightened>(spec.closeOpenBounds())
 
-        assertEquals(2, result.closedSides)
-        assertEquals(IntDomain(0, 4).excludeValue(2), result.spec.intDomainOrNull(0))
+        assertEquals(IntDomain(10, 10), result.spec.declaredIntDomains.finiteDomain(0))
+    }
+
+    @Test
+    fun `a proved bound intersects a declared value set rather than replacing it`() {
+        val spec = openBoxAndDeclaration(
+            box = IntDomain(0, 6),
+            declared = IntDomain(0, 9).excludeValue(5),
+            row(0 to 1L, op = LinearOp.LE, bound = 4L),
+            row(1 to 1L, op = LinearOp.LE, bound = 7L),
+        )
+
+        val result = assertIs<OpenPresolveResult.Tightened>(spec.closeOpenBounds())
+
+        assertEquals(IntDomain(0, 7).excludeValue(5), result.spec.intDomainOrNull(1))
     }
 
     @Test
     fun `a proved range holding no declared value refutes the model`() {
-        val spec = openDeclaring(
-            IntDomain(0, 6).excludeValues(longArrayOf(1, 2, 3, 4, 5))!!,
-            row(0 to 1L, op = LinearOp.GE, bound = 2L),
+        val spec = openBoxAndDeclaration(
+            box = IntDomain(0, 6),
+            declared = IntDomain(0, 9).excludeValues(longArrayOf(4, 5, 6))!!,
             row(0 to 1L, op = LinearOp.LE, bound = 4L),
+            row(1 to 1L, op = LinearOp.GE, bound = 4L),
+            row(1 to 1L, op = LinearOp.LE, bound = 6L),
         )
 
         assertIs<OpenPresolveResult.Refuted>(spec.closeOpenBounds())

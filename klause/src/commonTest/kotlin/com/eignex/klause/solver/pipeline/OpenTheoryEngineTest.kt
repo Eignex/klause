@@ -5,8 +5,10 @@ import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
 import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.formats.smtlib.SmtLib
 import com.eignex.klause.ir.IntBounds
+import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.presolve.PresolveConfig
@@ -572,5 +574,45 @@ class OpenTheoryEngineTest {
 
         assertEquals(ProblemPipeline.EXACT_LIRA, sourceRoute(model))
         assertIs<OpenTheoryResult.Unsat>(OpenTheoryEngine(model, ProblemPipeline.EXACT_LIRA).solve())
+    }
+
+    // Three CP columns each admitting {0, 3}, so an all-different over them has no solution; the bound
+    // hull [0, 3] admits four values and would. The fourth column is open, which is what puts the model
+    // on the composed open route in the first place.
+    private fun pigeonholeOverDeclaredHoles(): Problem = Problem(
+        numBoolVars = 0,
+        numIntVars = 4,
+        intDomains = Array(4) { column ->
+            if (column == 3) IntDomain(0, 0) else IntDomain(0, 3).excludeValues(longArrayOf(1, 2))!!
+        },
+        factors = arrayOf(
+            AllDifferent(intArrayOf(0, 1, 2), domainMin = 0, domainSize = 4),
+            Linear(intArrayOf(1), intArrayOf(3), LinearOp.LE, 4),
+        ),
+        openIntHi = booleanArrayOf(false, false, false, true),
+    )
+
+    @Test
+    fun `a CP column's domain is materialized from its declaration rather than its bound hull`() {
+        val model = pigeonholeOverDeclaredHoles()
+
+        val plan = model.componentPlan()
+
+        assertEquals(IntVariableOwner.CP, plan.intOwner(0))
+        assertEquals(IntVariableOwner.THEORY, plan.intOwner(3))
+        assertEquals(
+            IntDomain(0, 3).excludeValues(longArrayOf(1, 2)),
+            plan.cpSourceDomains(model)[0],
+            "the hull would hand the search values the model excludes",
+        )
+    }
+
+    @Test
+    fun `the composed open route refuses a model its declared holes make infeasible`() {
+        val model = pigeonholeOverDeclaredHoles()
+
+        val result = OpenTheoryEngine(model, model.sourceRoute()).solve()
+
+        assertIs<OpenTheoryResult.Unsat>(result)
     }
 }
