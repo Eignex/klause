@@ -104,7 +104,15 @@ fun FinitePipeline.planFixedBacktrack(request: FixedBacktrackPlanRequest): Fixed
         engineParams,
         allowSelectors = annotation == null,
     )
-    return FixedBacktrackPlan(params, dryRun)
+    // A model that states its own search owns the branch order, so the LP may bound it but never steer
+    // it: LP-guided branching picks the variable before the configured selector is asked, which is the
+    // one thing this route exists to prevent. The same rule [allowSelectors] applies to the selectors,
+    // and applied after the overrides for the same reason — the annotation outranks a `--param`.
+    val annotated = annotation != null
+    return FixedBacktrackPlan(
+        if (annotated) params.copy(lpPlan = params.lpPlan.copy(branching = false)) else params,
+        dryRun,
+    )
 }
 
 /** Resolve portfolio policy without constructing a problem-specific engine or rendering frontend output. */
