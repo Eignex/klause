@@ -3,6 +3,7 @@ package com.eignex.klause.propagation
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchBrancher
 import com.eignex.klause.solver.search.SearchConflictResolution
@@ -112,7 +113,10 @@ class CpSearchComponent(
             is SearchDecision.Theory -> ComponentResult.Consistent
         }
         recordNativeLevel(context.decisionLevel)
-        return result
+        // A cut fixpoint reports no conflict, so this node stands on factors that never fired: hand it
+        // back as undecided and let the traversal retract it, rather than descend toward a leaf those
+        // factors would have refuted. See [check] for the leaf that a fixpoint cut elsewhere reaches.
+        return if (session.fixpointCancelled) ComponentResult.Indeterminate else result
     }
 
     private fun result(
@@ -205,6 +209,15 @@ class CpSearchComponent(
 
     override fun nextBranch(context: com.eignex.klause.solver.search.SearchContext): List<SearchDecision>? =
         branching.alternatives(session, ::sourceIntId)
+
+    /**
+     * Refuse a leaf standing on a fixpoint the deadline cut short. A cut fixpoint reports no conflict
+     * (see [PropagationSession.fixpointCancelled]), so the factors it never fired have not had their
+     * say: the traversal would otherwise read the under-propagated state as a model and publish an
+     * assignment that violates them.
+     */
+    override fun check(context: com.eignex.klause.solver.search.SearchContext): ComponentCheck =
+        if (session.fixpointCancelled) ComponentCheck.Indeterminate else ComponentCheck.Feasible
 
     override fun blockModel(
         model: com.eignex.klause.solver.search.AssembledSearchModel,
