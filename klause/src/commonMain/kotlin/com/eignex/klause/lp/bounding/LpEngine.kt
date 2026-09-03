@@ -449,7 +449,7 @@ internal class LpEngine(
                     // A long eta chain: the persistent instance's pivots accumulate ACROSS nodes
                     // (reconciliation + dual repair after each pin flip), so the default limit would
                     // refactorize the full basis every few nodes — the exact cost this filter removes.
-                    RevisedSimplex(built.model, params.cancellation, refactorEtaLimit = GATED_ETA_LIMIT),
+                    RevisedSimplex(built.model, params.cancellation, refactorUpdateLimit = GATED_UPDATE_LIMIT),
                     BooleanArray(built.model.m),
                 )
             }
@@ -765,7 +765,7 @@ private const val RESIDUAL_MAX_ROWS = 1000
 /** Eta-chain length of the persistent gated-residual simplex before it refactorizes: its pivots
  *  accumulate across nodes, so the chain must span many node re-solves for the kept factorization to
  *  pay; each eta costs one extra sparse pass per FTRAN/BTRAN, bounding the drift. */
-private const val GATED_ETA_LIMIT = 400
+private const val GATED_UPDATE_LIMIT = 400
 
 /** Floor on the adaptive node LP work budget ([LpWorkBudget]). A floor rather than an off switch: with a
  *  persistent basis a stopped solve is progress the next node resumes from, and it still bounds. */

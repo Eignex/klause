@@ -15,7 +15,7 @@ import com.eignex.klause.util.Cancellation
  * All returned values are double-precision guides; the authoritative bound always comes from exactly
  * certifying the result downstream ([integerCertify] / [integerFarkasRay]), never from these.
  */
-internal interface LpSolver {
+internal interface LpSolver : AutoCloseable {
     /**
      * Solve the relaxation, optionally warm-started from a prior optimal [warm] basis of the same model
      * structure; null on non-convergence / dual-unbounded / singular basis. The warm basis only changes
@@ -50,7 +50,7 @@ internal interface LpSolver {
      */
     val lastPivots: Int get() = 0
 
-    /** Sparse LU factorizations the last solve built, on the same terms as [lastPivots]. */
+    /** Basis factorizations the last solve built, on the same terms as [lastPivots]. */
     val lastRefactorizations: Int get() = 0
 
     /** Whether the last solve started from a prior basis rather than a cold start, on the same terms
@@ -74,6 +74,15 @@ internal interface LpSolver {
 
     /** Columns the last solve ran over, the denominator [lastDegenerateColumns] is judged against. */
     val lastColumns: Int get() = 0
+
+    /**
+     * Release what the engine holds outside the heap.
+     *
+     * A basis factorization can be a native object, and a search builds an engine per node, so the
+     * ones a caller keeps are worth closing rather than leaving to a cleaner. An engine holding
+     * nothing external closes as a no-op, which is the default, and closing twice is harmless.
+     */
+    override fun close() {}
 }
 
 /**

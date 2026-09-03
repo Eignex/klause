@@ -33,6 +33,10 @@ internal class ComponentLpSolver(
     override var infeasibleRay: DoubleArray? = null
         private set
 
+    override fun close() {
+        for (s in solvers) s.close()
+    }
+
     override fun solve(warm: Basis?): FloatLpResult? = stitch { s -> s.solve(null) }
 
     override fun solvePrimal(warm: Basis?): FloatLpResult? = stitch { s -> s.solvePrimal(null) }
