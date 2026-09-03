@@ -131,8 +131,10 @@ internal fun Problem.closeOpenBounds(cancellation: Cancellation = Cancellation.N
         if (declared[v].lo == null && bounds[v].lo != null) closed++
         if (declared[v].hi == null && bounds[v].hi != null) closed++
     }
-    if (closed == 0) return OpenPresolveResult.Tightened(problem, closedSides = 0)
+    // A declared value set the proved range empties refutes the model whether or not that range also
+    // closed an open side, so the intersection runs ahead of the no-closure shortcut rather than behind it.
     val tighter = problem.withBounds(bounds) ?: return OpenPresolveResult.Refuted
+    if (closed == 0) return OpenPresolveResult.Tightened(problem, closedSides = 0)
     return OpenPresolveResult.Tightened(tighter, closedSides = closed)
 }
 
