@@ -150,4 +150,21 @@ class OpenTheoryMinimizeTest {
 
         assertEquals("7", assertIs<OpenTheoryOptimum.Optimal>(result).value.toString())
     }
+
+    @Test
+    fun `an optimum above the 64-bit range is reached rather than refuted`() {
+        val parsed = modelOf(
+            """
+                (declare-const x Int)
+                (assert (>= x 170141183460469231731687303715884105728))
+            """.trimIndent(),
+        )
+        val x = parsed.intVarNames.getValue("x")
+        val objective = LinearObjective(intCoefficients = LongArray(parsed.model.numIntVars).also { it[x] = 1L })
+
+        val result = assertIs<OpenTheoryOptimum.Optimal>(OpenTheoryMinimizer(parsed.model, objective).minimize())
+
+        assertEquals("170141183460469231731687303715884105728", result.value.toString())
+        assertEquals("170141183460469231731687303715884105728", result.assignment.intValue(x))
+    }
 }
