@@ -150,6 +150,7 @@ val BACKTRACK_OVERRIDE_KEYS = listOf(
     "mid-lbd", "vivification", "vivify-batch", "subsumption", "subsume-batch", "inprocessing-cadence",
     "lp-objective-cone", "lp-auto-off-reprobe",
     "lp-knapsack-lagrangian", "lp-component-split", "lp-bound-max-pivots", "lp-adaptive-work",
+    "lp-branching",
     "pb-learning", "pb-objective-cutoff",
     "objective-guided-values",
     "var-selector", "val-selector",
