@@ -33,6 +33,7 @@ internal class ImprovementRelay(private val lock: Mutex = Concurrency.None.lock(
     /** Deliver [improvement], installed as [version], once every version before it has been delivered. */
     fun deliver(version: Long, improvement: AttributedImprovement, consume: (AttributedImprovement) -> Unit) {
         lock.withLock {
+            require(version >= next) { "version $version was already delivered; the next one due is $next" }
             waiting.put(version, improvement)
             var due = waiting[next]
             while (due != null) {
