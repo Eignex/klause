@@ -93,17 +93,20 @@ class Portfolio(
         val cancelled = AtomicBoolean(false)
         val token: Cancellation = { cancelled.load() || cancellation() }
         fun readBound(): Double = incumbent.bound()
-        // Workers improve concurrently; [emitLock] serialises the attribution callback so the consumer
-        // (e.g. the CLI's `-s` per-arm line) never sees interleaved invocations. It is non-null exactly
-        // when [onImprovement] is, so the no-callback path takes neither the lock nor the callback. Only
-        // the publisher the exchange told it installed the new global best fires it — a loser never reports.
+        // Workers improve concurrently; [relay] serialises the attribution callback and holds it to the
+        // order the exchange installed the improvements, so the consumer (e.g. the CLI's `-s` per-arm line)
+        // sees neither interleaved invocations nor a regression the installs never made. It is non-null
+        // exactly when [onImprovement] is, so the no-callback path takes neither the lock nor the callback.
+        // Only the publisher the exchange told it installed the new global best reports — a loser never does.
         val start = TimeSource.Monotonic.markNow()
-        val emitLock = if (onImprovement != null) Concurrency.Strict.lock() else null
+        val relay = if (onImprovement != null) ImprovementRelay(Concurrency.Strict.lock()) else null
         fun fold(worker: PortfolioWorker, r: MinimizeResult.WithSample) {
-            if (incumbent.offer(r.sample, r.objectiveValue) !is Publication.Installed) return
+            val publication = incumbent.offer(r.sample, r.objectiveValue)
+            if (publication !is Publication.Installed) return
             val cb = onImprovement ?: return
-            val lock = emitLock ?: return
-            lock.withLock { cb(AttributedImprovement(worker.label, worker.armId, start.elapsedNow(), r)) }
+            val ordered = relay ?: return
+            val improvement = AttributedImprovement(worker.label, worker.armId, start.elapsedNow(), r)
+            ordered.deliver(publication.incumbent.version, improvement, cb)
         }
 
         val results = parallelRun(
@@ -147,29 +150,33 @@ class Portfolio(
     }
 
     /**
-     * Streaming branch-and-bound: a lazy [Sequence] of every *strict* global improvement, in arrival
-     * order, so the consumer sees a monotonically-improving sequence (the anytime/credit entry point).
-     * Iterating drives the workers in parallel; the shared bound is exposed to bound-pruning workers
-     * exactly as in [minimize]. Each element carries the producing worker and the elapsed time at the
-     * moment it was found. Stop early by flipping [cancellation] (then abandoning the iterator).
+     * Streaming branch-and-bound: a lazy [Sequence] of every *strict* global improvement, in the order the
+     * shared incumbent installed them, so the consumer sees a monotonically-improving sequence (the anytime/
+     * credit entry point). Iterating drives the workers in parallel; the shared bound is exposed to
+     * bound-pruning workers exactly as in [minimize]. Each element carries the producing worker and the
+     * elapsed time at the moment it was found. Stop early by flipping [cancellation] (then abandoning the
+     * iterator).
      */
     fun improvementsAttributed(cancellation: Cancellation = Cancellation.Never): Sequence<AttributedImprovement> {
         val start = TimeSource.Monotonic.markNow()
         val incumbent = IncumbentExchange.minimizing<Sample>()
+        val relay = ImprovementRelay(Concurrency.Strict.lock())
         fun readBound(): Double = incumbent.bound()
         val token: Cancellation = { streamStop.load() || cancellation() }
         return parallelStream(
             workers.map { worker ->
                 { emit: (AttributedImprovement) -> Unit ->
                     for (r in worker.improvements(::readBound, token)) {
-                        // Emit on the install, not on the offer: two workers can each beat the bound they
-                        // read, and only one of them installs. Emitting the loser too would break the
-                        // stream's monotonicity — its result is already stale when it arrives.
-                        if (r is MinimizeResult.WithSample &&
-                            incumbent.offer(r.sample, r.objectiveValue) is Publication.Installed
-                        ) {
-                            emit(AttributedImprovement(worker.label, worker.armId, start.elapsedNow(), r))
-                        }
+                        // Stream the install, not the offer: two workers can each beat the bound they read,
+                        // and only one of them installs. Streaming the loser too would break the stream's
+                        // monotonicity — its result is already stale when it arrives. The winner's own emit
+                        // cannot carry that monotonicity to the consumer either, since it runs after the CAS
+                        // rather than with it; the relay puts the installs on the wire in install order.
+                        if (r !is MinimizeResult.WithSample) continue
+                        val publication = incumbent.offer(r.sample, r.objectiveValue)
+                        if (publication !is Publication.Installed) continue
+                        val improvement = AttributedImprovement(worker.label, worker.armId, start.elapsedNow(), r)
+                        relay.deliver(publication.incumbent.version, improvement, emit)
                     }
                 }
             },
