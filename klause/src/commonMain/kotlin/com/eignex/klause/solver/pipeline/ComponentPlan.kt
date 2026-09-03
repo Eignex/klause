@@ -181,8 +181,6 @@ fun Problem.componentPlan(preferFinite: Boolean = false): ComponentPlan {
 
         supportsExactLira() -> ProblemPipeline.EXACT_LIRA
 
-        numRealVars != 0 -> null
-
         else -> null
     }
     // An open column some CP-only factor reads has no owner: CP cannot index it and no theory can hold
@@ -221,8 +219,6 @@ fun Problem.componentPlan(preferFinite: Boolean = false): ComponentPlan {
         theoryFragment.supportsExactLra() -> ProblemPipeline.EXACT_LRA
 
         intOwners.any { it == IntVariableOwner.THEORY } || factorOwners.any { it == FactorOwner.THEORY } -> when {
-            theoryFragment.supportsExactLra() -> ProblemPipeline.EXACT_LRA
-
             theoryFragment.numRealVars == 0 && supportsCompleteDifferenceTheory(
                 theoryFragment.factors,
                 theoryFragment.numIntVars,
@@ -230,8 +226,6 @@ fun Problem.componentPlan(preferFinite: Boolean = false): ComponentPlan {
             ) -> ProblemPipeline.DIFFERENCE_THEORY
 
             theoryFragment.supportsExactLira() -> ProblemPipeline.EXACT_LIRA
-
-            theoryFragment.numRealVars != 0 -> ProblemPipeline.UNSUPPORTED_OPEN
 
             else -> ProblemPipeline.UNSUPPORTED_OPEN
         }
