@@ -21,8 +21,9 @@ interface PortfolioExecutor : AutoCloseable {
      * entry point for anytime telemetry / per-arm credit. The callback is serialised: the parallel
      * executor holds a lock across it, the single-core one is inherently sequential, so the consumer
      * never sees concurrent invocations. It also fires in the order the shared incumbent installed the
-     * improvements rather than the order the producing threads reached the callback, so a consumer
-     * scoring each improvement against the one before it never reads a regression.
+     * improvements rather than the order the producing threads reached the callback, so the objectives a
+     * consumer scores against the one before them never regress. [AttributedImprovement.elapsed] carries no
+     * such ordering; see it.
      */
     fun minimize(
         cancellation: Cancellation = Cancellation.Never,
@@ -39,7 +40,9 @@ data class AttributedImprovement(
     /** [PortfolioWorker.armId] of the producing worker — its composed-arm identity; replicas of the
      *  same arm share it, so a credit consumer pools their rewards. */
     val armId: Int,
-    /** Time since the minimisation started. */
+    /** Time since the minimisation started, read by the producing worker after its own install rather than
+     *  with it. Two publishers racing between their compare-and-set and this read can take their readings
+     *  the other way round, so this does not increase along the install-ordered sequence. */
     val elapsed: Duration,
     /** The strict global improvement itself (always a [MinimizeResult.WithSample]). */
     val result: MinimizeResult,

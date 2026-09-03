@@ -96,7 +96,7 @@ class Portfolio(
         // Workers improve concurrently; [relay] serialises the attribution callback and holds it to the
         // order the exchange installed the improvements, so the consumer (e.g. the CLI's `-s` per-arm line)
         // sees neither interleaved invocations nor a regression the installs never made. It is non-null
-        // exactly when [onImprovement] is, so the no-callback path takes neither the lock nor the callback.
+        // exactly when [onImprovement] is, so the no-callback path takes neither the relay nor the callback.
         // Only the publisher the exchange told it installed the new global best reports — a loser never does.
         val start = TimeSource.Monotonic.markNow()
         val relay = if (onImprovement != null) ImprovementRelay(Concurrency.Strict.lock()) else null
