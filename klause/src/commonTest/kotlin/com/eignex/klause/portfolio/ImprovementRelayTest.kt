@@ -57,6 +57,18 @@ class ImprovementRelayTest {
     }
 
     @Test
+    fun `improvements waiting on a version no publisher will report are delivered once the producers finish`() {
+        val relay = ImprovementRelay()
+        val delivered = mutableListOf<Int>()
+        relay.deliver(3L, improvement(3)) { delivered += it.armId }
+        relay.deliver(2L, improvement(2)) { delivered += it.armId }
+
+        relay.flush { delivered += it.armId }
+
+        assertEquals(listOf(2, 3), delivered, "the tail behind an unfillable version 1 must still go out, in order")
+    }
+
+    @Test
     fun `a version that was already delivered is refused`() {
         val relay = ImprovementRelay()
         relay.deliver(1L, improvement(1)) {}

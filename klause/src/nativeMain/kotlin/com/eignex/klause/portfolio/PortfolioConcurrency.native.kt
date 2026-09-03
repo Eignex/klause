@@ -39,7 +39,10 @@ private class StreamBuffer<T>(val lock: Mutex) {
     var remaining = 0
 }
 
-internal actual fun <T> parallelStream(tasks: List<(emit: (T) -> Unit) -> Unit>): Sequence<T> = sequence {
+internal actual fun <T> parallelStream(
+    tasks: List<(emit: (T) -> Unit) -> Unit>,
+    onProducersFinished: ((emit: (T) -> Unit) -> Unit)?,
+): Sequence<T> = sequence {
     val state = StreamBuffer<T>(Concurrency.Strict.lock())
     state.remaining = tasks.size
     val workers = List(tasks.size) { Worker.start() }
@@ -67,6 +70,7 @@ internal actual fun <T> parallelStream(tasks: List<(emit: (T) -> Unit) -> Unit>)
     } finally {
         workers.forEach { it.requestTermination(processScheduledJobs = false) }
     }
+    yieldTail(onProducersFinished)
 }
 
 private const val POLL_MICROS: UInt = 1000u // 1ms poll while the merge buffer is empty

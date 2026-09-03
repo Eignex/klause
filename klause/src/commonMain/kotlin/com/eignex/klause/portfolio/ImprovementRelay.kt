@@ -19,6 +19,11 @@ import com.eignex.kumulant.stream.lock
  * on it. Publishing stays outside the lock, so the shared bound still tightens for every arm the instant it
  * is installed, whatever the consumer is doing with the improvement before it.
  *
+ * A publisher that dies between its CAS and its [deliver] leaves a version nothing will ever fill, so every
+ * later improvement would wait on it forever. [flush] closes that out once the publishers are done. It is
+ * safe to deliver the survivors past a gap because the installs are monotone in the objective, so a
+ * subsequence of them still improves strictly.
+ *
  * [deliver] runs the consumer under [lock] and one version at a time, so it is also the serialisation an
  * executor fanning in from real threads needs; the [Concurrency.None] default leaves it free for a
  * single-writer executor.
@@ -41,6 +46,22 @@ internal class ImprovementRelay(private val lock: Mutex = Concurrency.None.lock(
                 next++
                 consume(due)
                 due = waiting[next]
+            }
+        }
+    }
+
+    /**
+     * Deliver everything still waiting, in install order, skipping the versions no publisher will report.
+     * Call it once the publishers have finished: until then a gap is merely still open, and skipping it
+     * would deliver a later improvement before the earlier one it must follow.
+     */
+    fun flush(consume: (AttributedImprovement) -> Unit) {
+        lock.withLock {
+            while (!waiting.isEmpty()) {
+                val due = waiting[next]
+                waiting.remove(next)
+                next++
+                if (due != null) consume(due)
             }
         }
     }
