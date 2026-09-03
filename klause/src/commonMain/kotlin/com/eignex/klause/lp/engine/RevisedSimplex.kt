@@ -117,6 +117,12 @@ internal class RevisedSimplex(
     private val rowIdx: IntArray = columns.copyRowIndices()
     private val colVal: DoubleArray = columns.values
 
+    // `columns` by row. The pivot row is formed from the nonzeros of ρ = B⁻ᵀeᵣ over these, so a hypersparse ρ
+    // costs the rows it touches instead of a pass over every column — which is what makes a hypersparse
+    // BTRAN worth having, since dotting ρ against all numVars columns would swamp it.
+    private val rowCols: Array<IntArray>
+    private val rowVals: Array<DoubleArray>
+
     private val basicVar = IntArray(m)
     private val status = Array(numVars) { VarStatus.BASIC }
     private var pivots = 0
@@ -211,6 +217,24 @@ internal class RevisedSimplex(
     override val lastRefactorizations: Int get() = refactorizations
     override val lastWarmStarted: Boolean get() = warmStarted
     override val lastWorkOps: Long get() = work.ops
+
+    init {
+        // Transpose `columns` once. Counting sort by row: tally each row's entries, then fill, so the whole
+        // transpose is two passes over nnz rather than a per-row scan of every column.
+        val counts = IntArray(m)
+        for (k in rowIdx.indices) counts[rowIdx[k]]++
+        rowCols = Array(m) { IntArray(counts[it]) }
+        rowVals = Array(m) { DoubleArray(counts[it]) }
+        val cursor = IntArray(m)
+        for (j in 0 until numVars) {
+            for (k in colPtr[j] until colPtr[j + 1]) {
+                val i = rowIdx[k]
+                val at = cursor[i]++
+                rowCols[i][at] = j
+                rowVals[i][at] = colVal[k]
+            }
+        }
+    }
 
     /** Nonzeros in column [j] of `columns`. */
     private fun columnNnz(j: Int): Int = colPtr[j + 1] - colPtr[j]
@@ -500,7 +524,12 @@ internal class RevisedSimplex(
         val ratioBuf = DoubleArray(numVars) // |d_j / a_j| per eligible nonbasic
         val elig = IntArrayList()
         val eligOrdered = IntArray(numVars) // scratch for the ratio-ordered permutation of [elig]
-        val rho = DoubleArray(m)
+        // The columns this iteration's pivot row reached, and the iteration that reached them. A stamp
+        // rather than a clear: the row is formed over ρ's nonzeros, and zeroing [pivotRowEntry] between
+        // iterations would reintroduce the pass over every column that forming it this way removes.
+        val touched = IntArrayList()
+        val touchEpoch = IntArray(numVars)
+        var epoch = 0
         var iter = 0
         // Whether an iterate's basic values are in [beta], so a solve that stops short can still hand
         // back its bound. The buffer is reused, and holds the last iterate the loop completed.
@@ -554,19 +583,41 @@ internal class RevisedSimplex(
             }
 
             val y = duals()
-            // Pivot row ρ = e_r^T B⁻¹ = B⁻ᵀ e_r; entering column by dual ratio test. [pivotEtaVec] keeps
-            // the indexed form the solver produced, so the pivot below can hand it back.
+            // Pivot row ρ = e_r^T B⁻¹ = B⁻ᵀ e_r, kept indexed: it is the hypersparse vector of a simplex
+            // iteration, and the row is formed from its nonzeros below rather than by dotting it against
+            // every column.
             pivotalRow(r)
-            pivotEtaVec.gather(rho)
+            // ρ·A_j for every column ρ reaches, accumulated over the rows ρ stores. Costs those rows'
+            // entries instead of nnz(A), which is the whole point of ρ staying sparse. A column ρ misses
+            // has ρ·A_j = 0 exactly, so the eligibility pass below loses no candidate by skipping it.
+            epoch++
+            touched.clear()
+            var pivotRowOps = 0L
+            pivotEtaVec.forEachStored { i, rhoI ->
+                val cols = rowCols[i]
+                val vals = rowVals[i]
+                pivotRowOps += cols.size
+                for (k in cols.indices) {
+                    val j = cols[k]
+                    if (touchEpoch[j] != epoch) {
+                        touchEpoch[j] = epoch
+                        pivotRowEntry[j] = 0.0
+                        touched.add(j)
+                    }
+                    pivotRowEntry[j] += rhoI * vals[k]
+                }
+            }
+            work.add(pivotRowOps)
             // Collect the dual-feasible entering candidates and their ratios; eligibility is the sign
             // rule that keeps reduced costs feasible as the leaving variable moves to its bound.
             elig.clear()
-            for (j in 0 until numVars) {
+            for (t in 0 until touched.size) {
+                val j = touched[t]
                 if (status[j] == VarStatus.BASIC) continue
                 // An unenforced row's slack never enters — it is conceptually basic forever (and the
                 // reconciliation above seats it, so a nonbasic one cannot appear mid-loop).
                 if (enforced != null && j >= n && !enforced[j - n]) continue
-                val a = dotColumn(rho, j)
+                val a = pivotRowEntry[j]
                 if (abs(a) < TOL) continue
                 val atLower = status[j] == VarStatus.AT_LOWER
                 val eligible = if (belowLower) {
@@ -575,7 +626,6 @@ internal class RevisedSimplex(
                     (atLower && a > 0) || (!atLower && a < 0)
                 }
                 if (!eligible) continue
-                pivotRowEntry[j] = a
                 ratioBuf[j] = abs((model.costD(j) - dotColumn(y, j)) / a)
                 elig.add(j)
             }
@@ -584,7 +634,8 @@ internal class RevisedSimplex(
                 // certify infeasibility exactly (the float ray alone is not sound to prune on).
                 infeasibleBasis = Basis(basicVar.copyOf(), status.copyOf())
                 infeasibleRow = r
-                infeasibleRay = rho.copyOf() // float ρ = B⁻ᵀeᵣ; integerFarkasRay rounds + certifies it
+                // float ρ = B⁻ᵀeᵣ densely; integerFarkasRay rounds + certifies it.
+                infeasibleRay = pivotEtaVec.toDoubleArray()
                 basisKept = true // the seated basis stays dual-feasible for the next [resolve]
                 return null
             }
