@@ -151,6 +151,15 @@ internal class ResumableMinimize(
     }
 
     /**
+     * What ends the whole run, as opposed to [sliceCancelled]'s slice boundary. Propagation polls this
+     * one: a fixpoint the deadline cuts leaves the session under-propagated, and only a run that is
+     * over can afford to strand one — a slice must pause at decision granularity so the arm that
+     * resumes finds a state it can trust. The cost is that a runaway fixpoint overruns its slice,
+     * which spends another arm's turn; the run's own deadline still bounds it.
+     */
+    private fun solveCancelled(): Boolean = if (pausable) globalToken() else baseCancellation()
+
+    /**
      * The node budget when one is armed, and *only* the node budget.
      *
      * Leaving the per-slice clock as an outer bound defeats the purpose: whenever it binds first the
@@ -203,7 +212,7 @@ internal class ResumableMinimize(
     private val cp = CpSearchComponent(
         PropagationSession(
             problem,
-            params.cancellation,
+            Cancellation { solveCancelled() },
             params.propagationCancelFloor,
             nativeSat = params.nativeSat ?: true,
             pbLearning = params.pbLearning ?: true,

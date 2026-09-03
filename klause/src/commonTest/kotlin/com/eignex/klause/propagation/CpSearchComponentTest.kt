@@ -4,11 +4,13 @@ import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchResult
 import com.eignex.klause.solver.search.SearchRunEvent
 import com.eignex.klause.solver.search.SearchSession
+import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -36,6 +38,41 @@ class CpSearchComponentTest {
             ),
         )
         assertIs<SearchRunEvent.Exhausted>(run.next())
+    }
+
+    @Test
+    fun `a decision whose fixpoint the deadline cut is reported undecided`() {
+        // (¬x0 ∨ x1): pinning x0 wakes the clause, so the decision's fixpoint fires. cancelFloor 0
+        // makes the poll engage from the first fire, so the armed deadline cuts that propagation and
+        // the state it leaves has never heard from the clause.
+        var armed = false
+        val propagation = PropagationSession(
+            Problem(2, 0, emptyArray(), arrayOf(Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true))))),
+            Cancellation { armed },
+            propagationCancelFloor = 0,
+        )
+        val session = SearchSession(listOf(CpSearchComponent(propagation)))
+        assertIs<ComponentResult.Consistent>(session.initialize())
+
+        armed = true
+
+        assertIs<ComponentResult.Indeterminate>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+    }
+
+    @Test
+    fun `a leaf standing on a fixpoint the deadline cut is not feasible`() {
+        var armed = false
+        val propagation = PropagationSession(
+            Problem(2, 0, emptyArray(), arrayOf(Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true))))),
+            Cancellation { armed },
+            propagationCancelFloor = 0,
+        )
+        val session = SearchSession(listOf(CpSearchComponent(propagation)))
+        assertIs<ComponentResult.Consistent>(session.initialize())
+        armed = true
+        propagation.pinBool(0, true)
+
+        assertIs<ComponentCheck.Indeterminate>(session.check())
     }
 
     @Test
