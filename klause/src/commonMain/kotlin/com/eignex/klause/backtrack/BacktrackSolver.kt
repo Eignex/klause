@@ -194,7 +194,15 @@ class BacktrackSolver(override val problem: BakedProblem) :
         for (outcome in driveSearch(params)) {
             return when (outcome) {
                 is SearchOutcome.Found -> SolveResult.Sat(outcome.sample)
-                is SearchOutcome.Exhausted -> SolveResult.Unsat(outcome.core)
+
+                // An exhaustion a component could not decide leaves part of the tree unvisited, so it
+                // refutes nothing — see the same split in [solve].
+                is SearchOutcome.Exhausted -> if (outcome.indeterminate) {
+                    SolveResult.Unknown(TerminationReason.Unsupported)
+                } else {
+                    SolveResult.Unsat(outcome.core)
+                }
+
                 SearchOutcome.BudgetCapped -> SolveResult.Unknown(TerminationReason.BudgetExhausted)
             }
         }

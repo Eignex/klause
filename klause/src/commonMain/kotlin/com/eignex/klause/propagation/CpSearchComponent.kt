@@ -115,8 +115,14 @@ class CpSearchComponent(
         recordNativeLevel(context.decisionLevel)
         // A cut fixpoint reports no conflict, so this node stands on factors that never fired: hand it
         // back as undecided and let the traversal retract it, rather than descend toward a leaf those
-        // factors would have refuted. See [check] for the leaf that a fixpoint cut elsewhere reaches.
-        return if (session.fixpointCancelled) ComponentResult.Indeterminate else result
+        // factors would have refuted. A refutation the fixpoint did reach needs no such retreat — an
+        // under-propagated state only ever under-tightens, so the conflict holds and keeps its
+        // explanation. See [check] for the leaf that a fixpoint cut elsewhere reaches.
+        return if (result is ComponentResult.Consistent && session.fixpointCancelled) {
+            ComponentResult.Indeterminate
+        } else {
+            result
+        }
     }
 
     private fun result(

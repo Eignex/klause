@@ -144,18 +144,15 @@ internal class ResumableMinimize(
     // lets two identical invocations report identical counters.
     private var sliceNodeEnd: Long = -1L
 
-    private fun sliceCancelled(): Boolean = if (pausable) {
-        globalToken() || sliceExpired()
-    } else {
-        baseCancellation()
-    }
+    private fun sliceCancelled(): Boolean = solveCancelled() || (pausable && sliceExpired())
 
     /**
      * What ends the whole run, as opposed to [sliceCancelled]'s slice boundary. Propagation polls this
      * one: a fixpoint the deadline cuts leaves the session under-propagated, and only a run that is
      * over can afford to strand one — a slice must pause at decision granularity so the arm that
      * resumes finds a state it can trust. The cost is that a runaway fixpoint overruns its slice,
-     * which spends another arm's turn; the run's own deadline still bounds it.
+     * which spends another arm's turn; what bounds it instead is [globalToken] — the whole-solve
+     * deadline [runSlice] is handed — so a caller that supplies none leaves propagation unbounded.
      */
     private fun solveCancelled(): Boolean = if (pausable) globalToken() else baseCancellation()
 
