@@ -28,7 +28,6 @@ class SourceIntDomainsTest {
         )
 
         assertNull(declared.declaredOrNull(0), "no value set is stated beyond the range")
-        assertFalse(declared.hasDeclaredDomains)
         assertEquals(IntDomain(2, 9), declared.finiteDomain(0))
     }
 
@@ -37,7 +36,6 @@ class SourceIntDomainsTest {
         val holey = IntDomain(0, 6).excludeValue(2).excludeValue(4)
         val declared = SourceIntDomains.ofDomains(arrayOf(holey))
 
-        assertTrue(declared.hasDeclaredDomains)
         assertEquals(holey, declared.declaredOrNull(0))
         assertEquals(2L, declared.declaredOrNull(0)!!.holeCount)
         assertEquals(0L, declared.bounds.lower(0))
@@ -53,15 +51,28 @@ class SourceIntDomainsTest {
     }
 
     @Test
-    fun `an endpoint invented to close an open side is not a stated bound`() {
+    fun `an open-marked column declares nothing though it carries a finite box`() {
         val declared = SourceIntDomains.ofDomains(
             arrayOf(IntDomain(0, 1L shl 40)),
             openHi = booleanArrayOf(true),
         )
 
-        assertEquals(IntDomain(0, 1L shl 40), declared.declaredOrNull(0))
+        assertNull(declared.declaredOrNull(0), "an invented endpoint is not something the model states")
+        assertEquals(IntDomain(0, 1L shl 40), declared.finiteDomain(0), "the box stays available to branch on")
         assertFalse(declared.bounds.hasUpper(0), "the fallback endpoint is not a stated bound")
         assertTrue(declared.bounds.hasLower(0))
+    }
+
+    @Test
+    fun `rebounding an open column replaces its box rather than intersecting it`() {
+        val declared = SourceIntDomains.ofDomains(
+            arrayOf(IntDomain(0, 6)),
+            openHi = booleanArrayOf(true),
+        )
+
+        val tighter = declared.rebounded(IntBounds.fromModelBounds(longArrayOf(10), longArrayOf(10), null, null))
+
+        assertEquals(IntDomain(10, 10), tighter?.finiteDomain(0), "a box endpoint must not cap a proved bound")
     }
 
     @Test

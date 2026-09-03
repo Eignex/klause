@@ -5,80 +5,103 @@ import com.eignex.klause.util.Bits
 /**
  * The integer values a source model declares each of its columns may take.
  *
- * [bounds] states the range, either side of which may be open. A declaration that admits less than its
- * whole range — `{1, 3, 5}`, or a set a front-end carved before the model was assembled — keeps its value
- * set here as well, because two endpoints do not say which interior values the model excluded. A rebuild
- * that reads [bounds] alone widens such a declaration into its hull; reading this table instead is what
- * keeps a source rewrite equisatisfiable.
+ * [bounds] states the range, either side of which may be open. Two endpoints cannot say which interior
+ * values a declaration excludes, so a column that admits less than its whole range — `{1, 3, 5}`, or a set
+ * a front-end carved before the model was assembled — states its value set through [declaredOrNull]. A
+ * rebuild that reads [bounds] alone widens such a column into its hull, which is a different model.
  *
- * Nothing here says which engine owns a column or holds mutable search state for it. That is
+ * A column with an open side declares no value set at all. The finite machinery still needs something to
+ * branch on there, so a lane may materialize a fallback box for it, and [finiteDomain] hands that box
+ * back — but its endpoints were invented rather than declared, and treating them as a restriction caps a
+ * model that is genuinely unbounded. That is why the two are separate readings of this table and why
+ * [declaredOrNull] answers `null` for every open-marked column: no consumer can mistake a box for a
+ * declaration.
+ *
+ * Nothing here says which engine owns a column. That is
  * [com.eignex.klause.solver.pipeline.ComponentPlan.intOwner], selected once per solve, and the
- * root-propagated finite domains a finite engine branches on live on
+ * root-propagated domains a finite engine branches on live on
  * [com.eignex.klause.propagation.BakedProblem].
  */
 class SourceIntDomains internal constructor(
     /** Declared bounds of every column; either side may be open. */
     val bounds: IntBounds,
-    private val declared: Array<IntDomain>?,
+    private val stated: Array<IntDomain>?,
 ) {
     /** Number of source integer columns. */
     val size: Int get() = bounds.size
 
-    /** Whether the model states an explicit value set per column rather than bounds alone. */
-    val hasDeclaredDomains: Boolean get() = declared != null
-
-    /** Declared value set of column [v], or `null` when the model admits its whole [bounds] range. */
-    fun declaredOrNull(v: Int): IntDomain? = declared?.get(v)
+    /** Whether column [v] is closed on both sides, so a value set stated for it is a declaration. */
+    private fun isClosed(v: Int): Boolean = bounds.hasLower(v) && bounds.hasUpper(v)
 
     /**
-     * Every declared value set, or `null` when the model states bounds alone.
-     *
-     * Handed back without copying, so a consumer that folds root deductions into it mutates the
-     * declaration it was built from — which is exactly what the propagation projection owns its own array
-     * for.
+     * Value set column [v] declares, or `null` when the model admits its whole [bounds] range — including
+     * every column with an open side, whose stated domain is an invented box rather than a declaration.
      */
-    internal fun allDeclaredOrNull(): Array<IntDomain>? = declared
+    fun declaredOrNull(v: Int): IntDomain? = if (isClosed(v)) stated?.get(v) else null
 
     /**
-     * Finite value set of column [v], materialized from [bounds] when the model admits its whole range.
+     * Finite domain of column [v] for a lane that must branch on it: the box a caller supplied, else the
+     * closed [bounds] range.
      *
-     * Rejects a column with an open side: no finite set is declared for it, and inventing an endpoint is a
-     * decision for the lane that needs one.
+     * This is the finite reading, not the logical one — the box it returns for an open-marked column has an
+     * invented endpoint. A consumer reasoning about the model reads [declaredOrNull] and [bounds].
      */
-    fun finiteDomain(v: Int): IntDomain = declared?.get(v) ?: run {
-        require(bounds.hasLower(v) && bounds.hasUpper(v)) {
+    fun finiteDomain(v: Int): IntDomain = stated?.get(v) ?: run {
+        require(isClosed(v)) {
             "integer column $v has an open side and cannot enter finite preparation"
         }
         IntDomain(bounds.lower(v), bounds.upper(v))
     }
 
-    /** Every column's finite value set, materialized where the model admits its whole range. */
-    fun finiteDomains(): Array<IntDomain> = declared?.copyOf() ?: Array(size, ::finiteDomain)
+    /** Every column's finite domain, materialized where no box was supplied. */
+    fun finiteDomains(): Array<IntDomain> = stated?.copyOf() ?: Array(size, ::finiteDomain)
+
+    /** The supplied boxes, handed back without copying; the bridge a finite consumer still reads. */
+    internal fun statedOrNull(): Array<IntDomain>? = stated
 
     /**
      * These declarations over [newBounds], or `null` when the narrower range leaves a declared value set
      * empty.
      *
-     * A bound rewrite proves a column cannot leave [newBounds]; a value set it already declared still
-     * holds, so the two intersect rather than replace one another. Losing the intersection would widen the
-     * column, and taking [newBounds] as the whole declaration is that loss.
+     * A declared value set survives a bound rewrite: the two intersect rather than replace one another, so
+     * a non-contiguous column does not widen back to its hull. A column the source left open declares
+     * nothing, so a bound proved for it replaces its box outright — intersecting there would let an
+     * invented endpoint refute a range the model never excluded.
      */
     fun rebounded(newBounds: IntBounds): SourceIntDomains? {
         require(newBounds.size == size) { "rebounding ${newBounds.size} columns over a model of $size" }
-        val current = declared ?: return SourceIntDomains(newBounds, null)
+        val current = stated ?: return SourceIntDomains(newBounds, null)
         val next = Array(size) { v ->
-            var domain = current[v]
-            if (newBounds.hasLower(v) && newBounds.lower(v) > domain.min) {
-                if (newBounds.lower(v) > domain.max) return null
-                domain = domain.withMinAtLeast(newBounds.lower(v))
+            val declaration = declaredOrNull(v)
+            if (declaration == null) {
+                reboxed(v, current[v], newBounds)
+            } else {
+                narrowed(declaration, v, newBounds) ?: return null
             }
-            if (newBounds.hasUpper(v) && newBounds.upper(v) < domain.max) {
-                if (newBounds.upper(v) < domain.min) return null
-                domain = domain.withMaxAtMost(newBounds.upper(v))
-            }
-            domain
         }
         return SourceIntDomains(newBounds, next)
+    }
+
+    /** [box] replaced by the proved range, keeping it only while the column stays open. */
+    private fun reboxed(v: Int, box: IntDomain, newBounds: IntBounds): IntDomain =
+        if (newBounds.hasLower(v) && newBounds.hasUpper(v)) {
+            IntDomain(newBounds.lower(v), newBounds.upper(v))
+        } else {
+            box
+        }
+
+    /** [declaration] intersected with column [v]'s range in [newBounds], or `null` when nothing remains. */
+    private fun narrowed(declaration: IntDomain, v: Int, newBounds: IntBounds): IntDomain? {
+        var domain = declaration
+        if (newBounds.hasLower(v) && newBounds.lower(v) > domain.min) {
+            if (newBounds.lower(v) > domain.max) return null
+            domain = domain.withMinAtLeast(newBounds.lower(v))
+        }
+        if (newBounds.hasUpper(v) && newBounds.upper(v) < domain.max) {
+            if (newBounds.upper(v) < domain.min) return null
+            domain = domain.withMaxAtMost(newBounds.upper(v))
+        }
+        return domain
     }
 
     /** The two shapes a source declaration comes in: a bound range, or explicit value sets. */
@@ -87,13 +110,13 @@ class SourceIntDomains internal constructor(
         fun ofBounds(bounds: IntBounds): SourceIntDomains = SourceIntDomains(bounds, null)
 
         /**
-         * Columns declared by the explicit value sets [domains].
+         * Columns whose finite domains are [domains].
          *
          * [modelBounds] states the model-level range when the caller retains one across a rebuild;
          * otherwise the range is read off [domains] and the sides [openLo] / [openHi] mark — or their
-         * packed forms — are recorded as open, because a finite endpoint a lane invented to close an open
-         * side is an artefact rather than a declaration. [shared] hands [domains] itself to the result
-         * instead of a copy, for the projection that owns the array it passes in.
+         * packed forms — are recorded as open. An open-marked column's entry is a fallback box, so it
+         * declares nothing; see [declaredOrNull]. [shared] hands [domains] itself to the result instead of
+         * a copy, for the projection that owns the array it passes in.
          */
         internal fun ofDomains(
             domains: Array<IntDomain>,

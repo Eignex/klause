@@ -66,7 +66,12 @@ open class Problem(
      */
     val intBounds: IntBounds get() = declaredIntDomains.bounds
 
-    /** Value set declared for [v], or `null` when the model admits its whole [intBounds] range. */
+    /**
+     * Value set declared for [v], or `null` when the model admits its whole [intBounds] range.
+     *
+     * A column with an open side declares nothing, whatever finite box a lane materialized for it; read
+     * that box through [requireFiniteIntDomains] and only for finite work.
+     */
     fun intDomainOrNull(v: Int): IntDomain? = declaredIntDomains.declaredOrNull(v)
 
     /**
@@ -75,7 +80,7 @@ open class Problem(
      * A compatibility bridge for the finite consumers that still read their domains off a raw [Problem];
      * see [requireFiniteIntDomains].
      */
-    val hasFiniteIntDomains: Boolean get() = declaredIntDomains.allDeclaredOrNull() != null
+    val hasFiniteIntDomains: Boolean get() = declaredIntDomains.statedOrNull() != null
 
     /**
      * Every declared value set, rejecting a model that states bounds alone.
@@ -84,7 +89,7 @@ open class Problem(
      * [com.eignex.klause.propagation.BakedProblem], which states them in its own type. Consumers still
      * reading them off a raw [Problem] go through here until they take a `BakedProblem` parameter.
      */
-    fun requireFiniteIntDomains(): Array<IntDomain> = requireNotNull(declaredIntDomains.allDeclaredOrNull()) {
+    fun requireFiniteIntDomains(): Array<IntDomain> = requireNotNull(declaredIntDomains.statedOrNull()) {
         "finite CP state requested for a problem that declares integer bounds alone"
     }
 

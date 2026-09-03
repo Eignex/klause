@@ -1,6 +1,5 @@
 package com.eignex.klause.solver.pipeline
 
-import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.presolve.OpenPresolveResult
 import com.eignex.klause.presolve.PreparedSource
@@ -195,9 +194,7 @@ class OpenTheoryEngine internal constructor(
             OpenPresolveResult.Refuted -> return OpenTheoryResult.Unsat(stats.finish(state))
             is OpenPresolveResult.Tightened -> closed.spec
         }
-        val cpDomains = plan.cpIntVars.associateWith { column ->
-            IntDomain(model.intBounds.lower(column), model.intBounds.upper(column))
-        }
+        val cpDomains = plan.cpSourceDomains(model)
         val planned = plan.search(
             model,
             cpDomains,

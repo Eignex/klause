@@ -5458,8 +5458,6 @@ final class com.eignex.klause.ir/RealVars : com.eignex.klause.ir/VarList { // co
 final class com.eignex.klause.ir/SourceIntDomains { // com.eignex.klause.ir/SourceIntDomains|null[0]
     final val bounds // com.eignex.klause.ir/SourceIntDomains.bounds|{}bounds[0]
         final fun <get-bounds>(): com.eignex.klause.ir/IntBounds // com.eignex.klause.ir/SourceIntDomains.bounds.<get-bounds>|<get-bounds>(){}[0]
-    final val hasDeclaredDomains // com.eignex.klause.ir/SourceIntDomains.hasDeclaredDomains|{}hasDeclaredDomains[0]
-        final fun <get-hasDeclaredDomains>(): kotlin/Boolean // com.eignex.klause.ir/SourceIntDomains.hasDeclaredDomains.<get-hasDeclaredDomains>|<get-hasDeclaredDomains>(){}[0]
     final val size // com.eignex.klause.ir/SourceIntDomains.size|{}size[0]
         final fun <get-size>(): kotlin/Int // com.eignex.klause.ir/SourceIntDomains.size.<get-size>|<get-size>(){}[0]
 
@@ -9820,6 +9818,7 @@ final class com.eignex.klause.solver.pipeline/ComponentPlan { // com.eignex.klau
         final fun <get-unplaceable>(): com.eignex.klause.solver.pipeline/UnplaceableColumn? // com.eignex.klause.solver.pipeline/ComponentPlan.unplaceable.<get-unplaceable>|<get-unplaceable>(){}[0]
 
     final fun cpProjection(com.eignex.klause.ir/Problem, kotlin.collections/Map<kotlin/Int, com.eignex.klause.ir/IntDomain>): com.eignex.klause.solver.pipeline/CpProblemProjection // com.eignex.klause.solver.pipeline/ComponentPlan.cpProjection|cpProjection(com.eignex.klause.ir.Problem;kotlin.collections.Map<kotlin.Int,com.eignex.klause.ir.IntDomain>){}[0]
+    final fun cpSourceDomains(com.eignex.klause.ir/Problem): kotlin.collections/Map<kotlin/Int, com.eignex.klause.ir/IntDomain> // com.eignex.klause.solver.pipeline/ComponentPlan.cpSourceDomains|cpSourceDomains(com.eignex.klause.ir.Problem){}[0]
     final fun factorOwner(kotlin/Int): com.eignex.klause.solver.pipeline/FactorOwner // com.eignex.klause.solver.pipeline/ComponentPlan.factorOwner|factorOwner(kotlin.Int){}[0]
     final fun intOwner(kotlin/Int): com.eignex.klause.solver.pipeline/IntVariableOwner // com.eignex.klause.solver.pipeline/ComponentPlan.intOwner|intOwner(kotlin.Int){}[0]
     final fun theoryFragment(com.eignex.klause.ir/Problem): com.eignex.klause.ir/Problem // com.eignex.klause.solver.pipeline/ComponentPlan.theoryFragment|theoryFragment(com.eignex.klause.ir.Problem){}[0]

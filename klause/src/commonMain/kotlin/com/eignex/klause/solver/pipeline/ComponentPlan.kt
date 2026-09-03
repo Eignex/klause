@@ -110,6 +110,18 @@ class ComponentPlan internal constructor(
         )
     }
 
+    /**
+     * Each CP-owned column's finite domain, materialized from what [spec] declares for it.
+     *
+     * The bound hull is the wrong reading: a column that admits less than its range would be searched
+     * over values the model excludes, and the search would answer with one of them. Call this after any
+     * open-bound closure, so a side a bound proved is the side the domain gets.
+     */
+    fun cpSourceDomains(spec: Problem): Map<Int, IntDomain> {
+        requireBelongsTo(spec)
+        return cpIntVars.associateWith { column -> spec.declaredIntDomains.finiteDomain(column) }
+    }
+
     /** Source view consumed by the selected theory component. */
     fun theoryFragment(spec: Problem): Problem = fragment(spec) { it != FactorOwner.CP }
 
