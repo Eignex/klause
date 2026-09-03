@@ -70,6 +70,31 @@ class ComponentPlan internal constructor(
         requireBelongsTo(spec)
     }
 
+    /**
+     * This plan for [spec], the model it was selected from without the factor a caller appended to it.
+     *
+     * Column ownership and every remaining factor's owner are the ones already selected, so the finite
+     * projection is untouched and the theory fragment only loses a row — and a complete theory that
+     * decides a fragment decides a subset of it. A caller whose own row belongs to some rounds and not
+     * others selects ownership once from the shape carrying it, then drops it from plan and model
+     * together.
+     *
+     * [spec] is what makes the drop checkable: only a model one factor shorter than this plan can be the
+     * one the appended row was added to, so a plan that never carried an appended factor is refused here
+     * rather than silently losing a row of the model.
+     */
+    internal fun withoutAppendedFactor(spec: Problem): ComponentPlan {
+        require(spec.numIntVars == intOwners.size && spec.factors.size == factorOwners.size - 1) {
+            "dropping an appended factor needs the model the plan was selected from, minus that factor"
+        }
+        return ComponentPlan(
+            intOwners,
+            factorOwners.copyOfRange(0, factorOwners.size - 1),
+            theoryPipeline,
+            unplaceable,
+        )
+    }
+
     /** Build the compact finite problem owned by the CP component. */
     fun cpProjection(spec: Problem, cpDomains: Map<Int, IntDomain>): CpProblemProjection {
         requireBelongsTo(spec)
