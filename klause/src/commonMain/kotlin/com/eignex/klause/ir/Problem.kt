@@ -75,10 +75,13 @@ open class Problem(
     fun intDomainOrNull(v: Int): IntDomain? = declaredIntDomains.declaredOrNull(v)
 
     /**
-     * True when the model declares an explicit value set for every integer column.
+     * True when a value-set entry exists for every integer column, so [requireFiniteIntDomains] answers
+     * instead of rejecting.
      *
-     * A compatibility bridge for the finite consumers that still read their domains off a raw [Problem];
-     * see [requireFiniteIntDomains].
+     * A weaker question than [intDomainOrNull] answering for every column: an open-marked column's entry
+     * is a fallback box and declares nothing, so this stays true while [intDomainOrNull] answers `null`
+     * for that column. A compatibility bridge for the finite consumers that still read their domains off
+     * a raw [Problem]; see [requireFiniteIntDomains].
      */
     val hasFiniteIntDomains: Boolean get() = declaredIntDomains.statedOrNull() != null
 
