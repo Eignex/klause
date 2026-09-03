@@ -35,6 +35,12 @@ kotlin {
             implementation("com.eignex:kpermute:1.2.0")
             implementation("com.ionspin.kotlin:bignum:0.3.10")
         }
+        jvmMain.dependencies {
+            // The bundled HiGHS HFactor, which koblas offers as a basis-solver backend. Present only
+            // here: the binding is JVM-only, and every other target reaches the same seam through
+            // koblas's portable product-form solver.
+            implementation("com.eignex:koblas-hfactor:0.1.1-SNAPSHOT")
+        }
         commonTest.dependencies {
             implementation("org.jetbrains.kotlinx:kotlinx-serialization-core:1.11.0")
             implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")

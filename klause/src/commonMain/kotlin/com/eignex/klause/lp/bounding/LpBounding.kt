@@ -127,6 +127,9 @@ private fun LpEngine.solveNode(
         workLimit = nodeWorkBudget(),
         trackDegeneracy = adaptiveWork,
     )
+    // The engine this displaces holds a basis factorization, which can be a native object. Releasing it
+    // here rather than leaving it to a cleaner keeps a long search from carrying one per rebuilt matrix.
+    nodeSimplex?.close()
     nodeSimplex = fresh
     return fresh to fresh.solve(warm)
 }
