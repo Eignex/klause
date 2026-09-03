@@ -76,6 +76,25 @@ class CpSearchComponentTest {
     }
 
     @Test
+    fun `a run whose fixpoint the deadline cut surfaces no model`() {
+        // (x0 ∨ x1): the traversal's first decision is x0 = false, which wakes the clause with no true
+        // blocker to short-cut it, so the armed deadline cuts that fixpoint. Descending on the state it
+        // leaves reaches x1 = false — a leaf whose assignment falsifies the clause.
+        var armed = false
+        val propagation = PropagationSession(
+            Problem(2, 0, emptyArray(), arrayOf(Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))))),
+            Cancellation { armed },
+            propagationCancelFloor = 0,
+        )
+        val session = SearchSession(listOf(CpSearchComponent(propagation)))
+        assertIs<ComponentResult.Consistent>(session.initialize())
+        val run = session.openRun(2)
+        armed = true
+
+        assertIs<SearchRunEvent.Indeterminate>(run.next())
+    }
+
+    @Test
     fun `CP explains a Boolean it published when the shared analyzer asks`() {
         val propagation = PropagationSession(
             Problem(
