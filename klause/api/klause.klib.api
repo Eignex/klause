@@ -9283,8 +9283,8 @@ final class com.eignex.klause.propagation/BakedProblem : com.eignex.klause.ir/Pr
     final val bakeElapsed // com.eignex.klause.propagation/BakedProblem.bakeElapsed|{}bakeElapsed[0]
         final fun <get-bakeElapsed>(): kotlin.time/Duration // com.eignex.klause.propagation/BakedProblem.bakeElapsed.<get-bakeElapsed>|<get-bakeElapsed>(){}[0]
 
-    final fun intDomain(kotlin/Int): com.eignex.klause.ir/IntDomain // com.eignex.klause.propagation/BakedProblem.intDomain|intDomain(kotlin.Int){}[0]
-    final fun intDomains(): kotlin/Array<com.eignex.klause.ir/IntDomain> // com.eignex.klause.propagation/BakedProblem.intDomains|intDomains(){}[0]
+    final fun rootIntDomain(kotlin/Int): com.eignex.klause.ir/IntDomain // com.eignex.klause.propagation/BakedProblem.rootIntDomain|rootIntDomain(kotlin.Int){}[0]
+    final fun rootIntDomains(): kotlin/Array<com.eignex.klause.ir/IntDomain> // com.eignex.klause.propagation/BakedProblem.rootIntDomains|rootIntDomains(){}[0]
 }
 
 final class com.eignex.klause.propagation/CpSearchComponent : com.eignex.klause.solver.search/SearchBrancher, com.eignex.klause.solver.search/SearchConflictResolver, com.eignex.klause.solver.search/SearchModelBlocker { // com.eignex.klause.propagation/CpSearchComponent|null[0]

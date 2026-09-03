@@ -210,12 +210,10 @@ fun Problem.componentPlan(preferFinite: Boolean = false): ComponentPlan {
             else -> FactorOwner.CP
         }
     }
+    val theoryKept = factorOwners.indices.filter { factorOwners[it] != FactorOwner.CP }
     val theoryFragment = withFactors(
-        factorOwners.indices.asSequence()
-            .filter { factorOwners[it] != FactorOwner.CP }
-            .map { factors[it] }
-            .toList()
-            .toTypedArray(),
+        Array(theoryKept.size) { factors[theoryKept[it]] },
+        impliedFactorMask?.let { mask -> BooleanArray(theoryKept.size) { mask[theoryKept[it]] } },
     )
     val route = when {
         unownedOpenColumn >= 0 -> ProblemPipeline.UNSUPPORTED_OPEN

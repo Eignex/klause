@@ -13,7 +13,7 @@ import kotlin.time.TimeSource
 
 /**
  * A `Problem` whose root bake is guaranteed to have run, and the only problem type that owns finite
- * search domains: [intDomain] carries the root-propagation fold for every integer column, which is what
+ * search domains: [rootIntDomain] carries the root-propagation fold for every integer column, which is what
  * the finite engines, the model counter, sampling and the LP engine branch and propagate over. Produced
  * only by `Problem.bake` (or the presolve pipeline). A raw `Problem` is the supertype, so handing an
  * un-baked model to a solver is a compile error — the caller must `Problem.bake` it first, which is where
@@ -79,16 +79,22 @@ class BakedProblem internal constructor(
         }
     }
 
-    /** Root-propagated finite domain of integer column [v]. */
-    fun intDomain(v: Int): IntDomain = foldedIntDomains[v]
+    /**
+     * Root-propagated finite domain of integer column [v].
+     *
+     * The root domain, not the live one: `PropagationSession.intDomain` narrows as search descends and is
+     * what a propagator, cut, or relaxation reads at a node. Reading a root domain where the live one is
+     * meant loses every decision above the node.
+     */
+    fun rootIntDomain(v: Int): IntDomain = foldedIntDomains[v]
 
     /**
      * Every root-propagated finite domain, in column order.
      *
      * Copied: this projection owns the array the fold writes into, so a consumer that keeps one gets its
-     * own. Read a single column through [intDomain] rather than copying per access.
+     * own. Read a single column through [rootIntDomain] rather than copying per access.
      */
-    fun intDomains(): Array<IntDomain> = foldedIntDomains.copyOf()
+    fun rootIntDomains(): Array<IntDomain> = foldedIntDomains.copyOf()
 
     internal constructor(
         numBoolVars: Int,
