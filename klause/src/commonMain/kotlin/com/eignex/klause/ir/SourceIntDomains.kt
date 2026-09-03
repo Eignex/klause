@@ -82,7 +82,13 @@ class SourceIntDomains internal constructor(
         return SourceIntDomains(newBounds, next)
     }
 
-    /** [box] replaced by the proved range, keeping it only while the column stays open. */
+    /**
+     * [box] replaced by the proved range, keeping it only while the column stays open.
+     *
+     * A box kept over a column that stayed open can be wider than one side [newBounds] proved. That
+     * weakens the box, never the model — the bound came from the rows, which still enforce it — and
+     * narrowing it here has no representation to land in, since a half-open range is not an [IntDomain].
+     */
     private fun reboxed(v: Int, box: IntDomain, newBounds: IntBounds): IntDomain =
         if (newBounds.hasLower(v) && newBounds.hasUpper(v)) {
             IntDomain(newBounds.lower(v), newBounds.upper(v))

@@ -24,7 +24,7 @@ class BakedProblemTest {
             factors = listOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 3)),
         )
 
-        assertEquals(3, problem.bake().intDomain(0).max, "bake carries the x <= 3 tightening")
+        assertEquals(3, problem.bake().rootIntDomain(0).max, "bake carries the x <= 3 tightening")
     }
 
     @Test
@@ -38,8 +38,8 @@ class BakedProblemTest {
 
         val baked = problem.bake()
 
-        assertEquals(IntDomain(0, 3), baked.intDomain(0))
-        assertEquals(IntDomain(0, 10), baked.intDomain(1))
+        assertEquals(IntDomain(0, 3), baked.rootIntDomain(0))
+        assertEquals(IntDomain(0, 10), baked.rootIntDomain(1))
     }
 
     @Test
@@ -51,7 +51,7 @@ class BakedProblemTest {
             factors = arrayOf<Factor>(),
         )
 
-        assertEquals(holey(), problem.bake().intDomain(0))
+        assertEquals(holey(), problem.bake().rootIntDomain(0))
     }
 
     @Test
@@ -63,9 +63,9 @@ class BakedProblemTest {
             factors = arrayOf<Factor>(),
         ).bake()
 
-        baked.intDomains()[0] = IntDomain(7, 7)
+        baked.rootIntDomains()[0] = IntDomain(7, 7)
 
-        assertEquals(IntDomain(0, 10), baked.intDomain(0))
+        assertEquals(IntDomain(0, 10), baked.rootIntDomain(0))
     }
 
     @Test
@@ -76,7 +76,7 @@ class BakedProblemTest {
             factors = emptyArray(),
         )
 
-        assertEquals(IntDomain(2, 9), problem.bake().intDomain(0))
+        assertEquals(IntDomain(2, 9), problem.bake().rootIntDomain(0))
     }
 
     @Test

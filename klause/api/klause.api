@@ -7438,8 +7438,8 @@ public final class com/eignex/klause/propagation/Assumptions$Companion {
 
 public final class com/eignex/klause/propagation/BakedProblem : com/eignex/klause/ir/Problem {
 	public final fun getBakeElapsed-UwyO8pc ()J
-	public final fun intDomain (I)Lcom/eignex/klause/ir/IntDomain;
-	public final fun intDomains ()[Lcom/eignex/klause/ir/IntDomain;
+	public final fun rootIntDomain (I)Lcom/eignex/klause/ir/IntDomain;
+	public final fun rootIntDomains ()[Lcom/eignex/klause/ir/IntDomain;
 }
 
 public abstract interface class com/eignex/klause/propagation/ClauseExchange {
