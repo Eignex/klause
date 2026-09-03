@@ -1066,7 +1066,7 @@ class SmtLibTest {
         if (parsed.model.sourceRoute() == ProblemPipeline.EXACT_LIRA) {
             return liaSat(parsed.model).ints[parsed.intVarNames.values.first()]
         }
-        val r = BacktrackSolver(parsed.model.bake().bake()).solve(BacktrackParams())
+        val r = BacktrackSolver(parsed.model.bake()).solve(BacktrackParams())
         assertTrue(r is SolveResult.Sat, "expected SAT, got $r")
         return BigInteger.fromLong(r.assignment.ints[parsed.intVarNames.values.first()])
     }
