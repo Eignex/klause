@@ -99,10 +99,17 @@ data class LpPlan(
      * branch variable by its fresh fractional LP value — an int var splits `x ≤ floor(lp)` (the
      * dichotomy separating the fractional LP point), an integral value dives round-toward-LP. Pure
      * search-order guidance — it changes which solutions are found first, never the optimum or
-     * feasibility — so it is correctness-neutral. Off by default; a no-op for variables with no
-     * fresh LP value.
+     * feasibility — so it is correctness-neutral. A no-op for variables with no fresh LP value, and
+     * for any emphasis that leaves [bounding] off, since there is then no LP value to steer by.
+     *
+     * On, because branching on the relaxation is what makes a relaxation worth solving on a MIP: over
+     * the MIPLIB band a reference solver proves quickly, it wins 5 instances and loses none, turning
+     * one timeout into a proof at a sixth of the budget. The measurement that previously justified
+     * leaving it off could not have seen that — it averaged over CP-structured models where the LP
+     * prunes nothing and over instances where no solution is found at all, and this only ever changes
+     * which solution is found first.
      */
-    val branching: Boolean = false,
+    val branching: Boolean = true,
     /**
      * LP-rounding primal heuristic: before search, solve the root LP and try to round its
      * fractional point into a feasible assignment by pinning each variable toward its LP value and
