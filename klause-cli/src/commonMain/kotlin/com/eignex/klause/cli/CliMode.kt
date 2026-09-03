@@ -68,7 +68,11 @@ internal class CommonOptions {
     /** `--lp CEILING`: the LP-relaxation ceiling for the portfolio — an emphasis (`off` | `conservative`
      *  | `default` | `aggressive`) optionally followed by `+/-<technique>` deltas (e.g.
      *  `aggressive,-cuts`). Absent ⇒ uncapped (the pool spreads the LP intensity itself, so LP is on by
-     *  default); `off` disables LP across the portfolio. Parsed by `LpConfig.parse`. */
+     *  default); `off` disables LP across the portfolio. Parsed by `LpConfig.parse`.
+     *
+     *  The bare-invocation default is `aggressive`, meaning "uncapped" for a pool. On a
+     *  single-solver route there is nothing to cap, so it reads as a literal emphasis and enables
+     *  every `EXHAUSTIVE` technique — see #1887. */
     var lp: String? = null
 
     /** Raw repeatable `--param key=value` engine params; interpreted per engine (see [EngineParams]). */
