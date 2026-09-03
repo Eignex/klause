@@ -4,6 +4,7 @@ import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.bounding.LpConfig
+import com.eignex.klause.lp.bounding.LpEmphasis
 import com.eignex.klause.presolve.AffinePivotOrder
 import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.presolve.PresolveConfig
@@ -310,10 +311,27 @@ internal object SolveCore {
     ) {
         // `--lp CEILING` selects the LP emphasis for the naked engine too (it powers the single-engine
         // LP-success measurement under `-s`); the flag wins, then the `klause.lp` env default, else the
-        // route default (LP off for naked CP).
-        val lpConfig = (common.lp ?: defaultLp())?.let {
-            runCatching { LpConfig.parse(it) }.getOrElse { e -> usageError("--lp: ${e.message}") }
-        } ?: LpConfig.OFF
+        // route default.
+        //
+        // This route is propagation only, for every input. It exists for the CSP/COP fixed-search
+        // track, where a model states its own search and a relaxation bound is not among the permitted
+        // deductions; no other format has an interpretation of it at all. Making that unconditional
+        // rather than keying it on whether an annotation was found is the point: a rule that holds for
+        // some inputs and not others is what let an `engine=fixed` sweep silently measure a solver with
+        // no LP, and read the result as a property of the LP.
+        //
+        // So an explicit `--lp` asking for anything but `off` is refused rather than quietly dropped —
+        // the treatment the selector `--param`s already get here. A relaxation on one deterministic
+        // solver is `-e cp --param bt-arm=<label>`, which is a pool of one and takes the portfolio's
+        // LP surface with it.
+        if (common.lp != null) {
+            val asked = runCatching { LpConfig.parse(common.lp!!) }
+                .getOrElse { e -> usageError("--lp: ${e.message}") }
+            if (asked.emphasis != LpEmphasis.OFF) {
+                usageError("--lp: `-e fixed` solves by propagation alone; only `off` applies here")
+            }
+        }
+        val lpConfig = LpConfig.OFF
         executeFinite(
             FiniteSolveRequest(
                 shape = solvable.finiteShape,
