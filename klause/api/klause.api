@@ -4670,6 +4670,7 @@ public final class com/eignex/klause/lp/bounding/LpPlan {
 	public final fun getFlowCoverCuts ()Z
 	public final fun getGccCount ()Z
 	public final fun getGomory ()Z
+	public final fun getGomoryEnabled ()Z
 	public final fun getImpliedBoundCuts ()Z
 	public final fun getKnapsackLagrangian ()Z
 	public final fun getLagrangian ()Z
@@ -4680,6 +4681,7 @@ public final class com/eignex/klause/lp/bounding/LpPlan {
 	public final fun getLpWallBudgetFraction ()D
 	public final fun getMdd ()Z
 	public final fun getMir ()Z
+	public final fun getMirEnabled ()Z
 	public final fun getNValue ()Z
 	public final fun getObjectiveCone ()Z
 	public final fun getObjectiveShaving ()Z

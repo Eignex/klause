@@ -579,8 +579,8 @@ internal class ResumableMinimize(
         // Drop hulls that add no root strength before the harvest + persistent base read the relaxer.
         if (lpEngine.params.lpPlan.pruneHulls) lpEngine.pruneIneffectiveHulls(token)
         val relaxer = lpEngine.lpRelaxer ?: return
-        val gomory = lpEngine.params.lpPlan.cuts && lpEngine.params.lpPlan.gomory
-        val mir = lpEngine.params.lpPlan.cuts && lpEngine.params.lpPlan.mir
+        val gomory = lpEngine.params.lpPlan.gomoryEnabled
+        val mir = lpEngine.params.lpPlan.mirEnabled
         if (lpEngine.lpSeparators.isNotEmpty() || gomory || mir) {
             lpEngine.cutPool.addAll(
                 lpEngine.harvestRootCuts(
