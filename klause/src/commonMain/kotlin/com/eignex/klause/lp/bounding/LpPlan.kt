@@ -417,4 +417,17 @@ data class LpPlan(
      * [bounding]; off by default.
      */
     val booleanRlt: Boolean = false,
-)
+) {
+    /**
+     * Whether Gomory integrality cuts actually run: [gomory] permits them, [cuts] admits the
+     * separators at all.
+     *
+     * Derived here rather than re-formed per consumer. [gomory] and [mir] read as enabled on their
+     * own, so a caller that reads either without the [cuts] conjunction silently separates cuts the
+     * plan does not permit — and that conjunction was previously spelled out at each call site.
+     */
+    val gomoryEnabled: Boolean get() = cuts && gomory
+
+    /** Whether MIR cuts actually run, on the same terms as [gomoryEnabled]. */
+    val mirEnabled: Boolean get() = cuts && mir
+}
