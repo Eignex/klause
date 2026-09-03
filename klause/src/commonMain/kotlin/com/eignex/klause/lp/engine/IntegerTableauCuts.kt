@@ -60,6 +60,7 @@ internal fun integerTableauCuts(
             listOf((col - n) to 1.0) // slack column is the unit vector e_{col−n}
         }
     }
+    ensureKoblasBackends()
     val lu = SparseMatrix.ofColumns(m, m, columns).lu()
     if (lu.singular) return emptyList()
 

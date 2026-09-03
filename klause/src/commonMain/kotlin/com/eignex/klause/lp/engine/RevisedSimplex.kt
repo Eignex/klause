@@ -266,7 +266,10 @@ internal class RevisedSimplex(
     /** This engine's basis solver, built on first use. */
     private fun solver(): F64BasisSolver = basisSolver ?: newSolver()
 
-    private fun newSolver(): F64BasisSolver = koblas.basisSolver(columns).also { basisSolver = it }
+    private fun newSolver(): F64BasisSolver {
+        ensureKoblasBackends()
+        return koblas.basisSolver(columns).also { basisSolver = it }
+    }
 
     override fun close() {
         basisSolver?.close()
