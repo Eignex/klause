@@ -64,6 +64,16 @@ class SourceIntDomainsTest {
     }
 
     @Test
+    fun `a shared declaration reads the array it was given rather than a copy`() {
+        val domains = arrayOf(IntDomain(0, 1))
+        val declared = SourceIntDomains.ofDomains(domains, shared = true)
+
+        domains[0] = IntDomain(1, 1)
+
+        assertEquals(IntDomain(1, 1), declared.finiteDomain(0), "an already-folded view owns the array it passes")
+    }
+
+    @Test
     fun `rebounding an open column replaces its box rather than intersecting it`() {
         val declared = SourceIntDomains.ofDomains(
             arrayOf(IntDomain(0, 6)),

@@ -139,6 +139,11 @@ class SourceIntDomains internal constructor(
             require(openHi == null || openHi.size == domains.size) {
                 "openHi size ${openHi?.size} != column count ${domains.size}"
             }
+            // [size] reads the bounds, so a retained range of a different length would leave the value
+            // sets addressable past it with nothing left to catch the mismatch.
+            require(modelBounds == null || modelBounds.size == domains.size) {
+                "modelBounds size ${modelBounds?.size} != column count ${domains.size}"
+            }
             val bounds = modelBounds ?: IntBounds.fromFiniteBounds(
                 lowerBounds = LongArray(domains.size) { domains[it].min },
                 upperBounds = LongArray(domains.size) { domains[it].max },
