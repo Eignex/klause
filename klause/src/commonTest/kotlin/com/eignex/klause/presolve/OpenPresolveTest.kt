@@ -278,4 +278,25 @@ class OpenPresolveTest {
 
         assertIs<OpenPresolveResult.Refuted>(spec.closeOpenBounds())
     }
+
+    @Test
+    fun `a round that closes no open side keeps the narrowing it proved for a closed one`() {
+        // Column 0 is open above and no row mentions it, so nothing closes; x1 <= 4 still narrows the
+        // declared range of column 1.
+        val spec = Problem(
+            numBoolVars = 0,
+            intBounds = IntBounds.fromModelBounds(
+                longArrayOf(0, 0),
+                longArrayOf(0, 9),
+                null,
+                Bits(2).also { it.set(0) },
+            ),
+            factors = arrayOf<Factor>(row(1 to 1L, op = LinearOp.LE, bound = 4L)),
+        )
+
+        val result = assertIs<OpenPresolveResult.Tightened>(spec.closeOpenBounds())
+
+        assertEquals(0, result.closedSides)
+        assertEquals(4L, result.spec.intBounds.upper(1))
+    }
 }

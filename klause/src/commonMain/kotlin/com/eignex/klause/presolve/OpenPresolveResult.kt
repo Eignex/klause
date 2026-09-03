@@ -131,10 +131,10 @@ internal fun Problem.closeOpenBounds(cancellation: Cancellation = Cancellation.N
         if (declared[v].lo == null && bounds[v].lo != null) closed++
         if (declared[v].hi == null && bounds[v].hi != null) closed++
     }
-    // A declared value set the proved range empties refutes the model whether or not that range also
-    // closed an open side, so the intersection runs ahead of the no-closure shortcut rather than behind it.
+    // The proved range narrows sides that were already closed as well as open ones, and either kind of
+    // narrowing can empty a declared value set, so it is taken whether or not an open side closed. A
+    // column that stayed open keeps its box; only one the proof closed on both sides is reboxed.
     val tighter = problem.withBounds(bounds) ?: return OpenPresolveResult.Refuted
-    if (closed == 0) return OpenPresolveResult.Tightened(problem, closedSides = 0)
     return OpenPresolveResult.Tightened(tighter, closedSides = closed)
 }
 
