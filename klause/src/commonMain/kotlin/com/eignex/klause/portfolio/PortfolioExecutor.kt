@@ -20,7 +20,9 @@ interface PortfolioExecutor : AutoCloseable {
      * once per **strict global improvement**, tagged with the producing worker — the attribution
      * entry point for anytime telemetry / per-arm credit. The callback is serialised: the parallel
      * executor holds a lock across it, the single-core one is inherently sequential, so the consumer
-     * never sees concurrent invocations.
+     * never sees concurrent invocations. It also fires in the order the shared incumbent installed the
+     * improvements rather than the order the producing threads reached the callback, so a consumer
+     * scoring each improvement against the one before it never reads a regression.
      */
     fun minimize(
         cancellation: Cancellation = Cancellation.Never,
