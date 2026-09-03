@@ -136,6 +136,9 @@ class Portfolio(
                 }
             },
         )
+        // Every worker has joined, so a version still waiting on one that died between its install and its
+        // report is never coming; hand over what waited behind it rather than dropping it.
+        if (relay != null && onImprovement != null) relay.flush(onImprovement)
         val stats = PortfolioReduction.foldStats(results) { it.stats }
 
         // A direct Optimal claim is only produced by a worker not running under shared bounds
@@ -180,6 +183,11 @@ class Portfolio(
                     }
                 }
             },
+            // A producer that died between its install and its report leaves a version nothing will fill,
+            // and everything installed after it is waiting on that version. Once the producers are done the
+            // gap is permanent, so the tail goes out rather than being silently withheld; the installs are
+            // monotone in the objective, so what survives a gap still improves strictly.
+            onProducersFinished = { emit -> relay.flush(emit) },
         )
     }
 

@@ -3,7 +3,10 @@ package com.eignex.klause.portfolio
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.atomic.AtomicInteger
 
-internal actual fun <T> parallelStream(tasks: List<(emit: (T) -> Unit) -> Unit>): Sequence<T> = sequence {
+internal actual fun <T> parallelStream(
+    tasks: List<(emit: (T) -> Unit) -> Unit>,
+    onProducersFinished: ((emit: (T) -> Unit) -> Unit)?,
+): Sequence<T> = sequence {
     val done = Any()
     val queue = LinkedBlockingQueue<Any>()
     val remaining = AtomicInteger(tasks.size)
@@ -26,6 +29,7 @@ internal actual fun <T> parallelStream(tasks: List<(emit: (T) -> Unit) -> Unit>)
         yield(next as T)
     }
     threads.forEach { it.join() }
+    yieldTail(onProducersFinished)
 }
 
 internal actual fun <T> parallelRun(tasks: List<() -> T>): List<T> {
