@@ -56,6 +56,12 @@ data class LpStats(
     /** Whether the wall-clock backstop demoted the node LP — the one policy input that is not
      *  deterministic, so a run whose counters do not reproduce is explained by this being set. */
     val wallBackstop: Boolean = false,
+    /** Whether the node LP was ever demoted to its floor budget, by either rule.
+     *
+     *  Distinct from [wallBackstop], which says only that the clock rather than the work meter decided.
+     *  Without this a demotion by the deterministic rule leaves no trace at all, so a run that spent its
+     *  budget on a throttled relaxation reads the same as one that never throttled. */
+    val demoted: Boolean = false,
     /** Certified LP solves whose model decomposed into column components (`lp-component-split`); the
      *  denominator for judging the split is [solves] on the paths that carry a sink. */
     val componentSplits: SumResult = ZERO_COUNT,
@@ -80,6 +86,7 @@ data class LpStats(
         seeded = SumResult(seeded.sum + o.seeded.sum),
         refactorizations = SumResult(refactorizations.sum + o.refactorizations.sum),
         wallBackstop = wallBackstop || o.wallBackstop,
+        demoted = demoted || o.demoted,
         componentSplits = SumResult(componentSplits.sum + o.componentSplits.sum),
         componentBlocks = MaxResult(maxOf(componentBlocks.max, o.componentBlocks.max)),
     )
@@ -108,6 +115,7 @@ internal class LpStatsSink {
     // how the other counters record units (a unit update repeated). Work is a magnitude per solve.
     private var workOpsTotal: Long = 0L
     private var wallBackstop = false
+    private var demoted = false
     private var clock: TimeMark? = null
 
     /** One node LP-bounding pass that built and solved a relaxation (the rate denominator). */
@@ -157,6 +165,11 @@ internal class LpStatsSink {
     /** Record that the wall-clock backstop, not the deterministic work rule, demoted the LP. */
     fun observeWallBackstop() {
         wallBackstop = true
+    }
+
+    /** Record that the node LP stands demoted to its floor budget, whichever rule decided. */
+    fun observeDemoted() {
+        demoted = true
     }
 
     /** Record one node LP solve's deterministic work. Accumulated in a single update: the figure runs
@@ -211,6 +224,7 @@ internal class LpStatsSink {
         pivots = pivots.read(),
         workOps = SumResult(workOpsTotal.toDouble()),
         wallBackstop = wallBackstop,
+        demoted = demoted,
         luMaxFill = luMaxFill.read(),
         luMaxDensity = luMaxDensity.read(),
         cuts = cuts.read(),
