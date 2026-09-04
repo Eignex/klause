@@ -19,7 +19,29 @@ class IntBitChannelTest {
         numIntVars = domains.size,
         intDomains = domains.toTypedArray(),
         factors = arrayOf<Factor>(),
-    )
+    ).bake()
+
+    @Test
+    fun `channelling keeps the base columns invented sides and closes the ones it appends`() {
+        val open = Problem(
+            numBoolVars = 0,
+            numIntVars = 1,
+            intDomains = arrayOf(IntDomain(0, 7)),
+            factors = arrayOf<Factor>(),
+            openIntHi = booleanArrayOf(true),
+        ).bake()
+
+        val channelled = IntBitChannel.channel(open, intArrayOf(0)).problem
+
+        assertTrue(
+            channelled.intBounds.isOpenUpper(0),
+            "the encoding bounds the column through a row, so the column itself stays open",
+        )
+        for (v in 1 until channelled.numIntVars) {
+            assertTrue(channelled.intBounds.hasUpper(v), "channel column $v is a declared 0/1 bit")
+            assertTrue(channelled.intBounds.hasLower(v), "channel column $v is a declared 0/1 bit")
+        }
+    }
 
     /** Value `x` reconstructed from its channel bits (least-significant first), offset by `min`. */
     private fun decode(model: Sample, min: Int, bits: IntArray): Long {
@@ -36,7 +58,7 @@ class IntBitChannelTest {
         assertEquals(3, ch.allBits().size)
 
         val seen = HashSet<Long>()
-        for (m in BacktrackSolver(ch.problem.bake()).enumerate(BacktrackParams())) {
+        for (m in BacktrackSolver(ch.problem).enumerate(BacktrackParams())) {
             // The original int var keeps its id, so its value is readable directly...
             val x = m.ints[0]
             // ...and the channel bits decode to the same value (the bijection the count relies on).
@@ -53,7 +75,7 @@ class IntBitChannelTest {
         val ch = IntBitChannel.channel(base, intArrayOf(0))
         assertEquals(3, ch.bitsPerVar[0].size)
 
-        val values = BacktrackSolver(ch.problem.bake()).enumerate(BacktrackParams()).map { it.ints[0] }.toList()
+        val values = BacktrackSolver(ch.problem).enumerate(BacktrackParams()).map { it.ints[0] }.toList()
         assertEquals((0L..5L).toList().sorted(), values.sorted())
         assertEquals(6, values.size)
     }
@@ -64,7 +86,7 @@ class IntBitChannelTest {
         val ch = IntBitChannel.channel(base, intArrayOf(0))
         assertTrue(ch.bitsPerVar[0].isEmpty())
         assertEquals(0, ch.allBits().size)
-        val values = BacktrackSolver(ch.problem.bake()).enumerate(BacktrackParams()).map { it.ints[0] }.toList()
+        val values = BacktrackSolver(ch.problem).enumerate(BacktrackParams()).map { it.ints[0] }.toList()
         assertEquals(listOf(4L), values)
     }
 
@@ -77,7 +99,7 @@ class IntBitChannelTest {
         assertEquals(4, ch.allBits().size)
 
         val combos = HashSet<Pair<Long, Long>>()
-        for (m in BacktrackSolver(ch.problem.bake()).enumerate(BacktrackParams())) {
+        for (m in BacktrackSolver(ch.problem).enumerate(BacktrackParams())) {
             assertEquals(m.ints[0], decode(m, 0, ch.bitsPerVar[0]))
             assertEquals(m.ints[1], decode(m, 0, ch.bitsPerVar[1]))
             combos.add(m.ints[0] to m.ints[1])
@@ -92,7 +114,7 @@ class IntBitChannelTest {
         val base = ints(List(4) { IntDomain(0, 3) }) // 4^4 = 256 combos
         val ch = IntBitChannel.channel(base, intArrayOf(0, 1, 2, 3))
         val params = BacktrackParams(maxDecisions = 10_000_000L, randomSeed = 1L)
-        val combos = BacktrackSolver(ch.problem.bake()).enumerate(params)
+        val combos = BacktrackSolver(ch.problem).enumerate(params)
             .map { listOf(it.ints[0], it.ints[1], it.ints[2], it.ints[3]) }.toHashSet()
         assertEquals(256, combos.size)
     }

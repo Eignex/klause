@@ -1,6 +1,5 @@
 package com.eignex.klause.brute
 
-import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.values
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.propagation.BakedProblem
@@ -214,7 +213,7 @@ class BruteForceSolver(override val problem: BakedProblem) :
                 // holey domains (e.g. {0,2}) must enumerate real members, never the hole.
                 DimKind.INT -> state.assignment.setInt(
                     dim.varId,
-                    problem.requireFiniteIntDomains()[dim.varId].values.valueAt(digit),
+                    problem.rootIntDomain(dim.varId).values.valueAt(digit),
                 )
             }
         }
@@ -244,20 +243,20 @@ class BruteForceSolver(override val problem: BakedProblem) :
         /** True when the total assignment space fits the caller's heuristic cap. The
          *  sampler itself accepts any size; this is purely a gating decision for callers
          *  that want brute force only when it'll finish quickly. */
-        fun fits(problem: Problem, cap: Long = DEFAULT_MAX_SPACE): Boolean {
+        fun fits(problem: BakedProblem, cap: Long = DEFAULT_MAX_SPACE): Boolean {
             val size = computeSpaceSize(problem)
             return size in 1..cap
         }
 
         /** Total space size, or [Long.MAX_VALUE] if it overflows. */
-        private fun computeSpaceSize(problem: Problem): Long {
+        private fun computeSpaceSize(problem: BakedProblem): Long {
             var size = 1L
             repeat(problem.numBoolVars) {
                 if (size > Long.MAX_VALUE / 2) return Long.MAX_VALUE
                 size *= 2
             }
-            for (d in problem.requireFiniteIntDomains()) {
-                val r = d.valueCount
+            for (v in 0 until problem.numIntVars) {
+                val r = problem.rootIntDomain(v).valueCount
                 if (r <= 0) return Long.MAX_VALUE
                 if (size > Long.MAX_VALUE / r) return Long.MAX_VALUE
                 size *= r
@@ -268,11 +267,11 @@ class BruteForceSolver(override val problem: BakedProblem) :
         /** Build chunks sized so each per-chunk product stays under [CHUNK_CAP]. Bools
          *  come first, then ints — order doesn't affect correctness, only iteration
          *  shape. */
-        private fun buildChunks(problem: Problem): List<Chunk> {
+        private fun buildChunks(problem: BakedProblem): List<Chunk> {
             val dims = ArrayList<Dim>(problem.numBoolVars + problem.numIntVars)
             for (b in 0 until problem.numBoolVars) dims.add(Dim(DimKind.BOOL, b, 2L))
             for (i in 0 until problem.numIntVars) {
-                dims.add(Dim(DimKind.INT, i, problem.requireFiniteIntDomains()[i].valueCount))
+                dims.add(Dim(DimKind.INT, i, problem.rootIntDomain(i).valueCount))
             }
             val chunks = ArrayList<Chunk>()
 

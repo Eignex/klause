@@ -10,6 +10,7 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.propagation.Assumptions
+import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.result.SatisfyResult
@@ -40,7 +41,7 @@ import com.eignex.klause.util.MutableIntIntMap
  * weight-splitting + stratification — totalizer-with-weights (pseudo-Boolean encoding)
  * is a future extension.
  */
-internal class TotalizerOptimizer(val baseProblem: Problem) {
+internal class TotalizerOptimizer(val baseProblem: BakedProblem) {
 
     /** Soft literal that should be true; cost 1 if it ends up false. Weight is fixed at
      *  1 — this optimiser is the unweighted-MaxSAT specialisation. */
@@ -106,8 +107,9 @@ internal class TotalizerOptimizer(val baseProblem: Problem) {
         val problem = Problem(
             numBoolVars = nextBoolId,
             numIntVars = baseProblem.numIntVars,
-            intDomains = baseProblem.requireFiniteIntDomains(),
+            intDomains = baseProblem.rootIntDomains(),
             factors = factors,
+            modelBounds = baseProblem.intBounds,
         )
         val solver = BacktrackSolver(problem.bake())
         val costSofts = softs.map { Oll.Soft(it.lit) }
@@ -233,8 +235,9 @@ internal class TotalizerOptimizer(val baseProblem: Problem) {
                     Problem(
                         numBoolVars = nextBoolId,
                         numIntVars = baseProblem.numIntVars,
-                        intDomains = baseProblem.requireFiniteIntDomains(),
+                        intDomains = baseProblem.rootIntDomains(),
                         factors = factors,
+                        modelBounds = baseProblem.intBounds,
                     ).bake(),
                 ).also { solver = it }
             }

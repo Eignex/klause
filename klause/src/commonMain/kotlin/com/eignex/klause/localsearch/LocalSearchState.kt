@@ -9,6 +9,7 @@ import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.localsearch.Move
 import com.eignex.klause.localsearch.movesource.ViolatedRepairs
 import com.eignex.klause.propagation.Assumptions
+import com.eignex.klause.propagation.finiteRootDomains
 import com.eignex.klause.solver.Assignment
 import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective
@@ -42,7 +43,7 @@ class LocalSearchState(
     /** The stable root domains this search was seeded from — read by invariants for a variable's
      *  original bounds. Decoupled from [problem] so the seed source (declared vs baked) can vary without
      *  the invariants caring which. */
-    val rootDomains: Array<IntDomain> = problem.requireFiniteIntDomains()
+    val rootDomains: Array<IntDomain> = problem.finiteRootDomains
 
     /** The current variable assignment. */
     val assignment: Assignment = Assignment(

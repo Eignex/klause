@@ -11,6 +11,7 @@ import com.eignex.klause.localsearch.LocalSearchSolver
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
 import com.eignex.klause.localsearch.strategy.ProbSat
+import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
@@ -39,8 +40,10 @@ class ObjectiveBoundFactorTest {
             listOf(Cardinality.atLeastOne(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true)))),
         )
         val objective = LinearObjective(boolWeights = longArrayOf(1, 1, 1))
-        val (overlay, bound) = assertIs<Pair<Problem, MutableObjectiveBound>>(objectiveBoundOverlay(problem, objective))
-        val solver = LocalSearchSolver(overlay.bake(), strategy = ProbSat()).apply { objectiveBound = bound }
+        val (overlay, bound) = assertIs<Pair<BakedProblem, MutableObjectiveBound>>(
+            objectiveBoundOverlay(problem.bake(), objective),
+        )
+        val solver = LocalSearchSolver(overlay, strategy = ProbSat()).apply { objectiveBound = bound }
 
         val result = solver.minimize(objective, LocalSearchParams(maxFlips = 50_000, randomSeed = 7))
 
@@ -59,7 +62,9 @@ class ObjectiveBoundFactorTest {
             listOf(Linear(coeffs = intArrayOf(1, 1), vars = intArrayOf(0, 1), op = LinearOp.GE, bound = 2)),
         )
         val objective = LinearObjective(intCoefficients = longArrayOf(3, -2))
-        val (overlay, bound) = assertIs<Pair<Problem, MutableObjectiveBound>>(objectiveBoundOverlay(problem, objective))
+        val (overlay, bound) = assertIs<Pair<BakedProblem, MutableObjectiveBound>>(
+            objectiveBoundOverlay(problem.bake(), objective),
+        )
         val state = LocalSearchState(overlay, Random(0))
         state.assignment.setInt(0, 4)
         state.assignment.setInt(1, 0)
@@ -96,7 +101,9 @@ class ObjectiveBoundFactorTest {
             listOf(Cardinality.atLeastOne(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true)))),
         )
         val objective = LinearObjective(boolWeights = longArrayOf(1, 1, 1))
-        val (overlay, bound) = assertIs<Pair<Problem, MutableObjectiveBound>>(objectiveBoundOverlay(problem, objective))
+        val (overlay, bound) = assertIs<Pair<BakedProblem, MutableObjectiveBound>>(
+            objectiveBoundOverlay(problem.bake(), objective),
+        )
         val state = LocalSearchState(overlay, Random(0))
         for (b in 0 until 3) state.assignment.setBool(b, true) // feasible: three true, objective 3
         state.recompute()

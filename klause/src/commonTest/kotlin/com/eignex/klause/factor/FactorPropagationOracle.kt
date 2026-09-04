@@ -149,10 +149,11 @@ object FactorPropagationOracle {
     }
 
     private fun enumerateSat(problem: Problem): List<Sample> {
-        require(BruteForceSolver.fits(problem, cap = 1L shl 18)) {
+        val baked = problem.bake()
+        require(BruteForceSolver.fits(baked, cap = 1L shl 18)) {
             "Problem too large to brute-enumerate (cap 262 144 assignments). Shrink domains or vars."
         }
-        return BruteForceSolver(problem.bake()).enumerate(BruteForceParams(randomSeed = 0L)).toList()
+        return BruteForceSolver(baked).enumerate(BruteForceParams(randomSeed = 0L)).toList()
     }
 
     private fun fail(msg: String): Nothing = throw AssertionError(msg)

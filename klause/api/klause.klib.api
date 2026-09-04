@@ -3664,7 +3664,7 @@ final class com.eignex.klause.brute/BruteForceSolver : com.eignex.klause.solver/
         final const val DEFAULT_MAX_SPACE // com.eignex.klause.brute/BruteForceSolver.Companion.DEFAULT_MAX_SPACE|{}DEFAULT_MAX_SPACE[0]
             final fun <get-DEFAULT_MAX_SPACE>(): kotlin/Long // com.eignex.klause.brute/BruteForceSolver.Companion.DEFAULT_MAX_SPACE.<get-DEFAULT_MAX_SPACE>|<get-DEFAULT_MAX_SPACE>(){}[0]
 
-        final fun fits(com.eignex.klause.ir/Problem, kotlin/Long = ...): kotlin/Boolean // com.eignex.klause.brute/BruteForceSolver.Companion.fits|fits(com.eignex.klause.ir.Problem;kotlin.Long){}[0]
+        final fun fits(com.eignex.klause.propagation/BakedProblem, kotlin/Long = ...): kotlin/Boolean // com.eignex.klause.brute/BruteForceSolver.Companion.fits|fits(com.eignex.klause.propagation.BakedProblem;kotlin.Long){}[0]
     }
 }
 
@@ -9461,6 +9461,7 @@ final class com.eignex.klause.propagation/PropagationSession { // com.eignex.kla
     final fun popToLevel(kotlin/Int) // com.eignex.klause.propagation/PropagationSession.popToLevel|popToLevel(kotlin.Int){}[0]
     final fun popUntilUnpinned(com.eignex.klause.propagation/VarKind, kotlin/Int) // com.eignex.klause.propagation/PropagationSession.popUntilUnpinned|popUntilUnpinned(com.eignex.klause.propagation.VarKind;kotlin.Int){}[0]
     final fun reseedFrom(com.eignex.klause.propagation/Assumptions): com.eignex.klause.propagation/PropagationResult // com.eignex.klause.propagation/PropagationSession.reseedFrom|reseedFrom(com.eignex.klause.propagation.Assumptions){}[0]
+    final fun rootIntDomain(kotlin/Int): com.eignex.klause.ir/IntDomain // com.eignex.klause.propagation/PropagationSession.rootIntDomain|rootIntDomain(kotlin.Int){}[0]
     final fun seed(com.eignex.klause.propagation/Assumptions): com.eignex.klause.propagation/PropagationResult // com.eignex.klause.propagation/PropagationSession.seed|seed(com.eignex.klause.propagation.Assumptions){}[0]
 }
 

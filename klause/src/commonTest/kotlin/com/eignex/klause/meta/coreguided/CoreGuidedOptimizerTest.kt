@@ -4,6 +4,7 @@ import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.propagation.bake
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -13,7 +14,7 @@ class CoreGuidedOptimizerTest {
     @Test
     fun `no softs returns cost-0 optimum`() {
         val problem = Problem(numBoolVars = 2, numIntVars = 0, intDomains = emptyArray(), factors = emptyArray())
-        val r = CoreGuidedOptimizer(problem).minimize(emptyList(), BacktrackParams())
+        val r = CoreGuidedOptimizer(problem.bake()).minimize(emptyList(), BacktrackParams())
         val opt = assertIs<CoreGuidedOptimizer.Result.Optimal>(r)
         assertEquals(0L, opt.lowerBound)
         assertEquals(0, opt.coresFound)
@@ -22,7 +23,7 @@ class CoreGuidedOptimizerTest {
     @Test
     fun `single satisfiable soft yields cost 0`() {
         val problem = Problem(numBoolVars = 1, numIntVars = 0, intDomains = emptyArray(), factors = emptyArray())
-        val r = CoreGuidedOptimizer(problem).minimize(
+        val r = CoreGuidedOptimizer(problem.bake()).minimize(
             listOf(CoreGuidedOptimizer.Soft(Lit.make(0, true), weight = 5L)),
             BacktrackParams(),
         )
@@ -43,7 +44,7 @@ class CoreGuidedOptimizerTest {
                 Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false))),
             ),
         )
-        val r = CoreGuidedOptimizer(problem).minimize(
+        val r = CoreGuidedOptimizer(problem.bake()).minimize(
             listOf(
                 CoreGuidedOptimizer.Soft(Lit.make(0, true)),
                 CoreGuidedOptimizer.Soft(Lit.make(1, true)),
@@ -69,7 +70,7 @@ class CoreGuidedOptimizerTest {
                 Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false))),
             ),
         )
-        val r = CoreGuidedOptimizer(problem).minimize(
+        val r = CoreGuidedOptimizer(problem.bake()).minimize(
             listOf(
                 CoreGuidedOptimizer.Soft(Lit.make(0, true), weight = 5L),
                 CoreGuidedOptimizer.Soft(Lit.make(1, true), weight = 3L),
@@ -100,7 +101,7 @@ class CoreGuidedOptimizerTest {
             ),
         )
         val softs = (0..3).map { CoreGuidedOptimizer.Soft(Lit.make(it, true)) }
-        val r = CoreGuidedOptimizer(problem).minimize(softs, BacktrackParams())
+        val r = CoreGuidedOptimizer(problem.bake()).minimize(softs, BacktrackParams())
         val opt = assertIs<CoreGuidedOptimizer.Result.Optimal>(r)
         assertEquals(1L, opt.lowerBound)
         val violated = softs.count { !opt.sample.bools[Lit.variable(it.lit)] }
@@ -127,7 +128,7 @@ class CoreGuidedOptimizerTest {
             CoreGuidedOptimizer.Soft(Lit.make(2, true), weight = 1L),
         )
         val opt = assertIs<CoreGuidedOptimizer.Result.Optimal>(
-            CoreGuidedOptimizer(problem).minimize(softs, BacktrackParams()),
+            CoreGuidedOptimizer(problem.bake()).minimize(softs, BacktrackParams()),
         )
         assertEquals(2L, opt.lowerBound)
         val cost = softs.sumOf { if (!opt.sample.bools[Lit.variable(it.lit)]) it.weight else 0L }
@@ -146,7 +147,7 @@ class CoreGuidedOptimizerTest {
                 Clause(intArrayOf(Lit.make(0, false))),
             ),
         )
-        val r = CoreGuidedOptimizer(problem).minimize(
+        val r = CoreGuidedOptimizer(problem.bake()).minimize(
             listOf(CoreGuidedOptimizer.Soft(Lit.make(0, true))),
             BacktrackParams(),
         )
@@ -173,8 +174,8 @@ class CoreGuidedOptimizerTest {
             CoreGuidedOptimizer.Soft(Lit.make(1, true), weight = 4L),
             CoreGuidedOptimizer.Soft(Lit.make(2, true), weight = 1L),
         )
-        val withStrat = CoreGuidedOptimizer(problem).minimize(softs, BacktrackParams(), stratify = true)
-        val withoutStrat = CoreGuidedOptimizer(problem).minimize(softs, BacktrackParams(), stratify = false)
+        val withStrat = CoreGuidedOptimizer(problem.bake()).minimize(softs, BacktrackParams(), stratify = true)
+        val withoutStrat = CoreGuidedOptimizer(problem.bake()).minimize(softs, BacktrackParams(), stratify = false)
         val a = assertIs<CoreGuidedOptimizer.Result.Optimal>(withStrat)
         val b = assertIs<CoreGuidedOptimizer.Result.Optimal>(withoutStrat)
         assertEquals(5L, a.lowerBound)

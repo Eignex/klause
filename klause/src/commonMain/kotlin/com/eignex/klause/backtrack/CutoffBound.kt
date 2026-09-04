@@ -1,6 +1,6 @@
 package com.eignex.klause.backtrack
 
-import com.eignex.klause.ir.Problem
+import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.Int128
 
@@ -32,7 +32,11 @@ internal class CutoffBound(val varId: Int, val hi: Long)
  * box also invented a *lower* side for is skipped: its `lo_j` is the box, so what the cutoff would say
  * about it is a statement about the box rather than about the model.
  */
-internal fun objectiveCutoffBounds(problem: Problem, objective: LinearObjective, incumbent: Long): List<CutoffBound> {
+internal fun objectiveCutoffBounds(
+    problem: BakedProblem,
+    objective: LinearObjective,
+    incumbent: Long,
+): List<CutoffBound> {
     val coefficients = objective.intCoefficients
     val n = minOf(problem.numIntVars, coefficients.size)
     if ((0 until n).none {
@@ -50,7 +54,7 @@ internal fun objectiveCutoffBounds(problem: Problem, objective: LinearObjective,
     for (i in 0 until n) {
         val c = coefficients[i]
         if (c == 0L) continue
-        val d = problem.requireFiniteIntDomains()[i]
+        val d = problem.rootIntDomain(i)
         floor.addProduct(c, if (c > 0L) d.min else d.max)
     }
     for (b in 0 until minOf(problem.numBoolVars, objective.boolWeights.size)) {
@@ -70,7 +74,7 @@ internal fun objectiveCutoffBounds(problem: Problem, objective: LinearObjective,
     for (i in 0 until n) {
         val c = coefficients[i]
         if (c <= 0L || !problem.intBounds.isOpenUpper(i) || problem.intBounds.isOpenLower(i)) continue
-        val d = problem.requireFiniteIntDomains()[i]
+        val d = problem.rootIntDomain(i)
         val steps = slack.floorDivPositive(c) ?: continue
         val hi = addOrNull(d.min, steps) ?: continue
         if (hi < d.max) out.add(CutoffBound(i, hi))

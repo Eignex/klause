@@ -1,6 +1,6 @@
 package com.eignex.klause.count
 
-import com.eignex.klause.ir.Problem
+import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.util.LongArrayList
 import com.eignex.klause.util.MutableIntObjectMap
 import kotlin.math.ceil
@@ -22,7 +22,7 @@ import kotlin.random.Random
  */
 internal object ApproxMC {
 
-    fun run(problem: Problem, config: ApproxCountConfig): Count {
+    fun run(problem: BakedProblem, config: ApproxCountConfig): Count {
         val ctx = CellContext.resolve(problem, config.samplingSet, config.intSamplingSet)
         val eps = config.epsilon
         val thresh = threshold(eps)

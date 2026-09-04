@@ -1,9 +1,9 @@
 package com.eignex.klause.meta.alns
 
-import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.LocalSearchProblem
 import com.eignex.klause.localsearch.LocalSearchSession
 import com.eignex.klause.localsearch.LocalSearchState
+import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.EmptyIntArray
@@ -22,7 +22,7 @@ import kotlin.random.Random
 internal fun interface DestroyOperator {
     fun destroy(
         rng: Random,
-        problem: Problem,
+        problem: BakedProblem,
         incumbent: Sample,
         objective: LinearObjective,
         fraction: Double,
@@ -188,7 +188,7 @@ internal fun interface DestroyOperator {
             var globalLo = Long.MAX_VALUE
             var globalHi = Long.MIN_VALUE
             for (i in 0 until n) {
-                val d = problem.requireFiniteIntDomains()[i]
+                val d = problem.rootIntDomain(i)
                 if (d.min < globalLo) globalLo = d.min
                 if (d.max > globalHi) globalHi = d.max
             }

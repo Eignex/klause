@@ -9,6 +9,7 @@ import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.Assumptions
+import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
@@ -44,7 +45,7 @@ import com.eignex.klause.util.MutableIntIntMap
  * linearly with cores; a session-level "add factor at runtime" API is the natural
  * follow-up if this becomes the bottleneck.
  */
-internal class CoreGuidedOptimizer(val baseProblem: Problem) {
+internal class CoreGuidedOptimizer(val baseProblem: BakedProblem) {
 
     /**
      * One soft constraint: literal that *should* be true, with positive integer weight
@@ -238,7 +239,7 @@ internal class CoreGuidedOptimizer(val baseProblem: Problem) {
     }
 
     private fun buildProblem(
-        base: Problem,
+        base: BakedProblem,
         workings: List<Working>,
         exactly1s: List<IntArray>,
         totalBoolVars: Int,
@@ -258,8 +259,9 @@ internal class CoreGuidedOptimizer(val baseProblem: Problem) {
         return Problem(
             numBoolVars = totalBoolVars,
             numIntVars = base.numIntVars,
-            intDomains = base.requireFiniteIntDomains(),
+            intDomains = base.rootIntDomains(),
             factors = factors,
+            modelBounds = base.intBounds,
         )
     }
 
@@ -281,7 +283,7 @@ internal class CoreGuidedOptimizer(val baseProblem: Problem) {
     }
 
     private fun finalSolve(
-        base: Problem,
+        base: BakedProblem,
         workings: List<Working>,
         exactly1s: List<IntArray>,
         totalBoolVars: Int,

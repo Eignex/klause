@@ -193,7 +193,7 @@ internal class GreedyConstructionRepair(
 
         val intOrder = context.freed.ints.copyOf().also { it.shuffle(context.rng) }
         for (i in intOrder) {
-            val d = problem.requireFiniteIntDomains()[i]
+            val d = state.rootDomains[i]
             val cur = state.assignment.intValue(i)
             val baseline = currentScore()
             var bestVal = cur
@@ -266,7 +266,7 @@ internal class RegretRepair(
         data class Slot(val v: Int, val best: Long, val bestScore: Double, val regret: Double)
         val slots = ArrayList<Slot>(context.freed.ints.size)
         for (i in context.freed.ints) {
-            val d = problem.requireFiniteIntDomains()[i]
+            val d = state.rootDomains[i]
             val cur = state.assignment.intValue(i)
             val few = d.spanOrNull(intDomainSampleCap.toLong())
             val cand: LongArray = if (few != null) {
@@ -339,7 +339,7 @@ internal class BestImprovingRepair(val intDomainSampleCap: Int = 20, val maxIter
                 state.apply(Move.BoolFlip(b))
             }
             for (i in context.freed.ints) {
-                val d = problem.requireFiniteIntDomains()[i]
+                val d = state.rootDomains[i]
                 val cur = state.assignment.intValue(i)
                 val few = d.spanOrNull(intDomainSampleCap.toLong())
                 val cand: LongArray = if (few != null) {

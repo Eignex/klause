@@ -5,6 +5,7 @@ import com.eignex.klause.factor.bool.Xor
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.util.IntArrayList
 import kotlin.random.Random
 
@@ -67,7 +68,7 @@ class XorHashFamily(
  * jointly by Gauss-Jordan elimination, which is what makes enumerating a hashed cell tractable
  * (a per-hash [Xor] factor cannot — see [GaussianXor]).
  */
-internal fun Problem.withHashes(hashes: List<Xor>): Problem {
+internal fun BakedProblem.withHashes(hashes: List<Xor>): Problem {
     if (hashes.isEmpty()) return this
     val merged = ArrayList<Factor>(factors.size + 1)
     merged.addAll(factors)
@@ -75,7 +76,8 @@ internal fun Problem.withHashes(hashes: List<Xor>): Problem {
     return Problem(
         numBoolVars = numBoolVars,
         numIntVars = numIntVars,
-        intDomains = requireFiniteIntDomains(),
+        intDomains = rootIntDomains(),
         factors = merged,
+        modelBounds = intBounds,
     )
 }

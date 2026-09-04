@@ -4,6 +4,7 @@ import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
@@ -15,14 +16,14 @@ import kotlin.test.assertTrue
 class CutoffBoundTest {
 
     /** Two integer columns over the invented box; [openHi] / [openLo] mark column 0's invented sides. */
-    private fun problem(openHi: Boolean = true, openLo: Boolean = false, hi: Long = 1_000_000L): Problem = Problem(
+    private fun problem(openHi: Boolean = true, openLo: Boolean = false, hi: Long = 1_000_000L): BakedProblem = Problem(
         numBoolVars = 0,
         numIntVars = 2,
         intDomains = arrayOf(IntDomain(if (openLo) -1_000_000L else 0L, hi), IntDomain(0L, 10L)),
         factors = emptyList(),
         openIntLo = booleanArrayOf(openLo, false),
         openIntHi = booleanArrayOf(openHi, false),
-    )
+    ).bake()
 
     private val objective = LinearObjective(intCoefficients = longArrayOf(3L, 1L))
 
@@ -83,7 +84,7 @@ class CutoffBoundTest {
             intDomains = arrayOf(IntDomain(0L, 1L shl 62), IntDomain(-(1L shl 61), 0L)),
             factors = emptyList(),
             openIntHi = booleanArrayOf(true, false),
-        )
+        ).bake()
 
         val bounds = objectiveCutoffBounds(boxed, LinearObjective(intCoefficients = longArrayOf(3L, 3L)), 4e18.toLong())
 
