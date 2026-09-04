@@ -6,6 +6,7 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.Assumptions
+import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.propagate
 import com.eignex.klause.util.Cancellation
@@ -36,14 +37,14 @@ internal object Probing {
      * Booleans cannot blow up presolve time; the round engine re-enters the pass after other passes
      * fire, and a later round picks up where bumping units shifted the free set.
      */
-    fun probe(problem: Problem, maxCandidates: Int, cancellation: Cancellation): PassDelta {
+    fun probe(problem: BakedProblem, maxCandidates: Int, cancellation: Cancellation): PassDelta {
         val pinned = IntHashSet()
         for (f in problem.factors) {
             if (f is Clause && f.literals.size == 1) pinned.add(Lit.variable(f.literals[0]))
         }
 
         val units = ArrayList<Factor>()
-        val domains = problem.requireFiniteIntDomains().copyOf()
+        val domains = problem.rootIntDomains()
         var domainsChanged = false
         var probed = 0
         var v = 0

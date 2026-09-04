@@ -13,6 +13,7 @@ import com.eignex.klause.model.PbOp
 import com.eignex.klause.presolve.PresolveShared.withPassDelta
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.PropagationResult
+import com.eignex.klause.propagation.bake
 import com.eignex.klause.propagation.propagate
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -54,8 +55,10 @@ class DominatedVariablesTest {
         return best
     }
 
-    private fun fixed(problem: Problem, intCoeffs: Map<Int, Long>, boolCoeffs: Map<Int, Long> = emptyMap()): Problem =
-        problem.withPassDelta(Presolve.fixDominatedVariables(problem, intCoeffs, boolCoeffs), BakeConfig.NONE)
+    private fun fixed(problem: Problem, intCoeffs: Map<Int, Long>, boolCoeffs: Map<Int, Long> = emptyMap()): Problem {
+        val baked = problem.bake()
+        return baked.withPassDelta(Presolve.fixDominatedVariables(baked, intCoeffs, boolCoeffs), BakeConfig.NONE)
+    }
 
     private fun checkDualFix(name: String, problem: Problem, coeffs: Map<Int, Long>, expectFixed: Set<Int>) {
         val out = fixed(problem, coeffs)
@@ -67,7 +70,7 @@ class DominatedVariablesTest {
             )
         }
         if (expectFixed.isEmpty()) {
-            assertTrue(Presolve.fixDominatedVariables(problem, coeffs).isEmpty, "$name: expected no fixing")
+            assertTrue(Presolve.fixDominatedVariables(problem.bake(), coeffs).isEmpty, "$name: expected no fixing")
         }
     }
 
@@ -206,7 +209,7 @@ class DominatedVariablesTest {
         // b1 occurs nowhere: an earlier pass can fold a variable's defining factor away and leave it
         // referenced by nothing while its value stays tied to the model, so absence is not freedom.
         val problem = Problem(2, 0, emptyArray(), listOf(Clause(intArrayOf(pos(0)))))
-        val delta = Presolve.fixDominatedVariables(problem, emptyMap(), emptyMap())
+        val delta = Presolve.fixDominatedVariables(problem.bake(), emptyMap(), emptyMap())
         assertTrue(
             delta.addedFactors.none { f -> f.boolVars.contains(1) },
             "expected no pin for the unreferenced bool",
@@ -224,7 +227,7 @@ class DominatedVariablesTest {
             listOf(Cardinality(intArrayOf(pos(0), pos(1), pos(2)), min = 1, max = 1)),
         )
         assertTrue(
-            Presolve.fixDominatedVariables(problem, emptyMap(), emptyMap()).isEmpty,
+            Presolve.fixDominatedVariables(problem.bake(), emptyMap(), emptyMap()).isEmpty,
             "expected no fixing",
         )
     }
@@ -302,7 +305,7 @@ class DominatedVariablesTest {
             listOf(PseudoBoolean(longArrayOf(1, 1), intArrayOf(pos(0), pos(1)), PbOp.EQ, 1L)),
         )
         assertTrue(
-            Presolve.fixDominatedVariables(problem, emptyMap(), emptyMap()).isEmpty,
+            Presolve.fixDominatedVariables(problem.bake(), emptyMap(), emptyMap()).isEmpty,
             "expected no fixing",
         )
     }

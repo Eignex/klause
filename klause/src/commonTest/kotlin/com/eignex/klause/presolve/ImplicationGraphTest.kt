@@ -39,13 +39,14 @@ class ImplicationGraphTest {
 
     /** The problem [Presolve.reduceImplicationGraph] reduces [problem] to, materialized from its delta. */
     private fun reduced(problem: Problem, objectiveBoolVars: Set<Int> = emptySet()): Problem {
-        val delta = Presolve.reduceImplicationGraph(problem, cap, objectiveBoolVars = objectiveBoolVars)
-        return problem.withPassDelta(delta, BakeConfig.NONE)
+        val baked = problem.bake()
+        val delta = Presolve.reduceImplicationGraph(baked, cap, objectiveBoolVars = objectiveBoolVars)
+        return baked.withPassDelta(delta, BakeConfig.NONE)
     }
 
     /** Solve the reduced problem, reconstruct via the [delta], and assert the lifted sample is feasible. */
     private fun assertRoundTrip(original: Problem, delta: PassDelta) {
-        val solved = BacktrackSolver(original.withPassDelta(delta, BakeConfig.NONE).bake()).solve(BacktrackParams())
+        val solved = BacktrackSolver(original.bake().withPassDelta(delta, BakeConfig.NONE)).solve(BacktrackParams())
         check(solved is SolveResult.Sat) { "reduced problem should be satisfiable" }
         val full = (delta.reconstruct ?: { it })(solved.assignment)
         assertTrue(isFeasible(original, full), "reconstructed sample infeasible in the original")
@@ -65,7 +66,7 @@ class ImplicationGraphTest {
             ),
         )
         assertTrue(reduced(problem).factors.none { 1 in it.boolVars }, "b1 should be substituted away")
-        assertRoundTrip(problem, Presolve.reduceImplicationGraph(problem, cap))
+        assertRoundTrip(problem, Presolve.reduceImplicationGraph(problem.bake(), cap))
     }
 
     @Test
@@ -101,7 +102,7 @@ class ImplicationGraphTest {
             ),
         )
         assertTrue(reduced(problem).factors.none { 1 in it.boolVars || 2 in it.boolVars }, "b1, b2 merged into b0")
-        assertRoundTrip(problem, Presolve.reduceImplicationGraph(problem, cap))
+        assertRoundTrip(problem, Presolve.reduceImplicationGraph(problem.bake(), cap))
     }
 
     @Test
@@ -135,7 +136,7 @@ class ImplicationGraphTest {
             ),
         )
         assertEquals(2, binaryCount(reduced(problem)), "the redundant a -> c binary is dropped")
-        assertRoundTrip(problem, Presolve.reduceImplicationGraph(problem, cap))
+        assertRoundTrip(problem, Presolve.reduceImplicationGraph(problem.bake(), cap))
     }
 
     @Test
@@ -152,7 +153,10 @@ class ImplicationGraphTest {
             ),
         )
         assertEquals(2, binaryCount(reduced(problem)), "no binary is redundant")
-        assertTrue(Presolve.reduceImplicationGraph(problem, cap).isEmpty, "nothing to reduce is the no-op signal")
+        assertTrue(
+            Presolve.reduceImplicationGraph(problem.bake(), cap).isEmpty,
+            "nothing to reduce is the no-op signal",
+        )
     }
 
     @Test
@@ -184,7 +188,7 @@ class ImplicationGraphTest {
             intDomains = emptyArray(),
             factors = listOf(Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true)))),
         )
-        assertTrue(Presolve.reduceImplicationGraph(problem, cap).isEmpty, "no reduction is the no-op signal")
+        assertTrue(Presolve.reduceImplicationGraph(problem.bake(), cap).isEmpty, "no reduction is the no-op signal")
     }
 
     @Test

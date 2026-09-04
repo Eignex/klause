@@ -42,12 +42,13 @@ class ComparisonClauseFoldTest {
                 Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
             ),
         )
-        val delta = Presolve.foldComparisonClauses(problem)
+        val baked = problem.bake()
+        val delta = Presolve.foldComparisonClauses(baked)
         assertEquals(3, delta.droppedIndices.size, "the clause and both reified definitions are consumed")
         assertEquals(1, delta.addedFactors.size)
         assertTrue(delta.addedFactors.single() is ComparisonClause)
 
-        val reduced = problem.withPassDelta(delta, BakeConfig.NONE)
+        val reduced = baked.withPassDelta(delta, BakeConfig.NONE)
         val brute = HashSet<List<Long>>()
         for (a in 0..3) for (b in 0..3) if (a <= 1 || b <= 1) brute.add(listOf(a.toLong(), b.toLong()))
         assertEquals(brute, intSolutions(reduced), "folded model must have the same integer solution set")
@@ -66,9 +67,10 @@ class ComparisonClauseFoldTest {
                 Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true))),
             ),
         )
-        val delta = Presolve.foldComparisonClauses(problem)
+        val baked = problem.bake()
+        val delta = Presolve.foldComparisonClauses(baked)
         assertTrue(delta.addedFactors.single() is ComparisonClause)
-        val reduced = problem.withPassDelta(delta, BakeConfig.NONE)
+        val reduced = baked.withPassDelta(delta, BakeConfig.NONE)
         val brute = HashSet<List<Long>>()
         for (a in 0..3) for (b in 0..3) if (a >= 2 || b <= 1) brute.add(listOf(a.toLong(), b.toLong()))
         assertEquals(brute, intSolutions(reduced))
@@ -88,7 +90,8 @@ class ComparisonClauseFoldTest {
                 Clause(intArrayOf(Lit.make(0, true))), // extra consumer of b0
             ),
         )
-        val delta = Presolve.foldComparisonClauses(problem)
+        val baked = problem.bake()
+        val delta = Presolve.foldComparisonClauses(baked)
         assertTrue(delta.isEmpty, "a shared indicator must keep the reified encoding")
     }
 
@@ -105,9 +108,10 @@ class ComparisonClauseFoldTest {
                 Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
             ),
         )
-        val delta = Presolve.foldComparisonClauses(problem)
+        val baked = problem.bake()
+        val delta = Presolve.foldComparisonClauses(baked)
         assertTrue(delta.addedFactors.singleOrNull() is ComparisonClause, "constant term must fold into the bound")
-        val reduced = problem.withPassDelta(delta, BakeConfig.NONE)
+        val reduced = baked.withPassDelta(delta, BakeConfig.NONE)
         val brute = HashSet<List<Long>>()
         for (a in 0..3) for (b in 0..3) if (a <= 1 || b <= 1) brute.add(listOf(a.toLong(), b.toLong(), 1L, 1L))
         assertEquals(brute, intSolutions(reduced))
@@ -125,7 +129,8 @@ class ComparisonClauseFoldTest {
                 Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
             ),
         )
-        val delta = Presolve.foldComparisonClauses(problem)
+        val baked = problem.bake()
+        val delta = Presolve.foldComparisonClauses(baked)
         assertTrue(delta.isEmpty, "a multi-variable comparison is not a single-variable literal")
     }
 }

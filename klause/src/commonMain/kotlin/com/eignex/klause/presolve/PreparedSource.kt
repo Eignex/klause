@@ -1,7 +1,6 @@
 package com.eignex.klause.presolve
 
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.PresolveStats
 
@@ -12,6 +11,10 @@ import com.eignex.klause.solver.result.PresolveStats
  * pass that rewrites factors moves factor ownership with it, so a plan selected ahead of this phase is
  * indexed by factors the prepared model no longer has.
  *
+ * There is no reconstruction to carry: a source pass may rewrite rows but never eliminate a column, so a
+ * sample of [problem] is already a sample of [source]. The lane's change type says so
+ * ([SourceDelta] cannot lift a sample), which is what makes the absence a guarantee rather than a habit.
+ *
  * [budget] is carried rather than re-derived, so every phase after this one spends what is left of the
  * same allowance instead of restarting it.
  */
@@ -20,13 +23,6 @@ internal class PreparedSource(
     val source: Problem,
     /** The transformed model, or [source] itself when no source pass fired. */
     val problem: Problem,
-    /**
-     * Lifts a prepared-model assignment back into [source]'s variable space.
-     *
-     * Source passes may only rewrite factors, never columns, so this is the identity today; the bounded
-     * lane still composes it ahead of its own so that stays true by construction rather than by habit.
-     */
-    val reconstruct: (Sample) -> Sample,
     /** Whether preparation refuted the model. */
     val infeasible: Boolean,
     /**
@@ -56,7 +52,6 @@ internal class PreparedSource(
         fun unchanged(problem: Problem, budget: PresolveBudget?): PreparedSource = PreparedSource(
             source = problem,
             problem = problem,
-            reconstruct = { it },
             infeasible = false,
             objective = null,
             passesFired = emptyList(),

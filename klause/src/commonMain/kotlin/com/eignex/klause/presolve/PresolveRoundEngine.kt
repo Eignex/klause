@@ -1,39 +1,64 @@
 package com.eignex.klause.presolve
 
-import com.eignex.klause.ir.Problem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.util.Cancellation
 
 /** Abort a pass schedule after a round makes only a marginal complexity reduction. */
 private const val PRESOLVE_ABORT_FRACTION = 0.001
 
-/** Shared bounded-fixpoint scheduler for fresh and incremental presolve hosts. */
+/** What running one pass did to the host's model. */
+internal enum class PassOutcome {
+    /** The pass found nothing to do. */
+    UNCHANGED,
+
+    /** The pass rewrote the model. */
+    CHANGED,
+
+    /** The pass refuted the model. */
+    INFEASIBLE,
+}
+
+/** Shared bounded-fixpoint scheduler for the source and finite presolve lanes. */
 internal object PresolveRoundEngine {
 
-    /** The changes made by one bounded pass schedule. */
-    class Result(val fired: List<PresolvePass>, val reconstructs: List<(Sample) -> Sample>, val infeasible: Boolean)
+    /**
+     * The per-lane operations the scheduler drives.
+     *
+     * A host owns the model type its passes read, the change type they return, and where a firing pass's
+     * change lands; the scheduler needs only to know what a pass did, so neither type appears here. That
+     * is what lets the source lane run over declarations while the finite lane runs over root domains
+     * under one schedule.
+     */
+    interface RoundHost {
+        /** Run [pass] over the current model and fold its change in. [slice] caps this pass's own share
+         *  of the phase budget; `null` leaves the host's own cancellation in place. */
+        fun runPass(pass: PresolvePass, slice: Cancellation?): PassOutcome
 
-    /** Drive [passes] to their bounded fixpoint through the supplied host operations. */
+        /** Post-pass hook, invoked whether or not the pass fired. */
+        fun afterPass(pass: PresolvePass) {}
+
+        /** Current problem complexity, read at round boundaries for the abort check. */
+        fun complexity(): Long
+    }
+
+    /** The changes made by one bounded pass schedule. */
+    class Result(val fired: List<PresolvePass>, val infeasible: Boolean)
+
+    /** Drive [passes] to their bounded fixpoint through [host]. */
     fun run(
         passes: List<PresolvePass>,
         maxRounds: Int,
         cancellation: Cancellation,
         budget: PresolveBudget?,
-        passInput: () -> Problem,
-        passContext: (PresolvePass) -> PresolveContext,
-        applyPass: (PresolvePass, Problem, PresolveContext) -> PassDelta,
-        applyDelta: (PassDelta) -> Unit,
-        afterPass: (PresolvePass) -> Unit,
-        complexity: () -> Long,
+        host: RoundHost,
     ): Result {
-        val reconstructs = ArrayList<(Sample) -> Sample>()
         var version = 0
         val ranAtVersion = HashMap<PresolvePass, Int>()
         val fired = LinkedHashSet<PresolvePass>()
         val exhausted = HashSet<PresolvePass>()
         var infeasible = false
         var round = 0
-        var roundStartComplexity = complexity()
+        var roundStartComplexity = host.complexity()
         while (round < maxRounds && !cancellation()) {
             var ranAny = false
             var eligible = passes.count { it !in exhausted && ranAtVersion[it] != version }
@@ -42,34 +67,32 @@ internal object PresolveRoundEngine {
                 if (pass in exhausted || ranAtVersion[pass] == version) continue
                 ranAtVersion[pass] = version
                 ranAny = true
-                val input = passInput()
-                val ctx = passContext(pass)
-                val sliced = budget?.let { ctx.withCancellation(sliceOf(it, cancellation, eligible)) } ?: ctx
+                val slice = budget?.let { sliceOf(it, cancellation, eligible) }
                 eligible--
-                val delta = applyPass(pass, input, sliced)
-                if (delta.infeasible) {
-                    fired.add(pass)
-                    infeasible = true
-                    break
+                when (host.runPass(pass, slice)) {
+                    PassOutcome.INFEASIBLE -> {
+                        fired.add(pass)
+                        infeasible = true
+                    }
+
+                    PassOutcome.CHANGED -> {
+                        fired.add(pass)
+                        version++
+                    }
+
+                    PassOutcome.UNCHANGED -> if (pass.skipAfterEmpty) exhausted.add(pass)
                 }
-                if (!delta.isEmpty) {
-                    delta.reconstruct?.let(reconstructs::add)
-                    applyDelta(delta)
-                    fired.add(pass)
-                    version++
-                } else if (pass.skipAfterEmpty) {
-                    exhausted.add(pass)
-                }
-                afterPass(pass)
+                if (infeasible) break
+                host.afterPass(pass)
             }
             if (infeasible) break
             if (!ranAny) break
             round++
-            val reduced = roundStartComplexity - complexity()
+            val reduced = roundStartComplexity - host.complexity()
             if (reduced > 0 && reduced.toDouble() < PRESOLVE_ABORT_FRACTION * roundStartComplexity) break
-            roundStartComplexity = complexity()
+            roundStartComplexity = host.complexity()
         }
-        return Result(fired.toList(), reconstructs, infeasible)
+        return Result(fired.toList(), infeasible)
     }
 
     /** Compose pass reconstruction functions in reverse application order. */

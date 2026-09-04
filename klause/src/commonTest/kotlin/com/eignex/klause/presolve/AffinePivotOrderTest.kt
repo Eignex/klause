@@ -5,6 +5,7 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.presolve.PresolveShared.withPassDelta
+import com.eignex.klause.propagation.bake
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -42,8 +43,10 @@ class AffinePivotOrderTest {
         return Problem(0, nVars, Array(nVars) { IntDomain(0, 4) }, factors)
     }
 
-    private fun reduce(problem: Problem, order: AffinePivotOrder): Problem =
-        problem.withPassDelta(Presolve.eliminateAffineSingletons(problem, pivotOrder = order), BakeConfig.NONE)
+    private fun reduce(problem: Problem, order: AffinePivotOrder): Problem {
+        val baked = problem.bake()
+        return baked.withPassDelta(Presolve.eliminateAffineSingletons(baked, pivotOrder = order), BakeConfig.NONE)
+    }
 
     private fun totalTerms(problem: Problem): Int = problem.factors.filterIsInstance<Linear>().sumOf { it.vars.size }
 
@@ -56,8 +59,9 @@ class AffinePivotOrderTest {
     fun `the unparameterized pass uses the configured default order`() {
         val problem = sinkModel(sink = 20, wideFirst = 10)
 
-        val implicit = Presolve.eliminateAffineSingletons(problem)
-        val explicit = Presolve.eliminateAffineSingletons(problem, pivotOrder = AffinePivotOrder.MARKOWITZ)
+        val implicit = Presolve.eliminateAffineSingletons(problem.bake())
+        val explicit =
+            Presolve.eliminateAffineSingletons(problem.bake(), pivotOrder = AffinePivotOrder.MARKOWITZ)
 
         assertEquals(implicit.droppedIndices.toList(), explicit.droppedIndices.toList())
         assertEquals(implicit.addedFactors.size, explicit.addedFactors.size)

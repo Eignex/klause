@@ -6,6 +6,7 @@ import com.eignex.klause.presolve.PresolveShared.withPassDelta
 import com.eignex.klause.presolve.PresolveShared.withSourcePassDelta
 import com.eignex.klause.presolve.structural.RedundantConstraints.SubsumeIncremental
 import com.eignex.klause.presolve.structural.RedundantConstraints.SubsumeMemo
+import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.baked
 import com.eignex.klause.solver.Sample
@@ -46,9 +47,12 @@ internal const val AGGRESSIVE_PROBE_TOTAL_BUDGET = 250_000
 /** Cheap problem-complexity measure for the effectiveness abort: constraint count plus total domain
  *  span. Drops when a pass removes a constraint or tightens a domain; a round that instead grows the
  *  problem (symmetry breaking adding ordering constraints) simply doesn't trip the abort. */
-private fun complexity(problem: Problem): Long {
+private fun problemComplexity(problem: BakedProblem): Long {
     var c = problem.factors.size.toLong()
-    for (d in problem.requireFiniteIntDomains()) c += d.max - d.min
+    for (v in 0 until problem.numIntVars) {
+        val d = problem.rootIntDomain(v)
+        c += d.max - d.min
+    }
     return c
 }
 
@@ -58,52 +62,41 @@ object Presolver {
     /**
      * Run the factor-only part of presolve over a canonical source model.
      *
-     * Source passes may inspect declared bounds and factors, but cannot create finite domains, use
-     * propagation, or otherwise cross the deferred baking boundary. The shared round engine keeps their
-     * scheduling and cancellation semantics aligned with the finite lane.
+     * Source passes read declared bounds and factors; the [SourceDelta] they return cannot name a finite
+     * domain or lift a sample, so nothing here can cross the deferred baking boundary. The shared round
+     * engine keeps their scheduling and cancellation semantics aligned with the finite lane.
      */
     internal fun runSource(
         problem: Problem,
         config: PresolveConfig,
         context: PresolveContext = PresolveContext.EMPTY,
         cancellation: Cancellation = Cancellation.Never,
-    ): Presolved {
+    ): SourcePresolved {
         val passes = config.problemPasses(context, PresolvePass.Capability.SOURCE)
-        if (passes.isEmpty() || config.emphasis.maxRounds == 0) return Presolved(problem, { it })
+        if (passes.isEmpty() || config.emphasis.maxRounds == 0) return SourcePresolved(problem)
         val ctx = context.withCancellation(cancellation)
             .withPresolveBudget(context.presolveBudget)
-        val host = object : RoundHost {
+        val host = object : PresolveRoundEngine.RoundHost {
             var current = problem
 
-            override fun passInput(): Problem = current
-
-            override fun passContext(pass: PresolvePass): PresolveContext = ctx
-
-            override fun applyDelta(delta: PassDelta) {
+            override fun runPass(pass: PresolvePass, slice: Cancellation?): PassOutcome {
+                val delta = pass.applySource(current, slice?.let(ctx::withCancellation) ?: ctx)
+                if (delta.infeasible) return PassOutcome.INFEASIBLE
+                if (delta.isEmpty) return PassOutcome.UNCHANGED
                 current = current.withSourcePassDelta(delta)
+                return PassOutcome.CHANGED
             }
 
             override fun complexity(): Long = current.factors.size.toLong()
         }
-        val rounds = runRounds(
+        val rounds = PresolveRoundEngine.run(
             passes,
             config.emphasis.maxRounds,
             cancellation,
-            host,
             ctx.presolveBudget,
-        ) { pass, input, passContext ->
-            if (pass == PresolvePass.STRENGTHEN_COEFFICIENTS) {
-                Presolve.strengthenSourceCoefficients(input, passContext.cancellation)
-            } else {
-                pass.apply(input, passContext)
-            }
-        }
-        return Presolved(
-            host.current,
-            composeReconstructs(rounds.reconstructs),
-            rounds.fired,
-            rounds.infeasible,
+            host,
         )
+        return SourcePresolved(host.current, rounds.fired, rounds.infeasible)
     }
 
     /** Apply [config]'s passes to [problem] under [context], returning the transformed problem and a
@@ -111,7 +104,7 @@ object Presolver {
      *  and rounds: a fired deadline returns the partial result so far — every pass is individually
      *  sound, so stopping early only forgoes further reduction, never correctness. */
     fun run(
-        problem: Problem,
+        problem: BakedProblem,
         config: PresolveConfig,
         context: PresolveContext = PresolveContext.EMPTY,
         cancellation: Cancellation = Cancellation.Never,
@@ -148,23 +141,25 @@ object Presolver {
             return runIncremental(problem, passes, maxRounds, ctx, cancellation)
         }
 
-        val host = object : RoundHost {
+        val host = object : PresolveRoundEngine.RoundHost {
             var current = problem
+            val reconstructs = ArrayList<(Sample) -> Sample>()
 
-            override fun passInput(): Problem = current
-
-            override fun passContext(pass: PresolvePass): PresolveContext = ctx
-
-            override fun applyDelta(delta: PassDelta) {
+            override fun runPass(pass: PresolvePass, slice: Cancellation?): PassOutcome {
+                val delta = pass.applyFinite(current, slice?.let(ctx::withCancellation) ?: ctx)
+                if (delta.infeasible) return PassOutcome.INFEASIBLE
+                if (delta.isEmpty) return PassOutcome.UNCHANGED
+                delta.reconstruct?.let(reconstructs::add)
                 current = current.withPassDelta(delta, ctx.bakeConfig)
+                return PassOutcome.CHANGED
             }
 
-            override fun complexity(): Long = complexity(current)
+            override fun complexity(): Long = problemComplexity(current)
         }
-        val rounds = runRounds(passes, maxRounds, cancellation, host, ctx.presolveBudget)
+        val rounds = PresolveRoundEngine.run(passes, maxRounds, cancellation, ctx.presolveBudget, host)
         return Presolved(
             host.current,
-            composeReconstructs(rounds.reconstructs),
+            composeReconstructs(host.reconstructs),
             rounds.fired,
             rounds.infeasible || host.current.baked is PropagationResult.Unsat,
         )
@@ -179,7 +174,7 @@ object Presolver {
      * is materialized once at the end.
      */
     private fun runIncremental(
-        problem: Problem,
+        problem: BakedProblem,
         passes: List<PresolvePass>,
         maxRounds: Int,
         ctx: PresolveContext,
@@ -193,7 +188,7 @@ object Presolver {
         // its factors on an already-infeasible problem (e.g. xor-units emitting contradictory units).
         // [PresolveSession.applyDelta] tracks those factor changes but skips re-propagating a conflicted
         // state, and the final materialized problem's bake surfaces the infeasibility.
-        val host = object : RoundHost {
+        val host = object : PresolveRoundEngine.RoundHost {
             var subsumeMark: PresolveSession.ChangeMark? = null
 
             // Affine's change-mark at its last firing; a re-run rescans only the variables touched since.
@@ -203,13 +198,25 @@ object Presolver {
             // touched since instead of re-signing every column.
             var dupMark: PresolveSession.ChangeMark? = null
 
-            override fun passInput(): Problem = session.passInput()
+            val reconstructs = ArrayList<(Sample) -> Sample>()
+
+            override fun runPass(pass: PresolvePass, slice: Cancellation?): PassOutcome {
+                // Before the context: [passOccurrence] is keyed against the factor list [passInput] fixes.
+                val input = session.passInput()
+                val base = passContext(pass)
+                val delta = pass.applyFinite(input, slice?.let(base::withCancellation) ?: base)
+                if (delta.infeasible) return PassOutcome.INFEASIBLE
+                if (delta.isEmpty) return PassOutcome.UNCHANGED
+                delta.reconstruct?.let(reconstructs::add)
+                session.applyDelta(delta)
+                return PassOutcome.CHANGED
+            }
 
             // Hand the session's incrementally-maintained occurrence index only to the passes that read it
             // (affine / dup-columns), so a firing pass that changes the factor set does not force the
             // O(occurrences) dense-view rebuild for the non-consuming passes between it and the next
             // consumer. The view matches the pass input's factor order exactly, so decisions are unchanged.
-            override fun passContext(pass: PresolvePass): PresolveContext {
+            fun passContext(pass: PresolvePass): PresolveContext {
                 var passCtx = ctx
                 if (pass == PresolvePass.REMOVE_REDUNDANT) {
                     passCtx = passCtx.withSubsumeIncremental(subsumeIncremental(session, subsumeMark, subsumeMemo))
@@ -223,10 +230,6 @@ object Presolver {
                         .withDupColumnsTouchedVars(touchedSince(dupMark))
                 }
                 return passCtx
-            }
-
-            override fun applyDelta(delta: PassDelta) {
-                session.applyDelta(delta)
             }
 
             // Advance each incremental pass's mark past its own delta so the next firing sees only what
@@ -244,7 +247,7 @@ object Presolver {
 
             override fun complexity(): Long = session.complexity()
         }
-        val rounds = runRounds(passes, maxRounds, cancellation, host, ctx.presolveBudget)
+        val rounds = PresolveRoundEngine.run(passes, maxRounds, cancellation, ctx.presolveBudget, host)
 
         // No pass fired: presolve is a no-op, so return the input problem itself (identity) exactly like
         // the fresh path returns `current === problem` — several callers assertSame on a fixpoint.
@@ -252,73 +255,11 @@ object Presolver {
 
         return Presolved(
             session.materialize(),
-            composeReconstructs(rounds.reconstructs),
+            composeReconstructs(host.reconstructs),
             rounds.fired,
             rounds.infeasible || session.infeasible,
         )
     }
-
-    /** The per-path operations the shared [runRounds] scheduler drives: where a pass reads its input,
-     *  how its context is specialised, where a firing pass's delta lands, and the complexity measure
-     *  for the diminishing-returns abort. [run] backs it with a rebuilt `Problem` per firing pass,
-     *  [runIncremental] with a persistent [PresolveSession]. */
-
-    private interface RoundHost {
-        /** The problem view the next pass reads. */
-        fun passInput(): Problem
-
-        /** The context for [pass] over the current input (occurrence-index / subsume-memo hooks). */
-        fun passContext(pass: PresolvePass): PresolveContext
-
-        /** Fold a firing pass's [delta] into the state. */
-        fun applyDelta(delta: PassDelta)
-
-        /** Post-pass hook, invoked whether or not the pass fired. */
-        fun afterPass(pass: PresolvePass) {}
-
-        /** Current problem complexity, read at round boundaries for the abort check. */
-        fun complexity(): Long
-    }
-
-    /** What a [runRounds] run produced: the passes that changed the problem (first-fire order) and
-     *  the per-pass reconstructs in application order. */
-    private class RoundResult(
-        val fired: List<PresolvePass>,
-        val reconstructs: List<(Sample) -> Sample>,
-        val infeasible: Boolean,
-    )
-
-    /**
-     * The fixpoint scheduler shared by [run] and [runIncremental], order-identical for
-     * both hosts by construction. A monotone "problem version" is bumped on every change; a pass
-     * that already ran at the current version is skipped until some other pass changes the problem —
-     * the fixpoint/delay scheme. A [PresolvePass.skipAfterEmpty] pass that ran and changed nothing is
-     * parked so the engine does not re-run its expensive, overwhelmingly fruitless search after every
-     * later reduction. The effectiveness-based abort stops when a round simplified
-     * the problem by less than [PRESOLVE_ABORT_FRACTION] of it — a round that grew the problem
-     * (e.g. symmetry adding ordering constraints) or left it unchanged is left to the fixpoint check.
-     */
-    private fun runRounds(
-        passes: List<PresolvePass>,
-        maxRounds: Int,
-        cancellation: Cancellation,
-        host: RoundHost,
-        budget: PresolveBudget? = null,
-        applyPass: (PresolvePass, Problem, PresolveContext) -> PassDelta = { pass, input, context ->
-            pass.apply(input, context)
-        },
-    ): RoundResult = PresolveRoundEngine.run(
-        passes,
-        maxRounds,
-        cancellation,
-        budget,
-        host::passInput,
-        host::passContext,
-        applyPass,
-        host::applyDelta,
-        host::afterPass,
-        host::complexity,
-    ).let { RoundResult(it.fired, it.reconstructs, it.infeasible) }
 
     /** Compose per-pass reconstructs (application order) into the single solution-mapping function,
      *  applied in reverse so a final-problem solution maps all the way back to the original. */

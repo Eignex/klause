@@ -14,10 +14,7 @@ import com.eignex.klause.util.IntHashSet
 internal object PresolveShared {
 
     /** Apply a factor-only [delta] while retaining the canonical source representation. */
-    fun Problem.withSourcePassDelta(delta: PassDelta): Problem {
-        require(delta.domains == null && delta.reconstruct == null) {
-            "source presolve may only rewrite factors"
-        }
+    fun Problem.withSourcePassDelta(delta: SourceDelta): Problem {
         if (delta.isEmpty) return this
         val dropped = if (delta.droppedIndices.isEmpty()) {
             null
@@ -44,11 +41,11 @@ internal object PresolveShared {
      * Materialize the problem that results from applying [delta] to [this] — the fresh-path counterpart
      * of [PresolveSession.applyDelta]. The next factor list is [this]'s factors with [PassDelta.droppedIndices]
      * removed (kept in order) followed by [PassDelta.addedFactors]; the domains are the delta's own
-     * ([PassDelta.domains]) or [this]'s when it leaves them alone. Re-baked eagerly through
-     * [rebuildProblem] (the per-firing-pass rebuild the fresh path always did), so it is a plain solver
-     * `Problem` whose `baked` folds the delta's narrowings and any dependent tightenings.
+     * ([PassDelta.domains]) or [this]'s root ones when it leaves them alone. Re-baked eagerly through
+     * [rebuildProblem] (the per-firing-pass rebuild the fresh path always did), so its `baked` folds the
+     * delta's narrowings and any dependent tightenings.
      */
-    fun Problem.withPassDelta(delta: PassDelta, bakeConfig: BakeConfig): Problem {
+    fun BakedProblem.withPassDelta(delta: PassDelta, bakeConfig: BakeConfig): BakedProblem {
         val kept = ArrayList<Factor>(factors.size - delta.droppedIndices.size + delta.addedFactors.size)
         val dropped = if (delta.droppedIndices.isEmpty()) {
             null
@@ -57,7 +54,7 @@ internal object PresolveShared {
         }
         for (i in factors.indices) if (dropped == null || i !in dropped) kept.add(factors[i])
         kept.addAll(delta.addedFactors)
-        return rebuildProblem(this, kept, delta.domains ?: requireFiniteIntDomains().copyOf(), bakeConfig)
+        return rebuildProblem(this, kept, delta.domains ?: rootIntDomains(), bakeConfig)
     }
 
     /**
@@ -87,15 +84,15 @@ internal object PresolveShared {
     }
 
     fun rebuildProblem(
-        problem: Problem,
+        problem: BakedProblem,
         factors: List<Factor>,
-        intDomains: Array<IntDomain> = problem.requireFiniteIntDomains().copyOf(),
+        intDomains: Array<IntDomain> = problem.rootIntDomains(),
         bakeConfig: BakeConfig = BakeConfig.NONE,
         // Extends the Boolean namespace for the one transform that mints variables
         // ([BinaryColumnSubstitution]): ids `[problem.numBoolVars, numBoolVars)` are the fresh ones, so
         // every existing factor still addresses the same variable.
         numBoolVars: Int = problem.numBoolVars,
-    ): Problem {
+    ): BakedProblem {
         // Inherit the pass-view mode: a pass fed a cheap already-folded input returns a cheap already-folded
         // output (the session re-folds via incremental propagation); a fresh-path rebuild stays eager.
         val base = BakedProblem(

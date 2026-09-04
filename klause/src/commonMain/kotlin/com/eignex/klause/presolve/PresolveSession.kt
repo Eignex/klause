@@ -2,7 +2,6 @@ package com.eignex.klause.presolve
 
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
-import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.PropagationProblem
@@ -55,7 +54,7 @@ class SharedIntOccurrence internal constructor(internal val offsets: IntArray, i
  * would — no per-pass `computeBaked`. [materialize] builds the heavyweight solver `Problem` once at
  * the end, with the single renumber/remap.
  */
-internal class PresolveSession(private val base: Problem, private val bakeConfig: BakeConfig = BakeConfig.NONE) {
+internal class PresolveSession(private val base: BakedProblem, private val bakeConfig: BakeConfig = BakeConfig.NONE) {
 
     // Working factor set indexed by stable id: `[0, base.factors.size)` are the originals, appended
     // ids are pass-added factors. `null` marks a tombstoned (dropped) id; ids are never renumbered.
@@ -64,7 +63,7 @@ internal class PresolveSession(private val base: Problem, private val bakeConfig
 
     // The problem the current [state] is baked over: [base] initially, a widening pass's output after a
     // [reseed]. Its factor count is the stable-id boundary between base and mid-life factors.
-    private var stateProblem: Problem = base
+    private var stateProblem: BakedProblem = base
 
     // Seed the persistent state directly from the base's already-computed root fixpoint
     // (`Problem.baked`, produced once at base construction) rather than re-propagating every factor
@@ -85,7 +84,7 @@ internal class PresolveSession(private val base: Problem, private val bakeConfig
     // materialized domains are these, not the partially-tightened live ones — mirroring the fresh path,
     // where `foldIntoDomains` skips on an Unsat bake and the reported span stays at the pre-conflict
     // domains. Snapshotted at each mutation entry (before its narrowings) and initialised to the base.
-    private var lastFeasibleDomains: Array<IntDomain> = Array(base.numIntVars) { base.requireFiniteIntDomains()[it] }
+    private var lastFeasibleDomains: Array<IntDomain> = base.rootIntDomains()
 
     // Stable ids of the live factors [passInput] last returned, parallel to that view's factor list, so
     // a [PassDelta]'s droppedIndices (into that list) map back to the stable ids [apply] tombstones.
@@ -113,7 +112,7 @@ internal class PresolveSession(private val base: Problem, private val bakeConfig
     // the previous pass already saw — the next pass gets the same view instead of rebuilding the live-factor
     // list and domain snapshot. On a large model iterated to a fixpoint over many rounds, most pass calls
     // fire nothing, so this removes the bulk of the per-pass input reconstruction the round engine repeats.
-    private var cachedInput: Problem? = null
+    private var cachedInput: BakedProblem? = null
     private var inputDirty: Boolean = true
 
     init {
@@ -280,7 +279,7 @@ internal class PresolveSession(private val base: Problem, private val bakeConfig
      * Records [liveIds] parallel to the returned factor list so the next [applyDelta] maps the delta's
      * factor indices back to stable ids.
      */
-    fun passInput(): Problem {
+    fun passInput(): BakedProblem {
         cachedInput?.let { if (!inputDirty) return it }
         val live = ArrayList<Factor>(factors.size)
         val ids = IntArrayList(factors.size)
@@ -440,7 +439,7 @@ internal class PresolveSession(private val base: Problem, private val bakeConfig
      *  flag surfaces the infeasibility to the caller without forcing that bake. When probing *is* enabled it
      *  must be re-derived over the final factor set (a [RootBaker.reseed] the already-folded view would skip),
      *  so the eager rebuild path is taken. */
-    fun materialize(): Problem {
+    fun materialize(): BakedProblem {
         val domains = if (infeasible) lastFeasibleDomains else Array(base.numIntVars) { state.intDomains[it] }
         if (bakeConfig.anyEnabled) {
             return PresolveShared.rebuildProblem(stateProblem, liveFactors(), domains, bakeConfig)

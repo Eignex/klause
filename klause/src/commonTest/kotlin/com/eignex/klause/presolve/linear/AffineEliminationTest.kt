@@ -41,9 +41,10 @@ class AffineEliminationTest {
         BacktrackSolver(problem.bake()).solve(BacktrackParams()) is SolveResult.Sat
 
     private fun checkRoundTrip(name: String, original: Problem, expectEliminated: Boolean, expectSat: Boolean) {
-        val delta = Presolve.eliminateAffineSingletons(original)
+        val baked = original.bake()
+        val delta = Presolve.eliminateAffineSingletons(baked)
         assertEquals(expectEliminated, !delta.isEmpty, "$name: elimination expectation wrong")
-        val reduced = original.withPassDelta(delta, BakeConfig.NONE)
+        val reduced = baked.withPassDelta(delta, BakeConfig.NONE)
         val reconstruct = delta.reconstruct ?: { it }
         assertEquals(expectSat, verdictSat(original), "$name: original verdict unexpected")
         assertEquals(verdictSat(original), verdictSat(reduced), "$name: verdict changed by elimination")
@@ -59,9 +60,10 @@ class AffineEliminationTest {
      *  to a feasible assignment of the original, and the reconstructed set is *exactly* the original's
      *  feasible set (no solution lost, none invented). Small domains only — full enumeration. */
     private fun checkFeasibleSetPreserved(name: String, original: Problem) {
-        val delta = Presolve.eliminateAffineSingletons(original)
+        val baked = original.bake()
+        val delta = Presolve.eliminateAffineSingletons(baked)
         assertTrue(!delta.isEmpty, "$name: expected an elimination")
-        val reduced = original.withPassDelta(delta, BakeConfig.NONE)
+        val reduced = baked.withPassDelta(delta, BakeConfig.NONE)
         val reconstruct = delta.reconstruct ?: { it }
         val origFeasible = feasibleSet(original)
         val reconstructed = HashSet<List<Long>>()
@@ -130,8 +132,8 @@ class AffineEliminationTest {
                 Linear(intArrayOf(1), intArrayOf(1), LinearOp.GE, 1),
             ),
         )
-        assertTrue(AffineSingletons.eliminateAffineSingletons(problem, maxFactors = 1).isEmpty, "capped: skip")
-        assertTrue(!AffineSingletons.eliminateAffineSingletons(problem).isEmpty, "uncapped: eliminate")
+        assertTrue(AffineSingletons.eliminateAffineSingletons(problem.bake(), maxFactors = 1).isEmpty, "capped: skip")
+        assertTrue(!AffineSingletons.eliminateAffineSingletons(problem.bake()).isEmpty, "uncapped: eliminate")
     }
 
     @Test
@@ -237,7 +239,7 @@ class AffineEliminationTest {
             ),
         )
 
-        assertTrue(Presolve.eliminateAffineSingletons(problem).isEmpty)
+        assertTrue(Presolve.eliminateAffineSingletons(problem.bake()).isEmpty)
     }
 
     @Test
@@ -452,7 +454,7 @@ class AffineEliminationTest {
             intDomains = arrayOf(IntDomain(0, 20), IntDomain(0, 3), IntDomain(0, 3)),
             factors = listOf(Linear(intArrayOf(2, -4, -6), intArrayOf(0, 1, 2), LinearOp.EQ, 8)),
         )
-        val delta = Presolve.eliminateAffineSingletons(problem, objectiveIntVars = setOf(0))
+        val delta = Presolve.eliminateAffineSingletons(problem.bake(), objectiveIntVars = setOf(0))
         assertTrue(delta.isEmpty, "objective-protected: must not eliminate x0")
     }
 

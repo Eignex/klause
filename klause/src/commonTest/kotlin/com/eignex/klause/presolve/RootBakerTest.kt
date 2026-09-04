@@ -11,14 +11,16 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.propagation.baked
+import com.eignex.klause.util.Bits
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 
 class RootBakerTest {
 
-    private fun bake(problem: Problem, config: BakeConfig): PropagationResult = RootBaker.bake(problem, config)
+    private fun bake(problem: Problem, config: BakeConfig): PropagationResult = RootBaker.bake(problem.bake(), config)
 
     @Test
     fun `failed-literal probing pins a forced literal`() {
@@ -139,5 +141,24 @@ class RootBakerTest {
             ),
         )
         assertEquals(p.baked, bake(p, BakeConfig.NONE))
+    }
+
+    @Test
+    fun `a witnessed refutation keeps the model's open sides open`() {
+        // The upper endpoint was invented to close a genuinely open column. A refutation that reboxed it
+        // as a declared bound would read as one derived inside a box the model never stated.
+        val open = Bits(1).also { it.set(0) }
+        val p = Problem(
+            numBoolVars = 0,
+            numIntVars = 1,
+            intDomains = arrayOf(IntDomain(0, 100)),
+            factors = arrayOf<Factor>(Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 1)),
+            packedOpenIntHi = open,
+        ).bake()
+
+        val refuted = RootBaker.provenInfeasible(p, BakeConfig.NONE)
+
+        assertIs<PropagationResult.Unsat>(refuted.baked)
+        assertFalse(refuted.intBounds.hasUpper(0), "the invented endpoint must not become a declared bound")
     }
 }

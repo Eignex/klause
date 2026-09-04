@@ -144,8 +144,9 @@ class PresolverTest {
             arrayOf(IntDomain(0, 2)),
             listOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 2)),
         )
+        val baked = trivial.bake()
         for (p in PresolvePass.entries.filter { it.stage == PresolvePass.Stage.PROBLEM }) {
-            val applied = trivial.withPassDelta(p.apply(trivial, PresolveContext.EMPTY), BakeConfig.NONE)
+            val applied = baked.withPassDelta(p.applyFinite(baked, PresolveContext.EMPTY), BakeConfig.NONE)
             assertEquals(trivial.numIntVars, applied.numIntVars, "${p.id} returned a malformed problem")
         }
     }
@@ -222,8 +223,9 @@ class PresolverTest {
                 Linear(intArrayOf(2, 4), intArrayOf(0, 1), LinearOp.LE, 10),
             ),
         )
-        val once = Presolver.run(problem, PresolveConfig.AUTO).problem
-        assertTrue(once !== problem, "expected the engine to transform the problem")
+        val baked = problem.bake()
+        val once = Presolver.run(baked, PresolveConfig.AUTO).problem
+        assertTrue(once !== baked, "expected the engine to transform the problem")
         assertSame(once, Presolver.run(once, PresolveConfig.AUTO).problem, "re-presolving a fixpoint must be a no-op")
     }
 
@@ -237,7 +239,7 @@ class PresolverTest {
             arrayOf(IntDomain(0, 9), IntDomain(0, 9)),
             listOf(Linear(intArrayOf(2, 4), intArrayOf(0, 1), LinearOp.EQ, 5)),
         )
-        val pre = Presolver.run(problem, PresolveConfig.AUTO)
+        val pre = Presolver.run(problem.bake(), PresolveConfig.AUTO)
         assertTrue(pre.problem.propagate(Assumptions.None) is PropagationResult.Unsat, "infeasibility must be detected")
         assertSame(
             pre.problem,
@@ -266,8 +268,9 @@ class PresolverTest {
             arrayOf(IntDomain(0, 3)),
             listOf(Linear(intArrayOf(2), intArrayOf(0), LinearOp.LE, 4)),
         )
-        val pre = Presolver.run(problem, PresolveConfig.NONE)
-        assertSame(problem, pre.problem)
+        val baked = problem.bake()
+        val pre = Presolver.run(baked, PresolveConfig.NONE)
+        assertSame(baked, pre.problem)
         val s = Sample(BooleanArray(0), longArrayOf(2))
         assertSame(s, pre.reconstruct(s))
     }
@@ -285,7 +288,7 @@ class PresolverTest {
                 Linear(intArrayOf(2, 2), intArrayOf(1, 2), LinearOp.LE, 4),
             ),
         )
-        val pre = Presolver.run(problem, PresolveConfig.DEFAULT)
+        val pre = Presolver.run(problem.bake(), PresolveConfig.DEFAULT)
         assertTrue(pre.problem !== problem, "expected the pipeline to transform the problem")
         val result = BacktrackSolver(pre.problem.bake()).solve(BacktrackParams())
         assertTrue(result is SolveResult.Sat, "presolved problem should be SAT, got $result")
@@ -306,7 +309,7 @@ class PresolverTest {
             ),
         )
         val config = PresolveConfig.parse("xor-units")
-        val pre = Presolver.run(problem, config)
+        val pre = Presolver.run(problem.bake(), config)
         val units = pre.problem.factors.filterIsInstance<Clause>().filter { it.literals.size == 1 }
         assertEquals(setOf(Lit.make(0, true), Lit.make(1, true)), units.map { it.literals[0] }.toSet())
         // Re-running on the transformed problem should be a no-op (no duplicate unit clauses).
@@ -324,7 +327,7 @@ class PresolverTest {
                 Xor(intArrayOf(Lit.make(0, true)), targetParity = 0),
             ),
         )
-        val pre = Presolver.run(problem, PresolveConfig.parse("xor-units"))
+        val pre = Presolver.run(problem.bake(), PresolveConfig.parse("xor-units"))
         val units = pre.problem.factors.filterIsInstance<Clause>().filter { it.literals.size == 1 }
         assertTrue(units.any { it.literals[0] == Lit.make(0, true) })
         assertTrue(units.any { it.literals[0] == Lit.make(0, false) })
@@ -344,8 +347,9 @@ class PresolverTest {
                 Linear(intArrayOf(2, 2), intArrayOf(1, 2), LinearOp.LE, 4),
             ),
         )
-        val pre = Presolver.run(problem, PresolveConfig.DEFAULT, cancellation = { true })
-        assertSame(problem, pre.problem, "a fired cancellation must skip every pass and return the input")
+        val baked = problem.bake()
+        val pre = Presolver.run(baked, PresolveConfig.DEFAULT, cancellation = { true })
+        assertSame(baked, pre.problem, "a fired cancellation must skip every pass and return the input")
         val s = Sample(BooleanArray(0), longArrayOf(3, 1, 0))
         assertSame(s, pre.reconstruct(s), "no pass ran, so reconstruct is the identity")
     }
@@ -361,7 +365,7 @@ class PresolverTest {
             Array(3) { IntDomain(0, 2) },
             listOf(AllDifferent(intArrayOf(0, 1, 2), domainMin = 0, domainSize = 3)),
         )
-        val pre = Presolver.run(problem, PresolveConfig.parse("value-precede"))
+        val pre = Presolver.run(problem.bake(), PresolveConfig.parse("value-precede"))
         assertTrue(pre.problem !== problem, "value precedence should add precedence factors")
         assertEquals(problem.numIntVars, pre.problem.numIntVars, "no auxiliary variables are added")
         val result = BacktrackSolver(pre.problem.bake()).solve(BacktrackParams())
@@ -396,7 +400,7 @@ class PresolverTest {
                 AllDifferent(intArrayOf(1, 3, 5), domainMin = 0, domainSize = 3), // real (overlapping)
             ),
         )
-        val pre = Presolver.run(problem, PresolveConfig.DEFAULT)
+        val pre = Presolver.run(problem.bake(), PresolveConfig.DEFAULT)
         assertEquals(1, pre.problem.factors.count { it is AllDifferent }, "the vacuous all-different is dropped")
         assertTrue(pre.problem.factors.none { 0 in it.intVars }, "x0 is eliminated — present in no factor")
         val result = BacktrackSolver(pre.problem.bake()).solve(BacktrackParams())
@@ -440,7 +444,7 @@ class PresolverTest {
         val problem = Problem(0, 2 * n, domains, factors)
 
         fun count(config: PresolveConfig, sensitive: Boolean): Int {
-            val pre = Presolver.run(problem, config, PresolveContext(solutionSetSensitive = sensitive))
+            val pre = Presolver.run(problem.bake(), config, PresolveContext(solutionSetSensitive = sensitive))
             return BacktrackSolver(pre.problem.bake()).enumerate(BacktrackParams(randomSeed = 0L)).count()
         }
 
@@ -463,7 +467,8 @@ class PresolverTest {
             listOf(Linear(intArrayOf(1, -2), intArrayOf(0, 1), LinearOp.EQ, 1)),
         )
         val ctx = PresolveContext.of(LinearObjective(intCoefficients = longArrayOf(1, 0)))
-        val pre = Presolver.run(problem, PresolveConfig.parse("affine"), ctx)
-        assertSame(problem, pre.problem)
+        val baked = problem.bake()
+        val pre = Presolver.run(baked, PresolveConfig.parse("affine"), ctx)
+        assertSame(baked, pre.problem)
     }
 }

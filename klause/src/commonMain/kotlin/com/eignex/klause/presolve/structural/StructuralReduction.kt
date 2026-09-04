@@ -3,8 +3,8 @@ package com.eignex.klause.presolve.structural
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.FactorReduction
 import com.eignex.klause.ir.IntDomain
-import com.eignex.klause.ir.Problem
 import com.eignex.klause.presolve.PassDelta
+import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.util.IntArrayList
 
 internal object StructuralReduction {
@@ -15,19 +15,20 @@ internal object StructuralReduction {
      * solution-set exact (the hook's contract), so the pass preserves the solution set; the driver only
      * collects the replacements, intersects any returned bound narrowings into the domains, and rebuilds.
      */
-    fun reduce(problem: Problem): PassDelta {
+    fun reduce(problem: BakedProblem): PassDelta {
         val dropped = IntArrayList()
         val added = ArrayList<Factor>()
+        val root = problem.rootIntDomains()
         var domains: Array<IntDomain>? = null
         problem.factors.forEachIndexed { i, f ->
-            when (val reduction = f.structuralReduce(problem.requireFiniteIntDomains())) {
+            when (val reduction = f.structuralReduce(root)) {
                 FactorReduction.Unchanged -> {}
 
                 is FactorReduction.Rewrite -> {
                     dropped.add(i)
                     added.addAll(reduction.replacement)
                     for ((v, range) in reduction.tightenedBounds) {
-                        val d = domains ?: problem.requireFiniteIntDomains().copyOf().also { domains = it }
+                        val d = domains ?: root.copyOf().also { domains = it }
                         d[v] = d[v].withMinAtLeast(range.first.toLong()).withMaxAtMost(range.last.toLong())
                     }
                 }

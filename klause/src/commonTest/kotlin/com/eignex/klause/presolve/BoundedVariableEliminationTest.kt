@@ -6,6 +6,7 @@ import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.presolve.PresolveShared.withPassDelta
+import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.Sample
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -28,7 +29,7 @@ class BoundedVariableEliminationTest {
 
     /** Run BVE and assert soundness over the whole `2^numBool` assignment space; returns the reduced problem. */
     private fun checkBve(numBool: Int, clauses: List<Clause>, objectiveBoolVars: Set<Int> = emptySet()): Problem {
-        val problem = Problem(numBool, 0, emptyArray(), clauses)
+        val problem = Problem(numBool, 0, emptyArray(), clauses).bake()
         val delta = Presolve.eliminateBoolVars(problem, objectiveBoolVars)
         val reduced = problem.withPassDelta(delta, BakeConfig.NONE)
         var origSat = false
@@ -123,7 +124,8 @@ class BoundedVariableEliminationTest {
                 Cardinality(intArrayOf(pos(0), pos(1)), min = 1, max = 1),
             ),
         )
-        val reduced = problem.withPassDelta(Presolve.eliminateBoolVars(problem, emptySet()), BakeConfig.NONE)
+        val baked = problem.bake()
+        val reduced = baked.withPassDelta(Presolve.eliminateBoolVars(baked, emptySet()), BakeConfig.NONE)
         assertTrue(mentions(reduced, 0), "a variable outside the clause database must survive BVE")
     }
 
