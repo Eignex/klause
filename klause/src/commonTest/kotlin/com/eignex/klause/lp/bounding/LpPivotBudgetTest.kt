@@ -30,13 +30,35 @@ class LpPivotBudgetTest {
     }
 
     @Test
-    fun `a prune lifts the budget permanently`() {
+    fun `a prune lifts the budget`() {
+        val budget = LpPivotBudget(cap = 500, warmupSolves = 4)
+        repeat(4) { budget.observe(pruned = false, couldPrune = true) }
+        assertEquals(500, budget.pivots())
+
+        budget.observe(pruned = true, couldPrune = true)
+
+        assertEquals(0, budget.pivots(), "a prune says the cap was the wrong judgement")
+    }
+
+    @Test
+    fun `a prune restarts the window rather than ending it`() {
         val budget = LpPivotBudget(cap = 500, warmupSolves = 4)
         budget.observe(pruned = true, couldPrune = true)
 
-        repeat(20) { budget.observe(pruned = false, couldPrune = true) }
+        repeat(4) { budget.observe(pruned = false, couldPrune = true) }
 
-        assertEquals(0, budget.pivots(), "one prune spares the LP for the rest of the search")
+        assertEquals(500, budget.pivots(), "the cap is earned again on the solves since the prune")
+    }
+
+    @Test
+    fun `a prune is not held against the solves that preceded it`() {
+        val budget = LpPivotBudget(cap = 500, warmupSolves = 4)
+        repeat(3) { budget.observe(pruned = false, couldPrune = true) }
+        budget.observe(pruned = true, couldPrune = true)
+
+        repeat(3) { budget.observe(pruned = false, couldPrune = true) }
+
+        assertEquals(0, budget.pivots(), "three solves before the prune do not count toward the next window")
     }
 
     @Test
