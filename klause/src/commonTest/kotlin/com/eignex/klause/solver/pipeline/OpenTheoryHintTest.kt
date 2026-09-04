@@ -6,6 +6,7 @@ import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.formats.smtlib.SmtLib
+import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
@@ -36,36 +37,32 @@ class OpenTheoryHintTest {
         """.trimIndent(),
     )
 
-    /** Three shared clauses over `b0..b2` alongside one open difference row. */
-    private fun clausedDifferenceModel(): Problem {
+    /** [clauses] over [numBoolVars] shared Boolean columns alongside one open difference row. */
+    private fun clausedModel(numBoolVars: Int, vararg clauses: Clause): Problem {
         val open = Bits(2).also { bits -> repeat(2) { bits.set(it) } }
         return Problem(
-            numBoolVars = 3,
+            numBoolVars = numBoolVars,
             intBounds = IntBounds.fromModelBounds(LongArray(2), LongArray(2), open, open.copy()),
-            factors = arrayOf(
-                Linear(longArrayOf(1, -1), intArrayOf(0, 1), LinearOp.LE, 3),
-                Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
-                Clause(intArrayOf(Lit.make(0, false), Lit.make(2, true))),
-                Clause(intArrayOf(Lit.make(1, false), Lit.make(2, false))),
-            ),
+            factors = arrayOf<Factor>(Linear(longArrayOf(1, -1), intArrayOf(0, 1), LinearOp.LE, 3), *clauses),
         )
     }
 
+    /** Three shared clauses over `b0..b2` alongside one open difference row. */
+    private fun clausedDifferenceModel(): Problem = clausedModel(
+        numBoolVars = 3,
+        Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
+        Clause(intArrayOf(Lit.make(0, false), Lit.make(2, true))),
+        Clause(intArrayOf(Lit.make(1, false), Lit.make(2, false))),
+    )
+
     /** Shared clauses no assignment satisfies, so a draw over them spends its whole allowance. */
-    private fun refutedClauseModel(): Problem {
-        val open = Bits(2).also { bits -> repeat(2) { bits.set(it) } }
-        return Problem(
-            numBoolVars = 2,
-            intBounds = IntBounds.fromModelBounds(LongArray(2), LongArray(2), open, open.copy()),
-            factors = arrayOf(
-                Linear(longArrayOf(1, -1), intArrayOf(0, 1), LinearOp.LE, 3),
-                Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
-                Clause(intArrayOf(Lit.make(0, true), Lit.make(1, false))),
-                Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true))),
-                Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false))),
-            ),
-        )
-    }
+    private fun refutedClauseModel(): Problem = clausedModel(
+        numBoolVars = 2,
+        Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
+        Clause(intArrayOf(Lit.make(0, true), Lit.make(1, false))),
+        Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true))),
+        Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false))),
+    )
 
     private fun satisfiesClauses(model: Problem, assignment: OpenTheoryAssignment): Boolean =
         model.factors.filterIsInstance<Clause>().all { clause ->
