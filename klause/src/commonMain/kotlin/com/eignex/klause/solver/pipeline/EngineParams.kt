@@ -68,10 +68,12 @@ fun pipelineConfigError(message: String): Nothing = throw PipelineConfigExceptio
  * hard usage error (exit 2) so typos never silently fall back to defaults.
  *
  * Keys per engine:
- *  - `cp`: `bt-arm=label,label` pins named catalog arms, or the per-solver overrides `seed`,
+ *  - `cp`: `bt-arm=label,label` pins named catalog arms; the per-solver overrides `seed`,
  *    `max-decisions`, `luby`, `phase-saving`, `max-learned`, `lbd-glue`, `pb-learning`, `var-selector`
- *    (see [VarSelectorKind]), `val-selector` (see [ValSelectorKind]), … resolve a one-arm pool
- *    (single-solver heuristic A/B); plus the portfolio knobs below
+ *    (see [VarSelectorKind]), `val-selector` (see [ValSelectorKind]), … edit **every** arm of whatever
+ *    pool results. The two compose, so `bt-arm=X` with an override is the single-solver heuristic A/B —
+ *    one arm, one knob moved — where an override alone spreads that knob across the curated pool and
+ *    dilutes it with arms that cannot express it; plus the portfolio knobs below
  *  - `ls`: `strategy` (base `auto` (curated pool, default) | `cbls|feasibilityjump|walksat|probsat|sa`
  *    | `bare` | `sweep`, the full recipe cross-product as the arm pool for the recalibration campaign,
  *    which takes no edits), or `arm=<catalog-label>` to run one curated arm in isolation,
@@ -641,12 +643,6 @@ fun buildPortfolioScenario(
 fun resolveBtRecipes(p: EngineParams, kind: Kind): List<() -> BacktrackRecipe>? {
     val btArm = p.string("bt-arm")
     val edit = backtrackOverride(p, allowSelectors = true)
-    if (btArm != null && edit != null) {
-        pipelineConfigError(
-            "cp: bt-arm= pins catalog arms and is mutually exclusive with per-solver overrides " +
-                "(${BACKTRACK_OVERRIDE_KEYS.joinToString()})",
-        )
-    }
     if (btArm != null) {
         val labels = btArm.split(",").map { it.trim() }.filter { it.isNotEmpty() }
         if (labels.isEmpty()) pipelineConfigError("bt-arm: expected a comma-separated list of backtrack arm labels")
@@ -658,7 +654,12 @@ fun resolveBtRecipes(p: EngineParams, kind: Kind): List<() -> BacktrackRecipe>? 
                 )
             }
         }
-        return labels.map { label -> { BacktrackCatalog.byLabel(label) } }
+        // Pinning and editing compose: `bt-arm` chooses *which* arms run, an override changes *how*
+        // each is built. Refusing the pair forced a knob to be A/B'd across the whole curated pool,
+        // where the arms that cannot express it dilute the very thing being measured.
+        return labels.map { label ->
+            { BacktrackCatalog.byLabel(label).let { if (edit == null) it else editRecipe(it, edit) } }
+        }
     }
     if (edit == null) return null
     // Edit every curated arm, exactly as resolveLocalSearchRecipes edits its pool. The edit rebuilds selectors
