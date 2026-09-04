@@ -666,6 +666,7 @@ internal class LpEngine(
             pendingSolveOps = 0L
             solveStart?.let { lpWallBreaker.chargeWall(it.elapsedNow().inWholeMilliseconds) }
             if (lpWallBreaker.backstopFired) sink.lp.observeWallBackstop()
+            if (lpWallBreaker.isDemoted) sink.lp.observeDemoted()
             lpPivotBudget.observe(pruned = outcome.prune, couldPrune = effectiveBound.isFinite())
             if (outcome.basis != null) {
                 while (lpBasisByDepth.size <= depth) lpBasisByDepth.add(null)
