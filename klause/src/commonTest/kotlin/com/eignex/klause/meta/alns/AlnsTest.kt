@@ -96,7 +96,7 @@ class AlnsTest {
         val problem = Problem(numBoolVars = 10, numIntVars = 0, intDomains = emptyArray(), factors = emptyArray())
         val incumbent = Sample(BooleanArray(10) { false }, LongArray(0))
         val obj = LinearObjective(boolWeights = LongArray(10) { 1L })
-        val freed = DestroyOperator.Random.destroy(Random(0), problem, incumbent, obj, fraction = 0.3)
+        val freed = DestroyOperator.Random.destroy(Random(0), problem.bake(), incumbent, obj, fraction = 0.3)
         assertEquals(3, freed.bools.size, "expected 3 freed bools (fraction 0.3 of 10)")
         assertEquals(freed.bools.toSet().size, freed.bools.size, "freed bools should be distinct")
     }
@@ -119,7 +119,7 @@ class AlnsTest {
         )
         val incumbent = Sample(BooleanArray(8) { false }, LongArray(0))
         val obj = LinearObjective(boolWeights = LongArray(8) { 1L })
-        val freed = DestroyOperator.AdjacencyRelated.destroy(Random(0), problem, incumbent, obj, fraction = 0.25)
+        val freed = DestroyOperator.AdjacencyRelated.destroy(Random(0), problem.bake(), incumbent, obj, fraction = 0.25)
         assertEquals(2, freed.bools.size)
         val componentA = freed.bools.all { it in 0..3 }
         val componentB = freed.bools.all { it in 4..7 }
@@ -140,7 +140,7 @@ class AlnsTest {
         )
         val incumbent = Sample(BooleanArray(8) { false }, LongArray(0))
         val obj = LinearObjective(boolWeights = LongArray(8) { 1L })
-        val freed = DestroyOperator.AdjacencyRelated.destroy(Random(0), problem, incumbent, obj, fraction = 0.75)
+        val freed = DestroyOperator.AdjacencyRelated.destroy(Random(0), problem.bake(), incumbent, obj, fraction = 0.75)
         assertEquals(6, freed.bools.size)
         val fromA = freed.bools.count { it in 0..3 }
         val fromB = freed.bools.count { it in 4..7 }
@@ -152,7 +152,7 @@ class AlnsTest {
         val problem = Problem(numBoolVars = 4, numIntVars = 0, intDomains = emptyArray(), factors = emptyArray())
         val incumbent = Sample(booleanArrayOf(false, false, false, true), LongArray(0))
         val obj = LinearObjective(boolWeights = longArrayOf(1L, 2L, 3L, 100L))
-        val freed = DestroyOperator.WorstObjective.destroy(Random(0), problem, incumbent, obj, fraction = 0.25)
+        val freed = DestroyOperator.WorstObjective.destroy(Random(0), problem.bake(), incumbent, obj, fraction = 0.25)
         assertEquals(1, freed.bools.size)
         assertEquals(3, freed.bools[0], "expected var 3 (highest weighted-and-set)")
     }

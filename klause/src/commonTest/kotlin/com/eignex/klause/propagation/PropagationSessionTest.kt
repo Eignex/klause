@@ -3,6 +3,7 @@ package com.eignex.klause.propagation
 import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Factor
+import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.Assumptions
@@ -32,6 +33,23 @@ class PropagationSessionTest {
         val oneShot = p.propagate(Assumptions(bools = mapOf(0 to true, 2 to false)))
         assertIs<PropagationResult.Implied>(oneShot)
         assertEquals(true, oneShot.bools[1])
+    }
+
+    @Test
+    fun `the root domain stays at the seed while the live domain follows the trail`() {
+        val p = Problem(
+            numBoolVars = 0,
+            numIntVars = 1,
+            intDomains = arrayOf(IntDomain(0, 9)),
+            factors = arrayOf<Factor>(),
+        )
+        val s = PropagationSession(p)
+        assertIs<PropagationResult.Implied>(s.seed(Assumptions.None))
+        assertIs<PropagationResult.Implied>(s.pinIntAtLeast(0, 4L))
+
+        assertEquals(4L, s.intDomain(0).min, "the live domain should carry the pin")
+        assertEquals(0L, s.rootIntDomain(0).min, "the root domain should be the one the session was seeded with")
+        assertEquals(9L, s.rootIntDomain(0).max)
     }
 
     @Test

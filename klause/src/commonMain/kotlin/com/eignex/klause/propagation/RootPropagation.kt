@@ -79,7 +79,7 @@ internal fun runRootPropagation(
             intSetOffsets.add(intSetValues.size)
             continue
         }
-        val original = problem.requireFiniteIntDomains()[variable]
+        val original = state.rootDomains[variable]
         val seedMin = maxOf(original.min, assumptions.deductions.intMinOrNull(variable) ?: Long.MIN_VALUE)
         val seedMax = minOf(original.max, assumptions.deductions.intMaxOrNull(variable) ?: Long.MAX_VALUE)
         if (domain.min > seedMin) {

@@ -179,6 +179,14 @@ class PropagationSession(
     /** Current int domain after propagation. Always non-empty unless the session is Unsat. */
     fun intDomain(v: Int): IntDomain = state.intDomains[v]
 
+    /**
+     * Domain integer column [v] was seeded with, before any decision on this trail.
+     *
+     * What a consumer needing an instance-wide scale or a "narrowed past the root" test reads;
+     * [intDomain] answers the same question only while the trail is empty.
+     */
+    fun rootIntDomain(v: Int): IntDomain = state.rootDomains[v]
+
     /** Install (once, at the root) the incremental objective bool lower bound over [weights]; returns
      *  true while it is live. See [PropagationState.installObjectiveBoolBound]. */
     fun installObjectiveBoolBound(weights: LongArray): Boolean = state.installObjectiveBoolBound(weights)

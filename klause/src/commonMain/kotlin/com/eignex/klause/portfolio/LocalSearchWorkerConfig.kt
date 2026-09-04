@@ -9,7 +9,6 @@ import com.eignex.klause.localsearch.LocalSearchSolver
 import com.eignex.klause.localsearch.strategy.FeasibleDescent
 import com.eignex.klause.localsearch.strategy.LocalSearchRecipe
 import com.eignex.klause.propagation.BakedProblem
-import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.SearchEvent
@@ -51,7 +50,7 @@ internal class LocalSearchWorkerConfig(val recipe: LocalSearchRecipe) : WorkerCo
             problem to null
         }
         val session = LocalSearchSolver(
-            effectiveProblem.bake(),
+            effectiveProblem,
             strategy = recipe.strategy,
             optimizeStrategy = recipe.optimizeStrategy,
             definitionalSweep = definitionalSweep,

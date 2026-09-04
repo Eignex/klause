@@ -6,6 +6,9 @@ import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.propagation.BakedProblem
+import com.eignex.klause.propagation.bake
+import com.eignex.klause.util.Bits
 import com.eignex.klause.util.EmptyIntArray
 
 /**
@@ -33,7 +36,7 @@ internal object IntBitChannel {
 
     class Result(
         /** The augmented problem the solver enumerates: `base` plus the channel vars and factors. */
-        val problem: Problem,
+        val problem: BakedProblem,
         /** For each requested int var (in input order), its fresh bit ids, least-significant first. */
         val bitsPerVar: List<IntArray>,
     ) {
@@ -48,7 +51,7 @@ internal object IntBitChannel {
     }
 
     /** Build the channel for `intVars` of `base`. With no int vars the base problem is returned as-is. */
-    fun channel(base: Problem, intVars: IntArray): Result {
+    fun channel(base: BakedProblem, intVars: IntArray): Result {
         if (intVars.isEmpty()) return Result(base, emptyList())
 
         var nextBool = base.numBoolVars
@@ -58,7 +61,7 @@ internal object IntBitChannel {
         val bitsPerVar = ArrayList<IntArray>(intVars.size)
 
         for (x in intVars) {
-            val dom = base.requireFiniteIntDomains()[x]
+            val dom = base.rootIntDomain(x)
             val min = dom.min
             val span = dom.max - dom.min
             val width = bitWidth(span)
@@ -100,13 +103,25 @@ internal object IntBitChannel {
             bitsPerVar.add(bits)
         }
 
+        // The channel bounds a base column through its `Linear` row, not through the column: a side the
+        // source left open stays marked open, so nothing downstream reads the encoded box as a declaration.
         val problem = Problem(
             numBoolVars = nextBool,
             numIntVars = nextInt,
-            intDomains = base.requireFiniteIntDomains() + extraDomains.toTypedArray(),
+            intDomains = base.rootIntDomains() + extraDomains.toTypedArray(),
             factors = base.factors + extraFactors.toTypedArray(),
+            packedOpenIntLo = widened(base.intBounds.openLowerBits, nextInt),
+            packedOpenIntHi = widened(base.intBounds.openUpperBits, nextInt),
         )
-        return Result(problem, bitsPerVar)
+        return Result(problem.bake(), bitsPerVar)
+    }
+
+    /** [source] over [size] columns, the channel's appended ones left closed. */
+    private fun widened(source: Bits?, size: Int): Bits? {
+        if (source == null) return null
+        val out = Bits(size)
+        source.forEachSet { out.set(it) }
+        return out
     }
 
     /** Bits needed to represent values `0..span`; `0` for a singleton (`span == 0`). */

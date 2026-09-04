@@ -446,11 +446,17 @@ internal object SolveCore {
      * saturating at [Long.MAX_VALUE]. Both the per-domain width and the sum exceed a `Long` on a model
      * with near-full-range domains, and a wrapped total reads as a plausible figure rather than as
      * overflow, so each is checked. Matches the saturating convention of `PresolveShared.maxIntSpan`.
+     *
+     * A column the model leaves open on either side saturates it outright: what its width would measure
+     * is the box a lane invented to search it, not a size the model states. [openText] is the line that
+     * says how many columns that is.
      */
     private fun domainSpan(problem: Problem): Long {
+        val bounds = problem.intBounds
         var span = 0L
-        for (d in problem.requireFiniteIntDomains()) {
-            val width = d.max - d.min
+        for (v in 0 until problem.numIntVars) {
+            if (bounds.isOpenLower(v) || bounds.isOpenUpper(v)) return Long.MAX_VALUE
+            val width = bounds.upper(v) - bounds.lower(v)
             if (width < 0L) return Long.MAX_VALUE
             span += width
             if (span < 0L) return Long.MAX_VALUE
@@ -465,18 +471,18 @@ internal object SolveCore {
      * identically as "unbounded" - which is what makes an open-domain model look like a wall presolve
      * cannot touch when it may be nothing of the sort. This is the count that line hides.
      *
-     * A column counts as open when its width overflows `Long` or exceeds [OPEN_WIDTH]. The exact cut is
-     * not load-bearing: real models put their columns either near the integer limit or well under a million, so
-     * nothing observed lands near it.
+     * A column counts as open when the model declares no bound on one of its sides, whatever finite box
+     * a lane materialized to search it — so a wide declared column is not miscounted as unbounded, and a
+     * narrow invented box does not hide one that is.
      */
 
     private fun openText(problem: Problem): String {
+        val bounds = problem.intBounds
         var open = 0
-        for (d in problem.requireFiniteIntDomains()) {
-            val width = d.max - d.min
-            if (width < 0L || width > OPEN_WIDTH) open++
+        for (v in 0 until problem.numIntVars) {
+            if (bounds.isOpenLower(v) || bounds.isOpenUpper(v)) open++
         }
-        return "$open of ${problem.requireFiniteIntDomains().size}"
+        return "$open of ${problem.numIntVars}"
     }
 
     /**
@@ -519,9 +525,6 @@ internal object SolveCore {
     }
 
     private const val AFFINE_PIVOT_ORDER_KEY = "affine-pivot-order"
-
-    /** Width above which [openText] reads a column as carrying no usable bound. */
-    private const val OPEN_WIDTH = 1L shl 40
 
     private fun factorHistogram(problem: Problem): Map<String, Int> =
         problem.factors.groupingBy { it::class.simpleName ?: "?" }.eachCount()

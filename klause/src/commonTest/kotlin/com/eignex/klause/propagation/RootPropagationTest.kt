@@ -11,6 +11,7 @@ import com.eignex.klause.factor.bool.Xor
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.factor.reifiedIntCompare
 import com.eignex.klause.ir.Factor
+import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
@@ -38,6 +39,23 @@ class RootPropagationTest {
 
     private fun implied(r: PropagationResult): PropagationResult.Implied =
         r as? PropagationResult.Implied ?: fail("expected Implied, got $r")
+
+    @Test
+    fun `a model that states bounds alone propagates over the range they close`() {
+        // x + y <= 3 over x, y in [0, 10] declared as bounds, with no value set stated for either.
+        val p = Problem(
+            numBoolVars = 0,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(0, 0), longArrayOf(10, 10), null, null),
+            factors = arrayOf<Factor>(
+                Linear(longArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 3L),
+            ),
+        )
+
+        val r = implied(p.propagate())
+
+        assertEquals(3L, r.intMaxOrNullCompat(0), "the bound closes the range the row prunes against")
+        assertEquals(3L, r.intMaxOrNullCompat(1))
+    }
 
     @Test
     fun `unit clause with one undetermined literal pins it`() {
