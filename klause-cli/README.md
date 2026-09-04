@@ -117,13 +117,15 @@ Solver-control flags are common to **every** mode:
 
 Open-theory input (open SMT-LIB or MPS) is selected by the model route, not by `-e`: it always uses
 the complete theory solver. `--param node-limit=N` is a deterministic solve-wide budget: it counts
-finite decision nodes on a finite route and open-theory decisions, checks, and LIA row visits on an
-open route. `--param open-hint-flips=N` spends N local-search flips, once per request, on an
-unverified first-branch order over the model's shared clauses; it is off unless asked for, changes
-only which side of a Boolean split is tried first, and reports under `-s` (`openHint*`) what it drew
-and how many splits it went on to order. The allowance is not spent until
-`--param open-hint-min-splits=N` splits have asked for a hint (default 128), so a model the theory
-dominates — which reaches almost no split — never pays for one.
+finite decision nodes on a finite route and open-theory decisions, checks, LIA row visits, and the
+candidate hint's local-search moves on an open route. `--param open-hint-flips=N` spends up to N
+local-search flips, once per request, on an unverified first-branch order over the model's shared
+clauses; it is off unless asked for, changes only which side of a Boolean split is tried first, and
+reports under `-s` (`openHint*`) what it drew and how many splits it went on to order. The flips come
+out of the same `node-limit` budget the search spends — the draw gets what is left of it and is
+charged for what it uses — so a hinted run and an unhinted one at the same limit do the same total
+work. The allowance is not spent until `--param open-hint-min-splits=N` splits have asked for a hint
+(default 128), so a model the theory dominates — which reaches almost no split — never pays for one.
 `--param open-branching=activity|source-order` chooses which Boolean the traversal splits:
 `source-order` (the default) walks the variables in model order, `activity` follows conflict activity
 over the shared session. Only the Boolean skeleton is branched either way — the theory decides the

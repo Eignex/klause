@@ -10,7 +10,7 @@ data class OpenTheoryWorkStats(
     val openTheoryDecisions: Long = 0,
     /** Accepted legacy theory-check allowance uses. */
     val openTheoryChecks: Long = 0,
-    /** Accounting-policy sum of committed decisions and checks. */
+    /** Accounting-policy sum of committed decisions, checks, and charged hint moves. */
     val openWork: Long = 0,
 )
 
@@ -41,6 +41,9 @@ class OpenTheoryWorkSink(private val limit: Long = Long.MAX_VALUE) {
         return !exhausted
     }
 
+    /** Fixed-work allowance still unspent, which a producer sizing its own allowance may not exceed. */
+    fun remaining(): Long = limit - work
+
     /** Charge one committed shared Boolean decision. */
     fun boolDecision(): Boolean = consume().also { if (it) boolDecisions++ }
 
@@ -52,6 +55,19 @@ class OpenTheoryWorkSink(private val limit: Long = Long.MAX_VALUE) {
 
     /** Charge one accepted legacy theory check. */
     fun theoryCheck(): Boolean = consume().also { if (it) theoryChecks++ }
+
+    /**
+     * Charge the local-search moves a branch-order hint draw spent.
+     *
+     * The draw is the one open-route producer that spends work ahead of the traversal, so charging it is
+     * what keeps this allowance solve-wide: a hinted run and an unhinted one under the same limit do the
+     * same total work, the hinted one having given part of it to the draw. Charged against [remaining]
+     * so a producer that overran the allowance it was handed cannot report more spent than the sink
+     * ever held.
+     */
+    fun hintMoves(moves: Long) {
+        work += moves.coerceIn(0, remaining())
+    }
 
     /** Return the immutable public snapshot. */
     fun snapshot(): OpenTheoryWorkStats = OpenTheoryWorkStats(

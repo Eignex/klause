@@ -9537,7 +9537,9 @@ public final class com/eignex/klause/solver/result/OpenTheoryWorkSink {
 	public final fun boolDecision ()Z
 	public final fun getExhausted ()Z
 	public final fun hasAllowance ()Z
+	public final fun hintMoves (J)V
 	public final fun intDecision ()Z
+	public final fun remaining ()J
 	public final fun snapshot ()Lcom/eignex/klause/solver/result/OpenTheoryWorkStats;
 	public final fun theoryCheck ()Z
 	public final fun theoryDecision ()Z

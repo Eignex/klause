@@ -34,7 +34,7 @@ private const val DEFAULT_HINT_MIN_SPLITS = 128L
 data class TheoryParams(
     /** Legacy maximum theory-check allowance; this is not a complete leaf count. */
     val maxLeaves: Long = Long.MAX_VALUE,
-    /** Solve-wide deterministic open-theory work allowance. */
+    /** Solve-wide deterministic open-theory work allowance, covering the hint draw and the traversal. */
     val openWorkLimit: Long = Long.MAX_VALUE,
     /** Maximum committed shared decisions, independent of open-theory work accounting. */
     val maxDecisions: Long = Long.MAX_VALUE,
@@ -51,6 +51,10 @@ data class TheoryParams(
      * decision, so whether it pays is a measured question rather than a default. Zero is not that
      * switch: it runs the producer under an allowance it cannot reach a proposal within, which is what
      * separates the producer's own cost from the proposal's effect.
+     *
+     * This is a ceiling on the draw, not an allowance beside [openWorkLimit]: the draw may spend only
+     * what that budget has left and what it spends is charged there, so the traversal of a hinted run
+     * gets the budget minus the draw.
      */
     val openHintFlips: Long? = null,
     /**
