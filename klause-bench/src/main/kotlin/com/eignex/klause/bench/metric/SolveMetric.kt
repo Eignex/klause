@@ -118,6 +118,9 @@ internal object SolveMetric {
             lp = if (solverId == SolverInvocation.KLAUSE) search.lp else null,
             presolve = if (solverId == SolverInvocation.KLAUSE) search.presolve else null,
         )
+        if (solverId == SolverInvocation.KLAUSE) {
+            SolverInvocation.klauseCliDefect()?.let { error("the klause dist cannot solve: $it") }
+        }
         val tag = configTag(solverId, settings, budget, label)
         val outDir = File("output", tag).apply { mkdirs() }
         val timestamp = Instant.now().toString()
