@@ -13,7 +13,9 @@ import com.eignex.klause.presolve.Presolve
 import com.eignex.klause.presolve.PresolveShared.withPassDelta
 import com.eignex.klause.presolve.RootBaker
 import com.eignex.klause.propagation.Assumptions
+import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.PropagationResult
+import com.eignex.klause.propagation.bake
 import com.eignex.klause.propagation.propagate
 import kotlin.random.Random
 import kotlin.test.Test
@@ -27,7 +29,7 @@ import kotlin.test.assertTrue
  */
 class CoefficientStrengtheningTest {
 
-    private fun strengthened(problem: Problem): Problem =
+    private fun strengthened(problem: BakedProblem): Problem =
         problem.withPassDelta(Presolve.strengthenCoefficients(problem), BakeConfig.NONE)
 
     @Test
@@ -46,7 +48,7 @@ class CoefficientStrengtheningTest {
                     Linear(intArrayOf(2, 5), intArrayOf(0, 2), LinearOp.LE, 8), // lift target
                 ),
             )
-            val p = RootBaker.reseed(base, BakeConfig(probeIntBounds = probe))
+            val p = RootBaker.reseed(base.bake(), BakeConfig(probeIntBounds = probe))
             val out = strengthened(p)
             return out.factors.filterIsInstance<Linear>().single { 0 in it.vars && 2 in it.vars }
         }
@@ -99,9 +101,9 @@ class CoefficientStrengtheningTest {
 
     /**
      * Feasible-set equivalence over arbitrary per-variable integer domains [domains]. Enumeration
-     * runs over the problem's *post-construction* domains: the [Problem] constructor folds the
-     * constraint's own bound deductions into the domains (#148 init tightening), so that — not the
-     * declared range — is the feasible region presolve must preserve.
+     * runs over the *root-propagated* domains: the lift reads what the bake left, folding the
+     * constraint's own bound deductions in, so that — not the declared range — is the feasible region
+     * presolve must preserve.
      */
     private fun assertLinearEquivalent(domains: Array<IntRange>, original: Linear) {
         val numVars = domains.size
@@ -111,13 +113,13 @@ class CoefficientStrengtheningTest {
                 numVars,
                 Array(numVars) { IntDomain(domains[it].first.toLong(), domains[it].last.toLong()) },
                 listOf(original),
-            )
+            ).bake()
         // The rewrite may produce one factor (lifted / gcd-reduced), none (dropped ⇒ always-true), or
         // a multi-factor contradiction (an indivisible equality ⇒ infeasible); the feasible set is the
         // conjunction of whatever rewritten factors remain.
         val rewritten = strengthened(problem).factors.filterIsInstance<Linear>()
         val values = Array(numVars) { v ->
-            val d = problem.requireFiniteIntDomains()[v]
+            val d = problem.rootIntDomain(v)
             IntArray(d.values.size) { d.values.valueAt(it).toInt() }
         }
         val assign = IntArray(numVars)
@@ -148,7 +150,7 @@ class CoefficientStrengtheningTest {
     }
 
     private fun assertPbEquivalent(numVars: Int, original: PseudoBoolean) {
-        val problem = Problem(numVars, 0, emptyArray(), listOf(original))
+        val problem = Problem(numVars, 0, emptyArray(), listOf(original)).bake()
         val rewritten = strengthened(problem).factors.getOrNull(0) as? PseudoBoolean
         val bools = BooleanArray(numVars)
         for (mask in 0 until (1 shl numVars)) {
@@ -170,7 +172,7 @@ class CoefficientStrengtheningTest {
     }
 
     private fun assertInfeasibleAfterStrengthen(problem: Problem) {
-        val out = strengthened(problem)
+        val out = strengthened(problem.bake())
         assertTrue(
             out.propagate(Assumptions.None) is PropagationResult.Unsat,
             "strengthened problem should be infeasible: ${out.factors}",
@@ -208,7 +210,7 @@ class CoefficientStrengtheningTest {
                 2,
                 arrayOf(IntDomain(0, 4), IntDomain(0, 4)),
                 listOf(Linear(intArrayOf(2, 4), intArrayOf(0, 1), LinearOp.EQ, 6)),
-            ),
+            ).bake(),
         )
         assertTrue(out.propagate(Assumptions.None) !is PropagationResult.Unsat, "divisible equality stays feasible")
     }
@@ -328,7 +330,7 @@ class CoefficientStrengtheningTest {
         // Coprime (no GCD reduction), loose enough that no coefficient exceeds the cover slack
         // d = Amax − b = 4 (so no lifting), and not so loose the bound tightens the [0,2] domains.
         val original = Linear(intArrayOf(2, 3), intArrayOf(0, 1), LinearOp.LE, 6)
-        val problem = Problem(0, 2, Array(2) { IntDomain(0, 2) }, listOf(original))
+        val problem = Problem(0, 2, Array(2) { IntDomain(0, 2) }, listOf(original)).bake()
         assertTrue(strengthened(problem).factors[0] === original, "coprime factor was rewritten")
     }
 
@@ -359,7 +361,7 @@ class CoefficientStrengtheningTest {
             factors = listOf(Linear(intArrayOf(1, 1, 1), intArrayOf(0, 1, 2), LinearOp.LE, 10)),
         )
         assertTrue(
-            Presolve.strengthenCoefficients(problem).isEmpty,
+            Presolve.strengthenCoefficients(problem.bake()).isEmpty,
             "an unliftable row must pass through unchanged, neither dropped nor rewritten",
         )
     }

@@ -39,7 +39,7 @@ class SymmetryPropagatorTest {
     private fun key(s: Sample) = s.bools.toList() to s.ints.toList()
 
     private fun assertSoundUnderSearch(name: String, problem: Problem) {
-        val broken = problem.withPassDelta(Presolve.breakSymmetries(problem), BakeConfig.NONE)
+        val broken = problem.bake().let { it.withPassDelta(Presolve.breakSymmetries(it), BakeConfig.NONE) }
         val original = BruteForceSolver(
             problem.bake(),
         ).enumerate(BruteForceParams(randomSeed = 0L)).map { key(it) }.toHashSet()
@@ -121,7 +121,7 @@ class SymmetryPropagatorTest {
                 }
             }
             val problem = Problem(0, n, Array(n) { IntDomain(0, d.toLong()) }, factors)
-            val broken = problem.withPassDelta(Presolve.breakSymmetries(problem), BakeConfig.NONE)
+            val broken = problem.bake().let { it.withPassDelta(Presolve.breakSymmetries(it), BakeConfig.NONE) }
             val origSat = BruteForceSolver(problem.bake()).solve(BruteForceParams(randomSeed = 0L)) is SolveResult.Sat
             val brokenSat = BacktrackSolver(broken.bake()).solve(BacktrackParams(randomSeed = 1L)) is SolveResult.Sat
             assertEquals(origSat, brokenSat, "random#$iter(n=$n,d=$d): breaking changed satisfiability")

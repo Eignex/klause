@@ -77,7 +77,6 @@ class PreparedSourceTest {
                 intBounds = IntBounds.fromModelBounds(longArrayOf(0, 0), longArrayOf(3, 3), null, null),
                 factors = arrayOf<Factor>(Linear(longArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 4L)),
             ),
-            reconstruct = { it },
             infeasible = false,
             objective = null,
             passesFired = emptyList(),

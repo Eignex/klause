@@ -5,6 +5,7 @@ import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.propagation.bake
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -22,7 +23,7 @@ class PresolveSessionTest {
 
     private fun leq(coeffs: IntArray, vars: IntArray, bound: Int) = Linear(coeffs, vars, LinearOp.LE, bound)
 
-    private fun base(vararg factors: Factor) = Problem(0, 3, domains(), factors.toList())
+    private fun base(vararg factors: Factor) = Problem(0, 3, domains(), factors.toList()).bake()
 
     private fun bounds(problem: Problem) = (0 until problem.numIntVars).map {
         problem.requireFiniteIntDomains()[it].min to

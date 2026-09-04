@@ -10,6 +10,7 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.model.PbOp
+import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.LongArrayList
@@ -57,7 +58,7 @@ internal object BinaryColumnSubstitution {
     /** The result of a firing substitution: the transformed [problem] (its Boolean namespace extended by
      *  one variable per substituted column), the [reconstruct] that lifts its solutions back to the input's
      *  variable space, and the number of [columns] substituted. */
-    class Substitution(val problem: Problem, val reconstruct: (Sample) -> Sample, val columns: Int)
+    class Substitution(val problem: BakedProblem, val reconstruct: (Sample) -> Sample, val columns: Int)
 
     /**
      * Substitute every eligible `{0, 1}` column of [problem] for a fresh Boolean literal, or return `null`
@@ -65,14 +66,14 @@ internal object BinaryColumnSubstitution {
      * [objectiveIntVars] are held back. [bakeConfig] is threaded into the rebuild so the root-bake probing
      * policy is re-derived over the rewritten factor set.
      */
-    fun substitute(problem: Problem, objectiveIntVars: Set<Int>, bakeConfig: BakeConfig): Substitution? {
+    fun substitute(problem: BakedProblem, objectiveIntVars: Set<Int>, bakeConfig: BakeConfig): Substitution? {
         val numInts = problem.numIntVars
         if (numInts == 0) return null
         val factors = problem.factors
         val substitutable = BooleanArray(numInts)
         var anyColumn = false
         for (v in 0 until numInts) {
-            if (!problem.requireFiniteIntDomains()[v].isBinary() || v in objectiveIntVars) continue
+            if (!problem.rootIntDomain(v).isBinary() || v in objectiveIntVars) continue
             substitutable[v] = true
             anyColumn = true
         }
@@ -110,7 +111,7 @@ internal object BinaryColumnSubstitution {
             }
             out.addAll(lower(f, boolOf, bound))
         }
-        val domains = Array(numInts) { problem.requireFiniteIntDomains()[it] }
+        val domains = problem.rootIntDomains()
         for (k in 0 until columns.size) domains[columns[k]] = IntDomain(0, 0)
         val rebuilt = PresolveShared.rebuildProblem(problem, out, domains, bakeConfig, numBoolVars = nextBool)
         val substituted = columns.toIntArray()

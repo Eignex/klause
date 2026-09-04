@@ -7,6 +7,7 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.PropagationResult
+import com.eignex.klause.propagation.bake
 import com.eignex.klause.propagation.propagate
 import com.eignex.klause.solver.Sample
 import kotlin.test.Test
@@ -16,7 +17,7 @@ import kotlin.test.assertTrue
 class SingletonInequalityProjectionTest {
 
     private fun problem(domains: Array<IntDomain>, vararg factors: Factor) =
-        Problem(numBoolVars = 0, numIntVars = domains.size, intDomains = domains, factors = factors.toList())
+        Problem(numBoolVars = 0, numIntVars = domains.size, intDomains = domains, factors = factors.toList()).bake()
 
     private fun isFeasible(p: Problem, s: Sample): Boolean {
         var a = Assumptions.None

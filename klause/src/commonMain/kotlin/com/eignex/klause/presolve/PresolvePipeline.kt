@@ -73,7 +73,6 @@ object PresolvePipeline {
         return PreparedSource(
             source = problem,
             problem = presolved.problem,
-            reconstruct = presolved.reconstruct,
             infeasible = presolved.infeasible,
             objective = refit(linearObjective, presolved.problem),
             passesFired = presolved.passesFired,
@@ -134,12 +133,11 @@ object PresolvePipeline {
         }
         val objective = linearObjective ?: LinearObjective()
 
-        // Coefficient strengthening runs first — before [RootBaker.reseed] forces the root bake: a
-        // gcd-indivisible equality is infeasible regardless of the (possibly very wide) variable bounds, so
-        // it is caught in O(factors). The bake would otherwise narrow it toward the empty domain one step
-        // per round — O(span) on a wide clamped domain — before any pass runs.
-        val strengthenInfeasible = prepared.infeasible
-
+        // Coefficient strengthening ran first in the source phase — before [RootBaker.reseed] forces the
+        // root bake: a gcd-indivisible equality is infeasible regardless of the (possibly very wide)
+        // variable bounds, so it is caught in O(factors). The bake would otherwise narrow it toward the
+        // empty domain one step per round — O(span) on a wide clamped domain — before any pass runs.
+        //
         // On a genuinely wide integer domain, the LP relaxation proves global infeasibility (e.g. a
         // difference cycle `x < y ∧ y < x`) in O(one LP solve) — before [RootBaker.reseed]'s bound
         // propagation would grind it out one step per round (O(span)). [lpRootInfeasible] builds the root
@@ -147,21 +145,35 @@ object PresolvePipeline {
         // an exact Farkas ray; a true result contains every integer solution, so it is the same verdict the
         // bake would reach. Gated on span so small models never pay the LP.
         val wideSpan = Presolve.maxIntSpan(sourceProblem) > KlauseConfig.current.largeSpanThreshold
-        val lpInfeasible = !strengthenInfeasible && wideSpan &&
-            lpRootInfeasible(
+        val lpInfeasible = !prepared.infeasible && wideSpan && lpRootInfeasible(
+            sourceProblem,
+            objective,
+            LpPlan(bounding = true),
+            preBakeSlice(cancellation, presolveBudget),
+        )
+        // A refutation reached before the bake is the verdict, and the source model is what carries it: the
+        // bake and every round below would only re-derive it at O(span), so the phase stops here and reports
+        // what the source phase left.
+        if (prepared.infeasible || lpInfeasible) {
+            return PresolveOutcome(
                 sourceProblem,
-                objective,
-                LpPlan(bounding = true),
-                preBakeSlice(cancellation, presolveBudget),
+                { it },
+                PresolveStats(
+                    passes = prepared.passesFired.map { it.id },
+                    constraintsRemoved = problem.factors.size - sourceProblem.factors.size,
+                    infeasible = true,
+                ),
+                changed = true,
+                objective = refit(linearObjective, sourceProblem),
             )
-        val preBakeInfeasible = strengthenInfeasible || lpInfeasible
+        }
 
         // On a wide but feasible domain the LP still can't be skipped like the infeasible case, but its
         // optimum-based bound tightening (OBBT, [lpRootBounds]) collapses each variable's clamped domain in
         // one solve per bound — so the root bake starts from the tightened domains instead of narrowing them
         // one step per round (O(span)). Solution-set-preserving, so it is sound before the bake. Gated on
-        // span so small models never pay the OBBT; skipped when already proven infeasible.
-        val prebaked = if (!preBakeInfeasible && wideSpan) {
+        // span so small models never pay the OBBT.
+        val prebaked = if (wideSpan) {
             lpRootBounds(sourceProblem, objective, LpPlan(bounding = true), preBakeSlice(cancellation, presolveBudget))
         } else {
             sourceProblem
@@ -171,11 +183,10 @@ object PresolvePipeline {
         // directly-constructed (already-baked) problem, so this is where a front-end's deferred base bake
         // actually happens, after the O(one-LP) pre-bake infeasibility/OBBT that must precede it.
         val bakeStart = TimeSource.Monotonic.markNow()
-        val baked = if (preBakeInfeasible) sourceProblem else prebaked.bake(cancellation)
-        val seeded = if (preBakeInfeasible) sourceProblem else RootBaker.reseed(baked, bakeConfig)
+        val baked = prebaked.bake(cancellation)
+        val seeded = RootBaker.reseed(baked, bakeConfig)
         val bakeElapsed = bakeStart.elapsedNow()
-        val reconstructs = ArrayList<(Sample) -> Sample>() // in application order; source preparation first
-        reconstructs.add(prepared.reconstruct)
+        val reconstructs = ArrayList<(Sample) -> Sample>() // in application order
         val firedPasses = LinkedHashSet<String>() // pass ids that fired, across all rounds, in first-fire order
         prepared.passesFired.forEach { firedPasses.add(it.id) }
         // Pseudo-Boolean lane substitution: a `{0, 1}` integer column becomes a Boolean literal and the rows
@@ -186,7 +197,7 @@ object PresolvePipeline {
         // elimination, clause subsumption) apply where only the integer-column ones could before. It also
         // has to precede symmetry breaking, whose added handling factor reads the columns value-wise and
         // would hold every one of them in the integer lane.
-        val substitution = if (preBakeInfeasible || !config.resolved(PresolvePass.SUBSTITUTE_BINARY_COLUMNS, context)) {
+        val substitution = if (!config.resolved(PresolvePass.SUBSTITUTE_BINARY_COLUMNS, context)) {
             null
         } else {
             BinaryColumnSubstitution.substitute(seeded, context.objectiveIntVars, bakeConfig)
@@ -197,9 +208,9 @@ object PresolvePipeline {
             firedPasses.add(PresolvePass.SUBSTITUTE_BINARY_COLUMNS.id)
         }
         var harvest = LpHarvestReport() // the LP harvest's own contribution, summed over rounds
-        var infeasible = preBakeInfeasible
+        var infeasible = false
         var round = 0
-        while (!preBakeInfeasible && round++ < MAX_PRESOLVE_HARVEST_ROUNDS && !cancellation()) {
+        while (round++ < MAX_PRESOLVE_HARVEST_ROUNDS && !cancellation()) {
             val pre = Presolver.run(current, config, context, cancellation)
             infeasible = infeasible || pre.infeasible
             val harvestResult = harvestPlan?.let {

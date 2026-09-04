@@ -3,8 +3,8 @@ package com.eignex.klause.presolve.linear
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.LinearOp
-import com.eignex.klause.ir.Problem
 import com.eignex.klause.presolve.PassDelta
+import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.util.IntArrayList
 
@@ -24,7 +24,7 @@ internal object SingletonInequalityProjection {
 
     private fun fitsHalfLong(v: Long): Boolean = v > -(1L shl 31) && v < (1L shl 31)
 
-    fun project(problem: Problem, objectiveIntVars: Set<Int>): PassDelta {
+    fun project(problem: BakedProblem, objectiveIntVars: Set<Int>): PassDelta {
         // Occurrence count per integer variable across every factor: a projectable variable is in one.
         val occ = IntArray(problem.numIntVars)
         for (f in problem.factors) for (v in f.intVars) if (v in occ.indices) occ[v]++
@@ -45,7 +45,7 @@ internal object SingletonInequalityProjection {
             } ?: return@forEachIndexed
             val x = f.vars[j]
             val a = row.coeff(j)
-            val dom = problem.requireFiniteIntDomains()[x]
+            val dom = problem.rootIntDomain(x)
             if (!fitsHalfLong(dom.min) || !fitsHalfLong(dom.max)) return@forEachIndexed
             // The bound of x that leaves `rest` the widest feasible region.
             val xBest = when (f.op) {

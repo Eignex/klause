@@ -6,13 +6,13 @@ import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
-import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.presolve.AffinePivotOrder
 import com.eignex.klause.presolve.PassDelta
 import com.eignex.klause.presolve.Presolve
 import com.eignex.klause.presolve.PresolveShared
 import com.eignex.klause.presolve.SharedIntOccurrence
+import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.CheckedLongOverflowException
@@ -55,7 +55,7 @@ internal object AffineSingletons {
      * the engine optimises over the presolved problem where an eliminated variable is unconstrained.
      */
     fun eliminateAffineSingletons(
-        problem: Problem,
+        problem: BakedProblem,
         objectiveIntVars: Set<Int> = emptySet(),
         cancellation: Cancellation = Cancellation.Never,
         sharedIntOcc: SharedIntOccurrence? = null,
@@ -94,7 +94,7 @@ internal object AffineSingletons {
                     eliminated,
                     objVars,
                     capWide,
-                    problem.requireFiniteIntDomains(),
+                    problem.rootIntDomains(),
                     cancellation,
                 )
             } else {
@@ -103,7 +103,7 @@ internal object AffineSingletons {
                         seed,
                         eliminated,
                         objVars,
-                        problem.requireFiniteIntDomains(),
+                        problem.rootIntDomains(),
                         cancellation,
                     ) != null
             }
@@ -144,7 +144,7 @@ internal object AffineSingletons {
         // integer. Restrict `y` to those values (a domain modification, not a folded factor) and
         // reconstruct `x` with the divisor. Runs after the unit-pivot loop, so a residue partner `y`
         // is always a surviving variable.
-        val domains = problem.requireFiniteIntDomains().copyOf()
+        val domains = problem.rootIntDomains()
         while (!cancellation()) {
             val r = findResidueCandidate(ws, eliminated, objVars, domains, cancellation) ?: break
             ws.drop(r.defIdx)
@@ -926,7 +926,7 @@ internal object AffineSingletons {
          * equality [c].`defIdx` and rewriting only the factors that mention `x` in place, then appending
          * the domain-bound rows. The def id is tombstoned last so the occurrence scan below still sees it.
          */
-        fun fold(problem: Problem, c: AffineCandidate): Int {
+        fun fold(problem: BakedProblem, c: AffineCandidate): Int {
             val singlePartner = c.termVars.size == 1
             // Snapshot the occurrence ids of `x` before mutating them: [replace] rewrites x's occurrence
             // list as it goes, and the def id must be skipped rather than folded into itself.
@@ -954,7 +954,7 @@ internal object AffineSingletons {
                 if (next !== f) replace(id, f, next)
             }
             drop(c.defIdx)
-            for (bound in domainBoundsOnTerms(problem.requireFiniteIntDomains()[c.x], c)) append(bound)
+            for (bound in domainBoundsOnTerms(problem.rootIntDomain(c.x), c)) append(bound)
             // The lowest stable id whose candidacy this fold can newly establish: only the rewritten
             // factors (the pivot's occurrences) change content, so no factor below their minimum can
             // become a candidate. The candidate scan resumes from here instead of restarting at 0.
@@ -967,7 +967,7 @@ internal object AffineSingletons {
          * intrinsic to a rename — `Factor.remap` returns a fresh object for every factor — so this stays
          * O(live factors); only `x`'s occurrences migrate to `y`, so the index is patched, not rebuilt.
          */
-        fun alias(problem: Problem, c: AffineCandidate): Int {
+        fun alias(problem: BakedProblem, c: AffineCandidate): Int {
             val boolMap = IntArray(problem.numBoolVars) { it }
             val intMap = IntArray(problem.numIntVars) { it }
             val y = c.termVars[0]
@@ -1006,7 +1006,7 @@ internal object AffineSingletons {
             // eliminated, so any remaining x count is dead.
             drop(c.defIdx)
             atCapCount[c.x] = 0
-            for (bound in domainBoundsOnTerms(problem.requireFiniteIntDomains()[c.x], c)) append(bound)
+            for (bound in domainBoundsOnTerms(problem.rootIntDomain(c.x), c)) append(bound)
             // Only the rewritten factors (`x`'s occurrences, now renamed to `y`) change content, so — as in
             // [fold] — no factor below their minimum can newly become a candidate; the scan resumes from
             // here instead of restarting at 0. (The occurrence-scoped remap above is what makes this valid:
@@ -1020,7 +1020,7 @@ internal object AffineSingletons {
     // Σ termCoeffs·termVars` into every other Linear mentioning `x`. In both cases bounds on the term
     // vars keep `x` within its domain. Returns the lowest stable id whose candidacy the fold can newly
     // establish — the point the candidate scan may safely resume from (0 for the whole-set alias rename).
-    private fun foldOutVariable(problem: Problem, ws: WorkingSet, c: AffineCandidate): Int =
+    private fun foldOutVariable(problem: BakedProblem, ws: WorkingSet, c: AffineCandidate): Int =
         if (c.isAlias) ws.alias(problem, c) else ws.fold(problem, c)
 
     /** [l] with `x` replaced by `constTerm + Σ A_j·y_j`: drop `x`'s term, add `coeff_x·A_j` to each

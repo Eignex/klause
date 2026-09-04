@@ -16,6 +16,7 @@ import com.eignex.klause.presolve.Presolve
 import com.eignex.klause.presolve.PresolveShared.withPassDelta
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.PropagationResult
+import com.eignex.klause.propagation.bake
 import com.eignex.klause.propagation.propagate
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -53,8 +54,9 @@ class RedundantConstraintsTest {
     }
 
     private fun checkPreserved(name: String, problem: Problem, expectDrop: Boolean): Problem {
-        val delta = Presolve.removeRedundantConstraints(problem)
-        val out = problem.withPassDelta(delta, BakeConfig.NONE)
+        val baked = problem.bake()
+        val delta = Presolve.removeRedundantConstraints(baked)
+        val out = baked.withPassDelta(delta, BakeConfig.NONE)
         assertEquals(feasibleCount(problem), feasibleCount(out), "$name: feasible set changed")
         if (expectDrop) {
             assertTrue(out.factors.size < problem.factors.size, "$name: expected a constraint to be dropped")
@@ -256,8 +258,9 @@ class RedundantConstraintsTest {
     }
 
     private fun checkPbPreserved(name: String, problem: Problem, expectDrop: Boolean): Problem {
-        val delta = Presolve.removeRedundantConstraints(problem)
-        val out = problem.withPassDelta(delta, BakeConfig.NONE)
+        val baked = problem.bake()
+        val delta = Presolve.removeRedundantConstraints(baked)
+        val out = baked.withPassDelta(delta, BakeConfig.NONE)
         assertEquals(feasibleCountBools(problem), feasibleCountBools(out), "$name: feasible set changed")
         if (expectDrop) {
             assertTrue(out.factors.size < problem.factors.size, "$name: expected a constraint to be dropped")

@@ -7,8 +7,8 @@ import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
-import com.eignex.klause.ir.Problem
 import com.eignex.klause.presolve.PassDelta
+import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.PropagationProblem
 import com.eignex.klause.util.CheckedLongOverflowException
 import com.eignex.klause.util.IntArrayList
@@ -32,7 +32,7 @@ import com.eignex.klause.util.subExact
  */
 internal object ComparisonClauseFold {
 
-    fun fold(problem: Problem): PassDelta {
+    fun fold(problem: BakedProblem): PassDelta {
         val factors = problem.factors
         // Index each indicator bool var to its (index, ReifiedLinear) definition. Aux vars are unique, so
         // a var maps to at most one reified factor.
@@ -44,12 +44,13 @@ internal object ComparisonClauseFold {
         if (defByAux.isEmpty()) return PassDelta()
 
         val occ = PropagationProblem(problem).boolOccurrences
+        val root = problem.rootIntDomains()
         val dropped = IntArrayList()
         val added = ArrayList<Factor>()
         for (i in factors.indices) {
             val f = factors[i]
             if (f !is Clause || f.literals.size < 2) continue
-            foldClause(f, defByAux, occ, problem.requireFiniteIntDomains())?.let { (clause, consumed) ->
+            foldClause(f, defByAux, occ, root)?.let { (clause, consumed) ->
                 dropped.add(i)
                 for (c in consumed) dropped.add(c)
                 added.add(clause)

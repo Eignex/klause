@@ -17,6 +17,7 @@ import com.eignex.klause.model.PbOp
 import com.eignex.klause.presolve.BakeConfig
 import com.eignex.klause.presolve.Presolve
 import com.eignex.klause.presolve.PresolveShared.withPassDelta
+import com.eignex.klause.propagation.bake
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -30,6 +31,10 @@ class StructuralReductionTest {
 
     private fun theLinear(problem: Problem): Linear = problem.factors.filterIsInstance<Linear>().single()
 
+    /** What [Presolve.reduceStructural] rewrites [problem] to, materialized from its delta. */
+    private fun reduced(problem: Problem): Problem =
+        problem.bake().let { it.withPassDelta(Presolve.reduceStructural(it), BakeConfig.NONE) }
+
     @Test
     fun `a fixed index into a constant array becomes a result equality`() {
         // idx = 2 (offset 1) selects arr[1] = 20, so result = 20.
@@ -39,7 +44,7 @@ class StructuralReductionTest {
             arrayOf(IntDomain(2, 2), IntDomain(0, 100)),
             listOf(Element(idx = 0, result = 1, arr = longArrayOf(10, 20, 30), arrIsVars = false)),
         )
-        val out = problem.withPassDelta(Presolve.reduceStructural(problem), BakeConfig.NONE)
+        val out = reduced(problem)
         assertTrue(out.factors.none { it is Element }, "the element global is removed")
         val eq = theLinear(out)
         assertEquals(LinearOp.EQ, eq.op)
@@ -56,7 +61,7 @@ class StructuralReductionTest {
             Array(5) { IntDomain(0, 9) }.also { it[0] = IntDomain(1, 1) },
             listOf(Element(idx = 0, result = 1, arr = longArrayOf(2, 3, 4), arrIsVars = true)),
         )
-        val out = problem.withPassDelta(Presolve.reduceStructural(problem), BakeConfig.NONE)
+        val out = reduced(problem)
         assertTrue(out.factors.none { it is Element }, "the element global is removed")
         val eq = theLinear(out)
         assertEquals(LinearOp.EQ, eq.op)
@@ -73,7 +78,7 @@ class StructuralReductionTest {
             Array(3) { IntDomain(0, 9) }.also { it[0] = IntDomain(1, 1) },
             listOf(Element(idx = 0, result = 1, arr = longArrayOf(1, 2), arrIsVars = true)),
         )
-        val out = problem.withPassDelta(Presolve.reduceStructural(problem), BakeConfig.NONE)
+        val out = reduced(problem)
         assertTrue(out.factors.isEmpty(), "the vacuous element drops with no replacement")
     }
 
@@ -86,7 +91,7 @@ class StructuralReductionTest {
             arrayOf(IntDomain(0, 5), IntDomain(0, 10)),
             listOf(Element(idx = 0, result = 1, arr = longArrayOf(7, 7, 7), arrIsVars = false)),
         )
-        val out = problem.withPassDelta(Presolve.reduceStructural(problem), BakeConfig.NONE)
+        val out = reduced(problem)
         assertTrue(out.factors.none { it is Element }, "the element global is removed")
         assertEquals(7L, checkNotNull(theLinear(out).integerConstants).bound)
         assertEquals(
@@ -105,7 +110,10 @@ class StructuralReductionTest {
             arrayOf(IntDomain(1, 3), IntDomain(0, 100)),
             listOf(Element(idx = 0, result = 1, arr = longArrayOf(10, 20, 30), arrIsVars = false)),
         )
-        assertTrue(Presolve.reduceStructural(problem).isEmpty, "no fixed index and a varied array is the no-op signal")
+        assertTrue(
+            Presolve.reduceStructural(problem.bake()).isEmpty,
+            "no fixed index and a varied array is the no-op signal",
+        )
     }
 
     @Test
@@ -116,7 +124,7 @@ class StructuralReductionTest {
             arrayOf(IntDomain(0, 3), IntDomain(0, 3)),
             listOf(AllDifferent(intArrayOf(0, 1), domainMin = 0, domainSize = 4)),
         )
-        val out = problem.withPassDelta(Presolve.reduceStructural(problem), BakeConfig.NONE)
+        val out = reduced(problem)
         assertTrue(out.factors.none { it is AllDifferent }, "the all-different global is removed")
         val ne = theLinear(out)
         assertEquals(LinearOp.NE, ne.op)
@@ -132,7 +140,7 @@ class StructuralReductionTest {
             arrayOf(IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3)),
             listOf(AllDifferent(intArrayOf(0, 1, 2), domainMin = 0, domainSize = 4)),
         )
-        assertTrue(Presolve.reduceStructural(problem).isEmpty, "a 3-var all-different keeps its global form")
+        assertTrue(Presolve.reduceStructural(problem.bake()).isEmpty, "a 3-var all-different keeps its global form")
     }
 
     @Test
@@ -144,7 +152,7 @@ class StructuralReductionTest {
             emptyArray(),
             listOf(Cardinality(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true)), min = 0, max = 3)),
         )
-        val out = problem.withPassDelta(Presolve.reduceStructural(problem), BakeConfig.NONE)
+        val out = reduced(problem)
         assertTrue(out.factors.isEmpty(), "the vacuous cardinality drops")
     }
 
@@ -156,7 +164,7 @@ class StructuralReductionTest {
             emptyArray(),
             listOf(Cardinality(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true)), min = 0, max = 1)),
         )
-        assertTrue(Presolve.reduceStructural(problem).isEmpty, "an at-most-one still constrains, so it stays")
+        assertTrue(Presolve.reduceStructural(problem.bake()).isEmpty, "an at-most-one still constrains, so it stays")
     }
 
     @Test
@@ -175,7 +183,7 @@ class StructuralReductionTest {
             ),
             listOf(AllDifferent(intArrayOf(0, 1, 2, 3, 4, 5), domainMin = 0, domainSize = 16)),
         )
-        val out = problem.withPassDelta(Presolve.reduceStructural(problem), BakeConfig.NONE)
+        val out = reduced(problem)
         val groups = out.factors.filterIsInstance<AllDifferent>().map { it.vars.toSet() }
         assertEquals(setOf(setOf(0, 1, 2), setOf(3, 4, 5)), groups.toSet(), "splits into the two value-disjoint groups")
     }
@@ -188,7 +196,7 @@ class StructuralReductionTest {
             arrayOf(IntDomain(0, 5), IntDomain(0, 5), IntDomain(0, 5)),
             listOf(AllDifferent(intArrayOf(0, 1, 2), domainMin = 0, domainSize = 6)),
         )
-        assertTrue(Presolve.reduceStructural(problem).isEmpty, "one connected component does not split")
+        assertTrue(Presolve.reduceStructural(problem.bake()).isEmpty, "one connected component does not split")
     }
 
     @Test
@@ -207,7 +215,7 @@ class StructuralReductionTest {
                 ),
             ),
         )
-        val out = problem.withPassDelta(Presolve.reduceStructural(problem), BakeConfig.NONE)
+        val out = reduced(problem)
         assertTrue(out.factors.none { it is Cumulative && !it.unary }, "the cumulative is reduced to a unary one")
         val disj = out.factors.filterIsInstance<Cumulative>().single { it.unary }
         assertEquals(listOf(0, 1, 2), disj.starts.toList())
@@ -228,7 +236,7 @@ class StructuralReductionTest {
                 ),
             ),
         )
-        assertTrue(Presolve.reduceStructural(problem).isEmpty, "tasks fit together, so it stays cumulative")
+        assertTrue(Presolve.reduceStructural(problem.bake()).isEmpty, "tasks fit together, so it stays cumulative")
     }
 
     private fun pos(v: Int) = Lit.make(v, true)
@@ -267,7 +275,7 @@ class StructuralReductionTest {
 
     private fun checkUnitPbBecomesCardinality(numBool: Int, pb: PseudoBoolean): Problem {
         val problem = Problem(numBool, 0, emptyArray(), listOf(pb))
-        val out = problem.withPassDelta(Presolve.reduceStructural(problem), BakeConfig.NONE)
+        val out = reduced(problem)
         assertEquals(
             pbCardFeasibleCount(problem, numBool),
             pbCardFeasibleCount(out, numBool),
@@ -302,7 +310,7 @@ class StructuralReductionTest {
             emptyArray(),
             listOf(PseudoBoolean(longArrayOf(2, 1), intArrayOf(pos(0), pos(1)), PbOp.LE, 2)),
         )
-        assertTrue(Presolve.reduceStructural(problem).isEmpty, "a weighted pseudo-Boolean stays as-is")
+        assertTrue(Presolve.reduceStructural(problem.bake()).isEmpty, "a weighted pseudo-Boolean stays as-is")
     }
 
     @Test
@@ -314,7 +322,7 @@ class StructuralReductionTest {
             emptyArray(),
             listOf(PseudoBoolean(longArrayOf(1, 1, 1), intArrayOf(pos(0), pos(1), pos(2)), PbOp.LE, 3)),
         )
-        val out = problem.withPassDelta(Presolve.reduceStructural(problem), BakeConfig.NONE)
+        val out = reduced(problem)
         assertTrue(
             out.factors.none { it is PseudoBoolean || it is Cardinality },
             "the always-true constraint is dropped",
@@ -334,7 +342,7 @@ class StructuralReductionTest {
             arrayOf(IntDomain(3, 3), IntDomain(0, 10), IntDomain(0, 100)),
             listOf(Product(a = 0, b = 1, result = 2)),
         )
-        val out = problem.withPassDelta(Presolve.reduceStructural(problem), BakeConfig.NONE)
+        val out = reduced(problem)
         assertTrue(out.factors.none { it is Product }, "the product is linearised")
         val eq = theLinear(out)
         assertEquals(LinearOp.EQ, eq.op)
@@ -351,7 +359,7 @@ class StructuralReductionTest {
             arrayOf(IntDomain(0, 10), IntDomain(0, 0), IntDomain(0, 100)),
             listOf(Product(a = 0, b = 1, result = 2)),
         )
-        val out = problem.withPassDelta(Presolve.reduceStructural(problem), BakeConfig.NONE)
+        val out = reduced(problem)
         val eq = theLinear(out)
         assertEquals(listOf(2), eq.vars.toList(), "only the result remains")
         assertEquals(0L, checkNotNull(eq.integerConstants).bound)
@@ -365,7 +373,7 @@ class StructuralReductionTest {
             arrayOf(IntDomain(0, 10), IntDomain(0, 10), IntDomain(0, 100)),
             listOf(Product(a = 0, b = 1, result = 2)),
         )
-        assertTrue(Presolve.reduceStructural(problem).isEmpty, "a genuinely nonlinear product stays")
+        assertTrue(Presolve.reduceStructural(problem.bake()).isEmpty, "a genuinely nonlinear product stays")
     }
 
     @Test
@@ -376,7 +384,7 @@ class StructuralReductionTest {
             arrayOf(IntDomain(0, 9), IntDomain(0, 9)),
             listOf(ArrayMinMax(result = 0, xs = intArrayOf(1), max = true)),
         )
-        val out = problem.withPassDelta(Presolve.reduceStructural(problem), BakeConfig.NONE)
+        val out = reduced(problem)
         assertTrue(out.factors.none { it is ArrayMinMax }, "the min/max global is removed")
         val eq = theLinear(out)
         assertEquals(LinearOp.EQ, eq.op)
@@ -392,7 +400,7 @@ class StructuralReductionTest {
             arrayOf(IntDomain(0, 9), IntDomain(0, 9), IntDomain(0, 9)),
             listOf(ArrayMinMax(result = 0, xs = intArrayOf(1, 2), max = true)),
         )
-        assertTrue(Presolve.reduceStructural(problem).isEmpty, "a genuine maximum stays")
+        assertTrue(Presolve.reduceStructural(problem.bake()).isEmpty, "a genuine maximum stays")
     }
 
     @Test
@@ -404,7 +412,7 @@ class StructuralReductionTest {
             arrayOf(IntDomain(0, 5), IntDomain(0, 5), IntDomain(0, 5), IntDomain(3, 3)),
             listOf(NValue(n = 3, xs = intArrayOf(0, 1, 2))),
         )
-        val out = problem.withPassDelta(Presolve.reduceStructural(problem), BakeConfig.NONE)
+        val out = reduced(problem)
         assertTrue(out.factors.none { it is NValue }, "the nvalue global is removed")
         val ad = out.factors.filterIsInstance<AllDifferent>().single()
         assertEquals(listOf(0, 1, 2), ad.vars.toList())
@@ -418,7 +426,7 @@ class StructuralReductionTest {
             arrayOf(IntDomain(0, 5), IntDomain(0, 5), IntDomain(0, 5), IntDomain(1, 1)),
             listOf(NValue(n = 3, xs = intArrayOf(0, 1, 2))),
         )
-        val out = problem.withPassDelta(Presolve.reduceStructural(problem), BakeConfig.NONE)
+        val out = reduced(problem)
         assertTrue(out.factors.none { it is NValue }, "the nvalue global is removed")
         assertEquals(2, out.factors.filterIsInstance<Linear>().size, "two equalities chain the three vars")
     }
@@ -431,6 +439,6 @@ class StructuralReductionTest {
             arrayOf(IntDomain(0, 5), IntDomain(0, 5), IntDomain(0, 5), IntDomain(1, 3)),
             listOf(NValue(n = 3, xs = intArrayOf(0, 1, 2))),
         )
-        assertTrue(Presolve.reduceStructural(problem).isEmpty, "an unpinned nvalue stays")
+        assertTrue(Presolve.reduceStructural(problem.bake()).isEmpty, "an unpinned nvalue stays")
     }
 }

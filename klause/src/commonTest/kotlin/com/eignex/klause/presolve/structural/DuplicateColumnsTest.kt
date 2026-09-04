@@ -40,9 +40,10 @@ class DuplicateColumnsTest {
         BacktrackSolver(problem.bake()).solve(BacktrackParams()) is SolveResult.Sat
 
     private fun checkRoundTrip(name: String, original: Problem, expectMerged: Boolean, expectSat: Boolean) {
-        val delta = Presolve.mergeDuplicateColumns(original)
+        val baked = original.bake()
+        val delta = Presolve.mergeDuplicateColumns(baked)
         assertEquals(expectMerged, !delta.isEmpty, "$name: merge expectation wrong")
-        val reduced = original.withPassDelta(delta, BakeConfig.NONE)
+        val reduced = baked.withPassDelta(delta, BakeConfig.NONE)
         val reconstruct = delta.reconstruct ?: { it }
         assertEquals(expectSat, verdictSat(original), "$name: original verdict unexpected")
         assertEquals(verdictSat(original), verdictSat(reduced), "$name: verdict changed by merge")
@@ -59,9 +60,10 @@ class DuplicateColumnsTest {
      *  not recover *every* original solution — see `preservesSolutionSet = false`), and the reduced
      *  problem is feasible exactly when the original is. Small domains only — full enumeration. */
     private fun checkAllReconstructionsFeasible(name: String, original: Problem) {
-        val delta = Presolve.mergeDuplicateColumns(original)
+        val baked = original.bake()
+        val delta = Presolve.mergeDuplicateColumns(baked)
         assertTrue(!delta.isEmpty, "$name: expected a merge")
-        val reduced = original.withPassDelta(delta, BakeConfig.NONE)
+        val reduced = baked.withPassDelta(delta, BakeConfig.NONE)
         val reconstruct = delta.reconstruct ?: { it }
         var anyReduced = false
         enumerate(reduced.requireFiniteIntDomains()) { assign ->
@@ -114,7 +116,7 @@ class DuplicateColumnsTest {
                 Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),
             ),
         )
-        val reduced = problem.withPassDelta(Presolve.mergeDuplicateColumns(problem), BakeConfig.NONE)
+        val reduced = problem.bake().let { it.withPassDelta(Presolve.mergeDuplicateColumns(it), BakeConfig.NONE) }
         assertTrue(reduced !== problem, "expected a merge")
         assertTrue(
             reduced.factors.none { 1 in it.intVars },
@@ -135,7 +137,7 @@ class DuplicateColumnsTest {
             intDomains = arrayOf(pinned, pinned),
             factors = listOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1)),
         )
-        val delta = Presolve.mergeDuplicateColumns(problem)
+        val delta = Presolve.mergeDuplicateColumns(problem.bake())
         val aggregates = delta.domains ?: problem.requireFiniteIntDomains()
         assertTrue(
             aggregates.all { it.min >= 0L },
@@ -172,7 +174,7 @@ class DuplicateColumnsTest {
                 Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),
             ),
         )
-        val delta = DuplicateColumns.mergeDuplicateColumns(problem, objectiveIntVars = setOf(1))
+        val delta = DuplicateColumns.mergeDuplicateColumns(problem.bake(), objectiveIntVars = setOf(1))
         assertTrue(delta.isEmpty, "an objective variable must not be merged")
     }
 
@@ -241,7 +243,7 @@ class DuplicateColumnsTest {
                 Linear(intArrayOf(1, 1, 1), intArrayOf(0, 1, 2), LinearOp.GE, 2),
             ),
         )
-        val reduced = problem.withPassDelta(Presolve.mergeDuplicateColumns(problem), BakeConfig.NONE)
+        val reduced = problem.bake().let { it.withPassDelta(Presolve.mergeDuplicateColumns(it), BakeConfig.NONE) }
         assertTrue(
             reduced.factors.none { 1 in it.intVars || 2 in it.intVars },
             "both dropped duplicates are absorbed in a single pass",
@@ -278,9 +280,9 @@ class DuplicateColumnsTest {
                 AllDifferent(intArrayOf(2, 3), domainMin = 0, domainSize = 4),
             ),
         )
-        assertTrue(!Presolve.mergeDuplicateColumns(problem).isEmpty, "a full scan merges the duplicate columns")
+        assertTrue(!Presolve.mergeDuplicateColumns(problem.bake()).isEmpty, "a full scan merges the duplicate columns")
         val delta = DuplicateColumns.mergeDuplicateColumns(
-            problem,
+            problem.bake(),
             sharedIntOcc = sharedOcc(problem),
             incrementalTouchedVars = intArrayOf(2),
         )
@@ -300,9 +302,9 @@ class DuplicateColumnsTest {
                 Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),
             ),
         )
-        val full = Presolve.mergeDuplicateColumns(problem)
+        val full = Presolve.mergeDuplicateColumns(problem.bake())
         val incremental = DuplicateColumns.mergeDuplicateColumns(
-            problem,
+            problem.bake(),
             sharedIntOcc = sharedOcc(problem),
             incrementalTouchedVars = intArrayOf(0),
         )
