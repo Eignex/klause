@@ -122,6 +122,31 @@ class LpEffortGovernorTest {
     }
 
     @Test
+    fun `an LP that prunes and then turns expensive is demoted again`() {
+        val g = governor()
+        g.nodes(1)
+        g.observeSolve(opsSpent = 10L, pruned = true)
+
+        g.nodes(10)
+        repeat(10) { g.observeSolve(opsSpent = 5_000L, pruned = false) }
+
+        assertTrue(g.isDemoted, "a prune restores the LP; it does not excuse whatever it costs afterwards")
+    }
+
+    @Test
+    fun `a prune measures the next demotion on what followed it`() {
+        val g = governor()
+        g.nodes(2)
+        repeat(4) { g.observeSolve(opsSpent = 100_000L, pruned = false) }
+        g.observeSolve(opsSpent = 10L, pruned = true)
+
+        g.nodes(100)
+        repeat(10) { g.observeSolve(opsSpent = 5_000L, pruned = false) }
+
+        assertFalse(g.isDemoted, "the 400k ops before the prune are not evidence against the solves after it")
+    }
+
+    @Test
     fun `a pruning LP is spared by the backstop too`() {
         val g = governor()
         g.nodes(1)
