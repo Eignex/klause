@@ -68,7 +68,7 @@ data class LpPlan(
     /**
      * Deterministic ceiling on what the node LP may spend per node the search explores, in [com.eignex.klause.lp.engine.LpWork]
      * operations ([LpEffortGovernor]). Exceeding it, having pruned nothing, demotes the LP to its floor
-     * budget; a prune spares it permanently. `0` disables the rule.
+     * budget; a prune restores it and restarts its evidence window. `0` disables the rule.
      *
      * A ratio rather than a wall-clock fraction because it is scale-free and reproducible: it says *the
      * LP is taxing the search* without needing to know how long the run may take or how fast the machine
@@ -254,7 +254,8 @@ data class LpPlan(
      * costs reproducibility for nothing. `LpStats.wallBackstop` records when it did fire, so a run whose
      * counters do not reproduce says why.
      *
-     * A prune spares the LP permanently, and demotion is a floor rather than an off switch — a demoted
+     * A prune restores the LP and restarts the window it is judged over, and demotion is a floor
+     * rather than an off switch — a demoted
      * LP still bounds, and with a persistent basis its solves still advance the next one. `0.0` disables
      * the backstop; it has no effect when the total budget is unknown.
      */
