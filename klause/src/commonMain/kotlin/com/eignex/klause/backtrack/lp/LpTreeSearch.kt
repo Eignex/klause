@@ -38,11 +38,7 @@ private class LbNode(val decisions: List<LbDecision>, val bound: Double)
  * where another heuristic has already landed a point — it runs behind one rather than instead of it.
  */
 @Suppress("CyclomaticComplexMethod", "LongMethod", "NestedBlockDepth")
-internal fun LpEngine.lbTreeSearch(
-    objective: LinearObjective,
-    cutoff: Double,
-    cancellation: Cancellation,
-): Sample? {
+internal fun LpEngine.lbTreeSearch(objective: LinearObjective, cutoff: Double, cancellation: Cancellation): Sample? {
     val relaxer = lpRelaxer ?: return null
     var best: Sample? = null
     var bestObj = cutoff
