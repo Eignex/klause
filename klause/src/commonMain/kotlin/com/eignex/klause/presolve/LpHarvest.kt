@@ -13,6 +13,7 @@ import com.eignex.klause.lp.bounding.rootLpInfeasibleNoBake
 import com.eignex.klause.lp.bounding.rootRelaxationSize
 import com.eignex.klause.lp.bounding.shaveObjectiveLb
 import com.eignex.klause.lp.bounding.shaveVariableBounds
+import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.LpHarvestReport
 import com.eignex.klause.solver.result.SolveStatsSink
@@ -46,7 +47,7 @@ import com.eignex.klause.util.Cancellation
  * internally bounded by `SHAVE_MAX_ITERS`, and [cancellation] caps it further.
  */
 fun lpHarvest(
-    problem: Problem,
+    problem: BakedProblem,
     objective: LinearObjective,
     plan: LpPlan,
     bakeConfig: BakeConfig = BakeConfig.NONE,
@@ -54,7 +55,7 @@ fun lpHarvest(
 ): Problem = lpHarvestReporting(problem, objective, plan, bakeConfig, cancellation).problem
 
 /** [lpHarvest]'s transformed [problem] paired with the [report] of what the LP harvest contributed. */
-class LpHarvestResult(val problem: Problem, val report: LpHarvestReport)
+class LpHarvestResult(val problem: BakedProblem, val report: LpHarvestReport)
 
 /** Whether the root LP relaxation is Farkas-certifiably infeasible over [problem]'s declared domains,
  *  built without the [com.eignex.klause.propagation.PropagationSession] bake fixpoint (O(domain span) on
@@ -108,7 +109,7 @@ fun lpRootBounds(
  *  (root infeasibility, bounds shaved, objective floor, constraints removed, equalities added) so a
  *  caller can isolate it from the surrounding combinatorial passes. */
 fun lpHarvestReporting(
-    problem: Problem,
+    problem: BakedProblem,
     objective: LinearObjective,
     plan: LpPlan,
     bakeConfig: BakeConfig = BakeConfig.NONE,
@@ -172,7 +173,7 @@ fun lpHarvestReporting(
         relaxationNnz = size?.nnz ?: 0,
     )
 
-    val domains = problem.requireFiniteIntDomains().copyOf()
+    val domains = problem.rootIntDomains()
     for (sb in shaved) {
         // sb.lo/sb.hi lie within the variable's current [min, max] with lo <= hi, so neither narrowing
         // can empty the domain.
@@ -189,11 +190,16 @@ fun lpHarvestReporting(
         (problem.factors.filterIndexed { idx, _ -> idx !in redundant } + equalities).toTypedArray()
     }
     val transformed = RootBaker.reseed(
-        Problem(
+        BakedProblem(
             numBoolVars = problem.numBoolVars,
             numIntVars = problem.numIntVars,
             intDomains = domains,
             factors = factors,
+            // The LP-only continuous columns are a namespace the harvest never touches; carrying them
+            // through is what keeps the leaf's exact verdict on them after a shave.
+            numRealVars = problem.numRealVars,
+            realLower = problem.realLower,
+            realUpper = problem.realUpper,
             // See PresolveShared.rebuildProblem: the open-side marks address a namespace presolve keeps.
             packedOpenIntLo = problem.intBounds.openLowerBits,
             packedOpenIntHi = problem.intBounds.openUpperBits,

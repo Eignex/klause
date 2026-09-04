@@ -7,6 +7,7 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.presolve.BakeConfig
 import com.eignex.klause.presolve.Presolve
 import com.eignex.klause.presolve.PresolveShared.withPassDelta
+import com.eignex.klause.propagation.bake
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -32,7 +33,7 @@ class LinearBoundFusionTest {
             le(intArrayOf(1, 1), intArrayOf(0, 1), 5),
             ge(intArrayOf(1, 1), intArrayOf(0, 1), 5),
         )
-        val out = p.withPassDelta(Presolve.fuseLinearBounds(p), BakeConfig.NONE)
+        val out = p.bake().withPassDelta(Presolve.fuseLinearBounds(p), BakeConfig.NONE)
         val eqs = equalities(out)
         assertEquals(1, eqs.size, "the pair collapses to one equality")
         assertEquals(5L, checkNotNull(eqs.single().integerConstants).bound)
@@ -47,7 +48,7 @@ class LinearBoundFusionTest {
             le(intArrayOf(2, 2), intArrayOf(0, 1), 10),
             ge(intArrayOf(1, 1), intArrayOf(0, 1), 5),
         )
-        val out = p.withPassDelta(Presolve.fuseLinearBounds(p), BakeConfig.NONE)
+        val out = p.bake().withPassDelta(Presolve.fuseLinearBounds(p), BakeConfig.NONE)
         assertEquals(1, equalities(out).size, "proportional rows share a vector and fuse")
     }
 

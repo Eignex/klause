@@ -8,6 +8,7 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.presolve.BakeConfig
 import com.eignex.klause.presolve.Presolve
 import com.eignex.klause.presolve.PresolveShared.withPassDelta
+import com.eignex.klause.propagation.bake
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -30,7 +31,7 @@ class LinearSubSumAggregationTest {
 
     private fun run(vararg factors: Factor): Problem {
         val p = Problem(0, 4, Array(4) { IntDomain(0, 8) }, factors.toList())
-        return p.withPassDelta(Presolve.aggregateSubSums(p), BakeConfig.NONE)
+        return p.bake().withPassDelta(Presolve.aggregateSubSums(p), BakeConfig.NONE)
     }
 
     @Test
@@ -121,7 +122,7 @@ class LinearSubSumAggregationTest {
             Linear(intArrayOf(2, 2, -1), intArrayOf(1, 2, 3), LinearOp.GE, 1),
         )
         val p = Problem(0, 4, domains, factors)
-        val out = p.withPassDelta(Presolve.aggregateSubSums(p), BakeConfig.NONE)
+        val out = p.bake().withPassDelta(Presolve.aggregateSubSums(p), BakeConfig.NONE)
         assertTrue(out.factors.size < p.factors.size || linears(out).any { it.vars.contains(0) }, "a fold occurred")
         assertEquals(
             feasible(p.factors, mins, maxs),

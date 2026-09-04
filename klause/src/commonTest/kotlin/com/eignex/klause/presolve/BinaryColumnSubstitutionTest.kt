@@ -13,6 +13,7 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.values
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.PropagationResult
+import com.eignex.klause.propagation.bake
 import com.eignex.klause.propagation.propagate
 import com.eignex.klause.solver.Sample
 import kotlin.test.Test
@@ -34,7 +35,7 @@ class BinaryColumnSubstitutionTest {
         Problem(numBoolVars = 0, numIntVars = numIntVars, intDomains = domains, factors = factors)
 
     private fun substitute(problem: Problem, objectiveIntVars: Set<Int> = emptySet()) =
-        BinaryColumnSubstitution.substitute(problem, objectiveIntVars, BakeConfig.NONE)
+        BinaryColumnSubstitution.substitute(problem.bake(), objectiveIntVars, BakeConfig.NONE)
 
     /** Whether the total assignment ([bools], [ints]) satisfies every factor of [problem]. */
     private fun satisfies(problem: Problem, bools: BooleanArray, ints: LongArray): Boolean {

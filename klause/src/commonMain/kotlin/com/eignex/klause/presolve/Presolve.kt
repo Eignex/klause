@@ -13,25 +13,32 @@ import com.eignex.klause.presolve.structural.ComparisonClauseFold
 import com.eignex.klause.presolve.structural.DuplicateColumns
 import com.eignex.klause.presolve.structural.RedundantConstraints
 import com.eignex.klause.presolve.structural.StructuralReduction
+import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.util.Cancellation
 
 /**
- * Problem-level presolve transforms. Each takes a `Problem` and returns an equivalent one with
- * a smaller / tighter formulation. Pure (no solving); the caller decides when to apply them.
+ * Problem-level presolve transforms. Each takes a problem and returns the change that makes it an
+ * equivalent, smaller / tighter formulation. Pure (no solving); the caller decides when to apply them.
+ *
+ * The parameter type is the boundary: a transform that reads finite search domains takes a
+ * [BakedProblem] and reads them through `BakedProblem.rootIntDomain`, while one that reads only what
+ * the model declares takes the canonical [Problem] and runs before any finite projection exists.
  *
  * The passes live in focused per-technique units in this package; this object is the stable
  * entry surface the presolve pipeline and tests call.
  */
 object Presolve {
 
-    /** GCD coefficient strengthening for [com.eignex.klause.factor.arithmetic.Linear] and
-     *  pseudo-Boolean constraints. */
-    fun strengthenCoefficients(problem: Problem, cancellation: Cancellation = Cancellation.Never): PassDelta =
-        CoefficientStrengthening.strengthenCoefficients(problem, cancellation, problem.requireFiniteIntDomains())
+    /** GCD plus bounded-integer coefficient strengthening for
+     *  [com.eignex.klause.factor.arithmetic.Linear] and pseudo-Boolean constraints. */
+    fun strengthenCoefficients(problem: BakedProblem, cancellation: Cancellation = Cancellation.Never): PassDelta =
+        CoefficientStrengthening.strengthenCoefficients(problem, cancellation, problem.rootIntDomains())
 
     /** The source-safe GCD part of coefficient strengthening, before finite domains exist. */
-    internal fun strengthenSourceCoefficients(problem: Problem, cancellation: Cancellation): PassDelta =
-        CoefficientStrengthening.strengthenCoefficients(problem, cancellation)
+    internal fun strengthenSourceCoefficients(problem: Problem, cancellation: Cancellation): SourceDelta {
+        val delta = CoefficientStrengthening.strengthenCoefficients(problem, cancellation)
+        return SourceDelta(delta.droppedIndices, delta.addedFactors, delta.infeasible)
+    }
 
     internal fun strengthenCoefficients(
         problem: Problem,
@@ -42,14 +49,20 @@ object Presolve {
     /** One-shot GF(2) elimination over all xor factors. */
     fun deriveXorUnits(problem: Problem): PassDelta = XorUnits.deriveXorUnits(problem)
 
+    /** [deriveXorUnits] in the source lane's change form. */
+    internal fun deriveSourceXorUnits(problem: Problem): SourceDelta {
+        val delta = XorUnits.deriveXorUnits(problem)
+        return SourceDelta(delta.droppedIndices, delta.addedFactors, delta.infeasible)
+    }
+
     /** Per-variable modular (Diophantine) domain tightening for integer equalities. See
      *  [DiophantineReduction]. */
-    fun reduceDiophantine(problem: Problem): PassDelta = DiophantineReduction.reduce(problem)
+    fun reduceDiophantine(problem: BakedProblem): PassDelta = DiophantineReduction.reduce(problem)
 
     /** Affine variable elimination. [incrementalTouchedVars] (from the incremental
      *  round engine) restricts a re-run's candidate scan to the variables the delta changed. */
     fun eliminateAffineSingletons(
-        problem: Problem,
+        problem: BakedProblem,
         objectiveIntVars: Set<Int> = emptySet(),
         cancellation: Cancellation = Cancellation.Never,
         sharedIntOcc: SharedIntOccurrence? = null,
@@ -67,29 +80,45 @@ object Presolve {
     )
 
     /** Constraint subsumption / redundant-constraint removal. See [RedundantConstraints]. */
-    fun removeRedundantConstraints(problem: Problem): PassDelta =
-        RedundantConstraints.removeRedundantConstraints(problem)
+    fun removeRedundantConstraints(problem: BakedProblem): PassDelta =
+        RedundantConstraints.removeRedundantConstraints(problem, problem.rootIntDomains())
+
+    /** The declaration-only phases of subsumption. See [RedundantConstraints]. */
+    internal fun removeRedundantSourceConstraints(problem: Problem, cancellation: Cancellation): SourceDelta =
+        RedundantConstraints.removeRedundantSourceConstraints(problem, cancellation)
 
     /** Cross-direction linear bound fusion (`≤`/`≥` over one vector → `=`, or infeasible when they
      *  cross). See [LinearBoundFusion]. */
     fun fuseLinearBounds(problem: Problem): PassDelta = LinearBoundFusion.fuseLinearBounds(problem)
 
+    /** [fuseLinearBounds] in the source lane's change form. */
+    internal fun fuseSourceLinearBounds(problem: Problem): SourceDelta {
+        val delta = LinearBoundFusion.fuseLinearBounds(problem)
+        return SourceDelta(delta.droppedIndices, delta.addedFactors, delta.infeasible)
+    }
+
     /** Common linear sub-sum extraction — fold a sub-sum an equality defines as one variable back into
      *  the rows that contain it. See [LinearSubSumAggregation]. */
     fun aggregateSubSums(problem: Problem): PassDelta = LinearSubSumAggregation.aggregateSubSums(problem)
 
+    /** [aggregateSubSums] in the source lane's change form. */
+    internal fun aggregateSourceSubSums(problem: Problem): SourceDelta {
+        val delta = LinearSubSumAggregation.aggregateSubSums(problem)
+        return SourceDelta(delta.droppedIndices, delta.addedFactors, delta.infeasible)
+    }
+
     /** Fourier-Motzkin projection of a variable occurring in exactly one linear inequality (and not the
      *  objective). See [SingletonInequalityProjection]. */
-    fun projectSingletonInequalities(problem: Problem, objectiveIntVars: Set<Int> = emptySet()): PassDelta =
+    fun projectSingletonInequalities(problem: BakedProblem, objectiveIntVars: Set<Int> = emptySet()): PassDelta =
         SingletonInequalityProjection.project(problem, objectiveIntVars)
 
     /** Per-factor structural self-reduction via `Factor.structuralReduce`.
      *  See [StructuralReduction]. */
-    fun reduceStructural(problem: Problem): PassDelta = StructuralReduction.reduce(problem)
+    fun reduceStructural(problem: BakedProblem): PassDelta = StructuralReduction.reduce(problem)
 
     /** Fold a reified comparison disjunction (a clause over sole-use single-variable reified-comparison
      *  indicators) into one [com.eignex.klause.factor.arithmetic.ComparisonClause]. See [ComparisonClauseFold]. */
-    fun foldComparisonClauses(problem: Problem): PassDelta = ComparisonClauseFold.fold(problem)
+    fun foldComparisonClauses(problem: BakedProblem): PassDelta = ComparisonClauseFold.fold(problem)
 
     /** Maximal at-most-one cliques (Lit-encoded, at most one satisfied) recognised from [problem]'s
      *  factors — including those implied by pseudo-Boolean knapsacks — and grown into maximal cliques,
@@ -102,7 +131,7 @@ object Presolve {
 
     /** Duplicate / parallel integer-column aggregation. See [DuplicateColumns]. */
     fun mergeDuplicateColumns(
-        problem: Problem,
+        problem: BakedProblem,
         objectiveIntVars: Set<Int> = emptySet(),
         sharedIntOcc: SharedIntOccurrence? = null,
         incrementalTouchedVars: IntArray? = null,
@@ -111,25 +140,25 @@ object Presolve {
 
     /** Symmetry breaking by detecting interchangeable variables. See [SymmetryBreaking]. */
     fun breakSymmetries(
-        problem: Problem,
+        problem: BakedProblem,
         objectiveIntVars: Set<Int> = emptySet(),
         objectiveBoolVars: Set<Int> = emptySet(),
         cancellation: Cancellation = Cancellation.Never,
     ): PassDelta = SymmetryBreaking.breakSymmetries(problem, objectiveIntVars, objectiveBoolVars, cancellation)
 
     /** Value-precedence breaking over interchangeable value orbits. See [SymmetryBreaking]. */
-    fun breakValuePrecedence(problem: Problem, objectiveIntVars: Set<Int> = emptySet()): PassDelta =
+    fun breakValuePrecedence(problem: BakedProblem, objectiveIntVars: Set<Int> = emptySet()): PassDelta =
         SymmetryBreaking.breakValuePrecedence(problem, objectiveIntVars)
 
     /** Dual fixing / dominated-variable reductions. See [DominatedVariables]. */
     fun fixDominatedVariables(
-        problem: Problem,
+        problem: BakedProblem,
         objectiveIntCoeffs: Map<Int, Long>,
         objectiveBoolCoeffs: Map<Int, Long> = emptyMap(),
     ): PassDelta = DominatedVariables.fixDominatedVariables(problem, objectiveIntCoeffs, objectiveBoolCoeffs)
 
     /** Failed-literal and common-bound probing to fixpoint. See [Probing]. */
-    fun probe(problem: Problem, maxCandidates: Int, cancellation: Cancellation = Cancellation.Never): PassDelta =
+    fun probe(problem: BakedProblem, maxCandidates: Int, cancellation: Cancellation = Cancellation.Never): PassDelta =
         Probing.probe(problem, maxCandidates, cancellation)
 
     /** Binary implication graph: equivalent-literal substitution and transitive reduction. See
@@ -167,6 +196,6 @@ object Presolve {
     fun mergeAmoCliques(problem: Problem, cancellation: Cancellation = Cancellation.Never): PassDelta =
         AmoCliqueMerge.mergeAmoCliques(problem, cancellation)
 
-    internal fun refineColoursForTest(problem: Problem): Pair<IntArray, IntArray> =
+    internal fun refineColoursForTest(problem: BakedProblem): Pair<IntArray, IntArray> =
         SymmetryBreaking.refineColoursForTest(problem)
 }

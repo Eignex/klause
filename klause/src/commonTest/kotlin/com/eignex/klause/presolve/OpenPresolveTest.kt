@@ -299,4 +299,22 @@ class OpenPresolveTest {
         assertEquals(0, result.closedSides)
         assertEquals(4L, result.spec.intBounds.upper(1))
     }
+
+    @Test
+    fun `subsumption drops a dominated row on a model whose columns are open`() {
+        // `x + y <= 4` is implied by `x + y <= 2` over any range at all, so the drop is justified by the
+        // other row rather than by how far either column reaches — the property that lets subsumption
+        // run before a finite projection exists.
+        val spec = fullyOpen(
+            2,
+            row(0 to 1L, 1 to 1L, op = LinearOp.LE, bound = 2L),
+            row(0 to 1L, 1 to 1L, op = LinearOp.LE, bound = 4L),
+        )
+
+        val prepared = PresolvePipeline.prepareSource(spec, PresolveConfig.parse(PresolvePass.REMOVE_REDUNDANT.id))
+
+        assertEquals(listOf(PresolvePass.REMOVE_REDUNDANT.id), prepared.stats.passes)
+        assertEquals(1, prepared.problem.factors.size, "the looser row is dropped")
+        assertTrue(!prepared.problem.intBounds.hasUpper(0), "the pass invents no bound for an open column")
+    }
 }

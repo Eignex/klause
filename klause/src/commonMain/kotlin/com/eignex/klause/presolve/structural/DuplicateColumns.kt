@@ -3,10 +3,10 @@ package com.eignex.klause.presolve.structural
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
-import com.eignex.klause.ir.Problem
 import com.eignex.klause.presolve.PassDelta
 import com.eignex.klause.presolve.Presolve
 import com.eignex.klause.presolve.SharedIntOccurrence
+import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.LongArrayList
@@ -51,7 +51,7 @@ internal object DuplicateColumns {
      * two-variable aggregate over *declared* domains that the contiguous split reconstructs exactly.
      */
     fun mergeDuplicateColumns(
-        problem: Problem,
+        problem: BakedProblem,
         objectiveIntVars: Set<Int> = emptySet(),
         sharedIntOcc: SharedIntOccurrence? = null,
         incrementalTouchedVars: IntArray? = null,
@@ -76,7 +76,7 @@ internal object DuplicateColumns {
         // Eligibility and signatures are therefore computed once over the input rather than re-derived after
         // each fold: a class of K identical columns collapses in a single O(n) scan instead of K of them,
         // which is what let numbrix (a ~3950-column class) spend seconds re-scanning 8505 variables per pair.
-        val domains = problem.requireFiniteIntDomains().copyOf()
+        val domains = problem.rootIntDomains()
         val eligible = eligibleColumns(problem.factors, n, domains, objectiveIntVars)
         val signatures = columnSignatures(problem.factors, n, eligible)
         // Group eligible columns by signature in ascending-id order; the first is the representative.
@@ -157,11 +157,11 @@ internal object DuplicateColumns {
     private fun anyTouchedColumnEligible(
         touched: IntArray,
         occ: SharedIntOccurrence,
-        problem: Problem,
+        problem: BakedProblem,
         objectiveIntVars: Set<Int>,
     ): Boolean {
         for (v in touched) {
-            if (v in objectiveIntVars || !problem.requireFiniteIntDomains()[v].isContiguous()) continue
+            if (v in objectiveIntVars || !problem.rootIntDomain(v).isContiguous()) continue
             val start = occ.offsets[v]
             val end = occ.offsets[v + 1]
             var onlyLinear = true

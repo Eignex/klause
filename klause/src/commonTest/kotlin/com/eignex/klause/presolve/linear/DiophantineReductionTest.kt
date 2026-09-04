@@ -9,6 +9,7 @@ import com.eignex.klause.presolve.BakeConfig
 import com.eignex.klause.presolve.PresolveShared.withPassDelta
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.PropagationResult
+import com.eignex.klause.propagation.bake
 import com.eignex.klause.propagation.propagate
 import kotlin.random.Random
 import kotlin.test.Test
@@ -20,7 +21,7 @@ import kotlin.test.assertTrue
 class DiophantineReductionTest {
 
     private fun problem(domains: Array<IntDomain>, vararg factors: Factor) =
-        Problem(numBoolVars = 0, numIntVars = domains.size, intDomains = domains, factors = factors.toList())
+        Problem(numBoolVars = 0, numIntVars = domains.size, intDomains = domains, factors = factors.toList()).bake()
 
     @Test
     fun `carves interior off-residue values`() {

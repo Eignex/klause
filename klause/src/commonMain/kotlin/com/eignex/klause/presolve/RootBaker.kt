@@ -5,7 +5,6 @@ import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
-import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.PropagationProblem
@@ -25,7 +24,7 @@ import kotlin.random.Random
  * engine never depends on `presolve` (the `solver → presolve → solver` cycle the package split exists
  * to prevent).
  *
- * [bake] runs the probing fixpoint against an already-base-baked [Problem] and returns the accumulated
+ * [bake] runs the probing fixpoint against an already-base-baked [BakedProblem] and returns the accumulated
  * deductions. The pipeline builds a fresh [BakedProblem] with them, so the propagation projection
  * carries the probing pins, bound tightenings, and holes.
  */
@@ -39,14 +38,14 @@ object RootBaker {
      * the central re-probe point for the presolve fresh path and the LP harvest — the kernel never
      * initiates it, so no `solver → presolve` cycle.
      */
-    fun reseed(problem: Problem, config: BakeConfig): Problem {
+    fun reseed(problem: BakedProblem, config: BakeConfig): BakedProblem {
         if (!config.anyEnabled || problem.isFoldedPropagationView) return problem
         val extra = bake(problem, config)
         if (extra === problem.baked) return problem
         return BakedProblem(
             numBoolVars = problem.numBoolVars,
             numIntVars = problem.numIntVars,
-            intDomains = Array(problem.numIntVars) { problem.requireFiniteIntDomains()[it] },
+            intDomains = problem.rootIntDomains(),
             factors = problem.factors,
             seedDeductions = extra,
             cancellation = problem.propagationCancellation,
@@ -68,7 +67,7 @@ object RootBaker {
      * `Unsat`. Cancellation is polled between phases and probes; a fired deadline yields a sound partial
      * bake (probing only ever tightens).
      */
-    fun bake(problem: Problem, config: BakeConfig): PropagationResult {
+    fun bake(problem: BakedProblem, config: BakeConfig): PropagationResult {
         val base = problem.baked
         if (base !is PropagationResult.Implied) return base
         if (!config.anyEnabled) return base
@@ -98,7 +97,7 @@ object RootBaker {
      *  and max. Iterates with bound-SAC interleaved so hole-discovered tightenings can lift bounds and
      *  vice versa. */
     private fun probeIntHoles(
-        problem: Problem,
+        problem: BakedProblem,
         base: PropagationResult.Implied,
         config: BakeConfig,
         factorWeights: DoubleArray,
@@ -115,7 +114,7 @@ object RootBaker {
                 if (acc.intValueOrNull(v) != null) continue
                 if (perVarCalls[v] >= config.probeBudgetPerVar) continue
                 if (totalCalls >= config.probeTotalBudget) return acc
-                val orig = problem.requireFiniteIntDomains()[v]
+                val orig = problem.rootIntDomain(v)
                 val curMin = acc.intMinOrNullCompat(v) ?: orig.min
                 val curMax = acc.intMaxOrNullCompat(v) ?: orig.max
                 if (curMin >= curMax) continue
@@ -156,7 +155,7 @@ object RootBaker {
      *  by a per-pass random key (deterministic for a given seed) — this avoids the deterministic-id-order
      *  bias the prior dom-sized order would inherit when every var has the same dom and weight. */
     private fun sacProbeOrder(
-        problem: Problem,
+        problem: BakedProblem,
         acc: PropagationResult.Implied,
         factorWeights: DoubleArray,
         rng: Random,
@@ -164,7 +163,7 @@ object RootBaker {
         val numIntVars = problem.numIntVars
         val scores = DoubleArray(numIntVars) { v ->
             if (acc.intValueOrNull(v) != null) return@DoubleArray Double.NEGATIVE_INFINITY
-            val orig = problem.requireFiniteIntDomains()[v]
+            val orig = problem.rootIntDomain(v)
             val lo = acc.intMinOrNullCompat(v) ?: orig.min
             val hi = acc.intMaxOrNullCompat(v) ?: orig.max
             val dom = (hi - lo + 1).coerceAtLeast(1)
@@ -200,7 +199,7 @@ object RootBaker {
      * [PropagationResult.Implied], or `Unsat` if the problem turns out to be infeasible.
      */
     private fun probeBoundSac(
-        problem: Problem,
+        problem: BakedProblem,
         base: PropagationResult.Implied,
         config: BakeConfig,
         factorWeights: DoubleArray,
@@ -217,7 +216,7 @@ object RootBaker {
                 if (acc.intValueOrNull(v) != null) continue
                 if (perVarCalls[v] >= config.probeBudgetPerVar) continue
                 if (totalCalls >= config.probeTotalBudget) return acc
-                val orig = problem.requireFiniteIntDomains()[v]
+                val orig = problem.rootIntDomain(v)
                 val curMin = acc.intMinOrNullCompat(v) ?: orig.min
                 val curMax = acc.intMaxOrNullCompat(v) ?: orig.max
                 if (curMin >= curMax) continue
@@ -261,7 +260,7 @@ object RootBaker {
      * is Unsat under the current accumulated base, the opposite polarity is forced. Repeats until a full
      * pass finds no new forcings.
      */
-    private fun probeFreeBools(problem: Problem, initial: PropagationResult.Implied): PropagationResult {
+    private fun probeFreeBools(problem: BakedProblem, initial: PropagationResult.Implied): PropagationResult {
         val bools = HashMap(initial.bools)
         val ints = HashMap(initial.ints)
         var changed = true
@@ -308,16 +307,22 @@ object RootBaker {
     /**
      * [problem] with an explicit contradiction appended so its bake propagation reports `Unsat` — the
      * materialization a caller uses when an oracle (e.g. the LP harvest) has certified infeasibility but a
-     * concrete infeasible `Problem` is needed. Two equalities pinning one variable to consecutive values
+     * concrete infeasible model is needed. Two equalities pinning one variable to consecutive values
      * (or a Boolean forced both ways) are jointly unsatisfiable regardless of domains, so the conflict is
      * witnessed without depending on the certifying proof being re-derivable downstream.
+     *
+     * Every part of the model that is not the appended contradiction is carried through, the open-side
+     * marks included: a column the front-end closed with an invented endpoint must keep saying so, or the
+     * refutation reads as one derived inside a box the model never stated — which is the difference
+     * between `unsat` and `unknown` for whoever reports it. The mask is extended over the added rows,
+     * which are not implied ones.
      */
-    fun provenInfeasible(problem: Problem, config: BakeConfig): Problem {
+    fun provenInfeasible(problem: BakedProblem, config: BakeConfig): BakedProblem {
         val factors = ArrayList<Factor>(problem.factors.size + 2)
         factors.addAll(problem.factors)
         when {
             problem.numIntVars > 0 -> {
-                val min = problem.requireFiniteIntDomains()[0].min
+                val min = problem.rootIntDomain(0).min
                 val c = if (min < Long.MAX_VALUE) min else min - 1
                 factors.add(Linear(longArrayOf(1), intArrayOf(0), LinearOp.EQ, c))
                 factors.add(Linear(longArrayOf(1), intArrayOf(0), LinearOp.EQ, c + 1))
@@ -331,11 +336,20 @@ object RootBaker {
             else -> return problem // no variable to pin a contradiction on (a variable-free problem)
         }
         return reseed(
-            Problem(
+            BakedProblem(
                 numBoolVars = problem.numBoolVars,
                 numIntVars = problem.numIntVars,
-                intDomains = problem.requireFiniteIntDomains().copyOf(),
+                intDomains = problem.rootIntDomains(),
                 factors = factors,
+                impliedFactorMask = problem.impliedFactorMask?.let { mask ->
+                    BooleanArray(factors.size) { it < mask.size && mask[it] }
+                },
+                hasSymmetryBreaking = problem.hasSymmetryBreaking,
+                numRealVars = problem.numRealVars,
+                realLower = problem.realLower,
+                realUpper = problem.realUpper,
+                packedOpenIntLo = problem.intBounds.openLowerBits,
+                packedOpenIntHi = problem.intBounds.openUpperBits,
             ),
             config,
         )

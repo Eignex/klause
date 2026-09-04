@@ -9,6 +9,7 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.presolve.PresolveShared.withPassDelta
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.PropagationResult
+import com.eignex.klause.propagation.bake
 import com.eignex.klause.propagation.propagate
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
@@ -28,8 +29,10 @@ class ProbingTest {
     private fun units(problem: Problem): List<Int> =
         problem.factors.filterIsInstance<Clause>().filter { it.literals.size == 1 }.map { it.literals[0] }
 
-    private fun probed(problem: Problem): Problem =
-        problem.withPassDelta(Presolve.probe(problem, cap, Cancellation.Never), BakeConfig.NONE)
+    private fun probed(problem: Problem): Problem {
+        val baked = problem.bake()
+        return baked.withPassDelta(Presolve.probe(baked, cap, Cancellation.Never), BakeConfig.NONE)
+    }
 
     /** Whether [ints] is feasible against [problem] (every int pinned, propagation not Unsat). */
     private fun isFeasible(problem: Problem, ints: LongArray, bools: BooleanArray): Boolean {
@@ -159,7 +162,7 @@ class ProbingTest {
             ),
         )
         assertTrue(Lit.make(1, false) in units(probed(problem)), "an uncapped run reaches b1 and derives !b1")
-        assertTrue(Presolve.probe(problem, 1, Cancellation.Never).isEmpty, "a cap of 1 never reaches b1")
+        assertTrue(Presolve.probe(problem.bake(), 1, Cancellation.Never).isEmpty, "a cap of 1 never reaches b1")
     }
 
     @Test
@@ -197,7 +200,7 @@ class ProbingTest {
             factors = listOf(Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true)))),
         )
         assertTrue(
-            Presolve.probe(problem, cap, Cancellation.Never).isEmpty,
+            Presolve.probe(problem.bake(), cap, Cancellation.Never).isEmpty,
             "nothing derivable is the pass's no-op signal",
         )
     }

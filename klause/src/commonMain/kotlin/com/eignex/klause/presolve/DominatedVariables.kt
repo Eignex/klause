@@ -7,9 +7,9 @@ import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
-import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.Term
 import com.eignex.klause.model.PbOp
+import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.util.IntHashSet
 
 internal object DominatedVariables {
@@ -44,7 +44,7 @@ internal object DominatedVariables {
      * queries.
      */
     fun fixDominatedVariables(
-        problem: Problem,
+        problem: BakedProblem,
         objectiveIntCoeffs: Map<Int, Long>,
         objectiveBoolCoeffs: Map<Int, Long> = emptyMap(),
     ): PassDelta {
@@ -91,10 +91,10 @@ internal object DominatedVariables {
             markBoolSafety(f, trueSafe, falseSafe, boolEligible, alreadyPinned)
         }
         var domainsNarrowed = false
-        val domains = problem.requireFiniteIntDomains().copyOf()
+        val domains = problem.rootIntDomains()
         for (v in 0 until n) {
             if (!intEligible[v]) continue
-            val d = problem.requireFiniteIntDomains()[v]
+            val d = problem.rootIntDomain(v)
             if (d.min == d.max) continue // already fixed
             val c = objectiveIntCoeffs[v] ?: 0L
             when {

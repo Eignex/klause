@@ -6,6 +6,7 @@ import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.presolve.PresolveShared.withPassDelta
+import com.eignex.klause.propagation.bake
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -43,7 +44,7 @@ class AmoCliqueMergeTest {
     }
 
     private fun checkMerge(numBool: Int, factors: List<Factor>): Problem {
-        val problem = Problem(numBool, 0, emptyArray(), factors)
+        val problem = Problem(numBool, 0, emptyArray(), factors).bake()
         val delta = Presolve.mergeAmoCliques(problem)
         val reduced = problem.withPassDelta(delta, BakeConfig.NONE)
         assertEquals(

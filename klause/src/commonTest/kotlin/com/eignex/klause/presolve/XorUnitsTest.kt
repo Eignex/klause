@@ -5,6 +5,7 @@ import com.eignex.klause.factor.bool.Xor
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.presolve.PresolveShared.withPassDelta
+import com.eignex.klause.propagation.bake
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -20,7 +21,7 @@ class XorUnitsTest {
         problem.factors.filterIsInstance<Clause>().filter { it.literals.size == 1 }.map { it.literals[0] }
 
     private fun derived(problem: Problem): Problem =
-        problem.withPassDelta(Presolve.deriveXorUnits(problem), BakeConfig.NONE)
+        problem.bake().withPassDelta(Presolve.deriveXorUnits(problem), BakeConfig.NONE)
 
     @Test
     fun `a single-literal xor forces its variable with the right polarity`() {

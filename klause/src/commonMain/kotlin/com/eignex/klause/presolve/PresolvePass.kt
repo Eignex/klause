@@ -3,14 +3,15 @@ package com.eignex.klause.presolve
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.presolve.structural.RedundantConstraints
 import com.eignex.klause.presolve.structural.RedundantConstraints.SubsumeIncremental
+import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.util.Cancellation
 
 private const val PROBE_PASS_MAX_CANDIDATES = 2_048
 private const val IMPLICATION_GRAPH_MAX_CANDIDATES = 2_048
 
 /**
- * The catalogue of presolve passes. Each entry co-locates its metadata with [apply], so adding or
- * toggling a pass is a single self-contained place. Metadata:
+ * The catalogue of presolve passes. Each entry co-locates its metadata with the transform it runs, so
+ * adding or toggling a pass is a single self-contained place. Metadata:
  *
  * @property id serializable form for [PresolveConfig.parse] and the CLI `--presolve` flag.
  * @property stage [Stage.PROBLEM] passes are run by the [Presolver] round engine; [Stage.CONSTRUCTION]
@@ -52,10 +53,13 @@ enum class PresolvePass(
         true,
         autoEligible = true,
     ) {
-        override fun apply(problem: Problem, ctx: PresolveContext) = Presolve.strengthenCoefficients(
-            problem,
-            ctx.cancellation,
-        )
+        override fun applySource(problem: Problem, ctx: PresolveContext) =
+            Presolve.strengthenSourceCoefficients(problem, ctx.cancellation)
+
+        // The bounded-integer half reads how far each column can actually range, so it exists only once
+        // a finite projection does; the gcd half above is all a declaration alone supports.
+        override fun applyFinite(problem: BakedProblem, ctx: PresolveContext) =
+            Presolve.strengthenCoefficients(problem, ctx.cancellation)
     },
 
     /** Per-variable modular (Diophantine) bound tightening for integer equalities: `Σ aᵢxᵢ = b` confines
@@ -68,7 +72,7 @@ enum class PresolvePass(
         preservesSolutionSet = true,
         autoEligible = true,
     ) {
-        override fun apply(problem: Problem, ctx: PresolveContext) = Presolve.reduceDiophantine(problem)
+        override fun applyFinite(problem: BakedProblem, ctx: PresolveContext) = Presolve.reduceDiophantine(problem)
     },
 
     /** One-shot GF(2) elimination over all xor factors: emit implied root unit clauses. */
@@ -81,7 +85,7 @@ enum class PresolvePass(
         autoEligible = true,
         skipAfterEmpty = true,
     ) {
-        override fun apply(problem: Problem, ctx: PresolveContext) = Presolve.deriveXorUnits(problem)
+        override fun applySource(problem: Problem, ctx: PresolveContext) = Presolve.deriveSourceXorUnits(problem)
     },
 
     /** Cross-direction linear bound fusion — over the linear rows on one coefficient vector, an upper
@@ -96,7 +100,7 @@ enum class PresolvePass(
         true,
         autoEligible = true,
     ) {
-        override fun apply(problem: Problem, ctx: PresolveContext) = Presolve.fuseLinearBounds(problem)
+        override fun applySource(problem: Problem, ctx: PresolveContext) = Presolve.fuseSourceLinearBounds(problem)
     },
 
     /** Affine singleton elimination — reconstructs the eliminated variable. The eliminated
@@ -112,7 +116,7 @@ enum class PresolvePass(
         preservesSolutionSet = false,
         autoEligible = true,
     ) {
-        override fun apply(problem: Problem, ctx: PresolveContext) = Presolve.eliminateAffineSingletons(
+        override fun applyFinite(problem: BakedProblem, ctx: PresolveContext) = Presolve.eliminateAffineSingletons(
             problem,
             ctx.objectiveIntVars,
             ctx.cancellation,
@@ -135,18 +139,26 @@ enum class PresolvePass(
         preservesSolutionSet = true,
         autoEligible = true,
     ) {
-        override fun apply(problem: Problem, ctx: PresolveContext) = Presolve.aggregateSubSums(problem)
+        override fun applySource(problem: Problem, ctx: PresolveContext) = Presolve.aggregateSourceSubSums(problem)
     },
 
     /** Constraint subsumption / redundant-constraint removal — drops duplicate factors and
      *  dominated linear inequalities. Runs after the simplifying passes so proportional rows are
      *  already GCD-normalised. */
-    REMOVE_REDUNDANT("subsume", Stage.PROBLEM, Capability.FINITE, PresolveTiming.FAST, true, autoEligible = true) {
-        override fun apply(problem: Problem, ctx: PresolveContext) = RedundantConstraints.removeRedundantConstraints(
-            problem,
-            ctx.subsumeIncremental as? SubsumeIncremental,
-            ctx.cancellation,
-        )
+    REMOVE_REDUNDANT("subsume", Stage.PROBLEM, Capability.SOURCE, PresolveTiming.FAST, true, autoEligible = true) {
+        override fun applySource(problem: Problem, ctx: PresolveContext) =
+            Presolve.removeRedundantSourceConstraints(problem, ctx.cancellation)
+
+        // The activity-based phases charge a dropped row's extra terms their widest value and read a
+        // global's domains, neither of which a declaration answers; the finite lane adds them and carries
+        // the round engine's persistent phase-1/2 indices.
+        override fun applyFinite(problem: BakedProblem, ctx: PresolveContext) =
+            RedundantConstraints.removeRedundantConstraints(
+                problem,
+                problem.rootIntDomains(),
+                ctx.subsumeIncremental as? SubsumeIncremental,
+                ctx.cancellation,
+            )
     },
 
     /** Per-factor structural self-reduction — each factor rewrites itself into simpler / lower-arity
@@ -160,7 +172,7 @@ enum class PresolvePass(
         preservesSolutionSet = true,
         autoEligible = true,
     ) {
-        override fun apply(problem: Problem, ctx: PresolveContext) = Presolve.reduceStructural(problem)
+        override fun applyFinite(problem: BakedProblem, ctx: PresolveContext) = Presolve.reduceStructural(problem)
     },
 
     /** Fold a reified comparison disjunction — a clause over sole-use single-variable reified-comparison
@@ -176,7 +188,7 @@ enum class PresolvePass(
         preservesSolutionSet = false,
         autoEligible = true,
     ) {
-        override fun apply(problem: Problem, ctx: PresolveContext) = Presolve.foldComparisonClauses(problem)
+        override fun applyFinite(problem: BakedProblem, ctx: PresolveContext) = Presolve.foldComparisonClauses(problem)
     },
 
     /** Duplicate / parallel column aggregation — the column-side mirror of [REMOVE_REDUNDANT]. Folds
@@ -192,7 +204,7 @@ enum class PresolvePass(
         preservesSolutionSet = false,
         autoEligible = true,
     ) {
-        override fun apply(problem: Problem, ctx: PresolveContext) =
+        override fun applyFinite(problem: BakedProblem, ctx: PresolveContext) =
             Presolve.mergeDuplicateColumns(problem, ctx.objectiveIntVars, ctx.sharedIntOcc, ctx.dupColumnsTouchedVars)
     },
 
@@ -208,7 +220,7 @@ enum class PresolvePass(
         preservesSolutionSet = false,
         autoEligible = true,
     ) {
-        override fun apply(problem: Problem, ctx: PresolveContext) =
+        override fun applyFinite(problem: BakedProblem, ctx: PresolveContext) =
             Presolve.projectSingletonInequalities(problem, ctx.objectiveIntVars)
     },
 
@@ -222,7 +234,7 @@ enum class PresolvePass(
         autoEligible = true,
         skipAfterEmpty = true,
     ) {
-        override fun apply(problem: Problem, ctx: PresolveContext) = Presolve.breakSymmetries(
+        override fun applyFinite(problem: BakedProblem, ctx: PresolveContext) = Presolve.breakSymmetries(
             problem,
             ctx.objectiveIntVars,
             ctx.objectiveBoolVars,
@@ -241,7 +253,7 @@ enum class PresolvePass(
         preservesSolutionSet = false,
         autoEligible = false,
     ) {
-        override fun apply(problem: Problem, ctx: PresolveContext) =
+        override fun applyFinite(problem: BakedProblem, ctx: PresolveContext) =
             Presolve.breakValuePrecedence(problem, ctx.objectiveIntVars)
     },
 
@@ -256,7 +268,7 @@ enum class PresolvePass(
         preservesSolutionSet = false,
         autoEligible = true,
     ) {
-        override fun apply(problem: Problem, ctx: PresolveContext) =
+        override fun applyFinite(problem: BakedProblem, ctx: PresolveContext) =
             Presolve.fixDominatedVariables(problem, ctx.objectiveIntCoeffs, ctx.objectiveBoolCoeffs)
     },
 
@@ -295,7 +307,7 @@ enum class PresolvePass(
      *  deductions that hold in every solution — failed literals (emitted as unit clauses) and
      *  common-bound tightenings. Solution-preserving, so it needs no objective-variable exclusion. */
     PROBE("probe", Stage.PROBLEM, Capability.FINITE, PresolveTiming.EXHAUSTIVE, true, autoEligible = true) {
-        override fun apply(problem: Problem, ctx: PresolveContext) =
+        override fun applyFinite(problem: BakedProblem, ctx: PresolveContext) =
             Presolve.probe(problem, PROBE_PASS_MAX_CANDIDATES, Cancellation.Never)
     },
 
@@ -312,7 +324,7 @@ enum class PresolvePass(
         preservesSolutionSet = false,
         autoEligible = true,
     ) {
-        override fun apply(problem: Problem, ctx: PresolveContext) = Presolve.reduceImplicationGraph(
+        override fun applyFinite(problem: BakedProblem, ctx: PresolveContext) = Presolve.reduceImplicationGraph(
             problem,
             IMPLICATION_GRAPH_MAX_CANDIDATES,
             Cancellation.Never,
@@ -332,7 +344,7 @@ enum class PresolvePass(
         preservesSolutionSet = false,
         autoEligible = true,
     ) {
-        override fun apply(problem: Problem, ctx: PresolveContext) =
+        override fun applyFinite(problem: BakedProblem, ctx: PresolveContext) =
             Presolve.eliminateBoolVars(problem, ctx.objectiveBoolVars, ctx.cancellation)
     },
 
@@ -347,7 +359,7 @@ enum class PresolvePass(
         preservesSolutionSet = false,
         autoEligible = true,
     ) {
-        override fun apply(problem: Problem, ctx: PresolveContext) =
+        override fun applyFinite(problem: BakedProblem, ctx: PresolveContext) =
             Presolve.eliminateBlockedClauses(problem, ctx.objectiveBoolVars, ctx.cancellation)
     },
 
@@ -362,7 +374,8 @@ enum class PresolvePass(
         preservesSolutionSet = true,
         autoEligible = true,
     ) {
-        override fun apply(problem: Problem, ctx: PresolveContext) = Presolve.mergeAmoCliques(problem, ctx.cancellation)
+        override fun applyFinite(problem: BakedProblem, ctx: PresolveContext) =
+            Presolve.mergeAmoCliques(problem, ctx.cancellation)
     },
 
     /** Substitute an integer column whose domain is exactly `{0, 1}` for a fresh Boolean literal, rewriting
@@ -415,13 +428,35 @@ enum class PresolvePass(
     ),
     ;
 
-    /** Transform [problem] under [ctx], returning the change as a [PassDelta] against [problem]'s factor
-     *  list. An empty delta ([PassDelta.isEmpty]) signals the pass found nothing to do this round. Defined
-     *  only for [Stage.PROBLEM] passes — the round engine runs no other stage. [Stage.CONSTRUCTION]
-     *  (bake-time SAC) and [Stage.EXTERNAL] (LP harvest) passes are eligibility markers whose work runs
-     *  elsewhere, so calling this on one is a programming error. */
-    open fun apply(problem: Problem, ctx: PresolveContext): PassDelta =
-        error("PresolvePass.apply is defined only for Stage.PROBLEM passes; $name is a $stage pass")
+    /**
+     * Transform the canonical source [problem] under [ctx], returning the change as a [SourceDelta]
+     * against [problem]'s factor list.
+     *
+     * Defined only for [Stage.PROBLEM] [Capability.SOURCE] passes: the parameter carries declarations
+     * and factors alone and the result cannot name a finite domain or lift a sample, so a pass with a
+     * source form is one the type says may run before any finite projection exists.
+     */
+    internal open fun applySource(problem: Problem, ctx: PresolveContext): SourceDelta =
+        error("$name has no source form: it is a $stage pass needing $capability")
+
+    /**
+     * Transform the finite [problem] under [ctx], returning the change as a [PassDelta] against
+     * [problem]'s factor list. An empty delta ([PassDelta.isEmpty]) signals the pass found nothing to do
+     * this round.
+     *
+     * A [Capability.SOURCE] pass runs its source form here unless it overrides — the finite lane hands
+     * it the same declarations plus root domains it has no use for. [Stage.CONSTRUCTION] (bake-time SAC)
+     * and [Stage.EXTERNAL] (LP harvest) passes are eligibility markers whose work runs elsewhere, so
+     * calling this on one is a programming error.
+     */
+    internal open fun applyFinite(problem: BakedProblem, ctx: PresolveContext): PassDelta = when (capability) {
+        Capability.SOURCE -> applySource(problem, ctx).asPassDelta()
+
+        Capability.FINITE -> error(
+            "PresolvePass.applyFinite is defined only for Stage.PROBLEM passes; " +
+                "$name is a $stage pass",
+        )
+    }
 
     /** Where a pass runs. */
     enum class Stage {

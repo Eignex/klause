@@ -16,6 +16,7 @@ import com.eignex.klause.ir.Term
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.presolve.PassDelta
 import com.eignex.klause.presolve.PresolveShared
+import com.eignex.klause.presolve.SourceDelta
 import com.eignex.klause.presolve.SubsumeState
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.IntArrayList
@@ -35,22 +36,40 @@ internal object RedundantConstraints {
      * Subsumption entry point. On the fresh path (no [incremental]) it recomputes from scratch. Given a
      * [SubsumeIncremental] it maintains the phase-1/2 indices across rounds in [SubsumeIncremental.memo],
      * reprocessing only the factors added / dropped since the pass last ran — the whole-set rescan of a
-     * fruitless re-run becomes O(delta). Phases 3–5 run over the phase-2
+     * fruitless re-run becomes O(delta). The later phases run over the phase-2
      * survivor list either way.
+     *
+     * [domains] are the root-propagated finite domains the activity-based phases read; `null` runs the
+     * declaration-only phases alone (see [removeRedundantSourceConstraints]).
      */
     fun removeRedundantConstraints(
         problem: Problem,
+        domains: Array<IntDomain>?,
         incremental: SubsumeIncremental? = null,
         cancellation: Cancellation = Cancellation.Never,
     ): PassDelta {
-        if (incremental == null) return computeFull(problem, cancellation)
+        if (incremental == null) return computeFull(problem, domains, cancellation)
         val out = incremental.memo.reconcile(problem, incremental, cancellation)
-        val delta = finishAfterPhase2(problem, out, cancellation)
+        val delta = finishAfterPhase2(problem, domains, out, cancellation)
         // Phases 3–5 drop factors [reconcile] never saw; feed the full drop set back so the memo retracts
         // every dropped factor's index entry before the next firing.
         incremental.memo.setPendingSelfDrops(delta.droppedIndices.map { problem.factors[it] })
-        if (SUBSUME_DIFFERENTIAL_CHECK) assertMatchesFull(problem, delta)
+        if (SUBSUME_DIFFERENTIAL_CHECK) assertMatchesFull(problem, domains, delta)
         return delta
+    }
+
+    /**
+     * The part of subsumption that reads declarations and factors alone.
+     *
+     * Phases 1, 2 and 4 compare rows against each other — exact duplicates, same-vector domination, and
+     * knapsacks an at-most-one clique already implies — so each drop is justified by another retained
+     * row rather than by any column's finite extent. Phases 3 and 5 charge the extra terms their maximal
+     * activity and read a global's domains, which a model with an open side has no answer for, so they
+     * run only in [removeRedundantConstraints].
+     */
+    fun removeRedundantSourceConstraints(problem: Problem, cancellation: Cancellation): SourceDelta {
+        val delta = computeFull(problem, domains = null, cancellation)
+        return SourceDelta(delta.droppedIndices, delta.addedFactors)
     }
 
     // Flip on to validate the incremental path: every firing also recomputes the full delta and asserts
@@ -58,8 +77,8 @@ internal object RedundantConstraints {
     // presolve output. Off in production (the full recompute defeats the incremental win).
     private const val SUBSUME_DIFFERENTIAL_CHECK = false
 
-    private fun assertMatchesFull(problem: Problem, delta: PassDelta) {
-        val full = computeFull(problem)
+    private fun assertMatchesFull(problem: Problem, domains: Array<IntDomain>?, delta: PassDelta) {
+        val full = computeFull(problem, domains)
         val a = delta.droppedIndices.toHashSet()
         val b = full.droppedIndices.toHashSet()
         require(a == b) { "incremental subsume delta $a != full $b (nfac=${problem.factors.size})" }
@@ -87,7 +106,11 @@ internal object RedundantConstraints {
      * (maximal activity already within the bound) are dropped by the strengthen lift, so this pass is
      * purely cross-constraint.
      */
-    private fun computeFull(problem: Problem, cancellation: Cancellation = Cancellation.Never): PassDelta {
+    private fun computeFull(
+        problem: Problem,
+        domains: Array<IntDomain>?,
+        cancellation: Cancellation = Cancellation.Never,
+    ): PassDelta {
         val factors = problem.factors
         // Phase 1: exact-duplicate removal by structural key, two-tier so the full key — which for a
         // Table embeds its entire sorted tuple set and dominates presolve time on table-heavy models —
@@ -155,24 +178,25 @@ internal object RedundantConstraints {
             }
             if (keep) out.add(f)
         }
-        return finishAfterPhase2(problem, out, cancellation)
+        return finishAfterPhase2(problem, domains, out, cancellation)
     }
 
     /** Phases 3–5 over the phase-1/2 survivor list [out] (in `Problem.factors` order), recovering the
      *  dropped input indices. Shared by the fresh recompute and the incremental path. */
     private fun finishAfterPhase2(
         problem: Problem,
+        domains: Array<IntDomain>?,
         out: List<Factor>,
         cancellation: Cancellation = Cancellation.Never,
     ): PassDelta {
         val factors = problem.factors
         // Phase 3: variable-subset / proportional domination across different supports.
-        val out3 = dropSubsetDominated(problem, out, cancellation)
+        val out3 = if (domains == null) out else dropSubsetDominated(domains, out, cancellation)
         // Phase 4: clique-aware redundancy — a 0/1 knapsack implied by at-most-one cliques.
         val out4 = dropCliqueImpliedKnapsacks(out3, cancellation)
         // Phase 5: drop globals the current domains make vacuously satisfied; removing one frees
         // a variable contained only in it, which the affine pass then projects out (implied-free).
-        val out5 = out4.filterNot { isVacuousGlobal(it, problem.requireFiniteIntDomains()) }
+        val out5 = if (domains == null) out4 else out4.filterNot { isVacuousGlobal(it, domains) }
         if (out5.size == factors.size) return PassDelta()
         // This pass only drops; every survivor in [out5] is identity-equal to an input factor, in input
         // order, so a two-pointer walk recovers the dropped input indices (correct even with reference
@@ -484,7 +508,7 @@ internal object RedundantConstraints {
      * [SUBSET_DOMINATION_ROW_CAP] so the pairwise scan can't blow up.
      */
     private fun dropSubsetDominated(
-        problem: Problem,
+        domains: Array<IntDomain>,
         factors: List<Factor>,
         cancellation: Cancellation = Cancellation.Never,
     ): List<Factor> {
@@ -514,7 +538,7 @@ internal object RedundantConstraints {
             if ((bi and SUBSET_CANCEL_POLL_MASK) == 0 && cancellation()) break
             for (a in dominators) {
                 if (a.factorIndex == b.factorIndex || a.coeffByVar.size >= b.coeffByVar.size) continue
-                if (dominates(problem, a, b)) {
+                if (dominates(domains, a, b)) {
                     dropped.add(b.factorIndex)
                     break
                 }
@@ -526,7 +550,7 @@ internal object RedundantConstraints {
 
     /** Whether `≤`-row [a] (strict-subset support) dominates [b]: matching coefficients up to a single
      *  positive integer multiple `k` on the shared variables, and `k·boundA + maxExtra ≤ boundB`. */
-    private fun dominates(problem: Problem, a: LeRow, b: LeRow): Boolean {
+    private fun dominates(domains: Array<IntDomain>, a: LeRow, b: LeRow): Boolean {
         var k = 0L
         a.coeffByVar.forEach { v, ca ->
             if (!b.coeffByVar.containsKey(v)) return false // a's support must be ⊆ b's
@@ -544,7 +568,7 @@ internal object RedundantConstraints {
         var maxExtra = 0L
         b.coeffByVar.forEach { v, cb ->
             if (!a.coeffByVar.containsKey(v)) {
-                val d = problem.requireFiniteIntDomains()[v]
+                val d = domains[v]
                 maxExtra += if (cb >= 0) cb * d.max else cb * d.min
                 // Conservative overflow guard: an extra activity this large can't be dominated by a
                 // small-bound row anyway, so bail rather than risk a wrapped Long comparison.

@@ -33,6 +33,7 @@ import com.eignex.klause.model.PbOp
 import com.eignex.klause.presolve.PresolveShared.withPassDelta
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.PropagationResult
+import com.eignex.klause.propagation.bake
 import com.eignex.klause.propagation.propagate
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -80,10 +81,10 @@ class SymmetryBreakingTest {
     }
 
     private fun broken(problem: Problem): Problem =
-        problem.withPassDelta(Presolve.breakSymmetries(problem), BakeConfig.NONE)
+        problem.bake().let { it.withPassDelta(Presolve.breakSymmetries(it), BakeConfig.NONE) }
 
     private fun precedence(problem: Problem): Problem =
-        problem.withPassDelta(Presolve.breakValuePrecedence(problem), BakeConfig.NONE)
+        problem.bake().let { it.withPassDelta(Presolve.breakValuePrecedence(it), BakeConfig.NONE) }
 
     private fun checkSound(name: String, problem: Problem, expectReduced: Boolean) {
         val broken = broken(problem)
@@ -94,7 +95,7 @@ class SymmetryBreakingTest {
         if (expectReduced) {
             assertTrue(after < orig, "$name: expected fewer solutions but $orig -> $after")
         } else {
-            assertTrue(Presolve.breakSymmetries(problem).isEmpty, "$name: expected no symmetry detected")
+            assertTrue(Presolve.breakSymmetries(problem.bake()).isEmpty, "$name: expected no symmetry detected")
         }
     }
 
@@ -242,7 +243,7 @@ class SymmetryBreakingTest {
             Array(2) { IntDomain(0, 2) },
             listOf(Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.LE, 0)),
         )
-        assertTrue(Presolve.breakValuePrecedence(problem).isEmpty, "ordering ⇒ no value symmetry")
+        assertTrue(Presolve.breakValuePrecedence(problem.bake()).isEmpty, "ordering ⇒ no value symmetry")
     }
 
     @Test
@@ -477,7 +478,7 @@ class SymmetryBreakingTest {
                 Linear(intArrayOf(1, 2), intArrayOf(2, 3), LinearOp.LE, 3),
             ),
         )
-        val (intColour, _) = Presolve.refineColoursForTest(problem)
+        val (intColour, _) = Presolve.refineColoursForTest(problem.bake())
         assertEquals(intColour[0], intColour[2], "coeff-1 cells should share a WL colour")
         assertEquals(intColour[1], intColour[3], "coeff-2 cells should share a WL colour")
         assertTrue(intColour[0] != intColour[1], "different roles should get different WL colours")
