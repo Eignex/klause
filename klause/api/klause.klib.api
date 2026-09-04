@@ -10406,7 +10406,9 @@ final class com.eignex.klause.solver.result/OpenTheoryWorkSink { // com.eignex.k
 
     final fun boolDecision(): kotlin/Boolean // com.eignex.klause.solver.result/OpenTheoryWorkSink.boolDecision|boolDecision(){}[0]
     final fun hasAllowance(): kotlin/Boolean // com.eignex.klause.solver.result/OpenTheoryWorkSink.hasAllowance|hasAllowance(){}[0]
+    final fun hintMoves(kotlin/Long) // com.eignex.klause.solver.result/OpenTheoryWorkSink.hintMoves|hintMoves(kotlin.Long){}[0]
     final fun intDecision(): kotlin/Boolean // com.eignex.klause.solver.result/OpenTheoryWorkSink.intDecision|intDecision(){}[0]
+    final fun remaining(): kotlin/Long // com.eignex.klause.solver.result/OpenTheoryWorkSink.remaining|remaining(){}[0]
     final fun snapshot(): com.eignex.klause.solver.result/OpenTheoryWorkStats // com.eignex.klause.solver.result/OpenTheoryWorkSink.snapshot|snapshot(){}[0]
     final fun theoryCheck(): kotlin/Boolean // com.eignex.klause.solver.result/OpenTheoryWorkSink.theoryCheck|theoryCheck(){}[0]
     final fun theoryDecision(): kotlin/Boolean // com.eignex.klause.solver.result/OpenTheoryWorkSink.theoryDecision|theoryDecision(){}[0]

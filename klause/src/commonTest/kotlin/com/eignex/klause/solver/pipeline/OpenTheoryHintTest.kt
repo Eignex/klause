@@ -51,6 +51,22 @@ class OpenTheoryHintTest {
         )
     }
 
+    /** Shared clauses no assignment satisfies, so a draw over them spends its whole allowance. */
+    private fun refutedClauseModel(): Problem {
+        val open = Bits(2).also { bits -> repeat(2) { bits.set(it) } }
+        return Problem(
+            numBoolVars = 2,
+            intBounds = IntBounds.fromModelBounds(LongArray(2), LongArray(2), open, open.copy()),
+            factors = arrayOf(
+                Linear(longArrayOf(1, -1), intArrayOf(0, 1), LinearOp.LE, 3),
+                Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
+                Clause(intArrayOf(Lit.make(0, true), Lit.make(1, false))),
+                Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true))),
+                Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false))),
+            ),
+        )
+    }
+
     private fun satisfiesClauses(model: Problem, assignment: OpenTheoryAssignment): Boolean =
         model.factors.filterIsInstance<Clause>().all { clause ->
             clause.literals.any { Lit.evaluate(it, assignment.boolValue(Lit.variable(it))) }
@@ -309,5 +325,30 @@ class OpenTheoryHintTest {
 
         assertEquals(first.preferredBool(0), second.preferredBool(0))
         assertEquals(1L, state.hints.draws)
+    }
+
+    @Test
+    fun `the draw's allowance is what the work budget has left`() {
+        val model = refutedClauseModel()
+        val budget = 64L
+        val state = OpenTheorySolveState(
+            TheoryParams(openWorkLimit = budget, openHintFlips = 100_000, openHintMinSplits = 1),
+        )
+
+        state.candidateHints(model.componentPlan(), model, Cancellation.Never).preferredBool(0)
+
+        assertTrue(state.hints.moves in 1..budget, "the draw spent ${state.hints.moves} of a $budget budget")
+    }
+
+    @Test
+    fun `the moves a draw spends are charged against the work budget`() {
+        val model = refutedClauseModel()
+        val state = OpenTheorySolveState(hinted(flips = 64))
+
+        state.candidateHints(model.componentPlan(), model, Cancellation.Never).preferredBool(0)
+
+        val charged = state.work.snapshot().openWork
+        assertTrue(charged > 0, "the draw spent moves the budget never saw")
+        assertEquals(state.hints.moves, charged)
     }
 }

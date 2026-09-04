@@ -357,10 +357,17 @@ internal class OpenTheorySolveState(private val params: TheoryParams) {
             .also { deferred = it }
     }
 
-    /** Spend the allowance once the traversal has shown it branches. */
+    /** Spend the allowance once the traversal has shown it branches, within what the budget has left. */
     private fun draw(plan: ComponentPlan, model: Problem, cancellation: Cancellation): SearchCandidateHints {
         val flips = params.openHintFlips ?: return SearchCandidateHints.None
-        val result = plan.openBooleanDraw(model, OpenCandidateParams(maxFlips = flips, cancellation = cancellation))
+        // One budget covers the draw and the traversal that reads it: the allowance is capped by what the
+        // work sink still holds and the moves it spends are charged there, so a hinted run and an unhinted
+        // one under the same limit do the same total work instead of the hinted one drawing for free.
+        val result = plan.openBooleanDraw(
+            model,
+            OpenCandidateParams(maxFlips = minOf(flips, work.remaining()), cancellation = cancellation),
+        )
+        work.hintMoves(result.moves)
         val candidate = result.candidate
         drawStats = OpenHintStats(
             draws = 1,
