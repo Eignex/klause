@@ -22,7 +22,7 @@ class OpenTheoryWorkSink(private val limit: Long = Long.MAX_VALUE) {
     private var theoryChecks = 0L
     private var work = 0L
 
-    /** Whether a charged event found the fixed-work allowance already spent. */
+    /** Whether a charged event found the fixed-work allowance already spent, or spent the last of it. */
     var exhausted: Boolean = false
         private set
 
@@ -42,7 +42,7 @@ class OpenTheoryWorkSink(private val limit: Long = Long.MAX_VALUE) {
     }
 
     /** Fixed-work allowance still unspent, which a producer sizing its own allowance may not exceed. */
-    fun remaining(): Long = limit - work
+    fun remaining(): Long = (limit - work).coerceAtLeast(0)
 
     /** Charge one committed shared Boolean decision. */
     fun boolDecision(): Boolean = consume().also { if (it) boolDecisions++ }
@@ -63,10 +63,12 @@ class OpenTheoryWorkSink(private val limit: Long = Long.MAX_VALUE) {
      * what keeps this allowance solve-wide: a hinted run and an unhinted one under the same limit do the
      * same total work, the hinted one having given part of it to the draw. Charged against [remaining]
      * so a producer that overran the allowance it was handed cannot report more spent than the sink
-     * ever held.
+     * ever held, and a charge that fills the allowance marks it spent, so a run the draw ended reports
+     * the budget as its reason rather than a stop it never saw.
      */
     fun hintMoves(moves: Long) {
         work += moves.coerceIn(0, remaining())
+        if (work >= limit) exhausted = true
     }
 
     /** Return the immutable public snapshot. */

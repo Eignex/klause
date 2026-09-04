@@ -124,8 +124,11 @@ clauses; it is off unless asked for, changes only which side of a Boolean split 
 reports under `-s` (`openHint*`) what it drew and how many splits it went on to order. The flips come
 out of the same `node-limit` budget the search spends — the draw gets what is left of it and is
 charged for what it uses — so a hinted run and an unhinted one at the same limit do the same total
-work. The allowance is not spent until `--param open-hint-min-splits=N` splits have asked for a hint
-(default 128), so a model the theory dominates — which reaches almost no split — never pays for one.
+work. Without a `node-limit` there is nothing to divide and the draw gets the N it asked for; ask
+for more flips than the limit holds and the draw takes the whole remainder, leaving the traversal
+none. The allowance is not spent until `--param open-hint-min-splits=N` splits have asked for a
+hint (default 128), so a model the theory dominates — which reaches almost no split — never pays
+for one.
 `--param open-branching=activity|source-order` chooses which Boolean the traversal splits:
 `source-order` (the default) walks the variables in model order, `activity` follows conflict activity
 over the shared session. Only the Boolean skeleton is branched either way — the theory decides the
