@@ -32,12 +32,20 @@ private class LbNode(val decisions: List<LbDecision>, val bound: Double)
  * optimum, exactly like the feasibility pump. Bounded by [LB_TREE_BUDGET] node expansions and a
  * frontier cap; returns the best incumbent found, or null. Lives in the search layer because it realizes
  * incumbents through [pinToward] (which snapshots the backtrack assignment).
+ *
+ * [cutoff] is the objective of the incumbent already in hand, `POSITIVE_INFINITY` when there is none.
+ * Nodes it dominates are dropped and only a strict improvement is returned, so the dive costs least
+ * where another heuristic has already landed a point — it runs behind one rather than instead of it.
  */
 @Suppress("CyclomaticComplexMethod", "LongMethod", "NestedBlockDepth")
-internal fun LpEngine.lbTreeSearch(objective: LinearObjective, cancellation: Cancellation): Sample? {
+internal fun LpEngine.lbTreeSearch(
+    objective: LinearObjective,
+    cutoff: Double,
+    cancellation: Cancellation,
+): Sample? {
     val relaxer = lpRelaxer ?: return null
     var best: Sample? = null
-    var bestObj = Double.POSITIVE_INFINITY
+    var bestObj = cutoff
     val frontier = ArrayList<LbNode>()
     frontier.add(LbNode(emptyList(), Double.NEGATIVE_INFINITY))
     var expansions = 0

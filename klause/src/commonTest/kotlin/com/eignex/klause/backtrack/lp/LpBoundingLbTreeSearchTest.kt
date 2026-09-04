@@ -14,6 +14,7 @@ import com.eignex.klause.util.Cancellation
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
@@ -57,7 +58,7 @@ class LpBoundingLbTreeSearchTest {
             }
             val p = Problem(0, n, domains, factors.toTypedArray())
             val obj = LinearObjective(intCoefficients = LongArray(n) { rng.nextLong(-2, 3) })
-            val sample = engine(p, obj).lbTreeSearch(obj, Cancellation.Never) ?: return@repeat
+            val sample = engine(p, obj).lbTreeSearch(obj, Double.POSITIVE_INFINITY, Cancellation.Never) ?: return@repeat
             produced++
             for (f in p.factors.filterIsInstance<Linear>()) {
                 assertTrue(satisfies(f, sample.ints), "subsolver returned infeasible ${sample.ints.toList()}")
@@ -81,8 +82,29 @@ class LpBoundingLbTreeSearchTest {
             ),
         )
         val obj = LinearObjective(intCoefficients = longArrayOf(0, 0, 0, 1))
-        val sample = engine(p, obj).lbTreeSearch(obj, Cancellation.Never)
+        val sample = engine(p, obj).lbTreeSearch(obj, Double.POSITIVE_INFINITY, Cancellation.Never)
         assertTrue(sample != null, "best-bound search should find a feasible incumbent")
         assertEquals(2.0, obj.evaluate(sample), "best-bound search should dive to the optimal cost 2")
+    }
+
+    @Test
+    fun `the subsolver proposes nothing it cannot improve on`() {
+        // The same triangle vertex cover, handed the optimum as the incumbent it must beat.
+        val p = Problem(
+            0,
+            4,
+            arrayOf(IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 3)),
+            arrayOf<Factor>(
+                Linear(intArrayOf(1, 1, 1, -1), intArrayOf(0, 1, 2, 3), LinearOp.EQ, 0),
+                Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),
+                Linear(intArrayOf(1, 1), intArrayOf(1, 2), LinearOp.GE, 1),
+                Linear(intArrayOf(1, 1), intArrayOf(0, 2), LinearOp.GE, 1),
+            ),
+        )
+        val obj = LinearObjective(intCoefficients = longArrayOf(0, 0, 0, 1))
+
+        val sample = engine(p, obj).lbTreeSearch(obj, cutoff = 2.0, cancellation = Cancellation.Never)
+
+        assertNull(sample, "a dive behind an optimal incumbent has nothing to propose")
     }
 }

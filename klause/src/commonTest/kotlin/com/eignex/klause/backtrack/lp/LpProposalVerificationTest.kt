@@ -31,7 +31,7 @@ class LpProposalVerificationTest {
     private val producers: List<Pair<String, LpEngine.(LinearObjective, Cancellation) -> Sample?>> = listOf(
         "the rounding probe" to LpEngine::lpRoundingProbe,
         "the feasibility pump" to LpEngine::lpFeasibilityPump,
-        "the best-bound tree search" to LpEngine::lbTreeSearch,
+        "the best-bound tree search" to { obj, token -> lbTreeSearch(obj, Double.POSITIVE_INFINITY, token) },
     )
 
     private fun instance(rng: Random): Pair<Problem, LinearObjective> {

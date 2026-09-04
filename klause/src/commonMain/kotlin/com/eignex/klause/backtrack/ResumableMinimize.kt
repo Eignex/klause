@@ -500,9 +500,9 @@ internal class ResumableMinimize(
     /**
      * One-shot pre-search root work (harvest the global cut pool, capture the root relaxation bound for
      * the integrality-gap metric, root shaving, bound exchange, and the primal probes). Run on the first
-     * engine step so the live cancellation gates the LP solves. Returns the first incumbent if a probe
-     * seeds one (in which case the tree-search probe is skipped this call), else null. The root-LP work
-     * is time-boxed by [rootLpBudget].
+     * engine step so the live cancellation gates the LP solves. Returns the best incumbent the primal
+     * heuristics seeded, or null when none of them landed one. The root-LP work is time-boxed by
+     * [rootLpBudget].
      */
     private fun firstRunWork(): MinimizeResult.WithSample? {
         sink.start()
@@ -553,18 +553,24 @@ internal class ResumableMinimize(
         // solution (it validates the reals and attaches them); skip the heuristics there rather than
         // spend the root budget on proposals [publishLpProposal] would refuse anyway.
         if (problem.numRealVars == 0) {
+            var seeded: MinimizeResult.WithSample? = null
             // LP-rounding primal heuristic: seed an incumbent before search so the bound prunes and
             // reduced-cost fixing bite from the first node.
             if (lpEngine.params.lpPlan.probe && lpEngine.lpRelaxer != null) {
                 // Single-shot rounding first; if it can't land a feasible point, pump toward one.
                 val seed = lpEngine.lpRoundingProbe(objective, rootToken)
                     ?: lpEngine.lpFeasibilityPump(objective, rootToken)
-                if (seed != null) publishLpProposal(seed)?.let { return it }
+                if (seed != null) seeded = publishLpProposal(seed) ?: seeded
             }
-            // Best-bound tree-search primal subsolver: dive best-first for an incumbent.
+            // Best-bound tree-search primal subsolver: dive best-first for a better incumbent than the
+            // rounding landed. It takes the incumbent as its cutoff, so a probe that already succeeded
+            // makes the dive cheaper instead of cancelling it — an arm that asked for the dive gets it.
             if (lpEngine.params.lpPlan.lbTreeSearch && lpEngine.lpRelaxer != null) {
-                lpEngine.lbTreeSearch(objective, rootToken)?.let { seed -> publishLpProposal(seed)?.let { return it } }
+                lpEngine.lbTreeSearch(objective, bestObj, rootToken)?.let { seed ->
+                    seeded = publishLpProposal(seed) ?: seeded
+                }
             }
+            return seeded
         }
         return null
     }
