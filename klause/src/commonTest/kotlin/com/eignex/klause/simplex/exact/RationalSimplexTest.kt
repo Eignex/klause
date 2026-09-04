@@ -64,6 +64,18 @@ class RationalSimplexTest {
     }
 
     @Test
+    fun `decides whether an activity outside the rows descends along the cone`() {
+        // The one row bounds column 0 below and column 1 not at all, so only the second descends.
+        val rows = listOf(ExactRationalInequality(intArrayOf(0), listOf(BigFraction.MINUS_ONE), BigFraction.ZERO))
+
+        for ((column, descends) in listOf(0 to false, 1 to true)) {
+            val activity = ExactRationalInequality(intArrayOf(column), listOf(BigFraction.ONE), BigFraction.ZERO)
+
+            assertEquals(descends, exactDescendingDirection(rows, activity, variables = 2), "column $column")
+        }
+    }
+
+    @Test
     fun `minimizes an exact activity without a probe bound`() {
         val model = ExactRationalFeasibilityModel(
             n = 2,

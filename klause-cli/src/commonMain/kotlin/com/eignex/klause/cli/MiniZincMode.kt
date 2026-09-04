@@ -142,6 +142,8 @@ internal class MiniZincOutput : OutputProtocol {
             // Incumbents already streamed; printing `==========` would falsely claim optimality.
             Verdict.BEST_FOUND -> Unit
 
+            Verdict.UNBOUNDED -> println("=====UNBOUNDED=====")
+
             Verdict.UNSATISFIABLE -> println("=====UNSATISFIABLE=====")
 
             // A `%` line is a comment to every FlatZinc consumer, so the cause rides alongside the

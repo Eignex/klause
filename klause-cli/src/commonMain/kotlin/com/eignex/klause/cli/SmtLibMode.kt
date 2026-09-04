@@ -105,7 +105,7 @@ internal class SmtLibOutput : BufferedBestOutput() {
     override val commentPrefix: String = ";"
 
     override fun statusLine(verdict: Verdict): String = when (verdict) {
-        Verdict.SATISFIABLE, Verdict.OPTIMAL, Verdict.BEST_FOUND -> "sat"
+        Verdict.SATISFIABLE, Verdict.OPTIMAL, Verdict.BEST_FOUND, Verdict.UNBOUNDED -> "sat"
         Verdict.UNSATISFIABLE -> "unsat"
         Verdict.UNKNOWN -> "unknown"
     }

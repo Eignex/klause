@@ -152,6 +152,58 @@ class OpenTheoryMinimizeTest {
     }
 
     @Test
+    fun `an objective no row bounds below is unbounded rather than descended`() {
+        val parsed = modelOf("(declare-const x Int)")
+        val x = parsed.intVarNames.getValue("x")
+        val objective = LinearObjective(intCoefficients = LongArray(parsed.model.numIntVars).also { it[x] = 1L })
+
+        val result = assertIs<OpenTheoryOptimum.Unbounded>(OpenTheoryMinimizer(parsed.model, objective).minimize())
+
+        assertEquals(result.value.toString(), result.witness.intValue(x))
+    }
+
+    @Test
+    fun `an objective unbounded through the column it negates is unbounded`() {
+        val parsed = modelOf(
+            """
+                (declare-const x Int)
+                (assert (>= x 0))
+            """.trimIndent(),
+        )
+        val x = parsed.intVarNames.getValue("x")
+        val objective = LinearObjective(intCoefficients = LongArray(parsed.model.numIntVars).also { it[x] = -1L })
+
+        assertIs<OpenTheoryOptimum.Unbounded>(OpenTheoryMinimizer(parsed.model, objective).minimize())
+    }
+
+    @Test
+    fun `an objective unbounded inside one disjunct is unbounded`() {
+        val parsed = modelOf(
+            """
+                (declare-const x Int)
+                (declare-const y Int)
+                (assert (or (<= x 0) (>= x 10)))
+                (assert (= y 4))
+            """.trimIndent(),
+        )
+        val x = parsed.intVarNames.getValue("x")
+        val objective = LinearObjective(intCoefficients = LongArray(parsed.model.numIntVars).also { it[x] = 1L })
+
+        assertIs<OpenTheoryOptimum.Unbounded>(OpenTheoryMinimizer(parsed.model, objective).minimize())
+    }
+
+    @Test
+    fun `an objective bounded only by its disjuncts reaches its optimum`() {
+        val parsed = stepped()
+        val x = parsed.intVarNames.getValue("x")
+        val objective = LinearObjective(intCoefficients = LongArray(parsed.model.numIntVars).also { it[x] = 1L })
+
+        val result = assertIs<OpenTheoryOptimum.Optimal>(OpenTheoryMinimizer(parsed.model, objective).minimize())
+
+        assertEquals("0", result.value.toString())
+    }
+
+    @Test
     fun `an optimum above the 64-bit range is reached rather than refuted`() {
         val parsed = modelOf(
             """

@@ -68,7 +68,7 @@ internal abstract class BufferedBestOutput : OutputProtocol {
         // promises: `;` is an SMT-LIB comment and `c` is one in the competition protocol.
         verdictReason(verdict)?.let { println("$commentPrefix $it") }
         // The buffered model follows a feasible verdict only; UNSAT / UNKNOWN print the status alone.
-        if (verdict == Verdict.SATISFIABLE || verdict == Verdict.OPTIMAL || verdict == Verdict.BEST_FOUND) {
+        if (verdict in FEASIBLE_VERDICTS) {
             best?.let { println(it) }
         }
     }
@@ -84,5 +84,11 @@ internal abstract class BufferedBestOutput : OutputProtocol {
             printStatPairs(commentPrefix, openTheoryStatPairs(stats).filter { (k, _) -> keepStat(k) })
         }
         printStatPairs(commentPrefix, lpStatPairs(stats))
+    }
+
+    private companion object {
+        /** The verdicts that report an assignment: everything but a refutation and a soft stop. */
+        val FEASIBLE_VERDICTS =
+            setOf(Verdict.SATISFIABLE, Verdict.OPTIMAL, Verdict.BEST_FOUND, Verdict.UNBOUNDED)
     }
 }

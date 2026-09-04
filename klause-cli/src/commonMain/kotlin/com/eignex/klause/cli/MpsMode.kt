@@ -121,6 +121,8 @@ internal class MpsOutput(
                 "s SATISFIABLE"
             }
 
+        Verdict.UNBOUNDED -> "s UNBOUNDED"
+
         Verdict.UNSATISFIABLE -> if (hasInnerConstraintApproximation) "s UNKNOWN" else "s UNSATISFIABLE"
 
         Verdict.UNKNOWN -> "s UNKNOWN"
@@ -138,7 +140,7 @@ internal class MpsOutput(
         }
         val constraintQualification = if (hasInnerConstraintApproximation) {
             when (verdict) {
-                Verdict.SATISFIABLE, Verdict.BEST_FOUND, Verdict.OPTIMAL ->
+                Verdict.SATISFIABLE, Verdict.BEST_FOUND, Verdict.OPTIMAL, Verdict.UNBOUNDED ->
                     "satisfying assignment passed the inner constraint approximation"
 
                 Verdict.UNSATISFIABLE -> "inner constraint approximation is infeasible; source boundary is unresolved"

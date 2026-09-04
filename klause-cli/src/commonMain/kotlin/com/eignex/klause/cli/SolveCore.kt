@@ -762,6 +762,13 @@ private fun solveOpenTheoryOptimum(
 
         is OpenTheoryOptimum.Infeasible -> output.onComplete(Verdict.UNSATISFIABLE)
 
+        // The witness is reported like any other solution: it is one, and the verdict beside it says the
+        // objective reaches past it without limit rather than that this is the best value found.
+        is OpenTheoryOptimum.Unbounded -> {
+            output.onSolution(render(result.witness), reported(result.value))
+            output.onComplete(Verdict.UNBOUNDED)
+        }
+
         is OpenTheoryOptimum.Bounded -> {
             val incumbent = result.incumbent
             if (incumbent == null) {
@@ -776,6 +783,7 @@ private fun solveOpenTheoryOptimum(
         val found = when (result) {
             is OpenTheoryOptimum.Optimal -> 1L
             is OpenTheoryOptimum.Infeasible -> 0L
+            is OpenTheoryOptimum.Unbounded -> 1L
             is OpenTheoryOptimum.Bounded -> if (result.incumbent == null) 0L else 1L
         }
         output.onStatistics(result.stats, result.stats.run.wallMs, found)

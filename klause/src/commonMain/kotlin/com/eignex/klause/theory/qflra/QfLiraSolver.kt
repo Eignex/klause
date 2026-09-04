@@ -11,10 +11,15 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.ExactMixedBoundedRow
 import com.eignex.klause.lp.ExactMixedEchelonHermite
 import com.eignex.klause.lp.ExactMixedTriangularBounds
+import com.eignex.klause.lp.add
+import com.eignex.klause.lp.asFraction
 import com.eignex.klause.lp.engine.LpBuilder
 import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.Relation
 import com.eignex.klause.lp.engine.Sense
+import com.eignex.klause.lp.exactColumnLower
+import com.eignex.klause.lp.exactColumnUpper
+import com.eignex.klause.lp.exactComparison
 import com.eignex.klause.lp.exactMixedEchelonHermite
 import com.eignex.klause.lp.exactMixedTriangularBounds
 import com.eignex.klause.simplex.exact.BigFraction
@@ -468,153 +473,30 @@ private class ExactLiraReductionCache(private val model: Problem) {
 
     private fun sourceRows(bools: IntArray, node: SearchNode): List<ExactRationalInequality>? {
         val rows = ArrayList<ExactRationalInequality>()
-        fun add(terms: Map<Int, BigFraction>, rhs: BigFraction, strict: Boolean = false) {
-            val ordered = terms.entries.filter { !it.value.isZero }.sortedBy { it.key }
-            rows.add(
-                ExactRationalInequality(ordered.map { it.key }.toIntArray(), ordered.map { it.value }, rhs, strict),
-            )
-        }
-        fun addLower(column: Int, lower: BigInteger) {
-            add(mapOf(column to BigFraction.MINUS_ONE), BigFraction.of(-lower, BigInteger.ONE))
-        }
-        fun addUpper(column: Int, upper: BigInteger) {
-            add(mapOf(column to BigFraction.ONE), BigFraction.of(upper, BigInteger.ONE))
-        }
         for (integer in 0 until model.numIntVars) {
             val column = model.numRealVars + integer
-            model.intBounds.lowerAsBigInteger(integer)?.let { addLower(column, it) }
-            model.intBounds.upperAsBigInteger(integer)?.let { addUpper(column, it) }
+            model.intBounds.lowerAsBigInteger(integer)?.let { rows += exactColumnLower(column, it.asFraction()) }
+            model.intBounds.upperAsBigInteger(integer)?.let { rows += exactColumnUpper(column, it.asFraction()) }
         }
         for (branch in node.branches) {
             val column = model.numRealVars + branch.variable
-            branch.lower?.let { addLower(column, it) }
-            branch.upper?.let { addUpper(column, it) }
+            branch.lower?.let { rows += exactColumnLower(column, it.asFraction()) }
+            branch.upper?.let { rows += exactColumnUpper(column, it.asFraction()) }
         }
         for (real in 0 until model.numRealVars) {
-            model.realLower[real].takeIf(Double::isFinite)?.let { lower ->
-                add(mapOf(real to BigFraction.MINUS_ONE), requireNotNull(BigFraction.ofDouble(lower)).negated())
-            }
-            model.realUpper[real].takeIf(Double::isFinite)?.let { upper ->
-                add(mapOf(real to BigFraction.ONE), requireNotNull(BigFraction.ofDouble(upper)))
-            }
+            model.realLower[real].takeIf(Double::isFinite)?.let { rows += exactColumnLower(real, it.asFraction()) }
+            model.realUpper[real].takeIf(Double::isFinite)?.let { rows += exactColumnUpper(real, it.asFraction()) }
         }
         for ((index, factor) in model.factors.withIndex()) {
-            when (factor) {
-                is ComparisonClause -> {
-                    val literal = node.comparisonChoices[index] ?: return null
-                    addComparison(rows, factor, literal, node.disequalityDirections[index])
-                }
-
-                else -> {
-                    val row = factor.linearRow() ?: continue
-                    val truth = row.truthUnder(bools) ?: continue
-                    addFactorRow(rows, row, truth, node.disequalityDirections[index])
-                }
+            val comparison = if (factor is ComparisonClause) {
+                factor.exactComparison(model.numRealVars, node.comparisonChoices[index] ?: return null)
+            } else {
+                val row = factor.linearRow() ?: continue
+                row.exactComparison(model.numRealVars, row.truthUnder(bools) ?: continue)
             }
+            comparison.rowsInto(rows, node.disequalityDirections[index])
         }
         return rows
-    }
-
-    private fun addComparison(
-        rows: MutableList<ExactRationalInequality>,
-        clause: ComparisonClause,
-        literal: Int,
-        direction: LinearOp?,
-    ) {
-        val terms = mapOf(model.numRealVars + clause.vars[literal] to BigFraction.ONE)
-        val bound = BigFraction.ofLong(clause.consts[literal])
-        addRelation(rows, terms, clause.ops[literal], bound, strict = false, direction, hasReals = false)
-    }
-
-    private fun addFactorRow(
-        rows: MutableList<ExactRationalInequality>,
-        row: FactorRow,
-        truth: Boolean,
-        direction: LinearOp?,
-    ) {
-        val actualOp = if (truth) row.op else row.op.complemented()
-        val actualStrict = if (truth) row.strict else !row.strict
-        when (row) {
-            is FactorRow.Wide -> {
-                val terms = HashMap<Int, BigFraction>()
-                for (index in row.intVars.indices) {
-                    terms.add(
-                        model.numRealVars + row.intVars[index],
-                        BigFraction.of(row.coefficients[index], BigInteger.ONE),
-                    )
-                }
-                addRelation(rows, terms, actualOp, BigFraction.of(row.bound, BigInteger.ONE), false, direction, false)
-            }
-
-            is FactorRow.Doubles -> {
-                val terms = HashMap<Int, BigFraction>()
-                val integerCoeffs = row.integerCoeffs
-                if (integerCoeffs != null) {
-                    for (index in row.intVars.indices) {
-                        terms.add(model.numRealVars + row.intVars[index], BigFraction.ofLong(integerCoeffs[index]))
-                    }
-                } else {
-                    for (index in row.intVars.indices) {
-                        terms.add(
-                            model.numRealVars + row.intVars[index],
-                            requireNotNull(BigFraction.ofDouble(row.intCoeffs[index])),
-                        )
-                    }
-                }
-                for (index in row.realVars.indices) {
-                    terms.add(row.realVars[index], requireNotNull(BigFraction.ofDouble(row.realCoeffs[index])))
-                }
-                addRelation(
-                    rows,
-                    terms,
-                    actualOp,
-                    row.integerBound?.let(BigFraction::ofLong) ?: requireNotNull(BigFraction.ofDouble(row.bound)),
-                    actualStrict,
-                    direction,
-                    row.realVars.isNotEmpty(),
-                )
-            }
-        }
-    }
-
-    private fun addRelation(
-        rows: MutableList<ExactRationalInequality>,
-        terms: Map<Int, BigFraction>,
-        op: LinearOp,
-        bound: BigFraction,
-        strict: Boolean,
-        direction: LinearOp?,
-        hasReals: Boolean,
-    ) {
-        fun add(terms: Map<Int, BigFraction>, bound: BigFraction, strict: Boolean) {
-            val ordered = terms.entries.filter { !it.value.isZero }.sortedBy { it.key }
-            rows.add(
-                ExactRationalInequality(ordered.map { it.key }.toIntArray(), ordered.map { it.value }, bound, strict),
-            )
-        }
-        fun negate(): Map<Int, BigFraction> = terms.mapValues { (_, value) -> value.negated() }
-        when (op) {
-            LinearOp.LE -> add(terms, bound, strict)
-
-            LinearOp.GE -> add(negate(), bound.negated(), strict)
-
-            LinearOp.EQ -> {
-                add(terms, bound, false)
-                add(negate(), bound.negated(), false)
-            }
-
-            LinearOp.NE -> when (requireNotNull(direction) { "exact disequality direction is missing" }) {
-                LinearOp.LE -> add(terms, if (hasReals) bound else bound - BigFraction.ONE, hasReals)
-
-                LinearOp.GE -> add(
-                    negate(),
-                    if (hasReals) bound.negated() else bound.negated() - BigFraction.ONE,
-                    hasReals,
-                )
-
-                else -> error("exact disequality direction must be an inequality")
-            }
-        }
     }
 }
 
@@ -1375,11 +1257,6 @@ private class ExactGmiCut(val columns: IntArray, val coefficients: DoubleArray, 
 }
 
 private class ExactCutRow(val columns: IntArray, val coefficients: List<BigFraction>, val rhs: BigFraction)
-
-private fun MutableMap<Int, BigFraction>.add(column: Int, value: BigFraction) {
-    val sum = (this[column] ?: BigFraction.ZERO) + value
-    if (sum.isZero) remove(column) else this[column] = sum
-}
 
 private fun BigFraction.fractionalPart(): BigFraction = this - BigFraction.of(floor(), BigInteger.ONE)
 

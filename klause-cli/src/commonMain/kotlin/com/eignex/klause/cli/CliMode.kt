@@ -379,6 +379,9 @@ internal enum class Verdict {
     /** Optimisation: incumbent(s) found but optimality NOT proven (budget/incomplete). */
     BEST_FOUND,
 
+    /** Optimisation: the objective descends without limit, so the model has solutions and no optimum. */
+    UNBOUNDED,
+
     /** No solution exists (only a complete search that ran to completion may report this). */
     UNSATISFIABLE,
 

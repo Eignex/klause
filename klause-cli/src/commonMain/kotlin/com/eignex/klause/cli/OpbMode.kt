@@ -56,7 +56,7 @@ internal class OpbOutput : BufferedBestOutput() {
     override val streamObjective: Boolean = true
 
     override fun statusLine(verdict: Verdict): String = when (verdict) {
-        Verdict.SATISFIABLE, Verdict.BEST_FOUND -> "s SATISFIABLE"
+        Verdict.SATISFIABLE, Verdict.BEST_FOUND, Verdict.UNBOUNDED -> "s SATISFIABLE"
         Verdict.OPTIMAL -> "s OPTIMUM FOUND"
         Verdict.UNSATISFIABLE -> "s UNSATISFIABLE"
         Verdict.UNKNOWN -> "s UNKNOWN"
