@@ -4,9 +4,13 @@ import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.lp.ExactWitness
+import com.eignex.klause.lp.asFraction
+import com.eignex.klause.lp.objectiveUnboundedBelow
 import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.presolve.PresolvePipeline
+import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.incumbent.IncumbentSource
 import com.eignex.klause.solver.incumbent.Publication
 import com.eignex.klause.solver.objective.LinearObjective
@@ -24,7 +28,8 @@ import com.ionspin.kotlin.bignum.integer.BigInteger
  * An integer route states an [Optimal] because an integer optimum, where one exists over a feasible
  * bounded-below model, is attained. A route over the reals needs a case this does not carry: an
  * objective may approach a greatest lower bound it never reaches, and reporting that as optimal would
- * name a value no assignment achieves.
+ * name a value no assignment achieves. An open model needs one more: an objective may be bounded by
+ * nothing at all, which is [Unbounded] and is not a bound on anything.
  */
 sealed interface OpenTheoryOptimum {
 
@@ -42,6 +47,21 @@ sealed interface OpenTheoryOptimum {
 
     /** The model has no feasible assignment, at any objective value. */
     data class Infeasible(override val stats: SolveStats) : OpenTheoryOptimum
+
+    /**
+     * The model is feasible and its objective descends without limit, so it has no optimum.
+     *
+     * [witness] proves the model feasible and [value] is what the objective takes on it. Neither is a
+     * bound: the certificate is a ray of the model along which the objective strictly decreases, so every
+     * value below [value] is attained too.
+     */
+    data class Unbounded(
+        /** An assignment proving the model feasible. */
+        val witness: OpenTheoryAssignment,
+        /** The objective value at [witness]; every value below it is attained as well. */
+        val value: BigInteger,
+        override val stats: SolveStats,
+    ) : OpenTheoryOptimum
 
     /**
      * The budget stopped the descent. [incumbent] is the best assignment proved feasible, so the optimum
@@ -66,6 +86,12 @@ sealed interface OpenTheoryOptimum {
  * objective beats the incumbent. A satisfying answer tightens the row; a refutation proves the incumbent
  * optimal. So the descent needs no optimizing simplex — the route's feasibility answer carries it, and
  * the objective enters as a constraint the route already reasons about.
+ *
+ * A bound tightened by one per round reaches an optimum in as many rounds as there are objective values
+ * between the first witness and it, and an objective unbounded below has no optimum for it to reach at
+ * all. Every witness is therefore also asked for a ray ([objectiveUnboundedBelow]): a direction of its
+ * own branch along which the objective strictly decreases states [OpenTheoryOptimum.Unbounded], where the
+ * descent would otherwise improve until a budget fired.
  *
  * Source-safe preparation runs once, on the model without the bound row: the row is the descent's own,
  * and no source pass reads its constant. The route and the ownership plan are then selected once from
@@ -165,14 +191,29 @@ class OpenTheoryMinimizer internal constructor(
                 is OpenTheoryResult.Sat -> {
                     val value = objective.valueOf(result.assignment)
                     when (val published = incumbents.offer(result.assignment, value)) {
-                        // A constant objective has no row to tighten: its first witness is already
-                        // optimal, and a bound below the constant would exclude every assignment rather
-                        // than a worse one.
-                        is Publication.Installed -> if (terms.isEmpty()) {
-                            return incumbents.proven(result.stats)
-                        } else {
-                            spec = prepared.problem.boundedBy(published.incumbent.objective - BigInteger.ONE)
-                            plan = boundedPlan
+                        is Publication.Installed -> {
+                            val installed = published.incumbent
+                            when {
+                                // A constant objective has no row to tighten: its first witness is
+                                // already optimal, and a bound below the constant would exclude every
+                                // assignment rather than a worse one.
+                                terms.isEmpty() -> return incumbents.proven(result.stats)
+
+                                // A bound row states that nothing feasible sits at the incumbent or
+                                // above it, and a model with a ray has a witness below every such row:
+                                // the descent would improve forever, so it states the verdict instead.
+                                unboundedBelow(prepared.problem, installed.assignment, params) ->
+                                    return OpenTheoryOptimum.Unbounded(
+                                        installed.assignment,
+                                        installed.objective,
+                                        result.stats,
+                                    )
+
+                                else -> {
+                                    spec = prepared.problem.boundedBy(installed.objective - BigInteger.ONE)
+                                    plan = boundedPlan
+                                }
+                            }
                         }
 
                         // A round carrying the row decided the model *plus* the objective held below the
@@ -205,6 +246,21 @@ class OpenTheoryMinimizer internal constructor(
             }
         }
     }
+
+    /**
+     * Whether the objective descends without limit through the branch [witness] lies in.
+     *
+     * Asked of the model without the descent's own row. The row states that nothing feasible sits at the
+     * incumbent or above it, which is a fact about where the descent has reached rather than one about the
+     * model, and the ray the certificate looks for is the model's own.
+     */
+    private fun unboundedBelow(model: Problem, witness: OpenTheoryAssignment, params: TheoryParams): Boolean =
+        model.objectiveUnboundedBelow(
+            terms,
+            coefficients,
+            witness.exactWitness(model.numRealVars),
+            Cancellation { presolveCancellation() || params.cancellation() || params.timeout() },
+        )
 
     /**
      * What the standing incumbent proves once the descent has nothing left to refute: it is optimal, or —
@@ -301,4 +357,48 @@ class OpenTheoryMinimizer internal constructor(
         val LONG_MIN: BigInteger = BigInteger.fromLong(Long.MIN_VALUE)
         val LONG_MAX: BigInteger = BigInteger.fromLong(Long.MAX_VALUE)
     }
+}
+
+/**
+ * A witness read as the exact point a ray certificate takes its branch at.
+ *
+ * The routes carry their values at different widths — a difference witness in `Long`, an exact one in
+ * arbitrary precision — and every one of them is a rational exactly, which is the arithmetic the
+ * certificate reasons in.
+ */
+private fun OpenTheoryAssignment.exactWitness(realColumns: Int): ExactWitness = when (this) {
+    is OpenTheoryAssignment.Difference -> RouteWitness(
+        realColumns,
+        { sample.bools[it] },
+        { sample.reals.getOrElse(it) { 0.0 }.asFraction() },
+        { BigFraction.ofLong(sample.ints[it]) },
+    )
+
+    is OpenTheoryAssignment.ExactLira -> RouteWitness(
+        realColumns,
+        { assignment.bools[it] },
+        { assignment.reals[it] },
+        { assignment.ints[it].asFraction() },
+    )
+
+    // A real-only route has no integer column to read, which only a constant objective may ask of it —
+    // and a constant objective descends along nothing, so no certificate is taken over this witness.
+    is OpenTheoryAssignment.ExactLra -> RouteWitness(
+        realColumns,
+        { assignment.bools[it] },
+        { assignment.reals[it] },
+        { error("a route with no integer column cannot value an objective weighting one") },
+    )
+}
+
+/** One route's witness over the certificate's mixed column space: reals first, then integer columns. */
+private class RouteWitness(
+    private val realColumns: Int,
+    private val bool: (Int) -> Boolean,
+    private val real: (Int) -> BigFraction,
+    private val int: (Int) -> BigFraction,
+) : ExactWitness {
+    override fun at(column: Int): BigFraction = if (column < realColumns) real(column) else int(column - realColumns)
+
+    override fun truth(boolVar: Int): Boolean = bool(boolVar)
 }

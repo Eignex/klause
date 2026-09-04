@@ -47,7 +47,7 @@ internal class DimacsOutput : BufferedBestOutput() {
     override val commentPrefix: String = "c"
 
     override fun statusLine(verdict: Verdict): String = when (verdict) {
-        Verdict.SATISFIABLE, Verdict.OPTIMAL, Verdict.BEST_FOUND -> "s SATISFIABLE"
+        Verdict.SATISFIABLE, Verdict.OPTIMAL, Verdict.BEST_FOUND, Verdict.UNBOUNDED -> "s SATISFIABLE"
         Verdict.UNSATISFIABLE -> "s UNSATISFIABLE"
         Verdict.UNKNOWN -> "s UNKNOWN"
     }

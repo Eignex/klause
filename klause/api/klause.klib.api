@@ -2372,6 +2372,25 @@ sealed interface com.eignex.klause.solver.pipeline/OpenTheoryOptimum { // com.ei
         final fun hashCode(): kotlin/Int // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Optimal.hashCode|hashCode(){}[0]
         final fun toString(): kotlin/String // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Optimal.toString|toString(){}[0]
     }
+
+    final class Unbounded : com.eignex.klause.solver.pipeline/OpenTheoryOptimum { // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Unbounded|null[0]
+        constructor <init>(com.eignex.klause.solver.pipeline/OpenTheoryAssignment, com.ionspin.kotlin.bignum.integer/BigInteger, com.eignex.klause.solver.result/SolveStats) // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Unbounded.<init>|<init>(com.eignex.klause.solver.pipeline.OpenTheoryAssignment;com.ionspin.kotlin.bignum.integer.BigInteger;com.eignex.klause.solver.result.SolveStats){}[0]
+
+        final val stats // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Unbounded.stats|{}stats[0]
+            final fun <get-stats>(): com.eignex.klause.solver.result/SolveStats // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Unbounded.stats.<get-stats>|<get-stats>(){}[0]
+        final val value // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Unbounded.value|{}value[0]
+            final fun <get-value>(): com.ionspin.kotlin.bignum.integer/BigInteger // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Unbounded.value.<get-value>|<get-value>(){}[0]
+        final val witness // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Unbounded.witness|{}witness[0]
+            final fun <get-witness>(): com.eignex.klause.solver.pipeline/OpenTheoryAssignment // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Unbounded.witness.<get-witness>|<get-witness>(){}[0]
+
+        final fun component1(): com.eignex.klause.solver.pipeline/OpenTheoryAssignment // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Unbounded.component1|component1(){}[0]
+        final fun component2(): com.ionspin.kotlin.bignum.integer/BigInteger // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Unbounded.component2|component2(){}[0]
+        final fun component3(): com.eignex.klause.solver.result/SolveStats // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Unbounded.component3|component3(){}[0]
+        final fun copy(com.eignex.klause.solver.pipeline/OpenTheoryAssignment = ..., com.ionspin.kotlin.bignum.integer/BigInteger = ..., com.eignex.klause.solver.result/SolveStats = ...): com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Unbounded // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Unbounded.copy|copy(com.eignex.klause.solver.pipeline.OpenTheoryAssignment;com.ionspin.kotlin.bignum.integer.BigInteger;com.eignex.klause.solver.result.SolveStats){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Unbounded.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Unbounded.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Unbounded.toString|toString(){}[0]
+    }
 }
 
 sealed interface com.eignex.klause.solver.pipeline/OpenTheoryResult { // com.eignex.klause.solver.pipeline/OpenTheoryResult|null[0]

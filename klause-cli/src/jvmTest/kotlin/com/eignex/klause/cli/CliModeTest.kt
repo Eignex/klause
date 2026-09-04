@@ -1141,6 +1141,37 @@ class CliModeTest {
     }
 
     @Test
+    fun `an objective no row bounds below reports unbounded rather than a best value`() {
+        // A free integer column costed downwards: reporting `s SATISFIABLE` beside it would say only that
+        // the descent stopped, which is the one thing that did not happen.
+        val mps = File.createTempFile("cliunbounded", ".mps").apply {
+            writeText(
+                """
+                NAME          UNBOUNDED
+                ROWS
+                 N  COST
+                 L  ROW
+                COLUMNS
+                    MK1       'MARKER'                 'INTORG'
+                    X         COST           1.0
+                    X         ROW            1.0
+                    MK2       'MARKER'                 'INTEND'
+                RHS
+                    RHS       ROW            9.0
+                BOUNDS
+                 FR BND       X
+                ENDATA
+                """.trimIndent(),
+            )
+            deleteOnExit()
+        }
+
+        val out = capture { main(arrayOf(mps.absolutePath)) }
+
+        assertTrue("s UNBOUNDED" in out, out)
+    }
+
+    @Test
     fun `an unbounded model refuted over its true ranges reports unsat, not unknown`() {
         // x - y <= -1 and y - x <= -1 sum to 0 <= -2, with neither variable bounded anywhere. The
         // refutation owes nothing to the finite search box, so softening it to `unknown` would be

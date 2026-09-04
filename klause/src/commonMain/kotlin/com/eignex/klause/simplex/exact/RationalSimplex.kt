@@ -260,13 +260,10 @@ internal class ExactRationalFeasibilityModel(
 /**
  * Classify the row directions that are bounded by an exact homogeneous cone.
  *
- * A row `a*x <= b` has a finite lower activity bound precisely when the recession cone contains no
- * direction `d` with `a*d < 0`.  Since the cone is rational and homogeneous, such a direction exists
- * exactly when `A*d <= 0` together with `a*d <= -1` is feasible.  The test therefore needs no numeric
- * search radius and remains valid for coefficients and rational literals of arbitrary precision.
+ * A row `a*x <= b` has a finite lower activity bound precisely when its own activity descends along no
+ * direction of the recession cone ([exactDescendingDirection]).
  *
- * Strictness is intentionally ignored here: it changes feasible offsets, not the recession cone.  A
- * `null` result means cancellation or an interrupted exact simplex run; callers must keep the source
+ * A `null` result means cancellation or an interrupted exact simplex run; callers must keep the source
  * system rather than treating an undecided direction as bounded.
  */
 internal fun exactBoundedRows(
@@ -277,22 +274,42 @@ internal fun exactBoundedRows(
     val bounded = BooleanArray(rows.size)
     for (target in rows.indices) {
         if (cancellation()) return null
-        val coneRows = ArrayList<ExactRationalInequality>(rows.size + 1)
-        for (row in rows) coneRows.add(row.homogeneousOverSplit(variables, BigFraction.ZERO))
-        coneRows.add(rows[target].homogeneousOverSplit(variables, BigFraction.MINUS_ONE))
-        when (
-            bigRationalOutcome(
-                ExactRationalFeasibilityModel(2 * variables, coneRows),
-                cancellation,
-                Int.MAX_VALUE,
-            ).feasibility
-        ) {
-            RationalFeasibility.INFEASIBLE -> bounded[target] = true
-            RationalFeasibility.FEASIBLE -> Unit
-            RationalFeasibility.UNKNOWN -> return null
-        }
+        bounded[target] = !(exactDescendingDirection(rows, rows[target], variables, cancellation) ?: return null)
     }
     return bounded
+}
+
+/**
+ * Whether the recession cone of [rows] carries a direction along which [activity] strictly decreases,
+ * or `null` when the exact run was cut short.
+ *
+ * Such a direction exists exactly when `A*d <= 0` together with `a*d <= -1` is feasible, so the test
+ * needs no numeric search radius and remains valid for coefficients and rational literals of arbitrary
+ * precision. Strictness is intentionally ignored: it changes feasible offsets, not the recession cone.
+ *
+ * The affirmative answer is what a caller can build on. A cone direction is a ray of the system itself,
+ * so an activity that descends along one is unbounded below over every point of it.
+ */
+internal fun exactDescendingDirection(
+    rows: List<ExactRationalInequality>,
+    activity: ExactRationalInequality,
+    variables: Int,
+    cancellation: Cancellation = Cancellation.Never,
+): Boolean? {
+    val coneRows = ArrayList<ExactRationalInequality>(rows.size + 1)
+    for (row in rows) coneRows.add(row.homogeneousOverSplit(variables, BigFraction.ZERO))
+    coneRows.add(activity.homogeneousOverSplit(variables, BigFraction.MINUS_ONE))
+    return when (
+        bigRationalOutcome(
+            ExactRationalFeasibilityModel(2 * variables, coneRows),
+            cancellation,
+            Int.MAX_VALUE,
+        ).feasibility
+    ) {
+        RationalFeasibility.FEASIBLE -> true
+        RationalFeasibility.INFEASIBLE -> false
+        RationalFeasibility.UNKNOWN -> null
+    }
 }
 
 /** One source row together with the finite lower activity that makes it double-bounded. */
