@@ -154,6 +154,42 @@ class CumulativeRelaxationTest {
         assertTrue(!CumulativeRelaxation(p).applicable, "no verified makespan ⇒ no plan")
     }
 
+    /** Two unit-demand tasks of length 2 under a *variable* capacity: ints 0..1 are the starts, 2 the
+     *  makespan (linked by `M ≥ startᵢ + 2`), 3 the capacity variable. [openCapacityAbove] marks the
+     *  capacity's upper endpoint as one the finite lane invented rather than one the model states. */
+    private fun variableCapacityProblem(openCapacityAbove: Boolean): Problem = Problem(
+        numBoolVars = 0,
+        numIntVars = 4,
+        intDomains = arrayOf(IntDomain(0, 20), IntDomain(0, 20), IntDomain(0, 20), IntDomain(1, 1)),
+        factors = arrayOf<Factor>(
+            Linear(intArrayOf(1, -1), intArrayOf(2, 0), LinearOp.GE, 2),
+            Linear(intArrayOf(1, -1), intArrayOf(2, 1), LinearOp.GE, 2),
+            Cumulative(
+                starts = intArrayOf(0, 1),
+                durations = longArrayOf(2, 2),
+                resources = longArrayOf(1, 1),
+                capacity = 1,
+                capacityVar = 3,
+            ),
+        ),
+        openIntHi = booleanArrayOf(false, false, false, openCapacityAbove),
+    )
+
+    @Test
+    fun `a capacity variable the model leaves open above yields no plan`() {
+        // The energetic row weighs the counted energy against the declared capacity ceiling. Over a
+        // capacity the model leaves open above there is no ceiling to weigh it against — the box's
+        // endpoint would state a resource limit the model never declared.
+        assertTrue(
+            CumulativeRelaxation(variableCapacityProblem(openCapacityAbove = false)).applicable,
+            "a declared capacity ceiling yields the energetic plan",
+        )
+        assertTrue(
+            !CumulativeRelaxation(variableCapacityProblem(openCapacityAbove = true)).applicable,
+            "an invented capacity ceiling must not stand in for a declared one",
+        )
+    }
+
     @Test
     fun `variable durations and optional tasks are skipped`() {
         // durationVars present ⇒ the M ≥ startᵢ + durᵢ link is not a two-variable linear; skip (sound).

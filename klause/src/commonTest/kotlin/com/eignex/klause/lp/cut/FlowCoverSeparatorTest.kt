@@ -23,13 +23,20 @@ import kotlin.test.assertTrue
 class FlowCoverSeparatorTest {
 
     /** `n` flow vars `y₀..` (ints 0..n−1, domain `[0,u]`) + indicators `x₀..` (ints n..2n−1, `{0,1}`),
-     *  with VUBs `yⱼ ≤ u·xⱼ` and the capacity row `Σ yⱼ ≤ b`. */
-    private fun flowProblem(n: Int, u: Int, b: Int): Problem {
+     *  with VUBs `yⱼ ≤ u·xⱼ` and the capacity row `Σ yⱼ ≤ b`. [openFlowAbove] marks each flow column's
+     *  upper endpoint as one the finite lane invented rather than one the model states. */
+    private fun flowProblem(n: Int, u: Int, b: Int, openFlowAbove: Boolean = false): Problem {
         val domains = Array(2 * n) { if (it < n) IntDomain(0, u.toLong()) else IntDomain(0, 1) }
         val factors = ArrayList<Factor>()
         for (j in 0 until n) factors.add(Linear(intArrayOf(1, -u), intArrayOf(j, n + j), LinearOp.LE, 0))
         factors.add(Linear(IntArray(n) { 1 }, IntArray(n) { it }, LinearOp.LE, b))
-        return Problem(0, 2 * n, domains, factors.toTypedArray())
+        return Problem(
+            numBoolVars = 0,
+            numIntVars = 2 * n,
+            intDomains = domains,
+            factors = factors.toTypedArray(),
+            openIntHi = BooleanArray(2 * n) { openFlowAbove && it < n },
+        )
     }
 
     /** Separate flow-cover cuts at the LP point that maximizes total flow (which makes the `xⱼ` fractional). */
@@ -118,6 +125,15 @@ class FlowCoverSeparatorTest {
         // 3 arcs of capacity 3 into a node of capacity 4: max flow 4 opens all three fractionally.
         val (cuts, _) = cutsAtMaxFlow(flowProblem(n = 3, u = 3, b = 4), n = 3)
         assertTrue(cuts.isNotEmpty(), "expected a flow-cover cut on the fractional max-flow LP point")
+    }
+
+    @Test
+    fun `a flow variable the model leaves open above yields no cut`() {
+        // Same instance, but each arc's upper endpoint is one the finite lane invented. The cover
+        // inequality reads it as the arc's capacity and is published globally, so it may not be
+        // derived at all — the box bounds the search, not the model.
+        val (cuts, _) = cutsAtMaxFlow(flowProblem(n = 3, u = 3, b = 4, openFlowAbove = true), n = 3)
+        assertTrue(cuts.isEmpty(), "an invented flow ceiling must not become a flow-cover capacity")
     }
 
     @Test

@@ -35,6 +35,10 @@ import com.eignex.klause.lp.engine.Relation
 import com.eignex.klause.lp.engine.Sense
 import com.eignex.klause.lp.engine.solveAndCertify
 import com.eignex.klause.lp.lpHullEnabled
+import com.eignex.klause.lp.rootDomainOf
+import com.eignex.klause.lp.statesBinary
+import com.eignex.klause.lp.statesLowerBound
+import com.eignex.klause.lp.statesUpperBound
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
@@ -207,7 +211,7 @@ internal interface RelaxationDomains {
  *  and every Boolean free. Reads endpoints only, so building a relaxation from it never triggers the
  *  O(domain span) bake fixpoint a [PropagationSession] runs on construction. */
 internal class RootDomains(private val problem: Problem) : RelaxationDomains {
-    override fun intDomain(varId: Int): IntDomain = problem.finiteIntDomain(varId)
+    override fun intDomain(varId: Int): IntDomain = problem.rootDomainOf(varId)
     override fun boolValue(varId: Int): Boolean? = null
     override val honorsOpenSides: Boolean get() = true
 }
@@ -610,11 +614,15 @@ internal class CpToLpRelaxation(
         private fun buildArcModel(succ: IntArray, selfLoops: Boolean, sec: Boolean) {
             val n = succ.size
             if (n < 2) return
+            // The layout enumerates each successor's root box, and the degree rows then confine the
+            // column to the heads enumerated. Over a side the model left open that box is a search
+            // restriction, so the rows would refute successors the model admits — decline instead.
+            if (succ.any { !problem.statesLowerBound(it) || !problem.statesUpperBound(it) }) return
             // Gate on the candidate-arc total — the LP column count — not on n, so large sparse
             // graphs (small per-node successor domains) are not skipped by a blunt node cap.
             var arcCount = 0
             for (i in 0 until n) {
-                problem.requireFiniteIntDomains()[succ[i]].values.forEach { j ->
+                declaredDomain(succ[i]).values.forEach { j ->
                     if ((selfLoops || j != i.toLong()) && j >= 0 &&
                         j < n
                     ) {
@@ -633,7 +641,7 @@ internal class CpToLpRelaxation(
                 val outCols = IntArrayList()
                 val chanCols = IntArrayList()
                 val chanCoef = IntArrayList()
-                problem.requireFiniteIntDomains()[succ[i]].values.forEach { j ->
+                declaredDomain(succ[i]).values.forEach { j ->
                     if ((!selfLoops && j == i.toLong()) || j < 0 || j >= n) return@forEach
                     val jn = j.toInt() // validated node index in [0, n)
                     val present = live.contains(j)
@@ -984,13 +992,7 @@ internal class CpToLpRelaxation(
                 val row = f.integerConstants ?: continue
                 if (f.vars.size < 2 || f.vars.size > MAX_RLT_ROW) continue
                 if (row.bound < 0 || f.vars.indices.any { row.coeff(it) <= 0 }) continue
-                if (f.vars.any {
-                        problem.requireFiniteIntDomains()[it].min != 0L ||
-                            problem.requireFiniteIntDomains()[it].max != 1L
-                    }
-                ) {
-                    continue
-                }
+                if (f.vars.any { !problem.statesBinary(it) }) continue
                 val b = row.bound
                 for (iIdx in f.vars.indices) {
                     if (rltColumns >= MAX_RLT_COLUMNS) break
@@ -1091,7 +1093,7 @@ internal class CpToLpRelaxation(
 
         override fun liveBool(boolVar: Int): Boolean? = domains.boolValue(boolVar)
 
-        override fun declaredDomain(intVar: Int): IntDomain = problem.requireFiniteIntDomains()[intVar]
+        override fun declaredDomain(intVar: Int): IntDomain = problem.rootDomainOf(intVar)
 
         override fun row(columns: IntArray, coeffs: LongArray, op: LinearOp, rhs: Long, contribution: Contribution) {
             if (skipRow(contribution)) return
@@ -1155,7 +1157,7 @@ internal class CpToLpRelaxation(
                 if (c == 0L) continue
                 val v = colVarId[col]
                 val dom = domains.intDomain(v)
-                val dec = problem.requireFiniteIntDomains()[v]
+                val dec = declaredDomain(v)
                 if ((c >= 0L) == maxSide) {
                     if (dom.max != dec.max) {
                         pv.add(v)

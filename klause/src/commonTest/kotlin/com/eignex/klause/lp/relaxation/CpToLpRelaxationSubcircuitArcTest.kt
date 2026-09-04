@@ -27,7 +27,9 @@ import kotlin.test.assertTrue
  */
 class CpToLpRelaxationSubcircuitArcTest {
 
-    private fun problem(): Problem = Problem(
+    /** [openSuccAbove] marks `succ[0]`'s upper endpoint as one the finite lane invented rather than one
+     *  the model states. */
+    private fun problem(openSuccAbove: Boolean = false): Problem = Problem(
         numBoolVars = 0,
         numIntVars = 4,
         intDomains = Array(4) { IntDomain(0, 3) },
@@ -36,6 +38,7 @@ class CpToLpRelaxationSubcircuitArcTest {
             // Force node 0 into the cycle (succ[0] != 0) via a relaxable bound, so the optimum is non-trivial.
             Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 1),
         ),
+        openIntHi = BooleanArray(4) { openSuccAbove && it == 0 },
     )
 
     private val objective = LinearObjective(intCoefficients = longArrayOf(1L, 0L, 0L, 0L)) // minimize succ[0]
@@ -49,6 +52,16 @@ class CpToLpRelaxationSubcircuitArcTest {
         // No subtour model is registered for a subcircuit (the Hamiltonian SEC would be unsound).
         assertTrue(r.circuitArcs.isEmpty(), "subcircuit must not register a subtour-elimination arc model")
         assertNotNull(RevisedSimplex(r.model).solve(), "the permutation relaxation is feasible")
+    }
+
+    @Test
+    fun `a successor the model leaves open gets no arc model`() {
+        // The layout enumerates each successor's root box and the degree rows then confine the column to
+        // the heads enumerated, so over an invented endpoint the rows would refute successors the model
+        // admits. Every column left backs a CP variable — none is an arc.
+        val p = problem(openSuccAbove = true)
+        val r = CpToLpRelaxation(p, objective, circuitArcs = true).build(PropagationSession(p))
+        assertTrue(r.colVarId.all { it >= 0 }, "an open-sided successor must contribute no arc columns")
     }
 
     @Test

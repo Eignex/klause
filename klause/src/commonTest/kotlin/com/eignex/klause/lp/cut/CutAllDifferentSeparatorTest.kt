@@ -18,7 +18,12 @@ import kotlin.test.assertTrue
 /** #22: the AllDifferent Hall-set cut separator. */
 class CutAllDifferentSeparatorTest {
 
-    private fun setup(domainMin: Int, domainMax: Int, n: Int): Triple<Problem, LpRelaxation, FloatLpResult> {
+    private fun setup(
+        domainMin: Int,
+        domainMax: Int,
+        n: Int,
+        openAbove: Boolean = false,
+    ): Triple<Problem, LpRelaxation, FloatLpResult> {
         val p = Problem(
             numBoolVars = 0,
             numIntVars = n,
@@ -30,6 +35,7 @@ class CutAllDifferentSeparatorTest {
                     domainSize = domainMax - domainMin + 1,
                 ),
             ),
+            openIntHi = BooleanArray(n) { openAbove && it == 0 },
         )
         val session = PropagationSession(p)
         val obj = LinearObjective(intCoefficients = LongArray(n) { 1L })
@@ -50,6 +56,23 @@ class CutAllDifferentSeparatorTest {
         assertEquals(3L, geCut.rhs)
         assertEquals(3, geCut.cols.size)
         assertTrue(geCut.coeffs.all { it == 1L })
+    }
+
+    @Test
+    fun `hall cut over an invented endpoint is not global`() {
+        // The Hall bound reads the live intervals, and at the root those equal the root box — but one
+        // column's box closed a side the model left open, so the bound holds inside the box only.
+        val (open, openRelaxation, openSolution) = setup(0, 5, 3, openAbove = true)
+        val openCut = AllDifferentSeparator()
+            .separate(CutContext(open, openRelaxation, openSolution.primal, PropagationSession(open)))
+            .first { it.rel == Relation.GE }
+        assertTrue(!openCut.global, "a bound leaning on an invented endpoint must not be published global")
+
+        val (p, relaxation, solution) = setup(0, 5, 3)
+        val cut = AllDifferentSeparator()
+            .separate(CutContext(p, relaxation, solution.primal, PropagationSession(p)))
+            .first { it.rel == Relation.GE }
+        assertTrue(cut.global, "the same bound over declared intervals is global")
     }
 
     @Test

@@ -6,6 +6,9 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.engine.Cut
 import com.eignex.klause.lp.engine.Relation
+import com.eignex.klause.lp.rootDomainOf
+import com.eignex.klause.lp.statesBinary
+import com.eignex.klause.lp.statesUpperBound
 import com.eignex.klause.solver.UnitConsts
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.MutableIntIntMap
@@ -47,12 +50,12 @@ internal class FlowCoverSeparator : CutSeparator {
             val row = f.integerConstants ?: continue
             if (row.bound != 0L) continue
             val (y, x, u) = matchVub(f.vars, row) ?: continue
-            if (problem.requireFiniteIntDomains()[x].min != 0L ||
-                problem.requireFiniteIntDomains()[x].max != 1L
-            ) {
-                continue // xⱼ ∈ {0,1}
-            }
-            val cap = minOf(u, problem.requireFiniteIntDomains()[y].max) // effective flow when xⱼ = 1
+            if (!problem.statesBinary(x)) continue // xⱼ ∈ {0,1}
+            // The cover inequality reads capⱼ as a ceiling on the flow, and it is emitted globally. Over a
+            // flow the model leaves open above the root box supplies that ceiling, which bounds the search
+            // and not the model — so the arc is declined rather than capped there.
+            if (!problem.statesUpperBound(y)) continue
+            val cap = minOf(u, problem.rootDomainOf(y).max) // effective flow when xⱼ = 1
             if (cap <= 0L) continue
             indicator.put(y, x)
             vubCap.put(y, cap)
@@ -103,8 +106,7 @@ internal class FlowCoverSeparator : CutSeparator {
     private fun implicitArcs(vars: IntArray, row: IntegerConstants, problem: Problem, intColOf: IntArray): List<Arc>? {
         for (i in vars.indices) {
             if (row.coeff(i) <= 0) return null
-            val d = problem.requireFiniteIntDomains()[vars[i]]
-            if (d.min != 0L || d.max != 1L || intColOf[vars[i]] < 0) return null
+            if (!problem.statesBinary(vars[i]) || intColOf[vars[i]] < 0) return null
         }
         return vars.indices.map { i ->
             val col = intColOf[vars[i]]
