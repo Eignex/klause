@@ -1,6 +1,6 @@
 package com.eignex.klause.count
 
-import com.eignex.klause.ir.Problem
+import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.Sample
 import kotlin.math.ceil
 import kotlin.math.floor
@@ -22,59 +22,62 @@ import kotlin.random.Random
  */
 internal object UniGen {
 
-    fun samples(problem: Problem, config: SamplingConfig, cheapFallback: () -> Sequence<Sample>): Sequence<Sample> =
-        sequence {
-            val ctx = CellContext.resolve(problem, config.samplingSet, config.intSamplingSet)
-            val kappa = config.tolerance
-            val pivot = ceil(4.03 * (1.0 + 1.0 / kappa) * (1.0 + 1.0 / kappa)).toInt()
-            val loThresh = floor(pivot / (1.0 + kappa)).toInt().coerceAtLeast(1)
-            val hiThresh = ceil(1.0 + (1.0 + kappa) * pivot).toInt()
+    fun samples(
+        problem: BakedProblem,
+        config: SamplingConfig,
+        cheapFallback: () -> Sequence<Sample>,
+    ): Sequence<Sample> = sequence {
+        val ctx = CellContext.resolve(problem, config.samplingSet, config.intSamplingSet)
+        val kappa = config.tolerance
+        val pivot = ceil(4.03 * (1.0 + 1.0 / kappa) * (1.0 + 1.0 / kappa)).toInt()
+        val loThresh = floor(pivot / (1.0 + kappa)).toInt().coerceAtLeast(1)
+        val hiThresh = ceil(1.0 + (1.0 + kappa) * pivot).toInt()
 
-            // One-shot count estimate to pick the number of hashes.
-            val estimate = ApproxMC.run(
-                problem,
-                ApproxCountConfig(
-                    epsilon = config.countEpsilon,
-                    delta = config.countDelta,
-                    samplingSet = config.samplingSet,
-                    intSamplingSet = config.intSamplingSet,
-                    seed = config.seed,
-                ),
-            )
-            val count = estimate.estimate
-            if (count == 0L) return@sequence // UNSAT projection: no samples
+        // One-shot count estimate to pick the number of hashes.
+        val estimate = ApproxMC.run(
+            problem,
+            ApproxCountConfig(
+                epsilon = config.countEpsilon,
+                delta = config.countDelta,
+                samplingSet = config.samplingSet,
+                intSamplingSet = config.intSamplingSet,
+                seed = config.seed,
+            ),
+        )
+        val count = estimate.estimate
+        if (count == 0L) return@sequence // UNSAT projection: no samples
 
-            var seedCounter = config.seed ?: Random.Default.nextLong()
+        var seedCounter = config.seed ?: Random.Default.nextLong()
 
-            // Small enough to sample exactly-uniformly with no hashing — but gate on the real
-            // bounded enumeration, not the lossy ε=0.8 estimate: a capped set is a search-order-biased
-            // truncation, so fall through to hashing rather than sample it.
-            if (count <= hiThresh) {
-                val all = cellCount(ctx, hashes = emptyList(), cap = hiThresh)
-                if (!all.capped) {
-                    if (all.representatives.isEmpty()) return@sequence
-                    while (true) {
-                        val rng = Random(seedCounter++)
-                        yield(all.representatives[rng.nextInt(all.representatives.size)])
-                    }
-                }
-            }
-
-            // Otherwise hash down to a cell in the target band, then pick uniformly within it.
-            val mStar = (log2(count.toDouble()) - log2(pivot.toDouble())).roundToInt().coerceAtLeast(0)
-            var consecutiveRejects = 0
-            while (true) {
-                val s = drawOne(ctx, mStar, loThresh, hiThresh, seedCounter++)
-                if (s != null) {
-                    consecutiveRejects = 0
-                    yield(s)
-                } else if (++consecutiveRejects >= MAX_CONSECUTIVE_REJECTS) {
-                    // Hashing can't find an in-band cell (highly skewed count or hard slices).
-                    // Fall back to the cheap path rather than spin forever.
-                    yieldAll(cheapFallback())
+        // Small enough to sample exactly-uniformly with no hashing — but gate on the real
+        // bounded enumeration, not the lossy ε=0.8 estimate: a capped set is a search-order-biased
+        // truncation, so fall through to hashing rather than sample it.
+        if (count <= hiThresh) {
+            val all = cellCount(ctx, hashes = emptyList(), cap = hiThresh)
+            if (!all.capped) {
+                if (all.representatives.isEmpty()) return@sequence
+                while (true) {
+                    val rng = Random(seedCounter++)
+                    yield(all.representatives[rng.nextInt(all.representatives.size)])
                 }
             }
         }
+
+        // Otherwise hash down to a cell in the target band, then pick uniformly within it.
+        val mStar = (log2(count.toDouble()) - log2(pivot.toDouble())).roundToInt().coerceAtLeast(0)
+        var consecutiveRejects = 0
+        while (true) {
+            val s = drawOne(ctx, mStar, loThresh, hiThresh, seedCounter++)
+            if (s != null) {
+                consecutiveRejects = 0
+                yield(s)
+            } else if (++consecutiveRejects >= MAX_CONSECUTIVE_REJECTS) {
+                // Hashing can't find an in-band cell (highly skewed count or hard slices).
+                // Fall back to the cheap path rather than spin forever.
+                yieldAll(cheapFallback())
+            }
+        }
+    }
 
     /** Give up on rejection sampling after this many consecutive out-of-band draws. */
     private const val MAX_CONSECUTIVE_REJECTS = 64

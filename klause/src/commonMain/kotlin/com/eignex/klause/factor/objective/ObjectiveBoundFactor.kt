@@ -5,7 +5,6 @@ import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.FactorKind
 import com.eignex.klause.ir.KeySink
 import com.eignex.klause.ir.MixedVars
-import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.StructuralKey
 import com.eignex.klause.ir.VarList
 import com.eignex.klause.ir.VarRemap
@@ -14,6 +13,7 @@ import com.eignex.klause.ir.materializeKey
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.MoveSink
+import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.NoPropagator
 import com.eignex.klause.propagation.withAppendedFactor
 import com.eignex.klause.solver.objective.LinearObjective
@@ -26,9 +26,9 @@ import com.eignex.klause.solver.objective.LinearObjective
  * entries, nothing more.
  */
 internal fun objectiveBoundOverlay(
-    problem: Problem,
+    problem: BakedProblem,
     objective: LinearObjective,
-): Pair<Problem, MutableObjectiveBound>? {
+): Pair<BakedProblem, MutableObjectiveBound>? {
     val bound = MutableObjectiveBound(objective.constant)
     val factor = ObjectiveBoundFactor.of(objective, bound) ?: return null
     return problem.withAppendedFactor(factor) to bound

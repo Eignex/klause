@@ -9,7 +9,6 @@ import com.eignex.klause.backtrack.selector.IndomainBest
 import com.eignex.klause.backtrack.selector.SolutionGuided
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Lit
-import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.bounding.LpEngine
 import com.eignex.klause.lp.bounding.harvestRootCuts
 import com.eignex.klause.lp.bounding.rootLpRelaxationBound
@@ -18,6 +17,7 @@ import com.eignex.klause.lp.bounding.shaveVariableBounds
 import com.eignex.klause.lp.engine.LpVerdict
 import com.eignex.klause.lp.relaxation.leafRealFeasibility
 import com.eignex.klause.propagation.Assumptions
+import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.ConflictAnalyzer.AnalysisResult.LearnedConstraint
 import com.eignex.klause.propagation.CpBranching
 import com.eignex.klause.propagation.CpSearchComponent
@@ -102,7 +102,7 @@ internal class ResumableMinimize(
     // ways this one engine is driven.
     private val pausable: Boolean = true,
 ) : ResumableSearch {
-    private val problem: Problem = solver.problem
+    private val problem: BakedProblem = solver.problem
 
     /** Set when a leaf's residual continuous LP was neither certified feasible nor infeasible, so an
      *  exhausted search with no incumbent must report `unknown` rather than Infeasible. */

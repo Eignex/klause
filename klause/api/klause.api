@@ -589,8 +589,8 @@ public final class com/eignex/klause/brute/BruteForceSolver : com/eignex/klause/
 }
 
 public final class com/eignex/klause/brute/BruteForceSolver$Companion {
-	public final fun fits (Lcom/eignex/klause/ir/Problem;J)Z
-	public static synthetic fun fits$default (Lcom/eignex/klause/brute/BruteForceSolver$Companion;Lcom/eignex/klause/ir/Problem;JILjava/lang/Object;)Z
+	public final fun fits (Lcom/eignex/klause/propagation/BakedProblem;J)Z
+	public static synthetic fun fits$default (Lcom/eignex/klause/brute/BruteForceSolver$Companion;Lcom/eignex/klause/propagation/BakedProblem;JILjava/lang/Object;)Z
 }
 
 public final class com/eignex/klause/compile/CompiledSchema {
@@ -7678,6 +7678,7 @@ public final class com/eignex/klause/propagation/PropagationSession {
 	public final fun popToLevel (I)V
 	public final fun popUntilUnpinned (Lcom/eignex/klause/propagation/VarKind;I)V
 	public final fun reseedFrom (Lcom/eignex/klause/propagation/Assumptions;)Lcom/eignex/klause/propagation/PropagationResult;
+	public final fun rootIntDomain (I)Lcom/eignex/klause/ir/IntDomain;
 	public final fun seed (Lcom/eignex/klause/propagation/Assumptions;)Lcom/eignex/klause/propagation/PropagationResult;
 	public final fun setUnassignListener (Lkotlin/jvm/functions/Function1;)V
 }

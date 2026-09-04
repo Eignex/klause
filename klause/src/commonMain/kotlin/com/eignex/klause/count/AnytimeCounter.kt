@@ -2,9 +2,8 @@ package com.eignex.klause.count
 
 import com.eignex.klause.backtrack.BacktrackPresets
 import com.eignex.klause.backtrack.BacktrackSolver
-import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.Assumptions
-import com.eignex.klause.propagation.bake
+import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.util.EmptyIntArray
 import kotlin.math.ceil
@@ -33,7 +32,7 @@ internal object AnytimeCounter {
 
     private class Node(val depth: Int, val bools: Map<Int, Boolean>, val ints: Map<Int, Long>)
 
-    fun run(problem: Problem, config: ExactCountConfig): Sequence<Count> = sequence {
+    fun run(problem: BakedProblem, config: ExactCountConfig): Sequence<Count> = sequence {
         val boolVars = config.samplingSet
             ?: if (config.intSamplingSet == null) problem.allBoolVars() else EmptyIntArray
         val intVars = config.intSamplingSet
@@ -49,12 +48,12 @@ internal object AnytimeCounter {
             ) {
                 2.0
             } else {
-                problem.requireFiniteIntDomains()[intVars[d - boolVars.size]].valueCount.toDouble()
+                problem.rootIntDomain(intVars[d - boolVars.size]).valueCount.toDouble()
             }
             suffix[d] = sizeAtD * suffix[d + 1]
         }
 
-        val solver = BacktrackSolver(problem.bake())
+        val solver = BacktrackSolver(problem)
         var checks = 0L
         var lower = 0L
         var openMass = 0.0 // Σ suffix[node.depth] over feasible-but-unexpanded nodes
@@ -130,8 +129,8 @@ internal object AnytimeCounter {
         maxDecisions = config.maxDecisionsPerCheck,
     )
 
-    private fun valuesOf(problem: Problem, intVar: Int): List<Long> {
-        val span = problem.requireFiniteIntDomains()[intVar].span()
+    private fun valuesOf(problem: BakedProblem, intVar: Int): List<Long> {
+        val span = problem.rootIntDomain(intVar).span()
         return List(span.size) { span.valueAt(it) }
     }
 

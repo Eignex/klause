@@ -1,6 +1,6 @@
 package com.eignex.klause.backtrack
 
-import com.eignex.klause.ir.Problem
+import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.objective.SingleIntObjective
 import kotlin.math.ceil
@@ -17,7 +17,7 @@ import kotlin.math.ceil
  * engine. Mutates the shared [PropagationSession] via `imply*` (monotone, sound tightenings).
  */
 internal class PortfolioBoundExchange(
-    private val problem: Problem,
+    private val problem: BakedProblem,
     private val session: PropagationSession,
     private val params: BacktrackParams,
     private val singleObj: SingleIntObjective?,
@@ -63,14 +63,14 @@ internal class PortfolioBoundExchange(
         }
     }
 
-    /** Publish this arm's root variable tightenings (any narrowed past the declared domain). */
+    /** Publish this arm's root variable tightenings (any narrowed past its root domain). */
     fun publishGlobalVarBounds() {
         val sink = params.globalVarBoundSink ?: return
         if (session.decisionLevel != 0) return
         for (v in 0 until problem.numIntVars) {
             val d = session.intDomain(v)
-            val declared = problem.requireFiniteIntDomains()[v]
-            if (d.min > declared.min || d.max < declared.max) sink(v, d.min, d.max)
+            val root = problem.rootIntDomain(v)
+            if (d.min > root.min || d.max < root.max) sink(v, d.min, d.max)
         }
     }
 }

@@ -1,6 +1,7 @@
 package com.eignex.klause.propagation
 
 import com.eignex.klause.ir.Factor
+import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.util.Cancellation
 
@@ -51,11 +52,21 @@ internal val Problem.propagationCancellation: Cancellation
 internal val Problem.isFoldedPropagationView: Boolean
     get() = (this as? BakedProblem)?.alreadyFolded == true
 
+/**
+ * The finite domains an engine seeds its own root state from.
+ *
+ * A projection hands back the array its fold owns, so seeding a state costs no copy on the paths that
+ * build one per probe. Raw model data has no fold to read, and materializes the declared value sets
+ * instead — which is what the projection itself was built from.
+ */
+internal val Problem.finiteRootDomains: Array<IntDomain>
+    get() = (this as? BakedProblem)?.foldedIntDomains ?: finiteIntDomains()
+
 /** Append a root-inert factor to an already baked propagation projection. */
 internal fun Problem.withAppendedFactor(extra: Factor): BakedProblem = BakedProblem(
     numBoolVars = numBoolVars,
     numIntVars = numIntVars,
-    intDomains = requireFiniteIntDomains(),
+    intDomains = finiteRootDomains,
     factors = factors + extra,
     seedDeductions = baked,
     cancellation = propagationCancellation,

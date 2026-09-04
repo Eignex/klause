@@ -3,6 +3,7 @@ package com.eignex.klause.count
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.ir.Factor
+import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.bake
@@ -15,11 +16,27 @@ class XorHashFamilyTest {
     @Test
     fun `hashed problem enumerates a non-empty cell`() {
         // 9 free vars (512 models). 4 parity hashes should carve out roughly 2^5 = 32 solutions.
-        val p = Problem(numBoolVars = 9, numIntVars = 0, intDomains = emptyArray(), factors = arrayOf<Factor>())
+        val p = Problem(numBoolVars = 9, numIntVars = 0, intDomains = emptyArray(), factors = arrayOf<Factor>()).bake()
         val hashes = XorHashFamily(IntArray(9) { it }, seed = 11L).draw(4)
         val augmented = p.withHashes(hashes)
         val count = BacktrackSolver(augmented.bake()).enumerate(BacktrackParams()).count()
         assertTrue(count in 1..200, "hashed cell size $count is implausible (expected ~32)")
+    }
+
+    @Test
+    fun `hashing keeps which integer sides were invented rather than declared`() {
+        val open = Problem(
+            numBoolVars = 2,
+            numIntVars = 1,
+            intDomains = arrayOf(IntDomain(0, 5)),
+            factors = arrayOf<Factor>(),
+            openIntHi = booleanArrayOf(true),
+        ).bake()
+        val hashes = XorHashFamily(intArrayOf(0, 1), seed = 3L).draw(1)
+
+        val augmented = open.withHashes(hashes)
+
+        assertTrue(augmented.intBounds.isOpenUpper(0), "an invented endpoint must not read back as declared")
     }
 
     private val samplingSet = intArrayOf(0, 1, 2, 3, 4)

@@ -9,6 +9,7 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.propagation.Assumptions
+import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
@@ -37,12 +38,12 @@ internal object Oll {
     /** Base case shared by every driver: with no softs the cost is 0, so the answer is
      *  just whether the hard constraints are satisfiable. */
     inline fun <R> solveHardOnly(
-        base: Problem,
+        base: BakedProblem,
         params: BacktrackParams,
         onSat: (Sample) -> R,
         onUnsat: () -> R,
         onUnknown: (TerminationReason) -> R,
-    ): R = when (val r = BacktrackSolver(base.bake()).solve(params)) {
+    ): R = when (val r = BacktrackSolver(base).solve(params)) {
         is SolveResult.Sat -> onSat(r.assignment)
         is SolveResult.Unsat -> onUnsat()
         is SolveResult.Unknown -> onUnknown(r.reason)
@@ -96,7 +97,7 @@ internal object Oll {
      * [Int]-weight [PseudoBoolean] (a weight or [lb] exceeding [Int.MAX_VALUE]).
      */
     fun recoverOptimalSample(
-        base: Problem,
+        base: BakedProblem,
         softs: List<Soft>,
         sample: Sample,
         lb: Long,
@@ -114,8 +115,9 @@ internal object Oll {
         val problem = Problem(
             numBoolVars = base.numBoolVars,
             numIntVars = base.numIntVars,
-            intDomains = base.requireFiniteIntDomains(),
+            intDomains = base.rootIntDomains(),
             factors = factors,
+            modelBounds = base.intBounds,
         )
         return (BacktrackSolver(problem.bake()).solve(params) as? SolveResult.Sat)?.assignment ?: sample
     }

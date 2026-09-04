@@ -96,7 +96,7 @@ internal fun anchorAndPerturb(
                         val f = state.problem.factors[fid]
                         for (b in f.boolVars) state.assignment.flipBool(b)
                         for (i in f.intVars) {
-                            val d = problem.requireFiniteIntDomains()[i]
+                            val d = state.rootDomains[i]
                             state.assignment.setInt(i, d.randomValue(state.rng))
                         }
                     }
@@ -114,7 +114,7 @@ private fun kickRandomVar(state: LocalSearchState, problem: Problem) {
         state.assignment.flipBool(pick)
     } else {
         val v = pick - problem.numBoolVars
-        val d = problem.requireFiniteIntDomains()[v]
+        val d = state.rootDomains[v]
         state.assignment.setInt(v, d.randomValue(state.rng))
     }
 }

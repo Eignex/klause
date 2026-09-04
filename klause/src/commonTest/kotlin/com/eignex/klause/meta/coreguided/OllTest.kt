@@ -4,6 +4,7 @@ import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.Sample
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -17,7 +18,7 @@ class OllTest {
         numIntVars = 0,
         intDomains = emptyArray(),
         factors = arrayOf(Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false)))),
-    )
+    ).bake()
     private val softs = listOf(Oll.Soft(Lit.make(0, true)), Oll.Soft(Lit.make(1, true)))
 
     @Test

@@ -170,9 +170,9 @@ class RegressionVariableSelector private constructor(
         for (v in 0 until problem.numIntVars) maxDegree = maxOf(maxDegree, session.projection.intOccurrences[v].size)
         degreeScale = maxDegree.toDouble()
         var maxDom = 2
-        val domains = problem.requireFiniteIntDomains()
         for (v in 0 until problem.numIntVars) {
-            maxDom = maxOf(maxDom, domains[v].valueCount.coerceAtMost(Int.MAX_VALUE.toLong()).toInt())
+            val values = session.rootIntDomain(v).valueCount
+            maxDom = maxOf(maxDom, values.coerceAtMost(Int.MAX_VALUE.toLong()).toInt())
         }
         lnDomScale = ln((maxDom + 1).toDouble())
         depthScale = maxOf(1, n).toDouble()

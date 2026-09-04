@@ -3,7 +3,7 @@ package com.eignex.klause.count
 import com.eignex.klause.backtrack.BacktrackPresets
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.factor.bool.Xor
-import com.eignex.klause.ir.Problem
+import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.util.EmptyIntArray
@@ -22,7 +22,7 @@ import com.eignex.klause.util.EmptyIntArray
  * and decoding read them directly. Built once per count/sample run and reused across hash families.
  */
 internal class CellContext private constructor(
-    val problem: Problem,
+    val problem: BakedProblem,
     val hashDomain: IntArray,
     private val boolSet: IntArray,
     private val intSet: IntArray,
@@ -80,7 +80,7 @@ internal class CellContext private constructor(
          * Resolve the projection from a config's [boolSet]/[intSet] (see [ApproxCountConfig]) and build
          * the context. Both `null` projects over every variable; otherwise only the listed ones.
          */
-        fun resolve(base: Problem, boolSet: IntArray?, intSet: IntArray?): CellContext {
+        fun resolve(base: BakedProblem, boolSet: IntArray?, intSet: IntArray?): CellContext {
             val bools: IntArray
             val ints: IntArray
             if (boolSet == null && intSet == null) {
@@ -93,7 +93,7 @@ internal class CellContext private constructor(
             return build(base, bools, ints)
         }
 
-        private fun build(base: Problem, boolSet: IntArray, intSet: IntArray): CellContext {
+        private fun build(base: BakedProblem, boolSet: IntArray, intSet: IntArray): CellContext {
             if (intSet.isEmpty()) {
                 return CellContext(base, boolSet, boolSet, intSet, base.numBoolVars, base.numIntVars)
             }
