@@ -115,6 +115,29 @@ internal object SolverInvocation {
      *  klause's cached results while references stay frozen). */
     fun klauseCliBin(): File = File(CorpusFetcher.workspaceRoot(), KLAUSE_CLI_BIN)
 
+    /**
+     * Why the klause dist at [bin] cannot solve anything, or null when it can. A dist compiled for a
+     * newer JDK than the default `java` kills every subprocess identically with an
+     * `UnsupportedClassVersionError`, and one error record per instance is indistinguishable from a
+     * selection nothing was decided on: a whole sweep reports "0 feasible" in seconds. A run asks this
+     * once up front so that failure stops it instead of being spread over the selection.
+     */
+    fun klauseCliDefect(bin: File = klauseCliBin()): String? {
+        if (!bin.isFile) return "$bin is missing — run `./gradlew :klause-cli:installJvmDist`"
+        val proc = runCatching { ProcessBuilder(bin.absolutePath, "--version").redirectErrorStream(true).start() }
+            .getOrElse { return "$bin will not start: ${it.message}" }
+        // Same watchdog shape as [invoke]: kill a child that never answers so the read below returns.
+        Thread {
+            runCatching { if (!proc.waitFor(PREFLIGHT_TIMEOUT_MS, TimeUnit.MILLISECONDS)) proc.destroyForcibly() }
+        }.apply {
+            isDaemon = true
+            start()
+        }
+        val output = proc.inputStream.bufferedReader().readText().trim()
+        val exit = proc.waitFor()
+        return "`$bin --version` exited $exit: ${output.take(STDERR_CAP)}".takeIf { exit != 0 }
+    }
+
     /** klause-cli on the model file (compiled `.fzn` for MiniZinc, else the original source). */
     private fun klauseCommand(entry: ResolvedProblem, s: Settings, budget: Budget, optimize: Boolean): List<String> {
         val bin = klauseCliBin()
@@ -441,6 +464,9 @@ internal object SolverInvocation {
     private const val NANOS_PER_MILLI = 1_000_000L
     private const val GRACE_MILLIS = 30_000L
     private const val STDERR_CAP = 2000
+
+    /** Ceiling on the dist's answer to `--version`, so a child that never answers cannot hang a run. */
+    private const val PREFLIGHT_TIMEOUT_MS = 30_000L
     private const val REGISTRY_WAIT_MILLIS = 10_000L
 }
 

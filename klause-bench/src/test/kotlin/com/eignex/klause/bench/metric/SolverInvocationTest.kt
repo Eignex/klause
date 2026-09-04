@@ -3,14 +3,33 @@ package com.eignex.klause.bench.metric
 import com.eignex.klause.bench.report.Reports
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
+import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class SolverInvocationTest {
+
+    @Test
+    fun `a missing klause dist is reported as a defect naming the install task`() {
+        val defect = SolverInvocation.klauseCliDefect(File("does-not-exist/klause-cli"))
+        assertNotNull(defect)
+        assertTrue("installJvmDist" in defect, "the defect should say how to fix it, got: $defect")
+    }
+
+    @Test
+    fun `a klause dist that cannot start is reported as a defect`() {
+        assertNotNull(SolverInvocation.klauseCliDefect(File("/bin/false")))
+    }
+
+    @Test
+    fun `a klause dist that answers version is no defect`() {
+        assertNull(SolverInvocation.klauseCliDefect(File("/bin/true")))
+    }
 
     @Test
     fun `a subprocess killed by the hard timeout is recorded as an undecided run`() {
