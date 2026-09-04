@@ -194,8 +194,9 @@ private fun LpEngine.solveRelaxation(
     val relaxation = CpToLpRelaxation(problem, obj).build(session)
     if (relaxation.model.n == 0) return null
     val result = try {
-        dualSimplex(relaxation.model, cancellation).solvePrimal()
-            ?: dualSimplex(relaxation.model, cancellation).solve()
+        // One engine for both attempts: the second ran on the identical model object, so it rebuilt a
+        // matrix and a factorization the first had already produced.
+        dualSimplex(relaxation.model, cancellation).let { it.solvePrimal() ?: it.solve() }
     } catch (_: CheckedLongOverflowException) {
         return null
     } ?: return null
