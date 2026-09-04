@@ -96,6 +96,23 @@ class AggregationMirSeparatorTest {
     }
 
     @Test
+    fun `a column the model leaves open below yields no half cut`() {
+        // The same separating row, but x's lower endpoint is one the finite lane invented. The rounding
+        // needs the shift y = x − lo to be nonnegative and the cut is published globally, so a shift by
+        // an invented endpoint cannot be taken.
+        val p = Problem(
+            numBoolVars = 0,
+            numIntVars = 2,
+            intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 3)),
+            factors = arrayOf<Factor>(Linear(intArrayOf(2, 2), intArrayOf(0, 1), LinearOp.LE, 3)),
+            openIntLo = booleanArrayOf(true, false),
+        )
+        val obj = LinearObjective(intCoefficients = longArrayOf(-1L, -1L))
+        val (cuts, _) = separate(p, obj) ?: error("LP should solve")
+        assertTrue(cuts.isEmpty(), "an invented lower endpoint must not become the aggregation shift")
+    }
+
+    @Test
     fun `random aggregation cuts are always valid`() {
         val rng = Random(20260621)
         var produced = 0

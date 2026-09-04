@@ -3,6 +3,9 @@ package com.eignex.klause.lp.relaxation
 import com.eignex.klause.factor.scheduling.Cumulative
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.bound.CumulativeFlowBound
+import com.eignex.klause.lp.rootDomainOf
+import com.eignex.klause.lp.statesLowerBound
+import com.eignex.klause.lp.statesUpperBound
 
 /**
  * A [Cumulative] normalized to the constant data the LP relaxations and the flow
@@ -34,15 +37,8 @@ internal fun schedulingViews(problem: Problem): List<SchedulingView> {
         when (f) {
             is Cumulative -> {
                 if (f.durationVars.isNotEmpty() || f.presents.isNotEmpty() || f.starts.isEmpty()) continue
-                val cap = if (f.capacityVar >= 0) problem.requireFiniteIntDomains()[f.capacityVar].max else f.capacity
-                if (cap <= 0L) continue
-                val res = LongArray(f.starts.size) { i ->
-                    if (f.resourceVars.isNotEmpty()) {
-                        problem.requireFiniteIntDomains()[f.resourceVars[i]].min
-                    } else {
-                        f.resources[i]
-                    }
-                }
+                val cap = declaredCapacityOf(problem, f) ?: continue
+                val res = minimumResourcesOf(problem, f) ?: continue
                 out.add(SchedulingView(f.starts, f.durations, res, cap))
             }
 
@@ -50,4 +46,25 @@ internal fun schedulingViews(problem: Problem): List<SchedulingView> {
         }
     }
     return out
+}
+
+/**
+ * The declared (maximum) capacity of [f], or null when the model states none above 0.
+ *
+ * A capacity variable the model leaves open above states no ceiling at all, so every obligation an
+ * energetic relaxation would derive from it vanishes. The factor is dropped rather than capped at the
+ * search box, whose endpoint would state a resource limit the model never declared.
+ */
+internal fun declaredCapacityOf(problem: Problem, f: Cumulative): Long? {
+    if (f.capacityVar < 0) return f.capacity.takeIf { it > 0L }
+    if (!problem.statesUpperBound(f.capacityVar)) return null
+    return problem.rootDomainOf(f.capacityVar).max.takeIf { it > 0L }
+}
+
+/** Per-task minimum resource demand of [f], or null when a demand variable is open below — its minimum
+ *  is then the search box's invented endpoint rather than a demand the model states. */
+internal fun minimumResourcesOf(problem: Problem, f: Cumulative): LongArray? {
+    if (f.resourceVars.isEmpty()) return LongArray(f.starts.size) { i -> f.resources[i] }
+    if (f.resourceVars.any { !problem.statesLowerBound(it) }) return null
+    return LongArray(f.starts.size) { i -> problem.rootDomainOf(f.resourceVars[i]).min }
 }

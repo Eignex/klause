@@ -173,7 +173,11 @@ internal class AggregationMirSeparator : CutSeparator {
                 val coeff = if (flip) -row.coeff(idx) else row.coeff(idx)
                 cols[idx] = col
                 a[idx] = coeff
-                val lo = ctx.problem.requireFiniteIntDomains()[factor.vars[idx]].min
+                // The rounding needs `y_j = x_j − lo_j ≥ 0`, and the cut is emitted globally. Over a
+                // column the model leaves open below, the root box's endpoint is not a lower bound of the
+                // model, so the shift would not hold there — drop the row instead of shifting by it.
+                if (!ctx.statesLowerBound(factor.vars[idx])) return
+                val lo = ctx.rootDomain(factor.vars[idx]).min
                 loOf.put(col, lo)
                 b = addExact(b, -mulExact(coeff, lo)) // shift to y_j = x_j − lo_j
             }

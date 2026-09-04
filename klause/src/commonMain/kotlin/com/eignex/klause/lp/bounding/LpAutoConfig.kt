@@ -29,6 +29,10 @@ import com.eignex.klause.lp.lpHullFamily
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.lp.relaxation.CumulativeRelaxation
 import com.eignex.klause.lp.relaxation.schedulingViews
+import com.eignex.klause.lp.rootDomainOf
+import com.eignex.klause.lp.rootDomainsOf
+import com.eignex.klause.lp.statesLowerBound
+import com.eignex.klause.lp.statesUpperBound
 
 /**
  * Structural auto-configuration of the LP-relaxation family. Each technique is enabled when —
@@ -366,9 +370,12 @@ object LpAutoConfig {
             val selfLoops = circuitFactor.subcircuit
             val n = succ.size
             if (n < 2) continue
+            // Mirrors the build's own decline: an open-sided successor gets no arc model, so its arcs
+            // must not enter the estimate either.
+            if (succ.any { !problem.statesLowerBound(it) || !problem.statesUpperBound(it) }) continue
             var arcs = 0L
             for (i in 0 until n) {
-                problem.requireFiniteIntDomains()[succ[i]].values.forEach { j ->
+                problem.rootDomainOf(succ[i]).values.forEach { j ->
                     if ((selfLoops || j != i.toLong()) &&
                         j in 0L until n
                     ) {
@@ -388,12 +395,16 @@ object LpAutoConfig {
      *  own LP hull estimate — the single source shared with the build, so
      *  the gating estimate cannot drift from the rows actually emitted. */
     private fun hullEstimate(problem: Problem, technique: LpTechnique, family: HullFamily): HullEstimate? {
+        if (problem.factors.none { it.lpHullFamily() == family }) return null
         var cols = 0L
         var rows = 0L
         var any = false
+        // Snapshotted once, outside the loop: the whole-table reading copies, and per factor that would
+        // cost O(factors · columns) on a model this family is wide over.
+        val rootDomains = problem.rootDomainsOf()
         for (f in problem.factors) {
             if (f.lpHullFamily() != family) continue
-            val e = f.estimateLpHull(problem.requireFiniteIntDomains()) ?: continue
+            val e = f.estimateLpHull(rootDomains) ?: continue
             cols += e.cols
             rows += e.rows
             any = true
@@ -414,7 +425,7 @@ object LpAutoConfig {
             var c = 0L
             var ok = true
             for (i in 0 until n) {
-                val dom = problem.requireFiniteIntDomains()[v.starts[i]]
+                val dom = problem.rootDomainOf(v.starts[i])
                 if (dom.max < dom.min) {
                     ok = false
                     break

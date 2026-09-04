@@ -9,6 +9,9 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.bound.CumulativeEnergeticBound
 import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.LpRowPremises
+import com.eignex.klause.lp.rootDomainOf
+import com.eignex.klause.lp.statesLowerBound
+import com.eignex.klause.lp.statesUpperBound
 import com.eignex.klause.util.CheckedLongOverflowException
 import com.eignex.klause.util.IntArrayDeque
 import com.eignex.klause.util.IntArrayList
@@ -110,8 +113,8 @@ internal class CumulativeRelaxation(
         val cap = plan.capacity
         val n = plan.startVars.size
         val estLive = LongArray(n) { domains.intDomain(plan.startVars[it]).min }
-        val estDecl = LongArray(n) { problem.requireFiniteIntDomains()[plan.startVars[it]].min }
-        val floor = cap * problem.requireFiniteIntDomains()[plan.makespanVar].min
+        val estDecl = LongArray(n) { problem.rootDomainOf(plan.startVars[it]).min }
+        val floor = cap * problem.rootDomainOf(plan.makespanVar).min
 
         val energetic = try {
             energeticRhs(cap, estLive, plan.durations, plan.resources)
@@ -215,6 +218,10 @@ internal class CumulativeRelaxation(
         val cover = MutableIntObjectMap<IntArrayList>()
         for (i in s.starts.indices) {
             if (s.dur[i] <= 0 || s.res[i] <= 0) continue
+            // The row's energy counts each task from its earliest start. Over a start the model leaves
+            // open below that edge is the search box's invented endpoint, not the model's, so the row
+            // would claim energy no solution outside the box has to spend.
+            if (!problem.statesLowerBound(s.starts[i])) continue
             links.endUpperBoundsOf(s.starts[i], s.dur[i]).forEach { m ->
                 cover.getOrPut(m) { IntArrayList() }.add(i)
             }
@@ -224,7 +231,9 @@ internal class CumulativeRelaxation(
         val coverEntries = ArrayList<Pair<Int, IntArrayList>>(cover.size)
         cover.forEach { m, idxs -> coverEntries.add(m to idxs) }
         val ranked = coverEntries
-            .filter { it.second.size >= MIN_COVER }
+            // The trivial fallback right-hand side is `cap · M.min`, so a makespan the model leaves open
+            // below has no floor of its own to fall back on.
+            .filter { it.second.size >= MIN_COVER && problem.statesLowerBound(it.first) }
             .sortedWith(compareByDescending<Pair<Int, IntArrayList>> { it.second.size }.thenBy { it.first })
             .take(MAX_MAKESPAN_VARS)
         return ranked.map { (m, idxs) ->
@@ -252,21 +261,11 @@ internal class CumulativeRelaxation(
                     // the link is conditional on presence. Both are skipped (drops energy, sound).
                     if (f.durationVars.isNotEmpty() || f.presents.isNotEmpty()) continue
                     if (f.starts.size > MAX_TASKS) continue
-                    val cap = if (f.capacityVar >=
-                        0
-                    ) {
-                        problem.requireFiniteIntDomains()[f.capacityVar].max
-                    } else {
-                        f.capacity
-                    }
-                    if (cap <= 0L) continue
-                    val res = LongArray(f.starts.size) { i ->
-                        if (f.resourceVars.isNotEmpty()) {
-                            problem.requireFiniteIntDomains()[f.resourceVars[i]].min
-                        } else {
-                            f.resources[i]
-                        }
-                    }
+                    // The capacity ceiling and the per-task demand floor have to be the model's own;
+                    // [declaredCapacityOf] and [minimumResourcesOf] state why an invented endpoint
+                    // cannot stand in for either.
+                    val cap = declaredCapacityOf(problem, f) ?: continue
+                    val res = minimumResourcesOf(problem, f) ?: continue
                     out.add(Sched(f.starts, f.durations, res, cap))
                 }
 
@@ -292,12 +291,15 @@ internal class CumulativeRelaxation(
 
     /** Maximum extent of the bounding box along an axis: `max(coordᵢ.max + sizeᵢ) − min(coordᵢ.min)`.
      *  An upper bound on the perpendicular resource room, so using it as the cumulative capacity only
-     *  loosens the energetic bound (sound). */
+     *  loosens the energetic bound (sound). Zero — which drops the axis — when the model leaves a
+     *  coordinate open on either side, since the box's endpoint bounds the search rather than the
+     *  packing. */
     private fun perpendicularExtent(coords: IntArray, sizes: LongArray): Long {
         var hi = Long.MIN_VALUE
         var lo = Long.MAX_VALUE
         for (i in coords.indices) {
-            val d = problem.requireFiniteIntDomains()[coords[i]]
+            if (!problem.statesLowerBound(coords[i]) || !problem.statesUpperBound(coords[i])) return 0L
+            val d = problem.rootDomainOf(coords[i])
             if (d.max + sizes[i] > hi) hi = d.max + sizes[i]
             if (d.min < lo) lo = d.min
         }

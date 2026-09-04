@@ -107,7 +107,10 @@ internal fun LpEngine.redundantConstraints(token: Cancellation): List<Int> {
         val row = f.integerConstants ?: continue
         probes++
         val kept = problem.factors.filterIndexed { idx, _ -> idx != i && !removed.contains(idx) }
-        val others = Problem(problem.numBoolVars, problem.numIntVars, problem.requireFiniteIntDomains().copyOf(), kept)
+        // The probe keeps this model's columns and states only which rows it carries, so it goes through
+        // the source rewrite: restating the integer boxes alone drops the open-side marks and the LP-only
+        // continuous namespace, and a kept row addressing a real column then has no column to address.
+        val others = problem.withFactors(kept.toTypedArray())
         val a = LongArray(problem.numIntVars)
         for (k in f.vars.indices) a[f.vars[k]] += row.coeff(k)
         val b = row.bound.toDouble()

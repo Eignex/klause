@@ -6,6 +6,7 @@ import com.eignex.klause.lp.bounding.dualSimplex
 import com.eignex.klause.lp.engine.RevisedSimplex
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.lp.relaxation.LpRelaxation
+import com.eignex.klause.lp.rootDomainOf
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.Sample
@@ -113,7 +114,7 @@ internal fun LpEngine.lpFeasibilityPump(objective: LinearObjective, cancellation
         val (relaxation, primal) = solved
         val intTarget = LongArray(problem.numIntVars) { v ->
             val col = relaxation.intColOf[v]
-            val d = problem.requireFiniteIntDomains()[v]
+            val d = problem.rootDomainOf(v)
             if (col in 0 until primal.size) round(primal[col]).toLong().coerceIn(d.min, d.max) else d.min
         }
         val boolTarget = BooleanArray(problem.numBoolVars) { b ->
@@ -176,7 +177,7 @@ private fun LpEngine.perturbRounding(
         if (relaxation.colIsBool[col]) {
             boolTarget[v] = !boolTarget[v]
         } else {
-            val d = problem.requireFiniteIntDomains()[v]
+            val d = problem.rootDomainOf(v)
             val cur = intTarget[v]
             intTarget[v] = if (primal[col] >= cur) (cur + 1).coerceAtMost(d.max) else (cur - 1).coerceAtLeast(d.min)
         }
@@ -229,7 +230,7 @@ private fun LpEngine.distanceObjective(
 ): LinearObjective? {
     var any = false
     val intCoef = LongArray(problem.numIntVars) { v ->
-        val d = problem.requireFiniteIntDomains()[v]
+        val d = problem.rootDomainOf(v)
         when {
             relaxation.intColOf[v] < 0 -> 0L
 

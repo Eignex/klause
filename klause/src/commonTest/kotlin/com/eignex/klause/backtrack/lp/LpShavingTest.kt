@@ -1,6 +1,7 @@
 package com.eignex.klause.backtrack.lp
 
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
@@ -8,6 +9,7 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.bounding.LpEngine
 import com.eignex.klause.lp.bounding.LpParams
 import com.eignex.klause.lp.bounding.LpPlan
+import com.eignex.klause.lp.bounding.redundantConstraints
 import com.eignex.klause.lp.bounding.shaveObjectiveLb
 import com.eignex.klause.lp.bounding.shaveVariableBounds
 import com.eignex.klause.solver.objective.LinearObjective
@@ -52,6 +54,41 @@ class LpShavingTest {
         // cost's declared min is 0; shaving must prove cost ≥ 2 (cost ≤ 1 is infeasible) and stop there.
         val lb = engine.shaveObjectiveLb(objectiveVar = 3, ascending = true, token = Cancellation.Never)
         assertEquals(2, lb, "shaving must prove the true lower bound 2, not over- or under-shave")
+    }
+
+    @Test
+    fun `the redundancy probe reaches a verdict on a model with continuous columns`() {
+        // The probe judges each row against the others, so it rebuilds the model over the rows it kept.
+        // A rebuild that states only the finite integer columns drops the LP-only continuous namespace,
+        // and a kept row addressing a real column then has no column to address at all.
+        val p = Problem(
+            numBoolVars = 1,
+            numIntVars = 1,
+            intDomains = arrayOf(IntDomain(0, 4)),
+            factors = arrayOf<Factor>(
+                Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 4), // implied by x0's own domain
+                ReifiedRealLinear(
+                    aux = 0,
+                    vars = IntArray(0),
+                    intCoeffs = DoubleArray(0),
+                    realVars = intArrayOf(0),
+                    realCoeffs = doubleArrayOf(1.0),
+                    op = LinearOp.GE,
+                    bound = 0.0,
+                ),
+            ),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(1.0),
+        )
+        val engine = LpEngine(
+            p,
+            LinearObjective(intCoefficients = longArrayOf(1L)),
+            LpParams(lpPlan = LpPlan(bounding = true)),
+            SolveStatsSink(backend = "shave"),
+        )
+        // No row is provably redundant here — the point is that a verdict is reached at all.
+        assertEquals(emptyList(), engine.redundantConstraints(Cancellation.Never))
     }
 
     @Test
