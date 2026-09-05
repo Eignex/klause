@@ -29,11 +29,24 @@ internal fun Problem.rootDomainsOf(): Array<IntDomain> = finiteIntDomains()
  * lean on that endpoint holds inside the box only — it cannot be published as globally valid, and a
  * relaxation that enumerates the box restricts a range the model never excluded. Consumers either read
  * this state or decline the column outright.
+ *
+ * The question is whether the side is stated at all, not whether [rootDomainOf] sits exactly on it: the
+ * root fold and presolve narrow the box below the stated bound by proof, and a bound proved over the
+ * model is as much the model's as one it declared. The reading a narrowing by invention cannot be told
+ * from one by proof is `Problem.withIntDomains`, which boxes a wide column while keeping the wide bound;
+ * separating those needs provenance the source model does not carry.
  */
 internal fun Problem.statesLowerBound(v: Int): Boolean = intBounds.hasLower(v)
 
 /** Whether the model itself bounds integer column [v] above; see [statesLowerBound]. */
 internal fun Problem.statesUpperBound(v: Int): Boolean = intBounds.hasUpper(v)
+
+/** Whether both of integer column [v]'s root endpoints are the model's own — the reading a derivation
+ *  that enumerates the box, or leans on either endpoint, has to make; see [statesLowerBound]. */
+internal fun Problem.statesBothBounds(v: Int): Boolean = statesLowerBound(v) && statesUpperBound(v)
+
+/** Whether every member of [vars] states both of its endpoints; see [statesBothBounds]. */
+internal fun Problem.statesBothBounds(vars: IntArray): Boolean = vars.all { statesBothBounds(it) }
 
 /**
  * Whether integer column [v] takes a value in `{0, 1}` at every solution of the model.
@@ -43,4 +56,14 @@ internal fun Problem.statesUpperBound(v: Int): Boolean = intBounds.hasUpper(v)
  * column, an RLT row — would state constants no solution outside the box has to satisfy.
  */
 internal fun Problem.statesBinary(v: Int): Boolean =
-    statesLowerBound(v) && statesUpperBound(v) && rootDomainOf(v).let { it.min == 0L && it.max == 1L }
+    statesBothBounds(v) && rootDomainOf(v).let { it.min == 0L && it.max == 1L }
+
+/**
+ * Whether integer column [v] is bounded below by a value the model itself states, and that bound is
+ * at or above [floor].
+ *
+ * The reading a derivation needs when its validity rests on a sign — a flow that may not run backwards,
+ * a shifted variable that may not go negative — rather than on the endpoint's value.
+ */
+internal fun Problem.statesLowerBoundAtLeast(v: Int, floor: Long): Boolean =
+    statesLowerBound(v) && rootDomainOf(v).min >= floor

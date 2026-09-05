@@ -16,6 +16,7 @@ import com.eignex.klause.lp.engine.Cut
 import com.eignex.klause.lp.engine.Relation
 import com.eignex.klause.lp.relaxation.LpRelaxation
 import com.eignex.klause.lp.rootDomainOf
+import com.eignex.klause.lp.statesBothBounds
 import com.eignex.klause.lp.statesLowerBound
 import com.eignex.klause.lp.statesUpperBound
 import com.eignex.klause.model.PbOp
@@ -81,7 +82,7 @@ internal class CutContext(
     fun statesUpperBound(v: Int): Boolean = problem.statesUpperBound(v)
 
     /** Whether both of [v]'s root endpoints are the model's own; see [statesLowerBound]. */
-    fun statesBothBounds(v: Int): Boolean = statesLowerBound(v) && statesUpperBound(v)
+    fun statesBothBounds(v: Int): Boolean = problem.statesBothBounds(v)
 }
 
 /**

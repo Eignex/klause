@@ -66,7 +66,7 @@ class LpShavingTest {
             numIntVars = 1,
             intDomains = arrayOf(IntDomain(0, 4)),
             factors = arrayOf<Factor>(
-                Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 4), // implied by x0's own domain
+                Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 4),
                 ReifiedRealLinear(
                     aux = 0,
                     vars = IntArray(0),
@@ -87,7 +87,8 @@ class LpShavingTest {
             LpParams(lpPlan = LpPlan(bounding = true)),
             SolveStatsSink(backend = "shave"),
         )
-        // No row is provably redundant here — the point is that a verdict is reached at all.
+        // A real row puts the relaxation on the double view, where the safe bound declines, so nothing
+        // certifies as redundant — the point is that a verdict is reached at all.
         assertEquals(emptyList(), engine.redundantConstraints(Cancellation.Never))
     }
 

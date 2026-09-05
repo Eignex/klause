@@ -8,6 +8,7 @@ import com.eignex.klause.lp.engine.integerFarkasRay
 import com.eignex.klause.lp.engine.safeObjectiveLowerBound
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.lp.relaxation.RootDomains
+import com.eignex.klause.lp.rootDomainOf
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.objective.LinearObjective
@@ -108,8 +109,9 @@ internal fun LpEngine.redundantConstraints(token: Cancellation): List<Int> {
         probes++
         val kept = problem.factors.filterIndexed { idx, _ -> idx != i && !removed.contains(idx) }
         // The probe keeps this model's columns and states only which rows it carries, so it goes through
-        // the source rewrite: restating the integer boxes alone drops the open-side marks and the LP-only
-        // continuous namespace, and a kept row addressing a real column then has no column to address.
+        // the source rewrite: restating the integer boxes alone drops the LP-only continuous namespace,
+        // and a kept row addressing a real column then has no column to address. The declared value sets
+        // and open-side marks ride along for the same reason — nothing here is entitled to change them.
         val others = problem.withFactors(kept.toTypedArray())
         val a = LongArray(problem.numIntVars)
         for (k in f.vars.indices) a[f.vars[k]] += row.coeff(k)
@@ -231,7 +233,7 @@ internal fun LpEngine.rootLpBoundsNoBake(token: Cancellation): List<ShavedBound>
     var done = 0
     for (v in widestFirst(n)) {
         if (done >= OBBT_MAX_VARS || token()) break
-        val d = problem.finiteIntDomain(v)
+        val d = problem.rootDomainOf(v)
         if (d.min >= d.max) continue
         done++
         val coeffs = LongArray(n).also { it[v] = 1L }
@@ -252,13 +254,14 @@ internal fun LpEngine.rootLpBoundsNoBake(token: Cancellation): List<ShavedBound>
  * in index order and 8 and 7 bounds respectively in this one. A domain that overflows [Long] sorts
  * first — it is the most open there is.
  */
-private fun LpEngine.widestFirst(n: Int): List<Int> =
-    (0 until n).filter { problem.finiteIntDomain(it).min < problem.finiteIntDomain(it).max }
-        .sortedByDescending {
-            val d = problem.finiteIntDomain(it)
-            val width = d.max - d.min
-            if (width < 0L) Long.MAX_VALUE else width
-        }
+private fun LpEngine.widestFirst(n: Int): List<Int> {
+    val width = LongArray(n) { v ->
+        val d = problem.rootDomainOf(v)
+        val span = d.max - d.min
+        if (span < 0L) Long.MAX_VALUE else span
+    }
+    return (0 until n).filter { width[it] > 0L }.sortedByDescending { width[it] }
+}
 
 /** Whether the root relaxation is provably infeasible — the LP relaxation has no real point at an
  *  infinite incumbent, so `pruneNode` fires only on a genuine, certified infeasibility (the same sound
