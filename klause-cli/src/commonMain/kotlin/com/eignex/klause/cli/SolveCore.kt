@@ -2,6 +2,7 @@ package com.eignex.klause.cli
 
 import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.config.KlauseConfig
+import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.lp.bounding.LpEmphasis
@@ -455,8 +456,15 @@ internal object SolveCore {
         val bounds = problem.intBounds
         var span = 0L
         for (v in 0 until problem.numIntVars) {
-            if (bounds.isOpenLower(v) || bounds.isOpenUpper(v)) return Long.MAX_VALUE
-            val width = bounds.upper(v) - bounds.lower(v)
+            if (bounds.isOpen(v)) return Long.MAX_VALUE
+            // The value set a closed column declares is what the search enumerates, and the fold narrows
+            // it; the bounds are the hull it sits in. A column stating bounds alone has only the hull.
+            val declared = problem.intDomainOrNull(v)
+            val width = if (declared != null) {
+                declared.max - declared.min
+            } else {
+                bounds.upper(v) - bounds.lower(v)
+            }
             if (width < 0L) return Long.MAX_VALUE
             span += width
             if (span < 0L) return Long.MAX_VALUE
@@ -475,15 +483,17 @@ internal object SolveCore {
      * a lane materialized to search it — so a wide declared column is not miscounted as unbounded, and a
      * narrow invented box does not hide one that is.
      */
-
     private fun openText(problem: Problem): String {
         val bounds = problem.intBounds
         var open = 0
         for (v in 0 until problem.numIntVars) {
-            if (bounds.isOpenLower(v) || bounds.isOpenUpper(v)) open++
+            if (bounds.isOpen(v)) open++
         }
         return "$open of ${problem.numIntVars}"
     }
+
+    /** Whether the model declares no bound on one of integer column [v]'s sides. */
+    private fun IntBounds.isOpen(v: Int): Boolean = isOpenLower(v) || isOpenUpper(v)
 
     /**
      * Integer columns no factor needs a finite domain for, so nothing about them has to be enumerated.
@@ -495,9 +505,10 @@ internal object SolveCore {
     private fun theoryText(problem: Problem): String {
         val partition = problem.variablePartition()
         var openAndEligible = 0
+        val bounds = problem.intBounds
         for (v in 0 until partition.size) {
             if (!partition.isTheoryEligible(v)) continue
-            if (problem.intBounds.isOpenLower(v) || problem.intBounds.isOpenUpper(v)) openAndEligible++
+            if (bounds.isOpen(v)) openAndEligible++
         }
         return "${partition.theoryEligibleCount} of ${partition.size}, $openAndEligible of them open"
     }
