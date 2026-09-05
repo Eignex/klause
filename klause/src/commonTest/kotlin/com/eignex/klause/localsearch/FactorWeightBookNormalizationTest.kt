@@ -7,6 +7,7 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.propagation.bake
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -33,7 +34,7 @@ class FactorWeightBookNormalizationTest {
     @Test
     fun `off by default leaves every factor at weight 1`() {
         val factors = List(8) { linear() } + List(2) { clause() }
-        val state = LocalSearchState(problem(factors), Random(0))
+        val state = LocalSearchState(problem(factors).bake(), Random(0))
         assertTrue(state.weights.factorWeights.all { it == 1.0 })
     }
 
@@ -42,7 +43,7 @@ class FactorWeightBookNormalizationTest {
         // 8 Linear + 2 Clause: mean class size = 5, so Linear (8 > 5) is scaled to 5/8 each,
         // Clause (2 <= 5) stays at 1.0.
         val factors = List(8) { linear() } + List(2) { clause() }
-        val state = LocalSearchState(problem(factors), Random(0))
+        val state = LocalSearchState(problem(factors).bake(), Random(0))
         state.weights.normalizeWeightsByClass = true
         val w = state.weights.factorWeights
         for (i in 0 until 8) assertEquals(5.0 / 8.0, w[i], 1e-9)
@@ -53,7 +54,7 @@ class FactorWeightBookNormalizationTest {
     fun `balanced classes are left untouched`() {
         // 3 Linear + 3 Clause: mean = 3, neither class exceeds it, so nothing is damped.
         val factors = List(3) { linear() } + List(3) { clause() }
-        val state = LocalSearchState(problem(factors), Random(0))
+        val state = LocalSearchState(problem(factors).bake(), Random(0))
         state.weights.normalizeWeightsByClass = true
         assertTrue(state.weights.factorWeights.all { it == 1.0 })
     }
@@ -64,7 +65,7 @@ class FactorWeightBookNormalizationTest {
         // hold it immutable so decay restores the proactive landscape.
         val factors = List(8) { linear() } + List(2) { clause() }
         val implied = BooleanArray(10).also { for (i in 0 until 6) it[i] = true }
-        val state = LocalSearchState(problem(factors, implied), Random(0))
+        val state = LocalSearchState(problem(factors, implied).bake(), Random(0))
         val base = state.weights.baseFactorWeights
         for (i in 0 until 6) assertEquals(IMPLIED_FACTOR_INITIAL_WEIGHT, base[i], 1e-9)
         for (i in 6 until 10) assertEquals(1.0, base[i], 1e-9)
@@ -82,7 +83,7 @@ class FactorWeightBookNormalizationTest {
         // factors are pinned to the implied seed.
         val factors = List(8) { linear() } + List(2) { clause() }
         val implied = BooleanArray(10).also { for (i in 0 until 6) it[i] = true }
-        val state = LocalSearchState(problem(factors, implied), Random(0))
+        val state = LocalSearchState(problem(factors, implied).bake(), Random(0))
         state.weights.normalizeWeightsByClass = true
         val w = state.weights.factorWeights
         for (i in 0 until 6) assertEquals(IMPLIED_FACTOR_INITIAL_WEIGHT, w[i], 1e-9)

@@ -6,6 +6,7 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
 import com.eignex.klause.localsearch.MoveSink
+import com.eignex.klause.propagation.bake
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -47,7 +48,7 @@ class GlobalCardinalityInvariantTest {
             domainHi = 3,
         )
         fun seeded(seed: Long): LocalSearchState {
-            val state = LocalSearchState(p, Random(seed))
+            val state = LocalSearchState(p.bake(), Random(seed))
             for (i in 0 until 4) state.assignment.setInt(i, i.toLong())
             state.recompute()
             return state
@@ -71,7 +72,7 @@ class GlobalCardinalityInvariantTest {
     @Test
     fun `satisfied when all counts within bounds`() {
         val p = problem(intArrayOf(0, 1, 2), intArrayOf(1, 2), intArrayOf(1, 1), intArrayOf(2, 2))
-        val state = LocalSearchState(p, Random(0))
+        val state = LocalSearchState(p.bake(), Random(0))
         // xs = [1, 2, 1]: count(1)=2, count(2)=1 — both within [1,2]
         state.assignment.setInt(0, 1)
         state.assignment.setInt(1, 2)
@@ -84,7 +85,7 @@ class GlobalCardinalityInvariantTest {
     @Test
     fun `violated when count falls below lower bound`() {
         val p = problem(intArrayOf(0, 1, 2), intArrayOf(3), intArrayOf(2), intArrayOf(3))
-        val state = LocalSearchState(p, Random(0))
+        val state = LocalSearchState(p.bake(), Random(0))
         // xs = [3, 0, 0]: count(3)=1, one short of lo=2
         state.assignment.setInt(0, 3)
         state.assignment.setInt(1, 0)
@@ -98,7 +99,7 @@ class GlobalCardinalityInvariantTest {
     fun `violation degree equals total count deviation`() {
         // cover=[1,2], lo=[2,2], hi=[3,3]. xs=[0,0,0]: count(1)=0 (2 short), count(2)=0 (2 short) → degree 4
         val p = problem(intArrayOf(0, 1, 2), intArrayOf(1, 2), intArrayOf(2, 2), intArrayOf(3, 3))
-        val state = LocalSearchState(p, Random(0))
+        val state = LocalSearchState(p.bake(), Random(0))
         state.assignment.setInt(0, 0)
         state.assignment.setInt(1, 0)
         state.assignment.setInt(2, 0)
@@ -111,7 +112,7 @@ class GlobalCardinalityInvariantTest {
     fun `delta predicts degree change when reassigning to cover value`() {
         // cover=[1], lo=[2], hi=[2]. xs=[0,0,0]: violated, count(1)=0, need 2.
         val p = problem(intArrayOf(0, 1, 2), intArrayOf(1), intArrayOf(2), intArrayOf(2))
-        val state = LocalSearchState(p, Random(0))
+        val state = LocalSearchState(p.bake(), Random(0))
         state.assignment.setInt(0, 0)
         state.assignment.setInt(1, 0)
         state.assignment.setInt(2, 0)

@@ -5,6 +5,7 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move.IntSet
+import com.eignex.klause.propagation.bake
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -27,7 +28,7 @@ class SubcircuitInvariantTest {
     fun `single included node yields positive cost`() {
         // One included node (succ[0]=1) cannot form a cycle on its own; rest are self-loops.
         val problem = problem(4)
-        val state = LocalSearchState(problem, Random(0))
+        val state = LocalSearchState(problem.bake(), Random(0))
         state.assignment.setInt(0, 1)
         state.assignment.setInt(1, 1)
         state.assignment.setInt(2, 2)
@@ -42,7 +43,7 @@ class SubcircuitInvariantTest {
         // All nodes included in a single Hamiltonian cycle.
         val n = 4
         val problem = problem(n)
-        val state = LocalSearchState(problem, Random(0))
+        val state = LocalSearchState(problem.bake(), Random(0))
         for (i in 0 until n) state.assignment.setInt(i, ((i + 1) % n).toLong())
         state.recompute()
         assertEquals(0, state.intPayload[0], "a full N-cycle should satisfy Subcircuit with zero cost")
@@ -55,7 +56,7 @@ class SubcircuitInvariantTest {
         // including node 2 (succ[2]=3) — this breaks the valid subcircuit.
         val n = 4
         val problem = problem(n)
-        val state = LocalSearchState(problem, Random(0))
+        val state = LocalSearchState(problem.bake(), Random(0))
         state.assignment.setInt(0, 1)
         state.assignment.setInt(1, 0)
         state.assignment.setInt(2, 2)
@@ -82,7 +83,7 @@ class SubcircuitInvariantTest {
             intDomains = Array(n) { IntDomain(0, (n - 1).toLong()) },
             factors = arrayOf<Factor>(factor),
         )
-        val state = LocalSearchState(problem, Random(0))
+        val state = LocalSearchState(problem.bake(), Random(0))
 
         // One valid 6-cycle.
         for (i in 0 until n) state.assignment.setInt(i, ((i + 1) % n).toLong())

@@ -40,7 +40,7 @@ class MddInvariantTest {
             intDomains = arrayOf(IntDomain(1, 2), IntDomain(1, 2)),
             factors = arrayOf(mddFactor()),
         )
-        val state = LocalSearchState(problem, Random(0))
+        val state = LocalSearchState(problem.bake(), Random(0))
         state.assignment.setInt(0, 1) // (1,2) is accepted
         state.assignment.setInt(1, 2)
         state.recompute()
@@ -63,7 +63,7 @@ class MddInvariantTest {
             cost = 1,
         )
         val problem = Problem(0, 2, arrayOf(IntDomain(1, 1), IntDomain(0, 5_000_000_000L)), arrayOf(factor))
-        val state = LocalSearchState(problem, Random(0))
+        val state = LocalSearchState(problem.bake(), Random(0))
         assertTrue(state.factors[0].seedFeasible(state, 0), "the single accepted path must seed")
         assertEquals(3_000_000_000L, state.assignment.intValue(1))
     }
@@ -76,7 +76,7 @@ class MddInvariantTest {
             intDomains = arrayOf(IntDomain(1, 2), IntDomain(1, 2)),
             factors = arrayOf(mddFactor()),
         )
-        val state = LocalSearchState(problem, Random(7))
+        val state = LocalSearchState(problem.bake(), Random(7))
         state.assignment.setInt(0, 1)
         state.assignment.setInt(1, 1)
         state.recompute()
@@ -89,7 +89,7 @@ class MddInvariantTest {
             state.apply(Move.IntSet(v, nv))
             val after = state.factors[0].violationDegree(state, 0)
             assertEquals(after - before, predicted, "step $step: incremental delta mismatch")
-            val fresh = LocalSearchState(problem, Random(0))
+            val fresh = LocalSearchState(problem.bake(), Random(0))
             for (k in 0 until 2) fresh.assignment.setInt(k, state.assignment.intValue(k))
             fresh.recompute()
             assertEquals(
@@ -109,7 +109,7 @@ class MddInvariantTest {
                 intDomains = arrayOf(IntDomain(1, 2), IntDomain(1, 2)),
                 factors = arrayOf(mddFactor()),
             )
-            val state = LocalSearchState(problem, Random(0))
+            val state = LocalSearchState(problem.bake(), Random(0))
             state.assignment.setInt(0, 1) // (1,1) is rejected
             state.assignment.setInt(1, 1)
             state.recompute()
@@ -133,7 +133,7 @@ class MddInvariantTest {
             intDomains = arrayOf(IntDomain(1, 2), IntDomain(1, 2)),
             factors = arrayOf(mddFactor()),
         )
-        val state = LocalSearchState(problem, Random(0))
+        val state = LocalSearchState(problem.bake(), Random(0))
         state.assignment.setInt(0, 1) // (1,1) is rejected
         state.assignment.setInt(1, 1)
         state.recompute()
@@ -150,7 +150,7 @@ class MddInvariantTest {
             intDomains = arrayOf(IntDomain(1, 2), IntDomain(1, 2)),
             factors = arrayOf(mddFactor()),
         )
-        val state = LocalSearchState(problem, Random(0))
+        val state = LocalSearchState(problem.bake(), Random(0))
         state.assignment.setInt(0, 1)
         state.assignment.setInt(1, 1)
         state.recompute()

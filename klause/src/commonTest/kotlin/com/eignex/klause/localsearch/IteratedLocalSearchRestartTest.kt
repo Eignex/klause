@@ -3,6 +3,7 @@ import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.CrossoverBias.BetterBiased
+import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.*
 import kotlin.random.Random
 import kotlin.test.Test
@@ -82,7 +83,7 @@ class IteratedLocalSearchRestartTest {
     fun `restart falls back to random when no local optimum seen`() {
         val factor = Cardinality.atLeastOne(intArrayOf(Lit.make(0, true), Lit.make(1, true)))
         val problem = Problem(2, 0, emptyArray(), listOf(factor))
-        val state = LocalSearchState(problem, Random(0))
+        val state = LocalSearchState(problem.bake(), Random(0))
         for (i in 0 until problem.numFactors) state.factors[i].initialize(state, i)
 
         val policy = IteratedLocalSearchRestart()
@@ -94,7 +95,7 @@ class IteratedLocalSearchRestartTest {
     fun `incumbent updates on improving local optimum`() {
         val factor = Cardinality.atLeastOne(intArrayOf(Lit.make(0, true), Lit.make(1, true)))
         val problem = Problem(2, 0, emptyArray(), listOf(factor))
-        val state = LocalSearchState(problem, Random(0))
+        val state = LocalSearchState(problem.bake(), Random(0))
         for (i in 0 until problem.numFactors) state.factors[i].initialize(state, i)
 
         val policy = IteratedLocalSearchRestart(initialPerturbationStrength = 3)
@@ -115,7 +116,7 @@ class IteratedLocalSearchRestartTest {
     fun `population fills up to size and evicts worst on accept`() {
         val factor = Cardinality.atLeastOne(intArrayOf(Lit.make(0, true), Lit.make(1, true)))
         val problem = Problem(2, 0, emptyArray(), listOf(factor))
-        val state = LocalSearchState(problem, Random(0))
+        val state = LocalSearchState(problem.bake(), Random(0))
         for (i in 0 until problem.numFactors) state.factors[i].initialize(state, i)
 
         val policy = IteratedLocalSearchRestart(
@@ -143,7 +144,7 @@ class IteratedLocalSearchRestartTest {
     fun `single incumbent mode preserved by default`() {
         val factor = Cardinality.atLeastOne(intArrayOf(Lit.make(0, true), Lit.make(1, true)))
         val problem = Problem(2, 0, emptyArray(), listOf(factor))
-        val state = LocalSearchState(problem, Random(0))
+        val state = LocalSearchState(problem.bake(), Random(0))
         for (i in 0 until problem.numFactors) state.factors[i].initialize(state, i)
 
         val policy = IteratedLocalSearchRestart()
@@ -157,7 +158,7 @@ class IteratedLocalSearchRestartTest {
     fun `crossover restart with two anchors produces a mix of their values`() {
         val factor = Cardinality.atLeastOne(IntArray(8) { Lit.make(it, true) })
         val problem = Problem(8, 0, emptyArray(), listOf(factor))
-        val state = LocalSearchState(problem, Random(42))
+        val state = LocalSearchState(problem.bake(), Random(42))
         for (i in 0 until problem.numFactors) state.factors[i].initialize(state, i)
 
         val policy = IteratedLocalSearchRestart(
@@ -180,7 +181,7 @@ class IteratedLocalSearchRestartTest {
     fun `crossover survives incumbents whose arrays differ in length`() {
         val factor = Cardinality.atLeastOne(IntArray(4) { Lit.make(it, true) })
         val problem = Problem(4, 0, emptyArray(), listOf(factor))
-        val state = LocalSearchState(problem, Random(0))
+        val state = LocalSearchState(problem.bake(), Random(0))
         for (i in 0 until problem.numFactors) state.factors[i].initialize(state, i)
 
         val policy = IteratedLocalSearchRestart(populationSize = 2, crossoverRate = 1.0)
@@ -210,7 +211,7 @@ class IteratedLocalSearchRestartTest {
     fun `reset clears incumbents and restores perturbation strength`() {
         val factor = Cardinality.atLeastOne(intArrayOf(Lit.make(0, true), Lit.make(1, true)))
         val problem = Problem(2, 0, emptyArray(), listOf(factor))
-        val state = LocalSearchState(problem, Random(0))
+        val state = LocalSearchState(problem.bake(), Random(0))
         for (i in 0 until problem.numFactors) state.factors[i].initialize(state, i)
 
         val policy = IteratedLocalSearchRestart(populationSize = 3, initialPerturbationStrength = 3)

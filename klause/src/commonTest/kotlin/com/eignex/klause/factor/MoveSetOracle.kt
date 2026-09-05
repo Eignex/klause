@@ -7,6 +7,7 @@ import com.eignex.klause.ir.values
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
 import com.eignex.klause.localsearch.MoveSink
+import com.eignex.klause.propagation.bake
 import kotlin.random.Random
 import kotlin.test.assertTrue
 
@@ -39,21 +40,22 @@ object MoveSetOracle {
         require(problem.factors.size == 1) { "MoveSetOracle expects a single-factor Problem" }
         val factor = problem.factors[0]
         val rng = Random(seed)
+        val baked = problem.bake()
 
         repeat(iters) { iter ->
-            val state = LocalSearchState(problem, Random(seed + iter))
+            val state = LocalSearchState(baked, Random(seed + iter))
             randomizeAssignment(state, problem, rng)
             state.recompute()
             if (!state.factors[0].isViolated(state, 0)) return@repeat
 
-            val improvingNeighbors = bruteImproving(problem, state, factor)
+            val improvingNeighbors = bruteImproving(state, factor)
             val sink = MoveSink()
             state.factors[0].proposeRepairMoves(state, 0, sink)
             val proposed = sink.list
 
             for (move in proposed) {
-                assertLegal(move, problem, state, factor, label)
-                val delta = applyAndReport(problem, state, move)
+                assertLegal(move, state, factor, label)
+                val delta = applyAndReport(state, move)
                 if (requireImprovement) {
                     assertTrue(
                         delta <= 0,
@@ -64,7 +66,7 @@ object MoveSetOracle {
 
             if (improvingNeighbors.isNotEmpty()) {
                 val proposedImproves = proposed.any { move ->
-                    applyAndReport(problem, state, move) < 0
+                    applyAndReport(state, move) < 0
                 }
                 assertTrue(
                     proposedImproves,
@@ -92,9 +94,10 @@ object MoveSetOracle {
         require(problem.factors.size == 1) { "MoveSetOracle expects a single-factor Problem" }
         val factor = problem.factors[0]
         val rng = Random(seed)
+        val baked = problem.bake()
 
         repeat(iters) { iter ->
-            val state = LocalSearchState(problem, Random(seed + iter))
+            val state = LocalSearchState(baked, Random(seed + iter))
             // Search for a feasible start: a few random tries, then the factor's own feasible
             // seeder (structural globals supply one — it lands a permutation / tuple directly).
             var feasible = false
@@ -119,8 +122,8 @@ object MoveSetOracle {
             val sink = MoveSink()
             state.factors[0].proposeStructuredMoves(state, 0, sink)
             for (move in sink.list) {
-                assertLegal(move, problem, state, factor, label)
-                val delta = applyAndReport(problem, state, move)
+                assertLegal(move, state, factor, label)
+                val delta = applyAndReport(state, move)
                 assertTrue(
                     delta <= 0,
                     "$label: structured move $move broke feasibility (delta=$delta) on iter=$iter, " +
@@ -132,7 +135,7 @@ object MoveSetOracle {
 
     private const val FEASIBLE_SEARCH_BUDGET = 64
 
-    private fun assertLegal(move: Move, problem: Problem, state: LocalSearchState, factor: Factor, label: String) {
+    private fun assertLegal(move: Move, state: LocalSearchState, factor: Factor, label: String) {
         when (move) {
             is Move.BoolFlip -> {
                 assertTrue(
@@ -146,7 +149,7 @@ object MoveSetOracle {
                     move.varId in factor.intVars,
                     "$label: proposed IntSet on var ${move.varId} not in intVars ${factor.intVars.toList()}",
                 )
-                val d = problem.requireFiniteIntDomains()[move.varId]
+                val d = state.rootDomains[move.varId]
                 assertTrue(
                     move.newValue in d,
                     "$label: proposed IntSet target ${move.newValue} out of domain $d",
@@ -158,16 +161,16 @@ object MoveSetOracle {
             }
 
             is Move.Compound -> {
-                for (part in move.parts) assertLegal(part, problem, state, factor, label)
+                for (part in move.parts) assertLegal(part, state, factor, label)
             }
         }
     }
 
     /** Returns the delta in this factor's violation status when [move] is applied to a fresh
      *  copy of [state]. Does not mutate [state]. */
-    private fun applyAndReport(problem: Problem, state: LocalSearchState, move: Move): Int {
+    private fun applyAndReport(state: LocalSearchState, move: Move): Int {
         val before = if (state.factors[0].isViolated(state, 0)) 1 else 0
-        val sibling = LocalSearchState(problem, Random(0))
+        val sibling = LocalSearchState(state.problem, Random(0))
         copyAssignment(state, sibling)
         sibling.recompute()
         sibling.apply(move)
@@ -175,20 +178,20 @@ object MoveSetOracle {
         return after - before
     }
 
-    private fun bruteImproving(problem: Problem, state: LocalSearchState, factor: Factor): List<Move> {
+    private fun bruteImproving(state: LocalSearchState, factor: Factor): List<Move> {
         val out = ArrayList<Move>()
         for (b in factor.boolVars) {
             val move = Move.BoolFlip(b)
-            if (applyAndReport(problem, state, move) < 0) out.add(move)
+            if (applyAndReport(state, move) < 0) out.add(move)
         }
         for (v in factor.intVars) {
-            val d = problem.requireFiniteIntDomains()[v]
+            val d = state.rootDomains[v]
             val cur = state.assignment.intValue(v)
             for (k in d.min..d.max) {
                 if (k !in d) continue
                 if (k == cur) continue
                 val move = Move.IntSet(v, k)
-                if (applyAndReport(problem, state, move) < 0) out.add(move)
+                if (applyAndReport(state, move) < 0) out.add(move)
             }
         }
         return out
@@ -197,7 +200,7 @@ object MoveSetOracle {
     private fun randomizeAssignment(state: LocalSearchState, problem: Problem, rng: Random) {
         for (b in 0 until problem.numBoolVars) state.assignment.setBool(b, rng.nextBoolean())
         for (i in 0 until problem.numIntVars) {
-            val d: IntDomain = problem.requireFiniteIntDomains()[i]
+            val d: IntDomain = state.rootDomains[i]
             state.assignment.setInt(i, d.values.valueAt(rng.nextInt(d.values.size)))
         }
     }

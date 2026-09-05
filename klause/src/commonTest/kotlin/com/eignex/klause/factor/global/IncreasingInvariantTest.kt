@@ -7,6 +7,7 @@ import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move.Compound
 import com.eignex.klause.localsearch.Move.IntSet
 import com.eignex.klause.localsearch.MoveSink
+import com.eignex.klause.propagation.bake
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertFalse
@@ -22,7 +23,7 @@ class IncreasingInvariantTest {
             intDomains = Array(n) { IntDomain(lo.toLong(), hi.toLong()) },
             factors = arrayOf<Factor>(Increasing(IntArray(n) { it }, strict = strict)),
         )
-        val state = LocalSearchState(problem, Random(0))
+        val state = LocalSearchState(problem.bake(), Random(0))
         for (i in 0 until n) state.assignment.setInt(i, values[i].toLong())
         state.recompute()
         return state

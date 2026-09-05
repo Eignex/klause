@@ -4,6 +4,7 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
 import com.eignex.klause.localsearch.MoveSink
+import com.eignex.klause.propagation.bake
 import kotlin.random.Random
 import kotlin.test.assertEquals
 
@@ -65,7 +66,7 @@ class MoveMultiset private constructor(private val counts: Map<Move, Int>) {
 /** Build a fresh [LocalSearchState] over [problem] seeded with [seed], recomputed to a consistent
  *  initial violation state — the standard starting point both sides of an equivalence run share. */
 fun freshState(problem: Problem, seed: Long): LocalSearchState =
-    LocalSearchState(problem, Random(seed)).also { it.recompute() }
+    LocalSearchState(problem.bake(), Random(seed)).also { it.recompute() }
 
 /** Capture the multiset a [fill] closure emits into a fresh sink built from [state]'s assumptions
  *  and invariants (so the sink's frozen/defined filtering matches the production path). */

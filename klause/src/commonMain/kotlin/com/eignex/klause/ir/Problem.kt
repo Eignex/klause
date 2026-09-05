@@ -69,37 +69,27 @@ open class Problem(
     /**
      * Value set declared for [v], or `null` when the model admits its whole [intBounds] range.
      *
-     * A column with an open side declares nothing, whatever finite box a lane materialized for it; read
-     * that box through [requireFiniteIntDomains] and only for finite work.
+     * A column with an open side declares nothing, whatever finite box a lane materialized for it. The
+     * finite, root-propagated domains a search branches on are not read here at all — they belong to
+     * [com.eignex.klause.propagation.BakedProblem], which states them in its own type.
      */
     fun intDomainOrNull(v: Int): IntDomain? = declaredIntDomains.declaredOrNull(v)
 
     /**
-     * True when a value-set entry exists for every integer column, so [requireFiniteIntDomains] answers
-     * instead of rejecting.
+     * Finite domain of [v] as this model states it: the declared value set, or the closed [intBounds]
+     * range materialized where none was declared. On a [com.eignex.klause.propagation.BakedProblem] the
+     * two readings coincide — its declarations are the array its root fold writes into.
      *
-     * A weaker question than [intDomainOrNull] answering for every column: an open-marked column's entry
-     * is a fallback box and declares nothing, so this stays true while [intDomainOrNull] answers `null`
-     * for that column. A compatibility bridge for the finite consumers that still read their domains off
-     * a raw [Problem]; see [requireFiniteIntDomains].
+     * The model-side reading, taken where a projection may not exist yet: a span estimate, the
+     * materialization a bake is built from, a column a rebuild is about to box. A finite engine does not
+     * reach for it — it takes a `BakedProblem` and branches on `rootIntDomain`.
      */
-    val hasFiniteIntDomains: Boolean get() = declaredIntDomains.statedOrNull() != null
-
-    /**
-     * Every declared value set, rejecting a model that states bounds alone.
-     *
-     * A compatibility bridge, not the finite boundary: the finite, root-propagated domains belong to
-     * [com.eignex.klause.propagation.BakedProblem], which states them in its own type. Consumers still
-     * reading them off a raw [Problem] go through here until they take a `BakedProblem` parameter.
-     */
-    fun requireFiniteIntDomains(): Array<IntDomain> = requireNotNull(declaredIntDomains.statedOrNull()) {
-        "finite CP state requested for a problem that declares integer bounds alone"
-    }
-
-    /** Finite declared domain of [v], materialized from model bounds when no value set is declared. */
     internal fun finiteIntDomain(v: Int): IntDomain = declaredIntDomains.finiteDomain(v)
 
-    /** Finite declared domains without running root propagation. */
+    /**
+     * Every [finiteIntDomain], in column order, copied so a caller may narrow the result in place — the
+     * materialization a bake or an explicitly boxed candidate model is built from.
+     */
     internal fun finiteIntDomains(): Array<IntDomain> = declaredIntDomains.finiteDomains()
 
     init {

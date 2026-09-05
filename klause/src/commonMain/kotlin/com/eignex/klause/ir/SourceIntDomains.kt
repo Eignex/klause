@@ -56,9 +56,6 @@ class SourceIntDomains internal constructor(
     /** Every column's finite domain, materialized where no box was supplied. */
     fun finiteDomains(): Array<IntDomain> = stated?.copyOf() ?: Array(size, ::finiteDomain)
 
-    /** The supplied boxes, handed back without copying; the bridge a finite consumer still reads. */
-    internal fun statedOrNull(): Array<IntDomain>? = stated
-
     /**
      * These declarations over [newBounds], or `null` when the narrower range leaves a declared value set
      * empty.

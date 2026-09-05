@@ -6412,7 +6412,7 @@ final class com.eignex.klause.localsearch/LocalSearchSolver : com.eignex.klause.
 }
 
 final class com.eignex.klause.localsearch/LocalSearchState { // com.eignex.klause.localsearch/LocalSearchState|null[0]
-    constructor <init>(com.eignex.klause.ir/Problem, kotlin.random/Random, com.eignex.klause.propagation/Assumptions = ..., com.eignex.klause.localsearch/LocalSearchProblem = ...) // com.eignex.klause.localsearch/LocalSearchState.<init>|<init>(com.eignex.klause.ir.Problem;kotlin.random.Random;com.eignex.klause.propagation.Assumptions;com.eignex.klause.localsearch.LocalSearchProblem){}[0]
+    constructor <init>(com.eignex.klause.propagation/BakedProblem, kotlin.random/Random, com.eignex.klause.propagation/Assumptions = ..., com.eignex.klause.localsearch/LocalSearchProblem = ...) // com.eignex.klause.localsearch/LocalSearchState.<init>|<init>(com.eignex.klause.propagation.BakedProblem;kotlin.random.Random;com.eignex.klause.propagation.Assumptions;com.eignex.klause.localsearch.LocalSearchProblem){}[0]
 
     final val assignment // com.eignex.klause.localsearch/LocalSearchState.assignment|{}assignment[0]
         final fun <get-assignment>(): com.eignex.klause.solver/Assignment // com.eignex.klause.localsearch/LocalSearchState.assignment.<get-assignment>|<get-assignment>(){}[0]
@@ -6431,7 +6431,7 @@ final class com.eignex.klause.localsearch/LocalSearchState { // com.eignex.klaus
     final val moveSink // com.eignex.klause.localsearch/LocalSearchState.moveSink|{}moveSink[0]
         final fun <get-moveSink>(): com.eignex.klause.localsearch/MoveSink // com.eignex.klause.localsearch/LocalSearchState.moveSink.<get-moveSink>|<get-moveSink>(){}[0]
     final val problem // com.eignex.klause.localsearch/LocalSearchState.problem|{}problem[0]
-        final fun <get-problem>(): com.eignex.klause.ir/Problem // com.eignex.klause.localsearch/LocalSearchState.problem.<get-problem>|<get-problem>(){}[0]
+        final fun <get-problem>(): com.eignex.klause.propagation/BakedProblem // com.eignex.klause.localsearch/LocalSearchState.problem.<get-problem>|<get-problem>(){}[0]
     final val projection // com.eignex.klause.localsearch/LocalSearchState.projection|{}projection[0]
         final fun <get-projection>(): com.eignex.klause.localsearch/LocalSearchProblem // com.eignex.klause.localsearch/LocalSearchState.projection.<get-projection>|<get-projection>(){}[0]
     final val refPayload // com.eignex.klause.localsearch/LocalSearchState.refPayload|{}refPayload[0]
@@ -11159,8 +11159,6 @@ open class com.eignex.klause.ir/Problem { // com.eignex.klause.ir/Problem|null[0
         final fun <get-declaredIntDomains>(): com.eignex.klause.ir/SourceIntDomains // com.eignex.klause.ir/Problem.declaredIntDomains.<get-declaredIntDomains>|<get-declaredIntDomains>(){}[0]
     final val factors // com.eignex.klause.ir/Problem.factors|{}factors[0]
         final fun <get-factors>(): kotlin/Array<com.eignex.klause.ir/Factor> // com.eignex.klause.ir/Problem.factors.<get-factors>|<get-factors>(){}[0]
-    final val hasFiniteIntDomains // com.eignex.klause.ir/Problem.hasFiniteIntDomains|{}hasFiniteIntDomains[0]
-        final fun <get-hasFiniteIntDomains>(): kotlin/Boolean // com.eignex.klause.ir/Problem.hasFiniteIntDomains.<get-hasFiniteIntDomains>|<get-hasFiniteIntDomains>(){}[0]
     final val hasSymmetryBreaking // com.eignex.klause.ir/Problem.hasSymmetryBreaking|{}hasSymmetryBreaking[0]
         final fun <get-hasSymmetryBreaking>(): kotlin/Boolean // com.eignex.klause.ir/Problem.hasSymmetryBreaking.<get-hasSymmetryBreaking>|<get-hasSymmetryBreaking>(){}[0]
     final val impliedFactorMask // com.eignex.klause.ir/Problem.impliedFactorMask|{}impliedFactorMask[0]
@@ -11181,7 +11179,6 @@ open class com.eignex.klause.ir/Problem { // com.eignex.klause.ir/Problem|null[0
         final fun <get-realUpper>(): kotlin/DoubleArray // com.eignex.klause.ir/Problem.realUpper.<get-realUpper>|<get-realUpper>(){}[0]
 
     final fun intDomainOrNull(kotlin/Int): com.eignex.klause.ir/IntDomain? // com.eignex.klause.ir/Problem.intDomainOrNull|intDomainOrNull(kotlin.Int){}[0]
-    final fun requireFiniteIntDomains(): kotlin/Array<com.eignex.klause.ir/IntDomain> // com.eignex.klause.ir/Problem.requireFiniteIntDomains|requireFiniteIntDomains(){}[0]
     final fun withFactors(kotlin/Array<com.eignex.klause.ir/Factor>, kotlin/BooleanArray? = ...): com.eignex.klause.ir/Problem // com.eignex.klause.ir/Problem.withFactors|withFactors(kotlin.Array<com.eignex.klause.ir.Factor>;kotlin.BooleanArray?){}[0]
     final fun withIntDomains(kotlin/Array<com.eignex.klause.ir/IntDomain>): com.eignex.klause.ir/Problem // com.eignex.klause.ir/Problem.withIntDomains|withIntDomains(kotlin.Array<com.eignex.klause.ir.IntDomain>){}[0]
 }

@@ -96,10 +96,10 @@ class StructuralReductionTest {
         assertEquals(7L, checkNotNull(theLinear(out).integerConstants).bound)
         assertEquals(
             1L,
-            out.requireFiniteIntDomains()[0].min,
+            out.finiteIntDomain(0).min,
             "index lower bound clamped to the array's first position",
         )
-        assertEquals(3L, out.requireFiniteIntDomains()[0].max, "index upper bound clamped to the array's last position")
+        assertEquals(3L, out.finiteIntDomain(0).max, "index upper bound clamped to the array's last position")
     }
 
     @Test

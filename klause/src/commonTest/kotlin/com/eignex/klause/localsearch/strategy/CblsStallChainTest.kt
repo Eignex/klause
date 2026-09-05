@@ -10,6 +10,7 @@ import com.eignex.klause.localsearch.Move
 import com.eignex.klause.localsearch.MoveSink
 import com.eignex.klause.localsearch.proposeRepairChains
 import com.eignex.klause.propagation.Assumptions
+import com.eignex.klause.propagation.bake
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -47,7 +48,7 @@ class CblsStallChainTest {
         vals: IntArray,
         assumptions: Assumptions = Assumptions.None,
     ): LocalSearchState {
-        val state = LocalSearchState(problem, Random(7), assumptions)
+        val state = LocalSearchState(problem.bake(), Random(7), assumptions)
         for (i in vals.indices) state.assignment.setInt(i, vals[i].toLong())
         state.recompute()
         return state
@@ -110,7 +111,7 @@ class CblsStallChainTest {
                 Linear(intArrayOf(-1, 1), intArrayOf(0, 1), LinearOp.GE, 3),
             ),
         )
-        val state = LocalSearchState(problem, Random(7))
+        val state = LocalSearchState(problem.bake(), Random(7))
         state.recompute()
         val strategy = Cbls()
         var compounds = 0
@@ -143,7 +144,7 @@ class CblsStallChainTest {
                 Linear(intArrayOf(1), intArrayOf(2), LinearOp.GE, 7),
             ),
         )
-        val state = LocalSearchState(problem, Random(7))
+        val state = LocalSearchState(problem.bake(), Random(7))
         state.recompute()
         val strategy = Cbls(stallChainCap = 8)
         var chainPicks = 0

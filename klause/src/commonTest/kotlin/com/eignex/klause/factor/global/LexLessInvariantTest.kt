@@ -7,6 +7,7 @@ import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move.Compound
 import com.eignex.klause.localsearch.Move.IntSet
 import com.eignex.klause.localsearch.MoveSink
+import com.eignex.klause.propagation.bake
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertTrue
@@ -22,7 +23,7 @@ class LexLessInvariantTest {
             intDomains = Array(4) { IntDomain(0, 5) },
             factors = arrayOf<Factor>(factor),
         )
-        val state = LocalSearchState(problem, Random(0))
+        val state = LocalSearchState(problem.bake(), Random(0))
         // xs = [3, 1], ys = [2, 4]. Violation at k=0 (xs[0]=3 > ys[0]=2).
         state.assignment.setInt(0, 3)
         state.assignment.setInt(1, 1)
@@ -53,7 +54,7 @@ class LexLessInvariantTest {
             intDomains = Array(2) { IntDomain(0, 5) },
             factors = arrayOf<Factor>(factor),
         )
-        val state = LocalSearchState(problem, Random(0))
+        val state = LocalSearchState(problem.bake(), Random(0))
         state.assignment.setInt(0, 4)
         state.assignment.setInt(1, 2)
         state.recompute()
@@ -81,7 +82,7 @@ class LexLessInvariantTest {
             intDomains = Array(4) { IntDomain(0, 5) },
             factors = arrayOf<Factor>(factor),
         )
-        val state = LocalSearchState(problem, Random(0))
+        val state = LocalSearchState(problem.bake(), Random(0))
         // xs == ys. Strict requires a strict break; the comparable prefix is fully equal.
         state.assignment.setInt(0, 2)
         state.assignment.setInt(1, 3)

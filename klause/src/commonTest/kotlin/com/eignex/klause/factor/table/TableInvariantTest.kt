@@ -27,7 +27,7 @@ class TableInvariantTest {
                 Table(xs = intArrayOf(0, 1), tuples = longArrayOf(0, 1, 2, 3)),
             ),
         )
-        val state = LocalSearchState(problem, Random(0))
+        val state = LocalSearchState(problem.bake(), Random(0))
         state.assignment.setInt(0, 2)
         state.assignment.setInt(1, 3)
         state.recompute()
@@ -46,7 +46,7 @@ class TableInvariantTest {
                 Table(xs = intArrayOf(0, 1), tuples = longArrayOf(0, 1, 2, 3)),
             ),
         )
-        val state = LocalSearchState(problem, Random(0))
+        val state = LocalSearchState(problem.bake(), Random(0))
         state.assignment.setInt(0, 1)
         state.assignment.setInt(1, 1)
         state.recompute()
@@ -66,7 +66,7 @@ class TableInvariantTest {
                 Table(xs = intArrayOf(0, 1), tuples = longArrayOf(0, 1, 2, 3)),
             ),
         )
-        val state = LocalSearchState(problem, Random(0))
+        val state = LocalSearchState(problem.bake(), Random(0))
         state.assignment.setInt(0, 1)
         state.assignment.setInt(1, 1)
         state.recompute()

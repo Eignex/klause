@@ -6,6 +6,7 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.LocalSearchState
+import com.eignex.klause.propagation.bake
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -52,14 +53,14 @@ class FeasibilityJumpTest {
 
     @Test
     fun `reaches feasibility on a solvable instance`() {
-        val state = LocalSearchState(sumProblem(), Random(7))
+        val state = LocalSearchState(sumProblem().bake(), Random(7))
         drive(FeasibilityJump(), state, maxSteps = 100)
         assertEquals(0L, state.cost, "FJ must reach feasibility on x0 + x1 = 6")
     }
 
     @Test
     fun `makes progress on a coupled instance via adaptive weights`() {
-        val state = LocalSearchState(coupledProblem(), Random(7))
+        val state = LocalSearchState(coupledProblem().bake(), Random(7))
         state.recompute()
         val before = state.cost
         drive(FeasibilityJump(), state, maxSteps = 10_000)
@@ -68,8 +69,8 @@ class FeasibilityJumpTest {
 
     @Test
     fun `is deterministic for a fixed seed`() {
-        val a = LocalSearchState(coupledProblem(), Random(42))
-        val b = LocalSearchState(coupledProblem(), Random(42))
+        val a = LocalSearchState(coupledProblem().bake(), Random(42))
+        val b = LocalSearchState(coupledProblem().bake(), Random(42))
         drive(FeasibilityJump(), a, maxSteps = 500)
         drive(FeasibilityJump(), b, maxSteps = 500)
         assertEquals(a.assignment.intValue(0), b.assignment.intValue(0))

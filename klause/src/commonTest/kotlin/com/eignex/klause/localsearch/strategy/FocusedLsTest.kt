@@ -33,7 +33,7 @@ class FocusedLsTest {
     fun `conf change flips false on flipped var stays true for neighbors and resets on restart`() {
         val factor = Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true)))
         val problem = Problem(3, 0, emptyArray(), listOf(factor))
-        val state = LocalSearchState(problem, Random(0))
+        val state = LocalSearchState(problem.bake(), Random(0))
         state.restart()
         assertTrue(state.boolConfChange.all { it }, "restart should set all conf-change true")
 

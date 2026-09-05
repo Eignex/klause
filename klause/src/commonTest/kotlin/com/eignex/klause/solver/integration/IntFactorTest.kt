@@ -10,6 +10,7 @@ import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
 import com.eignex.klause.localsearch.MoveSink
 import com.eignex.klause.model.IntCmpOp
+import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.*
 import kotlin.random.Random
 import kotlin.test.Test
@@ -21,7 +22,7 @@ class IntFactorTest {
 
     private fun stateFor(numIntVars: Int, domains: Array<IntDomain>, factor: Factor): LocalSearchState {
         val problem = Problem(0, numIntVars, domains, listOf(factor))
-        val state = LocalSearchState(problem, Random(0))
+        val state = LocalSearchState(problem.bake(), Random(0))
         state.recompute()
         return state
     }
@@ -88,7 +89,7 @@ class IntFactorTest {
     fun `reified int compare tracks aux flips`() {
         val rfc = reifiedIntCompare(auxBoolVar = 0, intVar = 0, op = IntCmpOp.LE, 5)
         val problem = Problem(1, 1, arrayOf(IntDomain(0, 10)), listOf(rfc))
-        val state = LocalSearchState(problem, Random(0))
+        val state = LocalSearchState(problem.bake(), Random(0))
         state.assignment.setBool(0, true)
         state.assignment.setInt(0, 3)
         state.recompute()

@@ -5,6 +5,7 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
+import com.eignex.klause.propagation.bake
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -25,7 +26,7 @@ class SymmetricAllDifferentInvariantTest {
     fun `not violated for an involution`() {
         // xs[xs[i]]=i holds for the identity and for a 2-cycle with one fixed point.
         for (xs in listOf(listOf(0L, 1L, 2L), listOf(1L, 0L, 2L))) {
-            val state = LocalSearchState(problem(), Random(0))
+            val state = LocalSearchState(problem().bake(), Random(0))
             for (i in 0..2) state.assignment.setInt(i, xs[i])
             state.recompute()
             assertFalse(state.factors[0].isViolated(state, 0), "xs=$xs is an involution")
@@ -36,7 +37,7 @@ class SymmetricAllDifferentInvariantTest {
     @Test
     fun `violated when xs is a 3-cycle`() {
         val p = problem()
-        val state = LocalSearchState(p, Random(0))
+        val state = LocalSearchState(p.bake(), Random(0))
         // xs=[1,2,0]: xs[xs[0]]=xs[1]=2 ≠ 0 → violated
         state.assignment.setInt(0, 1)
         state.assignment.setInt(1, 2)
@@ -48,7 +49,7 @@ class SymmetricAllDifferentInvariantTest {
     @Test
     fun `delta predicts degree change on corrective assignment`() {
         val p = problem()
-        val state = LocalSearchState(p, Random(0))
+        val state = LocalSearchState(p.bake(), Random(0))
         // xs=[1,2,0] violated
         state.assignment.setInt(0, 1)
         state.assignment.setInt(1, 2)

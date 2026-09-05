@@ -54,7 +54,7 @@ class SmtLibAssertedOrTest {
         val accepted = (0L..5L).filter { v ->
             val domains = Array(
                 parsed.numIntVars,
-            ) { i -> if (i == 0) IntDomain(v, v) else parsed.requireFiniteIntDomains()[i] }
+            ) { i -> if (i == 0) IntDomain(v, v) else parsed.finiteIntDomain(i) }
             BacktrackSolver(parsed.withIntDomains(domains).bake()).solve(BacktrackParams()) is SolveResult.Sat
         }
         assertEquals(listOf(1L, 4L), accepted, "only the disjoined values should survive")

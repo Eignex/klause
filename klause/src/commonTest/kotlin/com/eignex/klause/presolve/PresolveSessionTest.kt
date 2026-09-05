@@ -26,8 +26,8 @@ class PresolveSessionTest {
     private fun base(vararg factors: Factor) = Problem(0, 3, domains(), factors.toList()).bake()
 
     private fun bounds(problem: Problem) = (0 until problem.numIntVars).map {
-        problem.requireFiniteIntDomains()[it].min to
-            problem.requireFiniteIntDomains()[it].max
+        problem.finiteIntDomain(it).min to
+            problem.finiteIntDomain(it).max
     }
 
     @Test
@@ -45,7 +45,7 @@ class PresolveSessionTest {
         assertEquals(bounds(reference), bounds(got))
         assertEquals(3, got.factors.size)
         // x2 upper-bounded through the chain
-        val x2 = got.requireFiniteIntDomains()[2]
+        val x2 = got.rootIntDomain(2)
         assertEquals(0L to 5L, x2.min to x2.max)
     }
 
@@ -69,7 +69,7 @@ class PresolveSessionTest {
         )
         assertEquals(bounds(reference), bounds(got))
         // x2 upper-bounded through the chain
-        val x2 = got.requireFiniteIntDomains()[2]
+        val x2 = got.rootIntDomain(2)
         assertEquals(0L to 3L, x2.min to x2.max)
     }
 

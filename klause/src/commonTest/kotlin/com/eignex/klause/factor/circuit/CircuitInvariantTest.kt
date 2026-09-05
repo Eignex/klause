@@ -33,7 +33,7 @@ class CircuitInvariantTest {
     @Test
     fun `complete cycle 0_1_2_3_0 is satisfied`() {
         val problem = fourNodeProblem()
-        val state = LocalSearchState(problem, Random(0))
+        val state = LocalSearchState(problem.bake(), Random(0))
         state.assignment.setInt(0, 1)
         state.assignment.setInt(1, 2)
         state.assignment.setInt(2, 3)
@@ -45,7 +45,7 @@ class CircuitInvariantTest {
     @Test
     fun `sub-cycle 0_1_0 with disconnected 2_3 is violated`() {
         val problem = fourNodeProblem()
-        val state = LocalSearchState(problem, Random(0))
+        val state = LocalSearchState(problem.bake(), Random(0))
         state.assignment.setInt(0, 1)
         state.assignment.setInt(1, 0)
         state.assignment.setInt(2, 3)
@@ -59,7 +59,7 @@ class CircuitInvariantTest {
     @Test
     fun `self-loop is violated for N greater than 1`() {
         val problem = fourNodeProblem()
-        val state = LocalSearchState(problem, Random(0))
+        val state = LocalSearchState(problem.bake(), Random(0))
         state.assignment.setInt(0, 0)
         state.assignment.setInt(1, 2)
         state.assignment.setInt(2, 3)
@@ -94,7 +94,7 @@ class CircuitInvariantTest {
     @Test
     fun `4 self-loops rank as more broken than two disjoint 2-cycles`() {
         val problem = fourNodeProblem()
-        val state = LocalSearchState(problem, Random(0))
+        val state = LocalSearchState(problem.bake(), Random(0))
 
         state.assignment.setInt(0, 0)
         state.assignment.setInt(1, 1)
@@ -111,7 +111,7 @@ class CircuitInvariantTest {
     @Test
     fun `applying a move that breaks the cycle raises the cost`() {
         val problem = fourNodeProblem()
-        val state = LocalSearchState(problem, Random(0))
+        val state = LocalSearchState(problem.bake(), Random(0))
         state.assignment.setInt(0, 1)
         state.assignment.setInt(1, 2)
         state.assignment.setInt(2, 3)
@@ -153,14 +153,15 @@ class CircuitInvariantTest {
     @Test
     fun `every structured circuit move preserves the Hamiltonian tour`() {
         val n = 8
+        val circuit = nNodeCircuit(n).bake()
         for (seed in longArrayOf(1L, 2L, 3L, 13L, 99L)) {
-            val state = LocalSearchState(nNodeCircuit(n), Random(seed))
+            val state = LocalSearchState(circuit, Random(seed))
             seedTour(state, n)
             assertEquals(0, state.cost, "the seed tour must be feasible")
             val sink = MoveSink()
             state.factors[0].proposeExtendedStructuredMoves(state, 0, sink)
             for (move in sink.list) {
-                val check = LocalSearchState(nNodeCircuit(n), Random(0))
+                val check = LocalSearchState(circuit, Random(0))
                 seedTour(check, n)
                 check.apply(move)
                 assertEquals(0, check.cost, "structured move $move broke the tour")
@@ -171,9 +172,10 @@ class CircuitInvariantTest {
     @Test
     fun `2-opt reversals reach compounds a 3-edge swap cannot`() {
         val n = 8
+        val circuit = nNodeCircuit(n).bake()
         var maxParts = 0
         for (seed in 0L until 40L) {
-            val state = LocalSearchState(nNodeCircuit(n), Random(seed))
+            val state = LocalSearchState(circuit, Random(seed))
             seedTour(state, n)
             val sink = MoveSink()
             state.factors[0].proposeExtendedStructuredMoves(state, 0, sink)
@@ -202,7 +204,7 @@ class CircuitInvariantTest {
         )
         for ((succ, message) in cases) {
             val problem = fourNodeSubcircuitProblem()
-            val state = LocalSearchState(problem, Random(0))
+            val state = LocalSearchState(problem.bake(), Random(0))
             for (i in succ.indices) state.assignment.setInt(i, succ[i])
             state.recompute()
             assertEquals(0, state.cost, message)
@@ -212,7 +214,7 @@ class CircuitInvariantTest {
     @Test
     fun `pointing to an excluded node is violated`() {
         val problem = fourNodeSubcircuitProblem()
-        val state = LocalSearchState(problem, Random(0))
+        val state = LocalSearchState(problem.bake(), Random(0))
         // succ[0]=2 but succ[2]=2 (excluded). Pointing to an excluded node breaks the chain.
         state.assignment.setInt(0, 2)
         state.assignment.setInt(1, 0)
@@ -231,7 +233,7 @@ class CircuitInvariantTest {
             intDomains = Array(6) { IntDomain(0, 5) },
             factors = arrayOf<Factor>(factor),
         )
-        val state = LocalSearchState(problem, Random(0))
+        val state = LocalSearchState(problem.bake(), Random(0))
         // Two 3-cycles: 0→1→2→0 and 3→4→5→3. All included, but two cycles → violated.
         state.assignment.setInt(0, 1)
         state.assignment.setInt(1, 2)
@@ -260,7 +262,7 @@ class CircuitInvariantTest {
     )
 
     private fun seededSubcircuit(seed: Long): LocalSearchState {
-        val state = LocalSearchState(subcircuitWithExcluded(), Random(seed))
+        val state = LocalSearchState(subcircuitWithExcluded().bake(), Random(seed))
         for (i in 0 until 5) state.assignment.setInt(i, ((i + 1) % 5).toLong())
         state.assignment.setInt(5, 5)
         state.recompute()

@@ -4,12 +4,11 @@ import com.eignex.klause.factor.DEFAULT_VIOLATION_SOFT_CAP
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.ir.IntDomain
-import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.localsearch.Move
 import com.eignex.klause.localsearch.movesource.ViolatedRepairs
 import com.eignex.klause.propagation.Assumptions
-import com.eignex.klause.propagation.finiteRootDomains
+import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.Assignment
 import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective
@@ -32,7 +31,7 @@ internal const val IMPLIED_FACTOR_INITIAL_WEIGHT: Double = 0.1
  */
 class LocalSearchState(
     /** The problem being searched. */
-    val problem: Problem,
+    val problem: BakedProblem,
     /** Search RNG. */
     val rng: Random,
     /** Variables pinned for this search. */
@@ -41,9 +40,9 @@ class LocalSearchState(
     val projection: LocalSearchProblem = LocalSearchProblem(problem),
 ) {
     /** The stable root domains this search was seeded from — read by invariants for a variable's
-     *  original bounds. Decoupled from [problem] so the seed source (declared vs baked) can vary without
-     *  the invariants caring which. */
-    val rootDomains: Array<IntDomain> = problem.finiteRootDomains
+     *  original bounds. The projection's own fold, aliased rather than copied: local search reads these
+     *  and never narrows them. */
+    val rootDomains: Array<IntDomain> = problem.rootIntDomainsInPlace
 
     /** The current variable assignment. */
     val assignment: Assignment = Assignment(

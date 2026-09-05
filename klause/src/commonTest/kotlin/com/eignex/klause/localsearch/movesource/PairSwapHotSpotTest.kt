@@ -8,6 +8,7 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
 import com.eignex.klause.localsearch.MoveSink
+import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.objective.LinearObjective
 import kotlin.random.Random
 import kotlin.test.Test
@@ -30,7 +31,7 @@ class PairSwapHotSpotTest {
     )
 
     private fun prepared(seed: Long): LocalSearchState {
-        val state = LocalSearchState(problem(), Random(seed))
+        val state = LocalSearchState(problem().bake(), Random(seed))
         state.shaping.objective = LinearObjective(intCoefficients = longArrayOf(0, 1, 0, 1))
         // Distinct values so int swaps are always legal.
         state.assignment.setInt(0, 2)
@@ -56,7 +57,7 @@ class PairSwapHotSpotTest {
 
     @Test
     fun `objective hot-spot var is -1 when the objective exposes no int gradient`() {
-        val state = LocalSearchState(problem(), Random(1))
+        val state = LocalSearchState(problem().bake(), Random(1))
         // No objective set.
         assertEquals(-1, state.shaping.objectiveHotSpotIntVar(state.rng))
     }

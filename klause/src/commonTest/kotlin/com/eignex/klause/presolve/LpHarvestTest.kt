@@ -80,7 +80,7 @@ class LpHarvestTest {
             fun rec(idx: Int) {
                 if (idx == n) {
                     if (feasible()) {
-                        val harvestedDomains = harvested.requireFiniteIntDomains()
+                        val harvestedDomains = harvested.finiteIntDomains()
                         for (v in 0 until n) {
                             assertTrue(
                                 point[v].toLong() in harvestedDomains[v],
@@ -120,8 +120,8 @@ class LpHarvestTest {
         val obj = LinearObjective(intCoefficients = longArrayOf(0L, 0L, 0L, 1L))
         val harvested = lpHarvest(problem, obj, objShavingParams, cancellation = Cancellation.Never)
         assertTrue(harvested !== problem, "objective shaving proved a floor; the harvest must apply it")
-        assertTrue(harvested.requireFiniteIntDomains()[3].min >= 2, "objective floor z>=2 not folded into the domain")
-        assertTrue(2 in harvested.requireFiniteIntDomains()[3], "harvest excluded the attainable optimum z=2")
+        assertTrue(harvested.finiteIntDomain(3).min >= 2, "objective floor z>=2 not folded into the domain")
+        assertTrue(2 in harvested.finiteIntDomain(3), "harvest excluded the attainable optimum z=2")
     }
 
     @Test
@@ -158,11 +158,11 @@ class LpHarvestTest {
         val harvested = lpHarvest(problem, obj, shavingParams, cancellation = Cancellation.Never)
         for (v in 0 until problem.numIntVars) {
             assertTrue(
-                harvested.requireFiniteIntDomains()[v].min >= problem.requireFiniteIntDomains()[v].min,
+                harvested.finiteIntDomain(v).min >= problem.finiteIntDomain(v).min,
                 "lower bound widened for x$v",
             )
             assertTrue(
-                harvested.requireFiniteIntDomains()[v].max <= problem.requireFiniteIntDomains()[v].max,
+                harvested.finiteIntDomain(v).max <= problem.finiteIntDomain(v).max,
                 "upper bound widened for x$v",
             )
         }
@@ -337,7 +337,7 @@ class LpHarvestTest {
             // Raw, exactly as the SMT frontend builds a wide model: the declared domains reach the
             // probe as-is, with no O(span) base bake at construction — so this asserts the probe alone
             // certifies infeasibility in one LP solve, fast regardless of the span.
-        ).bake()
+        )
         assertTrue(
             lpRootInfeasible(problem, LinearObjective(), LpPlan(bounding = true)),
             "the root LP must certify the difference cycle infeasible",
@@ -351,7 +351,7 @@ class LpHarvestTest {
             2,
             arrayOf(IntDomain(0, 1_000_000_000), IntDomain(0, 1_000_000_000)),
             arrayOf<Factor>(Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.LE, -1)),
-        ).bake()
+        )
         assertFalse(
             lpRootInfeasible(problem, LinearObjective(), LpPlan(bounding = true)),
             "a satisfiable relaxation must not be reported infeasible",
@@ -374,7 +374,7 @@ class LpHarvestTest {
         ).bake()
         val tightened = lpRootBounds(problem, LinearObjective(), LpPlan(bounding = true))
         assertTrue(tightened !== problem, "OBBT must tighten a domain the LP bounds below propagation")
-        assertEquals(5L, tightened.requireFiniteIntDomains()[0].max, "the LP proves x <= 5 (2x <= x + y <= 10)")
+        assertEquals(5L, tightened.finiteIntDomain(0).max, "the LP proves x <= 5 (2x <= x + y <= 10)")
     }
 
     @Test
@@ -397,7 +397,7 @@ class LpHarvestTest {
         val tightened = lpRootBounds(problem, LinearObjective(), LpPlan(bounding = true))
         assertEquals(
             5L,
-            tightened.requireFiniteIntDomains()[x].max,
+            tightened.finiteIntDomain(x).max,
             "the widest domain is probed regardless of its index",
         )
     }
@@ -441,7 +441,7 @@ class LpHarvestTest {
         val n = original.numIntVars
         val point = IntArray(n)
         fun feasible(p: Problem): Boolean {
-            for (v in 0 until n) if (point[v].toLong() !in p.requireFiniteIntDomains()[v]) return false
+            for (v in 0 until n) if (point[v].toLong() !in p.finiteIntDomain(v)) return false
             return p.factors.filterIsInstance<Linear>().all { f ->
                 var s = 0L
                 for (i in f.vars.indices) s += checkNotNull(f.integerConstants).coeffs[i] * point[f.vars[i]]

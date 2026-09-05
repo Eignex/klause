@@ -185,7 +185,7 @@ class FinitePipelineTest {
         val once = FinitePipeline.prepare(
             FinitePipelineRequest(problem, FiniteEngine.BACKTRACK, objective, config),
         )
-        assertTrue(once.problem.requireFiniteIntDomains()[3].min >= 2)
+        assertTrue(once.problem.finiteIntDomain(3).min >= 2)
 
         val again = FinitePipeline.prepare(
             FinitePipelineRequest(once.problem, FiniteEngine.BACKTRACK, objective, config),

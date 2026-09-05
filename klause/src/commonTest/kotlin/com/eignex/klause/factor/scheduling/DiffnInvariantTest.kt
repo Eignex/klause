@@ -4,6 +4,7 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
+import com.eignex.klause.propagation.bake
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -24,7 +25,7 @@ class DiffnInvariantTest {
         seed: Int,
     ) {
         val problem = Problem(0, numIntVars, domains, listOf(factor))
-        val state = LocalSearchState(problem, Random(seed.toLong()))
+        val state = LocalSearchState(problem.bake(), Random(seed.toLong()))
         state.recompute()
         val rng = Random(seed * 31L + 1)
         repeat(600) { step ->
@@ -47,12 +48,12 @@ class DiffnInvariantTest {
             heights = longArrayOf(1, 2, 2, 1),
         )
         val problem = Problem(0, 8, Array(8) { IntDomain(0, 4) }, listOf(factor))
-        val state = LocalSearchState(problem, Random(7))
+        val state = LocalSearchState(problem.bake(), Random(7))
         state.recompute()
         val rng = Random(99)
         repeat(600) { step ->
             state.apply(Move.IntSet(rng.nextInt(8), rng.nextInt(0, 5).toLong()))
-            val fresh = LocalSearchState(problem, Random(0))
+            val fresh = LocalSearchState(problem.bake(), Random(0))
             for (k in 0 until 8) fresh.assignment.setInt(k, state.assignment.intValue(k))
             fresh.recompute()
             assertEquals(

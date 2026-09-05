@@ -23,30 +23,36 @@ import kotlin.time.TimeSource
  * been invented to close a side the source left open. Consumers reasoning about the model rather than
  * enumerating its values read the bounds; consumers that search read the domains.
  */
-class BakedProblem internal constructor(
+class BakedProblem private constructor(
     numBoolVars: Int,
     numIntVars: Int,
-    intDomains: Array<IntDomain>,
+    /**
+     * The array the root fold writes into and every finite accessor reads, owned outright by this
+     * projection: it also backs the source declarations below, so a narrowing the fold proves lands in
+     * one place rather than leaving the two readings of the same column disagreeing.
+     */
+    internal val foldedIntDomains: Array<IntDomain>,
+    /** Whether [foldedIntDomains] already carries this projection's root deductions, so no fold runs. */
+    internal val alreadyFolded: Boolean,
     factors: Array<Factor>,
-    private val seedDeductions: PropagationResult = PropagationResult.Implied.EMPTY,
-    impliedFactorMask: BooleanArray? = null,
-    hasSymmetryBreaking: Boolean = false,
+    seedDeductions: PropagationResult,
+    impliedFactorMask: BooleanArray?,
+    hasSymmetryBreaking: Boolean,
     numRealVars: Int,
     realLower: DoubleArray,
     realUpper: DoubleArray,
-    openIntLo: BooleanArray? = null,
-    openIntHi: BooleanArray? = null,
-    packedOpenIntLo: Bits? = null,
-    packedOpenIntHi: Bits? = null,
-    modelBounds: IntBounds? = null,
-    internal val cancellation: Cancellation = Cancellation.Never,
-    internal val alreadyFolded: Boolean = false,
+    openIntLo: BooleanArray?,
+    openIntHi: BooleanArray?,
+    packedOpenIntLo: Bits?,
+    packedOpenIntHi: Bits?,
+    modelBounds: IntBounds?,
+    internal val cancellation: Cancellation,
 ) : Problem(
     numBoolVars = numBoolVars,
     numIntVars = numIntVars,
     declaredIntDomains = SourceIntDomains.ofDomains(
-        domains = intDomains,
-        shared = alreadyFolded,
+        domains = foldedIntDomains,
+        shared = true,
         openLo = openIntLo,
         openHi = openIntHi,
         packedOpenLo = packedOpenIntLo,
@@ -60,9 +66,6 @@ class BakedProblem internal constructor(
     realLower = realLower,
     realUpper = realUpper,
 ) {
-    /** The array the root fold writes into and every finite accessor reads. */
-    internal val foldedIntDomains: Array<IntDomain> = requireFiniteIntDomains()
-
     /** Deductions established while constructing this propagation projection. */
     internal val rootDeductions: PropagationResult = rootBake(this, seedDeductions, cancellation)
 
@@ -97,13 +100,54 @@ class BakedProblem internal constructor(
     fun rootIntDomains(): Array<IntDomain> = foldedIntDomains.copyOf()
 
     /**
-     * The array the fold writes into, for a consumer that reads it within one call and keeps nothing.
+     * The array the fold writes into, for a consumer that only ever reads it.
      *
-     * A model can declare millions of integer columns, so a per-firing presolve pass that only indexes the
-     * domains must not pay [rootIntDomains]' copy. Writing through this rewrites what every other consumer
-     * reads; a consumer that narrows or retains the array takes the copy.
+     * A model can declare millions of integer columns, so a per-firing presolve pass that indexes the
+     * domains — or a search state seeded once per probe — must not pay [rootIntDomains]' copy. Writing
+     * through this rewrites what every other consumer reads; a consumer that narrows the array takes
+     * the copy.
      */
     internal val rootIntDomainsInPlace: Array<IntDomain> get() = foldedIntDomains
+
+    internal constructor(
+        numBoolVars: Int,
+        numIntVars: Int,
+        intDomains: Array<IntDomain>,
+        factors: Array<Factor>,
+        seedDeductions: PropagationResult = PropagationResult.Implied.EMPTY,
+        impliedFactorMask: BooleanArray? = null,
+        hasSymmetryBreaking: Boolean = false,
+        numRealVars: Int,
+        realLower: DoubleArray,
+        realUpper: DoubleArray,
+        openIntLo: BooleanArray? = null,
+        openIntHi: BooleanArray? = null,
+        packedOpenIntLo: Bits? = null,
+        packedOpenIntHi: Bits? = null,
+        modelBounds: IntBounds? = null,
+        cancellation: Cancellation = Cancellation.Never,
+        alreadyFolded: Boolean = false,
+    ) : this(
+        numBoolVars = numBoolVars,
+        numIntVars = numIntVars,
+        // The fold rewrites what every reader of this projection sees, so it needs an array of its own:
+        // only a caller handing over domains that already carry the fold keeps its identity here.
+        foldedIntDomains = if (alreadyFolded) intDomains else intDomains.copyOf(),
+        alreadyFolded = alreadyFolded,
+        factors = factors,
+        seedDeductions = seedDeductions,
+        impliedFactorMask = impliedFactorMask,
+        hasSymmetryBreaking = hasSymmetryBreaking,
+        numRealVars = numRealVars,
+        realLower = realLower,
+        realUpper = realUpper,
+        openIntLo = openIntLo,
+        openIntHi = openIntHi,
+        packedOpenIntLo = packedOpenIntLo,
+        packedOpenIntHi = packedOpenIntHi,
+        modelBounds = modelBounds,
+        cancellation = cancellation,
+    )
 
     internal constructor(
         numBoolVars: Int,

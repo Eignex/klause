@@ -48,7 +48,7 @@ class MiniZincRunnerTest {
     }
 
     private fun satisfies(p: Problem, r: SolveResult.Sat): Boolean {
-        val st = LocalSearchState(p, Random(0))
+        val st = LocalSearchState(p.bake(), Random(0))
         for (b in 0 until p.numBoolVars) st.assignment.setBool(b, r.assignment.bools[b])
         for (i in 0 until p.numIntVars) st.assignment.setInt(i, r.assignment.ints[i])
         st.recompute()

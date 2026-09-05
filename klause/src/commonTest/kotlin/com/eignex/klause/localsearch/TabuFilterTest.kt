@@ -18,7 +18,7 @@ class TabuFilterTest {
     private fun smallState(): LocalSearchState {
         val factor = Cardinality.atLeastOne(intArrayOf(Lit.make(0, true), Lit.make(1, true)))
         val problem = Problem(2, 0, emptyArray(), listOf(factor))
-        val state = LocalSearchState(problem, Random(0))
+        val state = LocalSearchState(problem.bake(), Random(0))
         for (i in 0 until problem.numFactors) state.factors[i].initialize(state, i)
         // Touch var 0 so isTaboo(BoolFlip(0), >=1) becomes true.
         state.apply(Move.BoolFlip(0))
@@ -55,7 +55,7 @@ class TabuFilterTest {
     fun `aspiration admits tabu move that strictly improves cost`() {
         val factor = Cardinality.atLeastOne(intArrayOf(Lit.make(0, true), Lit.make(1, true)))
         val problem = Problem(2, 0, emptyArray(), listOf(factor))
-        val state = LocalSearchState(problem, Random(0))
+        val state = LocalSearchState(problem.bake(), Random(0))
         for (i in 0 until problem.numFactors) state.factors[i].initialize(state, i)
         // Touch var 0 twice so it is tabu, but flipping it now strictly improves cost.
         state.apply(Move.BoolFlip(0))

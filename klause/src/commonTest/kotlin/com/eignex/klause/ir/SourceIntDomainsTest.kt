@@ -102,15 +102,14 @@ class SourceIntDomainsTest {
     }
 
     @Test
-    fun `a model declaring bounds alone refuses to pose as finite`() {
+    fun `a model declaring bounds alone states no value set but materializes its range`() {
         val problem = Problem(
             numBoolVars = 0,
             intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(3), null, null),
             factors = emptyArray(),
         )
 
-        assertFalse(problem.hasFiniteIntDomains)
-        assertFailsWith<IllegalArgumentException> { problem.requireFiniteIntDomains() }
+        assertNull(problem.intDomainOrNull(0), "a bounds declaration states no value set")
         assertEquals(IntDomain(0, 3), problem.declaredIntDomains.finiteDomain(0))
     }
 }

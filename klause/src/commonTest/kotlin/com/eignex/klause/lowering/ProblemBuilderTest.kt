@@ -27,7 +27,7 @@ class ProblemBuilderTest {
         assertEquals(mapOf("limit" to limit), builder.intVarIdByName)
         assertEquals(mapOf("rate" to rate), builder.realVarIdByName)
         assertEquals(1, problem.factors.size)
-        assertEquals(IntDomain(2, 5), problem.requireFiniteIntDomains().single())
+        assertEquals(IntDomain(2, 5), problem.finiteIntDomains().single())
         assertEquals(1.0, problem.realUpper.single())
     }
 }

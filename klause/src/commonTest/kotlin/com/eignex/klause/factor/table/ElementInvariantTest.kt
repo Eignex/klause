@@ -4,6 +4,7 @@ import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.LocalSearchState
+import com.eignex.klause.propagation.bake
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -23,7 +24,7 @@ class ElementInvariantTest {
                 Element(idx = 0, result = 1, arr = longArrayOf(10, 20, 30), arrIsVars = false, indexOffset = 0),
             ),
         )
-        val state = LocalSearchState(problem, Random(0))
+        val state = LocalSearchState(problem.bake(), Random(0))
         state.assignment.setInt(0, 1)
         state.assignment.setInt(1, 20)
         state.recompute()
@@ -42,7 +43,7 @@ class ElementInvariantTest {
                 Element(idx = 0, result = 1, arr = longArrayOf(10, 20, 30), arrIsVars = false, indexOffset = 0),
             ),
         )
-        val state = LocalSearchState(problem, Random(0))
+        val state = LocalSearchState(problem.bake(), Random(0))
         state.assignment.setInt(0, 1)
         state.assignment.setInt(1, 10)
         state.recompute()
@@ -61,7 +62,7 @@ class ElementInvariantTest {
                 Element(idx = 0, result = 1, arr = longArrayOf(10, 20, 30), arrIsVars = false, indexOffset = 0),
             ),
         )
-        val state = LocalSearchState(problem, Random(0))
+        val state = LocalSearchState(problem.bake(), Random(0))
         state.assignment.setInt(0, -1)
         state.assignment.setInt(1, 10)
         state.recompute()
@@ -79,7 +80,7 @@ class ElementInvariantTest {
                 Element(idx = 0, result = 1, arr = longArrayOf(10, 20, 30), arrIsVars = false, indexOffset = 0),
             ),
         )
-        val state = LocalSearchState(problem, Random(0))
+        val state = LocalSearchState(problem.bake(), Random(0))
         state.assignment.setInt(0, 1)
         state.assignment.setInt(1, 10)
         state.recompute()
@@ -99,7 +100,7 @@ class ElementInvariantTest {
                 Element(idx = 0, result = 1, arr = longArrayOf(2, 3), arrIsVars = true, indexOffset = 0),
             ),
         )
-        val state = LocalSearchState(problem, Random(0))
+        val state = LocalSearchState(problem.bake(), Random(0))
         state.assignment.setInt(0, 0) // idx=0 → selects var 2
         state.assignment.setInt(1, 7) // result=7
         state.assignment.setInt(2, 7) // v2=7

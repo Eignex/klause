@@ -13,6 +13,7 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
 import com.eignex.klause.model.PbOp
+import com.eignex.klause.propagation.bake
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -36,7 +37,7 @@ class IntOverflowTest {
 
     private fun stateFor(numBool: Int, domains: Array<IntDomain>, factor: Factor): LocalSearchState {
         val problem = Problem(numBool, domains.size, domains, listOf(factor))
-        return LocalSearchState(problem, Random(0))
+        return LocalSearchState(problem.bake(), Random(0))
     }
 
     @Test

@@ -70,7 +70,7 @@ class AggregationMirSeparatorTest {
                 }
                 return
             }
-            val d = p.requireFiniteIntDomains()[v]
+            val d = p.finiteIntDomain(v)
             for (value in d.min..d.max) {
                 x[v] = value.toInt()
                 recurse(v + 1)

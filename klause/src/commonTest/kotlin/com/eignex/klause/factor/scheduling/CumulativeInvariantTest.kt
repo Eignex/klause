@@ -35,7 +35,7 @@ class CumulativeInvariantTest {
     @Test
     fun `non-overlapping schedule satisfies the cumulative bound`() {
         val problem = threeTasksUnary()
-        val state = LocalSearchState(problem, Random(0))
+        val state = LocalSearchState(problem.bake(), Random(0))
         state.assignment.setInt(0, 0)
         state.assignment.setInt(1, 2)
         state.assignment.setInt(2, 4)
@@ -46,7 +46,7 @@ class CumulativeInvariantTest {
     @Test
     fun `overlapping tasks blow the unary capacity`() {
         val problem = threeTasksUnary()
-        val state = LocalSearchState(problem, Random(0))
+        val state = LocalSearchState(problem.bake(), Random(0))
         state.assignment.setInt(0, 0)
         state.assignment.setInt(1, 0)
         state.assignment.setInt(2, 4)
@@ -68,7 +68,7 @@ class CumulativeInvariantTest {
             intDomains = arrayOf(IntDomain(0, 5), IntDomain(0, 5)),
             factors = arrayOf<Factor>(factor),
         )
-        val state = LocalSearchState(problem, Random(0))
+        val state = LocalSearchState(problem.bake(), Random(0))
         state.assignment.setInt(0, 0)
         state.assignment.setInt(1, 1)
         state.recompute()
@@ -78,7 +78,7 @@ class CumulativeInvariantTest {
     @Test
     fun `incremental apply matches a recompute`() {
         val problem = threeTasksUnary()
-        val state = LocalSearchState(problem, Random(0))
+        val state = LocalSearchState(problem.bake(), Random(0))
         state.assignment.setInt(0, 0)
         state.assignment.setInt(1, 0)
         state.assignment.setInt(2, 0)
@@ -87,7 +87,7 @@ class CumulativeInvariantTest {
         state.apply(IntSet(1, 2))
         state.apply(IntSet(2, 4))
         val afterIncr = state.intPayload[0]
-        val fresh = LocalSearchState(problem, Random(0))
+        val fresh = LocalSearchState(problem.bake(), Random(0))
         fresh.assignment.setInt(0, 0)
         fresh.assignment.setInt(1, 2)
         fresh.assignment.setInt(2, 4)
@@ -131,7 +131,7 @@ class CumulativeInvariantTest {
             intDomains = arrayOf(IntDomain(0, 4), IntDomain(0, 4), IntDomain(0, 1), IntDomain(0, 1)),
             factors = arrayOf<Factor>(factor),
         )
-        val state = LocalSearchState(problem, Random(0))
+        val state = LocalSearchState(problem.bake(), Random(0))
         state.assignment.setInt(0, 0)
         state.assignment.setInt(1, 1)
         state.assignment.setInt(2, 1)
@@ -158,7 +158,7 @@ class CumulativeInvariantTest {
             intDomains = arrayOf(IntDomain(0, 4), IntDomain(0, 4), IntDomain(1, 2)),
             factors = arrayOf<Factor>(factor),
         )
-        val state = LocalSearchState(problem, Random(0))
+        val state = LocalSearchState(problem.bake(), Random(0))
         state.assignment.setInt(0, 0)
         state.assignment.setInt(1, 1)
         state.assignment.setInt(2, 1)
@@ -184,7 +184,7 @@ class CumulativeInvariantTest {
             intDomains = arrayOf(IntDomain(0, 4), IntDomain(0, 4), IntDomain(1, 3), IntDomain(1, 3)),
             factors = arrayOf<Factor>(factor),
         )
-        val state = LocalSearchState(problem, Random(0))
+        val state = LocalSearchState(problem.bake(), Random(0))
         state.assignment.setInt(0, 0)
         state.assignment.setInt(1, 2)
         state.assignment.setInt(2, 2)
