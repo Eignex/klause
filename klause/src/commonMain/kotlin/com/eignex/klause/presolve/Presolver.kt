@@ -51,7 +51,11 @@ private fun problemComplexity(problem: BakedProblem): Long {
     var c = problem.factors.size.toLong()
     for (v in 0 until problem.numIntVars) {
         val d = problem.rootIntDomain(v)
-        c += d.max - d.min
+        // A clamped-wide column's span, and the running sum over several of them, exceed Long; saturate as
+        // [PresolveShared.maxIntSpan] does, so a wrapped negative total cannot make the round-boundary
+        // abort read a reduction that never happened.
+        val span = d.max - d.min
+        c = if (span < 0L || c > Long.MAX_VALUE - span) Long.MAX_VALUE else c + span
     }
     return c
 }
@@ -112,12 +116,10 @@ object Presolver {
         val passes = config.problemPasses(context)
         val maxRounds = config.emphasis.maxRounds
         if (passes.isEmpty() || maxRounds == 0) return Presolved(problem, { it })
-        // Coefficient strengthening runs first, before the [PresolveSession] seed forces the root bake:
-        // a gcd-indivisible equality (`Σ cᵢ·xᵢ = b`, `gcd(cᵢ) ∤ b`) is infeasible independent of the
-        // variable bounds, so it is caught here in O(factors) rather than letting the seed's bake narrow
-        // it toward the empty domain one step per round — O(span) on a wide domain. Only the infeasible
-        // case short-circuits; a feasible strengthening is recomputed (idempotently) by the round engine
-        // below. (The CLI presolve driver runs the same check before its own [RootBaker] reseed.)
+        // A gcd-indivisible equality (`Σ cᵢ·xᵢ = b`, `gcd(cᵢ) ∤ b`) is infeasible independent of the
+        // variable bounds, so refuting it here in O(factors) reports the verdict without the session ever
+        // seeding its state over the model. Only the infeasible case short-circuits; a feasible
+        // strengthening is recomputed (idempotently) by the round engine below.
         if (PresolvePass.STRENGTHEN_COEFFICIENTS in passes &&
             Presolve.strengthenCoefficients(problem, cancellation).infeasible
         ) {
