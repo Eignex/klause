@@ -8,6 +8,7 @@ import com.eignex.klause.lp.engine.Cut
 import com.eignex.klause.lp.engine.Relation
 import com.eignex.klause.lp.rootDomainOf
 import com.eignex.klause.lp.statesBinary
+import com.eignex.klause.lp.statesLowerBoundAtLeast
 import com.eignex.klause.lp.statesUpperBound
 import com.eignex.klause.solver.UnitConsts
 import com.eignex.klause.util.IntArrayList
@@ -55,6 +56,10 @@ internal class FlowCoverSeparator : CutSeparator {
             // flow the model leaves open above the root box supplies that ceiling, which bounds the search
             // and not the model — so the arc is declined rather than capped there.
             if (!problem.statesUpperBound(y)) continue
+            // `yⱼ ≥ 0` is what makes the cover inequality hold: a flow free to run negative lets the
+            // untaken arcs absorb the capacity row's slack, so Σ_C y can exceed b while the row is
+            // satisfied, and the cut then cuts off a feasible point.
+            if (!problem.statesLowerBoundAtLeast(y, 0L)) continue
             val cap = minOf(u, problem.rootDomainOf(y).max) // effective flow when xⱼ = 1
             if (cap <= 0L) continue
             indicator.put(y, x)

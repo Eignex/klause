@@ -230,10 +230,9 @@ private fun LpEngine.distanceObjective(
 ): LinearObjective? {
     var any = false
     val intCoef = LongArray(problem.numIntVars) { v ->
+        if (relaxation.intColOf[v] < 0) return@LongArray 0L
         val d = problem.rootDomainOf(v)
         when {
-            relaxation.intColOf[v] < 0 -> 0L
-
             intTarget[v] <= d.min -> {
                 any = true
                 1L

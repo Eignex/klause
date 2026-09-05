@@ -20,19 +20,19 @@ import com.eignex.klause.factor.table.Element
 import com.eignex.klause.factor.table.Mdd
 import com.eignex.klause.factor.table.Regular
 import com.eignex.klause.factor.table.Table
+import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.ir.values
 import com.eignex.klause.lp.HullFamily
 import com.eignex.klause.lp.bound.CumulativeEnergeticBound
 import com.eignex.klause.lp.estimateLpHull
 import com.eignex.klause.lp.lpHullFamily
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.lp.relaxation.CumulativeRelaxation
+import com.eignex.klause.lp.relaxation.candidateArcCount
 import com.eignex.klause.lp.relaxation.schedulingViews
 import com.eignex.klause.lp.rootDomainOf
 import com.eignex.klause.lp.rootDomainsOf
-import com.eignex.klause.lp.statesLowerBound
-import com.eignex.klause.lp.statesUpperBound
+import com.eignex.klause.lp.statesBothBounds
 
 /**
  * Structural auto-configuration of the LP-relaxation family. Each technique is enabled when —
@@ -372,18 +372,9 @@ object LpAutoConfig {
             if (n < 2) continue
             // Mirrors the build's own decline: an open-sided successor gets no arc model, so its arcs
             // must not enter the estimate either.
-            if (succ.any { !problem.statesLowerBound(it) || !problem.statesUpperBound(it) }) continue
-            var arcs = 0L
-            for (i in 0 until n) {
-                problem.rootDomainOf(succ[i]).values.forEach { j ->
-                    if ((selfLoops || j != i.toLong()) &&
-                        j in 0L until n
-                    ) {
-                        arcs++
-                    }
-                }
-            }
-            if (arcs == 0L || arcs > CpToLpRelaxation.MAX_CIRCUIT_ARCS) continue
+            if (!problem.statesBothBounds(succ)) continue
+            val arcs = candidateArcCount(succ, selfLoops, CpToLpRelaxation.MAX_CIRCUIT_ARCS, problem::rootDomainOf)
+            if (arcs == 0 || arcs > CpToLpRelaxation.MAX_CIRCUIT_ARCS) continue
             any = true
             cols += arcs
             rows += 3L * n // out-degree + channel + in-degree rows (upper bound)
@@ -395,16 +386,17 @@ object LpAutoConfig {
      *  own LP hull estimate — the single source shared with the build, so
      *  the gating estimate cannot drift from the rows actually emitted. */
     private fun hullEstimate(problem: Problem, technique: LpTechnique, family: HullFamily): HullEstimate? {
-        if (problem.factors.none { it.lpHullFamily() == family }) return null
         var cols = 0L
         var rows = 0L
         var any = false
-        // Snapshotted once, outside the loop: the whole-table reading copies, and per factor that would
-        // cost O(factors · columns) on a model this family is wide over.
-        val rootDomains = problem.rootDomainsOf()
+        // Materialized on the family's first factor and shared from there: the whole-table reading copies,
+        // so taking it per factor would cost O(factors · columns) on a model this family is wide over, and
+        // taking it up front would cost the copy on every model carrying no such factor at all.
+        var rootDomains: Array<IntDomain>? = null
         for (f in problem.factors) {
             if (f.lpHullFamily() != family) continue
-            val e = f.estimateLpHull(rootDomains) ?: continue
+            val domains = rootDomains ?: problem.rootDomainsOf().also { rootDomains = it }
+            val e = f.estimateLpHull(domains) ?: continue
             cols += e.cols
             rows += e.rows
             any = true
@@ -419,6 +411,9 @@ object LpAutoConfig {
         var rows = 0L
         var any = false
         for (v in schedulingViews(problem)) {
+            // Mirrors the build's own decline: a view with an open-sided start gets no time-indexed
+            // model, so its columns must not enter the estimate either.
+            if (!problem.statesBothBounds(v.starts)) continue
             val n = v.starts.size
             var t0 = Long.MAX_VALUE
             var t1 = Long.MIN_VALUE

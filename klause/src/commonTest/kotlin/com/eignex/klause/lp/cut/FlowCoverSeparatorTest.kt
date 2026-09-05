@@ -137,6 +137,28 @@ class FlowCoverSeparatorTest {
     }
 
     @Test
+    fun `a flow the model lets run negative yields no cut`() {
+        // y₂ ∈ [−10, 3] can absorb the capacity row's slack, so the two covered arcs may both run full
+        // while `Σ y ≤ 4` still holds: at y = (3, 3, −10), x = (1, 1, 1) the cover inequality
+        // `y₀ + y₁ − (1 − x₀) − (1 − x₁) ≤ 2` reads 6 > 2 and would cut off a feasible point. The
+        // derivation needs `yⱼ ≥ 0`, which this model does not state.
+        val domains = Array(6) {
+            if (it == 2) {
+                IntDomain(-10, 3)
+            } else if (it < 3) {
+                IntDomain(0, 3)
+            } else {
+                IntDomain(0, 1)
+            }
+        }
+        val factors = ArrayList<Factor>()
+        for (j in 0 until 3) factors.add(Linear(intArrayOf(1, -3), intArrayOf(j, 3 + j), LinearOp.LE, 0))
+        factors.add(Linear(IntArray(3) { 1 }, IntArray(3) { it }, LinearOp.LE, 4))
+        val (cuts, _) = cutsAtMaxFlow(Problem(0, 6, domains, factors.toTypedArray()), n = 3)
+        assertTrue(cuts.isEmpty(), "a flow with no stated floor of 0 must not become a flow-cover arc")
+    }
+
+    @Test
     fun `randomized flow-cover cuts never exclude a feasible integer point`() {
         val rng = Random(20260624)
         var fired = 0

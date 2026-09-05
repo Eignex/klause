@@ -37,8 +37,7 @@ import com.eignex.klause.lp.engine.solveAndCertify
 import com.eignex.klause.lp.lpHullEnabled
 import com.eignex.klause.lp.rootDomainOf
 import com.eignex.klause.lp.statesBinary
-import com.eignex.klause.lp.statesLowerBound
-import com.eignex.klause.lp.statesUpperBound
+import com.eignex.klause.lp.statesBothBounds
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
@@ -117,6 +116,42 @@ internal class LpRelaxation(
     /** The pin value activating gated entry k (`true` = the atom row, `false` = its complement). */
     val gatedWhenTrue: BooleanArray = BooleanArray(0),
 )
+
+/**
+ * Apply [action] to every candidate arc head of successor column `succ[i]` over an `n`-node graph: the
+ * heads in `[0, n)` that [dom] admits, `i` itself only when [selfLoops].
+ *
+ * Walks whichever of the two sides is smaller, because neither can be the only one. A large sparse
+ * routing graph carries a handful of heads per node, so sweeping the node range would cost `O(n²)` on
+ * exactly the models the arc cap exists to let through; a successor declared far wider than the graph
+ * makes the domain walk `O(box span)`, which past `2³¹` values cannot be enumerated at all.
+ */
+private inline fun eachCandidateArcHead(dom: IntDomain, i: Int, n: Int, selfLoops: Boolean, action: (Int) -> Unit) {
+    if (dom.valueCount <= n) {
+        val span = dom.values
+        for (k in 0 until span.size) {
+            val j = span.valueAt(k)
+            if ((selfLoops || j != i.toLong()) && j >= 0 && j < n) action(j.toInt())
+        }
+    } else {
+        for (j in 0 until n) {
+            if ((selfLoops || j != i) && dom.contains(j.toLong())) action(j)
+        }
+    }
+}
+
+/**
+ * Candidate arcs over `succ[0..n)` (see [eachCandidateArcHead]), counted no further than [cap] — above
+ * it the arc model is declined, so the exact total is never read and a dense graph must not pay for one.
+ */
+internal fun candidateArcCount(succ: IntArray, selfLoops: Boolean, cap: Int, domainOf: (Int) -> IntDomain): Int {
+    var arcs = 0
+    for (i in succ.indices) {
+        eachCandidateArcHead(domainOf(succ[i]), i, succ.size, selfLoops) { arcs++ }
+        if (arcs > cap) return arcs
+    }
+    return arcs
+}
 
 /**
  * Fill [out] (length `model.m`) with per-row enforcement at [session]'s pins: every non-gated row is
@@ -617,19 +652,10 @@ internal class CpToLpRelaxation(
             // The layout enumerates each successor's root box, and the degree rows then confine the
             // column to the heads enumerated. Over a side the model left open that box is a search
             // restriction, so the rows would refute successors the model admits — decline instead.
-            if (succ.any { !problem.statesLowerBound(it) || !problem.statesUpperBound(it) }) return
+            if (!problem.statesBothBounds(succ)) return
             // Gate on the candidate-arc total — the LP column count — not on n, so large sparse
             // graphs (small per-node successor domains) are not skipped by a blunt node cap.
-            var arcCount = 0
-            for (i in 0 until n) {
-                declaredDomain(succ[i]).values.forEach { j ->
-                    if ((selfLoops || j != i.toLong()) && j >= 0 &&
-                        j < n
-                    ) {
-                        arcCount++
-                    }
-                }
-            }
+            val arcCount = candidateArcCount(succ, selfLoops, MAX_CIRCUIT_ARCS, ::declaredDomain)
             if (arcCount == 0 || arcCount > MAX_CIRCUIT_ARCS) return
             val tails = IntArrayList()
             val heads = IntArrayList()
@@ -641,10 +667,8 @@ internal class CpToLpRelaxation(
                 val outCols = IntArrayList()
                 val chanCols = IntArrayList()
                 val chanCoef = IntArrayList()
-                declaredDomain(succ[i]).values.forEach { j ->
-                    if ((!selfLoops && j == i.toLong()) || j < 0 || j >= n) return@forEach
-                    val jn = j.toInt() // validated node index in [0, n)
-                    val present = live.contains(j)
+                eachCandidateArcHead(declaredDomain(succ[i]), i, n, selfLoops) { jn ->
+                    val present = live.contains(jn.toLong())
                     // The arc is present exactly while head j stays in succ[i]'s live domain — the single
                     // membership that lets the persistent relaxation re-bind this column.
                     val col = auxColumn(
@@ -864,7 +888,13 @@ internal class CpToLpRelaxation(
                 }
                 cumulativeRelaxation?.let { cumulativeRows(it) }
                 if (cumulativeTimeIndexed) {
-                    for (view in schedulingViews(problem)) buildCumulativeTimeIndexed(view)
+                    // The time-indexed layout gives each task one column per start in its root box and
+                    // then pins it there with `Σ_t x = 1`. Over a start side the model left open that box
+                    // is a search restriction, so those rows would exclude starts the model admits —
+                    // decline the view, as the arc model does (see [buildArcModel]).
+                    for (view in schedulingViews(problem)) {
+                        if (problem.statesBothBounds(view.starts)) buildCumulativeTimeIndexed(view)
+                    }
                 }
             }
 

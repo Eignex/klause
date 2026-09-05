@@ -10,8 +10,8 @@ import com.eignex.klause.lp.bound.CumulativeEnergeticBound
 import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.LpRowPremises
 import com.eignex.klause.lp.rootDomainOf
+import com.eignex.klause.lp.statesBothBounds
 import com.eignex.klause.lp.statesLowerBound
-import com.eignex.klause.lp.statesUpperBound
 import com.eignex.klause.util.CheckedLongOverflowException
 import com.eignex.klause.util.IntArrayDeque
 import com.eignex.klause.util.IntArrayList
@@ -89,6 +89,9 @@ internal class CumulativeRelaxation(
         val makespanVar: Int,
         /** Declared capacity upper bound (`> 0`); the energy ceiling per unit time. */
         val capacity: Long,
+        /** `capacity · M.rootMin`, the trivial right-hand side the row falls back to. Node-invariant, so
+         *  it is computed once — checked — while the plan is built rather than per node. */
+        val floor: Long,
         val startVars: IntArray,
         /** Per-task constant duration (`> 0`). */
         val durations: LongArray,
@@ -114,8 +117,7 @@ internal class CumulativeRelaxation(
         val n = plan.startVars.size
         val estLive = LongArray(n) { domains.intDomain(plan.startVars[it]).min }
         val estDecl = LongArray(n) { problem.rootDomainOf(plan.startVars[it]).min }
-        val floor = cap * problem.rootDomainOf(plan.makespanVar).min
-
+        val floor = plan.floor
         val energetic = try {
             energeticRhs(cap, estLive, plan.durations, plan.resources)
         } catch (_: CheckedLongOverflowException) {
@@ -236,11 +238,20 @@ internal class CumulativeRelaxation(
             .filter { it.second.size >= MIN_COVER && problem.statesLowerBound(it.first) }
             .sortedWith(compareByDescending<Pair<Int, IntArrayList>> { it.second.size }.thenBy { it.first })
             .take(MAX_MAKESPAN_VARS)
-        return ranked.map { (m, idxs) ->
+        return ranked.mapNotNull { (m, idxs) ->
             val k = idxs.size
+            // `capacity · M.rootMin` is the row's fallback right-hand side, so a product that does not
+            // fit has no sound stand-in: a wrapped value states a floor no solution has to reach. The
+            // plan is dropped, which only drops energy.
+            val floor = try {
+                mulExact(s.cap, problem.rootDomainOf(m).min)
+            } catch (_: CheckedLongOverflowException) {
+                return@mapNotNull null
+            }
             AreaPlan(
                 makespanVar = m,
                 capacity = s.cap,
+                floor = floor,
                 startVars = IntArray(k) { s.starts[idxs[it]] },
                 durations = LongArray(k) { s.dur[idxs[it]] },
                 resources = LongArray(k) { s.res[idxs[it]] },
@@ -293,17 +304,28 @@ internal class CumulativeRelaxation(
      *  An upper bound on the perpendicular resource room, so using it as the cumulative capacity only
      *  loosens the energetic bound (sound). Zero — which drops the axis — when the model leaves a
      *  coordinate open on either side, since the box's endpoint bounds the search rather than the
-     *  packing. */
+     *  packing, and equally when the extent does not fit a [Long]: a wrapped extent can land *below*
+     *  the true room, which would tighten the energetic row instead of loosening it. */
     private fun perpendicularExtent(coords: IntArray, sizes: LongArray): Long {
+        if (coords.isEmpty()) return 0L
         var hi = Long.MIN_VALUE
         var lo = Long.MAX_VALUE
         for (i in coords.indices) {
-            if (!problem.statesLowerBound(coords[i]) || !problem.statesUpperBound(coords[i])) return 0L
+            if (!problem.statesBothBounds(coords[i])) return 0L
             val d = problem.rootDomainOf(coords[i])
-            if (d.max + sizes[i] > hi) hi = d.max + sizes[i]
+            val end = try {
+                addExact(d.max, sizes[i])
+            } catch (_: CheckedLongOverflowException) {
+                return 0L
+            }
+            if (end > hi) hi = end
             if (d.min < lo) lo = d.min
         }
-        return hi - lo
+        return try {
+            subExact(hi, lo)
+        } catch (_: CheckedLongOverflowException) {
+            0L
+        }
     }
 
     /**
