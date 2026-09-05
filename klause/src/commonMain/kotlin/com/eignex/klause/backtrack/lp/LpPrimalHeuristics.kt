@@ -3,7 +3,7 @@ package com.eignex.klause.backtrack.lp
 import com.eignex.klause.backtrack.snapshotAssignment
 import com.eignex.klause.lp.bounding.LpEngine
 import com.eignex.klause.lp.bounding.dualSimplex
-import com.eignex.klause.lp.engine.RevisedSimplex
+import com.eignex.klause.lp.engine.LpSolver
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.lp.relaxation.LpRelaxation
 import com.eignex.klause.lp.rootDomainOf
@@ -101,8 +101,8 @@ private fun pinIntTowardLp(session: PropagationSession, v: Int, lp: Double?, lo:
  * still re-evaluates). Stops at the first feasible rounding or the round cap. A repeated rounding
  * (cycle) triggers a Fischetti–Glover–Lodi perturbation ([perturbRounding]) — flip the most-fractional
  * coordinates and keep pumping — up to [PUMP_MAX_RESTARTS] times before giving up. Re-solves prefer the
- * primal pass ([RevisedSimplex.solvePrimal], phase-1 included) and fall back to the dual
- * [RevisedSimplex.solve].
+ * primal pass ([LpSolver.solvePrimal], phase-1 included) and fall back to the dual
+ * [LpSolver.solve].
  */
 internal fun LpEngine.lpFeasibilityPump(objective: LinearObjective, cancellation: Cancellation): Sample? {
     var solved = solveRelaxation(objective, cancellation) ?: return null

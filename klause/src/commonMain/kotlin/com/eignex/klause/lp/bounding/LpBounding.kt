@@ -9,12 +9,14 @@ import com.eignex.klause.lp.engine.FloatLpResult
 import com.eignex.klause.lp.engine.IntegerCertificate
 import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.LpSolver
-import com.eignex.klause.lp.engine.RevisedSimplex
+import com.eignex.klause.lp.engine.PersistentLpSolver
 import com.eignex.klause.lp.engine.TableauCutSolver
 import com.eignex.klause.lp.engine.VarStatus
 import com.eignex.klause.lp.engine.integerCertify
 import com.eignex.klause.lp.engine.integerDualLowerBoundCeil
 import com.eignex.klause.lp.engine.integerFarkasRay
+import com.eignex.klause.lp.engine.newPersistentLpSolver
+import com.eignex.klause.lp.engine.newTableauCutSolver
 import com.eignex.klause.lp.engine.safeObjectiveLowerBound
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.lp.relaxation.LpExplanation
@@ -89,10 +91,10 @@ private fun LpEngine.boolLowerBoundPart(obj: LinearObjective, session: Propagati
  *  has residue `r` it is returned unchanged. */
 internal fun roundUpToResidue(lb: Long, g: Long, r: Long): Long = lb + (r - lb).mod(g)
 
-/** A [RevisedSimplex] over [model]. The simplex always uses Devex pricing, the Harris two-pass ratio
- *  test, the bound-flipping long step and basis equilibration — all correctness-neutral (they change
- *  only the pivot path / conditioning, never the certified optimum). */
-internal fun LpEngine.dualSimplex(model: LpModel, cancellation: Cancellation): TableauCutSolver = RevisedSimplex(
+/** A budgeted [TableauCutSolver] over [model]. The simplex always uses Devex pricing, the Harris
+ *  two-pass ratio test, the bound-flipping long step and basis equilibration — all correctness-neutral
+ *  (they change only the pivot path / conditioning, never the certified optimum). */
+internal fun LpEngine.dualSimplex(model: LpModel, cancellation: Cancellation): TableauCutSolver = newTableauCutSolver(
     model,
     cancellation,
     iterationLimit = nodePivotBudget(),
@@ -106,8 +108,8 @@ internal fun LpEngine.dualSimplex(model: LpModel, cancellation: Cancellation): T
  * A rebound relaxation shares its matrix and objective with the last node's, so the kept engine's basis
  * and LU factorization are still valid and the dual simplex resumes from them — the expensive half of a
  * node solve, skipped. Anything else (the first node, a rebuilt or cut-augmented relaxation) builds a
- * fresh engine, which then becomes the kept one; [RevisedSimplex.rebind] decides which case this is and
- * cannot mistake them, since it tests object identity of the matrix and cost arrays.
+ * fresh engine, which then becomes the kept one; [PersistentLpSolver.rebind] decides which case this is
+ * and cannot mistake them, since it tests object identity of the matrix and cost arrays.
  *
  * [warm] is used only on the fresh path: a kept engine already has that basis seated, and better, has it
  * factorized.
@@ -116,11 +118,11 @@ private fun LpEngine.solveNode(
     model: LpModel,
     warm: Basis?,
     cancellation: Cancellation,
-): Pair<TableauCutSolver, FloatLpResult?> {
+): Pair<LpSolver, FloatLpResult?> {
     nodeSimplex?.let { kept ->
         if (kept.rebind(model, cancellation)) return kept to kept.resolveBounds()
     }
-    val fresh = RevisedSimplex(
+    val fresh = newPersistentLpSolver(
         model,
         cancellation,
         iterationLimit = nodePivotBudget(),

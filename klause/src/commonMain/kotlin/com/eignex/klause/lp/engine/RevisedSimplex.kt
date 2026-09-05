@@ -49,6 +49,9 @@ internal class FloatLpResult(
     val optimal: Boolean = true,
 )
 
+/** Updates folded into the basis before it is rebuilt; bounds fill and rounding drift. */
+internal const val DEFAULT_REFACTOR_UPDATE_LIMIT: Int = 50
+
 /**
  * Double-precision bounded-variable **dual** simplex in *revised* form: the basis is held as a
  * factorization (`O(nnz)` memory) and the constraint columns in sparse CSC,
@@ -93,7 +96,8 @@ internal class RevisedSimplex(
     private val iterationLimit: Int = 0,
     private val workLimit: Long = 0L,
     private val trackDegeneracy: Boolean = false,
-) : TableauCutSolver {
+) : TableauCutSolver,
+    PersistentLpSolver {
     private val m = model.m
     private val n = model.n
     private val numVars = model.numVars
@@ -452,7 +456,8 @@ internal class RevisedSimplex(
      * invariant. When nothing usable is kept (first call, or the previous solve bailed), this is an
      * ordinary cold start — whose all-slack basis has every unenforced slack basic already.
      */
-    fun resolveGated(enforced: BooleanArray): FloatLpResult? = solveCore(null, reuse = true, enforced = enforced)
+    override fun resolveGated(enforced: BooleanArray): FloatLpResult? =
+        solveCore(null, reuse = true, enforced = enforced)
 
     /**
      * Re-point this engine at [next] and [token], keeping the seated basis and its factorization, then
@@ -469,7 +474,7 @@ internal class RevisedSimplex(
      * The bounds and right-hand side are re-read every iteration of the solve loop, so nothing stale
      * survives the swap; only the basis and its factorization do.
      */
-    fun rebind(next: LpModel, token: Cancellation): Boolean {
+    override fun rebind(next: LpModel, token: Cancellation): Boolean {
         if (next.csc !== model.csc || next.cost !== model.cost) return false
         if (next.n != n || next.m != m) return false
         model = next
@@ -478,7 +483,7 @@ internal class RevisedSimplex(
     }
 
     /** Re-solve after a [rebind], continuing from the kept basis and factorization. */
-    fun resolveBounds(): FloatLpResult? = solveCore(null, reuse = true)
+    override fun resolveBounds(): FloatLpResult? = solveCore(null, reuse = true)
 
     /** Whether the previous solve terminated with its basis still factorized, so [resolveGated] and
      *  [resolveBounds] may continue from it; the seated [basicVar]/[status] are still in place. False
@@ -1175,9 +1180,6 @@ internal class RevisedSimplex(
 
         /** Iterations between cooperative cancellation polls. */
         const val CANCEL_POLL: Int = 32
-
-        /** Updates folded into the basis before it is rebuilt; bounds fill and rounding drift. */
-        const val DEFAULT_REFACTOR_UPDATE_LIMIT: Int = 50
     }
 }
 

@@ -27,7 +27,8 @@ import com.eignex.klause.lp.cut.SharedCut
 import com.eignex.klause.lp.engine.Basis
 import com.eignex.klause.lp.engine.Cut
 import com.eignex.klause.lp.engine.LpVerdict
-import com.eignex.klause.lp.engine.RevisedSimplex
+import com.eignex.klause.lp.engine.PersistentLpSolver
+import com.eignex.klause.lp.engine.newPersistentLpSolver
 import com.eignex.klause.lp.engine.solveAndCertify
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.lp.relaxation.LeafRealResult
@@ -51,7 +52,11 @@ import kotlin.time.TimeSource
  *  [LpEngine.gatedResidual] refreshes to the live pins each node. [lastEnforced]/[lastFeasible] memo
  *  the previous solved node: the model is a pure function of the enforcement, so an unchanged
  *  fingerprint after a feasible solve (a decision that flips no real atom) needs no solve at all. */
-internal class GatedResidual(val relaxation: LpRelaxation, val simplex: RevisedSimplex, val enforced: BooleanArray) {
+internal class GatedResidual(
+    val relaxation: LpRelaxation,
+    val simplex: PersistentLpSolver,
+    val enforced: BooleanArray,
+) {
     val lastEnforced: BooleanArray = BooleanArray(enforced.size)
     var lastFeasible: Boolean = false
 }
@@ -377,13 +382,13 @@ internal class LpEngine(
 
     /**
      * The engine the node bound re-solves on, kept across nodes so its basis and LU factorization carry
-     * with it ([RevisedSimplex.resolveBounds]).
+     * with it ([PersistentLpSolver.resolveBounds]).
      *
      * Held here rather than per call because a factorization is the expensive half of a node solve and a
      * rebound relaxation does not invalidate it. Only the cut-free base relaxation is eligible: the
      * cut-augmented build is a different matrix, so it gets its own engine and never displaces this one.
      */
-    internal var nodeSimplex: RevisedSimplex? = null
+    internal var nodeSimplex: PersistentLpSolver? = null
 
     /**
      * The **cut-free** LP relaxation for the current node: the persistent relaxation re-bound to
@@ -449,7 +454,7 @@ internal class LpEngine(
                     // A long eta chain: the persistent instance's pivots accumulate ACROSS nodes
                     // (reconciliation + dual repair after each pin flip), so the default limit would
                     // refactorize the full basis every few nodes — the exact cost this filter removes.
-                    RevisedSimplex(built.model, params.cancellation, refactorUpdateLimit = GATED_UPDATE_LIMIT),
+                    newPersistentLpSolver(built.model, params.cancellation, refactorUpdateLimit = GATED_UPDATE_LIMIT),
                     BooleanArray(built.model.m),
                 )
             }

@@ -3,8 +3,9 @@ package com.eignex.klause.lp.bounding
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.lp.engine.RevisedSimplex
+import com.eignex.klause.lp.engine.LpSolver
 import com.eignex.klause.lp.engine.integerFarkasRay
+import com.eignex.klause.lp.engine.newTableauCutSolver
 import com.eignex.klause.lp.engine.safeObjectiveLowerBound
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.lp.relaxation.RootDomains
@@ -93,8 +94,8 @@ internal fun LpEngine.shaveVariableBounds(token: Cancellation): List<ShavedBound
  * mutually-implied constraints are never both removed (implication is transitive). Bounded by
  * [SHAVE_MAX_ITERS] and [token].
  *
- * The maximisation uses the primal pass ([RevisedSimplex.solvePrimal], phase-1 included): the dual simplex
- * cannot optimise this `−a·x` objective (it leaves the dual-feasible start, so [RevisedSimplex.solve]
+ * The maximisation uses the primal pass ([LpSolver.solvePrimal], phase-1 included): the dual simplex
+ * cannot optimise this `−a·x` objective (it leaves the dual-feasible start, so [LpSolver.solve]
  * returns the trivial point). A failed/unbounded primal solve just keeps the constraint.
  */
 internal fun LpEngine.redundantConstraints(token: Cancellation): List<Int> {
@@ -289,7 +290,7 @@ internal fun LpEngine.rootLpInfeasibleNoBake(token: Cancellation): Boolean {
         return false // a relaxation the row arithmetic cannot express yields no verdict, never a crash
     }
     if (model.n == 0) return false
-    val simplex = RevisedSimplex(model, token)
+    val simplex = newTableauCutSolver(model, token)
     // A non-null solve is a feasible optimum; null is infeasible or an inconclusive failure. Only a
     // dual-unbounded ray that survives exact 128-bit Farkas certification proves genuine infeasibility.
     if (simplex.solve() != null) return false
