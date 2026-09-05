@@ -45,6 +45,7 @@ internal object SmtLibMode : CliMode {
                     objective,
                     parsed.sense == ObjectiveSense.MAXIMIZE,
                     routePureRealToTheory = true,
+                    boundCancellation = common.routingCancellation(),
                 )
             ) {
                 is SourceProblemRoute.Finite -> linearSolvable(

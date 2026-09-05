@@ -45,7 +45,13 @@ internal object MpsMode : CliMode {
             }
             val render: (Sample) -> String = { s -> renderMpsModel(compiled, s) }
             val objective = compiled.objective?.toLinearObjective()
-            return when (val route = compiled.model.pipelineRoute(objective, compiled.maximize)) {
+            return when (
+                val route = compiled.model.pipelineRoute(
+                    objective,
+                    compiled.maximize,
+                    boundCancellation = common.routingCancellation(),
+                )
+            ) {
                 is SourceProblemRoute.Finite -> linearSolvable(
                     route.problem,
                     objective,
