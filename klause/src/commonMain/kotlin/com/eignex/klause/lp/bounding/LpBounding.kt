@@ -13,11 +13,10 @@ import com.eignex.klause.lp.engine.PersistentLpSolver
 import com.eignex.klause.lp.engine.TableauCutSolver
 import com.eignex.klause.lp.engine.VarStatus
 import com.eignex.klause.lp.engine.integerCertify
-import com.eignex.klause.lp.engine.integerDualLowerBoundCeil
 import com.eignex.klause.lp.engine.integerFarkasRay
 import com.eignex.klause.lp.engine.newPersistentLpSolver
 import com.eignex.klause.lp.engine.newTableauCutSolver
-import com.eignex.klause.lp.engine.safeObjectiveLowerBound
+import com.eignex.klause.lp.engine.tightObjectiveLowerBound
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.lp.relaxation.LpExplanation
 import com.eignex.klause.lp.relaxation.LpRelaxation
@@ -248,12 +247,13 @@ private fun LpEngine.foldSelectedCuts(
 }
 
 /**
- * Cheap sound prune + objective-bound propagation for the LP path: float revised
- * simplex for the duals, then the O(nnz) Neumaier–Shcherbina safe bound — no exact certify on the
- * common path, so the per-node cost is bounded and `-t` is honored. Prunes when the relaxation is
- * infeasible (exact Farkas certificate) or the safe bound reaches the incumbent, tightens an
- * ascending objective variable up to `ceil(safe bound)` (reason-less, a sound conflict-analysis
- * leaf), and fixes reduced-cost-dominated variables off their bounds. Any solver failure keeps the node.
+ * Cheap sound prune + objective-bound propagation for the LP path: float revised simplex for the duals,
+ * then the tighter of the Neumaier–Shcherbina safe bound and the certificate's integer-multiplier one
+ * ([tightObjectiveLowerBound]) — both O(nnz), so the per-node cost is bounded and `-t` is honored.
+ * Prunes when the relaxation is infeasible (exact Farkas certificate) or that bound reaches the
+ * incumbent, tightens an ascending objective variable up to its ceiling (reason-less, a sound
+ * conflict-analysis leaf), and fixes reduced-cost-dominated variables off their bounds. Any solver
+ * failure keeps the node.
  */
 @Suppress("LongParameterList")
 internal fun LpEngine.sparseSafePrune(
@@ -446,24 +446,27 @@ internal fun LpEngine.sparseSafePrune(
             boundRes = r
         }
     }
-    val safe = safeObjectiveLowerBound(boundRel.model, boundRes.duals) ?: return LpNodeOutcome(false, optimalBasis)
-    val full = safe + boundRel.objectiveConstant.toDouble()
-    if (canPrune && full >= bound) {
-        sink.lp.observePrune()
-        return LpNodeOutcome(true, null)
-    }
-    // The exact basis-certificate backs both the learnable objective-bound reason and the
-    // reduced-cost fixing. Compute it once when either needs it; a singular/unbounded certify yields
-    // null and both fall back to the cheap reason-less paths, which is sound.
+    // The exact basis-certificate backs the prune bound, the learnable objective-bound reason and the
+    // reduced-cost fixing. Compute it once when any of them needs it; a singular/unbounded certify
+    // yields null and each falls back to its cheap certificate-less path, which is sound.
     val cert = if ((learn && canPropagate) || canPrune) {
         integerCertify(boundRel.model, boundRes.duals)
     } else {
         null
     }
-    // Objective-bound propagation: the integer objective is ≥ ceil(LP lower bound). With
-    // learning, propagate the exact certified bound (tighter than the safe bound) and attach the
-    // reduced-cost reason so an Unsat tightening backjumps; otherwise tighten to ceil(safe bound)
-    // reason-less (a sound conflict-analysis leaf). The safe bound only under-estimates the optimum,
+    // Neither the float safe bound nor the certificate's integer-multiplier bound dominates the other,
+    // so the prune decides on the tighter of the two rather than on the float bound alone.
+    val lower = tightObjectiveLowerBound(boundRel.model, boundRes.duals, cert)
+        ?: return LpNodeOutcome(false, optimalBasis)
+    val full = lower + boundRel.objectiveConstant.toDouble()
+    if (canPrune && full >= bound) {
+        sink.lp.observePrune()
+        return LpNodeOutcome(true, null)
+    }
+    // Objective-bound propagation: the integer objective is ≥ ceil(LP lower bound). With learning,
+    // propagate the exact certified bound — the only one the reduced-cost reason proves — and attach that
+    // reason so an Unsat tightening backjumps; otherwise tighten to ceil of the combined bound,
+    // reason-less (a sound conflict-analysis leaf). Every bound here only under-estimates the optimum,
     // so either floor ≤ the true optimum.
     if (canPropagate && full.isFinite()) {
         val exactFloor = if (learn && cert != null) {
@@ -640,10 +643,10 @@ internal fun LpEngine.applySparseReducedCostFixing(
 }
 
 /**
- * Sound objective lower bound from the float revised simplex + integer-multiplier 128-bit
- * certification, used when the cheap safe-bound path overflowed during the relaxation build. Prunes when
- * the certified bound (plus the relaxation's objective constant) reaches the incumbent. Any failure
- * keeps the node.
+ * Sound objective lower bound from the float revised simplex — the tighter of the safe float and
+ * integer-multiplier 128-bit bounds ([tightObjectiveLowerBound]) — used when the cheap safe-bound path
+ * overflowed during the relaxation build. Prunes when that bound (plus the relaxation's objective
+ * constant) reaches the incumbent. Any failure keeps the node.
  */
 internal fun LpEngine.sparseCertifiedPrune(
     relaxer: CpToLpRelaxation,
@@ -663,17 +666,13 @@ internal fun LpEngine.sparseCertifiedPrune(
     observeSolveCost(sink, recoverySimplex)
     if (result == null) return LpNodeOutcome(false, null)
     if (cancellation()) return LpNodeOutcome(false, null) // honor the deadline before the exact certify
-    // The integer-multiplier 128-bit bound: round the float duals and evaluate the Lagrangian exactly.
-    // Sound by construction (a valid lower bound for any integer multipliers); includes the model's
-    // lo-shift constant. A null (no finite bound) keeps the node.
-    val lb = integerDualLowerBoundCeil(relaxation.model, result.duals)
+    // Both bounds are sound for any duals and neither dominates, so the larger wins: the
+    // integer-multiplier bound carries no rounding margin, the float one never declines. A null (neither
+    // available) keeps the node.
+    val lb = tightObjectiveLowerBound(relaxation.model, result.duals)
         ?: return LpNodeOutcome(false, null)
-    val full = try {
-        addExact(lb, relaxation.objectiveConstant)
-    } catch (_: CheckedLongOverflowException) {
-        return LpNodeOutcome(false, null)
-    }
-    return if (full.toDouble() >= bound) {
+    val full = lb + relaxation.objectiveConstant.toDouble()
+    return if (full >= bound) {
         sink.lp.observePrune()
         LpNodeOutcome(true, null)
     } else {
@@ -683,8 +682,8 @@ internal fun LpEngine.sparseCertifiedPrune(
 
 /**
  * The root-node LP relaxation objective (with the harvested [globalCuts]) on the undecided problem,
- * or NaN when the relaxation is empty / not optimal / overflows — the revised simplex + Neumaier–
- * Shcherbina safe bound, the same sound bound the per-node prune reports. Solved once before search,
+ * or NaN when the relaxation is empty / not optimal / overflows — the revised simplex +
+ * [tightObjectiveLowerBound], the same sound bound the per-node prune reports. Solved once before search,
  * so the value is a sound *global* lower bound on the objective — the integrality-gap baseline for `-s`.
  */
 internal fun LpEngine.rootLpRelaxationBound(
@@ -697,8 +696,8 @@ internal fun LpEngine.rootLpRelaxationBound(
         Double.NaN
     } else {
         val result = dualSimplex(relaxation.model, cancellation).solve()
-        val safe = result?.let { safeObjectiveLowerBound(relaxation.model, it.duals) }
-        if (safe != null) safe + relaxation.objectiveConstant.toDouble() else Double.NaN
+        val lower = result?.let { tightObjectiveLowerBound(relaxation.model, it.duals) }
+        if (lower != null) lower + relaxation.objectiveConstant.toDouble() else Double.NaN
     }
 } catch (_: CheckedLongOverflowException) {
     Double.NaN
@@ -707,9 +706,9 @@ internal fun LpEngine.rootLpRelaxationBound(
 /**
  * The **true** root LP optimum (the float simplex objective, plus the relaxation's objective constant),
  * or NaN when the relaxation is empty / not optimal / overflows. Unlike [rootLpRelaxationBound] this is
- * the raw LP value, not the Neumaier–Shcherbina safe under-estimate — so it reflects how much a hull
- * actually tightens the relaxation, which the safe bound can miss. Used only to compare relaxation
- * variants in [LpEngine.pruneIneffectiveHulls], never as a sound prune bound.
+ * the raw LP value, not a sound under-estimate — so it reflects how much a hull actually tightens the
+ * relaxation, which the sound bound can miss. Used only to compare relaxation variants in
+ * [LpEngine.pruneIneffectiveHulls], never as a sound prune bound.
  */
 internal fun LpEngine.rootLpObjective(
     relaxer: CpToLpRelaxation,

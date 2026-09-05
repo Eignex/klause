@@ -6,7 +6,7 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.engine.LpSolver
 import com.eignex.klause.lp.engine.integerFarkasRay
 import com.eignex.klause.lp.engine.newTableauCutSolver
-import com.eignex.klause.lp.engine.safeObjectiveLowerBound
+import com.eignex.klause.lp.engine.tightObjectiveLowerBound
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.lp.relaxation.RootDomains
 import com.eignex.klause.lp.rootDomainOf
@@ -140,9 +140,10 @@ internal fun LpEngine.redundantConstraints(token: Cancellation): List<Int> {
  * Linear equalities the LP proves implied — a two-term difference `±(x − y)` pinned by the relaxation to
  * a single integer `c`. Returns them as [Linear] `= c` factors for the affine-elimination pass to fold
  * out (substituting `x` for `y + c`), shrinking the variable space, not just the constraint set. Sound:
- * the safe min/max bracket the real range, so a single integer inside it means every integer-feasible
- * point shares that value. Candidates are existing two-term unit-difference rows (so the pair is already
- * coupled — no `O(n²)` pair scan); each pair is probed once. Bounded by [SHAVE_MAX_ITERS] and [token].
+ * the safe min/max bracket every integer-feasible value, so a single integer inside them means every
+ * integer-feasible point shares that value. Candidates are existing two-term unit-difference rows (so
+ * the pair is already coupled — no `O(n²)` pair scan); each pair is probed once. Bounded by
+ * [SHAVE_MAX_ITERS] and [token].
  */
 internal fun LpEngine.impliedEqualities(token: Cancellation): List<Linear> {
     if (lpRelaxer == null) return emptyList()
@@ -173,9 +174,10 @@ internal fun LpEngine.impliedEqualities(token: Cancellation): List<Linear> {
     return out
 }
 
-/** Safe (Neumaier–Shcherbina) lower bound on `min(coeffs·x)` over [prob]'s base relaxation, or null when
- *  it is empty / infeasible / unbounded / fails. Uses the primal pass — the dual simplex cannot optimise
- *  an arbitrary objective (it leaves its dual-feasible start). */
+/** Sound lower bound on `min(coeffs·x)` over [prob]'s base relaxation — the tighter of the two bounds
+ *  [tightObjectiveLowerBound] combines — or null when it is empty / infeasible / unbounded / fails. Uses
+ *  the primal pass: the dual simplex cannot optimise an arbitrary objective (it leaves its dual-feasible
+ *  start). */
 private fun LpEngine.safeMin(prob: Problem, coeffs: LongArray, token: Cancellation): Double? {
     val session = PropagationSession(prob)
     if (session.isUnsatAtRoot) return null
@@ -186,8 +188,8 @@ private fun LpEngine.safeMin(prob: Problem, coeffs: LongArray, token: Cancellati
     } catch (_: CheckedLongOverflowException) {
         return null
     } ?: return null
-    val safe = safeObjectiveLowerBound(relaxation.model, result.duals) ?: return null
-    return safe + relaxation.objectiveConstant.toDouble()
+    val lower = tightObjectiveLowerBound(relaxation.model, result.duals) ?: return null
+    return lower + relaxation.objectiveConstant.toDouble()
 }
 
 /** Safe upper bound on `max(coeffs·x)` over [prob] — `max(c·x) = −min(−c·x)`, so [safeMin] of the negated
@@ -209,8 +211,8 @@ private fun LpEngine.safeMinNoBake(coeffs: LongArray, token: Cancellation): Doub
     } catch (_: CheckedLongOverflowException) {
         return null
     } ?: return null
-    val safe = safeObjectiveLowerBound(relaxation.model, result.duals) ?: return null
-    return safe + relaxation.objectiveConstant.toDouble()
+    val lower = tightObjectiveLowerBound(relaxation.model, result.duals) ?: return null
+    return lower + relaxation.objectiveConstant.toDouble()
 }
 
 /** Safe upper bound on `max(coeffs·x)` over the declared domains — `max = −min(−·)`. See [safeMinNoBake]. */
@@ -223,9 +225,9 @@ private fun LpEngine.safeMaxNoBake(coeffs: LongArray, token: Cancellation): Doub
  * `[lo, hi]`. One LP solve per bound yields the tightened value *regardless of the domain span* — unlike
  * [shaveVariableBounds]'s unit-step SAC (which shaves at most [SHAVE_MAX_ITERS] units in total), so it
  * collapses in one solve a wide clamped domain the root bake would otherwise grind down one step per
- * round (O(span)). **Sound:** the safe bound over/under-estimates the true LP optimum, which bounds every
- * integer solution, so no feasible value is removed. Bounded by [OBBT_MAX_VARS] variables, spent on the
- * widest domains first — see [widestFirst].
+ * round (O(span)). **Sound:** the safe bound over/under-estimates the LP's optimum over the integer
+ * points, so no feasible value is removed. Bounded by [OBBT_MAX_VARS] variables, spent on the widest
+ * domains first — see [widestFirst].
  */
 internal fun LpEngine.rootLpBoundsNoBake(token: Cancellation): List<ShavedBound> {
     if (lpRelaxer == null || token()) return emptyList()
