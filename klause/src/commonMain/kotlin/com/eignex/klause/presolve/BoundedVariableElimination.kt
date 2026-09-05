@@ -139,7 +139,7 @@ internal object BoundedVariableElimination {
                 }
                 bools[e.v] = value
             }
-            return Sample(bools, sample.ints)
+            return sample.copy(bools = bools)
         }
 
         /** True if clause [c] is satisfied by a literal other than the one over [v]. */

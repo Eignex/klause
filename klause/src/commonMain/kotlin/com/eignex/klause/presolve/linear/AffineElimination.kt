@@ -1090,7 +1090,7 @@ internal class AffineElimination(private val subs: List<AffineSub>) {
             for (k in s.termVars.indices) v += s.termCoeffs[k] * ints[s.termVars[k]]
             ints[s.x] = if (s.divisor == 1L) v else v / s.divisor
         }
-        return Sample(sample.bools, ints)
+        return sample.copy(ints = ints)
     }
 }
 
