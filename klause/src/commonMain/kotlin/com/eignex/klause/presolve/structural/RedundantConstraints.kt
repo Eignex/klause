@@ -18,6 +18,7 @@ import com.eignex.klause.presolve.PassDelta
 import com.eignex.klause.presolve.PresolveShared
 import com.eignex.klause.presolve.SourceDelta
 import com.eignex.klause.presolve.SubsumeState
+import com.eignex.klause.presolve.asSourceDelta
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
@@ -67,10 +68,8 @@ internal object RedundantConstraints {
      * activity and read a global's domains, which a model with an open side has no answer for, so they
      * run only in [removeRedundantConstraints].
      */
-    fun removeRedundantSourceConstraints(problem: Problem, cancellation: Cancellation): SourceDelta {
-        val delta = computeFull(problem, domains = null, cancellation)
-        return SourceDelta(delta.droppedIndices, delta.addedFactors)
-    }
+    fun removeRedundantSourceConstraints(problem: Problem, cancellation: Cancellation): SourceDelta =
+        computeFull(problem, domains = null, cancellation).asSourceDelta()
 
     // Flip on to validate the incremental path: every firing also recomputes the full delta and asserts
     // the two agree, so a divergence throws on the exact instance/round instead of surfacing as a wrong

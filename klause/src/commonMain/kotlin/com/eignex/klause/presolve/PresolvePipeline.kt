@@ -158,11 +158,7 @@ object PresolvePipeline {
             return PresolveOutcome(
                 sourceProblem,
                 { it },
-                PresolveStats(
-                    passes = prepared.passesFired.map { it.id },
-                    constraintsRemoved = problem.factors.size - sourceProblem.factors.size,
-                    infeasible = true,
-                ),
+                prepared.stats.copy(infeasible = true),
                 changed = true,
                 objective = refit(linearObjective, sourceProblem),
             )
@@ -231,7 +227,7 @@ object PresolvePipeline {
         val reconstruct: (Sample) -> Sample = { sample -> reconstructs.foldRight(sample) { f, acc -> f(acc) } }
         // The base bake (declared → root-propagated domains) is not a presolve reduction: the solve boundary
         // re-runs it. So when no pass fired ([current] === [seeded]) and neither the OBBT pre-bake ([prebaked]
-        // === [problem]) nor the probing reseed ([seeded] === [baked]) tightened anything beyond that base
+        // === [sourceProblem]) nor the probing reseed ([seeded] === [baked]) tightened anything beyond that base
         // fold, report no change and let the caller keep its raw problem — preserving object identity for a
         // genuine no-op presolve, exactly as an already-baked input did before the bake became a fresh type.
         val onlyBaseBake = current === seeded && prebaked === sourceProblem && seeded === baked

@@ -32,13 +32,11 @@ object Presolve {
     /** GCD plus bounded-integer coefficient strengthening for
      *  [com.eignex.klause.factor.arithmetic.Linear] and pseudo-Boolean constraints. */
     fun strengthenCoefficients(problem: BakedProblem, cancellation: Cancellation = Cancellation.Never): PassDelta =
-        CoefficientStrengthening.strengthenCoefficients(problem, cancellation, problem.rootIntDomains())
+        CoefficientStrengthening.strengthenCoefficients(problem, cancellation, problem.rootIntDomainsInPlace)
 
     /** The source-safe GCD part of coefficient strengthening, before finite domains exist. */
-    internal fun strengthenSourceCoefficients(problem: Problem, cancellation: Cancellation): SourceDelta {
-        val delta = CoefficientStrengthening.strengthenCoefficients(problem, cancellation)
-        return SourceDelta(delta.droppedIndices, delta.addedFactors, delta.infeasible)
-    }
+    internal fun strengthenSourceCoefficients(problem: Problem, cancellation: Cancellation): SourceDelta =
+        CoefficientStrengthening.strengthenCoefficients(problem, cancellation).asSourceDelta()
 
     internal fun strengthenCoefficients(
         problem: Problem,
@@ -50,10 +48,7 @@ object Presolve {
     fun deriveXorUnits(problem: Problem): PassDelta = XorUnits.deriveXorUnits(problem)
 
     /** [deriveXorUnits] in the source lane's change form. */
-    internal fun deriveSourceXorUnits(problem: Problem): SourceDelta {
-        val delta = XorUnits.deriveXorUnits(problem)
-        return SourceDelta(delta.droppedIndices, delta.addedFactors, delta.infeasible)
-    }
+    internal fun deriveSourceXorUnits(problem: Problem): SourceDelta = XorUnits.deriveXorUnits(problem).asSourceDelta()
 
     /** Per-variable modular (Diophantine) domain tightening for integer equalities. See
      *  [DiophantineReduction]. */
@@ -81,7 +76,7 @@ object Presolve {
 
     /** Constraint subsumption / redundant-constraint removal. See [RedundantConstraints]. */
     fun removeRedundantConstraints(problem: BakedProblem): PassDelta =
-        RedundantConstraints.removeRedundantConstraints(problem, problem.rootIntDomains())
+        RedundantConstraints.removeRedundantConstraints(problem, problem.rootIntDomainsInPlace)
 
     /** The declaration-only phases of subsumption. See [RedundantConstraints]. */
     internal fun removeRedundantSourceConstraints(problem: Problem, cancellation: Cancellation): SourceDelta =
@@ -92,20 +87,16 @@ object Presolve {
     fun fuseLinearBounds(problem: Problem): PassDelta = LinearBoundFusion.fuseLinearBounds(problem)
 
     /** [fuseLinearBounds] in the source lane's change form. */
-    internal fun fuseSourceLinearBounds(problem: Problem): SourceDelta {
-        val delta = LinearBoundFusion.fuseLinearBounds(problem)
-        return SourceDelta(delta.droppedIndices, delta.addedFactors, delta.infeasible)
-    }
+    internal fun fuseSourceLinearBounds(problem: Problem): SourceDelta =
+        LinearBoundFusion.fuseLinearBounds(problem).asSourceDelta()
 
     /** Common linear sub-sum extraction — fold a sub-sum an equality defines as one variable back into
      *  the rows that contain it. See [LinearSubSumAggregation]. */
     fun aggregateSubSums(problem: Problem): PassDelta = LinearSubSumAggregation.aggregateSubSums(problem)
 
     /** [aggregateSubSums] in the source lane's change form. */
-    internal fun aggregateSourceSubSums(problem: Problem): SourceDelta {
-        val delta = LinearSubSumAggregation.aggregateSubSums(problem)
-        return SourceDelta(delta.droppedIndices, delta.addedFactors, delta.infeasible)
-    }
+    internal fun aggregateSourceSubSums(problem: Problem): SourceDelta =
+        LinearSubSumAggregation.aggregateSubSums(problem).asSourceDelta()
 
     /** Fourier-Motzkin projection of a variable occurring in exactly one linear inequality (and not the
      *  objective). See [SingletonInequalityProjection]. */

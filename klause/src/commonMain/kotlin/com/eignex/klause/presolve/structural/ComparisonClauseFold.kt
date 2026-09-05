@@ -44,7 +44,7 @@ internal object ComparisonClauseFold {
         if (defByAux.isEmpty()) return PassDelta()
 
         val occ = PropagationProblem(problem).boolOccurrences
-        val root = problem.rootIntDomains()
+        val root = problem.rootIntDomainsInPlace
         val dropped = IntArrayList()
         val added = ArrayList<Factor>()
         for (i in factors.indices) {
