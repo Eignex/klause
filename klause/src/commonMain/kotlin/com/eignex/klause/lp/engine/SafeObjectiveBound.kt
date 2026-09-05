@@ -2,6 +2,7 @@ package com.eignex.klause.lp.engine
 
 import kotlin.math.abs
 import kotlin.math.ceil
+import kotlin.math.nextDown
 
 /**
  * Neumaier and Shcherbina, *Safe Bounds in Linear and Mixed-Integer Linear Programming* (Mathematical
@@ -106,13 +107,11 @@ internal fun LpModel.safeVariableBound(
 }
 
 /**
- * The integer-exact twin of [safeVariableBound], from the 128-bit [integerDualLowerBoundCeil] instead of
- * the float [safeObjectiveLowerBound]. It is tight where the float bound is loose: the safe bound
+ * The integer-exact twin of [safeVariableBound], from the 128-bit [exactObjectiveLowerBoundCeil] instead
+ * of the float [safeObjectiveLowerBound]. It is tight where the float bound is loose: the safe bound
  * subtracts a conservative rounding margin from every reduced cost, which for a free column
  * ([LpBuilder.addFreeVar]) is multiplied by the ~`Long.MAX/4` probe upper and swamps the true bound; the
  * exact bound carries no such margin, so a free basic column (true reduced cost 0) contributes nothing.
- * A continuous model certifies over its scaled-integer rationalization
- * ([rationalizedDualLowerBoundCeil]), so mixed real models get the same sharpness.
  * Null on a 128-bit certification overflow (the caller falls back). Same probe-frontier rejection as
  * [safeVariableBound], with the same [clamped] override for split representations.
  */
@@ -122,14 +121,7 @@ internal fun LpModel.exactVariableBound(
     maximize: Boolean,
     clamped: Boolean? = null,
 ): Long? {
-    // ⌈L⌉ on the minimized objective (−x when maximizing, x when minimizing), objConstant folded in.
-    val ceilMin = (
-        if (hasContinuous) {
-            rationalizedDualLowerBoundCeil(this, result.duals)
-        } else {
-            integerDualLowerBoundCeil(this, result.duals)
-        }
-        ) ?: return null
+    val ceilMin = exactObjectiveLowerBoundCeil(result.duals) ?: return null
     return orientedVariableBound(ceilMin, objectiveCol, maximize, clamped)
 }
 
@@ -180,4 +172,54 @@ internal fun LpModel.tightVariableBound(
         maximize -> minOf(safe, exact)
         else -> maxOf(safe, exact)
     }
+}
+
+/**
+ * `⌈L⌉` on the minimized objective from the *approximate* duals [y], evaluated exactly: the
+ * integer-multiplier [integerDualLowerBoundCeil], or — on a model with continuous columns — the same
+ * bound over its scaled-integer rationalization ([rationalizedDualLowerBoundCeil]), so mixed real models
+ * get the same sharpness. The ceiling is sound against an **integral** objective, which is what every
+ * consumer bounds (an integer variable, or an integer-coefficient expression over integer variables);
+ * it may exceed a continuous LP's own fractional optimum. Null on a 128-bit certification overflow or a
+ * model that does not rationalize.
+ */
+internal fun LpModel.exactObjectiveLowerBoundCeil(y: DoubleArray): Long? =
+    if (hasContinuous) rationalizedDualLowerBoundCeil(this, y) else integerDualLowerBoundCeil(this, y)
+
+/**
+ * The tightest sound lower bound on [model]'s minimized objective from the approximate duals [y]: the
+ * larger of the float [safeObjectiveLowerBound] and the exact [exactObjectiveLowerBoundCeil] — the
+ * objective-level twin of [tightVariableBound]. Both are valid for any duals and neither dominates, so
+ * the combinator is `max` and never a fallback chain: the float margin is multiplied by a free column's
+ * [LP_UNBOUNDED_PROBE] upper and swamps the true bound, while the exact side carries no margin but
+ * declines on overflow. Sound against an integral objective, as [exactObjectiveLowerBoundCeil] is. Null
+ * only when neither side is available.
+ */
+internal fun tightObjectiveLowerBound(model: LpModel, y: DoubleArray): Double? =
+    tighterLowerBound(safeObjectiveLowerBound(model, y), model.exactObjectiveLowerBoundCeil(y))
+
+/**
+ * [tightObjectiveLowerBound] with the exact side taken from [certificate] — the certificate the caller
+ * already computed over the same [model] and [y], or null when that certification declined. A per-node
+ * caller uses this form so the node pays for at most one certification, and so a continuous model never
+ * re-rationalizes per node.
+ */
+internal fun tightObjectiveLowerBound(model: LpModel, y: DoubleArray, certificate: IntegerCertificate?): Double? =
+    tighterLowerBound(safeObjectiveLowerBound(model, y), certificate?.objectiveBoundCeil(0L))
+
+/** The larger of two sound lower bounds on the same objective, either of which may be unavailable. */
+private fun tighterLowerBound(safe: Double?, exactCeil: Long?): Double? {
+    val exact = exactCeil?.let(::lowerBoundAsDouble)
+    return when {
+        safe == null -> exact
+        exact == null -> safe
+        else -> maxOf(safe, exact)
+    }
+}
+
+/** [v] widened to `Double` without ever rounding **up**: past 2⁵³ the widening rounds to nearest, and a
+ *  lower bound that grew in the conversion would no longer be sound. */
+private fun lowerBoundAsDouble(v: Long): Double {
+    val d = v.toDouble()
+    return if (d == Long.MAX_VALUE.toDouble() || d.toLong() > v) d.nextDown() else d
 }

@@ -87,9 +87,9 @@ class LpShavingTest {
             LpParams(lpPlan = LpPlan(bounding = true)),
             SolveStatsSink(backend = "shave"),
         )
-        // A real row puts the relaxation on the double view, where the safe bound declines, so nothing
-        // certifies as redundant — the point is that a verdict is reached at all.
-        assertEquals(emptyList(), engine.redundantConstraints(Cancellation.Never))
+        // A real row puts the relaxation on the double view; the rationalized exact bound still brackets
+        // the integer column there, so the domain-implied row certifies as redundant.
+        assertEquals(listOf(0), engine.redundantConstraints(Cancellation.Never))
     }
 
     @Test
