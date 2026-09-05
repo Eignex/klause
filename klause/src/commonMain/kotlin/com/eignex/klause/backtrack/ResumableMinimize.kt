@@ -561,7 +561,9 @@ internal class ResumableMinimize(
                     ?: lpEngine.lpFeasibilityPump(objective, rootToken)
                 if (seed != null) publishLpProposal(seed)?.let { return it }
             }
-            // Best-bound tree-search primal subsolver: dive best-first for an incumbent.
+            // Best-bound tree-search primal subsolver: dive best-first for an incumbent. Reached only
+            // when the probe above seeded none — running it behind a successful probe was measured
+            // on MIPLIB as 0.3-1.5s of root time for no objective anywhere.
             if (lpEngine.params.lpPlan.lbTreeSearch && lpEngine.lpRelaxer != null) {
                 lpEngine.lbTreeSearch(objective, rootToken)?.let { seed -> publishLpProposal(seed)?.let { return it } }
             }
