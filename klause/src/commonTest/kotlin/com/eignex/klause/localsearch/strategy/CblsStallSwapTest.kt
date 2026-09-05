@@ -8,6 +8,7 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
 import com.eignex.klause.propagation.Assumptions
+import com.eignex.klause.propagation.bake
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -74,7 +75,7 @@ class CblsStallSwapTest {
 
     @Test
     fun `default stallSwapCap 0 never emits a stall swap`() {
-        val state = LocalSearchState(stallProblem(), Random(7))
+        val state = LocalSearchState(stallProblem().bake(), Random(7))
         var compounds = 0
         drive(Cbls(), state, steps = 2_000) { if (it is Move.Compound) compounds++ }
         assertEquals(0, compounds, "default Cbls must not emit swap compounds on a compound-free problem")
@@ -83,7 +84,7 @@ class CblsStallSwapTest {
     @Test
     fun `enabled swaps are legal same-domain two-part value exchanges`() {
         val problem = stallProblem()
-        val state = LocalSearchState(problem, Random(7))
+        val state = LocalSearchState(problem.bake(), Random(7))
         var swaps = 0
         drive(Cbls(stallSwapCap = 16), state, steps = 10_000, compoundCap = 5) { m ->
             if (m is Move.Compound) {
@@ -95,8 +96,8 @@ class CblsStallSwapTest {
                 // A value exchange: each var receives the other's current value.
                 assertEquals(state.assignment.intValue(b.varId), a.newValue, "swap must exchange values")
                 assertEquals(state.assignment.intValue(a.varId), b.newValue, "swap must exchange values")
-                val da = problem.requireFiniteIntDomains()[a.varId]
-                val db = problem.requireFiniteIntDomains()[b.varId]
+                val da = state.rootDomains[a.varId]
+                val db = state.rootDomains[b.varId]
                 assertEquals(da.min, db.min, "swap pairs must share domain bounds")
                 assertEquals(da.max, db.max, "swap pairs must share domain bounds")
             }
@@ -107,7 +108,7 @@ class CblsStallSwapTest {
     @Test
     fun `swaps never touch frozen vars`() {
         val frozen = Assumptions(ints = mapOf(2 to 3))
-        val state = LocalSearchState(stallProblem(), Random(7), frozen)
+        val state = LocalSearchState(stallProblem().bake(), Random(7), frozen)
         drive(Cbls(stallSwapCap = 16), state, steps = 10_000, compoundCap = 5) { m ->
             if (m is Move.Compound) {
                 for (p in m.parts) {

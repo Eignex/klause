@@ -8,6 +8,7 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.values
+import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.*
 import kotlin.random.Random
 import kotlin.test.Test
@@ -54,7 +55,7 @@ class LocalSearchStateBreakCacheTest {
             ),
         )
         val problem = Problem(numBool, numInt, intDomains, factors)
-        val state = LocalSearchState(problem, Random(42))
+        val state = LocalSearchState(problem.bake(), Random(42))
         state.restart()
         assertCacheConsistent(state, "after restart")
 
@@ -63,7 +64,7 @@ class LocalSearchStateBreakCacheTest {
             val pickInt = numInt > 0 && rng.nextInt(3) == 0
             if (pickInt) {
                 val v = rng.nextInt(numInt)
-                val d = problem.requireFiniteIntDomains()[v]
+                val d = state.rootDomains[v]
                 val target = d.min + rng.nextInt(d.values.size)
                 state.apply(Move.IntSet(v, target))
                 assertCacheConsistent(state, "after IntSet($v=$target) at step=$step")
@@ -81,7 +82,7 @@ class LocalSearchStateBreakCacheTest {
             Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
         )
         val problem = Problem(2, 0, emptyArray(), factors)
-        val state = LocalSearchState(problem, Random(0))
+        val state = LocalSearchState(problem.bake(), Random(0))
         state.restart()
 
         state.apply(Move.BoolFlip(0))

@@ -64,8 +64,8 @@ class PairSwapTest {
                 val va = state.assignment.intValue(a)
                 val vb = state.assignment.intValue(b)
                 if (va == vb) return@run null
-                if (vb !in state.problem.requireFiniteIntDomains()[a] ||
-                    va !in state.problem.requireFiniteIntDomains()[b]
+                if (vb !in state.problem.rootIntDomain(a) ||
+                    va !in state.problem.rootIntDomain(b)
                 ) {
                     return@run null
                 }

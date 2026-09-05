@@ -6,6 +6,7 @@ import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.propagation.bake
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertSame
@@ -19,7 +20,7 @@ class PostDifferenceSystemTest {
         numIntVars = 3,
         intDomains = Array(3) { IntDomain(0, 10) },
         factors = arrayOf(*factors),
-    )
+    ).bake()
 
     private fun reified(aux: Int, hi: Int, lo: Int, bound: Long) =
         ReifiedLinear(aux, longArrayOf(1, -1), intArrayOf(hi, lo), LinearOp.LE, bound)
@@ -50,7 +51,7 @@ class PostDifferenceSystemTest {
             numIntVars = 3,
             intDomains = Array(3) { IntDomain(-clamp, clamp) },
             factors = arrayOf<Factor>(reified(0, 1, 0, -1L), reified(1, 2, 1, -1L)),
-        )
+        ).bake()
         assertTrue(problem.withDifferenceSystem().factors.last() is DifferenceSystem)
     }
 

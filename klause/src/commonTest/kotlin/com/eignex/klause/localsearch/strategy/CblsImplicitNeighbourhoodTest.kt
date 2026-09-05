@@ -8,6 +8,7 @@ import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
 import com.eignex.klause.localsearch.MoveSink
 import com.eignex.klause.propagation.Assumptions
+import com.eignex.klause.propagation.bake
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertNotNull
@@ -46,7 +47,7 @@ class CblsImplicitNeighbourhoodTest {
 
     @Test
     fun `every all-different is elected for implicit neighbourhoods`() {
-        val state = LocalSearchState(latinSquare(), Random(1))
+        val state = LocalSearchState(latinSquare().bake(), Random(1))
         assertTrue(
             state.seeding.electedImplicit.toList().sorted() == listOf(0, 1, 2, 3),
             "all four all-differents must be elected, got ${state.seeding.electedImplicit.toList()}",
@@ -56,7 +57,7 @@ class CblsImplicitNeighbourhoodTest {
     @Test
     fun `a satisfied row's structured swap clears the coupled column clashes`() {
         val problem = latinSquare()
-        val state = LocalSearchState(problem, Random(1))
+        val state = LocalSearchState(problem.bake(), Random(1))
         seed(state)
         assertTrue(state.cost > 0L, "fixture must start infeasible (both columns clash)")
 
@@ -80,7 +81,7 @@ class CblsImplicitNeighbourhoodTest {
     @Test
     fun `the implicit seed set is scope-disjoint`() {
         val problem = latinSquare()
-        val state = LocalSearchState(problem, Random(1))
+        val state = LocalSearchState(problem.bake(), Random(1))
         val owned = HashSet<Int>()
         for (fid in state.seeding.implicitSeedFactors) {
             for (v in problem.factors[fid].intVars) {
@@ -100,7 +101,7 @@ class CblsImplicitNeighbourhoodTest {
             intDomains = arrayOf(IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2)),
             factors = arrayOf<Factor>(AllDifferent(intArrayOf(0, 1, 2), 0, 3)),
         )
-        val state = LocalSearchState(problem, Random(5))
+        val state = LocalSearchState(problem.bake(), Random(5))
         // Start from an all-equal (maximally violated) assignment.
         state.assignment.setInt(0, 0)
         state.assignment.setInt(1, 0)
@@ -121,7 +122,7 @@ class CblsImplicitNeighbourhoodTest {
             factors = arrayOf<Factor>(AllDifferent(intArrayOf(0, 1, 2), 0, 3)),
         )
         val frozen = Assumptions(ints = mapOf(0 to 2))
-        val state = LocalSearchState(problem, Random(5), frozen)
+        val state = LocalSearchState(problem.bake(), Random(5), frozen)
         state.assignment.setInt(0, 2)
         state.assignment.setInt(1, 0)
         state.assignment.setInt(2, 0)
@@ -138,7 +139,7 @@ class CblsImplicitNeighbourhoodTest {
             intDomains = arrayOf(IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2)),
             factors = arrayOf<Factor>(AllDifferent(intArrayOf(0, 1, 2), 0, 3)),
         )
-        val state = LocalSearchState(problem, Random(5))
+        val state = LocalSearchState(problem.bake(), Random(5))
         state.assignment.setInt(0, 0)
         state.assignment.setInt(1, 0)
         state.assignment.setInt(2, 0)
@@ -159,7 +160,7 @@ class CblsImplicitNeighbourhoodTest {
             intDomains = arrayOf(IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2)),
             factors = arrayOf<Factor>(AllDifferent(intArrayOf(0, 1, 2), 0, 3)),
         )
-        val state = LocalSearchState(problem, Random(5))
+        val state = LocalSearchState(problem.bake(), Random(5))
         state.assignment.setInt(0, 0)
         state.assignment.setInt(1, 0)
         state.assignment.setInt(2, 0)
@@ -185,7 +186,7 @@ class CblsImplicitNeighbourhoodTest {
     @Test
     fun `the CBLS engine drives the coupled square to feasibility`() {
         val problem = latinSquare()
-        val state = LocalSearchState(problem, Random(1))
+        val state = LocalSearchState(problem.bake(), Random(1))
         seed(state)
         val strategy = Cbls(implicitStructuredCap = 8)
         var solved = state.cost == 0L

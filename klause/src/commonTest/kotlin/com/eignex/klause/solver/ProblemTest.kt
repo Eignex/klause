@@ -42,8 +42,8 @@ class ProblemTest {
             intDomains = arrayOf(IntDomain(0, 10)),
             factors = tighteningFactors(),
         )
-        assertEquals(10, problem.requireFiniteIntDomains()[0].max, "a raw problem never folds the root bake")
-        assertEquals(3, problem.bake().requireFiniteIntDomains()[0].max, "bake carries the x <= 3 tightening")
+        assertEquals(10, problem.finiteIntDomain(0).max, "a raw problem never folds the root bake")
+        assertEquals(3, problem.bake().rootIntDomain(0).max, "bake carries the x <= 3 tightening")
     }
 
     @Test
@@ -307,7 +307,7 @@ class ProblemTest {
 
         val route = assertIs<SourceProblemRoute.Finite>(problem.pipelineRoute())
 
-        assertEquals(IntDomain(0, 5), route.problem.requireFiniteIntDomains().single())
+        assertEquals(IntDomain(0, 5), route.problem.finiteIntDomains().single())
     }
 
     @Test

@@ -6,6 +6,7 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
 import com.eignex.klause.localsearch.MoveSink
+import com.eignex.klause.propagation.bake
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -38,7 +39,7 @@ class InverseInvariantTest {
         // Two valid involutions to start from: all fixed points, and two transpositions.
         val starts = listOf(intArrayOf(0, 1, 2, 3), intArrayOf(1, 0, 3, 2))
         fun seeded(start: IntArray, seed: Long): LocalSearchState {
-            val state = LocalSearchState(problem, Random(seed))
+            val state = LocalSearchState(problem.bake(), Random(seed))
             for (i in 0 until 4) state.assignment.setInt(i, start[i].toLong())
             state.recompute()
             return state
@@ -78,7 +79,7 @@ class InverseInvariantTest {
             ),
             factors = arrayOf<Factor>(Inverse(f, g, fOffset = 0, gOffset = 0)),
         )
-        val state = LocalSearchState(problem, Random(0))
+        val state = LocalSearchState(problem.bake(), Random(0))
         assertTrue(state.factors[0].seedFeasible(state, 0), "matching seed must find a feasible inverse")
         state.recompute()
         assertEquals(0L, state.cost, "the seeded assignment must satisfy inverse")
@@ -92,7 +93,7 @@ class InverseInvariantTest {
             listOf(0L, 1L, 2L) to listOf(0L, 1L, 2L),
         )
         for ((fValues, gValues) in pairs) {
-            val state = LocalSearchState(problem(), Random(0))
+            val state = LocalSearchState(problem().bake(), Random(0))
             for (i in 0..2) state.assignment.setInt(i, fValues[i])
             for (i in 0..2) state.assignment.setInt(3 + i, gValues[i])
             state.recompute()
@@ -104,7 +105,7 @@ class InverseInvariantTest {
     @Test
     fun `violated when back-link is wrong`() {
         val p = problem()
-        val state = LocalSearchState(p, Random(0))
+        val state = LocalSearchState(p.bake(), Random(0))
         // f = [0, 1, 2], g = [1, 1, 2]: g[f[0]]=g[0]=1, but should be 0 → violated
         state.assignment.setInt(0, 0)
         state.assignment.setInt(1, 1)
@@ -119,7 +120,7 @@ class InverseInvariantTest {
     @Test
     fun `delta predicts degree change on corrective assignment`() {
         val p = problem()
-        val state = LocalSearchState(p, Random(0))
+        val state = LocalSearchState(p.bake(), Random(0))
         // Start with identity, break g[0] to 2 (was 0)
         for (i in 0..2) state.assignment.setInt(i, i.toLong())
         state.assignment.setInt(3, 2)

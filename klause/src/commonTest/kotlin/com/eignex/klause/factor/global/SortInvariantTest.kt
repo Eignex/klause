@@ -5,6 +5,7 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
+import com.eignex.klause.propagation.bake
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -24,7 +25,7 @@ class SortInvariantTest {
     @Test
     fun `not violated when ys equals sorted xs`() {
         val p = problem()
-        val state = LocalSearchState(p, Random(0))
+        val state = LocalSearchState(p.bake(), Random(0))
         // xs=[2,0,1], sorted=[0,1,2], ys=[0,1,2]
         state.assignment.setInt(0, 2)
         state.assignment.setInt(1, 0)
@@ -46,7 +47,7 @@ class SortInvariantTest {
             Triple(listOf(1L, 2L, 3L), listOf(3L, 2L, 1L), 2),
         )
         for ((xs, ys, degree) in cases) {
-            val state = LocalSearchState(problem(), Random(0))
+            val state = LocalSearchState(problem().bake(), Random(0))
             for (i in 0..2) state.assignment.setInt(i, xs[i])
             for (i in 0..2) state.assignment.setInt(3 + i, ys[i])
             state.recompute()
@@ -58,7 +59,7 @@ class SortInvariantTest {
     @Test
     fun `delta predicts degree change when correcting a ys entry`() {
         val p = problem()
-        val state = LocalSearchState(p, Random(0))
+        val state = LocalSearchState(p.bake(), Random(0))
         // xs=[0,1,2], ys=[2,1,0] — all wrong
         state.assignment.setInt(0, 0)
         state.assignment.setInt(1, 1)

@@ -19,6 +19,7 @@ import com.eignex.klause.localsearch.schedule.Geometric
 import com.eignex.klause.localsearch.schedule.ScheduleBundle
 import com.eignex.klause.localsearch.schedule.WeightSchedule
 import com.eignex.klause.localsearch.scoring.MoveScoring
+import com.eignex.klause.propagation.bake
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -57,7 +58,7 @@ class SourceDrivenStrategyAxisInputsTest {
             scoring = MoveScoring.Break,
             feasibleDescent = FeasibleDescent.RatchetAsConstraint,
         )
-        val state = LocalSearchState(satisfiable(), Random(7))
+        val state = LocalSearchState(satisfiable().bake(), Random(7))
         state.recompute()
         var steps = 0
         while (steps < 200 && state.cost > 0L) {
@@ -82,7 +83,7 @@ class SourceDrivenStrategyAxisInputsTest {
             ),
             feasibleDescent = FeasibleDescent.RatchetAsConstraint,
         )
-        val state = LocalSearchState(infeasibleRing(), Random(7))
+        val state = LocalSearchState(infeasibleRing().bake(), Random(7))
         state.recompute()
         repeat(30) { strategy.pickMove(state)?.let { move -> state.apply(move) } }
         assertTrue(
@@ -99,7 +100,7 @@ class SourceDrivenStrategyAxisInputsTest {
             perturbation = { kick },
             feasibleDescent = FeasibleDescent.RatchetAsConstraint,
         )
-        val state = LocalSearchState(satisfiable(), Random(7))
+        val state = LocalSearchState(satisfiable().bake(), Random(7))
         state.recompute()
         assertEquals(kick, strategy.pickMove(state), "a firing perturbation must be returned directly")
     }
@@ -127,7 +128,7 @@ class SourceDrivenStrategyAxisInputsTest {
             configurationChecking = true,
             feasibleDescent = FeasibleDescent.RatchetAsConstraint,
         )
-        val state = LocalSearchState(problem, Random(7))
+        val state = LocalSearchState(problem.bake(), Random(7))
         state.recompute()
         state.intConfChange[0] = false // var 0 CC-blocked
         state.intConfChange[1] = true
@@ -152,7 +153,7 @@ class SourceDrivenStrategyAxisInputsTest {
             schedule = ScheduleBundle(temperature = temperature),
             feasibleDescent = FeasibleDescent.RatchetAsConstraint,
         )
-        val state = LocalSearchState(infeasibleRing(), Random(7))
+        val state = LocalSearchState(infeasibleRing().bake(), Random(7))
         state.recompute()
         val t0 = temperature.temperature
         repeat(20) { strategy.pickMove(state)?.let { move -> state.apply(move) } }

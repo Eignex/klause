@@ -66,7 +66,7 @@ class DuplicateColumnsTest {
         val reduced = baked.withPassDelta(delta, BakeConfig.NONE)
         val reconstruct = delta.reconstruct ?: { it }
         var anyReduced = false
-        enumerate(reduced.requireFiniteIntDomains()) { assign ->
+        enumerate(reduced.rootIntDomains()) { assign ->
             if (isFeasible(reduced, Sample(BooleanArray(0), assign))) {
                 anyReduced = true
                 val full = reconstruct(Sample(BooleanArray(0), assign.copyOf()))
@@ -78,7 +78,7 @@ class DuplicateColumnsTest {
 
     private fun anyOriginalFeasible(problem: Problem): Boolean {
         var any = false
-        enumerate(problem.requireFiniteIntDomains()) { assign ->
+        enumerate(problem.finiteIntDomains()) { assign ->
             if (isFeasible(problem, Sample(BooleanArray(0), assign))) any = true
         }
         return any
@@ -138,7 +138,7 @@ class DuplicateColumnsTest {
             factors = listOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1)),
         )
         val delta = Presolve.mergeDuplicateColumns(problem.bake())
-        val aggregates = delta.domains ?: problem.requireFiniteIntDomains()
+        val aggregates = delta.domains ?: problem.finiteIntDomains()
         assertTrue(
             aggregates.all { it.min >= 0L },
             "aggregating two non-negative columns must not wrap to a negative domain",

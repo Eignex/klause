@@ -33,7 +33,7 @@ class IteratedLocalSearchSolveTest {
             emptyArray(),
             listOf(Cardinality.atLeastOne(IntArray(4) { Lit.make(it, true) })),
         )
-        val seedState = LocalSearchState(seedProblem, Random(0))
+        val seedState = LocalSearchState(seedProblem.bake(), Random(0))
         for (i in 0 until seedProblem.numFactors) seedState.factors[i].initialize(seedState, i)
         policy.onLocalOptimum(seedState, Sample(BooleanArray(0), LongArray(0)), 10.0)
         policy.onLocalOptimum(seedState, Sample(BooleanArray(0), LongArray(0)), 12.0)
@@ -64,7 +64,7 @@ class IteratedLocalSearchSolveTest {
             intDomains = arrayOf(IntDomain(0, 1), IntDomain(0, 1)),
             factors = emptyArray(),
         )
-        val seedState = LocalSearchState(seedProblem, Random(0))
+        val seedState = LocalSearchState(seedProblem.bake(), Random(0))
         for (i in 0 until seedProblem.numFactors) seedState.factors[i].initialize(seedState, i)
         policy.onLocalOptimum(seedState, Sample(BooleanArray(0), LongArray(2)), 10.0)
         policy.onLocalOptimum(seedState, Sample(BooleanArray(0), LongArray(2)), 12.0)

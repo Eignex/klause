@@ -1,13 +1,13 @@
 package com.eignex.klause.propagation.difference
 
 import com.eignex.klause.arithmetic.difference.DifferenceEdge
-import com.eignex.klause.ir.Problem
+import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.withAppendedFactor
 import com.eignex.klause.solver.differenceFragmentOf
 
 /**
- * This `Problem` with a [DifferenceSystem] over its difference rows appended, or the problem unchanged
- * when it carries none the joint propagator could act on.
+ * This propagation projection with a [DifferenceSystem] over its difference rows appended, or the
+ * projection unchanged when it carries none the joint propagator could act on.
  *
  * Posted exactly once, after the presolve fixpoint — never as a round pass. A factor pins every variable
  * it mentions into the model, so a system posted between rounds keeps a variable alive that affine
@@ -24,7 +24,7 @@ import com.eignex.klause.solver.differenceFragmentOf
  * built only from those repeats work the model already does; it is the reified ones, whose truth the
  * Boolean layer decides, that the joint graph can refute ahead of a decision.
  */
-internal fun Problem.withDifferenceSystem(): Problem {
+internal fun BakedProblem.withDifferenceSystem(): BakedProblem {
     val fragment = differenceFragmentOf(factors, numIntVars, intBounds)?.withoutOverHeavyDomainEdges() ?: return this
     if (fragment.edges.none { it.guard != DifferenceEdge.ALWAYS }) return this
     // The system is redundant with the rows it reads, so it changes nothing the base fold derived:

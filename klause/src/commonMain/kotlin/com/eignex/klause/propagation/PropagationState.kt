@@ -128,9 +128,14 @@ class PropagationState(
     val boolValues: BoolView = BoolView()
 
     /** The stable root domains this state was seeded from — the search root, read by propagators for a
-     *  variable's original bounds. Decoupled from [problem] so the bake can seed from raw declared domains
-     *  and search from baked ones without the machinery caring which. */
-    val rootDomains: Array<IntDomain> = problem.finiteRootDomains
+     *  variable's original bounds.
+     *
+     *  A [BakedProblem] hands back the array its fold owns, so seeding costs no copy on the paths that
+     *  build a state per probe. Raw model data reaches here only where no fold exists yet — the root bake
+     *  that builds a projection, and `Problem.propagate` over a source model — and materializes the
+     *  declared value sets, which is what that projection is itself built from. */
+    val rootDomains: Array<IntDomain> =
+        (problem as? BakedProblem)?.foldedIntDomains ?: problem.finiteIntDomains()
 
     /** Per-int current domain (copy of [rootDomains], narrowed as propagation proceeds). */
     val intDomains: Array<IntDomain> = Array(problem.numIntVars) { rootDomains[it] }

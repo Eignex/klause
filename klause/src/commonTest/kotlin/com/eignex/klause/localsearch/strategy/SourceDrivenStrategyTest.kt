@@ -13,6 +13,7 @@ import com.eignex.klause.localsearch.movesource.SatisfiedStructured
 import com.eignex.klause.localsearch.movesource.StallSwaps
 import com.eignex.klause.localsearch.movesource.ViolatedRepairs
 import com.eignex.klause.localsearch.scoring.MoveScoring
+import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.objective.LinearObjective
 import kotlin.random.Random
 import kotlin.test.Test
@@ -55,7 +56,7 @@ class SourceDrivenStrategyTest {
             scoring = MoveScoring.Raw,
             feasibleDescent = FeasibleDescent.RatchetAsConstraint,
         )
-        val state = LocalSearchState(satisfiableProblem(), Random(7))
+        val state = LocalSearchState(satisfiableProblem().bake(), Random(7))
         assertTrue(driveToFeasible(strategy, state, steps = 200), "ViolatedRepairs-only arm must reach feasibility")
     }
 
@@ -71,7 +72,7 @@ class SourceDrivenStrategyTest {
             feasibleDescent = FeasibleDescent.RatchetAsConstraint,
         )
         // A feasible state (the EQ is satisfied at (1,1)) with an objective so ObjectiveSeed fires.
-        val state = LocalSearchState(satisfiableProblem(), Random(7))
+        val state = LocalSearchState(satisfiableProblem().bake(), Random(7))
         state.shaping.objective = LinearObjective(intCoefficients = longArrayOf(1, 1))
         state.assignment.setInt(0, 1)
         state.assignment.setInt(1, 1)
@@ -94,7 +95,7 @@ class SourceDrivenStrategyTest {
             feasibleDescent = FeasibleDescent.SelfOwned,
             feasibleAcceptance = AcceptanceRule.GreedyDescent,
         )
-        val state = LocalSearchState(satisfiableProblem(), Random(7))
+        val state = LocalSearchState(satisfiableProblem().bake(), Random(7))
         state.shaping.objective = LinearObjective(intCoefficients = longArrayOf(1, 1))
         state.assignment.setInt(0, 1)
         state.assignment.setInt(1, 1)
@@ -125,7 +126,7 @@ class SourceDrivenStrategyTest {
                 Linear(intArrayOf(-1, 1), intArrayOf(0, 1), LinearOp.GE, 3),
             ),
         )
-        val state = LocalSearchState(problem, Random(7))
+        val state = LocalSearchState(problem.bake(), Random(7))
         state.recompute()
         assertTrue(state.cost > 0L, "fixture must be infeasible so StallSwaps is in phase")
         // Repeated picks must never throw / index an empty noise pool; a returned move (when any)

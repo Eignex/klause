@@ -5,6 +5,7 @@ import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.Assumptions
+import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.*
 import kotlin.random.Random
 import kotlin.test.Test
@@ -23,7 +24,7 @@ class MoveCompoundMoveTest {
             intDomains = arrayOf(IntDomain(0, 9), IntDomain(0, 9), IntDomain(0, 9)),
             factors = arrayOf<Factor>(factor),
         )
-        val state = LocalSearchState(problem, Random(0))
+        val state = LocalSearchState(problem.bake(), Random(0))
         state.assignment.setInt(0, 5)
         state.assignment.setInt(1, 5)
         state.assignment.setInt(2, 0)

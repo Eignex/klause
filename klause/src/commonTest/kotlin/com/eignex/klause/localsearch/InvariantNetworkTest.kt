@@ -1,5 +1,6 @@
 package com.eignex.klause.localsearch
 
+import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.pipeline.parseFlatZincExecution
 import kotlin.random.Random
 import kotlin.test.Test
@@ -41,7 +42,7 @@ class InvariantNetworkTest {
         val sweep = assertNotNull(execution.definitionalSweep)
         val net = sweep.network(program.problem.numIntVars, program.problem.numBoolVars)
         val iv = program.intVarsByName
-        val state = LocalSearchState(program.problem, Random(5))
+        val state = LocalSearchState(program.problem.bake(), Random(5))
         state.recompute()
         state.invariants = net
         state.apply(Move.IntSet(iv.getValue("x"), 10)) // dx = 3, a = 3
@@ -70,7 +71,7 @@ class InvariantNetworkTest {
         val iv = program.intVarsByName
         assertTrue(net.isDefinedInt(iv.getValue("s")))
         assertFalse(net.isDefinedInt(iv.getValue("x")))
-        val state = LocalSearchState(program.problem, Random(5))
+        val state = LocalSearchState(program.problem.bake(), Random(5))
         state.invariants = net
         val sink = state.moveSink
         sink.clear()

@@ -56,7 +56,7 @@ class CostShapingTest {
     fun `shapedBreakScore reduces to breakScore when no shaping configured`() {
         val factor = Cardinality.exactlyOne(intArrayOf(Lit.make(0, true), Lit.make(1, true)))
         val problem = Problem(2, 0, emptyArray(), listOf(factor))
-        val state = LocalSearchState(problem, Random(0))
+        val state = LocalSearchState(problem.bake(), Random(0))
         state.recompute()
         for (b in 0..1) {
             val move = BoolFlip(b)
@@ -72,7 +72,7 @@ class CostShapingTest {
         // and lambda 1.0 the shaped scores differ exactly by the weight gap of 99.
         val factor = Cardinality.exactlyOne(intArrayOf(Lit.make(0, true), Lit.make(1, true)))
         val problem = Problem(2, 0, emptyArray(), listOf(factor))
-        val state = LocalSearchState(problem, Random(0))
+        val state = LocalSearchState(problem.bake(), Random(0))
         state.assignment.setBool(0, false)
         state.assignment.setBool(1, false)
         state.recompute()
@@ -87,7 +87,7 @@ class CostShapingTest {
     fun `shapedObjectiveDelta returns zero when shaping is off`() {
         val factor = Cardinality.exactlyOne(intArrayOf(Lit.make(0, true), Lit.make(1, true)))
         val problem = Problem(2, 0, emptyArray(), listOf(factor))
-        val state = LocalSearchState(problem, Random(0))
+        val state = LocalSearchState(problem.bake(), Random(0))
         state.recompute()
         assertEquals(0.0, state.shapedObjectiveDelta(BoolFlip(0)))
         state.shaping.objective = LinearObjective(boolWeights = longArrayOf(10L, 1L))
@@ -99,7 +99,7 @@ class CostShapingTest {
     fun `shapedObjectiveDelta returns lambda times linear delta when shaping is on`() {
         val factor = Cardinality.exactlyOne(intArrayOf(Lit.make(0, true), Lit.make(1, true)))
         val problem = Problem(2, 0, emptyArray(), listOf(factor))
-        val state = LocalSearchState(problem, Random(0))
+        val state = LocalSearchState(problem.bake(), Random(0))
         state.assignment.setBool(0, false)
         state.assignment.setBool(1, false)
         state.recompute()
@@ -116,7 +116,7 @@ class CostShapingTest {
         // into shaped descent via IncrementalObjective.
         val factor = Cardinality.exactlyOne(intArrayOf(Lit.make(0, true), Lit.make(1, true)))
         val problem = Problem(2, 0, emptyArray(), listOf(factor))
-        val state = LocalSearchState(problem, Random(0))
+        val state = LocalSearchState(problem.bake(), Random(0))
         state.assignment.setBool(0, false)
         state.assignment.setBool(1, false)
         state.recompute()
@@ -159,7 +159,7 @@ class CostShapingTest {
         // A plain Objective without IncrementalObjective must yield 0.0 rather than crash or apply-revert.
         val factor = Cardinality.exactlyOne(intArrayOf(Lit.make(0, true), Lit.make(1, true)))
         val problem = Problem(2, 0, emptyArray(), listOf(factor))
-        val state = LocalSearchState(problem, Random(0))
+        val state = LocalSearchState(problem.bake(), Random(0))
         state.recompute()
         state.shaping.objective = object : Objective {
             override fun evaluate(sample: Sample): Double = 42.0

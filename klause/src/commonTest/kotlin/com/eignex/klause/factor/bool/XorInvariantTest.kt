@@ -5,6 +5,7 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
 import com.eignex.klause.localsearch.MoveSink
+import com.eignex.klause.propagation.bake
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -17,7 +18,7 @@ class XorInvariantTest {
     fun `violated when current parity differs from odd target`() {
         val factor = Xor(IntArray(3) { Lit.make(it, true) }, targetParity = 1)
         val problem = Problem(3, 0, emptyArray(), listOf(factor))
-        val state = LocalSearchState(problem, Random(0))
+        val state = LocalSearchState(problem.bake(), Random(0))
         for (v in 0..2) state.assignment.setBool(v, false)
         state.recompute()
         assertTrue(state.factors[0].isViolated(state, 0))
@@ -27,7 +28,7 @@ class XorInvariantTest {
     fun `satisfied when parity matches odd target`() {
         val factor = Xor(IntArray(3) { Lit.make(it, true) }, targetParity = 1)
         val problem = Problem(3, 0, emptyArray(), listOf(factor))
-        val state = LocalSearchState(problem, Random(0))
+        val state = LocalSearchState(problem.bake(), Random(0))
         state.assignment.setBool(0, true)
         state.assignment.setBool(1, false)
         state.assignment.setBool(2, false)
@@ -39,7 +40,7 @@ class XorInvariantTest {
     fun `delta is negative when flip fixes violation`() {
         val factor = Xor(IntArray(3) { Lit.make(it, true) }, targetParity = 1)
         val problem = Problem(3, 0, emptyArray(), listOf(factor))
-        val state = LocalSearchState(problem, Random(0))
+        val state = LocalSearchState(problem.bake(), Random(0))
         for (v in 0..2) state.assignment.setBool(v, false)
         state.recompute()
         val delta = state.factors[0].deltaIfBoolFlipped(state, 0, 0)
@@ -50,7 +51,7 @@ class XorInvariantTest {
     fun `delta is positive when flip breaks satisfied constraint`() {
         val factor = Xor(IntArray(3) { Lit.make(it, true) }, targetParity = 1)
         val problem = Problem(3, 0, emptyArray(), listOf(factor))
-        val state = LocalSearchState(problem, Random(0))
+        val state = LocalSearchState(problem.bake(), Random(0))
         state.assignment.setBool(0, true)
         state.assignment.setBool(1, false)
         state.assignment.setBool(2, false)
@@ -63,7 +64,7 @@ class XorInvariantTest {
     fun `repair proposes all parity-contributing vars when violated`() {
         val factor = Xor(IntArray(3) { Lit.make(it, true) }, targetParity = 1)
         val problem = Problem(3, 0, emptyArray(), listOf(factor))
-        val state = LocalSearchState(problem, Random(0))
+        val state = LocalSearchState(problem.bake(), Random(0))
         for (v in 0..2) state.assignment.setBool(v, false)
         state.recompute()
         val sink = MoveSink()
@@ -80,7 +81,7 @@ class XorInvariantTest {
             targetParity = 1,
         )
         val problem = Problem(2, 0, emptyArray(), listOf(factor))
-        val state = LocalSearchState(problem, Random(0))
+        val state = LocalSearchState(problem.bake(), Random(0))
         for (v in 0..1) state.assignment.setBool(v, false)
         state.recompute()
         assertEquals(0, state.factors[0].deltaIfBoolFlipped(state, 0, 0))

@@ -137,7 +137,7 @@ class BinaryColumnSubstitutionTest {
         val numBools = result.problem.numBoolVars
         for (mask in 0 until (1 shl numBools)) {
             val bools = BooleanArray(numBools) { ((mask shr it) and 1) == 1 }
-            val ints = LongArray(result.problem.numIntVars) { result.problem.requireFiniteIntDomains()[it].min }
+            val ints = LongArray(result.problem.numIntVars) { result.problem.rootIntDomain(it).min }
             if (!satisfies(result.problem, bools, ints)) continue
             val recon = result.reconstruct(Sample(bools, ints))
             assertTrue(
@@ -157,6 +157,6 @@ class BinaryColumnSubstitutionTest {
 
         val result = requireNotNull(substitute(model))
 
-        assertTrue(result.problem.requireFiniteIntDomains().all { it.values.size == 1 })
+        assertTrue(result.problem.rootIntDomains().all { it.values.size == 1 })
     }
 }

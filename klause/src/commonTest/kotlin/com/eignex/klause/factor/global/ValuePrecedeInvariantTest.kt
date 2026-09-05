@@ -5,6 +5,7 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
+import com.eignex.klause.propagation.bake
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -28,7 +29,7 @@ class ValuePrecedeInvariantTest {
             listOf(0L, 0L, 0L), // neither s nor t occurs
         )
         for (xs in cases) {
-            val state = LocalSearchState(problem(), Random(0))
+            val state = LocalSearchState(problem().bake(), Random(0))
             for (i in 0..2) state.assignment.setInt(i, xs[i])
             state.recompute()
             assertFalse(state.factors[0].isViolated(state, 0), "xs=$xs must satisfy value_precede")
@@ -39,7 +40,7 @@ class ValuePrecedeInvariantTest {
     @Test
     fun `violated when t appears before first s`() {
         val p = problem()
-        val state = LocalSearchState(p, Random(0))
+        val state = LocalSearchState(p.bake(), Random(0))
         // xs=[2,1,0]: t=2 at index 0, s=1 at index 1 → violated
         state.assignment.setInt(0, 2)
         state.assignment.setInt(1, 1)
@@ -52,7 +53,7 @@ class ValuePrecedeInvariantTest {
     @Test
     fun `delta predicts degree change when eliminating leading t`() {
         val p = problem()
-        val state = LocalSearchState(p, Random(0))
+        val state = LocalSearchState(p.bake(), Random(0))
         // xs=[2,2,1]: two bad t's before s → degree=2
         state.assignment.setInt(0, 2)
         state.assignment.setInt(1, 2)

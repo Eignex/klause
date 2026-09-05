@@ -45,7 +45,7 @@ class RestartPolicyTest {
             ),
         )
         val problem = Problem(3, 0, emptyArray(), listOf(factor))
-        val state = LocalSearchState(problem, Random(0))
+        val state = LocalSearchState(problem.bake(), Random(0))
         state.restart()
 
         state.assignment.setBool(0, false)
@@ -62,7 +62,7 @@ class RestartPolicyTest {
     @Test
     fun `adaptive perturbation anchors to best then perturbs`() {
         val problem = Problem(6, 0, emptyArray(), emptyList())
-        val state = LocalSearchState(problem, Random(0))
+        val state = LocalSearchState(problem.bake(), Random(0))
         state.restart()
         for (b in 0..5) state.assignment.setBool(b, false)
 
@@ -110,7 +110,7 @@ class RestartPolicyTest {
     fun `luby cadence emits the doubling restart sequence`() {
         val p = LubyRestart(unit = 1)
         val problem = Problem(1, 0, emptyArray(), emptyList())
-        val state = LocalSearchState(problem, Random(0))
+        val state = LocalSearchState(problem.bake(), Random(0))
         state.restart()
 
         val emitted = mutableListOf<Int>()
@@ -169,7 +169,7 @@ class RestartPolicyTest {
         assertTrue(p.shouldRestart(500), "the ceiling must force a restart even without stagnation")
         repeat(101) { p.observe(round(5.0)) } // 1 watermark round + 100 flat rounds (patience)
         assertTrue(p.shouldRestart(0), "stagnation must trigger after patience flat rounds")
-        val state = LocalSearchState(Problem(1, 0, emptyArray(), emptyList()), Random(0))
+        val state = LocalSearchState(Problem(1, 0, emptyArray(), emptyList()).bake(), Random(0))
         p.restart(state, bestSoFar = null)
         assertFalse(p.shouldRestart(0), "restart must clear the pending trigger")
     }

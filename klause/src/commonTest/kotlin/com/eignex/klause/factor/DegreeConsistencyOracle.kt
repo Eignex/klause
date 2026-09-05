@@ -5,6 +5,7 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.values
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
+import com.eignex.klause.propagation.bake
 import kotlin.random.Random
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -44,8 +45,9 @@ object DegreeConsistencyOracle {
     ) {
         require(problem.factors.size == 1) { "DegreeConsistencyOracle expects a single-factor Problem" }
         val rng = Random(seed)
-        val state = LocalSearchState(problem, rng)
-        val fresh = LocalSearchState(problem, Random(seed xor 0x5A5AL))
+        val baked = problem.bake()
+        val state = LocalSearchState(baked, rng)
+        val fresh = LocalSearchState(baked, Random(seed xor 0x5A5AL))
         // A non-default cap must be set on BOTH states (the fresh-recompute comparison uses it too)
         // before any recompute. Exercises the violationSoftCap threading: a compress call left on
         // the default cap would desync the maintained cost from the fresh recompute here.
@@ -125,7 +127,7 @@ object DegreeConsistencyOracle {
         // Bias toward int moves when both exist; both kinds get exercised over many iters.
         return if (ni > 0 && (nb == 0 || rng.nextBoolean())) {
             val v = rng.nextInt(ni)
-            val d = problem.requireFiniteIntDomains()[v]
+            val d = state.rootDomains[v]
             val cur = state.assignment.intValue(v)
             val target = d.values.valueAt(rng.nextInt(d.values.size))
             if (target == cur) null else Move.IntSet(v, target)
@@ -137,7 +139,7 @@ object DegreeConsistencyOracle {
     private fun randomize(state: LocalSearchState, problem: Problem, rng: Random) {
         for (b in 0 until problem.numBoolVars) state.assignment.setBool(b, rng.nextBoolean())
         for (i in 0 until problem.numIntVars) {
-            val d: IntDomain = problem.requireFiniteIntDomains()[i]
+            val d: IntDomain = state.rootDomains[i]
             state.assignment.setInt(i, d.values.valueAt(rng.nextInt(d.values.size)))
         }
     }

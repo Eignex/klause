@@ -29,7 +29,7 @@ class DisjunctiveInvariantTest {
     @Test
     fun `non-overlapping schedule satisfies disjunctive`() {
         val problem = threeUnitTasks()
-        val state = LocalSearchState(problem, Random(0))
+        val state = LocalSearchState(problem.bake(), Random(0))
         state.assignment.setInt(0, 0)
         state.assignment.setInt(1, 1)
         state.assignment.setInt(2, 2)
@@ -40,7 +40,7 @@ class DisjunctiveInvariantTest {
     @Test
     fun `overlap counts as violation`() {
         val problem = threeUnitTasks()
-        val state = LocalSearchState(problem, Random(0))
+        val state = LocalSearchState(problem.bake(), Random(0))
         state.assignment.setInt(0, 0)
         state.assignment.setInt(1, 0)
         state.assignment.setInt(2, 2)

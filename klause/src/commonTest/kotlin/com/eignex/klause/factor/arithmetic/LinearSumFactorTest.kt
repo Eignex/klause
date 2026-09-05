@@ -60,7 +60,7 @@ class LinearSumFactorTest {
     fun `duplicate variable coefficients coalesce and sum correctly in LS`() {
         val linear = Linear(intArrayOf(2, 3, 4), intArrayOf(0, 1, 0), LinearOp.EQ, 9)
         val problem = Problem(0, 2, arrayOf(IntDomain(0, 10), IntDomain(0, 10)), listOf<Factor>(linear))
-        val state = LocalSearchState(problem, Random(0))
+        val state = LocalSearchState(problem.bake(), Random(0))
         state.assignment.setInt(0, 1)
         state.assignment.setInt(1, 1)
         state.recompute()
@@ -71,7 +71,7 @@ class LinearSumFactorTest {
     fun `violation degree is distance to bound for LE`() {
         val linear = Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 5)
         val problem = Problem(0, 1, arrayOf(IntDomain(0, 20)), listOf<Factor>(linear))
-        val state = LocalSearchState(problem, Random(0))
+        val state = LocalSearchState(problem.bake(), Random(0))
         state.assignment.setInt(0, 8)
         state.recompute()
         assertEquals(3, state.factors[0].violationDegree(state, 0), "8 > 5 by 3")
@@ -81,7 +81,7 @@ class LinearSumFactorTest {
     fun `violation degree is zero when constraint satisfied`() {
         val linear = Linear(intArrayOf(2, 3), intArrayOf(0, 1), LinearOp.GE, 10)
         val problem = Problem(0, 2, arrayOf(IntDomain(0, 10), IntDomain(0, 10)), listOf<Factor>(linear))
-        val state = LocalSearchState(problem, Random(0))
+        val state = LocalSearchState(problem.bake(), Random(0))
         state.assignment.setInt(0, 5)
         state.assignment.setInt(1, 0)
         state.recompute()

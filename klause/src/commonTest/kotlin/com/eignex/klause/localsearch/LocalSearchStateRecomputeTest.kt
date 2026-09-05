@@ -16,6 +16,7 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.values
 import com.eignex.klause.model.IntCmpOp
 import com.eignex.klause.model.PbOp
+import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.*
 import kotlin.random.Random
 import kotlin.test.Test
@@ -37,7 +38,7 @@ class LocalSearchStateRecomputeTest {
     fun `after random moves state matches fresh recompute`() {
         for (case in cases) {
             for (seed in 0 until 8) {
-                val state = LocalSearchState(case.problem, Random(seed.toLong()))
+                val state = LocalSearchState(case.problem.bake(), Random(seed.toLong()))
                 state.restart()
 
                 val rng = Random(seed.toLong() xor 0xBEEFL)
@@ -46,7 +47,7 @@ class LocalSearchStateRecomputeTest {
                     state.apply(move)
                 }
 
-                val sibling = LocalSearchState(case.problem, Random(seed.toLong()))
+                val sibling = LocalSearchState(case.problem.bake(), Random(seed.toLong()))
                 copyAssignment(state, sibling)
                 sibling.recompute()
 
@@ -86,7 +87,7 @@ class LocalSearchStateRecomputeTest {
     @Test
     fun `violated set is subset of factor space`() {
         for (case in cases) {
-            val state = LocalSearchState(case.problem, Random(0))
+            val state = LocalSearchState(case.problem.bake(), Random(0))
             state.restart()
             val rng = Random(0xCAFEL)
             repeat(100) {
@@ -114,7 +115,7 @@ class LocalSearchStateRecomputeTest {
             Move.BoolFlip(rng.nextInt(problem.numBoolVars))
         } else {
             val v = rng.nextInt(problem.numIntVars)
-            val d = problem.requireFiniteIntDomains()[v]
+            val d = state.rootDomains[v]
             val cur = state.assignment.intValue(v)
             var target = cur
             repeat(8) {

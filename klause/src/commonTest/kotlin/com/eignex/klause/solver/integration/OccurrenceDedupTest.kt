@@ -8,6 +8,7 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move.BoolFlip
 import com.eignex.klause.model.PbOp
+import com.eignex.klause.propagation.bake
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -38,7 +39,7 @@ class OccurrenceDedupTest {
             max = 2,
         )
         val problem = Problem(2, 0, emptyArray(), listOf(factor))
-        val state = LocalSearchState(problem, Random(7))
+        val state = LocalSearchState(problem.bake(), Random(7))
         state.recompute()
         val brute = if (state.factors[0].isViolated(state, 0)) 1L else 0L
         assertEquals(brute, state.cost)

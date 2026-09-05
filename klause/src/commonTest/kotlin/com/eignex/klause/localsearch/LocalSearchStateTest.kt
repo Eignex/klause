@@ -6,6 +6,7 @@ import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.propagation.bake
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -35,7 +36,7 @@ class LocalSearchStateTest {
 
     @Test
     fun `single-var EQ reified channeling rolls indicator flips into one compound`() {
-        val state = LocalSearchState(reifiedChannelingProblem(), Random(1))
+        val state = LocalSearchState(reifiedChannelingProblem().bake(), Random(1))
         state.assignment.setInt(0, 0)
         state.assignment.setBool(0, true)
         state.assignment.setBool(1, false)
@@ -64,7 +65,7 @@ class LocalSearchStateTest {
 
     @Test
     fun `satisfied Linear EQ channeling counter-shifts a sibling to preserve the sum`() {
-        val state = LocalSearchState(sumChannelingProblem(), Random(1))
+        val state = LocalSearchState(sumChannelingProblem().bake(), Random(1))
         state.assignment.setInt(0, 1)
         state.assignment.setInt(1, 2)
         state.recompute()
@@ -79,7 +80,7 @@ class LocalSearchStateTest {
 
     @Test
     fun `no sibling indicators leaves a plain int set`() {
-        val state = LocalSearchState(sumChannelingProblem(), Random(1))
+        val state = LocalSearchState(sumChannelingProblem().bake(), Random(1))
         // Violated EQ: the caller is repairing it, so no counter-shift is synthesized.
         state.assignment.setInt(0, 0)
         state.assignment.setInt(1, 0)
@@ -88,5 +89,20 @@ class LocalSearchStateTest {
         val move = state.synthesizeChannelingMove(intVar = 0, newValue = 1)
 
         assertEquals(Move.IntSet(0, 1), move, "a violated EQ yields a bare int set, not a compound")
+    }
+
+    @Test
+    fun `the search seeds its root domains from the projection's fold rather than the declared box`() {
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 1,
+            intDomains = arrayOf(IntDomain(0, 10)),
+            factors = arrayOf<Factor>(Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 3)),
+        ).bake()
+
+        val state = LocalSearchState(problem, Random(1))
+
+        assertEquals(3L, state.rootDomains[0].max, "search must not propose values the root bake ruled out")
+        assertTrue(state.rootDomains === problem.rootIntDomainsInPlace, "the fold is aliased, not copied")
     }
 }

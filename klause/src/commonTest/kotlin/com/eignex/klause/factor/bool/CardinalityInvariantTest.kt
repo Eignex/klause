@@ -14,6 +14,7 @@ import com.eignex.klause.localsearch.Move.BoolFlip
 import com.eignex.klause.localsearch.Move.IntSet
 import com.eignex.klause.localsearch.MoveSink
 import com.eignex.klause.model.PbOp
+import com.eignex.klause.propagation.bake
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -34,7 +35,7 @@ class CardinalityInvariantTest {
             max = 2,
         )
         val problem = Problem(4, 0, emptyArray(), listOf(factor))
-        val state = LocalSearchState(problem, Random(0))
+        val state = LocalSearchState(problem.bake(), Random(0))
         for (v in intArrayOf(a, b, c, d)) state.assignment.setBool(v, true)
         state.recompute()
         assertTrue(state.factors[0].isViolated(state, 0))
@@ -57,7 +58,7 @@ class CardinalityInvariantTest {
             max = 3,
         )
         val problem = Problem(3, 0, emptyArray(), listOf(factor))
-        val state = LocalSearchState(problem, Random(0))
+        val state = LocalSearchState(problem.bake(), Random(0))
         state.assignment.setBool(a, true)
         state.recompute()
         assertTrue(state.factors[0].isViolated(state, 0))
@@ -79,7 +80,7 @@ class CardinalityInvariantTest {
             max = 2,
         )
         val problem = Problem(2, 0, emptyArray(), listOf(factor))
-        val state = LocalSearchState(problem, Random(0))
+        val state = LocalSearchState(problem.bake(), Random(0))
         state.assignment.setBool(a, true)
         state.assignment.setBool(b, true)
         state.recompute()
@@ -101,7 +102,7 @@ class CardinalityInvariantTest {
             max = 2,
         )
         val problem = Problem(2, 0, emptyArray(), listOf(factor))
-        val state = LocalSearchState(problem, Random(0))
+        val state = LocalSearchState(problem.bake(), Random(0))
         state.assignment.setBool(a, true)
         state.recompute()
         assertTrue(!state.factors[0].isViolated(state, 0))
@@ -114,7 +115,7 @@ class CardinalityInvariantTest {
     fun `at most one violated with two true`() {
         val amo = Cardinality.atMostOne(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true)))
         val problem = Problem(3, 0, emptyArray(), listOf(amo))
-        val state = LocalSearchState(problem, Random(0))
+        val state = LocalSearchState(problem.bake(), Random(0))
         state.assignment.setBool(0, true)
         state.assignment.setBool(1, true)
         state.recompute()
@@ -126,7 +127,7 @@ class CardinalityInvariantTest {
     fun `exactly one transitions`() {
         val one = Cardinality.exactlyOne(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true)))
         val problem = Problem(3, 0, emptyArray(), listOf(one))
-        val state = LocalSearchState(problem, Random(0))
+        val state = LocalSearchState(problem.bake(), Random(0))
         state.assignment.setBool(0, true)
         state.recompute()
         assertFalse(state.factors[0].isViolated(state, 0))
@@ -138,7 +139,7 @@ class CardinalityInvariantTest {
     }
 
     private fun assertConsistent(label: String, problem: Problem) {
-        val state = LocalSearchState(problem, Random(0))
+        val state = LocalSearchState(problem.bake(), Random(0))
         for (v in 0 until problem.numBoolVars) state.assignment.setBool(v, v and 1 == 0)
         state.recompute()
         for (v in 0 until problem.numBoolVars) {
@@ -380,7 +381,7 @@ class CardinalityInvariantTest {
         )
         val intDomains = Array(3) { IntDomain(0, 5) }
         val problem = Problem(1, 3, intDomains, listOf(factor))
-        val state = LocalSearchState(problem, Random(0))
+        val state = LocalSearchState(problem.bake(), Random(0))
         for (i in 0 until 3) state.assignment.setInt(i, (i + 1).toLong())
         state.recompute()
         for (round in 0 until 10) {
@@ -417,7 +418,7 @@ class CardinalityInvariantTest {
         )
         val intDomains = Array(3) { IntDomain(0, 5) }
         val problem = Problem(1, 3, intDomains, listOf(factor))
-        val state = LocalSearchState(problem, Random(0))
+        val state = LocalSearchState(problem.bake(), Random(0))
         for (i in 0 until 3) state.assignment.setInt(i, (i + 1).toLong())
         state.recompute()
         repeat(4) {

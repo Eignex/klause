@@ -21,6 +21,7 @@ import com.eignex.klause.localsearch.Move
 import com.eignex.klause.localsearch.MoveSink
 import com.eignex.klause.model.IntCmpOp
 import com.eignex.klause.model.PbOp
+import com.eignex.klause.propagation.bake
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -310,7 +311,7 @@ class FactorPropertyTest {
     private data class FactorEnv(val numBoolVars: Int = 0, val intDomains: Array<IntDomain> = emptyArray())
 
     private fun checkRepairValidity(factor: Factor, env: FactorEnv) {
-        val problem = Problem(env.numBoolVars, env.intDomains.size, env.intDomains, listOf(factor))
+        val problem = Problem(env.numBoolVars, env.intDomains.size, env.intDomains, listOf(factor)).bake()
         val rng = Random(0xfeed)
         val sink = MoveSink()
         repeat(50) { iter ->
@@ -336,7 +337,7 @@ class FactorPropertyTest {
                             "${factor::class.simpleName} proposed IntSet on var ${move.varId} " +
                                 "not in intVars ${factor.intVars.toList()}",
                         )
-                        val d = problem.requireFiniteIntDomains()[move.varId]
+                        val d = problem.rootIntDomain(move.varId)
                         assertTrue(
                             move.newValue in d.min..d.max,
                             "${factor::class.simpleName} proposed IntSet target ${move.newValue} out of domain $d",
@@ -371,7 +372,7 @@ class FactorPropertyTest {
         seed: Int,
         iters: Int = 200,
     ) {
-        val problem = Problem(numBoolVars, intDomains.size, intDomains, listOf(factor))
+        val problem = Problem(numBoolVars, intDomains.size, intDomains, listOf(factor)).bake()
         val state = LocalSearchState(problem, Random(seed.toLong()))
         val rng = Random(seed.toLong() xor 0xC0FFEEL)
         randomizeAssignment(state, FactorEnv(numBoolVars, intDomains), rng)

@@ -50,7 +50,7 @@ class AllDifferentInvariantTest {
             intDomains = arrayOf(IntDomain(0, 2), IntDomain(0, 0), IntDomain(1, 2)),
             factors = arrayOf<Factor>(AllDifferent(intArrayOf(0, 1, 2), domainMin = 0, domainSize = 3)),
         )
-        val state = LocalSearchState(problem, Random(0))
+        val state = LocalSearchState(problem.bake(), Random(0))
         assertTrue(state.factors[0].seedFeasible(state, 0), "matching seed must place all vars distinctly")
         state.recompute()
         assertTrue(state.cost == 0L, "the seeded assignment must satisfy all-different")
@@ -65,7 +65,7 @@ class AllDifferentInvariantTest {
             factors = arrayOf<Factor>(AllDifferent(intArrayOf(0, 1, 2, 3, 4), domainMin = 0, domainSize = 5)),
         )
         fun seeded(seed: Long): LocalSearchState {
-            val state = LocalSearchState(problem, Random(seed))
+            val state = LocalSearchState(problem.bake(), Random(seed))
             for (i in 0 until 5) state.assignment.setInt(i, i.toLong())
             state.recompute()
             return state
@@ -95,7 +95,7 @@ class AllDifferentInvariantTest {
             intDomains = arrayOf(IntDomain(0, 9), IntDomain(0, 9), IntDomain(0, 9)),
             factors = arrayOf<Factor>(factor),
         )
-        val state = LocalSearchState(problem, Random(0))
+        val state = LocalSearchState(problem.bake(), Random(0))
         state.assignment.setInt(0, 5)
         state.assignment.setInt(1, 5)
         state.assignment.setInt(2, 0)
@@ -126,7 +126,7 @@ class AllDifferentInvariantTest {
             intDomains = arrayOf(IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2)),
             factors = arrayOf<Factor>(factor),
         )
-        val state = LocalSearchState(problem, Random(0))
+        val state = LocalSearchState(problem.bake(), Random(0))
         state.assignment.setInt(0, 0)
         state.assignment.setInt(1, 1)
         state.assignment.setInt(2, 2)

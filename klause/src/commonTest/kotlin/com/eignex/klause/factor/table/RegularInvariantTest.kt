@@ -40,7 +40,7 @@ class RegularInvariantTest {
             intDomains = Array(3) { IntDomain(1, 2) },
             factors = arrayOf<Factor>(endsWith2Factor(3)),
         )
-        val state = LocalSearchState(problem, Random(0))
+        val state = LocalSearchState(problem.bake(), Random(0))
         state.assignment.setInt(0, 1)
         state.assignment.setInt(1, 1)
         state.assignment.setInt(2, 2)
@@ -58,7 +58,7 @@ class RegularInvariantTest {
             intDomains = Array(3) { IntDomain(1, 2) },
             factors = arrayOf<Factor>(endsWith2Factor(3)),
         )
-        val state = LocalSearchState(problem, Random(0))
+        val state = LocalSearchState(problem.bake(), Random(0))
         state.assignment.setInt(0, 1)
         state.assignment.setInt(1, 2)
         state.assignment.setInt(2, 1) // ends in 1, not accepted
@@ -76,7 +76,7 @@ class RegularInvariantTest {
             intDomains = Array(n) { IntDomain(1, 2) },
             factors = arrayOf<Factor>(endsWith2Factor(n)),
         )
-        val state = LocalSearchState(problem, Random(7))
+        val state = LocalSearchState(problem.bake(), Random(7))
         for (i in 0 until n) state.assignment.setInt(i, 1)
         state.recompute()
         val rng = Random(99)
@@ -88,7 +88,7 @@ class RegularInvariantTest {
             state.apply(Move.IntSet(v, nv))
             val after = state.factors[0].violationDegree(state, 0)
             assertEquals(after - before, predicted, "step $step: incremental delta mismatch")
-            val fresh = LocalSearchState(problem, Random(0))
+            val fresh = LocalSearchState(problem.bake(), Random(0))
             for (k in 0 until n) fresh.assignment.setInt(k, state.assignment.intValue(k))
             fresh.recompute()
             assertEquals(
@@ -108,7 +108,7 @@ class RegularInvariantTest {
             factors = arrayOf<Factor>(endsWith2Factor(3)),
         )
         fun seeded(): LocalSearchState {
-            val state = LocalSearchState(problem, Random(0))
+            val state = LocalSearchState(problem.bake(), Random(0))
             state.assignment.setInt(0, 1)
             state.assignment.setInt(1, 2)
             state.assignment.setInt(2, 1) // ends in 1 → violated
@@ -134,7 +134,7 @@ class RegularInvariantTest {
             intDomains = Array(3) { IntDomain(1, 2) },
             factors = arrayOf<Factor>(endsWith2Factor(3)),
         )
-        val state = LocalSearchState(problem, Random(0))
+        val state = LocalSearchState(problem.bake(), Random(0))
         state.assignment.setInt(0, 1)
         state.assignment.setInt(1, 2)
         state.assignment.setInt(2, 1)

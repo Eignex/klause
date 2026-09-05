@@ -7,6 +7,7 @@ import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
 import com.eignex.klause.localsearch.MoveSink
+import com.eignex.klause.propagation.bake
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
@@ -18,7 +19,7 @@ class ClauseInvariantTest {
 
     private fun stateFor(numBoolVars: Int, factor: Factor): LocalSearchState {
         val problem = Problem(numBoolVars, 0, emptyArray(), listOf(factor))
-        val state = LocalSearchState(problem, Random(0))
+        val state = LocalSearchState(problem.bake(), Random(0))
         state.recompute()
         return state
     }
@@ -46,7 +47,7 @@ class ClauseInvariantTest {
         val c = 2
         val factor = Clause(intArrayOf(Lit.make(a, true), Lit.make(b, false), Lit.make(c, true)))
         val problem = Problem(3, 0, emptyArray(), listOf(factor))
-        val state = LocalSearchState(problem, Random(0))
+        val state = LocalSearchState(problem.bake(), Random(0))
         state.assignment.setBool(a, false)
         state.assignment.setBool(b, true)
         state.assignment.setBool(c, false)
@@ -65,7 +66,7 @@ class ClauseInvariantTest {
         val b = 1
         val factor = Clause(intArrayOf(Lit.make(a, true), Lit.make(b, true)))
         val problem = Problem(2, 0, emptyArray(), listOf(factor))
-        val state = LocalSearchState(problem, Random(0))
+        val state = LocalSearchState(problem.bake(), Random(0))
         state.assignment.setBool(a, true)
         state.assignment.setBool(b, false)
         state.recompute()
@@ -86,7 +87,7 @@ class ClauseInvariantTest {
         )
         val clause = Clause(literals)
         val problem = Problem(5, 0, emptyArray(), listOf(clause))
-        val state = LocalSearchState(problem, Random(0))
+        val state = LocalSearchState(problem.bake(), Random(0))
         for (mask in 0..31) {
             for (i in 0..4) state.assignment.setBool(i, (mask shr i) and 1 == 1)
             state.recompute()
@@ -107,7 +108,7 @@ class ClauseInvariantTest {
         )
         val clause = Clause(literals)
         val problem = Problem(6, 0, emptyArray(), listOf(clause))
-        val state = LocalSearchState(problem, Random(0))
+        val state = LocalSearchState(problem.bake(), Random(0))
 
         for (i in 0..5) state.assignment.setBool(i, false)
         state.recompute()

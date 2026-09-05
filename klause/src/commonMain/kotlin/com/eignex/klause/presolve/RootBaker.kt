@@ -10,9 +10,7 @@ import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.PropagationProblem
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.baked
-import com.eignex.klause.propagation.isFoldedPropagationView
 import com.eignex.klause.propagation.propagate
-import com.eignex.klause.propagation.propagationCancellation
 import com.eignex.klause.util.LongHashSet
 import kotlin.random.Random
 
@@ -39,7 +37,7 @@ object RootBaker {
      * initiates it, so no `solver → presolve` cycle.
      */
     fun reseed(problem: BakedProblem, config: BakeConfig): BakedProblem {
-        if (!config.anyEnabled || problem.isFoldedPropagationView) return problem
+        if (!config.anyEnabled || problem.alreadyFolded) return problem
         val extra = bake(problem, config)
         if (extra === problem.baked) return problem
         return BakedProblem(
@@ -48,7 +46,7 @@ object RootBaker {
             intDomains = problem.rootIntDomains(),
             factors = problem.factors,
             seedDeductions = extra,
-            cancellation = problem.propagationCancellation,
+            cancellation = problem.cancellation,
             impliedFactorMask = problem.impliedFactorMask,
             hasSymmetryBreaking = problem.hasSymmetryBreaking,
             numRealVars = problem.numRealVars,
@@ -73,7 +71,7 @@ object RootBaker {
         if (!config.anyEnabled) return base
         // SAC probing fires `propagate` repeatedly; stop entering new probe phases once the bake
         // deadline has passed (each phase below also polls between its own probes).
-        if (problem.propagationCancellation()) return base
+        if (problem.cancellation()) return base
         var result: PropagationResult = base
         if (config.probeFailedLiterals) {
             result = probeFreeBools(problem, base)
@@ -110,7 +108,7 @@ object RootBaker {
         while (changed) {
             changed = false
             for (v in sacProbeOrder(problem, acc, factorWeights, rng)) {
-                if (problem.propagationCancellation()) return acc
+                if (problem.cancellation()) return acc
                 if (acc.intValueOrNull(v) != null) continue
                 if (perVarCalls[v] >= config.probeBudgetPerVar) continue
                 if (totalCalls >= config.probeTotalBudget) return acc
@@ -132,12 +130,12 @@ object RootBaker {
                     if (k in existingHoles) continue
                     perVarCalls[v]++
                     totalCalls++
-                    val pin = problem.propagate(accAsAssumptions.withInt(v, k), problem.propagationCancellation)
+                    val pin = problem.propagate(accAsAssumptions.withInt(v, k), problem.cancellation)
                     if (pin is PropagationResult.Unsat) {
                         bumpFactorWeights(pin, factorWeights)
                         perVarCalls[v]++
                         totalCalls++
-                        val r = problem.propagate(accAsAssumptions.withIntHole(v, k), problem.propagationCancellation)
+                        val r = problem.propagate(accAsAssumptions.withIntHole(v, k), problem.cancellation)
                         if (r is PropagationResult.Unsat) return r
                         acc = acc.withHole(v, k).merge(r as PropagationResult.Implied)
                         changed = true
@@ -212,7 +210,7 @@ object RootBaker {
         while (changed) {
             changed = false
             for (v in sacProbeOrder(problem, acc, factorWeights, rng)) {
-                if (problem.propagationCancellation()) return acc
+                if (problem.cancellation()) return acc
                 if (acc.intValueOrNull(v) != null) continue
                 if (perVarCalls[v] >= config.probeBudgetPerVar) continue
                 if (totalCalls >= config.probeTotalBudget) return acc
@@ -223,13 +221,13 @@ object RootBaker {
                 val accAsAssumptions = acc.toAssumptions()
                 perVarCalls[v]++
                 totalCalls++
-                val pinMin = problem.propagate(accAsAssumptions.withInt(v, curMin), problem.propagationCancellation)
+                val pinMin = problem.propagate(accAsAssumptions.withInt(v, curMin), problem.cancellation)
                 if (pinMin is PropagationResult.Unsat) {
                     bumpFactorWeights(pinMin, factorWeights)
                     perVarCalls[v]++
                     totalCalls++
                     val tightened = accAsAssumptions.withTightenedMin(v, curMin + 1)
-                    val r = problem.propagate(tightened, problem.propagationCancellation)
+                    val r = problem.propagate(tightened, problem.cancellation)
                     if (r is PropagationResult.Unsat) return r
                     acc = acc.withMin(v, curMin + 1).merge(r as PropagationResult.Implied)
                     changed = true
@@ -239,13 +237,13 @@ object RootBaker {
                 if (totalCalls >= config.probeTotalBudget) return acc
                 perVarCalls[v]++
                 totalCalls++
-                val pinMax = problem.propagate(accAsAssumptions.withInt(v, curMax), problem.propagationCancellation)
+                val pinMax = problem.propagate(accAsAssumptions.withInt(v, curMax), problem.cancellation)
                 if (pinMax is PropagationResult.Unsat) {
                     bumpFactorWeights(pinMax, factorWeights)
                     perVarCalls[v]++
                     totalCalls++
                     val tightened = accAsAssumptions.withTightenedMax(v, curMax - 1)
-                    val r = problem.propagate(tightened, problem.propagationCancellation)
+                    val r = problem.propagate(tightened, problem.cancellation)
                     if (r is PropagationResult.Unsat) return r
                     acc = acc.withMax(v, curMax - 1).merge(r as PropagationResult.Implied)
                     changed = true
@@ -267,22 +265,19 @@ object RootBaker {
         while (changed) {
             changed = false
             for (v in 0 until problem.numBoolVars) {
-                if (problem.propagationCancellation()) return PropagationResult.Implied(bools, ints)
+                if (problem.cancellation()) return PropagationResult.Implied(bools, ints)
                 if (v in bools) continue
-                val tryTrue = problem.propagate(Assumptions(bools + (v to true), ints), problem.propagationCancellation)
+                val tryTrue = problem.propagate(Assumptions(bools + (v to true), ints), problem.cancellation)
                 if (tryTrue is PropagationResult.Unsat) {
-                    val r = problem.propagate(Assumptions(bools + (v to false), ints), problem.propagationCancellation)
+                    val r = problem.propagate(Assumptions(bools + (v to false), ints), problem.cancellation)
                     if (r is PropagationResult.Unsat) return r
                     foldInto(bools, ints, v, false, r as PropagationResult.Implied)
                     changed = true
                     continue
                 }
-                val tryFalse = problem.propagate(
-                    Assumptions(bools + (v to false), ints),
-                    problem.propagationCancellation,
-                )
+                val tryFalse = problem.propagate(Assumptions(bools + (v to false), ints), problem.cancellation)
                 if (tryFalse is PropagationResult.Unsat) {
-                    val r = problem.propagate(Assumptions(bools + (v to true), ints), problem.propagationCancellation)
+                    val r = problem.propagate(Assumptions(bools + (v to true), ints), problem.cancellation)
                     if (r is PropagationResult.Unsat) return r
                     foldInto(bools, ints, v, true, r as PropagationResult.Implied)
                     changed = true

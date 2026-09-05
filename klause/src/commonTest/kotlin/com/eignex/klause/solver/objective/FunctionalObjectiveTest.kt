@@ -4,6 +4,7 @@ import com.eignex.klause.formats.flatzinc.FlatZincProgram
 import com.eignex.klause.ir.values
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
+import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.pipeline.parseFlatZincExecution
 import kotlin.math.abs
@@ -42,15 +43,15 @@ class FunctionalObjectiveTest {
         assertEquals(setOf(aId, bId, cId), fo.leafVars.toSet())
 
         val rng = Random(7)
-        val state = LocalSearchState(program.problem, rng)
+        val state = LocalSearchState(program.problem.bake(), rng)
         repeat(200) {
             for (i in 0 until program.problem.numIntVars) {
-                val dom = program.problem.requireFiniteIntDomains()[i]
+                val dom = program.problem.finiteIntDomain(i)
                 state.assignment.setInt(i, dom.values.valueAt(rng.nextInt(dom.values.size)))
             }
             // Pick a leaf var move.
             val v = listOf(aId, bId, cId).random(rng)
-            val dom = program.problem.requireFiniteIntDomains()[v]
+            val dom = program.problem.finiteIntDomain(v)
             val nv = dom.values.valueAt(rng.nextInt(dom.values.size))
             val move = Move.IntSet(v, nv)
             val before = obj.evaluate(snapshot(state, program))
@@ -100,7 +101,7 @@ class FunctionalObjectiveTest {
         assertEquals(x.toSet(), obj.boolLeafVars.toSet())
 
         val rng = Random(11)
-        val state = LocalSearchState(program.problem, rng)
+        val state = LocalSearchState(program.problem.bake(), rng)
         repeat(200) {
             for (b in 0 until program.problem.numBoolVars) state.assignment.setBool(b, rng.nextBoolean())
             val v = x.random(rng)
