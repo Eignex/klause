@@ -33,6 +33,24 @@ class CpToLpRelaxationNValueHullTest {
     private val minimizeN = LinearObjective(intCoefficients = longArrayOf(0L, 0L, 0L, 1L)) // minimise n
 
     @Test
+    fun `a variable the model leaves open gets no value hull`() {
+        // The selectors enumerate each variable's root box and the channel then pins the column to what
+        // was enumerated, so an invented endpoint would exclude values the model admits.
+        val p = Problem(
+            numBoolVars = 0,
+            numIntVars = 4,
+            intDomains = arrayOf(IntDomain(0, 1), IntDomain(1, 2), IntDomain(0, 2).excludeValue(1), IntDomain(0, 3)),
+            factors = arrayOf<Factor>(NValue(n = 3, xs = intArrayOf(0, 1, 2), mode = NValue.Mode.Eq)),
+            openIntHi = booleanArrayOf(false, true, false, false),
+        )
+        val session = PropagationSession(p)
+        val hull = CpToLpRelaxation(p, minimizeN, nValueHull = true).build(session)
+        val bare = CpToLpRelaxation(p, minimizeN, nValueHull = false).build(session)
+        assertEquals(bare.model.m, hull.model.m, "no hull row over an open-sided variable")
+        assertEquals(bare.model.n, hull.model.n, "and no selector column")
+    }
+
+    @Test
     fun `nvalue hull lower-bounds distinct beyond the greedy propagator bound`() {
         val p = triangle(NValue.Mode.Eq)
         val session = PropagationSession(p)

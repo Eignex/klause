@@ -1,7 +1,6 @@
 package com.eignex.klause.lp
 
 import com.eignex.klause.factor.global.NValue
-import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.values
 import com.eignex.klause.util.EmptyLongArray
@@ -14,12 +13,17 @@ import com.eignex.klause.util.MutableLongIntMap
  * per variable/value with `Σ_v z_iv = 1` and the channel `Σ_v v·z_iv = xs(i)`, and `y_v ≥ z_iv`. The
  * distinct count `Σ_v y_v` relates to `n` by the mode (`Eq → =`, `AtMost → ≥`, `AtLeast → ≤`), so
  * minimising `n` reads a real lower bound. Large encodings and optional-presence forms are skipped.
+ *
+ * The selectors enumerate each variable's root box and the channel then confines the column to what was
+ * enumerated, so over a side the model leaves open the encoding would exclude values the model admits —
+ * declined there.
  */
 internal fun NValue.emitLpRelaxation(builder: RelaxationBuilder) {
     if (!builder.hullEnabled()) return
     if (presents.isNotEmpty()) return // count is over present vars only — defer
+    if (!builder.statesBothBounds(xs)) return
     var cells = 0L
-    for (x in xs) cells += builder.declaredDomain(x).values.size.toLong()
+    for (x in xs) cells += builder.rootDomain(x).values.size.toLong()
     if (cells == 0L || cells > MAX_NVALUE_CELLS) return
     val yCols = IntArrayList()
     val yByValue = MutableLongIntMap()
@@ -34,11 +38,11 @@ internal fun NValue.emitLpRelaxation(builder: RelaxationBuilder) {
         return col
     }
     for (x in xs) {
-        val declared = builder.declaredDomain(x)
+        val box = builder.rootDomain(x)
         val live = builder.liveDomain(x)
         val sel = IntArrayList()
         val selVal = LongArrayList()
-        declared.values.forEach { v ->
+        box.values.forEach { v ->
             // The selector z_xv is present while value v stays in x's live domain.
             val z = builder.auxColumn(0L, if (live.contains(v)) 1L else 0L, presence = longArrayOf(x.toLong(), v))
             sel.add(z)
@@ -46,7 +50,7 @@ internal fun NValue.emitLpRelaxation(builder: RelaxationBuilder) {
             builder.row(intArrayOf(z, yOf(v)), longArrayOf(1L, -1L), LinearOp.LE, 0L, Contribution.HULL) // y_v ≥ z
         }
         val k = sel.size
-        if (k == 0) return // a variable with no declared values — leave it to propagation
+        if (k == 0) return // a variable with no values in its root box — leave it to propagation
         builder.row(sel.toIntArray(), LongArray(k) { 1L }, LinearOp.EQ, 1L, Contribution.HULL) // Σ_v z = 1
         // Σ_v v·z − xs(i) = 0.
         val cCols = IntArray(k + 1)
@@ -78,10 +82,11 @@ internal fun NValue.emitLpRelaxation(builder: RelaxationBuilder) {
     builder.row(cols, vals, op, 0L, Contribution.HULL)
 }
 
-internal fun NValue.estimateLpHull(domains: Array<IntDomain>): LpSizeEstimate? {
+internal fun NValue.estimateLpHull(boxes: RootBoxes): LpSizeEstimate? {
     if (presents.isNotEmpty()) return null
+    if (!boxes.statesBothBounds(xs)) return null
     var cells = 0L
-    for (x in xs) cells += domains[x].values.size.toLong()
+    for (x in xs) cells += boxes.domain(x).values.size.toLong()
     if (cells == 0L || cells > MAX_NVALUE_CELLS) return null
     // z (per var×value) + y (≤ distinct values ≤ cells) columns; y≥z rows + (Σz=1, channel) per
     // var + the count row.

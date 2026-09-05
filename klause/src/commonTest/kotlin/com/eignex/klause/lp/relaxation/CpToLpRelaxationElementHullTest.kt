@@ -32,6 +32,26 @@ class CpToLpRelaxationElementHullTest {
     }
 
     @Test
+    fun `an index the model leaves open gets no selector hull`() {
+        // The selectors enumerate idx's root box and Σ y = 1 then pins idx there, so over an invented
+        // endpoint the hull would refute positions the model admits.
+        val p = Problem(
+            numBoolVars = 0,
+            numIntVars = 2,
+            intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 20)),
+            factors = arrayOf<Factor>(
+                Element(idx = 0, result = 1, arr = longArrayOf(7, 3, 9, 5), arrIsVars = false, indexOffset = 0),
+            ),
+            openIntHi = booleanArrayOf(true, false),
+        )
+        val obj = LinearObjective(intCoefficients = longArrayOf(0L, 1L))
+        val hull = CpToLpRelaxation(p, obj, elementHull = true).build(PropagationSession(p))
+        val bare = CpToLpRelaxation(p, obj, elementHull = false).build(PropagationSession(p))
+        assertEquals(bare.model.m, hull.model.m, "no hull row over an open-sided index")
+        assertEquals(bare.model.n, hull.model.n, "and no selector column")
+    }
+
+    @Test
     fun `constant array hull bounds result by the min selectable entry`() {
         // result = arr[idx], arr = [7, 3, 9, 5] (0-based), idx in 0..3, minimize result.
         // The hull lets the LP pick the cheapest entry: result = 3.

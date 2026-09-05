@@ -14,11 +14,16 @@ import com.eignex.klause.util.LongArrayList
  * live. Rows: a source row `Σ y out of (0, q0) = 1`, flow conservation at every interior `(t, q)`, an
  * acceptance row at the last layer, and a channel `Σ_s s·y = seq[t]` per position. The flow polytope is
  * integral, so the LP is the true convex hull. Large arc sets and inputs with no accepting path are skipped.
+ *
+ * The layer expansion screens each position's symbols through its root box and the flow rows then confine
+ * the column to the arcs built, so over a side the model leaves open an invented endpoint would refute
+ * strings the automaton accepts — declined there.
  */
 @Suppress("CyclomaticComplexMethod", "NestedBlockDepth")
 internal fun Regular.emitLpRelaxation(builder: RelaxationBuilder) {
     if (!builder.hullEnabled()) return
-    val reach = forwardReach(builder::declaredDomain)?.states ?: return
+    if (!builder.statesBothBounds(seq)) return
+    val reach = forwardReach(builder::rootDomain)?.states ?: return
     val len = seq.size
     val s = alphabetSize
     val trans = transitions
@@ -31,10 +36,10 @@ internal fun Regular.emitLpRelaxation(builder: RelaxationBuilder) {
     val chanSym = Array(len) { IntArrayList() }
     val acceptCols = IntArrayList()
     for (t in 0 until len) {
-        val declared = builder.declaredDomain(seq[t])
+        val box = builder.rootDomain(seq[t])
         val live = builder.liveDomain(seq[t])
         reach[t].forEach { state ->
-            declared.values.forEach { sym ->
+            box.values.forEach { sym ->
                 if (sym !in 1..s) return@forEach
                 val nxt = delta(state, sym)
                 if (nxt == 0) return@forEach
@@ -97,8 +102,9 @@ internal fun Regular.emitLpRelaxation(builder: RelaxationBuilder) {
     }
 }
 
-internal fun Regular.estimateLpHull(domains: Array<IntDomain>): LpSizeEstimate? {
-    val reach = forwardReach { domains[it] } ?: return null
+internal fun Regular.estimateLpHull(boxes: RootBoxes): LpSizeEstimate? {
+    if (!boxes.statesBothBounds(seq)) return null
+    val reach = forwardReach(boxes::domain) ?: return null
     // arc columns + conservation (≤ arcs) + channel (len) + source + acceptance.
     return LpSizeEstimate(cols = reach.arcCount, rows = reach.arcCount + seq.size + 2L)
 }

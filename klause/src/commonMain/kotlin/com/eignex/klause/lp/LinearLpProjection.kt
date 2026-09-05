@@ -33,57 +33,83 @@ internal fun FactorRow.Wide.emitWideLpRelaxation(builder: RelaxationBuilder) =
 
 private fun FactorRow.Wide.emitWideOuterRows(builder: RelaxationBuilder, rounded: WideRounding?) {
     rounded ?: return
+    val split = splitColumns(builder) ?: return
     for (i in intVars.indices) {
-        val dom = builder.declaredDomain(intVars[i])
-        if (dom.min < 0L && dom.max > 0L && dom.min == Long.MIN_VALUE) return
+        if (!split.straddles(i)) continue
+        val dom = builder.rootDomain(intVars[i])
+        val cp = builder.auxColumn(0L, dom.max)
+        val cm = builder.auxColumn(0L, -dom.min)
+        builder.realRow(
+            intArrayOf(builder.intColumn(intVars[i]), cp, cm),
+            doubleArrayOf(1.0, -1.0, 1.0),
+            LinearOp.EQ,
+            0.0,
+            strict = false,
+        )
+        split.plusCol[i] = cp
+        split.minusCol[i] = cm
     }
-    val plusCol = IntArray(intVars.size) { -1 }
-    val minusCol = IntArray(intVars.size) { -1 }
+    emitWideOuterRow(builder, rounded, ge = false, split)
+    if (op == LinearOp.EQ) emitWideOuterRow(builder, rounded, ge = true, split)
+}
+
+/**
+ * Which side of zero the model confines each column to, or null when the row cannot be relaxed at all.
+ *
+ * A coefficient rounds outward on the side its column sits, so the direction is what the row's validity
+ * rests on — and a column the model states nothing about on the relevant side has no direction. Such a
+ * column would otherwise enter split over its root box, capping it at an endpoint the model never stated;
+ * an outer relaxation has no weaker form to fall back on, so the row is declined instead.
+ */
+private fun FactorRow.Wide.splitColumns(builder: RelaxationBuilder): WideSplit? {
+    val nonNegative = BooleanArray(intVars.size)
+    val straddling = BooleanArray(intVars.size)
     for (i in intVars.indices) {
-        val dom = builder.declaredDomain(intVars[i])
-        if (dom.min < 0L && dom.max > 0L) {
-            val cp = builder.auxColumn(0L, dom.max)
-            val cm = builder.auxColumn(0L, -dom.min)
-            builder.realRow(
-                intArrayOf(builder.intColumn(intVars[i]), cp, cm),
-                doubleArrayOf(1.0, -1.0, 1.0),
-                LinearOp.EQ,
-                0.0,
-                strict = false,
-            )
-            plusCol[i] = cp
-            minusCol[i] = cm
-        }
+        val v = intVars[i]
+        val dom = builder.rootDomain(v)
+        nonNegative[i] = builder.statesLowerBound(v) && dom.min >= 0L
+        if (nonNegative[i] || (builder.statesUpperBound(v) && dom.max <= 0L)) continue
+        if (!builder.statesBothBounds(v)) return null
+        if (dom.min == Long.MIN_VALUE) return null // the negative part's upper bound would overflow
+        straddling[i] = true
     }
-    emitWideOuterRow(builder, rounded, ge = false, plusCol, minusCol)
-    if (op == LinearOp.EQ) emitWideOuterRow(builder, rounded, ge = true, plusCol, minusCol)
+    return WideSplit(nonNegative, straddling)
+}
+
+/** Per column of a wide row: the side of zero the model confines it to, and the `x = x⁺ − x⁻` pair a
+ *  straddling column was split into (`-1` until the pair is created). */
+private class WideSplit(private val nonNegative: BooleanArray, private val straddling: BooleanArray) {
+    val plusCol = IntArray(nonNegative.size) { -1 }
+    val minusCol = IntArray(nonNegative.size) { -1 }
+
+    fun straddles(i: Int): Boolean = straddling[i]
+
+    /** Whether column [i]'s coefficient rounds down on a row read in direction [ge]. */
+    fun roundsDown(i: Int, ge: Boolean): Boolean = nonNegative[i] != ge
 }
 
 private fun FactorRow.Wide.emitWideOuterRow(
     builder: RelaxationBuilder,
     rounded: WideRounding,
     ge: Boolean,
-    plusCol: IntArray,
-    minusCol: IntArray,
+    split: WideSplit,
 ) {
     var straddle = 0
-    for (i in intVars.indices) if (plusCol[i] >= 0) straddle++
+    for (i in intVars.indices) if (split.plusCol[i] >= 0) straddle++
     val cols = IntArray(intVars.size + straddle)
     val dcoeffs = DoubleArray(cols.size)
     var w = 0
     for (i in intVars.indices) {
-        if (plusCol[i] >= 0) {
-            cols[w] = plusCol[i]
+        if (split.plusCol[i] >= 0) {
+            cols[w] = split.plusCol[i]
             dcoeffs[w] = if (ge) rounded.ceilCoeffs[i] else rounded.floorCoeffs[i]
             w++
-            cols[w] = minusCol[i]
+            cols[w] = split.minusCol[i]
             dcoeffs[w] = if (ge) -rounded.floorCoeffs[i] else -rounded.ceilCoeffs[i]
             w++
         } else {
-            val dom = builder.declaredDomain(intVars[i])
-            val roundDown = (dom.min >= 0L) != ge
             cols[w] = builder.intColumn(intVars[i])
-            dcoeffs[w] = if (roundDown) rounded.floorCoeffs[i] else rounded.ceilCoeffs[i]
+            dcoeffs[w] = if (split.roundsDown(i, ge)) rounded.floorCoeffs[i] else rounded.ceilCoeffs[i]
             w++
         }
     }

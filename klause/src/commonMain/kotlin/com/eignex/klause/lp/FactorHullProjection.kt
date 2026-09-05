@@ -9,7 +9,6 @@ import com.eignex.klause.factor.table.Mdd
 import com.eignex.klause.factor.table.Regular
 import com.eignex.klause.factor.table.Table
 import com.eignex.klause.ir.Factor
-import com.eignex.klause.ir.IntDomain
 
 /** The optional convex-hull family emitted by this factor's LP relaxation. */
 internal fun Factor.lpHullFamily(): HullFamily? = when (this) {
@@ -27,13 +26,15 @@ internal fun Factor.lpHullFamily(): HullFamily? = when (this) {
 /** Whether this factor's optional LP hull is enabled for the current build. */
 internal fun Factor.lpHullEnabled(flags: HullFlags): Boolean = lpHullFamily()?.let(flags::enabled) ?: true
 
-/** The LP columns and rows this factor's optional hull can add under [domains]. */
-internal fun Factor.estimateLpHull(domains: Array<IntDomain>): LpSizeEstimate? = when (this) {
-    is Element -> estimateLpHull(domains)
-    is GlobalCardinality -> estimateLpHull(domains)
-    is Mdd -> estimateLpHull(domains)
-    is NValue -> estimateLpHull(domains)
-    is Regular -> estimateLpHull(domains)
-    is Table -> estimateLpHull()
+/** The LP columns and rows this factor's optional hull can add over [boxes] — `null` where the build
+ *  would emit no hull at all, an open-sided column included, so the gate never sizes a family the
+ *  relaxation declines. */
+internal fun Factor.estimateLpHull(boxes: RootBoxes): LpSizeEstimate? = when (this) {
+    is Element -> estimateLpHull(boxes)
+    is GlobalCardinality -> estimateLpHull(boxes)
+    is Mdd -> estimateLpHull(boxes)
+    is NValue -> estimateLpHull(boxes)
+    is Regular -> estimateLpHull(boxes)
+    is Table -> estimateLpHull(boxes)
     else -> null
 }

@@ -20,12 +20,15 @@ internal fun FactorRow.Doubles.emitReifiedIntegerLpRelaxation(builder: Relaxatio
     }
 }
 
-/** Exact convex-hull rows for `aux ⇔ (c·v == bound)` when `v` has a two-value declared domain. */
+/** Exact convex-hull rows for `aux ⇔ (c·v == bound)` when `v` has a two-value root box the model
+ *  itself states — over an invented endpoint the box is a search restriction, and the equality it
+ *  linearizes would hold only inside it. */
 private fun FactorRow.Doubles.emitExactBinaryEquality(builder: RelaxationBuilder, row: IntegerRow): Boolean {
     if (op != LinearOp.EQ || intVars.size != 1) return false
     val c = row.coeffs[0]
     if (c == 0L) return false
-    val dec = builder.declaredDomain(intVars[0])
+    if (!builder.statesBothBounds(intVars[0])) return false
+    val dec = builder.rootDomain(intVars[0])
     if (dec.valueCount != 2L) return false
     val loValue = mulExact(c, dec.min)
     val hiValue = mulExact(c, dec.max)
@@ -51,25 +54,44 @@ private fun FactorRow.Doubles.emitExactBinaryEquality(builder: RelaxationBuilder
     return true
 }
 
+/**
+ * Indicator rows via big-M, each side gated on the row's own activation bound being one the model states.
+ *
+ * `lMax` and `lMin` are what the big-M is: the row is `Σ c·x ⟨op⟩ bound` slackened by the widest the left
+ * side can reach, so an endpoint the model never stated makes the slack an invention. The row then holds
+ * inside the search box only — and at the root the column enters the LP genuinely open, where it holds
+ * nowhere. The two directions are independent implications, so the stated one is still emitted when the
+ * other is not.
+ */
 private fun FactorRow.Doubles.emitBigMRows(builder: RelaxationBuilder, row: IntegerRow) {
+    var maxStated = true
+    var minStated = true
+    for (k in intVars.indices) {
+        val c = row.coeffs[k]
+        if (c == 0L) continue // a zero coefficient reads neither endpoint
+        val v = intVars[k]
+        maxStated = maxStated && if (c > 0L) builder.statesUpperBound(v) else builder.statesLowerBound(v)
+        minStated = minStated && if (c > 0L) builder.statesLowerBound(v) else builder.statesUpperBound(v)
+    }
+    if (!maxStated && !minStated) return
+    // An unstated side is never summed: its endpoint sits where the finite lane clamped the column, and
+    // the product there would overflow and take the stated side's row down with it.
     var lMin = 0L
     var lMax = 0L
     var lMinD = 0L
     var lMaxD = 0L
     for (k in intVars.indices) {
         val c = row.coeffs[k]
-        val dom = builder.liveDomain(intVars[k])
-        val dec = builder.declaredDomain(intVars[k])
-        if (c >= 0L) {
-            lMin = addExact(lMin, mulExact(c, dom.min))
-            lMax = addExact(lMax, mulExact(c, dom.max))
-            lMinD = addExact(lMinD, mulExact(c, dec.min))
-            lMaxD = addExact(lMaxD, mulExact(c, dec.max))
-        } else {
-            lMin = addExact(lMin, mulExact(c, dom.max))
-            lMax = addExact(lMax, mulExact(c, dom.min))
-            lMinD = addExact(lMinD, mulExact(c, dec.max))
-            lMaxD = addExact(lMaxD, mulExact(c, dec.min))
+        val v = intVars[k]
+        val dom = builder.liveDomain(v)
+        val dec = builder.rootDomain(v)
+        if (maxStated) {
+            lMax = addExact(lMax, mulExact(c, if (c >= 0L) dom.max else dom.min))
+            lMaxD = addExact(lMaxD, mulExact(c, if (c >= 0L) dec.max else dec.min))
+        }
+        if (minStated) {
+            lMin = addExact(lMin, mulExact(c, if (c >= 0L) dom.min else dom.max))
+            lMinD = addExact(lMinD, mulExact(c, if (c >= 0L) dec.min else dec.max))
         }
     }
     val a = builder.boolColumn(activator)
@@ -89,35 +111,51 @@ private fun FactorRow.Doubles.emitBigMRows(builder: RelaxationBuilder, row: Inte
 
     when (op) {
         LinearOp.LE -> {
-            val m1 = maxOf(0L, subExact(lMax, b))
-            emit(m1, LinearOp.LE, addExact(b, m1), m1 == maxOf(0L, subExact(lMaxD, b)), maxSide = true)
-            successorOrNull(b)?.let { boundUp ->
-                val m2 = maxOf(0L, subExact(boundUp, lMin))
-                emit(m2, LinearOp.GE, boundUp, m2 == maxOf(0L, subExact(boundUp, lMinD)), maxSide = false)
+            if (maxStated) {
+                val m1 = maxOf(0L, subExact(lMax, b))
+                emit(m1, LinearOp.LE, addExact(b, m1), m1 == maxOf(0L, subExact(lMaxD, b)), maxSide = true)
+            }
+            if (minStated) {
+                successorOrNull(b)?.let { boundUp ->
+                    val m2 = maxOf(0L, subExact(boundUp, lMin))
+                    emit(m2, LinearOp.GE, boundUp, m2 == maxOf(0L, subExact(boundUp, lMinD)), maxSide = false)
+                }
             }
         }
 
         LinearOp.GE -> {
-            val m1 = maxOf(0L, subExact(b, lMin))
-            emit(-m1, LinearOp.GE, subExact(b, m1), m1 == maxOf(0L, subExact(b, lMinD)), maxSide = false)
-            predecessorOrNull(b)?.let { boundDown ->
-                val m2 = maxOf(0L, subExact(lMax, boundDown))
-                emit(-m2, LinearOp.LE, boundDown, m2 == maxOf(0L, subExact(lMaxD, boundDown)), maxSide = true)
+            if (minStated) {
+                val m1 = maxOf(0L, subExact(b, lMin))
+                emit(-m1, LinearOp.GE, subExact(b, m1), m1 == maxOf(0L, subExact(b, lMinD)), maxSide = false)
+            }
+            if (maxStated) {
+                predecessorOrNull(b)?.let { boundDown ->
+                    val m2 = maxOf(0L, subExact(lMax, boundDown))
+                    emit(-m2, LinearOp.LE, boundDown, m2 == maxOf(0L, subExact(lMaxD, boundDown)), maxSide = true)
+                }
             }
         }
 
         LinearOp.EQ -> {
-            val mHi = maxOf(0L, subExact(lMax, b))
-            emit(mHi, LinearOp.LE, addExact(b, mHi), mHi == maxOf(0L, subExact(lMaxD, b)), maxSide = true)
-            val mLo = maxOf(0L, subExact(b, lMin))
-            emit(-mLo, LinearOp.GE, subExact(b, mLo), mLo == maxOf(0L, subExact(b, lMinD)), maxSide = false)
+            if (maxStated) {
+                val mHi = maxOf(0L, subExact(lMax, b))
+                emit(mHi, LinearOp.LE, addExact(b, mHi), mHi == maxOf(0L, subExact(lMaxD, b)), maxSide = true)
+            }
+            if (minStated) {
+                val mLo = maxOf(0L, subExact(b, lMin))
+                emit(-mLo, LinearOp.GE, subExact(b, mLo), mLo == maxOf(0L, subExact(b, lMinD)), maxSide = false)
+            }
         }
 
         LinearOp.NE -> {
-            val mHi = maxOf(0L, subExact(lMax, b))
-            emit(-mHi, LinearOp.LE, b, mHi == maxOf(0L, subExact(lMaxD, b)), maxSide = true)
-            val mLo = maxOf(0L, subExact(b, lMin))
-            emit(mLo, LinearOp.GE, b, mLo == maxOf(0L, subExact(b, lMinD)), maxSide = false)
+            if (maxStated) {
+                val mHi = maxOf(0L, subExact(lMax, b))
+                emit(-mHi, LinearOp.LE, b, mHi == maxOf(0L, subExact(lMaxD, b)), maxSide = true)
+            }
+            if (minStated) {
+                val mLo = maxOf(0L, subExact(b, lMin))
+                emit(mLo, LinearOp.GE, b, mLo == maxOf(0L, subExact(b, lMinD)), maxSide = false)
+            }
         }
     }
 }

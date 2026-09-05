@@ -43,6 +43,24 @@ class CpToLpRelaxationTableHullTest {
     }
 
     @Test
+    fun `a column the model leaves open gets no tuple hull`() {
+        // A root box screens the tuples, so an invented endpoint would drop tuples the table allows and
+        // the one-hot rows would then refute them.
+        val p = Problem(
+            numBoolVars = 0,
+            numIntVars = 2,
+            intDomains = arrayOf(IntDomain(0, 4), IntDomain(0, 5)),
+            factors = arrayOf<Factor>(Table(xs = intArrayOf(0, 1), tuples = longArrayOf(0, 5, 2, 2, 4, 0))),
+            openIntHi = booleanArrayOf(false, true),
+        )
+        val obj = LinearObjective(intCoefficients = longArrayOf(1L, 1L))
+        val hull = CpToLpRelaxation(p, obj, tableHull = true).build(PropagationSession(p))
+        val bare = CpToLpRelaxation(p, obj, tableHull = false).build(PropagationSession(p))
+        assertEquals(bare.model.m, hull.model.m, "no hull row over an open-sided column")
+        assertEquals(bare.model.n, hull.model.n, "and no selector column")
+    }
+
+    @Test
     fun `hull minimizes a linear objective over the allowed tuples`() {
         // minimize x0 + x1 over {(0,5),(2,2),(4,0)} -> value 4, achieved on the (2,2)–(4,0) face (a tie),
         // so assert the invariant optimum and that the point sits on that optimal face (x0 + x1 = 4)

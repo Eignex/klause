@@ -13,7 +13,13 @@ import kotlin.test.assertTrue
 
 class FactorRowLpProjectionTest {
 
-    private class RecordingBuilder(private val pin: Boolean? = null) : RelaxationBuilder {
+    /** [openLo] / [openHi] mark the endpoints of the fixed `[0, 10]` root box as ones the finite lane
+     *  invented rather than ones the model states. */
+    private class RecordingBuilder(
+        private val pin: Boolean? = null,
+        private val openLo: Boolean = false,
+        private val openHi: Boolean = false,
+    ) : RelaxationBuilder {
         data class IntegerRow(val coefficients: List<Long>, val bound: Long)
         data class RealRow(val strict: Boolean)
 
@@ -58,7 +64,9 @@ class FactorRowLpProjectionTest {
         override fun realColumn(realVar: Int): Int = 200 + realVar
         override fun liveBool(boolVar: Int): Boolean? = pin
         override fun liveDomain(intVar: Int): IntDomain = IntDomain(0, 10)
-        override fun declaredDomain(intVar: Int): IntDomain = IntDomain(0, 10)
+        override fun rootDomain(intVar: Int): IntDomain = IntDomain(0, 10)
+        override fun statesLowerBound(intVar: Int): Boolean = !openLo
+        override fun statesUpperBound(intVar: Int): Boolean = !openHi
         override fun auxColumn(lo: Long, hi: Long, presence: LongArray?): Int = 300
         override fun hullEnabled(): Boolean = true
         override fun boolRow(
@@ -88,6 +96,24 @@ class FactorRowLpProjectionTest {
         ReifiedLinear(1, longArrayOf(2), intArrayOf(0), LinearOp.LE, 5).emitLpRelaxation(builder)
 
         assertEquals(2, builder.bigMRows)
+    }
+
+    @Test
+    fun `a reified integer row keeps only the direction whose big M the model states`() {
+        // `Σ 2·x ≤ 5` slackened by how far the left side can reach: the `≤` row leans on x's upper
+        // endpoint, the complementary `≥` row on its lower. An invented endpoint takes its own row out.
+        val factor = ReifiedLinear(1, longArrayOf(2), intArrayOf(0), LinearOp.LE, 5)
+
+        listOf(
+            Triple(false, false, 2),
+            Triple(false, true, 1),
+            Triple(true, false, 1),
+            Triple(true, true, 0),
+        ).forEach { (openLo, openHi, expected) ->
+            val builder = RecordingBuilder(openLo = openLo, openHi = openHi)
+            factor.emitLpRelaxation(builder)
+            assertEquals(expected, builder.bigMRows, "openLo=$openLo openHi=$openHi")
+        }
     }
 
     @Test
