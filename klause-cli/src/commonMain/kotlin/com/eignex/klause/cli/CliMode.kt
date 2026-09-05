@@ -17,6 +17,7 @@ import com.eignex.klause.solver.pipeline.OpenTheoryAssignment
 import com.eignex.klause.solver.pipeline.OpenTheoryRequest
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
+import com.eignex.klause.util.Cancellation
 
 /*
  * Generic multi-mode CLI framework.
@@ -35,6 +36,20 @@ import com.eignex.klause.solver.result.TerminationReason
  * Adding a new competition front-end is therefore a new [CliMode] object plus its
  * [OutputProtocol]; no change to the parser, the router, or the engines.
  */
+
+/**
+ * The allowance for work a frontend must do before the solve begins — today the bound proof
+ * [com.eignex.klause.solver.pipeline.pipelineRoute] runs to decide which lane owns an open model.
+ *
+ * A share of `-t` on the policy presolve takes, capped by the run's own deadline, so proving a bound can
+ * never consume the run it was supposed to route.
+ */
+internal fun CommonOptions.routingCancellation(): Cancellation {
+    val budgetMs = SolveCore.derivedPresolveBudgetMs(timeLimitMs, CliKnobs.DEFAULT_PRESOLVE_BUDGET_FRACTION)
+    if (budgetMs <= 0) return Cancellation.Never
+    val cap = minOf(deadlineAtMs ?: Long.MAX_VALUE, nowMillis() + budgetMs)
+    return Cancellation { nowMillis() > cap }
+}
 
 /** Solver-control flags shared by every mode; populated by [commonFlagSpecs] during parsing. */
 internal class CommonOptions {

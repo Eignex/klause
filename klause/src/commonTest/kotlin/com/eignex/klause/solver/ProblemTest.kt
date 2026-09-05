@@ -297,6 +297,37 @@ class ProblemTest {
     }
 
     @Test
+    fun `an open side the relaxation bounds routes to the finite lane`() {
+        val openUpper = Bits(1).also { it.set(0) }
+        val problem = Problem(
+            numBoolVars = 0,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(0), null, openUpper),
+            factors = arrayOf<Factor>(Linear(intArrayOf(2), intArrayOf(0), LinearOp.LE, 10)),
+        )
+
+        val route = assertIs<SourceProblemRoute.Finite>(problem.pipelineRoute())
+
+        assertEquals(IntDomain(0, 5), route.problem.requireFiniteIntDomains().single())
+    }
+
+    @Test
+    fun `a model with one side still open stays on the open lane untouched`() {
+        val openUpper = Bits(2).also {
+            it.set(0)
+            it.set(1)
+        }
+        val problem = Problem(
+            numBoolVars = 0,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(0, 0), longArrayOf(0, 0), null, openUpper),
+            factors = arrayOf<Factor>(Linear(intArrayOf(2), intArrayOf(0), LinearOp.LE, 10)),
+        )
+
+        val route = assertIs<SourceProblemRoute.OpenTheory>(problem.pipelineRoute())
+
+        assertSame(problem, route.request.model)
+    }
+
+    @Test
     fun `routing a wide bounded model does not run its root bake`() {
         val problem = Problem(
             numBoolVars = 0,
