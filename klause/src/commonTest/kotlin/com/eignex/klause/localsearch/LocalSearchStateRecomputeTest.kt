@@ -37,8 +37,9 @@ class LocalSearchStateRecomputeTest {
     @Test
     fun `after random moves state matches fresh recompute`() {
         for (case in cases) {
+            val baked = case.problem.bake()
             for (seed in 0 until 8) {
-                val state = LocalSearchState(case.problem.bake(), Random(seed.toLong()))
+                val state = LocalSearchState(baked, Random(seed.toLong()))
                 state.restart()
 
                 val rng = Random(seed.toLong() xor 0xBEEFL)
@@ -47,7 +48,7 @@ class LocalSearchStateRecomputeTest {
                     state.apply(move)
                 }
 
-                val sibling = LocalSearchState(case.problem.bake(), Random(seed.toLong()))
+                val sibling = LocalSearchState(baked, Random(seed.toLong()))
                 copyAssignment(state, sibling)
                 sibling.recompute()
 
@@ -119,7 +120,7 @@ class LocalSearchStateRecomputeTest {
             val cur = state.assignment.intValue(v)
             var target = cur
             repeat(8) {
-                val cand = d.min + rng.nextInt(d.values.size)
+                val cand = d.values.valueAt(rng.nextInt(d.values.size))
                 if (cand != cur) {
                     target = cand
                     return@repeat

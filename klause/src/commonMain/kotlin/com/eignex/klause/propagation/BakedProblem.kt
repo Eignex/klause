@@ -27,9 +27,13 @@ class BakedProblem private constructor(
     numBoolVars: Int,
     numIntVars: Int,
     /**
-     * The array the root fold writes into and every finite accessor reads, owned outright by this
-     * projection: it also backs the source declarations below, so a narrowing the fold proves lands in
-     * one place rather than leaving the two readings of the same column disagreeing.
+     * The array the root fold writes into and every finite accessor reads: it also backs the source
+     * declarations below, so a narrowing the fold proves lands in one place rather than leaving the two
+     * readings of the same column disagreeing.
+     *
+     * Owned outright only when this projection ran its own fold. A caller handing over domains that
+     * already carry one keeps the array's identity — that is what lets a per-firing presolve view share
+     * the session's live domains — so nothing outside the fold may write through it.
      */
     internal val foldedIntDomains: Array<IntDomain>,
     /** Whether [foldedIntDomains] already carries this projection's root deductions, so no fold runs. */

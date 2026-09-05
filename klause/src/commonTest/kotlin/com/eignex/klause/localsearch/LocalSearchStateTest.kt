@@ -91,18 +91,26 @@ class LocalSearchStateTest {
         assertEquals(Move.IntSet(0, 1), move, "a violated EQ yields a bare int set, not a compound")
     }
 
+    private fun foldedProblem() = Problem(
+        numBoolVars = 0,
+        numIntVars = 1,
+        intDomains = arrayOf(IntDomain(0, 10)),
+        factors = arrayOf<Factor>(Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 3)),
+    ).bake()
+
     @Test
     fun `the search seeds its root domains from the projection's fold rather than the declared box`() {
-        val problem = Problem(
-            numBoolVars = 0,
-            numIntVars = 1,
-            intDomains = arrayOf(IntDomain(0, 10)),
-            factors = arrayOf<Factor>(Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 3)),
-        ).bake()
+        val state = LocalSearchState(foldedProblem(), Random(1))
+
+        assertEquals(3L, state.rootDomains[0].max, "search must not propose values the root bake ruled out")
+    }
+
+    @Test
+    fun `seeding a search state aliases the projection's fold instead of copying it`() {
+        val problem = foldedProblem()
 
         val state = LocalSearchState(problem, Random(1))
 
-        assertEquals(3L, state.rootDomains[0].max, "search must not propose values the root bake ruled out")
         assertTrue(state.rootDomains === problem.rootIntDomainsInPlace, "the fold is aliased, not copied")
     }
 }
