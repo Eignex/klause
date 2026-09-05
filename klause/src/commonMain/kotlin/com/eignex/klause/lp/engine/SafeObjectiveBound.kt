@@ -2,7 +2,6 @@ package com.eignex.klause.lp.engine
 
 import kotlin.math.abs
 import kotlin.math.ceil
-import kotlin.math.floor
 
 /**
  * Neumaier and Shcherbina, *Safe Bounds in Linear and Mixed-Integer Linear Programming* (Mathematical
@@ -99,15 +98,11 @@ internal fun LpModel.safeVariableBound(
     clamped: Boolean? = null,
 ): Long? {
     val objMin = safeObjectiveLowerBound(this, result.duals) ?: return null
-    // cost is −1 on the column for a maximization (we minimize −x), +1 for a minimization.
-    val bound = if (maximize) floor(-objMin) else ceil(objMin)
-    if (!bound.isFinite() || bound < Long.MIN_VALUE.toDouble() || bound > Long.MAX_VALUE.toDouble()) return null
-    val clampedThatSide = clamped ?: if (maximize) probeClampedHi[objectiveCol] else probeClampedLo[objectiveCol]
-    // Reject well below the exact cap: a bound this large is "at the frontier" and means unbounded (a
-    // real bound worth keeping is tiny next to the probe, which is ~Long.MAX/4).
-    val frontier = (LP_UNBOUNDED_PROBE - LP_UNBOUNDED_PROBE / 4).toDouble()
-    if (clampedThatSide && abs(bound) >= frontier) return null
-    return bound.toLong()
+    val ceilMin = ceil(objMin)
+    if (!ceilMin.isFinite() || ceilMin < Long.MIN_VALUE.toDouble() || ceilMin > Long.MAX_VALUE.toDouble()) {
+        return null
+    }
+    return orientedVariableBound(ceilMin.toLong(), objectiveCol, maximize, clamped)
 }
 
 /**
@@ -128,20 +123,36 @@ internal fun LpModel.exactVariableBound(
     clamped: Boolean? = null,
 ): Long? {
     // ⌈L⌉ on the minimized objective (−x when maximizing, x when minimizing), objConstant folded in.
-    val ceil = (
+    val ceilMin = (
         if (hasContinuous) {
             rationalizedDualLowerBoundCeil(this, result.duals)
         } else {
             integerDualLowerBoundCeil(this, result.duals)
         }
         ) ?: return null
+    return orientedVariableBound(ceilMin, objectiveCol, maximize, clamped)
+}
+
+/** The shared tail of [safeVariableBound] and [exactVariableBound]: orient `⌈L⌉` on the minimized
+ *  objective ([ceilMin]) to the requested sense, then reject a bound that only rode the probe frontier.
+ *  The bound source is the only thing the two entry points differ in. */
+private fun LpModel.orientedVariableBound(
+    ceilMin: Long,
+    objectiveCol: Int,
+    maximize: Boolean,
+    clamped: Boolean?,
+): Long? {
+    // cost is −1 on the column for a maximization (we minimize −x), +1 for a minimization; `−⌈L⌉` is
+    // exactly the `⌊−L⌋` a maximization wants.
     val bound = if (maximize) {
-        if (ceil == Long.MIN_VALUE) return null // −Long.MIN_VALUE overflows
-        -ceil
+        if (ceilMin == Long.MIN_VALUE) return null // −Long.MIN_VALUE overflows
+        -ceilMin
     } else {
-        ceil
+        ceilMin
     }
     val clampedThatSide = clamped ?: if (maximize) probeClampedHi[objectiveCol] else probeClampedLo[objectiveCol]
+    // Reject well below the exact cap: a bound this large is "at the frontier" and means unbounded (a
+    // real bound worth keeping is tiny next to the probe, which is ~Long.MAX/4).
     val frontier = LP_UNBOUNDED_PROBE - LP_UNBOUNDED_PROBE / 4
     if (clampedThatSide && (bound == Long.MIN_VALUE || abs(bound) >= frontier)) return null
     return bound
