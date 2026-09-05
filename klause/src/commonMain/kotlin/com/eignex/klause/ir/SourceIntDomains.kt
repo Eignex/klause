@@ -139,6 +139,15 @@ class SourceIntDomains internal constructor(
             require(openHi == null || openHi.size == domains.size) {
                 "openHi size ${openHi?.size} != column count ${domains.size}"
             }
+            // A packed mark set narrower than the columns leaves the tail addressable but unreadable:
+            // [IntBounds] would read a column past it as closed, silently turning an invented endpoint
+            // back into a declared bound.
+            require(packedOpenLo == null || packedOpenLo.size >= domains.size) {
+                "packedOpenLo size ${packedOpenLo?.size} < column count ${domains.size}"
+            }
+            require(packedOpenHi == null || packedOpenHi.size >= domains.size) {
+                "packedOpenHi size ${packedOpenHi?.size} < column count ${domains.size}"
+            }
             // [size] reads the bounds, so a retained range of a different length would leave the value
             // sets addressable past it with nothing left to catch the mismatch.
             require(modelBounds == null || modelBounds.size == domains.size) {

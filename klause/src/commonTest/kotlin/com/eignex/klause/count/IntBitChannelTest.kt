@@ -9,6 +9,7 @@ import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.Sample
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 /** The native int↔bits channel that replaces bit-blasting for XOR-hash counting over integers. */
@@ -35,12 +36,21 @@ class IntBitChannelTest {
 
         assertTrue(
             channelled.intBounds.isOpenUpper(0),
-            "the encoding bounds the column through a row, so the column itself stays open",
+            "an invented endpoint must not read back as declared",
         )
+        assertEquals(4, channelled.numIntVars, "one base column plus its three channel bits")
         for (v in 1 until channelled.numIntVars) {
             assertTrue(channelled.intBounds.hasUpper(v), "channel column $v is a declared 0/1 bit")
             assertTrue(channelled.intBounds.hasLower(v), "channel column $v is a declared 0/1 bit")
         }
+    }
+
+    @Test
+    fun `a column spanning more than the Long range is rejected rather than encoded as a constant`() {
+        val clamp = 1L shl 62
+        val base = ints(listOf(IntDomain(-clamp, clamp)))
+
+        assertFailsWith<IllegalArgumentException> { IntBitChannel.channel(base, intArrayOf(0)) }
     }
 
     /** Value `x` reconstructed from its channel bits (least-significant first), offset by `min`. */

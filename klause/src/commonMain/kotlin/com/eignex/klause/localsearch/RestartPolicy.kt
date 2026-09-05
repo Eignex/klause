@@ -1,6 +1,5 @@
 package com.eignex.klause.localsearch
 
-import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.randomValue
 import com.eignex.klause.localsearch.schedule.AdaptivePolicy
 import com.eignex.klause.localsearch.schedule.RoundLog
@@ -81,7 +80,7 @@ internal fun anchorAndPerturb(
     if (totalVars > 0) {
         when (kind) {
             PerturbationKind.Uniform -> repeat(perturbationStrength) {
-                kickRandomVar(state, problem)
+                kickRandomVar(state)
             }
 
             PerturbationKind.BasinHopping -> {
@@ -89,7 +88,7 @@ internal fun anchorAndPerturb(
                 // factor's scope, for a coordinated kick across a single decision-graph subregion.
                 val numFactors = problem.numFactors
                 if (numFactors == 0) {
-                    repeat(perturbationStrength) { kickRandomVar(state, problem) }
+                    repeat(perturbationStrength) { kickRandomVar(state) }
                 } else {
                     repeat(perturbationStrength) {
                         val fid = state.rng.nextInt(numFactors)
@@ -107,7 +106,8 @@ internal fun anchorAndPerturb(
     state.recompute()
 }
 
-private fun kickRandomVar(state: LocalSearchState, problem: Problem) {
+private fun kickRandomVar(state: LocalSearchState) {
+    val problem = state.problem
     val totalVars = problem.numBoolVars + problem.numIntVars
     val pick = state.rng.nextInt(totalVars)
     if (pick < problem.numBoolVars) {
