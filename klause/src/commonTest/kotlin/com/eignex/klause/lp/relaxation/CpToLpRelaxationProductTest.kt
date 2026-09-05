@@ -88,6 +88,27 @@ class CpToLpRelaxationProductTest {
     }
 
     @Test
+    fun `an envelope whose constant leaves the Long range is declined instead of wrapped`() {
+        // aH·bH is 9·10^18 past Long, so that envelope's rhs would wrap to a constant no feasible point
+        // satisfies. The three whose constants fit still arrive.
+        val wide = 4_000_000_000L
+        val p = Problem(
+            numBoolVars = 0,
+            numIntVars = 3,
+            intDomains = arrayOf(IntDomain(0, wide), IntDomain(0, wide), IntDomain(0, 100)),
+            factors = arrayOf<Factor>(Product(a = 0, b = 1, result = 2)),
+        )
+        val obj = LinearObjective(intCoefficients = longArrayOf(0L, 0L, 1L))
+        // RootDomains reads endpoints only, so a span this wide never enters a per-value fixpoint.
+        val withMc = CpToLpRelaxation(p, obj, productMcCormick = true).build(RootDomains(p))
+        val without = CpToLpRelaxation(p, obj, productMcCormick = false).build(RootDomains(p))
+        assertEquals(without.model.m + 3, withMc.model.m, "only the envelopes whose constants fit survive")
+        val sol = solveLp(withMc.model)
+        assertEquals(LpVerdict.OPTIMAL, sol.status)
+        assertTrue(sol.objectiveValue <= eps, "UNSOUND: LP min ${sol.objectiveValue} above the product's 0")
+    }
+
+    @Test
     fun `a square open on both sides emits no envelope at all`() {
         val p = Problem(
             numBoolVars = 0,

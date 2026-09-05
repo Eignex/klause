@@ -60,8 +60,11 @@ private fun FactorRow.Doubles.emitExactBinaryEquality(builder: RelaxationBuilder
  * `lMax` and `lMin` are what the big-M is: the row is `Σ c·x ⟨op⟩ bound` slackened by the widest the left
  * side can reach, so an endpoint the model never stated makes the slack an invention. The row then holds
  * inside the search box only — and at the root the column enters the LP genuinely open, where it holds
- * nowhere. The two directions are independent implications, so the stated one is still emitted when the
- * other is not.
+ * nowhere.
+ *
+ * Dropping one row only ever weakens, so the stated side is still emitted when the other is not: on `≤`
+ * and `≥` the two rows are the reification's two independent implications, and on `=` and `≠` they are
+ * the two halves of a single one, which the survivor then states in one direction alone.
  */
 private fun FactorRow.Doubles.emitBigMRows(builder: RelaxationBuilder, row: IntegerRow) {
     var maxStated = true

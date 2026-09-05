@@ -33,12 +33,21 @@ internal fun Element.estimateLpHull(boxes: RootBoxes): LpSizeEstimate? {
     if (arr.size > MAX_ELEM) return null
     if (!boxes.statesBothBounds(idx)) return null
     val box = boxes.domain(idx)
+    // The big-M result channel spans the result's box and the entry's, so it arrives only for the
+    // positions whose two boxes are both the model's own — sizing it over the rest would budget rows
+    // the build declines.
+    val linkable = arrIsVars && boxes.statesBothBounds(result)
     var k = 0L
-    for (p in arr.indices) if ((p + indexOffset).toLong() in box) k++
+    var linked = 0L
+    for (p in arr.indices) {
+        if ((p + indexOffset).toLong() !in box) continue
+        k++
+        if (linkable && boxes.statesBothBounds(arr[p].toInt())) linked++
+    }
     if (k == 0L) return null
     // Constant array: Σ y = 1 + index channel + result channel (3 rows). Variable array:
-    // Σ y = 1 + index channel + two big-M rows per selector (2 + 2k).
-    return LpSizeEstimate(cols = k, rows = if (arrIsVars) 2L + 2L * k else 3L)
+    // Σ y = 1 + index channel + two big-M rows per linked selector.
+    return LpSizeEstimate(cols = k, rows = if (arrIsVars) 2L + 2L * linked else 3L)
 }
 
 /** The shared one-hot selectors `Σ_p y_p = 1` and index channel `Σ_p (p + off)·y_p = idx`. */

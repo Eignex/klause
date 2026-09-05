@@ -13,10 +13,10 @@ import com.eignex.klause.ir.LinearOp
  * operand is declined the same way, by its own infinite bounds.
  */
 internal fun RealProduct.emitLpRelaxation(builder: RelaxationBuilder) {
+    if (!builder.statesBothBounds(intOperand)) return // decline before a column is seated for a dead row
     val resCol = builder.realColumn(result)
     val opCol = builder.realColumn(realOperand)
     if (resCol < 0 || opCol < 0) return // builder has no real-column backing (e.g. a presolve fake)
-    if (!builder.statesBothBounds(intOperand)) return
     val dom = builder.liveDomain(intOperand)
     val lo = dom.min
     val hi = dom.max

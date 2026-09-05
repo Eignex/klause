@@ -28,20 +28,24 @@ private fun ArrayMinMax.emitTightFace(builder: RelaxationBuilder, resultCol: Int
     // own; over an invented endpoint the pair may separate further at a genuine solution and the row
     // would cut it off. The result's box gates the whole face — no operand row survives without it.
     if (!builder.statesBothBounds(result)) return
+    val rDom = builder.rootDomain(result)
+    // `M_i` per operand, or `-1` where no row links it: an unstated endpoint, or an empty box whose
+    // span is negative (left to propagation).
+    val bigM = LongArray(n) { i ->
+        val x = xs[i]
+        if (!builder.statesBothBounds(x)) return@LongArray -1L
+        val xDom = builder.rootDomain(x)
+        maxOf(rDom.max, xDom.max) - minOf(rDom.min, xDom.min)
+    }
+    if (bigM.none { it >= 0L }) return
     // Σ z_i = 1 keeps a selector for every operand, linked or not: dropping the unlinked ones would
     // force the extremum onto an operand that carries a row, which the factor never says.
-    val linked = BooleanArray(n) { builder.statesBothBounds(xs[it]) }
-    if (linked.none { it }) return
     val sel = IntArray(n) { builder.auxColumn(0L, 1L) } // free binaries z_i ∈ [0,1]
     builder.row(sel, LongArray(n) { 1L }, LinearOp.EQ, 1L, Contribution.HULL) // Σ z_i = 1
-    val rDom = builder.rootDomain(result)
     for (i in 0 until n) {
-        if (!linked[i]) continue
-        val x = xs[i]
-        val xDom = builder.rootDomain(x)
-        val m = maxOf(rDom.max, xDom.max) - minOf(rDom.min, xDom.min)
+        val m = bigM[i]
         if (m < 0L) continue
-        val xCol = builder.intColumn(x)
+        val xCol = builder.intColumn(xs[i])
         val z = sel[i]
         // max: result − xs[i] + M·z_i ≤ M.  min: xs[i] − result + M·z_i ≤ M.
         val cols = if (max) intArrayOf(resultCol, xCol, z) else intArrayOf(xCol, resultCol, z)

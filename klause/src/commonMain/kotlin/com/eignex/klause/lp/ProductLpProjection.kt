@@ -2,6 +2,8 @@ package com.eignex.klause.lp
 
 import com.eignex.klause.factor.arithmetic.Product
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.util.CheckedLongOverflowException
+import com.eignex.klause.util.mulExact
 
 /**
  * LP relaxation — the four McCormick envelope inequalities `(a−aL)(b−bL) ≥ 0`, `(a−aH)(b−bH) ≥ 0`,
@@ -12,7 +14,7 @@ import com.eignex.klause.ir.LinearOp
  * Each envelope leans on one endpoint of each operand, and an endpoint the model does not state was
  * invented to close the search box: the product may leave that box at a genuine solution, and the row
  * built on it would cut the solution off. So the four are emitted individually, each only over the two
- * sides the model states — a square with one open side keeps the two envelopes on its stated side.
+ * sides the model states — a square with one open side keeps the single envelope tangent to it.
  */
 internal fun Product.emitLpRelaxation(builder: RelaxationBuilder) {
     if (!builder.hullEnabled()) return
@@ -32,12 +34,26 @@ internal fun Product.emitLpRelaxation(builder: RelaxationBuilder) {
     val aCol = builder.intColumn(a)
     val bCol = builder.intColumn(b)
 
-    // Each row is `result + ca·a + cb·b ⟨op⟩ rhs`; coefficients coalesce when a and b coincide.
-    fun mcCormick(ca: Long, cb: Long, op: LinearOp, rhs: Long) =
-        builder.row(intArrayOf(resCol, aCol, bCol), longArrayOf(1L, ca, cb), op, rhs, Contribution.HULL)
+    /**
+     * `(a − ea)(b − eb) ⟨op⟩ 0` expanded to `result − eb·a − ea·b ⟨op⟩ −ea·eb`; coefficients coalesce
+     * when a and b coincide. The constants are a product of two endpoints, so a model stating wide
+     * bounds can push them past 64 bits — that envelope is declined rather than emitted at a wrapped
+     * constant, which would cut off feasible points while marked globally valid.
+     */
+    fun mcCormick(ea: Long, eb: Long, op: LinearOp) {
+        val coeffs: LongArray
+        val rhs: Long
+        try {
+            coeffs = longArrayOf(1L, mulExact(-1L, eb), mulExact(-1L, ea))
+            rhs = mulExact(-1L, mulExact(ea, eb))
+        } catch (_: CheckedLongOverflowException) {
+            return
+        }
+        builder.row(intArrayOf(resCol, aCol, bCol), coeffs, op, rhs, Contribution.HULL)
+    }
 
-    if (aLow && bLow) mcCormick(-bL, -aL, LinearOp.GE, -(aL * bL))
-    if (aHigh && bHigh) mcCormick(-bH, -aH, LinearOp.GE, -(aH * bH))
-    if (aHigh && bLow) mcCormick(-bL, -aH, LinearOp.LE, -(aH * bL))
-    if (aLow && bHigh) mcCormick(-bH, -aL, LinearOp.LE, -(aL * bH))
+    if (aLow && bLow) mcCormick(aL, bL, LinearOp.GE)
+    if (aHigh && bHigh) mcCormick(aH, bH, LinearOp.GE)
+    if (aHigh && bLow) mcCormick(aH, bL, LinearOp.LE)
+    if (aLow && bHigh) mcCormick(aL, bH, LinearOp.LE)
 }
