@@ -36,9 +36,8 @@ private fun FactorRow.Wide.emitWideOuterRows(builder: RelaxationBuilder, rounded
     val split = splitColumns(builder) ?: return
     for (i in intVars.indices) {
         if (!split.straddles(i)) continue
-        val dom = builder.rootDomain(intVars[i])
-        val cp = builder.auxColumn(0L, dom.max)
-        val cm = builder.auxColumn(0L, -dom.min)
+        val cp = builder.auxColumn(0L, split.plusUpper(i))
+        val cm = builder.auxColumn(0L, split.minusUpper(i))
         builder.realRow(
             intArrayOf(builder.intColumn(intVars[i]), cp, cm),
             doubleArrayOf(1.0, -1.0, 1.0),
@@ -46,8 +45,7 @@ private fun FactorRow.Wide.emitWideOuterRows(builder: RelaxationBuilder, rounded
             0.0,
             strict = false,
         )
-        split.plusCol[i] = cp
-        split.minusCol[i] = cm
+        split.seat(i, cp, cm)
     }
     emitWideOuterRow(builder, rounded, ge = false, split)
     if (op == LinearOp.EQ) emitWideOuterRow(builder, rounded, ge = true, split)
@@ -64,6 +62,8 @@ private fun FactorRow.Wide.emitWideOuterRows(builder: RelaxationBuilder, rounded
 private fun FactorRow.Wide.splitColumns(builder: RelaxationBuilder): WideSplit? {
     val nonNegative = BooleanArray(intVars.size)
     val straddling = BooleanArray(intVars.size)
+    val plusUpper = LongArray(intVars.size)
+    val minusUpper = LongArray(intVars.size)
     for (i in intVars.indices) {
         val v = intVars[i]
         val dom = builder.rootDomain(v)
@@ -72,17 +72,39 @@ private fun FactorRow.Wide.splitColumns(builder: RelaxationBuilder): WideSplit? 
         if (!builder.statesBothBounds(v)) return null
         if (dom.min == Long.MIN_VALUE) return null // the negative part's upper bound would overflow
         straddling[i] = true
+        plusUpper[i] = dom.max
+        minusUpper[i] = -dom.min
     }
-    return WideSplit(nonNegative, straddling)
+    return WideSplit(nonNegative, straddling, plusUpper, minusUpper)
 }
 
 /** Per column of a wide row: the side of zero the model confines it to, and the `x = x⁺ − x⁻` pair a
- *  straddling column was split into (`-1` until the pair is created). */
-private class WideSplit(private val nonNegative: BooleanArray, private val straddling: BooleanArray) {
-    val plusCol = IntArray(nonNegative.size) { -1 }
-    val minusCol = IntArray(nonNegative.size) { -1 }
+ *  straddling column is split into — the parts' upper bounds up front, their column handles once
+ *  [seat] has created them. */
+private class WideSplit(
+    private val nonNegative: BooleanArray,
+    private val straddling: BooleanArray,
+    private val plusUpper: LongArray,
+    private val minusUpper: LongArray,
+) {
+    private val plusCol = IntArray(nonNegative.size) { -1 }
+    private val minusCol = IntArray(nonNegative.size) { -1 }
 
     fun straddles(i: Int): Boolean = straddling[i]
+
+    fun plusUpper(i: Int): Long = plusUpper[i]
+
+    fun minusUpper(i: Int): Long = minusUpper[i]
+
+    /** Record the `x⁺` / `x⁻` column handles created for straddling column [i]. */
+    fun seat(i: Int, plus: Int, minus: Int) {
+        plusCol[i] = plus
+        minusCol[i] = minus
+    }
+
+    fun plus(i: Int): Int = plusCol[i]
+
+    fun minus(i: Int): Int = minusCol[i]
 
     /** Whether column [i]'s coefficient rounds down on a row read in direction [ge]. */
     fun roundsDown(i: Int, ge: Boolean): Boolean = nonNegative[i] != ge
@@ -95,16 +117,16 @@ private fun FactorRow.Wide.emitWideOuterRow(
     split: WideSplit,
 ) {
     var straddle = 0
-    for (i in intVars.indices) if (split.plusCol[i] >= 0) straddle++
+    for (i in intVars.indices) if (split.straddles(i)) straddle++
     val cols = IntArray(intVars.size + straddle)
     val dcoeffs = DoubleArray(cols.size)
     var w = 0
     for (i in intVars.indices) {
-        if (split.plusCol[i] >= 0) {
-            cols[w] = split.plusCol[i]
+        if (split.straddles(i)) {
+            cols[w] = split.plus(i)
             dcoeffs[w] = if (ge) rounded.ceilCoeffs[i] else rounded.floorCoeffs[i]
             w++
-            cols[w] = split.minusCol[i]
+            cols[w] = split.minus(i)
             dcoeffs[w] = if (ge) -rounded.floorCoeffs[i] else -rounded.ceilCoeffs[i]
             w++
         } else {

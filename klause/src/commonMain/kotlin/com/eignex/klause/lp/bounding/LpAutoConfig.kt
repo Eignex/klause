@@ -254,15 +254,19 @@ object LpAutoConfig {
         } else {
             buildList {
                 fun admit(e: HullEstimate?) = e?.let { if (hullAdmitted(config, it)) add(it) }
+                // The whole-table root-box reading copies, so it is materialized on the first family
+                // that needs it and shared from there — never per family, and never on a model
+                // carrying no hull factor at all.
+                val boxes = lazy(LazyThreadSafetyMode.NONE) { RootBoxes(problem) }
                 // Per-factor hull sizes come from each factor's LP hull estimate (single source with
                 // the build); the driver-emitted circuit arcs and time-indexed model keep their own.
                 if (circuit) admit(circuitEstimate(problem))
-                if (constArrayElement) admit(hullEstimate(problem, LpTechnique.ELEMENT, HullFamily.ELEMENT))
-                if (table) admit(hullEstimate(problem, LpTechnique.TABLE, HullFamily.TABLE))
-                if (nValue) admit(hullEstimate(problem, LpTechnique.NVALUE, HullFamily.NVALUE))
-                if (regular) admit(hullEstimate(problem, LpTechnique.REGULAR, HullFamily.REGULAR))
-                if (mdd) admit(hullEstimate(problem, LpTechnique.MDD, HullFamily.MDD))
-                if (gccCount) admit(hullEstimate(problem, LpTechnique.GCC_COUNT, HullFamily.GCC_COUNT))
+                if (constArrayElement) admit(hullEstimate(problem, boxes, LpTechnique.ELEMENT, HullFamily.ELEMENT))
+                if (table) admit(hullEstimate(problem, boxes, LpTechnique.TABLE, HullFamily.TABLE))
+                if (nValue) admit(hullEstimate(problem, boxes, LpTechnique.NVALUE, HullFamily.NVALUE))
+                if (regular) admit(hullEstimate(problem, boxes, LpTechnique.REGULAR, HullFamily.REGULAR))
+                if (mdd) admit(hullEstimate(problem, boxes, LpTechnique.MDD, HullFamily.MDD))
+                if (gccCount) admit(hullEstimate(problem, boxes, LpTechnique.GCC_COUNT, HullFamily.GCC_COUNT))
                 if (scheduling) admit(timeIndexedEstimate(problem))
             }
         }
@@ -384,18 +388,18 @@ object LpAutoConfig {
     /** The aggregate hull size of every factor in the [family] convex-hull family, summing each factor's
      *  own LP hull estimate — the single source shared with the build, so
      *  the gating estimate cannot drift from the rows actually emitted. */
-    private fun hullEstimate(problem: Problem, technique: LpTechnique, family: HullFamily): HullEstimate? {
+    private fun hullEstimate(
+        problem: Problem,
+        boxes: Lazy<RootBoxes>,
+        technique: LpTechnique,
+        family: HullFamily,
+    ): HullEstimate? {
         var cols = 0L
         var rows = 0L
         var any = false
-        // Materialized on the family's first factor and shared from there: the whole-table reading copies,
-        // so taking it per factor would cost O(factors · columns) on a model this family is wide over, and
-        // taking it up front would cost the copy on every model carrying no such factor at all.
-        var rootBoxes: RootBoxes? = null
         for (f in problem.factors) {
             if (f.lpHullFamily() != family) continue
-            val boxes = rootBoxes ?: RootBoxes(problem).also { rootBoxes = it }
-            val e = f.estimateLpHull(boxes) ?: continue
+            val e = f.estimateLpHull(boxes.value) ?: continue
             cols += e.cols
             rows += e.rows
             any = true

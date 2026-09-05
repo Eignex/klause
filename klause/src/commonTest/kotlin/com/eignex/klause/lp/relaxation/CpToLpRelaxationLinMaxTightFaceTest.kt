@@ -95,8 +95,8 @@ class CpToLpRelaxationLinMaxTightFaceTest {
         // the row a search restriction. x2's selector stays in Σ z = 1 — dropping it would force the
         // extremum onto x1, which the factor never says.
         val obj = LinearObjective(intCoefficients = longArrayOf(-1L, 0L, 0L))
-        val closed = CpToLpRelaxation(maxProblem(BooleanArray(3)), obj, linMaxTightFace = true)
-            .build(PropagationSession(maxProblem(BooleanArray(3))))
+        val shut = maxProblem(BooleanArray(3))
+        val closed = CpToLpRelaxation(shut, obj, linMaxTightFace = true).build(PropagationSession(shut))
         val open = maxProblem(booleanArrayOf(false, false, true))
         val opened = CpToLpRelaxation(open, obj, linMaxTightFace = true).build(PropagationSession(open))
         assertEquals(closed.model.m - 1, opened.model.m, "one big-M row declined")
