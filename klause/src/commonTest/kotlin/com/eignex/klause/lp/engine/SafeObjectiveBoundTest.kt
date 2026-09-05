@@ -51,6 +51,24 @@ class SafeObjectiveBoundTest {
     }
 
     @Test
+    fun `a slack multiplier off by float noise still yields a bound`() {
+        // min -x subject to x <= 4, x in [0, 10]: the row's exact multiplier is -1, and a slack carries
+        // no upper, so a multiplier a hair the other side of its own reduced cost used to cost the bound.
+        val b = LpBuilder()
+        val x = b.addVar(0L, 10L, cost = -1L)
+        b.addRow(intArrayOf(x), longArrayOf(1L), Relation.LE, 4L)
+        val model = b.build(Sense.MINIMIZE)
+        val optimum = exactLpOptimum(model)
+
+        val bound = assertNotNull(
+            safeObjectiveLowerBound(model, doubleArrayOf(1e-12)),
+            "a multiplier off by 1e-12 must not cost the whole bound",
+        )
+
+        assertTrue(bound <= optimum + 1e-6, "UNSOUND repaired bound $bound > optimum $optimum")
+    }
+
+    @Test
     fun `exact variable bound tightens a free column the safe bound leaves loose`() {
         // maximize x subject to x <= 5, x open above (a free column at the ±∞ probe upper).
         val b = LpBuilder()
