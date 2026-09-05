@@ -63,7 +63,12 @@ internal object IntBitChannel {
         for (x in intVars) {
             val dom = base.rootIntDomain(x)
             val min = dom.min
+            // `max - min` wraps past `Long` on a near-full-range box, and a wrapped span reads as a
+            // singleton the encoding would drop silently instead of rejecting.
             val span = dom.max - dom.min
+            require(span >= 0L) {
+                "IntBitChannel: int var $x spans more than 2^63 values; too wide to hash (max 2^$MAX_WIDTH)"
+            }
             val width = bitWidth(span)
             require(width <= MAX_WIDTH) {
                 "IntBitChannel: int var $x spans ${span + 1} values; too wide to hash (max 2^$MAX_WIDTH)"
@@ -103,8 +108,13 @@ internal object IntBitChannel {
             bitsPerVar.add(bits)
         }
 
-        // The channel bounds a base column through its `Linear` row, not through the column: a side the
-        // source left open stays marked open, so nothing downstream reads the encoded box as a declaration.
+        // Every requested column was a singleton, so the encoding added nothing: the base projection already
+        // is the augmented one, and rebuilding it would pay a second root bake for the same model.
+        if (extraFactors.isEmpty()) return Result(base, bitsPerVar)
+
+        // A base column is restated as the projection held it: the same box, and the same marks saying
+        // which of its endpoints were invented. The channel re-encodes that box rather than replacing it,
+        // so a side the source left open is still open here and no consumer reads the box as a declaration.
         val problem = Problem(
             numBoolVars = nextBool,
             numIntVars = nextInt,
