@@ -7,6 +7,7 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.ExactWitness
 import com.eignex.klause.lp.asFraction
 import com.eignex.klause.lp.objectiveUnboundedBelow
+import com.eignex.klause.lp.statesOneBranch
 import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.presolve.PresolvePipeline
@@ -122,6 +123,10 @@ class OpenTheoryMinimizer internal constructor(
     private val coefficients: LongArray
     private val source: Problem
     private val route: ProblemPipeline
+
+    // Set once the certificate has refused a ray over a model that puts every witness in one branch, so
+    // the rounds after it read the refusal rather than rebuilding the same cone system.
+    private var rayRefusedForEveryWitness = false
 
     init {
         // A continuous column may exist — a mixed model keeps its reals — but the descent steps by one,
@@ -253,14 +258,23 @@ class OpenTheoryMinimizer internal constructor(
      * Asked of the model without the descent's own row. The row states that nothing feasible sits at the
      * incumbent or above it, which is a fact about where the descent has reached rather than one about the
      * model, and the ray the certificate looks for is the model's own.
+     *
+     * A model whose witnesses all lie in one branch answers this once: the cone system it builds is the
+     * same every round, and rebuilding it per improvement would cost an exact rational run to reach the
+     * refusal already on hand. Only a refusal is remembered — a run the stop cut short decided nothing,
+     * and reading it as a refusal would retire the certificate over a question never asked.
      */
-    private fun unboundedBelow(model: Problem, witness: OpenTheoryAssignment, params: TheoryParams): Boolean =
-        model.objectiveUnboundedBelow(
+    private fun unboundedBelow(model: Problem, witness: OpenTheoryAssignment, params: TheoryParams): Boolean {
+        if (rayRefusedForEveryWitness) return false
+        val ray = model.objectiveUnboundedBelow(
             terms,
             coefficients,
             witness.exactWitness(model.numRealVars),
             Cancellation { presolveCancellation() || params.cancellation() || params.timeout() },
         )
+        rayRefusedForEveryWitness = ray == false && model.statesOneBranch()
+        return ray == true
+    }
 
     /**
      * What the standing incumbent proves once the descent has nothing left to refute: it is optimal, or —

@@ -9,7 +9,7 @@ import com.eignex.klause.simplex.exact.ExactRationalInequality
 import com.ionspin.kotlin.bignum.integer.BigInteger
 
 /** Exact values of the mixed columns an [ExactComparison] states its terms over. */
-internal fun interface ExactColumnValues {
+internal interface ExactColumnValues {
     /** The value at mixed column [column]. */
     fun at(column: Int): BigFraction
 }
@@ -39,7 +39,7 @@ internal class ExactComparison(
     val bound: BigFraction,
     /** The comparison itself. */
     val op: LinearOp,
-    /** Whether the comparison is strict, which only one over continuous columns is. */
+    /** Whether the comparison is strict, which a row read against its own statement also is. */
     val strict: Boolean,
     /** Whether a continuous column carries a term, which decides how a disequality tightens. */
     val hasReals: Boolean,
@@ -109,7 +109,9 @@ internal fun FactorRow.exactComparison(realColumns: Int, truth: Boolean): ExactC
     return when (this) {
         is FactorRow.Wide -> {
             for (index in intVars.indices) terms.add(realColumns + intVars[index], coefficients[index].asFraction())
-            ExactComparison(terms, bound.asFraction(), actualOp, strict = false, hasReals = false)
+            // The complement of `a·x ≤ b` is `a·x > b`, and stating it as `a·x ≥ b` would readmit the very
+            // point the false activator excludes — the boundary the row itself sits on.
+            ExactComparison(terms, bound.asFraction(), actualOp, strict = !truth, hasReals = false)
         }
 
         is FactorRow.Doubles -> {
