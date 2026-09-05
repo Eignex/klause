@@ -96,7 +96,8 @@ internal class RevisedSimplex(
     private val iterationLimit: Int = 0,
     private val workLimit: Long = 0L,
     private val trackDegeneracy: Boolean = false,
-) : TableauCutSolver, PersistentLpSolver {
+) : TableauCutSolver,
+    PersistentLpSolver {
     private val m = model.m
     private val n = model.n
     private val numVars = model.numVars
@@ -1179,7 +1180,6 @@ internal class RevisedSimplex(
 
         /** Iterations between cooperative cancellation polls. */
         const val CANCEL_POLL: Int = 32
-
     }
 }
 

@@ -94,14 +94,13 @@ internal fun roundUpToResidue(lb: Long, g: Long, r: Long): Long = lb + (r - lb).
 /** A budgeted [TableauCutSolver] over [model]. The simplex always uses Devex pricing, the Harris
  *  two-pass ratio test, the bound-flipping long step and basis equilibration — all correctness-neutral
  *  (they change only the pivot path / conditioning, never the certified optimum). */
-internal fun LpEngine.dualSimplex(model: LpModel, cancellation: Cancellation): TableauCutSolver =
-    newTableauCutSolver(
-        model,
-        cancellation,
-        iterationLimit = nodePivotBudget(),
-        workLimit = nodeWorkBudget(),
-        trackDegeneracy = adaptiveWork,
-    )
+internal fun LpEngine.dualSimplex(model: LpModel, cancellation: Cancellation): TableauCutSolver = newTableauCutSolver(
+    model,
+    cancellation,
+    iterationLimit = nodePivotBudget(),
+    workLimit = nodeWorkBudget(),
+    trackDegeneracy = adaptiveWork,
+)
 
 /**
  * The node bound's engine and its solve.
