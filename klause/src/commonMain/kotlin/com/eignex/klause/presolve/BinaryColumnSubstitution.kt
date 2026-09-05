@@ -126,7 +126,7 @@ internal object BinaryColumnSubstitution {
             ints[substituted[k]] = if (sample.bools.getOrElse(firstBool + k) { false }) 1L else 0L
         }
         val bools = if (sample.bools.size > firstBool) sample.bools.copyOf(firstBool) else sample.bools
-        return Sample(bools, ints, sample.reals)
+        return sample.copy(bools = bools, ints = ints)
     }
 
     /** Clear [substitutable] for every column a factor this cannot rewrite mentions, and — to a fixpoint —

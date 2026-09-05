@@ -144,6 +144,29 @@ class FinitePipelineTest {
     }
 
     @Test
+    fun `reconstruction keeps the continuous part of a solution`() {
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 2,
+            intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 10)),
+            factors = arrayOf<Factor>(Linear(intArrayOf(-2, 1), intArrayOf(0, 1), LinearOp.EQ, 1)),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(4.0),
+        ).bake()
+
+        val preparation = FinitePipeline.prepare(
+            FinitePipelineRequest(problem, FiniteEngine.BACKTRACK),
+        )
+
+        assertTrue(preparation.problem.factors.isEmpty(), "the eliminating pass must fire for this to mean anything")
+        val reconstructed = preparation.reconstruct(
+            Sample(BooleanArray(0), longArrayOf(2, 0), doubleArrayOf(1.5)),
+        )
+        assertEquals(1.5, reconstructed.reals.single())
+    }
+
+    @Test
     fun `leaves a harvested model at the presolve fixpoint`() {
         val config = PresolveConfig.parse("default,+lp-harvest")
         val problem = Problem(

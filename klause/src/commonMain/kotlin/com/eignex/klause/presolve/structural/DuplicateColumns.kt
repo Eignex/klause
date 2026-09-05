@@ -255,7 +255,7 @@ internal class DuplicateColumnMerge(private val merges: List<ColumnMerge>) {
             ints[m.keep] = x
             ints[m.drop] = z - x
         }
-        return Sample(sample.bools, ints)
+        return sample.copy(ints = ints)
     }
 }
 

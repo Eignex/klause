@@ -104,7 +104,7 @@ internal object BlockedClauseElimination {
                     bools[Lit.variable(b.blockingLit)] = Lit.isPositive(b.blockingLit)
                 }
             }
-            return Sample(bools, sample.ints)
+            return sample.copy(bools = bools)
         }
 
         private fun satisfied(c: IntArray, bools: BooleanArray): Boolean {

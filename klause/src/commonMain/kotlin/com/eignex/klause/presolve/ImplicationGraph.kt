@@ -389,6 +389,6 @@ internal class ImplicationReduction(private val merges: List<BoolMerge>) {
         if (merges.isEmpty()) return sample
         val bools = sample.bools.copyOf()
         for (m in merges) bools[m.from] = bools[m.into]
-        return Sample(bools, sample.ints)
+        return sample.copy(bools = bools)
     }
 }
