@@ -100,6 +100,36 @@ internal interface TableauCutSolver : LpSolver {
 }
 
 /**
+ * An [LpSolver] a caller keeps across many solves, re-pointing one instance at a successor model rather
+ * than building a fresh engine for it. The basis and its factorization — the expensive half of a solve —
+ * carry over, so a model differing from its predecessor only in column bounds or in which rows are
+ * enforced is repaired in a few pivots.
+ *
+ * Kept off [LpSolver] because not every engine can honour it: [ComponentLpSolver] holds one sub-solver
+ * per column component, and neither the identity test [rebind] rests on nor a per-row enforcement toggle
+ * survives that split. Stating the limitation in the type is better than a no-op implementation that a
+ * caller would silently pay a full rebuild for.
+ */
+internal interface PersistentLpSolver : LpSolver {
+    /**
+     * Re-point this engine at [next] and [token], keeping the seated basis and its factorization; false
+     * when [next] is not a bound-only revision of the current model, which is the caller's signal to
+     * build a fresh engine.
+     */
+    fun rebind(next: LpModel, token: Cancellation): Boolean
+
+    /** Re-solve after a [rebind], continuing from the kept basis and factorization. */
+    fun resolveBounds(): FloatLpResult?
+
+    /**
+     * Re-solve with per-row enforcement, continuing from the kept basis and factorization. A row with
+     * `enforced(i) = false` does not constrain — its equation merely defines a free slack. Only sound
+     * for an all-zero objective, under which every basis is dual-feasible.
+     */
+    fun resolveGated(enforced: BooleanArray): FloatLpResult?
+}
+
+/**
  * Construct the LP engine for the general solve/certify path — the swap point for an alternative engine
  * (an interior-point method carries no basis, so it implements [LpSolver] without [TableauCutSolver]);
  * callers depend only on [LpSolver].
@@ -118,6 +148,52 @@ internal fun newLpSolver(
     }
     return monolithicLpSolver(model, cancellation)
 }
+
+/**
+ * Construct a basis-carrying engine, for the callers that read cuts off the optimal tableau or that
+ * budget the solve itself — both simplex-specific, so this never decomposes.
+ *
+ * [iterationLimit] and [workLimit] bound the dual solve, each 0 leaving it to the engine; a truncated
+ * dual iterate still carries a valid bound. [trackDegeneracy] turns on the dual-degeneracy measurement
+ * an adaptive budget reads back.
+ */
+internal fun newTableauCutSolver(
+    model: LpModel,
+    cancellation: Cancellation = Cancellation.Never,
+    iterationLimit: Int = 0,
+    workLimit: Long = 0L,
+    trackDegeneracy: Boolean = false,
+): TableauCutSolver = RevisedSimplex(
+    model,
+    cancellation,
+    iterationLimit = iterationLimit,
+    workLimit = workLimit,
+    trackDegeneracy = trackDegeneracy,
+)
+
+/**
+ * Construct an engine to keep across solves ([PersistentLpSolver]). Monolithic by construction: a
+ * decomposed model has no single basis to carry, which is the whole of what such a caller keeps it for.
+ *
+ * [refactorUpdateLimit] caps the updates folded into the basis before it is rebuilt. A caller whose
+ * pivots accumulate across solves raises it, since the default is sized for one solve's chain. The
+ * remaining knobs are [newTableauCutSolver]'s.
+ */
+internal fun newPersistentLpSolver(
+    model: LpModel,
+    cancellation: Cancellation = Cancellation.Never,
+    refactorUpdateLimit: Int = DEFAULT_REFACTOR_UPDATE_LIMIT,
+    iterationLimit: Int = 0,
+    workLimit: Long = 0L,
+    trackDegeneracy: Boolean = false,
+): PersistentLpSolver = RevisedSimplex(
+    model,
+    cancellation,
+    refactorUpdateLimit = refactorUpdateLimit,
+    iterationLimit = iterationLimit,
+    workLimit = workLimit,
+    trackDegeneracy = trackDegeneracy,
+)
 
 /** The single-model engine selection [newLpSolver] and each decomposed block share. */
 private fun monolithicLpSolver(model: LpModel, cancellation: Cancellation): LpSolver =
