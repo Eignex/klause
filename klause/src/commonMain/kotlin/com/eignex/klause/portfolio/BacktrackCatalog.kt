@@ -106,8 +106,13 @@ object BacktrackCatalog {
     }
 
     /** A best-bound-dive LP arm: the DEFAULT LP stack plus the `lb_tree_search` primal subsolver, which
-     *  explores the branch-and-bound tree best-first before search to land good incumbents fast. A no-op
-     *  when the LP relaxation is off (so a `--lp off` ceiling neutralises it). */
+     *  explores the branch-and-bound tree best-first to land good incumbents fast. It is the *fallback*
+     *  root heuristic, not an additional one: the LP-rounding probe is on whenever the LP is active, and
+     *  the root work stops at the first heuristic that seeds an incumbent, so the dive runs only where
+     *  rounding and the pump both come back empty. Measured on MIPLIB it earns nothing either way —
+     *  running it behind a successful probe costs 0.3-1.5s of root time and improves no objective, and
+     *  where it does run it seeds nothing the pool does not already reach. A no-op when the LP relaxation
+     *  is off (so a `--lp off` ceiling neutralises it). */
     private fun lpTreeSearchArm() = BacktrackRecipe("lp-lbtree") { seed, onEvent ->
         val base = BacktrackPresets.conflictDriven(randomSeed = seed, onEvent = onEvent)
         base.copy(lpConfig = LpConfig(LpEmphasis.DEFAULT), lpPlan = base.lpPlan.copy(lbTreeSearch = true))
