@@ -23,21 +23,22 @@ import com.eignex.klause.util.Cancellation
  * (Meyer), so such a direction scales to one whose integer steps are integral and the objective takes
  * every value below the witness's.
  *
- * Only the affirmative direction is a proof. `false` says no more than that this witness's own branch
- * carries no such direction: a factor outside the linear shapes, an interrupted exact run, and a bounded
- * branch of an unbounded model all answer it, and the descent goes on either way.
+ * Three-valued, because a refusal and an undecided run justify different things: `false` says this
+ * witness's own branch carries no such direction, which a bounded branch of an unbounded model answers
+ * too, and `null` says the question was not reached at all — a factor outside the linear shapes, or an
+ * exact run the stop cut short. The descent goes on under either.
  */
 internal fun Problem.objectiveUnboundedBelow(
     terms: IntArray,
     coefficients: LongArray,
     witness: ExactWitness,
     cancellation: Cancellation = Cancellation.Never,
-): Boolean {
+): Boolean? {
     // A constant objective has no direction to descend along, and one whose every column is bounded on
     // its own descent side is already bounded below by the declared box — the cheap half of the question,
     // answered before a cone system over every row of the model is built.
     if (terms.isEmpty() || descentSidesClosed(terms, coefficients)) return false
-    val rows = branchRowsAt(witness) ?: return false
+    val rows = branchRowsAt(witness) ?: return null
     val activity = HashMap<Int, BigFraction>()
     for (index in terms.indices) activity.add(numRealVars + terms[index], BigFraction.ofLong(coefficients[index]))
     return exactDescendingDirection(
@@ -45,7 +46,23 @@ internal fun Problem.objectiveUnboundedBelow(
         exactRow(activity, BigFraction.ZERO),
         numRealVars + numIntVars,
         cancellation,
-    ) == true
+    )
+}
+
+/**
+ * Whether every witness of this model lies in the same branch, so [objectiveUnboundedBelow] reads one
+ * polyhedron whichever witness it is handed.
+ *
+ * A witness enters the certificate to pick a disjunct, to say which side of a conditional row holds, and
+ * to direct a disequality. A model stating none of those states one cone, and a cone a completed run
+ * found no descending direction in carries none on any later round either — which is what lets a descent
+ * ask the question once instead of rebuilding an exact cone system per improvement.
+ */
+internal fun Problem.statesOneBranch(): Boolean = factors.all { factor ->
+    if (movesNoRay(factor)) return@all true
+    if (factor is ComparisonClause) return@all false
+    val row = factor.linearRow() ?: return@all false
+    row.activator == FactorRow.ALWAYS && row.op != LinearOp.NE
 }
 
 /** Whether every column the objective descends along is bounded on that side. */

@@ -18,7 +18,8 @@ import kotlin.math.floor
  * variables, float columns become LP-only continuous variables the simplex resolves). An open integer
  * model is routed to a complete supported theory pipeline or rejected at load.
  * Emits an `o <cost>` line per improving incumbent, then a final `s SATISFIABLE` / `s OPTIMUM FOUND` /
- * `s UNSATISFIABLE` / `s UNKNOWN` and a `v name=value` line. `-s` statistics are `c` comment lines.
+ * `s UNBOUNDED` / `s UNSATISFIABLE` / `s UNKNOWN` and a `v name=value` line. `-s` statistics are `c`
+ * comment lines.
  */
 internal object MpsMode : CliMode {
     override val names = listOf("mps")
