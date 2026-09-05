@@ -50,7 +50,9 @@ import kotlin.test.Test
  * PathTree) skip the move-set oracle. Factors whose default ±1 IntSet proposer
  * is incomplete by design (e.g. Linear with a far-away bound) run the oracle with
  * `requireImprovement = false` so spurious non-improving proposals don't fail the test —
- * the propose-cover assertion still fires.
+ * the propose-cover assertion still fires. A fixture its own root fold entails passes
+ * `repairs = false`: the search branches on the folded domains, so no draw over them reaches a
+ * violating state, and the repair oracle rejects a run that asserted nothing.
  */
 class AllFactorsOracleTest {
 
@@ -189,7 +191,15 @@ class AllFactorsOracleTest {
         // always 2 ⟹ n ≥ 2. Exercises the greedy independent-set lower bound (sound-only;
         // nvalue is not GAC).
         val f = NValue(n = 0, xs = intArrayOf(1, 2), mode = NValue.Mode.AtMost)
-        check(f, intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 1), IntDomain(2, 3)), exactProbe = true)
+        // That same lower bound is what the root fold folds into n, which entails AtMost: no assignment
+        // over the folded domains violates the factor, so the repair oracle has nothing here to drive.
+        // `nvalue eq` covers NValue's proposer.
+        check(
+            f,
+            intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 1), IntDomain(2, 3)),
+            exactProbe = true,
+            repairs = false,
+        )
     }
 
     @Test fun `global cardinality passes the GAC propagation and repair oracles`() {
@@ -504,6 +514,7 @@ class AllFactorsOracleTest {
         exactProbe: Boolean = false,
         gac: Boolean = false,
         softCap: Int? = null,
+        repairs: Boolean = true,
     ) {
         val name = label ?: factor::class.simpleName ?: "factor"
         val problem = Problem(
@@ -520,7 +531,9 @@ class AllFactorsOracleTest {
         } else {
             FactorPropagationOracle.assertSound(problem, name)
         }
-        MoveSetOracle.assertRepairsCoverImproving(problem, name, iters = 40, requireImprovement = false)
+        if (repairs) {
+            MoveSetOracle.assertRepairsCoverImproving(problem, name, iters = 40, requireImprovement = false)
+        }
         MoveSetOracle.assertStructuredMovesPreserveFeasibility(problem, name, iters = 40)
         DegreeConsistencyOracle.assertConsistent(problem, name, exactProbe = exactProbe, softCap = softCap)
     }

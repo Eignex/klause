@@ -65,7 +65,7 @@ class LocalSearchStateBreakCacheTest {
             if (pickInt) {
                 val v = rng.nextInt(numInt)
                 val d = state.rootDomains[v]
-                val target = d.min + rng.nextInt(d.values.size)
+                val target = d.values.valueAt(rng.nextInt(d.values.size))
                 state.apply(Move.IntSet(v, target))
                 assertCacheConsistent(state, "after IntSet($v=$target) at step=$step")
             } else {

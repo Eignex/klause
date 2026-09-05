@@ -42,11 +42,13 @@ object MoveSetOracle {
         val rng = Random(seed)
         val baked = problem.bake()
 
+        var violatedDraws = 0
         repeat(iters) { iter ->
             val state = LocalSearchState(baked, Random(seed + iter))
             randomizeAssignment(state, problem, rng)
             state.recompute()
             if (!state.factors[0].isViolated(state, 0)) return@repeat
+            violatedDraws++
 
             val improvingNeighbors = bruteImproving(state, factor)
             val sink = MoveSink()
@@ -76,6 +78,14 @@ object MoveSetOracle {
                 )
             }
         }
+        // Draws come from the root-propagated domains, which is what the search branches on. A factor its
+        // own root fold entails has no violating state left to reach, so every iteration would bail at the
+        // guard above and the oracle would report green having asserted nothing.
+        assertTrue(
+            violatedDraws > 0,
+            "$label: no draw left the factor violated, so this oracle asserted nothing. Widen the fixture, " +
+                "or send a factor its root fold entails through the propagation oracle alone.",
+        )
     }
 
     /**

@@ -68,6 +68,7 @@ class LpHarvestTest {
             // Every assignment feasible under the original constraints must still lie inside the
             // harvested domains — the harvest may only remove proven-infeasible values.
             val point = IntArray(n)
+            val harvestedDomains = harvested.finiteIntDomains()
             fun feasible(): Boolean = factors.filterIsInstance<Linear>().all { f ->
                 var s = 0L
                 for (i in f.vars.indices) s += checkNotNull(f.integerConstants).coeffs[i] * point[f.vars[i]]
@@ -80,7 +81,6 @@ class LpHarvestTest {
             fun rec(idx: Int) {
                 if (idx == n) {
                     if (feasible()) {
-                        val harvestedDomains = harvested.finiteIntDomains()
                         for (v in 0 until n) {
                             assertTrue(
                                 point[v].toLong() in harvestedDomains[v],
