@@ -30,10 +30,11 @@ internal fun safeObjectiveLowerBound(model: LpModel, y: DoubleArray): Double? {
     // so the integer path is unchanged.
     val m = model.m
     val n = model.n
+    val dual = repairedDual(model, y)
     var bound = 0.0
     var sumMag = 0.0 // magnitudes feeding the final summation, for its rounding-error term
     for (i in 0 until m) {
-        val yi = y[i]
+        val yi = dual[i]
         if (!yi.isFinite()) return null
         val t = yi * model.rhsD(i)
         bound += t
@@ -44,14 +45,14 @@ internal fun safeObjectiveLowerBound(model: LpModel, y: DoubleArray): Double? {
         var colMag = 0.0
         var terms = 1
         if (j >= n) {
-            atj = y[j - n]
+            atj = dual[j - n]
             colMag = abs(atj)
         } else {
             var acc = 0.0
             var mag = 0.0
             var t = terms
             model.forEachInColumnD(j) { i, a ->
-                val term = y[i] * a
+                val term = dual[i] * a
                 acc += term
                 mag += abs(term)
                 t++
@@ -76,6 +77,39 @@ internal fun safeObjectiveLowerBound(model: LpModel, y: DoubleArray): Double? {
     // Re-add the lower-bound-shift constant the relaxation folded out (exact; matches DualSimplex).
     val safe = bound - sumErr + model.objConstantD
     return if (safe.isFinite()) safe else null
+}
+
+/**
+ * [y] with each row multiplier moved to where its own slack's reduced cost is zero, for the rows where
+ * it had gone the other way; [y] itself when none had.
+ *
+ * The Lagrangian below is valid for **any** [y], so a multiplier is free to be moved — and moving one is
+ * worth far more than the alternative. A slack column carries no upper bound, so `min d_j·z_j` over its
+ * box is `−∞` the moment `d_j` is negative, and the whole bound is lost. What sends it negative is not a
+ * dual worth respecting: an approximate `y` leaves a multiplier whose exact value is zero sitting at
+ * `−1e-12`, while the rounding term this function charges covers only the arithmetic of *forming* the
+ * reduced cost — for a slack, a single subtraction, so around `1e-28`. Discarding the bound over that
+ * loses every bound on a model whose columns are all open, which is exactly where bounds are wanted.
+ *
+ * The repair is not a tolerance: the moved multiplier is used for the whole bound, so what comes back is
+ * the true Lagrangian of a different, equally valid `y`. A multiplier that was genuinely wrong rather
+ * than merely noisy is moved just the same, and only costs the bound some tightness.
+ *
+ * A structural column with no finite upper cannot be repaired this way — its reduced cost reads every
+ * multiplier at once — so one left negative still abandons the bound.
+ */
+private fun repairedDual(model: LpModel, y: DoubleArray): DoubleArray {
+    var repaired: DoubleArray? = null
+    for (i in 0 until model.m) {
+        val slack = model.n + i
+        if (model.hasFiniteUpper(slack)) continue
+        // A slack column is the unit column e_i, so its reduced cost is `c_slack − y_i`.
+        val cost = model.costD(slack)
+        if (cost - y[i] >= 0.0) continue
+        val fix = repaired ?: y.copyOf().also { repaired = it }
+        fix[i] = cost
+    }
+    return repaired ?: y
 }
 
 /** Conservative per-operation relative rounding bound (`> 2⁻⁵³` unit roundoff), with margin. */
