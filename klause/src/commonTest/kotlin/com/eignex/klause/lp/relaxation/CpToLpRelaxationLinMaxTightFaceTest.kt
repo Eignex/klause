@@ -79,4 +79,37 @@ class CpToLpRelaxationLinMaxTightFaceTest {
         // Sound: the relaxation contains result = 1, so LP min ≤ 1.
         assertTrue(sol.objectiveValue <= 1.0 + eps, "UNSOUND: LP min ${sol.objectiveValue} above integer optimum 1")
     }
+
+    /** `result = max(x1, x2)` with the sides [openHi] marks as ones the finite lane invented. */
+    private fun maxProblem(openHi: BooleanArray): Problem = Problem(
+        numBoolVars = 0,
+        numIntVars = 3,
+        intDomains = arrayOf(IntDomain(0, 100), IntDomain(1, 5), IntDomain(2, 7)),
+        factors = arrayOf<Factor>(ArrayMinMax(result = 0, xs = intArrayOf(1, 2), max = true)),
+        openIntHi = openHi,
+    )
+
+    @Test
+    fun `an operand the model leaves open loses only its own big-M row`() {
+        // Each M spans the result's root box and the operand's, so an invented endpoint on either makes
+        // the row a search restriction. x2's selector stays in Σ z = 1 — dropping it would force the
+        // extremum onto x1, which the factor never says.
+        val obj = LinearObjective(intCoefficients = longArrayOf(-1L, 0L, 0L))
+        val closed = CpToLpRelaxation(maxProblem(BooleanArray(3)), obj, linMaxTightFace = true)
+            .build(PropagationSession(maxProblem(BooleanArray(3))))
+        val open = maxProblem(booleanArrayOf(false, false, true))
+        val opened = CpToLpRelaxation(open, obj, linMaxTightFace = true).build(PropagationSession(open))
+        assertEquals(closed.model.m - 1, opened.model.m, "one big-M row declined")
+        assertEquals(closed.model.n, opened.model.n, "both selectors stay in the one-hot row")
+    }
+
+    @Test
+    fun `a result the model leaves open drops the whole tight face`() {
+        val obj = LinearObjective(intCoefficients = longArrayOf(-1L, 0L, 0L))
+        val open = maxProblem(booleanArrayOf(true, false, false))
+        val withFace = CpToLpRelaxation(open, obj, linMaxTightFace = true).build(PropagationSession(open))
+        val envelope = CpToLpRelaxation(open, obj, linMaxTightFace = false).build(PropagationSession(open))
+        assertEquals(envelope.model.m, withFace.model.m, "no M bounds the gap, so no face row holds")
+        assertEquals(envelope.model.n, withFace.model.n, "and no selector column is allocated")
+    }
 }

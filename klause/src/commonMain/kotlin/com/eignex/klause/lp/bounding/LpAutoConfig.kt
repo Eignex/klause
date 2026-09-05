@@ -20,9 +20,9 @@ import com.eignex.klause.factor.table.Element
 import com.eignex.klause.factor.table.Mdd
 import com.eignex.klause.factor.table.Regular
 import com.eignex.klause.factor.table.Table
-import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.HullFamily
+import com.eignex.klause.lp.RootBoxes
 import com.eignex.klause.lp.bound.CumulativeEnergeticBound
 import com.eignex.klause.lp.estimateLpHull
 import com.eignex.klause.lp.lpHullFamily
@@ -31,7 +31,6 @@ import com.eignex.klause.lp.relaxation.CumulativeRelaxation
 import com.eignex.klause.lp.relaxation.candidateArcCount
 import com.eignex.klause.lp.relaxation.schedulingViews
 import com.eignex.klause.lp.rootDomainOf
-import com.eignex.klause.lp.rootDomainsOf
 import com.eignex.klause.lp.statesBothBounds
 
 /**
@@ -392,11 +391,11 @@ object LpAutoConfig {
         // Materialized on the family's first factor and shared from there: the whole-table reading copies,
         // so taking it per factor would cost O(factors · columns) on a model this family is wide over, and
         // taking it up front would cost the copy on every model carrying no such factor at all.
-        var rootDomains: Array<IntDomain>? = null
+        var rootBoxes: RootBoxes? = null
         for (f in problem.factors) {
             if (f.lpHullFamily() != family) continue
-            val domains = rootDomains ?: problem.rootDomainsOf().also { rootDomains = it }
-            val e = f.estimateLpHull(domains) ?: continue
+            val boxes = rootBoxes ?: RootBoxes(problem).also { rootBoxes = it }
+            val e = f.estimateLpHull(boxes) ?: continue
             cols += e.cols
             rows += e.rows
             any = true

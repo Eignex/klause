@@ -69,4 +69,37 @@ class CpToLpRelaxationProductTest {
         val without = build(p, obj, mcCormick = false)
         assertTrue(withMc.model.m >= without.model.m + 4, "McCormick adds four envelope rows")
     }
+
+    @Test
+    fun `an operand side the model leaves open drops the envelopes that lean on it`() {
+        // `a` is open above, so `aH` is the finite lane's invention: the two envelopes built on it would
+        // refute products the model admits. The two over `aL` are unaffected.
+        val p = Problem(
+            numBoolVars = 0,
+            numIntVars = 3,
+            intDomains = arrayOf(IntDomain(1, 3), IntDomain(2, 4), IntDomain(-100, 100)),
+            factors = arrayOf<Factor>(Product(a = 0, b = 1, result = 2)),
+            openIntHi = booleanArrayOf(true, false, false),
+        )
+        val obj = LinearObjective(intCoefficients = longArrayOf(0L, 0L, 1L))
+        val withMc = build(p, obj, mcCormick = true)
+        val without = build(p, obj, mcCormick = false)
+        assertEquals(without.model.m + 2, withMc.model.m, "only the envelopes over stated endpoints survive")
+    }
+
+    @Test
+    fun `a square open on both sides emits no envelope at all`() {
+        val p = Problem(
+            numBoolVars = 0,
+            numIntVars = 2,
+            intDomains = arrayOf(IntDomain(1, 4), IntDomain(-100, 100)),
+            factors = arrayOf<Factor>(Product(a = 0, b = 0, result = 1)),
+            openIntLo = booleanArrayOf(true, false),
+            openIntHi = booleanArrayOf(true, false),
+        )
+        val obj = LinearObjective(intCoefficients = longArrayOf(0L, 1L))
+        val withMc = CpToLpRelaxation(p, obj, productMcCormick = true).build(PropagationSession(p))
+        val without = CpToLpRelaxation(p, obj, productMcCormick = false).build(PropagationSession(p))
+        assertEquals(without.model.m, withMc.model.m, "no endpoint is the model's own, so no secant holds")
+    }
 }

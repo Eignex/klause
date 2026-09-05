@@ -7,7 +7,7 @@ import com.eignex.klause.util.LongArrayList
 
 /**
  * Time-indexed `x_{i,t}` relaxation of one scheduling [view] over the bounded horizon
- * `[T0, T1)`. For each task a binary `x_{i,t} ∈ [0,1]` per declared-feasible start `t`
+ * `[T0, T1)`. For each task a binary `x_{i,t} ∈ [0,1]` per root-feasible start `t`
  * (pinned to 0 when `t` left the live start domain — layout stable across nodes for warm
  * starts), with `Σ_t x_{i,t} = 1` (starts once), the start channel `Σ_t t·x_{i,t} = startᵢ`
  * (ties to the integer column), and per-time-point resource rows
@@ -17,6 +17,12 @@ import com.eignex.klause.util.LongArrayList
  * [CpToLpRelaxation.MAX_TI_HORIZON] and [CpToLpRelaxation.MAX_TI_COLS]; above either the model is
  * skipped (only loosens). Column and row emission order is warm-start load-bearing — the layout
  * must be reproducible across nodes, so nothing here may reorder by live state.
+ *
+ * ## Open-sided starts
+ * The layout gives each task one column per start in its root box and `Σ_t x_{i,t} = 1` then pins it
+ * there. Over a start side the model left open that box is a search restriction, so the rows would
+ * exclude starts the model admits — such a view is declined, as the circuit arc model declines an
+ * open-sided successor.
  *
  * ## No separate makespan row
  * There is deliberately no disaggregated makespan row here. The makespan links through the
@@ -31,14 +37,15 @@ import com.eignex.klause.util.LongArrayList
  * energetic makespan row, but the disaggregated strengthening would be.
  */
 internal fun RelaxationBuilder.buildCumulativeTimeIndexed(view: SchedulingView) {
+    if (!statesBothBounds(view.starts)) return
     val n = view.starts.size
-    val est = LongArray(n) { declaredDomain(view.starts[it]).min }
-    val lst = LongArray(n) { declaredDomain(view.starts[it]).max }
+    val est = LongArray(n) { rootDomain(view.starts[it]).min }
+    val lst = LongArray(n) { rootDomain(view.starts[it]).max }
     var t0 = Long.MAX_VALUE
     var t1 = Long.MIN_VALUE
     var cols = 0L
     for (i in 0 until n) {
-        if (lst[i] < est[i]) return // empty declared start domain — leave to propagation
+        if (lst[i] < est[i]) return // empty root start box — leave to propagation
         if (est[i] < t0) t0 = est[i]
         val end = lst[i] + view.durations[i]
         if (end > t1) t1 = end

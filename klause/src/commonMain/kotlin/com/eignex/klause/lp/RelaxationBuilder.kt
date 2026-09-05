@@ -97,8 +97,40 @@ interface RelaxationBuilder {
     /** The live (node-current) domain of integer variable [intVar]. */
     fun liveDomain(intVar: Int): IntDomain
 
-    /** The declared (root) domain of integer variable [intVar]. */
-    fun declaredDomain(intVar: Int): IntDomain
+    /**
+     * The root box integer variable [intVar] takes — the root-propagation fold, or the model's own
+     * declaration before it has run.
+     *
+     * A box, not a statement of the model: a side the source left open was closed by an invented
+     * endpoint so the finite lane has something to branch on. A projection that enumerates this box, or
+     * bakes one of its endpoints into a coefficient, must first ask [statesLowerBound] /
+     * [statesUpperBound] whether that side is the model's own.
+     */
+    fun rootDomain(intVar: Int): IntDomain
+
+    /**
+     * Whether the model itself bounds integer variable [intVar] below.
+     *
+     * A side closed by an invented box bounds the search and not the model, so a row whose constants
+     * lean on that endpoint holds inside the box only, and a hull that enumerates the box restricts a
+     * range the model never excluded — at the root the column enters the LP genuinely open, and such a
+     * row would cut off feasible points outright.
+     *
+     * The question is whether the side is stated at all, not whether [rootDomain] sits exactly on it:
+     * the root fold and presolve narrow the box below the stated bound by proof, and a bound proved over
+     * the model is as much the model's as one it declared.
+     */
+    fun statesLowerBound(intVar: Int): Boolean
+
+    /** Whether the model itself bounds integer variable [intVar] above; see [statesLowerBound]. */
+    fun statesUpperBound(intVar: Int): Boolean
+
+    /** Whether both of [intVar]'s root endpoints are the model's own — the reading a projection that
+     *  enumerates the box, or leans on either endpoint, has to make; see [statesLowerBound]. */
+    fun statesBothBounds(intVar: Int): Boolean = statesLowerBound(intVar) && statesUpperBound(intVar)
+
+    /** Whether every member of [intVars] states both of its endpoints; see [statesBothBounds]. */
+    fun statesBothBounds(intVars: IntArray): Boolean = intVars.all { statesBothBounds(it) }
 
     /**
      * Emit `Σ coeffs(k) · columns(k) ⟨op⟩ rhs` over column handles obtained from [intColumn],

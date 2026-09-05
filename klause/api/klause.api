@@ -4507,7 +4507,6 @@ public abstract interface class com/eignex/klause/lp/RelaxationBuilder {
 	public abstract fun boolColumn (I)I
 	public abstract fun boolRow ([I[JLcom/eignex/klause/ir/LinearOp;JLcom/eignex/klause/lp/Contribution;)V
 	public static synthetic fun boolRow$default (Lcom/eignex/klause/lp/RelaxationBuilder;[I[JLcom/eignex/klause/ir/LinearOp;JLcom/eignex/klause/lp/Contribution;ILjava/lang/Object;)V
-	public abstract fun declaredDomain (I)Lcom/eignex/klause/ir/IntDomain;
 	public abstract fun hullEnabled ()Z
 	public abstract fun intColumn (I)I
 	public abstract fun linearRow (Lcom/eignex/klause/ir/LinearOp;[I[JJLcom/eignex/klause/lp/Contribution;)V
@@ -4517,8 +4516,13 @@ public abstract interface class com/eignex/klause/lp/RelaxationBuilder {
 	public fun realColumn (I)I
 	public fun realRow ([I[DLcom/eignex/klause/ir/LinearOp;DZ[I)V
 	public static synthetic fun realRow$default (Lcom/eignex/klause/lp/RelaxationBuilder;[I[DLcom/eignex/klause/ir/LinearOp;DZ[IILjava/lang/Object;)V
+	public abstract fun rootDomain (I)Lcom/eignex/klause/ir/IntDomain;
 	public abstract fun row ([I[JLcom/eignex/klause/ir/LinearOp;JLcom/eignex/klause/lp/Contribution;)V
 	public static synthetic fun row$default (Lcom/eignex/klause/lp/RelaxationBuilder;[I[JLcom/eignex/klause/ir/LinearOp;JLcom/eignex/klause/lp/Contribution;ILjava/lang/Object;)V
+	public fun statesBothBounds (I)Z
+	public fun statesBothBounds ([I)Z
+	public abstract fun statesLowerBound (I)Z
+	public abstract fun statesUpperBound (I)Z
 }
 
 public final class com/eignex/klause/lp/RelaxationBuilder$DefaultImpls {
@@ -4530,6 +4534,8 @@ public final class com/eignex/klause/lp/RelaxationBuilder$DefaultImpls {
 	public static fun realRow (Lcom/eignex/klause/lp/RelaxationBuilder;[I[DLcom/eignex/klause/ir/LinearOp;DZ[I)V
 	public static synthetic fun realRow$default (Lcom/eignex/klause/lp/RelaxationBuilder;[I[DLcom/eignex/klause/ir/LinearOp;DZ[IILjava/lang/Object;)V
 	public static synthetic fun row$default (Lcom/eignex/klause/lp/RelaxationBuilder;[I[JLcom/eignex/klause/ir/LinearOp;JLcom/eignex/klause/lp/Contribution;ILjava/lang/Object;)V
+	public static fun statesBothBounds (Lcom/eignex/klause/lp/RelaxationBuilder;I)Z
+	public static fun statesBothBounds (Lcom/eignex/klause/lp/RelaxationBuilder;[I)Z
 }
 
 public final class com/eignex/klause/lp/bounding/LpAutoConfig {

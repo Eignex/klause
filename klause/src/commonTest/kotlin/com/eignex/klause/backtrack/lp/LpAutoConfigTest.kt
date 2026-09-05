@@ -414,6 +414,28 @@ class LpAutoConfigTest {
     }
 
     @Test
+    fun `a hull the build declines over an open side is not enabled`() {
+        // The estimate has to decline exactly where the build declines, or the plan turns on a family
+        // whose rows never arrive and the size budget is spent on nothing.
+        val tuples = longArrayOf(0, 0, 1, 1)
+        val closed = Problem(
+            0,
+            2,
+            Array(2) { IntDomain(0, 5) },
+            arrayOf<Factor>(Table(xs = intArrayOf(0, 1), tuples = tuples)),
+        )
+        val open = Problem(
+            0,
+            2,
+            Array(2) { IntDomain(0, 5) },
+            arrayOf<Factor>(Table(xs = intArrayOf(0, 1), tuples = tuples)),
+            openIntHi = booleanArrayOf(false, true),
+        )
+        assertTrue(LpAutoConfig.recommend(closed).table, "a closed table gets its hull")
+        assertFalse(LpAutoConfig.recommend(open).table, "an open-sided column gets none")
+    }
+
+    @Test
     fun `pseudo-boolean enables cover cuts`() {
         val pb = PseudoBoolean(longArrayOf(2, 3), intArrayOf(Lit.make(0, true), Lit.make(1, true)), PbOp.LE, 4L)
         val r = LpAutoConfig.recommend(Problem(2, 0, emptyArray(), arrayOf<Factor>(pb)))

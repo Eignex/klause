@@ -14,8 +14,13 @@ class WideLinearLpTest {
 
     private class WideRow(val cols: List<Int>, val coeffs: List<Double>, val op: LinearOp, val rhs: Double)
 
-    /** Records the double rows a wide [Linear] emits, and hands back the declared domain per variable. */
-    private class RecordingBuilder(private val declared: Map<Int, IntDomain>) : RelaxationBuilder {
+    /** Records the double rows a wide [Linear] emits over the root boxes in [boxes]; a variable in
+     *  [openLo] / [openHi] has that endpoint marked as one the model does not state. */
+    private class RecordingBuilder(
+        private val boxes: Map<Int, IntDomain>,
+        private val openLo: Set<Int> = emptySet(),
+        private val openHi: Set<Int> = emptySet(),
+    ) : RelaxationBuilder {
         val realRows = mutableListOf<WideRow>()
 
         // Aux columns get fresh ids above the int-var range; their bounds are recorded by id.
@@ -23,7 +28,9 @@ class WideLinearLpTest {
         val auxBounds = mutableMapOf<Int, Pair<Long, Long>>()
 
         override fun intColumn(intVar: Int): Int = intVar
-        override fun declaredDomain(intVar: Int): IntDomain = declared.getValue(intVar)
+        override fun rootDomain(intVar: Int): IntDomain = boxes.getValue(intVar)
+        override fun statesLowerBound(intVar: Int): Boolean = intVar !in openLo
+        override fun statesUpperBound(intVar: Int): Boolean = intVar !in openHi
         override fun auxColumn(lo: Long, hi: Long, presence: LongArray?): Int {
             val c = nextAux++
             auxBounds[c] = lo to hi
@@ -105,6 +112,35 @@ class WideLinearLpTest {
         assertTrue(BigInteger.tryFromDouble(outer.coeffs[0], exactRequired = false) <= w, "x⁺ coeff rounded down")
         assertTrue(BigInteger.tryFromDouble(-outer.coeffs[1], exactRequired = false) >= w, "x⁻ coeff rounded up")
         assertTrue(BigInteger.tryFromDouble(outer.rhs, exactRequired = false) >= w, "bound rounded up")
+    }
+
+    @Test
+    fun `a wide row over a column the model leaves open emits no row`() {
+        // The split caps the column at its root box, so an invented endpoint restricts the model — and a
+        // column with no stated side of zero has no rounding direction either. An outer relaxation has no
+        // weaker form, so the row stays CP-only.
+        val row = Linear(intArrayOf(0), arrayOf(w), LinearOp.LE, w)
+        listOf(
+            RecordingBuilder(mapOf(0 to IntDomain(-5, 5)), openHi = setOf(0)),
+            RecordingBuilder(mapOf(0 to IntDomain(-5, 5)), openLo = setOf(0)),
+            RecordingBuilder(mapOf(0 to IntDomain(0, 10)), openLo = setOf(0)),
+        ).forEach { b ->
+            row.emitLpRelaxation(b)
+            assertEquals(0, b.realRows.size, "an unstated endpoint leaves the row to propagation")
+            assertTrue(b.auxBounds.isEmpty(), "and allocates no split column")
+        }
+    }
+
+    @Test
+    fun `a column the model bounds below stays unsplit and keeps its rounding direction`() {
+        // Open above but stated non-negative below: the sign is known, so no split is needed and the
+        // coefficient still rounds down on the `≤` side.
+        val row = Linear(intArrayOf(0), arrayOf(w), LinearOp.LE, w)
+        val b = RecordingBuilder(mapOf(0 to IntDomain(0, 10)), openHi = setOf(0))
+        row.emitLpRelaxation(b)
+        assertEquals(1, b.realRows.size)
+        assertTrue(b.auxBounds.isEmpty(), "a sign-known column needs no split")
+        assertTrue(BigInteger.tryFromDouble(b.realRows[0].coeffs[0], exactRequired = false) <= w, "coeff rounded down")
     }
 
     @Test

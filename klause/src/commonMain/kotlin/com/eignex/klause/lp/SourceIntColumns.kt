@@ -67,3 +67,27 @@ internal fun Problem.statesBinary(v: Int): Boolean =
  */
 internal fun Problem.statesLowerBoundAtLeast(v: Int, floor: Long): Boolean =
     statesLowerBound(v) && rootDomainOf(v).min >= floor
+
+/**
+ * The root boxes an LP hull sizes itself over, carrying the reading of which endpoints the model itself
+ * states alongside them.
+ *
+ * A size estimate has to decline exactly where the build declines, or the gate admits a family whose rows
+ * never arrive and the plan is chosen against a relaxation that was never built. The two readings
+ * therefore travel together: [domain] materializes the box a projection would enumerate,
+ * [statesBothBounds] says whether that box is the model's to enumerate.
+ *
+ * The whole-table reading copies, so this is built once for a model and shared across its factors.
+ */
+internal class RootBoxes(private val problem: Problem) {
+    private val domains: Array<IntDomain> = problem.rootDomainsOf()
+
+    /** Root box of integer column [v]; see [rootDomainOf]. */
+    fun domain(v: Int): IntDomain = domains[v]
+
+    /** Whether both of column [v]'s root endpoints are the model's own; see [statesBothBounds]. */
+    fun statesBothBounds(v: Int): Boolean = problem.statesBothBounds(v)
+
+    /** Whether every member of [vars] states both of its endpoints; see [statesBothBounds]. */
+    fun statesBothBounds(vars: IntArray): Boolean = problem.statesBothBounds(vars)
+}

@@ -66,4 +66,37 @@ class CpToLpRelaxationVarElementTest {
             assertEquals(expected, sol.objectiveValue, eps, "idx=$position: LP min is arr[$position]'s minimum")
         }
     }
+
+    /** `result = arr[idx]` over two variable entries, with the sides [openHi] marks as invented. */
+    private fun openProblem(openHi: BooleanArray): Problem = Problem(
+        numBoolVars = 0,
+        numIntVars = 4,
+        intDomains = arrayOf(IntDomain(0, 1), IntDomain(0, 50), IntDomain(4, 10), IntDomain(2, 8)),
+        factors = arrayOf<Factor>(
+            Element(idx = 0, result = 1, arr = longArrayOf(2, 3), arrIsVars = true, indexOffset = 0),
+        ),
+        openIntHi = openHi,
+    )
+
+    @Test
+    fun `an array entry the model leaves open loses only its own big-M pair`() {
+        // Each M spans the result's root box and the entry's, so an invented endpoint on either makes the
+        // pair a search restriction. The selectors and the index channel are untouched.
+        val obj = LinearObjective(intCoefficients = longArrayOf(0L, 1L, 0L, 0L))
+        val closed = openProblem(BooleanArray(4))
+        val open = openProblem(booleanArrayOf(false, false, false, true))
+        val closedRows = CpToLpRelaxation(closed, obj, elementHull = true).build(PropagationSession(closed)).model.m
+        val openRows = CpToLpRelaxation(open, obj, elementHull = true).build(PropagationSession(open)).model.m
+        assertEquals(closedRows - 2, openRows, "the open entry's two big-M rows are declined")
+    }
+
+    @Test
+    fun `a result the model leaves open drops every big-M row`() {
+        val obj = LinearObjective(intCoefficients = longArrayOf(0L, 1L, 0L, 0L))
+        val closed = openProblem(BooleanArray(4))
+        val open = openProblem(booleanArrayOf(false, true, false, false))
+        val closedRows = CpToLpRelaxation(closed, obj, elementHull = true).build(PropagationSession(closed)).model.m
+        val openRows = CpToLpRelaxation(open, obj, elementHull = true).build(PropagationSession(open)).model.m
+        assertEquals(closedRows - 4, openRows, "no M bounds the gap, so only Σ y = 1 and the index channel stay")
+    }
 }

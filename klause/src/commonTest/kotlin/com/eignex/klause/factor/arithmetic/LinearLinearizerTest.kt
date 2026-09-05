@@ -47,7 +47,9 @@ class LinearLinearizerTest {
         override fun boolColumn(boolVar: Int): Int = error("unused")
         override fun auxColumn(lo: Long, hi: Long, presence: LongArray?): Int = error("unused")
         override fun liveDomain(intVar: Int): IntDomain = error("unused")
-        override fun declaredDomain(intVar: Int): IntDomain = error("unused")
+        override fun rootDomain(intVar: Int): IntDomain = error("unused")
+        override fun statesLowerBound(intVar: Int): Boolean = true
+        override fun statesUpperBound(intVar: Int): Boolean = true
         override fun row(columns: IntArray, coeffs: LongArray, op: LinearOp, rhs: Long, contribution: Contribution) =
             error("unused")
 

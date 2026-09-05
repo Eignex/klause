@@ -38,6 +38,8 @@ import com.eignex.klause.lp.lpHullEnabled
 import com.eignex.klause.lp.rootDomainOf
 import com.eignex.klause.lp.statesBinary
 import com.eignex.klause.lp.statesBothBounds
+import com.eignex.klause.lp.statesLowerBound
+import com.eignex.klause.lp.statesUpperBound
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
@@ -223,7 +225,7 @@ internal fun LpRelaxation.rebound(session: PropagationSession): LpRelaxation {
 /**
  * The per-variable bounds the relaxation reads to size its columns: an integer variable's live domain
  * and a Boolean variable's pin (null when free). A [PropagationSession] is one source (its live search
- * state); [RootDomains] is another (the problem's declared domains, read without running the bake
+ * state); [RootDomains] is another (the problem's root boxes, read without running the bake
  * fixpoint) so a root relaxation can be built in O(model) rather than O(domain span).
  */
 internal interface RelaxationDomains {
@@ -242,9 +244,9 @@ internal interface RelaxationDomains {
     val honorsOpenSides: Boolean get() = false
 }
 
-/** [RelaxationDomains] over a `Problem`'s declared domains: every integer variable at its full domain
- *  and every Boolean free. Reads endpoints only, so building a relaxation from it never triggers the
- *  O(domain span) bake fixpoint a [PropagationSession] runs on construction. */
+/** [RelaxationDomains] over a `Problem`'s root boxes: every integer variable at its full box and every
+ *  Boolean free. Reads endpoints only, so building a relaxation from it never triggers the O(domain
+ *  span) bake fixpoint a [PropagationSession] runs on construction. */
 internal class RootDomains(private val problem: Problem) : RelaxationDomains {
     override fun intDomain(varId: Int): IntDomain = problem.rootDomainOf(varId)
     override fun boolValue(varId: Int): Boolean? = null
@@ -370,7 +372,7 @@ internal class CpToLpRelaxation(
      *  the diagram's accepting paths, so a cost-MDD's cost var gets an exact lower bound. Gated. */
     private val mddHull: Boolean = false,
     /** When true, linearize each count-variable [GlobalCardinality] with a one-hot selector model so
-     *  the count variables get an LP bound: per `xs[i]` a one-hot over its declared domain, and per
+     *  the count variables get an LP bound: per `xs[i]` a one-hot over its root box, and per
      *  cover value `Σ_i z_{i,cover} = counts(k)` — exact, so a count in the objective reads a true
      *  bound. Adds O(Σ|domain|) columns, so it is gated. */
     private val gccCountHull: Boolean = false,
@@ -533,7 +535,7 @@ internal class CpToLpRelaxation(
      * The **gated** residual relaxation ([LpRelaxation.gatedRows]), or null when the model does not
      * qualify: only a pure-real [realResidual] build is node-invariant enough (an integer column's
      * live lower bound would fold a changing constant into the double rhs, breaking the rhs-only
-     * rebind). Built from the declared domains — every reified row is emitted regardless of pins, so
+     * rebind). Built from the root boxes — every reified row is emitted regardless of pins, so
      * the result is independent of any session. This is the float filter's persistent model; exact
      * certificates keep running on the per-node pin-consulting [build], whose magnitudes rationalize.
      */
@@ -621,11 +623,11 @@ internal class CpToLpRelaxation(
 
         /**
          * Arc-indicator relaxation of one [Circuit] over `succ[0..n)`: a column `y_ij ∈ [0,1]` per
-         * candidate arc (`j` in the declared domain of `succ[i]`, `j ≠ i` — circuit forbids self
+         * candidate arc (`j` in the root box of `succ[i]`, `j ≠ i` — circuit forbids self
          * loops), pinned to 0 when `j` left the live domain. Rows: out-degree `Σ_j y_ij = 1`,
          * in-degree `Σ_i y_ij = 1`, and channelling `Σ_j j·y_ij = succ[i]` tying arcs to the integer
          * column. Integer solutions are then permutations; [CircuitSeparator] removes the subtours.
-         * The column *layout* uses the declared domain so it is identical across nodes (warm-start
+         * The column *layout* uses the root box so it is identical across nodes (warm-start
          * safe). A circuit whose candidate-arc count exceeds [MAX_CIRCUIT_ARCS] is skipped (the LP
          * column count would dominate); gating on arc count rather than n lets large sparse graphs
          * through. Arcs are recorded sparsely for the [CircuitSeparator] — no O(n²) matrix.
@@ -655,7 +657,7 @@ internal class CpToLpRelaxation(
             if (!problem.statesBothBounds(succ)) return
             // Gate on the candidate-arc total — the LP column count — not on n, so large sparse
             // graphs (small per-node successor domains) are not skipped by a blunt node cap.
-            val arcCount = candidateArcCount(succ, selfLoops, MAX_CIRCUIT_ARCS, ::declaredDomain)
+            val arcCount = candidateArcCount(succ, selfLoops, MAX_CIRCUIT_ARCS, ::rootDomain)
             if (arcCount == 0 || arcCount > MAX_CIRCUIT_ARCS) return
             val tails = IntArrayList()
             val heads = IntArrayList()
@@ -667,7 +669,7 @@ internal class CpToLpRelaxation(
                 val outCols = IntArrayList()
                 val chanCols = IntArrayList()
                 val chanCoef = IntArrayList()
-                eachCandidateArcHead(declaredDomain(succ[i]), i, n, selfLoops) { jn ->
+                eachCandidateArcHead(rootDomain(succ[i]), i, n, selfLoops) { jn ->
                     val present = live.contains(jn.toLong())
                     // The arc is present exactly while head j stays in succ[i]'s live domain — the single
                     // membership that lets the persistent relaxation re-bind this column.
@@ -888,13 +890,7 @@ internal class CpToLpRelaxation(
                 }
                 cumulativeRelaxation?.let { cumulativeRows(it) }
                 if (cumulativeTimeIndexed) {
-                    // The time-indexed layout gives each task one column per start in its root box and
-                    // then pins it there with `Σ_t x = 1`. Over a start side the model left open that box
-                    // is a search restriction, so those rows would exclude starts the model admits —
-                    // decline the view, as the arc model does (see [buildArcModel]).
-                    for (view in schedulingViews(problem)) {
-                        if (problem.statesBothBounds(view.starts)) buildCumulativeTimeIndexed(view)
-                    }
+                    for (view in schedulingViews(problem)) buildCumulativeTimeIndexed(view)
                 }
             }
 
@@ -1123,7 +1119,11 @@ internal class CpToLpRelaxation(
 
         override fun liveBool(boolVar: Int): Boolean? = domains.boolValue(boolVar)
 
-        override fun declaredDomain(intVar: Int): IntDomain = problem.rootDomainOf(intVar)
+        override fun rootDomain(intVar: Int): IntDomain = problem.rootDomainOf(intVar)
+
+        override fun statesLowerBound(intVar: Int): Boolean = problem.statesLowerBound(intVar)
+
+        override fun statesUpperBound(intVar: Int): Boolean = problem.statesUpperBound(intVar)
 
         override fun row(columns: IntArray, coeffs: LongArray, op: LinearOp, rhs: Long, contribution: Contribution) {
             if (skipRow(contribution)) return
@@ -1187,7 +1187,7 @@ internal class CpToLpRelaxation(
                 if (c == 0L) continue
                 val v = colVarId[col]
                 val dom = domains.intDomain(v)
-                val dec = declaredDomain(v)
+                val dec = rootDomain(v)
                 if ((c >= 0L) == maxSide) {
                     if (dom.max != dec.max) {
                         pv.add(v)

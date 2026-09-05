@@ -11,11 +11,16 @@ import com.eignex.klause.util.LongArrayList
  * Layered flow hull — the exact convex hull of the diagram's accepting paths. An arc variable
  * `y ∈ [0,1]` represents each forward-reachable transition. Source, conservation, acceptance,
  * value-channel, and optional cost-channel rows describe the path polytope. Large arc sets are skipped.
+ *
+ * The layer expansion screens each layer's values through its root box and the flow rows then confine the
+ * column to the arcs built, so over a side the model leaves open an invented endpoint would refute paths
+ * the diagram accepts — declined there.
  */
 @Suppress("CyclomaticComplexMethod", "NestedBlockDepth", "LongMethod")
 internal fun Mdd.emitLpRelaxation(builder: RelaxationBuilder) {
     if (!builder.hullEnabled()) return
-    val reach = forwardReach(builder::declaredDomain)?.states ?: return
+    if (!builder.statesBothBounds(seq)) return
+    val reach = forwardReach(builder::rootDomain)?.states ?: return
     val n = seq.size
     val stride = recordStride
     val trans = transitions
@@ -30,7 +35,7 @@ internal fun Mdd.emitLpRelaxation(builder: RelaxationBuilder) {
     val costArcs = IntArrayList()
     val costWeight = LongArrayList()
     for (layer in 0 until n) {
-        val declared = builder.declaredDomain(seq[layer])
+        val box = builder.rootDomain(seq[layer])
         val live = builder.liveDomain(seq[layer])
         var p = starts[layer]
         val end = starts[layer + 1]
@@ -38,7 +43,7 @@ internal fun Mdd.emitLpRelaxation(builder: RelaxationBuilder) {
             val src = trans[p].toInt()
             val value = trans[p + 1]
             val dst = trans[p + 2].toInt()
-            if (src in reach[layer] && value in declared) {
+            if (src in reach[layer] && value in box) {
                 val col = builder.auxColumn(
                     0L,
                     if (live.contains(value)) 1L else 0L,
@@ -110,8 +115,9 @@ internal fun Mdd.emitLpRelaxation(builder: RelaxationBuilder) {
     }
 }
 
-internal fun Mdd.estimateLpHull(domains: Array<IntDomain>): LpSizeEstimate? {
-    val reach = forwardReach { domains[it] } ?: return null
+internal fun Mdd.estimateLpHull(boxes: RootBoxes): LpSizeEstimate? {
+    if (!boxes.statesBothBounds(seq)) return null
+    val reach = forwardReach(boxes::domain) ?: return null
     return LpSizeEstimate(cols = reach.arcCount, rows = reach.arcCount + seq.size + 3L)
 }
 

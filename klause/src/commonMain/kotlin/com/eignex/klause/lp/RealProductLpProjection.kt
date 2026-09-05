@@ -3,10 +3,20 @@ package com.eignex.klause.lp
 import com.eignex.klause.factor.arithmetic.RealProduct
 import com.eignex.klause.ir.LinearOp
 
+/**
+ * McCormick envelope of `result = intOperand · realOperand` over the integer operand's live bounds and
+ * the real operand's declared ones.
+ *
+ * Every row here bakes an endpoint of the integer operand, so both of its sides have to be the model's
+ * own: over a side the model leaves open the live box is the finite lane's invention, the column enters
+ * the root LP genuinely open, and the envelope would cut off products the model admits. The real
+ * operand is declined the same way, by its own infinite bounds.
+ */
 internal fun RealProduct.emitLpRelaxation(builder: RelaxationBuilder) {
     val resCol = builder.realColumn(result)
     val opCol = builder.realColumn(realOperand)
     if (resCol < 0 || opCol < 0) return // builder has no real-column backing (e.g. a presolve fake)
+    if (!builder.statesBothBounds(intOperand)) return
     val dom = builder.liveDomain(intOperand)
     val lo = dom.min
     val hi = dom.max
