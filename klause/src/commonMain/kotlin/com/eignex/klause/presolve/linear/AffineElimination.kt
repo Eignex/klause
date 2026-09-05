@@ -77,6 +77,10 @@ internal object AffineSingletons {
         if (problem.factors.size > maxFactors) return PassDelta()
         val eliminated = BooleanArray(problem.numIntVars)
         val subs = ArrayList<AffineSub>()
+        // One copy of the root domains for the whole pass: the candidate scans read it and the residue loop
+        // below narrows it in place, so taking it per scan would allocate O(numIntVars) on every barren
+        // re-run — the path the incremental scan exists to keep at O(delta).
+        val domains = problem.rootIntDomains()
         // Before any fold the working set is byte-for-byte the pristine input, so the first candidate scan
         // can read the session's shared occurrence index directly (its CSR is in stable-id order). If no
         // candidate exists there, the pass is fruitless and returns without ever building the mutable
@@ -94,18 +98,12 @@ internal object AffineSingletons {
                     eliminated,
                     objVars,
                     capWide,
-                    problem.rootIntDomains(),
+                    domains,
                     cancellation,
                 )
             } else {
                 findAffineCandidate(seed, 0, eliminated, objVars, capWide, cancellation) != null ||
-                    findResidueCandidate(
-                        seed,
-                        eliminated,
-                        objVars,
-                        problem.rootIntDomains(),
-                        cancellation,
-                    ) != null
+                    findResidueCandidate(seed, eliminated, objVars, domains, cancellation) != null
             }
             if (!hasCandidate) return PassDelta()
         }
@@ -144,7 +142,6 @@ internal object AffineSingletons {
         // integer. Restrict `y` to those values (a domain modification, not a folded factor) and
         // reconstruct `x` with the divisor. Runs after the unit-pivot loop, so a residue partner `y`
         // is always a surviving variable.
-        val domains = problem.rootIntDomains()
         while (!cancellation()) {
             val r = findResidueCandidate(ws, eliminated, objVars, domains, cancellation) ?: break
             ws.drop(r.defIdx)

@@ -18,7 +18,7 @@ internal object StructuralReduction {
     fun reduce(problem: BakedProblem): PassDelta {
         val dropped = IntArrayList()
         val added = ArrayList<Factor>()
-        val root = problem.rootIntDomains()
+        val root = problem.rootIntDomainsInPlace
         var domains: Array<IntDomain>? = null
         problem.factors.forEachIndexed { i, f ->
             when (val reduction = f.structuralReduce(root)) {

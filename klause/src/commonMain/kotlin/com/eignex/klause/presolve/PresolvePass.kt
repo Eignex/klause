@@ -155,7 +155,7 @@ enum class PresolvePass(
         override fun applyFinite(problem: BakedProblem, ctx: PresolveContext) =
             RedundantConstraints.removeRedundantConstraints(
                 problem,
-                problem.rootIntDomains(),
+                problem.rootIntDomainsInPlace,
                 ctx.subsumeIncremental as? SubsumeIncremental,
                 ctx.cancellation,
             )
@@ -273,7 +273,7 @@ enum class PresolvePass(
     },
 
     /** Construction-time failed-literal SAC: folded into `Problem.baked` at build, read via
-     *  [PresolveConfig.resolved] — a [Stage.CONSTRUCTION] pass with no engine [apply]. */
+     *  [PresolveConfig.resolved] — a [Stage.CONSTRUCTION] pass the round engine never runs. */
     PROBE_FAILED_LITERALS(
         "probe-failed-literals",
         Stage.CONSTRUCTION,
@@ -398,8 +398,8 @@ enum class PresolvePass(
 
     /** LP-relaxation harvest: fold the LP's proven domain tightenings, redundant-row removals, root
      *  infeasibility and implied equalities into the problem. Run outside this enum's round engine (it
-     *  needs the backtrack-layer LP engine, which `solver/presolve` may not depend on), so it has no
-     *  engine [apply] and the work lives in the CLI's presolve↔harvest fixpoint, gated on this entry.
+     *  needs the backtrack-layer LP engine, which `solver/presolve` may not depend on), so the round engine
+     *  never runs it and the work lives in the CLI's presolve↔harvest fixpoint, gated on this entry.
      *  `EXHAUSTIVE` (it does an LP solve per shave/redundancy probe), so the aggressive level turns it on.
      *  The harvest itself then self-limits on the *built relaxation's* size (cols/rows/nnz): on a large
      *  relaxation, where the per-candidate cost would lose instances the search would otherwise solve, it
@@ -449,13 +449,14 @@ enum class PresolvePass(
      * and [Stage.EXTERNAL] (LP harvest) passes are eligibility markers whose work runs elsewhere, so
      * calling this on one is a programming error.
      */
-    internal open fun applyFinite(problem: BakedProblem, ctx: PresolveContext): PassDelta = when (capability) {
-        Capability.SOURCE -> applySource(problem, ctx).asPassDelta()
-
-        Capability.FINITE -> error(
-            "PresolvePass.applyFinite is defined only for Stage.PROBLEM passes; " +
-                "$name is a $stage pass",
+    internal open fun applyFinite(problem: BakedProblem, ctx: PresolveContext): PassDelta = when {
+        stage != Stage.PROBLEM -> error(
+            "PresolvePass.applyFinite is defined only for Stage.PROBLEM passes; $name is a $stage pass",
         )
+
+        capability == Capability.SOURCE -> applySource(problem, ctx).asPassDelta()
+
+        else -> error("$name is a Stage.PROBLEM pass needing $capability but defines no finite form")
     }
 
     /** Where a pass runs. */

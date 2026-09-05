@@ -96,6 +96,15 @@ class BakedProblem internal constructor(
      */
     fun rootIntDomains(): Array<IntDomain> = foldedIntDomains.copyOf()
 
+    /**
+     * The array the fold writes into, for a consumer that reads it within one call and keeps nothing.
+     *
+     * A model can declare millions of integer columns, so a per-firing presolve pass that only indexes the
+     * domains must not pay [rootIntDomains]' copy. Writing through this rewrites what every other consumer
+     * reads; a consumer that narrows or retains the array takes the copy.
+     */
+    internal val rootIntDomainsInPlace: Array<IntDomain> get() = foldedIntDomains
+
     internal constructor(
         numBoolVars: Int,
         numIntVars: Int,

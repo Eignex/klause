@@ -88,9 +88,10 @@ internal object PresolveRoundEngine {
             if (infeasible) break
             if (!ranAny) break
             round++
-            val reduced = roundStartComplexity - host.complexity()
+            val roundEndComplexity = host.complexity()
+            val reduced = roundStartComplexity - roundEndComplexity
             if (reduced > 0 && reduced.toDouble() < PRESOLVE_ABORT_FRACTION * roundStartComplexity) break
-            roundStartComplexity = host.complexity()
+            roundStartComplexity = roundEndComplexity
         }
         return Result(fired.toList(), infeasible)
     }

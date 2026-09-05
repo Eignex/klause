@@ -73,3 +73,15 @@ class PassDelta(
     /** Whether the pass left factors and domains unchanged. */
     val isEmpty: Boolean get() = droppedIndices.isEmpty() && addedFactors.isEmpty() && domains == null
 }
+
+/**
+ * This change as the source lane's delta, for a transform whose one implementation serves both lanes.
+ *
+ * The `require` is the boundary the narrower type states: a transform offered to the source lane may
+ * rewrite factors and refute, and nothing else — a domain or a sample lift arriving here would be
+ * dropped on the floor rather than rejected.
+ */
+internal fun PassDelta.asSourceDelta(): SourceDelta {
+    require(domains == null && reconstruct == null) { "source presolve may only rewrite factors" }
+    return SourceDelta(droppedIndices, addedFactors, infeasible)
+}
