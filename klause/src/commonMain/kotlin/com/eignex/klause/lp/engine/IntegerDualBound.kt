@@ -240,6 +240,9 @@ private fun repairedMultipliers(model: LpModel, mult: LongArray, scale: Long): L
     return repaired ?: mult
 }
 
+/** Which route produced a Farkas certificate, for a caller measuring where the chain earns its keep. */
+internal enum class FarkasRoute { RECONSTRUCTED, EXACT_BASIS, ROUNDED, NONE }
+
 /**
  * Exact Farkas infeasibility certificate as an **integer** ray. [ray] is the float `ρ = B⁻ᵀeᵣ` the
  * dual-unbounded termination
@@ -249,32 +252,65 @@ private fun repairedMultipliers(model: LpModel, mult: LongArray, scale: Long): L
  * float-misled ray simply fails the check and the node is kept — the prune is sound regardless. Null
  * when neither sign certifies, the rounding fails, or a 128-bit term overflows.
  */
+
 internal fun integerFarkasRay(
     model: LpModel,
     ray: DoubleArray,
     scaleBits: Int = DEFAULT_SCALE_BITS,
     basis: Basis? = null,
     basisRow: Int = -1,
+    onRoute: ((FarkasRoute) -> Unit)? = null,
 ): LongArray? {
     if (model.hasContinuous) {
         // A real model is certified over its scaled-integer rationalization (the existing 128-bit Farkas);
         // scaling by a positive 2ᵏ preserves feasibility, so an infeasibility proof carries back exactly.
         val integral = rationalizeToIntegerModel(model, outwardRealUppers = true)?.model ?: return null
-        return integerFarkasRay(integral, ray, scaleBits, basis, basisRow)
+        return integerFarkasRay(integral, ray, scaleBits, basis, basisRow, onRoute)
     }
-    // The exact basis solve first: it is the only source that annihilates the open columns exactly, which
-    // a model with an unbounded variable requires of any certificate (see [exactFarkasRay]).
-    if (basis != null) {
-        exactFarkasRay(model, basis, basisRow)?.let { exact ->
-            if (farkasCertifies(model, exact)) return exact
-            val negExact = LongArray(exact.size) { if (exact[it] == Long.MIN_VALUE) return@let else -exact[it] }
-            if (farkasCertifies(model, negExact)) return negExact
+    // Reconstruction first: the ray's entries are ratios of minors of B, so they are small rationals, and
+    // recovering them exactly annihilates the open columns the same way a basis solve does — without the
+    // basis, and with no bound on the dimension. See [reconstructIntegerVector].
+    reconstructIntegerVector(ray)?.let { exact ->
+        if (farkasCertifies(model, exact)) {
+            onRoute?.invoke(FarkasRoute.RECONSTRUCTED)
+            return exact
+        }
+        val negated = LongArray(exact.size) { if (exact[it] == Long.MIN_VALUE) return@let else -exact[it] }
+        if (farkasCertifies(model, negated)) {
+            onRoute?.invoke(FarkasRoute.RECONSTRUCTED)
+            return negated
         }
     }
-    val rd = roundDuals(model, ray, scaleBits) ?: return null
-    if (farkasCertifies(model, rd.mult)) return rd.mult
+    // The exact basis solve next: it annihilates the open columns exactly too, but is capped at
+    // [MAX_EXACT_BASIS] rows (see [exactFarkasRay]).
+    if (basis != null) {
+        exactFarkasRay(model, basis, basisRow)?.let { exact ->
+            if (farkasCertifies(model, exact)) {
+                onRoute?.invoke(FarkasRoute.EXACT_BASIS)
+                return exact
+            }
+            val negExact = LongArray(exact.size) { if (exact[it] == Long.MIN_VALUE) return@let else -exact[it] }
+            if (farkasCertifies(model, negExact)) {
+                onRoute?.invoke(FarkasRoute.EXACT_BASIS)
+                return negExact
+            }
+        }
+    }
+    val rd = roundDuals(model, ray, scaleBits) ?: run {
+        onRoute?.invoke(FarkasRoute.NONE)
+        return null
+    }
+    if (farkasCertifies(model, rd.mult)) {
+        onRoute?.invoke(FarkasRoute.ROUNDED)
+        return rd.mult
+    }
     val neg = LongArray(rd.mult.size) { -rd.mult[it] }
-    return if (farkasCertifies(model, neg)) neg else null
+    if (farkasCertifies(model, neg)) {
+        onRoute?.invoke(FarkasRoute.ROUNDED)
+        return neg
+    }
+    onRoute?.invoke(FarkasRoute.NONE)
+    return null
 }
 
 /** Whether integer ray [rho] is a Farkas infeasibility certificate: `ρ·rhs > Σⱼ max(0, ρ·Aⱼ)·uⱼ`,

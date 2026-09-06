@@ -5,6 +5,7 @@ import com.eignex.klause.lp.cut.CutPool
 import com.eignex.klause.lp.cut.CutSeparator
 import com.eignex.klause.lp.engine.Basis
 import com.eignex.klause.lp.engine.Cut
+import com.eignex.klause.lp.engine.FarkasRoute
 import com.eignex.klause.lp.engine.FloatLpResult
 import com.eignex.klause.lp.engine.IntegerCertificate
 import com.eignex.klause.lp.engine.LpModel
@@ -315,7 +316,14 @@ internal fun LpEngine.sparseSafePrune(
             val gatedRay = filter.simplex.infeasibleRay
             if (gatedRay != null) {
                 for (i in 0 until gatedModel.m) if (!filter.enforced[i]) gatedRay[i] = 0.0
-                val ray = integerFarkasRay(gatedModel, gatedRay)
+                val ray = integerFarkasRay(gatedModel, gatedRay, onRoute = {
+                    sink.lp.observeFarkasRoute(
+                        it == FarkasRoute.RECONSTRUCTED,
+                        it == FarkasRoute.EXACT_BASIS,
+                        it == FarkasRoute.ROUNDED,
+                        it == FarkasRoute.NONE,
+                    )
+                })
                 if (ray != null) {
                     sink.lp.observeInfeasiblePrune()
                     val clause = if (learn) {
@@ -372,7 +380,18 @@ internal fun LpEngine.sparseSafePrune(
         // confirm it with an exact Farkas certificate before pruning (the float ray alone is not sound).
         // Any other failure (non-convergence / singular) keeps the node.
         val floatRay = simplex.infeasibleRay
-        val ray = if (floatRay != null) integerFarkasRay(model, floatRay) else null
+        val ray = if (floatRay != null) {
+            integerFarkasRay(model, floatRay, onRoute = {
+                sink.lp.observeFarkasRoute(
+                    it == FarkasRoute.RECONSTRUCTED,
+                    it == FarkasRoute.EXACT_BASIS,
+                    it == FarkasRoute.ROUNDED,
+                    it == FarkasRoute.NONE,
+                )
+            })
+        } else {
+            null
+        }
         if (ray != null) {
             sink.lp.observeInfeasiblePrune()
             // With learning, the Farkas ray becomes a bound-atom nogood for a 1UIP backjump;
@@ -463,7 +482,16 @@ internal fun LpEngine.sparseSafePrune(
     // reduced-cost fixing. Compute it once when any of them needs it; a singular/unbounded certify
     // yields null and each falls back to its cheap certificate-less path, which is sound.
     val cert = if ((learn && canPropagate) || canPrune) {
-        integerCertify(boundRel.model, boundRes.duals)
+        integerCertify(boundRel.model, boundRes.duals).also {
+            // The node path is where certification actually happens; the certified wrapper is not on it.
+            sink.lp.observeCertification(
+                certified = it != null,
+                continuousDecline = it == null && boundRel.model.hasContinuous,
+                numericDecline = it == null && !boundRel.model.hasContinuous,
+                rationalFallback = false,
+                rows = boundRel.model.m,
+            )
+        }
     } else {
         null
     }

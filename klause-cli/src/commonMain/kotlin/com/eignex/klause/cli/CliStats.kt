@@ -56,6 +56,31 @@ internal fun lpStatPairs(stats: SolveStats): List<Pair<String, String>> {
     if (stats.lp.smallPivotBails.sum > 0.0) {
         out += "lpSmallPivotBails" to "${stats.lp.smallPivotBails.sum.toLong()}"
     }
+    // The decline rate: certified against the two causes it can fail for. Printed whenever any
+    // certification happened, since a zero decline count is as informative as a nonzero one here.
+    val certifyAttempts = stats.lp.certified.sum + stats.lp.certifyDeclinedContinuous.sum +
+        stats.lp.certifyDeclinedNumeric.sum
+    if (certifyAttempts > 0.0) {
+        out += "lpCertified" to "${stats.lp.certified.sum.toLong()}"
+        out += "lpCertifyDeclinedContinuous" to "${stats.lp.certifyDeclinedContinuous.sum.toLong()}"
+        out += "lpCertifyDeclinedNumeric" to "${stats.lp.certifyDeclinedNumeric.sum.toLong()}"
+        out += "lpCertifyRate" to round4(stats.lp.certified.sum / certifyAttempts)
+        if (stats.lp.certifyMaxRows.max.isFinite()) {
+            out += "lpCertifyMaxRows" to "${stats.lp.certifyMaxRows.max.toLong()}"
+        }
+    }
+    val farkas = stats.lp.farkasReconstructed.sum + stats.lp.farkasExactBasis.sum +
+        stats.lp.farkasRounded.sum + stats.lp.farkasNone.sum
+    if (farkas > 0.0) {
+        out += "lpFarkasAttempts" to "${farkas.toLong()}"
+        out += "lpFarkasReconstructed" to "${stats.lp.farkasReconstructed.sum.toLong()}"
+        out += "lpFarkasExactBasis" to "${stats.lp.farkasExactBasis.sum.toLong()}"
+        out += "lpFarkasRounded" to "${stats.lp.farkasRounded.sum.toLong()}"
+        out += "lpFarkasNone" to "${stats.lp.farkasNone.sum.toLong()}"
+    }
+    if (stats.lp.rationalFallbacks.sum > 0.0) {
+        out += "lpRationalFallbacks" to "${stats.lp.rationalFallbacks.sum.toLong()}"
+    }
     if (stats.lp.rootMatrixMinValue.isFinite()) {
         // Full precision, not [round4]: a coefficient below 1e-4 is exactly the one worth seeing, and
         // rounding it reports the badly scaled matrix as a zero.
