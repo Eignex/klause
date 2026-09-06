@@ -8,10 +8,11 @@ Run `./gradlew check lintDocs`.
 
 - check runs tests and some light checks.
 - lintDocs runs detekt and dokka linting.
-- For new/edited files add `--rerun-tasks`, detekt caches per source-set and skips them otherwise.
-- A full `--rerun-tasks` gate runs 30–45 minutes, nearly all `:klause:linuxX64Test`. Batch every edit
-  and gate once at the end — work that arrives in pieces otherwise buys a gate per piece, and no edit
-  can overlap a running gate.
+- Do NOT add `--rerun-tasks`. detekt re-analyses new and edited files on its own; the flag only
+  forces the whole graph to redo work the cache already has.
+- An idle-box gate is ~4 minutes, over half of it detekt. Batch every edit and gate once at the end
+  — work that arrives in pieces otherwise buys a gate per piece, and no edit can overlap a running
+  gate.
 - detekt and dokka run on alpha analysis engines. Two crash shapes look alike and are not:
   - **It names one of your files.** `No receiver found in qualified expression`, or an offsets error
     like `Range [0, 27) out of bounds for length 4`, means the file changed under the analysis. Usually
