@@ -23,6 +23,7 @@ import com.eignex.klause.solver.result.UnsatCore
 import com.eignex.klause.solver.result.projectSeedConflictToAssumptions
 import com.eignex.klause.solver.search.BooleanBranching
 import com.eignex.klause.solver.search.ComponentCheck
+import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchBrancher
 import com.eignex.klause.solver.search.SearchComponent
 import com.eignex.klause.solver.search.SearchComponentSet
@@ -133,6 +134,9 @@ private class CpSatisfactionTraversal(
         val components = ArrayList<SearchComponent>()
         components += cp
         completion.addTo(components)
+        // Only an arm that asked for the relaxation pays for it; the engine itself then declines on a
+        // model with no LP-emittable structure.
+        if (params.lpConfig != null) components += LpFeasibilityComponent(problem, cp, params)
         components += params.componentFactory?.invoke().orEmpty()
         val session = SearchComponentSet(components, branchers = listOf(traversal.brancher)).session(
             cancellation = params.cancellation,
@@ -401,6 +405,47 @@ private sealed interface BacktrackCompletion {
     companion object {
         fun of(problem: Problem, cp: CpSearchComponent, params: BacktrackParams): BacktrackCompletion =
             if (problem.numRealVars == 0) Discrete else ResidualReal(ResidualRealComponent(problem, cp, params))
+    }
+}
+
+/**
+ * The LP relaxation as a satisfaction-path participant: refute a node whose relaxation is infeasible.
+ *
+ * The optimize path reaches the relaxation through [ResumableMinimize], which owns an [LpEngine] to bound
+ * against an incumbent. A satisfaction search has no incumbent and no objective to bound, but that is not
+ * the only thing a relaxation decides — an infeasible one refutes its node whatever the objective is, and
+ * on real models that is where most of the pruning comes from. Without this component the relaxation is
+ * unreachable on a model with no objective, however the arm is configured.
+ *
+ * The engine is handed a zero objective, so the bound arms it also carries can never prune: the
+ * lower bound of a zero objective is zero and the bound to beat is infinite. Only the infeasibility
+ * prune fires, which is what a satisfaction node can act on.
+ */
+private class LpFeasibilityComponent(problem: Problem, private val cp: CpSearchComponent, params: BacktrackParams) :
+    SearchComponent {
+    private val engine = LpEngine(
+        problem,
+        LinearObjective(intCoefficients = LongArray(problem.numIntVars)),
+        LpParams(
+            lpPlan = params.lpPlan,
+            lpConfig = params.lpConfig,
+            cancellation = params.cancellation,
+            solveBudgetMillis = params.solveBudgetMillis,
+            randomSeed = params.randomSeed,
+        ),
+        SolveStatsSink(backend = "backtrack"),
+    )
+
+    override fun propagate(context: SearchContext): ComponentResult {
+        if (context.cancelled()) return ComponentResult.Indeterminate
+        // No incumbent and no objective column: `pruneNode` reports only what the relaxation refutes.
+        val refuted = engine.pruneNode(
+            cp.session,
+            Double.POSITIVE_INFINITY,
+            objectiveVar = -1,
+            objectiveAscending = true,
+        )
+        return if (refuted) ComponentResult.Conflict() else ComponentResult.Consistent
     }
 }
 
