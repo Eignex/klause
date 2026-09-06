@@ -393,10 +393,17 @@ internal object SolverInvocation {
         // binary, bad arguments, a crash — stays loud, since the callers' per-instance runCatching
         // already contains the throw without aborting the sweep.
         if (process.exitValue() != 0 && !anySolution && !unsat) {
-            check(killed.get()) {
+            // The drain runs on its own thread, and what it collected is now read for control flow
+            // rather than only for a message: wait for it, or a refusal races with its own stderr.
+            drain.join(STDERR_DRAIN_WAIT_MS)
+            val refusal = unsupportedModelRefusal(stderr.toString())
+            check(killed.get() || refusal != null) {
                 "${cmd.first()} failed (exit ${process.exitValue()}): ${stderr.toString().take(STDERR_CAP)}"
             }
-            stats["killed"] = "hard-timeout"
+            // A solver that declines a model it parsed decided nothing, which is not the same as
+            // crashing on it: recorded undecided and labelled, so a sweep can tell the two apart
+            // instead of reading every refusal as a failed run.
+            if (refusal != null) stats["unsupported"] = refusal else stats["killed"] = "hard-timeout"
             stats["exit"] = process.exitValue().toString()
         }
         return Result(
@@ -414,6 +421,22 @@ internal object SolverInvocation {
             rawOutput = raw.toString(),
             command = cmd.joinToString(" "),
         )
+    }
+
+    /**
+     * The reason a solver declined a model it had already parsed, or null when the failure is anything
+     * else.
+     *
+     * A frontend that refuses an unsupported-but-well-formed model exits non-zero with one
+     * `klause <format>: <reason>` line and no verdict, which is indistinguishable at the exit code from a
+     * crash. It is not one: nothing went wrong, the model is simply outside what the solver covers, and a
+     * sweep that scores it as a failed run hides both the refusals and the real crashes among them. A
+     * stack trace anywhere in the stream means it *is* a crash, whatever else was printed.
+     */
+    internal fun unsupportedModelRefusal(stderr: String): String? {
+        if (stderr.lineSequence().any { it.trimStart().startsWith("at ") || it.contains("Exception") }) return null
+        val line = stderr.lineSequence().firstOrNull { it.startsWith(REFUSAL_PREFIX) } ?: return null
+        return line.removePrefix(REFUSAL_PREFIX).trim().takeIf { it.isNotEmpty() }
     }
 
     /** Parse a `%%%klause-arm:` body. `label`, `objective` (the exact discrete `Long` channel), and
@@ -464,6 +487,12 @@ internal object SolverInvocation {
     private const val NANOS_PER_MILLI = 1_000_000L
     private const val GRACE_MILLIS = 30_000L
     private const val STDERR_CAP = 2000
+
+    /** How a frontend prefixes a model it declines: `klause mps: ...`, `klause opb: ...`. */
+    private const val REFUSAL_PREFIX = "klause "
+
+    /** How long the exit path waits for the stderr drain before reading what it collected. */
+    private const val STDERR_DRAIN_WAIT_MS = 2_000L
 
     /** Ceiling on the dist's answer to `--version`, so a child that never answers cannot hang a run. */
     private const val PREFLIGHT_TIMEOUT_MS = 30_000L
