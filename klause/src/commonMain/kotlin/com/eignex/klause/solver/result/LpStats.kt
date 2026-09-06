@@ -67,6 +67,27 @@ data class LpStats(
     val componentSplits: SumResult = ZERO_COUNT,
     /** Largest component count any one decomposed solve produced; 0 when none decomposed. */
     val componentBlocks: MaxResult = NO_MAX,
+    /** Certified solves whose exact integer certificate was produced. */
+    val certified: SumResult = ZERO_COUNT,
+    /** Declines because the model carries a real coefficient, which the integer certifier refuses by
+     *  design. Expected, and not a shortfall in the exact layer's reach. */
+    val certifyDeclinedContinuous: SumResult = ZERO_COUNT,
+    /** Declines for an arithmetic reason on an integer model — overflow, an out-of-range multiplier, a
+     *  negative reduced cost on an unbounded column. Each is a certificate the exact layer could in
+     *  principle have had, so this is the number that sizes its reach. */
+    val certifyDeclinedNumeric: SumResult = ZERO_COUNT,
+    /** Solves that reached the rational decider — the slow lane every decline falls into. */
+    val rationalFallbacks: SumResult = ZERO_COUNT,
+    /** Largest row count seen at a certified solve, against which `MAX_EXACT_BASIS` (48) is applied. */
+    val certifyMaxRows: MaxResult = NO_MAX,
+    /** Farkas certificates produced by rational reconstruction of the float ray. */
+    val farkasReconstructed: SumResult = ZERO_COUNT,
+    /** Farkas certificates produced by the exact basis solve (the `MAX_EXACT_BASIS`-capped route). */
+    val farkasExactBasis: SumResult = ZERO_COUNT,
+    /** Farkas certificates produced by rounding the float ray. */
+    val farkasRounded: SumResult = ZERO_COUNT,
+    /** Dual-unbounded terminations no route could certify. */
+    val farkasNone: SumResult = ZERO_COUNT,
     /**
      * Basis factorizations across all node LP solves that came back singular.
      *
@@ -113,6 +134,15 @@ data class LpStats(
         rootMatrixMinValue = naNDeferring(rootMatrixMinValue, o.rootMatrixMinValue, ::minOf),
         rootMatrixMaxValue = naNDeferring(rootMatrixMaxValue, o.rootMatrixMaxValue, ::maxOf),
         rootRowRatio = naNDeferring(rootRowRatio, o.rootRowRatio, ::maxOf),
+        certified = SumResult(certified.sum + o.certified.sum),
+        certifyDeclinedContinuous = SumResult(certifyDeclinedContinuous.sum + o.certifyDeclinedContinuous.sum),
+        certifyDeclinedNumeric = SumResult(certifyDeclinedNumeric.sum + o.certifyDeclinedNumeric.sum),
+        rationalFallbacks = SumResult(rationalFallbacks.sum + o.rationalFallbacks.sum),
+        certifyMaxRows = MaxResult(maxOf(certifyMaxRows.max, o.certifyMaxRows.max)),
+        farkasReconstructed = SumResult(farkasReconstructed.sum + o.farkasReconstructed.sum),
+        farkasExactBasis = SumResult(farkasExactBasis.sum + o.farkasExactBasis.sum),
+        farkasRounded = SumResult(farkasRounded.sum + o.farkasRounded.sum),
+        farkasNone = SumResult(farkasNone.sum + o.farkasNone.sum),
     )
 }
 
@@ -131,6 +161,15 @@ internal class LpStatsSink {
     val refactorizations: CountStat = CountStat()
     val componentSplits: CountStat = CountStat()
     val componentBlocks: MaxStat = MaxStat()
+    val certified: CountStat = CountStat()
+    val certifyDeclinedContinuous: CountStat = CountStat()
+    val certifyDeclinedNumeric: CountStat = CountStat()
+    val rationalFallbacks: CountStat = CountStat()
+    val certifyMaxRows: MaxStat = MaxStat()
+    val farkasReconstructed: CountStat = CountStat()
+    val farkasExactBasis: CountStat = CountStat()
+    val farkasRounded: CountStat = CountStat()
+    val farkasNone: CountStat = CountStat()
     val singularRefactorizations: CountStat = CountStat()
     val smallPivotBails: CountStat = CountStat()
 
@@ -258,6 +297,36 @@ internal class LpStatsSink {
         repeat(refactorizations) { this.refactorizations.update(1.0) }
     }
 
+    /**
+     * Record how one certified solve was decided, and where it declined if it did.
+     *
+     * The decline rate sizes the exact layer's reach — a decline is at once a lost prune, a lost clause
+     * and a fall-through to the rational decider — so the two causes are counted apart. A continuous
+     * decline is the certifier refusing a real coefficient by design; only a numeric one is a
+     * certificate that was arithmetically out of reach.
+     */
+    fun observeCertification(
+        certified: Boolean,
+        continuousDecline: Boolean,
+        numericDecline: Boolean,
+        rationalFallback: Boolean,
+        rows: Int,
+    ) {
+        if (certified) this.certified.update(1.0)
+        if (continuousDecline) certifyDeclinedContinuous.update(1.0)
+        if (numericDecline) certifyDeclinedNumeric.update(1.0)
+        if (rationalFallback) rationalFallbacks.update(1.0)
+        if (rows > 0) certifyMaxRows.update(rows.toDouble())
+    }
+
+    /** Which route produced one Farkas certificate, or that none did. */
+    fun observeFarkasRoute(reconstructed: Boolean, exactBasis: Boolean, rounded: Boolean, none: Boolean) {
+        if (reconstructed) farkasReconstructed.update(1.0)
+        if (exactBasis) farkasExactBasis.update(1.0)
+        if (rounded) farkasRounded.update(1.0)
+        if (none) farkasNone.update(1.0)
+    }
+
     /** One certified LP solve that decomposed into [blocks] column components. A monolithic solve
      *  (`blocks == 1`) is not recorded, so [componentSplits] counts only the split ones. */
     fun observeComponentSplit(blocks: Int) {
@@ -290,5 +359,14 @@ internal class LpStatsSink {
         rootMatrixMinValue = rootMatrixMinValue,
         rootMatrixMaxValue = rootMatrixMaxValue,
         rootRowRatio = rootRowRatio,
+        certified = certified.read(),
+        certifyDeclinedContinuous = certifyDeclinedContinuous.read(),
+        certifyDeclinedNumeric = certifyDeclinedNumeric.read(),
+        rationalFallbacks = rationalFallbacks.read(),
+        certifyMaxRows = certifyMaxRows.read(),
+        farkasReconstructed = farkasReconstructed.read(),
+        farkasExactBasis = farkasExactBasis.read(),
+        farkasRounded = farkasRounded.read(),
+        farkasNone = farkasNone.read(),
     )
 }
