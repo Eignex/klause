@@ -116,8 +116,8 @@ fun lpHarvestReporting(
     cancellation: Cancellation = Cancellation.Never,
 ): LpHarvestResult {
     // The token must reach the simplex itself, not just the probe loops below: one primal phase-1 on a
-    // large relaxation runs far past the presolve budget, and [RevisedSimplex] polls only what [LpParams]
-    // carries.
+    // large relaxation runs far past the presolve budget, and the engine polls only the `cancellation`
+    // that `LpParams` hands it — every `LpSolver` entry point defaults to `Cancellation.Never`.
     val engine = LpEngine(
         problem,
         objective,
