@@ -8878,6 +8878,13 @@ public final class com/eignex/klause/solver/pipeline/OpenBranching$Companion {
 	public final fun of (Ljava/lang/String;)Lcom/eignex/klause/solver/pipeline/OpenBranching;
 }
 
+public final class com/eignex/klause/solver/pipeline/OpenPreparation {
+	public final fun getClosedSides ()I
+	public final fun getInfeasible ()Z
+	public final fun getModel ()Lcom/eignex/klause/ir/Problem;
+	public final fun getStats ()Lcom/eignex/klause/solver/result/PresolveStats;
+}
+
 public abstract interface class com/eignex/klause/solver/pipeline/OpenTheoryAssignment {
 	public abstract fun boolValue (I)Z
 	public abstract fun intValue (I)Ljava/lang/String;
@@ -9030,6 +9037,7 @@ public final class com/eignex/klause/solver/pipeline/OpenTheoryPipeline {
 	public static final field INSTANCE Lcom/eignex/klause/solver/pipeline/OpenTheoryPipeline;
 	public final fun execute (Lcom/eignex/klause/solver/pipeline/OpenTheoryRequest;Lcom/eignex/klause/solver/pipeline/TheoryParams;)Lcom/eignex/klause/solver/pipeline/OpenTheoryExecution;
 	public static synthetic fun execute$default (Lcom/eignex/klause/solver/pipeline/OpenTheoryPipeline;Lcom/eignex/klause/solver/pipeline/OpenTheoryRequest;Lcom/eignex/klause/solver/pipeline/TheoryParams;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/OpenTheoryExecution;
+	public final fun prepare (Lcom/eignex/klause/solver/pipeline/OpenTheoryRequest;)Lcom/eignex/klause/solver/pipeline/OpenPreparation;
 }
 
 public final class com/eignex/klause/solver/pipeline/OpenTheoryRequest {

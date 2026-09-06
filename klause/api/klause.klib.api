@@ -10080,6 +10080,17 @@ final class com.eignex.klause.solver.pipeline/LsResolution { // com.eignex.klaus
         final fun <get-pool>(): kotlin.collections/List<kotlin/Function0<com.eignex.klause.localsearch.strategy/LocalSearchRecipe>>? // com.eignex.klause.solver.pipeline/LsResolution.pool.<get-pool>|<get-pool>(){}[0]
 }
 
+final class com.eignex.klause.solver.pipeline/OpenPreparation { // com.eignex.klause.solver.pipeline/OpenPreparation|null[0]
+    final val closedSides // com.eignex.klause.solver.pipeline/OpenPreparation.closedSides|{}closedSides[0]
+        final fun <get-closedSides>(): kotlin/Int // com.eignex.klause.solver.pipeline/OpenPreparation.closedSides.<get-closedSides>|<get-closedSides>(){}[0]
+    final val infeasible // com.eignex.klause.solver.pipeline/OpenPreparation.infeasible|{}infeasible[0]
+        final fun <get-infeasible>(): kotlin/Boolean // com.eignex.klause.solver.pipeline/OpenPreparation.infeasible.<get-infeasible>|<get-infeasible>(){}[0]
+    final val model // com.eignex.klause.solver.pipeline/OpenPreparation.model|{}model[0]
+        final fun <get-model>(): com.eignex.klause.ir/Problem // com.eignex.klause.solver.pipeline/OpenPreparation.model.<get-model>|<get-model>(){}[0]
+    final val stats // com.eignex.klause.solver.pipeline/OpenPreparation.stats|{}stats[0]
+        final fun <get-stats>(): com.eignex.klause.solver.result/PresolveStats? // com.eignex.klause.solver.pipeline/OpenPreparation.stats.<get-stats>|<get-stats>(){}[0]
+}
+
 final class com.eignex.klause.solver.pipeline/OpenTheoryEngine { // com.eignex.klause.solver.pipeline/OpenTheoryEngine|null[0]
     constructor <init>(com.eignex.klause.ir/Problem, com.eignex.klause.solver.pipeline/ProblemPipeline) // com.eignex.klause.solver.pipeline/OpenTheoryEngine.<init>|<init>(com.eignex.klause.ir.Problem;com.eignex.klause.solver.pipeline.ProblemPipeline){}[0]
 
@@ -11565,6 +11576,7 @@ final object com.eignex.klause.solver.pipeline/FinitePipeline { // com.eignex.kl
 
 final object com.eignex.klause.solver.pipeline/OpenTheoryPipeline { // com.eignex.klause.solver.pipeline/OpenTheoryPipeline|null[0]
     final fun execute(com.eignex.klause.solver.pipeline/OpenTheoryRequest, com.eignex.klause.solver.pipeline/TheoryParams = ...): com.eignex.klause.solver.pipeline/OpenTheoryExecution // com.eignex.klause.solver.pipeline/OpenTheoryPipeline.execute|execute(com.eignex.klause.solver.pipeline.OpenTheoryRequest;com.eignex.klause.solver.pipeline.TheoryParams){}[0]
+    final fun prepare(com.eignex.klause.solver.pipeline/OpenTheoryRequest): com.eignex.klause.solver.pipeline/OpenPreparation // com.eignex.klause.solver.pipeline/OpenTheoryPipeline.prepare|prepare(com.eignex.klause.solver.pipeline.OpenTheoryRequest){}[0]
 }
 
 final object com.eignex.klause.util/PermutationGroup { // com.eignex.klause.util/PermutationGroup|null[0]

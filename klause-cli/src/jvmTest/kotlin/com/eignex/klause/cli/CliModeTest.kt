@@ -513,6 +513,26 @@ class CliModeTest {
         assertTrue("presolvePasses=" in out, "expected a presolve summary, got: $out")
     }
 
+    @Test
+    fun `the presolve dry run reports an open model instead of solving it`() {
+        // Neither column is bounded anywhere, so the model takes the open route — which reaches no engine
+        // and so answered the dry run by solving instead.
+        val smt = File.createTempFile("cli", ".smt2").apply {
+            writeText(
+                "(set-logic QF_LIA)\n(declare-const x Int)\n(declare-const y Int)\n" +
+                    "(assert (<= (+ (* 2 x) (* 4 y)) 7))\n(check-sat)\n",
+            )
+            deleteOnExit()
+        }
+
+        var out = ""
+        val err = captureErr { out = capture { runCli(arrayOf("--param", "dry-run-presolve=true", smt.absolutePath)) } }
+
+        assertTrue("presolve dry-run:" in err, "expected the dry-run readout, got: $err")
+        assertTrue("open columns: 2 of 2" in err, "expected the open-column readout, got: $err")
+        assertTrue("sat" !in out, "the dry run must not solve the model, got: $out")
+    }
+
     private fun capture(block: () -> Unit): String {
         val buf = ByteArrayOutputStream()
         val old = System.out

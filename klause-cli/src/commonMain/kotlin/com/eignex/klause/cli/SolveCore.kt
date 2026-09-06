@@ -35,6 +35,7 @@ import com.eignex.klause.util.Cancellation
 import com.ionspin.kotlin.bignum.integer.BigInteger
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.TimeSource
 
 /**
  * The unified, mode-agnostic solve driver. Every CLI mode (MiniZinc, XCSP3, SMT-LIB) feeds a
@@ -98,6 +99,23 @@ internal object SolveCore {
                     cancellation = presolveCancel,
                     budget = presolveBudget,
                 )
+                // The open route reaches no engine below, so the dry run has to be answered here or the
+                // flag is silently ignored on exactly the models whose only reduction is this phase.
+                if (EngineParams(common.engineParams).bool("dry-run-presolve") == true) {
+                    val mark = TimeSource.Monotonic.markNow()
+                    val prepared = OpenTheoryPipeline.prepare(request)
+                    printPresolved(
+                        request.model,
+                        prepared.model,
+                        prepared.stats,
+                        mark.elapsedNow(),
+                        loadElapsedMs = null,
+                        constructionBakeElapsed = Duration.ZERO,
+                    )
+                    errPrintln("  open sides closed: ${prepared.closedSides}")
+                    if (prepared.infeasible) errPrintln("  preparation refuted the model")
+                    return
+                }
                 val objective = request.objective
                 if (objective != null) {
                     output.begin(optimize = true, maximize = request.maximize)
