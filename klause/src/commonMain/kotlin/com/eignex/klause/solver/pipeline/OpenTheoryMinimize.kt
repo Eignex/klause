@@ -8,9 +8,11 @@ import com.eignex.klause.lp.ExactWitness
 import com.eignex.klause.lp.asFraction
 import com.eignex.klause.lp.objectiveUnboundedBelow
 import com.eignex.klause.lp.statesOneBranch
+import com.eignex.klause.presolve.OpenPresolveResult
 import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.presolve.PresolvePipeline
+import com.eignex.klause.presolve.closeOpenBounds
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.incumbent.IncumbentSource
 import com.eignex.klause.solver.incumbent.Publication
@@ -97,8 +99,10 @@ sealed interface OpenTheoryOptimum {
  * Source-safe preparation runs once, on the model without the bound row: the row is the descent's own,
  * and no source pass reads its constant. The route and the ownership plan are then selected once from
  * the prepared model carrying the row, so re-bounding re-reads neither the factors nor the preparation.
- * The opening round drops the row: with no incumbent there is nothing to beat, and stating any bound
- * there would refute a model whose own optimum lies above it.
+ * Closing the open sides runs once with them, over that same row-less model: each round adds a strictly
+ * tighter row, and a row only removes solutions, so a bound proved for the model holds for every round of
+ * the descent. The opening round drops the row: with no incumbent there is nothing to beat, and stating
+ * any bound there would refute a model whose own optimum lies above it.
  */
 class OpenTheoryMinimizer internal constructor(
     model: Problem,
@@ -165,12 +169,13 @@ class OpenTheoryMinimizer internal constructor(
         // what a run refuted here has to report — there is no round behind it to carry one.
         val stats = SolveStatsSink(backend = route.backendName())
         stats.start()
+        val stop = Cancellation { presolveCancellation() || params.cancellation() || params.timeout() }
         val prepared = PresolvePipeline.prepareSource(
             source,
             presolveConfig,
             objective,
             solutionSetSensitive,
-            Cancellation { presolveCancellation() || params.cancellation() || params.timeout() },
+            stop,
             presolveBudget,
         )
         if (prepared.infeasible) {
@@ -178,14 +183,38 @@ class OpenTheoryMinimizer internal constructor(
             stats.stop()
             return OpenTheoryOptimum.Infeasible(stats.snapshot())
         }
+        // Ownership stays selected from the model as prepared, not from the closed one below. Closing a
+        // column does not move a factor between components, but it does change what `componentPlan` reads:
+        // a descent whose every side closed would select the finite route, which no round of it can run.
         val boundedPlan = prepared.planned(prepared.problem.boundedForPlanning()).plan
+        // Close the open sides once for the whole descent. Every round decides this model plus a strictly
+        // tighter objective row, and a row only removes solutions, so a bound proved here holds for every
+        // round below it. Leaving the close to the rounds has each one re-derive the same bounds from the
+        // declared sides, at one LP solve per open side per round.
+        //
+        // Not extra work: the opening round decides the model under no bound at all, so the close it would
+        // have run is this one. A refutation here is over the genuinely open ranges rather than inside an
+        // invented box, so it refutes the model itself — which, with no witness yet, is infeasibility.
+        val base = when (
+            val closed = prepared.problem.closeOpenBounds(
+                Cancellation { stop() || prepared.budget?.remaining() == 0L },
+            )
+        ) {
+            OpenPresolveResult.Refuted -> {
+                stats.presolve = prepared.stats
+                stats.stop()
+                return OpenTheoryOptimum.Infeasible(stats.snapshot())
+            }
+
+            is OpenPresolveResult.Tightened -> closed.spec
+        }
         val state = OpenTheorySolveState(params)
         // One incumbent for the whole descent: every witness a round proves feasible is offered here with
         // the value read off it, and the bound the next round refutes is whatever the offer installed.
         val incumbents = minimizingWitnessExchange()
         // The opening round decides the model itself, so the row leaves plan and spec together until a
         // witness gives it a bound to state.
-        var spec = prepared.problem
+        var spec = base
         var plan = if (terms.isEmpty()) boundedPlan else boundedPlan.withoutAppendedFactor(spec)
         while (true) {
             val result = OpenTheoryEngine(
@@ -215,7 +244,7 @@ class OpenTheoryMinimizer internal constructor(
                                     )
 
                                 else -> {
-                                    spec = prepared.problem.boundedBy(installed.objective - BigInteger.ONE)
+                                    spec = base.boundedBy(installed.objective - BigInteger.ONE)
                                     plan = boundedPlan
                                 }
                             }
