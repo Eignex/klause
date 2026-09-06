@@ -63,6 +63,8 @@ kotlin {
     sourceSets {
         commonMain.dependencies {
             implementation(project(":klause"))
+            // CharSource / Cancellation come straight from the util module.
+            implementation(project(":klause-util"))
             // KMP logger for `-v` progress output (custom stderr writer).
             implementation("co.touchlab:kermit:2.1.0")
             // SolveStats exposes kumulant summary types (SumResult/MaxResult); needed to

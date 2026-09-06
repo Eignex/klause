@@ -27,6 +27,7 @@ kotlin {
 
     sourceSets {
         commonMain.dependencies {
+            api(project(":klause-util"))
             compileOnly("org.jetbrains.kotlinx:kotlinx-serialization-core:1.11.0")
             implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
             api("com.eignex:skema:0.3.0")

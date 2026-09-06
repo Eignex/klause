@@ -23,6 +23,8 @@ tasks.withType<org.jetbrains.dokka.gradle.tasks.DokkaGenerateTask>().configureEa
 
 dependencies {
     implementation(project(":klause"))
+    // Cancellation comes straight from the util module.
+    implementation(project(":klause-util"))
     // SolveStats exposes kumulant summary types (SumResult/MaxResult); needed to read them.
     implementation("com.eignex:kumulant:0.3.3")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-core:1.11.0")
