@@ -186,6 +186,10 @@ object BacktrackCatalog {
     private val cspOrder = listOf(
         BacktrackArm.SatOptimized,
         BacktrackArm.ConflictDriven,
+        // The relaxation refutes a satisfaction node by infeasibility, which needs no objective — the
+        // emphasis is the axis here exactly as it is for the optimize palette.
+        BacktrackArm.LpDefault,
+        BacktrackArm.LpAggressive,
         BacktrackArm.Free,
         BacktrackArm.SelectorSwitch,
         BacktrackArm.DomWdeg,

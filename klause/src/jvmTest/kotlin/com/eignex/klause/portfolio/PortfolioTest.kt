@@ -39,7 +39,7 @@ import kotlin.time.TimeSource
 class PortfolioTest {
 
     @Test
-    fun `cop backtrack palette spreads lp-intensity arms and csp has none`() {
+    fun `both backtrack palettes spread lp-intensity arms`() {
         val cop = BacktrackWorkerConfig.ranked(Kind.COP).map { it.label }
         // The spectrum: AGGRESSIVE, DEFAULT and CONSERVATIVE LP arms plus a best-bound
         // dive arm, hedged by the OFF (no-LP) arms.
@@ -55,8 +55,13 @@ class PortfolioTest {
         // The #117 guard stays at slot 0.
         assertEquals("satOptimized", cop.first())
 
+        // A satisfaction search has no objective to bound, but an infeasible relaxation refutes its node
+        // regardless — so the CSP palette carries the emphases that reach it.
         val csp = BacktrackWorkerConfig.ranked(Kind.CSP).map { it.label }
-        assertTrue(csp.none { it.startsWith("lp-") }, "the LP machinery lives on the minimisation path; CSP skips it")
+        assertTrue("lp-default" in csp && "lp-aggressive" in csp, "CSP palette must reach the LP, got $csp")
+        val cspDefault = BacktrackWorkerConfig.ranked(Kind.CSP).first { it.label == "lp-default" }
+        assertEquals(LpEmphasis.DEFAULT, cspDefault.recipe.build(1L, null).lpConfig?.emphasis)
+        assertEquals("satOptimized", csp.first())
     }
 
     @Test
