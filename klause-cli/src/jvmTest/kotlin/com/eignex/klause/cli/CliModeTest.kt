@@ -494,6 +494,25 @@ class CliModeTest {
         assertTrue("s SATISFIABLE" in out, out)
     }
 
+    @Test
+    fun `an SMT-LIB run reports what presolve did`() {
+        // Coefficients sharing a divisor the bound does not: `strengthen` divides the row through. These
+        // formats carry the open models, where presolve is the only phase that runs before the route is
+        // chosen, so a run that does not report it cannot be measured at all.
+        val smt = File.createTempFile("cli", ".smt2").apply {
+            writeText(
+                "(set-logic QF_LIA)\n(declare-const x Int)\n(declare-const y Int)\n" +
+                    "(assert (>= x 0))\n(assert (>= y 0))\n" +
+                    "(assert (<= (+ (* 2 x) (* 4 y)) 7))\n(check-sat)\n",
+            )
+            deleteOnExit()
+        }
+
+        val out = capture { assertEquals(0, runCli(arrayOf("-s", smt.absolutePath))) }
+
+        assertTrue("presolvePasses=" in out, "expected a presolve summary, got: $out")
+    }
+
     private fun capture(block: () -> Unit): String {
         val buf = ByteArrayOutputStream()
         val old = System.out
