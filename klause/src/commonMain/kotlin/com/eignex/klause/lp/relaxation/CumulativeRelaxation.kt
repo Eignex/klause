@@ -1,12 +1,12 @@
 package com.eignex.klause.lp.relaxation
 
+import com.eignex.klause.bound.CumulativeEnergeticBound
 import com.eignex.klause.factor.arithmetic.ArrayMinMax
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.scheduling.Cumulative
 import com.eignex.klause.factor.scheduling.Diffn
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.lp.bound.CumulativeEnergeticBound
 import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.LpRowPremises
 import com.eignex.klause.lp.rootDomainOf
