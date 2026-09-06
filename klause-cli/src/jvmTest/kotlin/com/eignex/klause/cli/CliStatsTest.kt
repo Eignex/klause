@@ -212,4 +212,65 @@ class CliStatsTest {
         assertEquals("0", m["openHintSteered"])
         assertEquals("20000", m["openHintMoves"])
     }
+
+    @Test
+    fun `numerical trouble is omitted when a run met none`() {
+        val stats = SolveStats(
+            run = RunStats(backend = "backtrack"),
+            lp = LpStats(solves = SumResult(8.0), pivots = SumResult(20.0)),
+        )
+
+        val m = lpStatPairs(stats).toMap()
+
+        assertTrue("lpSingularRefactorizations" !in m)
+        assertTrue("lpSmallPivotBails" !in m)
+    }
+
+    @Test
+    fun `numerical trouble is reported when a run met it`() {
+        val stats = SolveStats(
+            run = RunStats(backend = "backtrack"),
+            lp = LpStats(
+                solves = SumResult(8.0),
+                singularRefactorizations = SumResult(3.0),
+                smallPivotBails = SumResult(2.0),
+            ),
+        )
+
+        val m = lpStatPairs(stats).toMap()
+
+        assertEquals("3", m["lpSingularRefactorizations"])
+        assertEquals("2", m["lpSmallPivotBails"])
+    }
+
+    @Test
+    fun `the root coefficient spread keeps the magnitude of a small coefficient`() {
+        val stats = SolveStats(
+            run = RunStats(backend = "backtrack"),
+            lp = LpStats(
+                solves = SumResult(1.0),
+                rootMatrixMinValue = 1.0e-7,
+                rootMatrixMaxValue = 2.5e6,
+                rootRowRatio = 1.0e9,
+            ),
+        )
+
+        val m = lpStatPairs(stats).toMap()
+
+        assertEquals("1.0E-7", m["lpRootMatrixMin"])
+        assertEquals("2500000.0", m["lpRootMatrixMax"])
+        assertEquals("1.0E9", m["lpRootRowRatio"])
+    }
+
+    @Test
+    fun `the root coefficient spread is omitted when never measured`() {
+        val stats = SolveStats(
+            run = RunStats(backend = "backtrack"),
+            lp = LpStats(solves = SumResult(8.0)),
+        )
+
+        val m = lpStatPairs(stats).toMap()
+
+        assertTrue("lpRootMatrixMin" !in m)
+    }
 }
