@@ -36,7 +36,7 @@ internal class LpHints(numIntVars: Int, numBoolVars: Int) : LpHintSink {
 
     /**
      * Record an LP solution: its fractional primal (per structural column,
-     * `RevisedSimplex.FloatLpResult.primal`) and, from the [duals], the decayed reduced-cost average of
+     * `FloatLpResult.primal`) and, from the [duals], the decayed reduced-cost average of
      * each variable (the reduced cost `dⱼ = cⱼ − yᵀAⱼ`; near-zero for basic columns). Keyed by the
      * relaxation's column→variable map. Purely advisory — drives value ([order]) and variable
      * ([branchScore]) selection, never feasibility or the optimum.
