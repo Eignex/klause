@@ -2488,6 +2488,12 @@ sealed interface com.eignex.klause.solver.pipeline/SourceProblemRoute { // com.e
         final fun hashCode(): kotlin/Int // com.eignex.klause.solver.pipeline/SourceProblemRoute.UnsupportedOpen.hashCode|hashCode(){}[0]
         final fun toString(): kotlin/String // com.eignex.klause.solver.pipeline/SourceProblemRoute.UnsupportedOpen.toString|toString(){}[0]
     }
+
+    final object Refuted : com.eignex.klause.solver.pipeline/SourceProblemRoute { // com.eignex.klause.solver.pipeline/SourceProblemRoute.Refuted|null[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.pipeline/SourceProblemRoute.Refuted.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.eignex.klause.solver.pipeline/SourceProblemRoute.Refuted.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.eignex.klause.solver.pipeline/SourceProblemRoute.Refuted.toString|toString(){}[0]
+    }
 }
 
 sealed interface com.eignex.klause.solver.result/MinimizeResult { // com.eignex.klause.solver.result/MinimizeResult|null[0]

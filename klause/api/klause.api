@@ -9185,6 +9185,13 @@ public final class com/eignex/klause/solver/pipeline/SourceProblemRoute$OpenTheo
 	public fun toString ()Ljava/lang/String;
 }
 
+public final class com/eignex/klause/solver/pipeline/SourceProblemRoute$Refuted : com/eignex/klause/solver/pipeline/SourceProblemRoute {
+	public static final field INSTANCE Lcom/eignex/klause/solver/pipeline/SourceProblemRoute$Refuted;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
 public final class com/eignex/klause/solver/pipeline/SourceProblemRoute$UnsupportedOpen : com/eignex/klause/solver/pipeline/SourceProblemRoute {
 	public fun <init> (Lcom/eignex/klause/solver/pipeline/UnplaceableColumn;)V
 	public final fun component1 ()Lcom/eignex/klause/solver/pipeline/UnplaceableColumn;

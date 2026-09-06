@@ -492,6 +492,25 @@ internal fun openTheorySolvable(
     ),
 )
 
+/**
+ * Build an instance already decided unsatisfiable by routing, so no engine runs.
+ *
+ * Routing refutes over the model's genuinely open ranges rather than inside an invented box, so the
+ * verdict is the model's own. Nothing here narrows to a [Sample]: there is no assignment to render.
+ */
+internal fun refutedSolvable(): Solvable = Solvable(
+    problem = null,
+    optimize = false,
+    maximize = false,
+    lsObjective = null,
+    linearObjective = null,
+    objVarId = null,
+    definitionalSweep = null,
+    render = { error("a refuted model has no assignment to render") },
+    objectiveValue = null,
+    pipeline = SolvablePipeline.Refuted,
+)
+
 /** Per-invocation parsing + loading + output for one front-end. Created fresh per run via
  *  [CliMode.newSession] so mode-specific flag state never leaks between invocations. */
 internal interface ModeSession {

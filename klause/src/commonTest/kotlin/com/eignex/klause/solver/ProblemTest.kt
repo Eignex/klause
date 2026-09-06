@@ -311,6 +311,21 @@ class ProblemTest {
     }
 
     @Test
+    fun `rows that cross over the open ranges refute the model at routing`() {
+        val open = Bits(1).also { it.set(0) }
+        val problem = Problem(
+            numBoolVars = 0,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(0), open, open),
+            factors = arrayOf<Factor>(
+                Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 3),
+                Linear(intArrayOf(-1), intArrayOf(0), LinearOp.LE, -5),
+            ),
+        )
+
+        assertIs<SourceProblemRoute.Refuted>(problem.pipelineRoute())
+    }
+
+    @Test
     fun `a model with one side still open keeps the bound the relaxation proved`() {
         val openUpper = Bits(2).also {
             it.set(0)
