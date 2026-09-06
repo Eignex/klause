@@ -76,6 +76,11 @@ internal abstract class BufferedBestOutput : OutputProtocol {
     final override fun onStatistics(stats: SolveStats, solveTimeMs: Long, solutions: Long) {
         println("$commentPrefix solveTime=${solveTimeMs / 1000.0}")
         println("$commentPrefix solutions=$solutions")
+        // Presolve runs before any engine and gates itself on having done something, so it is reported
+        // whatever backend followed — including none. These protocols carry the open-model formats, where
+        // presolve is the only phase that runs before the route is even chosen, so leaving it unreported
+        // is what makes a source-lane reduction impossible to observe from a run.
+        printStatPairs(commentPrefix, presolveStatPairs(stats))
         // The search block is unconditional counters, so it is worth printing only for an engine that
         // ran; the LP block reports nothing unless the LP did work, so it gates itself and must not sit
         // behind the backend check — a run that records no backend can still have solved relaxations.
