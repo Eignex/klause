@@ -1,0 +1,526 @@
+// Klib ABI Dump
+// Targets: [linuxX64]
+// Rendering settings:
+// - Signature version: 2
+// - Show manifest properties: true
+// - Show declarations: true
+
+// Library unique name: <com.eignex:klause-util>
+abstract fun interface com.eignex.klause.util/Cancellation { // com.eignex.klause.util/Cancellation|null[0]
+    abstract fun isCancelled(): kotlin/Boolean // com.eignex.klause.util/Cancellation.isCancelled|isCancelled(){}[0]
+    open fun and(com.eignex.klause.util/Cancellation): com.eignex.klause.util/Cancellation // com.eignex.klause.util/Cancellation.and|and(com.eignex.klause.util.Cancellation){}[0]
+    open fun deadline(): kotlin.time/ComparableTimeMark? // com.eignex.klause.util/Cancellation.deadline|deadline(){}[0]
+    open fun invoke(): kotlin/Boolean // com.eignex.klause.util/Cancellation.invoke|invoke(){}[0]
+    open fun or(com.eignex.klause.util/Cancellation): com.eignex.klause.util/Cancellation // com.eignex.klause.util/Cancellation.or|or(com.eignex.klause.util.Cancellation){}[0]
+    open fun shorten(kotlin/Double): com.eignex.klause.util/Cancellation // com.eignex.klause.util/Cancellation.shorten|shorten(kotlin.Double){}[0]
+
+    final object Companion { // com.eignex.klause.util/Cancellation.Companion|null[0]
+        final val Never // com.eignex.klause.util/Cancellation.Companion.Never|{}Never[0]
+            final fun <get-Never>(): com.eignex.klause.util/Cancellation // com.eignex.klause.util/Cancellation.Companion.Never.<get-Never>|<get-Never>(){}[0]
+
+        final fun after(kotlin.time/Duration): com.eignex.klause.util/Cancellation // com.eignex.klause.util/Cancellation.Companion.after|after(kotlin.time.Duration){}[0]
+        final fun until(kotlin.time/ComparableTimeMark): com.eignex.klause.util/Cancellation // com.eignex.klause.util/Cancellation.Companion.until|until(kotlin.time.ComparableTimeMark){}[0]
+    }
+}
+
+abstract interface com.eignex.klause.util/CharSource { // com.eignex.klause.util/CharSource|null[0]
+    abstract fun next(): kotlin/String? // com.eignex.klause.util/CharSource.next|next(){}[0]
+}
+
+final class <#A: kotlin/Any?, #B: kotlin/Any?> com.eignex.klause.util/ArmCatalog { // com.eignex.klause.util/ArmCatalog|null[0]
+    constructor <init>(kotlin.collections/List<#A>, kotlin/Function1<#A, kotlin/String>, kotlin/Function1<#A, #B>) // com.eignex.klause.util/ArmCatalog.<init>|<init>(kotlin.collections.List<1:0>;kotlin.Function1<1:0,kotlin.String>;kotlin.Function1<1:0,1:1>){}[0]
+
+    final fun byLabel(kotlin/String): #B // com.eignex.klause.util/ArmCatalog.byLabel|byLabel(kotlin.String){}[0]
+    final fun factories(kotlin.collections/List<#A>): kotlin.collections/List<kotlin/Function0<#B>> // com.eignex.klause.util/ArmCatalog.factories|factories(kotlin.collections.List<1:0>){}[0]
+    final fun fromLabel(kotlin/String): #A // com.eignex.klause.util/ArmCatalog.fromLabel|fromLabel(kotlin.String){}[0]
+    final fun labels(kotlin.collections/List<#A>): kotlin.collections/List<kotlin/String> // com.eignex.klause.util/ArmCatalog.labels|labels(kotlin.collections.List<1:0>){}[0]
+    final fun ranked(kotlin.collections/List<#A>): kotlin.collections/List<#B> // com.eignex.klause.util/ArmCatalog.ranked|ranked(kotlin.collections.List<1:0>){}[0]
+}
+
+final class <#A: kotlin/Any?> com.eignex.klause.util/MutableIntObjectMap { // com.eignex.klause.util/MutableIntObjectMap|null[0]
+    constructor <init>(kotlin/Int = ...) // com.eignex.klause.util/MutableIntObjectMap.<init>|<init>(kotlin.Int){}[0]
+
+    final val keysInternal // com.eignex.klause.util/MutableIntObjectMap.keysInternal|{}keysInternal[0]
+        final fun <get-keysInternal>(): kotlin/IntArray // com.eignex.klause.util/MutableIntObjectMap.keysInternal.<get-keysInternal>|<get-keysInternal>(){}[0]
+    final val usedInternal // com.eignex.klause.util/MutableIntObjectMap.usedInternal|{}usedInternal[0]
+        final fun <get-usedInternal>(): kotlin/BooleanArray // com.eignex.klause.util/MutableIntObjectMap.usedInternal.<get-usedInternal>|<get-usedInternal>(){}[0]
+    final val valuesInternal // com.eignex.klause.util/MutableIntObjectMap.valuesInternal|{}valuesInternal[0]
+        final fun <get-valuesInternal>(): kotlin/Array<kotlin/Any?> // com.eignex.klause.util/MutableIntObjectMap.valuesInternal.<get-valuesInternal>|<get-valuesInternal>(){}[0]
+
+    final var size // com.eignex.klause.util/MutableIntObjectMap.size|{}size[0]
+        final fun <get-size>(): kotlin/Int // com.eignex.klause.util/MutableIntObjectMap.size.<get-size>|<get-size>(){}[0]
+
+    final fun clear() // com.eignex.klause.util/MutableIntObjectMap.clear|clear(){}[0]
+    final fun containsKey(kotlin/Int): kotlin/Boolean // com.eignex.klause.util/MutableIntObjectMap.containsKey|containsKey(kotlin.Int){}[0]
+    final fun get(kotlin/Int): #A? // com.eignex.klause.util/MutableIntObjectMap.get|get(kotlin.Int){}[0]
+    final fun getValue(kotlin/Int): #A // com.eignex.klause.util/MutableIntObjectMap.getValue|getValue(kotlin.Int){}[0]
+    final fun isEmpty(): kotlin/Boolean // com.eignex.klause.util/MutableIntObjectMap.isEmpty|isEmpty(){}[0]
+    final fun put(kotlin/Int, #A) // com.eignex.klause.util/MutableIntObjectMap.put|put(kotlin.Int;1:0){}[0]
+    final fun remove(kotlin/Int): kotlin/Boolean // com.eignex.klause.util/MutableIntObjectMap.remove|remove(kotlin.Int){}[0]
+    final fun removeKeysAbove(kotlin/Int) // com.eignex.klause.util/MutableIntObjectMap.removeKeysAbove|removeKeysAbove(kotlin.Int){}[0]
+    final fun valueAtMaxKey(): #A? // com.eignex.klause.util/MutableIntObjectMap.valueAtMaxKey|valueAtMaxKey(){}[0]
+    final inline fun forEach(kotlin/Function2<kotlin/Int, #A, kotlin/Unit>) // com.eignex.klause.util/MutableIntObjectMap.forEach|forEach(kotlin.Function2<kotlin.Int,1:0,kotlin.Unit>){}[0]
+    final inline fun getOrPut(kotlin/Int, kotlin/Function0<#A>): #A // com.eignex.klause.util/MutableIntObjectMap.getOrPut|getOrPut(kotlin.Int;kotlin.Function0<1:0>){}[0]
+}
+
+final class <#A: kotlin/Any?> com.eignex.klause.util/MutableLongObjectMap { // com.eignex.klause.util/MutableLongObjectMap|null[0]
+    constructor <init>(kotlin/Int = ...) // com.eignex.klause.util/MutableLongObjectMap.<init>|<init>(kotlin.Int){}[0]
+
+    final val keysInternal // com.eignex.klause.util/MutableLongObjectMap.keysInternal|{}keysInternal[0]
+        final fun <get-keysInternal>(): kotlin/LongArray // com.eignex.klause.util/MutableLongObjectMap.keysInternal.<get-keysInternal>|<get-keysInternal>(){}[0]
+    final val usedInternal // com.eignex.klause.util/MutableLongObjectMap.usedInternal|{}usedInternal[0]
+        final fun <get-usedInternal>(): kotlin/BooleanArray // com.eignex.klause.util/MutableLongObjectMap.usedInternal.<get-usedInternal>|<get-usedInternal>(){}[0]
+    final val valuesInternal // com.eignex.klause.util/MutableLongObjectMap.valuesInternal|{}valuesInternal[0]
+        final fun <get-valuesInternal>(): kotlin/Array<kotlin/Any?> // com.eignex.klause.util/MutableLongObjectMap.valuesInternal.<get-valuesInternal>|<get-valuesInternal>(){}[0]
+
+    final var size // com.eignex.klause.util/MutableLongObjectMap.size|{}size[0]
+        final fun <get-size>(): kotlin/Int // com.eignex.klause.util/MutableLongObjectMap.size.<get-size>|<get-size>(){}[0]
+
+    final fun clear() // com.eignex.klause.util/MutableLongObjectMap.clear|clear(){}[0]
+    final fun containsKey(kotlin/Long): kotlin/Boolean // com.eignex.klause.util/MutableLongObjectMap.containsKey|containsKey(kotlin.Long){}[0]
+    final fun get(kotlin/Long): #A? // com.eignex.klause.util/MutableLongObjectMap.get|get(kotlin.Long){}[0]
+    final fun getValue(kotlin/Long): #A // com.eignex.klause.util/MutableLongObjectMap.getValue|getValue(kotlin.Long){}[0]
+    final fun isEmpty(): kotlin/Boolean // com.eignex.klause.util/MutableLongObjectMap.isEmpty|isEmpty(){}[0]
+    final fun put(kotlin/Long, #A) // com.eignex.klause.util/MutableLongObjectMap.put|put(kotlin.Long;1:0){}[0]
+    final fun remove(kotlin/Long): kotlin/Boolean // com.eignex.klause.util/MutableLongObjectMap.remove|remove(kotlin.Long){}[0]
+    final inline fun forEach(kotlin/Function2<kotlin/Long, #A, kotlin/Unit>) // com.eignex.klause.util/MutableLongObjectMap.forEach|forEach(kotlin.Function2<kotlin.Long,1:0,kotlin.Unit>){}[0]
+    final inline fun getOrPut(kotlin/Long, kotlin/Function0<#A>): #A // com.eignex.klause.util/MutableLongObjectMap.getOrPut|getOrPut(kotlin.Long;kotlin.Function0<1:0>){}[0]
+}
+
+final class com.eignex.klause.util/Bits { // com.eignex.klause.util/Bits|null[0]
+    constructor <init>(kotlin/Int) // com.eignex.klause.util/Bits.<init>|<init>(kotlin.Int){}[0]
+
+    final val size // com.eignex.klause.util/Bits.size|{}size[0]
+        final fun <get-size>(): kotlin/Int // com.eignex.klause.util/Bits.size.<get-size>|<get-size>(){}[0]
+    final val words // com.eignex.klause.util/Bits.words|{}words[0]
+        final fun <get-words>(): kotlin/LongArray // com.eignex.klause.util/Bits.words.<get-words>|<get-words>(){}[0]
+
+    final fun andInPlace(com.eignex.klause.util/Bits) // com.eignex.klause.util/Bits.andInPlace|andInPlace(com.eignex.klause.util.Bits){}[0]
+    final fun andNotInPlace(com.eignex.klause.util/Bits) // com.eignex.klause.util/Bits.andNotInPlace|andNotInPlace(com.eignex.klause.util.Bits){}[0]
+    final fun cardinality(): kotlin/Int // com.eignex.klause.util/Bits.cardinality|cardinality(){}[0]
+    final fun clear(kotlin/Int) // com.eignex.klause.util/Bits.clear|clear(kotlin.Int){}[0]
+    final fun containsAll(com.eignex.klause.util/Bits): kotlin/Boolean // com.eignex.klause.util/Bits.containsAll|containsAll(com.eignex.klause.util.Bits){}[0]
+    final fun copy(): com.eignex.klause.util/Bits // com.eignex.klause.util/Bits.copy|copy(){}[0]
+    final fun copyFrom(com.eignex.klause.util/Bits) // com.eignex.klause.util/Bits.copyFrom|copyFrom(com.eignex.klause.util.Bits){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.util/Bits.equals|equals(kotlin.Any?){}[0]
+    final fun get(kotlin/Int): kotlin/Boolean // com.eignex.klause.util/Bits.get|get(kotlin.Int){}[0]
+    final fun hashCode(): kotlin/Int // com.eignex.klause.util/Bits.hashCode|hashCode(){}[0]
+    final fun orInPlace(com.eignex.klause.util/Bits) // com.eignex.klause.util/Bits.orInPlace|orInPlace(com.eignex.klause.util.Bits){}[0]
+    final fun set(kotlin/Int) // com.eignex.klause.util/Bits.set|set(kotlin.Int){}[0]
+    final fun toIntArray(): kotlin/IntArray // com.eignex.klause.util/Bits.toIntArray|toIntArray(){}[0]
+    final fun toString(): kotlin/String // com.eignex.klause.util/Bits.toString|toString(){}[0]
+    final inline fun forEachSet(kotlin/Function1<kotlin/Int, kotlin/Unit>) // com.eignex.klause.util/Bits.forEachSet|forEachSet(kotlin.Function1<kotlin.Int,kotlin.Unit>){}[0]
+
+    final object Companion { // com.eignex.klause.util/Bits.Companion|null[0]
+        final fun clear(kotlin/LongArray, kotlin/Int) // com.eignex.klause.util/Bits.Companion.clear|clear(kotlin.LongArray;kotlin.Int){}[0]
+        final fun clearAbove(kotlin/LongArray, kotlin/Int) // com.eignex.klause.util/Bits.Companion.clearAbove|clearAbove(kotlin.LongArray;kotlin.Int){}[0]
+        final fun clearBelow(kotlin/LongArray, kotlin/Int) // com.eignex.klause.util/Bits.Companion.clearBelow|clearBelow(kotlin.LongArray;kotlin.Int){}[0]
+        final fun empty(kotlin/Int): com.eignex.klause.util/Bits // com.eignex.klause.util/Bits.Companion.empty|empty(kotlin.Int){}[0]
+        final fun fillRange(kotlin/LongArray, kotlin/Int, kotlin/Int) // com.eignex.klause.util/Bits.Companion.fillRange|fillRange(kotlin.LongArray;kotlin.Int;kotlin.Int){}[0]
+        final fun firstSet(kotlin/LongArray): kotlin/Int // com.eignex.klause.util/Bits.Companion.firstSet|firstSet(kotlin.LongArray){}[0]
+        final fun full(kotlin/Int): com.eignex.klause.util/Bits // com.eignex.klause.util/Bits.Companion.full|full(kotlin.Int){}[0]
+        final fun has(kotlin/LongArray, kotlin/Int): kotlin/Boolean // com.eignex.klause.util/Bits.Companion.has|has(kotlin.LongArray;kotlin.Int){}[0]
+        final fun lastSet(kotlin/LongArray): kotlin/Int // com.eignex.klause.util/Bits.Companion.lastSet|lastSet(kotlin.LongArray){}[0]
+        final fun of(kotlin/Int, kotlin/IntArray): com.eignex.klause.util/Bits // com.eignex.klause.util/Bits.Companion.of|of(kotlin.Int;kotlin.IntArray){}[0]
+        final fun popcount(kotlin/LongArray): kotlin/Int // com.eignex.klause.util/Bits.Companion.popcount|popcount(kotlin.LongArray){}[0]
+        final fun set(kotlin/LongArray, kotlin/Int) // com.eignex.klause.util/Bits.Companion.set|set(kotlin.LongArray;kotlin.Int){}[0]
+        final fun xorInto(kotlin/LongArray, kotlin/LongArray) // com.eignex.klause.util/Bits.Companion.xorInto|xorInto(kotlin.LongArray;kotlin.LongArray){}[0]
+    }
+}
+
+final class com.eignex.klause.util/CharReader { // com.eignex.klause.util/CharReader|null[0]
+    constructor <init>(com.eignex.klause.util/CharSource) // com.eignex.klause.util/CharReader.<init>|<init>(com.eignex.klause.util.CharSource){}[0]
+
+    final fun advance() // com.eignex.klause.util/CharReader.advance|advance(){}[0]
+    final fun eof(): kotlin/Boolean // com.eignex.klause.util/CharReader.eof|eof(){}[0]
+    final fun peek(kotlin/Int = ...): kotlin/Int // com.eignex.klause.util/CharReader.peek|peek(kotlin.Int){}[0]
+}
+
+final class com.eignex.klause.util/CheckedLongOverflowException : kotlin/ArithmeticException { // com.eignex.klause.util/CheckedLongOverflowException|null[0]
+    constructor <init>(kotlin/String) // com.eignex.klause.util/CheckedLongOverflowException.<init>|<init>(kotlin.String){}[0]
+}
+
+final class com.eignex.klause.util/FloatInterval { // com.eignex.klause.util/FloatInterval|null[0]
+    constructor <init>(kotlin/Double, kotlin/Double) // com.eignex.klause.util/FloatInterval.<init>|<init>(kotlin.Double;kotlin.Double){}[0]
+
+    final val hi // com.eignex.klause.util/FloatInterval.hi|{}hi[0]
+        final fun <get-hi>(): kotlin/Double // com.eignex.klause.util/FloatInterval.hi.<get-hi>|<get-hi>(){}[0]
+    final val isSingleton // com.eignex.klause.util/FloatInterval.isSingleton|{}isSingleton[0]
+        final fun <get-isSingleton>(): kotlin/Boolean // com.eignex.klause.util/FloatInterval.isSingleton.<get-isSingleton>|<get-isSingleton>(){}[0]
+    final val lo // com.eignex.klause.util/FloatInterval.lo|{}lo[0]
+        final fun <get-lo>(): kotlin/Double // com.eignex.klause.util/FloatInterval.lo.<get-lo>|<get-lo>(){}[0]
+    final val width // com.eignex.klause.util/FloatInterval.width|{}width[0]
+        final fun <get-width>(): kotlin/Double // com.eignex.klause.util/FloatInterval.width.<get-width>|<get-width>(){}[0]
+
+    final fun component1(): kotlin/Double // com.eignex.klause.util/FloatInterval.component1|component1(){}[0]
+    final fun component2(): kotlin/Double // com.eignex.klause.util/FloatInterval.component2|component2(){}[0]
+    final fun contains(kotlin/Double): kotlin/Boolean // com.eignex.klause.util/FloatInterval.contains|contains(kotlin.Double){}[0]
+    final fun copy(kotlin/Double = ..., kotlin/Double = ...): com.eignex.klause.util/FloatInterval // com.eignex.klause.util/FloatInterval.copy|copy(kotlin.Double;kotlin.Double){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.util/FloatInterval.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.eignex.klause.util/FloatInterval.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.eignex.klause.util/FloatInterval.toString|toString(){}[0]
+}
+
+final class com.eignex.klause.util/IndexedMaxHeap { // com.eignex.klause.util/IndexedMaxHeap|null[0]
+    constructor <init>(kotlin/Int) // com.eignex.klause.util/IndexedMaxHeap.<init>|<init>(kotlin.Int){}[0]
+
+    final val capacity // com.eignex.klause.util/IndexedMaxHeap.capacity|{}capacity[0]
+        final fun <get-capacity>(): kotlin/Int // com.eignex.klause.util/IndexedMaxHeap.capacity.<get-capacity>|<get-capacity>(){}[0]
+
+    final var size // com.eignex.klause.util/IndexedMaxHeap.size|{}size[0]
+        final fun <get-size>(): kotlin/Int // com.eignex.klause.util/IndexedMaxHeap.size.<get-size>|<get-size>(){}[0]
+
+    final fun contains(kotlin/Int): kotlin/Boolean // com.eignex.klause.util/IndexedMaxHeap.contains|contains(kotlin.Int){}[0]
+    final fun extractMax(): kotlin/Int // com.eignex.klause.util/IndexedMaxHeap.extractMax|extractMax(){}[0]
+    final fun insert(kotlin/Int, kotlin/Double) // com.eignex.klause.util/IndexedMaxHeap.insert|insert(kotlin.Int;kotlin.Double){}[0]
+    final fun keyOf(kotlin/Int): kotlin/Double // com.eignex.klause.util/IndexedMaxHeap.keyOf|keyOf(kotlin.Int){}[0]
+    final fun peekMax(): kotlin/Int // com.eignex.klause.util/IndexedMaxHeap.peekMax|peekMax(){}[0]
+    final fun remove(kotlin/Int) // com.eignex.klause.util/IndexedMaxHeap.remove|remove(kotlin.Int){}[0]
+    final fun resetAllKeysInIdOrder(kotlin/Double) // com.eignex.klause.util/IndexedMaxHeap.resetAllKeysInIdOrder|resetAllKeysInIdOrder(kotlin.Double){}[0]
+    final fun restore(kotlin/Int) // com.eignex.klause.util/IndexedMaxHeap.restore|restore(kotlin.Int){}[0]
+    final fun scaleKeys(kotlin/Double) // com.eignex.klause.util/IndexedMaxHeap.scaleKeys|scaleKeys(kotlin.Double){}[0]
+    final fun updateKey(kotlin/Int, kotlin/Double) // com.eignex.klause.util/IndexedMaxHeap.updateKey|updateKey(kotlin.Int;kotlin.Double){}[0]
+}
+
+final class com.eignex.klause.util/Int128 { // com.eignex.klause.util/Int128|null[0]
+    constructor <init>() // com.eignex.klause.util/Int128.<init>|<init>(){}[0]
+
+    final var hi // com.eignex.klause.util/Int128.hi|{}hi[0]
+        final fun <get-hi>(): kotlin/Long // com.eignex.klause.util/Int128.hi.<get-hi>|<get-hi>(){}[0]
+    final var lo // com.eignex.klause.util/Int128.lo|{}lo[0]
+        final fun <get-lo>(): kotlin/Long // com.eignex.klause.util/Int128.lo.<get-lo>|<get-lo>(){}[0]
+    final var overflow // com.eignex.klause.util/Int128.overflow|{}overflow[0]
+        final fun <get-overflow>(): kotlin/Boolean // com.eignex.klause.util/Int128.overflow.<get-overflow>|<get-overflow>(){}[0]
+
+    final fun add(com.eignex.klause.util/Int128) // com.eignex.klause.util/Int128.add|add(com.eignex.klause.util.Int128){}[0]
+    final fun addLong(kotlin/Long) // com.eignex.klause.util/Int128.addLong|addLong(kotlin.Long){}[0]
+    final fun addProduct(kotlin/Long, kotlin/Long) // com.eignex.klause.util/Int128.addProduct|addProduct(kotlin.Long;kotlin.Long){}[0]
+    final fun ceilDivPow2(kotlin/Int): kotlin/Long? // com.eignex.klause.util/Int128.ceilDivPow2|ceilDivPow2(kotlin.Int){}[0]
+    final fun clear() // com.eignex.klause.util/Int128.clear|clear(){}[0]
+    final fun copy(): com.eignex.klause.util/Int128 // com.eignex.klause.util/Int128.copy|copy(){}[0]
+    final fun divExactByLong(kotlin/Long): kotlin/Long? // com.eignex.klause.util/Int128.divExactByLong|divExactByLong(kotlin.Long){}[0]
+    final fun fitsLong(): kotlin/Boolean // com.eignex.klause.util/Int128.fitsLong|fitsLong(){}[0]
+    final fun floorDivPositive(kotlin/Long): kotlin/Long? // com.eignex.klause.util/Int128.floorDivPositive|floorDivPositive(kotlin.Long){}[0]
+    final fun isNonNegative(): kotlin/Boolean // com.eignex.klause.util/Int128.isNonNegative|isNonNegative(){}[0]
+    final fun shiftLeft(kotlin/Int) // com.eignex.klause.util/Int128.shiftLeft|shiftLeft(kotlin.Int){}[0]
+    final fun subtract(com.eignex.klause.util/Int128) // com.eignex.klause.util/Int128.subtract|subtract(com.eignex.klause.util.Int128){}[0]
+    final fun toLong(): kotlin/Long // com.eignex.klause.util/Int128.toLong|toLong(){}[0]
+}
+
+final class com.eignex.klause.util/IntArrayDeque { // com.eignex.klause.util/IntArrayDeque|null[0]
+    constructor <init>(kotlin/Int = ...) // com.eignex.klause.util/IntArrayDeque.<init>|<init>(kotlin.Int){}[0]
+
+    final val size // com.eignex.klause.util/IntArrayDeque.size|{}size[0]
+        final fun <get-size>(): kotlin/Int // com.eignex.klause.util/IntArrayDeque.size.<get-size>|<get-size>(){}[0]
+
+    final fun addFirst(kotlin/Int) // com.eignex.klause.util/IntArrayDeque.addFirst|addFirst(kotlin.Int){}[0]
+    final fun addLast(kotlin/Int) // com.eignex.klause.util/IntArrayDeque.addLast|addLast(kotlin.Int){}[0]
+    final fun clear() // com.eignex.klause.util/IntArrayDeque.clear|clear(){}[0]
+    final fun isEmpty(): kotlin/Boolean // com.eignex.klause.util/IntArrayDeque.isEmpty|isEmpty(){}[0]
+    final fun isNotEmpty(): kotlin/Boolean // com.eignex.klause.util/IntArrayDeque.isNotEmpty|isNotEmpty(){}[0]
+    final fun removeFirst(): kotlin/Int // com.eignex.klause.util/IntArrayDeque.removeFirst|removeFirst(){}[0]
+    final fun removeFirstOr(kotlin/Int): kotlin/Int // com.eignex.klause.util/IntArrayDeque.removeFirstOr|removeFirstOr(kotlin.Int){}[0]
+    final fun removeLast(): kotlin/Int // com.eignex.klause.util/IntArrayDeque.removeLast|removeLast(){}[0]
+}
+
+final class com.eignex.klause.util/IntArrayList { // com.eignex.klause.util/IntArrayList|null[0]
+    constructor <init>(kotlin/Int = ...) // com.eignex.klause.util/IntArrayList.<init>|<init>(kotlin.Int){}[0]
+
+    final val backingData // com.eignex.klause.util/IntArrayList.backingData|{}backingData[0]
+        final fun <get-backingData>(): kotlin/IntArray // com.eignex.klause.util/IntArrayList.backingData.<get-backingData>|<get-backingData>(){}[0]
+
+    final var size // com.eignex.klause.util/IntArrayList.size|{}size[0]
+        final fun <get-size>(): kotlin/Int // com.eignex.klause.util/IntArrayList.size.<get-size>|<get-size>(){}[0]
+
+    final fun add(kotlin/Int) // com.eignex.klause.util/IntArrayList.add|add(kotlin.Int){}[0]
+    final fun clear() // com.eignex.klause.util/IntArrayList.clear|clear(){}[0]
+    final fun contains(kotlin/Int): kotlin/Boolean // com.eignex.klause.util/IntArrayList.contains|contains(kotlin.Int){}[0]
+    final fun get(kotlin/Int): kotlin/Int // com.eignex.klause.util/IntArrayList.get|get(kotlin.Int){}[0]
+    final fun indexOf(kotlin/Int): kotlin/Int // com.eignex.klause.util/IntArrayList.indexOf|indexOf(kotlin.Int){}[0]
+    final fun insertAt(kotlin/Int, kotlin/Int) // com.eignex.klause.util/IntArrayList.insertAt|insertAt(kotlin.Int;kotlin.Int){}[0]
+    final fun isEmpty(): kotlin/Boolean // com.eignex.klause.util/IntArrayList.isEmpty|isEmpty(){}[0]
+    final fun last(): kotlin/Int // com.eignex.klause.util/IntArrayList.last|last(){}[0]
+    final fun lowerBound(kotlin/Int): kotlin/Int // com.eignex.klause.util/IntArrayList.lowerBound|lowerBound(kotlin.Int){}[0]
+    final fun lowerBoundDescending(kotlin/Int): kotlin/Int // com.eignex.klause.util/IntArrayList.lowerBoundDescending|lowerBoundDescending(kotlin.Int){}[0]
+    final fun removeAt(kotlin/Int) // com.eignex.klause.util/IntArrayList.removeAt|removeAt(kotlin.Int){}[0]
+    final fun removeValue(kotlin/Int): kotlin/Boolean // com.eignex.klause.util/IntArrayList.removeValue|removeValue(kotlin.Int){}[0]
+    final fun set(kotlin/Int, kotlin/Int) // com.eignex.klause.util/IntArrayList.set|set(kotlin.Int;kotlin.Int){}[0]
+    final fun toIntArray(): kotlin/IntArray // com.eignex.klause.util/IntArrayList.toIntArray|toIntArray(){}[0]
+    final fun toSet(): kotlin.collections/Set<kotlin/Int> // com.eignex.klause.util/IntArrayList.toSet|toSet(){}[0]
+    final fun truncateTo(kotlin/Int) // com.eignex.klause.util/IntArrayList.truncateTo|truncateTo(kotlin.Int){}[0]
+    final inline fun forEach(kotlin/Function1<kotlin/Int, kotlin/Unit>) // com.eignex.klause.util/IntArrayList.forEach|forEach(kotlin.Function1<kotlin.Int,kotlin.Unit>){}[0]
+    final inline fun sortByIntKey(kotlin/Boolean = ..., kotlin/Function1<kotlin/Int, kotlin/Int>) // com.eignex.klause.util/IntArrayList.sortByIntKey|sortByIntKey(kotlin.Boolean;kotlin.Function1<kotlin.Int,kotlin.Int>){}[0]
+}
+
+final class com.eignex.klause.util/IntDisjointSet { // com.eignex.klause.util/IntDisjointSet|null[0]
+    constructor <init>(kotlin/Int) // com.eignex.klause.util/IntDisjointSet.<init>|<init>(kotlin.Int){}[0]
+
+    final fun connected(kotlin/Int, kotlin/Int): kotlin/Boolean // com.eignex.klause.util/IntDisjointSet.connected|connected(kotlin.Int;kotlin.Int){}[0]
+    final fun find(kotlin/Int): kotlin/Int // com.eignex.klause.util/IntDisjointSet.find|find(kotlin.Int){}[0]
+    final fun groups(): kotlin.collections/List<kotlin/IntArray> // com.eignex.klause.util/IntDisjointSet.groups|groups(){}[0]
+    final fun union(kotlin/Int, kotlin/Int) // com.eignex.klause.util/IntDisjointSet.union|union(kotlin.Int;kotlin.Int){}[0]
+}
+
+final class com.eignex.klause.util/IntHashSet { // com.eignex.klause.util/IntHashSet|null[0]
+    constructor <init>(kotlin/Int = ...) // com.eignex.klause.util/IntHashSet.<init>|<init>(kotlin.Int){}[0]
+
+    final val keysInternal // com.eignex.klause.util/IntHashSet.keysInternal|{}keysInternal[0]
+        final fun <get-keysInternal>(): kotlin/IntArray // com.eignex.klause.util/IntHashSet.keysInternal.<get-keysInternal>|<get-keysInternal>(){}[0]
+    final val usedInternal // com.eignex.klause.util/IntHashSet.usedInternal|{}usedInternal[0]
+        final fun <get-usedInternal>(): kotlin/BooleanArray // com.eignex.klause.util/IntHashSet.usedInternal.<get-usedInternal>|<get-usedInternal>(){}[0]
+
+    final var size // com.eignex.klause.util/IntHashSet.size|{}size[0]
+        final fun <get-size>(): kotlin/Int // com.eignex.klause.util/IntHashSet.size.<get-size>|<get-size>(){}[0]
+
+    final fun add(kotlin/Int): kotlin/Boolean // com.eignex.klause.util/IntHashSet.add|add(kotlin.Int){}[0]
+    final fun clear() // com.eignex.klause.util/IntHashSet.clear|clear(){}[0]
+    final fun contains(kotlin/Int): kotlin/Boolean // com.eignex.klause.util/IntHashSet.contains|contains(kotlin.Int){}[0]
+    final fun isEmpty(): kotlin/Boolean // com.eignex.klause.util/IntHashSet.isEmpty|isEmpty(){}[0]
+    final fun remove(kotlin/Int): kotlin/Boolean // com.eignex.klause.util/IntHashSet.remove|remove(kotlin.Int){}[0]
+    final fun toIntArray(): kotlin/IntArray // com.eignex.klause.util/IntHashSet.toIntArray|toIntArray(){}[0]
+    final inline fun forEach(kotlin/Function1<kotlin/Int, kotlin/Unit>) // com.eignex.klause.util/IntHashSet.forEach|forEach(kotlin.Function1<kotlin.Int,kotlin.Unit>){}[0]
+}
+
+final class com.eignex.klause.util/IntIntMap { // com.eignex.klause.util/IntIntMap|null[0]
+    final fun contains(kotlin/Int): kotlin/Boolean // com.eignex.klause.util/IntIntMap.contains|contains(kotlin.Int){}[0]
+    final fun get(kotlin/Int): kotlin/Int // com.eignex.klause.util/IntIntMap.get|get(kotlin.Int){}[0]
+
+    final object Companion { // com.eignex.klause.util/IntIntMap.Companion|null[0]
+        final fun build(kotlin/IntArray, kotlin/IntArray, kotlin/Int = ..., kotlin/Int = ...): com.eignex.klause.util/IntIntMap // com.eignex.klause.util/IntIntMap.Companion.build|build(kotlin.IntArray;kotlin.IntArray;kotlin.Int;kotlin.Int){}[0]
+    }
+}
+
+final class com.eignex.klause.util/IntLongMap { // com.eignex.klause.util/IntLongMap|null[0]
+    final fun contains(kotlin/Int): kotlin/Boolean // com.eignex.klause.util/IntLongMap.contains|contains(kotlin.Int){}[0]
+    final fun get(kotlin/Int): kotlin/Long // com.eignex.klause.util/IntLongMap.get|get(kotlin.Int){}[0]
+
+    final object Companion { // com.eignex.klause.util/IntLongMap.Companion|null[0]
+        final fun build(kotlin/IntArray, kotlin/LongArray, kotlin/Long = ..., kotlin/Int = ...): com.eignex.klause.util/IntLongMap // com.eignex.klause.util/IntLongMap.Companion.build|build(kotlin.IntArray;kotlin.LongArray;kotlin.Long;kotlin.Int){}[0]
+    }
+}
+
+final class com.eignex.klause.util/IntSwapSet { // com.eignex.klause.util/IntSwapSet|null[0]
+    constructor <init>(kotlin/Int) // com.eignex.klause.util/IntSwapSet.<init>|<init>(kotlin.Int){}[0]
+
+    final val size // com.eignex.klause.util/IntSwapSet.size|{}size[0]
+        final fun <get-size>(): kotlin/Int // com.eignex.klause.util/IntSwapSet.size.<get-size>|<get-size>(){}[0]
+
+    final fun add(kotlin/Int): kotlin/Boolean // com.eignex.klause.util/IntSwapSet.add|add(kotlin.Int){}[0]
+    final fun clear() // com.eignex.klause.util/IntSwapSet.clear|clear(){}[0]
+    final fun contains(kotlin/Int): kotlin/Boolean // com.eignex.klause.util/IntSwapSet.contains|contains(kotlin.Int){}[0]
+    final fun get(kotlin/Int): kotlin/Int // com.eignex.klause.util/IntSwapSet.get|get(kotlin.Int){}[0]
+    final fun isEmpty(): kotlin/Boolean // com.eignex.klause.util/IntSwapSet.isEmpty|isEmpty(){}[0]
+    final fun random(kotlin.random/Random): kotlin/Int // com.eignex.klause.util/IntSwapSet.random|random(kotlin.random.Random){}[0]
+    final fun remove(kotlin/Int): kotlin/Boolean // com.eignex.klause.util/IntSwapSet.remove|remove(kotlin.Int){}[0]
+    final fun toIntArray(): kotlin/IntArray // com.eignex.klause.util/IntSwapSet.toIntArray|toIntArray(){}[0]
+    final inline fun forEach(kotlin/Function1<kotlin/Int, kotlin/Unit>) // com.eignex.klause.util/IntSwapSet.forEach|forEach(kotlin.Function1<kotlin.Int,kotlin.Unit>){}[0]
+}
+
+final class com.eignex.klause.util/LongArrayList { // com.eignex.klause.util/LongArrayList|null[0]
+    constructor <init>(kotlin/Int = ...) // com.eignex.klause.util/LongArrayList.<init>|<init>(kotlin.Int){}[0]
+
+    final var size // com.eignex.klause.util/LongArrayList.size|{}size[0]
+        final fun <get-size>(): kotlin/Int // com.eignex.klause.util/LongArrayList.size.<get-size>|<get-size>(){}[0]
+
+    final fun add(kotlin/Long) // com.eignex.klause.util/LongArrayList.add|add(kotlin.Long){}[0]
+    final fun clear() // com.eignex.klause.util/LongArrayList.clear|clear(){}[0]
+    final fun contains(kotlin/Long): kotlin/Boolean // com.eignex.klause.util/LongArrayList.contains|contains(kotlin.Long){}[0]
+    final fun get(kotlin/Int): kotlin/Long // com.eignex.klause.util/LongArrayList.get|get(kotlin.Int){}[0]
+    final fun indexOf(kotlin/Long): kotlin/Int // com.eignex.klause.util/LongArrayList.indexOf|indexOf(kotlin.Long){}[0]
+    final fun insertAt(kotlin/Int, kotlin/Long) // com.eignex.klause.util/LongArrayList.insertAt|insertAt(kotlin.Int;kotlin.Long){}[0]
+    final fun isEmpty(): kotlin/Boolean // com.eignex.klause.util/LongArrayList.isEmpty|isEmpty(){}[0]
+    final fun last(): kotlin/Long // com.eignex.klause.util/LongArrayList.last|last(){}[0]
+    final fun lowerBound(kotlin/Long): kotlin/Int // com.eignex.klause.util/LongArrayList.lowerBound|lowerBound(kotlin.Long){}[0]
+    final fun removeAt(kotlin/Int) // com.eignex.klause.util/LongArrayList.removeAt|removeAt(kotlin.Int){}[0]
+    final fun removeValue(kotlin/Long): kotlin/Boolean // com.eignex.klause.util/LongArrayList.removeValue|removeValue(kotlin.Long){}[0]
+    final fun set(kotlin/Int, kotlin/Long) // com.eignex.klause.util/LongArrayList.set|set(kotlin.Int;kotlin.Long){}[0]
+    final fun sort(kotlin/Boolean = ...) // com.eignex.klause.util/LongArrayList.sort|sort(kotlin.Boolean){}[0]
+    final fun toLongArray(): kotlin/LongArray // com.eignex.klause.util/LongArrayList.toLongArray|toLongArray(){}[0]
+    final fun toSet(): kotlin.collections/Set<kotlin/Long> // com.eignex.klause.util/LongArrayList.toSet|toSet(){}[0]
+    final fun truncateTo(kotlin/Int) // com.eignex.klause.util/LongArrayList.truncateTo|truncateTo(kotlin.Int){}[0]
+    final inline fun forEach(kotlin/Function1<kotlin/Long, kotlin/Unit>) // com.eignex.klause.util/LongArrayList.forEach|forEach(kotlin.Function1<kotlin.Long,kotlin.Unit>){}[0]
+}
+
+final class com.eignex.klause.util/LongHashSet { // com.eignex.klause.util/LongHashSet|null[0]
+    constructor <init>(kotlin/Int = ...) // com.eignex.klause.util/LongHashSet.<init>|<init>(kotlin.Int){}[0]
+
+    final val keysInternal // com.eignex.klause.util/LongHashSet.keysInternal|{}keysInternal[0]
+        final fun <get-keysInternal>(): kotlin/LongArray // com.eignex.klause.util/LongHashSet.keysInternal.<get-keysInternal>|<get-keysInternal>(){}[0]
+    final val usedInternal // com.eignex.klause.util/LongHashSet.usedInternal|{}usedInternal[0]
+        final fun <get-usedInternal>(): kotlin/BooleanArray // com.eignex.klause.util/LongHashSet.usedInternal.<get-usedInternal>|<get-usedInternal>(){}[0]
+
+    final var size // com.eignex.klause.util/LongHashSet.size|{}size[0]
+        final fun <get-size>(): kotlin/Int // com.eignex.klause.util/LongHashSet.size.<get-size>|<get-size>(){}[0]
+
+    final fun add(kotlin/Long): kotlin/Boolean // com.eignex.klause.util/LongHashSet.add|add(kotlin.Long){}[0]
+    final fun clear() // com.eignex.klause.util/LongHashSet.clear|clear(){}[0]
+    final fun contains(kotlin/Long): kotlin/Boolean // com.eignex.klause.util/LongHashSet.contains|contains(kotlin.Long){}[0]
+    final fun isEmpty(): kotlin/Boolean // com.eignex.klause.util/LongHashSet.isEmpty|isEmpty(){}[0]
+    final fun remove(kotlin/Long): kotlin/Boolean // com.eignex.klause.util/LongHashSet.remove|remove(kotlin.Long){}[0]
+    final fun toLongArray(): kotlin/LongArray // com.eignex.klause.util/LongHashSet.toLongArray|toLongArray(){}[0]
+    final inline fun forEach(kotlin/Function1<kotlin/Long, kotlin/Unit>) // com.eignex.klause.util/LongHashSet.forEach|forEach(kotlin.Function1<kotlin.Long,kotlin.Unit>){}[0]
+}
+
+final class com.eignex.klause.util/LubyIterator { // com.eignex.klause.util/LubyIterator|null[0]
+    constructor <init>() // com.eignex.klause.util/LubyIterator.<init>|<init>(){}[0]
+
+    final val value // com.eignex.klause.util/LubyIterator.value|{}value[0]
+        final fun <get-value>(): kotlin/Int // com.eignex.klause.util/LubyIterator.value.<get-value>|<get-value>(){}[0]
+
+    final fun advance() // com.eignex.klause.util/LubyIterator.advance|advance(){}[0]
+    final fun reset() // com.eignex.klause.util/LubyIterator.reset|reset(){}[0]
+}
+
+final class com.eignex.klause.util/MinCostAssignment { // com.eignex.klause.util/MinCostAssignment|null[0]
+    constructor <init>(kotlin/Int, kotlin/Int) // com.eignex.klause.util/MinCostAssignment.<init>|<init>(kotlin.Int;kotlin.Int){}[0]
+
+    final fun addOption(kotlin/Int, kotlin/Int, kotlin/Long) // com.eignex.klause.util/MinCostAssignment.addOption|addOption(kotlin.Int;kotlin.Int;kotlin.Long){}[0]
+    final fun solve(): com.eignex.klause.util/MinCostAssignment.Result // com.eignex.klause.util/MinCostAssignment.solve|solve(){}[0]
+
+    final class Result { // com.eignex.klause.util/MinCostAssignment.Result|null[0]
+        constructor <init>(kotlin/Boolean, kotlin/Long, kotlin/IntArray) // com.eignex.klause.util/MinCostAssignment.Result.<init>|<init>(kotlin.Boolean;kotlin.Long;kotlin.IntArray){}[0]
+
+        final val assignedValue // com.eignex.klause.util/MinCostAssignment.Result.assignedValue|{}assignedValue[0]
+            final fun <get-assignedValue>(): kotlin/IntArray // com.eignex.klause.util/MinCostAssignment.Result.assignedValue.<get-assignedValue>|<get-assignedValue>(){}[0]
+        final val cost // com.eignex.klause.util/MinCostAssignment.Result.cost|{}cost[0]
+            final fun <get-cost>(): kotlin/Long // com.eignex.klause.util/MinCostAssignment.Result.cost.<get-cost>|<get-cost>(){}[0]
+        final val feasible // com.eignex.klause.util/MinCostAssignment.Result.feasible|{}feasible[0]
+            final fun <get-feasible>(): kotlin/Boolean // com.eignex.klause.util/MinCostAssignment.Result.feasible.<get-feasible>|<get-feasible>(){}[0]
+
+        final object Companion { // com.eignex.klause.util/MinCostAssignment.Result.Companion|null[0]
+            final fun infeasible(): com.eignex.klause.util/MinCostAssignment.Result // com.eignex.klause.util/MinCostAssignment.Result.Companion.infeasible|infeasible(){}[0]
+        }
+    }
+}
+
+final class com.eignex.klause.util/MutableIntDoubleMap { // com.eignex.klause.util/MutableIntDoubleMap|null[0]
+    constructor <init>(kotlin/Int = ...) // com.eignex.klause.util/MutableIntDoubleMap.<init>|<init>(kotlin.Int){}[0]
+
+    final val keysInternal // com.eignex.klause.util/MutableIntDoubleMap.keysInternal|{}keysInternal[0]
+        final fun <get-keysInternal>(): kotlin/IntArray // com.eignex.klause.util/MutableIntDoubleMap.keysInternal.<get-keysInternal>|<get-keysInternal>(){}[0]
+    final val usedInternal // com.eignex.klause.util/MutableIntDoubleMap.usedInternal|{}usedInternal[0]
+        final fun <get-usedInternal>(): kotlin/BooleanArray // com.eignex.klause.util/MutableIntDoubleMap.usedInternal.<get-usedInternal>|<get-usedInternal>(){}[0]
+    final val valuesInternal // com.eignex.klause.util/MutableIntDoubleMap.valuesInternal|{}valuesInternal[0]
+        final fun <get-valuesInternal>(): kotlin/DoubleArray // com.eignex.klause.util/MutableIntDoubleMap.valuesInternal.<get-valuesInternal>|<get-valuesInternal>(){}[0]
+
+    final var size // com.eignex.klause.util/MutableIntDoubleMap.size|{}size[0]
+        final fun <get-size>(): kotlin/Int // com.eignex.klause.util/MutableIntDoubleMap.size.<get-size>|<get-size>(){}[0]
+
+    final fun addTo(kotlin/Int, kotlin/Double): kotlin/Double // com.eignex.klause.util/MutableIntDoubleMap.addTo|addTo(kotlin.Int;kotlin.Double){}[0]
+    final fun clear() // com.eignex.klause.util/MutableIntDoubleMap.clear|clear(){}[0]
+    final fun containsKey(kotlin/Int): kotlin/Boolean // com.eignex.klause.util/MutableIntDoubleMap.containsKey|containsKey(kotlin.Int){}[0]
+    final fun getOrDefault(kotlin/Int, kotlin/Double): kotlin/Double // com.eignex.klause.util/MutableIntDoubleMap.getOrDefault|getOrDefault(kotlin.Int;kotlin.Double){}[0]
+    final fun isEmpty(): kotlin/Boolean // com.eignex.klause.util/MutableIntDoubleMap.isEmpty|isEmpty(){}[0]
+    final fun put(kotlin/Int, kotlin/Double) // com.eignex.klause.util/MutableIntDoubleMap.put|put(kotlin.Int;kotlin.Double){}[0]
+    final fun remove(kotlin/Int): kotlin/Boolean // com.eignex.klause.util/MutableIntDoubleMap.remove|remove(kotlin.Int){}[0]
+    final inline fun forEach(kotlin/Function2<kotlin/Int, kotlin/Double, kotlin/Unit>) // com.eignex.klause.util/MutableIntDoubleMap.forEach|forEach(kotlin.Function2<kotlin.Int,kotlin.Double,kotlin.Unit>){}[0]
+}
+
+final class com.eignex.klause.util/MutableIntIntMap { // com.eignex.klause.util/MutableIntIntMap|null[0]
+    constructor <init>(kotlin/Int = ...) // com.eignex.klause.util/MutableIntIntMap.<init>|<init>(kotlin.Int){}[0]
+
+    final val keysInternal // com.eignex.klause.util/MutableIntIntMap.keysInternal|{}keysInternal[0]
+        final fun <get-keysInternal>(): kotlin/IntArray // com.eignex.klause.util/MutableIntIntMap.keysInternal.<get-keysInternal>|<get-keysInternal>(){}[0]
+    final val usedInternal // com.eignex.klause.util/MutableIntIntMap.usedInternal|{}usedInternal[0]
+        final fun <get-usedInternal>(): kotlin/BooleanArray // com.eignex.klause.util/MutableIntIntMap.usedInternal.<get-usedInternal>|<get-usedInternal>(){}[0]
+    final val valuesInternal // com.eignex.klause.util/MutableIntIntMap.valuesInternal|{}valuesInternal[0]
+        final fun <get-valuesInternal>(): kotlin/IntArray // com.eignex.klause.util/MutableIntIntMap.valuesInternal.<get-valuesInternal>|<get-valuesInternal>(){}[0]
+
+    final var size // com.eignex.klause.util/MutableIntIntMap.size|{}size[0]
+        final fun <get-size>(): kotlin/Int // com.eignex.klause.util/MutableIntIntMap.size.<get-size>|<get-size>(){}[0]
+
+    final fun addTo(kotlin/Int, kotlin/Int): kotlin/Int // com.eignex.klause.util/MutableIntIntMap.addTo|addTo(kotlin.Int;kotlin.Int){}[0]
+    final fun clear() // com.eignex.klause.util/MutableIntIntMap.clear|clear(){}[0]
+    final fun containsKey(kotlin/Int): kotlin/Boolean // com.eignex.klause.util/MutableIntIntMap.containsKey|containsKey(kotlin.Int){}[0]
+    final fun getOrDefault(kotlin/Int, kotlin/Int): kotlin/Int // com.eignex.klause.util/MutableIntIntMap.getOrDefault|getOrDefault(kotlin.Int;kotlin.Int){}[0]
+    final fun isEmpty(): kotlin/Boolean // com.eignex.klause.util/MutableIntIntMap.isEmpty|isEmpty(){}[0]
+    final fun put(kotlin/Int, kotlin/Int) // com.eignex.klause.util/MutableIntIntMap.put|put(kotlin.Int;kotlin.Int){}[0]
+    final fun remove(kotlin/Int): kotlin/Boolean // com.eignex.klause.util/MutableIntIntMap.remove|remove(kotlin.Int){}[0]
+    final inline fun forEach(kotlin/Function2<kotlin/Int, kotlin/Int, kotlin/Unit>) // com.eignex.klause.util/MutableIntIntMap.forEach|forEach(kotlin.Function2<kotlin.Int,kotlin.Int,kotlin.Unit>){}[0]
+}
+
+final class com.eignex.klause.util/MutableIntLongMap { // com.eignex.klause.util/MutableIntLongMap|null[0]
+    constructor <init>(kotlin/Int = ...) // com.eignex.klause.util/MutableIntLongMap.<init>|<init>(kotlin.Int){}[0]
+
+    final val keysInternal // com.eignex.klause.util/MutableIntLongMap.keysInternal|{}keysInternal[0]
+        final fun <get-keysInternal>(): kotlin/IntArray // com.eignex.klause.util/MutableIntLongMap.keysInternal.<get-keysInternal>|<get-keysInternal>(){}[0]
+    final val usedInternal // com.eignex.klause.util/MutableIntLongMap.usedInternal|{}usedInternal[0]
+        final fun <get-usedInternal>(): kotlin/BooleanArray // com.eignex.klause.util/MutableIntLongMap.usedInternal.<get-usedInternal>|<get-usedInternal>(){}[0]
+    final val valuesInternal // com.eignex.klause.util/MutableIntLongMap.valuesInternal|{}valuesInternal[0]
+        final fun <get-valuesInternal>(): kotlin/LongArray // com.eignex.klause.util/MutableIntLongMap.valuesInternal.<get-valuesInternal>|<get-valuesInternal>(){}[0]
+
+    final var size // com.eignex.klause.util/MutableIntLongMap.size|{}size[0]
+        final fun <get-size>(): kotlin/Int // com.eignex.klause.util/MutableIntLongMap.size.<get-size>|<get-size>(){}[0]
+
+    final fun addTo(kotlin/Int, kotlin/Long): kotlin/Long // com.eignex.klause.util/MutableIntLongMap.addTo|addTo(kotlin.Int;kotlin.Long){}[0]
+    final fun clear() // com.eignex.klause.util/MutableIntLongMap.clear|clear(){}[0]
+    final fun containsKey(kotlin/Int): kotlin/Boolean // com.eignex.klause.util/MutableIntLongMap.containsKey|containsKey(kotlin.Int){}[0]
+    final fun getOrDefault(kotlin/Int, kotlin/Long): kotlin/Long // com.eignex.klause.util/MutableIntLongMap.getOrDefault|getOrDefault(kotlin.Int;kotlin.Long){}[0]
+    final fun isEmpty(): kotlin/Boolean // com.eignex.klause.util/MutableIntLongMap.isEmpty|isEmpty(){}[0]
+    final fun put(kotlin/Int, kotlin/Long) // com.eignex.klause.util/MutableIntLongMap.put|put(kotlin.Int;kotlin.Long){}[0]
+    final fun remove(kotlin/Int): kotlin/Boolean // com.eignex.klause.util/MutableIntLongMap.remove|remove(kotlin.Int){}[0]
+    final inline fun forEach(kotlin/Function2<kotlin/Int, kotlin/Long, kotlin/Unit>) // com.eignex.klause.util/MutableIntLongMap.forEach|forEach(kotlin.Function2<kotlin.Int,kotlin.Long,kotlin.Unit>){}[0]
+}
+
+final class com.eignex.klause.util/MutableLongIntMap { // com.eignex.klause.util/MutableLongIntMap|null[0]
+    constructor <init>(kotlin/Int = ...) // com.eignex.klause.util/MutableLongIntMap.<init>|<init>(kotlin.Int){}[0]
+
+    final val keysInternal // com.eignex.klause.util/MutableLongIntMap.keysInternal|{}keysInternal[0]
+        final fun <get-keysInternal>(): kotlin/LongArray // com.eignex.klause.util/MutableLongIntMap.keysInternal.<get-keysInternal>|<get-keysInternal>(){}[0]
+    final val usedInternal // com.eignex.klause.util/MutableLongIntMap.usedInternal|{}usedInternal[0]
+        final fun <get-usedInternal>(): kotlin/BooleanArray // com.eignex.klause.util/MutableLongIntMap.usedInternal.<get-usedInternal>|<get-usedInternal>(){}[0]
+    final val valuesInternal // com.eignex.klause.util/MutableLongIntMap.valuesInternal|{}valuesInternal[0]
+        final fun <get-valuesInternal>(): kotlin/IntArray // com.eignex.klause.util/MutableLongIntMap.valuesInternal.<get-valuesInternal>|<get-valuesInternal>(){}[0]
+
+    final var size // com.eignex.klause.util/MutableLongIntMap.size|{}size[0]
+        final fun <get-size>(): kotlin/Int // com.eignex.klause.util/MutableLongIntMap.size.<get-size>|<get-size>(){}[0]
+
+    final fun addTo(kotlin/Long, kotlin/Int): kotlin/Int // com.eignex.klause.util/MutableLongIntMap.addTo|addTo(kotlin.Long;kotlin.Int){}[0]
+    final fun clear() // com.eignex.klause.util/MutableLongIntMap.clear|clear(){}[0]
+    final fun containsKey(kotlin/Long): kotlin/Boolean // com.eignex.klause.util/MutableLongIntMap.containsKey|containsKey(kotlin.Long){}[0]
+    final fun getOrDefault(kotlin/Long, kotlin/Int): kotlin/Int // com.eignex.klause.util/MutableLongIntMap.getOrDefault|getOrDefault(kotlin.Long;kotlin.Int){}[0]
+    final fun isEmpty(): kotlin/Boolean // com.eignex.klause.util/MutableLongIntMap.isEmpty|isEmpty(){}[0]
+    final fun put(kotlin/Long, kotlin/Int) // com.eignex.klause.util/MutableLongIntMap.put|put(kotlin.Long;kotlin.Int){}[0]
+    final fun remove(kotlin/Long): kotlin/Boolean // com.eignex.klause.util/MutableLongIntMap.remove|remove(kotlin.Long){}[0]
+    final fun removeAndGet(kotlin/Long, kotlin/Int): kotlin/Int // com.eignex.klause.util/MutableLongIntMap.removeAndGet|removeAndGet(kotlin.Long;kotlin.Int){}[0]
+    final inline fun forEach(kotlin/Function2<kotlin/Long, kotlin/Int, kotlin/Unit>) // com.eignex.klause.util/MutableLongIntMap.forEach|forEach(kotlin.Function2<kotlin.Long,kotlin.Int,kotlin.Unit>){}[0]
+}
+
+final class com.eignex.klause.util/StringCharSource : com.eignex.klause.util/CharSource { // com.eignex.klause.util/StringCharSource|null[0]
+    constructor <init>(kotlin/String) // com.eignex.klause.util/StringCharSource.<init>|<init>(kotlin.String){}[0]
+
+    final fun next(): kotlin/String? // com.eignex.klause.util/StringCharSource.next|next(){}[0]
+}
+
+final object com.eignex.klause.util/PermutationGroup { // com.eignex.klause.util/PermutationGroup|null[0]
+    final fun orbit(kotlin.collections/List<kotlin/IntArray>, kotlin/Int): kotlin.collections/Set<kotlin/Int> // com.eignex.klause.util/PermutationGroup.orbit|orbit(kotlin.collections.List<kotlin.IntArray>;kotlin.Int){}[0]
+    final fun orbitUnderStabilizer(kotlin.collections/List<kotlin/IntArray>, kotlin/IntArray, kotlin/Int, kotlin/Int, kotlin/Int = ...): kotlin.collections/Set<kotlin/Int> // com.eignex.klause.util/PermutationGroup.orbitUnderStabilizer|orbitUnderStabilizer(kotlin.collections.List<kotlin.IntArray>;kotlin.IntArray;kotlin.Int;kotlin.Int;kotlin.Int){}[0]
+    final fun strongGenerators(kotlin.collections/List<kotlin/IntArray>, kotlin/Int, kotlin/Int, kotlin/IntArray = ...): kotlin.collections/List<kotlin/IntArray> // com.eignex.klause.util/PermutationGroup.strongGenerators|strongGenerators(kotlin.collections.List<kotlin.IntArray>;kotlin.Int;kotlin.Int;kotlin.IntArray){}[0]
+}
+
+final val com.eignex.klause.util/EmptyBooleanArray // com.eignex.klause.util/EmptyBooleanArray|{}EmptyBooleanArray[0]
+    final fun <get-EmptyBooleanArray>(): kotlin/BooleanArray // com.eignex.klause.util/EmptyBooleanArray.<get-EmptyBooleanArray>|<get-EmptyBooleanArray>(){}[0]
+final val com.eignex.klause.util/EmptyDoubleArray // com.eignex.klause.util/EmptyDoubleArray|{}EmptyDoubleArray[0]
+    final fun <get-EmptyDoubleArray>(): kotlin/DoubleArray // com.eignex.klause.util/EmptyDoubleArray.<get-EmptyDoubleArray>|<get-EmptyDoubleArray>(){}[0]
+final val com.eignex.klause.util/EmptyIntArray // com.eignex.klause.util/EmptyIntArray|{}EmptyIntArray[0]
+    final fun <get-EmptyIntArray>(): kotlin/IntArray // com.eignex.klause.util/EmptyIntArray.<get-EmptyIntArray>|<get-EmptyIntArray>(){}[0]
+final val com.eignex.klause.util/EmptyLongArray // com.eignex.klause.util/EmptyLongArray|{}EmptyLongArray[0]
+    final fun <get-EmptyLongArray>(): kotlin/LongArray // com.eignex.klause.util/EmptyLongArray.<get-EmptyLongArray>|<get-EmptyLongArray>(){}[0]
+
+final fun (com.eignex.klause.util/CharSource).com.eignex.klause.util/lineSequence(): kotlin.sequences/Sequence<kotlin/String> // com.eignex.klause.util/lineSequence|lineSequence@com.eignex.klause.util.CharSource(){}[0]
+final fun (com.eignex.klause.util/CharSource).com.eignex.klause.util/readText(): kotlin/String // com.eignex.klause.util/readText|readText@com.eignex.klause.util.CharSource(){}[0]
+final fun (com.eignex.klause.util/IntArrayList).com.eignex.klause.util/toSortedIntArray(): kotlin/IntArray // com.eignex.klause.util/toSortedIntArray|toSortedIntArray@com.eignex.klause.util.IntArrayList(){}[0]
+final fun (com.eignex.klause.util/IntHashSet).com.eignex.klause.util/toSortedIntArray(): kotlin/IntArray // com.eignex.klause.util/toSortedIntArray|toSortedIntArray@com.eignex.klause.util.IntHashSet(){}[0]
+final fun (com.eignex.klause.util/LongArrayList).com.eignex.klause.util/toSortedLongArray(): kotlin/LongArray // com.eignex.klause.util/toSortedLongArray|toSortedLongArray@com.eignex.klause.util.LongArrayList(){}[0]
+final fun (com.eignex.klause.util/LongHashSet).com.eignex.klause.util/toSortedLongArray(): kotlin/LongArray // com.eignex.klause.util/toSortedLongArray|toSortedLongArray@com.eignex.klause.util.LongHashSet(){}[0]
+final fun (com.eignex.klause.util/MutableIntDoubleMap).com.eignex.klause.util/sortedKeys(): kotlin/IntArray // com.eignex.klause.util/sortedKeys|sortedKeys@com.eignex.klause.util.MutableIntDoubleMap(){}[0]
+final fun (com.eignex.klause.util/MutableIntIntMap).com.eignex.klause.util/sortedKeys(): kotlin/IntArray // com.eignex.klause.util/sortedKeys|sortedKeys@com.eignex.klause.util.MutableIntIntMap(){}[0]
+final fun (com.eignex.klause.util/MutableIntLongMap).com.eignex.klause.util/sortedKeys(): kotlin/IntArray // com.eignex.klause.util/sortedKeys|sortedKeys@com.eignex.klause.util.MutableIntLongMap(){}[0]
+final fun (kotlin/IntArray).com.eignex.klause.util/binarySearchInt(kotlin/Int, kotlin/Int = ..., kotlin/Int = ...): kotlin/Int // com.eignex.klause.util/binarySearchInt|binarySearchInt@kotlin.IntArray(kotlin.Int;kotlin.Int;kotlin.Int){}[0]
+final fun (kotlin/LongArray).com.eignex.klause.util/binarySearchLong(kotlin/Long, kotlin/Int = ..., kotlin/Int = ...): kotlin/Int // com.eignex.klause.util/binarySearchLong|binarySearchLong@kotlin.LongArray(kotlin.Long;kotlin.Int;kotlin.Int){}[0]
+final fun <#A: kotlin/Any?> (com.eignex.klause.util/MutableIntObjectMap<#A>).com.eignex.klause.util/sortedKeys(): kotlin/IntArray // com.eignex.klause.util/sortedKeys|sortedKeys@com.eignex.klause.util.MutableIntObjectMap<0:0>(){0§<kotlin.Any?>}[0]
+final fun com.eignex.klause.util/addExact(kotlin/Long, kotlin/Long): kotlin/Long // com.eignex.klause.util/addExact|addExact(kotlin.Long;kotlin.Long){}[0]
+final fun com.eignex.klause.util/lubyN(kotlin/Long): kotlin/Long // com.eignex.klause.util/lubyN|lubyN(kotlin.Long){}[0]
+final fun com.eignex.klause.util/mulExact(kotlin/Long, kotlin/Long): kotlin/Long // com.eignex.klause.util/mulExact|mulExact(kotlin.Long;kotlin.Long){}[0]
+final fun com.eignex.klause.util/subExact(kotlin/Long, kotlin/Long): kotlin/Long // com.eignex.klause.util/subExact|subExact(kotlin.Long;kotlin.Long){}[0]
+final inline fun com.eignex.klause.util/argsortBy(kotlin/Int, kotlin/Function2<kotlin/Int, kotlin/Int, kotlin/Int>): kotlin/IntArray // com.eignex.klause.util/argsortBy|argsortBy(kotlin.Int;kotlin.Function2<kotlin.Int,kotlin.Int,kotlin.Int>){}[0]

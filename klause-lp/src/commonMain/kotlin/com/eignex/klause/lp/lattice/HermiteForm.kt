@@ -11,8 +11,11 @@ import com.ionspin.kotlin.bignum.integer.BigInteger
  * A matrix in column Hermite normal form together with the column operations that produced it:
  * `H = A · V`, where [v] is unimodular (integer, determinant ±1) and therefore a bijection of the
  * integer lattice — so `Ax ⋛ b` and `Hy ⋛ b` have the same integer solutions, related by `x = Vy`.
+ *
+ * @property h The reduced rows, in column Hermite normal form.
+ * @property v The unimodular column transform that produced [h].
  */
-internal class HermiteForm(val h: List<SparseIntRow>, val v: UnimodularTransform)
+class HermiteForm(val h: List<SparseIntRow>, val v: UnimodularTransform)
 
 /**
  * Column Hermite normal form of [a] over [cols] columns, with the unimodular column transform that
@@ -33,7 +36,7 @@ internal class HermiteForm(val h: List<SparseIntRow>, val v: UnimodularTransform
  * bound the wrong column. Cancellation therefore reports nothing rather than a prefix.
  */
 @Suppress("NestedBlockDepth", "ReturnCount")
-internal fun hermiteNormalForm(
+fun hermiteNormalForm(
     a: List<SparseIntRow>,
     cols: Int,
     cancellation: Cancellation = Cancellation.Never,

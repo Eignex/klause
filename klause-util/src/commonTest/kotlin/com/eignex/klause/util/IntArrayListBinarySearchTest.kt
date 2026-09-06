@@ -5,7 +5,7 @@ import kotlin.test.assertEquals
 
 /**
  * Coverage for [IntArrayList.lowerBound] / [IntArrayList.lowerBoundDescending] — the O(log n)
- * monotone-history lookups behind [com.eignex.klause.propagation.PropagationState.minLevelForGe] /
+ * monotone-history lookups behind `PropagationState.minLevelForGe` /
  * `maxLevelForLe` (#97). Each is checked against a brute-force linear lower bound so the binary
  * search provably agrees with a scan.
  */

@@ -1,0 +1,702 @@
+// Klib ABI Dump
+// Targets: [linuxX64]
+// Rendering settings:
+// - Signature version: 2
+// - Show manifest properties: true
+// - Show declarations: true
+
+// Library unique name: <com.eignex:klause-lp>
+final enum class com.eignex.klause.lp.engine/LpVerdict : kotlin/Enum<com.eignex.klause.lp.engine/LpVerdict> { // com.eignex.klause.lp.engine/LpVerdict|null[0]
+    enum entry INDETERMINATE // com.eignex.klause.lp.engine/LpVerdict.INDETERMINATE|null[0]
+    enum entry INFEASIBLE // com.eignex.klause.lp.engine/LpVerdict.INFEASIBLE|null[0]
+    enum entry OPTIMAL // com.eignex.klause.lp.engine/LpVerdict.OPTIMAL|null[0]
+
+    final val entries // com.eignex.klause.lp.engine/LpVerdict.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<com.eignex.klause.lp.engine/LpVerdict> // com.eignex.klause.lp.engine/LpVerdict.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): com.eignex.klause.lp.engine/LpVerdict // com.eignex.klause.lp.engine/LpVerdict.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<com.eignex.klause.lp.engine/LpVerdict> // com.eignex.klause.lp.engine/LpVerdict.values|values#static(){}[0]
+}
+
+final enum class com.eignex.klause.lp.engine/Relation : kotlin/Enum<com.eignex.klause.lp.engine/Relation> { // com.eignex.klause.lp.engine/Relation|null[0]
+    enum entry EQ // com.eignex.klause.lp.engine/Relation.EQ|null[0]
+    enum entry GE // com.eignex.klause.lp.engine/Relation.GE|null[0]
+    enum entry LE // com.eignex.klause.lp.engine/Relation.LE|null[0]
+
+    final val entries // com.eignex.klause.lp.engine/Relation.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<com.eignex.klause.lp.engine/Relation> // com.eignex.klause.lp.engine/Relation.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): com.eignex.klause.lp.engine/Relation // com.eignex.klause.lp.engine/Relation.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<com.eignex.klause.lp.engine/Relation> // com.eignex.klause.lp.engine/Relation.values|values#static(){}[0]
+}
+
+final enum class com.eignex.klause.lp.engine/Sense : kotlin/Enum<com.eignex.klause.lp.engine/Sense> { // com.eignex.klause.lp.engine/Sense|null[0]
+    enum entry MAXIMIZE // com.eignex.klause.lp.engine/Sense.MAXIMIZE|null[0]
+    enum entry MINIMIZE // com.eignex.klause.lp.engine/Sense.MINIMIZE|null[0]
+
+    final val entries // com.eignex.klause.lp.engine/Sense.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<com.eignex.klause.lp.engine/Sense> // com.eignex.klause.lp.engine/Sense.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): com.eignex.klause.lp.engine/Sense // com.eignex.klause.lp.engine/Sense.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<com.eignex.klause.lp.engine/Sense> // com.eignex.klause.lp.engine/Sense.values|values#static(){}[0]
+}
+
+final enum class com.eignex.klause.lp.engine/VarStatus : kotlin/Enum<com.eignex.klause.lp.engine/VarStatus> { // com.eignex.klause.lp.engine/VarStatus|null[0]
+    enum entry AT_LOWER // com.eignex.klause.lp.engine/VarStatus.AT_LOWER|null[0]
+    enum entry AT_UPPER // com.eignex.klause.lp.engine/VarStatus.AT_UPPER|null[0]
+    enum entry BASIC // com.eignex.klause.lp.engine/VarStatus.BASIC|null[0]
+
+    final val entries // com.eignex.klause.lp.engine/VarStatus.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<com.eignex.klause.lp.engine/VarStatus> // com.eignex.klause.lp.engine/VarStatus.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): com.eignex.klause.lp.engine/VarStatus // com.eignex.klause.lp.engine/VarStatus.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<com.eignex.klause.lp.engine/VarStatus> // com.eignex.klause.lp.engine/VarStatus.values|values#static(){}[0]
+}
+
+final enum class com.eignex.klause.simplex.exact/RationalFeasibility : kotlin/Enum<com.eignex.klause.simplex.exact/RationalFeasibility> { // com.eignex.klause.simplex.exact/RationalFeasibility|null[0]
+    enum entry FEASIBLE // com.eignex.klause.simplex.exact/RationalFeasibility.FEASIBLE|null[0]
+    enum entry INFEASIBLE // com.eignex.klause.simplex.exact/RationalFeasibility.INFEASIBLE|null[0]
+    enum entry UNKNOWN // com.eignex.klause.simplex.exact/RationalFeasibility.UNKNOWN|null[0]
+
+    final val entries // com.eignex.klause.simplex.exact/RationalFeasibility.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<com.eignex.klause.simplex.exact/RationalFeasibility> // com.eignex.klause.simplex.exact/RationalFeasibility.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): com.eignex.klause.simplex.exact/RationalFeasibility // com.eignex.klause.simplex.exact/RationalFeasibility.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<com.eignex.klause.simplex.exact/RationalFeasibility> // com.eignex.klause.simplex.exact/RationalFeasibility.values|values#static(){}[0]
+}
+
+abstract interface com.eignex.klause.lp.engine/LpSolver : kotlin/AutoCloseable { // com.eignex.klause.lp.engine/LpSolver|null[0]
+    abstract val infeasibleRay // com.eignex.klause.lp.engine/LpSolver.infeasibleRay|{}infeasibleRay[0]
+        abstract fun <get-infeasibleRay>(): kotlin/DoubleArray? // com.eignex.klause.lp.engine/LpSolver.infeasibleRay.<get-infeasibleRay>|<get-infeasibleRay>(){}[0]
+    open val infeasibleBasis // com.eignex.klause.lp.engine/LpSolver.infeasibleBasis|{}infeasibleBasis[0]
+        open fun <get-infeasibleBasis>(): com.eignex.klause.lp.engine/Basis? // com.eignex.klause.lp.engine/LpSolver.infeasibleBasis.<get-infeasibleBasis>|<get-infeasibleBasis>(){}[0]
+    open val infeasibleRow // com.eignex.klause.lp.engine/LpSolver.infeasibleRow|{}infeasibleRow[0]
+        open fun <get-infeasibleRow>(): kotlin/Int // com.eignex.klause.lp.engine/LpSolver.infeasibleRow.<get-infeasibleRow>|<get-infeasibleRow>(){}[0]
+    open val lastColumns // com.eignex.klause.lp.engine/LpSolver.lastColumns|{}lastColumns[0]
+        open fun <get-lastColumns>(): kotlin/Int // com.eignex.klause.lp.engine/LpSolver.lastColumns.<get-lastColumns>|<get-lastColumns>(){}[0]
+    open val lastDegenerateColumns // com.eignex.klause.lp.engine/LpSolver.lastDegenerateColumns|{}lastDegenerateColumns[0]
+        open fun <get-lastDegenerateColumns>(): kotlin/Int // com.eignex.klause.lp.engine/LpSolver.lastDegenerateColumns.<get-lastDegenerateColumns>|<get-lastDegenerateColumns>(){}[0]
+    open val lastPivots // com.eignex.klause.lp.engine/LpSolver.lastPivots|{}lastPivots[0]
+        open fun <get-lastPivots>(): kotlin/Int // com.eignex.klause.lp.engine/LpSolver.lastPivots.<get-lastPivots>|<get-lastPivots>(){}[0]
+    open val lastRefactorizations // com.eignex.klause.lp.engine/LpSolver.lastRefactorizations|{}lastRefactorizations[0]
+        open fun <get-lastRefactorizations>(): kotlin/Int // com.eignex.klause.lp.engine/LpSolver.lastRefactorizations.<get-lastRefactorizations>|<get-lastRefactorizations>(){}[0]
+    open val lastSingularRefactorizations // com.eignex.klause.lp.engine/LpSolver.lastSingularRefactorizations|{}lastSingularRefactorizations[0]
+        open fun <get-lastSingularRefactorizations>(): kotlin/Int // com.eignex.klause.lp.engine/LpSolver.lastSingularRefactorizations.<get-lastSingularRefactorizations>|<get-lastSingularRefactorizations>(){}[0]
+    open val lastSmallPivotBails // com.eignex.klause.lp.engine/LpSolver.lastSmallPivotBails|{}lastSmallPivotBails[0]
+        open fun <get-lastSmallPivotBails>(): kotlin/Int // com.eignex.klause.lp.engine/LpSolver.lastSmallPivotBails.<get-lastSmallPivotBails>|<get-lastSmallPivotBails>(){}[0]
+    open val lastWarmStarted // com.eignex.klause.lp.engine/LpSolver.lastWarmStarted|{}lastWarmStarted[0]
+        open fun <get-lastWarmStarted>(): kotlin/Boolean // com.eignex.klause.lp.engine/LpSolver.lastWarmStarted.<get-lastWarmStarted>|<get-lastWarmStarted>(){}[0]
+    open val lastWorkOps // com.eignex.klause.lp.engine/LpSolver.lastWorkOps|{}lastWorkOps[0]
+        open fun <get-lastWorkOps>(): kotlin/Long // com.eignex.klause.lp.engine/LpSolver.lastWorkOps.<get-lastWorkOps>|<get-lastWorkOps>(){}[0]
+
+    abstract fun solve(com.eignex.klause.lp.engine/Basis? = ...): com.eignex.klause.lp.engine/FloatLpResult? // com.eignex.klause.lp.engine/LpSolver.solve|solve(com.eignex.klause.lp.engine.Basis?){}[0]
+    abstract fun solvePrimal(com.eignex.klause.lp.engine/Basis? = ...): com.eignex.klause.lp.engine/FloatLpResult? // com.eignex.klause.lp.engine/LpSolver.solvePrimal|solvePrimal(com.eignex.klause.lp.engine.Basis?){}[0]
+    open fun close() // com.eignex.klause.lp.engine/LpSolver.close|close(){}[0]
+}
+
+abstract interface com.eignex.klause.lp.engine/PersistentLpSolver : com.eignex.klause.lp.engine/LpSolver { // com.eignex.klause.lp.engine/PersistentLpSolver|null[0]
+    abstract fun rebind(com.eignex.klause.lp.engine/LpModel, com.eignex.klause.util/Cancellation): kotlin/Boolean // com.eignex.klause.lp.engine/PersistentLpSolver.rebind|rebind(com.eignex.klause.lp.engine.LpModel;com.eignex.klause.util.Cancellation){}[0]
+    abstract fun resolveBounds(): com.eignex.klause.lp.engine/FloatLpResult? // com.eignex.klause.lp.engine/PersistentLpSolver.resolveBounds|resolveBounds(){}[0]
+    abstract fun resolveGated(kotlin/BooleanArray): com.eignex.klause.lp.engine/FloatLpResult? // com.eignex.klause.lp.engine/PersistentLpSolver.resolveGated|resolveGated(kotlin.BooleanArray){}[0]
+}
+
+abstract interface com.eignex.klause.lp.engine/TableauCutSolver : com.eignex.klause.lp.engine/LpSolver { // com.eignex.klause.lp.engine/TableauCutSolver|null[0]
+    abstract fun gomoryCuts(kotlin/Int): kotlin.collections/List<com.eignex.klause.lp.engine/Cut> // com.eignex.klause.lp.engine/TableauCutSolver.gomoryCuts|gomoryCuts(kotlin.Int){}[0]
+    abstract fun mirCuts(kotlin/Int): kotlin.collections/List<com.eignex.klause.lp.engine/Cut> // com.eignex.klause.lp.engine/TableauCutSolver.mirCuts|mirCuts(kotlin.Int){}[0]
+}
+
+abstract interface com.eignex.klause.simplex.exact/ExactSimplexDoubleView { // com.eignex.klause.simplex.exact/ExactSimplexDoubleView|null[0]
+    abstract val colPtr // com.eignex.klause.simplex.exact/ExactSimplexDoubleView.colPtr|{}colPtr[0]
+        abstract fun <get-colPtr>(): kotlin/IntArray // com.eignex.klause.simplex.exact/ExactSimplexDoubleView.colPtr.<get-colPtr>|<get-colPtr>(){}[0]
+    abstract val colVal // com.eignex.klause.simplex.exact/ExactSimplexDoubleView.colVal|{}colVal[0]
+        abstract fun <get-colVal>(): kotlin/DoubleArray // com.eignex.klause.simplex.exact/ExactSimplexDoubleView.colVal.<get-colVal>|<get-colVal>(){}[0]
+    abstract val hasUpper // com.eignex.klause.simplex.exact/ExactSimplexDoubleView.hasUpper|{}hasUpper[0]
+        abstract fun <get-hasUpper>(): kotlin/BooleanArray // com.eignex.klause.simplex.exact/ExactSimplexDoubleView.hasUpper.<get-hasUpper>|<get-hasUpper>(){}[0]
+    abstract val rhs // com.eignex.klause.simplex.exact/ExactSimplexDoubleView.rhs|{}rhs[0]
+        abstract fun <get-rhs>(): kotlin/DoubleArray // com.eignex.klause.simplex.exact/ExactSimplexDoubleView.rhs.<get-rhs>|<get-rhs>(){}[0]
+    abstract val rowIdx // com.eignex.klause.simplex.exact/ExactSimplexDoubleView.rowIdx|{}rowIdx[0]
+        abstract fun <get-rowIdx>(): kotlin/IntArray // com.eignex.klause.simplex.exact/ExactSimplexDoubleView.rowIdx.<get-rowIdx>|<get-rowIdx>(){}[0]
+    abstract val upper // com.eignex.klause.simplex.exact/ExactSimplexDoubleView.upper|{}upper[0]
+        abstract fun <get-upper>(): kotlin/DoubleArray // com.eignex.klause.simplex.exact/ExactSimplexDoubleView.upper.<get-upper>|<get-upper>(){}[0]
+}
+
+abstract interface com.eignex.klause.simplex.exact/ExactSimplexModel { // com.eignex.klause.simplex.exact/ExactSimplexModel|null[0]
+    abstract val doubleView // com.eignex.klause.simplex.exact/ExactSimplexModel.doubleView|{}doubleView[0]
+        abstract fun <get-doubleView>(): com.eignex.klause.simplex.exact/ExactSimplexDoubleView? // com.eignex.klause.simplex.exact/ExactSimplexModel.doubleView.<get-doubleView>|<get-doubleView>(){}[0]
+    abstract val hasUpper // com.eignex.klause.simplex.exact/ExactSimplexModel.hasUpper|{}hasUpper[0]
+        abstract fun <get-hasUpper>(): kotlin/BooleanArray // com.eignex.klause.simplex.exact/ExactSimplexModel.hasUpper.<get-hasUpper>|<get-hasUpper>(){}[0]
+    abstract val m // com.eignex.klause.simplex.exact/ExactSimplexModel.m|{}m[0]
+        abstract fun <get-m>(): kotlin/Int // com.eignex.klause.simplex.exact/ExactSimplexModel.m.<get-m>|<get-m>(){}[0]
+    abstract val n // com.eignex.klause.simplex.exact/ExactSimplexModel.n|{}n[0]
+        abstract fun <get-n>(): kotlin/Int // com.eignex.klause.simplex.exact/ExactSimplexModel.n.<get-n>|<get-n>(){}[0]
+    abstract val numVars // com.eignex.klause.simplex.exact/ExactSimplexModel.numVars|{}numVars[0]
+        abstract fun <get-numVars>(): kotlin/Int // com.eignex.klause.simplex.exact/ExactSimplexModel.numVars.<get-numVars>|<get-numVars>(){}[0]
+    abstract val probeClampedHi // com.eignex.klause.simplex.exact/ExactSimplexModel.probeClampedHi|{}probeClampedHi[0]
+        abstract fun <get-probeClampedHi>(): kotlin/BooleanArray // com.eignex.klause.simplex.exact/ExactSimplexModel.probeClampedHi.<get-probeClampedHi>|<get-probeClampedHi>(){}[0]
+    abstract val probeClampedLo // com.eignex.klause.simplex.exact/ExactSimplexModel.probeClampedLo|{}probeClampedLo[0]
+        abstract fun <get-probeClampedLo>(): kotlin/BooleanArray // com.eignex.klause.simplex.exact/ExactSimplexModel.probeClampedLo.<get-probeClampedLo>|<get-probeClampedLo>(){}[0]
+    abstract val rhs // com.eignex.klause.simplex.exact/ExactSimplexModel.rhs|{}rhs[0]
+        abstract fun <get-rhs>(): kotlin/LongArray // com.eignex.klause.simplex.exact/ExactSimplexModel.rhs.<get-rhs>|<get-rhs>(){}[0]
+    abstract val rowStrict // com.eignex.klause.simplex.exact/ExactSimplexModel.rowStrict|{}rowStrict[0]
+        abstract fun <get-rowStrict>(): kotlin/BooleanArray // com.eignex.klause.simplex.exact/ExactSimplexModel.rowStrict.<get-rowStrict>|<get-rowStrict>(){}[0]
+    abstract val upper // com.eignex.klause.simplex.exact/ExactSimplexModel.upper|{}upper[0]
+        abstract fun <get-upper>(): kotlin/LongArray // com.eignex.klause.simplex.exact/ExactSimplexModel.upper.<get-upper>|<get-upper>(){}[0]
+    open val bigView // com.eignex.klause.simplex.exact/ExactSimplexModel.bigView|{}bigView[0]
+        open fun <get-bigView>(): com.eignex.klause.simplex.exact/ExactSimplexBigView? // com.eignex.klause.simplex.exact/ExactSimplexModel.bigView.<get-bigView>|<get-bigView>(){}[0]
+
+    abstract fun forEachExactColumn(kotlin/Int, kotlin/Function2<kotlin/Int, kotlin/Long, kotlin/Unit>) // com.eignex.klause.simplex.exact/ExactSimplexModel.forEachExactColumn|forEachExactColumn(kotlin.Int;kotlin.Function2<kotlin.Int,kotlin.Long,kotlin.Unit>){}[0]
+    abstract fun loShiftD(kotlin/Int): kotlin/Double // com.eignex.klause.simplex.exact/ExactSimplexModel.loShiftD|loShiftD(kotlin.Int){}[0]
+}
+
+sealed interface com.eignex.klause.simplex.exact/ExactDoubleBoundedSplit { // com.eignex.klause.simplex.exact/ExactDoubleBoundedSplit|null[0]
+    final class Split : com.eignex.klause.simplex.exact/ExactDoubleBoundedSplit { // com.eignex.klause.simplex.exact/ExactDoubleBoundedSplit.Split|null[0]
+        constructor <init>(kotlin.collections/List<com.eignex.klause.simplex.exact/ExactDoubleBoundedRow>, kotlin.collections/List<kotlin/Int>) // com.eignex.klause.simplex.exact/ExactDoubleBoundedSplit.Split.<init>|<init>(kotlin.collections.List<com.eignex.klause.simplex.exact.ExactDoubleBoundedRow>;kotlin.collections.List<kotlin.Int>){}[0]
+
+        final val bounded // com.eignex.klause.simplex.exact/ExactDoubleBoundedSplit.Split.bounded|{}bounded[0]
+            final fun <get-bounded>(): kotlin.collections/List<com.eignex.klause.simplex.exact/ExactDoubleBoundedRow> // com.eignex.klause.simplex.exact/ExactDoubleBoundedSplit.Split.bounded.<get-bounded>|<get-bounded>(){}[0]
+        final val unbounded // com.eignex.klause.simplex.exact/ExactDoubleBoundedSplit.Split.unbounded|{}unbounded[0]
+            final fun <get-unbounded>(): kotlin.collections/List<kotlin/Int> // com.eignex.klause.simplex.exact/ExactDoubleBoundedSplit.Split.unbounded.<get-unbounded>|<get-unbounded>(){}[0]
+    }
+
+    final object Infeasible : com.eignex.klause.simplex.exact/ExactDoubleBoundedSplit { // com.eignex.klause.simplex.exact/ExactDoubleBoundedSplit.Infeasible|null[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.simplex.exact/ExactDoubleBoundedSplit.Infeasible.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.eignex.klause.simplex.exact/ExactDoubleBoundedSplit.Infeasible.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.eignex.klause.simplex.exact/ExactDoubleBoundedSplit.Infeasible.toString|toString(){}[0]
+    }
+
+    final object Unknown : com.eignex.klause.simplex.exact/ExactDoubleBoundedSplit { // com.eignex.klause.simplex.exact/ExactDoubleBoundedSplit.Unknown|null[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.simplex.exact/ExactDoubleBoundedSplit.Unknown.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.eignex.klause.simplex.exact/ExactDoubleBoundedSplit.Unknown.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.eignex.klause.simplex.exact/ExactDoubleBoundedSplit.Unknown.toString|toString(){}[0]
+    }
+}
+
+final class com.eignex.klause.lp.engine/Basis { // com.eignex.klause.lp.engine/Basis|null[0]
+    constructor <init>(kotlin/IntArray, kotlin/Array<com.eignex.klause.lp.engine/VarStatus>) // com.eignex.klause.lp.engine/Basis.<init>|<init>(kotlin.IntArray;kotlin.Array<com.eignex.klause.lp.engine.VarStatus>){}[0]
+
+    final val basicVars // com.eignex.klause.lp.engine/Basis.basicVars|{}basicVars[0]
+        final fun <get-basicVars>(): kotlin/IntArray // com.eignex.klause.lp.engine/Basis.basicVars.<get-basicVars>|<get-basicVars>(){}[0]
+    final val status // com.eignex.klause.lp.engine/Basis.status|{}status[0]
+        final fun <get-status>(): kotlin/Array<com.eignex.klause.lp.engine/VarStatus> // com.eignex.klause.lp.engine/Basis.status.<get-status>|<get-status>(){}[0]
+}
+
+final class com.eignex.klause.lp.engine/CertifiedLpResult { // com.eignex.klause.lp.engine/CertifiedLpResult|null[0]
+    final val certificate // com.eignex.klause.lp.engine/CertifiedLpResult.certificate|{}certificate[0]
+        final fun <get-certificate>(): com.eignex.klause.lp.engine/IntegerCertificate? // com.eignex.klause.lp.engine/CertifiedLpResult.certificate.<get-certificate>|<get-certificate>(){}[0]
+    final val exactLowerBound // com.eignex.klause.lp.engine/CertifiedLpResult.exactLowerBound|{}exactLowerBound[0]
+        final fun <get-exactLowerBound>(): kotlin/Long? // com.eignex.klause.lp.engine/CertifiedLpResult.exactLowerBound.<get-exactLowerBound>|<get-exactLowerBound>(){}[0]
+    final val exactPrimal // com.eignex.klause.lp.engine/CertifiedLpResult.exactPrimal|{}exactPrimal[0]
+        final fun <get-exactPrimal>(): kotlin/DoubleArray? // com.eignex.klause.lp.engine/CertifiedLpResult.exactPrimal.<get-exactPrimal>|<get-exactPrimal>(){}[0]
+    final val farkasRay // com.eignex.klause.lp.engine/CertifiedLpResult.farkasRay|{}farkasRay[0]
+        final fun <get-farkasRay>(): kotlin/LongArray? // com.eignex.klause.lp.engine/CertifiedLpResult.farkasRay.<get-farkasRay>|<get-farkasRay>(){}[0]
+    final val float // com.eignex.klause.lp.engine/CertifiedLpResult.float|{}float[0]
+        final fun <get-float>(): com.eignex.klause.lp.engine/FloatLpResult? // com.eignex.klause.lp.engine/CertifiedLpResult.float.<get-float>|<get-float>(){}[0]
+    final val infeasibleRows // com.eignex.klause.lp.engine/CertifiedLpResult.infeasibleRows|{}infeasibleRows[0]
+        final fun <get-infeasibleRows>(): kotlin/IntArray? // com.eignex.klause.lp.engine/CertifiedLpResult.infeasibleRows.<get-infeasibleRows>|<get-infeasibleRows>(){}[0]
+    final val safeLowerBound // com.eignex.klause.lp.engine/CertifiedLpResult.safeLowerBound|{}safeLowerBound[0]
+        final fun <get-safeLowerBound>(): kotlin/Double? // com.eignex.klause.lp.engine/CertifiedLpResult.safeLowerBound.<get-safeLowerBound>|<get-safeLowerBound>(){}[0]
+    final val verdict // com.eignex.klause.lp.engine/CertifiedLpResult.verdict|{}verdict[0]
+        final fun <get-verdict>(): com.eignex.klause.lp.engine/LpVerdict // com.eignex.klause.lp.engine/CertifiedLpResult.verdict.<get-verdict>|<get-verdict>(){}[0]
+}
+
+final class com.eignex.klause.lp.engine/Csc { // com.eignex.klause.lp.engine/Csc|null[0]
+    constructor <init>(kotlin/IntArray, kotlin/IntArray, kotlin/LongArray) // com.eignex.klause.lp.engine/Csc.<init>|<init>(kotlin.IntArray;kotlin.IntArray;kotlin.LongArray){}[0]
+
+    final val colPtr // com.eignex.klause.lp.engine/Csc.colPtr|{}colPtr[0]
+        final fun <get-colPtr>(): kotlin/IntArray // com.eignex.klause.lp.engine/Csc.colPtr.<get-colPtr>|<get-colPtr>(){}[0]
+    final val colVal // com.eignex.klause.lp.engine/Csc.colVal|{}colVal[0]
+        final fun <get-colVal>(): kotlin/LongArray // com.eignex.klause.lp.engine/Csc.colVal.<get-colVal>|<get-colVal>(){}[0]
+    final val rowIdx // com.eignex.klause.lp.engine/Csc.rowIdx|{}rowIdx[0]
+        final fun <get-rowIdx>(): kotlin/IntArray // com.eignex.klause.lp.engine/Csc.rowIdx.<get-rowIdx>|<get-rowIdx>(){}[0]
+}
+
+final class com.eignex.klause.lp.engine/Cut { // com.eignex.klause.lp.engine/Cut|null[0]
+    constructor <init>(kotlin/IntArray, kotlin/LongArray, com.eignex.klause.lp.engine/Relation, kotlin/Long, kotlin/Boolean = ...) // com.eignex.klause.lp.engine/Cut.<init>|<init>(kotlin.IntArray;kotlin.LongArray;com.eignex.klause.lp.engine.Relation;kotlin.Long;kotlin.Boolean){}[0]
+
+    final val coeffs // com.eignex.klause.lp.engine/Cut.coeffs|{}coeffs[0]
+        final fun <get-coeffs>(): kotlin/LongArray // com.eignex.klause.lp.engine/Cut.coeffs.<get-coeffs>|<get-coeffs>(){}[0]
+    final val cols // com.eignex.klause.lp.engine/Cut.cols|{}cols[0]
+        final fun <get-cols>(): kotlin/IntArray // com.eignex.klause.lp.engine/Cut.cols.<get-cols>|<get-cols>(){}[0]
+    final val global // com.eignex.klause.lp.engine/Cut.global|{}global[0]
+        final fun <get-global>(): kotlin/Boolean // com.eignex.klause.lp.engine/Cut.global.<get-global>|<get-global>(){}[0]
+    final val rel // com.eignex.klause.lp.engine/Cut.rel|{}rel[0]
+        final fun <get-rel>(): com.eignex.klause.lp.engine/Relation // com.eignex.klause.lp.engine/Cut.rel.<get-rel>|<get-rel>(){}[0]
+    final val rhs // com.eignex.klause.lp.engine/Cut.rhs|{}rhs[0]
+        final fun <get-rhs>(): kotlin/Long // com.eignex.klause.lp.engine/Cut.rhs.<get-rhs>|<get-rhs>(){}[0]
+
+    final fun key(): kotlin/String // com.eignex.klause.lp.engine/Cut.key|key(){}[0]
+}
+
+final class com.eignex.klause.lp.engine/FloatLpResult { // com.eignex.klause.lp.engine/FloatLpResult|null[0]
+    constructor <init>(com.eignex.klause.lp.engine/Basis, kotlin/Double, kotlin/DoubleArray, kotlin/DoubleArray, kotlin/Int = ..., kotlin/Double = ..., kotlin/Double = ..., kotlin/Int = ..., kotlin/Boolean = ..., kotlin/Int = ..., kotlin/Boolean = ...) // com.eignex.klause.lp.engine/FloatLpResult.<init>|<init>(com.eignex.klause.lp.engine.Basis;kotlin.Double;kotlin.DoubleArray;kotlin.DoubleArray;kotlin.Int;kotlin.Double;kotlin.Double;kotlin.Int;kotlin.Boolean;kotlin.Int;kotlin.Boolean){}[0]
+
+    final val basis // com.eignex.klause.lp.engine/FloatLpResult.basis|{}basis[0]
+        final fun <get-basis>(): com.eignex.klause.lp.engine/Basis // com.eignex.klause.lp.engine/FloatLpResult.basis.<get-basis>|<get-basis>(){}[0]
+    final val blocks // com.eignex.klause.lp.engine/FloatLpResult.blocks|{}blocks[0]
+        final fun <get-blocks>(): kotlin/Int // com.eignex.klause.lp.engine/FloatLpResult.blocks.<get-blocks>|<get-blocks>(){}[0]
+    final val duals // com.eignex.klause.lp.engine/FloatLpResult.duals|{}duals[0]
+        final fun <get-duals>(): kotlin/DoubleArray // com.eignex.klause.lp.engine/FloatLpResult.duals.<get-duals>|<get-duals>(){}[0]
+    final val luMaxDensity // com.eignex.klause.lp.engine/FloatLpResult.luMaxDensity|{}luMaxDensity[0]
+        final fun <get-luMaxDensity>(): kotlin/Double // com.eignex.klause.lp.engine/FloatLpResult.luMaxDensity.<get-luMaxDensity>|<get-luMaxDensity>(){}[0]
+    final val luMaxFill // com.eignex.klause.lp.engine/FloatLpResult.luMaxFill|{}luMaxFill[0]
+        final fun <get-luMaxFill>(): kotlin/Double // com.eignex.klause.lp.engine/FloatLpResult.luMaxFill.<get-luMaxFill>|<get-luMaxFill>(){}[0]
+    final val objective // com.eignex.klause.lp.engine/FloatLpResult.objective|{}objective[0]
+        final fun <get-objective>(): kotlin/Double // com.eignex.klause.lp.engine/FloatLpResult.objective.<get-objective>|<get-objective>(){}[0]
+    final val optimal // com.eignex.klause.lp.engine/FloatLpResult.optimal|{}optimal[0]
+        final fun <get-optimal>(): kotlin/Boolean // com.eignex.klause.lp.engine/FloatLpResult.optimal.<get-optimal>|<get-optimal>(){}[0]
+    final val pivots // com.eignex.klause.lp.engine/FloatLpResult.pivots|{}pivots[0]
+        final fun <get-pivots>(): kotlin/Int // com.eignex.klause.lp.engine/FloatLpResult.pivots.<get-pivots>|<get-pivots>(){}[0]
+    final val primal // com.eignex.klause.lp.engine/FloatLpResult.primal|{}primal[0]
+        final fun <get-primal>(): kotlin/DoubleArray // com.eignex.klause.lp.engine/FloatLpResult.primal.<get-primal>|<get-primal>(){}[0]
+    final val refactorizations // com.eignex.klause.lp.engine/FloatLpResult.refactorizations|{}refactorizations[0]
+        final fun <get-refactorizations>(): kotlin/Int // com.eignex.klause.lp.engine/FloatLpResult.refactorizations.<get-refactorizations>|<get-refactorizations>(){}[0]
+    final val warmStarted // com.eignex.klause.lp.engine/FloatLpResult.warmStarted|{}warmStarted[0]
+        final fun <get-warmStarted>(): kotlin/Boolean // com.eignex.klause.lp.engine/FloatLpResult.warmStarted.<get-warmStarted>|<get-warmStarted>(){}[0]
+}
+
+final class com.eignex.klause.lp.engine/IntegerCertificate { // com.eignex.klause.lp.engine/IntegerCertificate|null[0]
+    constructor <init>(kotlin/Int, kotlin/Long, kotlin/LongArray, kotlin/LongArray, com.eignex.klause.util/Int128) // com.eignex.klause.lp.engine/IntegerCertificate.<init>|<init>(kotlin.Int;kotlin.Long;kotlin.LongArray;kotlin.LongArray;com.eignex.klause.util.Int128){}[0]
+
+    final val objectiveScaleBits // com.eignex.klause.lp.engine/IntegerCertificate.objectiveScaleBits|{}objectiveScaleBits[0]
+        final fun <get-objectiveScaleBits>(): kotlin/Int // com.eignex.klause.lp.engine/IntegerCertificate.objectiveScaleBits.<get-objectiveScaleBits>|<get-objectiveScaleBits>(){}[0]
+
+    final fun dualNonzeroRow(kotlin/Int): kotlin/Boolean // com.eignex.klause.lp.engine/IntegerCertificate.dualNonzeroRow|dualNonzeroRow(kotlin.Int){}[0]
+    final fun fixSteps(kotlin/Int, kotlin/Long): kotlin/Long? // com.eignex.klause.lp.engine/IntegerCertificate.fixSteps|fixSteps(kotlin.Int;kotlin.Long){}[0]
+    final fun improvingGapNonNegative(kotlin/Long): kotlin/Boolean // com.eignex.klause.lp.engine/IntegerCertificate.improvingGapNonNegative|improvingGapNonNegative(kotlin.Long){}[0]
+    final fun objectiveBoundCeil(kotlin/Long): kotlin/Long? // com.eignex.klause.lp.engine/IntegerCertificate.objectiveBoundCeil|objectiveBoundCeil(kotlin.Long){}[0]
+    final fun objectiveNumerator(): com.eignex.klause.util/Int128 // com.eignex.klause.lp.engine/IntegerCertificate.objectiveNumerator|objectiveNumerator(){}[0]
+    final fun reducedCostSign(kotlin/Int): kotlin/Int // com.eignex.klause.lp.engine/IntegerCertificate.reducedCostSign|reducedCostSign(kotlin.Int){}[0]
+}
+
+final class com.eignex.klause.lp.engine/LpBuilder { // com.eignex.klause.lp.engine/LpBuilder|null[0]
+    constructor <init>() // com.eignex.klause.lp.engine/LpBuilder.<init>|<init>(){}[0]
+
+    final val rowCount // com.eignex.klause.lp.engine/LpBuilder.rowCount|{}rowCount[0]
+        final fun <get-rowCount>(): kotlin/Int // com.eignex.klause.lp.engine/LpBuilder.rowCount.<get-rowCount>|<get-rowCount>(){}[0]
+    final val varCount // com.eignex.klause.lp.engine/LpBuilder.varCount|{}varCount[0]
+        final fun <get-varCount>(): kotlin/Int // com.eignex.klause.lp.engine/LpBuilder.varCount.<get-varCount>|<get-varCount>(){}[0]
+
+    final fun addFreeVar(kotlin/Long?, kotlin/Long?, kotlin/Long = ..., kotlin/Int = ...): kotlin/Int // com.eignex.klause.lp.engine/LpBuilder.addFreeVar|addFreeVar(kotlin.Long?;kotlin.Long?;kotlin.Long;kotlin.Int){}[0]
+    final fun addOpenAboveVar(kotlin/Long, kotlin/Long = ..., kotlin/Int = ...): kotlin/Int // com.eignex.klause.lp.engine/LpBuilder.addOpenAboveVar|addOpenAboveVar(kotlin.Long;kotlin.Long;kotlin.Int){}[0]
+    final fun addRealRow(kotlin/IntArray, kotlin/DoubleArray, com.eignex.klause.lp.engine/Relation, kotlin/Double, kotlin/Boolean = ..., kotlin/IntArray = ...) // com.eignex.klause.lp.engine/LpBuilder.addRealRow|addRealRow(kotlin.IntArray;kotlin.DoubleArray;com.eignex.klause.lp.engine.Relation;kotlin.Double;kotlin.Boolean;kotlin.IntArray){}[0]
+    final fun addRealVar(kotlin/Double?, kotlin/Double?, kotlin/Double = ..., kotlin/Int = ...): kotlin/Int // com.eignex.klause.lp.engine/LpBuilder.addRealVar|addRealVar(kotlin.Double?;kotlin.Double?;kotlin.Double;kotlin.Int){}[0]
+    final fun addRow(kotlin.collections/Map<kotlin/Int, kotlin/Long>, com.eignex.klause.lp.engine/Relation, kotlin/Long) // com.eignex.klause.lp.engine/LpBuilder.addRow|addRow(kotlin.collections.Map<kotlin.Int,kotlin.Long>;com.eignex.klause.lp.engine.Relation;kotlin.Long){}[0]
+    final fun addRow(kotlin/IntArray, kotlin/LongArray, com.eignex.klause.lp.engine/Relation, kotlin/Long, kotlin/Boolean = ..., com.eignex.klause.lp.engine/LpRowPremises? = ...) // com.eignex.klause.lp.engine/LpBuilder.addRow|addRow(kotlin.IntArray;kotlin.LongArray;com.eignex.klause.lp.engine.Relation;kotlin.Long;kotlin.Boolean;com.eignex.klause.lp.engine.LpRowPremises?){}[0]
+    final fun addVar(kotlin/Long, kotlin/Long, kotlin/Long = ..., kotlin/Int = ...): kotlin/Int // com.eignex.klause.lp.engine/LpBuilder.addVar|addVar(kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Int){}[0]
+    final fun build(com.eignex.klause.lp.engine/Sense): com.eignex.klause.lp.engine/LpModel // com.eignex.klause.lp.engine/LpBuilder.build|build(com.eignex.klause.lp.engine.Sense){}[0]
+}
+
+final class com.eignex.klause.lp.engine/LpConditioning { // com.eignex.klause.lp.engine/LpConditioning|null[0]
+    constructor <init>(kotlin/Double, kotlin/Double, kotlin/Double, kotlin/Double, kotlin/Int) // com.eignex.klause.lp.engine/LpConditioning.<init>|<init>(kotlin.Double;kotlin.Double;kotlin.Double;kotlin.Double;kotlin.Int){}[0]
+
+    final val columnRatio // com.eignex.klause.lp.engine/LpConditioning.columnRatio|{}columnRatio[0]
+        final fun <get-columnRatio>(): kotlin/Double // com.eignex.klause.lp.engine/LpConditioning.columnRatio.<get-columnRatio>|<get-columnRatio>(){}[0]
+    final val entries // com.eignex.klause.lp.engine/LpConditioning.entries|{}entries[0]
+        final fun <get-entries>(): kotlin/Int // com.eignex.klause.lp.engine/LpConditioning.entries.<get-entries>|<get-entries>(){}[0]
+    final val matrixRatio // com.eignex.klause.lp.engine/LpConditioning.matrixRatio|{}matrixRatio[0]
+        final fun <get-matrixRatio>(): kotlin/Double // com.eignex.klause.lp.engine/LpConditioning.matrixRatio.<get-matrixRatio>|<get-matrixRatio>(){}[0]
+    final val maxValue // com.eignex.klause.lp.engine/LpConditioning.maxValue|{}maxValue[0]
+        final fun <get-maxValue>(): kotlin/Double // com.eignex.klause.lp.engine/LpConditioning.maxValue.<get-maxValue>|<get-maxValue>(){}[0]
+    final val minValue // com.eignex.klause.lp.engine/LpConditioning.minValue|{}minValue[0]
+        final fun <get-minValue>(): kotlin/Double // com.eignex.klause.lp.engine/LpConditioning.minValue.<get-minValue>|<get-minValue>(){}[0]
+    final val rowRatio // com.eignex.klause.lp.engine/LpConditioning.rowRatio|{}rowRatio[0]
+        final fun <get-rowRatio>(): kotlin/Double // com.eignex.klause.lp.engine/LpConditioning.rowRatio.<get-rowRatio>|<get-rowRatio>(){}[0]
+    final val withinHighsNoScalingWindow // com.eignex.klause.lp.engine/LpConditioning.withinHighsNoScalingWindow|{}withinHighsNoScalingWindow[0]
+        final fun <get-withinHighsNoScalingWindow>(): kotlin/Boolean // com.eignex.klause.lp.engine/LpConditioning.withinHighsNoScalingWindow.<get-withinHighsNoScalingWindow>|<get-withinHighsNoScalingWindow>(){}[0]
+}
+
+final class com.eignex.klause.lp.engine/LpDoubleView : com.eignex.klause.simplex.exact/ExactSimplexDoubleView { // com.eignex.klause.lp.engine/LpDoubleView|null[0]
+    constructor <init>(kotlin/IntArray, kotlin/IntArray, kotlin/DoubleArray, kotlin/DoubleArray, kotlin/DoubleArray, kotlin/DoubleArray, kotlin/BooleanArray, kotlin/Double, kotlin/DoubleArray) // com.eignex.klause.lp.engine/LpDoubleView.<init>|<init>(kotlin.IntArray;kotlin.IntArray;kotlin.DoubleArray;kotlin.DoubleArray;kotlin.DoubleArray;kotlin.DoubleArray;kotlin.BooleanArray;kotlin.Double;kotlin.DoubleArray){}[0]
+
+    final val colPtr // com.eignex.klause.lp.engine/LpDoubleView.colPtr|{}colPtr[0]
+        final fun <get-colPtr>(): kotlin/IntArray // com.eignex.klause.lp.engine/LpDoubleView.colPtr.<get-colPtr>|<get-colPtr>(){}[0]
+    final val colVal // com.eignex.klause.lp.engine/LpDoubleView.colVal|{}colVal[0]
+        final fun <get-colVal>(): kotlin/DoubleArray // com.eignex.klause.lp.engine/LpDoubleView.colVal.<get-colVal>|<get-colVal>(){}[0]
+    final val cost // com.eignex.klause.lp.engine/LpDoubleView.cost|{}cost[0]
+        final fun <get-cost>(): kotlin/DoubleArray // com.eignex.klause.lp.engine/LpDoubleView.cost.<get-cost>|<get-cost>(){}[0]
+    final val hasUpper // com.eignex.klause.lp.engine/LpDoubleView.hasUpper|{}hasUpper[0]
+        final fun <get-hasUpper>(): kotlin/BooleanArray // com.eignex.klause.lp.engine/LpDoubleView.hasUpper.<get-hasUpper>|<get-hasUpper>(){}[0]
+    final val loShift // com.eignex.klause.lp.engine/LpDoubleView.loShift|{}loShift[0]
+        final fun <get-loShift>(): kotlin/DoubleArray // com.eignex.klause.lp.engine/LpDoubleView.loShift.<get-loShift>|<get-loShift>(){}[0]
+    final val rhs // com.eignex.klause.lp.engine/LpDoubleView.rhs|{}rhs[0]
+        final fun <get-rhs>(): kotlin/DoubleArray // com.eignex.klause.lp.engine/LpDoubleView.rhs.<get-rhs>|<get-rhs>(){}[0]
+    final val rowIdx // com.eignex.klause.lp.engine/LpDoubleView.rowIdx|{}rowIdx[0]
+        final fun <get-rowIdx>(): kotlin/IntArray // com.eignex.klause.lp.engine/LpDoubleView.rowIdx.<get-rowIdx>|<get-rowIdx>(){}[0]
+    final val upper // com.eignex.klause.lp.engine/LpDoubleView.upper|{}upper[0]
+        final fun <get-upper>(): kotlin/DoubleArray // com.eignex.klause.lp.engine/LpDoubleView.upper.<get-upper>|<get-upper>(){}[0]
+
+    final var objConstant // com.eignex.klause.lp.engine/LpDoubleView.objConstant|{}objConstant[0]
+        final fun <get-objConstant>(): kotlin/Double // com.eignex.klause.lp.engine/LpDoubleView.objConstant.<get-objConstant>|<get-objConstant>(){}[0]
+        final fun <set-objConstant>(kotlin/Double) // com.eignex.klause.lp.engine/LpDoubleView.objConstant.<set-objConstant>|<set-objConstant>(kotlin.Double){}[0]
+}
+
+final class com.eignex.klause.lp.engine/LpModel : com.eignex.klause.simplex.exact/ExactSimplexModel { // com.eignex.klause.lp.engine/LpModel|null[0]
+    constructor <init>(kotlin/Int, kotlin/Int, com.eignex.klause.lp.engine/Csc, kotlin/LongArray, kotlin/LongArray, kotlin/LongArray, kotlin/BooleanArray, kotlin/LongArray, kotlin/Long, com.eignex.klause.lp.engine/Sense, kotlin/IntArray, kotlin/BooleanArray = ..., kotlin/BooleanArray = ..., kotlin/Array<com.eignex.klause.lp.engine/LpRowPremises?> = ..., kotlin/LongArray = ..., kotlin/BooleanArray = ..., kotlin/BooleanArray = ..., kotlin/BooleanArray = ..., com.eignex.klause.lp.engine/LpDoubleView? = ...) // com.eignex.klause.lp.engine/LpModel.<init>|<init>(kotlin.Int;kotlin.Int;com.eignex.klause.lp.engine.Csc;kotlin.LongArray;kotlin.LongArray;kotlin.LongArray;kotlin.BooleanArray;kotlin.LongArray;kotlin.Long;com.eignex.klause.lp.engine.Sense;kotlin.IntArray;kotlin.BooleanArray;kotlin.BooleanArray;kotlin.Array<com.eignex.klause.lp.engine.LpRowPremises?>;kotlin.LongArray;kotlin.BooleanArray;kotlin.BooleanArray;kotlin.BooleanArray;com.eignex.klause.lp.engine.LpDoubleView?){}[0]
+
+    final val colContinuous // com.eignex.klause.lp.engine/LpModel.colContinuous|{}colContinuous[0]
+        final fun <get-colContinuous>(): kotlin/BooleanArray // com.eignex.klause.lp.engine/LpModel.colContinuous.<get-colContinuous>|<get-colContinuous>(){}[0]
+    final val cost // com.eignex.klause.lp.engine/LpModel.cost|{}cost[0]
+        final fun <get-cost>(): kotlin/LongArray // com.eignex.klause.lp.engine/LpModel.cost.<get-cost>|<get-cost>(){}[0]
+    final val csc // com.eignex.klause.lp.engine/LpModel.csc|{}csc[0]
+        final fun <get-csc>(): com.eignex.klause.lp.engine/Csc // com.eignex.klause.lp.engine/LpModel.csc.<get-csc>|<get-csc>(){}[0]
+    final val doubleView // com.eignex.klause.lp.engine/LpModel.doubleView|{}doubleView[0]
+        final fun <get-doubleView>(): com.eignex.klause.lp.engine/LpDoubleView? // com.eignex.klause.lp.engine/LpModel.doubleView.<get-doubleView>|<get-doubleView>(){}[0]
+    final val flippedRhs // com.eignex.klause.lp.engine/LpModel.flippedRhs|{}flippedRhs[0]
+        final fun <get-flippedRhs>(): kotlin/LongArray // com.eignex.klause.lp.engine/LpModel.flippedRhs.<get-flippedRhs>|<get-flippedRhs>(){}[0]
+    final val hasContinuous // com.eignex.klause.lp.engine/LpModel.hasContinuous|{}hasContinuous[0]
+        final fun <get-hasContinuous>(): kotlin/Boolean // com.eignex.klause.lp.engine/LpModel.hasContinuous.<get-hasContinuous>|<get-hasContinuous>(){}[0]
+    final val hasUpper // com.eignex.klause.lp.engine/LpModel.hasUpper|{}hasUpper[0]
+        final fun <get-hasUpper>(): kotlin/BooleanArray // com.eignex.klause.lp.engine/LpModel.hasUpper.<get-hasUpper>|<get-hasUpper>(){}[0]
+    final val loShift // com.eignex.klause.lp.engine/LpModel.loShift|{}loShift[0]
+        final fun <get-loShift>(): kotlin/LongArray // com.eignex.klause.lp.engine/LpModel.loShift.<get-loShift>|<get-loShift>(){}[0]
+    final val m // com.eignex.klause.lp.engine/LpModel.m|{}m[0]
+        final fun <get-m>(): kotlin/Int // com.eignex.klause.lp.engine/LpModel.m.<get-m>|<get-m>(){}[0]
+    final val n // com.eignex.klause.lp.engine/LpModel.n|{}n[0]
+        final fun <get-n>(): kotlin/Int // com.eignex.klause.lp.engine/LpModel.n.<get-n>|<get-n>(){}[0]
+    final val numVars // com.eignex.klause.lp.engine/LpModel.numVars|{}numVars[0]
+        final fun <get-numVars>(): kotlin/Int // com.eignex.klause.lp.engine/LpModel.numVars.<get-numVars>|<get-numVars>(){}[0]
+    final val objConstant // com.eignex.klause.lp.engine/LpModel.objConstant|{}objConstant[0]
+        final fun <get-objConstant>(): kotlin/Long // com.eignex.klause.lp.engine/LpModel.objConstant.<get-objConstant>|<get-objConstant>(){}[0]
+    final val objConstantD // com.eignex.klause.lp.engine/LpModel.objConstantD|{}objConstantD[0]
+        final fun <get-objConstantD>(): kotlin/Double // com.eignex.klause.lp.engine/LpModel.objConstantD.<get-objConstantD>|<get-objConstantD>(){}[0]
+    final val probeClampedHi // com.eignex.klause.lp.engine/LpModel.probeClampedHi|{}probeClampedHi[0]
+        final fun <get-probeClampedHi>(): kotlin/BooleanArray // com.eignex.klause.lp.engine/LpModel.probeClampedHi.<get-probeClampedHi>|<get-probeClampedHi>(){}[0]
+    final val probeClampedLo // com.eignex.klause.lp.engine/LpModel.probeClampedLo|{}probeClampedLo[0]
+        final fun <get-probeClampedLo>(): kotlin/BooleanArray // com.eignex.klause.lp.engine/LpModel.probeClampedLo.<get-probeClampedLo>|<get-probeClampedLo>(){}[0]
+    final val rhs // com.eignex.klause.lp.engine/LpModel.rhs|{}rhs[0]
+        final fun <get-rhs>(): kotlin/LongArray // com.eignex.klause.lp.engine/LpModel.rhs.<get-rhs>|<get-rhs>(){}[0]
+    final val rowGlobal // com.eignex.klause.lp.engine/LpModel.rowGlobal|{}rowGlobal[0]
+        final fun <get-rowGlobal>(): kotlin/BooleanArray // com.eignex.klause.lp.engine/LpModel.rowGlobal.<get-rowGlobal>|<get-rowGlobal>(){}[0]
+    final val rowPremises // com.eignex.klause.lp.engine/LpModel.rowPremises|{}rowPremises[0]
+        final fun <get-rowPremises>(): kotlin/Array<com.eignex.klause.lp.engine/LpRowPremises?> // com.eignex.klause.lp.engine/LpModel.rowPremises.<get-rowPremises>|<get-rowPremises>(){}[0]
+    final val rowStrict // com.eignex.klause.lp.engine/LpModel.rowStrict|{}rowStrict[0]
+        final fun <get-rowStrict>(): kotlin/BooleanArray // com.eignex.klause.lp.engine/LpModel.rowStrict.<get-rowStrict>|<get-rowStrict>(){}[0]
+    final val sense // com.eignex.klause.lp.engine/LpModel.sense|{}sense[0]
+        final fun <get-sense>(): com.eignex.klause.lp.engine/Sense // com.eignex.klause.lp.engine/LpModel.sense.<get-sense>|<get-sense>(){}[0]
+    final val tag // com.eignex.klause.lp.engine/LpModel.tag|{}tag[0]
+        final fun <get-tag>(): kotlin/IntArray // com.eignex.klause.lp.engine/LpModel.tag.<get-tag>|<get-tag>(){}[0]
+    final val upper // com.eignex.klause.lp.engine/LpModel.upper|{}upper[0]
+        final fun <get-upper>(): kotlin/LongArray // com.eignex.klause.lp.engine/LpModel.upper.<get-upper>|<get-upper>(){}[0]
+
+    final fun costD(kotlin/Int): kotlin/Double // com.eignex.klause.lp.engine/LpModel.costD|costD(kotlin.Int){}[0]
+    final fun forEachExactColumn(kotlin/Int, kotlin/Function2<kotlin/Int, kotlin/Long, kotlin/Unit>) // com.eignex.klause.lp.engine/LpModel.forEachExactColumn|forEachExactColumn(kotlin.Int;kotlin.Function2<kotlin.Int,kotlin.Long,kotlin.Unit>){}[0]
+    final fun hasFiniteUpper(kotlin/Int): kotlin/Boolean // com.eignex.klause.lp.engine/LpModel.hasFiniteUpper|hasFiniteUpper(kotlin.Int){}[0]
+    final fun loShiftD(kotlin/Int): kotlin/Double // com.eignex.klause.lp.engine/LpModel.loShiftD|loShiftD(kotlin.Int){}[0]
+    final fun rebind(kotlin/LongArray, kotlin/LongArray): com.eignex.klause.lp.engine/LpModel // com.eignex.klause.lp.engine/LpModel.rebind|rebind(kotlin.LongArray;kotlin.LongArray){}[0]
+    final fun rhsD(kotlin/Int): kotlin/Double // com.eignex.klause.lp.engine/LpModel.rhsD|rhsD(kotlin.Int){}[0]
+    final fun slackCol(kotlin/Int): kotlin/Int // com.eignex.klause.lp.engine/LpModel.slackCol|slackCol(kotlin.Int){}[0]
+    final fun upperD(kotlin/Int): kotlin/Double // com.eignex.klause.lp.engine/LpModel.upperD|upperD(kotlin.Int){}[0]
+    final fun withRowObjective(kotlin/IntArray, kotlin/LongArray, kotlin/IntArray): com.eignex.klause.lp.engine/LpModel // com.eignex.klause.lp.engine/LpModel.withRowObjective|withRowObjective(kotlin.IntArray;kotlin.LongArray;kotlin.IntArray){}[0]
+    final fun withSingleColumnObjective(kotlin/Int, kotlin/Long, kotlin/Int, kotlin/Int = ..., kotlin/Int = ...): com.eignex.klause.lp.engine/LpModel // com.eignex.klause.lp.engine/LpModel.withSingleColumnObjective|withSingleColumnObjective(kotlin.Int;kotlin.Long;kotlin.Int;kotlin.Int;kotlin.Int){}[0]
+    final inline fun forEachInColumn(kotlin/Int, kotlin/Function2<kotlin/Int, kotlin/Long, kotlin/Unit>) // com.eignex.klause.lp.engine/LpModel.forEachInColumn|forEachInColumn(kotlin.Int;kotlin.Function2<kotlin.Int,kotlin.Long,kotlin.Unit>){}[0]
+    final inline fun forEachInColumnD(kotlin/Int, kotlin/Function2<kotlin/Int, kotlin/Double, kotlin/Unit>) // com.eignex.klause.lp.engine/LpModel.forEachInColumnD|forEachInColumnD(kotlin.Int;kotlin.Function2<kotlin.Int,kotlin.Double,kotlin.Unit>){}[0]
+}
+
+final class com.eignex.klause.lp.engine/LpNeighborhood { // com.eignex.klause.lp.engine/LpNeighborhood|null[0]
+    constructor <init>(com.eignex.klause.lp.engine/LpModel, kotlin/IntArray?, kotlin/IntArray, kotlin/IntArray) // com.eignex.klause.lp.engine/LpNeighborhood.<init>|<init>(com.eignex.klause.lp.engine.LpModel;kotlin.IntArray?;kotlin.IntArray;kotlin.IntArray){}[0]
+
+    final val colMap // com.eignex.klause.lp.engine/LpNeighborhood.colMap|{}colMap[0]
+        final fun <get-colMap>(): kotlin/IntArray? // com.eignex.klause.lp.engine/LpNeighborhood.colMap.<get-colMap>|<get-colMap>(){}[0]
+    final val cols // com.eignex.klause.lp.engine/LpNeighborhood.cols|{}cols[0]
+        final fun <get-cols>(): kotlin/IntArray // com.eignex.klause.lp.engine/LpNeighborhood.cols.<get-cols>|<get-cols>(){}[0]
+    final val model // com.eignex.klause.lp.engine/LpNeighborhood.model|{}model[0]
+        final fun <get-model>(): com.eignex.klause.lp.engine/LpModel // com.eignex.klause.lp.engine/LpNeighborhood.model.<get-model>|<get-model>(){}[0]
+    final val rows // com.eignex.klause.lp.engine/LpNeighborhood.rows|{}rows[0]
+        final fun <get-rows>(): kotlin/IntArray // com.eignex.klause.lp.engine/LpNeighborhood.rows.<get-rows>|<get-rows>(){}[0]
+
+    final fun colOf(kotlin/Int): kotlin/Int // com.eignex.klause.lp.engine/LpNeighborhood.colOf|colOf(kotlin.Int){}[0]
+}
+
+final class com.eignex.klause.lp.engine/LpRowIndex { // com.eignex.klause.lp.engine/LpRowIndex|null[0]
+    constructor <init>(kotlin/IntArray, kotlin/IntArray) // com.eignex.klause.lp.engine/LpRowIndex.<init>|<init>(kotlin.IntArray;kotlin.IntArray){}[0]
+
+    final val colIdx // com.eignex.klause.lp.engine/LpRowIndex.colIdx|{}colIdx[0]
+        final fun <get-colIdx>(): kotlin/IntArray // com.eignex.klause.lp.engine/LpRowIndex.colIdx.<get-colIdx>|<get-colIdx>(){}[0]
+    final val rowPtr // com.eignex.klause.lp.engine/LpRowIndex.rowPtr|{}rowPtr[0]
+        final fun <get-rowPtr>(): kotlin/IntArray // com.eignex.klause.lp.engine/LpRowIndex.rowPtr.<get-rowPtr>|<get-rowPtr>(){}[0]
+}
+
+final class com.eignex.klause.lp.engine/LpRowPremises { // com.eignex.klause.lp.engine/LpRowPremises|null[0]
+    constructor <init>(kotlin/IntArray, kotlin/BooleanArray, kotlin/LongArray, kotlin/IntArray = ...) // com.eignex.klause.lp.engine/LpRowPremises.<init>|<init>(kotlin.IntArray;kotlin.BooleanArray;kotlin.LongArray;kotlin.IntArray){}[0]
+
+    final val boolLits // com.eignex.klause.lp.engine/LpRowPremises.boolLits|{}boolLits[0]
+        final fun <get-boolLits>(): kotlin/IntArray // com.eignex.klause.lp.engine/LpRowPremises.boolLits.<get-boolLits>|<get-boolLits>(){}[0]
+    final val isUpper // com.eignex.klause.lp.engine/LpRowPremises.isUpper|{}isUpper[0]
+        final fun <get-isUpper>(): kotlin/BooleanArray // com.eignex.klause.lp.engine/LpRowPremises.isUpper.<get-isUpper>|<get-isUpper>(){}[0]
+    final val thresholds // com.eignex.klause.lp.engine/LpRowPremises.thresholds|{}thresholds[0]
+        final fun <get-thresholds>(): kotlin/LongArray // com.eignex.klause.lp.engine/LpRowPremises.thresholds.<get-thresholds>|<get-thresholds>(){}[0]
+    final val vars // com.eignex.klause.lp.engine/LpRowPremises.vars|{}vars[0]
+        final fun <get-vars>(): kotlin/IntArray // com.eignex.klause.lp.engine/LpRowPremises.vars.<get-vars>|<get-vars>(){}[0]
+}
+
+final class com.eignex.klause.lp.engine/RevisedSimplex : com.eignex.klause.lp.engine/PersistentLpSolver, com.eignex.klause.lp.engine/TableauCutSolver { // com.eignex.klause.lp.engine/RevisedSimplex|null[0]
+    constructor <init>(com.eignex.klause.lp.engine/LpModel, com.eignex.klause.util/Cancellation = ..., kotlin/Int = ..., kotlin/Int = ..., kotlin/Long = ..., kotlin/Boolean = ...) // com.eignex.klause.lp.engine/RevisedSimplex.<init>|<init>(com.eignex.klause.lp.engine.LpModel;com.eignex.klause.util.Cancellation;kotlin.Int;kotlin.Int;kotlin.Long;kotlin.Boolean){}[0]
+
+    final val lastColumns // com.eignex.klause.lp.engine/RevisedSimplex.lastColumns|{}lastColumns[0]
+        final fun <get-lastColumns>(): kotlin/Int // com.eignex.klause.lp.engine/RevisedSimplex.lastColumns.<get-lastColumns>|<get-lastColumns>(){}[0]
+    final val lastDegenerateColumns // com.eignex.klause.lp.engine/RevisedSimplex.lastDegenerateColumns|{}lastDegenerateColumns[0]
+        final fun <get-lastDegenerateColumns>(): kotlin/Int // com.eignex.klause.lp.engine/RevisedSimplex.lastDegenerateColumns.<get-lastDegenerateColumns>|<get-lastDegenerateColumns>(){}[0]
+    final val lastPivots // com.eignex.klause.lp.engine/RevisedSimplex.lastPivots|{}lastPivots[0]
+        final fun <get-lastPivots>(): kotlin/Int // com.eignex.klause.lp.engine/RevisedSimplex.lastPivots.<get-lastPivots>|<get-lastPivots>(){}[0]
+    final val lastRefactorizations // com.eignex.klause.lp.engine/RevisedSimplex.lastRefactorizations|{}lastRefactorizations[0]
+        final fun <get-lastRefactorizations>(): kotlin/Int // com.eignex.klause.lp.engine/RevisedSimplex.lastRefactorizations.<get-lastRefactorizations>|<get-lastRefactorizations>(){}[0]
+    final val lastSingularRefactorizations // com.eignex.klause.lp.engine/RevisedSimplex.lastSingularRefactorizations|{}lastSingularRefactorizations[0]
+        final fun <get-lastSingularRefactorizations>(): kotlin/Int // com.eignex.klause.lp.engine/RevisedSimplex.lastSingularRefactorizations.<get-lastSingularRefactorizations>|<get-lastSingularRefactorizations>(){}[0]
+    final val lastSmallPivotBails // com.eignex.klause.lp.engine/RevisedSimplex.lastSmallPivotBails|{}lastSmallPivotBails[0]
+        final fun <get-lastSmallPivotBails>(): kotlin/Int // com.eignex.klause.lp.engine/RevisedSimplex.lastSmallPivotBails.<get-lastSmallPivotBails>|<get-lastSmallPivotBails>(){}[0]
+    final val lastWarmStarted // com.eignex.klause.lp.engine/RevisedSimplex.lastWarmStarted|{}lastWarmStarted[0]
+        final fun <get-lastWarmStarted>(): kotlin/Boolean // com.eignex.klause.lp.engine/RevisedSimplex.lastWarmStarted.<get-lastWarmStarted>|<get-lastWarmStarted>(){}[0]
+    final val lastWorkOps // com.eignex.klause.lp.engine/RevisedSimplex.lastWorkOps|{}lastWorkOps[0]
+        final fun <get-lastWorkOps>(): kotlin/Long // com.eignex.klause.lp.engine/RevisedSimplex.lastWorkOps.<get-lastWorkOps>|<get-lastWorkOps>(){}[0]
+
+    final var infeasibleBasis // com.eignex.klause.lp.engine/RevisedSimplex.infeasibleBasis|{}infeasibleBasis[0]
+        final fun <get-infeasibleBasis>(): com.eignex.klause.lp.engine/Basis? // com.eignex.klause.lp.engine/RevisedSimplex.infeasibleBasis.<get-infeasibleBasis>|<get-infeasibleBasis>(){}[0]
+    final var infeasibleRay // com.eignex.klause.lp.engine/RevisedSimplex.infeasibleRay|{}infeasibleRay[0]
+        final fun <get-infeasibleRay>(): kotlin/DoubleArray? // com.eignex.klause.lp.engine/RevisedSimplex.infeasibleRay.<get-infeasibleRay>|<get-infeasibleRay>(){}[0]
+    final var infeasibleRow // com.eignex.klause.lp.engine/RevisedSimplex.infeasibleRow|{}infeasibleRow[0]
+        final fun <get-infeasibleRow>(): kotlin/Int // com.eignex.klause.lp.engine/RevisedSimplex.infeasibleRow.<get-infeasibleRow>|<get-infeasibleRow>(){}[0]
+
+    final fun close() // com.eignex.klause.lp.engine/RevisedSimplex.close|close(){}[0]
+    final fun gomoryCuts(kotlin/Int): kotlin.collections/List<com.eignex.klause.lp.engine/Cut> // com.eignex.klause.lp.engine/RevisedSimplex.gomoryCuts|gomoryCuts(kotlin.Int){}[0]
+    final fun mirCuts(kotlin/Int): kotlin.collections/List<com.eignex.klause.lp.engine/Cut> // com.eignex.klause.lp.engine/RevisedSimplex.mirCuts|mirCuts(kotlin.Int){}[0]
+    final fun rebind(com.eignex.klause.lp.engine/LpModel, com.eignex.klause.util/Cancellation): kotlin/Boolean // com.eignex.klause.lp.engine/RevisedSimplex.rebind|rebind(com.eignex.klause.lp.engine.LpModel;com.eignex.klause.util.Cancellation){}[0]
+    final fun resolveBounds(): com.eignex.klause.lp.engine/FloatLpResult? // com.eignex.klause.lp.engine/RevisedSimplex.resolveBounds|resolveBounds(){}[0]
+    final fun resolveGated(kotlin/BooleanArray): com.eignex.klause.lp.engine/FloatLpResult? // com.eignex.klause.lp.engine/RevisedSimplex.resolveGated|resolveGated(kotlin.BooleanArray){}[0]
+    final fun solve(com.eignex.klause.lp.engine/Basis?): com.eignex.klause.lp.engine/FloatLpResult? // com.eignex.klause.lp.engine/RevisedSimplex.solve|solve(com.eignex.klause.lp.engine.Basis?){}[0]
+    final fun solvePrimal(com.eignex.klause.lp.engine/Basis?): com.eignex.klause.lp.engine/FloatLpResult? // com.eignex.klause.lp.engine/RevisedSimplex.solvePrimal|solvePrimal(com.eignex.klause.lp.engine.Basis?){}[0]
+}
+
+final class com.eignex.klause.lp.lattice/HermiteForm { // com.eignex.klause.lp.lattice/HermiteForm|null[0]
+    constructor <init>(kotlin.collections/List<com.eignex.klause.lp.lattice/SparseIntRow>, com.eignex.klause.lp.lattice/UnimodularTransform) // com.eignex.klause.lp.lattice/HermiteForm.<init>|<init>(kotlin.collections.List<com.eignex.klause.lp.lattice.SparseIntRow>;com.eignex.klause.lp.lattice.UnimodularTransform){}[0]
+
+    final val h // com.eignex.klause.lp.lattice/HermiteForm.h|{}h[0]
+        final fun <get-h>(): kotlin.collections/List<com.eignex.klause.lp.lattice/SparseIntRow> // com.eignex.klause.lp.lattice/HermiteForm.h.<get-h>|<get-h>(){}[0]
+    final val v // com.eignex.klause.lp.lattice/HermiteForm.v|{}v[0]
+        final fun <get-v>(): com.eignex.klause.lp.lattice/UnimodularTransform // com.eignex.klause.lp.lattice/HermiteForm.v.<get-v>|<get-v>(){}[0]
+}
+
+final class com.eignex.klause.lp.lattice/MixedEchelonHermite { // com.eignex.klause.lp.lattice/MixedEchelonHermite|null[0]
+    constructor <init>(kotlin.collections/List<com.eignex.klause.lp.lattice/SparseIntRow>, kotlin.collections/List<com.eignex.klause.lp.lattice/SparseIntRow>, com.eignex.klause.lp.lattice/UnimodularTransform, kotlin/Array<com.ionspin.kotlin.bignum.integer/BigInteger> = ..., kotlin/Boolean = ...) // com.eignex.klause.lp.lattice/MixedEchelonHermite.<init>|<init>(kotlin.collections.List<com.eignex.klause.lp.lattice.SparseIntRow>;kotlin.collections.List<com.eignex.klause.lp.lattice.SparseIntRow>;com.eignex.klause.lp.lattice.UnimodularTransform;kotlin.Array<com.ionspin.kotlin.bignum.integer.BigInteger>;kotlin.Boolean){}[0]
+
+    final val equalities // com.eignex.klause.lp.lattice/MixedEchelonHermite.equalities|{}equalities[0]
+        final fun <get-equalities>(): kotlin.collections/List<com.eignex.klause.lp.lattice/SparseIntRow> // com.eignex.klause.lp.lattice/MixedEchelonHermite.equalities.<get-equalities>|<get-equalities>(){}[0]
+    final val equalityRhs // com.eignex.klause.lp.lattice/MixedEchelonHermite.equalityRhs|{}equalityRhs[0]
+        final fun <get-equalityRhs>(): kotlin/Array<com.ionspin.kotlin.bignum.integer/BigInteger> // com.eignex.klause.lp.lattice/MixedEchelonHermite.equalityRhs.<get-equalityRhs>|<get-equalityRhs>(){}[0]
+    final val inconsistent // com.eignex.klause.lp.lattice/MixedEchelonHermite.inconsistent|{}inconsistent[0]
+        final fun <get-inconsistent>(): kotlin/Boolean // com.eignex.klause.lp.lattice/MixedEchelonHermite.inconsistent.<get-inconsistent>|<get-inconsistent>(){}[0]
+    final val inequalities // com.eignex.klause.lp.lattice/MixedEchelonHermite.inequalities|{}inequalities[0]
+        final fun <get-inequalities>(): kotlin.collections/List<com.eignex.klause.lp.lattice/SparseIntRow> // com.eignex.klause.lp.lattice/MixedEchelonHermite.inequalities.<get-inequalities>|<get-inequalities>(){}[0]
+    final val transform // com.eignex.klause.lp.lattice/MixedEchelonHermite.transform|{}transform[0]
+        final fun <get-transform>(): com.eignex.klause.lp.lattice/UnimodularTransform // com.eignex.klause.lp.lattice/MixedEchelonHermite.transform.<get-transform>|<get-transform>(){}[0]
+
+    final fun recover(kotlin/Array<com.ionspin.kotlin.bignum.integer/BigInteger>): kotlin/Array<com.ionspin.kotlin.bignum.integer/BigInteger> // com.eignex.klause.lp.lattice/MixedEchelonHermite.recover|recover(kotlin.Array<com.ionspin.kotlin.bignum.integer.BigInteger>){}[0]
+}
+
+final class com.eignex.klause.lp.lattice/SparseIntRow { // com.eignex.klause.lp.lattice/SparseIntRow|null[0]
+    constructor <init>(kotlin/IntArray, kotlin/Array<com.ionspin.kotlin.bignum.integer/BigInteger>) // com.eignex.klause.lp.lattice/SparseIntRow.<init>|<init>(kotlin.IntArray;kotlin.Array<com.ionspin.kotlin.bignum.integer.BigInteger>){}[0]
+
+    final val index // com.eignex.klause.lp.lattice/SparseIntRow.index|{}index[0]
+        final fun <get-index>(): kotlin/IntArray // com.eignex.klause.lp.lattice/SparseIntRow.index.<get-index>|<get-index>(){}[0]
+    final val isZero // com.eignex.klause.lp.lattice/SparseIntRow.isZero|{}isZero[0]
+        final fun <get-isZero>(): kotlin/Boolean // com.eignex.klause.lp.lattice/SparseIntRow.isZero.<get-isZero>|<get-isZero>(){}[0]
+    final val lead // com.eignex.klause.lp.lattice/SparseIntRow.lead|{}lead[0]
+        final fun <get-lead>(): kotlin/Int // com.eignex.klause.lp.lattice/SparseIntRow.lead.<get-lead>|<get-lead>(){}[0]
+    final val trail // com.eignex.klause.lp.lattice/SparseIntRow.trail|{}trail[0]
+        final fun <get-trail>(): kotlin/Int // com.eignex.klause.lp.lattice/SparseIntRow.trail.<get-trail>|<get-trail>(){}[0]
+    final val value // com.eignex.klause.lp.lattice/SparseIntRow.value|{}value[0]
+        final fun <get-value>(): kotlin/Array<com.ionspin.kotlin.bignum.integer/BigInteger> // com.eignex.klause.lp.lattice/SparseIntRow.value.<get-value>|<get-value>(){}[0]
+
+    final fun get(kotlin/Int): com.ionspin.kotlin.bignum.integer/BigInteger // com.eignex.klause.lp.lattice/SparseIntRow.get|get(kotlin.Int){}[0]
+
+    final object Companion { // com.eignex.klause.lp.lattice/SparseIntRow.Companion|null[0]
+        final val Zero // com.eignex.klause.lp.lattice/SparseIntRow.Companion.Zero|{}Zero[0]
+            final fun <get-Zero>(): com.eignex.klause.lp.lattice/SparseIntRow // com.eignex.klause.lp.lattice/SparseIntRow.Companion.Zero.<get-Zero>|<get-Zero>(){}[0]
+    }
+}
+
+final class com.eignex.klause.lp.lattice/TriangularBounds { // com.eignex.klause.lp.lattice/TriangularBounds|null[0]
+    constructor <init>(kotlin/Array<com.ionspin.kotlin.bignum.integer/BigInteger?>, kotlin/Array<com.ionspin.kotlin.bignum.integer/BigInteger?>) // com.eignex.klause.lp.lattice/TriangularBounds.<init>|<init>(kotlin.Array<com.ionspin.kotlin.bignum.integer.BigInteger?>;kotlin.Array<com.ionspin.kotlin.bignum.integer.BigInteger?>){}[0]
+
+    final val hi // com.eignex.klause.lp.lattice/TriangularBounds.hi|{}hi[0]
+        final fun <get-hi>(): kotlin/Array<com.ionspin.kotlin.bignum.integer/BigInteger?> // com.eignex.klause.lp.lattice/TriangularBounds.hi.<get-hi>|<get-hi>(){}[0]
+    final val lo // com.eignex.klause.lp.lattice/TriangularBounds.lo|{}lo[0]
+        final fun <get-lo>(): kotlin/Array<com.ionspin.kotlin.bignum.integer/BigInteger?> // com.eignex.klause.lp.lattice/TriangularBounds.lo.<get-lo>|<get-lo>(){}[0]
+}
+
+final class com.eignex.klause.lp.lattice/UnimodularTransform { // com.eignex.klause.lp.lattice/UnimodularTransform|null[0]
+    constructor <init>(kotlin/Int) // com.eignex.klause.lp.lattice/UnimodularTransform.<init>|<init>(kotlin.Int){}[0]
+
+    final val nonZeroCount // com.eignex.klause.lp.lattice/UnimodularTransform.nonZeroCount|{}nonZeroCount[0]
+        final fun <get-nonZeroCount>(): kotlin/Int // com.eignex.klause.lp.lattice/UnimodularTransform.nonZeroCount.<get-nonZeroCount>|<get-nonZeroCount>(){}[0]
+    final val size // com.eignex.klause.lp.lattice/UnimodularTransform.size|{}size[0]
+        final fun <get-size>(): kotlin/Int // com.eignex.klause.lp.lattice/UnimodularTransform.size.<get-size>|<get-size>(){}[0]
+
+    final fun addMultiple(kotlin/Int, kotlin/Int, com.ionspin.kotlin.bignum.integer/BigInteger) // com.eignex.klause.lp.lattice/UnimodularTransform.addMultiple|addMultiple(kotlin.Int;kotlin.Int;com.ionspin.kotlin.bignum.integer.BigInteger){}[0]
+    final fun columnOrNull(kotlin/Int): kotlin.collections/Map<kotlin/Int, com.ionspin.kotlin.bignum.integer/BigInteger>? // com.eignex.klause.lp.lattice/UnimodularTransform.columnOrNull|columnOrNull(kotlin.Int){}[0]
+    final fun get(kotlin/Int, kotlin/Int): com.ionspin.kotlin.bignum.integer/BigInteger // com.eignex.klause.lp.lattice/UnimodularTransform.get|get(kotlin.Int;kotlin.Int){}[0]
+    final fun inverse(): com.eignex.klause.lp.lattice/UnimodularTransform // com.eignex.klause.lp.lattice/UnimodularTransform.inverse|inverse(){}[0]
+    final fun negate(kotlin/Int) // com.eignex.klause.lp.lattice/UnimodularTransform.negate|negate(kotlin.Int){}[0]
+    final fun swap(kotlin/Int, kotlin/Int) // com.eignex.klause.lp.lattice/UnimodularTransform.swap|swap(kotlin.Int;kotlin.Int){}[0]
+    final inline fun forEachEntry(kotlin/Function3<kotlin/Int, kotlin/Int, com.ionspin.kotlin.bignum.integer/BigInteger, kotlin/Unit>) // com.eignex.klause.lp.lattice/UnimodularTransform.forEachEntry|forEachEntry(kotlin.Function3<kotlin.Int,kotlin.Int,com.ionspin.kotlin.bignum.integer.BigInteger,kotlin.Unit>){}[0]
+}
+
+final class com.eignex.klause.simplex.exact/BigFraction { // com.eignex.klause.simplex.exact/BigFraction|null[0]
+    final val den // com.eignex.klause.simplex.exact/BigFraction.den|{}den[0]
+        final fun <get-den>(): com.ionspin.kotlin.bignum.integer/BigInteger // com.eignex.klause.simplex.exact/BigFraction.den.<get-den>|<get-den>(){}[0]
+    final val isZero // com.eignex.klause.simplex.exact/BigFraction.isZero|{}isZero[0]
+        final fun <get-isZero>(): kotlin/Boolean // com.eignex.klause.simplex.exact/BigFraction.isZero.<get-isZero>|<get-isZero>(){}[0]
+    final val num // com.eignex.klause.simplex.exact/BigFraction.num|{}num[0]
+        final fun <get-num>(): com.ionspin.kotlin.bignum.integer/BigInteger // com.eignex.klause.simplex.exact/BigFraction.num.<get-num>|<get-num>(){}[0]
+
+    final fun compareTo(com.eignex.klause.simplex.exact/BigFraction): kotlin/Int // com.eignex.klause.simplex.exact/BigFraction.compareTo|compareTo(com.eignex.klause.simplex.exact.BigFraction){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.simplex.exact/BigFraction.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.eignex.klause.simplex.exact/BigFraction.hashCode|hashCode(){}[0]
+    final fun minus(com.eignex.klause.simplex.exact/BigFraction): com.eignex.klause.simplex.exact/BigFraction // com.eignex.klause.simplex.exact/BigFraction.minus|minus(com.eignex.klause.simplex.exact.BigFraction){}[0]
+    final fun negated(): com.eignex.klause.simplex.exact/BigFraction // com.eignex.klause.simplex.exact/BigFraction.negated|negated(){}[0]
+    final fun plus(com.eignex.klause.simplex.exact/BigFraction): com.eignex.klause.simplex.exact/BigFraction // com.eignex.klause.simplex.exact/BigFraction.plus|plus(com.eignex.klause.simplex.exact.BigFraction){}[0]
+    final fun reciprocal(): com.eignex.klause.simplex.exact/BigFraction // com.eignex.klause.simplex.exact/BigFraction.reciprocal|reciprocal(){}[0]
+    final fun signum(): kotlin/Int // com.eignex.klause.simplex.exact/BigFraction.signum|signum(){}[0]
+    final fun times(com.eignex.klause.simplex.exact/BigFraction): com.eignex.klause.simplex.exact/BigFraction // com.eignex.klause.simplex.exact/BigFraction.times|times(com.eignex.klause.simplex.exact.BigFraction){}[0]
+    final fun toDouble(): kotlin/Double // com.eignex.klause.simplex.exact/BigFraction.toDouble|toDouble(){}[0]
+    final fun toString(): kotlin/String // com.eignex.klause.simplex.exact/BigFraction.toString|toString(){}[0]
+
+    final object Companion { // com.eignex.klause.simplex.exact/BigFraction.Companion|null[0]
+        final val MINUS_ONE // com.eignex.klause.simplex.exact/BigFraction.Companion.MINUS_ONE|{}MINUS_ONE[0]
+            final fun <get-MINUS_ONE>(): com.eignex.klause.simplex.exact/BigFraction // com.eignex.klause.simplex.exact/BigFraction.Companion.MINUS_ONE.<get-MINUS_ONE>|<get-MINUS_ONE>(){}[0]
+        final val ONE // com.eignex.klause.simplex.exact/BigFraction.Companion.ONE|{}ONE[0]
+            final fun <get-ONE>(): com.eignex.klause.simplex.exact/BigFraction // com.eignex.klause.simplex.exact/BigFraction.Companion.ONE.<get-ONE>|<get-ONE>(){}[0]
+        final val ZERO // com.eignex.klause.simplex.exact/BigFraction.Companion.ZERO|{}ZERO[0]
+            final fun <get-ZERO>(): com.eignex.klause.simplex.exact/BigFraction // com.eignex.klause.simplex.exact/BigFraction.Companion.ZERO.<get-ZERO>|<get-ZERO>(){}[0]
+
+        final fun of(com.ionspin.kotlin.bignum.integer/BigInteger, com.ionspin.kotlin.bignum.integer/BigInteger): com.eignex.klause.simplex.exact/BigFraction // com.eignex.klause.simplex.exact/BigFraction.Companion.of|of(com.ionspin.kotlin.bignum.integer.BigInteger;com.ionspin.kotlin.bignum.integer.BigInteger){}[0]
+        final fun ofDouble(kotlin/Double): com.eignex.klause.simplex.exact/BigFraction? // com.eignex.klause.simplex.exact/BigFraction.Companion.ofDouble|ofDouble(kotlin.Double){}[0]
+        final fun ofLong(kotlin/Long): com.eignex.klause.simplex.exact/BigFraction // com.eignex.klause.simplex.exact/BigFraction.Companion.ofLong|ofLong(kotlin.Long){}[0]
+    }
+}
+
+final class com.eignex.klause.simplex.exact/BigRationalOutcome { // com.eignex.klause.simplex.exact/BigRationalOutcome|null[0]
+    constructor <init>(com.eignex.klause.simplex.exact/RationalFeasibility, kotlin.collections/List<com.eignex.klause.simplex.exact/BigFraction>? = ..., kotlin.collections/List<com.eignex.klause.simplex.exact/BigRationalTableauRow>? = ...) // com.eignex.klause.simplex.exact/BigRationalOutcome.<init>|<init>(com.eignex.klause.simplex.exact.RationalFeasibility;kotlin.collections.List<com.eignex.klause.simplex.exact.BigFraction>?;kotlin.collections.List<com.eignex.klause.simplex.exact.BigRationalTableauRow>?){}[0]
+
+    final val feasibility // com.eignex.klause.simplex.exact/BigRationalOutcome.feasibility|{}feasibility[0]
+        final fun <get-feasibility>(): com.eignex.klause.simplex.exact/RationalFeasibility // com.eignex.klause.simplex.exact/BigRationalOutcome.feasibility.<get-feasibility>|<get-feasibility>(){}[0]
+    final val tableau // com.eignex.klause.simplex.exact/BigRationalOutcome.tableau|{}tableau[0]
+        final fun <get-tableau>(): kotlin.collections/List<com.eignex.klause.simplex.exact/BigRationalTableauRow>? // com.eignex.klause.simplex.exact/BigRationalOutcome.tableau.<get-tableau>|<get-tableau>(){}[0]
+    final val witness // com.eignex.klause.simplex.exact/BigRationalOutcome.witness|{}witness[0]
+        final fun <get-witness>(): kotlin.collections/List<com.eignex.klause.simplex.exact/BigFraction>? // com.eignex.klause.simplex.exact/BigRationalOutcome.witness.<get-witness>|<get-witness>(){}[0]
+}
+
+final class com.eignex.klause.simplex.exact/BigRationalTableauRow { // com.eignex.klause.simplex.exact/BigRationalTableauRow|null[0]
+    constructor <init>(kotlin/Int, com.eignex.klause.simplex.exact/BigFraction, kotlin/IntArray, kotlin.collections/List<com.eignex.klause.simplex.exact/BigFraction>) // com.eignex.klause.simplex.exact/BigRationalTableauRow.<init>|<init>(kotlin.Int;com.eignex.klause.simplex.exact.BigFraction;kotlin.IntArray;kotlin.collections.List<com.eignex.klause.simplex.exact.BigFraction>){}[0]
+
+    final val basic // com.eignex.klause.simplex.exact/BigRationalTableauRow.basic|{}basic[0]
+        final fun <get-basic>(): kotlin/Int // com.eignex.klause.simplex.exact/BigRationalTableauRow.basic.<get-basic>|<get-basic>(){}[0]
+    final val coefficients // com.eignex.klause.simplex.exact/BigRationalTableauRow.coefficients|{}coefficients[0]
+        final fun <get-coefficients>(): kotlin.collections/List<com.eignex.klause.simplex.exact/BigFraction> // com.eignex.klause.simplex.exact/BigRationalTableauRow.coefficients.<get-coefficients>|<get-coefficients>(){}[0]
+    final val columns // com.eignex.klause.simplex.exact/BigRationalTableauRow.columns|{}columns[0]
+        final fun <get-columns>(): kotlin/IntArray // com.eignex.klause.simplex.exact/BigRationalTableauRow.columns.<get-columns>|<get-columns>(){}[0]
+    final val rhs // com.eignex.klause.simplex.exact/BigRationalTableauRow.rhs|{}rhs[0]
+        final fun <get-rhs>(): com.eignex.klause.simplex.exact/BigFraction // com.eignex.klause.simplex.exact/BigRationalTableauRow.rhs.<get-rhs>|<get-rhs>(){}[0]
+}
+
+final class com.eignex.klause.simplex.exact/ExactDoubleBoundedRow { // com.eignex.klause.simplex.exact/ExactDoubleBoundedRow|null[0]
+    constructor <init>(kotlin/Int, com.eignex.klause.simplex.exact/ExactRationalInequality, com.eignex.klause.simplex.exact/BigFraction) // com.eignex.klause.simplex.exact/ExactDoubleBoundedRow.<init>|<init>(kotlin.Int;com.eignex.klause.simplex.exact.ExactRationalInequality;com.eignex.klause.simplex.exact.BigFraction){}[0]
+
+    final val index // com.eignex.klause.simplex.exact/ExactDoubleBoundedRow.index|{}index[0]
+        final fun <get-index>(): kotlin/Int // com.eignex.klause.simplex.exact/ExactDoubleBoundedRow.index.<get-index>|<get-index>(){}[0]
+    final val inequality // com.eignex.klause.simplex.exact/ExactDoubleBoundedRow.inequality|{}inequality[0]
+        final fun <get-inequality>(): com.eignex.klause.simplex.exact/ExactRationalInequality // com.eignex.klause.simplex.exact/ExactDoubleBoundedRow.inequality.<get-inequality>|<get-inequality>(){}[0]
+    final val lower // com.eignex.klause.simplex.exact/ExactDoubleBoundedRow.lower|{}lower[0]
+        final fun <get-lower>(): com.eignex.klause.simplex.exact/BigFraction // com.eignex.klause.simplex.exact/ExactDoubleBoundedRow.lower.<get-lower>|<get-lower>(){}[0]
+}
+
+final class com.eignex.klause.simplex.exact/ExactRationalFeasibilityModel : com.eignex.klause.simplex.exact/ExactSimplexModel { // com.eignex.klause.simplex.exact/ExactRationalFeasibilityModel|null[0]
+    constructor <init>(kotlin/Int, kotlin.collections/List<com.eignex.klause.simplex.exact/ExactRationalInequality>, kotlin.collections/List<com.eignex.klause.simplex.exact/BigFraction?> = ...) // com.eignex.klause.simplex.exact/ExactRationalFeasibilityModel.<init>|<init>(kotlin.Int;kotlin.collections.List<com.eignex.klause.simplex.exact.ExactRationalInequality>;kotlin.collections.List<com.eignex.klause.simplex.exact.BigFraction?>){}[0]
+
+    final val bigView // com.eignex.klause.simplex.exact/ExactRationalFeasibilityModel.bigView|{}bigView[0]
+        final fun <get-bigView>(): com.eignex.klause.simplex.exact/ExactSimplexBigView // com.eignex.klause.simplex.exact/ExactRationalFeasibilityModel.bigView.<get-bigView>|<get-bigView>(){}[0]
+    final val doubleView // com.eignex.klause.simplex.exact/ExactRationalFeasibilityModel.doubleView|{}doubleView[0]
+        final fun <get-doubleView>(): com.eignex.klause.simplex.exact/ExactSimplexDoubleView? // com.eignex.klause.simplex.exact/ExactRationalFeasibilityModel.doubleView.<get-doubleView>|<get-doubleView>(){}[0]
+    final val hasUpper // com.eignex.klause.simplex.exact/ExactRationalFeasibilityModel.hasUpper|{}hasUpper[0]
+        final fun <get-hasUpper>(): kotlin/BooleanArray // com.eignex.klause.simplex.exact/ExactRationalFeasibilityModel.hasUpper.<get-hasUpper>|<get-hasUpper>(){}[0]
+    final val m // com.eignex.klause.simplex.exact/ExactRationalFeasibilityModel.m|{}m[0]
+        final fun <get-m>(): kotlin/Int // com.eignex.klause.simplex.exact/ExactRationalFeasibilityModel.m.<get-m>|<get-m>(){}[0]
+    final val n // com.eignex.klause.simplex.exact/ExactRationalFeasibilityModel.n|{}n[0]
+        final fun <get-n>(): kotlin/Int // com.eignex.klause.simplex.exact/ExactRationalFeasibilityModel.n.<get-n>|<get-n>(){}[0]
+    final val numVars // com.eignex.klause.simplex.exact/ExactRationalFeasibilityModel.numVars|{}numVars[0]
+        final fun <get-numVars>(): kotlin/Int // com.eignex.klause.simplex.exact/ExactRationalFeasibilityModel.numVars.<get-numVars>|<get-numVars>(){}[0]
+    final val probeClampedHi // com.eignex.klause.simplex.exact/ExactRationalFeasibilityModel.probeClampedHi|{}probeClampedHi[0]
+        final fun <get-probeClampedHi>(): kotlin/BooleanArray // com.eignex.klause.simplex.exact/ExactRationalFeasibilityModel.probeClampedHi.<get-probeClampedHi>|<get-probeClampedHi>(){}[0]
+    final val probeClampedLo // com.eignex.klause.simplex.exact/ExactRationalFeasibilityModel.probeClampedLo|{}probeClampedLo[0]
+        final fun <get-probeClampedLo>(): kotlin/BooleanArray // com.eignex.klause.simplex.exact/ExactRationalFeasibilityModel.probeClampedLo.<get-probeClampedLo>|<get-probeClampedLo>(){}[0]
+    final val rhs // com.eignex.klause.simplex.exact/ExactRationalFeasibilityModel.rhs|{}rhs[0]
+        final fun <get-rhs>(): kotlin/LongArray // com.eignex.klause.simplex.exact/ExactRationalFeasibilityModel.rhs.<get-rhs>|<get-rhs>(){}[0]
+    final val rowStrict // com.eignex.klause.simplex.exact/ExactRationalFeasibilityModel.rowStrict|{}rowStrict[0]
+        final fun <get-rowStrict>(): kotlin/BooleanArray // com.eignex.klause.simplex.exact/ExactRationalFeasibilityModel.rowStrict.<get-rowStrict>|<get-rowStrict>(){}[0]
+    final val upper // com.eignex.klause.simplex.exact/ExactRationalFeasibilityModel.upper|{}upper[0]
+        final fun <get-upper>(): kotlin/LongArray // com.eignex.klause.simplex.exact/ExactRationalFeasibilityModel.upper.<get-upper>|<get-upper>(){}[0]
+
+    final fun forEachExactColumn(kotlin/Int, kotlin/Function2<kotlin/Int, kotlin/Long, kotlin/Unit>) // com.eignex.klause.simplex.exact/ExactRationalFeasibilityModel.forEachExactColumn|forEachExactColumn(kotlin.Int;kotlin.Function2<kotlin.Int,kotlin.Long,kotlin.Unit>){}[0]
+    final fun loShiftD(kotlin/Int): kotlin/Double // com.eignex.klause.simplex.exact/ExactRationalFeasibilityModel.loShiftD|loShiftD(kotlin.Int){}[0]
+}
+
+final class com.eignex.klause.simplex.exact/ExactRationalInequality { // com.eignex.klause.simplex.exact/ExactRationalInequality|null[0]
+    constructor <init>(kotlin/IntArray, kotlin.collections/List<com.eignex.klause.simplex.exact/BigFraction>, com.eignex.klause.simplex.exact/BigFraction, kotlin/Boolean = ...) // com.eignex.klause.simplex.exact/ExactRationalInequality.<init>|<init>(kotlin.IntArray;kotlin.collections.List<com.eignex.klause.simplex.exact.BigFraction>;com.eignex.klause.simplex.exact.BigFraction;kotlin.Boolean){}[0]
+
+    final val coefficients // com.eignex.klause.simplex.exact/ExactRationalInequality.coefficients|{}coefficients[0]
+        final fun <get-coefficients>(): kotlin.collections/List<com.eignex.klause.simplex.exact/BigFraction> // com.eignex.klause.simplex.exact/ExactRationalInequality.coefficients.<get-coefficients>|<get-coefficients>(){}[0]
+    final val columns // com.eignex.klause.simplex.exact/ExactRationalInequality.columns|{}columns[0]
+        final fun <get-columns>(): kotlin/IntArray // com.eignex.klause.simplex.exact/ExactRationalInequality.columns.<get-columns>|<get-columns>(){}[0]
+    final val rhs // com.eignex.klause.simplex.exact/ExactRationalInequality.rhs|{}rhs[0]
+        final fun <get-rhs>(): com.eignex.klause.simplex.exact/BigFraction // com.eignex.klause.simplex.exact/ExactRationalInequality.rhs.<get-rhs>|<get-rhs>(){}[0]
+    final val strict // com.eignex.klause.simplex.exact/ExactRationalInequality.strict|{}strict[0]
+        final fun <get-strict>(): kotlin/Boolean // com.eignex.klause.simplex.exact/ExactRationalInequality.strict.<get-strict>|<get-strict>(){}[0]
+}
+
+final class com.eignex.klause.simplex.exact/ExactSimplexBigView { // com.eignex.klause.simplex.exact/ExactSimplexBigView|null[0]
+    constructor <init>(kotlin/IntArray, kotlin/IntArray, kotlin.collections/List<com.eignex.klause.simplex.exact/BigFraction>, kotlin.collections/List<com.eignex.klause.simplex.exact/BigFraction>, kotlin.collections/List<com.eignex.klause.simplex.exact/BigFraction?>) // com.eignex.klause.simplex.exact/ExactSimplexBigView.<init>|<init>(kotlin.IntArray;kotlin.IntArray;kotlin.collections.List<com.eignex.klause.simplex.exact.BigFraction>;kotlin.collections.List<com.eignex.klause.simplex.exact.BigFraction>;kotlin.collections.List<com.eignex.klause.simplex.exact.BigFraction?>){}[0]
+
+    final val colPtr // com.eignex.klause.simplex.exact/ExactSimplexBigView.colPtr|{}colPtr[0]
+        final fun <get-colPtr>(): kotlin/IntArray // com.eignex.klause.simplex.exact/ExactSimplexBigView.colPtr.<get-colPtr>|<get-colPtr>(){}[0]
+    final val colVal // com.eignex.klause.simplex.exact/ExactSimplexBigView.colVal|{}colVal[0]
+        final fun <get-colVal>(): kotlin.collections/List<com.eignex.klause.simplex.exact/BigFraction> // com.eignex.klause.simplex.exact/ExactSimplexBigView.colVal.<get-colVal>|<get-colVal>(){}[0]
+    final val rhs // com.eignex.klause.simplex.exact/ExactSimplexBigView.rhs|{}rhs[0]
+        final fun <get-rhs>(): kotlin.collections/List<com.eignex.klause.simplex.exact/BigFraction> // com.eignex.klause.simplex.exact/ExactSimplexBigView.rhs.<get-rhs>|<get-rhs>(){}[0]
+    final val rowIdx // com.eignex.klause.simplex.exact/ExactSimplexBigView.rowIdx|{}rowIdx[0]
+        final fun <get-rowIdx>(): kotlin/IntArray // com.eignex.klause.simplex.exact/ExactSimplexBigView.rowIdx.<get-rowIdx>|<get-rowIdx>(){}[0]
+    final val upper // com.eignex.klause.simplex.exact/ExactSimplexBigView.upper|{}upper[0]
+        final fun <get-upper>(): kotlin.collections/List<com.eignex.klause.simplex.exact/BigFraction?> // com.eignex.klause.simplex.exact/ExactSimplexBigView.upper.<get-upper>|<get-upper>(){}[0]
+}
+
+final class com.eignex.klause.simplex.exact/RationalOutcome { // com.eignex.klause.simplex.exact/RationalOutcome|null[0]
+    constructor <init>(com.eignex.klause.simplex.exact/RationalFeasibility, kotlin/DoubleArray? = ..., kotlin/IntArray? = ...) // com.eignex.klause.simplex.exact/RationalOutcome.<init>|<init>(com.eignex.klause.simplex.exact.RationalFeasibility;kotlin.DoubleArray?;kotlin.IntArray?){}[0]
+
+    final val feasibility // com.eignex.klause.simplex.exact/RationalOutcome.feasibility|{}feasibility[0]
+        final fun <get-feasibility>(): com.eignex.klause.simplex.exact/RationalFeasibility // com.eignex.klause.simplex.exact/RationalOutcome.feasibility.<get-feasibility>|<get-feasibility>(){}[0]
+    final val rows // com.eignex.klause.simplex.exact/RationalOutcome.rows|{}rows[0]
+        final fun <get-rows>(): kotlin/IntArray? // com.eignex.klause.simplex.exact/RationalOutcome.rows.<get-rows>|<get-rows>(){}[0]
+    final val witness // com.eignex.klause.simplex.exact/RationalOutcome.witness|{}witness[0]
+        final fun <get-witness>(): kotlin/DoubleArray? // com.eignex.klause.simplex.exact/RationalOutcome.witness.<get-witness>|<get-witness>(){}[0]
+}
+
+final fun (com.eignex.klause.lp.engine/LpModel).com.eignex.klause.lp.engine/columnNeighborhood(kotlin/IntArray, kotlin/Int, com.eignex.klause.lp.engine/LpRowIndex): com.eignex.klause.lp.engine/LpNeighborhood // com.eignex.klause.lp.engine/columnNeighborhood|columnNeighborhood@com.eignex.klause.lp.engine.LpModel(kotlin.IntArray;kotlin.Int;com.eignex.klause.lp.engine.LpRowIndex){}[0]
+final fun (com.eignex.klause.lp.engine/LpModel).com.eignex.klause.lp.engine/rowIndex(): com.eignex.klause.lp.engine/LpRowIndex // com.eignex.klause.lp.engine/rowIndex|rowIndex@com.eignex.klause.lp.engine.LpModel(){}[0]
+final fun (com.eignex.klause.lp.engine/LpModel).com.eignex.klause.lp.engine/tightVariableBound(com.eignex.klause.lp.engine/FloatLpResult, kotlin/Int, kotlin/Boolean, kotlin/Boolean? = ...): kotlin/Long? // com.eignex.klause.lp.engine/tightVariableBound|tightVariableBound@com.eignex.klause.lp.engine.LpModel(com.eignex.klause.lp.engine.FloatLpResult;kotlin.Int;kotlin.Boolean;kotlin.Boolean?){}[0]
+final fun (com.eignex.klause.lp.lattice/MixedEchelonHermite).com.eignex.klause.lp.lattice/originalBounds(kotlin/Array<com.ionspin.kotlin.bignum.integer/BigInteger?>, kotlin/Array<com.ionspin.kotlin.bignum.integer/BigInteger?>): com.eignex.klause.lp.lattice/TriangularBounds // com.eignex.klause.lp.lattice/originalBounds|originalBounds@com.eignex.klause.lp.lattice.MixedEchelonHermite(kotlin.Array<com.ionspin.kotlin.bignum.integer.BigInteger?>;kotlin.Array<com.ionspin.kotlin.bignum.integer.BigInteger?>){}[0]
+final fun com.eignex.klause.lp.engine/integerCertify(com.eignex.klause.lp.engine/LpModel, kotlin/DoubleArray, kotlin/Int = ...): com.eignex.klause.lp.engine/IntegerCertificate? // com.eignex.klause.lp.engine/integerCertify|integerCertify(com.eignex.klause.lp.engine.LpModel;kotlin.DoubleArray;kotlin.Int){}[0]
+final fun com.eignex.klause.lp.engine/integerFarkasRay(com.eignex.klause.lp.engine/LpModel, kotlin/DoubleArray, kotlin/Int = ..., com.eignex.klause.lp.engine/Basis? = ..., kotlin/Int = ...): kotlin/LongArray? // com.eignex.klause.lp.engine/integerFarkasRay|integerFarkasRay(com.eignex.klause.lp.engine.LpModel;kotlin.DoubleArray;kotlin.Int;com.eignex.klause.lp.engine.Basis?;kotlin.Int){}[0]
+final fun com.eignex.klause.lp.engine/lpConditioning(com.eignex.klause.lp.engine/LpModel): com.eignex.klause.lp.engine/LpConditioning // com.eignex.klause.lp.engine/lpConditioning|lpConditioning(com.eignex.klause.lp.engine.LpModel){}[0]
+final fun com.eignex.klause.lp.engine/newLpSolver(com.eignex.klause.lp.engine/LpModel, com.eignex.klause.util/Cancellation = ..., kotlin/Boolean = ...): com.eignex.klause.lp.engine/LpSolver // com.eignex.klause.lp.engine/newLpSolver|newLpSolver(com.eignex.klause.lp.engine.LpModel;com.eignex.klause.util.Cancellation;kotlin.Boolean){}[0]
+final fun com.eignex.klause.lp.engine/newPersistentLpSolver(com.eignex.klause.lp.engine/LpModel, com.eignex.klause.util/Cancellation = ..., kotlin/Int = ..., kotlin/Int = ..., kotlin/Long = ..., kotlin/Boolean = ...): com.eignex.klause.lp.engine/PersistentLpSolver // com.eignex.klause.lp.engine/newPersistentLpSolver|newPersistentLpSolver(com.eignex.klause.lp.engine.LpModel;com.eignex.klause.util.Cancellation;kotlin.Int;kotlin.Int;kotlin.Long;kotlin.Boolean){}[0]
+final fun com.eignex.klause.lp.engine/newTableauCutSolver(com.eignex.klause.lp.engine/LpModel, com.eignex.klause.util/Cancellation = ..., kotlin/Int = ..., kotlin/Long = ..., kotlin/Boolean = ...): com.eignex.klause.lp.engine/TableauCutSolver // com.eignex.klause.lp.engine/newTableauCutSolver|newTableauCutSolver(com.eignex.klause.lp.engine.LpModel;com.eignex.klause.util.Cancellation;kotlin.Int;kotlin.Long;kotlin.Boolean){}[0]
+final fun com.eignex.klause.lp.engine/solveAndCertify(com.eignex.klause.lp.engine/LpModel, com.eignex.klause.lp.engine/Basis? = ..., com.eignex.klause.util/Cancellation = ..., kotlin/Boolean = ...): com.eignex.klause.lp.engine/CertifiedLpResult // com.eignex.klause.lp.engine/solveAndCertify|solveAndCertify(com.eignex.klause.lp.engine.LpModel;com.eignex.klause.lp.engine.Basis?;com.eignex.klause.util.Cancellation;kotlin.Boolean){}[0]
+final fun com.eignex.klause.lp.engine/tightObjectiveLowerBound(com.eignex.klause.lp.engine/LpModel, kotlin/DoubleArray): kotlin/Double? // com.eignex.klause.lp.engine/tightObjectiveLowerBound|tightObjectiveLowerBound(com.eignex.klause.lp.engine.LpModel;kotlin.DoubleArray){}[0]
+final fun com.eignex.klause.lp.engine/tightObjectiveLowerBound(com.eignex.klause.lp.engine/LpModel, kotlin/DoubleArray, com.eignex.klause.lp.engine/IntegerCertificate?): kotlin/Double? // com.eignex.klause.lp.engine/tightObjectiveLowerBound|tightObjectiveLowerBound(com.eignex.klause.lp.engine.LpModel;kotlin.DoubleArray;com.eignex.klause.lp.engine.IntegerCertificate?){}[0]
+final fun com.eignex.klause.lp.lattice/hermiteNormalForm(kotlin.collections/List<com.eignex.klause.lp.lattice/SparseIntRow>, kotlin/Int, com.eignex.klause.util/Cancellation = ...): com.eignex.klause.lp.lattice/HermiteForm? // com.eignex.klause.lp.lattice/hermiteNormalForm|hermiteNormalForm(kotlin.collections.List<com.eignex.klause.lp.lattice.SparseIntRow>;kotlin.Int;com.eignex.klause.util.Cancellation){}[0]
+final fun com.eignex.klause.lp.lattice/mixedEchelonHermite(kotlin.collections/List<com.eignex.klause.lp.lattice/SparseIntRow>, kotlin.collections/List<com.eignex.klause.lp.lattice/SparseIntRow>, kotlin/Int, kotlin/Array<com.ionspin.kotlin.bignum.integer/BigInteger>? = ..., com.eignex.klause.util/Cancellation = ...): com.eignex.klause.lp.lattice/MixedEchelonHermite // com.eignex.klause.lp.lattice/mixedEchelonHermite|mixedEchelonHermite(kotlin.collections.List<com.eignex.klause.lp.lattice.SparseIntRow>;kotlin.collections.List<com.eignex.klause.lp.lattice.SparseIntRow>;kotlin.Int;kotlin.Array<com.ionspin.kotlin.bignum.integer.BigInteger>?;com.eignex.klause.util.Cancellation){}[0]
+final fun com.eignex.klause.lp.lattice/sparseIntRow(kotlin.collections/Map<kotlin/Int, com.ionspin.kotlin.bignum.integer/BigInteger>): com.eignex.klause.lp.lattice/SparseIntRow // com.eignex.klause.lp.lattice/sparseIntRow|sparseIntRow(kotlin.collections.Map<kotlin.Int,com.ionspin.kotlin.bignum.integer.BigInteger>){}[0]
+final fun com.eignex.klause.lp.lattice/triangularBounds(kotlin.collections/List<com.eignex.klause.lp.lattice/SparseIntRow>, kotlin/Int, kotlin/Array<com.ionspin.kotlin.bignum.integer/BigInteger?>, kotlin/Array<com.ionspin.kotlin.bignum.integer/BigInteger?>): com.eignex.klause.lp.lattice/TriangularBounds // com.eignex.klause.lp.lattice/triangularBounds|triangularBounds(kotlin.collections.List<com.eignex.klause.lp.lattice.SparseIntRow>;kotlin.Int;kotlin.Array<com.ionspin.kotlin.bignum.integer.BigInteger?>;kotlin.Array<com.ionspin.kotlin.bignum.integer.BigInteger?>){}[0]
+final fun com.eignex.klause.simplex.exact/bigRationalOutcome(com.eignex.klause.simplex.exact/ExactSimplexModel, com.eignex.klause.util/Cancellation = ..., kotlin/Int = ...): com.eignex.klause.simplex.exact/BigRationalOutcome // com.eignex.klause.simplex.exact/bigRationalOutcome|bigRationalOutcome(com.eignex.klause.simplex.exact.ExactSimplexModel;com.eignex.klause.util.Cancellation;kotlin.Int){}[0]
+final fun com.eignex.klause.simplex.exact/exactDescendingDirection(kotlin.collections/List<com.eignex.klause.simplex.exact/ExactRationalInequality>, com.eignex.klause.simplex.exact/ExactRationalInequality, kotlin/Int, com.eignex.klause.util/Cancellation = ...): kotlin/Boolean? // com.eignex.klause.simplex.exact/exactDescendingDirection|exactDescendingDirection(kotlin.collections.List<com.eignex.klause.simplex.exact.ExactRationalInequality>;com.eignex.klause.simplex.exact.ExactRationalInequality;kotlin.Int;com.eignex.klause.util.Cancellation){}[0]
+final fun com.eignex.klause.simplex.exact/exactDoubleBoundedSplit(kotlin.collections/List<com.eignex.klause.simplex.exact/ExactRationalInequality>, kotlin/Int, com.eignex.klause.util/Cancellation = ...): com.eignex.klause.simplex.exact/ExactDoubleBoundedSplit // com.eignex.klause.simplex.exact/exactDoubleBoundedSplit|exactDoubleBoundedSplit(kotlin.collections.List<com.eignex.klause.simplex.exact.ExactRationalInequality>;kotlin.Int;com.eignex.klause.util.Cancellation){}[0]
+final fun com.eignex.klause.simplex.exact/exactMixedUnitCubeSolution(kotlin.collections/List<com.eignex.klause.simplex.exact/ExactRationalInequality>, kotlin/Int, kotlin/Int, com.eignex.klause.util/Cancellation = ...): kotlin.collections/List<com.eignex.klause.simplex.exact/BigFraction>? // com.eignex.klause.simplex.exact/exactMixedUnitCubeSolution|exactMixedUnitCubeSolution(kotlin.collections.List<com.eignex.klause.simplex.exact.ExactRationalInequality>;kotlin.Int;kotlin.Int;com.eignex.klause.util.Cancellation){}[0]
+final fun com.eignex.klause.simplex.exact/rationalOutcome(com.eignex.klause.simplex.exact/ExactSimplexModel, com.eignex.klause.util/Cancellation = ..., kotlin/Int = ...): com.eignex.klause.simplex.exact/RationalOutcome // com.eignex.klause.simplex.exact/rationalOutcome|rationalOutcome(com.eignex.klause.simplex.exact.ExactSimplexModel;com.eignex.klause.util.Cancellation;kotlin.Int){}[0]

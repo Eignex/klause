@@ -22,7 +22,7 @@ import kotlin.math.min
  * overall while individual rows mix magnitudes (exactly what row scaling fixes). An empty row or
  * column contributes no ratio.
  */
-internal class LpConditioning(
+class LpConditioning(
     /** Smallest `|a_ij|` over the structural entries; 0 when there are none. */
     val minValue: Double,
     /** Largest `|a_ij|` over the structural entries; 0 when there are none. */
@@ -66,7 +66,7 @@ internal class LpConditioning(
  * model's lifetime ([LpModel.rebind] keeps the same [LpModel.csc]), so a per-node reading would
  * report the same numbers every time.
  */
-internal fun lpConditioning(model: LpModel): LpConditioning {
+fun lpConditioning(model: LpModel): LpConditioning {
     val n = model.n
     val m = model.m
     if (n == 0 || m == 0) return LpConditioning.EMPTY

@@ -11,14 +11,14 @@ package com.eignex.klause.lp.engine
  * live tightened domains (Hall/GCC/assignment sums deeper in the tree, Gomory/MIR tableau cuts) is
  * not. The flag flows into [LpModel.rowGlobal], which gates whether LP certificates over the
  * cut-augmented model may be learned. Defaults to `false` — the sound direction.
+ *
+ * @property cols Structural columns the cut mentions.
+ * @property coeffs Coefficient per entry of [cols], index-aligned.
+ * @property rel Relation between the activity and [rhs].
+ * @property rhs The cut's right-hand side.
+ * @property global Whether the cut holds at every integer solution of the problem.
  */
-internal class Cut(
-    val cols: IntArray,
-    val coeffs: LongArray,
-    val rel: Relation,
-    val rhs: Long,
-    val global: Boolean = false,
-) {
+class Cut(val cols: IntArray, val coeffs: LongArray, val rel: Relation, val rhs: Long, val global: Boolean = false) {
     /** A stable key for deduplicating cuts across separation rounds (ignores column order). */
     fun key(): String {
         val terms = cols.indices.sortedBy { cols[it] }.joinToString(",") { "${cols[it]}:${coeffs[it]}" }

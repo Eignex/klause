@@ -14,7 +14,16 @@ import com.eignex.klause.util.subExact
 import com.eignex.klause.util.toSortedIntArray
 
 /** Constraint relation for a row added to the builder, before normalization to `<=` form. */
-internal enum class Relation { LE, GE, EQ }
+enum class Relation {
+    /** `Σ a·x ≤ rhs`. */
+    LE,
+
+    /** `Σ a·x ≥ rhs`. */
+    GE,
+
+    /** `Σ a·x = rhs`. */
+    EQ,
+}
 
 /**
  * The live variable bounds a non-global row's validity rests on — the premises an LP certificate
@@ -25,9 +34,12 @@ internal enum class Relation { LE, GE, EQ }
  * tighter than the declared ones are recorded (a declared bound holds everywhere). Parallel
  * arrays: premise `k` is `x_{vars[k]} ≤ thresholds[k]` when `isUpper[k]`, else `≥`.
  */
-internal class LpRowPremises(
+class LpRowPremises(
+    /** Structural variable per premise. */
     val vars: IntArray,
+    /** Whether premise `k` is an upper-bound atom (`≤`) rather than a lower-bound one (`≥`). */
     val isUpper: BooleanArray,
+    /** Bound value per premise, index-aligned with [vars]. */
     val thresholds: LongArray,
     /** Boolean literals that must hold for the row to be valid (a reified real atom's activation);
      *  a learned clause leaning on the row cites their negations. */
@@ -35,7 +47,13 @@ internal class LpRowPremises(
 )
 
 /** Optimization sense. Branch-and-bound minimizes; [MAXIMIZE] is negated at build time. */
-internal enum class Sense { MINIMIZE, MAXIMIZE }
+enum class Sense {
+    /** Minimize the objective — the stored form. */
+    MINIMIZE,
+
+    /** Maximize the objective; negated at build time. */
+    MAXIMIZE,
+}
 
 /** The CPU simplex's private, finite stand-in for an unbounded variable bound (`±∞`). Large enough to
  *  behave as infinity for any realistic model, yet small enough (`Long.MAX / 4`) to leave headroom for
@@ -70,7 +88,7 @@ internal const val LP_UNBOUNDED_PROBE: Long = Long.MAX_VALUE / 4
  * for structural variables and equality slacks, and `+∞` for inequality slacks (see
  * [hasUpper]).
  */
-internal class LpModel(
+class LpModel(
     /** Number of structural (original) variables. */
     override val n: Int,
     /** Number of constraint rows, equivalently the number of slack variables. */
@@ -98,7 +116,7 @@ internal class LpModel(
     /**
      * Per-row global validity: `true` when row `i` holds at **every integer solution of the
      * problem** — not merely inside the current search node's box. Rows built from live
-     * (branch-tightened) information — a [com.eignex.klause.factor.arithmetic.ReifiedLinear] big-M row
+     * (branch-tightened) information — a `ReifiedLinear` big-M row
      * whose M came from tightened domains, a locally separated cut, a Gomory/MIR tableau cut — are
      * marked `false`. Learned artifacts (Farkas nogoods, objective-bound and reduced-cost reasons)
      * cite only variable-bound atoms and keep the rows implicit, so they are only valid when every
@@ -211,7 +229,7 @@ internal class LpModel(
     /**
      * A model identical in structure and bounds but whose objective is a single unit cost [unitCost] on
      * structural column [col] and zero elsewhere — the per-variable objective optimization-based bound
-     * tightening ([com.eignex.klause.lp.tightenOpenIntBounds]) swaps in for each open side. When the
+     * tightening (`tightenOpenIntBounds`) swaps in for each open side. When the
      * variable is represented split (`x = x⁺ − x⁻`), [negCol] names the negative part and takes
      * `−unitCost`, so the objective is still exactly `unitCost·x`. The [cost] array is **shared and
      * mutated in place**: [col]/[negCol] are set and the columns of the previous call
@@ -315,8 +333,12 @@ internal class LpModel(
  * Compressed-sparse-column store of an [LpModel]'s structural columns: column `j` occupies
  * `rowIdx[colPtr[j] until colPtr[j + 1]]` with the parallel values in [colVal], row indices ascending.
  * Slack columns are the implicit unit vectors and are never stored. Built by [LpBuilder.build].
+ *
+ * @property colPtr Start offset of each column in [rowIdx] / [colVal], length `n + 1`.
+ * @property rowIdx Row index per stored entry, ascending within a column.
+ * @property colVal Coefficient per stored entry, aligned with [rowIdx].
  */
-internal class Csc(val colPtr: IntArray, val rowIdx: IntArray, val colVal: LongArray)
+class Csc(val colPtr: IntArray, val rowIdx: IntArray, val colVal: LongArray)
 
 /**
  * The double-precision form of an [LpModel] with real coefficients, built by [LpBuilder.build] when any
@@ -325,7 +347,7 @@ internal class Csc(val colPtr: IntArray, val rowIdx: IntArray, val colVal: LongA
  * are length `n + m` and [loShift] length `n`, all in double precision after the same lower-shift /
  * `>=`-to-`<=` normalizations the [Long] core applies.
  */
-internal class LpDoubleView(
+class LpDoubleView(
     override val colPtr: IntArray,
     override val rowIdx: IntArray,
     override val colVal: DoubleArray,
@@ -348,7 +370,7 @@ internal class LpDoubleView(
  * Structural variables must have a finite lower bound (every klause integer variable does);
  * an infinite lower bound is rejected because the lower-shift normalization requires it.
  */
-internal class LpBuilder {
+class LpBuilder {
     // Primitive-specialized accumulators: one Long/Int per variable, no per-element boxing.
     private val lo = LongArrayList()
     private val hi = LongArrayList()

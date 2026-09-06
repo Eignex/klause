@@ -1,7 +1,7 @@
 package com.eignex.klause.lp.engine
 
 /** Where a variable sits. Nonbasic variables are pinned to a finite bound; basic ones float. */
-internal enum class VarStatus {
+enum class VarStatus {
     /** Basic: the variable floats; its value is read off the basis. */
     BASIC,
 
@@ -18,7 +18,7 @@ internal enum class VarStatus {
  * branch-and-bound only tightens bounds, a parent basis stays dual-feasible so a child re-optimizes
  * with a few pivots instead of a cold solve.
  */
-internal class Basis(
+class Basis(
     /** The `m` variable columns that are basic. Order is irrelevant; the loader assigns rows. */
     val basicVars: IntArray,
     /** Per-variable status (length `numVars`): [VarStatus.BASIC], [VarStatus.AT_LOWER] or `AT_UPPER`. */

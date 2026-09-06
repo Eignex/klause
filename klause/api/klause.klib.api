@@ -686,23 +686,6 @@ abstract fun interface com.eignex.klause.solver.search/SearchUnassignListener { 
     abstract fun onUnassign(kotlin/Int) // com.eignex.klause.solver.search/SearchUnassignListener.onUnassign|onUnassign(kotlin.Int){}[0]
 }
 
-abstract fun interface com.eignex.klause.util/Cancellation { // com.eignex.klause.util/Cancellation|null[0]
-    abstract fun isCancelled(): kotlin/Boolean // com.eignex.klause.util/Cancellation.isCancelled|isCancelled(){}[0]
-    open fun and(com.eignex.klause.util/Cancellation): com.eignex.klause.util/Cancellation // com.eignex.klause.util/Cancellation.and|and(com.eignex.klause.util.Cancellation){}[0]
-    open fun deadline(): kotlin.time/ComparableTimeMark? // com.eignex.klause.util/Cancellation.deadline|deadline(){}[0]
-    open fun invoke(): kotlin/Boolean // com.eignex.klause.util/Cancellation.invoke|invoke(){}[0]
-    open fun or(com.eignex.klause.util/Cancellation): com.eignex.klause.util/Cancellation // com.eignex.klause.util/Cancellation.or|or(com.eignex.klause.util.Cancellation){}[0]
-    open fun shorten(kotlin/Double): com.eignex.klause.util/Cancellation // com.eignex.klause.util/Cancellation.shorten|shorten(kotlin.Double){}[0]
-
-    final object Companion { // com.eignex.klause.util/Cancellation.Companion|null[0]
-        final val Never // com.eignex.klause.util/Cancellation.Companion.Never|{}Never[0]
-            final fun <get-Never>(): com.eignex.klause.util/Cancellation // com.eignex.klause.util/Cancellation.Companion.Never.<get-Never>|<get-Never>(){}[0]
-
-        final fun after(kotlin.time/Duration): com.eignex.klause.util/Cancellation // com.eignex.klause.util/Cancellation.Companion.after|after(kotlin.time.Duration){}[0]
-        final fun until(kotlin.time/ComparableTimeMark): com.eignex.klause.util/Cancellation // com.eignex.klause.util/Cancellation.Companion.until|until(kotlin.time.ComparableTimeMark){}[0]
-    }
-}
-
 abstract interface <#A: com.eignex.klause.solver/SolverParams> com.eignex.klause.solver/Optimizer : com.eignex.klause.solver/Solver<#A> { // com.eignex.klause.solver/Optimizer|null[0]
     abstract fun minimize(com.eignex.klause.solver.objective/LinearObjective, #A): com.eignex.klause.solver.result/MinimizeResult // com.eignex.klause.solver/Optimizer.minimize|minimize(com.eignex.klause.solver.objective.LinearObjective;1:0){}[0]
     open fun improvements(com.eignex.klause.solver.objective/LinearObjective, #A): kotlin.sequences/Sequence<com.eignex.klause.solver.result/MinimizeResult> // com.eignex.klause.solver/Optimizer.improvements|improvements(com.eignex.klause.solver.objective.LinearObjective;1:0){}[0]
@@ -1179,10 +1162,6 @@ abstract interface com.eignex.klause.theory/TheoryContext { // com.eignex.klause
     abstract fun consumeCheck(): kotlin/Boolean // com.eignex.klause.theory/TheoryContext.consumeCheck|consumeCheck(){}[0]
     open fun intLowerBound(kotlin/Int): kotlin/Long? // com.eignex.klause.theory/TheoryContext.intLowerBound|intLowerBound(kotlin.Int){}[0]
     open fun intUpperBound(kotlin/Int): kotlin/Long? // com.eignex.klause.theory/TheoryContext.intUpperBound|intUpperBound(kotlin.Int){}[0]
-}
-
-abstract interface com.eignex.klause.util/CharSource { // com.eignex.klause.util/CharSource|null[0]
-    abstract fun next(): kotlin/String? // com.eignex.klause.util/CharSource.next|next(){}[0]
 }
 
 sealed interface <#A: out kotlin/Any?, #B: out kotlin/Any?> com.eignex.klause.solver.incumbent/Publication { // com.eignex.klause.solver.incumbent/Publication|null[0]
@@ -9754,40 +9733,6 @@ final class com.eignex.klause.schema/OptNominalHandle { // com.eignex.klause.sch
     final fun ne(kotlin/String): com.eignex.klause.model/BoolExpr // com.eignex.klause.schema/OptNominalHandle.ne|ne(kotlin.String){}[0]
 }
 
-final class com.eignex.klause.simplex.exact/BigFraction { // com.eignex.klause.simplex.exact/BigFraction|null[0]
-    final val den // com.eignex.klause.simplex.exact/BigFraction.den|{}den[0]
-        final fun <get-den>(): com.ionspin.kotlin.bignum.integer/BigInteger // com.eignex.klause.simplex.exact/BigFraction.den.<get-den>|<get-den>(){}[0]
-    final val isZero // com.eignex.klause.simplex.exact/BigFraction.isZero|{}isZero[0]
-        final fun <get-isZero>(): kotlin/Boolean // com.eignex.klause.simplex.exact/BigFraction.isZero.<get-isZero>|<get-isZero>(){}[0]
-    final val num // com.eignex.klause.simplex.exact/BigFraction.num|{}num[0]
-        final fun <get-num>(): com.ionspin.kotlin.bignum.integer/BigInteger // com.eignex.klause.simplex.exact/BigFraction.num.<get-num>|<get-num>(){}[0]
-
-    final fun compareTo(com.eignex.klause.simplex.exact/BigFraction): kotlin/Int // com.eignex.klause.simplex.exact/BigFraction.compareTo|compareTo(com.eignex.klause.simplex.exact.BigFraction){}[0]
-    final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.simplex.exact/BigFraction.equals|equals(kotlin.Any?){}[0]
-    final fun hashCode(): kotlin/Int // com.eignex.klause.simplex.exact/BigFraction.hashCode|hashCode(){}[0]
-    final fun minus(com.eignex.klause.simplex.exact/BigFraction): com.eignex.klause.simplex.exact/BigFraction // com.eignex.klause.simplex.exact/BigFraction.minus|minus(com.eignex.klause.simplex.exact.BigFraction){}[0]
-    final fun negated(): com.eignex.klause.simplex.exact/BigFraction // com.eignex.klause.simplex.exact/BigFraction.negated|negated(){}[0]
-    final fun plus(com.eignex.klause.simplex.exact/BigFraction): com.eignex.klause.simplex.exact/BigFraction // com.eignex.klause.simplex.exact/BigFraction.plus|plus(com.eignex.klause.simplex.exact.BigFraction){}[0]
-    final fun reciprocal(): com.eignex.klause.simplex.exact/BigFraction // com.eignex.klause.simplex.exact/BigFraction.reciprocal|reciprocal(){}[0]
-    final fun signum(): kotlin/Int // com.eignex.klause.simplex.exact/BigFraction.signum|signum(){}[0]
-    final fun times(com.eignex.klause.simplex.exact/BigFraction): com.eignex.klause.simplex.exact/BigFraction // com.eignex.klause.simplex.exact/BigFraction.times|times(com.eignex.klause.simplex.exact.BigFraction){}[0]
-    final fun toDouble(): kotlin/Double // com.eignex.klause.simplex.exact/BigFraction.toDouble|toDouble(){}[0]
-    final fun toString(): kotlin/String // com.eignex.klause.simplex.exact/BigFraction.toString|toString(){}[0]
-
-    final object Companion { // com.eignex.klause.simplex.exact/BigFraction.Companion|null[0]
-        final val MINUS_ONE // com.eignex.klause.simplex.exact/BigFraction.Companion.MINUS_ONE|{}MINUS_ONE[0]
-            final fun <get-MINUS_ONE>(): com.eignex.klause.simplex.exact/BigFraction // com.eignex.klause.simplex.exact/BigFraction.Companion.MINUS_ONE.<get-MINUS_ONE>|<get-MINUS_ONE>(){}[0]
-        final val ONE // com.eignex.klause.simplex.exact/BigFraction.Companion.ONE|{}ONE[0]
-            final fun <get-ONE>(): com.eignex.klause.simplex.exact/BigFraction // com.eignex.klause.simplex.exact/BigFraction.Companion.ONE.<get-ONE>|<get-ONE>(){}[0]
-        final val ZERO // com.eignex.klause.simplex.exact/BigFraction.Companion.ZERO|{}ZERO[0]
-            final fun <get-ZERO>(): com.eignex.klause.simplex.exact/BigFraction // com.eignex.klause.simplex.exact/BigFraction.Companion.ZERO.<get-ZERO>|<get-ZERO>(){}[0]
-
-        final fun of(com.ionspin.kotlin.bignum.integer/BigInteger, com.ionspin.kotlin.bignum.integer/BigInteger): com.eignex.klause.simplex.exact/BigFraction // com.eignex.klause.simplex.exact/BigFraction.Companion.of|of(com.ionspin.kotlin.bignum.integer.BigInteger;com.ionspin.kotlin.bignum.integer.BigInteger){}[0]
-        final fun ofDouble(kotlin/Double): com.eignex.klause.simplex.exact/BigFraction? // com.eignex.klause.simplex.exact/BigFraction.Companion.ofDouble|ofDouble(kotlin.Double){}[0]
-        final fun ofLong(kotlin/Long): com.eignex.klause.simplex.exact/BigFraction // com.eignex.klause.simplex.exact/BigFraction.Companion.ofLong|ofLong(kotlin.Long){}[0]
-    }
-}
-
 final class com.eignex.klause.solver.objective/LinearObjective : com.eignex.klause.solver.objective/Objective { // com.eignex.klause.solver.objective/LinearObjective|null[0]
     constructor <init>(kotlin/LongArray = ..., kotlin/LongArray = ..., kotlin/Long = ..., kotlin/DoubleArray = ...) // com.eignex.klause.solver.objective/LinearObjective.<init>|<init>(kotlin.LongArray;kotlin.LongArray;kotlin.Long;kotlin.DoubleArray){}[0]
 
@@ -11036,103 +10981,6 @@ final class com.eignex.klause.theory.qflra/ExactLraSolver : com.eignex.klause.th
     final fun check(kotlin/BooleanArray, com.eignex.klause.theory/TheoryContext): com.eignex.klause.theory/TheoryCheck<com.eignex.klause.theory.qflra/ExactLraAssignment> // com.eignex.klause.theory.qflra/ExactLraSolver.check|check(kotlin.BooleanArray;com.eignex.klause.theory.TheoryContext){}[0]
 }
 
-final class com.eignex.klause.util/Bits { // com.eignex.klause.util/Bits|null[0]
-    constructor <init>(kotlin/Int) // com.eignex.klause.util/Bits.<init>|<init>(kotlin.Int){}[0]
-
-    final val size // com.eignex.klause.util/Bits.size|{}size[0]
-        final fun <get-size>(): kotlin/Int // com.eignex.klause.util/Bits.size.<get-size>|<get-size>(){}[0]
-    final val words // com.eignex.klause.util/Bits.words|{}words[0]
-        final fun <get-words>(): kotlin/LongArray // com.eignex.klause.util/Bits.words.<get-words>|<get-words>(){}[0]
-
-    final fun andInPlace(com.eignex.klause.util/Bits) // com.eignex.klause.util/Bits.andInPlace|andInPlace(com.eignex.klause.util.Bits){}[0]
-    final fun andNotInPlace(com.eignex.klause.util/Bits) // com.eignex.klause.util/Bits.andNotInPlace|andNotInPlace(com.eignex.klause.util.Bits){}[0]
-    final fun cardinality(): kotlin/Int // com.eignex.klause.util/Bits.cardinality|cardinality(){}[0]
-    final fun clear(kotlin/Int) // com.eignex.klause.util/Bits.clear|clear(kotlin.Int){}[0]
-    final fun containsAll(com.eignex.klause.util/Bits): kotlin/Boolean // com.eignex.klause.util/Bits.containsAll|containsAll(com.eignex.klause.util.Bits){}[0]
-    final fun copy(): com.eignex.klause.util/Bits // com.eignex.klause.util/Bits.copy|copy(){}[0]
-    final fun copyFrom(com.eignex.klause.util/Bits) // com.eignex.klause.util/Bits.copyFrom|copyFrom(com.eignex.klause.util.Bits){}[0]
-    final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.util/Bits.equals|equals(kotlin.Any?){}[0]
-    final fun get(kotlin/Int): kotlin/Boolean // com.eignex.klause.util/Bits.get|get(kotlin.Int){}[0]
-    final fun hashCode(): kotlin/Int // com.eignex.klause.util/Bits.hashCode|hashCode(){}[0]
-    final fun orInPlace(com.eignex.klause.util/Bits) // com.eignex.klause.util/Bits.orInPlace|orInPlace(com.eignex.klause.util.Bits){}[0]
-    final fun set(kotlin/Int) // com.eignex.klause.util/Bits.set|set(kotlin.Int){}[0]
-    final fun toIntArray(): kotlin/IntArray // com.eignex.klause.util/Bits.toIntArray|toIntArray(){}[0]
-    final fun toString(): kotlin/String // com.eignex.klause.util/Bits.toString|toString(){}[0]
-    final inline fun forEachSet(kotlin/Function1<kotlin/Int, kotlin/Unit>) // com.eignex.klause.util/Bits.forEachSet|forEachSet(kotlin.Function1<kotlin.Int,kotlin.Unit>){}[0]
-
-    final object Companion { // com.eignex.klause.util/Bits.Companion|null[0]
-        final fun clear(kotlin/LongArray, kotlin/Int) // com.eignex.klause.util/Bits.Companion.clear|clear(kotlin.LongArray;kotlin.Int){}[0]
-        final fun clearAbove(kotlin/LongArray, kotlin/Int) // com.eignex.klause.util/Bits.Companion.clearAbove|clearAbove(kotlin.LongArray;kotlin.Int){}[0]
-        final fun clearBelow(kotlin/LongArray, kotlin/Int) // com.eignex.klause.util/Bits.Companion.clearBelow|clearBelow(kotlin.LongArray;kotlin.Int){}[0]
-        final fun empty(kotlin/Int): com.eignex.klause.util/Bits // com.eignex.klause.util/Bits.Companion.empty|empty(kotlin.Int){}[0]
-        final fun fillRange(kotlin/LongArray, kotlin/Int, kotlin/Int) // com.eignex.klause.util/Bits.Companion.fillRange|fillRange(kotlin.LongArray;kotlin.Int;kotlin.Int){}[0]
-        final fun firstSet(kotlin/LongArray): kotlin/Int // com.eignex.klause.util/Bits.Companion.firstSet|firstSet(kotlin.LongArray){}[0]
-        final fun full(kotlin/Int): com.eignex.klause.util/Bits // com.eignex.klause.util/Bits.Companion.full|full(kotlin.Int){}[0]
-        final fun has(kotlin/LongArray, kotlin/Int): kotlin/Boolean // com.eignex.klause.util/Bits.Companion.has|has(kotlin.LongArray;kotlin.Int){}[0]
-        final fun lastSet(kotlin/LongArray): kotlin/Int // com.eignex.klause.util/Bits.Companion.lastSet|lastSet(kotlin.LongArray){}[0]
-        final fun of(kotlin/Int, kotlin/IntArray): com.eignex.klause.util/Bits // com.eignex.klause.util/Bits.Companion.of|of(kotlin.Int;kotlin.IntArray){}[0]
-        final fun popcount(kotlin/LongArray): kotlin/Int // com.eignex.klause.util/Bits.Companion.popcount|popcount(kotlin.LongArray){}[0]
-        final fun set(kotlin/LongArray, kotlin/Int) // com.eignex.klause.util/Bits.Companion.set|set(kotlin.LongArray;kotlin.Int){}[0]
-        final fun xorInto(kotlin/LongArray, kotlin/LongArray) // com.eignex.klause.util/Bits.Companion.xorInto|xorInto(kotlin.LongArray;kotlin.LongArray){}[0]
-    }
-}
-
-final class com.eignex.klause.util/CharReader { // com.eignex.klause.util/CharReader|null[0]
-    constructor <init>(com.eignex.klause.util/CharSource) // com.eignex.klause.util/CharReader.<init>|<init>(com.eignex.klause.util.CharSource){}[0]
-
-    final fun advance() // com.eignex.klause.util/CharReader.advance|advance(){}[0]
-    final fun eof(): kotlin/Boolean // com.eignex.klause.util/CharReader.eof|eof(){}[0]
-    final fun peek(kotlin/Int = ...): kotlin/Int // com.eignex.klause.util/CharReader.peek|peek(kotlin.Int){}[0]
-}
-
-final class com.eignex.klause.util/CheckedLongOverflowException : kotlin/ArithmeticException { // com.eignex.klause.util/CheckedLongOverflowException|null[0]
-    constructor <init>(kotlin/String) // com.eignex.klause.util/CheckedLongOverflowException.<init>|<init>(kotlin.String){}[0]
-}
-
-final class com.eignex.klause.util/FloatInterval { // com.eignex.klause.util/FloatInterval|null[0]
-    constructor <init>(kotlin/Double, kotlin/Double) // com.eignex.klause.util/FloatInterval.<init>|<init>(kotlin.Double;kotlin.Double){}[0]
-
-    final val hi // com.eignex.klause.util/FloatInterval.hi|{}hi[0]
-        final fun <get-hi>(): kotlin/Double // com.eignex.klause.util/FloatInterval.hi.<get-hi>|<get-hi>(){}[0]
-    final val isSingleton // com.eignex.klause.util/FloatInterval.isSingleton|{}isSingleton[0]
-        final fun <get-isSingleton>(): kotlin/Boolean // com.eignex.klause.util/FloatInterval.isSingleton.<get-isSingleton>|<get-isSingleton>(){}[0]
-    final val lo // com.eignex.klause.util/FloatInterval.lo|{}lo[0]
-        final fun <get-lo>(): kotlin/Double // com.eignex.klause.util/FloatInterval.lo.<get-lo>|<get-lo>(){}[0]
-    final val width // com.eignex.klause.util/FloatInterval.width|{}width[0]
-        final fun <get-width>(): kotlin/Double // com.eignex.klause.util/FloatInterval.width.<get-width>|<get-width>(){}[0]
-
-    final fun component1(): kotlin/Double // com.eignex.klause.util/FloatInterval.component1|component1(){}[0]
-    final fun component2(): kotlin/Double // com.eignex.klause.util/FloatInterval.component2|component2(){}[0]
-    final fun contains(kotlin/Double): kotlin/Boolean // com.eignex.klause.util/FloatInterval.contains|contains(kotlin.Double){}[0]
-    final fun copy(kotlin/Double = ..., kotlin/Double = ...): com.eignex.klause.util/FloatInterval // com.eignex.klause.util/FloatInterval.copy|copy(kotlin.Double;kotlin.Double){}[0]
-    final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.util/FloatInterval.equals|equals(kotlin.Any?){}[0]
-    final fun hashCode(): kotlin/Int // com.eignex.klause.util/FloatInterval.hashCode|hashCode(){}[0]
-    final fun toString(): kotlin/String // com.eignex.klause.util/FloatInterval.toString|toString(){}[0]
-}
-
-final class com.eignex.klause.util/IntSwapSet { // com.eignex.klause.util/IntSwapSet|null[0]
-    constructor <init>(kotlin/Int) // com.eignex.klause.util/IntSwapSet.<init>|<init>(kotlin.Int){}[0]
-
-    final val size // com.eignex.klause.util/IntSwapSet.size|{}size[0]
-        final fun <get-size>(): kotlin/Int // com.eignex.klause.util/IntSwapSet.size.<get-size>|<get-size>(){}[0]
-
-    final fun add(kotlin/Int): kotlin/Boolean // com.eignex.klause.util/IntSwapSet.add|add(kotlin.Int){}[0]
-    final fun clear() // com.eignex.klause.util/IntSwapSet.clear|clear(){}[0]
-    final fun contains(kotlin/Int): kotlin/Boolean // com.eignex.klause.util/IntSwapSet.contains|contains(kotlin.Int){}[0]
-    final fun get(kotlin/Int): kotlin/Int // com.eignex.klause.util/IntSwapSet.get|get(kotlin.Int){}[0]
-    final fun isEmpty(): kotlin/Boolean // com.eignex.klause.util/IntSwapSet.isEmpty|isEmpty(){}[0]
-    final fun random(kotlin.random/Random): kotlin/Int // com.eignex.klause.util/IntSwapSet.random|random(kotlin.random.Random){}[0]
-    final fun remove(kotlin/Int): kotlin/Boolean // com.eignex.klause.util/IntSwapSet.remove|remove(kotlin.Int){}[0]
-    final fun toIntArray(): kotlin/IntArray // com.eignex.klause.util/IntSwapSet.toIntArray|toIntArray(){}[0]
-    final inline fun forEach(kotlin/Function1<kotlin/Int, kotlin/Unit>) // com.eignex.klause.util/IntSwapSet.forEach|forEach(kotlin.Function1<kotlin.Int,kotlin.Unit>){}[0]
-}
-
-final class com.eignex.klause.util/StringCharSource : com.eignex.klause.util/CharSource { // com.eignex.klause.util/StringCharSource|null[0]
-    constructor <init>(kotlin/String) // com.eignex.klause.util/StringCharSource.<init>|<init>(kotlin.String){}[0]
-
-    final fun next(): kotlin/String? // com.eignex.klause.util/StringCharSource.next|next(){}[0]
-}
-
 final value class com.eignex.klause.localsearch.movesource/MoveSourceId { // com.eignex.klause.localsearch.movesource/MoveSourceId|null[0]
     constructor <init>(kotlin/String) // com.eignex.klause.localsearch.movesource/MoveSourceId.<init>|<init>(kotlin.String){}[0]
 
@@ -11561,12 +11409,6 @@ final object com.eignex.klause.solver.pipeline/OpenTheoryPipeline { // com.eigne
     final fun execute(com.eignex.klause.solver.pipeline/OpenTheoryRequest, com.eignex.klause.solver.pipeline/TheoryParams = ...): com.eignex.klause.solver.pipeline/OpenTheoryExecution // com.eignex.klause.solver.pipeline/OpenTheoryPipeline.execute|execute(com.eignex.klause.solver.pipeline.OpenTheoryRequest;com.eignex.klause.solver.pipeline.TheoryParams){}[0]
 }
 
-final object com.eignex.klause.util/PermutationGroup { // com.eignex.klause.util/PermutationGroup|null[0]
-    final fun orbit(kotlin.collections/List<kotlin/IntArray>, kotlin/Int): kotlin.collections/Set<kotlin/Int> // com.eignex.klause.util/PermutationGroup.orbit|orbit(kotlin.collections.List<kotlin.IntArray>;kotlin.Int){}[0]
-    final fun orbitUnderStabilizer(kotlin.collections/List<kotlin/IntArray>, kotlin/IntArray, kotlin/Int, kotlin/Int, kotlin/Int = ...): kotlin.collections/Set<kotlin/Int> // com.eignex.klause.util/PermutationGroup.orbitUnderStabilizer|orbitUnderStabilizer(kotlin.collections.List<kotlin.IntArray>;kotlin.IntArray;kotlin.Int;kotlin.Int;kotlin.Int){}[0]
-    final fun strongGenerators(kotlin.collections/List<kotlin/IntArray>, kotlin/Int, kotlin/Int, kotlin/IntArray = ...): kotlin.collections/List<kotlin/IntArray> // com.eignex.klause.util/PermutationGroup.strongGenerators|strongGenerators(kotlin.collections.List<kotlin.IntArray>;kotlin.Int;kotlin.Int;kotlin.IntArray){}[0]
-}
-
 final const val com.eignex.klause.config/DEFAULT_BITSET_THRESHOLD // com.eignex.klause.config/DEFAULT_BITSET_THRESHOLD|{}DEFAULT_BITSET_THRESHOLD[0]
     final fun <get-DEFAULT_BITSET_THRESHOLD>(): kotlin/Int // com.eignex.klause.config/DEFAULT_BITSET_THRESHOLD.<get-DEFAULT_BITSET_THRESHOLD>|<get-DEFAULT_BITSET_THRESHOLD>(){}[0]
 final const val com.eignex.klause.config/DEFAULT_DOMAIN_WALK_CAP // com.eignex.klause.config/DEFAULT_DOMAIN_WALK_CAP|{}DEFAULT_DOMAIN_WALK_CAP[0]
@@ -11683,8 +11525,6 @@ final fun (com.eignex.klause.solver.pipeline/FinitePipeline).com.eignex.klause.s
 final fun (com.eignex.klause.solver.pipeline/FinitePipeline).com.eignex.klause.solver.pipeline/solve(com.eignex.klause.solver.pipeline/FiniteSolveRequest, com.eignex.klause.solver.pipeline/FiniteSolveCallbacks): com.eignex.klause.solver.pipeline/FiniteSolveResult // com.eignex.klause.solver.pipeline/solve|solve@com.eignex.klause.solver.pipeline.FinitePipeline(com.eignex.klause.solver.pipeline.FiniteSolveRequest;com.eignex.klause.solver.pipeline.FiniteSolveCallbacks){}[0]
 final fun (com.eignex.klause.solver.search/VariableBranching<com.eignex.klause.solver.search/BranchingState>).com.eignex.klause.backtrack.selector/asSelector(): com.eignex.klause.backtrack.selector/VariableSelector // com.eignex.klause.backtrack.selector/asSelector|asSelector@com.eignex.klause.solver.search.VariableBranching<com.eignex.klause.solver.search.BranchingState>(){}[0]
 final fun (com.eignex.klause.solver/ConstList).com.eignex.klause.solver/longsOrNull(): com.eignex.klause.solver/LongConstList? // com.eignex.klause.solver/longsOrNull|longsOrNull@com.eignex.klause.solver.ConstList(){}[0]
-final fun (com.eignex.klause.util/CharSource).com.eignex.klause.util/lineSequence(): kotlin.sequences/Sequence<kotlin/String> // com.eignex.klause.util/lineSequence|lineSequence@com.eignex.klause.util.CharSource(){}[0]
-final fun (com.eignex.klause.util/CharSource).com.eignex.klause.util/readText(): kotlin/String // com.eignex.klause.util/readText|readText@com.eignex.klause.util.CharSource(){}[0]
 final fun (com.eignex.skema/SchemaDef<com.eignex.klause.model/SchemaEntry>).com.eignex.klause.compile/compile(com.eignex.klause.config/KlauseConfig = ...): com.eignex.klause.compile/CompiledSchema // com.eignex.klause.compile/compile|compile@com.eignex.skema.SchemaDef<com.eignex.klause.model.SchemaEntry>(com.eignex.klause.config.KlauseConfig){}[0]
 final fun (kotlin/Double).com.eignex.klause.schema/minus(com.eignex.klause.schema/FloatTerm): com.eignex.klause.schema/FloatExpr // com.eignex.klause.schema/minus|minus@kotlin.Double(com.eignex.klause.schema.FloatTerm){}[0]
 final fun (kotlin/Double).com.eignex.klause.schema/plus(com.eignex.klause.schema/FloatTerm): com.eignex.klause.schema/FloatExpr // com.eignex.klause.schema/plus|plus@kotlin.Double(com.eignex.klause.schema.FloatTerm){}[0]
@@ -11783,6 +11623,3 @@ final fun com.eignex.klause.solver.pipeline/withNodeBudget(kotlin.collections/Li
 final fun com.eignex.klause.solver.pipeline/writeFlatZincSolution(com.eignex.klause.formats.flatzinc/FlatZincProgram, com.eignex.klause.solver/Sample, kotlin/Boolean = ...): kotlin/String // com.eignex.klause.solver.pipeline/writeFlatZincSolution|writeFlatZincSolution(com.eignex.klause.formats.flatzinc.FlatZincProgram;com.eignex.klause.solver.Sample;kotlin.Boolean){}[0]
 final fun com.eignex.klause.solver/constsOf(kotlin/IntArray): com.eignex.klause.solver/LongConstList // com.eignex.klause.solver/constsOf|constsOf(kotlin.IntArray){}[0]
 final fun com.eignex.klause.solver/constsOf(kotlin/LongArray): com.eignex.klause.solver/LongConstList // com.eignex.klause.solver/constsOf|constsOf(kotlin.LongArray){}[0]
-final fun com.eignex.klause.util/addExact(kotlin/Long, kotlin/Long): kotlin/Long // com.eignex.klause.util/addExact|addExact(kotlin.Long;kotlin.Long){}[0]
-final fun com.eignex.klause.util/mulExact(kotlin/Long, kotlin/Long): kotlin/Long // com.eignex.klause.util/mulExact|mulExact(kotlin.Long;kotlin.Long){}[0]
-final fun com.eignex.klause.util/subExact(kotlin/Long, kotlin/Long): kotlin/Long // com.eignex.klause.util/subExact|subExact(kotlin.Long;kotlin.Long){}[0]

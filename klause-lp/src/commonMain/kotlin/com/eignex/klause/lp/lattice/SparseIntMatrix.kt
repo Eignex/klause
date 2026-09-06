@@ -12,7 +12,7 @@ import com.ionspin.kotlin.bignum.integer.BigInteger
  *
  * [index] is strictly ascending and [value] is index-aligned; no stored value is zero.
  */
-internal class SparseIntRow(val index: IntArray, val value: Array<BigInteger>) {
+class SparseIntRow(val index: IntArray, val value: Array<BigInteger>) {
 
     /** The lowest column the row mentions, or [Int.MAX_VALUE] when the row is zero. */
     val lead: Int get() = if (index.isEmpty()) Int.MAX_VALUE else index[0]
@@ -20,8 +20,10 @@ internal class SparseIntRow(val index: IntArray, val value: Array<BigInteger>) {
     /** The highest column the row mentions — its pivot in a lower-triangular form — or -1 when zero. */
     val trail: Int get() = if (index.isEmpty()) -1 else index[index.size - 1]
 
+    /** Whether the row mentions no column at all. */
     val isZero: Boolean get() = index.isEmpty()
 
+    /** The coefficient at [column], or zero when the row does not mention it. */
     operator fun get(column: Int): BigInteger {
         var lo = 0
         var hi = index.size - 1
@@ -37,13 +39,15 @@ internal class SparseIntRow(val index: IntArray, val value: Array<BigInteger>) {
         return BigInteger.ZERO
     }
 
+    /** The row every reduction starts and ends at. */
     companion object {
+        /** The row with no entries. */
         val Zero = SparseIntRow(IntArray(0), emptyArray())
     }
 }
 
 /** The row over [entries] `column -> coefficient`, dropping the zeros and sorting what is left. */
-internal fun sparseIntRow(entries: Map<Int, BigInteger>): SparseIntRow {
+fun sparseIntRow(entries: Map<Int, BigInteger>): SparseIntRow {
     val kept = entries.entries.filter { !it.value.isZero() }.sortedBy { it.key }
     if (kept.isEmpty()) return SparseIntRow.Zero
     return SparseIntRow(IntArray(kept.size) { kept[it].key }, Array(kept.size) { kept[it].value })
@@ -57,8 +61,10 @@ internal fun sparseIntRow(entries: Map<Int, BigInteger>): SparseIntRow {
  * untouched column rather than a full row, and a column swap is a pointer exchange rather than a sweep
  * down the whole matrix. An untouched column is left null and materialised on first access, so a
  * transform over a hundred thousand columns of which a few thousand move costs only what moved.
+ *
+ * @property size Number of columns the transform spans.
  */
-internal class UnimodularTransform(val size: Int) {
+class UnimodularTransform(val size: Int) {
     private val columns = arrayOfNulls<MutableMap<Int, BigInteger>>(size)
     private val operations = ArrayList<UnimodularColumnOperation>()
 
@@ -71,6 +77,7 @@ internal class UnimodularTransform(val size: Int) {
     /** Entry `V(i, j)`. */
     operator fun get(i: Int, j: Int): BigInteger = column(j)[i] ?: BigInteger.ZERO
 
+    /** Exchange columns [x] and [y]. */
     fun swap(x: Int, y: Int) {
         if (x == y) return
         val cx = column(x)
@@ -80,6 +87,7 @@ internal class UnimodularTransform(val size: Int) {
         operations.add(UnimodularColumnOperation.Swap(x, y))
     }
 
+    /** Negate every entry of column [j]. */
     fun negate(j: Int) {
         val c = column(j)
         for (row in c.keys.toList()) c[row] = -c.getValue(row)

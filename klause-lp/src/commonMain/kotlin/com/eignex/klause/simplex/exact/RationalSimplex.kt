@@ -28,12 +28,23 @@ import com.ionspin.kotlin.bignum.integer.BigInteger
  * bits (the level latches its overflow flag, the run is voided, and the whole solve restarts at the
  * big level, so every reported verdict is computed in one consistent arithmetic).
  */
-internal enum class RationalFeasibility { FEASIBLE, INFEASIBLE, UNKNOWN }
+enum class RationalFeasibility {
+    /** A rational point satisfying every row exists. */
+    FEASIBLE,
+
+    /** No rational point satisfies every row. */
+    INFEASIBLE,
+
+    /** The run was capped or cancelled before it decided. */
+    UNKNOWN,
+}
 
 /** The exact verdict plus, on FEASIBLE, a concrete structural-column witness in the source model's
  *  coordinates (evaluated at a small positive delta when strict rows are present). */
-internal class RationalOutcome(
+class RationalOutcome(
+    /** The exact verdict. */
     val feasibility: RationalFeasibility,
+    /** On [RationalFeasibility.FEASIBLE], a structural-column point satisfying every row; null otherwise. */
     val witness: DoubleArray? = null,
     /** On [RationalFeasibility.INFEASIBLE], the original rows carrying nonzero Farkas weight — the
      *  violated row's tableau slack coefficients are exactly `B⁻ᵀe_r` — so an explanation cites only
@@ -43,8 +54,10 @@ internal class RationalOutcome(
 
 /** Exact feasibility outcome for consumers that must retain a rational witness rather than round it
  *  back through the floating LP interface. */
-internal class BigRationalOutcome(
+class BigRationalOutcome(
+    /** The exact verdict. */
     val feasibility: RationalFeasibility,
+    /** On [RationalFeasibility.FEASIBLE], the rational structural-column point; null otherwise. */
     val witness: List<BigFraction>? = null,
     /**
      * Final exact slack-form rows when feasibility was established.  Each row is
@@ -65,10 +78,14 @@ internal class BigRationalOptimizationOutcome(
 )
 
 /** One final exact simplex row, expressed in the original structural/slack column space. */
-internal class BigRationalTableauRow(
+class BigRationalTableauRow(
+    /** The variable the row solves for. */
     val basic: Int,
+    /** The row's constant term. */
     val rhs: BigFraction,
+    /** The non-basic variables the row mentions, ascending. */
     val columns: IntArray,
+    /** Coefficient per entry of [columns], index-aligned. */
     val coefficients: List<BigFraction>,
 )
 
@@ -138,16 +155,35 @@ internal object BigFracOps : FracOps<BigFraction> {
 }
 
 /** Engine-neutral normalized LP input consumed by the exact feasibility simplex. */
-internal interface ExactSimplexModel {
+interface ExactSimplexModel {
+    /** Number of structural (original) variables. */
     val n: Int
+
+    /** Number of constraint rows, equivalently the number of slack variables. */
     val m: Int
+
+    /** Total variable count: structural plus slack. */
     val numVars: Int
+
+    /** Right-hand side per row, after the lower-bound shift. */
     val rhs: LongArray
+
+    /** Upper bound per variable (length [numVars]); meaningful only where [hasUpper] is true. */
     val upper: LongArray
+
+    /** Whether the variable has a finite upper bound; `false` means `+∞`. */
     val hasUpper: BooleanArray
+
+    /** Per row, whether the inequality is strict over the reals (`<` rather than `≤`). */
     val rowStrict: BooleanArray
+
+    /** Structural columns whose lower bound is a finite stand-in for `−∞` rather than a real bound. */
     val probeClampedLo: BooleanArray
+
+    /** Counterpart to [probeClampedLo] for the upper bound (`+∞` stand-in). */
     val probeClampedHi: BooleanArray
+
+    /** The double-precision form solved when the model carries real coefficients, else null. */
     val doubleView: ExactSimplexDoubleView?
 
     /**
@@ -159,35 +195,57 @@ internal interface ExactSimplexModel {
     val bigView: ExactSimplexBigView?
         get() = null
 
+    /** Invoke [action] for each stored entry of structural column [j], rows ascending. */
     fun forEachExactColumn(j: Int, action: (row: Int, value: Long) -> Unit)
 
+    /** The lower bound shifted out of structural column [j], in double precision. */
     fun loShiftD(j: Int): Double
 }
 
 /** Double-precision normalized LP input used when the model contains real data. */
-internal interface ExactSimplexDoubleView {
+interface ExactSimplexDoubleView {
+    /** Start offset of each column in [rowIdx] / [colVal], length `n + 1`. */
     val colPtr: IntArray
+
+    /** Row index per stored entry, ascending within a column. */
     val rowIdx: IntArray
+
+    /** Coefficient per stored entry, aligned with [rowIdx]. */
     val colVal: DoubleArray
+
+    /** Right-hand side per row, after the lower-bound shift. */
     val rhs: DoubleArray
+
+    /** Upper bound per variable; meaningful only where [hasUpper] is true. */
     val upper: DoubleArray
+
+    /** Whether the variable has a finite upper bound; `false` means `+∞`. */
     val hasUpper: BooleanArray
 }
 
 /** Arbitrary-precision counterpart of [ExactSimplexDoubleView]. */
-internal class ExactSimplexBigView(
+class ExactSimplexBigView(
+    /** Start offset of each column in [rowIdx] / [colVal], length `n + 1`. */
     val colPtr: IntArray,
+    /** Row index per stored entry, ascending within a column. */
     val rowIdx: IntArray,
+    /** Coefficient per stored entry, aligned with [rowIdx]. */
     val colVal: List<BigFraction>,
+    /** Right-hand side per row. */
     val rhs: List<BigFraction>,
+    /** Upper bound per variable, null where the variable is unbounded above. */
     val upper: List<BigFraction?>,
 )
 
 /** One exact `a*x <= rhs` row for the unshifted non-negative simplex form. */
-internal class ExactRationalInequality(
+class ExactRationalInequality(
+    /** The variables the row mentions, strictly ascending. */
     val columns: IntArray,
+    /** Coefficient per entry of [columns], index-aligned. */
     val coefficients: List<BigFraction>,
+    /** The row's right-hand side. */
     val rhs: BigFraction,
+    /** Whether the row is strict over the reals (`<` rather than `≤`). */
     val strict: Boolean = false,
 ) {
     init {
@@ -205,7 +263,7 @@ internal class ExactRationalInequality(
  * representation explicit makes homogeneous direction tests exact even for coefficients larger than a
  * machine word, and avoids introducing a numeric probe while classifying bounded rows.
  */
-internal class ExactRationalFeasibilityModel(
+class ExactRationalFeasibilityModel(
     override val n: Int,
     rows: List<ExactRationalInequality>,
     structuralUpper: List<BigFraction?> = List(n) { null },
@@ -290,7 +348,7 @@ internal fun exactBoundedRows(
  * The affirmative answer is what a caller can build on. A cone direction is a ray of the system itself,
  * so an activity that descends along one is unbounded below over every point of it.
  */
-internal fun exactDescendingDirection(
+fun exactDescendingDirection(
     rows: List<ExactRationalInequality>,
     activity: ExactRationalInequality,
     variables: Int,
@@ -312,15 +370,29 @@ internal fun exactDescendingDirection(
     }
 }
 
-/** One source row together with the finite lower activity that makes it double-bounded. */
-internal class ExactDoubleBoundedRow(val index: Int, val inequality: ExactRationalInequality, val lower: BigFraction)
+/**
+ * One source row together with the finite lower activity that makes it double-bounded.
+ *
+ * @property index The row's index in the source system.
+ * @property inequality The row itself.
+ * @property lower The finite lower activity the homogeneous cone establishes.
+ */
+class ExactDoubleBoundedRow(val index: Int, val inequality: ExactRationalInequality, val lower: BigFraction)
 
 /** Exact Double-Bounded Reduction split before its mixed-echelon/Hermite column transformation. */
-internal sealed interface ExactDoubleBoundedSplit {
+sealed interface ExactDoubleBoundedSplit {
+    /** The system has no rational solution, so no split exists. */
     data object Infeasible : ExactDoubleBoundedSplit
 
+    /** The reduction was capped or cancelled before it could decide the split. */
     data object Unknown : ExactDoubleBoundedSplit
 
+    /**
+     * The rows that carry a finite lower activity, and the indices of those that do not.
+     *
+     * @property bounded Rows with a finite lower activity, each paired with it.
+     * @property unbounded Source indices of the rows without one.
+     */
     class Split(val bounded: List<ExactDoubleBoundedRow>, val unbounded: List<Int>) : ExactDoubleBoundedSplit
 }
 
@@ -333,7 +405,7 @@ internal sealed interface ExactDoubleBoundedSplit {
  * by index as the absolutely unbounded lane used later for mixed witness extension. No result is exposed
  * if cancellation interrupts either phase.
  */
-internal fun exactDoubleBoundedSplit(
+fun exactDoubleBoundedSplit(
     rows: List<ExactRationalInequality>,
     variables: Int,
     cancellation: Cancellation = Cancellation.Never,
@@ -383,7 +455,7 @@ internal fun exactDoubleBoundedSplit(
  * supplies exactly the absolute-unboundedness premise.  A null result is consequently reserved for
  * cancellation or an interrupted exact solve; callers must not substitute a finite search box.
  */
-internal fun exactMixedUnitCubeSolution(
+fun exactMixedUnitCubeSolution(
     rows: List<ExactRationalInequality>,
     realColumns: Int,
     integerColumns: Int,
@@ -466,7 +538,9 @@ internal fun rationalFeasible(
     maxPivots: Int = defaultRationalPivotCap(model),
 ): RationalFeasibility = rationalOutcome(model, cancellation, maxPivots).feasibility
 
-internal fun rationalOutcome(
+/** Decide [model] exactly, escalating from the fixed-width fraction level to the unbounded one when a
+ *  pivot chain escapes 128 bits, and retain the witness or the load-bearing rows. */
+fun rationalOutcome(
     model: ExactSimplexModel,
     cancellation: Cancellation = Cancellation.Never,
     maxPivots: Int = defaultRationalPivotCap(model),
@@ -479,7 +553,7 @@ internal fun rationalOutcome(
 }
 
 /** Decide [model] entirely with arbitrary-precision rationals and retain its structural witness. */
-internal fun bigRationalOutcome(
+fun bigRationalOutcome(
     model: ExactSimplexModel,
     cancellation: Cancellation = Cancellation.Never,
     maxPivots: Int = defaultRationalPivotCap(model),

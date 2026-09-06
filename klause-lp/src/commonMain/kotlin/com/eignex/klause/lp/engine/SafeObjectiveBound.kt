@@ -192,7 +192,7 @@ private fun LpModel.orientedVariableBound(
  * available (both unbounded / overflow). [clamped] is the split-representation probe override of
  * [safeVariableBound].
  */
-internal fun LpModel.tightVariableBound(
+fun LpModel.tightVariableBound(
     result: FloatLpResult,
     objectiveCol: Int,
     maximize: Boolean,
@@ -229,7 +229,7 @@ internal fun LpModel.exactObjectiveLowerBoundCeil(y: DoubleArray): Long? =
  * declines on overflow. Sound against an integral objective, as [exactObjectiveLowerBoundCeil] is. Null
  * only when neither side is available.
  */
-internal fun tightObjectiveLowerBound(model: LpModel, y: DoubleArray): Double? =
+fun tightObjectiveLowerBound(model: LpModel, y: DoubleArray): Double? =
     tighterLowerBound(safeObjectiveLowerBound(model, y), model.exactObjectiveLowerBoundCeil(y))
 
 /**
@@ -238,7 +238,7 @@ internal fun tightObjectiveLowerBound(model: LpModel, y: DoubleArray): Double? =
  * caller uses this form so the node pays for at most one certification, and so a continuous model never
  * re-rationalizes per node.
  */
-internal fun tightObjectiveLowerBound(model: LpModel, y: DoubleArray, certificate: IntegerCertificate?): Double? =
+fun tightObjectiveLowerBound(model: LpModel, y: DoubleArray, certificate: IntegerCertificate?): Double? =
     tighterLowerBound(safeObjectiveLowerBound(model, y), certificate?.objectiveBoundCeil(0L))
 
 /** The larger of two sound lower bounds on the same objective, either of which may be unavailable. */

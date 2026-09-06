@@ -25,7 +25,8 @@ import com.eignex.klause.util.mulExact
  * not merely a relaxation but exact, and per-component optima stitch back to the full optimum
  * ([ComponentLpSolver]).
  */
-internal class LpNeighborhood(
+class LpNeighborhood(
+    /** The restricted sub-model. */
     val model: LpModel,
     /** Old→new structural column map (`-1` outside), or null when the caller tracks columns via
      *  [cols] alone — per-part full-length maps would cost `n × parts` on a decomposed model. */
@@ -43,11 +44,15 @@ internal class LpNeighborhood(
  *  and shared across many [columnNeighborhood] walks. Covers the union of the [Long] core's and the
  *  double view's sparsity — the two patterns may differ on mixed models (real coefficients live only
  *  in the view; differing zero-coalescing can go either way), and the walk's whole-row-support
- *  soundness needs every entry of either. */
-internal class LpRowIndex(val rowPtr: IntArray, val colIdx: IntArray)
+ *  soundness needs every entry of either.
+ *
+ * @property rowPtr Start offset of each row in [colIdx], length `m + 1`.
+ * @property colIdx Structural column per stored entry, ascending within a row.
+ */
+class LpRowIndex(val rowPtr: IntArray, val colIdx: IntArray)
 
 /** Build the row-major union adjacency of this model's structural columns. */
-internal fun LpModel.rowIndex(): LpRowIndex {
+fun LpModel.rowIndex(): LpRowIndex {
     // Deduplicate per column across the two patterns (rows ascending within each), then bucket by row.
     val counts = IntArray(m + 1)
     forEachUnionEntry { _, i -> counts[i + 1]++ }
@@ -105,7 +110,7 @@ internal inline fun LpModel.forEachUnionEntry(action: (j: Int, i: Int) -> Unit) 
  * sub-model's costs are zero — a probing caller installs its objective via
  * [LpModel.withSingleColumnObjective] on the mapped columns.
  */
-internal fun LpModel.columnNeighborhood(seeds: IntArray, maxRows: Int, rowIndex: LpRowIndex): LpNeighborhood {
+fun LpModel.columnNeighborhood(seeds: IntArray, maxRows: Int, rowIndex: LpRowIndex): LpNeighborhood {
     val colMap = IntArray(n) { -1 }
     val takenRows = IntArrayList()
     val takenCols = IntArrayList()

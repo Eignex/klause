@@ -17,9 +17,11 @@ import kotlin.math.abs
  * bound. All values are double-precision; the authoritative bound comes from exact certification of
  * [basis], never from these.
  */
-internal class FloatLpResult(
+class FloatLpResult(
     val basis: Basis,
+    /** Float objective at the optimum; the authoritative bound comes from certifying [basis]. */
     val objective: Double,
+    /** Dual vector `y`, one per row, feeding the Neumaier-Shcherbina safe bound. */
     val duals: DoubleArray,
     /** Per-structural-variable primal value (unshifted, length `n`); the LP point. */
     val primal: DoubleArray,
@@ -89,7 +91,7 @@ internal const val DEFAULT_REFACTOR_UPDATE_LIMIT: Int = 50
  * something different on every model while a work budget does not. 0 leaves it unbounded. Both limits
  * apply when both are set; whichever binds first stops the solve.
  */
-internal class RevisedSimplex(
+class RevisedSimplex(
     private var model: LpModel,
     private var cancellation: Cancellation = Cancellation.Never,
     private val refactorUpdateLimit: Int = DEFAULT_REFACTOR_UPDATE_LIMIT,

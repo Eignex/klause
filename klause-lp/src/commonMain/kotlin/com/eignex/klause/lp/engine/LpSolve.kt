@@ -5,7 +5,7 @@ import com.eignex.klause.simplex.exact.rationalOutcome
 import com.eignex.klause.util.Cancellation
 
 /** The certified verdict of an LP over an [LpModel], independent of any search node. */
-internal enum class LpVerdict {
+enum class LpVerdict {
     /** A finite optimum was found (see [CertifiedLpResult.float] / [CertifiedLpResult.certificate]). */
     OPTIMAL,
 
@@ -24,7 +24,8 @@ internal enum class LpVerdict {
  * arithmetic. The cheap Neumaier–Shcherbina [safeLowerBound] is a float pruning heuristic and is
  * computed on demand, not eagerly, so a consumer that only wants the exact verdict pays nothing for it.
  */
-internal class CertifiedLpResult internal constructor(
+class CertifiedLpResult internal constructor(
+    /** What the certified solve established. */
     val verdict: LpVerdict,
     /** The float solve result on an [LpVerdict.OPTIMAL] verdict (primal, duals, basis, objective); null otherwise. */
     val float: FloatLpResult?,
@@ -67,7 +68,7 @@ internal class CertifiedLpResult internal constructor(
  * [warm] optionally warm-starts from a prior optimal basis of the same model structure; it changes only
  * the pivot path, never the verdict.
  */
-internal fun solveAndCertify(
+fun solveAndCertify(
     model: LpModel,
     warm: Basis? = null,
     cancellation: Cancellation = Cancellation.Never,

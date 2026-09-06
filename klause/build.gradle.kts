@@ -28,19 +28,13 @@ kotlin {
     sourceSets {
         commonMain.dependencies {
             api(project(":klause-util"))
+            api(project(":klause-lp"))
             compileOnly("org.jetbrains.kotlinx:kotlinx-serialization-core:1.11.0")
             implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
             api("com.eignex:skema:0.3.0")
-            implementation("com.eignex:koblas:0.1.1-SNAPSHOT")
             implementation("com.eignex:kumulant:0.3.3")
             implementation("com.eignex:kpermute:1.2.0")
             implementation("com.ionspin.kotlin:bignum:0.3.10")
-        }
-        jvmMain.dependencies {
-            // The bundled HiGHS HFactor, which koblas offers as a basis-solver backend. Present only
-            // here: the binding is JVM-only, and every other target reaches the same seam through
-            // koblas's portable product-form solver.
-            implementation("com.eignex:koblas-hfactor:0.1.1-SNAPSHOT")
         }
         commonTest.dependencies {
             implementation("org.jetbrains.kotlinx:kotlinx-serialization-core:1.11.0")

@@ -15,7 +15,7 @@ import com.eignex.klause.util.Cancellation
  * All returned values are double-precision guides; the authoritative bound always comes from exactly
  * certifying the result downstream ([integerCertify] / [integerFarkasRay]), never from these.
  */
-internal interface LpSolver : AutoCloseable {
+interface LpSolver : AutoCloseable {
     /**
      * Solve the relaxation, optionally warm-started from a prior optimal [warm] basis of the same model
      * structure; null on non-convergence / dual-unbounded / singular basis. The warm basis only changes
@@ -110,7 +110,7 @@ internal interface LpSolver : AutoCloseable {
  * simplex basis, so only a basis-carrying (simplex) engine can supply them; the cut-separation loop
  * types against this, while the general solve/certify path types against [LpSolver].
  */
-internal interface TableauCutSolver : LpSolver {
+interface TableauCutSolver : LpSolver {
     /** Gomory (Chvátal) integrality cuts from the last optimal basis, up to [maxCuts]; empty if the
      *  last solve was not optimal. */
     fun gomoryCuts(maxCuts: Int): List<Cut>
@@ -130,7 +130,7 @@ internal interface TableauCutSolver : LpSolver {
  * survives that split. Stating the limitation in the type is better than a no-op implementation that a
  * caller would silently pay a full rebuild for.
  */
-internal interface PersistentLpSolver : LpSolver {
+interface PersistentLpSolver : LpSolver {
     /**
      * Re-point this engine at [next] and [token], keeping the seated basis and its factorization; false
      * when [next] is not a bound-only revision of the current model, which is the caller's signal to
@@ -158,7 +158,7 @@ internal interface PersistentLpSolver : LpSolver {
  * each block factorizes at a fraction of the monolithic cost; [componentSplit] (default on, the
  * `lp-component-split` knob) opts out.
  */
-internal fun newLpSolver(
+fun newLpSolver(
     model: LpModel,
     cancellation: Cancellation = Cancellation.Never,
     componentSplit: Boolean = true,
@@ -177,7 +177,7 @@ internal fun newLpSolver(
  * dual iterate still carries a valid bound. [trackDegeneracy] turns on the dual-degeneracy measurement
  * an adaptive budget reads back.
  */
-internal fun newTableauCutSolver(
+fun newTableauCutSolver(
     model: LpModel,
     cancellation: Cancellation = Cancellation.Never,
     iterationLimit: Int = 0,
@@ -199,7 +199,7 @@ internal fun newTableauCutSolver(
  * pivots accumulate across solves raises it, since the default is sized for one solve's chain. The
  * remaining knobs are [newTableauCutSolver]'s.
  */
-internal fun newPersistentLpSolver(
+fun newPersistentLpSolver(
     model: LpModel,
     cancellation: Cancellation = Cancellation.Never,
     refactorUpdateLimit: Int = DEFAULT_REFACTOR_UPDATE_LIMIT,

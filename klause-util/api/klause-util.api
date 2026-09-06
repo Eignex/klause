@@ -1,0 +1,478 @@
+public final class com/eignex/klause/util/ArgSortKt {
+	public static final fun argsortBy (ILkotlin/jvm/functions/Function2;)[I
+}
+
+public final class com/eignex/klause/util/ArmCatalog {
+	public fun <init> (Ljava/util/List;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;)V
+	public final fun byLabel (Ljava/lang/String;)Ljava/lang/Object;
+	public final fun factories (Ljava/util/List;)Ljava/util/List;
+	public final fun fromLabel (Ljava/lang/String;)Ljava/lang/Object;
+	public final fun labels (Ljava/util/List;)Ljava/util/List;
+	public final fun ranked (Ljava/util/List;)Ljava/util/List;
+}
+
+public final class com/eignex/klause/util/BinarySearchKt {
+	public static final fun binarySearchInt ([IIII)I
+	public static synthetic fun binarySearchInt$default ([IIIIILjava/lang/Object;)I
+	public static final fun binarySearchLong ([JJII)I
+	public static synthetic fun binarySearchLong$default ([JJIIILjava/lang/Object;)I
+}
+
+public final class com/eignex/klause/util/Bits {
+	public static final field Companion Lcom/eignex/klause/util/Bits$Companion;
+	public fun <init> (I)V
+	public final fun andInPlace (Lcom/eignex/klause/util/Bits;)V
+	public final fun andNotInPlace (Lcom/eignex/klause/util/Bits;)V
+	public final fun cardinality ()I
+	public final fun clear (I)V
+	public final fun containsAll (Lcom/eignex/klause/util/Bits;)Z
+	public final fun copy ()Lcom/eignex/klause/util/Bits;
+	public final fun copyFrom (Lcom/eignex/klause/util/Bits;)V
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun forEachSet (Lkotlin/jvm/functions/Function1;)V
+	public final fun get (I)Z
+	public final fun getSize ()I
+	public final fun getWords ()[J
+	public fun hashCode ()I
+	public final fun orInPlace (Lcom/eignex/klause/util/Bits;)V
+	public final fun set (I)V
+	public final fun toIntArray ()[I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/util/Bits$Companion {
+	public final fun clear ([JI)V
+	public final fun clearAbove ([JI)V
+	public final fun clearBelow ([JI)V
+	public final fun empty (I)Lcom/eignex/klause/util/Bits;
+	public final fun fillRange ([JII)V
+	public final fun firstSet ([J)I
+	public final fun full (I)Lcom/eignex/klause/util/Bits;
+	public final fun has ([JI)Z
+	public final fun lastSet ([J)I
+	public final fun of (I[I)Lcom/eignex/klause/util/Bits;
+	public final fun popcount ([J)I
+	public final fun set ([JI)V
+	public final fun xorInto ([J[J)V
+}
+
+public abstract interface class com/eignex/klause/util/Cancellation {
+	public static final field Companion Lcom/eignex/klause/util/Cancellation$Companion;
+	public fun and (Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/util/Cancellation;
+	public fun deadline ()Lkotlin/time/ComparableTimeMark;
+	public fun invoke ()Z
+	public abstract fun isCancelled ()Z
+	public fun or (Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/util/Cancellation;
+	public fun shorten (D)Lcom/eignex/klause/util/Cancellation;
+}
+
+public final class com/eignex/klause/util/Cancellation$Companion {
+	public final fun after-LRDsOJo (J)Lcom/eignex/klause/util/Cancellation;
+	public final fun getNever ()Lcom/eignex/klause/util/Cancellation;
+	public final fun until (Lkotlin/time/ComparableTimeMark;)Lcom/eignex/klause/util/Cancellation;
+}
+
+public final class com/eignex/klause/util/Cancellation$DefaultImpls {
+	public static fun and (Lcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/util/Cancellation;
+	public static fun deadline (Lcom/eignex/klause/util/Cancellation;)Lkotlin/time/ComparableTimeMark;
+	public static fun invoke (Lcom/eignex/klause/util/Cancellation;)Z
+	public static fun or (Lcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/util/Cancellation;
+	public static fun shorten (Lcom/eignex/klause/util/Cancellation;D)Lcom/eignex/klause/util/Cancellation;
+}
+
+public final class com/eignex/klause/util/CharReader {
+	public fun <init> (Lcom/eignex/klause/util/CharSource;)V
+	public final fun advance ()V
+	public final fun eof ()Z
+	public final fun peek (I)I
+	public static synthetic fun peek$default (Lcom/eignex/klause/util/CharReader;IILjava/lang/Object;)I
+}
+
+public abstract interface class com/eignex/klause/util/CharSource {
+	public abstract fun next ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/util/CharSourceKt {
+	public static final fun lineSequence (Lcom/eignex/klause/util/CharSource;)Lkotlin/sequences/Sequence;
+	public static final fun readText (Lcom/eignex/klause/util/CharSource;)Ljava/lang/String;
+}
+
+public final class com/eignex/klause/util/CheckedLongOverflowException : java/lang/ArithmeticException {
+	public fun <init> (Ljava/lang/String;)V
+}
+
+public final class com/eignex/klause/util/CheckedLongOverflowExceptionKt {
+	public static final fun addExact (JJ)J
+	public static final fun mulExact (JJ)J
+	public static final fun subExact (JJ)J
+}
+
+public final class com/eignex/klause/util/CollectionExtrasKt {
+	public static final fun sortedKeys (Lcom/eignex/klause/util/MutableIntDoubleMap;)[I
+	public static final fun sortedKeys (Lcom/eignex/klause/util/MutableIntIntMap;)[I
+	public static final fun sortedKeys (Lcom/eignex/klause/util/MutableIntLongMap;)[I
+	public static final fun sortedKeys (Lcom/eignex/klause/util/MutableIntObjectMap;)[I
+	public static final fun toSortedIntArray (Lcom/eignex/klause/util/IntArrayList;)[I
+	public static final fun toSortedIntArray (Lcom/eignex/klause/util/IntHashSet;)[I
+	public static final fun toSortedLongArray (Lcom/eignex/klause/util/LongArrayList;)[J
+	public static final fun toSortedLongArray (Lcom/eignex/klause/util/LongHashSet;)[J
+}
+
+public final class com/eignex/klause/util/EmptyArraysKt {
+	public static final fun getEmptyBooleanArray ()[Z
+	public static final fun getEmptyDoubleArray ()[D
+	public static final fun getEmptyIntArray ()[I
+	public static final fun getEmptyLongArray ()[J
+}
+
+public final class com/eignex/klause/util/FloatInterval {
+	public fun <init> (DD)V
+	public final fun component1 ()D
+	public final fun component2 ()D
+	public final fun contains (D)Z
+	public final fun copy (DD)Lcom/eignex/klause/util/FloatInterval;
+	public static synthetic fun copy$default (Lcom/eignex/klause/util/FloatInterval;DDILjava/lang/Object;)Lcom/eignex/klause/util/FloatInterval;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getHi ()D
+	public final fun getLo ()D
+	public final fun getWidth ()D
+	public fun hashCode ()I
+	public final fun isSingleton ()Z
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/util/IndexedMaxHeap {
+	public fun <init> (I)V
+	public final fun contains (I)Z
+	public final fun extractMax ()I
+	public final fun getCapacity ()I
+	public final fun getSize ()I
+	public final fun insert (ID)V
+	public final fun keyOf (I)D
+	public final fun peekMax ()I
+	public final fun remove (I)V
+	public final fun resetAllKeysInIdOrder (D)V
+	public final fun restore (I)V
+	public final fun scaleKeys (D)V
+	public final fun updateKey (ID)V
+}
+
+public final class com/eignex/klause/util/Int128 {
+	public fun <init> ()V
+	public final fun add (Lcom/eignex/klause/util/Int128;)V
+	public final fun addLong (J)V
+	public final fun addProduct (JJ)V
+	public final fun ceilDivPow2 (I)Ljava/lang/Long;
+	public final fun clear ()V
+	public final fun copy ()Lcom/eignex/klause/util/Int128;
+	public final fun divExactByLong (J)Ljava/lang/Long;
+	public final fun fitsLong ()Z
+	public final fun floorDivPositive (J)Ljava/lang/Long;
+	public final fun getHi ()J
+	public final fun getLo ()J
+	public final fun getOverflow ()Z
+	public final fun isNonNegative ()Z
+	public final fun shiftLeft (I)V
+	public final fun subtract (Lcom/eignex/klause/util/Int128;)V
+	public final fun toLong ()J
+}
+
+public final class com/eignex/klause/util/IntArrayDeque {
+	public fun <init> ()V
+	public fun <init> (I)V
+	public synthetic fun <init> (IILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun addFirst (I)V
+	public final fun addLast (I)V
+	public final fun clear ()V
+	public final fun getSize ()I
+	public final fun isEmpty ()Z
+	public final fun isNotEmpty ()Z
+	public final fun removeFirst ()I
+	public final fun removeFirstOr (I)I
+	public final fun removeLast ()I
+}
+
+public final class com/eignex/klause/util/IntArrayList {
+	public fun <init> ()V
+	public fun <init> (I)V
+	public synthetic fun <init> (IILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun add (I)V
+	public final fun clear ()V
+	public final fun contains (I)Z
+	public final fun forEach (Lkotlin/jvm/functions/Function1;)V
+	public final fun get (I)I
+	public final fun getBackingData ()[I
+	public final fun getSize ()I
+	public final fun indexOf (I)I
+	public final fun insertAt (II)V
+	public final fun isEmpty ()Z
+	public final fun last ()I
+	public final fun lowerBound (I)I
+	public final fun lowerBoundDescending (I)I
+	public final fun removeAt (I)V
+	public final fun removeValue (I)Z
+	public final fun set (II)V
+	public final fun sortByIntKey (ZLkotlin/jvm/functions/Function1;)V
+	public static synthetic fun sortByIntKey$default (Lcom/eignex/klause/util/IntArrayList;ZLkotlin/jvm/functions/Function1;ILjava/lang/Object;)V
+	public final fun toIntArray ()[I
+	public final fun toSet ()Ljava/util/Set;
+	public final fun truncateTo (I)V
+}
+
+public final class com/eignex/klause/util/IntDisjointSet {
+	public fun <init> (I)V
+	public final fun connected (II)Z
+	public final fun find (I)I
+	public final fun groups ()Ljava/util/List;
+	public final fun union (II)V
+}
+
+public final class com/eignex/klause/util/IntHashSet {
+	public fun <init> ()V
+	public fun <init> (I)V
+	public synthetic fun <init> (IILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun add (I)Z
+	public final fun clear ()V
+	public final fun contains (I)Z
+	public final fun forEach (Lkotlin/jvm/functions/Function1;)V
+	public final fun getKeysInternal ()[I
+	public final fun getSize ()I
+	public final fun getUsedInternal ()[Z
+	public final fun isEmpty ()Z
+	public final fun remove (I)Z
+	public final fun toIntArray ()[I
+}
+
+public final class com/eignex/klause/util/IntIntMap {
+	public static final field Companion Lcom/eignex/klause/util/IntIntMap$Companion;
+	public final fun contains (I)Z
+	public final fun get (I)I
+}
+
+public final class com/eignex/klause/util/IntIntMap$Companion {
+	public final fun build ([I[III)Lcom/eignex/klause/util/IntIntMap;
+	public static synthetic fun build$default (Lcom/eignex/klause/util/IntIntMap$Companion;[I[IIIILjava/lang/Object;)Lcom/eignex/klause/util/IntIntMap;
+}
+
+public final class com/eignex/klause/util/IntLongMap {
+	public static final field Companion Lcom/eignex/klause/util/IntLongMap$Companion;
+	public final fun contains (I)Z
+	public final fun get (I)J
+}
+
+public final class com/eignex/klause/util/IntLongMap$Companion {
+	public final fun build ([I[JJI)Lcom/eignex/klause/util/IntLongMap;
+	public static synthetic fun build$default (Lcom/eignex/klause/util/IntLongMap$Companion;[I[JJIILjava/lang/Object;)Lcom/eignex/klause/util/IntLongMap;
+}
+
+public final class com/eignex/klause/util/IntSwapSet {
+	public fun <init> (I)V
+	public final fun add (I)Z
+	public final fun clear ()V
+	public final fun contains (I)Z
+	public final fun forEach (Lkotlin/jvm/functions/Function1;)V
+	public final fun get (I)I
+	public final fun getSize ()I
+	public final fun isEmpty ()Z
+	public final fun random (Lkotlin/random/Random;)I
+	public final fun remove (I)Z
+	public final fun toIntArray ()[I
+}
+
+public final class com/eignex/klause/util/LongArrayList {
+	public fun <init> ()V
+	public fun <init> (I)V
+	public synthetic fun <init> (IILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun add (J)V
+	public final fun clear ()V
+	public final fun contains (J)Z
+	public final fun forEach (Lkotlin/jvm/functions/Function1;)V
+	public final fun get (I)J
+	public final fun getSize ()I
+	public final fun indexOf (J)I
+	public final fun insertAt (IJ)V
+	public final fun isEmpty ()Z
+	public final fun last ()J
+	public final fun lowerBound (J)I
+	public final fun removeAt (I)V
+	public final fun removeValue (J)Z
+	public final fun set (IJ)V
+	public final fun sort (Z)V
+	public static synthetic fun sort$default (Lcom/eignex/klause/util/LongArrayList;ZILjava/lang/Object;)V
+	public final fun toLongArray ()[J
+	public final fun toSet ()Ljava/util/Set;
+	public final fun truncateTo (I)V
+}
+
+public final class com/eignex/klause/util/LongHashSet {
+	public fun <init> ()V
+	public fun <init> (I)V
+	public synthetic fun <init> (IILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun add (J)Z
+	public final fun clear ()V
+	public final fun contains (J)Z
+	public final fun forEach (Lkotlin/jvm/functions/Function1;)V
+	public final fun getKeysInternal ()[J
+	public final fun getSize ()I
+	public final fun getUsedInternal ()[Z
+	public final fun isEmpty ()Z
+	public final fun remove (J)Z
+	public final fun toLongArray ()[J
+}
+
+public final class com/eignex/klause/util/LubyIterator {
+	public fun <init> ()V
+	public final fun advance ()V
+	public final fun getValue ()I
+	public final fun reset ()V
+}
+
+public final class com/eignex/klause/util/LubyKt {
+	public static final fun lubyN (J)J
+}
+
+public final class com/eignex/klause/util/MinCostAssignment {
+	public fun <init> (II)V
+	public final fun addOption (IIJ)V
+	public final fun solve ()Lcom/eignex/klause/util/MinCostAssignment$Result;
+}
+
+public final class com/eignex/klause/util/MinCostAssignment$Result {
+	public static final field Companion Lcom/eignex/klause/util/MinCostAssignment$Result$Companion;
+	public fun <init> (ZJ[I)V
+	public final fun getAssignedValue ()[I
+	public final fun getCost ()J
+	public final fun getFeasible ()Z
+}
+
+public final class com/eignex/klause/util/MinCostAssignment$Result$Companion {
+	public final fun infeasible ()Lcom/eignex/klause/util/MinCostAssignment$Result;
+}
+
+public final class com/eignex/klause/util/MutableIntDoubleMap {
+	public fun <init> ()V
+	public fun <init> (I)V
+	public synthetic fun <init> (IILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun addTo (ID)D
+	public final fun clear ()V
+	public final fun containsKey (I)Z
+	public final fun forEach (Lkotlin/jvm/functions/Function2;)V
+	public final fun getKeysInternal ()[I
+	public final fun getOrDefault (ID)D
+	public final fun getSize ()I
+	public final fun getUsedInternal ()[Z
+	public final fun getValuesInternal ()[D
+	public final fun isEmpty ()Z
+	public final fun put (ID)V
+	public final fun remove (I)Z
+}
+
+public final class com/eignex/klause/util/MutableIntIntMap {
+	public fun <init> ()V
+	public fun <init> (I)V
+	public synthetic fun <init> (IILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun addTo (II)I
+	public final fun clear ()V
+	public final fun containsKey (I)Z
+	public final fun forEach (Lkotlin/jvm/functions/Function2;)V
+	public final fun getKeysInternal ()[I
+	public final fun getOrDefault (II)I
+	public final fun getSize ()I
+	public final fun getUsedInternal ()[Z
+	public final fun getValuesInternal ()[I
+	public final fun isEmpty ()Z
+	public final fun put (II)V
+	public final fun remove (I)Z
+}
+
+public final class com/eignex/klause/util/MutableIntLongMap {
+	public fun <init> ()V
+	public fun <init> (I)V
+	public synthetic fun <init> (IILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun addTo (IJ)J
+	public final fun clear ()V
+	public final fun containsKey (I)Z
+	public final fun forEach (Lkotlin/jvm/functions/Function2;)V
+	public final fun getKeysInternal ()[I
+	public final fun getOrDefault (IJ)J
+	public final fun getSize ()I
+	public final fun getUsedInternal ()[Z
+	public final fun getValuesInternal ()[J
+	public final fun isEmpty ()Z
+	public final fun put (IJ)V
+	public final fun remove (I)Z
+}
+
+public final class com/eignex/klause/util/MutableIntObjectMap {
+	public fun <init> ()V
+	public fun <init> (I)V
+	public synthetic fun <init> (IILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun clear ()V
+	public final fun containsKey (I)Z
+	public final fun forEach (Lkotlin/jvm/functions/Function2;)V
+	public final fun get (I)Ljava/lang/Object;
+	public final fun getKeysInternal ()[I
+	public final fun getOrPut (ILkotlin/jvm/functions/Function0;)Ljava/lang/Object;
+	public final fun getSize ()I
+	public final fun getUsedInternal ()[Z
+	public final fun getValue (I)Ljava/lang/Object;
+	public final fun getValuesInternal ()[Ljava/lang/Object;
+	public final fun isEmpty ()Z
+	public final fun put (ILjava/lang/Object;)V
+	public final fun remove (I)Z
+	public final fun removeKeysAbove (I)V
+	public final fun valueAtMaxKey ()Ljava/lang/Object;
+}
+
+public final class com/eignex/klause/util/MutableLongIntMap {
+	public fun <init> ()V
+	public fun <init> (I)V
+	public synthetic fun <init> (IILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun addTo (JI)I
+	public final fun clear ()V
+	public final fun containsKey (J)Z
+	public final fun forEach (Lkotlin/jvm/functions/Function2;)V
+	public final fun getKeysInternal ()[J
+	public final fun getOrDefault (JI)I
+	public final fun getSize ()I
+	public final fun getUsedInternal ()[Z
+	public final fun getValuesInternal ()[I
+	public final fun isEmpty ()Z
+	public final fun put (JI)V
+	public final fun remove (J)Z
+	public final fun removeAndGet (JI)I
+}
+
+public final class com/eignex/klause/util/MutableLongObjectMap {
+	public fun <init> ()V
+	public fun <init> (I)V
+	public synthetic fun <init> (IILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun clear ()V
+	public final fun containsKey (J)Z
+	public final fun forEach (Lkotlin/jvm/functions/Function2;)V
+	public final fun get (J)Ljava/lang/Object;
+	public final fun getKeysInternal ()[J
+	public final fun getOrPut (JLkotlin/jvm/functions/Function0;)Ljava/lang/Object;
+	public final fun getSize ()I
+	public final fun getUsedInternal ()[Z
+	public final fun getValue (J)Ljava/lang/Object;
+	public final fun getValuesInternal ()[Ljava/lang/Object;
+	public final fun isEmpty ()Z
+	public final fun put (JLjava/lang/Object;)V
+	public final fun remove (J)Z
+}
+
+public final class com/eignex/klause/util/PermutationGroup {
+	public static final field INSTANCE Lcom/eignex/klause/util/PermutationGroup;
+	public final fun orbit (Ljava/util/List;I)Ljava/util/Set;
+	public final fun orbitUnderStabilizer (Ljava/util/List;[IIII)Ljava/util/Set;
+	public static synthetic fun orbitUnderStabilizer$default (Lcom/eignex/klause/util/PermutationGroup;Ljava/util/List;[IIIIILjava/lang/Object;)Ljava/util/Set;
+	public final fun strongGenerators (Ljava/util/List;II[I)Ljava/util/List;
+	public static synthetic fun strongGenerators$default (Lcom/eignex/klause/util/PermutationGroup;Ljava/util/List;II[IILjava/lang/Object;)Ljava/util/List;
+}
+
+public final class com/eignex/klause/util/StringCharSource : com/eignex/klause/util/CharSource {
+	public fun <init> (Ljava/lang/String;)V
+	public fun next ()Ljava/lang/String;
+}
+

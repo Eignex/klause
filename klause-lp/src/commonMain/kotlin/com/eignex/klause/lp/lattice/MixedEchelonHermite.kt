@@ -14,7 +14,7 @@ import com.ionspin.kotlin.bignum.integer.BigInteger
  * the integer points `x` does. A solution of the rewritten system therefore maps back to a solution of
  * the original by [recover], and an unsatisfiability proof needs no conversion at all.
  */
-internal class MixedEchelonHermite(
+class MixedEchelonHermite(
     /** The equality rows in the new variables, in echelon form. */
     val equalities: List<SparseIntRow>,
     /** The inequality rows in the new variables, in the same column order. */
@@ -55,7 +55,7 @@ internal class MixedEchelonHermite(
  * expensive half. A reduction cut short by [cancellation] comes back with no equalities and the identity
  * transform, which is the honest "the structure implied nothing here".
  */
-internal fun mixedEchelonHermite(
+fun mixedEchelonHermite(
     equalities: List<SparseIntRow>,
     inequalities: List<SparseIntRow>,
     cols: Int,
@@ -107,7 +107,7 @@ private fun applyTransform(row: SparseIntRow, v: UnimodularTransform): SparseInt
  * A side stays `null` when any term feeding it is open — an unbounded `y` makes `x` unbounded in the
  * direction its coefficient points, and claiming otherwise would invent exactly the box this avoids.
  */
-internal fun MixedEchelonHermite.originalBounds(yLo: Array<BigInteger?>, yHi: Array<BigInteger?>): TriangularBounds {
+fun MixedEchelonHermite.originalBounds(yLo: Array<BigInteger?>, yHi: Array<BigInteger?>): TriangularBounds {
     val n = transform.size
     val lo = arrayOfNulls<BigInteger>(n)
     val hi = arrayOfNulls<BigInteger>(n)

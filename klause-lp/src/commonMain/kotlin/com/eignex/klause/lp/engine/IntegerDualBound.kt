@@ -93,7 +93,7 @@ internal fun roundDuals(model: LpModel, y: DoubleArray, scaleBits: Int = DEFAULT
  * scaled integers from rounded duals at scale `2ᵏ`. Every quantity is a valid deduction for **any**
  * integer multipliers, so rounding only weakens it — never makes it unsound (see [integerCertify]).
  */
-internal class IntegerCertificate(
+class IntegerCertificate(
     private val scaleBits: Int,
     private val scale: Long,
     /** Scaled integer duals `2ᵏ·yᵢ`, one per row. */
@@ -168,7 +168,7 @@ internal class IntegerCertificate(
  *  - a reduced cost too large to evaluate in 64 bits, or a 128-bit accumulator overflow;
  *  - a strictly-negative reduced cost on a column with no finite upper bound (unbounded Lagrangian).
  */
-internal fun integerCertify(model: LpModel, y: DoubleArray, scaleBits: Int = DEFAULT_SCALE_BITS): IntegerCertificate? {
+fun integerCertify(model: LpModel, y: DoubleArray, scaleBits: Int = DEFAULT_SCALE_BITS): IntegerCertificate? {
     if (model.hasContinuous) return null // a real coefficient is not integrally certifiable here (Phase 3b)
     val rd = roundDuals(model, y, scaleBits) ?: return null
     val m = model.m
@@ -210,7 +210,7 @@ internal fun integerCertify(model: LpModel, y: DoubleArray, scaleBits: Int = DEF
  * float-misled ray simply fails the check and the node is kept — the prune is sound regardless. Null
  * when neither sign certifies, the rounding fails, or a 128-bit term overflows.
  */
-internal fun integerFarkasRay(
+fun integerFarkasRay(
     model: LpModel,
     ray: DoubleArray,
     scaleBits: Int = DEFAULT_SCALE_BITS,

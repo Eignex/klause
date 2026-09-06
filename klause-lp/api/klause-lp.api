@@ -1,0 +1,581 @@
+public final class com/eignex/klause/lp/engine/Basis {
+	public fun <init> ([I[Lcom/eignex/klause/lp/engine/VarStatus;)V
+	public final fun getBasicVars ()[I
+	public final fun getStatus ()[Lcom/eignex/klause/lp/engine/VarStatus;
+}
+
+public final class com/eignex/klause/lp/engine/CertifiedLpResult {
+	public final fun getCertificate ()Lcom/eignex/klause/lp/engine/IntegerCertificate;
+	public final fun getExactLowerBound ()Ljava/lang/Long;
+	public final fun getExactPrimal ()[D
+	public final fun getFarkasRay ()[J
+	public final fun getFloat ()Lcom/eignex/klause/lp/engine/FloatLpResult;
+	public final fun getInfeasibleRows ()[I
+	public final fun getSafeLowerBound ()Ljava/lang/Double;
+	public final fun getVerdict ()Lcom/eignex/klause/lp/engine/LpVerdict;
+}
+
+public final class com/eignex/klause/lp/engine/Csc {
+	public fun <init> ([I[I[J)V
+	public final fun getColPtr ()[I
+	public final fun getColVal ()[J
+	public final fun getRowIdx ()[I
+}
+
+public final class com/eignex/klause/lp/engine/Cut {
+	public fun <init> ([I[JLcom/eignex/klause/lp/engine/Relation;JZ)V
+	public synthetic fun <init> ([I[JLcom/eignex/klause/lp/engine/Relation;JZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getCoeffs ()[J
+	public final fun getCols ()[I
+	public final fun getGlobal ()Z
+	public final fun getRel ()Lcom/eignex/klause/lp/engine/Relation;
+	public final fun getRhs ()J
+	public final fun key ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/lp/engine/FloatLpResult {
+	public fun <init> (Lcom/eignex/klause/lp/engine/Basis;D[D[DIDDIZIZ)V
+	public synthetic fun <init> (Lcom/eignex/klause/lp/engine/Basis;D[D[DIDDIZIZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getBasis ()Lcom/eignex/klause/lp/engine/Basis;
+	public final fun getBlocks ()I
+	public final fun getDuals ()[D
+	public final fun getLuMaxDensity ()D
+	public final fun getLuMaxFill ()D
+	public final fun getObjective ()D
+	public final fun getOptimal ()Z
+	public final fun getPivots ()I
+	public final fun getPrimal ()[D
+	public final fun getRefactorizations ()I
+	public final fun getWarmStarted ()Z
+}
+
+public final class com/eignex/klause/lp/engine/IntegerCertificate {
+	public fun <init> (IJ[J[JLcom/eignex/klause/util/Int128;)V
+	public final fun dualNonzeroRow (I)Z
+	public final fun fixSteps (IJ)Ljava/lang/Long;
+	public final fun getObjectiveScaleBits ()I
+	public final fun improvingGapNonNegative (J)Z
+	public final fun objectiveBoundCeil (J)Ljava/lang/Long;
+	public final fun objectiveNumerator ()Lcom/eignex/klause/util/Int128;
+	public final fun reducedCostSign (I)I
+}
+
+public final class com/eignex/klause/lp/engine/IntegerDualBoundKt {
+	public static final fun integerCertify (Lcom/eignex/klause/lp/engine/LpModel;[DI)Lcom/eignex/klause/lp/engine/IntegerCertificate;
+	public static synthetic fun integerCertify$default (Lcom/eignex/klause/lp/engine/LpModel;[DIILjava/lang/Object;)Lcom/eignex/klause/lp/engine/IntegerCertificate;
+	public static final fun integerFarkasRay (Lcom/eignex/klause/lp/engine/LpModel;[DILcom/eignex/klause/lp/engine/Basis;I)[J
+	public static synthetic fun integerFarkasRay$default (Lcom/eignex/klause/lp/engine/LpModel;[DILcom/eignex/klause/lp/engine/Basis;IILjava/lang/Object;)[J
+}
+
+public final class com/eignex/klause/lp/engine/LpBuilder {
+	public fun <init> ()V
+	public final fun addFreeVar (Ljava/lang/Long;Ljava/lang/Long;JI)I
+	public static synthetic fun addFreeVar$default (Lcom/eignex/klause/lp/engine/LpBuilder;Ljava/lang/Long;Ljava/lang/Long;JIILjava/lang/Object;)I
+	public final fun addOpenAboveVar (JJI)I
+	public static synthetic fun addOpenAboveVar$default (Lcom/eignex/klause/lp/engine/LpBuilder;JJIILjava/lang/Object;)I
+	public final fun addRealRow ([I[DLcom/eignex/klause/lp/engine/Relation;DZ[I)V
+	public static synthetic fun addRealRow$default (Lcom/eignex/klause/lp/engine/LpBuilder;[I[DLcom/eignex/klause/lp/engine/Relation;DZ[IILjava/lang/Object;)V
+	public final fun addRealVar (Ljava/lang/Double;Ljava/lang/Double;DI)I
+	public static synthetic fun addRealVar$default (Lcom/eignex/klause/lp/engine/LpBuilder;Ljava/lang/Double;Ljava/lang/Double;DIILjava/lang/Object;)I
+	public final fun addRow (Ljava/util/Map;Lcom/eignex/klause/lp/engine/Relation;J)V
+	public final fun addRow ([I[JLcom/eignex/klause/lp/engine/Relation;JZLcom/eignex/klause/lp/engine/LpRowPremises;)V
+	public static synthetic fun addRow$default (Lcom/eignex/klause/lp/engine/LpBuilder;[I[JLcom/eignex/klause/lp/engine/Relation;JZLcom/eignex/klause/lp/engine/LpRowPremises;ILjava/lang/Object;)V
+	public final fun addVar (JJJI)I
+	public static synthetic fun addVar$default (Lcom/eignex/klause/lp/engine/LpBuilder;JJJIILjava/lang/Object;)I
+	public final fun build (Lcom/eignex/klause/lp/engine/Sense;)Lcom/eignex/klause/lp/engine/LpModel;
+	public final fun getRowCount ()I
+	public final fun getVarCount ()I
+}
+
+public final class com/eignex/klause/lp/engine/LpConditioning {
+	public fun <init> (DDDDI)V
+	public final fun getColumnRatio ()D
+	public final fun getEntries ()I
+	public final fun getMatrixRatio ()D
+	public final fun getMaxValue ()D
+	public final fun getMinValue ()D
+	public final fun getRowRatio ()D
+	public final fun getWithinHighsNoScalingWindow ()Z
+}
+
+public final class com/eignex/klause/lp/engine/LpConditioningKt {
+	public static final fun lpConditioning (Lcom/eignex/klause/lp/engine/LpModel;)Lcom/eignex/klause/lp/engine/LpConditioning;
+}
+
+public final class com/eignex/klause/lp/engine/LpDoubleView : com/eignex/klause/simplex/exact/ExactSimplexDoubleView {
+	public fun <init> ([I[I[D[D[D[D[ZD[D)V
+	public fun getColPtr ()[I
+	public fun getColVal ()[D
+	public final fun getCost ()[D
+	public fun getHasUpper ()[Z
+	public final fun getLoShift ()[D
+	public final fun getObjConstant ()D
+	public fun getRhs ()[D
+	public fun getRowIdx ()[I
+	public fun getUpper ()[D
+	public final fun setObjConstant (D)V
+}
+
+public final class com/eignex/klause/lp/engine/LpModel : com/eignex/klause/simplex/exact/ExactSimplexModel {
+	public fun <init> (IILcom/eignex/klause/lp/engine/Csc;[J[J[J[Z[JJLcom/eignex/klause/lp/engine/Sense;[I[Z[Z[Lcom/eignex/klause/lp/engine/LpRowPremises;[J[Z[Z[ZLcom/eignex/klause/lp/engine/LpDoubleView;)V
+	public synthetic fun <init> (IILcom/eignex/klause/lp/engine/Csc;[J[J[J[Z[JJLcom/eignex/klause/lp/engine/Sense;[I[Z[Z[Lcom/eignex/klause/lp/engine/LpRowPremises;[J[Z[Z[ZLcom/eignex/klause/lp/engine/LpDoubleView;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun costD (I)D
+	public fun forEachExactColumn (ILkotlin/jvm/functions/Function2;)V
+	public final fun forEachInColumn (ILkotlin/jvm/functions/Function2;)V
+	public final fun forEachInColumnD (ILkotlin/jvm/functions/Function2;)V
+	public fun getBigView ()Lcom/eignex/klause/simplex/exact/ExactSimplexBigView;
+	public final fun getColContinuous ()[Z
+	public final fun getCost ()[J
+	public final fun getCsc ()Lcom/eignex/klause/lp/engine/Csc;
+	public fun getDoubleView ()Lcom/eignex/klause/lp/engine/LpDoubleView;
+	public synthetic fun getDoubleView ()Lcom/eignex/klause/simplex/exact/ExactSimplexDoubleView;
+	public final fun getFlippedRhs ()[J
+	public final fun getHasContinuous ()Z
+	public fun getHasUpper ()[Z
+	public final fun getLoShift ()[J
+	public fun getM ()I
+	public fun getN ()I
+	public fun getNumVars ()I
+	public final fun getObjConstant ()J
+	public final fun getObjConstantD ()D
+	public fun getProbeClampedHi ()[Z
+	public fun getProbeClampedLo ()[Z
+	public fun getRhs ()[J
+	public final fun getRowGlobal ()[Z
+	public final fun getRowPremises ()[Lcom/eignex/klause/lp/engine/LpRowPremises;
+	public fun getRowStrict ()[Z
+	public final fun getSense ()Lcom/eignex/klause/lp/engine/Sense;
+	public final fun getTag ()[I
+	public fun getUpper ()[J
+	public final fun hasFiniteUpper (I)Z
+	public fun loShiftD (I)D
+	public final fun rebind ([J[J)Lcom/eignex/klause/lp/engine/LpModel;
+	public final fun rhsD (I)D
+	public final fun slackCol (I)I
+	public final fun upperD (I)D
+	public final fun withRowObjective ([I[J[I)Lcom/eignex/klause/lp/engine/LpModel;
+	public final fun withSingleColumnObjective (IJIII)Lcom/eignex/klause/lp/engine/LpModel;
+	public static synthetic fun withSingleColumnObjective$default (Lcom/eignex/klause/lp/engine/LpModel;IJIIIILjava/lang/Object;)Lcom/eignex/klause/lp/engine/LpModel;
+}
+
+public final class com/eignex/klause/lp/engine/LpNeighborhood {
+	public fun <init> (Lcom/eignex/klause/lp/engine/LpModel;[I[I[I)V
+	public final fun colOf (I)I
+	public final fun getColMap ()[I
+	public final fun getCols ()[I
+	public final fun getModel ()Lcom/eignex/klause/lp/engine/LpModel;
+	public final fun getRows ()[I
+}
+
+public final class com/eignex/klause/lp/engine/LpNeighborhoodKt {
+	public static final fun columnNeighborhood (Lcom/eignex/klause/lp/engine/LpModel;[IILcom/eignex/klause/lp/engine/LpRowIndex;)Lcom/eignex/klause/lp/engine/LpNeighborhood;
+	public static final fun rowIndex (Lcom/eignex/klause/lp/engine/LpModel;)Lcom/eignex/klause/lp/engine/LpRowIndex;
+}
+
+public final class com/eignex/klause/lp/engine/LpRowIndex {
+	public fun <init> ([I[I)V
+	public final fun getColIdx ()[I
+	public final fun getRowPtr ()[I
+}
+
+public final class com/eignex/klause/lp/engine/LpRowPremises {
+	public fun <init> ([I[Z[J[I)V
+	public synthetic fun <init> ([I[Z[J[IILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getBoolLits ()[I
+	public final fun getThresholds ()[J
+	public final fun getVars ()[I
+	public final fun isUpper ()[Z
+}
+
+public final class com/eignex/klause/lp/engine/LpSolveKt {
+	public static final fun solveAndCertify (Lcom/eignex/klause/lp/engine/LpModel;Lcom/eignex/klause/lp/engine/Basis;Lcom/eignex/klause/util/Cancellation;Z)Lcom/eignex/klause/lp/engine/CertifiedLpResult;
+	public static synthetic fun solveAndCertify$default (Lcom/eignex/klause/lp/engine/LpModel;Lcom/eignex/klause/lp/engine/Basis;Lcom/eignex/klause/util/Cancellation;ZILjava/lang/Object;)Lcom/eignex/klause/lp/engine/CertifiedLpResult;
+}
+
+public abstract interface class com/eignex/klause/lp/engine/LpSolver : java/lang/AutoCloseable {
+	public fun close ()V
+	public fun getInfeasibleBasis ()Lcom/eignex/klause/lp/engine/Basis;
+	public abstract fun getInfeasibleRay ()[D
+	public fun getInfeasibleRow ()I
+	public fun getLastColumns ()I
+	public fun getLastDegenerateColumns ()I
+	public fun getLastPivots ()I
+	public fun getLastRefactorizations ()I
+	public fun getLastSingularRefactorizations ()I
+	public fun getLastSmallPivotBails ()I
+	public fun getLastWarmStarted ()Z
+	public fun getLastWorkOps ()J
+	public abstract fun solve (Lcom/eignex/klause/lp/engine/Basis;)Lcom/eignex/klause/lp/engine/FloatLpResult;
+	public static synthetic fun solve$default (Lcom/eignex/klause/lp/engine/LpSolver;Lcom/eignex/klause/lp/engine/Basis;ILjava/lang/Object;)Lcom/eignex/klause/lp/engine/FloatLpResult;
+	public abstract fun solvePrimal (Lcom/eignex/klause/lp/engine/Basis;)Lcom/eignex/klause/lp/engine/FloatLpResult;
+	public static synthetic fun solvePrimal$default (Lcom/eignex/klause/lp/engine/LpSolver;Lcom/eignex/klause/lp/engine/Basis;ILjava/lang/Object;)Lcom/eignex/klause/lp/engine/FloatLpResult;
+}
+
+public final class com/eignex/klause/lp/engine/LpSolver$DefaultImpls {
+	public static fun close (Lcom/eignex/klause/lp/engine/LpSolver;)V
+	public static fun getInfeasibleBasis (Lcom/eignex/klause/lp/engine/LpSolver;)Lcom/eignex/klause/lp/engine/Basis;
+	public static fun getInfeasibleRow (Lcom/eignex/klause/lp/engine/LpSolver;)I
+	public static fun getLastColumns (Lcom/eignex/klause/lp/engine/LpSolver;)I
+	public static fun getLastDegenerateColumns (Lcom/eignex/klause/lp/engine/LpSolver;)I
+	public static fun getLastPivots (Lcom/eignex/klause/lp/engine/LpSolver;)I
+	public static fun getLastRefactorizations (Lcom/eignex/klause/lp/engine/LpSolver;)I
+	public static fun getLastSingularRefactorizations (Lcom/eignex/klause/lp/engine/LpSolver;)I
+	public static fun getLastSmallPivotBails (Lcom/eignex/klause/lp/engine/LpSolver;)I
+	public static fun getLastWarmStarted (Lcom/eignex/klause/lp/engine/LpSolver;)Z
+	public static fun getLastWorkOps (Lcom/eignex/klause/lp/engine/LpSolver;)J
+	public static synthetic fun solve$default (Lcom/eignex/klause/lp/engine/LpSolver;Lcom/eignex/klause/lp/engine/Basis;ILjava/lang/Object;)Lcom/eignex/klause/lp/engine/FloatLpResult;
+	public static synthetic fun solvePrimal$default (Lcom/eignex/klause/lp/engine/LpSolver;Lcom/eignex/klause/lp/engine/Basis;ILjava/lang/Object;)Lcom/eignex/klause/lp/engine/FloatLpResult;
+}
+
+public final class com/eignex/klause/lp/engine/LpSolverKt {
+	public static final fun newLpSolver (Lcom/eignex/klause/lp/engine/LpModel;Lcom/eignex/klause/util/Cancellation;Z)Lcom/eignex/klause/lp/engine/LpSolver;
+	public static synthetic fun newLpSolver$default (Lcom/eignex/klause/lp/engine/LpModel;Lcom/eignex/klause/util/Cancellation;ZILjava/lang/Object;)Lcom/eignex/klause/lp/engine/LpSolver;
+	public static final fun newPersistentLpSolver (Lcom/eignex/klause/lp/engine/LpModel;Lcom/eignex/klause/util/Cancellation;IIJZ)Lcom/eignex/klause/lp/engine/PersistentLpSolver;
+	public static synthetic fun newPersistentLpSolver$default (Lcom/eignex/klause/lp/engine/LpModel;Lcom/eignex/klause/util/Cancellation;IIJZILjava/lang/Object;)Lcom/eignex/klause/lp/engine/PersistentLpSolver;
+	public static final fun newTableauCutSolver (Lcom/eignex/klause/lp/engine/LpModel;Lcom/eignex/klause/util/Cancellation;IJZ)Lcom/eignex/klause/lp/engine/TableauCutSolver;
+	public static synthetic fun newTableauCutSolver$default (Lcom/eignex/klause/lp/engine/LpModel;Lcom/eignex/klause/util/Cancellation;IJZILjava/lang/Object;)Lcom/eignex/klause/lp/engine/TableauCutSolver;
+}
+
+public final class com/eignex/klause/lp/engine/LpVerdict : java/lang/Enum {
+	public static final field INDETERMINATE Lcom/eignex/klause/lp/engine/LpVerdict;
+	public static final field INFEASIBLE Lcom/eignex/klause/lp/engine/LpVerdict;
+	public static final field OPTIMAL Lcom/eignex/klause/lp/engine/LpVerdict;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/eignex/klause/lp/engine/LpVerdict;
+	public static fun values ()[Lcom/eignex/klause/lp/engine/LpVerdict;
+}
+
+public abstract interface class com/eignex/klause/lp/engine/PersistentLpSolver : com/eignex/klause/lp/engine/LpSolver {
+	public abstract fun rebind (Lcom/eignex/klause/lp/engine/LpModel;Lcom/eignex/klause/util/Cancellation;)Z
+	public abstract fun resolveBounds ()Lcom/eignex/klause/lp/engine/FloatLpResult;
+	public abstract fun resolveGated ([Z)Lcom/eignex/klause/lp/engine/FloatLpResult;
+}
+
+public final class com/eignex/klause/lp/engine/PersistentLpSolver$DefaultImpls {
+	public static fun close (Lcom/eignex/klause/lp/engine/PersistentLpSolver;)V
+	public static fun getInfeasibleBasis (Lcom/eignex/klause/lp/engine/PersistentLpSolver;)Lcom/eignex/klause/lp/engine/Basis;
+	public static fun getInfeasibleRow (Lcom/eignex/klause/lp/engine/PersistentLpSolver;)I
+	public static fun getLastColumns (Lcom/eignex/klause/lp/engine/PersistentLpSolver;)I
+	public static fun getLastDegenerateColumns (Lcom/eignex/klause/lp/engine/PersistentLpSolver;)I
+	public static fun getLastPivots (Lcom/eignex/klause/lp/engine/PersistentLpSolver;)I
+	public static fun getLastRefactorizations (Lcom/eignex/klause/lp/engine/PersistentLpSolver;)I
+	public static fun getLastSingularRefactorizations (Lcom/eignex/klause/lp/engine/PersistentLpSolver;)I
+	public static fun getLastSmallPivotBails (Lcom/eignex/klause/lp/engine/PersistentLpSolver;)I
+	public static fun getLastWarmStarted (Lcom/eignex/klause/lp/engine/PersistentLpSolver;)Z
+	public static fun getLastWorkOps (Lcom/eignex/klause/lp/engine/PersistentLpSolver;)J
+}
+
+public final class com/eignex/klause/lp/engine/Relation : java/lang/Enum {
+	public static final field EQ Lcom/eignex/klause/lp/engine/Relation;
+	public static final field GE Lcom/eignex/klause/lp/engine/Relation;
+	public static final field LE Lcom/eignex/klause/lp/engine/Relation;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/eignex/klause/lp/engine/Relation;
+	public static fun values ()[Lcom/eignex/klause/lp/engine/Relation;
+}
+
+public final class com/eignex/klause/lp/engine/RevisedSimplex : com/eignex/klause/lp/engine/PersistentLpSolver, com/eignex/klause/lp/engine/TableauCutSolver {
+	public fun <init> (Lcom/eignex/klause/lp/engine/LpModel;Lcom/eignex/klause/util/Cancellation;IIJZ)V
+	public synthetic fun <init> (Lcom/eignex/klause/lp/engine/LpModel;Lcom/eignex/klause/util/Cancellation;IIJZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun close ()V
+	public fun getInfeasibleBasis ()Lcom/eignex/klause/lp/engine/Basis;
+	public fun getInfeasibleRay ()[D
+	public fun getInfeasibleRow ()I
+	public fun getLastColumns ()I
+	public fun getLastDegenerateColumns ()I
+	public fun getLastPivots ()I
+	public fun getLastRefactorizations ()I
+	public fun getLastSingularRefactorizations ()I
+	public fun getLastSmallPivotBails ()I
+	public fun getLastWarmStarted ()Z
+	public fun getLastWorkOps ()J
+	public fun gomoryCuts (I)Ljava/util/List;
+	public fun mirCuts (I)Ljava/util/List;
+	public fun rebind (Lcom/eignex/klause/lp/engine/LpModel;Lcom/eignex/klause/util/Cancellation;)Z
+	public fun resolveBounds ()Lcom/eignex/klause/lp/engine/FloatLpResult;
+	public fun resolveGated ([Z)Lcom/eignex/klause/lp/engine/FloatLpResult;
+	public fun solve (Lcom/eignex/klause/lp/engine/Basis;)Lcom/eignex/klause/lp/engine/FloatLpResult;
+	public fun solvePrimal (Lcom/eignex/klause/lp/engine/Basis;)Lcom/eignex/klause/lp/engine/FloatLpResult;
+}
+
+public final class com/eignex/klause/lp/engine/SafeObjectiveBoundKt {
+	public static final fun tightObjectiveLowerBound (Lcom/eignex/klause/lp/engine/LpModel;[D)Ljava/lang/Double;
+	public static final fun tightObjectiveLowerBound (Lcom/eignex/klause/lp/engine/LpModel;[DLcom/eignex/klause/lp/engine/IntegerCertificate;)Ljava/lang/Double;
+	public static final fun tightVariableBound (Lcom/eignex/klause/lp/engine/LpModel;Lcom/eignex/klause/lp/engine/FloatLpResult;IZLjava/lang/Boolean;)Ljava/lang/Long;
+	public static synthetic fun tightVariableBound$default (Lcom/eignex/klause/lp/engine/LpModel;Lcom/eignex/klause/lp/engine/FloatLpResult;IZLjava/lang/Boolean;ILjava/lang/Object;)Ljava/lang/Long;
+}
+
+public final class com/eignex/klause/lp/engine/Sense : java/lang/Enum {
+	public static final field MAXIMIZE Lcom/eignex/klause/lp/engine/Sense;
+	public static final field MINIMIZE Lcom/eignex/klause/lp/engine/Sense;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/eignex/klause/lp/engine/Sense;
+	public static fun values ()[Lcom/eignex/klause/lp/engine/Sense;
+}
+
+public abstract interface class com/eignex/klause/lp/engine/TableauCutSolver : com/eignex/klause/lp/engine/LpSolver {
+	public abstract fun gomoryCuts (I)Ljava/util/List;
+	public abstract fun mirCuts (I)Ljava/util/List;
+}
+
+public final class com/eignex/klause/lp/engine/TableauCutSolver$DefaultImpls {
+	public static fun close (Lcom/eignex/klause/lp/engine/TableauCutSolver;)V
+	public static fun getInfeasibleBasis (Lcom/eignex/klause/lp/engine/TableauCutSolver;)Lcom/eignex/klause/lp/engine/Basis;
+	public static fun getInfeasibleRow (Lcom/eignex/klause/lp/engine/TableauCutSolver;)I
+	public static fun getLastColumns (Lcom/eignex/klause/lp/engine/TableauCutSolver;)I
+	public static fun getLastDegenerateColumns (Lcom/eignex/klause/lp/engine/TableauCutSolver;)I
+	public static fun getLastPivots (Lcom/eignex/klause/lp/engine/TableauCutSolver;)I
+	public static fun getLastRefactorizations (Lcom/eignex/klause/lp/engine/TableauCutSolver;)I
+	public static fun getLastSingularRefactorizations (Lcom/eignex/klause/lp/engine/TableauCutSolver;)I
+	public static fun getLastSmallPivotBails (Lcom/eignex/klause/lp/engine/TableauCutSolver;)I
+	public static fun getLastWarmStarted (Lcom/eignex/klause/lp/engine/TableauCutSolver;)Z
+	public static fun getLastWorkOps (Lcom/eignex/klause/lp/engine/TableauCutSolver;)J
+}
+
+public final class com/eignex/klause/lp/engine/VarStatus : java/lang/Enum {
+	public static final field AT_LOWER Lcom/eignex/klause/lp/engine/VarStatus;
+	public static final field AT_UPPER Lcom/eignex/klause/lp/engine/VarStatus;
+	public static final field BASIC Lcom/eignex/klause/lp/engine/VarStatus;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/eignex/klause/lp/engine/VarStatus;
+	public static fun values ()[Lcom/eignex/klause/lp/engine/VarStatus;
+}
+
+public final class com/eignex/klause/lp/lattice/HermiteForm {
+	public fun <init> (Ljava/util/List;Lcom/eignex/klause/lp/lattice/UnimodularTransform;)V
+	public final fun getH ()Ljava/util/List;
+	public final fun getV ()Lcom/eignex/klause/lp/lattice/UnimodularTransform;
+}
+
+public final class com/eignex/klause/lp/lattice/HermiteFormKt {
+	public static final fun hermiteNormalForm (Ljava/util/List;ILcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/lp/lattice/HermiteForm;
+	public static synthetic fun hermiteNormalForm$default (Ljava/util/List;ILcom/eignex/klause/util/Cancellation;ILjava/lang/Object;)Lcom/eignex/klause/lp/lattice/HermiteForm;
+}
+
+public final class com/eignex/klause/lp/lattice/MixedEchelonHermite {
+	public fun <init> (Ljava/util/List;Ljava/util/List;Lcom/eignex/klause/lp/lattice/UnimodularTransform;[Lcom/ionspin/kotlin/bignum/integer/BigInteger;Z)V
+	public synthetic fun <init> (Ljava/util/List;Ljava/util/List;Lcom/eignex/klause/lp/lattice/UnimodularTransform;[Lcom/ionspin/kotlin/bignum/integer/BigInteger;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getEqualities ()Ljava/util/List;
+	public final fun getEqualityRhs ()[Lcom/ionspin/kotlin/bignum/integer/BigInteger;
+	public final fun getInconsistent ()Z
+	public final fun getInequalities ()Ljava/util/List;
+	public final fun getTransform ()Lcom/eignex/klause/lp/lattice/UnimodularTransform;
+	public final fun recover ([Lcom/ionspin/kotlin/bignum/integer/BigInteger;)[Lcom/ionspin/kotlin/bignum/integer/BigInteger;
+}
+
+public final class com/eignex/klause/lp/lattice/MixedEchelonHermiteKt {
+	public static final fun mixedEchelonHermite (Ljava/util/List;Ljava/util/List;I[Lcom/ionspin/kotlin/bignum/integer/BigInteger;Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/lp/lattice/MixedEchelonHermite;
+	public static synthetic fun mixedEchelonHermite$default (Ljava/util/List;Ljava/util/List;I[Lcom/ionspin/kotlin/bignum/integer/BigInteger;Lcom/eignex/klause/util/Cancellation;ILjava/lang/Object;)Lcom/eignex/klause/lp/lattice/MixedEchelonHermite;
+	public static final fun originalBounds (Lcom/eignex/klause/lp/lattice/MixedEchelonHermite;[Lcom/ionspin/kotlin/bignum/integer/BigInteger;[Lcom/ionspin/kotlin/bignum/integer/BigInteger;)Lcom/eignex/klause/lp/lattice/TriangularBounds;
+}
+
+public final class com/eignex/klause/lp/lattice/SparseIntMatrixKt {
+	public static final fun sparseIntRow (Ljava/util/Map;)Lcom/eignex/klause/lp/lattice/SparseIntRow;
+}
+
+public final class com/eignex/klause/lp/lattice/SparseIntRow {
+	public static final field Companion Lcom/eignex/klause/lp/lattice/SparseIntRow$Companion;
+	public fun <init> ([I[Lcom/ionspin/kotlin/bignum/integer/BigInteger;)V
+	public final fun get (I)Lcom/ionspin/kotlin/bignum/integer/BigInteger;
+	public final fun getIndex ()[I
+	public final fun getLead ()I
+	public final fun getTrail ()I
+	public final fun getValue ()[Lcom/ionspin/kotlin/bignum/integer/BigInteger;
+	public final fun isZero ()Z
+}
+
+public final class com/eignex/klause/lp/lattice/SparseIntRow$Companion {
+	public final fun getZero ()Lcom/eignex/klause/lp/lattice/SparseIntRow;
+}
+
+public final class com/eignex/klause/lp/lattice/TriangularBounds {
+	public fun <init> ([Lcom/ionspin/kotlin/bignum/integer/BigInteger;[Lcom/ionspin/kotlin/bignum/integer/BigInteger;)V
+	public final fun getHi ()[Lcom/ionspin/kotlin/bignum/integer/BigInteger;
+	public final fun getLo ()[Lcom/ionspin/kotlin/bignum/integer/BigInteger;
+}
+
+public final class com/eignex/klause/lp/lattice/TriangularBoundsKt {
+	public static final fun triangularBounds (Ljava/util/List;I[Lcom/ionspin/kotlin/bignum/integer/BigInteger;[Lcom/ionspin/kotlin/bignum/integer/BigInteger;)Lcom/eignex/klause/lp/lattice/TriangularBounds;
+}
+
+public final class com/eignex/klause/lp/lattice/UnimodularTransform {
+	public fun <init> (I)V
+	public final fun addMultiple (IILcom/ionspin/kotlin/bignum/integer/BigInteger;)V
+	public final fun columnOrNull (I)Ljava/util/Map;
+	public final fun forEachEntry (Lkotlin/jvm/functions/Function3;)V
+	public final fun get (II)Lcom/ionspin/kotlin/bignum/integer/BigInteger;
+	public final fun getNonZeroCount ()I
+	public final fun getSize ()I
+	public final fun inverse ()Lcom/eignex/klause/lp/lattice/UnimodularTransform;
+	public final fun negate (I)V
+	public final fun swap (II)V
+}
+
+public final class com/eignex/klause/simplex/exact/BigFraction {
+	public static final field Companion Lcom/eignex/klause/simplex/exact/BigFraction$Companion;
+	public final fun compareTo (Lcom/eignex/klause/simplex/exact/BigFraction;)I
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getDen ()Lcom/ionspin/kotlin/bignum/integer/BigInteger;
+	public final fun getNum ()Lcom/ionspin/kotlin/bignum/integer/BigInteger;
+	public fun hashCode ()I
+	public final fun isZero ()Z
+	public final fun minus (Lcom/eignex/klause/simplex/exact/BigFraction;)Lcom/eignex/klause/simplex/exact/BigFraction;
+	public final fun negated ()Lcom/eignex/klause/simplex/exact/BigFraction;
+	public final fun plus (Lcom/eignex/klause/simplex/exact/BigFraction;)Lcom/eignex/klause/simplex/exact/BigFraction;
+	public final fun reciprocal ()Lcom/eignex/klause/simplex/exact/BigFraction;
+	public final fun signum ()I
+	public final fun times (Lcom/eignex/klause/simplex/exact/BigFraction;)Lcom/eignex/klause/simplex/exact/BigFraction;
+	public final fun toDouble ()D
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/simplex/exact/BigFraction$Companion {
+	public final fun getMINUS_ONE ()Lcom/eignex/klause/simplex/exact/BigFraction;
+	public final fun getONE ()Lcom/eignex/klause/simplex/exact/BigFraction;
+	public final fun getZERO ()Lcom/eignex/klause/simplex/exact/BigFraction;
+	public final fun of (Lcom/ionspin/kotlin/bignum/integer/BigInteger;Lcom/ionspin/kotlin/bignum/integer/BigInteger;)Lcom/eignex/klause/simplex/exact/BigFraction;
+	public final fun ofDouble (D)Lcom/eignex/klause/simplex/exact/BigFraction;
+	public final fun ofLong (J)Lcom/eignex/klause/simplex/exact/BigFraction;
+}
+
+public final class com/eignex/klause/simplex/exact/BigRationalOutcome {
+	public fun <init> (Lcom/eignex/klause/simplex/exact/RationalFeasibility;Ljava/util/List;Ljava/util/List;)V
+	public synthetic fun <init> (Lcom/eignex/klause/simplex/exact/RationalFeasibility;Ljava/util/List;Ljava/util/List;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getFeasibility ()Lcom/eignex/klause/simplex/exact/RationalFeasibility;
+	public final fun getTableau ()Ljava/util/List;
+	public final fun getWitness ()Ljava/util/List;
+}
+
+public final class com/eignex/klause/simplex/exact/BigRationalTableauRow {
+	public fun <init> (ILcom/eignex/klause/simplex/exact/BigFraction;[ILjava/util/List;)V
+	public final fun getBasic ()I
+	public final fun getCoefficients ()Ljava/util/List;
+	public final fun getColumns ()[I
+	public final fun getRhs ()Lcom/eignex/klause/simplex/exact/BigFraction;
+}
+
+public final class com/eignex/klause/simplex/exact/ExactDoubleBoundedRow {
+	public fun <init> (ILcom/eignex/klause/simplex/exact/ExactRationalInequality;Lcom/eignex/klause/simplex/exact/BigFraction;)V
+	public final fun getIndex ()I
+	public final fun getInequality ()Lcom/eignex/klause/simplex/exact/ExactRationalInequality;
+	public final fun getLower ()Lcom/eignex/klause/simplex/exact/BigFraction;
+}
+
+public abstract interface class com/eignex/klause/simplex/exact/ExactDoubleBoundedSplit {
+}
+
+public final class com/eignex/klause/simplex/exact/ExactDoubleBoundedSplit$Infeasible : com/eignex/klause/simplex/exact/ExactDoubleBoundedSplit {
+	public static final field INSTANCE Lcom/eignex/klause/simplex/exact/ExactDoubleBoundedSplit$Infeasible;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/simplex/exact/ExactDoubleBoundedSplit$Split : com/eignex/klause/simplex/exact/ExactDoubleBoundedSplit {
+	public fun <init> (Ljava/util/List;Ljava/util/List;)V
+	public final fun getBounded ()Ljava/util/List;
+	public final fun getUnbounded ()Ljava/util/List;
+}
+
+public final class com/eignex/klause/simplex/exact/ExactDoubleBoundedSplit$Unknown : com/eignex/klause/simplex/exact/ExactDoubleBoundedSplit {
+	public static final field INSTANCE Lcom/eignex/klause/simplex/exact/ExactDoubleBoundedSplit$Unknown;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/simplex/exact/ExactRationalFeasibilityModel : com/eignex/klause/simplex/exact/ExactSimplexModel {
+	public fun <init> (ILjava/util/List;Ljava/util/List;)V
+	public synthetic fun <init> (ILjava/util/List;Ljava/util/List;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun forEachExactColumn (ILkotlin/jvm/functions/Function2;)V
+	public fun getBigView ()Lcom/eignex/klause/simplex/exact/ExactSimplexBigView;
+	public fun getDoubleView ()Lcom/eignex/klause/simplex/exact/ExactSimplexDoubleView;
+	public fun getHasUpper ()[Z
+	public fun getM ()I
+	public fun getN ()I
+	public fun getNumVars ()I
+	public fun getProbeClampedHi ()[Z
+	public fun getProbeClampedLo ()[Z
+	public fun getRhs ()[J
+	public fun getRowStrict ()[Z
+	public fun getUpper ()[J
+	public fun loShiftD (I)D
+}
+
+public final class com/eignex/klause/simplex/exact/ExactRationalInequality {
+	public fun <init> ([ILjava/util/List;Lcom/eignex/klause/simplex/exact/BigFraction;Z)V
+	public synthetic fun <init> ([ILjava/util/List;Lcom/eignex/klause/simplex/exact/BigFraction;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getCoefficients ()Ljava/util/List;
+	public final fun getColumns ()[I
+	public final fun getRhs ()Lcom/eignex/klause/simplex/exact/BigFraction;
+	public final fun getStrict ()Z
+}
+
+public final class com/eignex/klause/simplex/exact/ExactSimplexBigView {
+	public fun <init> ([I[ILjava/util/List;Ljava/util/List;Ljava/util/List;)V
+	public final fun getColPtr ()[I
+	public final fun getColVal ()Ljava/util/List;
+	public final fun getRhs ()Ljava/util/List;
+	public final fun getRowIdx ()[I
+	public final fun getUpper ()Ljava/util/List;
+}
+
+public abstract interface class com/eignex/klause/simplex/exact/ExactSimplexDoubleView {
+	public abstract fun getColPtr ()[I
+	public abstract fun getColVal ()[D
+	public abstract fun getHasUpper ()[Z
+	public abstract fun getRhs ()[D
+	public abstract fun getRowIdx ()[I
+	public abstract fun getUpper ()[D
+}
+
+public abstract interface class com/eignex/klause/simplex/exact/ExactSimplexModel {
+	public abstract fun forEachExactColumn (ILkotlin/jvm/functions/Function2;)V
+	public fun getBigView ()Lcom/eignex/klause/simplex/exact/ExactSimplexBigView;
+	public abstract fun getDoubleView ()Lcom/eignex/klause/simplex/exact/ExactSimplexDoubleView;
+	public abstract fun getHasUpper ()[Z
+	public abstract fun getM ()I
+	public abstract fun getN ()I
+	public abstract fun getNumVars ()I
+	public abstract fun getProbeClampedHi ()[Z
+	public abstract fun getProbeClampedLo ()[Z
+	public abstract fun getRhs ()[J
+	public abstract fun getRowStrict ()[Z
+	public abstract fun getUpper ()[J
+	public abstract fun loShiftD (I)D
+}
+
+public final class com/eignex/klause/simplex/exact/ExactSimplexModel$DefaultImpls {
+	public static fun getBigView (Lcom/eignex/klause/simplex/exact/ExactSimplexModel;)Lcom/eignex/klause/simplex/exact/ExactSimplexBigView;
+}
+
+public final class com/eignex/klause/simplex/exact/RationalFeasibility : java/lang/Enum {
+	public static final field FEASIBLE Lcom/eignex/klause/simplex/exact/RationalFeasibility;
+	public static final field INFEASIBLE Lcom/eignex/klause/simplex/exact/RationalFeasibility;
+	public static final field UNKNOWN Lcom/eignex/klause/simplex/exact/RationalFeasibility;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/eignex/klause/simplex/exact/RationalFeasibility;
+	public static fun values ()[Lcom/eignex/klause/simplex/exact/RationalFeasibility;
+}
+
+public final class com/eignex/klause/simplex/exact/RationalOutcome {
+	public fun <init> (Lcom/eignex/klause/simplex/exact/RationalFeasibility;[D[I)V
+	public synthetic fun <init> (Lcom/eignex/klause/simplex/exact/RationalFeasibility;[D[IILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getFeasibility ()Lcom/eignex/klause/simplex/exact/RationalFeasibility;
+	public final fun getRows ()[I
+	public final fun getWitness ()[D
+}
+
+public final class com/eignex/klause/simplex/exact/RationalSimplexKt {
+	public static final fun bigRationalOutcome (Lcom/eignex/klause/simplex/exact/ExactSimplexModel;Lcom/eignex/klause/util/Cancellation;I)Lcom/eignex/klause/simplex/exact/BigRationalOutcome;
+	public static synthetic fun bigRationalOutcome$default (Lcom/eignex/klause/simplex/exact/ExactSimplexModel;Lcom/eignex/klause/util/Cancellation;IILjava/lang/Object;)Lcom/eignex/klause/simplex/exact/BigRationalOutcome;
+	public static final fun exactDescendingDirection (Ljava/util/List;Lcom/eignex/klause/simplex/exact/ExactRationalInequality;ILcom/eignex/klause/util/Cancellation;)Ljava/lang/Boolean;
+	public static synthetic fun exactDescendingDirection$default (Ljava/util/List;Lcom/eignex/klause/simplex/exact/ExactRationalInequality;ILcom/eignex/klause/util/Cancellation;ILjava/lang/Object;)Ljava/lang/Boolean;
+	public static final fun exactDoubleBoundedSplit (Ljava/util/List;ILcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/simplex/exact/ExactDoubleBoundedSplit;
+	public static synthetic fun exactDoubleBoundedSplit$default (Ljava/util/List;ILcom/eignex/klause/util/Cancellation;ILjava/lang/Object;)Lcom/eignex/klause/simplex/exact/ExactDoubleBoundedSplit;
+	public static final fun exactMixedUnitCubeSolution (Ljava/util/List;IILcom/eignex/klause/util/Cancellation;)Ljava/util/List;
+	public static synthetic fun exactMixedUnitCubeSolution$default (Ljava/util/List;IILcom/eignex/klause/util/Cancellation;ILjava/lang/Object;)Ljava/util/List;
+	public static final fun rationalOutcome (Lcom/eignex/klause/simplex/exact/ExactSimplexModel;Lcom/eignex/klause/util/Cancellation;I)Lcom/eignex/klause/simplex/exact/RationalOutcome;
+	public static synthetic fun rationalOutcome$default (Lcom/eignex/klause/simplex/exact/ExactSimplexModel;Lcom/eignex/klause/util/Cancellation;IILjava/lang/Object;)Lcom/eignex/klause/simplex/exact/RationalOutcome;
+}
+
