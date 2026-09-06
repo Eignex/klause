@@ -1,11 +1,4 @@
-package com.eignex.klause.lp.bound
-
-import com.eignex.klause.util.CheckedLongOverflowException
-import com.eignex.klause.util.EmptyIntArray
-import com.eignex.klause.util.IntArrayDeque
-import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.LongArrayList
-import com.eignex.klause.util.addExact
+package com.eignex.klause.util
 
 /**
  * Exact minimum-cost bipartite assignment over [Long] costs — the AllDifferent Lagrangian

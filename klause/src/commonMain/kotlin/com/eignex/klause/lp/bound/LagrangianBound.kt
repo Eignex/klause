@@ -13,6 +13,7 @@ import com.eignex.klause.util.EmptyLongArray
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.LongArrayList
+import com.eignex.klause.util.MinCostAssignment
 import com.eignex.klause.util.MutableLongIntMap
 import com.eignex.klause.util.addExact
 import com.eignex.klause.util.mulExact

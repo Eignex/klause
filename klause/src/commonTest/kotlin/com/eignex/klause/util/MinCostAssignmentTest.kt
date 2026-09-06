@@ -1,4 +1,4 @@
-package com.eignex.klause.lp.bound
+package com.eignex.klause.util
 
 import kotlin.random.Random
 import kotlin.test.Test

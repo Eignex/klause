@@ -1,13 +1,13 @@
 package com.eignex.klause.lp.cut
 
 import com.eignex.klause.ir.values
-import com.eignex.klause.lp.bound.MinCostAssignment
 import com.eignex.klause.lp.engine.Cut
 import com.eignex.klause.lp.engine.Relation
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.util.CheckedLongOverflowException
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.LongArrayList
+import com.eignex.klause.util.MinCostAssignment
 import com.eignex.klause.util.MutableLongIntMap
 import com.eignex.klause.util.mulExact
 
