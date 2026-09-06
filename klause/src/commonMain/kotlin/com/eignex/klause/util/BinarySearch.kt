@@ -46,7 +46,7 @@ internal fun IntArray.binarySearchInt(element: Int, fromIndex: Int = 0, toIndex:
 }
 
 /** [binarySearchInt] for a sorted [LongArray] — same return contract. Used by the wide-value
- *  [com.eignex.klause.ir.intdomain.SurvivorsDomain] whose present values may exceed 32-bit range. */
+ *  `SurvivorsDomain` whose present values may exceed 32-bit range. */
 internal fun LongArray.binarySearchLong(element: Long, fromIndex: Int = 0, toIndex: Int = size): Int {
     var lo = fromIndex
     var len = toIndex - fromIndex

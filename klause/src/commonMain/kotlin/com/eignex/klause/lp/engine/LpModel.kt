@@ -98,7 +98,7 @@ internal class LpModel(
     /**
      * Per-row global validity: `true` when row `i` holds at **every integer solution of the
      * problem** — not merely inside the current search node's box. Rows built from live
-     * (branch-tightened) information — a [com.eignex.klause.factor.arithmetic.ReifiedLinear] big-M row
+     * (branch-tightened) information — a `ReifiedLinear` big-M row
      * whose M came from tightened domains, a locally separated cut, a Gomory/MIR tableau cut — are
      * marked `false`. Learned artifacts (Farkas nogoods, objective-bound and reduced-cost reasons)
      * cite only variable-bound atoms and keep the rows implicit, so they are only valid when every
@@ -211,7 +211,7 @@ internal class LpModel(
     /**
      * A model identical in structure and bounds but whose objective is a single unit cost [unitCost] on
      * structural column [col] and zero elsewhere — the per-variable objective optimization-based bound
-     * tightening ([com.eignex.klause.lp.tightenOpenIntBounds]) swaps in for each open side. When the
+     * tightening (`tightenOpenIntBounds`) swaps in for each open side. When the
      * variable is represented split (`x = x⁺ − x⁻`), [negCol] names the negative part and takes
      * `−unitCost`, so the objective is still exactly `unitCost·x`. The [cost] array is **shared and
      * mutated in place**: [col]/[negCol] are set and the columns of the previous call
