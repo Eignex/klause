@@ -2,6 +2,7 @@ package com.eignex.klause.presolve.linear
 
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.bool.PseudoBoolean
+import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
@@ -17,9 +18,12 @@ import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.propagation.propagate
+import com.eignex.klause.util.Bits
+import com.eignex.klause.util.Cancellation
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 /**
@@ -345,6 +349,40 @@ class CoefficientStrengtheningTest {
             val bound = rng.nextInt(41) - 20
             assertLinearEquivalent(n, 3, Linear(coeffs, IntArray(n) { idx -> idx }, op, bound))
         }
+    }
+
+    @Test
+    fun `a row the source bounds on both sides is lifted without a finite projection`() {
+        // 7x + 3y <= 8 over two binaries: Amax 10, d 2, so both coefficients clamp to 2 and the bound
+        // becomes 2. Coprime coefficients, so nothing here is the GCD half.
+        val problem = Problem(
+            numBoolVars = 0,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(0, 0), longArrayOf(1, 1), null, null),
+            factors = arrayOf(Linear(intArrayOf(7, 3), intArrayOf(0, 1), LinearOp.LE, 8)),
+        )
+
+        val delta = Presolve.strengthenSourceCoefficients(problem, Cancellation.Never)
+
+        val lifted = assertIs<Linear>(delta.addedFactors.single())
+        assertEquals(listOf(2L, 2L), lifted.vars.indices.map { lifted.integerConstants!!.coeff(it) })
+        assertEquals(2L, lifted.integerConstants!!.bound)
+    }
+
+    @Test
+    fun `a row mentioning a column the source leaves open is not lifted`() {
+        // The same row with nothing bounding y above. Its width is what the lift charges, so an invented
+        // endpoint is the only thing that could justify the clamp.
+        val openHi = Bits(2).also { it.set(1) }
+        val problem = Problem(
+            numBoolVars = 0,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(0, 0), longArrayOf(1, 0), null, openHi),
+            factors = arrayOf(Linear(intArrayOf(7, 3), intArrayOf(0, 1), LinearOp.LE, 8)),
+        )
+
+        assertTrue(
+            Presolve.strengthenSourceCoefficients(problem, Cancellation.Never).isEmpty,
+            "an open column has no width for the lift to charge",
+        )
     }
 
     @Test

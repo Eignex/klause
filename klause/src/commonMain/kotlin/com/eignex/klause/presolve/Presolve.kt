@@ -32,17 +32,26 @@ object Presolve {
     /** GCD plus bounded-integer coefficient strengthening for
      *  [com.eignex.klause.factor.arithmetic.Linear] and pseudo-Boolean constraints. */
     fun strengthenCoefficients(problem: BakedProblem, cancellation: Cancellation = Cancellation.Never): PassDelta =
-        CoefficientStrengthening.strengthenCoefficients(problem, cancellation, problem.rootIntDomainsInPlace)
+        CoefficientStrengthening.strengthenCoefficients(
+            problem,
+            cancellation,
+            ColumnRanges.of(problem.rootIntDomainsInPlace),
+        )
 
-    /** The source-safe GCD part of coefficient strengthening, before finite domains exist. */
+    /** Coefficient strengthening over what a source model states: the GCD reduction on every row, and the
+     *  bounded-integer lift on the rows whose columns the model bounds on both sides. */
     internal fun strengthenSourceCoefficients(problem: Problem, cancellation: Cancellation): SourceDelta =
-        CoefficientStrengthening.strengthenCoefficients(problem, cancellation).asSourceDelta()
+        CoefficientStrengthening.strengthenCoefficients(
+            problem,
+            cancellation,
+            ColumnRanges.of(problem.intBounds),
+        ).asSourceDelta()
 
     internal fun strengthenCoefficients(
         problem: Problem,
         cancellation: Cancellation,
         domains: Array<IntDomain>,
-    ): PassDelta = CoefficientStrengthening.strengthenCoefficients(problem, cancellation, domains)
+    ): PassDelta = CoefficientStrengthening.strengthenCoefficients(problem, cancellation, ColumnRanges.of(domains))
 
     /** One-shot GF(2) elimination over all xor factors. */
     fun deriveXorUnits(problem: Problem): PassDelta = XorUnits.deriveXorUnits(problem)
@@ -76,9 +85,9 @@ object Presolve {
 
     /** Constraint subsumption / redundant-constraint removal. See [RedundantConstraints]. */
     fun removeRedundantConstraints(problem: BakedProblem): PassDelta =
-        RedundantConstraints.removeRedundantConstraints(problem, problem.rootIntDomainsInPlace)
+        RedundantConstraints.removeRedundantConstraints(problem, ColumnRanges.of(problem.rootIntDomainsInPlace))
 
-    /** The declaration-only phases of subsumption. See [RedundantConstraints]. */
+    /** Subsumption over what a source model states. See [RedundantConstraints]. */
     internal fun removeRedundantSourceConstraints(problem: Problem, cancellation: Cancellation): SourceDelta =
         RedundantConstraints.removeRedundantSourceConstraints(problem, cancellation)
 
