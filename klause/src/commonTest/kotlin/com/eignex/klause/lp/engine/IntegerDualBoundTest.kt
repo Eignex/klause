@@ -9,6 +9,8 @@ import com.eignex.klause.lp.engine.integerDualLowerBoundCeil
 import kotlin.math.ceil
 import kotlin.random.Random
 import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 /**
@@ -55,5 +57,36 @@ class IntegerDualBoundTest {
         assertTrue(total > 300, "covered only $total instances")
         assertTrue(finite >= total * 4 / 5, "integer bound was finite on only $finite/$total")
         assertTrue(matchesCeil >= finite * 2 / 3, "matched ceil(optimum) on only $matchesCeil/$finite")
+    }
+
+    @Test
+    fun `a slack multiplier off by float noise still yields an exact bound`() {
+        // Mirrors the float bound's own repair test: min -x subject to x <= 4, x in [0, 10]. The row's
+        // exact multiplier is -1, and a slack carries no upper bound, so a multiplier a hair the other
+        // side of its own reduced cost used to abandon the certificate outright.
+        val b = LpBuilder()
+        val x = b.addVar(0L, 10L, cost = -1L)
+        b.addRow(intArrayOf(x), longArrayOf(1L), Relation.LE, 4L)
+        val model = b.build(Sense.MINIMIZE)
+        val optimum = exactLpOptimum(model)
+
+        val bound = assertNotNull(
+            integerDualLowerBoundCeil(model, doubleArrayOf(1e-12)),
+            "a multiplier off by 1e-12 must not cost the whole certificate",
+        )
+
+        assertTrue(bound <= ceil(optimum) + 1e-9, "UNSOUND repaired bound $bound > ceil(optimum) ${ceil(optimum)}")
+    }
+
+    @Test
+    fun `the repair leaves a certificate that already had one untouched`() {
+        val b = LpBuilder()
+        val x = b.addVar(0L, 10L, cost = -1L)
+        b.addRow(intArrayOf(x), longArrayOf(1L), Relation.LE, 4L)
+        val model = b.build(Sense.MINIMIZE)
+
+        val exact = assertNotNull(integerDualLowerBoundCeil(model, doubleArrayOf(-1.0)))
+
+        assertEquals(-4L, exact)
     }
 }
