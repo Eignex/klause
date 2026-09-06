@@ -18,7 +18,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /** Clique cuts for set-packing structure. */
-class CutCliqueCutSeparatorTest {
+class CliqueCutSeparatorTest {
 
     private fun excl(a: Int, b: Int): Clause = Clause(intArrayOf(Lit.make(a, false), Lit.make(b, false)))
 
