@@ -7,13 +7,13 @@ import com.eignex.klause.factor.bool.PseudoBoolean
 import com.eignex.klause.factor.bool.internals.maximalPersistentAmoCliques
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.ir.Factor
-import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.LinearRow
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.StructuralKey
 import com.eignex.klause.ir.Term
 import com.eignex.klause.model.PbOp
+import com.eignex.klause.presolve.ColumnRanges
 import com.eignex.klause.presolve.PassDelta
 import com.eignex.klause.presolve.PresolveShared
 import com.eignex.klause.presolve.SourceDelta
@@ -40,22 +40,22 @@ internal object RedundantConstraints {
      * fruitless re-run becomes O(delta). The later phases run over the phase-2
      * survivor list either way.
      *
-     * [domains] are the root-propagated finite domains the activity-based phases read; `null` runs the
-     * declaration-only phases alone (see [removeRedundantSourceConstraints]).
+     * [ranges] is how wide each column is to the activity-based phases: a finite projection's folded
+     * domains, or what a source model states (see [removeRedundantSourceConstraints]).
      */
     fun removeRedundantConstraints(
         problem: Problem,
-        domains: Array<IntDomain>?,
+        ranges: ColumnRanges,
         incremental: SubsumeIncremental? = null,
         cancellation: Cancellation = Cancellation.Never,
     ): PassDelta {
-        if (incremental == null) return computeFull(problem, domains, cancellation)
+        if (incremental == null) return computeFull(problem, ranges, cancellation)
         val out = incremental.memo.reconcile(problem, incremental, cancellation)
-        val delta = finishAfterPhase2(problem, domains, out, cancellation)
+        val delta = finishAfterPhase2(problem, ranges, out, cancellation)
         // Phases 3–5 drop factors [reconcile] never saw; feed the full drop set back so the memo retracts
         // every dropped factor's index entry before the next firing.
         incremental.memo.setPendingSelfDrops(delta.droppedIndices.map { problem.factors[it] })
-        if (SUBSUME_DIFFERENTIAL_CHECK) assertMatchesFull(problem, domains, delta)
+        if (SUBSUME_DIFFERENTIAL_CHECK) assertMatchesFull(problem, ranges, delta)
         return delta
     }
 
@@ -64,20 +64,20 @@ internal object RedundantConstraints {
      *
      * Phases 1, 2 and 4 compare rows against each other — exact duplicates, same-vector domination, and
      * knapsacks an at-most-one clique already implies — so each drop is justified by another retained
-     * row rather than by any column's finite extent. Phases 3 and 5 charge the extra terms their maximal
-     * activity and read a global's domains, which a model with an open side has no answer for, so they
-     * run only in [removeRedundantConstraints].
+     * row rather than by any column's finite extent. Phases 3 and 5 charge a column its whole width, so
+     * they run here over what the source states and decline the individual row or global that mentions a
+     * column with an open side. The model being open somewhere else costs them nothing.
      */
     fun removeRedundantSourceConstraints(problem: Problem, cancellation: Cancellation): SourceDelta =
-        computeFull(problem, domains = null, cancellation).asSourceDelta()
+        computeFull(problem, ColumnRanges.of(problem.intBounds), cancellation).asSourceDelta()
 
     // Flip on to validate the incremental path: every firing also recomputes the full delta and asserts
     // the two agree, so a divergence throws on the exact instance/round instead of surfacing as a wrong
     // presolve output. Off in production (the full recompute defeats the incremental win).
     private const val SUBSUME_DIFFERENTIAL_CHECK = false
 
-    private fun assertMatchesFull(problem: Problem, domains: Array<IntDomain>?, delta: PassDelta) {
-        val full = computeFull(problem, domains)
+    private fun assertMatchesFull(problem: Problem, ranges: ColumnRanges, delta: PassDelta) {
+        val full = computeFull(problem, ranges)
         val a = delta.droppedIndices.toHashSet()
         val b = full.droppedIndices.toHashSet()
         require(a == b) { "incremental subsume delta $a != full $b (nfac=${problem.factors.size})" }
@@ -107,7 +107,7 @@ internal object RedundantConstraints {
      */
     private fun computeFull(
         problem: Problem,
-        domains: Array<IntDomain>?,
+        ranges: ColumnRanges,
         cancellation: Cancellation = Cancellation.Never,
     ): PassDelta {
         val factors = problem.factors
@@ -177,25 +177,25 @@ internal object RedundantConstraints {
             }
             if (keep) out.add(f)
         }
-        return finishAfterPhase2(problem, domains, out, cancellation)
+        return finishAfterPhase2(problem, ranges, out, cancellation)
     }
 
     /** Phases 3–5 over the phase-1/2 survivor list [out] (in `Problem.factors` order), recovering the
      *  dropped input indices. Shared by the fresh recompute and the incremental path. */
     private fun finishAfterPhase2(
         problem: Problem,
-        domains: Array<IntDomain>?,
+        ranges: ColumnRanges,
         out: List<Factor>,
         cancellation: Cancellation = Cancellation.Never,
     ): PassDelta {
         val factors = problem.factors
         // Phase 3: variable-subset / proportional domination across different supports.
-        val out3 = if (domains == null) out else dropSubsetDominated(domains, out, cancellation)
+        val out3 = dropSubsetDominated(ranges, out, cancellation)
         // Phase 4: clique-aware redundancy — a 0/1 knapsack implied by at-most-one cliques.
         val out4 = dropCliqueImpliedKnapsacks(out3, cancellation)
-        // Phase 5: drop globals the current domains make vacuously satisfied; removing one frees
+        // Phase 5: drop globals the current ranges make vacuously satisfied; removing one frees
         // a variable contained only in it, which the affine pass then projects out (implied-free).
-        val out5 = if (domains == null) out4 else out4.filterNot { isVacuousGlobal(it, domains) }
+        val out5 = out4.filterNot { isVacuousGlobal(it, ranges) }
         if (out5.size == factors.size) return PassDelta()
         // This pass only drops; every survivor in [out5] is identity-equal to an input factor, in input
         // order, so a two-pointer walk recovers the dropped input indices (correct even with reference
@@ -439,18 +439,21 @@ internal object RedundantConstraints {
         }
     }
 
-    /** Whether [factor] is a global constraint that the current [domains] make *vacuously* satisfied —
+    /** Whether [factor] is a global constraint that the current [ranges] make *vacuously* satisfied —
      *  it can never prune, so dropping it preserves the feasible set exactly. Currently detects
      *  an [AllDifferent] whose variables have pairwise-disjoint domains (no two can ever be equal, so
      *  distinctness always holds — for the plain, opt, and `_except` variants alike, since absence and
      *  excepted values only relax the constraint). Disjointness is tested on the `[min, max]` intervals
      *  (a sound sufficient condition; hole-induced disjointness is conservatively not claimed). */
-    private fun isVacuousGlobal(factor: Factor, domains: Array<IntDomain>): Boolean {
+    private fun isVacuousGlobal(factor: Factor, ranges: ColumnRanges): Boolean {
         if (factor !is AllDifferent || factor.vars.size < 2) return false
+        // Disjointness is a claim about where each column can sit, so a column with an open side leaves
+        // it unmade rather than tested against an invented endpoint.
+        if (!ranges.allClosed(factor.vars)) return false
         var prevMax = Long.MIN_VALUE
-        for (d in factor.vars.map { domains[it] }.sortedBy { it.min }) {
-            if (d.min <= prevMax) return false // intervals overlap → a collision is possible
-            if (d.max > prevMax) prevMax = d.max
+        for (v in factor.vars.sortedBy { ranges.min(it) }) {
+            if (ranges.min(v) <= prevMax) return false // intervals overlap → a collision is possible
+            if (ranges.max(v) > prevMax) prevMax = ranges.max(v)
         }
         return true // every pair of intervals is disjoint → all-different holds for every assignment
     }
@@ -507,7 +510,7 @@ internal object RedundantConstraints {
      * [SUBSET_DOMINATION_ROW_CAP] so the pairwise scan can't blow up.
      */
     private fun dropSubsetDominated(
-        domains: Array<IntDomain>,
+        ranges: ColumnRanges,
         factors: List<Factor>,
         cancellation: Cancellation = Cancellation.Never,
     ): List<Factor> {
@@ -537,7 +540,7 @@ internal object RedundantConstraints {
             if ((bi and SUBSET_CANCEL_POLL_MASK) == 0 && cancellation()) break
             for (a in dominators) {
                 if (a.factorIndex == b.factorIndex || a.coeffByVar.size >= b.coeffByVar.size) continue
-                if (dominates(domains, a, b)) {
+                if (dominates(ranges, a, b)) {
                     dropped.add(b.factorIndex)
                     break
                 }
@@ -549,7 +552,7 @@ internal object RedundantConstraints {
 
     /** Whether `≤`-row [a] (strict-subset support) dominates [b]: matching coefficients up to a single
      *  positive integer multiple `k` on the shared variables, and `k·boundA + maxExtra ≤ boundB`. */
-    private fun dominates(domains: Array<IntDomain>, a: LeRow, b: LeRow): Boolean {
+    private fun dominates(ranges: ColumnRanges, a: LeRow, b: LeRow): Boolean {
         var k = 0L
         a.coeffByVar.forEach { v, ca ->
             if (!b.coeffByVar.containsKey(v)) return false // a's support must be ⊆ b's
@@ -567,8 +570,10 @@ internal object RedundantConstraints {
         var maxExtra = 0L
         b.coeffByVar.forEach { v, cb ->
             if (!a.coeffByVar.containsKey(v)) {
-                val d = domains[v]
-                maxExtra += if (cb >= 0) cb * d.max else cb * d.min
+                // An extra term over a column the model leaves open has unbounded activity, so no
+                // domination can be claimed from it.
+                if (!ranges.isClosed(v)) return false
+                maxExtra += if (cb >= 0) cb * ranges.max(v) else cb * ranges.min(v)
                 // Conservative overflow guard: an extra activity this large can't be dominated by a
                 // small-bound row anyway, so bail rather than risk a wrapped Long comparison.
                 if (maxExtra > OVERFLOW_GUARD || maxExtra < -OVERFLOW_GUARD) return false

@@ -149,13 +149,12 @@ enum class PresolvePass(
         override fun applySource(problem: Problem, ctx: PresolveContext) =
             Presolve.removeRedundantSourceConstraints(problem, ctx.cancellation)
 
-        // The activity-based phases charge a dropped row's extra terms their widest value and read a
-        // global's domains, neither of which a declaration answers; the finite lane adds them and carries
-        // the round engine's persistent phase-1/2 indices.
+        // The finite lane charges the same phases over root-propagated domains, which are narrower than
+        // the source states, and carries the round engine's persistent phase-1/2 indices.
         override fun applyFinite(problem: BakedProblem, ctx: PresolveContext) =
             RedundantConstraints.removeRedundantConstraints(
                 problem,
-                problem.rootIntDomainsInPlace,
+                ColumnRanges.of(problem.rootIntDomainsInPlace),
                 ctx.subsumeIncremental as? SubsumeIncremental,
                 ctx.cancellation,
             )

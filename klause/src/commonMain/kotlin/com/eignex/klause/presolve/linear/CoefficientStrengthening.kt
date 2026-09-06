@@ -3,11 +3,11 @@ package com.eignex.klause.presolve.linear
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.bool.PseudoBoolean
 import com.eignex.klause.ir.Factor
-import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.model.PbOp
+import com.eignex.klause.presolve.ColumnRanges
 import com.eignex.klause.presolve.PassDelta
 import com.eignex.klause.presolve.PresolveShared
 import com.eignex.klause.util.Cancellation
@@ -36,7 +36,7 @@ internal object CoefficientStrengthening {
     fun strengthenCoefficients(
         problem: Problem,
         cancellation: Cancellation = Cancellation.Never,
-        domains: Array<IntDomain>? = null,
+        ranges: ColumnRanges? = null,
     ): PassDelta {
         val dropped = IntArrayList()
         val added = ArrayList<Factor>()
@@ -54,7 +54,7 @@ internal object CoefficientStrengthening {
             }
             val rewritten = when {
                 factor is Linear && factor.integerConstants != null ->
-                    strengthenLinear(factor, domains)
+                    strengthenLinear(factor, ranges)
 
                 factor is PseudoBoolean -> strengthenPb(factor)
 
@@ -118,7 +118,7 @@ internal object CoefficientStrengthening {
         Rel.NE -> if (bound.mod(g) == 0L) Reduced.Bound(bound / g) else Reduced.Drop
     }
 
-    private fun strengthenLinear(factor: Linear, domains: Array<IntDomain>?): Factor? {
+    private fun strengthenLinear(factor: Linear, ranges: ColumnRanges?): Factor? {
         val row = factor.integerConstants ?: return factor
         val g = PresolveShared.gcdOf(row.coeffs)
         val gcdReduced: Linear = if (g <= 1L) {
@@ -137,7 +137,10 @@ internal object CoefficientStrengthening {
                 Reduced.Unchanged -> factor
             }
         }
-        return if (domains == null) gcdReduced else liftLinear(gcdReduced, domains)
+        // The lift charges every column in the row its whole width, so a row mentioning one the model
+        // leaves open keeps the GCD reduction alone rather than resting on an invented endpoint.
+        if (ranges == null || !ranges.allClosed(gcdReduced.vars)) return gcdReduced
+        return liftLinear(gcdReduced, ranges)
     }
 
     /**
@@ -166,13 +169,13 @@ internal object CoefficientStrengthening {
      * lifted row whose bound has no relation to the original. Both change the feasible set, so an
      * overflow anywhere returns the row untouched.
      */
-    private fun liftLinear(l: Linear, domains: Array<IntDomain>): Factor? = try {
-        liftLinearExact(l, domains)
+    private fun liftLinear(l: Linear, ranges: ColumnRanges): Factor? = try {
+        liftLinearExact(l, ranges)
     } catch (_: CheckedLongOverflowException) {
         l // the row is not liftable within Long; keep it exactly as it stands
     }
 
-    private fun liftLinearExact(l: Linear, domains: Array<IntDomain>): Factor? {
+    private fun liftLinearExact(l: Linear, ranges: ColumnRanges): Factor? {
         val row = l.integerConstants ?: return l
         // Only ≤ / ≥ lift by clamping; complement ≥ to ≤ by negating coeffs and bound.
         val coeffs: LongArray
@@ -197,12 +200,12 @@ internal object CoefficientStrengthening {
         var b = bound
         for (i in 0 until n) {
             val a = coeffs[i]
-            val dom = domains[l.vars[i]]
-            cap[i] = subExact(dom.max, dom.min)
+            val v = l.vars[i]
+            cap[i] = subExact(ranges.max(v), ranges.min(v))
             absA[i] = if (a < 0) -a else a
             // Fold the variable's contribution at its zero-of-zⱼ end into the bound:
             // aⱼ>0 shifts by aⱼ·lⱼ, aⱼ<0 (complemented) shifts by aⱼ·uⱼ.
-            val zeroEnd = if (a >= 0) dom.min else dom.max
+            val zeroEnd = if (a >= 0) ranges.min(v) else ranges.max(v)
             b = subExact(b, mulExact(a, zeroEnd))
         }
         var amax = 0L
@@ -224,13 +227,13 @@ internal object CoefficientStrengthening {
         for (i in 0 until n) newBound = addExact(newBound, mulExact(lifted[i], cap[i]))
         val newCoeffs = LongArray(n)
         for (i in 0 until n) {
-            val dom = domains[l.vars[i]]
+            val v = l.vars[i]
             if (coeffs[i] >= 0) {
                 newCoeffs[i] = lifted[i]
-                newBound = addExact(newBound, mulExact(lifted[i], dom.min))
+                newBound = addExact(newBound, mulExact(lifted[i], ranges.min(v)))
             } else {
                 newCoeffs[i] = -lifted[i]
-                newBound = subExact(newBound, mulExact(lifted[i], dom.max))
+                newBound = subExact(newBound, mulExact(lifted[i], ranges.max(v)))
             }
         }
         return Linear(newCoeffs, l.vars.copyOf(), LinearOp.LE, newBound)

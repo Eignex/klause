@@ -6,6 +6,7 @@ import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.bool.PseudoBoolean
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.factor.global.Increasing
+import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
@@ -18,6 +19,8 @@ import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.propagation.propagate
+import com.eignex.klause.util.Bits
+import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -225,6 +228,37 @@ class RedundantConstraintsTest {
         // x+y<=2 implies x+y-z<=2 because z>=0 (the extra term's maximal activity is 0).
         val problem = Problem(0, 3, dom(3, 3), listOf(le(2, 0, 1, 1, 1), le(2, 0, 1, 1, 1, 2, -1)))
         checkPreserved("subset-negative-extra", problem, expectDrop = true)
+    }
+
+    @Test
+    fun `a subset-dominated row is dropped over what the source states`() {
+        // x+y<=2 implies x+y+z<=5 because z<=3 — the phase-3 argument, reached with no finite projection.
+        val problem = Problem(0, 3, dom(3, 3), listOf(le(2, 0, 1, 1, 1), le(5, 0, 1, 1, 1, 2, 1)))
+
+        val delta = Presolve.removeRedundantSourceConstraints(problem, Cancellation.Never)
+
+        assertEquals(listOf(1), delta.droppedIndices.toList())
+    }
+
+    @Test
+    fun `a row whose extra term the source leaves open is not dominated`() {
+        // The same pair, except nothing bounds z above: its extra activity is unbounded, so the wider
+        // row is not implied and dropping it would lose solutions.
+        val openHi = Bits(3).also { it.set(2) }
+        val problem = Problem(
+            numBoolVars = 0,
+            intBounds = IntBounds.fromModelBounds(
+                longArrayOf(0, 0, 0),
+                longArrayOf(3, 3, 0),
+                null,
+                openHi,
+            ),
+            factors = arrayOf(le(2, 0, 1, 1, 1), le(5, 0, 1, 1, 1, 2, 1)),
+        )
+
+        val delta = Presolve.removeRedundantSourceConstraints(problem, Cancellation.Never)
+
+        assertTrue(delta.droppedIndices.isEmpty(), "an open extra term cannot justify a drop")
     }
 
     @Test
