@@ -54,6 +54,24 @@ class UnplaceableColumnTest {
     }
 
     @Test
+    fun `a refuted model is decided rather than declined for the column it could not place`() {
+        // AllDifferent leaves column 1 unplaceable while it is open, and the two rows cross over its
+        // range. Deciding the model is the stronger answer, so the refusal must not win the race.
+        val openHi = Bits(2).also { it.set(1) }
+        val model = Problem(
+            numBoolVars = 0,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(0, 0), longArrayOf(5, 0), null, openHi),
+            factors = arrayOf(
+                AllDifferent(vars = intArrayOf(0, 1), domainMin = 0, domainSize = 6),
+                Linear(longArrayOf(1), intArrayOf(1), LinearOp.LE, 3),
+                Linear(longArrayOf(-1), intArrayOf(1), LinearOp.LE, -5),
+            ),
+        )
+
+        assertIs<SourceProblemRoute.Refuted>(model.pipelineRoute())
+    }
+
+    @Test
     fun `a column a row bounds is placed even though another column stays open`() {
         // Column 1 is the one AllDifferent demands be finite, and the row states its upper side. Column 2
         // is open with nothing to bound it, so the closure reaches only part of the model.

@@ -70,6 +70,8 @@ internal object MpsMode : CliMode {
                 }
 
                 is SourceProblemRoute.UnsupportedOpen -> unsupportedOpenMpsModel()
+
+                SourceProblemRoute.Refuted -> refutedSolvable()
             }
         }
 

@@ -114,6 +114,7 @@ private fun sourceRouteName(route: SourceProblemRoute): String = when (route) {
     is SourceProblemRoute.Finite -> "a finite model"
     is SourceProblemRoute.OpenTheory -> "an open theory model"
     is SourceProblemRoute.UnsupportedOpen -> "an unsupported open model"
+    SourceProblemRoute.Refuted -> "a model routing refuted"
 }
 
 /** A concrete solve pipeline, selected before [SolveCore] starts its finite CP loop. */
@@ -127,4 +128,7 @@ internal sealed interface SolvablePipeline {
         val request: OpenTheoryRequest,
         val render: (OpenTheoryAssignment) -> String,
     ) : SolvablePipeline
+
+    /** Routing refuted the model while bounding its open sides, so no engine runs. */
+    data object Refuted : SolvablePipeline
 }

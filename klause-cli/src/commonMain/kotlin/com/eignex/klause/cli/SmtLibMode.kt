@@ -66,6 +66,8 @@ internal object SmtLibMode : CliMode {
 
                 is SourceProblemRoute.UnsupportedOpen ->
                     throw UnsupportedSmtException(unsupportedOpenReason(route.unplaceable, ints))
+
+                SourceProblemRoute.Refuted -> refutedSolvable()
             }
         }
 

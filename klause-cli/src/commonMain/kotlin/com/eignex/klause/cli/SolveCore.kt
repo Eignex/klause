@@ -139,6 +139,14 @@ internal object SolveCore {
                 return
             }
 
+            // Routing already decided the model over its genuinely open ranges, so no engine runs and
+            // there is nothing for a budget to have cut short.
+            SolvablePipeline.Refuted -> {
+                output.begin(optimize = false, maximize = false)
+                output.onComplete(Verdict.UNSATISFIABLE)
+                return
+            }
+
             SolvablePipeline.FiniteCp -> Unit
         }
         val nodeBudget = takeNodeBudget(common)

@@ -53,6 +53,16 @@ sealed interface SourceProblemRoute {
         /** The column and factor that prevented routing, when one specific column caused the refusal. */
         val unplaceable: UnplaceableColumn?,
     ) : SourceProblemRoute
+
+    /**
+     * Bounding the model's open sides refuted it, so no lane needs to run.
+     *
+     * Derived over the genuinely open ranges rather than inside an invented box, which is what makes it
+     * the unbounded model's own verdict and reportable as `unsat`. A caller that dropped this would ask a
+     * lane to re-derive the same proof — or, where the model is one no lane accepts, would report it
+     * unsupported having already decided it.
+     */
+    data object Refuted : SourceProblemRoute
 }
 
 /**
@@ -71,7 +81,10 @@ fun Problem.pipelineRoute(
     routePureRealToTheory: Boolean = false,
     boundCancellation: Cancellation = Cancellation.Never,
 ): SourceProblemRoute {
-    val routed = proveBounded(boundCancellation)
+    val routed = when (val bounded = proveBounded(boundCancellation)) {
+        BoundedRouting.Refuted -> return SourceProblemRoute.Refuted
+        is BoundedRouting.Proved -> bounded.problem
+    }
     val finiteIntegerRanges = routed.hasFiniteIntegerRanges()
     val preferFinite = finiteIntegerRanges && (!routePureRealToTheory || !routed.supportsExactLra())
     val plan = routed.componentPlan(preferFinite)
@@ -106,17 +119,31 @@ private fun Problem.hasFiniteIntegerRanges(): Boolean =
  * decline a model on account of the very column the proof had just bounded. Tightening only ever closes
  * sides, so keeping it can move a column to CP or admit a complete fragment, never the reverse.
  *
- * A refutation is still left to the open lane, which reports it as the model's verdict.
+ * A refutation the bounding derives is the model's verdict and travels as one; see [BoundedRouting].
  */
-private fun Problem.proveBounded(cancellation: Cancellation): Problem {
-    if (hasFiniteIntegerRanges()) return this
-    val closed = closeOpenBounds(cancellation) as? OpenPresolveResult.Tightened ?: return this
+private fun Problem.proveBounded(cancellation: Cancellation): BoundedRouting {
+    if (hasFiniteIntegerRanges()) return BoundedRouting.Proved(this)
+    val closed = when (val outcome = closeOpenBounds(cancellation)) {
+        OpenPresolveResult.Refuted -> return BoundedRouting.Refuted
+        is OpenPresolveResult.Tightened -> outcome
+    }
     val spec = closed.spec
     // State the proved range as each column's value set, once every side is closed. A source that declared
     // bounds alone leaves `SourceIntDomains` with nothing stated, and the finite lane reads declared value
     // sets throughout — the pre-bake root LP check reaches one before anything has baked. A column still
     // open has no value set to state, so a partial closure travels as the bounds it proved.
-    return if (spec.hasFiniteIntegerRanges()) spec.withIntDomains(spec.finiteIntDomains()) else spec
+    return BoundedRouting.Proved(
+        if (spec.hasFiniteIntegerRanges()) spec.withIntDomains(spec.finiteIntDomains()) else spec,
+    )
+}
+
+/** What bounding a model's open sides established: the model to route, or that there is nothing to route. */
+private sealed interface BoundedRouting {
+    /** The model as far as bounding could prove it, which is the model the lane is chosen from. */
+    class Proved(val problem: Problem) : BoundedRouting
+
+    /** Bounding refuted the model over its open ranges. */
+    data object Refuted : BoundedRouting
 }
 
 /**
