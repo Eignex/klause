@@ -67,6 +67,25 @@ data class LpStats(
     val componentSplits: SumResult = ZERO_COUNT,
     /** Largest component count any one decomposed solve produced; 0 when none decomposed. */
     val componentBlocks: MaxResult = NO_MAX,
+    /**
+     * Basis factorizations across all node LP solves that came back singular.
+     *
+     * Each one cost a warm start: the engine falls back to the slack basis and refactorizes again, so
+     * the [seeded] hit rate above overstates how many solves actually kept their warm basis. Against
+     * [refactorizations] this is the rate at which the relaxation's columns defeat the factorization.
+     */
+    val singularRefactorizations: SumResult = ZERO_COUNT,
+    /** Node LP solves abandoned mid-pivot because the pivot element was numerically too small. The
+     *  engine does not refactorize and retry, so each is a solve lost outright. */
+    val smallPivotBails: SumResult = ZERO_COUNT,
+    /** Smallest structural `|a_ij|` in the root relaxation, or NaN when never measured. With
+     *  [rootMatrixMaxValue] this is what a scaling decision is made on. */
+    val rootMatrixMinValue: Double = Double.NaN,
+    /** Largest structural `|a_ij|` in the root relaxation, or NaN when never measured. */
+    val rootMatrixMaxValue: Double = Double.NaN,
+    /** Worst within-row `max/min` magnitude in the root relaxation, or NaN when never measured. The
+     *  part of the spread that row scaling could absorb, as against a uniform rescale. */
+    val rootRowRatio: Double = Double.NaN,
 ) {
     /** Combine two workers' LP stats: counts add, LU maxes take the larger, wall time sums, and the
      *  root bound (same root across workers) keeps the tightest finite reading (NaN defers). */
@@ -89,6 +108,11 @@ data class LpStats(
         demoted = demoted || o.demoted,
         componentSplits = SumResult(componentSplits.sum + o.componentSplits.sum),
         componentBlocks = MaxResult(maxOf(componentBlocks.max, o.componentBlocks.max)),
+        singularRefactorizations = SumResult(singularRefactorizations.sum + o.singularRefactorizations.sum),
+        smallPivotBails = SumResult(smallPivotBails.sum + o.smallPivotBails.sum),
+        rootMatrixMinValue = naNDeferring(rootMatrixMinValue, o.rootMatrixMinValue, ::minOf),
+        rootMatrixMaxValue = naNDeferring(rootMatrixMaxValue, o.rootMatrixMaxValue, ::maxOf),
+        rootRowRatio = naNDeferring(rootRowRatio, o.rootRowRatio, ::maxOf),
     )
 }
 
@@ -107,8 +131,13 @@ internal class LpStatsSink {
     val refactorizations: CountStat = CountStat()
     val componentSplits: CountStat = CountStat()
     val componentBlocks: MaxStat = MaxStat()
+    val singularRefactorizations: CountStat = CountStat()
+    val smallPivotBails: CountStat = CountStat()
 
     private var rootBound: Double = Double.NaN
+    private var rootMatrixMinValue: Double = Double.NaN
+    private var rootMatrixMaxValue: Double = Double.NaN
+    private var rootRowRatio: Double = Double.NaN
     private var ms: Long = 0L
 
     // A running total, not a [CountStat]: that counts observations and ignores their magnitude, which is
@@ -199,6 +228,29 @@ internal class LpStatsSink {
         seeded.update(1.0)
     }
 
+    /**
+     * Record the numerical trouble one node LP solve met: [singular] factorizations and [smallPivot]
+     * pivots abandoned as too small.
+     *
+     * Read off the engine rather than a [com.eignex.klause.lp.engine.FloatLpResult], on the same
+     * grounds as [observePivots]: a solve lost to either has no result, and those are precisely the
+     * solves worth counting here.
+     */
+    fun observeNumericalTrouble(singular: Int, smallPivot: Int) {
+        repeat(singular) { singularRefactorizations.update(1.0) }
+        repeat(smallPivot) { smallPivotBails.update(1.0) }
+    }
+
+    /** Record the root-node (decision level 0) relaxation's coefficient spread; first write at the root
+     *  wins, since the matrix is fixed for a model's lifetime. Ignored off the root or for an empty
+     *  matrix. */
+    fun observeRootConditioning(decisionLevel: Int, minValue: Double, maxValue: Double, rowRatio: Double) {
+        if (decisionLevel != 0 || !rootMatrixMinValue.isNaN() || maxValue <= 0.0) return
+        rootMatrixMinValue = minValue
+        rootMatrixMaxValue = maxValue
+        rootRowRatio = rowRatio
+    }
+
     /** Record how one node LP solve started: [warmStarted] off a prior basis, and the [refactorizations]
      *  it built getting there and back to optimal. */
     fun observeStart(warmStarted: Boolean, refactorizations: Int) {
@@ -233,5 +285,10 @@ internal class LpStatsSink {
         refactorizations = refactorizations.read(),
         componentSplits = componentSplits.read(),
         componentBlocks = componentBlocks.read(),
+        singularRefactorizations = singularRefactorizations.read(),
+        smallPivotBails = smallPivotBails.read(),
+        rootMatrixMinValue = rootMatrixMinValue,
+        rootMatrixMaxValue = rootMatrixMaxValue,
+        rootRowRatio = rootRowRatio,
     )
 }
