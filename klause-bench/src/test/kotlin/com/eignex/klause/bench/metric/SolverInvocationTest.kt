@@ -32,6 +32,35 @@ class SolverInvocationTest {
     }
 
     @Test
+    fun `a model the solver declines is undecided rather than a failed run`() {
+        val r = SolverInvocation.invoke(
+            listOf(
+                "sh",
+                "-c",
+                "echo 'klause MPS: optimization over a continuous objective is unsupported' >&2; exit 2",
+            ),
+            SolverInvocation.Dialect.PB_COMPETITION,
+        )
+
+        assertNull(r.feasible)
+        assertEquals("MPS: optimization over a continuous objective is unsupported", r.stats["unsupported"])
+    }
+
+    @Test
+    fun `a crash that also printed a refusal line still raises`() {
+        assertFailsWith<IllegalStateException> {
+            SolverInvocation.invoke(
+                listOf(
+                    "sh",
+                    "-c",
+                    "echo 'klause MPS: nope' >&2; echo 'java.lang.IllegalStateException: boom' >&2; exit 1",
+                ),
+                SolverInvocation.Dialect.PB_COMPETITION,
+            )
+        }
+    }
+
+    @Test
     fun `a subprocess killed by the hard timeout is recorded as an undecided run`() {
         val r = SolverInvocation.invoke(listOf("sleep", "5"), SolverInvocation.Dialect.MINIZINC, hardTimeoutMs = 100)
         assertNull(r.feasible)
