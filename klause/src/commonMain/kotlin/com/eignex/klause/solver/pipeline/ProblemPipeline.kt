@@ -100,18 +100,23 @@ private fun Problem.hasFiniteIntegerRanges(): Boolean =
  * model being handed to the exact theory, which cannot use the proof and, on the `gen-ip*` and `enlight*`
  * families, spends the whole budget inside one exact reduction.
  *
- * All-or-nothing on purpose. A partial closure would change what the open lane is handed without changing
- * which lane runs, and the open lane tightens again from its own prepared model — a strictly better place
- * to do it. A refutation is likewise left to that lane, which reports it as the model's verdict.
+ * A closure that reaches only some of the open sides is kept too. Which lane runs is not all that reads
+ * these bounds: [componentPlan] owns a column CP or THEORY by whether its sides are stated, and an open
+ * column some CP-only factor reads is what refuses a model outright. So dropping a partial closure can
+ * decline a model on account of the very column the proof had just bounded. Tightening only ever closes
+ * sides, so keeping it can move a column to CP or admit a complete fragment, never the reverse.
+ *
+ * A refutation is still left to the open lane, which reports it as the model's verdict.
  */
 private fun Problem.proveBounded(cancellation: Cancellation): Problem {
     if (hasFiniteIntegerRanges()) return this
     val closed = closeOpenBounds(cancellation) as? OpenPresolveResult.Tightened ?: return this
-    val spec = closed.spec.takeIf { it.hasFiniteIntegerRanges() } ?: return this
-    // State the proved range as each column's value set. A source that declared bounds alone leaves
-    // `SourceIntDomains` with nothing stated, and the finite lane reads declared value sets throughout —
-    // the pre-bake root LP check reaches one before anything has baked.
-    return spec.withIntDomains(spec.finiteIntDomains())
+    val spec = closed.spec
+    // State the proved range as each column's value set, once every side is closed. A source that declared
+    // bounds alone leaves `SourceIntDomains` with nothing stated, and the finite lane reads declared value
+    // sets throughout — the pre-bake root LP check reaches one before anything has baked. A column still
+    // open has no value set to state, so a partial closure travels as the bounds it proved.
+    return if (spec.hasFiniteIntegerRanges()) spec.withIntDomains(spec.finiteIntDomains()) else spec
 }
 
 /**

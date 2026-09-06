@@ -1,7 +1,9 @@
 package com.eignex.klause.solver.pipeline
 
+import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.ir.IntBounds
+import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.solver.pipeline.ProblemPipeline
 import com.eignex.klause.solver.pipeline.componentPlan
@@ -49,5 +51,32 @@ class UnplaceableColumnTest {
         val route = assertIs<SourceProblemRoute.UnsupportedOpen>(withAllDifferentOverOpenColumn().pipelineRoute())
 
         assertEquals(1, assertNotNull(route.unplaceable).column)
+    }
+
+    @Test
+    fun `a column a row bounds is placed even though another column stays open`() {
+        // Column 1 is the one AllDifferent demands be finite, and the row states its upper side. Column 2
+        // is open with nothing to bound it, so the closure reaches only part of the model.
+        val openHi = Bits(3).also {
+            it.set(1)
+            it.set(2)
+        }
+        val model = Problem(
+            numBoolVars = 0,
+            intBounds = IntBounds.fromModelBounds(
+                longArrayOf(0, 0, 0),
+                longArrayOf(5, 0, 0),
+                null,
+                openHi,
+            ),
+            factors = arrayOf(
+                AllDifferent(vars = intArrayOf(0, 1), domainMin = 0, domainSize = 6),
+                Linear(longArrayOf(1), intArrayOf(1), LinearOp.LE, 5),
+            ),
+        )
+
+        val route = model.pipelineRoute()
+
+        assertIs<SourceProblemRoute.OpenTheory>(route, "the bounded column leaves nothing unplaceable")
     }
 }

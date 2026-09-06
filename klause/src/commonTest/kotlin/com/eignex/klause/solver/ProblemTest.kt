@@ -311,7 +311,7 @@ class ProblemTest {
     }
 
     @Test
-    fun `a model with one side still open stays on the open lane untouched`() {
+    fun `a model with one side still open keeps the bound the relaxation proved`() {
         val openUpper = Bits(2).also {
             it.set(0)
             it.set(1)
@@ -324,7 +324,9 @@ class ProblemTest {
 
         val route = assertIs<SourceProblemRoute.OpenTheory>(problem.pipelineRoute())
 
-        assertSame(problem, route.request.model)
+        val model = route.request.model
+        assertEquals(5, model.intBounds.upper(0))
+        assertTrue(model.intBounds.isOpenUpper(1), "a column no row bounds must not gain an invented endpoint")
     }
 
     @Test
