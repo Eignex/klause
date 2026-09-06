@@ -132,6 +132,19 @@ internal class RevisedSimplex(
     private var pivots = 0
     private var warmStarted = false
     private var refactorizations = 0
+
+    /**
+     * Numerical trouble this solve met, counted rather than only acted on.
+     *
+     * [singularRefactorizations] counts factorizations that came back singular and
+     * [smallPivotBails] the pivots abandoned because the spike's pivot entry was below [TOL]. Both
+     * paths end a solve without a [FloatLpResult], so a caller reading the result alone sees none of
+     * them — which is why they are read off the engine, as [lastPivots] is. They are the measurement
+     * behind two open questions: whether the basis needs scaling, and how often accepting HFactor's
+     * rank-deficiency repair would save a cold start.
+     */
+    private var singularRefactorizations = 0
+    private var smallPivotBails = 0
     private val work = LpWork()
     private var maxLuFill = 0.0 // max (nnz of the held factors) / nnz(B) over this solve's factorizations
     private var maxLuDensity = 0.0 // max (nnz of the held factors) / m² — 1.0 means the factors are dense
@@ -221,6 +234,8 @@ internal class RevisedSimplex(
     override val lastRefactorizations: Int get() = refactorizations
     override val lastWarmStarted: Boolean get() = warmStarted
     override val lastWorkOps: Long get() = work.ops
+    override val lastSingularRefactorizations: Int get() = singularRefactorizations
+    override val lastSmallPivotBails: Int get() = smallPivotBails
 
     init {
         // Transpose `columns` once. Counting sort by row: tally each row's entries, then fill, so the whole
@@ -296,7 +311,10 @@ internal class RevisedSimplex(
         work.add(nnzB)
         val solver = solver()
         basisFactorized = solver.refactorize(basicVar)
-        if (!basisFactorized) return false
+        if (!basisFactorized) {
+            singularRefactorizations++
+            return false
+        }
         // Fill of the factors the solver now holds: how much they grow the basis, and how dense they
         // become. Read off the solver, so unlike the work meter this measures the backend in play — a
         // density approaching 1 on real bases says the sparse factors are dense after all.
@@ -500,6 +518,8 @@ internal class RevisedSimplex(
         maxLuFill = 0.0
         maxLuDensity = 0.0
         refactorizations = 0
+        singularRefactorizations = 0
+        smallPivotBails = 0
         work.reset()
         val kept = reuse && basisKept && basisFactorized
         basisKept = false
@@ -650,7 +670,12 @@ internal class RevisedSimplex(
             val q = chooseEntering(elig, eligOrdered, ratioBuf, pivotRowEntry, worst)
 
             spike(q) // spike η = B⁻¹ A_q in the pre-pivot factorization
-            if (abs(spikeVec[r]) < TOL) return null // numerically singular pivot
+            if (abs(spikeVec[r]) < TOL) {
+                // Numerically singular pivot. Counted before giving up: a solve lost here leaves no
+                // result to read, so this is the only place the loss is visible.
+                smallPivotBails++
+                return null
+            }
             updateGamma(spikeVec, r)
             val leaving = basicVar[r]
             status[leaving] = if (belowLower) VarStatus.AT_LOWER else VarStatus.AT_UPPER
@@ -723,7 +748,10 @@ internal class RevisedSimplex(
                 }
             }
             if (r == -1) r = rAny
-            if (r == -1) return false // singular spike: no pivotable row
+            if (r == -1) {
+                smallPivotBails++
+                return false // singular spike: no pivotable row
+            }
             val evicted = basicVar[r]
             if (evicted >= n && !enforced[evicted - n]) requeued.add(evicted - n)
             status[evicted] = VarStatus.AT_LOWER
@@ -1047,7 +1075,10 @@ internal class RevisedSimplex(
                 basicValues(beta)
                 continue
             }
-            if (abs(alpha[leaving]) < TOL) return false
+            if (abs(alpha[leaving]) < TOL) {
+                smallPivotBails++
+                return false
+            }
             val evicted = basicVar[leaving]
             status[evicted] = if (leavingToUpper) VarStatus.AT_UPPER else VarStatus.AT_LOWER
             basicVar[leaving] = q
@@ -1151,7 +1182,10 @@ internal class RevisedSimplex(
                 basicValues(beta)
                 continue
             }
-            if (abs(alpha[leaving]) < TOL) return null // numerically singular pivot
+            if (abs(alpha[leaving]) < TOL) {
+                smallPivotBails++
+                return null // numerically singular pivot
+            }
             degenerate = if (tMax <= TOL) degenerate + 1 else 0
             val evicted = basicVar[leaving]
             status[evicted] = if (leavingToUpper) VarStatus.AT_UPPER else VarStatus.AT_LOWER

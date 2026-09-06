@@ -68,6 +68,26 @@ internal interface LpSolver : AutoCloseable {
      */
     val lastWorkOps: Long get() = 0L
 
+    /**
+     * Factorizations the last solve built that came back singular, on the same terms as [lastPivots].
+     *
+     * A singular factorization is not a failure the caller sees: the engine falls back to the slack
+     * cold start and carries on, discarding the warm basis. So this is the only trace that a warm
+     * start was thrown away, and the measurement behind whether the relaxation's columns are badly
+     * enough conditioned to want scaling. 0 on an engine that keeps no factorization.
+     */
+    val lastSingularRefactorizations: Int get() = 0
+
+    /**
+     * Pivots the last solve abandoned because the pivot element was numerically too small, on the same
+     * terms as [lastPivots].
+     *
+     * The engine gives up on the solve rather than refactorizing and retrying, so each one is a solve
+     * lost outright — and lost without a [FloatLpResult] to record it in. 0 on an engine that does not
+     * pivot.
+     */
+    val lastSmallPivotBails: Int get() = 0
+
     /** Nonbasic columns with zero reduced cost at the last termination — dual degeneracy. 0 on an engine
      *  that does not measure it. */
     val lastDegenerateColumns: Int get() = 0

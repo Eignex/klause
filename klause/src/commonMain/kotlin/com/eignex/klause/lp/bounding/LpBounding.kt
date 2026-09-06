@@ -14,6 +14,7 @@ import com.eignex.klause.lp.engine.TableauCutSolver
 import com.eignex.klause.lp.engine.VarStatus
 import com.eignex.klause.lp.engine.integerCertify
 import com.eignex.klause.lp.engine.integerFarkasRay
+import com.eignex.klause.lp.engine.lpConditioning
 import com.eignex.klause.lp.engine.newPersistentLpSolver
 import com.eignex.klause.lp.engine.newTableauCutSolver
 import com.eignex.klause.lp.engine.tightObjectiveLowerBound
@@ -146,6 +147,7 @@ private fun LpEngine.observeSolveCost(sink: SolveStatsSink, solver: LpSolver) {
     sink.lp.observePivots(solver.lastPivots)
     sink.lp.observeWork(solver.lastWorkOps)
     sink.lp.observeStart(solver.lastWarmStarted, solver.lastRefactorizations)
+    sink.lp.observeNumericalTrouble(solver.lastSingularRefactorizations, solver.lastSmallPivotBails)
     noteSolveOps(solver.lastWorkOps)
 }
 
@@ -330,6 +332,17 @@ internal fun LpEngine.sparseSafePrune(
     if (relaxation.model.n == 0) return LpNodeOutcome(false, null)
     sink.lp.observeSolve()
     val model = relaxation.model
+    // Measured only at the root: the pass is O(nnz), and the matrix a node solves is the root's, so a
+    // deeper reading would repeat it for the same answer.
+    if (session.decisionLevel == 0) {
+        val spread = lpConditioning(model)
+        sink.lp.observeRootConditioning(
+            session.decisionLevel,
+            spread.minValue,
+            spread.maxValue,
+            spread.rowRatio,
+        )
+    }
     // The float LP relaxes strict rows to non-strict, so a node infeasible only through strictness
     // looks feasible here and survives to an expensive leaf. Perturb each strict row's rhs inward by a
     // small relative epsilon for the float solve only — a heuristic filter, restored before any
