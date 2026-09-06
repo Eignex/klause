@@ -99,10 +99,6 @@ internal fun Problem.closeOpenBounds(cancellation: Cancellation = Cancellation.N
             if (problem.intBounds.hasUpper(v)) problem.intBounds.upper(v) else null,
         )
     }
-    if (declared.none { it.lo == null || it.hi == null }) {
-        return OpenPresolveResult.Tightened(problem, closedSides = 0)
-    }
-
     val rows = problem.openPresolveRows()
     val intRows = rows.filter { it.realVars.isEmpty() }
     // Exact arithmetic refutes ahead of the tightening below, which reads the same rows in `Long` and
@@ -112,6 +108,13 @@ internal fun Problem.closeOpenBounds(cancellation: Cancellation = Cancellation.N
     // Then the relaxation over the same open ranges. A Farkas ray reaches the systems no bound ever
     // crosses, which is what both the pass above and the tightening below need to conclude anything.
     if (openLpInfeasible(declared, intRows, cancellation)) return OpenPresolveResult.Refuted
+    // Only now is there nothing left to do: closing is what a model with no open side does not need, and
+    // refuting is a separate job it may still deserve. Returning before the two checks above conflates
+    // them — a model whose sides something else already closed comes back looking feasible, and on this
+    // route there is no bake behind it to catch what was skipped.
+    if (declared.none { it.lo == null || it.hi == null }) {
+        return OpenPresolveResult.Tightened(problem, closedSides = 0)
+    }
     val tightened = tightenOpenIntBounds(
         declared,
         intRows,

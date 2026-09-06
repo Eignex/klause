@@ -83,6 +83,20 @@ class OpenPresolveTest {
     }
 
     @Test
+    fun `a model with nothing open is still refuted rather than passed on`() {
+        // Both sides stated, so there is nothing to close — but the rows have no solution between them.
+        // Closing is what this model does not need; refuting is what it still deserves, and on the open
+        // route there is no bake behind this to catch it.
+        val spec = Problem(
+            numBoolVars = 0,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(5), null, null),
+            factors = arrayOf<Factor>(row(0 to 1L, op = LinearOp.LE, bound = -1L)),
+        )
+
+        assertIs<OpenPresolveResult.Refuted>(spec.closeOpenBounds())
+    }
+
+    @Test
     fun `a model contradictory over its open ranges is refuted rather than boxed`() {
         // x >= 0 with x <= -1: no solution anywhere in the unbounded model, not merely inside a box.
         val spec = openAbove(1, row(0 to 1L, op = LinearOp.LE, bound = -1L))
