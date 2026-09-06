@@ -205,6 +205,27 @@ class DominatedVariablesTest {
     }
 
     @Test
+    fun `an integer column no factor mentions is not pinned`() {
+        // The mirror of the Boolean rule: x1 occurs nowhere, so no occurrence earned a pin and its value
+        // is not the model's to state. Pinning it would only discard solutions — a column nothing reads
+        // prunes nothing.
+        val problem = Problem(
+            0,
+            2,
+            Array(2) { IntDomain(0, 3) },
+            listOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 3)),
+        )
+
+        val delta = Presolve.fixDominatedVariables(problem.bake(), emptyMap(), emptyMap())
+
+        assertEquals(
+            IntDomain(0, 3),
+            delta.domains?.get(1) ?: problem.finiteIntDomain(1),
+            "the unreferenced column keeps its whole range",
+        )
+    }
+
+    @Test
     fun `a boolean no factor mentions is not fixed`() {
         // b1 occurs nowhere: an earlier pass can fold a variable's defining factor away and leave it
         // referenced by nothing while its value stays tied to the model, so absence is not freedom.

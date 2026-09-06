@@ -63,9 +63,13 @@ internal object DominatedVariables {
         // integer column through the bake. Pinning one of those asserts something the model never stated,
         // and buys nothing: a variable nothing references prunes nothing.
         val boolSeen = BooleanArray(nb)
+        // The same rule holds for an integer column, and for the same reason: a pin earns nothing on one
+        // no surviving factor reads, and states a value the model never did.
+        val intSeen = BooleanArray(n)
         val alreadyPinned = IntHashSet() // bool vars already forced by a unit clause
         for (f in problem.factors) {
             for (v in f.boolVars) boolSeen[v] = true
+            for (v in f.intVars) intSeen[v] = true
             val rows = f.linearRows
             // The integer monotonicity analysis reads the integer side of a row; a row carrying Boolean
             // literals is left to the bool-side [markBoolSafety] (unifying the two is a follow-up).
@@ -93,7 +97,7 @@ internal object DominatedVariables {
         var domainsNarrowed = false
         val domains = problem.rootIntDomains()
         for (v in 0 until n) {
-            if (!intEligible[v]) continue
+            if (!intEligible[v] || !intSeen[v]) continue
             val d = problem.rootIntDomain(v)
             if (d.min == d.max) continue // already fixed
             val c = objectiveIntCoeffs[v] ?: 0L
