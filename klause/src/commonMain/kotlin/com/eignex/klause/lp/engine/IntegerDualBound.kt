@@ -168,13 +168,14 @@ internal class IntegerCertificate(
  *  - a reduced cost too large to evaluate in 64 bits, or a 128-bit accumulator overflow;
  *  - a strictly-negative reduced cost on a column with no finite upper bound (unbounded Lagrangian).
  */
+
 internal fun integerCertify(model: LpModel, y: DoubleArray, scaleBits: Int = DEFAULT_SCALE_BITS): IntegerCertificate? {
     if (model.hasContinuous) return null // a real coefficient is not integrally certifiable here (Phase 3b)
     val rd = roundDuals(model, y, scaleBits) ?: return null
     val m = model.m
     val n = model.n
-    val mult = rd.mult
     val scale = rd.scale
+    val mult = repairedMultipliers(model, rd.mult, scale)
     val acc = Int128() // N = 2ᵏ · (objective − objConstant), accumulated exactly
     for (i in 0 until m) acc.addProduct(mult[i], model.rhs[i])
     val reduced = LongArray(model.numVars)
@@ -199,6 +200,44 @@ internal fun integerCertify(model: LpModel, y: DoubleArray, scaleBits: Int = DEF
     acc.addProduct(model.objConstant, scale)
     if (acc.overflow) return null
     return IntegerCertificate(rd.scaleBits, scale, mult, reduced, acc)
+}
+
+/**
+ * [mult] with each row multiplier moved to where its own slack's reduced cost is zero, for the rows
+ * where it had gone the other way; [mult] itself when none had.
+ *
+ * The Lagrangian is valid for **any** multipliers, so one is free to be moved, and moving it is worth
+ * far more than the alternative. A slack column carries no upper bound, so `min dⱼ·zⱼ` over its box is
+ * `−∞` the moment `dⱼ` is negative and the whole certificate is abandoned. What sends it negative is
+ * not a dual worth respecting: an approximate `y` leaves a multiplier whose exact value is zero
+ * rounded to a hair below it. Declining over that loses every bound on a model whose columns are all
+ * open, which is exactly where a bound is wanted.
+ *
+ * This mirrors the repair the float bound already makes ([safeObjectiveLowerBound]), so the exact
+ * bound no longer declines where the cheap one succeeds. It is not a tolerance: the moved multiplier
+ * is used for the whole certificate, so what comes back is the true Lagrangian of a different, equally
+ * valid choice. A multiplier that was genuinely wrong rather than merely rounded is moved just the
+ * same, and only costs the bound some tightness.
+ *
+ * A structural column with no finite upper cannot be repaired this way — its reduced cost reads every
+ * multiplier at once — so one left negative still abandons the certificate.
+ */
+private fun repairedMultipliers(model: LpModel, mult: LongArray, scale: Long): LongArray {
+    var repaired: LongArray? = null
+    for (i in 0 until model.m) {
+        val slack = model.n + i
+        if (model.hasUpper[slack]) continue
+        // A slack column is the unit column eᵢ, so its scaled reduced cost is `2ᵏ·c_slack − mᵢ`.
+        val scaled = Int128()
+        scaled.addProduct(model.cost[slack], scale)
+        if (!scaled.fitsLong()) continue // the moved multiplier is not expressible; leave it to decline
+        val target = scaled.toLong()
+        // `target − mult[i] < 0` without risking the subtraction overflowing.
+        if (target >= mult[i]) continue
+        val fix = repaired ?: mult.copyOf().also { repaired = it }
+        fix[i] = target
+    }
+    return repaired ?: mult
 }
 
 /**
