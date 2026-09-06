@@ -73,6 +73,10 @@ Read `klause-bench/README.md` before benchmarking. In short:
   bounds a triangular block implies. It is a leaf: `util` and nothing else.
 - `lp` and its remaining subpackages own the model-facing half: relaxation assembly from factors,
   separators, bounding policy, open-model reasoning. Dependencies point at `lp.engine`, never back.
+- `bound` owns the combinatorial bounds a CP constraint admits on its own: Lagrangian duals over
+  AllDifferent and multi-knapsack structure, energetic and flow feasibility over `Cumulative`. It
+  reads factors, `ir`, `solver.objective`, and propagation state, and may read `lp.relaxation`
+  views — never `lp.engine`. Needing the simplex is what puts a bound under `lp` instead.
 - `theory.difference`, `theory.lia`, and `theory.qflra` decide complete open-model fragments. They must
   not materialize finite CP domains.
 - `solver.pipeline` selects an open theory once and exposes one verdict surface. Frontends render
