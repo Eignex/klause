@@ -1,5 +1,6 @@
 package com.eignex.klause.lp.bounding
 
+import com.eignex.klause.bound.CumulativeEnergeticBound
 import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.factor.arithmetic.ArrayMinMax
 import com.eignex.klause.factor.arithmetic.Linear
@@ -23,7 +24,6 @@ import com.eignex.klause.factor.table.Table
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.HullFamily
 import com.eignex.klause.lp.RootBoxes
-import com.eignex.klause.lp.bound.CumulativeEnergeticBound
 import com.eignex.klause.lp.estimateLpHull
 import com.eignex.klause.lp.lpHullFamily
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation

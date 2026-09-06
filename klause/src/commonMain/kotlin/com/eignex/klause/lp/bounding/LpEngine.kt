@@ -1,15 +1,15 @@
 package com.eignex.klause.lp.bounding
 
+import com.eignex.klause.bound.CumulativeEnergeticBound
+import com.eignex.klause.bound.CumulativeFlowBound
+import com.eignex.klause.bound.KnapsackLagrangianBound
+import com.eignex.klause.bound.LagrangianBound
+import com.eignex.klause.bound.LagrangianDualBound
+import com.eignex.klause.bound.SchedulingFeasibilityBound
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.lp.bound.CumulativeEnergeticBound
-import com.eignex.klause.lp.bound.CumulativeFlowBound
-import com.eignex.klause.lp.bound.KnapsackLagrangianBound
-import com.eignex.klause.lp.bound.LagrangianBound
-import com.eignex.klause.lp.bound.LagrangianDualBound
-import com.eignex.klause.lp.bound.SchedulingFeasibilityBound
 import com.eignex.klause.lp.cut.AggregationMirSeparator
 import com.eignex.klause.lp.cut.AllDifferentSeparator
 import com.eignex.klause.lp.cut.AssignmentObjectiveCut

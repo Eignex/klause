@@ -295,7 +295,7 @@ data class LpPlan(
      * pairwise-window [energeticReasoning] scan and horizon-independent — it keys off
      * the O(n) start-bound breakpoints, not the time axis), and the verified makespan variable is
      * lower-bounded by the smallest feasible completion time. Pure relaxation; off by default; a no-op
-     * without a scheduling global. See [com.eignex.klause.lp.bound.CumulativeFlowBound].
+     * without a scheduling global. See [com.eignex.klause.bound.CumulativeFlowBound].
      */
     val cumulativeFlow: Boolean = false,
     /** Frequency policy for [cumulativeFlow]: run the max-flow check at one in every this-many

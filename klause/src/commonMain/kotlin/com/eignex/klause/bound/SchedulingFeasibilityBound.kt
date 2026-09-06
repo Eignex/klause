@@ -1,4 +1,4 @@
-package com.eignex.klause.lp.bound
+package com.eignex.klause.bound
 
 import com.eignex.klause.propagation.PropagationSession
 
