@@ -48,6 +48,21 @@ internal fun lpStatPairs(stats: SolveStats): List<Pair<String, String>> {
     if (stats.lp.demoted) out += "lpDemoted" to "1"
     if (stats.lp.luMaxFill.max.isFinite()) out += "lpLuMaxFill" to round4(stats.lp.luMaxFill.max)
     if (stats.lp.luMaxDensity.max.isFinite()) out += "lpLuMaxDensity" to round4(stats.lp.luMaxDensity.max)
+    // Printed only when nonzero: a solve that meets neither says nothing, so a line appearing at all
+    // is the whole signal.
+    if (stats.lp.singularRefactorizations.sum > 0.0) {
+        out += "lpSingularRefactorizations" to "${stats.lp.singularRefactorizations.sum.toLong()}"
+    }
+    if (stats.lp.smallPivotBails.sum > 0.0) {
+        out += "lpSmallPivotBails" to "${stats.lp.smallPivotBails.sum.toLong()}"
+    }
+    if (stats.lp.rootMatrixMinValue.isFinite()) {
+        // Full precision, not [round4]: a coefficient below 1e-4 is exactly the one worth seeing, and
+        // rounding it reports the badly scaled matrix as a zero.
+        out += "lpRootMatrixMin" to "${stats.lp.rootMatrixMinValue}"
+        out += "lpRootMatrixMax" to "${stats.lp.rootMatrixMaxValue}"
+        out += "lpRootRowRatio" to "${stats.lp.rootRowRatio}"
+    }
     if (splits > 0.0) {
         out += "lpComponentSplits" to "${splits.toLong()}"
         out += "lpComponentBlocksMax" to "${stats.lp.componentBlocks.max.toLong()}"
