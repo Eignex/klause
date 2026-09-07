@@ -16,8 +16,29 @@ data class LpCertifierStats(
     val attempts: SumResult = ZERO_COUNT,
     val successes: SumResult = ZERO_COUNT,
     val declines: SumResult = ZERO_COUNT,
+    val node: LpCertifierRouteStats = LpCertifierRouteStats(),
+    val standalone: LpCertifierRouteStats = LpCertifierRouteStats(),
+    val component: LpCertifierRouteStats = LpCertifierRouteStats(),
+    val root: LpCertifierRouteStats = LpCertifierRouteStats(),
 ) {
     fun mergedWith(other: LpCertifierStats) = LpCertifierStats(
+        SumResult(attempts.sum + other.attempts.sum),
+        SumResult(successes.sum + other.successes.sum),
+        SumResult(declines.sum + other.declines.sum),
+        node.mergedWith(other.node),
+        standalone.mergedWith(other.standalone),
+        component.mergedWith(other.component),
+        root.mergedWith(other.root),
+    )
+}
+
+/** Attempts of one exact certifier attributed to a single production route. */
+data class LpCertifierRouteStats(
+    val attempts: SumResult = ZERO_COUNT,
+    val successes: SumResult = ZERO_COUNT,
+    val declines: SumResult = ZERO_COUNT,
+) {
+    fun mergedWith(other: LpCertifierRouteStats) = LpCertifierRouteStats(
         SumResult(attempts.sum + other.attempts.sum),
         SumResult(successes.sum + other.successes.sum),
         SumResult(declines.sum + other.declines.sum),
@@ -77,7 +98,8 @@ data class LpStats(
     val cuts: SumResult = ZERO_COUNT,
     val cutCandidates: SumResult = ZERO_COUNT,
     val cutSelected: SumResult = ZERO_COUNT,
-    val cutActive: SumResult = ZERO_COUNT,
+    /** Largest number of cuts simultaneously active in a relaxation. */
+    val cutActive: MaxResult = NO_MAX,
     val rootReducedCostFixes: SumResult = ZERO_COUNT,
     /** Non-chronological backjumps driven by an LP infeasibility (Farkas) certificate. */
     val backjumps: SumResult = ZERO_COUNT,
@@ -185,7 +207,7 @@ data class LpStats(
         cuts = SumResult(cuts.sum + o.cuts.sum),
         cutCandidates = SumResult(cutCandidates.sum + o.cutCandidates.sum),
         cutSelected = SumResult(cutSelected.sum + o.cutSelected.sum),
-        cutActive = SumResult(cutActive.sum + o.cutActive.sum),
+        cutActive = MaxResult(maxOf(cutActive.max, o.cutActive.max)),
         rootReducedCostFixes = SumResult(rootReducedCostFixes.sum + o.rootReducedCostFixes.sum),
         backjumps = SumResult(backjumps.sum + o.backjumps.sum),
         seeded = SumResult(seeded.sum + o.seeded.sum),
@@ -282,11 +304,14 @@ internal class LpStatsSink {
     private var primalRefactorizations = 0L
     private var cutCandidates = 0L
     private var cutSelected = 0L
-    private var cutActive = 0L
+    private val cutActive = MaxStat()
     private var rootReducedCostFixes = 0L
     private val certifierAttempts = LongArray(LpCertifier.entries.size)
     private val certifierSuccesses = LongArray(LpCertifier.entries.size)
     private val certifierDeclines = LongArray(LpCertifier.entries.size)
+    private val certifierRouteAttempts = Array(LpRoute.entries.size) { LongArray(LpCertifier.entries.size) }
+    private val certifierRouteSuccesses = Array(LpRoute.entries.size) { LongArray(LpCertifier.entries.size) }
+    private val certifierRouteDeclines = Array(LpRoute.entries.size) { LongArray(LpCertifier.entries.size) }
     private var exactInputAttempts = 0L
     private var exactInputRejections = 0L
 
@@ -303,10 +328,14 @@ internal class LpStatsSink {
     private var demoted = false
     private var clock: TimeMark? = null
 
-    /** One node LP-bounding pass that built and solved a relaxation (the rate denominator). */
+    /** One node visited by LP bounding, irrespective of how many re-solves cuts require. */
+    fun observeNodePass() {
+        nodePasses++
+    }
+
+    /** One node LP solve. This remains the cost denominator; [observeNodePass] is the node count. */
     fun observeSolve() {
         solves.update(1.0)
-        nodePasses++
     }
 
     /** Route-specific engine cost. Node callers retain the legacy aggregate while standalone, component,
@@ -339,25 +368,31 @@ internal class LpStatsSink {
     }
 
     /** The local bridge passed into engine exact checks. */
-    fun certificationObserver(): LpCertificationObserver = object : LpCertificationObserver {
-        override fun observe(certifier: LpCertifier, success: Boolean) {
-            val i = certifier.ordinal
-            certifierAttempts[i]++
-            if (success) certifierSuccesses[i]++ else certifierDeclines[i]++
+    fun certificationObserver(route: LpRoute = LpRoute.STANDALONE): LpCertificationObserver =
+        object : LpCertificationObserver {
+            var activeRoute = route
+            override fun observe(certifier: LpCertifier, success: Boolean) {
+                val i = certifier.ordinal
+                certifierAttempts[i]++
+                if (success) certifierSuccesses[i]++ else certifierDeclines[i]++
+                val routeIndex = activeRoute.ordinal
+                certifierRouteAttempts[routeIndex][i]++
+                if (success) certifierRouteSuccesses[routeIndex][i]++ else certifierRouteDeclines[routeIndex][i]++
+            }
+            override fun observeExactInput(accepted: Boolean) {
+                exactInputAttempts++
+                if (!accepted) exactInputRejections++
+            }
+            override fun observeSolve(metrics: LpSolveMetrics, component: Boolean) {
+                if (component && activeRoute == LpRoute.STANDALONE) activeRoute = LpRoute.COMPONENT
+                observeEngineCost(activeRoute, metrics)
+            }
         }
-        override fun observeExactInput(accepted: Boolean) {
-            exactInputAttempts++
-            if (!accepted) exactInputRejections++
-        }
-        override fun observeSolve(metrics: LpSolveMetrics, component: Boolean) {
-            observeEngineCost(if (component) LpRoute.COMPONENT else LpRoute.STANDALONE, metrics)
-        }
-    }
 
     fun observeCutAccounting(candidates: Int, selected: Int, active: Int) {
         cutCandidates += candidates.coerceAtLeast(0)
         cutSelected += selected.coerceAtLeast(0)
-        cutActive += active.coerceAtLeast(0)
+        cutActive.update(active.coerceAtLeast(0).toDouble())
     }
 
     fun observeRootReducedCostFixes(count: Int) {
@@ -556,7 +591,7 @@ internal class LpStatsSink {
         cuts = cuts.read(),
         cutCandidates = SumResult(cutCandidates.toDouble()),
         cutSelected = SumResult(cutSelected.toDouble()),
-        cutActive = SumResult(cutActive.toDouble()),
+        cutActive = cutActive.read(),
         rootReducedCostFixes = SumResult(rootReducedCostFixes.toDouble()),
         backjumps = backjumps.read(),
         seeded = seeded.read(),
@@ -602,6 +637,16 @@ internal class LpStatsSink {
             SumResult(certifierAttempts[i].toDouble()),
             SumResult(certifierSuccesses[i].toDouble()),
             SumResult(certifierDeclines[i].toDouble()),
+            certifierRouteStats(LpRoute.NODE, i),
+            certifierRouteStats(LpRoute.STANDALONE, i),
+            certifierRouteStats(LpRoute.COMPONENT, i),
+            certifierRouteStats(LpRoute.ROOT, i),
         )
     }
+
+    private fun certifierRouteStats(route: LpRoute, certifier: Int) = LpCertifierRouteStats(
+        SumResult(certifierRouteAttempts[route.ordinal][certifier].toDouble()),
+        SumResult(certifierRouteSuccesses[route.ordinal][certifier].toDouble()),
+        SumResult(certifierRouteDeclines[route.ordinal][certifier].toDouble()),
+    )
 }

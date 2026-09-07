@@ -199,6 +199,7 @@ internal fun LpEngine.lpBoundAndFix(
     warm: Basis? = null,
     cutsAllowed: Boolean = false,
 ): LpNodeOutcome = try {
+    sink.lp.observeNodePass()
     sink.lp.clockStart()
     sparseSafePrune(
         relaxer, session, bound, sink, cancellation, objectiveVar, objectiveAscending, hints, learn, warm,
@@ -322,7 +323,7 @@ internal fun LpEngine.sparseSafePrune(
                         it == FarkasRoute.ROUNDED,
                         it == FarkasRoute.NONE,
                     )
-                }, observer = sink.lp.certificationObserver())
+                }, observer = sink.lp.certificationObserver(LpRoute.NODE))
                 if (ray != null) {
                     sink.lp.observeInfeasiblePrune()
                     val clause = if (learn) {
@@ -387,7 +388,7 @@ internal fun LpEngine.sparseSafePrune(
                     it == FarkasRoute.ROUNDED,
                     it == FarkasRoute.NONE,
                 )
-            }, observer = sink.lp.certificationObserver())
+            }, observer = sink.lp.certificationObserver(LpRoute.NODE))
         } else {
             null
         }
@@ -400,7 +401,7 @@ internal fun LpEngine.sparseSafePrune(
         }
         if (strictSaved != null && !cancellation()) {
             val outcome = rationalOutcome(model, cancellation).also {
-                sink.lp.certificationObserver().observe(
+                sink.lp.certificationObserver(LpRoute.NODE).observe(
                     com.eignex.klause.lp.engine.LpCertifier.RATIONAL,
                     it.feasibility != RationalFeasibility.UNKNOWN,
                 )
@@ -490,7 +491,7 @@ internal fun LpEngine.sparseSafePrune(
     // reduced-cost fixing. Compute it once when any of them needs it; a singular/unbounded certify
     // yields null and each falls back to its cheap certificate-less path, which is sound.
     val cert = if ((learn && canPropagate) || canPrune) {
-        integerCertify(boundRel.model, boundRes.duals, observer = sink.lp.certificationObserver()).also {
+        integerCertify(boundRel.model, boundRes.duals, observer = sink.lp.certificationObserver(LpRoute.NODE)).also {
             // The node path is where certification actually happens; the certified wrapper is not on it.
             sink.lp.observeCertification(
                 certified = it != null,
@@ -505,7 +506,12 @@ internal fun LpEngine.sparseSafePrune(
     }
     // Neither the float safe bound nor the certificate's integer-multiplier bound dominates the other,
     // so the prune decides on the tighter of the two rather than on the float bound alone.
-    val lower = tightObjectiveLowerBound(boundRel.model, boundRes.duals, cert, sink.lp.certificationObserver())
+    val lower = tightObjectiveLowerBound(
+        boundRel.model,
+        boundRes.duals,
+        cert,
+        sink.lp.certificationObserver(LpRoute.NODE),
+    )
         ?: return LpNodeOutcome(false, optimalBasis)
     val full = lower + boundRel.objectiveConstant.toDouble()
     if (canPrune && full >= bound) {
@@ -748,7 +754,7 @@ internal fun LpEngine.rootLpRelaxationBound(
         val simplex = dualSimplex(relaxation.model, cancellation)
         val result = simplex.solve()
         observeRootSolve(simplex)
-        val lower = result?.let { tightObjectiveLowerBound(relaxation.model, it.duals) }
+        val lower = result?.let { tightObjectiveLowerBound(relaxation.model, it.duals, rootCertificationObserver()) }
         if (lower != null) lower + relaxation.objectiveConstant.toDouble() else Double.NaN
     }
 } catch (_: CheckedLongOverflowException) {

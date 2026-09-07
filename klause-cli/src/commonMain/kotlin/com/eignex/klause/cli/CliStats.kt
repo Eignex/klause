@@ -122,12 +122,16 @@ internal fun lpStatPairs(stats: SolveStats): List<Pair<String, String>> {
         out += "lpExactInputAttempts" to "${stats.lp.exactInputAttempts.sum.toLong()}"
         out += "lpExactInputRejections" to "${stats.lp.exactInputRejections.sum.toLong()}"
     }
-    if (stats.lp.cutCandidates.sum > 0.0 || stats.lp.cutSelected.sum > 0.0 || stats.lp.cutActive.sum > 0.0) {
+    if (stats.lp.cutCandidates.sum > 0.0 || stats.lp.cutSelected.sum > 0.0 || stats.lp.cutActive.max.isFinite()) {
         out += "lpCutCandidates" to "${stats.lp.cutCandidates.sum.toLong()}"
         out += "lpCutSelected" to "${stats.lp.cutSelected.sum.toLong()}"
-        out += "lpCutActive" to "${stats.lp.cutActive.sum.toLong()}"
+        out += "lpCutActive" to "${stats.lp.cutActive.max.toLong()}"
     }
-    if (stats.lp.rootReducedCostFixes.sum > 0.0) out += "lpRootReducedCostFixes" to "${stats.lp.rootReducedCostFixes.sum.toLong()}"
+    if (stats.lp.rootReducedCostFixes.sum >
+        0.0
+    ) {
+        out += "lpRootReducedCostFixes" to "${stats.lp.rootReducedCostFixes.sum.toLong()}"
+    }
     if (stats.lp.rootMatrixMinValue.isFinite()) {
         // Full precision, not [round4]: a coefficient below 1e-4 is exactly the one worth seeing, and
         // rounding it reports the badly scaled matrix as a zero.
@@ -147,12 +151,33 @@ internal fun lpStatPairs(stats: SolveStats): List<Pair<String, String>> {
     return out
 }
 
-private fun appendCertifierStats(out: MutableList<Pair<String, String>>, name: String, stats: com.eignex.klause.solver.result.LpCertifierStats) {
-    if (stats.attempts.sum == 0.0) return
+private fun appendCertifierStats(
+    out: MutableList<Pair<String, String>>,
+    name: String,
+    stats: com.eignex.klause.solver.result.LpCertifierStats,
+) {
     out += "lp${name}Attempts" to "${stats.attempts.sum.toLong()}"
     out += "lp${name}Successes" to "${stats.successes.sum.toLong()}"
     out += "lp${name}Declines" to "${stats.declines.sum.toLong()}"
-    out += "lp${name}SuccessRate" to round4(stats.successes.sum / stats.attempts.sum)
+    if (stats.attempts.sum > 0.0) out += "lp${name}SuccessRate" to round4(stats.successes.sum / stats.attempts.sum)
+    appendRouteCertifierStats(out, name, "Node", stats.node)
+    appendRouteCertifierStats(out, name, "Standalone", stats.standalone)
+    appendRouteCertifierStats(out, name, "Component", stats.component)
+    appendRouteCertifierStats(out, name, "Root", stats.root)
+}
+
+private fun appendRouteCertifierStats(
+    out: MutableList<Pair<String, String>>,
+    certifier: String,
+    route: String,
+    stats: com.eignex.klause.solver.result.LpCertifierRouteStats,
+) {
+    out += "lp${certifier}${route}Attempts" to "${stats.attempts.sum.toLong()}"
+    out += "lp${certifier}${route}Successes" to "${stats.successes.sum.toLong()}"
+    out += "lp${certifier}${route}Declines" to "${stats.declines.sum.toLong()}"
+    if (stats.attempts.sum > 0.0) {
+        out += "lp${certifier}${route}SuccessRate" to round4(stats.successes.sum / stats.attempts.sum)
+    }
 }
 
 /**

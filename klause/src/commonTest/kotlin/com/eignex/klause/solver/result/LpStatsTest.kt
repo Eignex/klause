@@ -12,8 +12,9 @@ class LpStatsTest {
     @Test
     fun `route and certifier observations preserve zero attempt routes`() {
         val sink = LpStatsSink()
-        val observer = sink.certificationObserver()
+        val observer = sink.certificationObserver(LpRoute.NODE)
 
+        sink.observeNodePass()
         sink.observeEngineCost(LpRoute.STANDALONE, LpSolveMetrics(pivots = 3, workOps = 11, warmAttempts = 1))
         observer.observe(LpCertifier.INTEGER, success = false)
         observer.observe(LpCertifier.RATIONAL, success = true)
@@ -21,12 +22,37 @@ class LpStatsTest {
 
         val stats = sink.snapshot()
         assertEquals(1.0, stats.standalonePasses.sum)
-        assertEquals(0.0, stats.nodePasses.sum)
+        assertEquals(1.0, stats.nodePasses.sum)
         assertEquals(0.0, stats.componentPasses.sum)
         assertEquals(1.0, stats.integerCertify.attempts.sum)
         assertEquals(1.0, stats.integerCertify.declines.sum)
+        assertEquals(1.0, stats.integerCertify.node.attempts.sum)
+        assertEquals(0.0, stats.integerCertify.standalone.attempts.sum)
         assertEquals(1.0, stats.rationalOutcome.successes.sum)
         assertEquals(1.0, stats.exactInputRejections.sum)
+    }
+
+    @Test
+    fun `node passes count nodes while solves count cut re-solves`() {
+        val sink = LpStatsSink()
+
+        sink.observeNodePass()
+        sink.observeSolve()
+        sink.observeSolve()
+
+        val stats = sink.snapshot()
+        assertEquals(1.0, stats.nodePasses.sum)
+        assertEquals(2.0, stats.solves.sum)
+    }
+
+    @Test
+    fun `active cuts preserve the largest simultaneous pool`() {
+        val sink = LpStatsSink()
+
+        sink.observeCutAccounting(candidates = 3, selected = 2, active = 2)
+        sink.observeCutAccounting(candidates = 4, selected = 1, active = 5)
+
+        assertEquals(5.0, sink.snapshot().cutActive.max)
     }
 
     @Test

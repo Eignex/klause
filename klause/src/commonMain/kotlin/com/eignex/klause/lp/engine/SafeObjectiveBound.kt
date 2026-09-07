@@ -237,8 +237,11 @@ internal fun LpModel.exactObjectiveLowerBoundCeil(y: DoubleArray): Long? =
  * declines on overflow. Sound against an integral objective, as [exactObjectiveLowerBoundCeil] is. Null
  * only when neither side is available.
  */
-internal fun tightObjectiveLowerBound(model: LpModel, y: DoubleArray): Double? =
-    tighterLowerBound(safeObjectiveLowerBound(model, y), model.exactObjectiveLowerBoundCeil(y))
+internal fun tightObjectiveLowerBound(
+    model: LpModel,
+    y: DoubleArray,
+    observer: LpCertificationObserver? = null,
+): Double? = tighterLowerBound(safeObjectiveLowerBound(model, y, observer), model.exactObjectiveLowerBoundCeil(y))
 
 /**
  * [tightObjectiveLowerBound] with the exact side taken from [certificate] — the certificate the caller
