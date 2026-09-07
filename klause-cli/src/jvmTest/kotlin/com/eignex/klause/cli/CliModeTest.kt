@@ -14,6 +14,7 @@ import java.io.PrintStream
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class CliModeTest {
@@ -531,6 +532,53 @@ class CliModeTest {
         assertTrue("presolve dry-run:" in err, "expected the dry-run readout, got: $err")
         assertTrue("open columns: 2 of 2" in err, "expected the open-column readout, got: $err")
         assertTrue("sat" !in out, "the dry run must not solve the model, got: $out")
+    }
+
+    @Test
+    fun `declining the bound proof sends a provably bounded model to the open theory instead`() {
+        // `x` is declared bounded below only, so the model is open — but the row `x <= 5` implies the
+        // missing side, so the proof closes it and the finite lane owns the model. Declining the proof
+        // sends the same model to the open theory, which is what lets one instance run down both lanes.
+        val mps = File.createTempFile("cli", ".mps").apply {
+            writeText(
+                "NAME          T\nROWS\n N  COST\n L  R1\nCOLUMNS\n" +
+                    "    MARKER                 'MARKER'                 'INTORG'\n" +
+                    "    x  COST  -1.0   R1  1.0\n" +
+                    "    MARKER                 'MARKER'                 'INTEND'\n" +
+                    "RHS\n    RHS  R1  5.0\nBOUNDS\n LI BND  x  0\nENDATA\n",
+            )
+            deleteOnExit()
+        }
+
+        val kept = capture { runCli(arrayOf("-s", "-t", "10000", mps.absolutePath)) }
+        val declined = capture {
+            runCli(arrayOf("-s", "-t", "10000", "--param", "open-bound-proof=false", mps.absolutePath))
+        }
+
+        assertTrue("openTheoryChecks=0" in kept, "expected the finite lane, got: $kept")
+        assertFalse("openTheoryChecks=0" in declined, "expected the open theory, got: $declined")
+    }
+
+    @Test
+    fun `the bound-proof param is consumed rather than left for an engine to reject`() {
+        // Every CLI-level param has to leave `engineParams` as it is read; a leftover key fails engine
+        // validation on a fully bounded model, which never reaches the proof at all.
+        val mps = File.createTempFile("cli", ".mps").apply {
+            writeText(
+                "NAME          T\nROWS\n N  COST\n G  R1\nCOLUMNS\n" +
+                    "    MARKER                 'MARKER'                 'INTORG'\n" +
+                    "    x  COST  1.0   R1  1.0\n" +
+                    "    MARKER                 'MARKER'                 'INTEND'\n" +
+                    "RHS\n    RHS  R1  1.0\nBOUNDS\n UI BND  x  4\nENDATA\n",
+            )
+            deleteOnExit()
+        }
+
+        val err = captureErr {
+            capture { runCli(arrayOf("-t", "10000", "--param", "open-bound-proof=false", mps.absolutePath)) }
+        }
+
+        assertFalse("open-bound-proof" in err, "the param must not reach engine validation, got: $err")
     }
 
     private fun capture(block: () -> Unit): String {
