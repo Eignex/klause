@@ -43,4 +43,15 @@ class RevisedSimplexWarmStartTest {
         )
         assertEquals(cold.objective, warm.objective, 1e-9, "the warm start changes only the pivot path")
     }
+
+    @Test
+    fun `a persistent reused basis records a warm attempt before its hit`() {
+        val solver = newPersistentLpSolver(model())
+
+        assertNotNull(solver.resolveBounds())
+        assertNotNull(solver.resolveBounds())
+
+        assertEquals(1, solver.lastMetrics.warmAttempts)
+        assertEquals(1, solver.lastMetrics.warmHits)
+    }
 }

@@ -13,6 +13,7 @@ import com.eignex.klause.lp.openLpInfeasible
 import com.eignex.klause.lp.structuralIntBounds
 import com.eignex.klause.lp.tightenOpenIntBounds
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.result.LpStatsSink
 import com.eignex.klause.util.Bits
 import com.eignex.klause.util.Cancellation
 
@@ -89,7 +90,10 @@ internal fun Problem.presolveOpen(
  * [cancellation] is polled between variables and threaded into each LP solve, so a budget spent partway
  * through leaves the bounds it had already proved — every one of them sound on its own.
  */
-internal fun Problem.closeOpenBounds(cancellation: Cancellation = Cancellation.Never): OpenPresolveResult {
+internal fun Problem.closeOpenBounds(
+    cancellation: Cancellation = Cancellation.Never,
+    lpStats: LpStatsSink? = null,
+): OpenPresolveResult {
     val problem = this
     val columns = problem.numIntVars
     if (columns == 0) return OpenPresolveResult.Tightened(problem, closedSides = 0)
@@ -107,7 +111,9 @@ internal fun Problem.closeOpenBounds(cancellation: Cancellation = Cancellation.N
     if (exactBoundsInfeasible(declared, intRows, cancellation)) return OpenPresolveResult.Refuted
     // Then the relaxation over the same open ranges. A Farkas ray reaches the systems no bound ever
     // crosses, which is what both the pass above and the tightening below need to conclude anything.
-    if (openLpInfeasible(declared, intRows, cancellation)) return OpenPresolveResult.Refuted
+    if (openLpInfeasible(declared, intRows, cancellation, lpStats?.certificationObserver())) {
+        return OpenPresolveResult.Refuted
+    }
     // Only now is there nothing left to do: closing is what a model with no open side does not need, and
     // refuting is a separate job it may still deserve. Returning before the two checks above conflates
     // them — a model whose sides something else already closed comes back looking feasible, and on this

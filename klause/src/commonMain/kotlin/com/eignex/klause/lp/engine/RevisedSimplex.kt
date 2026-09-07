@@ -440,10 +440,10 @@ internal class RevisedSimplex(
         val reason = if (outcome ==
             BasisUpdate.APPLIED
         ) {
-                LpRefactorReason.UPDATE_LIMIT
-            } else {
-                LpRefactorReason.BACKEND_REQUESTED
-            }
+            LpRefactorReason.UPDATE_LIMIT
+        } else {
+            LpRefactorReason.BACKEND_REQUESTED
+        }
         return if (refactorize(reason)) PivotFold.REBUILT else PivotFold.FAILED
     }
 
@@ -573,6 +573,7 @@ internal class RevisedSimplex(
         // A kept factorization implies the basis it factorizes is still seated, so that is the warmest
         // start there is; a warm basis alone still pays for a factorization.
         warmStarted = kept
+        if (kept) warmAttempts++
         // A warm basis can be singular; fall back to the (always non-singular) slack cold start.
         if (!kept) {
             if (warm == null) {

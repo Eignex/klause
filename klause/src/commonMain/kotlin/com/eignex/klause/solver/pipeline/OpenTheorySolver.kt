@@ -190,7 +190,12 @@ class OpenTheoryEngine internal constructor(
         // Close the open sides before the theory sees them. A proved bound narrows the box the theory
         // searches; a refutation here is over the genuinely open ranges, so it refutes the unbounded model
         // rather than an invented box, and is reportable as unsat.
-        val model = when (val closed = routed.model.closeOpenBounds(boundCancellation(prepared, cancellation))) {
+        val model = when (
+            val closed = routed.model.closeOpenBounds(
+            boundCancellation(prepared, cancellation),
+            stats.lp,
+        )
+        ) {
             OpenPresolveResult.Refuted -> return OpenTheoryResult.Unsat(stats.finish(state))
             is OpenPresolveResult.Tightened -> closed.spec
         }

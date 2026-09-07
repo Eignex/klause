@@ -214,14 +214,14 @@ object PresolvePipeline {
             val harvestResult = harvestPlan?.let {
                 lpHarvestReporting(pre.problem, objective, it, bakeConfig, cancellation)
             }
-            val harvested = harvestResult?.problem ?: pre.problem
-            // Neither presolve nor the harvest changed anything this round → fixpoint.
-            if (pre.problem === current && harvested === pre.problem) break
-            pre.passesFired.forEach { firedPasses.add(it.id) }
             harvestResult?.let {
                 harvest += it.report
                 harvestStats = harvestStats.mergedWith(it.stats)
             }
+            val harvested = harvestResult?.problem ?: pre.problem
+            // Neither presolve nor the harvest changed anything this round → fixpoint.
+            if (pre.problem === current && harvested === pre.problem) break
+            pre.passesFired.forEach { firedPasses.add(it.id) }
             // The harvest only narrows domains, so it contributes no reconstruct; add presolve's only when it
             // actually transformed the problem (else it is the identity).
             if (pre.problem !== current) reconstructs.add(pre.reconstruct)
@@ -251,7 +251,12 @@ object PresolvePipeline {
             // The step-0 bake still ran, and reporting it as zero leaves its cost folded into the phase
             // total. That mis-attribution lands on exactly the runs anyone would investigate, since
             // "presolve changed nothing" is what makes a run interesting in the first place.
-            return PresolveOutcome(problem, reconstruct, PresolveStats(bakeElapsed = bakeElapsed), changed = false)
+            return PresolveOutcome(
+                problem,
+                reconstruct,
+                PresolveStats(bakeElapsed = bakeElapsed, lpStats = harvestStats),
+                changed = false,
+            )
         }
 
         // Terse presolve summary for `-s`: which passes fired (+ `lp-harvest` when the LP tightened anything)

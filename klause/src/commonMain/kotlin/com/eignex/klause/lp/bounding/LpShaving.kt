@@ -190,7 +190,7 @@ private fun LpEngine.safeMin(prob: Problem, coeffs: LongArray, token: Cancellati
         return null
     } ?: return null
     observeRootSolve(simplex)
-    val lower = tightObjectiveLowerBound(relaxation.model, result.duals) ?: return null
+    val lower = tightObjectiveLowerBound(relaxation.model, result.duals, rootCertificationObserver()) ?: return null
     return lower + relaxation.objectiveConstant.toDouble()
 }
 
@@ -215,7 +215,7 @@ private fun LpEngine.safeMinNoBake(coeffs: LongArray, token: Cancellation): Doub
         return null
     } ?: return null
     observeRootSolve(simplex)
-    val lower = tightObjectiveLowerBound(relaxation.model, result.duals) ?: return null
+    val lower = tightObjectiveLowerBound(relaxation.model, result.duals, rootCertificationObserver()) ?: return null
     return lower + relaxation.objectiveConstant.toDouble()
 }
 
@@ -303,7 +303,7 @@ internal fun LpEngine.rootLpInfeasibleNoBake(token: Cancellation): Boolean {
     observeRootSolve(simplex)
     if (result != null) return false
     val floatRay = simplex.infeasibleRay ?: return false
-    return integerFarkasRay(model, floatRay) != null
+    return integerFarkasRay(model, floatRay, observer = rootCertificationObserver()) != null
 }
 
 /** The built root relaxation's columns, rows and nonzeros, plus a per-solve cost proxy. */

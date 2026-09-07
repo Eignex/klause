@@ -87,6 +87,9 @@ internal class LpEngine(
         sink.lp.observeEngineCost(com.eignex.klause.solver.result.LpRoute.ROOT, solver.lastMetrics)
     }
 
+    internal fun rootCertificationObserver() =
+        sink.lp.certificationObserver(com.eignex.klause.solver.result.LpRoute.ROOT)
+
     internal fun observeRootCutAccounting(candidates: Int, selected: Int, active: Int) {
         sink.lp.observeCutAccounting(candidates, selected, active)
     }

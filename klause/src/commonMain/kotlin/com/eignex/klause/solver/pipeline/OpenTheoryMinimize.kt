@@ -198,6 +198,7 @@ class OpenTheoryMinimizer internal constructor(
         val base = when (
             val closed = prepared.problem.closeOpenBounds(
                 Cancellation { stop() || prepared.budget?.remaining() == 0L },
+                stats.lp,
             )
         ) {
             OpenPresolveResult.Refuted -> {
