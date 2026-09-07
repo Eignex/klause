@@ -183,11 +183,13 @@ private fun LpEngine.safeMin(prob: Problem, coeffs: LongArray, token: Cancellati
     if (session.isUnsatAtRoot) return null
     val relaxation = CpToLpRelaxation(prob, LinearObjective(intCoefficients = coeffs)).build(session)
     if (relaxation.model.n == 0) return null
+    val simplex = dualSimplex(relaxation.model, token)
     val result = try {
-        dualSimplex(relaxation.model, token).solvePrimal()
+        simplex.solvePrimal()
     } catch (_: CheckedLongOverflowException) {
         return null
     } ?: return null
+    observeRootSolve(simplex)
     val lower = tightObjectiveLowerBound(relaxation.model, result.duals) ?: return null
     return lower + relaxation.objectiveConstant.toDouble()
 }
@@ -206,11 +208,13 @@ private fun LpEngine.safeMinNoBake(coeffs: LongArray, token: Cancellation): Doub
         return null
     }
     if (relaxation.model.n == 0) return null
+    val simplex = dualSimplex(relaxation.model, token)
     val result = try {
-        dualSimplex(relaxation.model, token).solvePrimal()
+        simplex.solvePrimal()
     } catch (_: CheckedLongOverflowException) {
         return null
     } ?: return null
+    observeRootSolve(simplex)
     val lower = tightObjectiveLowerBound(relaxation.model, result.duals) ?: return null
     return lower + relaxation.objectiveConstant.toDouble()
 }
@@ -295,7 +299,9 @@ internal fun LpEngine.rootLpInfeasibleNoBake(token: Cancellation): Boolean {
     val simplex = newTableauCutSolver(model, token)
     // A non-null solve is a feasible optimum; null is infeasible or an inconclusive failure. Only a
     // dual-unbounded ray that survives exact 128-bit Farkas certification proves genuine infeasibility.
-    if (simplex.solve() != null) return false
+    val result = simplex.solve()
+    observeRootSolve(simplex)
+    if (result != null) return false
     val floatRay = simplex.infeasibleRay ?: return false
     return integerFarkasRay(model, floatRay) != null
 }

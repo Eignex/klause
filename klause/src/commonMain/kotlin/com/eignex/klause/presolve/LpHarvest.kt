@@ -16,6 +16,7 @@ import com.eignex.klause.lp.bounding.shaveVariableBounds
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.LpHarvestReport
+import com.eignex.klause.solver.result.LpStats
 import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.util.Cancellation
 
@@ -55,7 +56,7 @@ fun lpHarvest(
 ): Problem = lpHarvestReporting(problem, objective, plan, bakeConfig, cancellation).problem
 
 /** [lpHarvest]'s transformed [problem] paired with the [report] of what the LP harvest contributed. */
-class LpHarvestResult(val problem: BakedProblem, val report: LpHarvestReport)
+class LpHarvestResult(val problem: BakedProblem, val report: LpHarvestReport, val stats: LpStats = LpStats())
 
 /** Whether the root LP relaxation is Farkas-certifiably infeasible over [problem]'s declared domains,
  *  built without the [com.eignex.klause.propagation.PropagationSession] bake fixpoint (O(domain span) on
@@ -118,19 +119,30 @@ fun lpHarvestReporting(
     // The token must reach the simplex itself, not just the probe loops below: one primal phase-1 on a
     // large relaxation runs far past the presolve budget, and the engine polls only the `cancellation`
     // that `LpParams` hands it — every `LpSolver` entry point defaults to `Cancellation.Never`.
+    val sink = SolveStatsSink(backend = "lp-harvest")
     val engine = LpEngine(
         problem,
         objective,
         LpParams(lpPlan = plan, cancellation = cancellation),
-        SolveStatsSink(backend = "lp-harvest"),
+        sink,
     )
-    if (engine.lpRelaxer == null) return LpHarvestResult(problem, LpHarvestReport())
+    if (engine.lpRelaxer == null) return LpHarvestResult(problem, LpHarvestReport(), sink.snapshot().lp)
     // A certified-infeasible root relaxation proves the whole problem has no solution; fold it in as an
     // explicit contradiction so the problem bakes Unsat and every backend short-circuits.
     if (engine.rootInfeasible(cancellation)) {
-        return LpHarvestResult(RootBaker.provenInfeasible(problem, bakeConfig), LpHarvestReport(rootInfeasible = true))
+        return LpHarvestResult(
+            RootBaker.provenInfeasible(problem, bakeConfig),
+            LpHarvestReport(rootInfeasible = true),
+            sink.snapshot().lp,
+        )
     }
-    if (!plan.variableShaving && !plan.objectiveShaving) return LpHarvestResult(problem, LpHarvestReport())
+    if (!plan.variableShaving && !plan.objectiveShaving) {
+        return LpHarvestResult(
+            problem,
+            LpHarvestReport(),
+            sink.snapshot().lp,
+        )
+    }
 
     // Self-limit on the built relaxation's size. The shave / redundancy / equality probes each rebuild and
     // re-solve the relaxation (up to SHAVE_MAX_ITERS of each), so on a large relaxation that per-candidate
@@ -145,7 +157,7 @@ fun lpHarvestReporting(
             relaxationNnz = size.nnz,
             skipped = true,
         )
-        return LpHarvestResult(problem, report)
+        return LpHarvestResult(problem, report, sink.snapshot().lp)
     }
 
     val shaved = if (plan.variableShaving) engine.shaveVariableBounds(cancellation) else emptyList()
@@ -161,7 +173,7 @@ fun lpHarvestReporting(
     // affine elimination to fold out, shrinking the variable space (this transform only adds the factor).
     val equalities = if (plan.variableShaving) engine.impliedEqualities(cancellation) else emptyList()
     if (shaved.isEmpty() && objLb == null && redundant.isEmpty() && equalities.isEmpty()) {
-        return LpHarvestResult(problem, LpHarvestReport())
+        return LpHarvestResult(problem, LpHarvestReport(), sink.snapshot().lp)
     }
     val report = LpHarvestReport(
         boundsShaved = shaved.size,
@@ -206,5 +218,5 @@ fun lpHarvestReporting(
         ),
         bakeConfig,
     )
-    return LpHarvestResult(transformed, report)
+    return LpHarvestResult(transformed, report, sink.snapshot().lp)
 }

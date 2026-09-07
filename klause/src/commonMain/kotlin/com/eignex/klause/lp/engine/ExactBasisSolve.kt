@@ -14,7 +14,15 @@ import kotlin.math.roundToLong
  * reconstruction is finicky — e.g. a degenerate inequality-plus-equality vertex — since it checks the
  * point, not the basis.
  */
-internal fun exactPointFeasible(model: LpModel, primal: DoubleArray): Boolean {
+internal fun exactPointFeasible(
+    model: LpModel,
+    primal: DoubleArray,
+    observer: LpCertificationObserver? = null,
+): Boolean = exactPointFeasibleUnchecked(model, primal).also {
+    observer?.observe(LpCertifier.EXACT_POINT, it)
+}
+
+private fun exactPointFeasibleUnchecked(model: LpModel, primal: DoubleArray): Boolean {
     val n = model.n
     val m = model.m
     // Shifted point zⱼ = primalⱼ − loShiftⱼ (the constraints/rhs are in shifted, lower-bound-zero coords).
@@ -127,8 +135,17 @@ private const val DEC_MAX_INT = 9.007199254740992E15
  * rationalization ([rationalizeToIntegerModel]), where a positive integer scale preserves the feasible
  * region so the proof carries back exactly.
  */
-internal fun exactBasisFeasible(model: LpModel, basis: Basis): Boolean? {
-    val integral = rationalizeToIntegerModel(model, outwardRealUppers = false)?.model ?: return null
+internal fun exactBasisFeasible(model: LpModel, basis: Basis, observer: LpCertificationObserver? = null): Boolean? =
+    exactBasisFeasibleUnchecked(model, basis, observer).also {
+        observer?.observe(LpCertifier.EXACT_BASIS, it == true)
+    }
+
+private fun exactBasisFeasibleUnchecked(model: LpModel, basis: Basis, observer: LpCertificationObserver?): Boolean? {
+    val integral = rationalizeToIntegerModel(
+        model,
+        outwardRealUppers = false,
+        observer = observer,
+    )?.model ?: return null
     val m = integral.m
     if (m == 0) return true // no rows ⇒ the box `0 ≤ x ≤ u` (all nonbasic at a valid bound) is feasible
     if (m > MAX_EXACT_BASIS) return null // beyond this the fraction-free minors cannot stay in 128 bits
@@ -214,7 +231,16 @@ private fun detSign(v: Int128): Int = when {
  * result is normalized to a *positive* multiple of `ρ`, since a negative multiple of a Farkas ray is not
  * one.
  */
-internal fun exactFarkasRay(model: LpModel, basis: Basis, row: Int): LongArray? {
+internal fun exactFarkasRay(
+    model: LpModel,
+    basis: Basis,
+    row: Int,
+    observer: LpCertificationObserver? = null,
+): LongArray? = exactFarkasRayUnchecked(model, basis, row).also {
+    observer?.observe(LpCertifier.EXACT_FARKAS, it != null)
+}
+
+private fun exactFarkasRayUnchecked(model: LpModel, basis: Basis, row: Int): LongArray? {
     val m = model.m
     if (m == 0 || row < 0 || row >= m || m > MAX_EXACT_BASIS) return null
     val basic = basis.basicVars

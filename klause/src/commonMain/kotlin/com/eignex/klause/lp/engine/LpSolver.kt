@@ -3,6 +3,51 @@ package com.eignex.klause.lp.engine
 import com.eignex.klause.lp.engine.Cut
 import com.eignex.klause.util.Cancellation
 
+/** Exact checks that may decline a float candidate.  This is deliberately engine-local: consumers
+ * adapt it into their own statistics rather than making the kernel depend on solver results. */
+internal enum class LpCertifier { INTEGER, SAFE_OBJECTIVE, EXACT_BASIS, EXACT_FARKAS, EXACT_POINT, RATIONAL }
+
+/** Why a simplex solve rebuilt its factors.  The reasons are emitted by the engine, not inferred from
+ * aggregate counts by a consumer. */
+internal enum class LpRefactorReason { INITIAL, WARM_START, SINGULAR_RECOVERY, UPDATE_LIMIT, BACKEND_REQUESTED, RECONCILE_RECOVERY, PRIMAL }
+
+/** Optional, solve-scoped observer for certification and exact-input eligibility. */
+internal interface LpCertificationObserver {
+    fun observe(certifier: LpCertifier, success: Boolean)
+    fun observeExactInput(accepted: Boolean)
+    fun observeSolve(metrics: LpSolveMetrics, component: Boolean)
+}
+
+/** Primitive cost reading from one engine invocation.  It can cross the engine boundary without
+ * importing model-facing result types, and component engines add it even when a later block fails. */
+internal data class LpSolveMetrics(
+    val pivots: Int = 0,
+    val workOps: Long = 0L,
+    val warmAttempts: Int = 0,
+    val warmHits: Int = 0,
+    val singularRefactorizations: Int = 0,
+    val smallPivotBails: Int = 0,
+    val initialRefactorizations: Int = 0,
+    val warmStartRefactorizations: Int = 0,
+    val singularRecoveryRefactorizations: Int = 0,
+    val updateLimitRefactorizations: Int = 0,
+    val backendRequestedRefactorizations: Int = 0,
+    val reconcileRecoveryRefactorizations: Int = 0,
+    val primalRefactorizations: Int = 0,
+) {
+    operator fun plus(other: LpSolveMetrics) = LpSolveMetrics(
+        pivots + other.pivots, workOps + other.workOps, warmAttempts + other.warmAttempts,
+        warmHits + other.warmHits, singularRefactorizations + other.singularRefactorizations,
+        smallPivotBails + other.smallPivotBails, initialRefactorizations + other.initialRefactorizations,
+        warmStartRefactorizations + other.warmStartRefactorizations,
+        singularRecoveryRefactorizations + other.singularRecoveryRefactorizations,
+        updateLimitRefactorizations + other.updateLimitRefactorizations,
+        backendRequestedRefactorizations + other.backendRequestedRefactorizations,
+        reconcileRecoveryRefactorizations + other.reconcileRecoveryRefactorizations,
+        primalRefactorizations + other.primalRefactorizations,
+    )
+}
+
 /**
  * The engine that solves an [LpModel] to a float optimum and the artifacts an exact certifier needs
  * from it. The seam is deliberately engine-agnostic: everything here is producible by any LP method,
@@ -87,6 +132,16 @@ internal interface LpSolver : AutoCloseable {
      * pivot.
      */
     val lastSmallPivotBails: Int get() = 0
+
+    /** Complete primitive metrics for the most recent invocation. */
+    val lastMetrics: LpSolveMetrics get() = LpSolveMetrics(
+        pivots = lastPivots,
+        workOps = lastWorkOps,
+        warmAttempts = if (lastWarmStarted) 1 else 0,
+        warmHits = if (lastWarmStarted) 1 else 0,
+        singularRefactorizations = lastSingularRefactorizations,
+        smallPivotBails = lastSmallPivotBails,
+    )
 
     /** Nonbasic columns with zero reduced cost at the last termination — dual degeneracy. 0 on an engine
      *  that does not measure it. */

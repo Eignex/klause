@@ -165,7 +165,7 @@ internal class SolveStatsSink(var backend: String) {
             run = RunStats(backend = backend, wallMs = elapsedMs, timedOut = timedOut),
             search = searchStats,
             ca = ca.snapshot(),
-            lp = lp.snapshot(),
+            lp = lp.snapshot().mergedWith(presolve?.lpStats ?: LpStats()),
             scheduling = scheduling.snapshot(),
             ls = ls.snapshot(),
             openTheory = openTheory,
@@ -232,6 +232,8 @@ data class PresolveStats(
     val constraintsRemoved: Int = 0,
     val infeasible: Boolean = false,
     val lpHarvest: LpHarvestReport? = null,
+    /** LP work performed before search; merged into [SolveStats.lp] at snapshot time. */
+    val lpStats: LpStats = LpStats(),
     /** Wall time the base bake (presolve step 0, `Problem.bake`) took. */
     val bakeElapsed: Duration = Duration.ZERO,
 )

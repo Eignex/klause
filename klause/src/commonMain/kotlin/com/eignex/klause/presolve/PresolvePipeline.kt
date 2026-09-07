@@ -9,6 +9,7 @@ import com.eignex.klause.propagation.difference.withDifferenceSystem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.LpHarvestReport
+import com.eignex.klause.solver.result.LpStats
 import com.eignex.klause.solver.result.PresolveStats
 import com.eignex.klause.util.Cancellation
 import kotlin.time.TimeSource
@@ -204,6 +205,7 @@ object PresolvePipeline {
             firedPasses.add(PresolvePass.SUBSTITUTE_BINARY_COLUMNS.id)
         }
         var harvest = LpHarvestReport() // the LP harvest's own contribution, summed over rounds
+        var harvestStats = LpStats()
         var infeasible = false
         var round = 0
         while (round++ < MAX_PRESOLVE_HARVEST_ROUNDS && !cancellation()) {
@@ -216,7 +218,10 @@ object PresolvePipeline {
             // Neither presolve nor the harvest changed anything this round → fixpoint.
             if (pre.problem === current && harvested === pre.problem) break
             pre.passesFired.forEach { firedPasses.add(it.id) }
-            harvestResult?.let { harvest += it.report }
+            harvestResult?.let {
+                harvest += it.report
+                harvestStats = harvestStats.mergedWith(it.stats)
+            }
             // The harvest only narrows domains, so it contributes no reconstruct; add presolve's only when it
             // actually transformed the problem (else it is the identity).
             if (pre.problem !== current) reconstructs.add(pre.reconstruct)
@@ -261,6 +266,7 @@ object PresolvePipeline {
             constraintsRemoved = problem.factors.size - reduced.factors.size,
             infeasible = infeasible || harvest.rootInfeasible,
             lpHarvest = harvest.takeUnless { it.isEmpty },
+            lpStats = harvestStats,
             bakeElapsed = bakeElapsed,
         )
         return PresolveOutcome(posted, reconstruct, stats, changed = true, objective = refit(linearObjective, posted))

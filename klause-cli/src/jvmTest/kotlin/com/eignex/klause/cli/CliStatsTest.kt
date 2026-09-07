@@ -2,6 +2,7 @@ package com.eignex.klause.cli
 
 import com.eignex.klause.solver.result.LocalSearchStats
 import com.eignex.klause.solver.result.LpStats
+import com.eignex.klause.solver.result.LpCertifierStats
 import com.eignex.klause.solver.result.OpenHintStats
 import com.eignex.klause.solver.result.PresolveStats
 import com.eignex.klause.solver.result.RunStats
@@ -89,6 +90,23 @@ class CliStatsTest {
         assertEquals("0.625", m["lpPruneRate"]) // 5 / 8
         assertEquals("2.5", m["lpPivotsPerSolve"]) // 20 / 8
         assertEquals("12.5", m["lpRootBound"])
+    }
+
+    @Test
+    fun `uncalled certifier has no fabricated decline rate`() {
+        val stats = SolveStats(
+            run = RunStats(backend = "backtrack"),
+            lp = LpStats(
+                solves = SumResult(1.0),
+                integerCertify = LpCertifierStats(attempts = SumResult(1.0), declines = SumResult(1.0)),
+            ),
+        )
+
+        val pairs = lpStatPairs(stats).toMap()
+        assertEquals("1", pairs["lpIntegerCertifyAttempts"])
+        assertEquals("1", pairs["lpIntegerCertifyDeclines"])
+        assertTrue("lpExactBasisFeasibleAttempts" !in pairs)
+        assertTrue("lpExactBasisFeasibleSuccessRate" !in pairs)
     }
 
     @Test

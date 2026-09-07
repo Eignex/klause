@@ -291,7 +291,12 @@ internal fun leafRealFeasibility(
     // Bound the residual-LP solve by the search deadline: on a continuous-heavy model a single leaf LP is a
     // large factorization, so an unbounded solve could outlast the whole budget. A solve cut short returns
     // INDETERMINATE, degrading the leaf to `unknown` — never an unsound SAT/UNSAT.
-    val certified = solveAndCertify(relaxation.model, cancellation = cancellation, componentSplit = componentSplit)
+    val certified = solveAndCertify(
+        relaxation.model,
+        cancellation = cancellation,
+        componentSplit = componentSplit,
+        observer = sink?.certificationObserver(),
+    )
     certified.float?.let { sink?.observeComponentSplit(it.blocks) }
     if (certified.verdict != LpVerdict.OPTIMAL) return LeafRealResult(certified.verdict, EmptyDoubleArray)
     val primal = certified.exactPrimal ?: certified.float?.primal

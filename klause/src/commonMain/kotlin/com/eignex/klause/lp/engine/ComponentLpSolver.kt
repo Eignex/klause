@@ -29,6 +29,9 @@ internal class ComponentLpSolver(
     private val isolated: IntArray,
 ) : LpSolver {
     private var blockResults: List<FloatLpResult>? = null
+    private var metrics = LpSolveMetrics()
+
+    override val lastMetrics: LpSolveMetrics get() = metrics
 
     override var infeasibleRay: DoubleArray? = null
         private set
@@ -44,6 +47,7 @@ internal class ComponentLpSolver(
     private inline fun stitch(op: (LpSolver) -> FloatLpResult?): FloatLpResult? {
         infeasibleRay = null
         blockResults = null
+        metrics = LpSolveMetrics()
         var objective = 0.0
         val primal = DoubleArray(model.n)
         val duals = DoubleArray(model.m)
@@ -68,6 +72,7 @@ internal class ComponentLpSolver(
         for (k in parts.indices) {
             val part = parts[k]
             val r = op(solvers[k]) ?: run {
+                metrics += solvers[k].lastMetrics
                 // A dual-unbounded block is a candidate infeasibility of the whole model: its float
                 // ray extends with zeros on the other blocks' rows.
                 solvers[k].infeasibleRay?.let { ray ->
@@ -77,6 +82,7 @@ internal class ComponentLpSolver(
                 }
                 return null
             }
+            metrics += solvers[k].lastMetrics
             results.add(r)
             objective += r.objective
             val sub = part.model
@@ -109,12 +115,16 @@ internal class ComponentLpSolver(
     }
 
     /** Exact lower bound assembled from the independently certified block objectives. */
-    fun exactLowerBound(): Long? {
+    fun exactLowerBound(observer: LpCertificationObserver? = null): Long? {
         if (model.hasContinuous) return null
         val results = blockResults ?: return null
         val certificates = ArrayList<IntegerCertificate>(parts.size)
         for (index in parts.indices) {
-            val certificate = integerCertify(parts[index].model, results[index].duals) ?: return null
+            val certificate = integerCertify(
+                parts[index].model,
+                results[index].duals,
+                observer = observer,
+            ) ?: return null
             certificates.add(certificate)
         }
         var scaleBits = 0
@@ -140,9 +150,9 @@ internal class ComponentLpSolver(
     }
 
     /** Whether every independently solved continuous block has an exact feasible basis. */
-    fun exactBasisFeasible(): Boolean {
+    fun exactBasisFeasible(observer: LpCertificationObserver? = null): Boolean {
         val results = blockResults ?: return false
-        return parts.indices.all { exactBasisFeasible(parts[it].model, results[it].basis) == true }
+        return parts.indices.all { exactBasisFeasible(parts[it].model, results[it].basis, observer) == true }
     }
 }
 

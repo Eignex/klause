@@ -27,6 +27,7 @@ import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.simplex.exact.RationalFeasibility
 import com.eignex.klause.simplex.exact.rationalOutcome
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.result.LpRoute
 import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.CheckedLongOverflowException
@@ -145,10 +146,7 @@ private fun LpEngine.solveNode(
  * non-convergent solve has no result to read, and on a model that prunes often those are most of them.
  */
 private fun LpEngine.observeSolveCost(sink: SolveStatsSink, solver: LpSolver) {
-    sink.lp.observePivots(solver.lastPivots)
-    sink.lp.observeWork(solver.lastWorkOps)
-    sink.lp.observeStart(solver.lastWarmStarted, solver.lastRefactorizations)
-    sink.lp.observeNumericalTrouble(solver.lastSingularRefactorizations, solver.lastSmallPivotBails)
+    sink.lp.observeEngineCost(LpRoute.NODE, solver.lastMetrics)
     noteSolveOps(solver.lastWorkOps)
 }
 
@@ -235,6 +233,7 @@ private fun LpEngine.foldSelectedCuts(
     cutPool.observe(res.primal)
     cutPool.retainMostActive()
     val selected = cutPool.select(res.primal, objectiveCoefficients(base.model), cutPool.maxCuts)
+    sink.lp.observeCutAccounting(cutPool.size, selected.size, cutPool.size)
     if (selected.isEmpty()) return base to res
     val tightened = try {
         relaxer.build(session, selected)
@@ -323,7 +322,7 @@ internal fun LpEngine.sparseSafePrune(
                         it == FarkasRoute.ROUNDED,
                         it == FarkasRoute.NONE,
                     )
-                })
+                }, observer = sink.lp.certificationObserver())
                 if (ray != null) {
                     sink.lp.observeInfeasiblePrune()
                     val clause = if (learn) {
@@ -388,7 +387,7 @@ internal fun LpEngine.sparseSafePrune(
                     it == FarkasRoute.ROUNDED,
                     it == FarkasRoute.NONE,
                 )
-            })
+            }, observer = sink.lp.certificationObserver())
         } else {
             null
         }
@@ -400,7 +399,12 @@ internal fun LpEngine.sparseSafePrune(
             return LpNodeOutcome(true, null, clause)
         }
         if (strictSaved != null && !cancellation()) {
-            val outcome = rationalOutcome(model, cancellation)
+            val outcome = rationalOutcome(model, cancellation).also {
+                sink.lp.certificationObserver().observe(
+                    com.eignex.klause.lp.engine.LpCertifier.RATIONAL,
+                    it.feasibility != RationalFeasibility.UNKNOWN,
+                )
+            }
             if (outcome.feasibility == RationalFeasibility.INFEASIBLE) {
                 sink.lp.observeInfeasiblePrune()
                 // No integer ray exists for a strictness-only conflict; cite the rational decider's
@@ -458,14 +462,18 @@ internal fun LpEngine.sparseSafePrune(
                 lpSeparatorGate.record(i, produced.isNotEmpty())
                 fresh.addAll(produced)
             }
+            sink.lp.observeCutAccounting(fresh.size, 0, cutPool.size)
             if (fresh.isEmpty()) break
             recordSearchCuts(fresh, boundRes.primal) // persist the global cuts into the pool
             for (c in fresh) if (!c.global) localCuts.add(c)
+            val selectedCuts = cutPool.select(
+                boundRes.primal,
+                objectiveCoefficients(boundRel.model),
+                cutPool.maxCuts,
+            ) + localCuts
+            sink.lp.observeCutAccounting(0, selectedCuts.size, cutPool.size)
             val tightened = try {
-                relaxer.build(
-                    session,
-                    cutPool.select(boundRes.primal, objectiveCoefficients(boundRel.model), cutPool.maxCuts) + localCuts,
-                )
+                relaxer.build(session, selectedCuts)
             } catch (_: CheckedLongOverflowException) {
                 break // overflow in the cut-augmented build: keep the prior (sound) relaxation
             }
@@ -482,7 +490,7 @@ internal fun LpEngine.sparseSafePrune(
     // reduced-cost fixing. Compute it once when any of them needs it; a singular/unbounded certify
     // yields null and each falls back to its cheap certificate-less path, which is sound.
     val cert = if ((learn && canPropagate) || canPrune) {
-        integerCertify(boundRel.model, boundRes.duals).also {
+        integerCertify(boundRel.model, boundRes.duals, observer = sink.lp.certificationObserver()).also {
             // The node path is where certification actually happens; the certified wrapper is not on it.
             sink.lp.observeCertification(
                 certified = it != null,
@@ -497,7 +505,7 @@ internal fun LpEngine.sparseSafePrune(
     }
     // Neither the float safe bound nor the certificate's integer-multiplier bound dominates the other,
     // so the prune decides on the tighter of the two rather than on the float bound alone.
-    val lower = tightObjectiveLowerBound(boundRel.model, boundRes.duals, cert)
+    val lower = tightObjectiveLowerBound(boundRel.model, boundRes.duals, cert, sink.lp.certificationObserver())
         ?: return LpNodeOutcome(false, optimalBasis)
     val full = lower + boundRel.objectiveConstant.toDouble()
     if (canPrune && full >= bound) {
@@ -679,6 +687,7 @@ internal fun LpEngine.applySparseReducedCostFixing(
             return true
         }
         sink.lp.observeFix()
+        if (session.decisionLevel == 0) sink.lp.observeRootReducedCostFixes(1)
     }
     return false
 }
@@ -736,7 +745,9 @@ internal fun LpEngine.rootLpRelaxationBound(
     if (relaxation.model.n == 0) {
         Double.NaN
     } else {
-        val result = dualSimplex(relaxation.model, cancellation).solve()
+        val simplex = dualSimplex(relaxation.model, cancellation)
+        val result = simplex.solve()
+        observeRootSolve(simplex)
         val lower = result?.let { tightObjectiveLowerBound(relaxation.model, it.duals) }
         if (lower != null) lower + relaxation.objectiveConstant.toDouble() else Double.NaN
     }
@@ -759,7 +770,9 @@ internal fun LpEngine.rootLpObjective(
     if (relaxation.model.n == 0) {
         Double.NaN
     } else {
-        val result = dualSimplex(relaxation.model, cancellation).solve()
+        val simplex = dualSimplex(relaxation.model, cancellation)
+        val result = simplex.solve()
+        observeRootSolve(simplex)
         if (result != null) result.objective + relaxation.objectiveConstant.toDouble() else Double.NaN
     }
 } catch (_: CheckedLongOverflowException) {
@@ -789,7 +802,9 @@ internal fun LpEngine.harvestRootCuts(
         var relaxation = relaxer.build(session)
         if (relaxation.model.n == 0) return emptyList()
         var simplex = dualSimplex(relaxation.model, cancellation)
-        var result = simplex.solve() ?: return emptyList()
+        val initial = simplex.solve()
+        observeRootSolve(simplex)
+        var result = initial ?: return emptyList()
         var round = 0
         while (round++ < CUT_POOL_ROUNDS && !cancellation()) {
             pool.observe(result.primal)
@@ -802,15 +817,21 @@ internal fun LpEngine.harvestRootCuts(
             // non-global (big-M) row. Only the genuinely-global ones may join the tree-wide pool.
             val gomoryCuts = if (gomory) simplex.gomoryCuts(GOMORY_CUTS_PER_ROUND) else emptyList()
             val mirCuts = if (mir) simplex.mirCuts(GOMORY_CUTS_PER_ROUND) else emptyList()
-            val added = pool.addAll(structural + (gomoryCuts + mirCuts).filter { it.global })
+            val candidates = structural + (gomoryCuts + mirCuts).filter { it.global }
+            val added = pool.addAll(candidates)
+            observeRootCutAccounting(candidates.size, added, pool.size)
             if (added == 0) break
             relaxation = relaxer.build(session, pool.cuts())
             simplex = dualSimplex(relaxation.model, cancellation)
-            result = simplex.solve() ?: break
+            val next = simplex.solve()
+            observeRootSolve(simplex)
+            if (next == null) break
+            result = next
         }
         // Bound the pool the search nodes inherit by per-cut activity (tightness at the final LP point):
         // a large harvest is trimmed to the most-active cuts, the rest evicted (sound — all global).
         pool.retainMostActive()
+        observeRootCutAccounting(0, 0, pool.size)
     } catch (_: CheckedLongOverflowException) {
         return pool.cuts() // keep whatever stayed within 64-bit determinants — still globally valid
     }
