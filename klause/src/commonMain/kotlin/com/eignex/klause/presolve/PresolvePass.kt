@@ -368,13 +368,13 @@ enum class PresolvePass(
     MERGE_AMO_CLIQUES(
         "amo-clique",
         Stage.PROBLEM,
-        Capability.FINITE,
+        Capability.SOURCE,
         PresolveTiming.MEDIUM,
         preservesSolutionSet = true,
         autoEligible = true,
     ) {
-        override fun applyFinite(problem: BakedProblem, ctx: PresolveContext) =
-            Presolve.mergeAmoCliques(problem, ctx.cancellation)
+        override fun applySource(problem: Problem, ctx: PresolveContext) =
+            Presolve.mergeAmoCliques(problem, ctx.cancellation).asSourceDelta()
     },
 
     /** Substitute an integer column whose domain is exactly `{0, 1}` for a fresh Boolean literal, rewriting
