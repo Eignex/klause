@@ -82,6 +82,12 @@ sealed interface OpenTheoryOptimum {
     ) : OpenTheoryOptimum
 }
 
+/** Retain a round's outcome while reporting the enclosing optimization's elapsed time. */
+internal fun SolveStats.withOptimizationEnvelope(envelope: SolveStats): SolveStats = copy(
+    run = run.copy(wallMs = envelope.run.wallMs),
+    lp = envelope.lp.mergedWith(lp),
+)
+
 /**
  * Minimizes a linear objective over an open source model by refuting bounds below the incumbent.
  *
@@ -211,7 +217,7 @@ class OpenTheoryMinimizer internal constructor(
         }
         fun finish(round: SolveStats): SolveStats {
             stats.stop()
-            return round.copy(lp = stats.snapshot().lp.mergedWith(round.lp))
+            return round.withOptimizationEnvelope(stats.snapshot())
         }
         val state = OpenTheorySolveState(params)
         // One incumbent for the whole descent: every witness a round proves feasible is offered here with
