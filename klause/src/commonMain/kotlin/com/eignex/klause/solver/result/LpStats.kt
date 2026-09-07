@@ -444,7 +444,7 @@ internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
      * so their denominator ([solves]) always names the same route. */
     fun observeEngineCost(route: LpRoute, metrics: LpSolveMetrics) {
         val effectiveRoute = if (route == LpRoute.NODE) probeRoute else route
-        routeMetrics[effectiveRoute.ordinal].observe(metrics)
+        if (effectiveRoute != LpRoute.NODE) routeMetrics[effectiveRoute.ordinal].observe(metrics)
         when (effectiveRoute) {
             LpRoute.NODE -> observeMetrics(metrics)
 
@@ -638,13 +638,6 @@ internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
         rootMatrixMinValue = minValue
         rootMatrixMaxValue = maxValue
         rootRowRatio = rowRatio
-    }
-
-    /** Record how one node LP solve started: [warmStarted] off a prior basis, and the [refactorizations]
-     *  it built getting there and back to optimal. */
-    fun observeStart(warmStarted: Boolean, refactorizations: Int) {
-        if (warmStarted) seeded.update(1.0)
-        repeat(refactorizations) { this.refactorizations.update(1.0) }
     }
 
     /**

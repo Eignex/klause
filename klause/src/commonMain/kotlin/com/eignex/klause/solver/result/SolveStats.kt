@@ -71,7 +71,7 @@ data class SolveStats(
     /** Unverified open-model branch-order hint accounting. */
     val openHints: OpenHintStats = OpenHintStats(),
     /** Presolve outcome, set by whoever ran presolve — the CLI for a lane handed a prepared model, the
-     *  backend itself for one that prepares its own (null when presolve was off / a no-op).
+     *  backend itself for one that prepares its own (null only when presolve was not run).
      *  Surfaced under `-s` as a terse summary — see [PresolveStats]. */
     val presolve: PresolveStats? = null,
 ) {

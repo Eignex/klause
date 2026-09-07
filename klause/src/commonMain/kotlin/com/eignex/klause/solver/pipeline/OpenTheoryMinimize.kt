@@ -209,6 +209,10 @@ class OpenTheoryMinimizer internal constructor(
 
             is OpenPresolveResult.Tightened -> closed.spec
         }
+        fun finish(round: SolveStats): SolveStats {
+            stats.stop()
+            return stats.snapshot().mergedWith(round)
+        }
         val state = OpenTheorySolveState(params)
         // One incumbent for the whole descent: every witness a round proves feasible is offered here with
         // the value read off it, and the bound the next round refutes is whatever the offer installed.
@@ -232,7 +236,7 @@ class OpenTheoryMinimizer internal constructor(
                                 // A constant objective has no row to tighten: its first witness is
                                 // already optimal, and a bound below the constant would exclude every
                                 // assignment rather than a worse one.
-                                terms.isEmpty() -> return incumbents.proven(result.stats)
+                                terms.isEmpty() -> return incumbents.proven(finish(result.stats))
 
                                 // A bound row states that nothing feasible sits at the incumbent or
                                 // above it, and a model with a ray has a witness below every such row:
@@ -241,7 +245,7 @@ class OpenTheoryMinimizer internal constructor(
                                     return OpenTheoryOptimum.Unbounded(
                                         installed.assignment,
                                         installed.objective,
-                                        result.stats,
+                                        finish(result.stats),
                                     )
 
                                 else -> {
@@ -267,7 +271,7 @@ class OpenTheoryMinimizer internal constructor(
                     }
                 }
 
-                is OpenTheoryResult.Unsat -> return incumbents.proven(result.stats)
+                is OpenTheoryResult.Unsat -> return incumbents.proven(finish(result.stats))
 
                 is OpenTheoryResult.Unknown -> {
                     val standing = incumbents.current()
@@ -275,7 +279,7 @@ class OpenTheoryMinimizer internal constructor(
                         standing?.assignment,
                         standing?.objective,
                         result.reason,
-                        result.stats,
+                        finish(result.stats),
                     )
                 }
             }

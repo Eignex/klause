@@ -545,9 +545,7 @@ internal class RevisedSimplex(
      *  after a bailed solve. */
     private var basisKept = false
 
-    private fun solveCore(warm: Basis?, reuse: Boolean, enforced: BooleanArray? = null): FloatLpResult? {
-        // Per-solve state: the infeasibility certificate slots and counters must not leak across a
-        // persistent instance's solves.
+    private fun resetSolveState(warmAttempted: Boolean) {
         infeasibleBasis = null
         infeasibleRow = -1
         infeasibleRay = null
@@ -562,10 +560,17 @@ internal class RevisedSimplex(
         backendRequestedRefactorizations = 0
         reconcileRecoveryRefactorizations = 0
         primalRefactorizations = 0
-        warmAttempts = if (reuse || warm != null) 1 else 0
+        warmAttempts = if (warmAttempted) 1 else 0
         singularRefactorizations = 0
         smallPivotBails = 0
         work.reset()
+        warmStarted = false
+    }
+
+    private fun solveCore(warm: Basis?, reuse: Boolean, enforced: BooleanArray? = null): FloatLpResult? {
+        // Per-solve state: the infeasibility certificate slots and counters must not leak across a
+        // persistent instance's solves.
+        resetSolveState(reuse || warm != null)
         val kept = reuse && basisKept && basisFactorized
         basisKept = false
         // A kept factorization implies the basis it factorizes is still seated, so that is the warmest
@@ -1152,20 +1157,7 @@ internal class RevisedSimplex(
      */
     @Suppress("CyclomaticComplexMethod", "NestedBlockDepth", "ReturnCount", "LongMethod")
     override fun solvePrimal(warm: Basis?): FloatLpResult? {
-        pivots = 0
-        refactorizations = 0
-        initialRefactorizations = 0
-        warmStartRefactorizations = 0
-        singularRecoveryRefactorizations = 0
-        updateLimitRefactorizations = 0
-        backendRequestedRefactorizations = 0
-        reconcileRecoveryRefactorizations = 0
-        primalRefactorizations = 0
-        warmAttempts = if (warm == null) 0 else 1
-        singularRefactorizations = 0
-        smallPivotBails = 0
-        work.reset()
-        warmStarted = false
+        resetSolveState(warm != null)
         if (warm == null || !tryWarmStart(warm)) {
             lowerStart()
         } else {

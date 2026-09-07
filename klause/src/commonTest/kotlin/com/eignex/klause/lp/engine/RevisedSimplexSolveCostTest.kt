@@ -1,6 +1,7 @@
 package com.eignex.klause.lp.engine
 
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -50,5 +51,18 @@ class RevisedSimplexSolveCostTest {
 
         assertTrue(simplex.lastPivots == result.pivots, "one solve, one pivot count")
         assertTrue(simplex.lastRefactorizations == result.refactorizations, "one solve, one factorization count")
+    }
+
+    @Test
+    fun `a primal solve clears the prior infeasibility artifacts`() {
+        val simplex = RevisedSimplex(infeasible())
+        assertNull(simplex.solve())
+        assertNotNull(simplex.infeasibleRay)
+
+        simplex.solvePrimal()
+
+        assertNull(simplex.infeasibleRay)
+        assertNull(simplex.infeasibleBasis)
+        assertEquals(-1, simplex.infeasibleRow)
     }
 }
