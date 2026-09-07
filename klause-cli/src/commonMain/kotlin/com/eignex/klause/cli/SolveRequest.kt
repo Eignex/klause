@@ -11,6 +11,7 @@ import com.eignex.klause.solver.pipeline.OpenTheoryAssignment
 import com.eignex.klause.solver.pipeline.OpenTheoryRequest
 import com.eignex.klause.solver.pipeline.SourceProblemRoute
 import com.eignex.klause.solver.pipeline.pipelineRoute
+import com.eignex.klause.solver.result.LpStats
 
 /**
  * A parsed instance, lowered to exactly what [SolveCore] needs — mode-neutral. Both the
@@ -27,6 +28,8 @@ internal class Solvable(
     val continuousObjectiveValue: ((Sample) -> Double)? = null,
     /** The component set selected once while loading the source model. */
     val pipeline: SolvablePipeline = SolvablePipeline.FiniteCp,
+    /** LP work performed while proving bounds for pipeline selection. */
+    val routingLpStats: LpStats = LpStats(),
 ) {
     constructor(
         /** Finite CP problem. */
@@ -57,6 +60,8 @@ internal class Solvable(
         searchHints: FlatZincSearchHints? = null,
         /** The component set selected once while loading the source model. */
         pipeline: SolvablePipeline = SolvablePipeline.FiniteCp,
+        /** LP work performed while proving bounds for pipeline selection. */
+        routingLpStats: LpStats = LpStats(),
     ) : this(
         finite = problem?.finiteSolveShape(
             optimize,
@@ -71,6 +76,7 @@ internal class Solvable(
         objectiveValue = objectiveValue,
         continuousObjectiveValue = continuousObjectiveValue,
         pipeline = pipeline,
+        routingLpStats = routingLpStats,
     )
 
     /** Finite CP problem. */

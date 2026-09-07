@@ -155,8 +155,13 @@ internal fun tightenOpenIntBounds(
                 solver.solvePrimal(warm)
             } catch (_: CheckedLongOverflowException) {
                 null
+            } finally {
+                try {
+                    onSolve?.invoke(solver)
+                } finally {
+                    solver.close()
+                }
             }
-            onSolve?.invoke(solver)
             if (result != null) {
                 warm = result.basis
                 // The open direction's probe: the upper probe of x⁺ when maximizing, of x⁻ (whose growth
@@ -215,8 +220,13 @@ private fun tightenByNeighborhoodProbes(
                 solver.solvePrimal(null)
             } catch (_: CheckedLongOverflowException) {
                 null
+            } finally {
+                try {
+                    onSolve?.invoke(solver)
+                } finally {
+                    solver.close()
+                }
             }
-            onSolve?.invoke(solver)
             if (result != null) {
                 val probeCol = if (maximize || q < 0) p else q
                 val bound = model.tightVariableBound(

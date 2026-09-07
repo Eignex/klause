@@ -146,20 +146,27 @@ object PresolvePipeline {
         // an exact Farkas ray; a true result contains every integer solution, so it is the same verdict the
         // bake would reach. Gated on span so small models never pay the LP.
         val wideSpan = Presolve.maxIntSpan(sourceProblem) > KlauseConfig.current.largeSpanThreshold
-        val lpInfeasible = !prepared.infeasible && wideSpan && lpRootInfeasible(
-            sourceProblem,
-            objective,
-            LpPlan(bounding = true),
-            preBakeSlice(cancellation, presolveBudget),
-        )
+        val rootInfeasible = if (!prepared.infeasible && wideSpan) {
+            lpRootInfeasibleReporting(
+                sourceProblem,
+                objective,
+                LpPlan(bounding = true),
+                preBakeSlice(cancellation, presolveBudget),
+            )
+        } else {
+            LpRootInfeasibleResult(infeasible = false, stats = LpStats())
+        }
         // A refutation reached before the bake is the verdict, and the source model is what carries it: the
         // bake and every round below would only re-derive it at O(span), so the phase stops here and reports
         // what the source phase left.
-        if (prepared.infeasible || lpInfeasible) {
+        if (prepared.infeasible || rootInfeasible.infeasible) {
             return PresolveOutcome(
                 sourceProblem,
                 { it },
-                prepared.stats.copy(infeasible = true),
+                prepared.stats.copy(
+                    infeasible = true,
+                    lpStats = prepared.stats.lpStats.mergedWith(rootInfeasible.stats),
+                ),
                 changed = true,
                 objective = refit(linearObjective, sourceProblem),
             )
@@ -170,11 +177,17 @@ object PresolvePipeline {
         // one solve per bound — so the root bake starts from the tightened domains instead of narrowing them
         // one step per round (O(span)). Solution-set-preserving, so it is sound before the bake. Gated on
         // span so small models never pay the OBBT.
-        val prebaked = if (wideSpan) {
-            lpRootBounds(sourceProblem, objective, LpPlan(bounding = true), preBakeSlice(cancellation, presolveBudget))
+        val rootBounds = if (wideSpan) {
+            lpRootBoundsReporting(
+                sourceProblem,
+                objective,
+                LpPlan(bounding = true),
+                preBakeSlice(cancellation, presolveBudget),
+            )
         } else {
-            sourceProblem
+            LpRootBoundsResult(sourceProblem, LpStats())
         }
+        val prebaked = rootBounds.problem
 
         // Step 0: run the deferred base bake — fold the root propagation into the domains. A no-op for a
         // directly-constructed (already-baked) problem, so this is where a front-end's deferred base bake
@@ -205,7 +218,7 @@ object PresolvePipeline {
             firedPasses.add(PresolvePass.SUBSTITUTE_BINARY_COLUMNS.id)
         }
         var harvest = LpHarvestReport() // the LP harvest's own contribution, summed over rounds
-        var harvestStats = LpStats()
+        var harvestStats = rootInfeasible.stats.mergedWith(rootBounds.stats)
         var infeasible = false
         var round = 0
         while (round++ < MAX_PRESOLVE_HARVEST_ROUNDS && !cancellation()) {

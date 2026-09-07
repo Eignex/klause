@@ -211,7 +211,7 @@ class OpenTheoryMinimizer internal constructor(
         }
         fun finish(round: SolveStats): SolveStats {
             stats.stop()
-            return stats.snapshot().mergedWith(round)
+            return round.copy(lp = stats.snapshot().lp.mergedWith(round.lp))
         }
         val state = OpenTheorySolveState(params)
         // One incumbent for the whole descent: every witness a round proves feasible is offered here with

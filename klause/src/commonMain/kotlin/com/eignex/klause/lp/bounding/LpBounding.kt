@@ -8,6 +8,7 @@ import com.eignex.klause.lp.engine.Cut
 import com.eignex.klause.lp.engine.FarkasRoute
 import com.eignex.klause.lp.engine.FloatLpResult
 import com.eignex.klause.lp.engine.IntegerCertificate
+import com.eignex.klause.lp.engine.LpCertifier
 import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.LpSolver
 import com.eignex.klause.lp.engine.PersistentLpSolver
@@ -401,7 +402,7 @@ internal fun LpEngine.sparseSafePrune(
         if (strictSaved != null && !cancellation()) {
             val outcome = rationalOutcome(model, cancellation).also {
                 sink.lp.certificationObserver(LpRoute.NODE).observe(
-                    com.eignex.klause.lp.engine.LpCertifier.RATIONAL,
+                    LpCertifier.RATIONAL,
                     it.feasibility != RationalFeasibility.UNKNOWN,
                 )
             }
@@ -840,7 +841,6 @@ internal fun LpEngine.harvestRootCuts(
         // Bound the pool the search nodes inherit by per-cut activity (tightness at the final LP point):
         // a large harvest is trimmed to the most-active cuts, the rest evicted (sound — all global).
         pool.retainMostActive()
-        observeRootCutAccounting(0, 0, pool.size)
     } catch (_: CheckedLongOverflowException) {
         return pool.cuts() // keep whatever stayed within 64-bit determinants — still globally valid
     }

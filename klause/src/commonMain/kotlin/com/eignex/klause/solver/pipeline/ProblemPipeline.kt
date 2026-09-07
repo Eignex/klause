@@ -6,6 +6,9 @@ import com.eignex.klause.presolve.OpenPresolveResult
 import com.eignex.klause.presolve.closeOpenBounds
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.pipeline.componentPlan
+import com.eignex.klause.solver.result.LpRoute
+import com.eignex.klause.solver.result.LpStats
+import com.eignex.klause.solver.result.LpStatsSink
 import com.eignex.klause.theory.qflra.supportsExactLra
 import com.eignex.klause.util.Cancellation
 
@@ -80,8 +83,40 @@ fun Problem.pipelineRoute(
     maximize: Boolean = false,
     routePureRealToTheory: Boolean = false,
     boundCancellation: Cancellation = Cancellation.Never,
+): SourceProblemRoute = pipelineRouteObserved(
+    objective,
+    maximize,
+    routePureRealToTheory,
+    boundCancellation,
+    onLpStats = null,
+)
+
+/** Select a pipeline and report the LP work performed while proving bounds for that selection. */
+fun Problem.pipelineRoute(
+    objective: LinearObjective? = null,
+    maximize: Boolean = false,
+    routePureRealToTheory: Boolean = false,
+    boundCancellation: Cancellation = Cancellation.Never,
+    onLpStats: (LpStats) -> Unit,
+): SourceProblemRoute = pipelineRouteObserved(
+    objective,
+    maximize,
+    routePureRealToTheory,
+    boundCancellation,
+    onLpStats,
+)
+
+private fun Problem.pipelineRouteObserved(
+    objective: LinearObjective?,
+    maximize: Boolean,
+    routePureRealToTheory: Boolean,
+    boundCancellation: Cancellation,
+    onLpStats: ((LpStats) -> Unit)?,
 ): SourceProblemRoute {
-    val routed = when (val bounded = proveBounded(boundCancellation)) {
+    val lpStats = onLpStats?.let { LpStatsSink(LpRoute.STANDALONE) }
+    val bounded = proveBounded(boundCancellation, lpStats)
+    if (lpStats != null) onLpStats(lpStats.snapshot())
+    val routed = when (bounded) {
         BoundedRouting.Refuted -> return SourceProblemRoute.Refuted
         is BoundedRouting.Proved -> bounded.problem
     }
@@ -121,9 +156,9 @@ private fun Problem.hasFiniteIntegerRanges(): Boolean =
  *
  * A refutation the bounding derives is the model's verdict and travels as one; see [BoundedRouting].
  */
-private fun Problem.proveBounded(cancellation: Cancellation): BoundedRouting {
+private fun Problem.proveBounded(cancellation: Cancellation, lpStats: LpStatsSink?): BoundedRouting {
     if (hasFiniteIntegerRanges()) return BoundedRouting.Proved(this)
-    val closed = when (val outcome = closeOpenBounds(cancellation)) {
+    val closed = when (val outcome = closeOpenBounds(cancellation, lpStats)) {
         OpenPresolveResult.Refuted -> return BoundedRouting.Refuted
         is OpenPresolveResult.Tightened -> outcome
     }

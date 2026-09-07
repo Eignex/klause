@@ -7,6 +7,7 @@ import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.OpenIntBounds
+import com.eignex.klause.lp.engine.ComponentLpSolver
 import com.eignex.klause.lp.exactBoundsInfeasible
 import com.eignex.klause.lp.longOrNull
 import com.eignex.klause.lp.openLpInfeasible
@@ -130,7 +131,10 @@ internal fun Problem.closeOpenBounds(
         realLower = problem.realLower,
         realUpper = problem.realUpper,
         observer = lpStats?.certificationObserver(LpRoute.STANDALONE),
-        onSolve = { solver -> lpStats?.observeEngineCost(LpRoute.STANDALONE, solver.lastMetrics) },
+        onSolve = { solver ->
+            lpStats?.certificationObserver(LpRoute.STANDALONE)
+                ?.observeSolve(solver.lastMetrics, solver is ComponentLpSolver)
+        },
     )
     if (tightened.refuted) return OpenPresolveResult.Refuted
 

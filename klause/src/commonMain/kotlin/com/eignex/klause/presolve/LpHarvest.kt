@@ -75,12 +75,25 @@ fun lpRootInfeasible(
     objective: LinearObjective,
     plan: LpPlan,
     cancellation: Cancellation = Cancellation.Never,
-): Boolean = LpEngine(
-    problem,
-    objective,
-    LpParams(lpPlan = plan, cancellation = cancellation),
-    SolveStatsSink(backend = "lp-root-feasibility", lpProbeRoute = LpRoute.ROOT),
-).rootLpInfeasibleNoBake(cancellation)
+): Boolean = lpRootInfeasibleReporting(problem, objective, plan, cancellation).infeasible
+
+internal class LpRootInfeasibleResult(val infeasible: Boolean, val stats: LpStats)
+
+internal fun lpRootInfeasibleReporting(
+    problem: Problem,
+    objective: LinearObjective,
+    plan: LpPlan,
+    cancellation: Cancellation = Cancellation.Never,
+): LpRootInfeasibleResult {
+    val sink = SolveStatsSink(backend = "lp-root-feasibility", lpProbeRoute = LpRoute.ROOT)
+    val infeasible = LpEngine(
+        problem,
+        objective,
+        LpParams(lpPlan = plan, cancellation = cancellation),
+        sink,
+    ).rootLpInfeasibleNoBake(cancellation)
+    return LpRootInfeasibleResult(infeasible, sink.snapshot().lp)
+}
 
 /** [problem] with each integer variable's domain tightened by the no-bake root-LP OBBT
  *  ([LpEngine.rootLpBoundsNoBake]): the pre-bake bound-tightening a presolve pipeline runs on a wide model
@@ -92,25 +105,38 @@ fun lpRootBounds(
     objective: LinearObjective,
     plan: LpPlan,
     cancellation: Cancellation = Cancellation.Never,
-): Problem {
+): Problem = lpRootBoundsReporting(problem, objective, plan, cancellation).problem
+
+internal class LpRootBoundsResult(val problem: Problem, val stats: LpStats)
+
+internal fun lpRootBoundsReporting(
+    problem: Problem,
+    objective: LinearObjective,
+    plan: LpPlan,
+    cancellation: Cancellation = Cancellation.Never,
+): LpRootBoundsResult {
+    val sink = SolveStatsSink(backend = "lp-obbt", lpProbeRoute = LpRoute.ROOT)
     val engine = LpEngine(
         problem,
         objective,
         LpParams(lpPlan = plan, cancellation = cancellation),
-        SolveStatsSink(backend = "lp-obbt", lpProbeRoute = LpRoute.ROOT),
+        sink,
     )
     val shaved = engine.rootLpBoundsNoBake(cancellation)
-    if (shaved.isEmpty()) return problem
+    if (shaved.isEmpty()) return LpRootBoundsResult(problem, sink.snapshot().lp)
     val domains = problem.finiteIntDomains()
     for (sb in shaved) domains[sb.varId] = domains[sb.varId].withMinAtLeast(sb.lo).withMaxAtMost(sb.hi)
-    return Problem(
-        numBoolVars = problem.numBoolVars,
-        numIntVars = problem.numIntVars,
-        intDomains = domains,
-        factors = problem.factors,
-        // See PresolveShared.rebuildProblem: the open-side marks address a namespace presolve keeps.
-        packedOpenIntLo = problem.intBounds.openLowerBits,
-        packedOpenIntHi = problem.intBounds.openUpperBits,
+    return LpRootBoundsResult(
+        Problem(
+            numBoolVars = problem.numBoolVars,
+            numIntVars = problem.numIntVars,
+            intDomains = domains,
+            factors = problem.factors,
+            // See PresolveShared.rebuildProblem: the open-side marks address a namespace presolve keeps.
+            packedOpenIntLo = problem.intBounds.openLowerBits,
+            packedOpenIntHi = problem.intBounds.openUpperBits,
+        ),
+        sink.snapshot().lp,
     )
 }
 

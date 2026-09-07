@@ -1,5 +1,7 @@
 package com.eignex.klause.cli
 
+import com.eignex.klause.solver.result.LpCertifierRouteStats
+import com.eignex.klause.solver.result.LpCertifierStats
 import com.eignex.klause.solver.result.LpRouteSolveStats
 import com.eignex.klause.solver.result.LpStats
 import com.eignex.klause.solver.result.SolveStats
@@ -138,9 +140,7 @@ internal fun lpStatPairs(stats: SolveStats): List<Pair<String, String>> {
         out += "lpCutSelected" to "${stats.lp.cutSelected.sum.toLong()}"
         out += "lpCutActive" to "${stats.lp.cutActive.max.toLong()}"
     }
-    if (stats.lp.rootReducedCostFixes.sum >
-        0.0
-    ) {
+    if (stats.lp.rootReducedCostFixes.sum > 0.0) {
         out += "lpRootReducedCostFixes" to "${stats.lp.rootReducedCostFixes.sum.toLong()}"
     }
     if (stats.lp.rootMatrixMinValue.isFinite()) {
@@ -185,11 +185,7 @@ private fun appendRouteSolveStats(out: MutableList<Pair<String, String>>, name: 
     out += "lp${name}SmallPivotBails" to "${stats.smallPivotBails.sum.toLong()}"
 }
 
-private fun appendCertifierStats(
-    out: MutableList<Pair<String, String>>,
-    name: String,
-    stats: com.eignex.klause.solver.result.LpCertifierStats,
-) {
+private fun appendCertifierStats(out: MutableList<Pair<String, String>>, name: String, stats: LpCertifierStats) {
     out += "lp${name}Attempts" to "${stats.attempts.sum.toLong()}"
     out += "lp${name}Successes" to "${stats.successes.sum.toLong()}"
     out += "lp${name}Declines" to "${stats.declines.sum.toLong()}"
@@ -204,7 +200,7 @@ private fun appendRouteCertifierStats(
     out: MutableList<Pair<String, String>>,
     certifier: String,
     route: String,
-    stats: com.eignex.klause.solver.result.LpCertifierRouteStats,
+    stats: LpCertifierRouteStats,
 ) {
     out += "lp${certifier}${route}Attempts" to "${stats.attempts.sum.toLong()}"
     out += "lp${certifier}${route}Successes" to "${stats.successes.sum.toLong()}"

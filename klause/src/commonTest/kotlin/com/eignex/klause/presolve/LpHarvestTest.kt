@@ -344,10 +344,13 @@ class LpHarvestTest {
             // probe as-is, with no O(span) base bake at construction — so this asserts the probe alone
             // certifies infeasibility in one LP solve, fast regardless of the span.
         )
+        val result = lpRootInfeasibleReporting(problem, LinearObjective(), LpPlan(bounding = true))
+
         assertTrue(
-            lpRootInfeasible(problem, LinearObjective(), LpPlan(bounding = true)),
+            result.infeasible,
             "the root LP must certify the difference cycle infeasible",
         )
+        assertTrue(result.stats.rootPasses.sum > 0.0, "the no-bake root solve must be reported")
     }
 
     @Test
@@ -378,9 +381,11 @@ class LpHarvestTest {
                 Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.LE, 0), // x - y <= 0  (x <= y)
             ),
         ).bake()
-        val tightened = lpRootBounds(problem, LinearObjective(), LpPlan(bounding = true))
-        assertTrue(tightened !== problem, "OBBT must tighten a domain the LP bounds below propagation")
-        assertEquals(5L, tightened.finiteIntDomain(0).max, "the LP proves x <= 5 (2x <= x + y <= 10)")
+        val result = lpRootBoundsReporting(problem, LinearObjective(), LpPlan(bounding = true))
+
+        assertTrue(result.problem !== problem, "OBBT must tighten a domain the LP bounds below propagation")
+        assertEquals(5L, result.problem.finiteIntDomain(0).max, "the LP proves x <= 5 (2x <= x + y <= 10)")
+        assertTrue(result.stats.rootPasses.sum > 0.0, "the no-bake OBBT solves must be reported")
     }
 
     @Test

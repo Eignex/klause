@@ -10,6 +10,7 @@ import com.eignex.klause.solver.pipeline.OpenTheoryAssignment
 import com.eignex.klause.solver.pipeline.SourceProblemRoute
 import com.eignex.klause.solver.pipeline.UnplaceableColumn
 import com.eignex.klause.solver.pipeline.pipelineRoute
+import com.eignex.klause.solver.result.LpStats
 
 /**
  * SMT-LIB 2 front-end (`.smt2` / `.smt`; QF_LIA / QF_LRA / QF_LIRA). Emits the SMT-LIB convention: a
@@ -40,12 +41,14 @@ internal object SmtLibMode : CliMode {
             val reals = parsed.realVarNames
             val render: (Sample) -> String = { s -> renderModel(ints, bools, reals, s) }
             val objective = parsed.objective?.toLinearObjective()
+            var routingLpStats = LpStats()
             return when (
                 val route = parsed.model.pipelineRoute(
                     objective,
                     parsed.sense == ObjectiveSense.MAXIMIZE,
                     routePureRealToTheory = true,
                     boundCancellation = common.routingCancellation(),
+                    onLpStats = { routingLpStats = it },
                 )
             ) {
                 is SourceProblemRoute.Finite -> linearSolvable(
@@ -53,21 +56,24 @@ internal object SmtLibMode : CliMode {
                     objective,
                     parsed.sense == ObjectiveSense.MAXIMIZE,
                     render,
+                    routingLpStats = routingLpStats,
                 )
 
                 is SourceProblemRoute.OpenTheory -> {
                     if (parsed.objective != null) {
                         throw UnsupportedSmtException("open theory optimization is unsupported")
                     }
-                    openTheorySolvable(route.request) { assignment ->
-                        renderOpenTheoryModel(ints, bools, reals, assignment)
-                    }
+                    openTheorySolvable(
+                        route.request,
+                        { assignment -> renderOpenTheoryModel(ints, bools, reals, assignment) },
+                        routingLpStats,
+                    )
                 }
 
                 is SourceProblemRoute.UnsupportedOpen ->
                     throw UnsupportedSmtException(unsupportedOpenReason(route.unplaceable, ints))
 
-                SourceProblemRoute.Refuted -> refutedSolvable()
+                SourceProblemRoute.Refuted -> refutedSolvable(routingLpStats)
             }
         }
 
