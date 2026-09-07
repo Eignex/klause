@@ -402,6 +402,9 @@ internal class RationalizedLp(val model: LpModel, val scale: Long, val objConsta
  * box max grows, a dual lower bound drops), so Farkas rays and objective bounds stay sound; `false`
  * rounds **down** — a feasibility certificate's point must live inside the true box.
  *
+ * @param model model to rationalize.
+ * @param outwardRealUppers whether real upper bounds round outward rather than inward.
+ * @param observer recipient of this rationalization's exact-input outcome.
  * @param requireExactObjectiveConstant reject a rationalization whose objective constant cannot be
  * represented exactly at the matrix scale.
  */
