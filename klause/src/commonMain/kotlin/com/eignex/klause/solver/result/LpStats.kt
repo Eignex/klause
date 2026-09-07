@@ -60,6 +60,56 @@ data class LpCertifierRouteStats(
 /** Consumer route for a single engine invocation. */
 internal enum class LpRoute { NODE, STANDALONE, COMPONENT, ROOT }
 
+/** Complete engine telemetry for one non-node production route. */
+data class LpRouteSolveStats(
+    /** Engine invocations on the route, including failed solves. */
+    val passes: SumResult = ZERO_COUNT,
+    /** Simplex pivots on the route. */
+    val pivots: SumResult = ZERO_COUNT,
+    /** Deterministic floating-point work on the route. */
+    val workOps: SumResult = ZERO_COUNT,
+    /** Invocations that requested reuse of a prior basis. */
+    val warmStartAttempts: SumResult = ZERO_COUNT,
+    /** Reuse attempts that retained the prior basis. */
+    val warmStartHits: SumResult = ZERO_COUNT,
+    /** Refactorizations from a cold slack basis. */
+    val initialRefactorizations: SumResult = ZERO_COUNT,
+    /** Refactorizations after accepting a warm basis. */
+    val warmStartRefactorizations: SumResult = ZERO_COUNT,
+    /** Refactorizations recovering a singular basis or update. */
+    val singularRecoveryRefactorizations: SumResult = ZERO_COUNT,
+    /** Refactorizations after the eta-update chain limit. */
+    val updateLimitRefactorizations: SumResult = ZERO_COUNT,
+    /** Refactorizations requested by the basis backend. */
+    val backendRequestedRefactorizations: SumResult = ZERO_COUNT,
+    /** Refactorizations restoring unenforced gated rows. */
+    val reconcileRecoveryRefactorizations: SumResult = ZERO_COUNT,
+    /** Refactorizations during primal simplex. */
+    val primalRefactorizations: SumResult = ZERO_COUNT,
+    /** Factorizations that came back singular. */
+    val singularRefactorizations: SumResult = ZERO_COUNT,
+    /** Solves abandoned because a pivot was numerically too small. */
+    val smallPivotBails: SumResult = ZERO_COUNT,
+) {
+    /** Combine independent observations of this route. */
+    fun mergedWith(other: LpRouteSolveStats) = LpRouteSolveStats(
+        SumResult(passes.sum + other.passes.sum),
+        SumResult(pivots.sum + other.pivots.sum),
+        SumResult(workOps.sum + other.workOps.sum),
+        SumResult(warmStartAttempts.sum + other.warmStartAttempts.sum),
+        SumResult(warmStartHits.sum + other.warmStartHits.sum),
+        SumResult(initialRefactorizations.sum + other.initialRefactorizations.sum),
+        SumResult(warmStartRefactorizations.sum + other.warmStartRefactorizations.sum),
+        SumResult(singularRecoveryRefactorizations.sum + other.singularRecoveryRefactorizations.sum),
+        SumResult(updateLimitRefactorizations.sum + other.updateLimitRefactorizations.sum),
+        SumResult(backendRequestedRefactorizations.sum + other.backendRequestedRefactorizations.sum),
+        SumResult(reconcileRecoveryRefactorizations.sum + other.reconcileRecoveryRefactorizations.sum),
+        SumResult(primalRefactorizations.sum + other.primalRefactorizations.sum),
+        SumResult(singularRefactorizations.sum + other.singularRefactorizations.sum),
+        SumResult(smallPivotBails.sum + other.smallPivotBails.sum),
+    )
+}
+
 /**
  * LP-relaxation bounding counters, split out of [SolveStats] so the whole LP diagnostic surface —
  * definition, merge, accumulation, and snapshot — lives in one place. Produced entirely by
@@ -222,6 +272,12 @@ data class LpStats(
     /** Worst within-row `max/min` magnitude in the root relaxation, or NaN when never measured. The
      *  part of the spread that row scaling could absorb, as against a uniform rescale. */
     val rootRowRatio: Double = Double.NaN,
+    /** Complete standalone-engine telemetry. */
+    val standaloneRoute: LpRouteSolveStats = LpRouteSolveStats(),
+    /** Complete decomposed-component engine telemetry. */
+    val componentRoute: LpRouteSolveStats = LpRouteSolveStats(),
+    /** Complete root and presolve engine telemetry. */
+    val rootRoute: LpRouteSolveStats = LpRouteSolveStats(),
 ) {
     /** Combine two workers' LP stats: counts add, LU maxes take the larger, wall time sums, and the
      *  root bound (same root across workers) keeps the tightest finite reading (NaN defers). */
@@ -236,6 +292,9 @@ data class LpStats(
         componentWorkOps = SumResult(componentWorkOps.sum + o.componentWorkOps.sum),
         rootPivots = SumResult(rootPivots.sum + o.rootPivots.sum),
         rootWorkOps = SumResult(rootWorkOps.sum + o.rootWorkOps.sum),
+        standaloneRoute = standaloneRoute.mergedWith(o.standaloneRoute),
+        componentRoute = componentRoute.mergedWith(o.componentRoute),
+        rootRoute = rootRoute.mergedWith(o.rootRoute),
         solves = SumResult(solves.sum + o.solves.sum),
         pruned = SumResult(pruned.sum + o.pruned.sum),
         infeasible = SumResult(infeasible.sum + o.infeasible.sum),
@@ -299,7 +358,7 @@ data class LpStats(
 }
 
 /** Mutable LP-stats accumulator, one per solve; snapshots into an [LpStats]. See [SolveStatsSink]. */
-internal class LpStatsSink {
+internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
     val solves: CountStat = CountStat()
     val pruned: CountStat = CountStat()
     val infeasible: CountStat = CountStat()
@@ -356,6 +415,7 @@ internal class LpStatsSink {
     private val certifierRouteDeclines = Array(LpRoute.entries.size) { LongArray(LpCertifier.entries.size) }
     private var exactInputAttempts = 0L
     private var exactInputRejections = 0L
+    private val routeMetrics = Array(LpRoute.entries.size) { LpRouteSolveStatsSink() }
 
     private var rootBound: Double = Double.NaN
     private var rootMatrixMinValue: Double = Double.NaN
@@ -372,18 +432,20 @@ internal class LpStatsSink {
 
     /** One node visited by LP bounding, irrespective of how many re-solves cuts require. */
     fun observeNodePass() {
-        nodePasses++
+        if (probeRoute == LpRoute.NODE) nodePasses++
     }
 
     /** One node LP solve. This remains the cost denominator; [observeNodePass] is the node count. */
     fun observeSolve() {
-        solves.update(1.0)
+        if (probeRoute == LpRoute.NODE) solves.update(1.0)
     }
 
     /** Route-specific engine cost. The legacy pivot, work, warm-start and refactor totals are node-only,
      * so their denominator ([solves]) always names the same route. */
     fun observeEngineCost(route: LpRoute, metrics: LpSolveMetrics) {
-        when (route) {
+        val effectiveRoute = if (route == LpRoute.NODE) probeRoute else route
+        routeMetrics[effectiveRoute.ordinal].observe(metrics)
+        when (effectiveRoute) {
             LpRoute.NODE -> observeMetrics(metrics)
 
             LpRoute.STANDALONE -> {
@@ -408,27 +470,35 @@ internal class LpStatsSink {
         }
     }
 
-    /** The local bridge passed into engine exact checks. */
-    fun certificationObserver(route: LpRoute = LpRoute.STANDALONE): LpCertificationObserver =
-        object : LpCertificationObserver {
-            var activeRoute = route
-            override fun observe(certifier: LpCertifier, success: Boolean) {
-                val i = certifier.ordinal
-                certifierAttempts[i]++
-                if (success) certifierSuccesses[i]++ else certifierDeclines[i]++
-                val routeIndex = activeRoute.ordinal
-                certifierRouteAttempts[routeIndex][i]++
-                if (success) certifierRouteSuccesses[routeIndex][i]++ else certifierRouteDeclines[routeIndex][i]++
-            }
-            override fun observeExactInput(accepted: Boolean) {
-                exactInputAttempts++
-                if (!accepted) exactInputRejections++
-            }
-            override fun observeSolve(metrics: LpSolveMetrics, component: Boolean) {
-                if (component && activeRoute == LpRoute.STANDALONE) activeRoute = LpRoute.COMPONENT
-                observeEngineCost(activeRoute, metrics)
+    private val certificationObservers: Array<LpCertificationObserver> by lazy {
+        Array(LpRoute.entries.size) { index ->
+            val route = LpRoute.entries[index]
+            object : LpCertificationObserver {
+                override fun observe(certifier: LpCertifier, success: Boolean) {
+                    val i = certifier.ordinal
+                    certifierAttempts[i]++
+                    if (success) certifierSuccesses[i]++ else certifierDeclines[i]++
+                    val routeIndex = route.ordinal
+                    certifierRouteAttempts[routeIndex][i]++
+                    if (success) certifierRouteSuccesses[routeIndex][i]++ else certifierRouteDeclines[routeIndex][i]++
+                }
+                override fun observeExactInput(accepted: Boolean) {
+                    exactInputAttempts++
+                    if (!accepted) exactInputRejections++
+                }
+                override fun observeSolve(metrics: LpSolveMetrics, component: Boolean) {
+                    val solveRoute = if (component && route == LpRoute.STANDALONE) LpRoute.COMPONENT else route
+                    observeEngineCost(solveRoute, metrics)
+                }
             }
         }
+    }
+
+    /** The local bridge passed into engine exact checks. */
+    fun certificationObserver(route: LpRoute = LpRoute.STANDALONE): LpCertificationObserver {
+        val effectiveRoute = if (route == LpRoute.NODE) probeRoute else route
+        return certificationObservers[effectiveRoute.ordinal]
+    }
 
     fun observeCutAccounting(candidates: Int, selected: Int, active: Int) {
         cutCandidates += candidates.coerceAtLeast(0)
@@ -436,8 +506,16 @@ internal class LpStatsSink {
         cutActive.update(active.coerceAtLeast(0).toDouble())
     }
 
+    /** Count a selection before its build and make it active only after that build succeeds. */
+    fun <T> observeCutBuild(selected: Int, build: () -> T): T {
+        observeCutAccounting(candidates = 0, selected = selected, active = 0)
+        val result = build()
+        observeCutAccounting(candidates = 0, selected = 0, active = selected)
+        return result
+    }
+
     fun observeRootReducedCostFixes(count: Int) {
-        rootReducedCostFixes += count.coerceAtLeast(0)
+        if (probeRoute == LpRoute.NODE) rootReducedCostFixes += count.coerceAtLeast(0)
     }
 
     private fun observeMetrics(metrics: LpSolveMetrics) {
@@ -465,12 +543,13 @@ internal class LpStatsSink {
     /** A node whose subtree was cut by the LP-relaxation bound because its bound dominated the
      *  incumbent (or an LP-derived deduction emptied a domain). */
     fun observePrune() {
-        pruned.update(1.0)
+        if (probeRoute == LpRoute.NODE) pruned.update(1.0)
     }
 
     /** A node pruned because the LP relaxation was infeasible — counted in both [pruned] (the total)
      *  and [infeasible] (the feasibility-filter share). */
     fun observeInfeasiblePrune() {
+        if (probeRoute != LpRoute.NODE) return
         pruned.update(1.0)
         infeasible.update(1.0)
     }
@@ -483,7 +562,7 @@ internal class LpStatsSink {
 
     /** Bracket LP-bounding wall time: [clockStart] then [clockStop] adds the interval to [ms]. */
     fun clockStart() {
-        clock = Monotonic.markNow()
+        if (probeRoute == LpRoute.NODE) clock = Monotonic.markNow()
     }
     fun clockStop() {
         val mark = clock ?: return
@@ -493,7 +572,7 @@ internal class LpStatsSink {
 
     /** One domain reduction applied by LP reduced-cost fixing. */
     fun observeFix() {
-        fixed.update(1.0)
+        if (probeRoute == LpRoute.NODE) fixed.update(1.0)
     }
 
     /** Record [count] dual-simplex pivots from one node LP solve. */
@@ -555,7 +634,7 @@ internal class LpStatsSink {
      *  wins, since the matrix is fixed for a model's lifetime. Ignored off the root or for an empty
      *  matrix. */
     fun observeRootConditioning(decisionLevel: Int, minValue: Double, maxValue: Double, rowRatio: Double) {
-        if (decisionLevel != 0 || !rootMatrixMinValue.isNaN() || maxValue <= 0.0) return
+        if (probeRoute != LpRoute.NODE || decisionLevel != 0 || !rootMatrixMinValue.isNaN() || maxValue <= 0.0) return
         rootMatrixMinValue = minValue
         rootMatrixMaxValue = maxValue
         rootRowRatio = rowRatio
@@ -617,6 +696,9 @@ internal class LpStatsSink {
         componentWorkOps = SumResult(componentWorkOps.toDouble()),
         rootPivots = SumResult(rootPivots.toDouble()),
         rootWorkOps = SumResult(rootWorkOps.toDouble()),
+        standaloneRoute = routeMetrics[LpRoute.STANDALONE.ordinal].snapshot(),
+        componentRoute = routeMetrics[LpRoute.COMPONENT.ordinal].snapshot(),
+        rootRoute = routeMetrics[LpRoute.ROOT.ordinal].snapshot(),
         solves = solves.read(),
         pruned = pruned.read(),
         infeasible = infeasible.read(),
@@ -689,5 +771,32 @@ internal class LpStatsSink {
         SumResult(certifierRouteAttempts[route.ordinal][certifier].toDouble()),
         SumResult(certifierRouteSuccesses[route.ordinal][certifier].toDouble()),
         SumResult(certifierRouteDeclines[route.ordinal][certifier].toDouble()),
+    )
+}
+
+private class LpRouteSolveStatsSink {
+    private var passes = 0L
+    private var metrics = LpSolveMetrics()
+
+    fun observe(value: LpSolveMetrics) {
+        passes++
+        metrics += value
+    }
+
+    fun snapshot() = LpRouteSolveStats(
+        passes = SumResult(passes.toDouble()),
+        pivots = SumResult(metrics.pivots.toDouble()),
+        workOps = SumResult(metrics.workOps.toDouble()),
+        warmStartAttempts = SumResult(metrics.warmAttempts.toDouble()),
+        warmStartHits = SumResult(metrics.warmHits.toDouble()),
+        initialRefactorizations = SumResult(metrics.initialRefactorizations.toDouble()),
+        warmStartRefactorizations = SumResult(metrics.warmStartRefactorizations.toDouble()),
+        singularRecoveryRefactorizations = SumResult(metrics.singularRecoveryRefactorizations.toDouble()),
+        updateLimitRefactorizations = SumResult(metrics.updateLimitRefactorizations.toDouble()),
+        backendRequestedRefactorizations = SumResult(metrics.backendRequestedRefactorizations.toDouble()),
+        reconcileRecoveryRefactorizations = SumResult(metrics.reconcileRecoveryRefactorizations.toDouble()),
+        primalRefactorizations = SumResult(metrics.primalRefactorizations.toDouble()),
+        singularRefactorizations = SumResult(metrics.singularRefactorizations.toDouble()),
+        smallPivotBails = SumResult(metrics.smallPivotBails.toDouble()),
     )
 }

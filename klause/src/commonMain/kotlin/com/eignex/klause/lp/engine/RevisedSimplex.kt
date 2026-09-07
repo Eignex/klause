@@ -562,7 +562,7 @@ internal class RevisedSimplex(
         backendRequestedRefactorizations = 0
         reconcileRecoveryRefactorizations = 0
         primalRefactorizations = 0
-        warmAttempts = 0
+        warmAttempts = if (reuse || warm != null) 1 else 0
         singularRefactorizations = 0
         smallPivotBails = 0
         work.reset()
@@ -571,13 +571,11 @@ internal class RevisedSimplex(
         // A kept factorization implies the basis it factorizes is still seated, so that is the warmest
         // start there is; a warm basis alone still pays for a factorization.
         warmStarted = kept
-        if (kept) warmAttempts++
         // A warm basis can be singular; fall back to the (always non-singular) slack cold start.
         if (!kept) {
             if (warm == null) {
                 coldStart()
             } else {
-                warmAttempts++
                 if (!tryWarmStart(warm)) coldStart() else warmStarted = true
             }
             if (!refactorize(if (warmStarted) LpRefactorReason.WARM_START else LpRefactorReason.INITIAL)) {

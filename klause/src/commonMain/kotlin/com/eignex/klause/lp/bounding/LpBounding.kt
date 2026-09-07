@@ -834,8 +834,7 @@ internal fun LpEngine.harvestRootCuts(
             observeRootCutAccounting(candidates.size, 0, 0)
             if (added == 0) break
             val selected = pool.cuts()
-            relaxation = relaxer.build(session, selected)
-            observeRootCutAccounting(0, added, selected.size)
+            relaxation = observeRootCutBuild(selected.size) { relaxer.build(session, selected) }
             simplex = dualSimplex(relaxation.model, cancellation)
             val next = simplex.solve()
             observeRootSolve(simplex)

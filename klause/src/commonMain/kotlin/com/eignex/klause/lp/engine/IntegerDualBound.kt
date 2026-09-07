@@ -308,16 +308,17 @@ internal fun integerFarkasRay(
     // The exact basis solve next: it annihilates the open columns exactly too, but is capped at
     // [MAX_EXACT_BASIS] rows (see [exactFarkasRay]).
     if (basis != null) {
-        exactFarkasRay(model, basis, basisRow, observer)?.let { exact ->
-            if (farkasCertifies(model, exact)) {
-                onRoute?.invoke(FarkasRoute.EXACT_BASIS)
-                return exact
-            }
-            val negExact = LongArray(exact.size) { if (exact[it] == Long.MIN_VALUE) return@let else -exact[it] }
-            if (farkasCertifies(model, negExact)) {
-                onRoute?.invoke(FarkasRoute.EXACT_BASIS)
-                return negExact
-            }
+        val exact = exactFarkasRay(model, basis, basisRow)
+        val certified = when {
+            exact == null -> null
+            farkasCertifies(model, exact) -> exact
+            exact.any { it == Long.MIN_VALUE } -> null
+            else -> LongArray(exact.size) { -exact[it] }.takeIf { farkasCertifies(model, it) }
+        }
+        observer?.observe(LpCertifier.EXACT_FARKAS, certified != null)
+        if (certified != null) {
+            onRoute?.invoke(FarkasRoute.EXACT_BASIS)
+            return certified
         }
     }
     val rd = roundDuals(model, ray, scaleBits) ?: run {

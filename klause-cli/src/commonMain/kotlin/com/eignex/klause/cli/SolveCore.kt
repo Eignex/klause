@@ -681,7 +681,6 @@ internal object SolveCore {
                     withModelObjective(outcome.stats, solvable, outcome.bestSample),
                     outcome.elapsedMs,
                     outcome.solutions,
-                    preparation.presolve,
                 )
             }
         }
@@ -704,15 +703,8 @@ internal object SolveCore {
         return objective to continuousObjective
     }
 
-    private fun stats(
-        common: CommonOptions,
-        output: OutputProtocol,
-        s: SolveStats,
-        ms: Long,
-        solutions: Long,
-        presolve: PresolveStats?,
-    ) {
-        if (common.statistics) output.onStatistics(s.copy(presolve = presolve), ms, solutions)
+    private fun stats(common: CommonOptions, output: OutputProtocol, s: SolveStats, ms: Long, solutions: Long) {
+        if (common.statistics) output.onStatistics(s, ms, solutions)
     }
 
     /** Re-express the LS incumbent objective in the model's orientation, reusing the same sign-corrected

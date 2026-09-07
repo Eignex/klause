@@ -113,4 +113,37 @@ class IntegerDualBoundTest {
         assertEquals(1, exactInputAttempts)
         assertEquals(1, exactInputRejections)
     }
+
+    @Test
+    fun `an exact Farkas candidate rejected by both signs records one decline`() {
+        val builder = LpBuilder()
+        val x = builder.addVar(0L, 1L)
+        builder.addRow(intArrayOf(x), longArrayOf(1L), Relation.LE, 0L)
+        val model = builder.build(Sense.MINIMIZE)
+        val basis = Basis(intArrayOf(model.n), Array(model.numVars) { VarStatus.BASIC })
+        var attempts = 0
+        var successes = 0
+        val observer = object : LpCertificationObserver {
+            override fun observe(certifier: LpCertifier, success: Boolean) {
+                if (certifier == LpCertifier.EXACT_FARKAS) {
+                    attempts++
+                    if (success) successes++
+                }
+            }
+            override fun observeExactInput(accepted: Boolean) = Unit
+            override fun observeSolve(metrics: LpSolveMetrics, component: Boolean) = Unit
+        }
+
+        val ray = integerFarkasRay(
+            model,
+            doubleArrayOf(Double.NaN),
+            basis = basis,
+            basisRow = 0,
+            observer = observer,
+        )
+
+        assertEquals(null, ray)
+        assertEquals(1, attempts)
+        assertEquals(0, successes)
+    }
 }

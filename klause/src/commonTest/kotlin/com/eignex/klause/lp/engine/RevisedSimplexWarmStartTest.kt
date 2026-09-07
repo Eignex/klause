@@ -49,6 +49,8 @@ class RevisedSimplexWarmStartTest {
         val solver = newPersistentLpSolver(model())
 
         assertNotNull(solver.resolveBounds())
+        assertEquals(1, solver.lastMetrics.warmAttempts)
+        assertEquals(0, solver.lastMetrics.warmHits)
         assertNotNull(solver.resolveBounds())
 
         assertEquals(1, solver.lastMetrics.warmAttempts)

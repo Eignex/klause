@@ -21,8 +21,10 @@ import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
+import com.eignex.klause.solver.result.PresolveStats
 import com.eignex.klause.solver.result.SearchEvent
 import com.eignex.klause.solver.result.SolveStats
+import com.eignex.klause.solver.result.withPresolve
 import com.eignex.klause.util.Cancellation
 import kotlin.time.Duration
 import kotlin.time.TimeMark
@@ -298,7 +300,7 @@ fun FinitePipeline.solve(request: FiniteSolveRequest, callbacks: FiniteSolveCall
                 0,
                 null,
                 0,
-            ).toSolveOutcome(),
+            ).toSolveOutcome().withPresolve(preparation.presolve),
         )
     }
     val execution = execute(
@@ -341,7 +343,7 @@ fun FinitePipeline.solve(request: FiniteSolveRequest, callbacks: FiniteSolveCall
     return FiniteSolveResult(
         preparation,
         preparationElapsed,
-        execution.reconstructed(preparation.reconstruct).toSolveOutcome(),
+        execution.reconstructed(preparation.reconstruct).toSolveOutcome().withPresolve(preparation.presolve),
     )
 }
 
@@ -355,6 +357,18 @@ private fun FiniteExecutionResult.toSolveOutcome(): FiniteSolveOutcome = when (t
         bestSample,
         elapsedMs,
     )
+}
+
+private fun FiniteSolveOutcome.withPresolve(presolve: PresolveStats?): FiniteSolveOutcome = when (this) {
+    is FiniteSolveOutcome.Completed -> FiniteSolveOutcome.Completed(
+        verdict,
+        stats.withPresolve(presolve),
+        solutions,
+        bestSample,
+        elapsedMs,
+    )
+
+    else -> this
 }
 
 private fun FiniteExecutionResult.reconstructed(reconstruct: (Sample) -> Sample): FiniteExecutionResult = when (this) {

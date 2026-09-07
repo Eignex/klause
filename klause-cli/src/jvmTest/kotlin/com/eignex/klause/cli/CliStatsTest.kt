@@ -3,6 +3,7 @@ package com.eignex.klause.cli
 import com.eignex.klause.solver.result.LocalSearchStats
 import com.eignex.klause.solver.result.LpCertifierRouteStats
 import com.eignex.klause.solver.result.LpCertifierStats
+import com.eignex.klause.solver.result.LpRouteSolveStats
 import com.eignex.klause.solver.result.LpStats
 import com.eignex.klause.solver.result.OpenHintStats
 import com.eignex.klause.solver.result.PresolveStats
@@ -49,6 +50,40 @@ class CliStatsTest {
                 SolveStats(run = RunStats(backend = "backtrack"), search = SearchStats(nodes = SumResult(10.0))),
             ).isEmpty(),
         )
+    }
+
+    @Test
+    fun `a node pass without a solve still emits the LP block`() {
+        val pairs = lpStatPairs(
+            SolveStats(lp = LpStats(nodePasses = SumResult(1.0))),
+        ).toMap()
+
+        assertEquals("1", pairs["lpNodePasses"])
+        assertEquals("0", pairs["lpSolves"])
+    }
+
+    @Test
+    fun `root route emits warm refactor and numerical metrics`() {
+        val pairs = lpStatPairs(
+            SolveStats(
+                lp = LpStats(
+                    rootPasses = SumResult(1.0),
+                    rootRoute = LpRouteSolveStats(
+                        passes = SumResult(1.0),
+                        warmStartAttempts = SumResult(2.0),
+                        warmStartHits = SumResult(1.0),
+                        initialRefactorizations = SumResult(1.0),
+                        singularRefactorizations = SumResult(3.0),
+                        smallPivotBails = SumResult(4.0),
+                    ),
+                ),
+            ),
+        ).toMap()
+
+        assertEquals("0.5", pairs["lpRootWarmStartHitRate"])
+        assertEquals("1", pairs["lpRootRefactorInitial"])
+        assertEquals("3", pairs["lpRootSingularRefactorizations"])
+        assertEquals("4", pairs["lpRootSmallPivotBails"])
     }
 
     @Test

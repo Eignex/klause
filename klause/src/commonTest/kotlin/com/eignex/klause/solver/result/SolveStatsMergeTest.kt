@@ -86,4 +86,16 @@ class SolveStatsMergeTest {
         assertEquals(1.5, m.search.depthMean.mean)
         assertTrue(m.run.timedOut.not())
     }
+
+    @Test
+    fun `presolve LP work is attached exactly once even when preparation changes nothing`() {
+        val presolve = PresolveStats(lpStats = LpStats(rootPasses = SumResult(2.0)))
+
+        val once = SolveStats.EMPTY.withPresolve(presolve)
+        val twice = once.withPresolve(presolve)
+
+        assertEquals(2.0, once.lp.rootPasses.sum)
+        assertEquals(2.0, twice.lp.rootPasses.sum)
+        assertEquals(presolve, twice.presolve)
+    }
 }
