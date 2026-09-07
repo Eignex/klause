@@ -6,10 +6,12 @@ import com.eignex.klause.solver.result.LpCertifierStats
 import com.eignex.klause.solver.result.LpRouteSolveStats
 import com.eignex.klause.solver.result.LpStats
 import com.eignex.klause.solver.result.OpenHintStats
+import com.eignex.klause.solver.result.OpenTheoryWorkStats
 import com.eignex.klause.solver.result.PresolveStats
 import com.eignex.klause.solver.result.RunStats
 import com.eignex.klause.solver.result.SchedulingStats
 import com.eignex.klause.solver.result.SearchStats
+import com.eignex.klause.solver.result.SmtStats
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.kumulant.stat.summary.SumResult
 import kotlin.test.Test
@@ -292,6 +294,44 @@ class CliStatsTest {
         assertEquals("0", m["openHintProduced"])
         assertEquals("0", m["openHintSteered"])
         assertEquals("20000", m["openHintMoves"])
+    }
+
+    @Test
+    fun `SMT stats distinguish private and shared checks without zero-denominator rates`() {
+        val stats = SolveStats(
+            run = RunStats(backend = "exact-lira"),
+            openTheory = OpenTheoryWorkStats(openTheoryChecks = 5),
+            smt = SmtStats(privateChecks = 2, explainedConflicts = 0, witnessCandidates = 0),
+        )
+
+        val pairs = openTheoryStatPairs(stats).toMap()
+
+        assertEquals("2", pairs["smtPrivateChecks"])
+        assertEquals("3", pairs["smtSharedChecks"])
+        assertEquals("5", pairs["smtTheoryChecks"])
+        assertTrue("smtTheoryChecksPerSec" !in pairs)
+        assertTrue("smtLiteralsPerExplainedConflict" !in pairs)
+        assertTrue("smtWitnessAcceptance" !in pairs)
+    }
+
+    @Test
+    fun `SMT check rate uses the whole solve duration`() {
+        val stats = SolveStats(
+            run = RunStats(backend = "exact-lira", wallMs = 10),
+            openTheory = OpenTheoryWorkStats(openTheoryChecks = 100),
+            smt = SmtStats(privateChecks = 1),
+        )
+
+        val pairs = openTheoryStatPairs(stats, solveTimeMs = 1_000).toMap()
+
+        assertEquals("100", pairs["smtTheoryChecksPerSec"])
+    }
+
+    @Test
+    fun `SMT stats are omitted when no exact lane ran`() {
+        val pairs = openTheoryStatPairs(SolveStats(run = RunStats(backend = "backtrack"))).toMap()
+
+        assertTrue("smtTheoryChecks" !in pairs)
     }
 
     @Test

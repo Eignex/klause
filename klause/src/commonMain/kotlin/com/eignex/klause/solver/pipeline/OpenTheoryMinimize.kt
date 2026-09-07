@@ -241,7 +241,7 @@ class OpenTheoryMinimizer internal constructor(
                                 // A bound row states that nothing feasible sits at the incumbent or
                                 // above it, and a model with a ray has a witness below every such row:
                                 // the descent would improve forever, so it states the verdict instead.
-                                unboundedBelow(prepared.problem, installed.assignment, params) ->
+                                unboundedBelow(prepared.problem, installed.assignment, params, state) ->
                                     return OpenTheoryOptimum.Unbounded(
                                         installed.assignment,
                                         installed.objective,
@@ -298,13 +298,19 @@ class OpenTheoryMinimizer internal constructor(
      * refusal already on hand. Only a refusal is remembered — a run the stop cut short decided nothing,
      * and reading it as a refusal would retire the certificate over a question never asked.
      */
-    private fun unboundedBelow(model: Problem, witness: OpenTheoryAssignment, params: TheoryParams): Boolean {
+    private fun unboundedBelow(
+        model: Problem,
+        witness: OpenTheoryAssignment,
+        params: TheoryParams,
+        state: OpenTheorySolveState,
+    ): Boolean {
         if (rayRefusedForEveryWitness) return false
         val ray = model.objectiveUnboundedBelow(
             terms,
             coefficients,
             witness.exactWitness(model.numRealVars),
             Cancellation { presolveCancellation() || params.cancellation() || params.timeout() },
+            state.smt.takeIf { route == ProblemPipeline.EXACT_LRA || route == ProblemPipeline.EXACT_LIRA },
         )
         rayRefusedForEveryWitness = ray == false && model.statesOneBranch()
         return ray == true

@@ -20,6 +20,21 @@ import kotlin.test.assertTrue
 class CliModeTest {
 
     @Test
+    fun `SMT-LIB statistics include exact theory counters`() {
+        val smt = File.createTempFile("cli", ".smt2").apply {
+            writeText(
+                "(set-logic QF_LRA)\n(declare-const x Real)\n(assert (<= x 1))\n(check-sat)\n",
+            )
+            deleteOnExit()
+        }
+
+        val output = capture { runCli(arrayOf("-s", smt.absolutePath)) }
+
+        assertTrue("; smtTheoryChecks=" in output, output)
+        assertTrue("; smtWitnessCandidates=1" in output, output)
+    }
+
+    @Test
     fun `numeric flags reject a non-numeric value with a usage error`() {
         val specs = commonFlagSpecs(CommonOptions())
         for (flag in listOf("-t", "-r", "-n")) {

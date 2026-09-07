@@ -5,6 +5,7 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.CpSearchComponent
 import com.eignex.klause.propagation.PropagationSession
+import com.eignex.klause.solver.result.SmtStatsSink
 import com.eignex.klause.solver.search.ClauseSearchComponent
 import com.eignex.klause.solver.search.SearchComponent
 import com.eignex.klause.solver.search.SearchComponentSet
@@ -30,6 +31,15 @@ fun ComponentPlan.search(
     maxChecks: Long = Long.MAX_VALUE,
     cancellation: Cancellation = Cancellation.Never,
     learnedDb: SearchLearnedDbParams = SearchLearnedDbParams(),
+): PlannedSearch = search(spec, cpDomains, maxChecks, cancellation, learnedDb, null)
+
+internal fun ComponentPlan.search(
+    spec: Problem,
+    cpDomains: Map<Int, IntDomain>,
+    maxChecks: Long,
+    cancellation: Cancellation,
+    learnedDb: SearchLearnedDbParams,
+    smtStats: SmtStatsSink?,
 ): PlannedSearch {
     val components = ArrayList<SearchComponent>(3)
     val cp = if (hasCpComponent) {
@@ -42,7 +52,7 @@ fun ComponentPlan.search(
         null
     }
     components += ClauseSearchComponent(spec.factors.filterIsInstance<Clause>())
-    val theory = theoryComponent(spec)
+    val theory = theoryComponent(spec, smtStats)
     if (theory != null) components += theory
     cp?.rebase()
     return PlannedSearch(

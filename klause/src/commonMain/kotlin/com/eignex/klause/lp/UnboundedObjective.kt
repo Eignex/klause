@@ -8,6 +8,7 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ExactRationalInequality
+import com.eignex.klause.simplex.exact.RationalSimplexObserver
 import com.eignex.klause.simplex.exact.exactDescendingDirection
 import com.eignex.klause.util.Cancellation
 
@@ -33,6 +34,7 @@ internal fun Problem.objectiveUnboundedBelow(
     coefficients: LongArray,
     witness: ExactWitness,
     cancellation: Cancellation = Cancellation.Never,
+    observer: RationalSimplexObserver? = null,
 ): Boolean? {
     // A constant objective has no direction to descend along, and one whose every column is bounded on
     // its own descent side is already bounded below by the declared box — the cheap half of the question,
@@ -46,6 +48,7 @@ internal fun Problem.objectiveUnboundedBelow(
         exactRow(activity, BigFraction.ZERO),
         numRealVars + numIntVars,
         cancellation,
+        observer,
     )
 }
 

@@ -108,6 +108,7 @@ class OpenTheoryEngineTest {
 
         assertEquals(TerminationReason.Cancelled, assertIs<OpenTheoryResult.Unknown>(result).reason)
         assertEquals(false, result.stats.run.timedOut)
+        assertEquals(0L, result.stats.smt.simplexAttempts)
     }
 
     @Test
@@ -202,6 +203,8 @@ class OpenTheoryEngineTest {
         assertIs<OpenTheoryResult.Sat>(first)
         assertIs<OpenTheoryResult.Sat>(second)
         assertEquals(first.stats.openTheory, second.stats.openTheory)
+        assertTrue(first.stats.smt.witnessCandidates > 0L)
+        assertEquals(first.stats.smt.witnessCandidates, first.stats.smt.witnessAccepted)
     }
 
     @Test
@@ -355,7 +358,10 @@ class OpenTheoryEngineTest {
 
         val result = OpenTheoryEngine(model, ProblemPipeline.EXACT_LRA).solve()
 
-        assertIs<OpenTheoryAssignment.ExactLra>(assertIs<OpenTheoryResult.Sat>(result).assignment)
+        val sat = assertIs<OpenTheoryResult.Sat>(result)
+        assertIs<OpenTheoryAssignment.ExactLra>(sat.assignment)
+        assertEquals(sat.stats.smt.witnessCandidates, sat.stats.smt.witnessAccepted)
+        assertTrue(sat.stats.smt.witnessCandidates > 0L)
     }
 
     @Test
