@@ -89,4 +89,28 @@ class IntegerDualBoundTest {
 
         assertEquals(-4L, exact)
     }
+
+    @Test
+    fun `inexact objective constant records one rejected rationalization`() {
+        val builder = LpBuilder()
+        builder.addRealVar(0.0, 1.0)
+        val model = builder.build(Sense.MINIMIZE)
+        model.doubleView!!.objConstant = Double.MAX_VALUE
+        var exactInputAttempts = 0
+        var exactInputRejections = 0
+        val observer = object : LpCertificationObserver {
+            override fun observe(certifier: LpCertifier, success: Boolean) = Unit
+            override fun observeExactInput(accepted: Boolean) {
+                exactInputAttempts++
+                if (!accepted) exactInputRejections++
+            }
+            override fun observeSolve(metrics: LpSolveMetrics, component: Boolean) = Unit
+        }
+
+        val bound = rationalizedDualLowerBoundCeil(model, doubleArrayOf(), observer = observer)
+
+        assertEquals(null, bound)
+        assertEquals(1, exactInputAttempts)
+        assertEquals(1, exactInputRejections)
+    }
 }

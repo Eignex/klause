@@ -53,11 +53,12 @@ internal fun rationalizedDualLowerBoundCeil(
     scaleBits: Int = DEFAULT_SCALE_BITS,
     observer: LpCertificationObserver? = null,
 ): Long? {
-    val r = rationalizeToIntegerModel(model, outwardRealUppers = true, observer = observer) ?: return null
-    if (!r.objConstantExact) {
-        observer?.observeExactInput(false)
-        return null
-    }
+    val r = rationalizeToIntegerModel(
+        model,
+        outwardRealUppers = true,
+        observer = observer,
+        requireExactObjectiveConstant = true,
+    ) ?: return null
     val scaled = integerCertify(r.model, y, scaleBits, observer)?.objectiveBoundCeil(0L) ?: return null
     return ceilDivPositive(scaled, r.scale)
 }
@@ -400,13 +401,20 @@ internal class RationalizedLp(val model: LpModel, val scale: Long, val objConsta
  * [outwardRealUppers]: `true` rounds **up** — enlarging the box only weakens a refutation (a Farkas
  * box max grows, a dual lower bound drops), so Farkas rays and objective bounds stay sound; `false`
  * rounds **down** — a feasibility certificate's point must live inside the true box.
+ *
+ * @param requireExactObjectiveConstant reject a rationalization whose objective constant cannot be
+ * represented exactly at the matrix scale.
  */
 internal fun rationalizeToIntegerModel(
     model: LpModel,
     outwardRealUppers: Boolean,
     observer: LpCertificationObserver? = null,
-): RationalizedLp? = rationalizeToIntegerModelUnchecked(model, outwardRealUppers).also {
-    if (model.doubleView != null) observer?.observeExactInput(it != null)
+    requireExactObjectiveConstant: Boolean = false,
+): RationalizedLp? {
+    val rationalized = rationalizeToIntegerModelUnchecked(model, outwardRealUppers)
+    val accepted = rationalized != null && (!requireExactObjectiveConstant || rationalized.objConstantExact)
+    if (model.doubleView != null) observer?.observeExactInput(accepted)
+    return rationalized?.takeIf { !requireExactObjectiveConstant || it.objConstantExact }
 }
 
 private fun rationalizeToIntegerModelUnchecked(model: LpModel, outwardRealUppers: Boolean): RationalizedLp? {
