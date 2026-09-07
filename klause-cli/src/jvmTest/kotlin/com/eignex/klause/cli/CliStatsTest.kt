@@ -80,6 +80,8 @@ class CliStatsTest {
                 pruned = SumResult(5.0),
                 infeasible = SumResult(2.0),
                 pivots = SumResult(20.0),
+                workOps = SumResult(63.0),
+                nodePasses = SumResult(3.0),
                 rootBound = 12.5,
             ),
         )
@@ -90,6 +92,7 @@ class CliStatsTest {
         assertEquals("3", m["lpBoundPruned"]) // 5 - 2
         assertEquals("0.625", m["lpPruneRate"]) // 5 / 8
         assertEquals("2.5", m["lpPivotsPerSolve"]) // 20 / 8
+        assertEquals("21", m["lpWorkOpsPerNode"]) // 63 / 3
         assertEquals("12.5", m["lpRootBound"])
     }
 

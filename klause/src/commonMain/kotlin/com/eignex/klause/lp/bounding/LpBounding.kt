@@ -234,7 +234,7 @@ private fun LpEngine.foldSelectedCuts(
     cutPool.observe(res.primal)
     cutPool.retainMostActive()
     val selected = cutPool.select(res.primal, objectiveCoefficients(base.model), cutPool.maxCuts)
-    sink.lp.observeCutAccounting(candidates = 0, selected = selected.size, active = cutPool.size)
+    sink.lp.observeCutAccounting(candidates = 0, selected = selected.size, active = selected.size)
     if (selected.isEmpty()) return base to res
     val tightened = try {
         relaxer.build(session, selected)
