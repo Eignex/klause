@@ -189,7 +189,11 @@ private fun LpEngine.safeMin(prob: Problem, coeffs: LongArray, token: Cancellati
     } catch (_: CheckedLongOverflowException) {
         null
     } finally {
-        observeRootSolve(simplex)
+        try {
+            observeRootSolve(simplex)
+        } finally {
+            simplex.close()
+        }
     }
     result ?: return null
     val lower = tightObjectiveLowerBound(relaxation.model, result.duals, rootCertificationObserver()) ?: return null
@@ -216,7 +220,11 @@ private fun LpEngine.safeMinNoBake(coeffs: LongArray, token: Cancellation): Doub
     } catch (_: CheckedLongOverflowException) {
         null
     } finally {
-        observeRootSolve(simplex)
+        try {
+            observeRootSolve(simplex)
+        } finally {
+            simplex.close()
+        }
     }
     result ?: return null
     val lower = tightObjectiveLowerBound(relaxation.model, result.duals, rootCertificationObserver()) ?: return null

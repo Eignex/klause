@@ -11,6 +11,7 @@ import com.eignex.klause.solver.pipeline.SourceProblemRoute
 import com.eignex.klause.solver.pipeline.UnplaceableColumn
 import com.eignex.klause.solver.pipeline.pipelineRoute
 import com.eignex.klause.solver.result.LpStats
+import kotlin.time.TimeSource
 
 /**
  * SMT-LIB 2 front-end (`.smt2` / `.smt`; QF_LIA / QF_LRA / QF_LIRA). Emits the SMT-LIB convention: a
@@ -42,21 +43,23 @@ internal object SmtLibMode : CliMode {
             val render: (Sample) -> String = { s -> renderModel(ints, bools, reals, s) }
             val objective = parsed.objective?.toLinearObjective()
             var routingLpStats = LpStats()
-            return when (
-                val route = parsed.model.pipelineRoute(
-                    objective,
-                    parsed.sense == ObjectiveSense.MAXIMIZE,
-                    routePureRealToTheory = true,
-                    boundCancellation = common.routingCancellation(),
-                    onLpStats = { routingLpStats = it },
-                )
-            ) {
+            val routingStart = TimeSource.Monotonic.markNow()
+            val route = parsed.model.pipelineRoute(
+                objective,
+                parsed.sense == ObjectiveSense.MAXIMIZE,
+                routePureRealToTheory = true,
+                boundCancellation = common.routingCancellation(),
+                onLpStats = { routingLpStats = it },
+            )
+            val routingElapsedMs = routingStart.elapsedNow().inWholeMilliseconds
+            return when (route) {
                 is SourceProblemRoute.Finite -> linearSolvable(
                     route.problem,
                     objective,
                     parsed.sense == ObjectiveSense.MAXIMIZE,
                     render,
                     routingLpStats = routingLpStats,
+                    routingElapsedMs = routingElapsedMs,
                 )
 
                 is SourceProblemRoute.OpenTheory -> {
@@ -67,13 +70,14 @@ internal object SmtLibMode : CliMode {
                         route.request,
                         { assignment -> renderOpenTheoryModel(ints, bools, reals, assignment) },
                         routingLpStats,
+                        routingElapsedMs,
                     )
                 }
 
                 is SourceProblemRoute.UnsupportedOpen ->
                     throw UnsupportedSmtException(unsupportedOpenReason(route.unplaceable, ints))
 
-                SourceProblemRoute.Refuted -> refutedSolvable(routingLpStats)
+                SourceProblemRoute.Refuted -> refutedSolvable(routingLpStats, routingElapsedMs)
             }
         }
 

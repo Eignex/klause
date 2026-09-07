@@ -242,9 +242,16 @@ private fun LpEngine.foldSelectedCuts(
         return base to res // overflow in the cut-augmented build: keep the prior (sound) relaxation
     }
     val cutSimplex = dualSimplex(tightened.model, cancellation)
-    val r = cutSimplex.solve()
-    sink.lp.observeSolve()
-    observeSolveCost(sink, cutSimplex)
+    val r = try {
+        cutSimplex.solve()
+    } finally {
+        sink.lp.observeSolve()
+        try {
+            observeSolveCost(sink, cutSimplex)
+        } finally {
+            cutSimplex.close()
+        }
+    }
     if (r == null) return base to res
     return tightened to r
 }
@@ -478,9 +485,16 @@ internal fun LpEngine.sparseSafePrune(
                 break // overflow in the cut-augmented build: keep the prior (sound) relaxation
             }
             val roundSimplex = dualSimplex(tightened.model, cancellation)
-            val r = roundSimplex.solve()
-            sink.lp.observeSolve()
-            observeSolveCost(sink, roundSimplex)
+            val r = try {
+                roundSimplex.solve()
+            } finally {
+                sink.lp.observeSolve()
+                try {
+                    observeSolveCost(sink, roundSimplex)
+                } finally {
+                    roundSimplex.close()
+                }
+            }
             if (r == null) break
             boundRel = tightened
             boundRes = r
@@ -717,8 +731,15 @@ internal fun LpEngine.sparseCertifiedPrune(
     if (relaxation.model.n == 0) return LpNodeOutcome(false, null)
     sink.lp.observeSolve()
     val recoverySimplex = dualSimplex(relaxation.model, cancellation)
-    val result = recoverySimplex.solve()
-    observeSolveCost(sink, recoverySimplex)
+    val result = try {
+        recoverySimplex.solve()
+    } finally {
+        try {
+            observeSolveCost(sink, recoverySimplex)
+        } finally {
+            recoverySimplex.close()
+        }
+    }
     if (result == null) return LpNodeOutcome(false, null)
     if (cancellation()) return LpNodeOutcome(false, null) // honor the deadline before the exact certify
     // Both bounds are sound for any duals and neither dominates, so the larger wins: the
@@ -755,8 +776,15 @@ internal fun LpEngine.rootLpRelaxationBound(
         Double.NaN
     } else {
         val simplex = dualSimplex(relaxation.model, cancellation)
-        val result = simplex.solve()
-        observeRootSolve(simplex)
+        val result = try {
+            simplex.solve()
+        } finally {
+            try {
+                observeRootSolve(simplex)
+            } finally {
+                simplex.close()
+            }
+        }
         val lower = result?.let { tightObjectiveLowerBound(relaxation.model, it.duals, rootCertificationObserver()) }
         if (lower != null) lower + relaxation.objectiveConstant.toDouble() else Double.NaN
     }
@@ -780,8 +808,15 @@ internal fun LpEngine.rootLpObjective(
         Double.NaN
     } else {
         val simplex = dualSimplex(relaxation.model, cancellation)
-        val result = simplex.solve()
-        observeRootSolve(simplex)
+        val result = try {
+            simplex.solve()
+        } finally {
+            try {
+                observeRootSolve(simplex)
+            } finally {
+                simplex.close()
+            }
+        }
         if (result != null) result.objective + relaxation.objectiveConstant.toDouble() else Double.NaN
     }
 } catch (_: CheckedLongOverflowException) {
@@ -811,36 +846,48 @@ internal fun LpEngine.harvestRootCuts(
         var relaxation = relaxer.build(session)
         if (relaxation.model.n == 0) return emptyList()
         var simplex = dualSimplex(relaxation.model, cancellation)
-        val initial = simplex.solve()
-        observeRootSolve(simplex)
-        var result = initial ?: return emptyList()
-        var round = 0
-        while (round++ < CUT_POOL_ROUNDS && !cancellation()) {
-            pool.observe(result.primal)
-            val ctx = CutContext(problem, relaxation, result.primal, session)
-            // Structural separators read the LP point and factor structure (not the constraint rows), so a
-            // cut they separate over the undecided root is valid at every solution — force it global.
-            val structural = separators.flatMap { it.separate(ctx) }
-                .map { if (it.global) it else Cut(it.cols, it.coeffs, it.rel, it.rhs, global = true) }
-            // Gomory/MIR combine rows; tableauCuts already marks one global iff its row weights avoid every
-            // non-global (big-M) row. Only the genuinely-global ones may join the tree-wide pool.
-            val gomoryCuts = if (gomory) simplex.gomoryCuts(GOMORY_CUTS_PER_ROUND) else emptyList()
-            val mirCuts = if (mir) simplex.mirCuts(GOMORY_CUTS_PER_ROUND) else emptyList()
-            val candidates = structural + (gomoryCuts + mirCuts).filter { it.global }
-            val added = pool.addAll(candidates)
-            observeRootCutAccounting(candidates.size, 0, 0)
-            if (added == 0) break
-            val selected = pool.cuts()
-            relaxation = observeRootCutBuild(selected.size) { relaxer.build(session, selected) }
-            simplex = dualSimplex(relaxation.model, cancellation)
-            val next = simplex.solve()
-            observeRootSolve(simplex)
-            if (next == null) break
-            result = next
+        try {
+            val initial = try {
+                simplex.solve()
+            } finally {
+                observeRootSolve(simplex)
+            }
+            var result = initial ?: return emptyList()
+            var round = 0
+            while (round++ < CUT_POOL_ROUNDS && !cancellation()) {
+                pool.observe(result.primal)
+                val ctx = CutContext(problem, relaxation, result.primal, session)
+                // Structural separators read the LP point and factor structure (not the constraint rows), so a
+                // cut they separate over the undecided root is valid at every solution — force it global.
+                val structural = separators.flatMap { it.separate(ctx) }
+                    .map { if (it.global) it else Cut(it.cols, it.coeffs, it.rel, it.rhs, global = true) }
+                // Gomory/MIR combine rows; tableauCuts already marks one global iff its row weights avoid every
+                // non-global (big-M) row. Only the genuinely-global ones may join the tree-wide pool.
+                val gomoryCuts = if (gomory) simplex.gomoryCuts(GOMORY_CUTS_PER_ROUND) else emptyList()
+                val mirCuts = if (mir) simplex.mirCuts(GOMORY_CUTS_PER_ROUND) else emptyList()
+                val candidates = structural + (gomoryCuts + mirCuts).filter { it.global }
+                val added = pool.addAll(candidates)
+                observeRootCutAccounting(candidates.size, 0, 0)
+                if (added == 0) break
+                val selected = pool.cuts()
+                relaxation = observeRootCutBuild(selected.size) { relaxer.build(session, selected) }
+                val replacement = dualSimplex(relaxation.model, cancellation)
+                simplex.close()
+                simplex = replacement
+                val next = try {
+                    simplex.solve()
+                } finally {
+                    observeRootSolve(simplex)
+                }
+                if (next == null) break
+                result = next
+            }
+            // Bound the pool the search nodes inherit by per-cut activity (tightness at the final LP point):
+            // a large harvest is trimmed to the most-active cuts, the rest evicted (sound — all global).
+            pool.retainMostActive()
+        } finally {
+            simplex.close()
         }
-        // Bound the pool the search nodes inherit by per-cut activity (tightness at the final LP point):
-        // a large harvest is trimmed to the most-active cuts, the rest evicted (sound — all global).
-        pool.retainMostActive()
     } catch (_: CheckedLongOverflowException) {
         return pool.cuts() // keep whatever stayed within 64-bit determinants — still globally valid
     }

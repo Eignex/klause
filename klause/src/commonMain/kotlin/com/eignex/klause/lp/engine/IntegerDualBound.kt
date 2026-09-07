@@ -418,7 +418,7 @@ internal fun rationalizeToIntegerModel(
     val rationalized = rationalizeToIntegerModelUnchecked(model, outwardRealUppers)
     val accepted = rationalized != null && (!requireExactObjectiveConstant || rationalized.objConstantExact)
     if (model.doubleView != null) observer?.observeExactInput(accepted)
-    return rationalized?.takeIf { !requireExactObjectiveConstant || it.objConstantExact }
+    return if (accepted) rationalized else null
 }
 
 private fun rationalizeToIntegerModelUnchecked(model: LpModel, outwardRealUppers: Boolean): RationalizedLp? {

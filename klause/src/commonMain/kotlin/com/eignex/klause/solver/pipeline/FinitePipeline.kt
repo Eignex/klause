@@ -10,6 +10,7 @@ import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.PresolveStats
+import com.eignex.klause.solver.result.hasActivity
 import com.eignex.klause.util.Cancellation
 import kotlin.time.Duration
 
@@ -113,7 +114,7 @@ object FinitePipeline {
             problem = finiteModel,
             objective = outcome.objective ?: objective,
             reconstruct = outcome.reconstruct,
-            presolve = outcome.stats,
+            presolve = outcome.stats.takeIf { outcome.changed || it.infeasible || it.lpStats.hasActivity() },
             constructionBakeElapsed = (request.problem as? BakedProblem)?.bakeElapsed ?: Duration.ZERO,
         )
     }

@@ -478,6 +478,7 @@ internal fun openTheorySolvable(
     request: OpenTheoryRequest,
     renderOpenTheory: (OpenTheoryAssignment) -> String,
     routingLpStats: LpStats = LpStats(),
+    routingElapsedMs: Long = 0L,
 ): Solvable = Solvable(
     problem = null,
     optimize = request.objective != null,
@@ -493,6 +494,7 @@ internal fun openTheorySolvable(
         render = renderOpenTheory,
     ),
     routingLpStats = routingLpStats,
+    routingElapsedMs = routingElapsedMs,
 )
 
 /**
@@ -501,7 +503,7 @@ internal fun openTheorySolvable(
  * Routing refutes over the model's genuinely open ranges rather than inside an invented box, so the
  * verdict is the model's own. Nothing here narrows to a [Sample]: there is no assignment to render.
  */
-internal fun refutedSolvable(routingLpStats: LpStats = LpStats()): Solvable = Solvable(
+internal fun refutedSolvable(routingLpStats: LpStats = LpStats(), routingElapsedMs: Long = 0L): Solvable = Solvable(
     problem = null,
     optimize = false,
     maximize = false,
@@ -513,6 +515,7 @@ internal fun refutedSolvable(routingLpStats: LpStats = LpStats()): Solvable = So
     objectiveValue = null,
     pipeline = SolvablePipeline.Refuted,
     routingLpStats = routingLpStats,
+    routingElapsedMs = routingElapsedMs,
 )
 
 /** Per-invocation parsing + loading + output for one front-end. Created fresh per run via
@@ -538,6 +541,7 @@ internal fun linearSolvable(
     definedVars: IntArray = IntArray(0),
     boolFolds: List<BoolFoldDefinition> = emptyList(),
     routingLpStats: LpStats = LpStats(),
+    routingElapsedMs: Long = 0L,
 ): Solvable = linearSolvable(
     problem,
     objective?.toLinearObjective(),
@@ -546,6 +550,7 @@ internal fun linearSolvable(
     definedVars,
     boolFolds,
     routingLpStats,
+    routingElapsedMs,
 )
 
 internal fun linearSolvable(
@@ -556,6 +561,7 @@ internal fun linearSolvable(
     definedVars: IntArray = IntArray(0),
     boolFolds: List<BoolFoldDefinition> = emptyList(),
     routingLpStats: LpStats = LpStats(),
+    routingElapsedMs: Long = 0L,
 ): Solvable {
     // Feasibility sweep derives functionally-defined vars and excludes them from search. A bool AND
     // fold is derived only when all its literals are objective variables: deriving an OPB product
@@ -571,6 +577,7 @@ internal fun linearSolvable(
             definitionalSweep = sweep,
             render = render, objectiveValue = null,
             routingLpStats = routingLpStats,
+            routingElapsedMs = routingElapsedMs,
         )
     }
     // The gradient view reads every fold (evaluating through a fold is always safe — it only needs
@@ -595,6 +602,7 @@ internal fun linearSolvable(
         objectiveValue = { s -> objective.evaluateLong(s).let { if (maximize) -it else it } },
         continuousObjectiveValue = objective.continuousObjectiveValue(maximize),
         routingLpStats = routingLpStats,
+        routingElapsedMs = routingElapsedMs,
     )
 }
 

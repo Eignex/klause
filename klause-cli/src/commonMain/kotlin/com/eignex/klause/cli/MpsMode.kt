@@ -12,6 +12,7 @@ import com.eignex.klause.solver.pipeline.pipelineRoute
 import com.eignex.klause.solver.result.LpStats
 import kotlin.math.abs
 import kotlin.math.floor
+import kotlin.time.TimeSource
 
 /**
  * MPS (Mathematical Programming System) MIP front-end (`.mps`). Parses the instance and lowers it to
@@ -47,20 +48,22 @@ internal object MpsMode : CliMode {
             val render: (Sample) -> String = { s -> renderMpsModel(compiled, s) }
             val objective = compiled.objective?.toLinearObjective()
             var routingLpStats = LpStats()
-            return when (
-                val route = compiled.model.pipelineRoute(
-                    objective,
-                    compiled.maximize,
-                    boundCancellation = common.routingCancellation(),
-                    onLpStats = { routingLpStats = it },
-                )
-            ) {
+            val routingStart = TimeSource.Monotonic.markNow()
+            val route = compiled.model.pipelineRoute(
+                objective,
+                compiled.maximize,
+                boundCancellation = common.routingCancellation(),
+                onLpStats = { routingLpStats = it },
+            )
+            val routingElapsedMs = routingStart.elapsedNow().inWholeMilliseconds
+            return when (route) {
                 is SourceProblemRoute.Finite -> linearSolvable(
                     route.problem,
                     objective,
                     compiled.maximize,
                     render,
                     routingLpStats = routingLpStats,
+                    routingElapsedMs = routingElapsedMs,
                 )
 
                 is SourceProblemRoute.OpenTheory -> {
@@ -74,12 +77,13 @@ internal object MpsMode : CliMode {
                         route.request,
                         { assignment -> renderMpsOpenModel(compiled, assignment) },
                         routingLpStats,
+                        routingElapsedMs,
                     )
                 }
 
                 is SourceProblemRoute.UnsupportedOpen -> unsupportedOpenMpsModel()
 
-                SourceProblemRoute.Refuted -> refutedSolvable(routingLpStats)
+                SourceProblemRoute.Refuted -> refutedSolvable(routingLpStats, routingElapsedMs)
             }
         }
 
