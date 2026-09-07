@@ -192,9 +192,9 @@ class OpenTheoryEngine internal constructor(
         // rather than an invented box, and is reportable as unsat.
         val model = when (
             val closed = routed.model.closeOpenBounds(
-            boundCancellation(prepared, cancellation),
-            stats.lp,
-        )
+                boundCancellation(prepared, cancellation),
+                stats.lp,
+            )
         ) {
             OpenPresolveResult.Refuted -> return OpenTheoryResult.Unsat(stats.finish(state))
             is OpenPresolveResult.Tightened -> closed.spec
