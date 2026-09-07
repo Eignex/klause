@@ -43,6 +43,7 @@ import com.eignex.klause.lp.statesUpperBound
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.result.LpRoute
 import com.eignex.klause.solver.result.LpStatsSink
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.EmptyDoubleArray
@@ -295,7 +296,7 @@ internal fun leafRealFeasibility(
         relaxation.model,
         cancellation = cancellation,
         componentSplit = componentSplit,
-        observer = sink?.certificationObserver(),
+        observer = sink?.certificationObserver(LpRoute.STANDALONE),
     )
     certified.float?.let { sink?.observeComponentSplit(it.blocks) }
     if (certified.verdict != LpVerdict.OPTIMAL) return LeafRealResult(certified.verdict, EmptyDoubleArray)

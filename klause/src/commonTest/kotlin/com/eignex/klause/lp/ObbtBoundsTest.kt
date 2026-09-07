@@ -53,7 +53,6 @@ class ObbtBoundsTest {
             emptyList(),
             realConstraints = rows,
             observer = sink.certificationObserver(LpRoute.STANDALONE),
-            onSolve = { sink.observeEngineCost(LpRoute.STANDALONE, it.lastMetrics) },
         )
 
         assertEquals(baseline.bounds[0].hi, observed.bounds[0].hi)

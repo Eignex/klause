@@ -138,7 +138,9 @@ internal fun lpStatPairs(stats: SolveStats): List<Pair<String, String>> {
     if (stats.lp.cutCandidates.sum > 0.0 || stats.lp.cutSelected.sum > 0.0 || stats.lp.cutActive.max.isFinite()) {
         out += "lpCutCandidates" to "${stats.lp.cutCandidates.sum.toLong()}"
         out += "lpCutSelected" to "${stats.lp.cutSelected.sum.toLong()}"
-        out += "lpCutActive" to "${stats.lp.cutActive.max.toLong()}"
+        if (stats.lp.cutActive.max.isFinite()) {
+            out += "lpCutActive" to "${stats.lp.cutActive.max.toLong()}"
+        }
     }
     if (stats.lp.rootReducedCostFixes.sum > 0.0) {
         out += "lpRootReducedCostFixes" to "${stats.lp.rootReducedCostFixes.sum.toLong()}"

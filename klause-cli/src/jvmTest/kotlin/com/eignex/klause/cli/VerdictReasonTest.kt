@@ -1,9 +1,11 @@
 package com.eignex.klause.cli
 
+import com.eignex.klause.solver.result.LpStats
 import com.eignex.klause.solver.result.OpenTheoryWorkStats
 import com.eignex.klause.solver.result.RunStats
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
+import com.eignex.kumulant.stat.summary.SumResult
 import java.io.ByteArrayOutputStream
 import java.io.PrintStream
 import kotlin.test.Test
@@ -138,5 +140,18 @@ class VerdictReasonTest {
             }
         }
         assertEquals("==========", out.trim())
+    }
+
+    @Test
+    fun `the flatzinc mode reports LP work without a backend`() {
+        val out = capture {
+            MiniZincOutput().onStatistics(
+                SolveStats(lp = LpStats(standalonePasses = SumResult(1.0))),
+                solveTimeMs = 0L,
+                solutions = 0L,
+            )
+        }
+
+        assertTrue("%%%mzn-stat: lpStandalonePasses=1" in out, out)
     }
 }

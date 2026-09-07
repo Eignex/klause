@@ -7,7 +7,6 @@ import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.OpenIntBounds
-import com.eignex.klause.lp.engine.ComponentLpSolver
 import com.eignex.klause.lp.exactBoundsInfeasible
 import com.eignex.klause.lp.longOrNull
 import com.eignex.klause.lp.openLpInfeasible
@@ -113,7 +112,7 @@ internal fun Problem.closeOpenBounds(
     if (exactBoundsInfeasible(declared, intRows, cancellation)) return OpenPresolveResult.Refuted
     // Then the relaxation over the same open ranges. A Farkas ray reaches the systems no bound ever
     // crosses, which is what both the pass above and the tightening below need to conclude anything.
-    if (openLpInfeasible(declared, intRows, cancellation, lpStats?.certificationObserver())) {
+    if (openLpInfeasible(declared, intRows, cancellation, lpStats?.certificationObserver(LpRoute.STANDALONE))) {
         return OpenPresolveResult.Refuted
     }
     // Only now is there nothing left to do: closing is what a model with no open side does not need, and
@@ -131,10 +130,6 @@ internal fun Problem.closeOpenBounds(
         realLower = problem.realLower,
         realUpper = problem.realUpper,
         observer = lpStats?.certificationObserver(LpRoute.STANDALONE),
-        onSolve = { solver ->
-            lpStats?.certificationObserver(LpRoute.STANDALONE)
-                ?.observeSolve(solver.lastMetrics, solver is ComponentLpSolver)
-        },
     )
     if (tightened.refuted) return OpenPresolveResult.Refuted
 

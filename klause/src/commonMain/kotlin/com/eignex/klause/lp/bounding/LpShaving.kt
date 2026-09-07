@@ -309,13 +309,15 @@ internal fun LpEngine.rootLpInfeasibleNoBake(token: Cancellation): Boolean {
     }
     if (model.n == 0) return false
     val simplex = newTableauCutSolver(model, token)
-    // A non-null solve is a feasible optimum; null is infeasible or an inconclusive failure. Only a
-    // dual-unbounded ray that survives exact 128-bit Farkas certification proves genuine infeasibility.
-    val result = simplex.solve()
-    observeRootSolve(simplex)
-    if (result != null) return false
-    val floatRay = simplex.infeasibleRay ?: return false
-    return integerFarkasRay(model, floatRay, observer = rootCertificationObserver()) != null
+    return simplex.use {
+        // A non-null solve is a feasible optimum; null is infeasible or an inconclusive failure. Only a
+        // dual-unbounded ray that survives exact 128-bit Farkas certification proves genuine infeasibility.
+        val result = simplex.solve()
+        observeRootSolve(simplex)
+        if (result != null) return@use false
+        val floatRay = simplex.infeasibleRay ?: return@use false
+        integerFarkasRay(model, floatRay, observer = rootCertificationObserver()) != null
+    }
 }
 
 /** The built root relaxation's columns, rows and nonzeros, plus a per-solve cost proxy. */

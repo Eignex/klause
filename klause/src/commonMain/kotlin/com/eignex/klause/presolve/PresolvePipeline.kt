@@ -230,13 +230,13 @@ object PresolvePipeline {
                 lpHarvestReporting(pre.problem, objective, it, bakeConfig, cancellation)
             }
             harvestResult?.let {
-                harvest += it.report
                 harvestStats = harvestStats.mergedWith(it.stats)
             }
             val harvested = harvestResult?.problem ?: pre.problem
             // Neither presolve nor the harvest changed anything this round → fixpoint.
             if (pre.problem === current && harvested === pre.problem) break
             pre.passesFired.forEach { firedPasses.add(it.id) }
+            harvestResult?.let { harvest += it.report }
             // The harvest only narrows domains, so it contributes no reconstruct; add presolve's only when it
             // actually transformed the problem (else it is the identity).
             if (pre.problem !== current) reconstructs.add(pre.reconstruct)

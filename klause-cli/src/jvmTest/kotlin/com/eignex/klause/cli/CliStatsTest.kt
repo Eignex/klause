@@ -87,6 +87,23 @@ class CliStatsTest {
     }
 
     @Test
+    fun `cut accounting without an active measurement omits the maximum`() {
+        val pairs = lpStatPairs(
+            SolveStats(
+                lp = LpStats(
+                    standalonePasses = SumResult(1.0),
+                    cutCandidates = SumResult(3.0),
+                    cutSelected = SumResult(2.0),
+                ),
+            ),
+        ).toMap()
+
+        assertEquals("3", pairs["lpCutCandidates"])
+        assertEquals("2", pairs["lpCutSelected"])
+        assertTrue("lpCutActive" !in pairs)
+    }
+
+    @Test
     fun `every emitted key is lp-prefixed`() {
         val stats = SolveStats(
             run = RunStats(backend = "backtrack"),
