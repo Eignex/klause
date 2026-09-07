@@ -45,11 +45,34 @@ import com.eignex.klause.util.Cancellation
  * never consume the run it was supposed to route.
  */
 internal fun CommonOptions.routingCancellation(): Cancellation {
+    if (!takeOpenBoundProof()) return Cancellation { true }
     val budgetMs = SolveCore.derivedPresolveBudgetMs(timeLimitMs, CliKnobs.DEFAULT_PRESOLVE_BUDGET_FRACTION)
     if (budgetMs <= 0) return Cancellation.Never
     val cap = minOf(deadlineAtMs ?: Long.MAX_VALUE, nowMillis() + budgetMs)
     return Cancellation { nowMillis() > cap }
 }
+
+/**
+ * Whether the routing bound proof runs, consuming `open-bound-proof` and **removing** it as it reads —
+ * `EngineParams` rejects a key no engine claimed, so a param the CLI answers itself has to leave the list
+ * (the same reason `node-limit` is taken this way).
+ *
+ * `--param open-bound-proof=false` is the only way to run one model down both lanes: with the proof, a
+ * model whose open sides all close takes the finite route; without it, the same model goes to the open
+ * theory. Shrinking `-t` cannot substitute, since it starves the solve along with the proof and the two
+ * arms stop being comparable. Read only by the front-ends that route open models — MPS and SMT-LIB.
+ */
+private fun CommonOptions.takeOpenBoundProof(): Boolean {
+    val entry = engineParams.firstOrNull { it.startsWith("$OPEN_BOUND_PROOF_KEY=") } ?: return true
+    engineParams.remove(entry)
+    return when (val raw = entry.substringAfter('=').lowercase()) {
+        "false", "off", "0", "no" -> false
+        "true", "on", "1", "yes" -> true
+        else -> usageError("engine param `$OPEN_BOUND_PROOF_KEY` expects a boolean, got `$raw`")
+    }
+}
+
+private const val OPEN_BOUND_PROOF_KEY = "open-bound-proof"
 
 /** Solver-control flags shared by every mode; populated by [commonFlagSpecs] during parsing. */
 internal class CommonOptions {
