@@ -76,8 +76,11 @@ internal fun solveAndCertify(
 ): CertifiedLpResult {
     val solver = newLpSolver(model, cancellation, componentSplit)
     return solver.use {
-        val result = solver.solve(warm)
-        observer?.observeSolve(solver.lastMetrics, solver is ComponentLpSolver)
+        val result = try {
+            solver.solve(warm)
+        } finally {
+            observer?.observeSolve(solver.lastMetrics, solver is ComponentLpSolver)
+        }
         if (result == null) {
             // A dual-unbounded termination is only a *candidate* infeasibility — confirm it with an exact
             // Farkas certificate. Any other failure (non-convergence / singular) is indeterminate.

@@ -307,9 +307,15 @@ internal fun LpEngine.sparseSafePrune(
                     if (gatedModel.rowStrict[i]) gatedDv.rhs[i] -= STRICT_FILTER_EPS * (1.0 + abs(gatedDv.rhs[i]))
                 }
             }
-            val gatedResult = filter.simplex.resolveGated(filter.enforced)
-            if (gatedStrictSaved != null && gatedDv != null) gatedStrictSaved.copyInto(gatedDv.rhs)
-            observeSolveCost(sink, filter.simplex)
+            val gatedResult = try {
+                filter.simplex.resolveGated(filter.enforced)
+            } finally {
+                try {
+                    if (gatedStrictSaved != null && gatedDv != null) gatedStrictSaved.copyInto(gatedDv.rhs)
+                } finally {
+                    observeSolveCost(sink, filter.simplex)
+                }
+            }
             if (gatedResult != null) {
                 filter.enforced.copyInto(filter.lastEnforced)
                 filter.lastFeasible = true
@@ -371,8 +377,11 @@ internal fun LpEngine.sparseSafePrune(
         for (i in 0 until model.m) if (model.rowStrict[i]) dv.rhs[i] -= STRICT_FILTER_EPS * (1.0 + abs(dv.rhs[i]))
     }
     // Always solve: an infeasible relaxation prunes the node regardless of incumbent or objective.
-    val (simplex, floatResult) = solveNode(model, warm, cancellation)
-    if (strictSaved != null && dv != null) strictSaved.copyInto(dv.rhs)
+    val (simplex, floatResult) = try {
+        solveNode(model, warm, cancellation)
+    } finally {
+        if (strictSaved != null && dv != null) strictSaved.copyInto(dv.rhs)
+    }
     // Read the cost off the solver rather than the result: a solve that terminates dual-unbounded
     // returns none, and those are the solves that prune — costing only the ones that return a result
     // would drop the most valuable work from the average.

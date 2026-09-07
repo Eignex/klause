@@ -312,8 +312,11 @@ internal fun LpEngine.rootLpInfeasibleNoBake(token: Cancellation): Boolean {
     return simplex.use {
         // A non-null solve is a feasible optimum; null is infeasible or an inconclusive failure. Only a
         // dual-unbounded ray that survives exact 128-bit Farkas certification proves genuine infeasibility.
-        val result = simplex.solve()
-        observeRootSolve(simplex)
+        val result = try {
+            simplex.solve()
+        } finally {
+            observeRootSolve(simplex)
+        }
         if (result != null) return@use false
         val floatRay = simplex.infeasibleRay ?: return@use false
         integerFarkasRay(model, floatRay, observer = rootCertificationObserver()) != null
