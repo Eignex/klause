@@ -139,8 +139,9 @@ internal fun LpModel.safeVariableBound(
     objectiveCol: Int,
     maximize: Boolean,
     clamped: Boolean? = null,
+    observer: LpCertificationObserver? = null,
 ): Long? {
-    val objMin = safeObjectiveLowerBound(this, result.duals) ?: return null
+    val objMin = safeObjectiveLowerBound(this, result.duals, observer) ?: return null
     val ceilMin = ceil(objMin)
     if (!ceilMin.isFinite() || ceilMin < Long.MIN_VALUE.toDouble() || ceilMin > Long.MAX_VALUE.toDouble()) {
         return null
@@ -162,8 +163,9 @@ internal fun LpModel.exactVariableBound(
     objectiveCol: Int,
     maximize: Boolean,
     clamped: Boolean? = null,
+    observer: LpCertificationObserver? = null,
 ): Long? {
-    val ceilMin = exactObjectiveLowerBoundCeil(result.duals) ?: return null
+    val ceilMin = exactObjectiveLowerBoundCeil(result.duals, observer) ?: return null
     return orientedVariableBound(ceilMin, objectiveCol, maximize, clamped)
 }
 
@@ -205,9 +207,10 @@ internal fun LpModel.tightVariableBound(
     objectiveCol: Int,
     maximize: Boolean,
     clamped: Boolean? = null,
+    observer: LpCertificationObserver? = null,
 ): Long? {
-    val safe = safeVariableBound(result, objectiveCol, maximize, clamped)
-    val exact = exactVariableBound(result, objectiveCol, maximize, clamped)
+    val safe = safeVariableBound(result, objectiveCol, maximize, clamped, observer)
+    val exact = exactVariableBound(result, objectiveCol, maximize, clamped, observer)
     return when {
         safe == null -> exact
         exact == null -> safe
@@ -225,8 +228,12 @@ internal fun LpModel.tightVariableBound(
  * it may exceed a continuous LP's own fractional optimum. Null on a 128-bit certification overflow or a
  * model that does not rationalize.
  */
-internal fun LpModel.exactObjectiveLowerBoundCeil(y: DoubleArray): Long? =
-    if (hasContinuous) rationalizedDualLowerBoundCeil(this, y) else integerDualLowerBoundCeil(this, y)
+internal fun LpModel.exactObjectiveLowerBoundCeil(y: DoubleArray, observer: LpCertificationObserver? = null): Long? =
+    if (hasContinuous) {
+        rationalizedDualLowerBoundCeil(this, y, observer = observer)
+    } else {
+        integerDualLowerBoundCeil(this, y, observer = observer)
+    }
 
 /**
  * The tightest sound lower bound on [model]'s minimized objective from the approximate duals [y]: the
@@ -241,7 +248,10 @@ internal fun tightObjectiveLowerBound(
     model: LpModel,
     y: DoubleArray,
     observer: LpCertificationObserver? = null,
-): Double? = tighterLowerBound(safeObjectiveLowerBound(model, y, observer), model.exactObjectiveLowerBoundCeil(y))
+): Double? = tighterLowerBound(
+    safeObjectiveLowerBound(model, y, observer),
+    model.exactObjectiveLowerBoundCeil(y, observer),
+)
 
 /**
  * [tightObjectiveLowerBound] with the exact side taken from [certificate] — the certificate the caller

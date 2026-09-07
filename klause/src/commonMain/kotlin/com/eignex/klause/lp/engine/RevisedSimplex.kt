@@ -437,12 +437,10 @@ internal class RevisedSimplex(
         // advisory, and SINGULAR parted them from the basis so only a rebuild recovers. Rebuild on
         // anything but an APPLIED still inside the chain limit.
         if (outcome == BasisUpdate.APPLIED && solver.updateCount < refactorUpdateLimit) return PivotFold.UPDATED
-        val reason = if (outcome ==
-            BasisUpdate.APPLIED
-        ) {
-            LpRefactorReason.UPDATE_LIMIT
-        } else {
-            LpRefactorReason.BACKEND_REQUESTED
+        val reason = when (outcome) {
+            BasisUpdate.APPLIED -> LpRefactorReason.UPDATE_LIMIT
+            BasisUpdate.SINGULAR -> LpRefactorReason.SINGULAR_RECOVERY
+            BasisUpdate.REFACTORIZE -> LpRefactorReason.BACKEND_REQUESTED
         }
         return if (refactorize(reason)) PivotFold.REBUILT else PivotFold.FAILED
     }

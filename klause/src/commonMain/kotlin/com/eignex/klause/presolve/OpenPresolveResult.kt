@@ -13,6 +13,7 @@ import com.eignex.klause.lp.openLpInfeasible
 import com.eignex.klause.lp.structuralIntBounds
 import com.eignex.klause.lp.tightenOpenIntBounds
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.result.LpRoute
 import com.eignex.klause.solver.result.LpStatsSink
 import com.eignex.klause.util.Bits
 import com.eignex.klause.util.Cancellation
@@ -128,6 +129,8 @@ internal fun Problem.closeOpenBounds(
         realConstraints = rows.filter { it.realVars.isNotEmpty() },
         realLower = problem.realLower,
         realUpper = problem.realUpper,
+        observer = lpStats?.certificationObserver(LpRoute.STANDALONE),
+        onSolve = { solver -> lpStats?.observeEngineCost(LpRoute.STANDALONE, solver.lastMetrics) },
     )
     if (tightened.refuted) return OpenPresolveResult.Refuted
 

@@ -16,6 +16,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotSame
 import kotlin.test.assertSame
+import kotlin.test.assertTrue
 
 /**
  * Per-hull pruning drops a convex-hull technique that adds no strength to the root LP optimum, keeps one
@@ -87,11 +88,12 @@ class LpEngineHullPruningTest {
             ),
         )
         val obj = LinearObjective(intCoefficients = longArrayOf(1, 1, 0, 0)) // minimize x0 + x1
+        val sink = SolveStatsSink(backend = "hull")
         val engine = LpEngine(
             p,
             obj,
             LpParams(lpPlan = LpPlan(bounding = true, table = true, pruneHulls = true)),
-            SolveStatsSink(backend = "hull"),
+            sink,
         )
         val original = engine.lpRelaxer
         engine.pruneIneffectiveHulls(Cancellation.Never)
@@ -102,5 +104,6 @@ class LpEngineHullPruningTest {
             1e-6,
             "the objective table hull must be kept, so the root optimum stays 2",
         )
+        assertTrue(sink.snapshot().lp.rootPasses.sum > 0.0, "root objective solves must use the root route")
     }
 }

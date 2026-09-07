@@ -2,6 +2,8 @@ package com.eignex.klause.lp
 
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.solver.result.LpRoute
+import com.eignex.klause.solver.result.LpStatsSink
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -35,6 +37,27 @@ class ObbtBoundsTest {
         )
         val out = tightenOpenIntBounds(arrayOf(OpenIntBounds(0L, null)), emptyList(), realConstraints = rows)
         assertEquals(7L, out.bounds[0].hi)
+    }
+
+    @Test
+    fun `open OBBT observation preserves bounds and records standalone work`() {
+        val rows = listOf(
+            realRow(longArrayOf(1), intArrayOf(0), doubleArrayOf(-1.0, -1.0), LinearOp.EQ, 0.0),
+            realRow(longArrayOf(), intArrayOf(), doubleArrayOf(1.0, -1.0), LinearOp.EQ, 0.0),
+            realRow(longArrayOf(), intArrayOf(), doubleArrayOf(1.0, 1.0), LinearOp.LE, 7.0),
+        )
+        val baseline = tightenOpenIntBounds(arrayOf(OpenIntBounds(0L, null)), emptyList(), realConstraints = rows)
+        val sink = LpStatsSink()
+        val observed = tightenOpenIntBounds(
+            arrayOf(OpenIntBounds(0L, null)),
+            emptyList(),
+            realConstraints = rows,
+            observer = sink.certificationObserver(LpRoute.STANDALONE),
+            onSolve = { sink.observeEngineCost(LpRoute.STANDALONE, it.lastMetrics) },
+        )
+
+        assertEquals(baseline.bounds[0].hi, observed.bounds[0].hi)
+        assertTrue(sink.snapshot().standalonePasses.sum > 0.0)
     }
 
     @Test

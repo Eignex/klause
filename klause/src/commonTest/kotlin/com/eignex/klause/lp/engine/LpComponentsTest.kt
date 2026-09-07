@@ -8,6 +8,7 @@ import com.eignex.klause.lp.engine.Sense
 import com.eignex.klause.lp.engine.integerDualLowerBoundCeil
 import com.eignex.klause.lp.engine.integerFarkasRay
 import com.eignex.klause.lp.engine.newLpSolver
+import com.eignex.klause.solver.result.LpStatsSink
 import kotlin.math.abs
 import kotlin.random.Random
 import kotlin.test.Test
@@ -37,6 +38,21 @@ class LpComponentsTest {
         assertNotNull(mono)
         assertEquals(mono.objective, split.objective, 1e-9)
         for (j in 0 until model.n) assertEquals(mono.primal[j], split.primal[j], 1e-9, "primal[$j]")
+    }
+
+    @Test
+    fun `component solve reports component route work`() {
+        val b = LpBuilder()
+        val x = b.addVar(0L, 10L, cost = 1L)
+        val y = b.addVar(0L, 10L, cost = 2L)
+        b.addRow(intArrayOf(x), longArrayOf(1L), Relation.GE, 4L)
+        b.addRow(intArrayOf(y), longArrayOf(1L), Relation.GE, 5L)
+        val sink = LpStatsSink()
+
+        val result = solveAndCertify(b.build(Sense.MINIMIZE), observer = sink.certificationObserver())
+
+        assertEquals(LpVerdict.OPTIMAL, result.verdict)
+        assertEquals(1.0, sink.snapshot().componentPasses.sum)
     }
 
     @Test
