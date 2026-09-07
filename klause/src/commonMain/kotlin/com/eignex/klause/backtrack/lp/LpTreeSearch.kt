@@ -55,8 +55,15 @@ internal fun LpEngine.lbTreeSearch(objective: LinearObjective, cancellation: Can
         val relaxation = nodeRelaxation(relaxer, session)
         if (relaxation.model.n == 0) continue
         val simplex = dualSimplex(relaxation.model, cancellation)
-        val result = simplex.solve()
-        observeRootSolve(simplex)
+        val result = try {
+            simplex.solve()
+        } finally {
+            try {
+                observeRootSolve(simplex)
+            } finally {
+                simplex.close()
+            }
+        }
         if (result == null) continue // infeasible / unknown ⇒ drop
         if (result.objective >= bestObj) continue
         val frac = mostFractionalCol(relaxation, result.primal)

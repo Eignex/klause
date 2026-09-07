@@ -40,9 +40,15 @@ internal fun LpEngine.lpRoundingProbe(objective: LinearObjective, cancellation: 
     if (relaxation.model.n == 0) return null
     val result = try {
         val simplex = dualSimplex(relaxation.model, cancellation)
-        val solved = simplex.solve()
-        observeRootSolve(simplex)
-        solved
+        try {
+            simplex.solve()
+        } finally {
+            try {
+                observeRootSolve(simplex)
+            } finally {
+                simplex.close()
+            }
+        }
     } catch (_: CheckedLongOverflowException) {
         return null
     } ?: return null
@@ -199,9 +205,20 @@ private fun LpEngine.solveRelaxation(
     if (relaxation.model.n == 0) return null
     val result = try {
         val simplex = dualSimplex(relaxation.model, cancellation)
-        val primal = simplex.solvePrimal()
-        observeRootSolve(simplex)
-        primal ?: simplex.solve().also { observeRootSolve(simplex) }
+        try {
+            val primal = try {
+                simplex.solvePrimal()
+            } finally {
+                observeRootSolve(simplex)
+            }
+            primal ?: try {
+                simplex.solve()
+            } finally {
+                observeRootSolve(simplex)
+            }
+        } finally {
+            simplex.close()
+        }
     } catch (_: CheckedLongOverflowException) {
         return null
     } ?: return null

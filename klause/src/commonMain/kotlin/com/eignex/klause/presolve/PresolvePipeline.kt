@@ -218,7 +218,9 @@ object PresolvePipeline {
             firedPasses.add(PresolvePass.SUBSTITUTE_BINARY_COLUMNS.id)
         }
         var harvest = LpHarvestReport() // the LP harvest's own contribution, summed over rounds
-        var harvestStats = rootInfeasible.stats.mergedWith(rootBounds.stats)
+        var harvestStats = prepared.stats.lpStats
+            .mergedWith(rootInfeasible.stats)
+            .mergedWith(rootBounds.stats)
         var infeasible = false
         var round = 0
         while (round++ < MAX_PRESOLVE_HARVEST_ROUNDS && !cancellation()) {

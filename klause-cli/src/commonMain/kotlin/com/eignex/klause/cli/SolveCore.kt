@@ -127,6 +127,7 @@ internal object SolveCore {
                         common.statistics,
                         output,
                         rawSolvable.routingLpStats,
+                        rawSolvable.routingElapsedMs,
                     ) {
                         budgetSpent(common, it)
                     }
@@ -159,7 +160,7 @@ internal object SolveCore {
                 if (common.statistics) {
                     output.onStatistics(
                         resultStats,
-                        resultStats.run.wallMs,
+                        resultStats.run.wallMs + rawSolvable.routingElapsedMs,
                         if (result is OpenTheoryResult.Sat) 1L else 0L,
                     )
                 }
@@ -172,7 +173,11 @@ internal object SolveCore {
                 output.begin(optimize = false, maximize = false)
                 output.onComplete(Verdict.UNSATISFIABLE)
                 if (common.statistics) {
-                    output.onStatistics(SolveStats(lp = rawSolvable.routingLpStats), 0L, 0L)
+                    output.onStatistics(
+                        SolveStats(lp = rawSolvable.routingLpStats),
+                        rawSolvable.routingElapsedMs,
+                        0L,
+                    )
                 }
                 return
             }
@@ -691,7 +696,7 @@ internal object SolveCore {
                     common,
                     output,
                     withModelObjective(outcome.stats, solvable, outcome.bestSample),
-                    outcome.elapsedMs,
+                    outcome.elapsedMs + solvable.routingElapsedMs,
                     outcome.solutions,
                 )
             }
@@ -781,6 +786,7 @@ private fun solveOpenTheoryOptimum(
     statistics: Boolean,
     output: OutputProtocol,
     routingLpStats: LpStats,
+    routingElapsedMs: Long,
     budgetExhausted: (Boolean) -> Boolean,
 ) {
     val result = (
@@ -833,7 +839,7 @@ private fun solveOpenTheoryOptimum(
             is OpenTheoryOptimum.Unbounded -> 1L
             is OpenTheoryOptimum.Bounded -> if (result.incumbent == null) 0L else 1L
         }
-        output.onStatistics(resultStats, resultStats.run.wallMs, found)
+        output.onStatistics(resultStats, resultStats.run.wallMs + routingElapsedMs, found)
     }
 }
 

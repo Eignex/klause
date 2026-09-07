@@ -357,6 +357,10 @@ data class LpStats(
     )
 }
 
+/** Whether an LP engine was invoked on any production route. */
+internal fun LpStats.hasActivity(): Boolean =
+    nodePasses.sum + standalonePasses.sum + componentPasses.sum + rootPasses.sum > 0.0
+
 /** Mutable LP-stats accumulator, one per solve; snapshots into an [LpStats]. See [SolveStatsSink]. */
 internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
     val solves: CountStat = CountStat()
@@ -485,7 +489,7 @@ internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
                     if (!accepted) exactInputRejections++
                 }
                 override fun observeSolve(metrics: LpSolveMetrics, component: Boolean) {
-                    val solveRoute = if (component && route == LpRoute.STANDALONE) LpRoute.COMPONENT else route
+                    val solveRoute = if (component) LpRoute.COMPONENT else route
                     observeEngineCost(solveRoute, metrics)
                 }
             }
@@ -493,7 +497,7 @@ internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
     }
 
     /** The local bridge passed into engine exact checks. */
-    fun certificationObserver(route: LpRoute = LpRoute.STANDALONE): LpCertificationObserver {
+    fun certificationObserver(route: LpRoute = LpRoute.NODE): LpCertificationObserver {
         val effectiveRoute = if (route == LpRoute.NODE) probeRoute else route
         return certificationObservers[effectiveRoute.ordinal]
     }
@@ -501,7 +505,7 @@ internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
     fun observeCutAccounting(candidates: Int, selected: Int, active: Int) {
         cutCandidates += candidates.coerceAtLeast(0)
         cutSelected += selected.coerceAtLeast(0)
-        cutActive.update(active.coerceAtLeast(0).toDouble())
+        if (active > 0) cutActive.update(active.toDouble())
     }
 
     /** Count a selection before its build and make it active only after that build succeeds. */
@@ -767,27 +771,51 @@ internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
 
 private class LpRouteSolveStatsSink {
     private var passes = 0L
-    private var metrics = LpSolveMetrics()
+    private var pivots = 0L
+    private var workOps = 0L
+    private var warmAttempts = 0L
+    private var warmHits = 0L
+    private var singularRefactorizations = 0L
+    private var smallPivotBails = 0L
+    private var initialRefactorizations = 0L
+    private var warmStartRefactorizations = 0L
+    private var singularRecoveryRefactorizations = 0L
+    private var updateLimitRefactorizations = 0L
+    private var backendRequestedRefactorizations = 0L
+    private var reconcileRecoveryRefactorizations = 0L
+    private var primalRefactorizations = 0L
 
     fun observe(value: LpSolveMetrics) {
         passes++
-        metrics += value
+        pivots += value.pivots
+        workOps += value.workOps
+        warmAttempts += value.warmAttempts
+        warmHits += value.warmHits
+        singularRefactorizations += value.singularRefactorizations
+        smallPivotBails += value.smallPivotBails
+        initialRefactorizations += value.initialRefactorizations
+        warmStartRefactorizations += value.warmStartRefactorizations
+        singularRecoveryRefactorizations += value.singularRecoveryRefactorizations
+        updateLimitRefactorizations += value.updateLimitRefactorizations
+        backendRequestedRefactorizations += value.backendRequestedRefactorizations
+        reconcileRecoveryRefactorizations += value.reconcileRecoveryRefactorizations
+        primalRefactorizations += value.primalRefactorizations
     }
 
     fun snapshot() = LpRouteSolveStats(
         passes = SumResult(passes.toDouble()),
-        pivots = SumResult(metrics.pivots.toDouble()),
-        workOps = SumResult(metrics.workOps.toDouble()),
-        warmStartAttempts = SumResult(metrics.warmAttempts.toDouble()),
-        warmStartHits = SumResult(metrics.warmHits.toDouble()),
-        initialRefactorizations = SumResult(metrics.initialRefactorizations.toDouble()),
-        warmStartRefactorizations = SumResult(metrics.warmStartRefactorizations.toDouble()),
-        singularRecoveryRefactorizations = SumResult(metrics.singularRecoveryRefactorizations.toDouble()),
-        updateLimitRefactorizations = SumResult(metrics.updateLimitRefactorizations.toDouble()),
-        backendRequestedRefactorizations = SumResult(metrics.backendRequestedRefactorizations.toDouble()),
-        reconcileRecoveryRefactorizations = SumResult(metrics.reconcileRecoveryRefactorizations.toDouble()),
-        primalRefactorizations = SumResult(metrics.primalRefactorizations.toDouble()),
-        singularRefactorizations = SumResult(metrics.singularRefactorizations.toDouble()),
-        smallPivotBails = SumResult(metrics.smallPivotBails.toDouble()),
+        pivots = SumResult(pivots.toDouble()),
+        workOps = SumResult(workOps.toDouble()),
+        warmStartAttempts = SumResult(warmAttempts.toDouble()),
+        warmStartHits = SumResult(warmHits.toDouble()),
+        initialRefactorizations = SumResult(initialRefactorizations.toDouble()),
+        warmStartRefactorizations = SumResult(warmStartRefactorizations.toDouble()),
+        singularRecoveryRefactorizations = SumResult(singularRecoveryRefactorizations.toDouble()),
+        updateLimitRefactorizations = SumResult(updateLimitRefactorizations.toDouble()),
+        backendRequestedRefactorizations = SumResult(backendRequestedRefactorizations.toDouble()),
+        reconcileRecoveryRefactorizations = SumResult(reconcileRecoveryRefactorizations.toDouble()),
+        primalRefactorizations = SumResult(primalRefactorizations.toDouble()),
+        singularRefactorizations = SumResult(singularRefactorizations.toDouble()),
+        smallPivotBails = SumResult(smallPivotBails.toDouble()),
     )
 }

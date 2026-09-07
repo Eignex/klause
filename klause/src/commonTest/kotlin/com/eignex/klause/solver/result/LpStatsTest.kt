@@ -57,6 +57,15 @@ class LpStatsTest {
     }
 
     @Test
+    fun `a cutless separation does not fabricate an active-pool measurement`() {
+        val sink = LpStatsSink()
+
+        sink.observeCutAccounting(candidates = 0, selected = 0, active = 0)
+
+        assertFalse(sink.snapshot().cutActive.max.isFinite())
+    }
+
+    @Test
     fun `cut builds count every growing selection but activate only successful builds`() {
         val sink = LpStatsSink()
 
@@ -134,6 +143,17 @@ class LpStatsTest {
         assertEquals(0.0, stats.pruned.sum)
         assertEquals(0.0, stats.fixed.sum)
         assertEquals(0.0, stats.rootReducedCostFixes.sum)
+    }
+
+    @Test
+    fun `component engines override the caller route for solve cost`() {
+        val sink = LpStatsSink(LpRoute.ROOT)
+
+        sink.certificationObserver().observeSolve(LpSolveMetrics(pivots = 3), component = true)
+
+        val stats = sink.snapshot()
+        assertEquals(1.0, stats.componentPasses.sum)
+        assertEquals(0.0, stats.rootPasses.sum)
     }
 
     @Test

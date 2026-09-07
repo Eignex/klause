@@ -30,6 +30,8 @@ internal class Solvable(
     val pipeline: SolvablePipeline = SolvablePipeline.FiniteCp,
     /** LP work performed while proving bounds for pipeline selection. */
     val routingLpStats: LpStats = LpStats(),
+    /** Wall time spent proving bounds for pipeline selection. */
+    val routingElapsedMs: Long = 0L,
 ) {
     constructor(
         /** Finite CP problem. */
@@ -62,6 +64,8 @@ internal class Solvable(
         pipeline: SolvablePipeline = SolvablePipeline.FiniteCp,
         /** LP work performed while proving bounds for pipeline selection. */
         routingLpStats: LpStats = LpStats(),
+        /** Wall time spent proving bounds for pipeline selection. */
+        routingElapsedMs: Long = 0L,
     ) : this(
         finite = problem?.finiteSolveShape(
             optimize,
@@ -77,6 +81,7 @@ internal class Solvable(
         continuousObjectiveValue = continuousObjectiveValue,
         pipeline = pipeline,
         routingLpStats = routingLpStats,
+        routingElapsedMs = routingElapsedMs,
     )
 
     /** Finite CP problem. */

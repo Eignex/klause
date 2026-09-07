@@ -7,9 +7,9 @@ import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.presolve.closeOpenBounds
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.LpRoute
-import com.eignex.klause.solver.result.LpStats
 import com.eignex.klause.solver.result.LpStatsSink
 import com.eignex.klause.solver.result.PresolveStats
+import com.eignex.klause.solver.result.hasActivity
 import com.eignex.klause.util.Cancellation
 
 /**
@@ -120,7 +120,7 @@ object OpenTheoryPipeline {
         val lpStats = LpStatsSink(LpRoute.STANDALONE)
         val closed = planned.model.closeOpenBounds(request.presolveCancellation, lpStats)
         val closingStats = lpStats.snapshot()
-        val stats = if (closingStats == LpStats()) {
+        val stats = if (!closingStats.hasActivity()) {
             sourceStats
         } else {
             val base = sourceStats ?: PresolveStats()
