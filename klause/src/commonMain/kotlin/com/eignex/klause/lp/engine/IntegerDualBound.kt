@@ -30,6 +30,7 @@ import kotlin.math.roundToLong
  * @param y approximate dual vector over the `m` rows (e.g. from [RevisedSimplex]); length `≥ model.m`.
  * @param scaleBits the requested power-of-two scale exponent; capped down so the rounded multipliers
  *   stay exactly representable as `Double` (and below the [MAX_EXACT_INT] round-trip guard).
+ * @param observer optional sink for the integer-certificate attempt.
  */
 internal fun integerDualLowerBoundCeil(
     model: LpModel,

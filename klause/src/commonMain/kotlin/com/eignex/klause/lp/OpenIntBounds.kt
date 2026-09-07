@@ -77,6 +77,8 @@ internal class TightenedIntBounds(val bounds: Array<OpenIntBounds>, val refuted:
  *   boundable; strict rows enter non-strict (a relaxation — every derived bound stays sound).
  * @param realLower per-real-variable declared lower bounds (`-inf` for open); indexed by real id.
  * @param realUpper per-real-variable declared upper bounds (`+inf` for open); indexed by real id.
+ * @param observer optional sink for the probe's float and exact-bound certification attempts.
+ * @param onSolve called after every primal probe, including an unsuccessful one.
  * @return fresh bounds with every provable open side closed, or the prefilter's refutation of the system.
  */
 internal fun tightenOpenIntBounds(

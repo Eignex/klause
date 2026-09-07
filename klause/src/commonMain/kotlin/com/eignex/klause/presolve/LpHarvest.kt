@@ -55,8 +55,15 @@ fun lpHarvest(
     cancellation: Cancellation = Cancellation.Never,
 ): Problem = lpHarvestReporting(problem, objective, plan, bakeConfig, cancellation).problem
 
-/** [lpHarvest]'s transformed [problem] paired with the [report] of what the LP harvest contributed. */
-class LpHarvestResult(val problem: BakedProblem, val report: LpHarvestReport, val stats: LpStats = LpStats())
+/** [lpHarvest]'s transformed [problem] paired with its report and LP telemetry. */
+class LpHarvestResult(
+    /** Problem after the root harvest's sound reductions. */
+    val problem: BakedProblem,
+    /** Reductions the root harvest contributed. */
+    val report: LpHarvestReport,
+    /** LP work spent by the root harvest, including a no-op harvest. */
+    val stats: LpStats = LpStats(),
+)
 
 /** Whether the root LP relaxation is Farkas-certifiably infeasible over [problem]'s declared domains,
  *  built without the [com.eignex.klause.propagation.PropagationSession] bake fixpoint (O(domain span) on
