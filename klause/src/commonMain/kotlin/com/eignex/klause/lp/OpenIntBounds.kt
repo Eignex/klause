@@ -3,11 +3,11 @@ package com.eignex.klause.lp
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.lp.engine.Basis
+import com.eignex.klause.lp.engine.ComponentLpSolver
 import com.eignex.klause.lp.engine.LpBuilder
 import com.eignex.klause.lp.engine.LpCertificationObserver
 import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.LpNeighborhood
-import com.eignex.klause.lp.engine.LpSolver
 import com.eignex.klause.lp.engine.Relation
 import com.eignex.klause.lp.engine.Sense
 import com.eignex.klause.lp.engine.columnNeighborhood
@@ -61,7 +61,8 @@ internal class TightenedIntBounds(val bounds: Array<OpenIntBounds>, val refuted:
  * That LP relaxation is built **once** and every remaining open side is a re-solve of that one model with
  * a single ±1 cost swapped onto its column ([LpModel.withSingleColumnObjective]) — the matrix, rows and
  * bounds never change, so the previous optimal basis stays primal-feasible and the primal simplex
- * warm-starts from it ([LpSolver.solvePrimal]) in a few pivots rather than refactorizing a freshly-built
+ * warm-starts from it ([com.eignex.klause.lp.engine.LpSolver.solvePrimal]) in a few pivots rather than
+ * refactorizing a freshly-built
  * model per side. Each side's LP bound is derived over the prefiltered (but not further-OBBT-tightened)
  * bounds, so — unlike a sequential pass that feeds each closed side into later solves — an LP bound is
  * never sharpened by an earlier LP bound; every bound is still individually sound (the relaxation contains
@@ -78,7 +79,6 @@ internal class TightenedIntBounds(val bounds: Array<OpenIntBounds>, val refuted:
  * @param realLower per-real-variable declared lower bounds (`-inf` for open); indexed by real id.
  * @param realUpper per-real-variable declared upper bounds (`+inf` for open); indexed by real id.
  * @param observer optional sink for the probe's float and exact-bound certification attempts.
- * @param onSolve called after every primal probe, including an unsuccessful one.
  * @return fresh bounds with every provable open side closed, or the prefilter's refutation of the system.
  */
 internal fun tightenOpenIntBounds(
@@ -89,7 +89,6 @@ internal fun tightenOpenIntBounds(
     realLower: DoubleArray = EmptyDoubleArray,
     realUpper: DoubleArray = EmptyDoubleArray,
     observer: LpCertificationObserver? = null,
-    onSolve: ((LpSolver) -> Unit)? = null,
 ): TightenedIntBounds {
     val n = bounds.size
     // Working real-variable bounds the prefilter tightens alongside the integers (outward-rounded, so
@@ -123,7 +122,7 @@ internal fun tightenOpenIntBounds(
     // derivable finite bounds instead of falling to the clamp.
     if (base.m > OBBT_MAX_LP_ROWS) {
         return TightenedIntBounds(
-            tightenByNeighborhoodProbes(base, work, posCol, negCol, cancellation, observer, onSolve),
+            tightenByNeighborhoodProbes(base, work, posCol, negCol, cancellation, observer),
         )
     }
 
@@ -157,7 +156,7 @@ internal fun tightenOpenIntBounds(
                 null
             } finally {
                 try {
-                    onSolve?.invoke(solver)
+                    observer?.observeSolve(solver.lastMetrics, solver is ComponentLpSolver)
                 } finally {
                     solver.close()
                 }
@@ -197,7 +196,6 @@ private fun tightenByNeighborhoodProbes(
     negCol: IntArray,
     cancellation: Cancellation,
     observer: LpCertificationObserver?,
-    onSolve: ((LpSolver) -> Unit)?,
 ): Array<OpenIntBounds> {
     val rowIndex = base.rowIndex()
     var solves = 0
@@ -222,7 +220,7 @@ private fun tightenByNeighborhoodProbes(
                 null
             } finally {
                 try {
-                    onSolve?.invoke(solver)
+                    observer?.observeSolve(solver.lastMetrics, solver is ComponentLpSolver)
                 } finally {
                     solver.close()
                 }

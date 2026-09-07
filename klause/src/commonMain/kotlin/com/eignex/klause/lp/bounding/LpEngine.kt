@@ -513,7 +513,7 @@ internal class LpEngine(
             model,
             cancellation = params.cancellation,
             componentSplit = params.lpPlan.componentSplit,
-            observer = sink.lp.certificationObserver(),
+            observer = sink.lp.certificationObserver(LpRoute.STANDALONE),
         )
         certified.float?.let { sink.lp.observeComponentSplit(it.blocks) }
         return when (certified.verdict) {

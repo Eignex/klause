@@ -12,6 +12,7 @@ import com.eignex.klause.lp.relaxation.leafRealFeasibility
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
+import com.eignex.klause.solver.result.LpStatsSink
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
@@ -63,6 +64,25 @@ class LpOnlyContinuousLeafTest {
 
         assertEquals(LpVerdict.OPTIMAL, result.verdict)
         assertEquals(9.0, result.reals[0], absoluteTolerance = 1e-9)
+    }
+
+    @Test
+    fun `a residual leaf solve is reported as standalone LP work`() {
+        val row = Linear(longArrayOf(), intArrayOf(), doubleArrayOf(2.0), intArrayOf(0), LinearOp.EQ, 3L)
+        val p = problem(0, emptyArray(), 0.0, 10.0, row)
+        val sink = LpStatsSink()
+
+        val result = leafRealFeasibility(
+            p,
+            objective = null,
+            sample = Sample(booleanArrayOf(), longArrayOf()),
+            sink = sink,
+        )
+
+        assertEquals(LpVerdict.OPTIMAL, result.verdict)
+        val stats = sink.snapshot()
+        assertEquals(1.0, stats.standalonePasses.sum)
+        assertEquals(0.0, stats.solves.sum)
     }
 
     @Test

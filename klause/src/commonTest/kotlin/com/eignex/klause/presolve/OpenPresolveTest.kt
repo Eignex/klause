@@ -9,6 +9,7 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.solver.result.LpStatsSink
 import com.eignex.klause.util.Bits
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -155,7 +156,14 @@ class OpenPresolveTest {
             row(0 to -1L, 1 to -1L, op = LinearOp.LE, bound = -10L),
         )
 
-        assertIs<OpenPresolveResult.Refuted>(spec.presolveOpen())
+        val sink = LpStatsSink()
+
+        assertIs<OpenPresolveResult.Refuted>(spec.closeOpenBounds(lpStats = sink))
+        val stats = sink.snapshot()
+        assertTrue(
+            stats.standalonePasses.sum + stats.componentPasses.sum > 0.0,
+            "the LP solve that refuted the open model must be reported",
+        )
     }
 
     @Test
