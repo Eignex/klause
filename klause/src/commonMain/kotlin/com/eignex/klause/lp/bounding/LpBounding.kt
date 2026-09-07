@@ -463,7 +463,7 @@ internal fun LpEngine.sparseSafePrune(
                 lpSeparatorGate.record(i, produced.isNotEmpty())
                 fresh.addAll(produced)
             }
-            sink.lp.observeCutAccounting(fresh.size, 0, cutPool.size)
+            sink.lp.observeCutAccounting(fresh.size, 0, 0)
             if (fresh.isEmpty()) break
             recordSearchCuts(fresh, boundRes.primal) // persist the global cuts into the pool
             for (c in fresh) if (!c.global) localCuts.add(c)
@@ -829,9 +829,11 @@ internal fun LpEngine.harvestRootCuts(
             val mirCuts = if (mir) simplex.mirCuts(GOMORY_CUTS_PER_ROUND) else emptyList()
             val candidates = structural + (gomoryCuts + mirCuts).filter { it.global }
             val added = pool.addAll(candidates)
-            observeRootCutAccounting(candidates.size, pool.size, pool.size)
+            observeRootCutAccounting(candidates.size, 0, 0)
             if (added == 0) break
-            relaxation = relaxer.build(session, pool.cuts())
+            val selected = pool.cuts()
+            relaxation = relaxer.build(session, selected)
+            observeRootCutAccounting(0, added, selected.size)
             simplex = dualSimplex(relaxation.model, cancellation)
             val next = simplex.solve()
             observeRootSolve(simplex)
