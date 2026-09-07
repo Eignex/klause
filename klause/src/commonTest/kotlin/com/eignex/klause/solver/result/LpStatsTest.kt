@@ -56,6 +56,24 @@ class LpStatsTest {
     }
 
     @Test
+    fun `auxiliary route metrics do not change node cost totals`() {
+        val sink = LpStatsSink()
+
+        sink.observeEngineCost(LpRoute.NODE, LpSolveMetrics(pivots = 2, workOps = 7, initialRefactorizations = 1))
+        sink.observeEngineCost(LpRoute.STANDALONE, LpSolveMetrics(pivots = 3, workOps = 11))
+        sink.observeEngineCost(LpRoute.COMPONENT, LpSolveMetrics(pivots = 5, workOps = 13))
+        sink.observeEngineCost(LpRoute.ROOT, LpSolveMetrics(pivots = 7, workOps = 17))
+
+        val stats = sink.snapshot()
+        assertEquals(2.0, stats.pivots.sum)
+        assertEquals(7.0, stats.workOps.sum)
+        assertEquals(1.0, stats.refactorizations.sum)
+        assertEquals(3.0, stats.standalonePivots.sum)
+        assertEquals(5.0, stats.componentPivots.sum)
+        assertEquals(7.0, stats.rootPivots.sum)
+    }
+
+    @Test
     fun `engine reasons sum to refactorizations without inference`() {
         val sink = LpStatsSink()
 

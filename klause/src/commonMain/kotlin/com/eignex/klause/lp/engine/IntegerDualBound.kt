@@ -31,8 +31,12 @@ import kotlin.math.roundToLong
  * @param scaleBits the requested power-of-two scale exponent; capped down so the rounded multipliers
  *   stay exactly representable as `Double` (and below the [MAX_EXACT_INT] round-trip guard).
  */
-internal fun integerDualLowerBoundCeil(model: LpModel, y: DoubleArray, scaleBits: Int = DEFAULT_SCALE_BITS): Long? =
-    integerCertify(model, y, scaleBits)?.objectiveBoundCeil(0L)
+internal fun integerDualLowerBoundCeil(
+    model: LpModel,
+    y: DoubleArray,
+    scaleBits: Int = DEFAULT_SCALE_BITS,
+    observer: LpCertificationObserver? = null,
+): Long? = integerCertify(model, y, scaleBits, observer)?.objectiveBoundCeil(0L)
 
 /**
  * `⌈L⌉` on a **continuous** model's true minimized objective, certified over its scaled-integer
@@ -46,10 +50,14 @@ internal fun rationalizedDualLowerBoundCeil(
     model: LpModel,
     y: DoubleArray,
     scaleBits: Int = DEFAULT_SCALE_BITS,
+    observer: LpCertificationObserver? = null,
 ): Long? {
-    val r = rationalizeToIntegerModel(model, outwardRealUppers = true) ?: return null
-    if (!r.objConstantExact) return null
-    val scaled = integerCertify(r.model, y, scaleBits)?.objectiveBoundCeil(0L) ?: return null
+    val r = rationalizeToIntegerModel(model, outwardRealUppers = true, observer = observer) ?: return null
+    if (!r.objConstantExact) {
+        observer?.observeExactInput(false)
+        return null
+    }
+    val scaled = integerCertify(r.model, y, scaleBits, observer)?.objectiveBoundCeil(0L) ?: return null
     return ceilDivPositive(scaled, r.scale)
 }
 

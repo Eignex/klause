@@ -338,11 +338,11 @@ internal class LpStatsSink {
         solves.update(1.0)
     }
 
-    /** Route-specific engine cost. Node callers retain the legacy aggregate while standalone, component,
-     * and root auxiliary callers get their own denominators. */
+    /** Route-specific engine cost. The legacy pivot, work, warm-start and refactor totals are node-only,
+     * so their denominator ([solves]) always names the same route. */
     fun observeEngineCost(route: LpRoute, metrics: LpSolveMetrics) {
         when (route) {
-            LpRoute.NODE -> Unit
+            LpRoute.NODE -> observeMetrics(metrics)
 
             LpRoute.STANDALONE -> {
                 standalonePasses++
@@ -364,7 +364,6 @@ internal class LpStatsSink {
                 rootWorkOps += metrics.workOps
             }
         }
-        observeMetrics(metrics)
     }
 
     /** The local bridge passed into engine exact checks. */

@@ -234,7 +234,7 @@ private fun LpEngine.foldSelectedCuts(
     cutPool.observe(res.primal)
     cutPool.retainMostActive()
     val selected = cutPool.select(res.primal, objectiveCoefficients(base.model), cutPool.maxCuts)
-    sink.lp.observeCutAccounting(cutPool.size, selected.size, cutPool.size)
+    sink.lp.observeCutAccounting(candidates = 0, selected = selected.size, active = cutPool.size)
     if (selected.isEmpty()) return base to res
     val tightened = try {
         relaxer.build(session, selected)
@@ -472,7 +472,7 @@ internal fun LpEngine.sparseSafePrune(
                 objectiveCoefficients(boundRel.model),
                 cutPool.maxCuts,
             ) + localCuts
-            sink.lp.observeCutAccounting(0, selectedCuts.size, cutPool.size)
+            sink.lp.observeCutAccounting(0, selectedCuts.size, selectedCuts.size)
             val tightened = try {
                 relaxer.build(session, selectedCuts)
             } catch (_: CheckedLongOverflowException) {
@@ -725,7 +725,11 @@ internal fun LpEngine.sparseCertifiedPrune(
     // Both bounds are sound for any duals and neither dominates, so the larger wins: the
     // integer-multiplier bound carries no rounding margin, the float one never declines. A null (neither
     // available) keeps the node.
-    val lb = tightObjectiveLowerBound(relaxation.model, result.duals)
+    val lb = tightObjectiveLowerBound(
+        relaxation.model,
+        result.duals,
+        sink.lp.certificationObserver(LpRoute.NODE),
+    )
         ?: return LpNodeOutcome(false, null)
     val full = lb + relaxation.objectiveConstant.toDouble()
     return if (full >= bound) {
@@ -825,7 +829,7 @@ internal fun LpEngine.harvestRootCuts(
             val mirCuts = if (mir) simplex.mirCuts(GOMORY_CUTS_PER_ROUND) else emptyList()
             val candidates = structural + (gomoryCuts + mirCuts).filter { it.global }
             val added = pool.addAll(candidates)
-            observeRootCutAccounting(candidates.size, added, pool.size)
+            observeRootCutAccounting(candidates.size, pool.size, pool.size)
             if (added == 0) break
             relaxation = relaxer.build(session, pool.cuts())
             simplex = dualSimplex(relaxation.model, cancellation)
