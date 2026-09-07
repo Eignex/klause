@@ -9,7 +9,15 @@ internal enum class LpCertifier { INTEGER, SAFE_OBJECTIVE, EXACT_BASIS, EXACT_FA
 
 /** Why a simplex solve rebuilt its factors.  The reasons are emitted by the engine, not inferred from
  * aggregate counts by a consumer. */
-internal enum class LpRefactorReason { INITIAL, WARM_START, SINGULAR_RECOVERY, UPDATE_LIMIT, BACKEND_REQUESTED, RECONCILE_RECOVERY, PRIMAL }
+internal enum class LpRefactorReason {
+    INITIAL,
+    WARM_START,
+    SINGULAR_RECOVERY,
+    UPDATE_LIMIT,
+    BACKEND_REQUESTED,
+    RECONCILE_RECOVERY,
+    PRIMAL,
+}
 
 /** Optional, solve-scoped observer for certification and exact-input eligibility. */
 internal interface LpCertificationObserver {
