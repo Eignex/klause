@@ -67,16 +67,21 @@ internal fun CommonOptions.routingCancellation(): Cancellation {
  * arms stop being comparable. Read only by the front-ends that route open models — MPS and SMT-LIB.
  */
 private fun CommonOptions.takeOpenBoundProof(): Boolean {
-    val entry = engineParams.firstOrNull { it.startsWith("$OPEN_BOUND_PROOF_KEY=") } ?: return true
-    engineParams.remove(entry)
+    val entries = engineParams.filter { it.startsWith("$OPEN_BOUND_PROOF_KEY=") }
+    if (entries.isEmpty()) return true
+    engineParams.removeAll(entries)
     // Same vocabulary as `EngineParams.bool`, so one spelling does not depend on which side reads the key;
     // the raw token is reported unfolded, since a rejected value is easier to spot as it was typed.
-    val raw = entry.substringAfter('=')
-    return when (raw.lowercase()) {
-        "true", "on", "1", "yes" -> true
-        "false", "off", "0", "no" -> false
-        else -> usageError("engine param `$OPEN_BOUND_PROOF_KEY` expects a boolean, got `$raw`")
-    }
+    val values = entries.map { entry ->
+        val raw = entry.substringAfter('=')
+        when (raw.lowercase()) {
+            "true", "on", "1", "yes" -> true
+            "false", "off", "0", "no" -> false
+            else -> usageError("engine param `$OPEN_BOUND_PROOF_KEY` expects a boolean, got `$raw`")
+        }
+    }.distinct()
+    return values.singleOrNull()
+        ?: usageError("engine param `$OPEN_BOUND_PROOF_KEY` cannot be set to conflicting values")
 }
 
 private const val OPEN_BOUND_PROOF_KEY = "open-bound-proof"

@@ -582,7 +582,7 @@ class CliModeTest {
     }
 
     @Test
-    fun `the bound-proof param is consumed rather than left for an engine to reject`() {
+    fun `bound-proof params are consumed rather than left for an engine to reject`() {
         // Every CLI-level param has to leave `engineParams` as it is read; a leftover key fails engine
         // validation on a fully bounded model, which never reaches the proof at all.
         val mps = File.createTempFile("cli", ".mps").apply {
@@ -598,7 +598,19 @@ class CliModeTest {
 
         var code = -1
         val err = captureErr {
-            capture { code = runCli(arrayOf("-t", "10000", "--param", "open-bound-proof=false", mps.absolutePath)) }
+            capture {
+                code = runCli(
+                    arrayOf(
+                        "-t",
+                        "10000",
+                        "--param",
+                        "open-bound-proof=false",
+                        "--param",
+                        "open-bound-proof=false",
+                        mps.absolutePath,
+                    ),
+                )
+            }
         }
 
         assertEquals(0, code, err)

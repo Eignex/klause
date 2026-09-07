@@ -226,7 +226,7 @@ private fun appendRouteCertifierStats(
  * reached — the only signal of how close an otherwise-UNKNOWN run got. Every key is `ls`-prefixed so the
  * block is unambiguous in the flat stat stream, matching the `lp`-prefix convention.
  */
-internal fun lsStatPairs(stats: SolveStats): List<Pair<String, String>> {
+internal fun lsStatPairs(stats: SolveStats, solveTimeMs: Long): List<Pair<String, String>> {
     val moves = stats.ls.moves.sum
     if (stats.run.backend != "ls" && moves == 0.0) return emptyList()
 
@@ -234,7 +234,7 @@ internal fun lsStatPairs(stats: SolveStats): List<Pair<String, String>> {
     out += "lsMoves" to "${moves.toLong()}"
     out += "lsRestarts" to "${stats.search.restarts.sum.toLong()}"
     out += "lsStalls" to "${stats.ls.stalls.sum.toLong()}"
-    if (stats.run.wallMs > 0L) out += "lsMovesPerSec" to round4(moves / (stats.run.wallMs / 1000.0))
+    if (solveTimeMs > 0L) out += "lsMovesPerSec" to round4(moves / (solveTimeMs / 1000.0))
     if (stats.ls.timeToBestMs >= 0L) out += "lsTimeToBest" to round4(stats.ls.timeToBestMs / 1000.0)
     if (stats.ls.incumbentObjective.isFinite()) out += "lsIncumbentObjective" to round4(stats.ls.incumbentObjective)
     if (stats.ls.incumbentViolation.isFinite()) out += "lsIncumbentViolation" to round4(stats.ls.incumbentViolation)
@@ -259,7 +259,7 @@ internal fun searchStatPairs(stats: SolveStats): List<Pair<String, String>> {
 }
 
 /** Exact deterministic open-theory accounting pairs for `-s`. */
-internal fun openTheoryStatPairs(stats: SolveStats, solveTimeMs: Long = 0L): List<Pair<String, String>> =
+internal fun openTheoryStatPairs(stats: SolveStats, solveTimeMs: Long): List<Pair<String, String>> =
     with(stats.openTheory) {
         listOf(
             "openBoolDecisions" to "$openBoolDecisions",

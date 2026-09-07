@@ -597,7 +597,7 @@ class OpenTheoryEngineTest {
     }
 
     @Test
-    fun `a cardinality beside an open column no longer drags a finite component onto the model`() {
+    fun `a cardinality beside an open column needs no finite component`() {
         val model = openCardinalityModel(Cardinality.exactlyOne(intArrayOf(0, 2)))
 
         val plan = model.componentPlan()
