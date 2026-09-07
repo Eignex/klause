@@ -4,6 +4,7 @@ import com.eignex.klause.factor.arithmetic.ComparisonClause
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
+import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.formats.smtlib.SmtLib
@@ -574,6 +575,77 @@ class OpenTheoryEngineTest {
 
         assertEquals(ProblemPipeline.EXACT_LIRA, sourceRoute(model))
         assertIs<OpenTheoryResult.Unsat>(OpenTheoryEngine(model, ProblemPipeline.EXACT_LIRA).solve())
+    }
+
+    /** The rows of [cardinalities] over two Boolean variables, beside two columns open above. */
+    private fun openCardinalityModel(vararg cardinalities: Cardinality): Problem {
+        val openUpper = Bits(2).also {
+            it.set(0)
+            it.set(1)
+        }
+        return Problem(
+            numBoolVars = 2,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(0, 0), longArrayOf(0, 0), null, openUpper),
+            factors = arrayOf(*cardinalities, Linear(intArrayOf(2, 3), intArrayOf(0, 1), LinearOp.EQ, 0)),
+        )
+    }
+
+    @Test
+    fun `a cardinality beside an open column no longer drags a finite component onto the model`() {
+        val model = openCardinalityModel(Cardinality.exactlyOne(intArrayOf(0, 2)))
+
+        val plan = model.componentPlan()
+
+        assertEquals(ProblemPipeline.EXACT_LIRA, plan.theoryPipeline)
+        assertEquals(FactorOwner.THEORY, plan.factorOwner(0))
+        assertEquals(false, plan.hasCpComponent, "nothing in the model needs a finite domain")
+    }
+
+    @Test
+    fun `a cardinality leaves a pure real model wholly held by the exact rational lane`() {
+        val model = Problem(
+            numBoolVars = 2,
+            intBounds = IntBounds.fromModelBounds(LongArray(0), LongArray(0), null, null),
+            factors = arrayOf(
+                Cardinality.exactlyOne(intArrayOf(0, 2)),
+                ReifiedRealLinear(
+                    aux = 0,
+                    vars = intArrayOf(),
+                    intCoeffs = doubleArrayOf(),
+                    realVars = intArrayOf(0, 1),
+                    realCoeffs = doubleArrayOf(1.0, -1.0),
+                    op = LinearOp.LE,
+                    bound = 2.0,
+                ),
+            ),
+            numRealVars = 2,
+            realLower = doubleArrayOf(0.0, 0.0),
+            realUpper = doubleArrayOf(Double.POSITIVE_INFINITY, Double.POSITIVE_INFINITY),
+        )
+
+        val plan = model.componentPlan()
+
+        assertEquals(ProblemPipeline.EXACT_LRA, plan.theoryPipeline)
+        assertEquals(FactorOwner.THEORY, plan.factorOwner(0))
+        assertEquals(false, plan.hasCpComponent, "a model of continuous columns has nothing for CP to search")
+    }
+
+    @Test
+    fun `a shared cardinality still refutes an exact LIA fragment`() {
+        val model = openCardinalityModel(
+            Cardinality(intArrayOf(0, 2), min = 2, max = 2),
+            Cardinality(intArrayOf(0, 2), min = 0, max = 1),
+        )
+
+        assertEquals(ProblemPipeline.EXACT_LIRA, sourceRoute(model))
+        assertIs<OpenTheoryResult.Unsat>(OpenTheoryEngine(model, ProblemPipeline.EXACT_LIRA).solve())
+    }
+
+    @Test
+    fun `a satisfiable cardinality leaves the exact LIA fragment satisfiable`() {
+        val model = openCardinalityModel(Cardinality.exactlyOne(intArrayOf(0, 2)))
+
+        assertIs<OpenTheoryResult.Sat>(OpenTheoryEngine(model, ProblemPipeline.EXACT_LIRA).solve())
     }
 
     // Three CP columns each admitting {0, 3}, so an all-different over them has no solution; the bound
