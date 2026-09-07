@@ -156,9 +156,20 @@ class OpenPresolveTest {
             row(0 to -1L, 1 to -1L, op = LinearOp.LE, bound = -10L),
         )
 
+        assertIs<OpenPresolveResult.Refuted>(spec.presolveOpen())
+    }
+
+    @Test
+    fun `an LP refutation records standalone route work`() {
+        val spec = fullyOpen(
+            2,
+            row(0 to 1L, 1 to 1L, op = LinearOp.LE, bound = 5L),
+            row(0 to -1L, 1 to -1L, op = LinearOp.LE, bound = -10L),
+        )
         val sink = LpStatsSink()
 
-        assertIs<OpenPresolveResult.Refuted>(spec.closeOpenBounds(lpStats = sink))
+        spec.closeOpenBounds(lpStats = sink)
+
         val stats = sink.snapshot()
         assertTrue(
             stats.standalonePasses.sum + stats.componentPasses.sum > 0.0,
