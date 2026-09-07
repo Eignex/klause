@@ -26,6 +26,7 @@ import com.eignex.klause.lp.cut.KnapsackCoverSeparator
 import com.eignex.klause.lp.cut.SharedCut
 import com.eignex.klause.lp.engine.Basis
 import com.eignex.klause.lp.engine.Cut
+import com.eignex.klause.lp.engine.LpSolver
 import com.eignex.klause.lp.engine.LpVerdict
 import com.eignex.klause.lp.engine.PersistentLpSolver
 import com.eignex.klause.lp.engine.newPersistentLpSolver
@@ -81,6 +82,15 @@ internal class LpEngine(
     params0: LpParams,
     private val sink: SolveStatsSink,
 ) {
+    /** Attribute an auxiliary root/presolve simplex invocation to this solve's shared sink. */
+    internal fun observeRootSolve(solver: LpSolver) {
+        sink.lp.observeEngineCost(com.eignex.klause.solver.result.LpRoute.ROOT, solver.lastMetrics)
+    }
+
+    internal fun observeRootCutAccounting(candidates: Int, selected: Int, active: Int) {
+        sink.lp.observeCutAccounting(candidates, selected, active)
+    }
+
     /** The relaxation-bound family resolved from the high-level emphasis ([LpParams.lpConfig])
      *  against this problem's structure; with no emphasis set, the explicit
      *  [LpParams.lpPlan] is used verbatim. Resolving here makes the engine the single home for
@@ -498,6 +508,7 @@ internal class LpEngine(
             model,
             cancellation = params.cancellation,
             componentSplit = params.lpPlan.componentSplit,
+            observer = sink.lp.certificationObserver(),
         )
         certified.float?.let { sink.lp.observeComponentSplit(it.blocks) }
         return when (certified.verdict) {

@@ -24,7 +24,15 @@ import kotlin.math.nextDown
  * This is the cheap pruning bound; the integer-multiplier [integerCertify] gives the tight
  * authoritative one. A loose result here only costs a missed prune, never correctness.
  */
-internal fun safeObjectiveLowerBound(model: LpModel, y: DoubleArray): Double? {
+internal fun safeObjectiveLowerBound(
+    model: LpModel,
+    y: DoubleArray,
+    observer: LpCertificationObserver? = null,
+): Double? = safeObjectiveLowerBoundUnchecked(model, y).also {
+    observer?.observe(LpCertifier.SAFE_OBJECTIVE, it != null)
+}
+
+private fun safeObjectiveLowerBoundUnchecked(model: LpModel, y: DoubleArray): Double? {
     // The Neumaier–Shcherbina bound is sound over real data too, so it reads the double view when the
     // model has continuous columns — an integer model's accessors return the same widened Long values,
     // so the integer path is unchanged.
@@ -238,8 +246,12 @@ internal fun tightObjectiveLowerBound(model: LpModel, y: DoubleArray): Double? =
  * caller uses this form so the node pays for at most one certification, and so a continuous model never
  * re-rationalizes per node.
  */
-internal fun tightObjectiveLowerBound(model: LpModel, y: DoubleArray, certificate: IntegerCertificate?): Double? =
-    tighterLowerBound(safeObjectiveLowerBound(model, y), certificate?.objectiveBoundCeil(0L))
+internal fun tightObjectiveLowerBound(
+    model: LpModel,
+    y: DoubleArray,
+    certificate: IntegerCertificate?,
+    observer: LpCertificationObserver? = null,
+): Double? = tighterLowerBound(safeObjectiveLowerBound(model, y, observer), certificate?.objectiveBoundCeil(0L))
 
 /** The larger of two sound lower bounds on the same objective, either of which may be unavailable. */
 private fun tighterLowerBound(safe: Double?, exactCeil: Long?): Double? {

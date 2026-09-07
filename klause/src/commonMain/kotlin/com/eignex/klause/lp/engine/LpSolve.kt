@@ -72,50 +72,60 @@ internal fun solveAndCertify(
     warm: Basis? = null,
     cancellation: Cancellation = Cancellation.Never,
     componentSplit: Boolean = true,
+    observer: LpCertificationObserver? = null,
 ): CertifiedLpResult {
     val solver = newLpSolver(model, cancellation, componentSplit)
     val result = solver.solve(warm)
-        ?: run {
-            // A dual-unbounded termination is only a *candidate* infeasibility — confirm it with an exact
-            // Farkas certificate. Any other failure (non-convergence / singular) is indeterminate.
-            val floatRay = solver.infeasibleRay
-            val ray = if (floatRay != null) {
-                integerFarkasRay(model, floatRay, basis = solver.infeasibleBasis, basisRow = solver.infeasibleRow)
-            } else {
-                null
-            }
-            if (ray != null) {
-                return CertifiedLpResult(
-                    LpVerdict.INFEASIBLE,
-                    float = null,
-                    certificate = null,
-                    farkasRay = ray,
-                    model = null,
-                )
-            }
-            val outcome = rationalOutcome(model, cancellation)
+    observer?.observeSolve(solver.lastMetrics, solver is ComponentLpSolver)
+    if (result == null) {
+        // A dual-unbounded termination is only a *candidate* infeasibility — confirm it with an exact
+        // Farkas certificate. Any other failure (non-convergence / singular) is indeterminate.
+        val floatRay = solver.infeasibleRay
+        val ray = if (floatRay != null) {
+            integerFarkasRay(
+                model,
+                floatRay,
+                basis = solver.infeasibleBasis,
+                basisRow = solver.infeasibleRow,
+                observer = observer,
+            )
+        } else {
+            null
+        }
+        if (ray != null) {
             return CertifiedLpResult(
-                when (outcome.feasibility) {
-                    RationalFeasibility.FEASIBLE -> LpVerdict.OPTIMAL
-                    RationalFeasibility.INFEASIBLE -> LpVerdict.INFEASIBLE
-                    RationalFeasibility.UNKNOWN -> LpVerdict.INDETERMINATE
-                },
+                LpVerdict.INFEASIBLE,
                 float = null,
                 certificate = null,
-                farkasRay = null,
+                farkasRay = ray,
                 model = null,
-                exactPrimal = outcome.witness,
-                infeasibleRows = outcome.rows,
             )
         }
+        val outcome = rationalOutcome(model, cancellation).also {
+            observer?.observe(LpCertifier.RATIONAL, it.feasibility != RationalFeasibility.UNKNOWN)
+        }
+        return CertifiedLpResult(
+            when (outcome.feasibility) {
+                RationalFeasibility.FEASIBLE -> LpVerdict.OPTIMAL
+                RationalFeasibility.INFEASIBLE -> LpVerdict.INFEASIBLE
+                RationalFeasibility.UNKNOWN -> LpVerdict.INDETERMINATE
+            },
+            float = null,
+            certificate = null,
+            farkasRay = null,
+            model = null,
+            exactPrimal = outcome.witness,
+            infeasibleRows = outcome.rows,
+        )
+    }
     // A float optimum that cannot be certified exactly (a 128-bit overflow, or a real coefficient the
     // integer certifier declines) is INDETERMINATE — the float point is not a proof. An integer model is
     // certified by the exact dual bound ([integerCertify]); a continuous model has no integer dual bound,
     // so its feasibility is certified by reconstructing the reported basis's point exactly
     // ([exactBasisFeasible]) — enough for a definitive SAT verdict at a leaf.
     val componentSolver = solver as? ComponentLpSolver
-    val certificate = integerCertify(model, result.duals)
-    val componentExactLowerBound = if (certificate == null) componentSolver?.exactLowerBound() else null
+    val certificate = integerCertify(model, result.duals, observer = observer)
+    val componentExactLowerBound = if (certificate == null) componentSolver?.exactLowerBound(observer) else null
     // Strict rows are relaxed to non-strict in the float model, so the basis/point certificates would
     // bless a boundary point a strict row forbids; those models go straight to the delta-aware
     // rational decider.
@@ -127,9 +137,9 @@ internal fun solveAndCertify(
 
         model.hasContinuous && !anyStrict &&
             (
-                componentSolver?.exactBasisFeasible() == true ||
-                    exactBasisFeasible(model, result.basis) == true ||
-                    exactPointFeasible(model, result.primal)
+                componentSolver?.exactBasisFeasible(observer) == true ||
+                    exactBasisFeasible(model, result.basis, observer) == true ||
+                    exactPointFeasible(model, result.primal, observer)
                 ) ->
             LpVerdict.OPTIMAL
 
@@ -138,7 +148,9 @@ internal fun solveAndCertify(
         // basis/point certificates (a definitive SAT, with the exact witness carried out), INFEASIBLE
         // is an exact refutation.
         model.hasContinuous -> {
-            val outcome = rationalOutcome(model, cancellation)
+            val outcome = rationalOutcome(model, cancellation).also {
+                observer?.observe(LpCertifier.RATIONAL, it.feasibility != RationalFeasibility.UNKNOWN)
+            }
             exactPrimal = outcome.witness
             infeasibleRows = outcome.rows
             when (outcome.feasibility) {

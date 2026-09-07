@@ -24,7 +24,8 @@ internal fun lpStatPairs(stats: SolveStats): List<Pair<String, String>> {
     val lagrangian = stats.scheduling.lagrangianPruned.sum
     val energetic = stats.scheduling.energeticPruned.sum
     val splits = stats.lp.componentSplits.sum
-    if (solves == 0.0 && lagrangian == 0.0 && energetic == 0.0 && splits == 0.0) return emptyList()
+    val routed = stats.lp.standalonePasses.sum + stats.lp.componentPasses.sum + stats.lp.rootPasses.sum
+    if (solves == 0.0 && routed == 0.0 && lagrangian == 0.0 && energetic == 0.0 && splits == 0.0) return emptyList()
 
     val pruned = stats.lp.pruned.sum
     val infeasible = stats.lp.infeasible.sum
@@ -44,6 +45,22 @@ internal fun lpStatPairs(stats: SolveStats): List<Pair<String, String>> {
     out += "lpCuts" to "${stats.lp.cuts.sum.toLong()}"
     out += "lpPivots" to "${stats.lp.pivots.sum.toLong()}"
     out += "lpWorkOps" to "${stats.lp.workOps.sum.toLong()}"
+    out += "lpNodePasses" to "${stats.lp.nodePasses.sum.toLong()}"
+    if (stats.lp.standalonePasses.sum > 0.0) {
+        out += "lpStandalonePasses" to "${stats.lp.standalonePasses.sum.toLong()}"
+        out += "lpStandalonePivots" to "${stats.lp.standalonePivots.sum.toLong()}"
+        out += "lpStandaloneWorkOps" to "${stats.lp.standaloneWorkOps.sum.toLong()}"
+    }
+    if (stats.lp.componentPasses.sum > 0.0) {
+        out += "lpComponentPasses" to "${stats.lp.componentPasses.sum.toLong()}"
+        out += "lpComponentPivots" to "${stats.lp.componentPivots.sum.toLong()}"
+        out += "lpComponentWorkOps" to "${stats.lp.componentWorkOps.sum.toLong()}"
+    }
+    if (stats.lp.rootPasses.sum > 0.0) {
+        out += "lpRootPasses" to "${stats.lp.rootPasses.sum.toLong()}"
+        out += "lpRootPivots" to "${stats.lp.rootPivots.sum.toLong()}"
+        out += "lpRootWorkOps" to "${stats.lp.rootWorkOps.sum.toLong()}"
+    }
     if (stats.lp.wallBackstop) out += "lpWallBackstop" to "1"
     if (stats.lp.demoted) out += "lpDemoted" to "1"
     if (stats.lp.luMaxFill.max.isFinite()) out += "lpLuMaxFill" to round4(stats.lp.luMaxFill.max)
@@ -55,6 +72,15 @@ internal fun lpStatPairs(stats: SolveStats): List<Pair<String, String>> {
     }
     if (stats.lp.smallPivotBails.sum > 0.0) {
         out += "lpSmallPivotBails" to "${stats.lp.smallPivotBails.sum.toLong()}"
+    }
+    if (stats.lp.refactorizations.sum > 0.0) {
+        out += "lpRefactorInitial" to "${stats.lp.initialRefactorizations.sum.toLong()}"
+        out += "lpRefactorWarmStart" to "${stats.lp.warmStartRefactorizations.sum.toLong()}"
+        out += "lpRefactorSingularRecovery" to "${stats.lp.singularRecoveryRefactorizations.sum.toLong()}"
+        out += "lpRefactorUpdateLimit" to "${stats.lp.updateLimitRefactorizations.sum.toLong()}"
+        out += "lpRefactorBackendRequested" to "${stats.lp.backendRequestedRefactorizations.sum.toLong()}"
+        out += "lpRefactorReconcileRecovery" to "${stats.lp.reconcileRecoveryRefactorizations.sum.toLong()}"
+        out += "lpRefactorPrimal" to "${stats.lp.primalRefactorizations.sum.toLong()}"
     }
     // The decline rate: certified against the two causes it can fail for. Printed whenever any
     // certification happened, since a zero decline count is as informative as a nonzero one here.
@@ -81,6 +107,27 @@ internal fun lpStatPairs(stats: SolveStats): List<Pair<String, String>> {
     if (stats.lp.rationalFallbacks.sum > 0.0) {
         out += "lpRationalFallbacks" to "${stats.lp.rationalFallbacks.sum.toLong()}"
     }
+    appendCertifierStats(out, "IntegerCertify", stats.lp.integerCertify)
+    appendCertifierStats(out, "SafeObjectiveLowerBound", stats.lp.safeObjectiveLowerBound)
+    appendCertifierStats(out, "ExactBasisFeasible", stats.lp.exactBasisFeasible)
+    appendCertifierStats(out, "ExactFarkasRay", stats.lp.exactFarkasRay)
+    appendCertifierStats(out, "ExactPointFeasible", stats.lp.exactPointFeasible)
+    appendCertifierStats(out, "RationalOutcome", stats.lp.rationalOutcome)
+    if (stats.lp.warmStartAttempts.sum > 0.0) {
+        out += "lpWarmStartAttempts" to "${stats.lp.warmStartAttempts.sum.toLong()}"
+        out += "lpWarmStartHits" to "${stats.lp.warmStartHits.sum.toLong()}"
+        out += "lpWarmStartHitRate" to round4(stats.lp.warmStartHits.sum / stats.lp.warmStartAttempts.sum)
+    }
+    if (stats.lp.exactInputAttempts.sum > 0.0) {
+        out += "lpExactInputAttempts" to "${stats.lp.exactInputAttempts.sum.toLong()}"
+        out += "lpExactInputRejections" to "${stats.lp.exactInputRejections.sum.toLong()}"
+    }
+    if (stats.lp.cutCandidates.sum > 0.0 || stats.lp.cutSelected.sum > 0.0 || stats.lp.cutActive.sum > 0.0) {
+        out += "lpCutCandidates" to "${stats.lp.cutCandidates.sum.toLong()}"
+        out += "lpCutSelected" to "${stats.lp.cutSelected.sum.toLong()}"
+        out += "lpCutActive" to "${stats.lp.cutActive.sum.toLong()}"
+    }
+    if (stats.lp.rootReducedCostFixes.sum > 0.0) out += "lpRootReducedCostFixes" to "${stats.lp.rootReducedCostFixes.sum.toLong()}"
     if (stats.lp.rootMatrixMinValue.isFinite()) {
         // Full precision, not [round4]: a coefficient below 1e-4 is exactly the one worth seeing, and
         // rounding it reports the badly scaled matrix as a zero.
@@ -98,6 +145,14 @@ internal fun lpStatPairs(stats: SolveStats): List<Pair<String, String>> {
     out += "lpMs" to "${stats.lp.ms}"
     if (stats.lp.rootBound.isFinite()) out += "lpRootBound" to round4(stats.lp.rootBound)
     return out
+}
+
+private fun appendCertifierStats(out: MutableList<Pair<String, String>>, name: String, stats: com.eignex.klause.solver.result.LpCertifierStats) {
+    if (stats.attempts.sum == 0.0) return
+    out += "lp${name}Attempts" to "${stats.attempts.sum.toLong()}"
+    out += "lp${name}Successes" to "${stats.successes.sum.toLong()}"
+    out += "lp${name}Declines" to "${stats.declines.sum.toLong()}"
+    out += "lp${name}SuccessRate" to round4(stats.successes.sum / stats.attempts.sum)
 }
 
 /**

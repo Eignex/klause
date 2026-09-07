@@ -124,7 +124,7 @@ private class CpSatisfactionTraversal(
             ),
             branching = CpBranching.None,
         )
-        val completion = BacktrackCompletion.of(problem, cp, params)
+        val completion = BacktrackCompletion.of(problem, cp, params, sink)
         val traversal = CpSatisfactionTraversalPolicy(
             cp.session,
             params,
@@ -136,7 +136,7 @@ private class CpSatisfactionTraversal(
         completion.addTo(components)
         // Only an arm that asked for the relaxation pays for it; the engine itself then declines on a
         // model with no LP-emittable structure.
-        if (params.lpConfig != null) components += LpFeasibilityComponent(problem, cp, params)
+        if (params.lpConfig != null) components += LpFeasibilityComponent(problem, cp, params, sink)
         components += params.componentFactory?.invoke().orEmpty()
         val session = SearchComponentSet(components, branchers = listOf(traversal.brancher)).session(
             cancellation = params.cancellation,
@@ -403,8 +403,13 @@ private sealed interface BacktrackCompletion {
     }
 
     companion object {
-        fun of(problem: Problem, cp: CpSearchComponent, params: BacktrackParams): BacktrackCompletion =
-            if (problem.numRealVars == 0) Discrete else ResidualReal(ResidualRealComponent(problem, cp, params))
+        fun of(
+            problem: Problem,
+            cp: CpSearchComponent,
+            params: BacktrackParams,
+            sink: SolveStatsSink?,
+        ): BacktrackCompletion =
+            if (problem.numRealVars == 0) Discrete else ResidualReal(ResidualRealComponent(problem, cp, params, sink))
     }
 }
 
@@ -421,8 +426,12 @@ private sealed interface BacktrackCompletion {
  * lower bound of a zero objective is zero and the bound to beat is infinite. Only the infeasibility
  * prune fires, which is what a satisfaction node can act on.
  */
-private class LpFeasibilityComponent(problem: Problem, private val cp: CpSearchComponent, params: BacktrackParams) :
-    SearchComponent {
+private class LpFeasibilityComponent(
+    problem: Problem,
+    private val cp: CpSearchComponent,
+    params: BacktrackParams,
+    sink: SolveStatsSink?,
+) : SearchComponent {
     private val engine = LpEngine(
         problem,
         LinearObjective(intCoefficients = LongArray(problem.numIntVars)),
@@ -433,7 +442,7 @@ private class LpFeasibilityComponent(problem: Problem, private val cp: CpSearchC
             solveBudgetMillis = params.solveBudgetMillis,
             randomSeed = params.randomSeed,
         ),
-        SolveStatsSink(backend = "backtrack"),
+        sink ?: SolveStatsSink(backend = "backtrack"),
     )
 
     override fun propagate(context: SearchContext): ComponentResult {
@@ -453,6 +462,7 @@ private class ResidualRealComponent(
     private val problem: Problem,
     private val cp: CpSearchComponent,
     params: BacktrackParams,
+    sink: SolveStatsSink?,
 ) : SearchComponent {
     private val engine = LpEngine(
         problem,
@@ -464,7 +474,7 @@ private class ResidualRealComponent(
             solveBudgetMillis = params.solveBudgetMillis,
             randomSeed = params.randomSeed,
         ),
-        SolveStatsSink(backend = "backtrack"),
+        sink ?: SolveStatsSink(backend = "backtrack"),
     )
     private var completed: Sample? = null
 

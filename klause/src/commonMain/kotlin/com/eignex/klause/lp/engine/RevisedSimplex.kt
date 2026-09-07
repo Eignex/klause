@@ -132,6 +132,14 @@ internal class RevisedSimplex(
     private var pivots = 0
     private var warmStarted = false
     private var refactorizations = 0
+    private var initialRefactorizations = 0
+    private var warmStartRefactorizations = 0
+    private var singularRecoveryRefactorizations = 0
+    private var updateLimitRefactorizations = 0
+    private var backendRequestedRefactorizations = 0
+    private var reconcileRecoveryRefactorizations = 0
+    private var primalRefactorizations = 0
+    private var warmAttempts = 0
 
     /**
      * Numerical trouble this solve met, counted rather than only acted on.
@@ -236,6 +244,21 @@ internal class RevisedSimplex(
     override val lastWorkOps: Long get() = work.ops
     override val lastSingularRefactorizations: Int get() = singularRefactorizations
     override val lastSmallPivotBails: Int get() = smallPivotBails
+    override val lastMetrics: LpSolveMetrics get() = LpSolveMetrics(
+        pivots = pivots,
+        workOps = work.ops,
+        warmAttempts = warmAttempts,
+        warmHits = if (warmStarted) 1 else 0,
+        singularRefactorizations = singularRefactorizations,
+        smallPivotBails = smallPivotBails,
+        initialRefactorizations = initialRefactorizations,
+        warmStartRefactorizations = warmStartRefactorizations,
+        singularRecoveryRefactorizations = singularRecoveryRefactorizations,
+        updateLimitRefactorizations = updateLimitRefactorizations,
+        backendRequestedRefactorizations = backendRequestedRefactorizations,
+        reconcileRecoveryRefactorizations = reconcileRecoveryRefactorizations,
+        primalRefactorizations = primalRefactorizations,
+    )
 
     init {
         // Transpose `columns` once. Counting sort by row: tally each row's entries, then fill, so the whole
@@ -302,8 +325,17 @@ internal class RevisedSimplex(
      * folded into it. False when it came back singular, which leaves this engine unable to solve until
      * a later call succeeds.
      */
-    private fun refactorize(): Boolean {
+    private fun refactorize(reason: LpRefactorReason): Boolean {
         refactorizations++
+        when (reason) {
+            LpRefactorReason.INITIAL -> initialRefactorizations++
+            LpRefactorReason.WARM_START -> warmStartRefactorizations++
+            LpRefactorReason.SINGULAR_RECOVERY -> singularRecoveryRefactorizations++
+            LpRefactorReason.UPDATE_LIMIT -> updateLimitRefactorizations++
+            LpRefactorReason.BACKEND_REQUESTED -> backendRequestedRefactorizations++
+            LpRefactorReason.RECONCILE_RECOVERY -> reconcileRecoveryRefactorizations++
+            LpRefactorReason.PRIMAL -> primalRefactorizations++
+        }
         nnzB = 0
         for (t in 0 until m) nnzB += columnNnz(basicVar[t])
         // The elimination's deterministic stand-in: the entries it reads. Not what it produces — that
@@ -405,7 +437,14 @@ internal class RevisedSimplex(
         // advisory, and SINGULAR parted them from the basis so only a rebuild recovers. Rebuild on
         // anything but an APPLIED still inside the chain limit.
         if (outcome == BasisUpdate.APPLIED && solver.updateCount < refactorUpdateLimit) return PivotFold.UPDATED
-        return if (refactorize()) PivotFold.REBUILT else PivotFold.FAILED
+        val reason = if (outcome ==
+            BasisUpdate.APPLIED
+        ) {
+                LpRefactorReason.UPDATE_LIMIT
+            } else {
+                LpRefactorReason.BACKEND_REQUESTED
+            }
+        return if (refactorize(reason)) PivotFold.REBUILT else PivotFold.FAILED
     }
 
     /** Duals `y` solving `Bᵀ y = c_B` (BTRAN). */
@@ -518,6 +557,14 @@ internal class RevisedSimplex(
         maxLuFill = 0.0
         maxLuDensity = 0.0
         refactorizations = 0
+        initialRefactorizations = 0
+        warmStartRefactorizations = 0
+        singularRecoveryRefactorizations = 0
+        updateLimitRefactorizations = 0
+        backendRequestedRefactorizations = 0
+        reconcileRecoveryRefactorizations = 0
+        primalRefactorizations = 0
+        warmAttempts = 0
         singularRefactorizations = 0
         smallPivotBails = 0
         work.reset()
@@ -528,12 +575,17 @@ internal class RevisedSimplex(
         warmStarted = kept
         // A warm basis can be singular; fall back to the (always non-singular) slack cold start.
         if (!kept) {
-            if (warm == null || !tryWarmStart(warm)) coldStart() else warmStarted = true
-            if (!refactorize()) {
+            if (warm == null) {
+                coldStart()
+            } else {
+                warmAttempts++
+                if (!tryWarmStart(warm)) coldStart() else warmStarted = true
+            }
+            if (!refactorize(if (warmStarted) LpRefactorReason.WARM_START else LpRefactorReason.INITIAL)) {
                 // The warm basis factorized singular, so the solve runs from the slack start after all.
                 coldStart()
                 warmStarted = false
-                if (!refactorize()) return null
+                if (!refactorize(LpRefactorReason.SINGULAR_RECOVERY)) return null
             }
         }
         if (enforced != null) {
@@ -541,7 +593,7 @@ internal class RevisedSimplex(
             // resets to the all-slack cold start, where the invariant holds trivially.
             if (!reconcileUnenforced(enforced)) {
                 coldStart()
-                if (!refactorize()) return null
+                if (!refactorize(LpRefactorReason.RECONCILE_RECOVERY)) return null
             }
         }
         resetGamma() // fresh Devex reference frame for this solve
@@ -1103,10 +1155,29 @@ internal class RevisedSimplex(
      */
     @Suppress("CyclomaticComplexMethod", "NestedBlockDepth", "ReturnCount", "LongMethod")
     override fun solvePrimal(warm: Basis?): FloatLpResult? {
-        if (warm == null || !tryWarmStart(warm)) lowerStart()
-        if (!refactorize()) {
+        pivots = 0
+        refactorizations = 0
+        initialRefactorizations = 0
+        warmStartRefactorizations = 0
+        singularRecoveryRefactorizations = 0
+        updateLimitRefactorizations = 0
+        backendRequestedRefactorizations = 0
+        reconcileRecoveryRefactorizations = 0
+        primalRefactorizations = 0
+        warmAttempts = if (warm == null) 0 else 1
+        singularRefactorizations = 0
+        smallPivotBails = 0
+        work.reset()
+        warmStarted = false
+        if (warm == null || !tryWarmStart(warm)) {
             lowerStart()
-            if (!refactorize()) return null
+        } else {
+            warmStarted = true
+        }
+        if (!refactorize(LpRefactorReason.PRIMAL)) {
+            lowerStart()
+            warmStarted = false
+            if (!refactorize(LpRefactorReason.SINGULAR_RECOVERY)) return null
         }
         val beta = basicValues()
         if (!primalFeasible(beta)) {

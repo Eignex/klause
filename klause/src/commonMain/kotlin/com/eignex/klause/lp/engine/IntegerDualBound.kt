@@ -169,7 +169,16 @@ internal class IntegerCertificate(
  *  - a strictly-negative reduced cost on a column with no finite upper bound (unbounded Lagrangian).
  */
 
-internal fun integerCertify(model: LpModel, y: DoubleArray, scaleBits: Int = DEFAULT_SCALE_BITS): IntegerCertificate? {
+internal fun integerCertify(
+    model: LpModel,
+    y: DoubleArray,
+    scaleBits: Int = DEFAULT_SCALE_BITS,
+    observer: LpCertificationObserver? = null,
+): IntegerCertificate? = integerCertifyUnchecked(model, y, scaleBits).also {
+    observer?.observe(LpCertifier.INTEGER, it != null)
+}
+
+private fun integerCertifyUnchecked(model: LpModel, y: DoubleArray, scaleBits: Int): IntegerCertificate? {
     if (model.hasContinuous) return null // a real coefficient is not integrally certifiable here (Phase 3b)
     val rd = roundDuals(model, y, scaleBits) ?: return null
     val m = model.m
@@ -260,12 +269,17 @@ internal fun integerFarkasRay(
     basis: Basis? = null,
     basisRow: Int = -1,
     onRoute: ((FarkasRoute) -> Unit)? = null,
+    observer: LpCertificationObserver? = null,
 ): LongArray? {
     if (model.hasContinuous) {
         // A real model is certified over its scaled-integer rationalization (the existing 128-bit Farkas);
         // scaling by a positive 2ᵏ preserves feasibility, so an infeasibility proof carries back exactly.
-        val integral = rationalizeToIntegerModel(model, outwardRealUppers = true)?.model ?: return null
-        return integerFarkasRay(integral, ray, scaleBits, basis, basisRow, onRoute)
+        val integral = rationalizeToIntegerModel(
+            model,
+            outwardRealUppers = true,
+            observer = observer,
+        )?.model ?: return null
+        return integerFarkasRay(integral, ray, scaleBits, basis, basisRow, onRoute, observer)
     }
     // Reconstruction first: the ray's entries are ratios of minors of B, so they are small rationals, and
     // recovering them exactly annihilates the open columns the same way a basis solve does — without the
@@ -284,7 +298,7 @@ internal fun integerFarkasRay(
     // The exact basis solve next: it annihilates the open columns exactly too, but is capped at
     // [MAX_EXACT_BASIS] rows (see [exactFarkasRay]).
     if (basis != null) {
-        exactFarkasRay(model, basis, basisRow)?.let { exact ->
+        exactFarkasRay(model, basis, basisRow, observer)?.let { exact ->
             if (farkasCertifies(model, exact)) {
                 onRoute?.invoke(FarkasRoute.EXACT_BASIS)
                 return exact
@@ -378,7 +392,15 @@ internal class RationalizedLp(val model: LpModel, val scale: Long, val objConsta
  * box max grows, a dual lower bound drops), so Farkas rays and objective bounds stay sound; `false`
  * rounds **down** — a feasibility certificate's point must live inside the true box.
  */
-internal fun rationalizeToIntegerModel(model: LpModel, outwardRealUppers: Boolean): RationalizedLp? {
+internal fun rationalizeToIntegerModel(
+    model: LpModel,
+    outwardRealUppers: Boolean,
+    observer: LpCertificationObserver? = null,
+): RationalizedLp? = rationalizeToIntegerModelUnchecked(model, outwardRealUppers).also {
+    if (model.doubleView != null) observer?.observeExactInput(it != null)
+}
+
+private fun rationalizeToIntegerModelUnchecked(model: LpModel, outwardRealUppers: Boolean): RationalizedLp? {
     val dv = model.doubleView ?: return RationalizedLp(model, 1L, objConstantExact = true)
     val n = model.n
     val numVars = model.numVars
