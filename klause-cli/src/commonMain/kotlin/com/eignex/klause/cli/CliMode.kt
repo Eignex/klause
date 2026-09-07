@@ -44,6 +44,9 @@ import com.eignex.klause.util.Cancellation
  *
  * A share of `-t` on the policy presolve takes, capped by the run's own deadline, so proving a bound can
  * never consume the run it was supposed to route.
+ *
+ * Consumes `open-bound-proof` from [CommonOptions.engineParams] on the way through, so a mode calls this
+ * exactly once per run: a second call finds the key gone and answers as if the proof had been asked for.
  */
 internal fun CommonOptions.routingCancellation(): Cancellation {
     if (!takeOpenBoundProof()) return Cancellation { true }
@@ -66,9 +69,12 @@ internal fun CommonOptions.routingCancellation(): Cancellation {
 private fun CommonOptions.takeOpenBoundProof(): Boolean {
     val entry = engineParams.firstOrNull { it.startsWith("$OPEN_BOUND_PROOF_KEY=") } ?: return true
     engineParams.remove(entry)
-    return when (val raw = entry.substringAfter('=').lowercase()) {
-        "false", "off", "0", "no" -> false
+    // Same vocabulary as `EngineParams.bool`, so one spelling does not depend on which side reads the key;
+    // the raw token is reported unfolded, since a rejected value is easier to spot as it was typed.
+    val raw = entry.substringAfter('=')
+    return when (raw.lowercase()) {
         "true", "on", "1", "yes" -> true
+        "false", "off", "0", "no" -> false
         else -> usageError("engine param `$OPEN_BOUND_PROOF_KEY` expects a boolean, got `$raw`")
     }
 }

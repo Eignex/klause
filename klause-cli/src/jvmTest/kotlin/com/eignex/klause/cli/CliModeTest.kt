@@ -550,12 +550,19 @@ class CliModeTest {
             deleteOnExit()
         }
 
-        val kept = capture { runCli(arrayOf("-s", "-t", "10000", mps.absolutePath)) }
+        var keptCode = -1
+        var declinedCode = -1
+        val kept = capture { keptCode = runCli(arrayOf("-s", "-t", "10000", mps.absolutePath)) }
         val declined = capture {
-            runCli(arrayOf("-s", "-t", "10000", "--param", "open-bound-proof=false", mps.absolutePath))
+            declinedCode = runCli(arrayOf("-s", "-t", "10000", "--param", "open-bound-proof=false", mps.absolutePath))
         }
 
+        assertEquals(0, keptCode, kept)
+        assertEquals(0, declinedCode, declined)
         assertTrue("openTheoryChecks=0" in kept, "expected the finite lane, got: $kept")
+        // Both halves: the block is reported at all (a run that printed none would satisfy a bare
+        // `assertFalse` without ever reaching a theory), and the count it reports is not zero.
+        assertTrue("openTheoryChecks=" in declined, "expected an open-theory counter, got: $declined")
         assertFalse("openTheoryChecks=0" in declined, "expected the open theory, got: $declined")
     }
 
@@ -574,10 +581,12 @@ class CliModeTest {
             deleteOnExit()
         }
 
+        var code = -1
         val err = captureErr {
-            capture { runCli(arrayOf("-t", "10000", "--param", "open-bound-proof=false", mps.absolutePath)) }
+            capture { code = runCli(arrayOf("-t", "10000", "--param", "open-bound-proof=false", mps.absolutePath)) }
         }
 
+        assertEquals(0, code, err)
         assertFalse("open-bound-proof" in err, "the param must not reach engine validation, got: $err")
     }
 
