@@ -305,9 +305,15 @@ class ProblemTest {
             factors = arrayOf<Factor>(Linear(intArrayOf(2), intArrayOf(0), LinearOp.LE, 10)),
         )
 
-        val route = assertIs<SourceProblemRoute.Finite>(problem.pipelineRoute())
+        var lpPasses = 0.0
+        val route = assertIs<SourceProblemRoute.Finite>(
+            problem.pipelineRoute { stats ->
+                lpPasses = stats.standalonePasses.sum + stats.componentPasses.sum
+            },
+        )
 
         assertEquals(IntDomain(0, 5), route.problem.finiteIntDomains().single())
+        assertTrue(lpPasses > 0.0, "the bound proof used for routing must be observable")
     }
 
     @Test

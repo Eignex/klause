@@ -9,6 +9,7 @@ import com.eignex.klause.solver.objective.toLinearObjective
 import com.eignex.klause.solver.pipeline.OpenTheoryAssignment
 import com.eignex.klause.solver.pipeline.SourceProblemRoute
 import com.eignex.klause.solver.pipeline.pipelineRoute
+import com.eignex.klause.solver.result.LpStats
 import kotlin.math.abs
 import kotlin.math.floor
 
@@ -45,11 +46,13 @@ internal object MpsMode : CliMode {
             }
             val render: (Sample) -> String = { s -> renderMpsModel(compiled, s) }
             val objective = compiled.objective?.toLinearObjective()
+            var routingLpStats = LpStats()
             return when (
                 val route = compiled.model.pipelineRoute(
                     objective,
                     compiled.maximize,
                     boundCancellation = common.routingCancellation(),
+                    onLpStats = { routingLpStats = it },
                 )
             ) {
                 is SourceProblemRoute.Finite -> linearSolvable(
@@ -57,6 +60,7 @@ internal object MpsMode : CliMode {
                     objective,
                     compiled.maximize,
                     render,
+                    routingLpStats = routingLpStats,
                 )
 
                 is SourceProblemRoute.OpenTheory -> {
@@ -66,12 +70,16 @@ internal object MpsMode : CliMode {
                     if (compiled.objective?.realCoefficients?.any { it != 0.0 } == true) {
                         throw MpsLoweringException("open MPS optimization over a continuous objective is unsupported")
                     }
-                    openTheorySolvable(route.request) { assignment -> renderMpsOpenModel(compiled, assignment) }
+                    openTheorySolvable(
+                        route.request,
+                        { assignment -> renderMpsOpenModel(compiled, assignment) },
+                        routingLpStats,
+                    )
                 }
 
                 is SourceProblemRoute.UnsupportedOpen -> unsupportedOpenMpsModel()
 
-                SourceProblemRoute.Refuted -> refutedSolvable()
+                SourceProblemRoute.Refuted -> refutedSolvable(routingLpStats)
             }
         }
 

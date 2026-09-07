@@ -15,6 +15,7 @@ import com.eignex.klause.solver.objective.toLinearObjective
 import com.eignex.klause.solver.pipeline.FiniteEngine
 import com.eignex.klause.solver.pipeline.OpenTheoryAssignment
 import com.eignex.klause.solver.pipeline.OpenTheoryRequest
+import com.eignex.klause.solver.result.LpStats
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.Cancellation
@@ -499,6 +500,7 @@ internal interface OutputProtocol {
 internal fun openTheorySolvable(
     request: OpenTheoryRequest,
     renderOpenTheory: (OpenTheoryAssignment) -> String,
+    routingLpStats: LpStats = LpStats(),
 ): Solvable = Solvable(
     problem = null,
     optimize = request.objective != null,
@@ -513,6 +515,7 @@ internal fun openTheorySolvable(
         request,
         render = renderOpenTheory,
     ),
+    routingLpStats = routingLpStats,
 )
 
 /**
@@ -521,7 +524,7 @@ internal fun openTheorySolvable(
  * Routing refutes over the model's genuinely open ranges rather than inside an invented box, so the
  * verdict is the model's own. Nothing here narrows to a [Sample]: there is no assignment to render.
  */
-internal fun refutedSolvable(): Solvable = Solvable(
+internal fun refutedSolvable(routingLpStats: LpStats = LpStats()): Solvable = Solvable(
     problem = null,
     optimize = false,
     maximize = false,
@@ -532,6 +535,7 @@ internal fun refutedSolvable(): Solvable = Solvable(
     render = { error("a refuted model has no assignment to render") },
     objectiveValue = null,
     pipeline = SolvablePipeline.Refuted,
+    routingLpStats = routingLpStats,
 )
 
 /** Per-invocation parsing + loading + output for one front-end. Created fresh per run via
@@ -556,6 +560,7 @@ internal fun linearSolvable(
     render: (Sample) -> String,
     definedVars: IntArray = IntArray(0),
     boolFolds: List<BoolFoldDefinition> = emptyList(),
+    routingLpStats: LpStats = LpStats(),
 ): Solvable = linearSolvable(
     problem,
     objective?.toLinearObjective(),
@@ -563,6 +568,7 @@ internal fun linearSolvable(
     render,
     definedVars,
     boolFolds,
+    routingLpStats,
 )
 
 internal fun linearSolvable(
@@ -572,6 +578,7 @@ internal fun linearSolvable(
     render: (Sample) -> String,
     definedVars: IntArray = IntArray(0),
     boolFolds: List<BoolFoldDefinition> = emptyList(),
+    routingLpStats: LpStats = LpStats(),
 ): Solvable {
     // Feasibility sweep derives functionally-defined vars and excludes them from search. A bool AND
     // fold is derived only when all its literals are objective variables: deriving an OPB product
@@ -586,6 +593,7 @@ internal fun linearSolvable(
             lsObjective = null, linearObjective = null, objVarId = null,
             definitionalSweep = sweep,
             render = render, objectiveValue = null,
+            routingLpStats = routingLpStats,
         )
     }
     // The gradient view reads every fold (evaluating through a fold is always safe — it only needs
@@ -609,6 +617,7 @@ internal fun linearSolvable(
         render = render,
         objectiveValue = { s -> objective.evaluateLong(s).let { if (maximize) -it else it } },
         continuousObjectiveValue = objective.continuousObjectiveValue(maximize),
+        routingLpStats = routingLpStats,
     )
 }
 

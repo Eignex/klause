@@ -9164,7 +9164,9 @@ public final class com/eignex/klause/solver/pipeline/ProblemPipeline : java/lang
 
 public final class com/eignex/klause/solver/pipeline/ProblemPipelineKt {
 	public static final fun pipelineRoute (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/objective/LinearObjective;ZZLcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/solver/pipeline/SourceProblemRoute;
+	public static final fun pipelineRoute (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/objective/LinearObjective;ZZLcom/eignex/klause/util/Cancellation;Lkotlin/jvm/functions/Function1;)Lcom/eignex/klause/solver/pipeline/SourceProblemRoute;
 	public static synthetic fun pipelineRoute$default (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/objective/LinearObjective;ZZLcom/eignex/klause/util/Cancellation;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/SourceProblemRoute;
+	public static synthetic fun pipelineRoute$default (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/objective/LinearObjective;ZZLcom/eignex/klause/util/Cancellation;Lkotlin/jvm/functions/Function1;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/SourceProblemRoute;
 	public static final fun sourceRoute (Lcom/eignex/klause/ir/Problem;)Lcom/eignex/klause/solver/pipeline/ProblemPipeline;
 }
 

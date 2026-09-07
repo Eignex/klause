@@ -40,6 +40,7 @@ import com.eignex.klause.lp.relaxation.rebound
 import com.eignex.klause.propagation.ConflictAnalyzer.AnalysisResult.Learned
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.result.LpRoute
 import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.EmptyDoubleArray
@@ -84,11 +85,10 @@ internal class LpEngine(
 ) {
     /** Attribute an auxiliary root/presolve simplex invocation to this solve's shared sink. */
     internal fun observeRootSolve(solver: LpSolver) {
-        sink.lp.observeEngineCost(com.eignex.klause.solver.result.LpRoute.ROOT, solver.lastMetrics)
+        sink.lp.observeEngineCost(LpRoute.ROOT, solver.lastMetrics)
     }
 
-    internal fun rootCertificationObserver() =
-        sink.lp.certificationObserver(com.eignex.klause.solver.result.LpRoute.ROOT)
+    internal fun rootCertificationObserver() = sink.lp.certificationObserver(LpRoute.ROOT)
 
     internal fun observeRootCutAccounting(candidates: Int, selected: Int, active: Int) {
         sink.lp.observeCutAccounting(candidates, selected, active)

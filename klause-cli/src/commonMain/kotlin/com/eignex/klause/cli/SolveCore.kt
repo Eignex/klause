@@ -28,6 +28,7 @@ import com.eignex.klause.solver.pipeline.TheoryParams
 import com.eignex.klause.solver.pipeline.autoArms
 import com.eignex.klause.solver.pipeline.solve
 import com.eignex.klause.solver.pipeline.variablePartition
+import com.eignex.klause.solver.result.LpStats
 import com.eignex.klause.solver.result.PresolveStats
 import com.eignex.klause.solver.result.SearchEvent
 import com.eignex.klause.solver.result.SolveStats
@@ -119,7 +120,14 @@ internal object SolveCore {
                 val objective = request.objective
                 if (objective != null) {
                     output.begin(optimize = true, maximize = request.maximize)
-                    solveOpenTheoryOptimum(request, pipeline.render, theoryParams, common.statistics, output) {
+                    solveOpenTheoryOptimum(
+                        request,
+                        pipeline.render,
+                        theoryParams,
+                        common.statistics,
+                        output,
+                        rawSolvable.routingLpStats,
+                    ) {
                         budgetSpent(common, it)
                     }
                     return
@@ -131,9 +139,10 @@ internal object SolveCore {
                         theoryParams,
                     ) as OpenTheoryExecution.Satisfy
                     ).result
+                val resultStats = result.stats.copy(lp = result.stats.lp.mergedWith(rawSolvable.routingLpStats))
                 output.onVerdictContext(
                     VerdictContext(
-                        budgetExhausted = budgetSpent(common, result.stats.run.timedOut),
+                        budgetExhausted = budgetSpent(common, resultStats.run.timedOut),
                         terminationReason = (result as? OpenTheoryResult.Unknown)?.reason,
                     ),
                 )
@@ -149,8 +158,8 @@ internal object SolveCore {
                 }
                 if (common.statistics) {
                     output.onStatistics(
-                        result.stats,
-                        result.stats.run.wallMs,
+                        resultStats,
+                        resultStats.run.wallMs,
                         if (result is OpenTheoryResult.Sat) 1L else 0L,
                     )
                 }
@@ -162,6 +171,9 @@ internal object SolveCore {
             SolvablePipeline.Refuted -> {
                 output.begin(optimize = false, maximize = false)
                 output.onComplete(Verdict.UNSATISFIABLE)
+                if (common.statistics) {
+                    output.onStatistics(SolveStats(lp = rawSolvable.routingLpStats), 0L, 0L)
+                }
                 return
             }
 
@@ -714,14 +726,15 @@ internal object SolveCore {
      *  the LS functional gradient view back to the linear objective. No-op for satisfy / infeasible
      *  runs (no incumbent) and non-MiniZinc modes without an objective lambda. */
     private fun withModelObjective(s: SolveStats, solvable: Solvable, sample: Sample?): SolveStats {
-        if (sample == null || s.ls.incumbentObjective.isNaN()) return s
+        val routed = s.copy(lp = s.lp.mergedWith(solvable.routingLpStats))
+        if (sample == null || s.ls.incumbentObjective.isNaN()) return routed
         // The statistic is already a Double, so it reports the continuous contribution where there is
         // one rather than the discrete part the `o` line stopped reporting alone.
         solvable.continuousObjectiveValue?.let { exact ->
-            return s.copy(ls = s.ls.copy(incumbentObjective = exact(sample)))
+            return routed.copy(ls = routed.ls.copy(incumbentObjective = exact(sample)))
         }
-        val objectiveValue = solvable.objectiveValue ?: return s
-        return s.copy(ls = s.ls.copy(incumbentObjective = objectiveValue(sample).toDouble()))
+        val objectiveValue = solvable.objectiveValue ?: return routed
+        return routed.copy(ls = routed.ls.copy(incumbentObjective = objectiveValue(sample).toDouble()))
     }
 }
 
@@ -767,6 +780,7 @@ private fun solveOpenTheoryOptimum(
     params: TheoryParams,
     statistics: Boolean,
     output: OutputProtocol,
+    routingLpStats: LpStats,
     budgetExhausted: (Boolean) -> Boolean,
 ) {
     val result = (
@@ -775,6 +789,7 @@ private fun solveOpenTheoryOptimum(
             params,
         ) as OpenTheoryExecution.Optimize
         ).result
+    val resultStats = result.stats.copy(lp = result.stats.lp.mergedWith(routingLpStats))
     val reported: (BigInteger) -> Long? = { value ->
         val signed = if (request.maximize) -value else value
         // An objective past 64 bits is reported as absent rather than as a wrapped number.
@@ -782,7 +797,7 @@ private fun solveOpenTheoryOptimum(
     }
     output.onVerdictContext(
         VerdictContext(
-            budgetExhausted = budgetExhausted(result.stats.run.timedOut),
+            budgetExhausted = budgetExhausted(resultStats.run.timedOut),
             terminationReason = (result as? OpenTheoryOptimum.Bounded)?.reason,
         ),
     )
@@ -818,7 +833,7 @@ private fun solveOpenTheoryOptimum(
             is OpenTheoryOptimum.Unbounded -> 1L
             is OpenTheoryOptimum.Bounded -> if (result.incumbent == null) 0L else 1L
         }
-        output.onStatistics(result.stats, result.stats.run.wallMs, found)
+        output.onStatistics(resultStats, resultStats.run.wallMs, found)
     }
 }
 

@@ -6,6 +6,9 @@ import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.presolve.closeOpenBounds
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.result.LpRoute
+import com.eignex.klause.solver.result.LpStats
+import com.eignex.klause.solver.result.LpStatsSink
 import com.eignex.klause.solver.result.PresolveStats
 import com.eignex.klause.util.Cancellation
 
@@ -111,10 +114,19 @@ object OpenTheoryPipeline {
             request.presolveBudget,
         )
         val prepared = source.prepared
-        val stats = prepared.stats.takeIf { prepared.changed || it.infeasible }
+        val sourceStats = prepared.stats.takeIf { prepared.changed || it.infeasible }
         val planned = source as? OpenSourcePreparation.Planned
-            ?: return OpenPreparation(prepared.problem, stats, closedSides = 0, infeasible = true)
-        return when (val closed = planned.model.closeOpenBounds(request.presolveCancellation)) {
+            ?: return OpenPreparation(prepared.problem, sourceStats, closedSides = 0, infeasible = true)
+        val lpStats = LpStatsSink(LpRoute.STANDALONE)
+        val closed = planned.model.closeOpenBounds(request.presolveCancellation, lpStats)
+        val closingStats = lpStats.snapshot()
+        val stats = if (closingStats == LpStats()) {
+            sourceStats
+        } else {
+            val base = sourceStats ?: PresolveStats()
+            base.copy(lpStats = base.lpStats.mergedWith(closingStats))
+        }
+        return when (closed) {
             OpenPresolveResult.Refuted ->
                 OpenPreparation(planned.model, stats, closedSides = 0, infeasible = true)
 

@@ -451,15 +451,13 @@ internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
             LpRoute.STANDALONE -> {
                 standalonePasses++
                 standalonePivots += metrics.pivots
-                standaloneWorkOps +=
-                    metrics.workOps
+                standaloneWorkOps += metrics.workOps
             }
 
             LpRoute.COMPONENT -> {
                 componentPasses++
                 componentPivots += metrics.pivots
-                componentWorkOps +=
-                    metrics.workOps
+                componentWorkOps += metrics.workOps
             }
 
             LpRoute.ROOT -> {
