@@ -234,14 +234,12 @@ private fun LpEngine.foldSelectedCuts(
     cutPool.observe(res.primal)
     cutPool.retainMostActive()
     val selected = cutPool.select(res.primal, objectiveCoefficients(base.model), cutPool.maxCuts)
-    sink.lp.observeCutAccounting(candidates = 0, selected = selected.size, active = 0)
     if (selected.isEmpty()) return base to res
     val tightened = try {
-        relaxer.build(session, selected)
+        sink.lp.observeCutBuild(selected.size) { relaxer.build(session, selected) }
     } catch (_: CheckedLongOverflowException) {
         return base to res // overflow in the cut-augmented build: keep the prior (sound) relaxation
     }
-    sink.lp.observeCutAccounting(candidates = 0, selected = 0, active = selected.size)
     val cutSimplex = dualSimplex(tightened.model, cancellation)
     val r = cutSimplex.solve()
     sink.lp.observeSolve()
@@ -473,13 +471,11 @@ internal fun LpEngine.sparseSafePrune(
                 objectiveCoefficients(boundRel.model),
                 cutPool.maxCuts,
             ) + localCuts
-            sink.lp.observeCutAccounting(0, selectedCuts.size, 0)
             val tightened = try {
-                relaxer.build(session, selectedCuts)
+                sink.lp.observeCutBuild(selectedCuts.size) { relaxer.build(session, selectedCuts) }
             } catch (_: CheckedLongOverflowException) {
                 break // overflow in the cut-augmented build: keep the prior (sound) relaxation
             }
-            sink.lp.observeCutAccounting(0, 0, selectedCuts.size)
             val roundSimplex = dualSimplex(tightened.model, cancellation)
             val r = roundSimplex.solve()
             sink.lp.observeSolve()

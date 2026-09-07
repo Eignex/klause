@@ -13,6 +13,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 import com.eignex.klause.ir.ObjectiveSense as ObjectiveDirection
 
 class OpenTheoryMinimizeTest {
@@ -50,7 +51,9 @@ class OpenTheoryMinimizeTest {
 
         val result = OpenTheoryMinimizer(parsed.model, objective).minimize()
 
-        assertEquals("3", assertIs<OpenTheoryOptimum.Optimal>(result).value.toString())
+        val optimum = assertIs<OpenTheoryOptimum.Optimal>(result)
+        assertEquals("3", optimum.value.toString())
+        assertTrue(optimum.stats.lp.standalonePasses.sum > 0.0, "bound-closing LP work must reach the result")
     }
 
     @Test
