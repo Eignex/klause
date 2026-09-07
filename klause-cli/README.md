@@ -134,6 +134,10 @@ for one.
 over the shared session. Only the Boolean skeleton is branched either way — the theory decides the
 arithmetic residual at each leaf. Activity order settles no additional instance on the measured
 corpus, so it is opt-in.
+`--param open-bound-proof=false` declines the routing bound proof, so a model whose open sides the
+relaxation would have closed goes to the open theory instead of the finite lane. That is what runs one
+instance down both lanes; shrinking `-t` does not substitute, since it starves the solve along with the
+proof. Read by the front-ends that route open models — MPS and SMT-LIB — and rejected by the others.
 
 MiniZinc-mode-only flags:
 

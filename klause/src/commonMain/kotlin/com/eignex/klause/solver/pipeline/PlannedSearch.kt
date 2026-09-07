@@ -1,11 +1,13 @@
 package com.eignex.klause.solver.pipeline
 
+import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.CpSearchComponent
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.result.SmtStatsSink
+import com.eignex.klause.solver.search.CardinalitySearchComponent
 import com.eignex.klause.solver.search.ClauseSearchComponent
 import com.eignex.klause.solver.search.SearchComponent
 import com.eignex.klause.solver.search.SearchComponentSet
@@ -52,6 +54,12 @@ internal fun ComponentPlan.search(
         null
     }
     components += ClauseSearchComponent(spec.factors.filterIsInstance<Clause>())
+    // Only the cardinalities CP did not take: a finite projection has its own watched-literal propagator
+    // for them, and running both would enforce one constraint twice.
+    val cardinalities = spec.factors.indices
+        .filter { factorOwner(it) != FactorOwner.CP }
+        .mapNotNull { spec.factors[it] as? Cardinality }
+    if (cardinalities.isNotEmpty()) components += CardinalitySearchComponent(cardinalities)
     val theory = theoryComponent(spec, smtStats)
     if (theory != null) components += theory
     cp?.rebase()

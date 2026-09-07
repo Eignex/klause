@@ -10211,6 +10211,19 @@ public abstract interface class com/eignex/klause/solver/search/BranchingState {
 	public abstract fun intFixed (I)Z
 }
 
+public final class com/eignex/klause/solver/search/CardinalitySearchComponent : com/eignex/klause/solver/search/SearchComponent {
+	public fun <init> (Ljava/lang/Iterable;)V
+	public fun assert (Lcom/eignex/klause/solver/search/SearchDecision;Lcom/eignex/klause/solver/search/SearchContext;)Lcom/eignex/klause/solver/search/ComponentResult;
+	public fun check (Lcom/eignex/klause/solver/search/SearchContext;)Lcom/eignex/klause/solver/search/ComponentCheck;
+	public fun contributeModel (Lcom/eignex/klause/solver/search/SearchModel;Lcom/eignex/klause/solver/search/SearchContext;)V
+	public fun getRetainsOwnExplanations ()Z
+	public fun initialize (Lcom/eignex/klause/solver/search/SearchContext;)Lcom/eignex/klause/solver/search/ComponentResult;
+	public fun onRestart (Lcom/eignex/klause/solver/search/SearchContext;)V
+	public fun propagate (Lcom/eignex/klause/solver/search/SearchContext;)Lcom/eignex/klause/solver/search/ComponentResult;
+	public fun reasonFor (I)Lcom/eignex/klause/solver/search/SearchExplanation;
+	public fun retract (I)V
+}
+
 public final class com/eignex/klause/solver/search/ClauseSearchComponent : com/eignex/klause/solver/search/ClauseWatchHost, com/eignex/klause/solver/search/SearchComponent {
 	public fun <init> (Ljava/lang/Iterable;)V
 	public fun assert (Lcom/eignex/klause/solver/search/SearchDecision;Lcom/eignex/klause/solver/search/SearchContext;)Lcom/eignex/klause/solver/search/ComponentResult;

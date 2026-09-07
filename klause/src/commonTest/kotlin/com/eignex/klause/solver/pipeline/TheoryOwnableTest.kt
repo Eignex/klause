@@ -1,12 +1,14 @@
 package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.FactorKind
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.IntVars
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.StructuralKey
 import com.eignex.klause.ir.VarList
@@ -58,6 +60,18 @@ class TheoryOwnableTest {
         assertEquals(true, row.integerTheoryOwnable)
         assertEquals(false, global.integerTheoryOwnable)
         assertEquals(false, global.exactTheoryOwnable)
+    }
+
+    @Test
+    fun `a cardinality states that the exact lane holds it and CP still owns it without one`() {
+        val cardinality = Cardinality.atMostOne(intArrayOf(Lit.make(0, true), Lit.make(1, true)))
+
+        assertEquals(true, cardinality.exactTheoryOwnable)
+        assertEquals(
+            false,
+            cardinality.integerTheoryOwnable,
+            "a finite projection keeps its own watched propagator for the constraint",
+        )
     }
 
     @Test

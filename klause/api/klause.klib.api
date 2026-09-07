@@ -4304,6 +4304,8 @@ final class com.eignex.klause.factor.arithmetic/WideConstants : com.eignex.klaus
 final class com.eignex.klause.factor.bool/Cardinality : com.eignex.klause.ir/Factor { // com.eignex.klause.factor.bool/Cardinality|null[0]
     constructor <init>(kotlin/IntArray, kotlin/Int, kotlin/Int) // com.eignex.klause.factor.bool/Cardinality.<init>|<init>(kotlin.IntArray;kotlin.Int;kotlin.Int){}[0]
 
+    final val exactTheoryOwnable // com.eignex.klause.factor.bool/Cardinality.exactTheoryOwnable|{}exactTheoryOwnable[0]
+        final fun <get-exactTheoryOwnable>(): kotlin/Boolean // com.eignex.klause.factor.bool/Cardinality.exactTheoryOwnable.<get-exactTheoryOwnable>|<get-exactTheoryOwnable>(){}[0]
     final val linearRows // com.eignex.klause.factor.bool/Cardinality.linearRows|{}linearRows[0]
         final fun <get-linearRows>(): kotlin.collections/List<com.eignex.klause.ir/LinearRow> // com.eignex.klause.factor.bool/Cardinality.linearRows.<get-linearRows>|<get-linearRows>(){}[0]
     final val literals // com.eignex.klause.factor.bool/Cardinality.literals|{}literals[0]
@@ -11015,6 +11017,16 @@ final class com.eignex.klause.solver.search/BranchingConflict { // com.eignex.kl
         final val Empty // com.eignex.klause.solver.search/BranchingConflict.Companion.Empty|{}Empty[0]
             final fun <get-Empty>(): com.eignex.klause.solver.search/BranchingConflict // com.eignex.klause.solver.search/BranchingConflict.Companion.Empty.<get-Empty>|<get-Empty>(){}[0]
     }
+}
+
+final class com.eignex.klause.solver.search/CardinalitySearchComponent : com.eignex.klause.solver.search/SearchComponent { // com.eignex.klause.solver.search/CardinalitySearchComponent|null[0]
+    constructor <init>(kotlin.collections/Iterable<com.eignex.klause.factor.bool/Cardinality>) // com.eignex.klause.solver.search/CardinalitySearchComponent.<init>|<init>(kotlin.collections.Iterable<com.eignex.klause.factor.bool.Cardinality>){}[0]
+
+    final fun assert(com.eignex.klause.solver.search/SearchDecision, com.eignex.klause.solver.search/SearchContext): com.eignex.klause.solver.search/ComponentResult // com.eignex.klause.solver.search/CardinalitySearchComponent.assert|assert(com.eignex.klause.solver.search.SearchDecision;com.eignex.klause.solver.search.SearchContext){}[0]
+    final fun check(com.eignex.klause.solver.search/SearchContext): com.eignex.klause.solver.search/ComponentCheck // com.eignex.klause.solver.search/CardinalitySearchComponent.check|check(com.eignex.klause.solver.search.SearchContext){}[0]
+    final fun initialize(com.eignex.klause.solver.search/SearchContext): com.eignex.klause.solver.search/ComponentResult // com.eignex.klause.solver.search/CardinalitySearchComponent.initialize|initialize(com.eignex.klause.solver.search.SearchContext){}[0]
+    final fun propagate(com.eignex.klause.solver.search/SearchContext): com.eignex.klause.solver.search/ComponentResult // com.eignex.klause.solver.search/CardinalitySearchComponent.propagate|propagate(com.eignex.klause.solver.search.SearchContext){}[0]
+    final fun retract(kotlin/Int) // com.eignex.klause.solver.search/CardinalitySearchComponent.retract|retract(kotlin.Int){}[0]
 }
 
 final class com.eignex.klause.solver.search/ClauseSearchComponent : com.eignex.klause.solver.search/ClauseWatchHost, com.eignex.klause.solver.search/SearchComponent { // com.eignex.klause.solver.search/ClauseSearchComponent|null[0]

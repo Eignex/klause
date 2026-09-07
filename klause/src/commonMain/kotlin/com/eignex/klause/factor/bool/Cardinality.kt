@@ -58,6 +58,14 @@ class Cardinality(literals: IntArray, val min: Int, val max: Int) : Factor {
             LinearRow.ofBools(literals, LinearOp.LE, max.toLong()),
         )
 
+    // Unit weights and integer bounds are exactly representable, and the shared session's counting
+    // component holds the constraint whole — the same division a clause is placed by, where the exact
+    // core reads the arithmetic and the Boolean side enforces the skeleton. Undeclared, one cardinality
+    // makes a whole model inexact, which stands a finite component up beside a theory that needs none
+    // and, for a model of continuous columns, prefers the finite lane that cannot search them at all.
+    // [integerTheoryOwnable] stays false so a finite projection keeps its own watched propagator.
+    override val exactTheoryOwnable: Boolean get() = true
+
     /** Factory methods for this factor. */
     companion object {
         /** At-most-one: at most one of [literals] is true; an empty input is vacuously true. */
