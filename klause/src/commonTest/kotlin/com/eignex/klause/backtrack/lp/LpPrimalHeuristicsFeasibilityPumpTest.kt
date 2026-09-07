@@ -13,6 +13,7 @@ import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.util.Cancellation
 import kotlin.random.Random
 import kotlin.test.Test
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 /**
@@ -67,5 +68,22 @@ class LpPrimalHeuristicsFeasibilityPumpTest {
             }
         }
         assertTrue(produced > 50, "the pump produced only $produced incumbents across 300 instances")
+    }
+
+    @Test
+    fun `the rounding probe attributes its solve to root work`() {
+        val problem = Problem(
+            0,
+            2,
+            arrayOf(IntDomain(0, 1), IntDomain(0, 1)),
+            arrayOf<Factor>(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1)),
+        )
+        val objective = LinearObjective(intCoefficients = longArrayOf(1, 1))
+        val sink = SolveStatsSink(backend = "rounding-test")
+        val engine = LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true)), sink)
+
+        assertNotNull(engine.lpRoundingProbe(objective, Cancellation.Never))
+
+        assertTrue(sink.snapshot().lp.rootPasses.sum > 0.0)
     }
 }

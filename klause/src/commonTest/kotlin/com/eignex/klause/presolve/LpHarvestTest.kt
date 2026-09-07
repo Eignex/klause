@@ -271,15 +271,21 @@ class LpHarvestTest {
                 Linear(intArrayOf(1, 1, 1), intArrayOf(0, 1, 2), LinearOp.LE, 5),
             ),
         ).bake()
-        val report = lpHarvestReporting(
+        val result = lpHarvestReporting(
             problem,
             LinearObjective(),
             shavingParams,
             cancellation = Cancellation.Never,
-        ).report
+        )
+        val report = result.report
         assertEquals(1, report.constraintsRemoved, "the LP-redundant row must be counted")
         assertTrue(!report.rootInfeasible && report.equalitiesAdded == 0, "no other LP action fired here")
         assertTrue(!report.skipped && report.relaxationNnz > 0, "the built relaxation's size must be reported")
+        assertTrue(result.stats.rootPasses.sum > 0.0, "harvest solves must be attributed to root work")
+        assertEquals(0.0, result.stats.nodePasses.sum)
+        assertEquals(0.0, result.stats.pruned.sum)
+        assertEquals(0.0, result.stats.fixed.sum)
+        assertEquals(0.0, result.stats.rootReducedCostFixes.sum)
     }
 
     /** Pairwise covers summing past the total: LP-infeasible, but no single row's bounds contradict, so

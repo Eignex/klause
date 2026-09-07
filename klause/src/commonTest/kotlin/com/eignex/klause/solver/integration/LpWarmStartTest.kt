@@ -61,6 +61,5 @@ class LpWarmStartTest {
         assertEquals(11.0, result.objectiveValue)
         assertTrue(result.stats.lp.pivots.sum > 0.0, "expected LP pivots to be recorded")
         assertTrue(result.stats.lp.nodePasses.sum > 0.0, "expected visited LP nodes to be recorded")
-        assertTrue(result.stats.lp.nodePasses.sum <= result.stats.lp.solves.sum)
     }
 }

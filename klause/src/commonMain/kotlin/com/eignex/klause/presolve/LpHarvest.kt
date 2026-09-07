@@ -16,6 +16,7 @@ import com.eignex.klause.lp.bounding.shaveVariableBounds
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.LpHarvestReport
+import com.eignex.klause.solver.result.LpRoute
 import com.eignex.klause.solver.result.LpStats
 import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.util.Cancellation
@@ -78,7 +79,7 @@ fun lpRootInfeasible(
     problem,
     objective,
     LpParams(lpPlan = plan, cancellation = cancellation),
-    SolveStatsSink(backend = "lp-root-feasibility"),
+    SolveStatsSink(backend = "lp-root-feasibility", lpProbeRoute = LpRoute.ROOT),
 ).rootLpInfeasibleNoBake(cancellation)
 
 /** [problem] with each integer variable's domain tightened by the no-bake root-LP OBBT
@@ -96,7 +97,7 @@ fun lpRootBounds(
         problem,
         objective,
         LpParams(lpPlan = plan, cancellation = cancellation),
-        SolveStatsSink(backend = "lp-obbt"),
+        SolveStatsSink(backend = "lp-obbt", lpProbeRoute = LpRoute.ROOT),
     )
     val shaved = engine.rootLpBoundsNoBake(cancellation)
     if (shaved.isEmpty()) return problem
@@ -126,7 +127,7 @@ fun lpHarvestReporting(
     // The token must reach the simplex itself, not just the probe loops below: one primal phase-1 on a
     // large relaxation runs far past the presolve budget, and the engine polls only the `cancellation`
     // that `LpParams` hands it — every `LpSolver` entry point defaults to `Cancellation.Never`.
-    val sink = SolveStatsSink(backend = "lp-harvest")
+    val sink = SolveStatsSink(backend = "lp-harvest", lpProbeRoute = LpRoute.ROOT)
     val engine = LpEngine(
         problem,
         objective,

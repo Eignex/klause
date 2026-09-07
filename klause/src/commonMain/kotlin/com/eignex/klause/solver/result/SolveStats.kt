@@ -111,6 +111,12 @@ data class SolveStats(
     }
 }
 
+/** Attach one preparation result at the engine boundary, merging its LP work exactly once. */
+internal fun SolveStats.withPresolve(presolve: PresolveStats?): SolveStats {
+    if (presolve == null || this.presolve == presolve) return this
+    return copy(lp = lp.mergedWith(presolve.lpStats), presolve = presolve)
+}
+
 /**
  * Mutable accumulator that backends update during a solve. Snapshots into a [SolveStats]
  * record when the solve terminates.
@@ -119,12 +125,12 @@ data class SolveStats(
  * that fan out across threads (LS portfolio, parallel restarts) should keep one sink per
  * worker and merge their [SolveStats] snapshots after.
  */
-internal class SolveStatsSink(var backend: String) {
+internal class SolveStatsSink(var backend: String, lpProbeRoute: LpRoute = LpRoute.NODE) {
     val search: SearchStatsSink = SearchStatsSink()
     val ca: ConflictAnalysisStatsSink = ConflictAnalysisStatsSink()
 
     /** LP-bounding counters + timing; observe via `sink.lp.observeSolve()`, etc. */
-    val lp: LpStatsSink = LpStatsSink()
+    val lp: LpStatsSink = LpStatsSink(lpProbeRoute)
     val scheduling: SchedulingStatsSink = SchedulingStatsSink()
     val ls: LocalSearchStatsSink = LocalSearchStatsSink()
     var openTheory: OpenTheoryWorkStats = OpenTheoryWorkStats()

@@ -231,14 +231,8 @@ private fun detSign(v: Int128): Int = when {
  * result is normalized to a *positive* multiple of `ρ`, since a negative multiple of a Farkas ray is not
  * one.
  */
-internal fun exactFarkasRay(
-    model: LpModel,
-    basis: Basis,
-    row: Int,
-    observer: LpCertificationObserver? = null,
-): LongArray? = exactFarkasRayUnchecked(model, basis, row).also {
-    observer?.observe(LpCertifier.EXACT_FARKAS, it != null)
-}
+internal fun exactFarkasRay(model: LpModel, basis: Basis, row: Int): LongArray? =
+    exactFarkasRayUnchecked(model, basis, row)
 
 private fun exactFarkasRayUnchecked(model: LpModel, basis: Basis, row: Int): LongArray? {
     val m = model.m

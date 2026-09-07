@@ -48,7 +48,7 @@ class FinitePipelinePreparation(
     val objective: LinearObjective?,
     /** Lifts a prepared-model assignment to the source model. */
     val reconstruct: (Sample) -> Sample,
-    /** Presolve statistics when preparation changed the model. */
+    /** Presolve statistics, including LP work from a no-op preparation. */
     val presolve: PresolveStats?,
     /** Time spent baking the source problem before this preparation began. */
     val constructionBakeElapsed: Duration = Duration.ZERO,
@@ -113,7 +113,7 @@ object FinitePipeline {
             problem = finiteModel,
             objective = outcome.objective ?: objective,
             reconstruct = outcome.reconstruct,
-            presolve = outcome.stats.takeIf { outcome.changed },
+            presolve = outcome.stats,
             constructionBakeElapsed = (request.problem as? BakedProblem)?.bakeElapsed ?: Duration.ZERO,
         )
     }

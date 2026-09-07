@@ -94,6 +94,8 @@ internal class LpEngine(
         sink.lp.observeCutAccounting(candidates, selected, active)
     }
 
+    internal fun <T> observeRootCutBuild(selected: Int, build: () -> T): T = sink.lp.observeCutBuild(selected, build)
+
     /** The relaxation-bound family resolved from the high-level emphasis ([LpParams.lpConfig])
      *  against this problem's structure; with no emphasis set, the explicit
      *  [LpParams.lpPlan] is used verbatim. Resolving here makes the engine the single home for

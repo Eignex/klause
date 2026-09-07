@@ -1,5 +1,6 @@
 package com.eignex.klause.cli
 
+import com.eignex.klause.solver.result.LpRouteSolveStats
 import com.eignex.klause.solver.result.LpStats
 import com.eignex.klause.solver.result.SolveStats
 import kotlin.math.round
@@ -25,7 +26,11 @@ internal fun lpStatPairs(stats: SolveStats): List<Pair<String, String>> {
     val energetic = stats.scheduling.energeticPruned.sum
     val splits = stats.lp.componentSplits.sum
     val routed = stats.lp.standalonePasses.sum + stats.lp.componentPasses.sum + stats.lp.rootPasses.sum
-    if (solves == 0.0 && routed == 0.0 && lagrangian == 0.0 && energetic == 0.0 && splits == 0.0) return emptyList()
+    if (solves == 0.0 && stats.lp.nodePasses.sum == 0.0 && routed == 0.0 &&
+        lagrangian == 0.0 && energetic == 0.0 && splits == 0.0
+    ) {
+        return emptyList()
+    }
 
     val pruned = stats.lp.pruned.sum
     val infeasible = stats.lp.infeasible.sum
@@ -64,6 +69,9 @@ internal fun lpStatPairs(stats: SolveStats): List<Pair<String, String>> {
         out += "lpRootPivots" to "${stats.lp.rootPivots.sum.toLong()}"
         out += "lpRootWorkOps" to "${stats.lp.rootWorkOps.sum.toLong()}"
     }
+    appendRouteSolveStats(out, "Standalone", stats.lp.standaloneRoute)
+    appendRouteSolveStats(out, "Component", stats.lp.componentRoute)
+    appendRouteSolveStats(out, "Root", stats.lp.rootRoute)
     if (stats.lp.wallBackstop) out += "lpWallBackstop" to "1"
     if (stats.lp.demoted) out += "lpDemoted" to "1"
     if (stats.lp.luMaxFill.max.isFinite()) out += "lpLuMaxFill" to round4(stats.lp.luMaxFill.max)
@@ -152,6 +160,29 @@ internal fun lpStatPairs(stats: SolveStats): List<Pair<String, String>> {
     out += "lpMs" to "${stats.lp.ms}"
     if (stats.lp.rootBound.isFinite()) out += "lpRootBound" to round4(stats.lp.rootBound)
     return out
+}
+
+private fun appendRouteSolveStats(out: MutableList<Pair<String, String>>, name: String, stats: LpRouteSolveStats) {
+    if (stats.passes.sum == 0.0) return
+    out += "lp${name}WarmStartAttempts" to "${stats.warmStartAttempts.sum.toLong()}"
+    out += "lp${name}WarmStartHits" to "${stats.warmStartHits.sum.toLong()}"
+    if (stats.warmStartAttempts.sum > 0.0) {
+        out += "lp${name}WarmStartHitRate" to round4(stats.warmStartHits.sum / stats.warmStartAttempts.sum)
+    }
+    val refactorizations = stats.initialRefactorizations.sum + stats.warmStartRefactorizations.sum +
+        stats.singularRecoveryRefactorizations.sum + stats.updateLimitRefactorizations.sum +
+        stats.backendRequestedRefactorizations.sum + stats.reconcileRecoveryRefactorizations.sum +
+        stats.primalRefactorizations.sum
+    out += "lp${name}Refactorizations" to "${refactorizations.toLong()}"
+    out += "lp${name}RefactorInitial" to "${stats.initialRefactorizations.sum.toLong()}"
+    out += "lp${name}RefactorWarmStart" to "${stats.warmStartRefactorizations.sum.toLong()}"
+    out += "lp${name}RefactorSingularRecovery" to "${stats.singularRecoveryRefactorizations.sum.toLong()}"
+    out += "lp${name}RefactorUpdateLimit" to "${stats.updateLimitRefactorizations.sum.toLong()}"
+    out += "lp${name}RefactorBackendRequested" to "${stats.backendRequestedRefactorizations.sum.toLong()}"
+    out += "lp${name}RefactorReconcileRecovery" to "${stats.reconcileRecoveryRefactorizations.sum.toLong()}"
+    out += "lp${name}RefactorPrimal" to "${stats.primalRefactorizations.sum.toLong()}"
+    out += "lp${name}SingularRefactorizations" to "${stats.singularRefactorizations.sum.toLong()}"
+    out += "lp${name}SmallPivotBails" to "${stats.smallPivotBails.sum.toLong()}"
 }
 
 private fun appendCertifierStats(

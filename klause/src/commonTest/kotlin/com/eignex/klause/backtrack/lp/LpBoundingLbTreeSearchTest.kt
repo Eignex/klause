@@ -81,8 +81,11 @@ class LpBoundingLbTreeSearchTest {
             ),
         )
         val obj = LinearObjective(intCoefficients = longArrayOf(0, 0, 0, 1))
-        val sample = engine(p, obj).lbTreeSearch(obj, Cancellation.Never)
+        val sink = SolveStatsSink(backend = "lbtree")
+        val lp = LpEngine(p, obj, LpParams(lpPlan = LpPlan(bounding = true)), sink)
+        val sample = lp.lbTreeSearch(obj, Cancellation.Never)
         assertTrue(sample != null, "best-bound search should find a feasible incumbent")
         assertEquals(2.0, obj.evaluate(sample), "best-bound search should dive to the optimal cost 2")
+        assertTrue(sink.snapshot().lp.rootPasses.sum > 0.0, "every tree-search LP must be attributed to root work")
     }
 }

@@ -145,8 +145,6 @@ internal interface LpSolver : AutoCloseable {
     val lastMetrics: LpSolveMetrics get() = LpSolveMetrics(
         pivots = lastPivots,
         workOps = lastWorkOps,
-        warmAttempts = if (lastWarmStarted) 1 else 0,
-        warmHits = if (lastWarmStarted) 1 else 0,
         singularRefactorizations = lastSingularRefactorizations,
         smallPivotBails = lastSmallPivotBails,
     )

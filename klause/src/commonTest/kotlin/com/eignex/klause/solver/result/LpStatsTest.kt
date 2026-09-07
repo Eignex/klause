@@ -4,6 +4,7 @@ import com.eignex.klause.lp.engine.LpCertifier
 import com.eignex.klause.lp.engine.LpSolveMetrics
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
@@ -56,6 +57,21 @@ class LpStatsTest {
     }
 
     @Test
+    fun `cut builds count every growing selection but activate only successful builds`() {
+        val sink = LpStatsSink()
+
+        sink.observeCutBuild(2) { Unit }
+        sink.observeCutBuild(5) { Unit }
+        assertFailsWith<IllegalStateException> {
+            sink.observeCutBuild(7) { error("build failed") }
+        }
+
+        val stats = sink.snapshot()
+        assertEquals(14.0, stats.cutSelected.sum)
+        assertEquals(5.0, stats.cutActive.max)
+    }
+
+    @Test
     fun `auxiliary route metrics do not change node cost totals`() {
         val sink = LpStatsSink()
 
@@ -71,6 +87,53 @@ class LpStatsTest {
         assertEquals(3.0, stats.standalonePivots.sum)
         assertEquals(5.0, stats.componentPivots.sum)
         assertEquals(7.0, stats.rootPivots.sum)
+    }
+
+    @Test
+    fun `auxiliary routes preserve warm refactor and numerical metrics`() {
+        val sink = LpStatsSink()
+
+        sink.observeEngineCost(
+            LpRoute.ROOT,
+            LpSolveMetrics(
+                warmAttempts = 2,
+                warmHits = 1,
+                initialRefactorizations = 1,
+                primalRefactorizations = 2,
+                singularRefactorizations = 3,
+                smallPivotBails = 4,
+            ),
+        )
+
+        val root = sink.snapshot().rootRoute
+        assertEquals(1.0, root.passes.sum)
+        assertEquals(2.0, root.warmStartAttempts.sum)
+        assertEquals(1.0, root.warmStartHits.sum)
+        assertEquals(1.0, root.initialRefactorizations.sum)
+        assertEquals(2.0, root.primalRefactorizations.sum)
+        assertEquals(3.0, root.singularRefactorizations.sum)
+        assertEquals(4.0, root.smallPivotBails.sum)
+    }
+
+    @Test
+    fun `presolve probes count root work without node outcomes`() {
+        val sink = LpStatsSink(LpRoute.ROOT)
+
+        sink.observeNodePass()
+        sink.observeSolve()
+        sink.observeEngineCost(LpRoute.NODE, LpSolveMetrics(pivots = 2, workOps = 7))
+        sink.observeInfeasiblePrune()
+        sink.observeFix()
+        sink.observeRootReducedCostFixes(1)
+
+        val stats = sink.snapshot()
+        assertEquals(1.0, stats.rootPasses.sum)
+        assertEquals(2.0, stats.rootPivots.sum)
+        assertEquals(0.0, stats.nodePasses.sum)
+        assertEquals(0.0, stats.solves.sum)
+        assertEquals(0.0, stats.pruned.sum)
+        assertEquals(0.0, stats.fixed.sum)
+        assertEquals(0.0, stats.rootReducedCostFixes.sum)
     }
 
     @Test
