@@ -136,7 +136,7 @@ from the v2 medians. Before any v3 results, it fixes these rules:
 - validity requires both arm medians to be at least 300 ms and paired-delta IQR to be at most 10
   percentage points; no pair is discarded;
 - statistic: median of the nine paired percentage deltas; pass threshold remains at most 5%;
-- no benchmark cache and no external solver process.
+- no Gradle build-cache reuse, no benchmark cache and no external solver process.
 
 Capture construction, codec round-trip, and exact replay-validator incremental cost are reported as
 three separate `LP_AUXILIARY_COST` lines. None is included in the 5% observer gate. The ordinary JVM

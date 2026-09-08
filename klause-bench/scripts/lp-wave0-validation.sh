@@ -113,7 +113,7 @@ instrument() {
     cp "$manifest" "$result_dir/manifest.json"
     local instrumentation_status
     set +e
-    KLAUSE_LP_INSTRUMENTATION=1 ./gradlew \
+    KLAUSE_LP_INSTRUMENTATION=1 ./gradlew --no-build-cache \
         :klause:cleanAllTests :klause:jvmTest \
         --tests com.eignex.klause.lp.engine.LpInstrumentationHarness --info \
         | tee "$log_file"
