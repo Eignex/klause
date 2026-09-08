@@ -1,5 +1,5 @@
 measuredSha=3378fa6e2aa3dbeab2e34d203ffe41f90284c4db
-auditorSha=ac5e3ae9d6bb583e95d2ae23623225ce4c6f6940
+auditorSha=a198dfff3ae7fbd35175b8defc54af9d4b92f7b8
 referenceRows=43
 baselineCsvFiles=39
 baselineRows=321

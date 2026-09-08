@@ -862,7 +862,7 @@ c106add7f2a307631225d62c27094b4611c59c6ec25d943ad9e3a6d419bf8b12  ./baseline/xcs
 4e801f791a4be90b394454309da277122617cbd249ef91e12a2d294bebfb08aa  ./baseline/xcsp3-core/rep-3/off/results/sum-opt-tiny.out
 ef7302aa1b2bfe65820f4129e0f55e109dbb432bee11eacd0a717bd1a345f8a8  ./baseline/xcsp3-core/rep-3/off/stdout.log
 81ec39d9bdfc556f51c3ca9cd02785546a7db45c1cf99eb8f5082696639f0838  ./campaign-audit.before-review-remediation.txt
-d7746d81d9171268b2e20ac2d2908187008ee3899115ff3a1936a53e8ecdbb9d  ./campaign-audit.txt
+8f62ffc82541bdc2f9a09a313dd719c2fddacce910eecfc343efe7b4622312d3  ./campaign-audit.txt
 7057fdcb17418b810b5d4aa09afab476875dc4a0c7e1d2b24a099d1a8ba5dbc2  ./cli-build/SHA256SUMS
 e6faa77b1a39f965a897755da1343f2dd34b53bd99a452e7a4e1af236cdab864  ./cli-build/command.txt
 9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa  ./cli-build/exit-status.txt
