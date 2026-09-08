@@ -115,15 +115,17 @@ internal class ComponentLpSolver(
     }
 
     /** Exact lower bound assembled from the independently certified block objectives. */
-    fun exactLowerBound(observer: LpCertificationObserver? = null): Long? {
+    fun exactLowerBound(
+        observer: LpCertificationObserver? = null,
+        policy: LpCertificationPolicy = ProductionLpCertificationPolicy,
+    ): Long? {
         if (model.hasContinuous) return null
         val results = blockResults ?: return null
         val certificates = ArrayList<IntegerCertificate>(parts.size)
         for (index in parts.indices) {
-            val certificate = integerCertify(
-                parts[index].model,
-                results[index].duals,
-                observer = observer,
+            val certificate = policy.acceptNullable(
+                LpCertifier.INTEGER,
+                integerCertify(parts[index].model, results[index].duals, observer = observer),
             ) ?: return null
             certificates.add(certificate)
         }
@@ -150,9 +152,17 @@ internal class ComponentLpSolver(
     }
 
     /** Whether every independently solved continuous block has an exact feasible basis. */
-    fun exactBasisFeasible(observer: LpCertificationObserver? = null): Boolean {
+    fun exactBasisFeasible(
+        observer: LpCertificationObserver? = null,
+        policy: LpCertificationPolicy = ProductionLpCertificationPolicy,
+    ): Boolean {
         val results = blockResults ?: return false
-        return parts.indices.all { exactBasisFeasible(parts[it].model, results[it].basis, observer) == true }
+        return parts.indices.all {
+            policy.acceptBoolean(
+                LpCertifier.EXACT_BASIS,
+                exactBasisFeasible(parts[it].model, results[it].basis, observer) == true,
+            )
+        }
     }
 }
 
@@ -167,6 +177,7 @@ internal fun componentLpSolverOrNull(
     model: LpModel,
     cancellation: Cancellation,
     engine: (LpModel, Cancellation) -> LpSolver,
+    component: (LpModel, List<LpNeighborhood>, List<LpSolver>, IntArray) -> LpSolver = ::ComponentLpSolver,
 ): LpSolver? {
     val n = model.n
     val m = model.m
@@ -226,5 +237,5 @@ internal fun componentLpSolverOrNull(
         )
     }
     val solvers = parts.map { engine(it.model, cancellation) }
-    return ComponentLpSolver(model, parts, solvers, isolated.toIntArray())
+    return component(model, parts, solvers, isolated.toIntArray())
 }

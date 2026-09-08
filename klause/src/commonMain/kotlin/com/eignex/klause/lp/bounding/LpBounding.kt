@@ -14,12 +14,13 @@ import com.eignex.klause.lp.engine.LpSolver
 import com.eignex.klause.lp.engine.PersistentLpSolver
 import com.eignex.klause.lp.engine.TableauCutSolver
 import com.eignex.klause.lp.engine.VarStatus
+import com.eignex.klause.lp.engine.acceptNullable
+import com.eignex.klause.lp.engine.certifiedTightObjectiveLowerBound
 import com.eignex.klause.lp.engine.integerCertify
 import com.eignex.klause.lp.engine.integerFarkasRay
 import com.eignex.klause.lp.engine.lpConditioning
 import com.eignex.klause.lp.engine.newPersistentLpSolver
 import com.eignex.klause.lp.engine.newTableauCutSolver
-import com.eignex.klause.lp.engine.tightObjectiveLowerBound
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.lp.relaxation.LpExplanation
 import com.eignex.klause.lp.relaxation.LpRelaxation
@@ -103,6 +104,7 @@ internal fun LpEngine.dualSimplex(model: LpModel, cancellation: Cancellation): T
     iterationLimit = nodePivotBudget(),
     workLimit = nodeWorkBudget(),
     trackDegeneracy = adaptiveWork,
+    factory = solveContext.engineFactory,
 )
 
 /**
@@ -131,6 +133,7 @@ private fun LpEngine.solveNode(
         iterationLimit = nodePivotBudget(),
         workLimit = nodeWorkBudget(),
         trackDegeneracy = adaptiveWork,
+        factory = solveContext.engineFactory,
     )
     // The engine this displaces holds a basis factorization, which can be a native object. Releasing it
     // here rather than leaving it to a cleaner keeps a long search from carrying one per rebuilt matrix.
@@ -259,7 +262,7 @@ private fun LpEngine.foldSelectedCuts(
 /**
  * Cheap sound prune + objective-bound propagation for the LP path: float revised simplex for the duals,
  * then the tighter of the Neumaier–Shcherbina safe bound and the certificate's integer-multiplier one
- * ([tightObjectiveLowerBound]) — both O(nnz), so the per-node cost is bounded and `-t` is honored.
+ * ([certifiedTightObjectiveLowerBound]) — both O(nnz), so the per-node cost is bounded and `-t` is honored.
  * Prunes when the relaxation is infeasible (exact Farkas certificate) or that bound reaches the
  * incumbent, tightens an ascending objective variable up to its ceiling (reason-less, a sound
  * conflict-analysis leaf), and fixes reduced-cost-dominated variables off their bounds. Any solver
@@ -329,14 +332,17 @@ internal fun LpEngine.sparseSafePrune(
             val gatedRay = filter.simplex.infeasibleRay
             if (gatedRay != null) {
                 for (i in 0 until gatedModel.m) if (!filter.enforced[i]) gatedRay[i] = 0.0
-                val ray = integerFarkasRay(gatedModel, gatedRay, onRoute = {
-                    sink.lp.observeFarkasRoute(
-                        it == FarkasRoute.RECONSTRUCTED,
-                        it == FarkasRoute.EXACT_BASIS,
-                        it == FarkasRoute.ROUNDED,
-                        it == FarkasRoute.NONE,
-                    )
-                }, observer = sink.lp.certificationObserver(LpRoute.NODE))
+                val ray = solveContext.certificationPolicy.acceptNullable(
+                    LpCertifier.EXACT_FARKAS,
+                    integerFarkasRay(gatedModel, gatedRay, onRoute = {
+                        sink.lp.observeFarkasRoute(
+                            it == FarkasRoute.RECONSTRUCTED,
+                            it == FarkasRoute.EXACT_BASIS,
+                            it == FarkasRoute.ROUNDED,
+                            it == FarkasRoute.NONE,
+                        )
+                    }, observer = sink.lp.certificationObserver(LpRoute.NODE)),
+                )
                 if (ray != null) {
                     sink.lp.observeInfeasiblePrune()
                     val clause = if (learn) {
@@ -397,14 +403,17 @@ internal fun LpEngine.sparseSafePrune(
         // Any other failure (non-convergence / singular) keeps the node.
         val floatRay = simplex.infeasibleRay
         val ray = if (floatRay != null) {
-            integerFarkasRay(model, floatRay, onRoute = {
-                sink.lp.observeFarkasRoute(
-                    it == FarkasRoute.RECONSTRUCTED,
-                    it == FarkasRoute.EXACT_BASIS,
-                    it == FarkasRoute.ROUNDED,
-                    it == FarkasRoute.NONE,
-                )
-            }, observer = sink.lp.certificationObserver(LpRoute.NODE))
+            solveContext.certificationPolicy.acceptNullable(
+                LpCertifier.EXACT_FARKAS,
+                integerFarkasRay(model, floatRay, onRoute = {
+                    sink.lp.observeFarkasRoute(
+                        it == FarkasRoute.RECONSTRUCTED,
+                        it == FarkasRoute.EXACT_BASIS,
+                        it == FarkasRoute.ROUNDED,
+                        it == FarkasRoute.NONE,
+                    )
+                }, observer = sink.lp.certificationObserver(LpRoute.NODE)),
+            )
         } else {
             null
         }
@@ -422,13 +431,17 @@ internal fun LpEngine.sparseSafePrune(
                     it.feasibility != RationalFeasibility.UNKNOWN,
                 )
             }
-            if (outcome.feasibility == RationalFeasibility.INFEASIBLE) {
+            val acceptedOutcome = solveContext.certificationPolicy.acceptNullable(
+                LpCertifier.RATIONAL,
+                outcome.takeIf { it.feasibility != RationalFeasibility.UNKNOWN },
+            )
+            if (acceptedOutcome?.feasibility == RationalFeasibility.INFEASIBLE) {
                 sink.lp.observeInfeasiblePrune()
                 // No integer ray exists for a strictness-only conflict; cite the rational decider's
                 // load-bearing rows (their premises plus touched integer bound atoms), falling back to
                 // every active row's premises when the row set is unavailable.
                 val clause = if (learn) {
-                    outcome.rows?.let { LpExplanation.premiseClauseForRows(relaxation, it, session) }
+                    acceptedOutcome.rows?.let { LpExplanation.premiseClauseForRows(relaxation, it, session) }
                         ?: activePremiseClause(relaxation, session)
                 } else {
                     null
@@ -513,7 +526,10 @@ internal fun LpEngine.sparseSafePrune(
     // reduced-cost fixing. Compute it once when any of them needs it; a singular/unbounded certify
     // yields null and each falls back to its cheap certificate-less path, which is sound.
     val cert = if ((learn && canPropagate) || canPrune) {
-        integerCertify(boundRel.model, boundRes.duals, observer = sink.lp.certificationObserver(LpRoute.NODE)).also {
+        solveContext.certificationPolicy.acceptNullable(
+            LpCertifier.INTEGER,
+            integerCertify(boundRel.model, boundRes.duals, observer = sink.lp.certificationObserver(LpRoute.NODE)),
+        ).also {
             // The node path is where certification actually happens; the certified wrapper is not on it.
             sink.lp.observeCertification(
                 certified = it != null,
@@ -528,11 +544,12 @@ internal fun LpEngine.sparseSafePrune(
     }
     // Neither the float safe bound nor the certificate's integer-multiplier bound dominates the other,
     // so the prune decides on the tighter of the two rather than on the float bound alone.
-    val lower = tightObjectiveLowerBound(
+    val lower = certifiedTightObjectiveLowerBound(
         boundRel.model,
         boundRes.duals,
         cert,
         sink.lp.certificationObserver(LpRoute.NODE),
+        solveContext.certificationPolicy,
     )
         ?: return LpNodeOutcome(false, optimalBasis)
     val full = lower + boundRel.objectiveConstant.toDouble()
@@ -722,7 +739,7 @@ internal fun LpEngine.applySparseReducedCostFixing(
 
 /**
  * Sound objective lower bound from the float revised simplex — the tighter of the safe float and
- * integer-multiplier 128-bit bounds ([tightObjectiveLowerBound]) — used when the cheap safe-bound path
+ * integer-multiplier 128-bit bounds ([certifiedTightObjectiveLowerBound]) — used when the cheap safe-bound path
  * overflowed during the relaxation build. Prunes when that bound (plus the relaxation's objective
  * constant) reaches the incumbent. Any failure keeps the node.
  */
@@ -754,10 +771,11 @@ internal fun LpEngine.sparseCertifiedPrune(
     // Both bounds are sound for any duals and neither dominates, so the larger wins: the
     // integer-multiplier bound carries no rounding margin, the float one never declines. A null (neither
     // available) keeps the node.
-    val lb = tightObjectiveLowerBound(
+    val lb = certifiedTightObjectiveLowerBound(
         relaxation.model,
         result.duals,
         sink.lp.certificationObserver(LpRoute.NODE),
+        solveContext.certificationPolicy,
     )
         ?: return LpNodeOutcome(false, null)
     val full = lb + relaxation.objectiveConstant.toDouble()
@@ -772,7 +790,7 @@ internal fun LpEngine.sparseCertifiedPrune(
 /**
  * The root-node LP relaxation objective (with the harvested [globalCuts]) on the undecided problem,
  * or NaN when the relaxation is empty / not optimal / overflows — the revised simplex +
- * [tightObjectiveLowerBound], the same sound bound the per-node prune reports. Solved once before search,
+ * [certifiedTightObjectiveLowerBound], the same sound bound the per-node prune reports. Solved once before search,
  * so the value is a sound *global* lower bound on the objective — the integrality-gap baseline for `-s`.
  */
 internal fun LpEngine.rootLpRelaxationBound(
@@ -794,7 +812,14 @@ internal fun LpEngine.rootLpRelaxationBound(
                 simplex.close()
             }
         }
-        val lower = result?.let { tightObjectiveLowerBound(relaxation.model, it.duals, rootCertificationObserver()) }
+        val lower = result?.let {
+            certifiedTightObjectiveLowerBound(
+                relaxation.model,
+                it.duals,
+                rootCertificationObserver(),
+                solveContext.certificationPolicy,
+            )
+        }
         if (lower != null) lower + relaxation.objectiveConstant.toDouble() else Double.NaN
     }
 } catch (_: CheckedLongOverflowException) {

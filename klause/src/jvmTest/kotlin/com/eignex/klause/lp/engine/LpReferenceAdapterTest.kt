@@ -205,8 +205,11 @@ class LpReferenceAdapterTest {
             files.filter { Files.isRegularFile(it) && it.toString().endsWith(".kt") }.toList().flatMap { file ->
                 LpBoundaryScanner.codeOnly(file.readText())
                     .lineSequence()
-                    .mapNotNull(declaration::find)
-                    .map { it.groupValues[1] }
+                    .mapNotNull { line ->
+                        val match = declaration.find(line) ?: return@mapNotNull null
+                        val name = match.groupValues[1]
+                        Regex("\\bfun\\s+$name\\.([A-Za-z_]\\w*)").find(line)?.groupValues?.get(1) ?: name
+                    }
                     .toList()
             }
         }
@@ -214,6 +217,8 @@ class LpReferenceAdapterTest {
             .filter { name -> Regex("\\b$name\\b").containsMatchIn(adapter) }
             .toSet()
 
+        assertTrue("toVerdict" in engineNames)
+        assertFalse("RationalFeasibility" in engineNames)
         assertEquals(setOf("LpModel"), referencedEngineNames)
     }
 

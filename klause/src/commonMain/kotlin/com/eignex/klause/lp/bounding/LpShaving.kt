@@ -3,10 +3,12 @@ package com.eignex.klause.lp.bounding
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.lp.engine.LpCertifier
 import com.eignex.klause.lp.engine.LpSolver
+import com.eignex.klause.lp.engine.acceptNullable
+import com.eignex.klause.lp.engine.certifiedTightObjectiveLowerBound
 import com.eignex.klause.lp.engine.integerFarkasRay
 import com.eignex.klause.lp.engine.newTableauCutSolver
-import com.eignex.klause.lp.engine.tightObjectiveLowerBound
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.lp.relaxation.RootDomains
 import com.eignex.klause.lp.rootDomainOf
@@ -175,7 +177,7 @@ internal fun LpEngine.impliedEqualities(token: Cancellation): List<Linear> {
 }
 
 /** Sound lower bound on `min(coeffs·x)` over [prob]'s base relaxation — the tighter of the two bounds
- *  [tightObjectiveLowerBound] combines — or null when it is empty / infeasible / unbounded / fails. Uses
+ *  [certifiedTightObjectiveLowerBound] combines — or null when it is empty / infeasible / unbounded / fails. Uses
  *  the primal pass: the dual simplex cannot optimise an arbitrary objective (it leaves its dual-feasible
  *  start). */
 private fun LpEngine.safeMin(prob: Problem, coeffs: LongArray, token: Cancellation): Double? {
@@ -196,7 +198,12 @@ private fun LpEngine.safeMin(prob: Problem, coeffs: LongArray, token: Cancellati
         }
     }
     result ?: return null
-    val lower = tightObjectiveLowerBound(relaxation.model, result.duals, rootCertificationObserver()) ?: return null
+    val lower = certifiedTightObjectiveLowerBound(
+        relaxation.model,
+        result.duals,
+        rootCertificationObserver(),
+        solveContext.certificationPolicy,
+    ) ?: return null
     return lower + relaxation.objectiveConstant.toDouble()
 }
 
@@ -227,7 +234,12 @@ private fun LpEngine.safeMinNoBake(coeffs: LongArray, token: Cancellation): Doub
         }
     }
     result ?: return null
-    val lower = tightObjectiveLowerBound(relaxation.model, result.duals, rootCertificationObserver()) ?: return null
+    val lower = certifiedTightObjectiveLowerBound(
+        relaxation.model,
+        result.duals,
+        rootCertificationObserver(),
+        solveContext.certificationPolicy,
+    ) ?: return null
     return lower + relaxation.objectiveConstant.toDouble()
 }
 
@@ -308,7 +320,7 @@ internal fun LpEngine.rootLpInfeasibleNoBake(token: Cancellation): Boolean {
         return false // a relaxation the row arithmetic cannot express yields no verdict, never a crash
     }
     if (model.n == 0) return false
-    val simplex = newTableauCutSolver(model, token)
+    val simplex = newTableauCutSolver(model, token, factory = solveContext.engineFactory)
     return simplex.use {
         // A non-null solve is a feasible optimum; null is infeasible or an inconclusive failure. Only a
         // dual-unbounded ray that survives exact 128-bit Farkas certification proves genuine infeasibility.
@@ -319,7 +331,10 @@ internal fun LpEngine.rootLpInfeasibleNoBake(token: Cancellation): Boolean {
         }
         if (result != null) return@use false
         val floatRay = simplex.infeasibleRay ?: return@use false
-        integerFarkasRay(model, floatRay, observer = rootCertificationObserver()) != null
+        solveContext.certificationPolicy.acceptNullable(
+            LpCertifier.EXACT_FARKAS,
+            integerFarkasRay(model, floatRay, observer = rootCertificationObserver()),
+        ) != null
     }
 }
 
