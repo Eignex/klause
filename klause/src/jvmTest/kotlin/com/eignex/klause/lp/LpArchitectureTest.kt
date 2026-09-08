@@ -1,12 +1,13 @@
 package com.eignex.klause.lp
 
+import java.io.IOException
+import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
 import kotlin.io.path.extension
 import kotlin.io.path.isDirectory
 import kotlin.io.path.name
-import kotlin.io.path.readText
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -14,10 +15,21 @@ import kotlin.test.assertTrue
 class LpArchitectureTest {
 
     @Test
-    fun `production sources respect the LP kernel boundary`() {
+    fun `production clients do not bypass LP implementations`() {
         val root = repositoryRoot()
         val violations = productionKotlinSources(root)
-            .flatMap { source -> LpBoundaryScanner.scan(root.relativize(source).toString(), source.readText()) }
+            .filterNot { source -> source.isKernelOrBoundSource(root) }
+            .flatMap { source -> LpBoundaryScanner.scan(root.relativize(source).toString(), source) }
+
+        assertEquals(emptyList(), violations, violations.joinToString("\n"))
+    }
+
+    @Test
+    fun `LP kernels respect outbound dependency allowlists`() {
+        val root = repositoryRoot()
+        val violations = productionKotlinSources(root)
+            .filter { source -> source.isKernelOrBoundSource(root) }
+            .flatMap { source -> LpBoundaryScanner.scan(root.relativize(source).toString(), source) }
 
         assertEquals(emptyList(), violations, violations.joinToString("\n"))
     }
@@ -26,6 +38,7 @@ class LpArchitectureTest {
     fun `scanner rejects direct aliased wildcard and qualified bypasses`() {
         val fixtures = listOf(
             "import com.eignex.klause.lp.engine.RevisedSimplex" to "RevisedSimplex",
+            "import com.eignex.klause.lp.engine.RevisedSimplex.Companion" to "RevisedSimplex",
             "import com.eignex.klause.lp.engine.Csc as SparseColumns" to "Csc",
             "import com.eignex.klause.lp.engine.*\nval meter = LpWork()" to "LpWork",
             "val solver = com.eignex.klause.lp.engine.RevisedSimplex(model)" to "RevisedSimplex",
@@ -81,6 +94,10 @@ class LpArchitectureTest {
                 import com.eignex.klause.propagation.PropagationSession
             """.trimIndent(),
             """
+                package com.eignex.klause.bound
+                import com.eignex.klause.lp.engine.solveAndCertify
+            """.trimIndent(),
+            """
                 package com.eignex.klause.lp.lattice
                 val state: com.eignex.klause.solver.Model? = null
             """.trimIndent(),
@@ -106,13 +123,33 @@ private object LpBoundaryScanner {
         "\\bcom\\s*\\.\\s*eignex\\s*\\.\\s*(?:klause|koblas)(?:\\s*\\.\\s*[A-Za-z_]\\w*)+",
     )
     private val forbiddenEngineSymbols = setOf("RevisedSimplex", "Csc", "LpWork")
+    private val forbiddenSymbolPatterns = forbiddenEngineSymbols.associateWith { Regex("\\b$it\\b") }
     private const val ENGINE_PACKAGE = "com.eignex.klause.lp.engine"
     private const val BASIS_PACKAGE = "com.eignex.klause.simplex.basis"
+    private val scanNeedles = (
+        forbiddenEngineSymbols + listOf(
+            "com.eignex.koblas",
+            "package com.eignex.klause.lp.engine",
+            "package com.eignex.klause.lp.lattice",
+            "package com.eignex.klause.simplex.exact",
+            "package com.eignex.klause.simplex.basis",
+            "package com.eignex.klause.bound",
+        )
+        ).map { it.toByteArray(StandardCharsets.UTF_8) }
+
+    fun scan(path: String, source: Path): List<String> {
+        val bytes = Files.readAllBytes(source)
+        if (scanNeedles.none { needle -> bytes.containsNeedle(needle) }) return emptyList()
+        return scan(path, String(bytes, StandardCharsets.UTF_8))
+    }
 
     fun scan(path: String, source: String): List<String> {
+        if (!needsScan(source)) return emptyList()
         val code = stripCommentsAndLiterals(source)
         val packageName = packagePattern.find(code)?.groupValues?.get(1)?.normalizedName().orEmpty()
         val imports = importPattern.findAll(code).map { it.groupValues[1].normalizedName() }.toList()
+        val body = withoutDirectives(code)
+        val qualifiedDependencies = qualifiedPattern.findAll(body).map { it.value.normalizedName() }.toList()
         val allowedKernel = packageName == ENGINE_PACKAGE || packageName.startsWith("$ENGINE_PACKAGE.") ||
             packageName == BASIS_PACKAGE || packageName.startsWith("$BASIS_PACKAGE.")
         val violations = linkedSetOf<String>()
@@ -121,19 +158,18 @@ private object LpBoundaryScanner {
             for (imported in imports) {
                 if (forbiddenImport(imported)) violations += "$path: forbidden import $imported"
             }
-            for (qualified in qualifiedPattern.findAll(withoutDirectives(code)).map { it.value.normalizedName() }) {
+            for (qualified in qualifiedDependencies) {
                 if (forbiddenQualifiedUse(qualified)) violations += "$path: forbidden qualified use $qualified"
             }
             if (imports.any { it == "$ENGINE_PACKAGE.*" }) {
                 for (symbol in forbiddenEngineSymbols) {
-                    if (Regex("\\b$symbol\\b").containsMatchIn(withoutDirectives(code))) {
+                    if (checkNotNull(forbiddenSymbolPatterns[symbol]).containsMatchIn(body)) {
                         violations += "$path: forbidden wildcard use $symbol"
                     }
                 }
             }
         }
 
-        val qualifiedDependencies = qualifiedPattern.findAll(withoutDirectives(code)).map { it.value.normalizedName() }
         for (dependency in imports + qualifiedDependencies) {
             if (forbiddenOutboundDependency(packageName, dependency)) {
                 violations += "$path: outbound dependency $packageName -> $dependency"
@@ -144,7 +180,7 @@ private object LpBoundaryScanner {
 
     private fun forbiddenImport(name: String): Boolean =
         name.startsWith("com.eignex.koblas.") || name == "com.eignex.koblas" ||
-            forbiddenEngineSymbols.any { name == "$ENGINE_PACKAGE.$it" }
+            forbiddenEngineSymbols.any { name == "$ENGINE_PACKAGE.$it" || name.startsWith("$ENGINE_PACKAGE.$it.") }
 
     private fun forbiddenQualifiedUse(name: String): Boolean =
         name.startsWith("com.eignex.koblas.") || name == "com.eignex.koblas" ||
@@ -152,6 +188,12 @@ private object LpBoundaryScanner {
 
     private fun forbiddenOutboundDependency(packageName: String, dependency: String): Boolean {
         if (!dependency.startsWith("com.eignex.klause.")) return false
+        if (
+            (packageName == "com.eignex.klause.bound" || packageName.startsWith("com.eignex.klause.bound.")) &&
+            (dependency == ENGINE_PACKAGE || dependency.startsWith("$ENGINE_PACKAGE."))
+        ) {
+            return true
+        }
         val allowed = when {
             packageName == ENGINE_PACKAGE || packageName.startsWith("$ENGINE_PACKAGE.") -> listOf(
                 ENGINE_PACKAGE,
@@ -181,6 +223,24 @@ private object LpBoundaryScanner {
             else -> return false
         }
         return allowed.none { dependency == it || dependency.startsWith("$it.") }
+    }
+
+    private fun needsScan(source: String): Boolean = forbiddenEngineSymbols.any(source::contains) ||
+        "com.eignex.koblas" in source ||
+        "package com.eignex.klause.lp.engine" in source ||
+        "package com.eignex.klause.lp.lattice" in source ||
+        "package com.eignex.klause.simplex.exact" in source ||
+        "package com.eignex.klause.simplex.basis" in source ||
+        "package com.eignex.klause.bound" in source
+
+    private fun ByteArray.containsNeedle(needle: ByteArray): Boolean {
+        if (needle.isEmpty()) return true
+        for (start in 0..size - needle.size) {
+            var offset = 0
+            while (offset < needle.size && this[start + offset] == needle[offset]) offset++
+            if (offset == needle.size) return true
+        }
+        return false
     }
 
     private fun withoutDirectives(code: String): String = code.lineSequence()
@@ -355,17 +415,48 @@ private object LpBoundaryScanner {
 
 private fun productionKotlinSources(root: Path): List<Path> {
     val sourceRoot = root.resolve("klause/src")
-    return Files.list(sourceRoot).use { sourceSets ->
-        sourceSets
-            .filter { it.isDirectory() && it.name.endsWith("Main") }
-            .flatMap { sourceSet ->
-                val kotlinRoot = sourceSet.resolve("kotlin")
-                if (kotlinRoot.isDirectory()) Files.walk(kotlinRoot) else java.util.stream.Stream.empty()
-            }
-            .filter { it.extension == "kt" }
-            .sorted()
-            .toList()
+    return try {
+        val process = ProcessBuilder(
+            "rg",
+            "--files-with-matches",
+            "--glob",
+            "**/*Main/kotlin/**/*.kt",
+            PRODUCTION_CANDIDATE_PATTERN,
+            sourceRoot.toString(),
+        ).redirectErrorStream(true).start()
+        val paths = process.inputStream.bufferedReader().use { it.readLines() }
+        check(process.waitFor() == 0) { paths.joinToString("\n") }
+        paths.map(Paths::get).sorted()
+    } catch (_: IOException) {
+        allProductionKotlinSources(sourceRoot)
     }
+}
+
+private fun allProductionKotlinSources(sourceRoot: Path): List<Path> = Files.list(sourceRoot).use { sourceSets ->
+    sourceSets
+        .filter { it.isDirectory() && it.name.endsWith("Main") }
+        .flatMap { sourceSet ->
+            val kotlinRoot = sourceSet.resolve("kotlin")
+            if (kotlinRoot.isDirectory()) Files.walk(kotlinRoot) else java.util.stream.Stream.empty()
+        }
+        .filter { it.extension == "kt" }
+        .sorted()
+        .toList()
+}
+
+private const val PRODUCTION_CANDIDATE_PATTERN =
+    "RevisedSimplex|\\bCsc\\b|\\bLpWork\\b|com\\.eignex\\.koblas|" +
+        "package\\s+com\\.eignex\\.klause\\.(lp\\.engine|lp\\.lattice|simplex\\.exact|simplex\\.basis|bound)"
+
+private fun Path.isKernelOrBoundSource(root: Path): Boolean {
+    val path = root.relativize(this).toString().replace('\\', '/')
+    return listOf(
+        "/lp/engine/",
+        "/lp/lattice/",
+        "/simplex/exact/",
+        "/simplex/basis/",
+        "/bound/",
+    ).any(path::contains)
 }
 
 private fun repositoryRoot(): Path = generateSequence(Paths.get("").toAbsolutePath().normalize()) { it.parent }

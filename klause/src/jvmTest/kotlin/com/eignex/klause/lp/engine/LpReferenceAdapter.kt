@@ -1,6 +1,8 @@
 package com.eignex.klause.lp.engine
 
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.simplex.exact.ExactRationalFeasibilityModel
+import com.eignex.klause.simplex.exact.ExactRationalInequality
 import com.eignex.klause.simplex.exact.RationalFeasibility
 import com.eignex.klause.simplex.exact.bigRationalMinimum
 import com.eignex.klause.simplex.exact.bigRationalOutcome
@@ -21,73 +23,198 @@ internal sealed interface LpReferenceResult {
 
 internal enum class LpReferenceDecline {
     CANCELLED_OR_PIVOT_LIMIT,
+    INVALID_EXACT_WITNESS,
     NON_FINITE_INPUT,
+    PROBE_BOUND_FEASIBILITY,
     PROBE_BOUND_OBJECTIVE,
 }
 
-/**
- * Test-only exact reference for the public LP model seam.
+/*
+ * Test-only exact reference for the normalized [LpModel] seam.
  *
- * Every finite [LpModel] datum is eligible because the adapter reads the exact model directly and
- * converts real inputs from their IEEE representation into [BigFraction]. A run declines when
- * cancellation or [maxPivots] interrupts an exact simplex call, or when a non-finite input reaches the
- * seam. Feasibility remains usable while objective comparison declines if a finite probe stands in for
- * an objective-improving open side. The feasibility witness and objective lower bound stay separate: a
- * finite infimum is attained only when the exact witness reaches it.
+ * Integer data is lifted from its `Long` storage and continuous data from its exact IEEE value. The
+ * adapter rebuilds an exact model rather than calling a float solver or any production certifier. A
+ * finite probe box may provide a valid feasible witness, but cannot prove infeasibility or an objective
+ * bound for the open model, so those claims decline. Objective attainment is decided by an independent
+ * exact feasibility run with the computed infimum imposed as an equality.
  */
 internal class LpReferenceAdapter(
     private val cancellation: Cancellation = Cancellation.Never,
     private val maxPivots: Int = Int.MAX_VALUE,
 ) {
     fun solve(model: LpModel): LpReferenceResult {
-        val feasibility = bigRationalOutcome(model, cancellation, maxPivots)
+        val data = exactData(model)
+            ?: return LpReferenceResult.Declined(LpReferenceDecline.NON_FINITE_INPUT)
+        val referenceModel = ExactRationalFeasibilityModel(model.n, data.rows, data.upper)
+        val feasibility = bigRationalOutcome(referenceModel, cancellation, maxPivots)
         when (feasibility.feasibility) {
-            RationalFeasibility.INFEASIBLE -> return LpReferenceResult.Infeasible
-            RationalFeasibility.UNKNOWN -> return declined()
+            RationalFeasibility.INFEASIBLE -> {
+                return if (model.hasProbeBounds()) {
+                    LpReferenceResult.Declined(LpReferenceDecline.PROBE_BOUND_FEASIBILITY)
+                } else {
+                    LpReferenceResult.Infeasible
+                }
+            }
+
+            RationalFeasibility.UNKNOWN -> return interrupted()
+
             RationalFeasibility.FEASIBLE -> Unit
         }
-        val costs = List(model.n) { column ->
-            exact(model.costD(column)) ?: return LpReferenceResult.Declined(LpReferenceDecline.NON_FINITE_INPUT)
-        }
-        val shifts = List(model.n) { column ->
-            exact(model.loShiftD(column)) ?: return LpReferenceResult.Declined(LpReferenceDecline.NON_FINITE_INPUT)
-        }
-        val shiftedWitness = checkNotNull(feasibility.witness).mapIndexed { column, value -> value + shifts[column] }
-        val witnessObjective = shiftedWitness.foldIndexed(BigFraction.ZERO) { column, total, value ->
-            total + costs[column] * value
-        }
-        val probeMaySupportObjective = costs.indices.any { column ->
-            val sign = costs[column].signum()
-            (sign > 0 && model.probeClampedLo[column]) ||
-                (sign < 0 && model.probeClampedHi[column])
-        }
-        if (probeMaySupportObjective) {
+        val feasibleShifted = checkNotNull(feasibility.witness)
+        if (!data.accepts(feasibleShifted)) return invalidWitness()
+        if (model.hasProbeBounds()) {
             return LpReferenceResult.Feasible(
-                shiftedWitness,
+                data.unshift(feasibleShifted),
                 objectiveLowerBound = null,
                 lowerBoundAttained = false,
                 objectiveDecline = LpReferenceDecline.PROBE_BOUND_OBJECTIVE,
             )
         }
-        val optimum = bigRationalMinimum(model, costs, cancellation, maxPivots)
-        if (optimum.feasibility == RationalFeasibility.UNKNOWN) return declined()
-        if (optimum.feasibility == RationalFeasibility.INFEASIBLE) return LpReferenceResult.Infeasible
-        val lowerBound = if (optimum.unbounded) {
-            null
-        } else {
-            val constant = exact(model.objConstantD)
-                ?: return LpReferenceResult.Declined(LpReferenceDecline.NON_FINITE_INPUT)
-            checkNotNull(optimum.infimum) + constant
+
+        val optimum = bigRationalMinimum(referenceModel, data.costs, cancellation, maxPivots)
+        when (optimum.feasibility) {
+            RationalFeasibility.INFEASIBLE -> return invalidWitness()
+            RationalFeasibility.UNKNOWN -> return interrupted()
+            RationalFeasibility.FEASIBLE -> Unit
         }
+        if (optimum.unbounded) {
+            return LpReferenceResult.Feasible(
+                data.unshift(feasibleShifted),
+                objectiveLowerBound = null,
+                lowerBoundAttained = false,
+            )
+        }
+
+        val shiftedInfimum = checkNotNull(optimum.infimum)
+        val attainment = bigRationalOutcome(data.withObjectiveEquality(shiftedInfimum), cancellation, maxPivots)
+        val attainedShifted = when (attainment.feasibility) {
+            RationalFeasibility.FEASIBLE -> checkNotNull(attainment.witness)
+            RationalFeasibility.INFEASIBLE -> null
+            RationalFeasibility.UNKNOWN -> return interrupted()
+        }
+        if (attainedShifted != null && !data.accepts(attainedShifted)) return invalidWitness()
+        val witness = attainedShifted ?: feasibleShifted
         return LpReferenceResult.Feasible(
-            shiftedWitness,
-            lowerBound,
-            lowerBoundAttained = lowerBound != null && witnessObjective == lowerBound,
+            data.unshift(witness),
+            shiftedInfimum + data.objectiveConstant,
+            lowerBoundAttained = attainedShifted != null,
         )
     }
 
-    private fun declined(): LpReferenceResult.Declined =
+    private fun interrupted(): LpReferenceResult.Declined =
         LpReferenceResult.Declined(LpReferenceDecline.CANCELLED_OR_PIVOT_LIMIT)
 
-    private fun exact(value: Double): BigFraction? = BigFraction.ofDouble(value)
+    private fun invalidWitness(): LpReferenceResult.Declined =
+        LpReferenceResult.Declined(LpReferenceDecline.INVALID_EXACT_WITNESS)
 }
+
+private class ExactModelData(
+    val costs: List<BigFraction>,
+    val shifts: List<BigFraction>,
+    val objectiveConstant: BigFraction,
+    val rows: List<ExactRationalInequality>,
+    val upper: List<BigFraction?>,
+) {
+    fun unshift(witness: List<BigFraction>): List<BigFraction> =
+        witness.mapIndexed { column, value -> value + shifts[column] }
+
+    fun accepts(witness: List<BigFraction>): Boolean {
+        if (witness.size != costs.size) return false
+        for (column in witness.indices) {
+            if (witness[column] < BigFraction.ZERO) return false
+            if (upper[column]?.let { witness[column] > it } == true) return false
+        }
+        return rows.all { row ->
+            var activity = BigFraction.ZERO
+            for (entry in row.columns.indices) {
+                activity += witness[row.columns[entry]] * row.coefficients[entry]
+            }
+            if (row.strict) activity < row.rhs else activity <= row.rhs
+        }
+    }
+
+    fun withObjectiveEquality(infimum: BigFraction): ExactRationalFeasibilityModel {
+        val columns = costs.indices.filter { !costs[it].isZero }.toIntArray()
+        val coefficients = columns.map(costs::get)
+        val equality = listOf(
+            ExactRationalInequality(columns, coefficients, infimum),
+            ExactRationalInequality(columns, coefficients.map(BigFraction::negated), infimum.negated()),
+        )
+        return ExactRationalFeasibilityModel(costs.size, rows + equality, upper)
+    }
+}
+
+private fun exactData(model: LpModel): ExactModelData? {
+    val view = model.doubleView
+    val costs = if (view == null) {
+        List(model.n) { BigFraction.ofLong(model.cost[it]) }
+    } else {
+        view.cost.take(model.n).exact() ?: return null
+    }
+    val shifts = if (view == null) {
+        List(model.n) { BigFraction.ofLong(model.loShift[it]) }
+    } else {
+        view.loShift.toList().exact() ?: return null
+    }
+    val objectiveConstant = if (view == null) {
+        BigFraction.ofLong(model.objConstant)
+    } else {
+        BigFraction.ofDouble(view.objConstant) ?: return null
+    }
+    val rhs = if (view == null) {
+        List(model.m) { BigFraction.ofLong(model.rhs[it]) }
+    } else {
+        view.rhs.toList().exact() ?: return null
+    }
+    val allUpper = if (view == null) {
+        List(model.numVars) { BigFraction.ofLong(model.upper[it]) }
+    } else {
+        view.upper.toList().exact() ?: return null
+    }
+    val rowColumns = Array(model.m) { ArrayList<Int>() }
+    val rowCoefficients = Array(model.m) { ArrayList<BigFraction>() }
+    for (column in 0 until model.n) {
+        val from = view?.colPtr?.get(column) ?: model.csc.colPtr[column]
+        val until = view?.colPtr?.get(column + 1) ?: model.csc.colPtr[column + 1]
+        for (entry in from until until) {
+            val row = view?.rowIdx?.get(entry) ?: model.csc.rowIdx[entry]
+            val coefficient = if (view == null) {
+                BigFraction.ofLong(model.csc.colVal[entry])
+            } else {
+                BigFraction.ofDouble(view.colVal[entry]) ?: return null
+            }
+            if (!coefficient.isZero) {
+                rowColumns[row].add(column)
+                rowCoefficients[row].add(coefficient)
+            }
+        }
+    }
+    val rows = ArrayList<ExactRationalInequality>(2 * model.m)
+    for (row in 0 until model.m) {
+        val columns = rowColumns[row].toIntArray()
+        val coefficients = rowCoefficients[row].toList()
+        rows.add(ExactRationalInequality(columns, coefficients, rhs[row], model.rowStrict[row]))
+        val slack = model.n + row
+        if (model.hasUpper[slack]) {
+            rows.add(
+                ExactRationalInequality(
+                    columns,
+                    coefficients.map(BigFraction::negated),
+                    allUpper[slack] - rhs[row],
+                ),
+            )
+        }
+    }
+    val structuralUpper = List(model.n) { column ->
+        if (model.hasUpper[column]) allUpper[column] else null
+    }
+    return ExactModelData(costs, shifts, objectiveConstant, rows, structuralUpper)
+}
+
+private fun List<Double>.exact(): List<BigFraction>? {
+    val values = ArrayList<BigFraction>(size)
+    for (value in this) values.add(BigFraction.ofDouble(value) ?: return null)
+    return values
+}
+
+private fun LpModel.hasProbeBounds(): Boolean = probeClampedLo.any { it } || probeClampedHi.any { it }

@@ -9,6 +9,7 @@ import com.eignex.koblas.koblas
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
@@ -25,6 +26,9 @@ class LpOperationTraceTest {
                 ?: backendNamed("hfactor", F64Capabilities.basisSolvers),
             "the JVM test runtime must provide HFactor",
         )
+        assertTrue(portable.basisSolvers.isPortable)
+        assertFalse(hfactor.isPortable)
+        assertTrue(portable.basisSolvers.name != hfactor.name)
         try {
             installBackends(portable)
             val portableTrace = replayTrace()
@@ -39,6 +43,8 @@ class LpOperationTraceTest {
             assertContentEquals(portableTrace.finalBasis.basicVars, hfactorTrace.finalBasis.basicVars)
             assertContentEquals(portableTrace.finalBasis.status, hfactorTrace.finalBasis.status)
             assertEquals(portableTrace.workOps, hfactorTrace.workOps)
+            assertTrue(portableTrace.operations.pivots >= 2)
+            assertTrue(portableTrace.operations.updateLimitRefactorizations > 0)
             assertTrue(portableTrace.workOps > 0L)
         } finally {
             installBackends(null)
@@ -46,38 +52,28 @@ class LpOperationTraceTest {
     }
 
     private fun replayTrace(): WorkTrace {
-        val solver = RevisedSimplex(alreadyOptimalModel())
+        val solver = RevisedSimplex(pivotingModel(), refactorUpdateLimit = 1)
         val result = solver.use { assertNotNull(it.solve()) }
         val metrics = solver.lastMetrics
-        val operations = PrescribedSolve(metrics.pivots, metrics.refactorizationTrace())
-        assertEquals(PrescribedSolve(0, listOf(1, 0, 0, 0, 0, 0, 0)), operations)
         return WorkTrace(
-            operations,
+            metrics.copy(workOps = 0L),
             metrics.workOps,
             result.basis,
         )
     }
 
-    private fun alreadyOptimalModel(): LpModel = LpBuilder().apply {
-        val x = addVar(0L, 5L, cost = 1L)
-        val y = addVar(0L, 5L, cost = 2L)
-        addRow(intArrayOf(x, y), longArrayOf(1L, 1L), Relation.LE, 7L)
-        addRow(intArrayOf(x, y), longArrayOf(2L, 1L), Relation.LE, 9L)
+    private fun pivotingModel(): LpModel = LpBuilder().apply {
+        val x1 = addVar(0L, 10L, cost = 1L)
+        val x2 = addVar(0L, 10L, cost = 1L)
+        val x3 = addVar(0L, 10L, cost = 1L)
+        val x4 = addVar(0L, 10L, cost = 1L)
+        addRow(intArrayOf(x1, x2), longArrayOf(1L, 1L), Relation.GE, 3L)
+        addRow(intArrayOf(x2, x3), longArrayOf(1L, 1L), Relation.GE, 4L)
+        addRow(intArrayOf(x3, x4), longArrayOf(1L, 1L), Relation.GE, 5L)
+        addRow(intArrayOf(x1, x4), longArrayOf(1L, 1L), Relation.GE, 2L)
     }.build(Sense.MINIMIZE)
 
-    private fun LpSolveMetrics.refactorizationTrace(): List<Int> = listOf(
-        initialRefactorizations,
-        warmStartRefactorizations,
-        singularRecoveryRefactorizations,
-        updateLimitRefactorizations,
-        backendRequestedRefactorizations,
-        reconcileRecoveryRefactorizations,
-        primalRefactorizations,
-    )
-
-    private data class PrescribedSolve(val pivots: Int, val refactorizations: List<Int>)
-
-    private data class WorkTrace(val operations: PrescribedSolve, val workOps: Long, val finalBasis: Basis)
+    private data class WorkTrace(val operations: LpSolveMetrics, val workOps: Long, val finalBasis: Basis)
 
     private companion object {
         val backendLock = Any()
