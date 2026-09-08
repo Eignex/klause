@@ -22,11 +22,6 @@ require_tools() {
     command -v sha256sum >/dev/null || die "sha256sum is required"
 }
 
-require_idle_window() {
-    [[ "${KLAUSE_LP_IDLE_WINDOW:-}" == "1" ]] ||
-        die "set KLAUSE_LP_IDLE_WINDOW=1 only for a coordinated idle-host window"
-}
-
 campaign_dir() {
     local measured_sha=$1
     printf '%s/klause-bench/output/lp-wave0-campaign-%s\n' "$repo_root" "$measured_sha"
@@ -378,7 +373,6 @@ run_reference() {
 }
 
 reference_frozen() {
-    require_idle_window
     reject_residual_selection
     local measured_sha=$1
     local suite=$2
@@ -494,7 +488,6 @@ run_baseline_arm() {
 }
 
 baseline_pair() {
-    require_idle_window
     reject_residual_selection
     require_cli_java
     local measured_sha=$1
@@ -532,7 +525,6 @@ baseline_pair() {
 }
 
 baseline_smt() {
-    require_idle_window
     reject_residual_selection
     require_cli_java
     local measured_sha=$1
@@ -608,12 +600,13 @@ instrument() {
 
 print_reference_commands() {
     cat <<'COMMANDS'
-# Run after init-campaign and a coordinated idle-host reservation. Substitute the measured SHA.
-KLAUSE_LP_IDLE_WINDOW=1 klause-bench/scripts/lp-wave0-validation.sh reference-frozen <sha> mzn-bench
-KLAUSE_LP_IDLE_WINDOW=1 klause-bench/scripts/lp-wave0-validation.sh reference-frozen <sha> xcsp3-core
-KLAUSE_LP_IDLE_WINDOW=1 klause-bench/scripts/lp-wave0-validation.sh reference-frozen <sha> mps-core
-KLAUSE_LP_IDLE_WINDOW=1 klause-bench/scripts/lp-wave0-validation.sh reference-frozen <sha> smtlib-qfidl
-KLAUSE_LP_IDLE_WINDOW=1 klause-bench/scripts/lp-wave0-validation.sh reference-frozen <sha> smtlib-qfrdl
+# Run after init-campaign. Substitute the measured SHA. Independent suites may run concurrently only
+# when they write different reference tables; never run two writers for the same CSV concurrently.
+klause-bench/scripts/lp-wave0-validation.sh reference-frozen <sha> mzn-bench
+klause-bench/scripts/lp-wave0-validation.sh reference-frozen <sha> xcsp3-core
+klause-bench/scripts/lp-wave0-validation.sh reference-frozen <sha> mps-core
+klause-bench/scripts/lp-wave0-validation.sh reference-frozen <sha> smtlib-qfidl
+klause-bench/scripts/lp-wave0-validation.sh reference-frozen <sha> smtlib-qfrdl
 
 # Existing LRA/LIRA/LIA rows are reused. Full IDL/RDL coverage is intentionally deferred; these
 # commands run only the frozen per-family=1, max=10, seed=1 representative slices.
@@ -622,10 +615,11 @@ COMMANDS
 
 print_baseline_commands() {
     cat <<'COMMANDS'
-# Rebuild once, then run each suite for repetitions 1, 2 and 3 in coordinated idle-host windows.
+# Rebuild once, then run each suite for repetitions 1, 2 and 3. At most two independent suites run
+# concurrently; each solver remains single-worker and every run has an isolated campaign directory.
 klause-bench/scripts/lp-wave0-validation.sh prepare-cli <sha>
-KLAUSE_LP_IDLE_WINDOW=1 klause-bench/scripts/lp-wave0-validation.sh baseline-pair <sha> <cp-or-mip-suite> <rep>
-KLAUSE_LP_IDLE_WINDOW=1 klause-bench/scripts/lp-wave0-validation.sh baseline-smt <sha> <smt-suite> <rep>
+klause-bench/scripts/lp-wave0-validation.sh baseline-pair <sha> <cp-or-mip-suite> <rep>
+klause-bench/scripts/lp-wave0-validation.sh baseline-smt <sha> <smt-suite> <rep>
 
 # LP pairs: mzn-bench, xcsp3-core, mps-core, miplib2017. The four deterministic MiniZinc source
 # incompatibilities run in repetition 1 only; repetitions 2 and 3 time the 15 compatible entries.

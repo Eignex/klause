@@ -12,6 +12,14 @@
     "baselineRepetitions": 3,
     "baselineProcessors": 1,
     "baselineSeed": 3,
+    "scheduling": {
+      "hostPolicy": "busy shared host; no exclusive reservation or idle-host gate",
+      "maximumConcurrentSuites": 2,
+      "perSolverWorkers": 1,
+      "referenceWritePolicy": "concurrent reference commands must write different CSV tables; commands targeting the same table run serially",
+      "timingInterpretation": "wall times are descriptive and noisy, not regression or performance gates",
+      "primaryEvidence": "oracle verdicts, witnesses, coverage, frozen membership and deterministic work counts"
+    },
     "smtBaseline": {
       "engine": "fixed",
       "lp": "omitted",

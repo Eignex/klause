@@ -67,6 +67,13 @@ and 1,290 seconds (21 min 30 s) worst-case CPU time at `jobs=1 workers=1`. Exist
 LIA and selected MIPLIB rows are not rerun merely to produce new labels. Unknown and timeout rows are
 retained and count as coverage rows, but never as proofs.
 
+The campaign runs on a busy shared host without an exclusive reservation or idle-host gate. At most
+two independent suites run concurrently, with one worker per solver. Reference commands may overlap
+only when they write different CSV tables; writers targeting the same table run serially. Wall times
+are retained as descriptive, noisy context and are not regression or performance gates. Oracle
+verdicts, witnesses, frozen coverage and deterministic work counts are the primary evidence, and the
+campaign is not repeated merely to seek cleaner timing.
+
 The baseline matrix contains 39 CP/MIP instances: all 19 selected MiniZinc entries, including the four
 known source-incompatible Klause cases, plus four XCSP3, four MPS and twelve MIPLIB entries. The four
 MiniZinc incompatibilities run once in both controls to preserve eligibility and the 39-instance
@@ -80,7 +87,7 @@ not construct the floating LP engine. Fixed search also rejects `--lp default` a
 so a default/off A/B is neither runnable nor an LP comparison. The baseline freezes one uncached
 `engine=fixed` configuration with no `--lp` flag for three repetitions: 111 attempts and 3,330 seconds
 worst case. It measures exact-theory stability only. The combined baseline ceiling is 3,984 seconds
-(1 h 6 min 24 s); observed calibration rates are recorded before scheduling the longer slices.
+(1 h 6 min 24 s); bounded independent suites may overlap under the scheduling policy above.
 
 ## Independent reference semantics
 
@@ -210,7 +217,7 @@ klause-bench/scripts/lp-wave0-validation.sh print-baseline-commands
 klause-bench/scripts/lp-wave0-validation.sh init-campaign
 ```
 
-After reserving an idle host window:
+The preserved instrumentation-v3 reproduction alone requires its original idle-host guard:
 
 ```text
 KLAUSE_LP_IDLE_WINDOW=1 klause-bench/scripts/lp-wave0-validation.sh instrument
