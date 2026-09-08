@@ -8,6 +8,8 @@ import com.eignex.klause.formats.mps.toProblem
 import com.eignex.klause.formats.smtlib.SmtLib
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.objective.toLinearObjective
+import com.eignex.klause.solver.result.RunStats
+import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -17,6 +19,17 @@ import kotlin.test.assertTrue
 import com.eignex.klause.ir.ObjectiveSense as ObjectiveDirection
 
 class OpenTheoryMinimizeTest {
+
+    @Test
+    fun `optimization envelope reports the whole descent time`() {
+        val round = SolveStats(run = RunStats(backend = "exact-lia", wallMs = 25, timedOut = true))
+        val envelope = SolveStats(run = RunStats(backend = "exact-lia", wallMs = 1_000))
+
+        assertEquals(
+            RunStats(backend = "exact-lia", wallMs = 1_000, timedOut = true),
+            round.withOptimizationEnvelope(envelope).run,
+        )
+    }
 
     private fun modelOf(body: String) = SmtLib.parse(
         """
@@ -163,6 +176,7 @@ class OpenTheoryMinimizeTest {
         val result = assertIs<OpenTheoryOptimum.Unbounded>(OpenTheoryMinimizer(parsed.model, objective).minimize())
 
         assertEquals(result.value.toString(), result.witness.intValue(x))
+        assertTrue(result.stats.smt.simplexAttempts > 0)
     }
 
     @Test

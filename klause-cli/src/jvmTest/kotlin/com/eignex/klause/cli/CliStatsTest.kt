@@ -6,10 +6,12 @@ import com.eignex.klause.solver.result.LpCertifierStats
 import com.eignex.klause.solver.result.LpRouteSolveStats
 import com.eignex.klause.solver.result.LpStats
 import com.eignex.klause.solver.result.OpenHintStats
+import com.eignex.klause.solver.result.OpenTheoryWorkStats
 import com.eignex.klause.solver.result.PresolveStats
 import com.eignex.klause.solver.result.RunStats
 import com.eignex.klause.solver.result.SchedulingStats
 import com.eignex.klause.solver.result.SearchStats
+import com.eignex.klause.solver.result.SmtStats
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.kumulant.stat.summary.SumResult
 import kotlin.test.Test
@@ -185,11 +187,12 @@ class CliStatsTest {
 
     @Test
     fun `no ls activity emits nothing`() {
-        assertTrue(lsStatPairs(SolveStats.EMPTY).isEmpty())
+        assertTrue(lsStatPairs(SolveStats.EMPTY, solveTimeMs = 0).isEmpty())
         // A complete backend that never ran LS: nothing in the LS block.
         assertTrue(
             lsStatPairs(
                 SolveStats(run = RunStats(backend = "backtrack"), search = SearchStats(nodes = SumResult(10.0))),
+                solveTimeMs = 0,
             ).isEmpty(),
         )
     }
@@ -197,7 +200,7 @@ class CliStatsTest {
     @Test
     fun `ls backend emits the block even before any move`() {
         // An LS solve that found feasibility immediately still identifies as the LS engine.
-        val pairs = lsStatPairs(SolveStats(run = RunStats(backend = "ls")))
+        val pairs = lsStatPairs(SolveStats(run = RunStats(backend = "ls")), solveTimeMs = 0)
         assertTrue(pairs.isNotEmpty())
         assertEquals("0", pairs.toMap()["lsMoves"])
     }
@@ -215,7 +218,7 @@ class CliStatsTest {
                 incumbentViolation = 0.0,
             ),
         )
-        val pairs = lsStatPairs(stats)
+        val pairs = lsStatPairs(stats, solveTimeMs = 2_000)
         assertTrue(pairs.isNotEmpty())
         for ((k, _) in pairs) assertTrue(k.startsWith("ls"), "key not ls-prefixed: $k")
     }
@@ -233,7 +236,7 @@ class CliStatsTest {
                 incumbentViolation = 0.0,
             ),
         )
-        val m = lsStatPairs(stats).toMap()
+        val m = lsStatPairs(stats, solveTimeMs = 2_000).toMap()
         assertEquals("1000", m["lsMoves"])
         assertEquals("5", m["lsRestarts"])
         assertEquals("3", m["lsStalls"])
@@ -249,7 +252,7 @@ class CliStatsTest {
             run = RunStats(backend = "ls"),
             ls = LocalSearchStats(moves = SumResult(800.0), incumbentViolation = 7.0),
         )
-        val m = lsStatPairs(stats).toMap()
+        val m = lsStatPairs(stats, solveTimeMs = 0).toMap()
         assertEquals("7", m["lsIncumbentViolation"])
         assertTrue("lsIncumbentObjective" !in m, "no objective when never feasible")
         assertTrue("lsTimeToBest" !in m, "no time-to-best when no incumbent")
@@ -258,13 +261,13 @@ class CliStatsTest {
     @Test
     fun `mixed portfolio with ls moves still emits the ls block`() {
         val stats = SolveStats(run = RunStats(backend = "mixed"), ls = LocalSearchStats(moves = SumResult(42.0)))
-        assertTrue(lsStatPairs(stats).isNotEmpty())
-        assertEquals("42", lsStatPairs(stats).toMap()["lsMoves"])
+        assertTrue(lsStatPairs(stats, solveTimeMs = 0).isNotEmpty())
+        assertEquals("42", lsStatPairs(stats, solveTimeMs = 0).toMap()["lsMoves"])
     }
 
     @Test
     fun `an open solve that drew no hint emits no hint keys`() {
-        val keys = openTheoryStatPairs(SolveStats(run = RunStats(backend = "exact-lira"))).toMap().keys
+        val keys = openTheoryStatPairs(SolveStats(run = RunStats(backend = "exact-lira")), solveTimeMs = 0).toMap().keys
         assertTrue(keys.none { it.startsWith("openHint") }, "hint keys without a draw: $keys")
     }
 
@@ -274,7 +277,7 @@ class CliStatsTest {
             run = RunStats(backend = "exact-lira"),
             openHints = OpenHintStats(draws = 1, produced = 1, hintedVars = 4, steeredSplits = 9, moves = 37),
         )
-        val m = openTheoryStatPairs(stats).toMap()
+        val m = openTheoryStatPairs(stats, solveTimeMs = 0).toMap()
         assertEquals("1", m["openHintDraws"])
         assertEquals("1", m["openHintProduced"])
         assertEquals("4", m["openHintVars"])
@@ -288,10 +291,48 @@ class CliStatsTest {
             run = RunStats(backend = "exact-lira"),
             openHints = OpenHintStats(draws = 1, produced = 0, hintedVars = 0, moves = 20_000),
         )
-        val m = openTheoryStatPairs(stats).toMap()
+        val m = openTheoryStatPairs(stats, solveTimeMs = 0).toMap()
         assertEquals("0", m["openHintProduced"])
         assertEquals("0", m["openHintSteered"])
         assertEquals("20000", m["openHintMoves"])
+    }
+
+    @Test
+    fun `SMT stats distinguish private and shared checks without zero-denominator rates`() {
+        val stats = SolveStats(
+            run = RunStats(backend = "exact-lira"),
+            openTheory = OpenTheoryWorkStats(openTheoryChecks = 5),
+            smt = SmtStats(privateChecks = 2, explainedConflicts = 0, witnessCandidates = 0),
+        )
+
+        val pairs = openTheoryStatPairs(stats, solveTimeMs = 0).toMap()
+
+        assertEquals("2", pairs["smtPrivateChecks"])
+        assertEquals("3", pairs["smtSharedChecks"])
+        assertEquals("5", pairs["smtTheoryChecks"])
+        assertTrue("smtTheoryChecksPerSec" !in pairs)
+        assertTrue("smtLiteralsPerExplainedConflict" !in pairs)
+        assertTrue("smtWitnessAcceptance" !in pairs)
+    }
+
+    @Test
+    fun `SMT check rate uses the whole solve duration`() {
+        val stats = SolveStats(
+            run = RunStats(backend = "exact-lira", wallMs = 10),
+            openTheory = OpenTheoryWorkStats(openTheoryChecks = 100),
+            smt = SmtStats(privateChecks = 1),
+        )
+
+        val pairs = openTheoryStatPairs(stats, solveTimeMs = 1_000).toMap()
+
+        assertEquals("100", pairs["smtTheoryChecksPerSec"])
+    }
+
+    @Test
+    fun `SMT stats are omitted when no exact lane ran`() {
+        val pairs = openTheoryStatPairs(SolveStats(run = RunStats(backend = "backtrack")), solveTimeMs = 0).toMap()
+
+        assertTrue("smtTheoryChecks" !in pairs)
     }
 
     @Test

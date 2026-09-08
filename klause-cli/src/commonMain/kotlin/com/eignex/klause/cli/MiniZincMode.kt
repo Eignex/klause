@@ -175,8 +175,8 @@ internal class MiniZincOutput : OutputProtocol {
                 printStatPairs("%%%mzn-stat:", searchStatPairs(stats))
                 printStatPairs("%%%mzn-stat:", caStatPairs(stats))
             }
-            printStatPairs("%%%mzn-stat:", openTheoryStatPairs(stats))
-            printStatPairs("%%%mzn-stat:", lsStatPairs(stats))
+            printStatPairs("%%%mzn-stat:", openTheoryStatPairs(stats, solveTimeMs))
+            printStatPairs("%%%mzn-stat:", lsStatPairs(stats, solveTimeMs))
         }
         printStatPairs("%%%mzn-stat:", lpStatPairs(stats))
         println("%%%mzn-stat-end")

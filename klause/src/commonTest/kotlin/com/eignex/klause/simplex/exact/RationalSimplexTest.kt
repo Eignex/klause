@@ -10,6 +10,24 @@ import kotlin.test.assertTrue
 
 class RationalSimplexTest {
 
+    private class RecordingObserver : RationalSimplexObserver {
+        val fracEligible = ArrayList<Boolean>()
+        val escalations = ArrayList<Frac128Escalation>()
+        val attempts = ArrayList<Pair<ExactSimplexStage, ExactSimplexRunResult>>()
+
+        override fun observeFrac128Attempt(eligible: Boolean) {
+            fracEligible += eligible
+        }
+
+        override fun observeEscalation(reason: Frac128Escalation) {
+            escalations += reason
+        }
+
+        override fun observeSimplex(stage: ExactSimplexStage, result: ExactSimplexRunResult, elapsedNs: Long) {
+            attempts += stage to result
+        }
+    }
+
     @Test
     fun `decides a fractional feasible system exactly`() {
         // 2x = 1 over x in [0, 1]: feasible only at the non-integer point x = 1/2.
@@ -46,6 +64,63 @@ class RationalSimplexTest {
 
         assertEquals(RationalFeasibility.FEASIBLE, outcome.feasibility)
         assertEquals(BigFraction.ZERO, outcome.witness!![0])
+    }
+
+    @Test
+    fun `records an input escalation separately from a direct BigFraction attempt`() {
+        val large = BigInteger.ONE shl 160
+        val model = ExactRationalFeasibilityModel(
+            n = 1,
+            rows = listOf(
+                ExactRationalInequality(
+                    intArrayOf(0),
+                    listOf(BigFraction.of(large, BigInteger.ONE)),
+                    BigFraction.of(large, BigInteger.ONE),
+                ),
+            ),
+        )
+        val observer = RecordingObserver()
+
+        assertEquals(RationalFeasibility.FEASIBLE, rationalOutcome(model, observer = observer).feasibility)
+
+        assertEquals(listOf(false), observer.fracEligible)
+        assertEquals(listOf(Frac128Escalation.INPUT), observer.escalations)
+        assertEquals(
+            listOf(
+                ExactSimplexStage.FRAC128 to ExactSimplexRunResult.UNKNOWN,
+                ExactSimplexStage.ESCALATED_BIG to ExactSimplexRunResult.FEASIBLE,
+            ),
+            observer.attempts,
+        )
+    }
+
+    @Test
+    fun `does not record an empty BigFraction model as a simplex attempt`() {
+        val b = LpBuilder()
+        b.addRealVar(0.0, 1.0, cost = 0.0)
+        val observer = RecordingObserver()
+
+        assertEquals(
+            RationalFeasibility.FEASIBLE,
+            bigRationalOutcome(b.build(Sense.MINIMIZE), observer = observer).feasibility,
+        )
+
+        assertTrue(observer.attempts.isEmpty())
+    }
+
+    @Test
+    fun `records direct BigFraction without a synthetic Frac128 escalation`() {
+        val model = ExactRationalFeasibilityModel(
+            n = 1,
+            rows = listOf(ExactRationalInequality(intArrayOf(0), listOf(BigFraction.ONE), BigFraction.ONE)),
+        )
+        val observer = RecordingObserver()
+
+        assertEquals(RationalFeasibility.FEASIBLE, bigRationalOutcome(model, observer = observer).feasibility)
+
+        assertTrue(observer.fracEligible.isEmpty())
+        assertTrue(observer.escalations.isEmpty())
+        assertEquals(listOf(ExactSimplexStage.DIRECT_BIG to ExactSimplexRunResult.FEASIBLE), observer.attempts)
     }
 
     @Test

@@ -6,6 +6,7 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.CpSearchComponent
 import com.eignex.klause.propagation.PropagationSession
+import com.eignex.klause.solver.result.SmtStatsSink
 import com.eignex.klause.solver.search.CardinalitySearchComponent
 import com.eignex.klause.solver.search.ClauseSearchComponent
 import com.eignex.klause.solver.search.SearchComponent
@@ -32,6 +33,15 @@ fun ComponentPlan.search(
     maxChecks: Long = Long.MAX_VALUE,
     cancellation: Cancellation = Cancellation.Never,
     learnedDb: SearchLearnedDbParams = SearchLearnedDbParams(),
+): PlannedSearch = search(spec, cpDomains, maxChecks, cancellation, learnedDb, null)
+
+internal fun ComponentPlan.search(
+    spec: Problem,
+    cpDomains: Map<Int, IntDomain>,
+    maxChecks: Long,
+    cancellation: Cancellation,
+    learnedDb: SearchLearnedDbParams,
+    smtStats: SmtStatsSink?,
 ): PlannedSearch {
     val components = ArrayList<SearchComponent>(3)
     val cp = if (hasCpComponent) {
@@ -50,7 +60,7 @@ fun ComponentPlan.search(
         .filter { factorOwner(it) != FactorOwner.CP }
         .mapNotNull { spec.factors[it] as? Cardinality }
     if (cardinalities.isNotEmpty()) components += CardinalitySearchComponent(cardinalities)
-    val theory = theoryComponent(spec)
+    val theory = theoryComponent(spec, smtStats)
     if (theory != null) components += theory
     cp?.rebase()
     return PlannedSearch(

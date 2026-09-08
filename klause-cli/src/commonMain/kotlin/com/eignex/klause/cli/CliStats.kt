@@ -4,6 +4,7 @@ import com.eignex.klause.solver.result.LpCertifierRouteStats
 import com.eignex.klause.solver.result.LpCertifierStats
 import com.eignex.klause.solver.result.LpRouteSolveStats
 import com.eignex.klause.solver.result.LpStats
+import com.eignex.klause.solver.result.SmtStats
 import com.eignex.klause.solver.result.SolveStats
 import kotlin.math.round
 
@@ -225,7 +226,7 @@ private fun appendRouteCertifierStats(
  * reached — the only signal of how close an otherwise-UNKNOWN run got. Every key is `ls`-prefixed so the
  * block is unambiguous in the flat stat stream, matching the `lp`-prefix convention.
  */
-internal fun lsStatPairs(stats: SolveStats): List<Pair<String, String>> {
+internal fun lsStatPairs(stats: SolveStats, solveTimeMs: Long): List<Pair<String, String>> {
     val moves = stats.ls.moves.sum
     if (stats.run.backend != "ls" && moves == 0.0) return emptyList()
 
@@ -233,7 +234,7 @@ internal fun lsStatPairs(stats: SolveStats): List<Pair<String, String>> {
     out += "lsMoves" to "${moves.toLong()}"
     out += "lsRestarts" to "${stats.search.restarts.sum.toLong()}"
     out += "lsStalls" to "${stats.ls.stalls.sum.toLong()}"
-    if (stats.run.wallMs > 0L) out += "lsMovesPerSec" to round4(moves / (stats.run.wallMs / 1000.0))
+    if (solveTimeMs > 0L) out += "lsMovesPerSec" to round4(moves / (solveTimeMs / 1000.0))
     if (stats.ls.timeToBestMs >= 0L) out += "lsTimeToBest" to round4(stats.ls.timeToBestMs / 1000.0)
     if (stats.ls.incumbentObjective.isFinite()) out += "lsIncumbentObjective" to round4(stats.ls.incumbentObjective)
     if (stats.ls.incumbentViolation.isFinite()) out += "lsIncumbentViolation" to round4(stats.ls.incumbentViolation)
@@ -258,39 +259,102 @@ internal fun searchStatPairs(stats: SolveStats): List<Pair<String, String>> {
 }
 
 /** Exact deterministic open-theory accounting pairs for `-s`. */
-internal fun openTheoryStatPairs(stats: SolveStats): List<Pair<String, String>> = with(stats.openTheory) {
-    listOf(
-        "openBoolDecisions" to "$openBoolDecisions",
-        "openIntDecisions" to "$openIntDecisions",
-        "openTheoryDecisions" to "$openTheoryDecisions",
-        "openTheoryChecks" to "$openTheoryChecks",
-        "openWork" to "$openWork",
-    ) + with(stats.openTheoryClauses) {
+internal fun openTheoryStatPairs(stats: SolveStats, solveTimeMs: Long): List<Pair<String, String>> =
+    with(stats.openTheory) {
         listOf(
-            "openLearned" to "$learned",
-            "openRelearned" to "$relearned",
-            "openRestarts" to "$restarts",
-            "openReductions" to "$reductions",
-            "openDropped" to "$dropped",
-            "openRetained" to "$retained",
-            "openPeakRetained" to "$peakRetained",
-            "openLearnedWatchVisits" to "$watchVisits",
-        )
-    } + with(stats.openHints) {
-        // Only a run that drew a hint has anything to say about one, so every other open solve reports
-        // no hint block rather than a zeroed one.
-        if (draws == 0L) {
-            emptyList()
-        } else {
+            "openBoolDecisions" to "$openBoolDecisions",
+            "openIntDecisions" to "$openIntDecisions",
+            "openTheoryDecisions" to "$openTheoryDecisions",
+            "openTheoryChecks" to "$openTheoryChecks",
+            "openWork" to "$openWork",
+        ) + with(stats.openTheoryClauses) {
             listOf(
-                "openHintDraws" to "$draws",
-                "openHintProduced" to "$produced",
-                "openHintVars" to "$hintedVars",
-                "openHintSteered" to "$steeredSplits",
-                "openHintMoves" to "$moves",
+                "openLearned" to "$learned",
+                "openRelearned" to "$relearned",
+                "openRestarts" to "$restarts",
+                "openReductions" to "$reductions",
+                "openDropped" to "$dropped",
+                "openRetained" to "$retained",
+                "openPeakRetained" to "$peakRetained",
+                "openLearnedWatchVisits" to "$watchVisits",
             )
-        }
+        } + with(stats.openHints) {
+            // Only a run that drew a hint has anything to say about one, so every other open solve reports
+            // no hint block rather than a zeroed one.
+            if (draws == 0L) {
+                emptyList()
+            } else {
+                listOf(
+                    "openHintDraws" to "$draws",
+                    "openHintProduced" to "$produced",
+                    "openHintVars" to "$hintedVars",
+                    "openHintSteered" to "$steeredSplits",
+                    "openHintMoves" to "$moves",
+                )
+            }
+        } + smtStatPairs(stats, solveTimeMs)
     }
+
+/** Exact SMT-theory lane counters, with rates only when their denominator is meaningful. */
+private fun smtStatPairs(stats: SolveStats, solveTimeMs: Long): List<Pair<String, String>> = with(stats.smt) {
+    if (this == SmtStats()) return emptyList()
+    val sharedChecks = stats.openTheory.openTheoryChecks - privateChecks
+    val out = ArrayList<Pair<String, String>>()
+    out += "smtPrivateChecks" to "$privateChecks"
+    out += "smtSharedChecks" to "$sharedChecks"
+    out += "smtTheoryChecks" to "${stats.openTheory.openTheoryChecks}"
+    if (solveTimeMs > 0L) {
+        out += "smtTheoryChecksPerSec" to round4(stats.openTheory.openTheoryChecks / (solveTimeMs / 1000.0))
+    }
+    out += "smtConflicts" to "$conflicts"
+    out += "smtExplainedConflicts" to "$explainedConflicts"
+    out += "smtUnexplainedConflicts" to "$unexplainedConflicts"
+    out += "smtConflictLiterals" to "$conflictLiterals"
+    if (explainedConflicts > 0L) {
+        out += "smtLiteralsPerExplainedConflict" to round4(
+            conflictLiterals.toDouble() / explainedConflicts,
+        )
+    }
+    out += "smtReductionRequests" to "$reductionRequests"
+    out += "smtReductionCacheHits" to "$reductionCacheHits"
+    out += "smtReductionAccepted" to "$reductionAccepted"
+    out += "smtReductionDeclined" to "$reductionDeclined"
+    out += "smtReductionMs" to round4(reductionNs / 1_000_000.0)
+    out += "smtSimplexAttempts" to "$simplexAttempts"
+    out += "smtSimplexAccepted" to "$simplexAccepted"
+    out += "smtSimplexDeclined" to "$simplexDeclined"
+    out += "smtSimplexMs" to round4(simplexNs / 1_000_000.0)
+    out += "smtFrac128Attempts" to "$frac128Attempts"
+    out += "smtFrac128Eligible" to "$frac128Eligible"
+    out += "smtFrac128Accepted" to "$frac128Accepted"
+    out += "smtFrac128Escalations" to "$frac128Escalations"
+    out += "smtFrac128OverflowEscalations" to "$frac128OverflowEscalations"
+    out += "smtFrac128InputEscalations" to "$frac128InputEscalations"
+    out += "smtEscalationMs" to round4(
+        escalationNs / 1_000_000.0,
+    )
+    out += "smtWitnessCandidates" to "$witnessCandidates"
+    out += "smtWitnessAccepted" to "$witnessAccepted"
+    out += "smtStrictWitnessCandidates" to "$strictWitnessCandidates"
+    out += "smtStrictWitnessAccepted" to "$strictWitnessAccepted"
+    out += "smtWideWitnessCandidates" to "$wideWitnessCandidates"
+    out += "smtWideWitnessAccepted" to "$wideWitnessAccepted"
+    if (witnessCandidates > 0L) {
+        out += "smtWitnessAcceptance" to round4(
+            witnessAccepted.toDouble() / witnessCandidates,
+        )
+    }
+    if (strictWitnessCandidates > 0L) {
+        out += "smtStrictWitnessAcceptance" to round4(
+            strictWitnessAccepted.toDouble() / strictWitnessCandidates,
+        )
+    }
+    if (wideWitnessCandidates > 0L) {
+        out += "smtWideWitnessAcceptance" to round4(
+            wideWitnessAccepted.toDouble() / wideWitnessCandidates,
+        )
+    }
+    return out
 }
 
 /** Conflict-analysis diagnostic counters for `-s` — why 1UIP learning was skipped or rejected.
