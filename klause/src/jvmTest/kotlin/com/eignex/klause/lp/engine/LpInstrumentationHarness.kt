@@ -1,5 +1,6 @@
 package com.eignex.klause.lp.engine
 
+import com.eignex.klause.util.Cancellation
 import kotlin.math.roundToLong
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -138,26 +139,44 @@ class LpInstrumentationHarness {
             expectedObserverEvents = activeRun.observerEvents
             baseline[repetition] = baselineRun.elapsedNanos
             active[repetition] = activeRun.elapsedNanos
-            pairedDelta[repetition] = percentage(activeRun.elapsedNanos - baselineRun.elapsedNanos, baselineRun.elapsedNanos)
+            pairedDelta[repetition] = percentage(
+                activeRun.elapsedNanos - baselineRun.elapsedNanos,
+                baselineRun.elapsedNanos,
+            )
         }
 
         val overhead = median(pairedDelta)
+        val pairedIqr = interquartileRange(pairedDelta)
+        val baselineMedian = median(baseline)
+        val activeMedian = median(active)
         println(
             "LP_INSTRUMENTATION label=$OBSERVER_LABEL seed=none engine=RevisedSimplex " +
                 "factory=ProductionLpEngineFactory componentSplit=false observer=LpCertificationObserver " +
                 "workloads=${workloads.joinToString(",") { it.name }} batch=$OBSERVER_BATCH " +
                 "warmups=$WARMUPS repetitions=$REPETITIONS ordering=alternating-paired " +
                 "statistic=median-paired-percent baselineNs=${summary(baseline)} activeNs=${summary(active)} " +
-                "pairedDeltaPct=${summary(pairedDelta)} gatePct=$MAX_OVERHEAD_PCT " +
+                "pairedDeltaPct=${summary(pairedDelta)} pairedIqrPct=${rounded(pairedIqr)} " +
+                "gatePct=$MAX_OVERHEAD_PCT minArmNs=$MIN_ARM_NANOS maxPairedIqrPct=$MAX_PAIRED_IQR_PCT " +
                 "pivots=${checkNotNull(expectedWork).pivots} workOps=${expectedWork.workOps} " +
-                "observerEvents=${checkNotNull(expectedObserverEvents)} semanticDigest=${checkNotNull(expectedDigest)} " +
+                "observerEvents=${checkNotNull(
+                    expectedObserverEvents,
+                )} semanticDigest=${checkNotNull(expectedDigest)} " +
                 "baselineSamplesNs=${baseline.contentToString()} activeSamplesNs=${active.contentToString()} " +
                 "pairedDeltaSamplesPct=${
                     pairedDelta.joinToString(prefix = "[", postfix = "]") { rounded(it).toString() }
                 }",
         )
         reportAuxiliaryCosts(workloads)
-        assertTrue(overhead <= MAX_OVERHEAD_PCT, "observer median paired overhead $overhead% exceeds $MAX_OVERHEAD_PCT%")
+        assertTrue(baselineMedian >= MIN_ARM_NANOS, "baseline median $baselineMedian ns is below validity floor")
+        assertTrue(activeMedian >= MIN_ARM_NANOS, "active median $activeMedian ns is below validity floor")
+        assertTrue(
+            pairedIqr <= MAX_PAIRED_IQR_PCT,
+            "observer paired IQR $pairedIqr percentage points exceeds $MAX_PAIRED_IQR_PCT",
+        )
+        assertTrue(
+            overhead <= MAX_OVERHEAD_PCT,
+            "observer median paired overhead $overhead% exceeds $MAX_OVERHEAD_PCT%",
+        )
     }
 
     private fun reportAuxiliaryCosts(workloads: List<LpWave0Workload>) {
@@ -201,11 +220,7 @@ class LpInstrumentationHarness {
         )
     }
 
-    private fun runObserverArm(
-        workloads: List<LpWave0Workload>,
-        batch: Int,
-        active: Boolean,
-    ): ArmResult {
+    private fun runObserverArm(workloads: List<LpWave0Workload>, batch: Int, active: Boolean): ArmResult {
         val observer = if (active) CountingObserver() else null
         val metrics = MetricsSink()
         val context = LpSolveContext(engineFactory = MeasuringFactory(metrics))
@@ -261,6 +276,13 @@ class LpInstrumentationHarness {
 
     private fun median(values: DoubleArray): Double = values.sorted()[values.size / 2]
 
+    private fun median(values: LongArray): Long = values.sorted()[values.size / 2]
+
+    private fun interquartileRange(values: DoubleArray): Double {
+        val sorted = values.sorted()
+        return sorted[3 * sorted.size / 4] - sorted[sorted.size / 4]
+    }
+
     private fun summary(values: LongArray): String {
         val sorted = values.sorted()
         return "${sorted[sorted.size / 2]}(${sorted.first()}..${sorted.last()})"
@@ -302,10 +324,8 @@ class LpInstrumentationHarness {
     }
 
     private class MeasuringFactory(private val sink: MetricsSink) : LpEngineFactory by ProductionLpEngineFactory {
-        override fun newGeneralSolver(
-            model: LpModel,
-            cancellation: com.eignex.klause.util.Cancellation,
-        ): LpSolver = MeasuringSolver(ProductionLpEngineFactory.newGeneralSolver(model, cancellation), sink)
+        override fun newGeneralSolver(model: LpModel, cancellation: Cancellation): LpSolver =
+            MeasuringSolver(ProductionLpEngineFactory.newGeneralSolver(model, cancellation), sink)
     }
 
     private class MeasuringSolver(private val delegate: LpSolver, private val sink: MetricsSink) :
@@ -317,23 +337,20 @@ class LpInstrumentationHarness {
         }
     }
 
-    private class ArmResult(
-        val elapsedNanos: Long,
-        val digest: Long,
-        val work: WorkSignature,
-        val observerEvents: Int,
-    )
+    private class ArmResult(val elapsedNanos: Long, val digest: Long, val work: WorkSignature, val observerEvents: Int)
 
     private data class WorkSignature(val pivots: Int, val workOps: Long)
 
     private companion object {
         const val ENABLE_ENV = "KLAUSE_LP_INSTRUMENTATION"
-        const val OBSERVER_LABEL = "w0-instrumentation-v1"
-        const val OBSERVER_BATCH = 100
+        const val OBSERVER_LABEL = "w0-instrumentation-v2"
+        const val OBSERVER_BATCH = 5_000
         const val CAPTURE_BATCH = 100
         const val CODEC_BATCH = 50
         const val WARMUPS = 3
         const val REPETITIONS = 9
         const val MAX_OVERHEAD_PCT = 5.0
+        const val MIN_ARM_NANOS = 300_000_000L
+        const val MAX_PAIRED_IQR_PCT = 10.0
     }
 }

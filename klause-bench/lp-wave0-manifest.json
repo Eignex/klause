@@ -1,7 +1,32 @@
 {
   "schemaVersion": 1,
   "baseSha": "848cfef9b6661a5b3eb941de006b2050bca44c5b",
-  "artifactDirectory": "klause-bench/output/lp-wave0-validation-<git-sha>",
+  "artifactDirectory": "klause-bench/output/lp-wave0-validation-v2-<git-sha>",
+  "instrumentationContracts": [
+    {
+      "label": "w0-instrumentation-v1",
+      "sourceSha": "1f1bd19a24cd181dcae27013a2465a51cc23b1b1",
+      "batch": 100,
+      "warmups": 3,
+      "repetitions": 9,
+      "ordering": "alternating-paired",
+      "statistic": "median-paired-percent",
+      "maximumOverheadPercent": 5.0,
+      "outcome": "inconclusive: arm medians below a stable timing scale and paired range -21.16%..67.75%"
+    },
+    {
+      "label": "w0-instrumentation-v2",
+      "batch": 5000,
+      "warmups": 3,
+      "repetitions": 9,
+      "ordering": "alternating-paired",
+      "statistic": "median-paired-percent",
+      "minimumArmMedianNanos": 300000000,
+      "maximumPairedIqrPercentagePoints": 10.0,
+      "maximumOverheadPercent": 5.0,
+      "outcome": "unmeasured"
+    }
+  ],
   "replaySlice": {
     "label": "w0.4-replay-v1",
     "seed": 327765405748,

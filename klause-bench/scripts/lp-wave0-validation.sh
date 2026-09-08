@@ -96,7 +96,7 @@ instrument() {
     cd "$repo_root"
     local head_sha result_dir log_file
     head_sha=$(git rev-parse HEAD)
-    result_dir="$repo_root/klause-bench/output/lp-wave0-validation-$head_sha"
+    result_dir="$repo_root/klause-bench/output/lp-wave0-validation-v2-$head_sha"
     [[ ! -e "$result_dir" ]] || die "refusing to overwrite $result_dir"
     mkdir -p "$result_dir"
     log_file="$result_dir/instrumentation.log"
@@ -115,8 +115,9 @@ instrument() {
         :klause:cleanAllTests :klause:jvmTest \
         --tests com.eignex.klause.lp.engine.LpInstrumentationHarness --info \
         | tee "$log_file"
-    grep -q '^LP_INSTRUMENTATION ' "$log_file" || die "instrumentation result line was not emitted"
-    grep '^LP_\(INSTRUMENTATION\|AUXILIARY_COST\) ' "$log_file" >"$result_dir/results.txt"
+    grep -q 'LP_INSTRUMENTATION ' "$log_file" || die "instrumentation result line was not emitted"
+    grep -E 'LP_(INSTRUMENTATION|AUXILIARY_COST) ' "$log_file" \
+        | sed 's/^[[:space:]]*//' >"$result_dir/results.txt"
     sha256sum "$result_dir"/{host.txt,manifest.json,instrumentation.log,results.txt} \
         >"$result_dir/SHA256SUMS"
     printf 'wrote %s\n' "$result_dir"

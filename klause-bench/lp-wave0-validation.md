@@ -82,11 +82,30 @@ The independent claims are deliberately distinct:
 `LpTestSupport.exactLpOptimum` remains a read-only production-simplex test helper despite its name. It
 is not used as an independent exact oracle and was outside this task's frozen paths.
 
-## Instrumentation contract
+## Instrumentation evidence and contract
 
-The required gate measures only the optional production `LpCertificationObserver` seam:
+The v1 run measured only the optional production `LpCertificationObserver` seam at source
+`1f1bd19a24cd181dcae27013a2465a51cc23b1b1`. The host was 96.8% idle immediately before the
+coordinated window. Both arms had the same semantic digest, 1,300 pivots and 268,500 work operations.
+The median paired delta was -2.08%, but the baseline samples were only 6.45–22.26 ms, the active
+samples were 6.85–30.85 ms, and the paired range was -21.16%..67.75%. That timing scale and spread are
+inconclusive, so v1 is not a 5% gate pass even though its raw median is below 5%.
 
-- label `w0-instrumentation-v1`; one standalone solve over each of the six `w0.4-replay-v1` model
+The complete v1 samples are preserved in the ignored local artifact directory
+`klause-bench/output/lp-wave0-validation-1f1bd19a24cd181dcae27013a2465a51cc23b1b1/`:
+
+- baseline ns: `[18392788, 19974485, 22260151, 10313531, 6899133, 8682755, 6446782, 7651630, 8105646]`;
+- active ns: `[30854005, 17389746, 18315129, 11954063, 9638230, 6845356, 7892940, 7492182, 7298727]`;
+- paired delta %: `[67.75, -12.94, -17.72, 15.91, 39.7, -21.16, 22.43, -2.08, -9.96]`.
+
+The v1 auxiliary medians, excluded from the observer gate, were 2.42 ms for 100 capture batches,
+5.98 ms for 50 codec round-trips, and +3,928.65% for exact independent validation over one replay
+slice. These quantify different work and are not instrumentation overhead.
+
+The unmeasured v2 contract uses v1 only as duration calibration: scaling its 100-batch medians predicts
+roughly 0.4–0.5 s arms at the frozen 5,000 batch. Before any v2 results, it fixes these rules:
+
+- label `w0-instrumentation-v2`; one standalone solve over each of the six `w0.4-replay-v1` model
   shapes per batch (the replay-only cancellation, pivot and gated-event controls are not available at
   the production observer seam);
 - `ProductionLpEngineFactory` / `RevisedSimplex`, `componentSplit=false`, identical models and solve
@@ -95,17 +114,19 @@ The required gate measures only the optional production `LpCertificationObserver
   events;
 - both arms use an identical test-only metrics wrapper, and every pair asserts equal semantic digest,
   pivot count and work count;
-- 100 batches per arm, three warm-ups and nine alternating paired repetitions;
-- statistic: median of the nine paired percentage deltas; pass threshold: at most 5%;
+- 5,000 batches per arm, three warm-ups and nine alternating paired repetitions;
+- validity requires both arm medians to be at least 300 ms and paired-delta IQR to be at most 10
+  percentage points; no pair is discarded;
+- statistic: median of the nine paired percentage deltas; pass threshold remains at most 5%;
 - no benchmark cache and no external solver process.
 
 Capture construction, codec round-trip, and exact replay-validator incremental cost are reported as
 three separate `LP_AUXILIARY_COST` lines. None is included in the 5% observer gate. The ordinary JVM
 test returns immediately unless `KLAUSE_LP_INSTRUMENTATION=1`, keeping the default test below 300 ms.
 
-Measurement result: pending the coordinated idle-host window. The runner records the final SHA, host,
-runtime, raw log, extracted result lines and checksums under the run-specific directory approved for
-this task. It refuses to overwrite an existing directory.
+V2 remains unmeasured and the Wave 0 overhead gate remains open. Its runner records the source SHA,
+host, runtime, raw log, extracted result lines and checksums under a distinct run-specific directory.
+It refuses to overwrite an existing directory.
 
 ## Reproduction
 
@@ -125,8 +146,9 @@ After reserving an idle host window:
 KLAUSE_LP_IDLE_WINDOW=1 klause-bench/scripts/lp-wave0-validation.sh instrument
 ```
 
-The approved generated-artifact path is
-`klause-bench/output/lp-wave0-validation-<git-sha>/`. This task does not overwrite historical labels.
+The v2 generated-artifact path is
+`klause-bench/output/lp-wave0-validation-v2-<git-sha>/`. This task does not overwrite the preserved v1
+artifact or historical labels.
 The reference and baseline commands freeze `jobs=1`, `workers=1`, `processors=1`, seeds, timeouts,
 LP default/off controls and three uncached repetitions where timing is involved. Use
 `klause-bench/output/compare.sh` on each paired default/off result directory; timeouts and declines

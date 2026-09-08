@@ -136,6 +136,7 @@ class LpReplayHarnessTest {
                     LpIndependentCheck(LpIndependentValidation.DECLINED, candidateClaim(step))
 
                 LpReferenceResult.Infeasible -> validateInfeasible(step)
+
                 is LpReferenceResult.Feasible -> validateFeasible(model, step, reference)
             }
         }
@@ -226,13 +227,9 @@ class LpReplayHarnessTest {
 
         private fun candidateClaim(step: LpReplayStep): LpIndependentClaim = when {
             step.hasInfeasibilityProof -> LpIndependentClaim.PROVED_INFEASIBLE
-
             step.hasFeasibleWitness -> LpIndependentClaim.FEASIBLE_WITNESS
-
             step.hasCertifiedBound -> LpIndependentClaim.CERTIFIED_BOUND
-
             step.candidate != LpCandidateKind.NONE -> LpIndependentClaim.CANDIDATE_HINT
-
             else -> LpIndependentClaim.NONE
         }
     }
