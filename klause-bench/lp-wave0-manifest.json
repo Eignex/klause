@@ -12,6 +12,12 @@
     "baselineRepetitions": 3,
     "baselineProcessors": 1,
     "baselineSeed": 3,
+    "smtBaseline": {
+      "engine": "fixed",
+      "lp": "omitted",
+      "reason": "fixed search is propagation/exact-theory only; --lp default is rejected and --lp does not control SMT routing bound closure"
+    },
+    "mznUnsupportedRepetitionPolicy": "the four frozen source-incompatible instances run in both controls of repetition 1 only; repetitions 2 and 3 contain the 15 compatible instances",
     "cpMipBaselineTimeoutMs": 3000,
     "smtBaselineTimeoutMs": 30000,
     "fullSmtMembership": {
@@ -41,15 +47,26 @@
         "missingAtPrerequisite": 255
       }
     },
+    "sliceMissingAtPrerequisite": {
+      "smtlib-qflra": 0,
+      "smtlib-qflira": 0,
+      "smtlib-qflia": 0,
+      "smtlib-qfidl": 10,
+      "smtlib-qfrdl": 6,
+      "mzn-bench": 19,
+      "xcsp3-core": 4,
+      "mps-core": 4,
+      "miplib2017": 0
+    },
     "expectedAttempts": {
       "frozenReference": 43,
-      "baselineCpMip": 234,
-      "baselineSmt": 222
+      "baselineCpMip": 218,
+      "baselineSmt": 111
     },
     "worstCaseCpuSeconds": {
       "frozenReference": 1290,
-      "baselineCpMip": 702,
-      "baselineSmt": 6660
+      "baselineCpMip": 654,
+      "baselineSmt": 3330
     }
   },
   "instrumentationContracts": [

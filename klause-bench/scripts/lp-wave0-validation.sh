@@ -8,6 +8,9 @@ cache_home=$(getent passwd "$(id -u)" | cut -d: -f6)
 corpus_root="${KLAUSE_BENCH_CORPUS_ROOT:-$cache_home/.cache/klause-bench/corpus}"
 full_per_family=2147483647
 miplib_names=10teams,22433,23588,2club200v15p5scn,30_70_45_05_100,30_70_45_095_100,30n20b8,50v-10,8div-n59k10,8div-n59k11,CMS750_4,Test3
+mzn_compatible_names=$(jq -r \
+    '.suiteSlices[] | select(.suite == "mzn-bench") | (.excluded | map(.[0])) as $excluded | .instances[] | select(. as $id | ($excluded | index($id) | not))' \
+    "$manifest" | paste -sd, -)
 
 die() {
     printf 'lp-wave0-validation: %s\n' "$*" >&2
@@ -234,6 +237,55 @@ write_slice_preflight() {
             "$manifest" | LC_ALL=C sort >"$expected_file"
         cmp -s "$ids_file" "$expected_file" || die "$suite frozen slice differs from the manifest"
     done
+    (
+        cd "$repo_root"
+        ./gradlew -q :klause-bench:bench \
+            --args="preview suite=mzn-bench per-family=1 max=60 seed=1 name=$mzn_compatible_names"
+    ) >"$dir/slices/mzn-bench-compatible.preview.txt"
+    extract_preview_ids "$dir/slices/mzn-bench-compatible.preview.txt" \
+        "$dir/slices/mzn-bench-compatible.ids"
+    jq -r \
+        '.suiteSlices[] | select(.suite == "mzn-bench") | (.excluded | map(.[0])) as $excluded | .instances[] | select(. as $id | ($excluded | index($id) | not))' \
+        "$manifest" | LC_ALL=C sort >"$dir/slices/mzn-bench-compatible.expected.ids"
+    cmp -s "$dir/slices/mzn-bench-compatible.ids" "$dir/slices/mzn-bench-compatible.expected.ids" ||
+        die "MiniZinc compatible timing slice differs from the manifest exclusions"
+    local table key expected_missing actual_missing
+    for suite in smtlib-qflra smtlib-qflira smtlib-qflia smtlib-qfidl smtlib-qfrdl \
+        mzn-bench xcsp3-core mps-core miplib2017; do
+        case "$suite" in
+            smtlib-qflra) table="$repo_root/klause-bench/reference/z3.csv"; key=smtlib-qf_lra ;;
+            smtlib-qflira) table="$repo_root/klause-bench/reference/z3.csv"; key=smtlib-qf_lira ;;
+            smtlib-qflia) table="$repo_root/klause-bench/reference/z3.csv"; key=smtlib-qf_lia ;;
+            smtlib-qfidl) table="$repo_root/klause-bench/reference/z3.csv"; key=smtlib-qf_idl ;;
+            smtlib-qfrdl) table="$repo_root/klause-bench/reference/z3.csv"; key=smtlib-qf_rdl ;;
+            mzn-bench) table="$repo_root/klause-bench/reference/cp-sat.csv"; key=mzn-challenge ;;
+            xcsp3-core) table="$repo_root/klause-bench/reference/cp-sat.csv"; key=xcsp3-core ;;
+            mps-core) table="$repo_root/klause-bench/reference/scip.csv"; key=mps-core ;;
+            miplib2017) table="$repo_root/klause-bench/reference/scip.csv"; key=miplib2017 ;;
+        esac
+        awk -F, -v key="$key" 'NR > 1 && $1 == key { print $2 }' "$table" | LC_ALL=C sort \
+            >"$dir/slices/$suite.existing.ids"
+        LC_ALL=C comm -23 "$dir/slices/$suite.ids" "$dir/slices/$suite.existing.ids" \
+            >"$dir/slices/$suite.missing.ids"
+        expected_missing=$(jq -r --arg suite "$suite" \
+            '.campaignContract.sliceMissingAtPrerequisite[$suite]' "$manifest")
+        actual_missing=$(wc -l <"$dir/slices/$suite.missing.ids")
+        [[ "$actual_missing" == "$expected_missing" ]] ||
+            die "$suite has $actual_missing missing frozen rows, expected $expected_missing"
+    done
+    (
+        cd "$dir/slices"
+        for suite in smtlib-qflra smtlib-qflira smtlib-qflia smtlib-qfidl smtlib-qfrdl \
+            mzn-bench xcsp3-core mps-core miplib2017; do
+            printf '%s selected=%s existing=%s missing=%s idsSha256=%s missingSha256=%s\n' \
+                "$suite" \
+                "$(wc -l <"$suite.ids")" \
+                "$(wc -l <"$suite.existing.ids")" \
+                "$(wc -l <"$suite.missing.ids")" \
+                "$(sha256sum "$suite.ids" | cut -d' ' -f1)" \
+                "$(sha256sum "$suite.missing.ids" | cut -d' ' -f1)"
+        done
+    ) >"$dir/slices/coverage.txt"
 }
 
 init_campaign() {
@@ -401,17 +453,20 @@ run_baseline_arm() {
     local timeout=$6
     local filters=$7
     local engine=$8
-    local campaign run_dir label tag standard_dir standard_csv status
+    local campaign run_dir label tag standard_dir standard_csv status arm
     campaign=$(campaign_dir "$measured_sha")
-    run_dir="$campaign/baseline/$suite/rep-$rep/$lp"
+    arm=${lp:-single}
+    run_dir="$campaign/baseline/$suite/rep-$rep/$arm"
     [[ ! -e "$run_dir" ]] || die "refusing to overwrite $run_dir"
     mkdir -p "$run_dir/results"
-    label="w0-${measured_sha:0:12}-$short-$lp-r$rep"
+    label="w0-${measured_sha:0:12}-$short-$arm-r$rep"
     if [[ -n "$engine" ]]; then
-        tag="klause-$engine-p1-t$((timeout / 1000))s-lp-$lp-$label"
+        tag="klause-$engine-p1-t$((timeout / 1000))s"
     else
-        tag="klause-p1-t$((timeout / 1000))s-lp-$lp-$label"
+        tag="klause-p1-t$((timeout / 1000))s"
     fi
+    [[ -z "$lp" ]] || tag="$tag-lp-$lp"
+    tag="$tag-$label"
     standard_dir="$repo_root/klause-bench/output/$tag"
     standard_csv="$repo_root/klause-bench/output/$tag.csv"
     [[ ! -e "$standard_dir" && ! -e "$standard_csv" ]] ||
@@ -420,8 +475,9 @@ run_baseline_arm() {
     ln -s "$run_dir/results" "$standard_dir"
     ln -s "$run_dir/results.csv" "$standard_csv"
     trap cleanup_baseline_links RETURN INT TERM
-    local args="solve suite=$suite $filters processors=1 timeout=$timeout lp=$lp label=$label"
+    local args="solve suite=$suite $filters processors=1 timeout=$timeout label=$label"
     [[ -z "$engine" ]] || args="$args engine=$engine"
+    [[ -z "$lp" ]] || args="$args lp=$lp"
     record_command "$run_dir/command.txt" ./gradlew -Dklause.bench.cache=false :klause-bench:bench --args="$args"
     set +e
     (
@@ -434,7 +490,7 @@ run_baseline_arm() {
     trap - RETURN INT TERM
     printf '%s\n' "$status" >"$run_dir/exit-status.txt"
     checksum_dir "$run_dir"
-    [[ "$status" == 0 ]] || die "$suite $lp repetition $rep exited $status; evidence retained in $run_dir"
+    [[ "$status" == 0 ]] || die "$suite $arm repetition $rep exited $status; evidence retained in $run_dir"
 }
 
 baseline_pair() {
@@ -453,16 +509,18 @@ baseline_pair() {
     [[ "$rep" =~ ^[123]$ ]] || die "baseline repetition must be 1, 2 or 3"
     local short timeout filters engine
     case "$suite" in
-        mzn-bench) short=mzn; timeout=3000; filters="per-family=1 max=60 seed=1"; engine="" ;;
+        mzn-bench)
+            short=mzn; timeout=3000; engine=""
+            if [[ "$rep" == 1 ]]; then
+                filters="per-family=1 max=60 seed=1"
+            else
+                filters="per-family=1 max=60 seed=1 name=$mzn_compatible_names"
+            fi
+            ;;
         xcsp3-core) short=xcsp3; timeout=3000; filters=""; engine="" ;;
         mps-core) short=mps; timeout=3000; filters=""; engine="" ;;
         miplib2017) short=miplib12; timeout=3000; filters="name=$miplib_names"; engine="" ;;
-        smtlib-qflra) short=qflra; timeout=30000; filters="per-family=1 max=10 seed=1"; engine=fixed ;;
-        smtlib-qflira) short=qflira; timeout=30000; filters="per-family=1 max=10 seed=1"; engine=fixed ;;
-        smtlib-qflia) short=qflia; timeout=30000; filters="per-family=1 max=10 seed=1"; engine=fixed ;;
-        smtlib-qfidl) short=qfidl; timeout=30000; filters="per-family=1 max=10 seed=1"; engine=fixed ;;
-        smtlib-qfrdl) short=qfrdl; timeout=30000; filters="per-family=1 max=10 seed=1"; engine=fixed ;;
-        *) die "unsupported baseline suite: $suite" ;;
+        *) die "paired LP baseline suite must be mzn-bench, xcsp3-core, mps-core or miplib2017" ;;
     esac
     run_baseline_arm "$measured_sha" "$suite" "$rep" default "$short" "$timeout" "$filters" "$engine"
     run_baseline_arm "$measured_sha" "$suite" "$rep" off "$short" "$timeout" "$filters" "$engine"
@@ -471,6 +529,33 @@ baseline_pair() {
     "$repo_root/klause-bench/output/compare.sh" \
         "$pair_dir/default/results" "$pair_dir/off/results" >"$pair_dir/compare.txt"
     checksum_dir "$pair_dir"
+}
+
+baseline_smt() {
+    require_idle_window
+    reject_residual_selection
+    require_cli_java
+    local measured_sha=$1
+    local suite=$2
+    local rep=$3
+    require_campaign "$measured_sha"
+    verify_corpora
+    [[ -f "$(campaign_dir "$measured_sha")/cli-build/exit-status.txt" ]] ||
+        die "run prepare-cli before timed baselines"
+    [[ "$(<"$(campaign_dir "$measured_sha")/cli-build/exit-status.txt")" == 0 ]] ||
+        die "the retained CLI build did not succeed"
+    [[ "$rep" =~ ^[123]$ ]] || die "baseline repetition must be 1, 2 or 3"
+    local short
+    case "$suite" in
+        smtlib-qflra) short=qflra ;;
+        smtlib-qflira) short=qflira ;;
+        smtlib-qflia) short=qflia ;;
+        smtlib-qfidl) short=qfidl ;;
+        smtlib-qfrdl) short=qfrdl ;;
+        *) die "SMT baseline suite must be one of the five frozen arithmetic suites" ;;
+    esac
+    run_baseline_arm "$measured_sha" "$suite" "$rep" "" "$short" 30000 \
+        "per-family=1 max=10 seed=1" fixed
 }
 
 check() {
@@ -539,11 +624,14 @@ print_baseline_commands() {
     cat <<'COMMANDS'
 # Rebuild once, then run each suite for repetitions 1, 2 and 3 in coordinated idle-host windows.
 klause-bench/scripts/lp-wave0-validation.sh prepare-cli <sha>
-KLAUSE_LP_IDLE_WINDOW=1 klause-bench/scripts/lp-wave0-validation.sh baseline-pair <sha> <suite> <rep>
+KLAUSE_LP_IDLE_WINDOW=1 klause-bench/scripts/lp-wave0-validation.sh baseline-pair <sha> <cp-or-mip-suite> <rep>
+KLAUSE_LP_IDLE_WINDOW=1 klause-bench/scripts/lp-wave0-validation.sh baseline-smt <sha> <smt-suite> <rep>
 
-# Suites: mzn-bench, xcsp3-core, mps-core, miplib2017, smtlib-qflra, smtlib-qflira,
-# smtlib-qflia, smtlib-qfidl, smtlib-qfrdl. Each pair is uncached and runs LP default then off.
-# SMT uses the exact theory pipeline; its equal LP labels are a routing control, not float-LP timing.
+# LP pairs: mzn-bench, xcsp3-core, mps-core, miplib2017. The four deterministic MiniZinc source
+# incompatibilities run in repetition 1 only; repetitions 2 and 3 time the 15 compatible entries.
+# SMT suites: smtlib-qflra, smtlib-qflira, smtlib-qflia, smtlib-qfidl, smtlib-qfrdl.
+# SMT uses one uncached fixed/exact-theory configuration with no --lp flag; fixed rejects --lp default,
+# and the SMT routing bound closure does not read the CLI LP emphasis.
 COMMANDS
 }
 
@@ -552,6 +640,7 @@ usage() {
         "usage: $0 verify|preview|check|instrument|init-campaign|prepare-cli SHA" \
         "       $0 reference-frozen SHA SUITE" \
         "       $0 baseline-pair SHA SUITE REP" \
+        "       $0 baseline-smt SHA SUITE REP" \
         "       $0 print-reference-commands|print-baseline-commands"
 }
 
@@ -564,6 +653,7 @@ case "${1:-}" in
     prepare-cli) [[ $# == 2 ]] || die "prepare-cli requires SHA"; prepare_cli "$2" ;;
     reference-frozen) [[ $# == 3 ]] || die "reference-frozen requires SHA SUITE"; reference_frozen "$2" "$3" ;;
     baseline-pair) [[ $# == 4 ]] || die "baseline-pair requires SHA SUITE REP"; baseline_pair "$2" "$3" "$4" ;;
+    baseline-smt) [[ $# == 4 ]] || die "baseline-smt requires SHA SUITE REP"; baseline_smt "$2" "$3" "$4" ;;
     print-reference-commands) print_reference_commands ;;
     print-baseline-commands) print_baseline_commands ;;
     *) usage; exit 2 ;;

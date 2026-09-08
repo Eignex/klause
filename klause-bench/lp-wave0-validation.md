@@ -50,8 +50,9 @@ are in `lp-wave0-manifest.json`.
 
 The format adapters already route SMT-LIB to Z3, XCSP3 and MiniZinc to CP-SAT, and MPS to SCIP.
 No missing adapter logic was found. The gaps are missing oracle executions or a corpus-ID mismatch, so
-this task does not change production benchmark adapters or oracle tables. In particular, SMT reference
-generation must use `bench reference`; `backend=z3` is not an equivalent `bench solve` baseline.
+the campaign changes only the producing solver's oracle table and the owned validation tooling. In
+particular, SMT reference generation uses `bench reference`; `backend=z3` is not an equivalent `bench
+solve` baseline.
 
 The original printed "full" commands were not full: every dynamic suite is constructed with a default
 one-instance-per-family cap, even when no `per-family=` filter appears in the command. Read-only
@@ -67,12 +68,19 @@ LIA and selected MIPLIB rows are not rerun merely to produce new labels. Unknown
 retained and count as coverage rows, but never as proofs.
 
 The baseline matrix contains 39 CP/MIP instances: all 19 selected MiniZinc entries, including the four
-known source-incompatible Klause cases, plus four XCSP3, four MPS and twelve MIPLIB entries. Three
-uncached default/off repetitions therefore make 234 CP/MIP attempts (702 seconds worst case). The five
-SMT slices contain 37 instances and make 222 attempts (6,660 seconds worst case). The four MiniZinc
-source incompatibilities remain in the 39-instance denominator; the compatible shared denominator is
-35. SMT exact-theory solving does not reach the floating LP engine, so its default/off pair is a route
-and semantic consistency control rather than a float-LP performance comparison.
+known source-incompatible Klause cases, plus four XCSP3, four MPS and twelve MIPLIB entries. The four
+MiniZinc incompatibilities run once in both controls to preserve eligibility and the 39-instance
+coverage denominator; repetitions two and three contain the 15 compatible MiniZinc entries. Three
+uncached default/off repetitions therefore make 218 CP/MIP attempts (654 seconds worst case), with a
+35-instance shared-compatible denominator.
+
+The five SMT slices contain 37 instances. `SmtLibMode` selects bound closure and the open exact-theory
+route before search without reading the CLI LP emphasis; its exact LRA/LIRA/difference components do
+not construct the floating LP engine. Fixed search also rejects `--lp default` and accepts only `off`,
+so a default/off A/B is neither runnable nor an LP comparison. The baseline freezes one uncached
+`engine=fixed` configuration with no `--lp` flag for three repetitions: 111 attempts and 3,330 seconds
+worst case. It measures exact-theory stability only. The combined baseline ceiling is 3,984 seconds
+(1 h 6 min 24 s); observed calibration rates are recorded before scheduling the longer slices.
 
 ## Independent reference semantics
 
@@ -211,10 +219,11 @@ KLAUSE_LP_IDLE_WINDOW=1 klause-bench/scripts/lp-wave0-validation.sh instrument
 The v3 generated-artifact path is
 `klause-bench/output/lp-wave0-validation-v3-<git-sha>/`. This task does not overwrite the preserved v1
 or v2 artifacts or historical labels.
-The reference and baseline commands freeze `jobs=1`, `workers=1`, `processors=1`, seeds, timeouts,
-LP default/off controls and three uncached repetitions where timing is involved. Use
-`klause-bench/output/compare.sh` on each paired default/off result directory; timeouts and declines
-remain in the denominator.
+The reference and baseline commands freeze `jobs=1`, `workers=1`, `processors=1`, seeds and timeouts.
+CP/MIP baselines use three uncached LP default/off repetitions, subject to the explicit MiniZinc
+incompatibility policy above, and each pair is analysed with `klause-bench/output/compare.sh`. SMT uses
+the one frozen uncached exact-theory configuration for three repetitions. Timeouts and declines remain
+in their stated denominators.
 
 Campaign commands retain evidence under
 `klause-bench/output/lp-wave0-campaign-<measured-sha>/`. Initialization refuses an existing campaign
