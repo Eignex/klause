@@ -254,8 +254,8 @@ write_slice_preflight() {
             smtlib-qfidl) table="$repo_root/klause-bench/reference/z3.csv"; key=smtlib-qf_idl ;;
             smtlib-qfrdl) table="$repo_root/klause-bench/reference/z3.csv"; key=smtlib-qf_rdl ;;
             mzn-bench) table="$repo_root/klause-bench/reference/cp-sat.csv"; key=mzn-challenge ;;
-            xcsp3-core) table="$repo_root/klause-bench/reference/cp-sat.csv"; key=xcsp3-core ;;
-            mps-core) table="$repo_root/klause-bench/reference/scip.csv"; key=mps-core ;;
+            xcsp3-core) table="$repo_root/klause-bench/reference/cp-sat.csv"; key=klause-bench/smoke-corpus/xcsp3 ;;
+            mps-core) table="$repo_root/klause-bench/reference/scip.csv"; key=klause-bench/smoke-corpus/mps ;;
             miplib2017) table="$repo_root/klause-bench/reference/scip.csv"; key=miplib2017 ;;
         esac
         awk -F, -v key="$key" 'NR > 1 && $1 == key { print $2 }' "$table" | LC_ALL=C sort \
@@ -327,7 +327,8 @@ reference_table_for() {
 reference_key_for() {
     case "$1" in
         mzn-bench) printf 'mzn-challenge\n' ;;
-        xcsp3-core|mps-core) printf '%s\n' "$1" ;;
+        xcsp3-core) printf 'klause-bench/smoke-corpus/xcsp3\n' ;;
+        mps-core) printf 'klause-bench/smoke-corpus/mps\n' ;;
         smtlib-qfidl) printf 'smtlib-qf_idl\n' ;;
         smtlib-qfrdl) printf 'smtlib-qf_rdl\n' ;;
         *) die "unsupported missing reference suite: $1" ;;
@@ -395,6 +396,35 @@ reference_frozen() {
         write_smt_source_hashes "$suite" "$run_dir/ids.txt" "$run_dir/sources.sha256"
         checksum_dir "$run_dir"
     fi
+}
+
+repair_reference_snapshot() {
+    local measured_sha=$1
+    local suite=$2
+    require_campaign "$measured_sha"
+    case "$suite" in
+        mps-core|xcsp3-core) ;;
+        *) die "snapshot repair is only defined for mps-core or xcsp3-core" ;;
+    esac
+    local run_dir original table key expected_rows actual_rows
+    run_dir="$(campaign_dir "$measured_sha")/reference/$suite/frozen"
+    original="$run_dir/results.before-key-fix.csv"
+    [[ -f "$run_dir/results.csv" ]] || die "reference snapshot is absent: $run_dir/results.csv"
+    [[ ! -e "$original" ]] || die "refusing to overwrite $original"
+    mv "$run_dir/results.csv" "$original"
+    table=$(reference_table_for "$suite")
+    key=$(reference_key_for "$suite")
+    write_selected_reference_rows "$run_dir/ids.txt" "$table" "$key" "$run_dir/results.csv"
+    expected_rows=$(( $(wc -l <"$run_dir/ids.txt") + 1 ))
+    actual_rows=$(wc -l <"$run_dir/results.csv")
+    [[ "$actual_rows" == "$expected_rows" ]] ||
+        die "$suite repaired snapshot has $actual_rows rows, expected $expected_rows"
+    {
+        printf 'reason=reference CSV uses corpus-path suite key\n'
+        printf 'runnerSha=%s\n' "$(git -C "$repo_root" rev-parse HEAD)"
+        printf 'preserved=%s\n' "$(basename "$original")"
+    } >"$run_dir/snapshot-repair.txt"
+    checksum_dir "$run_dir"
 }
 
 write_smt_source_hashes() {
@@ -633,6 +663,7 @@ usage() {
     printf '%s\n' \
         "usage: $0 verify|preview|check|instrument|init-campaign|prepare-cli SHA" \
         "       $0 reference-frozen SHA SUITE" \
+        "       $0 repair-reference-snapshot SHA SUITE" \
         "       $0 baseline-pair SHA SUITE REP" \
         "       $0 baseline-smt SHA SUITE REP" \
         "       $0 print-reference-commands|print-baseline-commands"
@@ -646,6 +677,7 @@ case "${1:-}" in
     init-campaign) init_campaign ;;
     prepare-cli) [[ $# == 2 ]] || die "prepare-cli requires SHA"; prepare_cli "$2" ;;
     reference-frozen) [[ $# == 3 ]] || die "reference-frozen requires SHA SUITE"; reference_frozen "$2" "$3" ;;
+    repair-reference-snapshot) [[ $# == 3 ]] || die "repair-reference-snapshot requires SHA SUITE"; repair_reference_snapshot "$2" "$3" ;;
     baseline-pair) [[ $# == 4 ]] || die "baseline-pair requires SHA SUITE REP"; baseline_pair "$2" "$3" "$4" ;;
     baseline-smt) [[ $# == 4 ]] || die "baseline-smt requires SHA SUITE REP"; baseline_smt "$2" "$3" "$4" ;;
     print-reference-commands) print_reference_commands ;;
