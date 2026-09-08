@@ -82,7 +82,7 @@ internal fun solveAndCertify(
         val result = try {
             solver.solve(warm)
         } finally {
-            observer?.observeSolve(solver.lastMetrics, solver is ComponentLpSolver)
+            observer?.observeSolve(solver.lastMetrics, solver is ComponentLpSolverCapability)
         }
         if (result == null) {
             // A dual-unbounded termination is only a *candidate* infeasibility — confirm it with an exact
@@ -140,7 +140,7 @@ internal fun solveAndCertify(
         // certified by the exact dual bound ([integerCertify]); a continuous model has no integer dual bound,
         // so its feasibility is certified by reconstructing the reported basis's point exactly
         // ([exactBasisFeasible]) — enough for a definitive SAT verdict at a leaf.
-        val componentSolver = solver as? ComponentLpSolver
+        val componentSolver = solver as? ComponentLpSolverCapability
         val certificate = policy.acceptNullable(
             LpCertifier.INTEGER,
             integerCertify(model, result.duals, observer = observer),
