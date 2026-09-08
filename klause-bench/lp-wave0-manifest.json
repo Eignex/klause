@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "baseSha": "848cfef9b6661a5b3eb941de006b2050bca44c5b",
-  "artifactDirectory": "klause-bench/output/lp-wave0-validation-v2-<git-sha>",
+  "artifactDirectory": "klause-bench/output/lp-wave0-validation-v3-<git-sha>",
   "instrumentationContracts": [
     {
       "label": "w0-instrumentation-v1",
@@ -16,7 +16,20 @@
     },
     {
       "label": "w0-instrumentation-v2",
+      "sourceSha": "a51dcab07fe77802fbd2bbfd720d884c65dcc2b9",
       "batch": 5000,
+      "warmups": 3,
+      "repetitions": 9,
+      "ordering": "alternating-paired",
+      "statistic": "median-paired-percent",
+      "minimumArmMedianNanos": 300000000,
+      "maximumPairedIqrPercentagePoints": 10.0,
+      "maximumOverheadPercent": 5.0,
+      "outcome": "inconclusive: baseline median 275448337 ns and active median 272294240 ns were below the 300000000 ns validity floor"
+    },
+    {
+      "label": "w0-instrumentation-v3",
+      "batch": 10000,
       "warmups": 3,
       "repetitions": 9,
       "ordering": "alternating-paired",

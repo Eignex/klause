@@ -343,8 +343,8 @@ class LpInstrumentationHarness {
 
     private companion object {
         const val ENABLE_ENV = "KLAUSE_LP_INSTRUMENTATION"
-        const val OBSERVER_LABEL = "w0-instrumentation-v2"
-        const val OBSERVER_BATCH = 5_000
+        const val OBSERVER_LABEL = "w0-instrumentation-v3"
+        const val OBSERVER_BATCH = 10_000
         const val CAPTURE_BATCH = 100
         const val CODEC_BATCH = 50
         const val WARMUPS = 3
