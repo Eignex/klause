@@ -581,7 +581,9 @@ for suite, rep, arm, expected, budget in expected_runs:
         oracle_maximize = normalized(oracle["maximize"])
         if record["kind"] == "optimize" and record["maximize"] != oracle_maximize:
             objective_sense_mismatches.append((suite, rep, arm, record["problem"]))
-        if oracle_proven and record["proven"] and record["feasible"] != oracle_feasible:
+        contradicts_unsat = oracle_feasible is False and record["feasible"] is True
+        contradicts_proven = record["proven"] and record["feasible"] != oracle_feasible
+        if oracle_proven and (contradicts_unsat or contradicts_proven):
             verdict_conflicts.append((suite, rep, arm, record["problem"]))
         if oracle_proven and oracle_feasible and record["feasible"] and oracle_objective is not None:
             objective = normalized(record["objective"])
