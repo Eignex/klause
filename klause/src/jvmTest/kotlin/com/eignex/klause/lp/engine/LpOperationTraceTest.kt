@@ -1,7 +1,7 @@
 package com.eignex.klause.lp.engine
 
-import com.eignex.koblas.F64Capabilities
-import com.eignex.koblas.F64ContextBuilder
+import com.eignex.koblas.Capabilities
+import com.eignex.koblas.ContextBuilder
 import com.eignex.koblas.backendNamed
 import com.eignex.koblas.installBackends
 import com.eignex.koblas.koblas
@@ -17,10 +17,10 @@ class LpOperationTraceTest {
     fun `fixed backend replays charge deterministic work for the same pivot trace`() {
         ensureKoblasBackends()
         val original = koblas
-        val portable = F64ContextBuilder().resolve()
+        val portable = ContextBuilder().resolve()
         val hfactor = assertNotNull(
-            backendNamed("hfactor-bundled", F64Capabilities.basisSolvers)
-                ?: backendNamed("hfactor", F64Capabilities.basisSolvers),
+            backendNamed("hfactor-bundled", Capabilities.basisSolvers)
+                ?: backendNamed("hfactor", Capabilities.basisSolvers),
             "the JVM test runtime must provide HFactor",
         )
         assertTrue(portable.basisSolvers.isPortable)

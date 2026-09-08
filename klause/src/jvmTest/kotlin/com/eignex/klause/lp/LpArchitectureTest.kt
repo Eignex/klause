@@ -40,7 +40,7 @@ class LpArchitectureTest {
             "val columns: com.eignex.klause.lp.engine.Csc? = null" to "Csc",
             "val work = com.eignex.klause.lp.engine.LpWork()" to "LpWork",
             "val text = \"${'$'}{com.eignex.klause.lp.engine.RevisedSimplex(model)}\"" to "RevisedSimplex",
-            "import com.eignex.koblas.sparse.basis.F64BasisSolver" to "koblas",
+            "import com.eignex.koblas.sparse.basis.BasisSolver" to "koblas",
             "val context = com.eignex.koblas.koblas" to "koblas",
         )
 
@@ -58,12 +58,12 @@ class LpArchitectureTest {
         val fixtures = listOf(
             """
                 package com.eignex.klause.lp.engine
-                import com.eignex.koblas.sparse.basis.F64BasisSolver
+                import com.eignex.koblas.sparse.basis.BasisSolver
                 val solver: RevisedSimplex? = null
             """.trimIndent(),
             """
                 package com.eignex.klause.simplex.basis
-                val solver: com.eignex.koblas.sparse.basis.F64BasisSolver? = null
+                val solver: com.eignex.koblas.sparse.basis.BasisSolver? = null
             """.trimIndent(),
             """
                 package com.eignex.klause.lp.bounding
