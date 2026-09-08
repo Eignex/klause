@@ -11,6 +11,7 @@ import com.eignex.klause.solver.pipeline.ProblemPipeline
 import com.eignex.klause.solver.result.OpenHintStats
 import com.eignex.klause.solver.result.OpenTheoryClauseStats
 import com.eignex.klause.solver.result.OpenTheoryWorkSink
+import com.eignex.klause.solver.result.SmtStatsSink
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.solver.result.TerminationReason
@@ -206,6 +207,7 @@ class OpenTheoryEngine internal constructor(
             maxChecks = params.maxLeaves,
             cancellation = cancellation,
             learnedDb = SearchLearnedDbParams(params.maxLearnedClauses, params.lbdGlue),
+            smtStats = state.smt,
         )
         planned.session.attachOpenTheoryWork(work)
         when (planned.session.initialize()) {
@@ -296,6 +298,10 @@ class OpenTheoryEngine internal constructor(
     ): SolveStats {
         state.capture(session)
         openTheory = state.work.snapshot()
+        smt = state.smt.snapshot()
+        check(openTheory.openTheoryChecks >= smt.privateChecks) {
+            "private exact checks exceeded accepted open-theory checks"
+        }
         openTheoryClauses = state.clauses
         openHints = state.hints
         stop()
@@ -334,6 +340,7 @@ internal fun ProblemPipeline.backendName(): String = when (this) {
 /** Solve-wide controls and telemetry shared by every feasibility round of one open optimization. */
 internal class OpenTheorySolveState(private val params: TheoryParams) {
     val work = OpenTheoryWorkSink(params.openWorkLimit)
+    val smt = SmtStatsSink()
     private val maxDecisions = params.maxDecisions
     var clauses = OpenTheoryClauseStats()
         private set

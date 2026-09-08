@@ -66,6 +66,8 @@ data class SolveStats(
     val ls: LocalSearchStats = LocalSearchStats(),
     /** Deterministic complete open-theory work accounting. */
     val openTheory: OpenTheoryWorkStats = OpenTheoryWorkStats(),
+    /** Exact SMT-theory lane counters and timings. */
+    val smt: SmtStats = SmtStats(),
     /** Shared learned-clause telemetry for an open-theory solve. */
     val openTheoryClauses: OpenTheoryClauseStats = OpenTheoryClauseStats(),
     /** Unverified open-model branch-order hint accounting. */
@@ -98,6 +100,7 @@ data class SolveStats(
                 openTheory.openTheoryChecks + other.openTheory.openTheoryChecks,
                 openTheory.openWork + other.openTheory.openWork,
             ),
+            smt = smt.mergedWith(other.smt),
             openTheoryClauses = openTheoryClauses.mergedWith(other.openTheoryClauses),
             openHints = openHints.mergedWith(other.openHints),
             presolve = presolve ?: other.presolve,
@@ -134,6 +137,7 @@ internal class SolveStatsSink(var backend: String, lpProbeRoute: LpRoute = LpRou
     val scheduling: SchedulingStatsSink = SchedulingStatsSink()
     val ls: LocalSearchStatsSink = LocalSearchStatsSink()
     var openTheory: OpenTheoryWorkStats = OpenTheoryWorkStats()
+    var smt: SmtStats = SmtStats()
     var openTheoryClauses: OpenTheoryClauseStats = OpenTheoryClauseStats()
     var openHints: OpenHintStats = OpenHintStats()
 
@@ -175,6 +179,7 @@ internal class SolveStatsSink(var backend: String, lpProbeRoute: LpRoute = LpRou
             scheduling = scheduling.snapshot(),
             ls = ls.snapshot(),
             openTheory = openTheory,
+            smt = smt,
             openTheoryClauses = openTheoryClauses,
             openHints = openHints,
             presolve = presolve,

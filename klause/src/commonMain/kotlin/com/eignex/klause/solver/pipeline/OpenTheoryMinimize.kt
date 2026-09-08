@@ -82,6 +82,12 @@ sealed interface OpenTheoryOptimum {
     ) : OpenTheoryOptimum
 }
 
+/** Retain a round's outcome while reporting the enclosing optimization's elapsed time. */
+internal fun SolveStats.withOptimizationEnvelope(envelope: SolveStats): SolveStats = copy(
+    run = run.copy(wallMs = envelope.run.wallMs),
+    lp = envelope.lp.mergedWith(lp),
+)
+
 /**
  * Minimizes a linear objective over an open source model by refuting bounds below the incumbent.
  *
@@ -126,7 +132,16 @@ class OpenTheoryMinimizer internal constructor(
     private val terms: IntArray
     private val coefficients: LongArray
     private val source: Problem
-    private val route: ProblemPipeline
+    private val route: ProblemPipeline by lazy {
+        val selected = source.boundedForPlanning().componentPlan().theoryPipeline
+        // A row at PLANNING_RHS carries no potential, so a model whose rows were all differences leaves
+        // that fragment by being optimized at all — the row's weight, not its shape, is what moves it.
+        // Say so here rather than at the first round's engine build.
+        require(selected != ProblemPipeline.UNSUPPORTED_OPEN && selected != ProblemPipeline.FINITE_CP) {
+            "objective row leaves the model outside every complete open theory"
+        }
+        selected
+    }
 
     // Set once the certificate has refused a ray over a model that puts every witness in one branch, so
     // the rounds after it read the refusal rather than rebuilding the same cone system.
@@ -146,13 +161,6 @@ class OpenTheoryMinimizer internal constructor(
         terms = present.toIntArray()
         coefficients = LongArray(present.size) { objective.intCoefficients[present[it]] }
         source = model
-        route = model.boundedForPlanning().componentPlan().theoryPipeline
-        // A row at PLANNING_RHS carries no potential, so a model whose rows were all differences leaves
-        // that fragment by being optimized at all — the row's weight, not its shape, is what moves it.
-        // Say so here rather than at the first round's engine build.
-        require(route != ProblemPipeline.UNSUPPORTED_OPEN && route != ProblemPipeline.FINITE_CP) {
-            "objective row leaves the model outside every complete open theory"
-        }
     }
 
     /**
@@ -167,8 +175,9 @@ class OpenTheoryMinimizer internal constructor(
     fun minimize(params: TheoryParams = TheoryParams()): OpenTheoryOptimum {
         // Preparation is the descent's first phase, so the caller's stop reaches it and its own summary is
         // what a run refuted here has to report — there is no round behind it to carry one.
-        val stats = SolveStatsSink(backend = route.backendName())
+        val stats = SolveStatsSink(backend = "")
         stats.start()
+        stats.backend = route.backendName()
         val stop = Cancellation { presolveCancellation() || params.cancellation() || params.timeout() }
         val prepared = PresolvePipeline.prepareSource(
             source,
@@ -209,11 +218,11 @@ class OpenTheoryMinimizer internal constructor(
 
             is OpenPresolveResult.Tightened -> closed.spec
         }
+        val state = OpenTheorySolveState(params)
         fun finish(round: SolveStats): SolveStats {
             stats.stop()
-            return round.copy(lp = stats.snapshot().lp.mergedWith(round.lp))
+            return round.withOptimizationEnvelope(stats.snapshot()).copy(smt = state.smt.snapshot())
         }
-        val state = OpenTheorySolveState(params)
         // One incumbent for the whole descent: every witness a round proves feasible is offered here with
         // the value read off it, and the bound the next round refutes is whatever the offer installed.
         val incumbents = minimizingWitnessExchange()
@@ -241,7 +250,13 @@ class OpenTheoryMinimizer internal constructor(
                                 // A bound row states that nothing feasible sits at the incumbent or
                                 // above it, and a model with a ray has a witness below every such row:
                                 // the descent would improve forever, so it states the verdict instead.
-                                unboundedBelow(prepared.problem, installed.assignment, params) ->
+                                unboundedBelow(
+                                    prepared.problem,
+                                    installed.assignment,
+                                    params,
+                                    state,
+                                    boundedPlan.theoryPipeline,
+                                ) ->
                                     return OpenTheoryOptimum.Unbounded(
                                         installed.assignment,
                                         installed.objective,
@@ -298,13 +313,20 @@ class OpenTheoryMinimizer internal constructor(
      * refusal already on hand. Only a refusal is remembered — a run the stop cut short decided nothing,
      * and reading it as a refusal would retire the certificate over a question never asked.
      */
-    private fun unboundedBelow(model: Problem, witness: OpenTheoryAssignment, params: TheoryParams): Boolean {
+    private fun unboundedBelow(
+        model: Problem,
+        witness: OpenTheoryAssignment,
+        params: TheoryParams,
+        state: OpenTheorySolveState,
+        pipeline: ProblemPipeline,
+    ): Boolean {
         if (rayRefusedForEveryWitness) return false
         val ray = model.objectiveUnboundedBelow(
             terms,
             coefficients,
             witness.exactWitness(model.numRealVars),
             Cancellation { presolveCancellation() || params.cancellation() || params.timeout() },
+            state.smt.takeIf { pipeline == ProblemPipeline.EXACT_LRA || pipeline == ProblemPipeline.EXACT_LIRA },
         )
         rayRefusedForEveryWitness = ray == false && model.statesOneBranch()
         return ray == true

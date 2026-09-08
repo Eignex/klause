@@ -18,6 +18,8 @@ import com.eignex.klause.ir.RealConsts
 import com.eignex.klause.ir.TaggedLinearRow
 import com.eignex.klause.ir.Term
 import com.eignex.klause.ir.UnitConsts
+import com.eignex.klause.ir.linearRows
+import com.eignex.klause.solver.result.SmtStatsSink
 import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchContext
@@ -25,6 +27,7 @@ import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.theory.TheoryCheck
 import com.eignex.klause.theory.TheoryContext
+import com.eignex.klause.theory.TheorySearchComponent
 import com.eignex.klause.util.Bits
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
@@ -32,6 +35,7 @@ import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class ExactLiraSearchComponentTest {
 
@@ -98,6 +102,75 @@ class ExactLiraSearchComponentTest {
 
         assertContentEquals(intArrayOf(Lit.make(0, positive = false)), conflict.explanation?.literals)
         assertNull(session.model().valueOf<ExactLiraAssignment>(component))
+    }
+
+    @Test
+    fun `partial exact conflict counts only accepted private checks and its explanation`() {
+        val stats = SmtStatsSink()
+        val component = ExactLiraSearchComponent(partialModel()).also { it.observeWith(stats) }
+        val session = SearchSession(listOf(component))
+
+        assertIs<ComponentResult.Consistent>(session.initialize())
+        assertIs<ComponentResult.Conflict>(session.push(SearchDecision.Bool(Lit.make(0, positive = true))))
+
+        val snapshot = stats.snapshot()
+        assertTrue(snapshot.privateChecks > 0L)
+        assertEquals(1L, snapshot.conflicts)
+        assertEquals(1L, snapshot.explainedConflicts)
+        assertEquals(1L, snapshot.conflictLiterals)
+    }
+
+    @Test
+    fun `theory adapter forwards exact LIRA telemetry`() {
+        val model = Problem(
+            numBoolVars = 0,
+            intBounds = openBounds(),
+            factors = arrayOf(Linear(intArrayOf(2), intArrayOf(0), LinearOp.EQ, 1)),
+        )
+        val stats = SmtStatsSink()
+        val component = TheorySearchComponent(ExactLiraSolver(model)).also { it.observeWith(stats) }
+
+        val result = SearchSession(listOf(component)).initialize()
+
+        assertIs<ComponentResult.Conflict>(result)
+        val snapshot = stats.snapshot()
+        assertTrue(snapshot.privateChecks > 0L)
+        assertEquals(1L, snapshot.unexplainedConflicts)
+        assertEquals(0L, snapshot.explainedConflicts)
+    }
+
+    @Test
+    fun `real disjunction search reports strict witness telemetry`() {
+        val source = Linear(
+            intVars = intArrayOf(),
+            intCoeffs = doubleArrayOf(),
+            realVars = intArrayOf(0),
+            realCoeffs = doubleArrayOf(1.0),
+            op = LinearOp.LE,
+            bound = 0.0,
+            strict = true,
+        )
+        val factor = object : Factor by source {
+            override val linearForm: LinearForm = LinearForm.Disjunction(source.linearRows)
+        }
+        val model = Problem(
+            numBoolVars = 0,
+            intBounds = openBounds(0),
+            numRealVars = 1,
+            realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
+            realUpper = doubleArrayOf(Double.POSITIVE_INFINITY),
+            factors = arrayOf(factor),
+        )
+        val stats = SmtStatsSink()
+        val solver = ExactLraSolver(model).also { it.observeWith(stats) }
+
+        val result = solver.check(booleanArrayOf(), exactContext())
+
+        assertIs<TheoryCheck.Sat<ExactLraAssignment>>(result)
+        val snapshot = stats.snapshot()
+        assertEquals(1L, snapshot.witnessCandidates)
+        assertEquals(1L, snapshot.witnessAccepted)
+        assertEquals(1L, snapshot.strictWitnessAccepted)
     }
 
     @Test

@@ -8,6 +8,7 @@ import com.eignex.klause.ir.linearRows
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.RationalFeasibility
 import com.eignex.klause.simplex.exact.bigRationalOutcome
+import com.eignex.klause.solver.result.SmtStatsSink
 import com.eignex.klause.theory.Theory
 import com.eignex.klause.theory.TheoryCheck
 import com.eignex.klause.theory.TheoryContext
@@ -28,6 +29,8 @@ data class ExactLraAssignment(
  * rational simplex decides that conjunction. The finite CP and double-simplex lanes are never entered.
  */
 class ExactLraSolver(override val model: Problem) : Theory<ExactLraAssignment> {
+    private var smtStats: SmtStatsSink? = null
+
     init {
         require(model.supportsExactLra()) {
             "exact LRA search requires a pure-real linear source model"
@@ -42,7 +45,7 @@ class ExactLraSolver(override val model: Problem) : Theory<ExactLraAssignment> {
                 }
             }
         ) {
-            return when (val result = checkExactLinear(model, bools, context)) {
+            return when (val result = checkExactLinear(model, bools, context, smtStats)) {
                 is TheoryCheck.Sat -> TheoryCheck.Sat(
                     ExactLraAssignment(result.assignment.bools, result.assignment.reals),
                 )
@@ -54,9 +57,19 @@ class ExactLraSolver(override val model: Problem) : Theory<ExactLraAssignment> {
         }
         if (!context.consumeCheck()) return TheoryCheck.Cancelled
         val relaxation = QfLraSystem(model).build(bools)
-        val outcome = bigRationalOutcome(relaxation, Cancellation(context::cancelled), maxPivots = Int.MAX_VALUE)
+        val outcome = bigRationalOutcome(
+            relaxation,
+            Cancellation(context::cancelled),
+            maxPivots = Int.MAX_VALUE,
+            observer = smtStats,
+        )
         return when (outcome.feasibility) {
             RationalFeasibility.FEASIBLE -> {
+                val telemetry = smtStats?.let { stats ->
+                    relaxation.rowStrict.any { it }.also { strict ->
+                        stats.observeWitnessCandidate(strict, wide = false)
+                    }
+                }
                 val witness = requireNotNull(outcome.witness)
                 TheoryCheck.Sat(
                     ExactLraAssignment(
@@ -65,12 +78,16 @@ class ExactLraSolver(override val model: Problem) : Theory<ExactLraAssignment> {
                             witness[real] - witness[model.numRealVars + real]
                         },
                     ),
-                )
+                ).also { telemetry?.let { strict -> smtStats?.observeWitnessAccepted(strict, wide = false) } }
             }
 
             RationalFeasibility.UNKNOWN -> TheoryCheck.Cancelled
 
             RationalFeasibility.INFEASIBLE -> TheoryCheck.Infeasible()
         }
+    }
+
+    internal fun observeWith(stats: SmtStatsSink) {
+        smtStats = stats
     }
 }

@@ -98,4 +98,17 @@ class SolveStatsMergeTest {
         assertEquals(2.0, twice.lp.rootPasses.sum)
         assertEquals(presolve, twice.presolve)
     }
+
+    @Test
+    fun `SMT counters and exclusive timings add across solve slices`() {
+        val left = SolveStats(smt = SmtStats(privateChecks = 2, reductionNs = 7, simplexNs = 11, escalationNs = 13))
+        val right = SolveStats(smt = SmtStats(privateChecks = 3, reductionNs = 17, simplexNs = 19, escalationNs = 23))
+
+        val merged = left.mergedWith(right).smt
+
+        assertEquals(5L, merged.privateChecks)
+        assertEquals(24L, merged.reductionNs)
+        assertEquals(30L, merged.simplexNs)
+        assertEquals(36L, merged.escalationNs)
+    }
 }

@@ -123,8 +123,8 @@ internal class SmtLibOutput : BufferedBestOutput() {
         Verdict.UNKNOWN -> "unknown"
     }
 
-    // Deliberately lean block: SMT-LIB comments carry only the headline search counters.
-    override fun keepStat(key: String): Boolean = key in SMT_SEARCH_KEYS
+    // Deliberately lean block: SMT-LIB comments carry headline search and exact-theory counters.
+    override fun keepStat(key: String): Boolean = key in SMT_SEARCH_KEYS || key.startsWith("smt")
 
     private companion object {
         private val SMT_SEARCH_KEYS = setOf(

@@ -4,6 +4,7 @@ import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntArrayList
 import com.ionspin.kotlin.bignum.integer.BigInteger
+import kotlin.time.TimeSource.Monotonic
 
 /**
  * Exact rational feasibility of an [ExactSimplexModel]: slack-form rows `A·x = rhs` over boxes `0 ≤ xⱼ ≤ uⱼ`
@@ -29,6 +30,24 @@ import com.ionspin.kotlin.bignum.integer.BigInteger
  * big level, so every reported verdict is computed in one consistent arithmetic).
  */
 internal enum class RationalFeasibility { FEASIBLE, INFEASIBLE, UNKNOWN }
+
+/** Arithmetic lane of one exact-simplex attempt. */
+internal enum class ExactSimplexStage { FRAC128, DIRECT_BIG, ESCALATED_BIG }
+
+/** Decisive or undecided result of an exact-simplex attempt. */
+internal enum class ExactSimplexRunResult { FEASIBLE, INFEASIBLE, UNKNOWN }
+
+/** Why a Frac128 run was replaced by an arbitrary-precision rerun. */
+internal enum class Frac128Escalation { INPUT, OVERFLOW }
+
+/** Optional kernel-local telemetry observer for exact simplex calls. */
+internal interface RationalSimplexObserver {
+    fun observeFrac128Attempt(eligible: Boolean)
+
+    fun observeEscalation(reason: Frac128Escalation)
+
+    fun observeSimplex(stage: ExactSimplexStage, result: ExactSimplexRunResult, elapsedNs: Long)
+}
 
 /** The exact verdict plus, on FEASIBLE, a concrete structural-column witness in the source model's
  *  coordinates (evaluated at a small positive delta when strict rows are present). */
@@ -270,11 +289,19 @@ internal fun exactBoundedRows(
     rows: List<ExactRationalInequality>,
     variables: Int,
     cancellation: Cancellation = Cancellation.Never,
+    observer: RationalSimplexObserver? = null,
 ): BooleanArray? {
     val bounded = BooleanArray(rows.size)
     for (target in rows.indices) {
         if (cancellation()) return null
-        bounded[target] = !(exactDescendingDirection(rows, rows[target], variables, cancellation) ?: return null)
+        val descends = exactDescendingDirection(
+            rows,
+            rows[target],
+            variables,
+            cancellation,
+            observer,
+        ) ?: return null
+        bounded[target] = !descends
     }
     return bounded
 }
@@ -295,6 +322,7 @@ internal fun exactDescendingDirection(
     activity: ExactRationalInequality,
     variables: Int,
     cancellation: Cancellation = Cancellation.Never,
+    observer: RationalSimplexObserver? = null,
 ): Boolean? {
     val coneRows = ArrayList<ExactRationalInequality>(rows.size + 1)
     for (row in rows) coneRows.add(row.homogeneousOverSplit(variables, BigFraction.ZERO))
@@ -304,6 +332,7 @@ internal fun exactDescendingDirection(
             ExactRationalFeasibilityModel(2 * variables, coneRows),
             cancellation,
             Int.MAX_VALUE,
+            observer,
         ).feasibility
     ) {
         RationalFeasibility.FEASIBLE -> true
@@ -337,8 +366,9 @@ internal fun exactDoubleBoundedSplit(
     rows: List<ExactRationalInequality>,
     variables: Int,
     cancellation: Cancellation = Cancellation.Never,
+    observer: RationalSimplexObserver? = null,
 ): ExactDoubleBoundedSplit {
-    val bounded = exactBoundedRows(rows, variables, cancellation) ?: return ExactDoubleBoundedSplit.Unknown
+    val bounded = exactBoundedRows(rows, variables, cancellation, observer) ?: return ExactDoubleBoundedSplit.Unknown
     val splitRows = rows.map { row -> row.homogeneousOverSplit(variables, row.rhs, row.strict) }
     val model = ExactRationalFeasibilityModel(2 * variables, splitRows)
     val result = ArrayList<ExactDoubleBoundedRow>()
@@ -356,7 +386,7 @@ internal fun exactDoubleBoundedSplit(
             costs[column] = row.coefficients[entry]
             costs[variables + column] = row.coefficients[entry].negated()
         }
-        val minimum = bigRationalMinimum(model, costs, cancellation)
+        val minimum = bigRationalMinimum(model, costs, cancellation, observer = observer)
         when (minimum.feasibility) {
             RationalFeasibility.INFEASIBLE -> return ExactDoubleBoundedSplit.Infeasible
 
@@ -388,6 +418,7 @@ internal fun exactMixedUnitCubeSolution(
     realColumns: Int,
     integerColumns: Int,
     cancellation: Cancellation = Cancellation.Never,
+    observer: RationalSimplexObserver? = null,
 ): List<BigFraction>? {
     val variables = realColumns + integerColumns
     val shifted = rows.map { row ->
@@ -412,6 +443,7 @@ internal fun exactMixedUnitCubeSolution(
         ),
         cancellation,
         Int.MAX_VALUE,
+        observer,
     )
     if (outcome.feasibility != RationalFeasibility.FEASIBLE || cancellation()) return null
     val centre = checkNotNull(outcome.witness)
@@ -470,12 +502,34 @@ internal fun rationalOutcome(
     model: ExactSimplexModel,
     cancellation: Cancellation = Cancellation.Never,
     maxPivots: Int = defaultRationalPivotCap(model),
+    observer: RationalSimplexObserver? = null,
 ): RationalOutcome {
     if (model.m == 0) return RationalOutcome(RationalFeasibility.FEASIBLE, DoubleArray(model.n))
     // Fixed-width level first; a voided run (latched overflow / unrepresentable input) escalates.
-    runSimplex(Frac128Ops(), model, cancellation, maxPivots)?.let { return it }
-    return runSimplex(BigFracOps, model, cancellation, maxPivots)
-        ?: RationalOutcome(RationalFeasibility.UNKNOWN)
+    val fracMark = observer?.let { Monotonic.markNow() }
+    val frac = runSimplex(Frac128Ops(), model, cancellation, maxPivots)
+    observer?.observeFrac128Attempt(frac.eligible)
+    fracMark?.let { mark ->
+        val result = frac.outcome?.runResult() ?: ExactSimplexRunResult.UNKNOWN
+        observer.observeSimplex(
+            ExactSimplexStage.FRAC128,
+            result,
+            mark.elapsedNow().inWholeNanoseconds,
+        )
+    }
+    frac.outcome?.let { return it }
+    observer?.observeEscalation(if (frac.overflowed) Frac128Escalation.OVERFLOW else Frac128Escalation.INPUT)
+    val bigMark = observer?.let { Monotonic.markNow() }
+    val big = runSimplex(BigFracOps, model, cancellation, maxPivots)
+    val outcome = big.outcome ?: RationalOutcome(RationalFeasibility.UNKNOWN)
+    bigMark?.let { mark ->
+        observer.observeSimplex(
+            ExactSimplexStage.ESCALATED_BIG,
+            outcome.runResult(),
+            mark.elapsedNow().inWholeNanoseconds,
+        )
+    }
+    return outcome
 }
 
 /** Decide [model] entirely with arbitrary-precision rationals and retain its structural witness. */
@@ -483,6 +537,16 @@ internal fun bigRationalOutcome(
     model: ExactSimplexModel,
     cancellation: Cancellation = Cancellation.Never,
     maxPivots: Int = defaultRationalPivotCap(model),
+    observer: RationalSimplexObserver? = null,
+): BigRationalOutcome {
+    if (model.m == 0) return bigRationalOutcomeUnobserved(model, cancellation, maxPivots)
+    return observeBigOutcome(observer) { bigRationalOutcomeUnobserved(model, cancellation, maxPivots) }
+}
+
+private fun bigRationalOutcomeUnobserved(
+    model: ExactSimplexModel,
+    cancellation: Cancellation,
+    maxPivots: Int,
 ): BigRationalOutcome {
     if (model.m == 0) {
         return BigRationalOutcome(
@@ -527,6 +591,18 @@ internal fun bigRationalMinimum(
     costs: List<BigFraction>,
     cancellation: Cancellation = Cancellation.Never,
     maxPivots: Int = Int.MAX_VALUE,
+    observer: RationalSimplexObserver? = null,
+): BigRationalOptimizationOutcome {
+    require(costs.size == model.n) { "exact objective has ${costs.size} columns, expected ${model.n}" }
+    if (model.m == 0) return bigRationalMinimumUnobserved(model, costs, cancellation, maxPivots)
+    return observeBigOutcome(observer) { bigRationalMinimumUnobserved(model, costs, cancellation, maxPivots) }
+}
+
+private fun bigRationalMinimumUnobserved(
+    model: ExactSimplexModel,
+    costs: List<BigFraction>,
+    cancellation: Cancellation,
+    maxPivots: Int,
 ): BigRationalOptimizationOutcome {
     require(costs.size == model.n) { "exact objective has ${costs.size} columns, expected ${model.n}" }
     val state = buildState(BigFracOps, model) ?: return BigRationalOptimizationOutcome(RationalFeasibility.UNKNOWN)
@@ -568,36 +644,68 @@ internal fun bigRationalMinimum(
     }
 }
 
-/** One simplex run at arithmetic level [ops]; null when the level cannot carry it (escalate). At the
- *  unbounded level null only arises from a non-finite input coefficient, which no level can carry —
- *  the caller maps that to UNKNOWN. */
+private class SimplexRun(val outcome: RationalOutcome?, val eligible: Boolean, val overflowed: Boolean)
+
+/** One simplex run at arithmetic level [ops], including whether its tableau can carry the input. */
 private fun <F> runSimplex(
     ops: FracOps<F>,
     model: ExactSimplexModel,
     cancellation: Cancellation,
     maxPivots: Int,
-): RationalOutcome? {
-    val st = buildState(ops, model) ?: return null
+): SimplexRun {
+    val st = buildState(ops, model)
+        ?: return SimplexRun(null, eligible = false, overflowed = ops.overflowed())
     var pivots = 0
     while (true) {
-        if (ops.overflowed()) return null
-        if (cancellation.isCancelled() || pivots >= maxPivots) return unknownOutcome()
+        if (ops.overflowed()) return SimplexRun(null, eligible = true, overflowed = true)
+        if (cancellation.isCancelled() || pivots >= maxPivots) {
+            return SimplexRun(
+                unknownOutcome(),
+                eligible = true,
+                overflowed = false,
+            )
+        }
         st.refreshBasicValues()
         val row = st.selectViolatedRow()
-        if (ops.overflowed()) return null
+        if (ops.overflowed()) return SimplexRun(null, eligible = true, overflowed = true)
         if (row < 0) {
             val witness = structuralWitness(ops, st)
             // A latched overflow during witness extraction voids the run: the verdict may stand but
             // the point does not, and the big-level rerun produces both consistently.
-            if (ops.overflowed()) return null
-            return RationalOutcome(RationalFeasibility.FEASIBLE, witness)
+            if (ops.overflowed()) return SimplexRun(null, eligible = true, overflowed = true)
+            return SimplexRun(
+                RationalOutcome(RationalFeasibility.FEASIBLE, witness),
+                eligible = true,
+                overflowed = false,
+            )
         }
         val enter = st.selectEnteringColumn(row)
-        if (enter < 0) return st.refutation(row)
+        if (enter < 0) return SimplexRun(st.refutation(row), eligible = true, overflowed = ops.overflowed())
         st.pivot(row, enter)
         pivots++
     }
 }
+
+private inline fun <T> observeBigOutcome(observer: RationalSimplexObserver?, block: () -> T): T {
+    if (observer == null) return block()
+    val mark = Monotonic.markNow()
+    val outcome = block()
+    val result = when (outcome) {
+        is BigRationalOutcome -> outcome.feasibility.runResult()
+        is BigRationalOptimizationOutcome -> outcome.feasibility.runResult()
+        else -> error("unexpected exact simplex outcome")
+    }
+    observer.observeSimplex(ExactSimplexStage.DIRECT_BIG, result, mark.elapsedNow().inWholeNanoseconds)
+    return outcome
+}
+
+private fun RationalFeasibility.runResult(): ExactSimplexRunResult = when (this) {
+    RationalFeasibility.FEASIBLE -> ExactSimplexRunResult.FEASIBLE
+    RationalFeasibility.INFEASIBLE -> ExactSimplexRunResult.INFEASIBLE
+    RationalFeasibility.UNKNOWN -> ExactSimplexRunResult.UNKNOWN
+}
+
+private fun RationalOutcome.runResult(): ExactSimplexRunResult = feasibility.runResult()
 
 private fun unknownOutcome(): RationalOutcome = RationalOutcome(RationalFeasibility.UNKNOWN)
 
