@@ -1,0 +1,35 @@
+Calculating task graph as no cached configuration is available for tasks: :klause-bench:bench --args=reference suite=mps-core  jobs=1 workers=1 timeout=30000
+
+> Configure project :klause
+Signing skipped: SNAPSHOT is a snapshot.
+
+> Task :klause-bench:protobufDummy UP-TO-DATE
+> Task :klause-bench:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :klause:kmpPartiallyResolvedDependenciesChecker
+> Task :klause:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :klause:jvmProcessResources NO-SOURCE
+> Task :klause:processJvmMainResources SKIPPED
+> Task :klause-bench:extractProto
+> Task :klause-bench:processResources
+> Task :klause:compileKotlinJvm FROM-CACHE
+> Task :klause:compileJvmMainJava NO-SOURCE
+> Task :klause:jvmMainClasses UP-TO-DATE
+> Task :klause:jvmJar
+> Task :klause-bench:extractIncludeProto
+> Task :klause-bench:generateProto FROM-CACHE
+> Task :klause-bench:compileKotlin FROM-CACHE
+> Task :klause-bench:compileJava FROM-CACHE
+> Task :klause-bench:classes
+
+> Task :klause-bench:bench
+=== reference (cp-sat, 30000ms budget, jobs=1 × workers=1): 4 instance(s) ===
+[1/4] blend-tiny = opt=9.0
+[2/4] feasible-tiny = opt=0.0
+[3/4] float-tiny = opt=0.0
+[4/4] infeasible-tiny = UNSAT
+
+reference table: +4 new, 0 tightened, 0 unchanged (4 decisive, 4 rows of 4 from scip)
+
+BUILD SUCCESSFUL in 7s
+10 actionable tasks: 6 executed, 4 from cache
+Configuration cache entry stored.

@@ -1,0 +1,14 @@
+{
+    "feasible": null,
+    "objective": null,
+    "timeToBestMs": null,
+    "timeToFirstFeasibleMs": null,
+    "proven": false,
+    "stats": {
+        "solveTime": "30.015",
+        "maximize": "false"
+    },
+    "attribution": [],
+    "rawOutput": "timeout\n",
+    "command": "z3 -T:30 -memory:2048 -smt2 sat.threads=1 parallel.enable=false /home/rasmus/.cache/klause-bench/corpus/smtlib-qf_idl/QF_IDL/asp/15Puzzle/15-puzzle.init10.smt2"
+}

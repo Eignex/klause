@@ -1,0 +1,18 @@
+{
+    "feasible": null,
+    "objective": null,
+    "timeToBestMs": null,
+    "timeToFirstFeasibleMs": null,
+    "proven": false,
+    "stats": {
+        "paths": "0",
+        "flatIntVars": "91",
+        "flatIntConstraints": "79",
+        "method": "\"minimize\"",
+        "flatTime": "4.34453",
+        "nSolutions": "0"
+    },
+    "attribution": [],
+    "rawOutput": "% Generated FlatZinc statistics:\n%%%mzn-stat: paths=0\n%%%mzn-stat: flatIntVars=91\n%%%mzn-stat: flatIntConstraints=79\n%%%mzn-stat: method=\"minimize\"\n%%%mzn-stat: flatTime=4.34453\n%%%mzn-stat-end\n=====UNKNOWN=====\n%%%mzn-stat: nSolutions=0\n%%%mzn-stat-end\n",
+    "command": "minizinc --solver cp-sat --time-limit 30000 --output-mode dzn -s -a --output-objective -f -p 1 /home/rasmus/.cache/klause-bench/corpus/mzn-challenge/2013/proteindesign12/wcsp.mzn /home/rasmus/.cache/klause-bench/corpus/mzn-challenge/2013/proteindesign12/1HZ5.12p.19aa.usingEref_self.dzn"
+}

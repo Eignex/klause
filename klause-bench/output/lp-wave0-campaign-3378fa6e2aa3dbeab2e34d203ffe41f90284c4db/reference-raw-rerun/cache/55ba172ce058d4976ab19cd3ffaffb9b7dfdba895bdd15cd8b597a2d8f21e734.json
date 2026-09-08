@@ -1,0 +1,14 @@
+{
+    "feasible": true,
+    "objective": null,
+    "timeToBestMs": 54,
+    "timeToFirstFeasibleMs": 54,
+    "proven": true,
+    "stats": {
+        "solveTime": "0.054",
+        "maximize": "false"
+    },
+    "attribution": [],
+    "rawOutput": "sat\n",
+    "command": "z3 -T:30 -memory:2048 -smt2 sat.threads=1 parallel.enable=false /home/rasmus/.cache/klause-bench/corpus/smtlib-qf_idl/QF_IDL/20220214-jobshop-BohanLi/jobshop10-2-5-5-2-4-12.smt2"
+}

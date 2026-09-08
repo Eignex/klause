@@ -1,0 +1,14 @@
+{
+    "feasible": true,
+    "objective": null,
+    "timeToBestMs": 19,
+    "timeToFirstFeasibleMs": 19,
+    "proven": true,
+    "stats": {
+        "solveTime": "0.019",
+        "maximize": "false"
+    },
+    "attribution": [],
+    "rawOutput": "sat\n",
+    "command": "z3 -T:30 -memory:2048 -smt2 sat.threads=1 parallel.enable=false /home/rasmus/.cache/klause-bench/corpus/smtlib-qf_rdl/QF_RDL/SMT-Temporal-Planning-Benchmarks/cooking01.smt2"
+}

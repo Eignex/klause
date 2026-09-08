@@ -1,0 +1,37 @@
+Calculating task graph as no cached configuration is available for tasks: :klause-bench:bench --args=reference suite=smtlib-qfrdl per-family=1 max=10 seed=1 jobs=1 workers=1 timeout=30000
+
+> Configure project :klause
+Signing skipped: SNAPSHOT is a snapshot.
+
+> Task :klause-bench:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :klause-bench:protobufDummy UP-TO-DATE
+> Task :klause:kmpPartiallyResolvedDependenciesChecker
+> Task :klause:jvmProcessResources NO-SOURCE
+> Task :klause:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :klause:processJvmMainResources SKIPPED
+> Task :klause-bench:extractProto UP-TO-DATE
+> Task :klause-bench:processResources UP-TO-DATE
+> Task :klause:compileKotlinJvm UP-TO-DATE
+> Task :klause:compileJvmMainJava NO-SOURCE
+> Task :klause:jvmMainClasses UP-TO-DATE
+> Task :klause:jvmJar UP-TO-DATE
+> Task :klause-bench:extractIncludeProto UP-TO-DATE
+> Task :klause-bench:generateProto UP-TO-DATE
+> Task :klause-bench:compileKotlin UP-TO-DATE
+> Task :klause-bench:compileJava UP-TO-DATE
+> Task :klause-bench:classes UP-TO-DATE
+
+> Task :klause-bench:bench
+=== reference (cp-sat, 30000ms budget, jobs=1 × workers=1): 6 instance(s) ===
+[1/6] SMT-Temporal-Planning-Benchmarks/cooking01 = opt=sat
+[2/6] check/bignum_rdl1 = opt=sat
+[3/6] sal/fischer3-mutex-1 = UNSAT
+[4/6] scheduling/abz5_1000 = UNSAT
+[5/6] skdmxa/skdmxa-3x3-10 = UNSAT
+[6/6] skdmxa2/skdmxa-3x3-10.base.cvc = UNSAT
+
+reference table: +6 new, 0 tightened, 0 unchanged (6 decisive, 6 rows of 6 from z3)
+
+BUILD SUCCESSFUL in 6s
+10 actionable tasks: 2 executed, 8 up-to-date
+Configuration cache entry stored.

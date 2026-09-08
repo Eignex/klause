@@ -1,0 +1,29 @@
+{
+    "feasible": true,
+    "objective": 454.0,
+    "timeToBestMs": 551,
+    "timeToFirstFeasibleMs": 468,
+    "proven": true,
+    "stats": {
+        "paths": "0",
+        "flatBoolVars": "956",
+        "flatIntVars": "589",
+        "flatBoolConstraints": "1100",
+        "flatIntConstraints": "1117",
+        "evaluatedReifiedConstraints": "136",
+        "evaluatedHalfReifiedConstraints": "920",
+        "eliminatedImplications": "536",
+        "method": "\"minimize\"",
+        "flatTime": "0.206585",
+        "objective": "454",
+        "objectiveBound": "454",
+        "boolVariables": "415",
+        "failures": "2171",
+        "propagations": "1332984",
+        "solveTime": "0.603395",
+        "nSolutions": "5"
+    },
+    "attribution": [],
+    "rawOutput": "% Generated FlatZinc statistics:\n%%%mzn-stat: paths=0\n%%%mzn-stat: flatBoolVars=956\n%%%mzn-stat: flatIntVars=589\n%%%mzn-stat: flatBoolConstraints=1100\n%%%mzn-stat: flatIntConstraints=1117\n%%%mzn-stat: evaluatedReifiedConstraints=136\n%%%mzn-stat: evaluatedHalfReifiedConstraints=920\n%%%mzn-stat: eliminatedImplications=536\n%%%mzn-stat: method=\"minimize\"\n%%%mzn-stat: flatTime=0.206585\n%%%mzn-stat-end\n%%%mzn-stat: objective=534\n%%%mzn-stat: objectiveBound=366\n%%%mzn-stat: boolVariables=0\n%%%mzn-stat: failures=0\n%%%mzn-stat: propagations=0\n%%%mzn-stat: solveTime=0.223168\nvisit = \n[| 1, 0, 0, 1, 0, 0, 0, 0, 0\n | 1, 0, 1, 0, 0, 0, 1, 1, 1\n | 1, 1, 0, 0, 0, 0, 0, 0, 0\n | 1, 0, 0, 0, 1, 1, 0, 0, 0\n |];\norder = \n[| 1, 0, 0, 2, 0, 0, 0, 0, 0, 3\n | 1, 0, 2, 0, 0, 0, 3, 4, 5, 6\n | 1, 2, 0, 0, 0, 0, 0, 0, 0, 3\n | 1, 0, 0, 0, 2, 3, 0, 0, 0, 4\n |];\n_objective = 534;\n----------\n%%%mzn-stat: objective=485\n%%%mzn-stat: objectiveBound=366\n%%%mzn-stat: boolVariables=0\n%%%mzn-stat: failures=0\n%%%mzn-stat: propagations=0\n%%%mzn-stat: solveTime=0.231612\nvisit = \n[| 1, 0, 0, 1, 0, 0, 0, 0, 1\n | 1, 0, 1, 0, 0, 0, 1, 1, 0\n | 1, 1, 0, 0, 0, 0, 0, 0, 0\n | 1, 0, 0, 0, 1, 1, 0, 0, 0\n |];\norder = \n[| 1, 0, 0, 2, 0, 0, 0, 0, 3, 4\n | 1, 0, 2, 0, 0, 0, 3, 4, 0, 5\n | 1, 2, 0, 0, 0, 0, 0, 0, 0, 3\n | 1, 0, 0, 0, 2, 3, 0, 0, 0, 4\n |];\n_objective = 485;\n----------\n%%%mzn-stat: objective=463\n%%%mzn-stat: objectiveBound=366\n%%%mzn-stat: boolVariables=0\n%%%mzn-stat: failures=0\n%%%mzn-stat: propagations=0\n%%%mzn-stat: solveTime=0.239553\nvisit = \n[| 1, 0, 0, 1, 0, 0, 0, 0, 1\n | 1, 0, 1, 0, 0, 0, 1, 0, 0\n | 1, 1, 0, 0, 0, 0, 0, 1, 0\n | 1, 0, 0, 0, 1, 1, 0, 0, 0\n |];\norder = \n[| 1, 0, 0, 2, 0, 0, 0, 0, 3, 4\n | 1, 0, 2, 0, 0, 0, 3, 0, 0, 4\n | 1, 2, 0, 0, 0, 0, 0, 3, 0, 4\n | 1, 0, 0, 0, 2, 3, 0, 0, 0, 4\n |];\n_objective = 463;\n----------\n%%%mzn-stat: objective=458\n%%%mzn-stat: objectiveBound=366\n%%%mzn-stat: boolVariables=412\n%%%mzn-stat: failures=253\n%%%mzn-stat: propagations=241794\n%%%mzn-stat: solveTime=0.289922\nvisit = \n[| 1, 0, 0, 1, 0, 0, 0, 0, 1\n | 1, 0, 0, 0, 0, 1, 1, 0, 0\n | 1, 1, 0, 0, 1, 0, 0, 0, 0\n | 1, 0, 1, 0, 0, 0, 0, 1, 0\n |];\norder = \n[| 1, 0, 0, 2, 0, 0, 0, 0, 3, 4\n | 1, 0, 0, 0, 0, 2, 3, 0, 0, 4\n | 1, 2, 0, 0, 3, 0, 0, 0, 0, 4\n | 1, 0, 2, 0, 0, 0, 0, 3, 0, 4\n |];\n_objective = 458;\n----------\n%%%mzn-stat: objective=454\n%%%mzn-stat: objectiveBound=366\n%%%mzn-stat: boolVariables=415\n%%%mzn-stat: failures=374\n%%%mzn-stat: propagations=265170\n%%%mzn-stat: solveTime=0.306172\nvisit = \n[| 1, 0, 0, 1, 0, 0, 0, 0, 1\n | 1, 0, 0, 0, 1, 1, 0, 0, 0\n | 1, 1, 0, 0, 0, 0, 1, 0, 0\n | 1, 0, 1, 0, 0, 0, 0, 1, 0\n |];\norder = \n[| 1, 0, 0, 2, 0, 0, 0, 0, 3, 4\n | 1, 0, 0, 0, 2, 3, 0, 0, 0, 4\n | 1, 2, 0, 0, 0, 0, 3, 0, 0, 4\n | 1, 0, 2, 0, 0, 0, 0, 3, 0, 4\n |];\n_objective = 454;\n----------\n==========\n%%%mzn-stat: objective=454\n%%%mzn-stat: objectiveBound=454\n%%%mzn-stat: boolVariables=415\n%%%mzn-stat: failures=2171\n%%%mzn-stat: propagations=1332984\n%%%mzn-stat: solveTime=0.603395\n%%%mzn-stat: nSolutions=5\n%%%mzn-stat-end\n",
+    "command": "minizinc --solver cp-sat --time-limit 30000 --output-mode dzn -s -a --output-objective -f -p 1 /home/rasmus/.cache/klause-bench/corpus/mzn-challenge/2024/tiny-cvrp/TinyCVRP_ExactlyOneSolution.mzn /home/rasmus/.cache/klause-bench/corpus/mzn-challenge/2024/tiny-cvrp/easy_instance_04.dzn"
+}

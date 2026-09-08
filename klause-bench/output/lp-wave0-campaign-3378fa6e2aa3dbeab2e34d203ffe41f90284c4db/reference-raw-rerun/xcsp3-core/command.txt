@@ -1,0 +1,1 @@
+./gradlew :klause-bench:bench --args=reference\ suite=xcsp3-core\ \ jobs=1\ workers=1\ timeout=30000

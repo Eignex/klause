@@ -17436,7 +17436,7 @@ minizinc-benchmarks,zephyrus/14__10__8__3,false,2600.0,true,true,460,10000,miniz
 minizinc-benchmarks,zephyrus/14__6__8__3,false,1170.0,true,true,500,10000,minizinc,global,1,20,false
 minizinc-benchmarks,zephyrus/14__8__6__3,false,1170.0,true,true,574,10000,minizinc,global,1,20,false
 mzn-challenge,2008/nmseq/020,false,,,false,30000,30000,,,,,
-mzn-challenge,2009/still_life/still_life_5,false,,,false,30000,30000,,,,,
+mzn-challenge,2009/still_life/still_life_5,true,,,false,30000,30000,,,,,
 mzn-challenge,2010/wwtp_random/ex05100_2600_100,false,,,false,30000,30000,,,,,
 mzn-challenge,2011/ship-schedule/4Ships,true,371850.0,true,true,1514,30000,,,,,
 mzn-challenge,2012/vrp/A-n38-k5.vrp,false,751.0,true,false,322,30000,,,,,

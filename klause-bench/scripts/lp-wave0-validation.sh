@@ -19,6 +19,7 @@ die() {
 
 require_tools() {
     command -v jq >/dev/null || die "jq is required"
+    command -v python3 >/dev/null || die "python3 is required"
     command -v sha256sum >/dev/null || die "sha256sum is required"
 }
 
@@ -434,39 +435,254 @@ repair_reference_snapshot() {
     checksum_dir "$run_dir"
 }
 
+audit_campaign() {
+    local measured_sha=$1
+    require_campaign "$measured_sha"
+    require_tools
+    python3 - "$repo_root" "$(campaign_dir "$measured_sha")" "$manifest" "$measured_sha" <<'PY'
+import csv
+import hashlib
+import json
+import math
+import pathlib
+import subprocess
+import sys
+
+repo, campaign, manifest_path = map(pathlib.Path, sys.argv[1:4])
+measured_sha = sys.argv[4]
+manifest = json.loads(manifest_path.read_text())
+prerequisite = manifest["campaignPrerequisiteSha"]
+
+def fail(message):
+    raise SystemExit(f"lp-wave0-validation: {message}")
+
+def ids_for(suite):
+    spec = next(s for s in manifest["suiteSlices"] if s["suite"] == suite)
+    return {entry[0] if isinstance(entry, list) else entry for entry in spec["instances"]}
+
+def read_csv(path):
+    with path.open(newline="") as stream:
+        return list(csv.DictReader(stream))
+
+def normalized(value):
+    if value in (None, ""):
+        return None
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return value
+    if value.lower() in ("true", "false"):
+        return value.lower() == "true"
+    try:
+        return float(value)
+    except ValueError:
+        return value
+
+reference_layout = {
+    "smtlib-qfidl": ("z3.csv", "smtlib-qf_idl"),
+    "smtlib-qfrdl": ("z3.csv", "smtlib-qf_rdl"),
+    "mzn-bench": ("cp-sat.csv", "mzn-challenge"),
+    "xcsp3-core": ("cp-sat.csv", "klause-bench/smoke-corpus/xcsp3"),
+    "mps-core": ("scip.csv", "klause-bench/smoke-corpus/mps"),
+}
+reference_by_problem = {}
+for suite, (table_name, table_suite) in reference_layout.items():
+    table = read_csv(repo / "klause-bench/reference" / table_name)
+    rows = [row for row in table if row["suite"] == table_suite and row["problem"] in ids_for(suite)]
+    if {row["problem"] for row in rows} != ids_for(suite):
+        fail(f"{suite} reference identities differ from the frozen manifest")
+    reference_by_problem.update({row["problem"]: row for row in rows})
+    snapshot = read_csv(campaign / "reference" / suite / "frozen" / "results.csv")
+    if {row["problem"] for row in snapshot} != ids_for(suite):
+        fail(f"{suite} retained reference snapshot identities differ from the frozen manifest")
+
+for table_spec in manifest["referenceTablesAfterCampaign"]:
+    rel = pathlib.Path(table_spec["file"])
+    current = read_csv(repo / rel)
+    base_text = subprocess.check_output(
+        ["git", "-C", str(repo), "show", f"{prerequisite}:{rel.as_posix()}"], text=True
+    )
+    base = list(csv.DictReader(base_text.splitlines()))
+    key = lambda row: (row["suite"], row["problem"])
+    current_by_key = {key(row): row for row in current}
+    base_by_key = {key(row): row for row in base}
+    changed = [item for item, row in base_by_key.items() if current_by_key.get(item) != row]
+    if changed:
+        fail(f"{rel} changed {len(changed)} prerequisite rows")
+    expected_added = set()
+    for suite, (expected_table, table_suite) in reference_layout.items():
+        if expected_table == rel.name:
+            expected_added |= {(table_suite, problem) for problem in ids_for(suite)}
+    actual_added = set(current_by_key) - set(base_by_key)
+    if actual_added != expected_added:
+        fail(f"{rel} additions differ from the frozen campaign slice")
+    digest = hashlib.sha256((repo / rel).read_bytes()).hexdigest()
+    if digest != table_spec["sha256"] or len(current) != table_spec["rows"]:
+        fail(f"{rel} hash or row count differs from the campaign manifest")
+
+expected_runs = []
+for suite in ("mzn-bench", "xcsp3-core", "mps-core", "miplib2017"):
+    excluded = {item[0] for item in next(s for s in manifest["suiteSlices"] if s["suite"] == suite).get("excluded", [])}
+    for rep in (1, 2, 3):
+        expected = ids_for(suite) - excluded
+        for arm in ("default", "off"):
+            expected_runs.append((suite, rep, arm, expected, 3000))
+for suite in ("smtlib-qflra", "smtlib-qflira", "smtlib-qflia", "smtlib-qfidl", "smtlib-qfrdl"):
+    for rep in (1, 2, 3):
+        expected_runs.append((suite, rep, "single", ids_for(suite), 30000))
+
+all_json = []
+objective_sense_mismatches = []
+verdict_conflicts = []
+objective_conflicts = []
+smt_signatures = {}
+for suite, rep, arm, expected, budget in expected_runs:
+    run = campaign / "baseline" / suite / f"rep-{rep}" / arm
+    rows = read_csv(run / "results.csv")
+    json_paths = sorted((run / "results").glob("*.json"))
+    out_paths = sorted((run / "results").glob("*.out"))
+    records = [json.loads(path.read_text()) for path in json_paths]
+    all_json.extend(json_paths)
+    if {row["problem"] for row in rows} != expected or {record["problem"] for record in records} != expected:
+        fail(f"{suite} repetition {rep} {arm} identities differ from the frozen selection")
+    if len(out_paths) != len(expected):
+        fail(f"{suite} repetition {rep} {arm} has {len(out_paths)} raw outputs, expected {len(expected)}")
+    by_problem = {record["problem"]: record for record in records}
+    for row in rows:
+        record = by_problem[row["problem"]]
+        for field in ("maximize", "objective", "feasible", "proven", "budgetMs"):
+            if normalized(row[field]) != normalized(record[field]):
+                fail(f"{suite} repetition {rep} {arm} CSV/JSON mismatch for {row['problem']} {field}")
+        if record["gitSha"] != measured_sha or record["solver"] != "klause":
+            fail(f"{suite} repetition {rep} {arm} has foreign solver metadata")
+        if record["processors"] != 1 or record["seed"] != 3 or record["budgetMs"] != budget:
+            fail(f"{suite} repetition {rep} {arm} has unexpected deterministic settings")
+        command = record["command"]
+        if suite.startswith("smtlib-"):
+            if record["engine"] != "fixed" or " -e fixed" not in command or "--lp" in command:
+                fail(f"{suite} repetition {rep} is not the fixed no-LP configuration")
+        elif f"--lp {arm}" not in command:
+            fail(f"{suite} repetition {rep} {arm} does not encode its LP arm")
+        oracle = reference_by_problem.get(record["problem"])
+        if oracle is None:
+            if suite.startswith("smtlib-"):
+                table_name = "z3.csv"
+            elif suite in ("mps-core", "miplib2017"):
+                table_name = "scip.csv"
+            else:
+                table_name = "cp-sat.csv"
+            candidates = [r for r in read_csv(repo / "klause-bench/reference" / table_name) if r["problem"] == record["problem"]]
+            oracle = candidates[0] if len(candidates) == 1 else None
+        if oracle is None:
+            fail(f"no unambiguous oracle for {suite} {record['problem']}")
+        oracle_feasible = normalized(oracle["feasible"])
+        oracle_proven = normalized(oracle["proven"])
+        oracle_objective = normalized(oracle["objective"])
+        oracle_maximize = normalized(oracle["maximize"])
+        if record["kind"] == "optimize" and record["maximize"] != oracle_maximize:
+            objective_sense_mismatches.append((suite, rep, arm, record["problem"]))
+        if oracle_proven and record["proven"] and record["feasible"] != oracle_feasible:
+            verdict_conflicts.append((suite, rep, arm, record["problem"]))
+        if oracle_proven and oracle_feasible and record["feasible"] and oracle_objective is not None:
+            objective = normalized(record["objective"])
+            if objective is not None:
+                impossible = objective > oracle_objective + 1e-8 if oracle_maximize else objective < oracle_objective - 1e-8
+                if impossible or (record["proven"] and not math.isclose(objective, oracle_objective, rel_tol=1e-8, abs_tol=1e-8)):
+                    objective_conflicts.append((suite, rep, arm, record["problem"]))
+    if suite.startswith("smtlib-"):
+        signature = sorted((r["problem"], r["feasible"], r["proven"], r["objective"]) for r in records)
+        smt_signatures.setdefault(suite, []).append(signature)
+
+if len(expected_runs) != 39 or len(all_json) != 321:
+    fail(f"campaign has {len(expected_runs)} baseline CSVs and {len(all_json)} JSON records")
+for arm in ("default", "off"):
+    log = (campaign / "baseline/mzn-bench/rep-1" / arm / "stdout.log").read_text()
+    excluded = next(s for s in manifest["suiteSlices"] if s["suite"] == "mzn-bench")["excluded"]
+    if "compile failed" not in log or any(problem not in log for problem, _ in excluded):
+        fail(f"mzn-bench repetition 1 {arm} does not retain all four source-incompatible attempts")
+if verdict_conflicts or objective_conflicts:
+    fail(f"oracle audit found {len(verdict_conflicts)} verdict and {len(objective_conflicts)} objective conflicts")
+expected_sense = {("xcsp3-core", rep, arm, "sum-opt-tiny") for rep in (1, 2, 3) for arm in ("default", "off")}
+if set(objective_sense_mismatches) != expected_sense:
+    fail(f"objective-sense metadata mismatches differ from the six documented sum-opt-tiny rows")
+if any(len({json.dumps(signature, sort_keys=True) for signature in signatures}) != 1 for signatures in smt_signatures.values()):
+    fail("SMT result signatures are not stable across repetitions")
+
+for checksum_file in campaign.rglob("SHA256SUMS"):
+    for line in checksum_file.read_text().splitlines():
+        digest, rel = line.split("  ", 1)
+        target = checksum_file.parent / rel.removeprefix("./")
+        if not target.is_file() or hashlib.sha256(target.read_bytes()).hexdigest() != digest:
+            fail(f"checksum mismatch in {checksum_file.relative_to(campaign)}: {rel}")
+
+raw_cache = list((campaign / "reference-raw-rerun/cache").glob("*.json"))
+if raw_cache:
+    if len(raw_cache) != 39:
+        fail(f"raw reference recovery has {len(raw_cache)} cache records, expected 39")
+    with (campaign / "reference-raw-rerun/cache-index.tsv").open(newline="") as stream:
+        index = list(csv.DictReader(stream, delimiter="\t"))
+    expected_raw_ids = {
+        (suite, problem)
+        for suite in ("smtlib-qfidl", "smtlib-qfrdl", "mzn-bench", "xcsp3-core", "mps-core")
+        for problem in ids_for(suite)
+    }
+    expected_raw_ids -= {
+        ("mzn-bench", item[0])
+        for item in next(s for s in manifest["suiteSlices"] if s["suite"] == "mzn-bench")["excluded"]
+    }
+    if {(row["suite"], row["problem"]) for row in index} != expected_raw_ids:
+        fail("raw reference cache index identities differ from the 39 successful frozen attempts")
+    for path in raw_cache:
+        record = json.loads(path.read_text())
+        if not record.get("command") or "rawOutput" not in record:
+            fail(f"raw reference recovery record lacks command/output: {path.name}")
+        rows = [row for row in index if row["cacheFile"] == path.name]
+        if len(rows) != 1:
+            fail(f"raw reference cache index does not uniquely name {path.name}")
+        row = rows[0]
+        if hashlib.sha256(record["command"].encode()).hexdigest() != row["commandSha256"]:
+            fail(f"raw reference command hash mismatch for {path.name}")
+        if hashlib.sha256(record["rawOutput"].encode()).hexdigest() != row["rawOutputSha256"]:
+            fail(f"raw reference output hash mismatch for {path.name}")
+    with (campaign / "reference-raw-rerun/source-error-index.tsv").open(newline="") as stream:
+        error_index = list(csv.DictReader(stream, delimiter="\t"))
+    expected_errors = {
+        ("mzn-bench", item[0])
+        for item in next(s for s in manifest["suiteSlices"] if s["suite"] == "mzn-bench")["excluded"]
+    }
+    if {(row["suite"], row["problem"]) for row in error_index} != expected_errors:
+        fail("raw source-error index identities differ from the four frozen incompatibilities")
+    error_dirs = [
+        campaign / "reference-raw-rerun/source-errors" / row["directory"] / "exit-status.txt"
+        for row in error_index
+    ]
+    if any(not path.is_file() or path.read_text().strip() == "0" for path in error_dirs):
+        fail("raw reference recovery does not retain four source-incompatible failures")
+
+print(f"measuredSha={measured_sha}")
+print(f"auditorSha={subprocess.check_output(['git', '-C', str(repo), 'rev-parse', 'HEAD'], text=True).strip()}")
+print("referenceRows=43")
+print("baselineCsvFiles=39")
+print("baselineRows=321")
+print("baselineJsonFiles=321")
+print("baselineOutFiles=321")
+print("oracleVerdictConflicts=0")
+print("oracleObjectiveConflicts=0")
+print("objectiveSenseMetadataMismatches=6")
+print("smtSignaturesStable=true")
+print("nestedChecksumsVerified=true")
+PY
+}
+
 finalize_campaign() {
     local measured_sha=$1
     require_campaign "$measured_sha"
     verify
-    local dir reference_rows baseline_files baseline_rows json_files out_files bad_status
+    local dir
     dir=$(campaign_dir "$measured_sha")
     [[ ! -e "$dir/final-manifest.json" ]] || die "refusing to overwrite $dir/final-manifest.json"
-    reference_rows=$(find "$dir/reference" -name results.csv -type f -exec awk 'FNR > 1 { n++ } END { print n + 0 }' {} + |
-        awk '{ n += $1 } END { print n + 0 }')
-    baseline_files=$(find "$dir/baseline" -name results.csv -type f | wc -l)
-    baseline_rows=$(find "$dir/baseline" -name results.csv -type f -exec awk 'FNR > 1 { n++ } END { print n + 0 }' {} + |
-        awk '{ n += $1 } END { print n + 0 }')
-    json_files=$(find "$dir/baseline" -name '*.json' -type f | wc -l)
-    out_files=$(find "$dir/baseline" -name '*.out' -type f | wc -l)
-    bad_status=$(find "$dir" -name exit-status.txt -type f -exec awk '$0 != 0 { n++ } END { print n + 0 }' {} + |
-        awk '{ n += $1 } END { print n + 0 }')
-    [[ "$reference_rows" == 43 ]] || die "campaign has $reference_rows reference rows, expected 43"
-    [[ "$baseline_files" == 39 ]] || die "campaign has $baseline_files baseline CSVs, expected 39"
-    [[ "$baseline_rows" == 321 ]] || die "campaign has $baseline_rows baseline rows, expected 321"
-    [[ "$json_files" == 321 && "$out_files" == 321 ]] ||
-        die "campaign has $json_files JSON and $out_files OUT files, expected 321 each"
-    [[ "$bad_status" == 0 ]] || die "campaign has $bad_status nonzero retained exit statuses"
+    audit_campaign "$measured_sha" >"$dir/campaign-audit.txt"
     cp "$manifest" "$dir/final-manifest.json"
-    {
-        printf 'measuredSha=%s\n' "$measured_sha"
-        printf 'finalizerSha=%s\n' "$(git -C "$repo_root" rev-parse HEAD)"
-        printf 'referenceRows=%s\n' "$reference_rows"
-        printf 'baselineCsvFiles=%s\n' "$baseline_files"
-        printf 'baselineRows=%s\n' "$baseline_rows"
-        printf 'baselineJsonFiles=%s\n' "$json_files"
-        printf 'baselineOutFiles=%s\n' "$out_files"
-        printf 'nonzeroExitStatuses=%s\n' "$bad_status"
-    } >"$dir/campaign-audit.txt"
     (
         cd "$dir"
         find . -type f ! -name FINAL_SHA256SUMS -print0 |
@@ -712,6 +928,7 @@ usage() {
         "usage: $0 verify|preview|check|instrument|init-campaign|prepare-cli SHA" \
         "       $0 reference-frozen SHA SUITE" \
         "       $0 repair-reference-snapshot SHA SUITE" \
+        "       $0 audit-campaign SHA" \
         "       $0 finalize-campaign SHA" \
         "       $0 baseline-pair SHA SUITE REP" \
         "       $0 baseline-smt SHA SUITE REP" \
@@ -727,6 +944,7 @@ case "${1:-}" in
     prepare-cli) [[ $# == 2 ]] || die "prepare-cli requires SHA"; prepare_cli "$2" ;;
     reference-frozen) [[ $# == 3 ]] || die "reference-frozen requires SHA SUITE"; reference_frozen "$2" "$3" ;;
     repair-reference-snapshot) [[ $# == 3 ]] || die "repair-reference-snapshot requires SHA SUITE"; repair_reference_snapshot "$2" "$3" ;;
+    audit-campaign) [[ $# == 2 ]] || die "audit-campaign requires SHA"; audit_campaign "$2" ;;
     finalize-campaign) [[ $# == 2 ]] || die "finalize-campaign requires SHA"; finalize_campaign "$2" ;;
     baseline-pair) [[ $# == 4 ]] || die "baseline-pair requires SHA SUITE REP"; baseline_pair "$2" "$3" "$4" ;;
     baseline-smt) [[ $# == 4 ]] || die "baseline-smt requires SHA SUITE REP"; baseline_smt "$2" "$3" "$4" ;;

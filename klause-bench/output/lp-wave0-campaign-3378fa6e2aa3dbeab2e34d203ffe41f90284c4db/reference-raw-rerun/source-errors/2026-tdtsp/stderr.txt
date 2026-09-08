@@ -1,0 +1,30 @@
+Multiple type errors:
+Error: type error:   symbol error: variable `n' must be defined (did you forget to specify a data file?)
+/home/rasmus/.cache/klause-bench/corpus/mzn-challenge/2026/tdtsp/tdtsp.mzn:9.1-6
+
+Error: type error:   symbol error: variable `D' must be defined (did you forget to specify a data file?)
+/home/rasmus/.cache/klause-bench/corpus/mzn-challenge/2026/tdtsp/tdtsp.mzn:12.1-22
+
+Error: type error:   symbol error: variable `q' must be defined (did you forget to specify a data file?)
+/home/rasmus/.cache/klause-bench/corpus/mzn-challenge/2026/tdtsp/tdtsp.mzn:14.1-6
+
+Error: type error:   symbol error: variable `prec' must be defined (did you forget to specify a data file?)
+/home/rasmus/.cache/klause-bench/corpus/mzn-challenge/2026/tdtsp/tdtsp.mzn:16.1-31
+
+Error: type error:   symbol error: variable `steps' must be defined (did you forget to specify a data file?)
+/home/rasmus/.cache/klause-bench/corpus/mzn-challenge/2026/tdtsp/tdtsp.mzn:18.1-10
+
+Error: type error:   symbol error: variable `l' must be defined (did you forget to specify a data file?)
+/home/rasmus/.cache/klause-bench/corpus/mzn-challenge/2026/tdtsp/tdtsp.mzn:19.1-6
+
+Error: type error:   symbol error: variable `r' must be defined (did you forget to specify a data file?)
+/home/rasmus/.cache/klause-bench/corpus/mzn-challenge/2026/tdtsp/tdtsp.mzn:23.1-6
+
+Error: type error:   symbol error: variable `which' must be defined (did you forget to specify a data file?)
+/home/rasmus/.cache/klause-bench/corpus/mzn-challenge/2026/tdtsp/tdtsp.mzn:25.1-29
+
+Error: type error:   symbol error: variable `interval' must be defined (did you forget to specify a data file?)
+/home/rasmus/.cache/klause-bench/corpus/mzn-challenge/2026/tdtsp/tdtsp.mzn:26.1-36
+
+Error: type error:   symbol error: variable `T' must be defined (did you forget to specify a data file?)
+/home/rasmus/.cache/klause-bench/corpus/mzn-challenge/2026/tdtsp/tdtsp.mzn:28.1-39

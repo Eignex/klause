@@ -1,6 +1,6 @@
 suite,problem,maximize,objective,feasible,proven,elapsedMs,budgetMs,format,structure,numGlobal,numLinear,boolHeavy,logic
 mzn-challenge,2008/nmseq/020,false,,,false,30000,30000,,,,,,
-mzn-challenge,2009/still_life/still_life_5,false,,,false,30000,30000,,,,,,
+mzn-challenge,2009/still_life/still_life_5,true,,,false,30000,30000,,,,,,
 mzn-challenge,2010/wwtp_random/ex05100_2600_100,false,,,false,30000,30000,,,,,,
 mzn-challenge,2011/ship-schedule/4Ships,true,371850.0,true,true,1514,30000,,,,,,
 mzn-challenge,2012/vrp/A-n38-k5.vrp,false,751.0,true,false,322,30000,,,,,,

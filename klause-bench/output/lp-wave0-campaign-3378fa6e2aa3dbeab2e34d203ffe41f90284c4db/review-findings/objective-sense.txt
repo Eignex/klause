@@ -1,0 +1,22 @@
+finding=retained Klause objective-sense metadata disagrees with source/reference
+suite=xcsp3-core
+problem=sum-opt-tiny
+source=klause-bench/smoke-corpus/xcsp3/sum-opt-tiny.xml
+sourceSha256=cec450c49c2ed5a07b87ebc790163204e4647bb55f0ffcfebe1ec4b0d1048355
+sourceSense=maximize
+cpSatReferenceSense=maximize
+cpSatReferenceObjective=10.0
+affectedRecords=rep-1/default,rep-1/off,rep-2/default,rep-2/off,rep-3/default,rep-3/off
+retainedKlauseSense=minimize
+retainedKlauseObjective=10.0
+retainedKlauseProof=true
+disposition=objective and witness agree with the oracle; exclude all six records from objective-direction claims
+
+finding=failed MiniZinc row needed source-level sense correction
+suite=mzn-bench
+problem=2009/still_life/still_life_5
+source=/home/rasmus/.cache/klause-bench/corpus/mzn-challenge/2009/still_life/still_life.mzn
+sourceSha256=e8bf15404d72d8922a6e47dc058fb60928e80cf9377e57df2abdce8354f80f06
+sourceSense=maximize
+processOutcome=source-incompatible before solve
+disposition=committed unknown reference row records maximize; raw recovery preserves the classifier output and source failure

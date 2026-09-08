@@ -71,8 +71,7 @@ The campaign runs on a busy shared host without an exclusive reservation or idle
 two independent suites run concurrently, with one worker per solver. Reference commands may overlap
 only when they write different CSV tables; writers targeting the same table run serially. Wall times
 are retained as descriptive, noisy context and are not regression or performance gates. Oracle
-verdicts, witnesses, frozen coverage and deterministic work counts are the primary evidence, and the
-campaign is not repeated merely to seek cleaner timing.
+verdicts, witnesses, frozen coverage and deterministic work counts are the primary evidence.
 
 The baseline matrix contains 39 CP/MIP instances: all 19 selected MiniZinc entries, including the four
 known source-incompatible Klause cases, plus four XCSP3, four MPS and twelve MIPLIB entries. The four
@@ -97,6 +96,9 @@ decisive; the other seven are two IDL UNKNOWNs, one MiniZinc UNKNOWN and four ex
 incompatibilities. The full-coverage gaps that remain are 2,518 IDL and 249 RDL instances. Reference
 serialization temporarily added an empty `logic` column; the retained raw snapshots preserve that
 output, while the committed tables remove the empty column so all prerequisite rows remain unchanged.
+The MiniZinc `still_life_5` source puts its `maximize objective` solve item after a multiline search
+annotation that the lightweight classifier misses. Its source hash and direct process failure are
+retained, and the committed unknown row records the source's maximizing sense.
 
 | Suite | Reference outcome | Measured baseline outcome per repetition |
 |---|---|---|
@@ -114,12 +116,26 @@ The CP/MIP aggregate over the 35 compatible instances was feasible `[15, 8, 12]`
 `[13, 10, 15]` for LP off, with three proofs in each arm in every repetition. The 210 result rows plus
 eight recorded MiniZinc source-incompatible attempts account for the planned 218 attempts. SMT
 contributed 111 rows, with an identical result signature in all repetitions. Across all 321 solver
-result rows there were zero oracle verdict, objective-sense or proof conflicts. Busy-host elapsed times
-are intentionally not promoted to a speedup or regression claim.
+result rows there were zero oracle verdict, impossible-objective or proof conflicts. Six
+`sum-opt-tiny` records, both arms in all three repetitions, say `maximize=false` although the XCSP3
+source and CP-SAT oracle say maximize. Their objective 10 and witness are correct, but those records
+are excluded from objective-direction claims. Busy-host elapsed times are intentionally not promoted
+to a speedup or regression claim.
 
-The campaign directory retains 321 `.out` files, 321 `.json` files, 39 baseline CSVs, every command
-and stdout log, the preflight ID inventories and source hashes, tool/container/host metadata, repair
-provenance for the two corpus-path snapshot keys, per-run checksums and a final campaign checksum.
+The original reference sweep retained driver logs and derived CSV snapshots, but not the external
+solver streams. A separate post-review recovery reran the same frozen 43-instance selection at the
+measured SHA: 39 successful process records retain the exact command and raw output, while four
+per-instance records retain the source-incompatible MiniZinc command, stdout, stderr and nonzero exit.
+All decisive results and SMT unknown classifications agreed. Two unproven MiniZinc incumbents varied
+(`751` versus `757`, and `480` versus `512`); the committed table keeps the stronger original
+incumbents and makes no proof claim for either. Recovery elapsed times are descriptive and non-gating.
+
+The campaign directory also retains 321 `.out` files, 321 `.json` files, 39 baseline CSVs, every
+baseline command and stdout log, the preflight ID inventories and source hashes, tool/container/host
+metadata, repair provenance for the two corpus-path snapshot keys, per-run checksums and a final
+campaign checksum. The campaign audit checks exact reference additions, exact baseline identities,
+CSV/JSON agreement, measured SHA and deterministic settings, oracle outcomes, stable SMT signatures,
+the six documented objective-sense metadata mismatches, and every nested checksum.
 
 ## Independent reference semantics
 
@@ -244,6 +260,7 @@ From the repository root:
 klause-bench/scripts/lp-wave0-validation.sh verify
 klause-bench/scripts/lp-wave0-validation.sh preview
 klause-bench/scripts/lp-wave0-validation.sh check
+klause-bench/scripts/lp-wave0-validation.sh audit-campaign <measured-sha>
 klause-bench/scripts/lp-wave0-validation.sh print-reference-commands
 klause-bench/scripts/lp-wave0-validation.sh print-baseline-commands
 klause-bench/scripts/lp-wave0-validation.sh init-campaign
@@ -275,5 +292,7 @@ The campaign root also retains the manifest, exact preview inventories, host/run
 container image metadata and MiniZinc corpus commit. Machine-specific detail stays in that artifact
 tree rather than this report.
 
-Per the user's direct instruction for this task, no Opus review is run. This is a task-specific review
-exception, not a completed integrated Wave 0 review.
+Per the user's direct instruction for this task, no Opus review is run. An independent Codex Sol
+high-reasoning review found the missing process streams, count-only finalizer and objective-sense
+metadata issues described above; this report and the retained evidence incorporate those findings.
+This task-specific exception is not a completed integrated Wave 0 review.

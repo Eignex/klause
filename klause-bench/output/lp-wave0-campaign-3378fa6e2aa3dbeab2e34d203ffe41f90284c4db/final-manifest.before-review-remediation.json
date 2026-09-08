@@ -97,10 +97,7 @@
       "resultRows": 321,
       "rawJsonFiles": 321,
       "rawOutFiles": 321,
-      "oracleVerdictConflicts": 0,
-      "oracleObjectiveConflicts": 0,
-      "objectiveSenseMetadataMismatches": 6,
-      "objectiveSenseMetadataMismatch": "xcsp3-core/sum-opt-tiny in both arms of all three repetitions; source and CP-SAT oracle maximize, retained Klause records say minimize",
+      "oracleConflicts": 0,
       "timingOutcome": "not evaluated as a performance signal on the busy shared host",
       "cpMipFeasibleByRepetition": {
         "default": [15, 8, 12],
@@ -116,13 +113,6 @@
         "unsatProofs": 3,
         "unknown": 24
       }
-    },
-    "referenceRawRecovery": {
-      "purpose": "post-review process-output recovery; not a timing retry",
-      "successfulSolverRecords": 39,
-      "sourceIncompatibleProcessRecords": 4,
-      "originalRunStreamsAvailable": false,
-      "timingInterpretation": "descriptive and noisy; excluded from performance claims"
     }
   },
   "instrumentationContracts": [
@@ -187,8 +177,7 @@
     "logicalProcessors": 20,
     "memoryGiB": 61,
     "gradle": "9.7.0",
-    "auditPreparationGradleLauncherJvm": "OpenJDK 22.0.2 Homebrew",
-    "measuredCampaignCliJvm": "OpenJDK 25.0.1 Eclipse Adoptium",
+    "gradleLauncherJvm": "OpenJDK 22.0.2 Homebrew",
     "z3": "4.16.0",
     "minizinc": "2.9.7 build 2490193457",
     "minizincCpSat": "OR Tools CP-SAT 9.15",
@@ -249,7 +238,7 @@
     },
     {
       "file": "klause-bench/reference/cp-sat.csv",
-      "sha256": "8629da950b9ab8f2bb1509f28635d9c4846590410a8b44c6bb1c328dd870a6d7",
+      "sha256": "c87f8208aa115192ea5bb8def49a18659b27d50168dfee47604b72288f59b308",
       "rows": 19255,
       "added": 23,
       "existingRowsChanged": 0

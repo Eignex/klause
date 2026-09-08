@@ -1,0 +1,5 @@
+purpose=post-review independent raw-output recovery; not a timing retry
+measuredSha=3378fa6e2aa3dbeab2e34d203ffe41f90284c4db
+cacheRecords=39
+sourceIncompatibleWithoutCache=4
+timingInterpretation=descriptive and noisy; excluded from performance claims

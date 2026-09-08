@@ -1,0 +1,29 @@
+{
+    "feasible": true,
+    "objective": 2.6003678E7,
+    "timeToBestMs": 214,
+    "timeToFirstFeasibleMs": 199,
+    "proven": true,
+    "stats": {
+        "paths": "0",
+        "flatBoolVars": "324",
+        "flatIntVars": "154",
+        "flatBoolConstraints": "332",
+        "flatIntConstraints": "307",
+        "evaluatedReifiedConstraints": "74",
+        "evaluatedHalfReifiedConstraints": "146",
+        "eliminatedImplications": "34",
+        "method": "\"minimize\"",
+        "flatTime": "0.104584",
+        "objective": "2.60037e+07",
+        "objectiveBound": "2.60037e+07",
+        "boolVariables": "111",
+        "failures": "74",
+        "propagations": "23122",
+        "solveTime": "0.0920045",
+        "nSolutions": "4"
+    },
+    "attribution": [],
+    "rawOutput": "% Generated FlatZinc statistics:\n%%%mzn-stat: paths=0\n%%%mzn-stat: flatBoolVars=324\n%%%mzn-stat: flatIntVars=154\n%%%mzn-stat: flatBoolConstraints=332\n%%%mzn-stat: flatIntConstraints=307\n%%%mzn-stat: evaluatedReifiedConstraints=74\n%%%mzn-stat: evaluatedHalfReifiedConstraints=146\n%%%mzn-stat: eliminatedImplications=34\n%%%mzn-stat: method=\"minimize\"\n%%%mzn-stat: flatTime=0.104584\n%%%mzn-stat-end\n%%%mzn-stat: objective=3.09682e+07\n%%%mzn-stat: objectiveBound=2.27865e+07\n%%%mzn-stat: boolVariables=0\n%%%mzn-stat: failures=0\n%%%mzn-stat: propagations=0\n%%%mzn-stat: solveTime=0.0744435\nvs = [true, true, true, true, true, true, true, true, true, true, true, true, false, true, true, true, true];\nes = [true, true, true, true, false, true, true, true, false, true, true, false, true, true, true, false, false, true, true, true];\nroot = 4;\nobjective = 30968155;\n_objective = 30968155;\n----------\n%%%mzn-stat: objective=2.8676e+07\n%%%mzn-stat: objectiveBound=2.27865e+07\n%%%mzn-stat: boolVariables=0\n%%%mzn-stat: failures=0\n%%%mzn-stat: propagations=0\n%%%mzn-stat: solveTime=0.0793073\nvs = [true, true, true, true, true, true, true, true, true, true, true, true, false, true, true, true, true];\nes = [true, true, true, true, false, true, true, true, false, true, true, false, false, true, true, false, true, true, true, true];\nroot = 4;\nobjective = 28676046;\n_objective = 28676046;\n----------\n%%%mzn-stat: objective=2.64966e+07\n%%%mzn-stat: objectiveBound=2.27865e+07\n%%%mzn-stat: boolVariables=111\n%%%mzn-stat: failures=14\n%%%mzn-stat: propagations=15816\n%%%mzn-stat: solveTime=0.0848671\nvs = [true, true, true, true, true, true, true, true, true, true, true, true, true, true, false, false, true];\nes = [true, true, true, true, true, true, false, true, true, false, true, false, false, true, false, true, false, true, true, true];\nroot = 13;\nobjective = 26496603;\n_objective = 26496603;\n----------\n%%%mzn-stat: objective=2.60037e+07\n%%%mzn-stat: objectiveBound=2.27865e+07\n%%%mzn-stat: boolVariables=111\n%%%mzn-stat: failures=68\n%%%mzn-stat: propagations=22404\n%%%mzn-stat: solveTime=0.0900861\nvs = [true, true, true, true, true, true, true, true, true, true, true, true, false, true, true, true, true];\nes = [true, true, true, true, false, true, true, true, false, true, false, true, true, false, true, false, true, true, true, true];\nroot = 3;\nobjective = 26003678;\n_objective = 26003678;\n----------\n==========\n%%%mzn-stat: objective=2.60037e+07\n%%%mzn-stat: objectiveBound=2.60037e+07\n%%%mzn-stat: boolVariables=111\n%%%mzn-stat: failures=74\n%%%mzn-stat: propagations=23122\n%%%mzn-stat: solveTime=0.0920045\n%%%mzn-stat: nSolutions=4\n%%%mzn-stat-end\n",
+    "command": "minizinc --solver cp-sat --time-limit 30000 --output-mode dzn -s -a --output-objective -f -p 1 /home/rasmus/.cache/klause-bench/corpus/mzn-challenge/2018/steiner-tree/steiner-tree.mzn /home/rasmus/.cache/klause-bench/corpus/mzn-challenge/2018/steiner-tree/es10fst03.stp.dzn"
+}
