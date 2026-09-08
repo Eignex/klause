@@ -453,7 +453,7 @@ enum class PresolvePass(
             "PresolvePass.applyFinite is defined only for Stage.PROBLEM passes; $name is a $stage pass",
         )
 
-        capability == Capability.SOURCE -> applySource(problem, ctx).asPassDelta()
+        capability == Capability.SOURCE -> applySource(problem, ctx).asPassDelta(problem.rootIntDomainsInPlace)
 
         else -> error("$name is a Stage.PROBLEM pass needing $capability but defines no finite form")
     }

@@ -55,6 +55,67 @@ class IntBounds internal constructor(
 
     internal val openUpperBits: Bits? get() = openHi
 
+    /** A [Tightening] over a copy of these ranges, for a pass that proves bounds on some of the columns. */
+    internal fun tightening(): Tightening =
+        Tightening(lowerBounds.copyOf(), upperBounds.copyOf(), openLo?.copy(), openHi?.copy())
+
+    /**
+     * The first column whose proved range admits nothing, or -1.
+     *
+     * A crossed range is a refutation, and it has to be read here rather than left to whoever
+     * materializes a domain from it: two bounds proved from different rows can cross without either one
+     * being wrong, so the caller reports `unsat` where a domain would only throw.
+     */
+    internal fun crossedColumn(): Int {
+        for (v in 0 until size) if (hasLower(v) && hasUpper(v) && lowerBounds[v] > upperBounds[v]) return v
+        return -1
+    }
+
+    /**
+     * Bounds under construction, narrowed column by column before being stated as one [IntBounds].
+     *
+     * The ranges are copied once and mutated in place, so proving a bound on a handful of columns of a
+     * wide model costs one copy rather than one per column. Only narrowing is possible: [atLeast] and
+     * [atMost] keep whichever of the proved and the current bound is tighter, and closing an open side
+     * counts as narrowing however wide the proved bound is. A pass that ends with [changed] false proved
+     * nothing its input did not already state.
+     */
+    internal class Tightening internal constructor(
+        private val lowerBounds: LongArray,
+        private val upperBounds: LongArray,
+        private var openLo: Bits?,
+        private var openHi: Bits?,
+    ) {
+        /** Whether any call actually narrowed a range. */
+        var changed: Boolean = false
+            private set
+
+        /** Raise column [v]'s lower bound to [value], or close its open lower side at [value]. */
+        fun atLeast(v: Int, value: Long) {
+            if (openLo?.get(v) == true) {
+                openLo?.clear(v)
+            } else if (value <= lowerBounds[v]) {
+                return
+            }
+            lowerBounds[v] = value
+            changed = true
+        }
+
+        /** Lower column [v]'s upper bound to [value], or close its open upper side at [value]. */
+        fun atMost(v: Int, value: Long) {
+            if (openHi?.get(v) == true) {
+                openHi?.clear(v)
+            } else if (value >= upperBounds[v]) {
+                return
+            }
+            upperBounds[v] = value
+            changed = true
+        }
+
+        /** The narrowed ranges, or null when nothing was narrowed. */
+        fun build(): IntBounds? = if (!changed) null else fromModelBounds(lowerBounds, upperBounds, openLo, openHi)
+    }
+
     /** Internal constructor for source-model storage. */
     companion object {
         internal fun fromFiniteBounds(

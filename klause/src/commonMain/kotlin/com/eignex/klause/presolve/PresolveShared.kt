@@ -12,9 +12,27 @@ import com.eignex.klause.util.IntHashSet
 /** Small math and problem-rebuild helpers shared across the presolve passes. */
 internal object PresolveShared {
 
-    /** Apply a factor-only [delta] while retaining the canonical source representation. */
-    fun Problem.withSourcePassDelta(delta: SourceDelta): Problem {
+    /**
+     * Apply [delta] while retaining the canonical source representation, or null when it refutes.
+     *
+     * A proved range intersects the column's declaration rather than replacing it, so a non-contiguous
+     * declaration does not widen back to its hull on the way through. Either half can refute, and this
+     * returns null for both: the range itself can cross, and the intersection can empty a column that
+     * neither endpoint crossed.
+     */
+    fun Problem.withSourcePassDelta(delta: SourceDelta): Problem? {
         if (delta.isEmpty) return this
+        val rebounded = delta.bounds?.let {
+            if (it.crossedColumn() >= 0) return null
+            declaredIntDomains.rebounded(it) ?: return null
+        }
+        val spec = if (rebounded == null) this else withDeclaredIntDomains(rebounded)
+        return spec.withFactorPassDelta(delta)
+    }
+
+    /** [delta]'s factor rewrite alone, over this model's declarations. */
+    private fun Problem.withFactorPassDelta(delta: SourceDelta): Problem {
+        if (delta.droppedIndices.isEmpty() && delta.addedFactors.isEmpty()) return this
         val dropped = if (delta.droppedIndices.isEmpty()) {
             null
         } else {

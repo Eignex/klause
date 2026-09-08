@@ -270,6 +270,26 @@ open class Problem(
         realUpper = realUpper,
     )
 
+    /**
+     * This model over [newDomains], carrying every row and every other declaration through unchanged.
+     *
+     * Takes the rebounded declarations rather than a range, so the caller has already intersected its
+     * proved range with whatever value sets the columns declare — see [SourceIntDomains.rebounded]. That
+     * keeps the widening [withFactors] warns about out of this path: a range cannot arrive here and
+     * quietly replace a value set with its hull.
+     */
+    internal fun withDeclaredIntDomains(newDomains: SourceIntDomains): Problem = Problem(
+        numBoolVars = numBoolVars,
+        numIntVars = numIntVars,
+        declaredIntDomains = newDomains,
+        factors = factors,
+        impliedFactorMask = impliedFactorMask,
+        hasSymmetryBreaking = hasSymmetryBreaking,
+        numRealVars = numRealVars,
+        realLower = realLower,
+        realUpper = realUpper,
+    )
+
     /** Total number of factors. */
     val numFactors: Int get() = factors.size
 }
