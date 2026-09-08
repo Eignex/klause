@@ -167,6 +167,23 @@ internal interface LpSolver : AutoCloseable {
 }
 
 /**
+ * An [LpSolver] whose independent component results can be certified without reconstructing one
+ * monolithic exact problem. Factories return this capability explicitly so a decorator around a
+ * component engine cannot accidentally hide the certification routes from its consumers.
+ */
+internal interface ComponentLpSolverCapability : LpSolver {
+    fun exactLowerBound(
+        observer: LpCertificationObserver? = null,
+        policy: LpCertificationPolicy = ProductionLpCertificationPolicy,
+    ): Long?
+
+    fun exactBasisFeasible(
+        observer: LpCertificationObserver? = null,
+        policy: LpCertificationPolicy = ProductionLpCertificationPolicy,
+    ): Boolean
+}
+
+/**
  * An [LpSolver] that also exposes tableau cut generation. Gomory/MIR cuts are read off an optimal
  * simplex basis, so only a basis-carrying (simplex) engine can supply them; the cut-separation loop
  * types against this, while the general solve/certify path types against [LpSolver].

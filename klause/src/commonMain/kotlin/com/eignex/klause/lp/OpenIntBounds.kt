@@ -3,7 +3,7 @@ package com.eignex.klause.lp
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.lp.engine.Basis
-import com.eignex.klause.lp.engine.ComponentLpSolver
+import com.eignex.klause.lp.engine.ComponentLpSolverCapability
 import com.eignex.klause.lp.engine.LpBuilder
 import com.eignex.klause.lp.engine.LpCertificationObserver
 import com.eignex.klause.lp.engine.LpModel
@@ -159,7 +159,7 @@ internal fun tightenOpenIntBounds(
                 null
             } finally {
                 try {
-                    observer?.observeSolve(solver.lastMetrics, solver is ComponentLpSolver)
+                    observer?.observeSolve(solver.lastMetrics, solver is ComponentLpSolverCapability)
                 } finally {
                     solver.close()
                 }
@@ -225,7 +225,7 @@ private fun tightenByNeighborhoodProbes(
                 null
             } finally {
                 try {
-                    observer?.observeSolve(solver.lastMetrics, solver is ComponentLpSolver)
+                    observer?.observeSolve(solver.lastMetrics, solver is ComponentLpSolverCapability)
                 } finally {
                     solver.close()
                 }

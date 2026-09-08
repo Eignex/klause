@@ -27,7 +27,7 @@ internal class ComponentLpSolver(
     private val parts: List<LpNeighborhood>,
     private val solvers: List<LpSolver>,
     private val isolated: IntArray,
-) : LpSolver {
+) : ComponentLpSolverCapability {
     private var blockResults: List<FloatLpResult>? = null
     private var metrics = LpSolveMetrics()
 
@@ -115,10 +115,7 @@ internal class ComponentLpSolver(
     }
 
     /** Exact lower bound assembled from the independently certified block objectives. */
-    fun exactLowerBound(
-        observer: LpCertificationObserver? = null,
-        policy: LpCertificationPolicy = ProductionLpCertificationPolicy,
-    ): Long? {
+    override fun exactLowerBound(observer: LpCertificationObserver?, policy: LpCertificationPolicy): Long? {
         if (model.hasContinuous) return null
         val results = blockResults ?: return null
         val certificates = ArrayList<IntegerCertificate>(parts.size)
@@ -152,10 +149,7 @@ internal class ComponentLpSolver(
     }
 
     /** Whether every independently solved continuous block has an exact feasible basis. */
-    fun exactBasisFeasible(
-        observer: LpCertificationObserver? = null,
-        policy: LpCertificationPolicy = ProductionLpCertificationPolicy,
-    ): Boolean {
+    override fun exactBasisFeasible(observer: LpCertificationObserver?, policy: LpCertificationPolicy): Boolean {
         val results = blockResults ?: return false
         return parts.indices.all {
             policy.acceptBoolean(
@@ -177,8 +171,9 @@ internal fun componentLpSolverOrNull(
     model: LpModel,
     cancellation: Cancellation,
     engine: (LpModel, Cancellation) -> LpSolver,
-    component: (LpModel, List<LpNeighborhood>, List<LpSolver>, IntArray) -> LpSolver = ::ComponentLpSolver,
-): LpSolver? {
+    component: (LpModel, List<LpNeighborhood>, List<LpSolver>, IntArray) -> ComponentLpSolverCapability =
+        ::ComponentLpSolver,
+): ComponentLpSolverCapability? {
     val n = model.n
     val m = model.m
     if (n == 0 || m < 2) return null
@@ -236,6 +231,16 @@ internal fun componentLpSolverOrNull(
             model.restrictTo(blockCols[b], blockRows[b], colMap = null, copyCosts = true, rowMapScratch),
         )
     }
-    val solvers = parts.map { engine(it.model, cancellation) }
-    return component(model, parts, solvers, isolated.toIntArray())
+    val solvers = ArrayList<LpSolver>(parts.size)
+    var ownershipTransferred = false
+    try {
+        for (part in parts) solvers += engine(part.model, cancellation)
+        return component(model, parts, solvers, isolated.toIntArray()).also {
+            ownershipTransferred = true
+        }
+    } finally {
+        if (!ownershipTransferred) {
+            for (solver in solvers) runCatching { solver.close() }
+        }
+    }
 }

@@ -11,7 +11,7 @@ internal interface LpEngineFactory {
         parts: List<LpNeighborhood>,
         solvers: List<LpSolver>,
         isolated: IntArray,
-    ): LpSolver
+    ): ComponentLpSolverCapability
 
     fun newTableauSolver(
         model: LpModel,
@@ -40,7 +40,7 @@ internal object ProductionLpEngineFactory : LpEngineFactory {
         parts: List<LpNeighborhood>,
         solvers: List<LpSolver>,
         isolated: IntArray,
-    ): LpSolver = ComponentLpSolver(model, parts, solvers, isolated)
+    ): ComponentLpSolverCapability = ComponentLpSolver(model, parts, solvers, isolated)
 
     override fun newTableauSolver(
         model: LpModel,
