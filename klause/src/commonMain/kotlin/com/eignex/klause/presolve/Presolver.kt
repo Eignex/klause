@@ -87,7 +87,9 @@ object Presolver {
                 val delta = pass.applySource(current, slice?.let(ctx::withCancellation) ?: ctx)
                 if (delta.infeasible) return PassOutcome.INFEASIBLE
                 if (delta.isEmpty) return PassOutcome.UNCHANGED
-                current = current.withSourcePassDelta(delta)
+                // A proved range can empty a column whose declaration it intersects, which refutes the
+                // model even though the pass itself only claimed a bound.
+                current = current.withSourcePassDelta(delta) ?: return PassOutcome.INFEASIBLE
                 return PassOutcome.CHANGED
             }
 
