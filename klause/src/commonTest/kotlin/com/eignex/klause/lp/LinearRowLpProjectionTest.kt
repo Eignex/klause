@@ -3,15 +3,21 @@ package com.eignex.klause.lp
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
+import com.eignex.klause.factor.bool.Cardinality
+import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.global.AllDifferent
+import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.LinearForm
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.linearRows
 import com.ionspin.kotlin.bignum.integer.BigInteger
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-class FactorRowLpProjectionTest {
+class LinearRowLpProjectionTest {
 
     /** [openLo] / [openHi] mark the endpoints of the fixed `[0, 10]` root box as ones the finite lane
      *  invented rather than ones the model states. */
@@ -26,6 +32,7 @@ class FactorRowLpProjectionTest {
         val integerRows = mutableListOf<IntegerRow>()
         val realRows = mutableListOf<RealRow>()
         var bigMRows = 0
+        val booleanWeights = mutableListOf<LongArray?>()
 
         override fun linearRow(
             op: LinearOp,
@@ -75,9 +82,23 @@ class FactorRowLpProjectionTest {
             op: LinearOp,
             bound: Long,
             contribution: Contribution,
-        ) = error("unused")
+        ) {
+            booleanWeights += weights
+        }
         override fun row(columns: IntArray, coeffs: LongArray, op: LinearOp, rhs: Long, contribution: Contribution) =
             error("unused")
+    }
+
+    @Test
+    fun `unit-weight Boolean factors retain the compact LP representation`() {
+        for (factor in listOf<Factor>(Clause(intArrayOf(0, 2)), Cardinality.exactlyOne(intArrayOf(0, 2)))) {
+            val builder = RecordingBuilder()
+
+            factor.emitLpRelaxation(builder)
+
+            assertTrue(builder.booleanWeights.isNotEmpty())
+            for (weights in builder.booleanWeights) assertNull(weights)
+        }
     }
 
     @Test
@@ -178,5 +199,22 @@ class FactorRowLpProjectionTest {
 
         assertEquals(1, projection.cachedWideRoundingCount)
         assertEquals(2, builder.realRows.size)
+    }
+
+    @Test
+    fun `multiple wide rows in one declaration cache their own rounding`() {
+        val huge = BigInteger.ONE shl 100
+        val first = Linear(intArrayOf(0), arrayOf(huge), LinearOp.LE, huge)
+        val second = Linear(intArrayOf(0), arrayOf(huge), LinearOp.LE, huge * 2)
+        val factor = object : Factor by first {
+            override val linearForm: LinearForm = LinearForm.Conjunction(first.linearRows + second.linearRows)
+        }
+        val builder = RecordingBuilder()
+        val projection = LinearLpProjection()
+
+        repeat(2) { factor.emitLpRelaxation(builder, projection) }
+
+        assertEquals(2, projection.cachedWideRoundingCount)
+        assertEquals(4, builder.realRows.size)
     }
 }

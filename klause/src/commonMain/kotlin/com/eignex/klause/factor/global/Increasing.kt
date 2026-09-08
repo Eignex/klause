@@ -4,12 +4,14 @@ import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.FactorKind
 import com.eignex.klause.ir.IntVars
 import com.eignex.klause.ir.KeySink
+import com.eignex.klause.ir.LinearForm
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.LinearRow
 import com.eignex.klause.ir.StructuralKey
 import com.eignex.klause.ir.VarList
 import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.ir.hashRemappedKey
+import com.eignex.klause.ir.linearRows
 import com.eignex.klause.ir.materializeKey
 
 /**
@@ -52,10 +54,11 @@ class Increasing(val xs: IntArray, val strict: Boolean) : Factor {
         sink.intVars(xs)
     }
 
-    override val linearRows: List<LinearRow>
-        get() = buildList {
+    override val linearForm: LinearForm = LinearForm.Conjunction(
+        buildList {
             for (i in 0 until xs.size - 1) {
                 add(LinearRow.ofInts(intArrayOf(xs[i + 1], xs[i]), longArrayOf(1, -1), LinearOp.GE, gap.toLong()))
             }
-        }
+        },
+    )
 }

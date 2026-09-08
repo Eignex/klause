@@ -79,13 +79,30 @@ class RootFixedRowsTest {
     }
 
     @Test
-    fun `a negation whose bound would wrap yields no row`() {
+    fun `a negation beyond long range retains its exact bound`() {
         val r = rows(unit(0, false), ReifiedLinear(0, longArrayOf(1L), intArrayOf(0), LinearOp.LE, Long.MAX_VALUE))
-        assertEquals(0, r.size, "a wrapped bound is a constraint the model never stated")
+        assertEquals(
+            -com.ionspin.kotlin.bignum.integer.BigInteger.fromLong(Long.MAX_VALUE) -
+                com.ionspin.kotlin.bignum.integer.BigInteger.ONE,
+            checkNotNull(r.single().integralConstants).exactBound,
+        )
     }
 
     @Test
     fun `a plain linear factor is not mistaken for a reified one`() {
         assertEquals(0, rows(unit(0, true), Linear(longArrayOf(1L), intArrayOf(0), LinearOp.LE, 5L)).size)
+    }
+
+    @Test
+    fun `canonicalizing a minimum long lower bound preserves its exact value`() {
+        val result = rows(
+            unit(0, true),
+            ReifiedLinear(0, longArrayOf(1), intArrayOf(0), LinearOp.GE, Long.MIN_VALUE),
+        )
+
+        assertEquals(
+            -com.ionspin.kotlin.bignum.integer.BigInteger.fromLong(Long.MIN_VALUE),
+            checkNotNull(result.single().wideConstants).bound,
+        )
     }
 }

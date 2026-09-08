@@ -3,8 +3,12 @@ package com.eignex.klause.factor.arithmetic
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.FactorKind
 import com.eignex.klause.ir.KeySink
+import com.eignex.klause.ir.LinearForm
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.LinearRow
 import com.eignex.klause.ir.MixedVars
+import com.eignex.klause.ir.RealConstants
+import com.eignex.klause.ir.RealConsts
 import com.eignex.klause.ir.StructuralKey
 import com.eignex.klause.ir.VarList
 import com.eignex.klause.ir.VarRemap
@@ -52,11 +56,17 @@ class ReifiedRealLinear(
         require(realVars.size == realCoeffs.size) { "real vars/coeffs length mismatch" }
     }
 
-    override val exactTheoryOwnable: Boolean get() = bound.isFinite() &&
-        intCoeffs.all(Double::isFinite) &&
-        realCoeffs.all(Double::isFinite) &&
-        intCoeffs.all(::isExactInteger)
-
+    override val linearForm: LinearForm = LinearForm.Conjunction(
+        listOf(
+            LinearRow.ofColumns(
+                vars,
+                realVars,
+                RealConstants(RealConsts(intCoeffs), RealConsts(realCoeffs), bound, strict),
+                op,
+                aux,
+            ),
+        ),
+    )
     override val variables: VarList =
         MixedVars(boundInts = vars, boolVars = intArrayOf(aux), reals = realVars)
 

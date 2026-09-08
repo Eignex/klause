@@ -1,16 +1,16 @@
 package com.eignex.klause.lp.cut
 
-import com.eignex.klause.factor.arithmetic.IntegerConstants
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.ir.IntegerConstants
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.UnitConsts
 import com.eignex.klause.lp.engine.Cut
 import com.eignex.klause.lp.engine.Relation
 import com.eignex.klause.lp.rootDomainOf
 import com.eignex.klause.lp.statesBinary
 import com.eignex.klause.lp.statesLowerBoundAtLeast
 import com.eignex.klause.lp.statesUpperBound
-import com.eignex.klause.solver.UnitConsts
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.MutableIntIntMap
 import com.eignex.klause.util.MutableIntLongMap

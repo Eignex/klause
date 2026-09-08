@@ -1,6 +1,10 @@
 package com.eignex.klause.theory.qflra
 
+import com.eignex.klause.ir.LinearForm
+import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.LinearRow
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.linearRows
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.RationalFeasibility
 import com.eignex.klause.simplex.exact.bigRationalOutcome
@@ -31,29 +35,42 @@ class ExactLraSolver(override val model: Problem) : Theory<ExactLraAssignment> {
     }
 
     override fun check(bools: BooleanArray, context: TheoryContext): TheoryCheck<ExactLraAssignment> {
+        if (model.factors.any { factor ->
+                factor.linearForm is LinearForm.Disjunction || factor.linearRows.any { row ->
+                    row.relation == LinearOp.NE ||
+                        (row.relation == LinearOp.EQ && row.activator != LinearRow.ALWAYS && !bools[row.activator])
+                }
+            }
+        ) {
+            return when (val result = checkExactLinear(model, bools, context)) {
+                is TheoryCheck.Sat -> TheoryCheck.Sat(
+                    ExactLraAssignment(result.assignment.bools, result.assignment.reals),
+                )
+
+                is TheoryCheck.Infeasible -> TheoryCheck.Infeasible(result.explanation)
+
+                TheoryCheck.Cancelled -> TheoryCheck.Cancelled
+            }
+        }
         if (!context.consumeCheck()) return TheoryCheck.Cancelled
-        val cancellation = Cancellation(context::cancelled)
-        val system = QfLraSystem(model)
-        val relaxation = system.build(bools)
-        val outcome = bigRationalOutcome(relaxation.model, cancellation, maxPivots = Int.MAX_VALUE)
+        val relaxation = QfLraSystem(model).build(bools)
+        val outcome = bigRationalOutcome(relaxation, Cancellation(context::cancelled), maxPivots = Int.MAX_VALUE)
         return when (outcome.feasibility) {
-            RationalFeasibility.FEASIBLE -> TheoryCheck.Sat(
-                ExactLraAssignment(bools.copyOf(), reals(model.numRealVars, relaxation, outcome.witness!!)),
-            )
+            RationalFeasibility.FEASIBLE -> {
+                val witness = requireNotNull(outcome.witness)
+                TheoryCheck.Sat(
+                    ExactLraAssignment(
+                        bools.copyOf(),
+                        List(model.numRealVars) { real ->
+                            witness[real] - witness[model.numRealVars + real]
+                        },
+                    ),
+                )
+            }
 
             RationalFeasibility.UNKNOWN -> TheoryCheck.Cancelled
 
             RationalFeasibility.INFEASIBLE -> TheoryCheck.Infeasible()
         }
-    }
-
-    private fun reals(count: Int, relaxation: QfLraLeaf, witness: List<BigFraction>): List<BigFraction> {
-        val result = MutableList(count) { BigFraction.ZERO }
-        for (column in relaxation.realId.indices) {
-            val real = relaxation.realId[column]
-            val value = witness[column]
-            result[real] = if (relaxation.realSign[column] > 0) result[real] + value else result[real] - value
-        }
-        return result
     }
 }

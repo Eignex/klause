@@ -12,6 +12,9 @@ import com.eignex.klause.factor.symmetry.SymmetryHandling
 import com.eignex.klause.factor.symmetry.SymmetryPropagator
 import com.eignex.klause.factor.table.*
 import com.eignex.klause.ir.Factor
+import com.eignex.klause.ir.IntegerConstants
+import com.eignex.klause.ir.RealConstants
+import com.eignex.klause.ir.WideConstants
 import com.eignex.klause.propagation.difference.DifferenceSystem
 import com.eignex.klause.propagation.difference.DifferenceSystemPropagator
 import com.eignex.klause.util.PermutationGroup

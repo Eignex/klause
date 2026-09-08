@@ -5,9 +5,11 @@ import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.bool.PseudoBoolean
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.LinearForm
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Term
+import com.eignex.klause.ir.impliedLinearRows
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.util.IntHashSet
@@ -70,11 +72,14 @@ internal object DominatedVariables {
         for (f in problem.factors) {
             for (v in f.boolVars) boolSeen[v] = true
             for (v in f.intVars) intSeen[v] = true
-            val rows = f.linearRows
+            val rows = f.impliedLinearRows
             // The integer monotonicity analysis reads the integer side of a row; a row carrying Boolean
             // literals is left to the bool-side [markBoolSafety] (unifying the two is a follow-up).
-            val monotoneIntRows = rows.isNotEmpty() &&
-                rows.all { (it.relation == LinearOp.LE || it.relation == LinearOp.GE) && it.isIntegerOnly }
+            val monotoneIntRows = (f.linearForm is LinearForm.Conjunction) && rows.isNotEmpty() &&
+                rows.all {
+                    (it.relation == LinearOp.LE || it.relation == LinearOp.GE) && it.isIntegerOnly &&
+                        it.isLongUnconditional
+                }
             if (monotoneIntRows) {
                 // Every exact row is monotone ≤/≥, so each variable has one safe direction per row.
                 for (row in rows) {

@@ -1,145 +1,180 @@
 package com.eignex.klause.presolve.linear
 
-import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.ir.Factor
+import com.eignex.klause.ir.IntegerConstants
+import com.eignex.klause.ir.IntegralConstants
+import com.eignex.klause.ir.LinearForm
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.LinearRow
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.Term
+import com.eignex.klause.ir.impliedLinearRows
+import com.eignex.klause.ir.linearRows
 import com.eignex.klause.presolve.PassDelta
-import com.eignex.klause.presolve.PresolvePass
 import com.eignex.klause.presolve.PresolveShared
-import com.eignex.klause.presolve.structural.RedundantConstraints
-import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.IntHashSet
+import com.eignex.klause.presolve.integralLinear
+import com.eignex.klause.util.CheckedLongOverflowException
+import com.eignex.klause.util.addExact
+import com.eignex.klause.util.subExact
+import com.ionspin.kotlin.bignum.integer.BigInteger
 
-/**
- * Cross-direction linear bound fusion. Over the [Linear] inequalities sharing one coefficient vector — up
- * to a common GCD and an overall sign — an upper bound `Σ a·x ≤ u` and a lower bound `Σ a·x ≥ l` interact
- * in two ways a per-direction dominator bucket never sees:
- *
- *  - `l > u` proves the problem infeasible outright, reported without materialising the constraints.
- *  - `l = u` pins `Σ a·x = l`; the pair (and any looser same-vector siblings) collapse into a single
- *    equality, which [ELIMINATE_AFFINE_SINGLETONS][PresolvePass.ELIMINATE_AFFINE_SINGLETONS] can then
- *    pivot on to project out a variable.
- *
- * Solution-set exact: `(Σ ≤ v) ∧ (Σ ≥ v) ⟺ (Σ = v)`, and an empty feasible set is reported faithfully.
- * Same-direction domination (two `≤` keep the tighter) already lives in [RedundantConstraints]; this pass
- * adds only the orthogonal `≤`/`≥` combination. Operates on [Linear] factors — the droppable single-row
- * integer inequalities whose fusion most directly unblocks the affine pass; the pseudo-Boolean / Boolean
- * rows are left to a follow-up.
- */
 internal object LinearBoundFusion {
-
-    /** The rows on one canonical coefficient vector: the tightest bound seen from each direction, the
-     *  representative canonical `(vars, coeffs)` for emitting the fused equality, and the inequality
-     *  factor indices eligible to drop into it. An equality among them makes fusion redundant. */
-    private class Group {
-        var vars: IntArray = intArrayOf()
-        var coeffs: LongArray = longArrayOf()
-        var upper: Long = Long.MAX_VALUE
-        var lower: Long = Long.MIN_VALUE
-        var hasEq = false
-        val ineqIndices = IntArrayList()
+    private class Group(val terms: Terms) {
+        var upper: BigInteger? = null
+        var lower: BigInteger? = null
+        var hasEquality = false
+        val droppable = ArrayList<Int>()
     }
 
     fun fuseLinearBounds(problem: Problem): PassDelta {
-        val factors = problem.factors
-        val groups = HashMap<List<Long>, Group>()
-        for (i in factors.indices) {
-            val f = factors[i]
-            if (f !is Linear || f.integerConstants == null || f.op == LinearOp.NE) continue
-            val canon = canonicalize(f) ?: continue
-            val g = groups.getOrPut(canon.key) {
-                Group().also {
-                    it.vars = canon.vars
-                    it.coeffs = canon.coeffs
+        val groups = HashMap<Terms, Group>()
+        for ((index, factor) in problem.factors.withIndex()) {
+            for (row in factor.impliedLinearRows) {
+                val canonical = canonicalize(row) ?: continue
+                val group = groups.getOrPut(canonical.terms) {
+                    Group(canonical.terms)
                 }
-            }
-            when {
-                f.op == LinearOp.EQ -> {
-                    g.hasEq = true
-                    if (canon.value < g.upper) g.upper = canon.value
-                    if (canon.value > g.lower) g.lower = canon.value
+                if (row.relation == LinearOp.EQ || canonical.upper) {
+                    group.upper = group.upper?.let { minOf(it, canonical.bound) } ?: canonical.bound
                 }
-
-                canon.isUpper -> {
-                    if (canon.value < g.upper) g.upper = canon.value
-                    g.ineqIndices.add(i)
+                if (row.relation == LinearOp.EQ || !canonical.upper) {
+                    group.lower = group.lower?.let { maxOf(it, canonical.bound) } ?: canonical.bound
                 }
-
-                else -> {
-                    if (canon.value > g.lower) g.lower = canon.value
-                    g.ineqIndices.add(i)
+                if (row.relation == LinearOp.EQ) {
+                    group.hasEquality = true
+                } else if (factor.linearForm is LinearForm.Conjunction && factor.linearRows.size == 1) {
+                    group.droppable.add(index)
                 }
             }
         }
-
-        val dropped = IntHashSet()
+        val dropped = ArrayList<Int>()
         val added = ArrayList<Factor>()
-        for (g in groups.values) {
-            if (g.lower == Long.MIN_VALUE || g.upper == Long.MAX_VALUE) continue // one-directional
-            if (g.lower > g.upper) return PassDelta(infeasible = true)
-            // Both bounds present and equal, with no equality already asserting it: the inequalities
-            // (all on this vector, since l == u == every side's tightest) collapse into one equality.
-            if (g.lower == g.upper && !g.hasEq) {
-                for (k in 0 until g.ineqIndices.size) dropped.add(g.ineqIndices[k])
-                added.add(Linear(g.coeffs, g.vars, LinearOp.EQ, g.upper))
+        for (group in groups.values) {
+            val lower = group.lower ?: continue
+            val upper = group.upper ?: continue
+            if (lower > upper) return PassDelta(infeasible = true)
+            if (lower == upper && !group.hasEquality) {
+                dropped.addAll(group.droppable)
+                added.add(integralLinear(group.terms.vars, group.terms.exactCoefficients(), LinearOp.EQ, upper))
             }
         }
-        if (dropped.isEmpty() && added.isEmpty()) return PassDelta()
         return PassDelta(droppedIndices = dropped.toIntArray(), addedFactors = added)
     }
 
-    /** A factor's row in a sign-canonical orientation (leading coefficient positive) and GCD-reduced, so
-     *  a `≤` and a `≥` over the same underlying vector land in one [Group]. [value] is the bound in that
-     *  orientation, [isUpper] marks a `≤`. `null` for an empty / all-zero support or an equality whose
-     *  bound the GCD does not divide (a genuine infeasibility left to [CoefficientStrengthening]). */
-    private class Canon(
-        val key: List<Long>,
+    private class Terms(
         val vars: IntArray,
-        val coeffs: LongArray,
-        val value: Long,
-        val isUpper: Boolean,
-    )
+        private val coefficients: LongArray?,
+        private val wideCoefficients: Array<BigInteger>? = null,
+    ) {
+        private val hash =
+            31 * vars.contentHashCode() + (coefficients?.contentHashCode() ?: wideCoefficients.contentHashCode())
 
-    private fun canonicalize(f: Linear): Canon? {
-        val row = f.integerConstants ?: return null
-        val vars = f.vars
-        if (vars.isEmpty()) return null
-        val g = PresolveShared.gcdOf(row.coeffs)
-        if (g < 1L) return null // all-zero coefficients: a trivial row with no support
+        fun exactCoefficients(): Array<BigInteger> = wideCoefficients ?: Array(vars.size) {
+            BigInteger.fromLong(checkNotNull(coefficients)[it])
+        }
 
-        // The row is stored `≤` (a `≥` was folded to `≤` with negated sides at construction); GCD-reduce
-        // on that form (exact, the left side is a multiple of `g`) before choosing the canonical sign.
-        val reducedBound = if (f.op == LinearOp.EQ) {
-            if (row.bound % g != 0L) return null
-            row.bound / g
+        override fun hashCode(): Int = hash
+
+        override fun equals(other: Any?): Boolean = other is Terms && vars.contentEquals(other.vars) &&
+            coefficients.contentEquals(other.coefficients) && wideCoefficients.contentEquals(other.wideCoefficients)
+    }
+
+    private class Canonical(val terms: Terms, val bound: BigInteger, val upper: Boolean)
+
+    private fun canonicalize(row: LinearRow): Canonical? {
+        val constants = row.constants as? IntegralConstants ?: return null
+        if (!row.isIntegerOnly || row.activator != LinearRow.ALWAYS || row.relation == LinearOp.NE) return null
+        if (constants is IntegerConstants) {
+            try {
+                return canonicalizeLong(row, constants)
+            } catch (_: CheckedLongOverflowException) {
+                // Coalescing, strictness and orientation must preserve values outside Long as well.
+            }
+        }
+        return canonicalizeWide(row, constants)
+    }
+
+    private fun canonicalizeLong(row: LinearRow, constants: IntegerConstants): Canonical? {
+        val order = (0 until row.size).sortedBy { Term.intVar(row.ref(it)) }
+        val vars = IntArray(row.size)
+        val coefficients = LongArray(row.size)
+        var count = 0
+        for (k in order) {
+            val variable = Term.intVar(row.ref(k))
+            if (count > 0 && vars[count - 1] == variable) {
+                coefficients[count - 1] = addExact(coefficients[count - 1], constants.coeff(k))
+            } else {
+                vars[count] = variable
+                coefficients[count++] = constants.coeff(k)
+            }
+        }
+        var nonzero = 0
+        for (k in 0 until count) {
+            if (coefficients[k] == 0L) continue
+            if (coefficients[k] == Long.MIN_VALUE) {
+                throw CheckedLongOverflowException("coefficient magnitude exceeds Long")
+            }
+            vars[nonzero] = vars[k]
+            coefficients[nonzero++] = coefficients[k]
+        }
+        if (nonzero == 0) return null
+        val compact = coefficients.copyOf(nonzero)
+        val gcd = PresolveShared.gcdOf(compact)
+        var bound = constants.bound
+        if (row.strict && row.relation == LinearOp.LE) bound = subExact(bound, 1L)
+        if (row.strict && row.relation == LinearOp.GE) bound = addExact(bound, 1L)
+        val negate = row.relation == LinearOp.GE
+        if (negate) bound = subExact(0L, bound)
+        if (row.relation == LinearOp.EQ && bound % gcd != 0L) return null
+        val reducedBound = bound.floorDiv(gcd)
+        val flip = (compact[0] < 0L) != negate
+        for (k in compact.indices) {
+            compact[k] /= gcd
+            if (flip != negate) compact[k] = -compact[k]
+        }
+        return Canonical(
+            Terms(vars.copyOf(nonzero), compact),
+            BigInteger.fromLong(if (flip) subExact(0L, reducedBound) else reducedBound),
+            upper = !flip,
+        )
+    }
+
+    private fun canonicalizeWide(row: LinearRow, constants: IntegralConstants): Canonical? {
+        val terms = HashMap<Int, BigInteger>()
+        for (k in 0 until row.size) {
+            val variable = Term.intVar(row.ref(k))
+            terms[variable] = (terms[variable] ?: BigInteger.ZERO) + constants.exactCoeff(k)
+        }
+        val ordered = terms.entries.filter { it.value != BigInteger.ZERO }.sortedBy { it.key }
+        if (ordered.isEmpty()) return null
+        val gcd = ordered.fold(BigInteger.ZERO) { value, term -> value.gcd(term.value.abs()) }
+        var bound = constants.exactBound
+        if (row.strict && row.relation == LinearOp.LE) bound -= BigInteger.ONE
+        if (row.strict && row.relation == LinearOp.GE) bound += BigInteger.ONE
+        val sign = if (row.relation == LinearOp.GE) -BigInteger.ONE else BigInteger.ONE
+        bound *= sign
+        if (row.relation == LinearOp.EQ && bound % gcd != BigInteger.ZERO) return null
+        val quotient = bound / gcd
+        val reducedBound = if (bound < BigInteger.ZERO && bound % gcd != BigInteger.ZERO) {
+            quotient - BigInteger.ONE
         } else {
-            row.bound.floorDiv(g)
+            quotient
         }
-        val reduced = LongArray(vars.size) { row.coeff(it) / g }
-        val lead = leadingIndex(vars)
-        val flip = reduced[lead] < 0L
-        val coeffs = if (flip) LongArray(reduced.size) { -reduced[it] } else reduced
-        // Flipping sign turns the stored `≤ reducedBound` into `≥ -reducedBound`, i.e. a lower bound.
-        val value = if (flip) -reducedBound else reducedBound
-        return Canon(keyOf(vars, coeffs), vars, coeffs, value, isUpper = !flip)
-    }
-
-    /** Index of the lowest variable id — the deterministic anchor whose coefficient sign orients the
-     *  canonical vector. */
-    private fun leadingIndex(vars: IntArray): Int {
-        var lead = 0
-        for (i in vars.indices) if (vars[i] < vars[lead]) lead = i
-        return lead
-    }
-
-    /** The canonical `(var, coeff)` pairs sorted by variable id — the group key. */
-    private fun keyOf(vars: IntArray, coeffs: LongArray): List<Long> {
-        val terms = ArrayList<Long>(vars.size * 2)
-        for (i in vars.indices.sortedBy { vars[it] }) {
-            terms.add(vars[i].toLong())
-            terms.add(coeffs[i])
+        val flip = ordered.first().value * sign < BigInteger.ZERO
+        val orientation = if (flip) -sign else sign
+        val coefficients = ordered.map { it.value / gcd * orientation }.toTypedArray()
+        val vars = ordered.map { it.key }.toIntArray()
+        val min = BigInteger.fromLong(Long.MIN_VALUE)
+        val max = BigInteger.fromLong(Long.MAX_VALUE)
+        val key = if (coefficients.all { it in min..max }) {
+            Terms(vars, LongArray(coefficients.size) { coefficients[it].longValue() })
+        } else {
+            Terms(vars, null, coefficients)
         }
-        return terms
+        return Canonical(
+            key,
+            if (flip) -reducedBound else reducedBound,
+            upper = !flip,
+        )
     }
 }

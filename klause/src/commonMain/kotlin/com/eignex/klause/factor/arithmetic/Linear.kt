@@ -5,21 +5,28 @@ import com.eignex.klause.factor.bool.internals.coalesceLinearTerms
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.FactorKind
 import com.eignex.klause.ir.IntVars
+import com.eignex.klause.ir.IntegerConstants
+import com.eignex.klause.ir.IntegralConstants
 import com.eignex.klause.ir.KeySink
+import com.eignex.klause.ir.LinearConstants
+import com.eignex.klause.ir.LinearForm
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.LinearRow
 import com.eignex.klause.ir.MixedVars
+import com.eignex.klause.ir.RealConstants
+import com.eignex.klause.ir.RealConsts
 import com.eignex.klause.ir.StructuralKey
+import com.eignex.klause.ir.Term
 import com.eignex.klause.ir.VarList
 import com.eignex.klause.ir.VarRemap
+import com.eignex.klause.ir.WideConstants
+import com.eignex.klause.ir.WideConsts
+import com.eignex.klause.ir.constsOf
 import com.eignex.klause.ir.hashRemappedKey
+import com.eignex.klause.ir.indices
 import com.eignex.klause.ir.materializeKey
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.propagation.NoPropagator
-import com.eignex.klause.solver.RealConsts
-import com.eignex.klause.solver.WideConsts
-import com.eignex.klause.solver.constsOf
-import com.eignex.klause.solver.indices
 import com.eignex.klause.util.EmptyDoubleArray
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.EmptyLongArray
@@ -50,7 +57,8 @@ class Linear private constructor(
     // rows.
     wideCoeffsIn: Array<BigInteger>? = null,
     wideBoundIn: BigInteger? = null,
-) : Factor {
+) : Factor,
+    LinearRow {
 
     // Canonicalise inequalities to ≤ at construction — the LP/MIP convention the cut separators
     // (FlowCoverSeparator, knapsack cover) expect. A ≥ becomes ≤ by negating the coefficients and bound;
@@ -66,7 +74,7 @@ class Linear private constructor(
      *
      * The GE→LE canonicalisation negates the constants here, once.
      */
-    val constants: LinearConstants = run {
+    override val constants: LinearConstants = run {
         val negate = rawOp == LinearOp.GE
         val canonicalBound = if (negate) -rawBound else rawBound
         when {
@@ -89,9 +97,7 @@ class Linear private constructor(
             else -> {
                 val integerCoeffs = constsOf(terms.coeffs)
                 IntegerConstants(
-                    vars,
                     if (negate) integerCoeffs.negated() else integerCoeffs,
-                    op,
                     canonicalBound,
                 )
             }
@@ -143,26 +149,6 @@ class Linear private constructor(
         // integer row states that its coefficients are its own.
         val integer = integerConstants
         require(integer == null || integer.coefficients.size == vars.size) { "int coeff/var length mismatch" }
-    }
-
-    // Real columns are declared here like any other kind. They were reachable only through the LP
-    // payload before, so no consumer scanning a factor's variables could see them.
-
-    override val integerTheoryOwnable: Boolean get() = true
-
-    // Exactness is a question about this row's data, not its kind: a continuous row is exact when every
-    // double is finite and its integer terms are integral, an integer row when its constants survive a
-    // double reading, and a wide row always, since the theory carries its BigIntegers directly.
-    override val exactTheoryOwnable: Boolean get() = when (val c = constants) {
-        is RealConstants -> c.bound.isFinite() &&
-            c.intCoefficients.indices.all { c.intCoefficients.at(it).isFinite() } &&
-            c.realCoefficients.indices.all { c.realCoefficients.at(it).isFinite() } &&
-            c.intCoefficients.indices.all { isExactInteger(c.intCoefficients.at(it)) }
-
-        is IntegerConstants -> vars.indices.all { isExactInteger(c.coeff(it).toDouble()) } &&
-            isExactInteger(c.bound.toDouble())
-
-        is WideConstants -> true
     }
 
     override val variables: VarList = if (realVars.isEmpty()) {
@@ -336,7 +322,15 @@ class Linear private constructor(
     // local-search engine is gated off for problems with real variables, so its invariant is never
     // consulted; an inert one keeps the factory total without pretending to evaluate the real terms.
 
-    override val linearRows: List<LinearRow> get() = listOfNotNull(integerConstants)
+    override val size: Int get() = vars.size + realVars.size
+    override val relation: LinearOp get() = op
+    override val isIntegerOnly: Boolean get() = realVars.isEmpty()
+    override fun ref(k: Int): Int = if (k < vars.size) {
+        Term.ofIntVar(vars[k])
+    } else {
+        Term.ofRealVar(realVars[k - vars.size])
+    }
+    override val linearForm: LinearForm = LinearForm.Conjunction(listOf(this))
 }
 
 /** True when every coefficient and the bound fit 32-bit range — the precondition for the Int-coefficient
@@ -375,6 +369,3 @@ internal fun coalesceWide(vars: IntArray, coeffs: Array<BigInteger>): Pair<IntAr
     }
     return order.toIntArray() to Array(order.size) { sum.getValue(order[it]) }
 }
-
-/** True when [value] is an integer a `Double` states exactly. */
-internal fun isExactInteger(value: Double): Boolean = value.isFinite() && value == value.toLong().toDouble()

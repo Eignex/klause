@@ -7,6 +7,7 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.supportsCompleteDifferenceTheory
+import com.eignex.klause.theory.qflra.exactTheoryOwnable
 import com.eignex.klause.theory.qflra.supportsExactLira
 import com.eignex.klause.theory.qflra.supportsExactLra
 

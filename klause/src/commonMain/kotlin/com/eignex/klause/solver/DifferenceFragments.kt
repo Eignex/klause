@@ -4,11 +4,14 @@ import com.eignex.klause.arithmetic.difference.DifferenceEdge
 import com.eignex.klause.arithmetic.difference.DifferenceFragment
 import com.eignex.klause.arithmetic.difference.appendDifferenceEdges
 import com.eignex.klause.arithmetic.difference.appendNegatedDifferenceEdges
-import com.eignex.klause.factor.arithmetic.Linear
-import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntBounds
+import com.eignex.klause.ir.IntegerConstants
+import com.eignex.klause.ir.LinearForm
+import com.eignex.klause.ir.LinearRow
 import com.eignex.klause.ir.Lit
+import com.eignex.klause.ir.Term
+import com.eignex.klause.ir.impliedLinearRows
 
 /** Gather the immutable difference fragment represented by this core model data. */
 internal fun differenceFragmentOf(factors: Array<Factor>, numIntVars: Int, intBounds: IntBounds): DifferenceFragment? {
@@ -49,38 +52,34 @@ internal fun supportsCompleteDifferenceTheory(factors: Array<Factor>, numIntVars
     hasCompleteDifferenceCoverage(factors) &&
         (differenceFragmentOf(factors, numIntVars, intBounds)?.carriesAPotential() ?: true)
 
-private fun appendFactorDifferenceEdges(factor: Factor, edges: MutableList<DifferenceEdge>): Boolean = when (factor) {
-    is Linear -> factor.integerConstants?.let { row ->
-        appendDifferenceEdges(
-            factor.vars,
+private fun appendFactorDifferenceEdges(factor: Factor, edges: MutableList<DifferenceEdge>): Boolean {
+    var complete = factor.linearForm is LinearForm.Conjunction
+    for (row in factor.impliedLinearRows) {
+        if (!row.isIntegerOnly || row.constants !is IntegerConstants || row.strict) {
+            complete = false
+            continue
+        }
+        val vars = IntArray(row.size) { Term.intVar(row.ref(it)) }
+        val guard = if (row.activator == LinearRow.ALWAYS) DifferenceEdge.ALWAYS else Lit.make(row.activator, true)
+        val forward = appendDifferenceEdges(
+            vars,
             row::coeff,
-            factor.op,
+            row.relation,
             row.bound,
             DifferenceFragment.ZERO,
-            DifferenceEdge.ALWAYS,
+            guard,
             edges,
         )
-    } ?: false
-
-    is ReifiedLinear -> factor.integerConstants?.let { row ->
-        appendDifferenceEdges(
-            factor.vars,
+        val reverse = row.activator == LinearRow.ALWAYS || appendNegatedDifferenceEdges(
+            vars,
             row::coeff,
-            factor.op,
+            row.relation,
             row.bound,
             DifferenceFragment.ZERO,
-            Lit.make(factor.auxBoolVar, true),
-            edges,
-        ) && appendNegatedDifferenceEdges(
-            factor.vars,
-            row::coeff,
-            factor.op,
-            row.bound,
-            DifferenceFragment.ZERO,
-            Lit.make(factor.auxBoolVar, false),
+            Lit.make(row.activator, false),
             edges,
         )
-    } ?: false
-
-    else -> true
+        complete = complete && forward && reverse
+    }
+    return complete
 }

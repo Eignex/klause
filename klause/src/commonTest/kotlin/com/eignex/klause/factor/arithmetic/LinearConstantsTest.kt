@@ -1,7 +1,14 @@
 package com.eignex.klause.factor.arithmetic
 
+import com.eignex.klause.ir.IntegerConstants
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.LinearRow
+import com.eignex.klause.ir.RealConstants
+import com.eignex.klause.ir.TaggedLinearRow
+import com.eignex.klause.ir.UnitConsts
 import com.eignex.klause.ir.VarRemap
+import com.eignex.klause.ir.WideConstants
+import com.eignex.klause.ir.linearRows
 import com.ionspin.kotlin.bignum.integer.BigInteger
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -86,12 +93,12 @@ class LinearConstantsTest {
     }
 
     @Test
-    fun `a wide row exposes no linear row`() {
+    fun `a wide row declares its exact linear row`() {
         val huge = BigInteger.fromLong(Long.MAX_VALUE) * 4
 
         val row = Linear(intArrayOf(0), arrayOf(huge), LinearOp.LE, huge)
 
-        assertTrue(row.linearRows.isEmpty(), "no integer row may be read off wide constants")
+        assertEquals(huge, assertIs<WideConstants>(row.linearRows.single().constants).bound)
     }
 
     @Test
@@ -111,15 +118,15 @@ class LinearConstantsTest {
         val unconditional = Linear(longArrayOf(Long.MAX_VALUE), intArrayOf(2), LinearOp.LE, Long.MAX_VALUE)
         val reified = ReifiedLinear(4, longArrayOf(-7), intArrayOf(3), LinearOp.GE, 9)
 
-        val plainRow = assertIs<FactorRow.Doubles>(unconditional.linearRow())
-        val reifiedRow = assertIs<FactorRow.Doubles>(reified.linearRow())
+        val plainRow = unconditional.linearRows.single()
+        val reifiedRow = reified.linearRows.single()
 
-        assertEquals(FactorRow.ALWAYS, plainRow.activator)
-        assertEquals(Long.MAX_VALUE, checkNotNull(plainRow.integerCoeffs)[0])
-        assertEquals(Long.MAX_VALUE, plainRow.integerBound)
+        assertEquals(LinearRow.ALWAYS, plainRow.activator)
+        assertEquals(Long.MAX_VALUE, plainRow.coeff(0))
+        assertEquals(Long.MAX_VALUE, plainRow.bound)
         assertEquals(4, reifiedRow.activator)
-        assertEquals(-7L, checkNotNull(reifiedRow.integerCoeffs)[0])
-        assertEquals(9L, reifiedRow.integerBound)
+        assertEquals(-7L, reifiedRow.coeff(0))
+        assertEquals(9L, reifiedRow.bound)
     }
 
     @Test
@@ -136,34 +143,23 @@ class LinearConstantsTest {
         val huge = BigInteger.fromLong(Long.MAX_VALUE) * 4
         val wide = Linear(intArrayOf(0), arrayOf(huge), LinearOp.LE, huge)
 
-        val realRow = assertIs<FactorRow.Doubles>(strictReal.linearRow())
-        val wideRow = assertIs<FactorRow.Wide>(wide.linearRow())
+        val realRow = strictReal.linearRows.single()
+        val wideRow = wide.linearRows.single()
 
         assertTrue(realRow.strict)
-        assertEquals(huge, wideRow.coefficients[0])
-        assertEquals(huge, wideRow.bound)
+        assertEquals(huge, assertIs<WideConstants>(wideRow.constants).exactCoeff(0))
+        assertEquals(huge, assertIs<WideConstants>(wideRow.constants).bound)
     }
 
     @Test
     fun `nonlinear factors expose no factor row`() {
-        assertNull(Product(0, 1, 2).linearRow())
+        assertTrue(Product(0, 1, 2).linearRows.isEmpty())
     }
 
     @Test
-    fun `factor rows require an atomic exact integer payload`() {
+    fun `rows require one coefficient per term`() {
         assertFailsWith<IllegalArgumentException> {
-            FactorRow.Doubles(
-                intVars = intArrayOf(0),
-                intCoeffs = doubleArrayOf(1.0),
-                realVars = IntArray(0),
-                realCoeffs = DoubleArray(0),
-                op = LinearOp.LE,
-                bound = 1.0,
-                strict = false,
-                activator = FactorRow.ALWAYS,
-                integerCoeffs = longArrayOf(1L),
-                integerBound = null,
-            )
+            TaggedLinearRow(intArrayOf(), IntegerConstants(UnitConsts(1), 1L), LinearOp.LE)
         }
     }
 

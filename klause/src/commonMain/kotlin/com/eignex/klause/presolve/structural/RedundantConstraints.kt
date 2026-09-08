@@ -7,11 +7,15 @@ import com.eignex.klause.factor.bool.PseudoBoolean
 import com.eignex.klause.factor.bool.internals.maximalPersistentAmoCliques
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.ir.Factor
+import com.eignex.klause.ir.IntegerConstants
+import com.eignex.klause.ir.LinearForm
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.LinearRow
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.StructuralKey
 import com.eignex.klause.ir.Term
+import com.eignex.klause.ir.impliedLinearRows
+import com.eignex.klause.ir.linearRows
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.presolve.ColumnRanges
 import com.eignex.klause.presolve.PassDelta
@@ -482,6 +486,12 @@ internal object RedundantConstraints {
      *  plain put per index is faithful; zero coefficients carry no support (and would divide by zero in
      *  the dominance ratio check), so skip them. */
     private fun leRowOf(row: LinearRow, factorIndex: Int): LeRow? {
+        if (!row.isLongUnconditional || row.bound == Long.MIN_VALUE ||
+            (0 until row.size).any { row.coeff(it) == Long.MIN_VALUE }
+        ) {
+            return null
+        }
+        if ((0 until row.size).map(row::ref).toSet().size != row.size) return null
         val raw = LongArray(row.size) { row.coeff(it) }
         val (coeffs, bound) = when (row.relation) {
             LinearOp.LE -> raw to row.bound
@@ -521,10 +531,10 @@ internal object RedundantConstraints {
         val candidates = ArrayList<LeRow>()
         for (i in factors.indices) {
             val f = factors[i]
-            val fRows = f.linearRows
+            val fRows = f.impliedLinearRows
             // This monotone-domination scan reads the integer side; skip Boolean-literal rows for now.
             if (fRows.isEmpty() || fRows.any { !it.isIntegerOnly }) continue
-            val droppable = f is Linear
+            val droppable = f.linearForm is LinearForm.Conjunction && f.linearRows.size == 1
             for (row in fRows) {
                 val le = leRowOf(row, i) ?: continue
                 dominators.add(le)
@@ -647,12 +657,13 @@ internal object RedundantConstraints {
 
     /** Every exact [LinearRow] of [f] as `≤`-normalised [IneqForm]s (each `=` row carries its opposite
      *  direction), for offering into the dominator buckets. Clause-shaped rows are skipped (see [rowForm]). */
-    private fun offerForms(f: Factor): List<IneqForm> = f.linearRows.mapNotNull { rowForm(it) }
+    private fun offerForms(f: Factor): List<IneqForm> = f.impliedLinearRows.mapNotNull { rowForm(it) }
 
     /** The `≤`-normalised [IneqForm] of [f] when it is a single-row inequality (the only shape this pass
      *  drops as dominated), else `null` — a multi-row factor (cardinality, increasing chain) offers its
      *  rows but is never itself dropped here. */
-    private fun dropForm(f: Factor): IneqForm? = f.linearRows.singleOrNull()?.let { rowForm(it) }
+    private fun dropForm(f: Factor): IneqForm? =
+        if (f.linearForm is LinearForm.Conjunction) f.impliedLinearRows.singleOrNull()?.let { rowForm(it) } else null
 
     /**
      * A single exact [LinearRow] as its `≤`-normalised [IneqForm], keyed uniformly over the row's tagged
@@ -663,7 +674,13 @@ internal object RedundantConstraints {
      * phase-2 no-op (clause subsumption is BVE's job).
      */
     private fun rowForm(row: LinearRow): IneqForm? {
+        if (row.constants !is IntegerConstants) return null
         if (isPureClause(row)) return null
+        if (!row.isLongUnconditional || row.bound == Long.MIN_VALUE ||
+            (0 until row.size).any { row.coeff(it) == Long.MIN_VALUE }
+        ) {
+            return null
+        }
         val refs = IntArray(row.size) { row.ref(it) }
         val coeffs = LongArray(row.size) { row.coeff(it) }
         return when (row.relation) {

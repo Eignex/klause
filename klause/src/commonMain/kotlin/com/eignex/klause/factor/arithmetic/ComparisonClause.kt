@@ -3,7 +3,9 @@ package com.eignex.klause.factor.arithmetic
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.FactorKind
 import com.eignex.klause.ir.KeySink
+import com.eignex.klause.ir.LinearForm
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.LinearRow
 import com.eignex.klause.ir.MixedVars
 import com.eignex.klause.ir.StructuralKey
 import com.eignex.klause.ir.VarList
@@ -28,11 +30,12 @@ class ComparisonClause(val vars: IntArray, val ops: Array<LinearOp>, val consts:
         require(vars.size == ops.size && vars.size == consts.size) { "literal arrays must be parallel" }
     }
 
+    override val linearForm: LinearForm = LinearForm.Disjunction(
+        vars.indices.map { i ->
+            LinearRow.ofInts(intArrayOf(vars[i]), longArrayOf(1L), ops[i], consts[i])
+        },
+    )
     override val variables: VarList = MixedVars(boundInts = vars.distinct().toIntArray(), boolVars = IntArray(0))
-
-    override val integerTheoryOwnable: Boolean get() = true
-
-    override val exactTheoryOwnable: Boolean get() = true
 
     override fun remap(mapping: VarRemap): Factor = ComparisonClause(mapping.ints(vars), ops, consts)
 

@@ -8,6 +8,7 @@ import com.eignex.klause.formats.smtlib.SmtLib
 import com.eignex.klause.formats.smtlib.SmtLibProblem
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.linearRows
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.SolveResult
 import kotlin.test.Test
@@ -188,5 +189,21 @@ class SmtLibChainTest {
         val n = r.assignment.ints[0]
         val x = r.assignment.reals[0]
         assertTrue(x > n.toDouble() && x < 2.5, "x=$x outside (n=$n, 2.5)")
+    }
+
+    @Test
+    fun `an open order chain retains its increasing declaration`() {
+        val parsed = SmtLib.parse(
+            """
+            (declare-const x Int)
+            (declare-const y Int)
+            (declare-const z Int)
+            (assert (< x y z))
+            (check-sat)
+            """.trimIndent(),
+        )
+
+        assertEquals(1, parsed.model.factors.filterIsInstance<Increasing>().size)
+        assertEquals(2, parsed.model.factors.filterIsInstance<Increasing>().single().linearRows.size)
     }
 }

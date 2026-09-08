@@ -7,17 +7,22 @@ import com.eignex.klause.factor.bool.internals.linearHolds
 import com.eignex.klause.factor.bool.internals.linearResidual
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.FactorKind
+import com.eignex.klause.ir.IntegerConstants
+import com.eignex.klause.ir.IntegralConstants
 import com.eignex.klause.ir.KeySink
+import com.eignex.klause.ir.LinearForm
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.LinearRow
 import com.eignex.klause.ir.MixedVars
 import com.eignex.klause.ir.StructuralKey
 import com.eignex.klause.ir.VarList
 import com.eignex.klause.ir.VarRemap
+import com.eignex.klause.ir.WideConstants
+import com.eignex.klause.ir.WideConsts
+import com.eignex.klause.ir.constsOf
 import com.eignex.klause.ir.hashRemappedKey
 import com.eignex.klause.ir.materializeKey
 import com.eignex.klause.localsearch.LocalSearchState
-import com.eignex.klause.solver.WideConsts
-import com.eignex.klause.solver.constsOf
 import com.ionspin.kotlin.bignum.integer.BigInteger
 
 /**
@@ -47,7 +52,7 @@ class ReifiedLinear private constructor(
     val constants: IntegralConstants = if (wideCoeffsIn != null) {
         WideConstants(WideConsts(wideCoeffsIn), wideBoundIn!!)
     } else {
-        IntegerConstants(vars, constsOf(terms.coeffs), op, rawBound)
+        IntegerConstants(constsOf(terms.coeffs), rawBound)
     }
 
     /** The row read as plain 64-bit integer arithmetic, or `null` when its constants are wider. */
@@ -74,15 +79,9 @@ class ReifiedLinear private constructor(
             wideBoundIn = wideBound,
         )
 
-    override val integerTheoryOwnable: Boolean get() = true
-
-    override val exactTheoryOwnable: Boolean get() = when (val c = constants) {
-        is IntegerConstants -> vars.indices.all { isExactInteger(c.coeff(it).toDouble()) } &&
-            isExactInteger(c.bound.toDouble())
-
-        is WideConstants -> true
-    }
-
+    override val linearForm: LinearForm = LinearForm.Conjunction(
+        listOf(LinearRow.ofColumns(vars, intArrayOf(), constants, op, auxBoolVar)),
+    )
     override val variables: VarList = MixedVars(boundInts = vars, boolVars = intArrayOf(auxBoolVar))
 
     /**

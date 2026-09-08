@@ -3,6 +3,7 @@ package com.eignex.klause.presolve
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.factor.global.Increasing
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.IntDomain
@@ -349,5 +350,18 @@ class OpenPresolveTest {
         assertEquals(listOf(PresolvePass.REMOVE_REDUNDANT.id), prepared.stats.passes)
         assertEquals(1, prepared.problem.factors.size, "the looser row is dropped")
         assertTrue(!prepared.problem.intBounds.hasUpper(0), "the pass invents no bound for an open column")
+    }
+
+    @Test
+    fun `open bound tightening reads every row of an increasing chain`() {
+        val spec = openAbove(
+            3,
+            Increasing(intArrayOf(0, 1, 2), strict = true),
+            row(2 to 1L, op = LinearOp.LE, bound = 4L),
+        )
+
+        val result = assertIs<OpenPresolveResult.Tightened>(spec.closeOpenBounds())
+
+        assertEquals(listOf(2L, 3L, 4L), (0 until 3).map { result.spec.intBounds.upper(it) })
     }
 }

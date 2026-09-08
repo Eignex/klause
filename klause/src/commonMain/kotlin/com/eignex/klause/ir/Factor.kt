@@ -26,24 +26,6 @@ interface Factor {
     val intVars: IntArray get() = variables.ints
 
     /**
-     * Whether an integer-linear theory can hold this factor whole, so CP need not own its columns.
-     *
-     * Declared by the factor, which knows its own shape, rather than decided by the plan naming classes.
-     * The default is `false`: a factor that has not said a theory can take it is held by CP, which is the
-     * conservative direction — CP can always index a finite column, while a theory handed a constraint it
-     * cannot represent would simply not see it.
-     */
-    val integerTheoryOwnable: Boolean get() = false
-
-    /**
-     * Whether the exact rational lane can hold this factor whole, once the model has continuous columns.
-     *
-     * Separate from [integerTheoryOwnable] because it is a question about the factor's *data*, not only its
-     * shape: a row whose coefficients are not exactly representable is not exact whatever its kind.
-     */
-    val exactTheoryOwnable: Boolean get() = false
-
-    /**
      * A copy of this factor with every variable id renumbered through [mapping]. Non-variable data — coefficients,
      * bounds, constant arrays, domain offsets, DFA tables — is carried over unchanged. Used by
      * presolve passes that renumber or substitute variables.
@@ -160,19 +142,10 @@ interface Factor {
     fun structuralReduce(domains: Array<IntDomain>): FactorReduction = FactorReduction.Unchanged
 
     /**
-     * This factor's constraint as one or more **solution-set-exact** [LinearRow]s over its integer
-     * variables and Boolean literals, or the empty list (the default) when the factor has no exact
-     * linear form. "Exact" means the conjunction of the returned rows accepts exactly the assignments
-     * this factor accepts — it *is* the constraint, not a relaxation. A factor whose only linear form is
-     * a relaxation (big-M, convex hull) leaves this empty for the LP projection to handle separately.
-     *
-     * Lets presolve analyses (redundancy, domination) read the linear content of any factor
-     * uniformly instead of pattern-matching the concrete factor type. Read-only: it carries no
-     * write-back, so passes that *rewrite* a factor still go through [structuralReduce] /
-     * [substituteAffine]. Cache it in the override (the content is immutable) rather than rebuilding
-     * per call.
+     * The structural linear content of this factor, or `null` when none is declared.
+     * Returned rows retain their identity across reads: engine caches attach derived data to each row.
      */
-    val linearRows: List<LinearRow> get() = emptyList()
+    val linearForm: LinearForm? get() = null
 }
 
 /**

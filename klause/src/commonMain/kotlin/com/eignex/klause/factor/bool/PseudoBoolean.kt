@@ -9,16 +9,20 @@ import com.eignex.klause.ir.FactorReduction
 import com.eignex.klause.ir.FactorReduction.Rewrite
 import com.eignex.klause.ir.FactorReduction.Unchanged
 import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.IntegerConstants
 import com.eignex.klause.ir.KeySink
+import com.eignex.klause.ir.LinearForm
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.LinearRow
 import com.eignex.klause.ir.StructuralKey
 import com.eignex.klause.ir.Term
 import com.eignex.klause.ir.VarList
 import com.eignex.klause.ir.VarRemap
+import com.eignex.klause.ir.constsOf
 import com.eignex.klause.ir.hashRemappedKey
 import com.eignex.klause.ir.materializeKey
 import com.eignex.klause.model.PbOp
+import kotlin.concurrent.Volatile
 
 /**
  * `Σ weights(i) * lit(i) ⟨op⟩ bound` over Boolean literals (each contributing its weight when
@@ -100,5 +104,15 @@ class PseudoBoolean(weights: LongArray, literals: IntArray, val op: PbOp, overri
     override fun ref(k: Int): Int = Term.ofLit(literals[k])
     override fun coeff(k: Int): Long = weights[k]
     override val isIntegerOnly: Boolean get() = false
-    override val linearRows: List<LinearRow> get() = listOf(this)
+
+    @Volatile
+    private var cachedConstants: IntegerConstants? = null
+
+    @Volatile
+    private var cachedForm: LinearForm? = null
+
+    override val constants: IntegerConstants
+        get() = cachedConstants ?: IntegerConstants(constsOf(weights), bound).also { cachedConstants = it }
+    override val linearForm: LinearForm
+        get() = cachedForm ?: LinearForm.Conjunction(listOf(this)).also { cachedForm = it }
 }

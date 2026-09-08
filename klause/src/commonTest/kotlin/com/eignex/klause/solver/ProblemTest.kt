@@ -196,10 +196,7 @@ class ProblemTest {
     }
 
     @Test
-    fun `a bounded column reached only by a factor CP must hold is CP-owned`() {
-        // The reified real atom reasons over its integer column's bounds, so it enumerates nothing —
-        // but no theory lane takes it once its coefficients are not exactly representable, which
-        // leaves CP holding the factor and therefore the column.
+    fun `a bounded column with fractional linear coefficients is theory-owned`() {
         val spec = Problem(
             numBoolVars = 1,
             intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(10), null, null),
@@ -221,12 +218,12 @@ class ProblemTest {
 
         val plan = spec.componentPlan()
 
-        assertEquals(IntVariableOwner.CP, plan.intOwner(0))
-        assertEquals(FactorOwner.CP, plan.factorOwner(0))
+        assertEquals(IntVariableOwner.THEORY, plan.intOwner(0))
+        assertEquals(FactorOwner.THEORY, plan.factorOwner(0))
     }
 
     @Test
-    fun `an open column reached only by a factor CP must hold is unroutable rather than fatal`() {
+    fun `an open column with fractional linear coefficients routes to the exact theory`() {
         val openUpper = Bits(1).also { it.set(0) }
         val spec = Problem(
             numBoolVars = 1,
@@ -247,11 +244,11 @@ class ProblemTest {
             realUpper = doubleArrayOf(3.0),
         )
 
-        assertEquals(ProblemPipeline.UNSUPPORTED_OPEN, spec.sourceRoute())
+        assertEquals(ProblemPipeline.EXACT_LIRA, spec.sourceRoute())
         assertEquals(
-            ProblemPipeline.UNSUPPORTED_OPEN,
+            ProblemPipeline.EXACT_LIRA,
             spec.componentPlan().theoryPipeline,
-            "the plan answers the same verdict rather than asserting the model away",
+            "both entry points select the same exact reader",
         )
     }
 

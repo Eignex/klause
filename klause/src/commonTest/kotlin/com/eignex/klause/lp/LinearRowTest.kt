@@ -10,6 +10,7 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.LinearRow
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Term
+import com.eignex.klause.ir.linearRows
 import com.eignex.klause.model.PbOp
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -93,6 +94,10 @@ class LinearRowTest {
         val lit = Lit.make(3, false)
         assertTrue(Term.isBool(Term.ofLit(lit)))
         assertEquals(lit, Term.lit(Term.ofLit(lit)))
+        assertTrue(Term.isReal(Term.ofRealVar(7)))
+        assertTrue(!Term.isInt(Term.ofRealVar(7)))
+        assertTrue(!Term.isBool(Term.ofRealVar(7)))
+        assertEquals(7, Term.realVar(Term.ofRealVar(7)))
     }
 
     @Test

@@ -1,29 +1,23 @@
 package com.eignex.klause.theory.qflra
 
-import com.eignex.klause.factor.arithmetic.ComparisonClause
-import com.eignex.klause.factor.arithmetic.FactorRow
-import com.eignex.klause.factor.arithmetic.complemented
-import com.eignex.klause.factor.arithmetic.linearRow
-import com.eignex.klause.ir.IntBounds
+import com.eignex.klause.ir.LinearForm
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.LinearRow
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.Term
+import com.eignex.klause.ir.complemented
+import com.eignex.klause.ir.linearRows
 import com.eignex.klause.lp.ExactMixedBoundedRow
 import com.eignex.klause.lp.ExactMixedEchelonHermite
 import com.eignex.klause.lp.ExactMixedTriangularBounds
-import com.eignex.klause.lp.add
 import com.eignex.klause.lp.asFraction
-import com.eignex.klause.lp.engine.LpBuilder
-import com.eignex.klause.lp.engine.LpModel
-import com.eignex.klause.lp.engine.Relation
-import com.eignex.klause.lp.engine.Sense
 import com.eignex.klause.lp.exactColumnLower
 import com.eignex.klause.lp.exactColumnUpper
 import com.eignex.klause.lp.exactComparison
 import com.eignex.klause.lp.exactMixedEchelonHermite
 import com.eignex.klause.lp.exactMixedTriangularBounds
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.simplex.exact.BigRationalTableauRow
 import com.eignex.klause.simplex.exact.ExactDoubleBoundedSplit
 import com.eignex.klause.simplex.exact.ExactRationalFeasibilityModel
 import com.eignex.klause.simplex.exact.ExactRationalInequality
@@ -70,23 +64,30 @@ class ExactLiraSolver(override val model: Problem) : Theory<ExactLiraAssignment>
         require(model.supportsExactLira()) { "exact LIRA search requires a supported integer-containing linear model" }
     }
 
-    override fun check(bools: BooleanArray, context: TheoryContext): TheoryCheck<ExactLiraAssignment> {
-        val cancellation = Cancellation(context::cancelled)
-        return when (
-            val result = ExactIntegerSearch(
-                model = model,
-                bools = bools.toStates(),
-                cancellation = cancellation,
-                consumeLeaf = context::consumeCheck,
-                lowerBound = context::intLowerBound,
-                upperBound = context::intUpperBound,
-                emitAssignment = true,
-            ).run()
-        ) {
-            is IntegerSearchResult.Found -> TheoryCheck.Sat(checkNotNull(result.assignment))
-            IntegerSearchResult.Infeasible -> TheoryCheck.Infeasible()
-            IntegerSearchResult.Cancelled, IntegerSearchResult.Budget -> TheoryCheck.Cancelled
-        }
+    override fun check(bools: BooleanArray, context: TheoryContext): TheoryCheck<ExactLiraAssignment> =
+        checkExactLinear(model, bools, context)
+}
+
+internal fun checkExactLinear(
+    model: Problem,
+    bools: BooleanArray,
+    context: TheoryContext,
+): TheoryCheck<ExactLiraAssignment> {
+    val cancellation = Cancellation(context::cancelled)
+    return when (
+        val result = ExactIntegerSearch(
+            model = model,
+            bools = bools.toStates(),
+            cancellation = cancellation,
+            consumeLeaf = context::consumeCheck,
+            lowerBound = context::intLowerBound,
+            upperBound = context::intUpperBound,
+            emitAssignment = true,
+        ).run()
+    ) {
+        is IntegerSearchResult.Found -> TheoryCheck.Sat(checkNotNull(result.assignment))
+        IntegerSearchResult.Infeasible -> TheoryCheck.Infeasible()
+        IntegerSearchResult.Cancelled, IntegerSearchResult.Budget -> TheoryCheck.Cancelled
     }
 }
 
@@ -98,10 +99,16 @@ class ExactLiraSearchComponent(
     SearchBrancher {
     private val bools = IntArray(model.numBoolVars) { UNASSIGNED }
     private val boolLevels = IntArray(model.numBoolVars) { -1 }
+    private val arithmeticRows = model.factors.flatMap { factor ->
+        val rows = factor.linearRows
+        if (rows.any { row -> (0 until row.size).any { !Term.isBool(row.ref(it)) } }) rows else emptyList()
+    }
     private val exactActivators = BooleanArray(model.numBoolVars).also { activators ->
-        for (factor in model.factors) {
-            val activator = factor.linearRow()?.activator ?: continue
-            if (activator != FactorRow.ALWAYS) activators[activator] = true
+        for (row in arithmeticRows) {
+            if (row.activator != LinearRow.ALWAYS) activators[row.activator] = true
+            for (k in 0 until row.size) {
+                if (Term.isBool(row.ref(k))) activators[Lit.variable(Term.lit(row.ref(k)))] = true
+            }
         }
     }
     private val root = SearchNode()
@@ -191,14 +198,14 @@ class ExactLiraSearchComponent(
             context::intUpperBound,
         )
         val comparison = current.nextComparison(model)
-        if (comparison >= 0) {
-            val clause = model.factors[comparison] as ComparisonClause
-            return clause.vars.indices.map { literal ->
+        if (comparison != null) {
+            val rows = model.factors[comparison.factor].linearRows
+            return rows.indices.map { literal ->
                 decision(current.withComparison(comparison, literal))
             }
         }
         val disequality = current.nextDisequality(model, bools)
-        if (disequality >= 0) {
+        if (disequality != null) {
             return listOf(
                 decision(current.withDirection(disequality, LinearOp.GE)),
                 decision(current.withDirection(disequality, LinearOp.LE)),
@@ -264,11 +271,7 @@ class ExactLiraSearchComponent(
 
     private fun decision(node: SearchNode): SearchDecision = SearchDecision.Theory(ExactLiraDecision(node))
 
-    private fun hasActiveExactConstraint(): Boolean = model.factors.any { factor ->
-        if (factor is ComparisonClause) return@any true
-        val row = factor.linearRow() ?: return@any false
-        row.activator == FactorRow.ALWAYS || bools[row.activator] != UNASSIGNED
-    }
+    private fun hasActiveExactConstraint(): Boolean = arithmeticRows.any { it.truthUnder(bools) != null }
 
     private fun partialExplanation(): SearchExplanation = SearchExplanation(
         bools.indices.mapNotNull { variable ->
@@ -302,15 +305,15 @@ private class ExactIntegerSearch(
             if (cancellation()) return IntegerSearchResult.Cancelled
             val node = stack.removeLast()
             val comparison = node.nextComparison(model)
-            if (comparison >= 0) {
-                val clause = model.factors[comparison] as ComparisonClause
-                for (literal in clause.vars.indices.reversed()) {
+            if (comparison != null) {
+                val rows = model.factors[comparison.factor].linearRows
+                for (literal in rows.indices.reversed()) {
                     stack.addLast(node.withComparison(comparison, literal))
                 }
                 continue
             }
             val disequality = node.nextDisequality(model, bools)
-            if (disequality >= 0) {
+            if (disequality != null) {
                 stack.addLast(node.withDirection(disequality, LinearOp.GE))
                 stack.addLast(node.withDirection(disequality, LinearOp.LE))
                 continue
@@ -380,10 +383,13 @@ private fun IntArray.toCompleteValues(): BooleanArray = BooleanArray(size) { var
     }
 }
 
-private fun FactorRow.truthUnder(bools: IntArray): Boolean? = if (activator == FactorRow.ALWAYS) {
-    true
-} else {
-    when (bools[activator]) {
+private fun LinearRow.truthUnder(bools: IntArray): Boolean? {
+    for (k in 0 until size) {
+        val reference = ref(k)
+        if (Term.isBool(reference) && bools[Lit.variable(Term.lit(reference))] == UNASSIGNED) return null
+    }
+    if (activator == LinearRow.ALWAYS) return true
+    return when (bools[activator]) {
         TRUE -> true
         FALSE -> false
         else -> null
@@ -487,24 +493,25 @@ private class ExactLiraReductionCache(private val model: Problem) {
             model.realLower[real].takeIf(Double::isFinite)?.let { rows += exactColumnLower(real, it.asFraction()) }
             model.realUpper[real].takeIf(Double::isFinite)?.let { rows += exactColumnUpper(real, it.asFraction()) }
         }
-        for ((index, factor) in model.factors.withIndex()) {
-            val comparison = if (factor is ComparisonClause) {
-                factor.exactComparison(model.numRealVars, node.comparisonChoices[index] ?: return null)
+        val complete = node.forEachSelectedRow(model) { factor, index, row ->
+            val truth = row.truthUnder(bools) ?: return@forEachSelectedRow
+            val comparison = row.exactComparison(model.numRealVars, truth) { bools[it] == TRUE }
+            val direction = if (comparison.op == LinearOp.NE) {
+                node.disequalityDirections[RowAddress(factor, index)]
             } else {
-                val row = factor.linearRow() ?: continue
-                row.exactComparison(model.numRealVars, row.truthUnder(bools) ?: continue)
+                null
             }
-            comparison.rowsInto(rows, node.disequalityDirections[index])
+            comparison.rowsInto(rows, direction)
         }
-        return rows
+        return rows.takeIf { complete }
     }
 }
 
 private data class ExactLiraReductionKey(
     val bools: List<Int>,
     val branches: List<IntegerBranch>,
-    val comparisons: List<Pair<Int, Int>>,
-    val directions: List<Pair<Int, LinearOp>>,
+    val comparisons: List<Pair<RowAddress, Int>>,
+    val directions: List<Pair<RowAddress, LinearOp>>,
 )
 
 /**
@@ -664,7 +671,7 @@ private fun ExactMixedBoundedRow.asLower(): ExactRationalInequality {
     )
 }
 
-private fun ExactRationalInequality.overFreeColumns(variables: Int): ExactRationalInequality {
+internal fun ExactRationalInequality.overFreeColumns(variables: Int): ExactRationalInequality {
     val terms = ArrayList<Pair<Int, BigFraction>>(columns.size * 2)
     for (entry in columns.indices) {
         terms.add(columns[entry] to coefficients[entry])
@@ -692,13 +699,16 @@ private data class IntegerLinearBranch(
         variables.contentEquals(other.variables) && coefficients.contentEquals(other.coefficients)
 }
 
+private data class RowAddress(val factor: Int, val row: Int) : Comparable<RowAddress> {
+    override fun compareTo(other: RowAddress): Int = compareValuesBy(this, other, RowAddress::factor, RowAddress::row)
+}
+
 private data class SearchNode(
     val branches: List<IntegerBranch> = emptyList(),
     val reducedBranches: List<IntegerBranch> = emptyList(),
     val transformedBranches: List<IntegerLinearBranch> = emptyList(),
-    val comparisonChoices: Map<Int, Int> = emptyMap(),
-    val disequalityDirections: Map<Int, LinearOp> = emptyMap(),
-    val cuts: List<ExactGmiCut> = emptyList(),
+    val comparisonChoices: Map<RowAddress, Int> = emptyMap(),
+    val disequalityDirections: Map<RowAddress, LinearOp> = emptyMap(),
 ) {
     fun withBranch(branch: IntegerBranch): SearchNode {
         val existing = branches.indexOfFirst { it.variable == branch.variable }
@@ -740,35 +750,38 @@ private data class SearchNode(
         },
     )
 
-    fun withComparison(factor: Int, literal: Int): SearchNode =
+    fun withComparison(factor: RowAddress, literal: Int): SearchNode =
         copy(comparisonChoices = comparisonChoices + (factor to literal))
 
-    fun withDirection(factor: Int, direction: LinearOp): SearchNode =
+    fun withDirection(factor: RowAddress, direction: LinearOp): SearchNode =
         copy(disequalityDirections = disequalityDirections + (factor to direction))
 
-    fun withCut(cut: ExactGmiCut): SearchNode = copy(cuts = cuts + cut)
+    fun nextComparison(model: Problem): RowAddress? = model.factors.indices.firstOrNull { index ->
+        model.factors[index].linearForm is LinearForm.Disjunction &&
+            RowAddress(index, 0) !in comparisonChoices
+    }?.let { RowAddress(it, 0) }
 
-    fun nextComparison(model: Problem): Int {
-        for (index in model.factors.indices) {
-            if (model.factors[index] is ComparisonClause && index !in comparisonChoices) return index
+    inline fun forEachSelectedRow(model: Problem, action: (Int, Int, LinearRow) -> Unit): Boolean {
+        for ((index, factor) in model.factors.withIndex()) {
+            val rows = factor.linearRows
+            if (factor.linearForm is LinearForm.Disjunction) {
+                val selected = comparisonChoices[RowAddress(index, 0)] ?: return false
+                action(index, selected, rows[selected])
+            } else {
+                for (rowIndex in rows.indices) action(index, rowIndex, rows[rowIndex])
+            }
         }
-        return -1
+        return true
     }
 
-    fun nextDisequality(model: Problem, bools: IntArray): Int {
-        for (index in model.factors.indices) {
-            if (index in disequalityDirections) continue
-            val comparison = model.factors[index] as? ComparisonClause
-            if (comparison != null) {
-                val literal = comparisonChoices[index] ?: continue
-                if (comparison.ops[literal] == LinearOp.NE) return index
-                continue
-            }
-            val row = model.factors[index].linearRow() ?: continue
-            val truth = row.truthUnder(bools) ?: continue
-            if ((if (truth) row.op else row.op.complemented()) == LinearOp.NE) return index
+    fun nextDisequality(model: Problem, bools: IntArray): RowAddress? {
+        forEachSelectedRow(model) { factor, index, row ->
+            val truth = row.truthUnder(bools) ?: return@forEachSelectedRow
+            if ((if (truth) row.relation else row.relation.complemented()) != LinearOp.NE) return@forEachSelectedRow
+            val address = RowAddress(factor, index)
+            if (address !in disequalityDirections) return address
         }
-        return -1
+        return null
     }
 }
 
@@ -803,585 +816,9 @@ private fun SearchNode.withPublishedBounds(
 
 private data class ExactLiraDecision(val node: SearchNode) : SearchTheoryDecision
 
-@Suppress("UnusedPrivateClass")
-private class QfLiraSystem(private val model: Problem) {
-    fun build(bools: IntArray, node: SearchNode, cancellation: Cancellation): QfLiraLeaf? {
-        val builder = LpBuilder()
-        // Split every source column as p - n. Both halves use true open-above columns rather than
-        // the LP probe box: an exact infeasibility proof must never rest on an invented frontier.
-        val intsPositive = IntArray(model.numIntVars) { builder.addOpenAboveVar(0L) }
-        val intsNegative = IntArray(model.numIntVars) { builder.addOpenAboveVar(0L) }
-        val realsPositive = IntArray(model.numRealVars) { builder.addOpenAboveVar(0L) }
-        val realsNegative = IntArray(model.numRealVars) { builder.addOpenAboveVar(0L) }
-        val constants = BigConstantEncoder(builder, cancellation)
-        for (integer in 0 until model.numIntVars) {
-            if (cancellation()) return null
-            model.intBounds.lowerOrNull(integer)?.let(BigInteger::fromLong)?.let { lower ->
-                if (!constants.addBound(intsPositive[integer], intsNegative[integer], Relation.GE, lower)) return null
-            }
-            model.intBounds.upperOrNull(integer)?.let(BigInteger::fromLong)?.let { upper ->
-                if (!constants.addBound(intsPositive[integer], intsNegative[integer], Relation.LE, upper)) return null
-            }
-        }
-        for (real in 0 until model.numRealVars) {
-            if (cancellation()) return null
-            model.realLower[real].takeIf(Double::isFinite)?.let { lower ->
-                builder.addRealRow(
-                    intArrayOf(realsPositive[real], realsNegative[real]),
-                    doubleArrayOf(1.0, -1.0),
-                    Relation.GE,
-                    lower,
-                )
-            }
-            model.realUpper[real].takeIf(Double::isFinite)?.let { upper ->
-                builder.addRealRow(
-                    intArrayOf(realsPositive[real], realsNegative[real]),
-                    doubleArrayOf(1.0, -1.0),
-                    Relation.LE,
-                    upper,
-                )
-            }
-        }
-        for (branch in node.branches) {
-            if (cancellation()) return null
-            if (branch.lower != null) {
-                if (!constants.addBound(
-                        intsPositive[branch.variable],
-                        intsNegative[branch.variable],
-                        Relation.GE,
-                        branch.lower,
-                    )
-                ) {
-                    return null
-                }
-            }
-            if (branch.upper != null) {
-                if (!constants.addBound(
-                        intsPositive[branch.variable],
-                        intsNegative[branch.variable],
-                        Relation.LE,
-                        branch.upper,
-                    )
-                ) {
-                    return null
-                }
-            }
-        }
-        for (branch in node.transformedBranches) {
-            if (cancellation()) return null
-            if (branch.lower != null) {
-                if (!addIntegerCombinationBound(
-                        builder,
-                        intsPositive,
-                        intsNegative,
-                        constants,
-                        branch.variables,
-                        Array(branch.coefficients.size) { index -> branch.coefficients[index].negate() },
-                        Relation.LE,
-                        branch.lower.negate(),
-                    )
-                ) {
-                    return null
-                }
-            }
-            if (branch.upper != null) {
-                if (!addIntegerCombinationBound(
-                        builder,
-                        intsPositive,
-                        intsNegative,
-                        constants,
-                        branch.variables,
-                        branch.coefficients,
-                        Relation.LE,
-                        branch.upper,
-                    )
-                ) {
-                    return null
-                }
-            }
-        }
-        // Every linear shape states its row the same way; only whether a Boolean gates it differs, and
-        // an ungated row is read as one whose activator is true.
-        for ((index, factor) in model.factors.withIndex()) {
-            if (cancellation()) return null
-            if (factor is ComparisonClause) {
-                val literal = requireNotNull(node.comparisonChoices[index]) {
-                    "comparison clause must be selected before exact feasibility"
-                }
-                if (!addComparison(
-                        intsPositive,
-                        intsNegative,
-                        constants,
-                        factor.vars[literal],
-                        factor.ops[literal],
-                        factor.consts[literal],
-                        node.disequalityDirections[index],
-                    )
-                ) {
-                    return null
-                }
-                continue
-            }
-            val row = factor.linearRow() ?: continue
-            val truth = row.truthUnder(bools) ?: continue
-            val direction = node.disequalityDirections[index]
-            when (row) {
-                is FactorRow.Wide -> if (!addWide(
-                        builder, intsPositive, intsNegative, constants, row.intVars,
-                        row.coefficients, if (truth) row.op else row.op.complemented(), row.bound, direction,
-                    )
-                ) {
-                    return null
-                }
-
-                is FactorRow.Doubles -> addReified(
-                    builder = builder,
-                    intsPositive = intsPositive,
-                    intsNegative = intsNegative,
-                    realsPositive = realsPositive,
-                    realsNegative = realsNegative,
-                    intVars = row.intVars,
-                    intCoeffs = row.intCoeffs,
-                    realVars = row.realVars,
-                    realCoeffs = row.realCoeffs,
-                    op = row.op,
-                    bound = row.bound,
-                    strict = row.strict,
-                    truth = truth,
-                    disequalityDirection = direction,
-                    hasReals = row.realVars.isNotEmpty(),
-                )
-            }
-        }
-        for (cut in node.cuts) {
-            if (cancellation()) return null
-            builder.addRealRow(cut.columns, cut.coefficients, Relation.GE, cut.rhs)
-        }
-        return QfLiraLeaf(builder.build(Sense.MINIMIZE), intsPositive, intsNegative, realsPositive, realsNegative)
-    }
-
-    private fun addComparison(
-        positive: IntArray,
-        negative: IntArray,
-        constants: BigConstantEncoder,
-        variable: Int,
-        op: LinearOp,
-        bound: Long,
-        direction: LinearOp?,
-    ): Boolean {
-        val (actualOp, actualBound) = lowerWideDisequality(op, BigInteger.fromLong(bound), direction)
-        return constants.addBound(
-            positive[variable],
-            negative[variable],
-            when (actualOp) {
-                LinearOp.LE -> Relation.LE
-                LinearOp.GE -> Relation.GE
-                LinearOp.EQ -> Relation.EQ
-                LinearOp.NE -> error("comparison disequality must be directed")
-            },
-            actualBound,
-        )
-    }
-
-    private fun addReified(
-        builder: LpBuilder,
-        intsPositive: IntArray,
-        intsNegative: IntArray,
-        realsPositive: IntArray,
-        realsNegative: IntArray,
-        intVars: IntArray,
-        intCoeffs: DoubleArray,
-        realVars: IntArray,
-        realCoeffs: DoubleArray,
-        op: LinearOp,
-        bound: Double,
-        strict: Boolean,
-        truth: Boolean,
-        disequalityDirection: LinearOp?,
-        hasReals: Boolean,
-    ) {
-        val actualOp = if (truth) {
-            op
-        } else {
-            when (op) {
-                LinearOp.LE -> LinearOp.GE
-                LinearOp.GE -> LinearOp.LE
-                LinearOp.EQ -> LinearOp.NE
-                LinearOp.NE -> LinearOp.EQ
-            }
-        }
-        val (rel, rhs, actualStrict) = lowerDisequality(
-            actualOp,
-            bound,
-            if (truth) strict else !strict,
-            disequalityDirection,
-            hasReals,
-        )
-        add(
-            builder,
-            intsPositive,
-            intsNegative,
-            realsPositive,
-            realsNegative,
-            intVars,
-            intCoeffs,
-            realVars,
-            realCoeffs,
-            rel,
-            rhs,
-            actualStrict,
-        )
-    }
-
-    private fun addWide(
-        builder: LpBuilder,
-        positive: IntArray,
-        negative: IntArray,
-        constants: BigConstantEncoder,
-        variables: IntArray,
-        coefficients: Array<BigInteger>,
-        op: LinearOp,
-        bound: BigInteger,
-        direction: LinearOp?,
-    ): Boolean {
-        val (relation, rhs) = lowerWideDisequality(op, bound, direction)
-        val columns = ArrayList<Int>()
-        val values = ArrayList<Double>()
-        for (index in variables.indices) {
-            if (!constants.appendProduct(coefficients[index], positive[variables[index]], columns, values, 1.0)) {
-                return false
-            }
-            if (!constants.appendProduct(coefficients[index], negative[variables[index]], columns, values, -1.0)) {
-                return false
-            }
-        }
-        if (!constants.appendConstant(-rhs, columns, values)) return false
-        builder.addRealRow(columns.toIntArray(), values.toDoubleArray(), relation(relation), 0.0)
-        return true
-    }
-
-    private fun addIntegerCombinationBound(
-        builder: LpBuilder,
-        positive: IntArray,
-        negative: IntArray,
-        constants: BigConstantEncoder,
-        variables: IntArray,
-        coefficients: Array<BigInteger>,
-        relation: Relation,
-        bound: BigInteger,
-    ): Boolean {
-        val columns = ArrayList<Int>()
-        val values = ArrayList<Double>()
-        for (index in variables.indices) {
-            if (!constants.appendProduct(coefficients[index], positive[variables[index]], columns, values, 1.0)) {
-                return false
-            }
-            if (!constants.appendProduct(coefficients[index], negative[variables[index]], columns, values, -1.0)) {
-                return false
-            }
-        }
-        if (!constants.appendConstant(-bound, columns, values)) return false
-        builder.addRealRow(columns.toIntArray(), values.toDoubleArray(), relation, 0.0)
-        return true
-    }
-
-    private fun add(
-        builder: LpBuilder,
-        intsPositive: IntArray,
-        intsNegative: IntArray,
-        realsPositive: IntArray,
-        realsNegative: IntArray,
-        intVars: IntArray,
-        intCoeffs: DoubleArray,
-        realVars: IntArray,
-        realCoeffs: DoubleArray,
-        op: LinearOp,
-        bound: Double,
-        strict: Boolean,
-    ) {
-        require(op != LinearOp.NE) { "QF_LIRA disequality must be lowered before exact feasibility" }
-        val columns = IntArray(2 * (intVars.size + realVars.size))
-        val values = DoubleArray(columns.size)
-        for (i in intVars.indices) {
-            columns[2 * i] = intsPositive[intVars[i]]
-            values[2 * i] = intCoeffs[i]
-            columns[2 * i + 1] = intsNegative[intVars[i]]
-            values[2 * i + 1] = -intCoeffs[i]
-        }
-        for (i in realVars.indices) {
-            val offset = 2 * (intVars.size + i)
-            columns[offset] = realsPositive[realVars[i]]
-            values[offset] = realCoeffs[i]
-            columns[offset + 1] = realsNegative[realVars[i]]
-            values[offset + 1] = -realCoeffs[i]
-        }
-        builder.addRealRow(columns, values, relation(op), bound, strict)
-    }
-
-    // A wide row is added to the theory through its exact constants ([addWide]), never through these
-    // double readings.
-    private fun lowerDisequality(
-        op: LinearOp,
-        bound: Double,
-        strict: Boolean,
-        direction: LinearOp?,
-        hasReals: Boolean,
-    ): Triple<LinearOp, Double, Boolean> = if (op == LinearOp.NE) {
-        when (requireNotNull(direction) { "integer disequality direction is missing" }) {
-            LinearOp.LE -> if (hasReals) {
-                Triple(LinearOp.LE, bound, true)
-            } else {
-                Triple(LinearOp.LE, bound - 1.0, false)
-            }
-
-            LinearOp.GE -> if (hasReals) {
-                Triple(LinearOp.GE, bound, true)
-            } else {
-                Triple(LinearOp.GE, bound + 1.0, false)
-            }
-
-            else -> error("integer disequality direction must be an inequality")
-        }
-    } else {
-        Triple(op, bound, strict)
-    }
-
-    private fun relation(op: LinearOp): Relation = when (op) {
-        LinearOp.LE -> Relation.LE
-        LinearOp.GE -> Relation.GE
-        LinearOp.EQ -> Relation.EQ
-        LinearOp.NE -> error("checked by add")
-    }
-}
-
-private fun lowerWideDisequality(op: LinearOp, bound: BigInteger, direction: LinearOp?): Pair<LinearOp, BigInteger> =
-    if (op == LinearOp.NE) {
-        when (requireNotNull(direction) { "wide integer disequality direction is missing" }) {
-            LinearOp.LE -> LinearOp.LE to (bound - BigInteger.ONE)
-            LinearOp.GE -> LinearOp.GE to (bound + BigInteger.ONE)
-            else -> error("wide integer disequality direction must be an inequality")
-        }
-    } else {
-        op to bound
-    }
-
-private class QfLiraLeaf(
-    val model: com.eignex.klause.lp.engine.LpModel,
-    val integerPositive: IntArray,
-    val integerNegative: IntArray,
-    val realPositive: IntArray,
-    val realNegative: IntArray,
-) {
-    fun value(witness: List<BigFraction>, positive: Int, negative: Int): BigFraction =
-        witness[positive] - witness[negative]
-
-    fun value(witness: List<BigFraction>, branch: IntegerLinearBranch): BigFraction =
-        branch.variables.indices.fold(BigFraction.ZERO) { sum, index ->
-            sum + BigFraction.of(branch.coefficients[index], BigInteger.ONE) *
-                value(witness, integerPositive[branch.variables[index]], integerNegative[branch.variables[index]])
-        }
-
-    fun gmiCut(tableau: List<BigRationalTableauRow>?): ExactGmiCut? {
-        if (model.rowStrict.any { it }) return null
-        val integral = BooleanArray(model.n)
-        for (column in integerPositive) integral[column] = true
-        for (column in integerNegative) integral[column] = true
-        for (row in tableau.orEmpty()) {
-            if (row.basic !in 0 until model.n || !integral[row.basic]) continue
-            val fraction = row.rhs.fractionalPart()
-            if (fraction.isZero) continue
-            val coefficients = ArrayList<BigFraction>()
-            val columns = ArrayList<Int>()
-            for (index in row.columns.indices) {
-                val column = row.columns[index]
-                val coefficient = if (column < model.n && integral[column]) {
-                    row.coefficients[index].fractionalPart()
-                } else {
-                    row.coefficients[index].mixedIntegerCoefficient(fraction)
-                }
-                if (!coefficient.isZero) {
-                    columns.add(column)
-                    coefficients.add(coefficient)
-                }
-            }
-            val projected = projectSlacks(columns, coefficients, fraction) ?: continue
-            ExactGmiCut.from(projected)?.let { return it }
-        }
-        return null
-    }
-
-    private fun projectSlacks(columns: List<Int>, coefficients: List<BigFraction>, rhs: BigFraction): ExactCutRow? {
-        val terms = HashMap<Int, BigFraction>()
-        var cutRhs = rhs
-        for (index in columns.indices) {
-            val column = columns[index]
-            val coefficient = coefficients[index]
-            if (column < model.n) {
-                terms.add(column, coefficient)
-                continue
-            }
-            val row = column - model.n
-            if (model.hasUpper[column] && model.upper[column] == 0L) continue
-            cutRhs -= coefficient * requireNotNull(BigFraction.ofDouble(model.rhsD(row)))
-            for (sourceColumn in 0 until model.n) {
-                model.forEachInColumnD(sourceColumn) { sourceRow, value ->
-                    if (sourceRow == row) {
-                        terms.add(sourceColumn, coefficient * requireNotNull(BigFraction.ofDouble(value)).negated())
-                    }
-                }
-            }
-        }
-        val ordered = terms.entries.filter { !it.value.isZero }.sortedBy { it.key }
-        return ExactCutRow(
-            ordered.map { it.key }.toIntArray(),
-            ordered.map { it.value },
-            cutRhs,
-        )
-    }
-}
-
-private class ExactGmiCut(val columns: IntArray, val coefficients: DoubleArray, val rhs: Double) {
-    fun sameAs(other: ExactGmiCut): Boolean =
-        columns.contentEquals(other.columns) && coefficients.contentEquals(other.coefficients) && rhs == other.rhs
-
-    companion object {
-        fun from(row: ExactCutRow): ExactGmiCut? {
-            val rhs = row.rhs.exactDoubleOrNull() ?: return null
-            val coefficients = DoubleArray(row.coefficients.size)
-            for (index in coefficients.indices) {
-                coefficients[index] = row.coefficients[index].exactDoubleOrNull() ?: return null
-            }
-            return ExactGmiCut(row.columns, coefficients, rhs)
-        }
-    }
-}
-
-private class ExactCutRow(val columns: IntArray, val coefficients: List<BigFraction>, val rhs: BigFraction)
-
-private fun BigFraction.fractionalPart(): BigFraction = this - BigFraction.of(floor(), BigInteger.ONE)
-
-private fun BigFraction.mixedIntegerCoefficient(fraction: BigFraction): BigFraction = if (signum() >= 0) {
-    this
-} else {
-    BigFraction.of(fraction.num, fraction.den - fraction.num) * negated()
-}
-
-private fun BigFraction.exactDoubleOrNull(): Double? {
-    val value = toDouble()
-    return value.takeIf { it.isFinite() && BigFraction.ofDouble(it) == this }
-}
-
-private class BigConstantEncoder(private val builder: LpBuilder, private val cancellation: Cancellation) {
-    private val base = BigInteger.ONE shl 40
-    private val columns = ArrayList<Int>()
-    private val scaledColumns = HashMap<Int, ArrayList<Int>>()
-
-    fun addBound(positive: Int, negative: Int, relation: Relation, bound: BigInteger): Boolean {
-        val rowColumns = arrayListOf(positive, negative)
-        val rowValues = arrayListOf(1.0, -1.0)
-        if (!appendConstant(-bound, rowColumns, rowValues)) return false
-        builder.addRealRow(rowColumns.toIntArray(), rowValues.toDoubleArray(), relation, 0.0)
-        return true
-    }
-
-    fun appendProduct(
-        coefficient: BigInteger,
-        column: Int,
-        targetColumns: MutableList<Int>,
-        targetValues: MutableList<Double>,
-        multiplier: Double,
-    ): Boolean {
-        val digits = digits(coefficient) ?: return false
-        for ((digit, value) in digits.withIndex()) {
-            if (cancellation()) return false
-            if (value.isZero()) continue
-            targetColumns.add(scaled(column, digit) ?: return false)
-            targetValues.add(multiplier * value.longValue().toDouble())
-        }
-        return true
-    }
-
-    fun appendConstant(value: BigInteger, targetColumns: MutableList<Int>, targetValues: MutableList<Double>): Boolean {
-        val digits = digits(value) ?: return false
-        if (!ensureDigits(digits.size)) return false
-        for ((digit, part) in digits.withIndex()) {
-            if (cancellation()) return false
-            if (part.isZero()) continue
-            targetColumns.add(columns[digit])
-            targetValues.add(part.longValue().toDouble())
-        }
-        return true
-    }
-
-    private fun ensureDigits(needed: Int): Boolean {
-        while (columns.size < needed) {
-            if (cancellation()) return false
-            val column = builder.addOpenAboveVar(0L)
-            if (columns.isEmpty()) {
-                builder.addRealRow(intArrayOf(column), doubleArrayOf(1.0), Relation.EQ, 1.0)
-            } else {
-                builder.addRealRow(
-                    intArrayOf(column, columns.last()),
-                    doubleArrayOf(1.0, -(1L shl 40).toDouble()),
-                    Relation.EQ,
-                    0.0,
-                )
-            }
-            columns.add(column)
-        }
-        return true
-    }
-
-    private fun digits(value: BigInteger): List<BigInteger>? {
-        var remaining = value.abs()
-        val sign = if (value < BigInteger.ZERO) -BigInteger.ONE else BigInteger.ONE
-        val result = ArrayList<BigInteger>()
-        do {
-            if (cancellation()) return null
-            result.add((remaining % base) * sign)
-            remaining /= base
-        } while (remaining != BigInteger.ZERO)
-        return result
-    }
-
-    private fun scaled(column: Int, exponent: Int): Int? {
-        val chain = scaledColumns.getOrPut(column) { arrayListOf(column) }
-        while (chain.size <= exponent) {
-            if (cancellation()) return null
-            val next = builder.addOpenAboveVar(0L)
-            builder.addRealRow(
-                intArrayOf(next, chain.last()),
-                doubleArrayOf(1.0, -(1L shl 40).toDouble()),
-                Relation.EQ,
-                0.0,
-            )
-            chain.add(next)
-        }
-        return chain[exponent]
-    }
-}
-
 private fun BigFraction.isInteger(): Boolean = den == BigInteger.ONE
 
 private fun BigFraction.floor(): BigInteger {
     val quotient = num / den
     return if (num < BigInteger.ZERO && num % den != BigInteger.ZERO) quotient - BigInteger.ONE else quotient
-}
-
-private fun IntBounds.lowerOrNull(variable: Int): Long? = if (hasLower(
-        variable,
-    )
-) {
-    lower(variable)
-} else {
-    null
-}
-
-private fun IntBounds.upperOrNull(variable: Int): Long? = if (hasUpper(
-        variable,
-    )
-) {
-    upper(variable)
-} else {
-    null
 }
