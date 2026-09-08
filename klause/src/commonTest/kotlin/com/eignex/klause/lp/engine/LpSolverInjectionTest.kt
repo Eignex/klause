@@ -1,0 +1,190 @@
+package com.eignex.klause.lp.engine
+
+import com.eignex.klause.util.Cancellation
+import kotlin.test.Test
+import kotlin.test.assertContentEquals
+import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertIs
+import kotlin.test.assertSame
+import kotlin.test.assertTrue
+
+internal enum class EngineConstruction { GENERAL, COMPONENT, TABLEAU, PERSISTENT }
+
+internal data class EngineConstructionCall(
+    val kind: EngineConstruction,
+    val iterationLimit: Int = 0,
+    val workLimit: Long = 0L,
+    val refactorUpdateLimit: Int = 0,
+    val trackDegeneracy: Boolean = false,
+)
+
+internal class RecordingLpEngineFactory(private val delegate: LpEngineFactory = ProductionLpEngineFactory) :
+    LpEngineFactory {
+    val calls = ArrayList<EngineConstructionCall>()
+
+    override fun newGeneralSolver(model: LpModel, cancellation: Cancellation): LpSolver {
+        calls += EngineConstructionCall(EngineConstruction.GENERAL)
+        return delegate.newGeneralSolver(model, cancellation)
+    }
+
+    override fun newComponentSolver(
+        model: LpModel,
+        parts: List<LpNeighborhood>,
+        solvers: List<LpSolver>,
+        isolated: IntArray,
+    ): LpSolver {
+        calls += EngineConstructionCall(EngineConstruction.COMPONENT)
+        return delegate.newComponentSolver(model, parts, solvers, isolated)
+    }
+
+    override fun newTableauSolver(
+        model: LpModel,
+        cancellation: Cancellation,
+        iterationLimit: Int,
+        workLimit: Long,
+        trackDegeneracy: Boolean,
+    ): TableauCutSolver {
+        calls += EngineConstructionCall(
+            EngineConstruction.TABLEAU,
+            iterationLimit = iterationLimit,
+            workLimit = workLimit,
+            trackDegeneracy = trackDegeneracy,
+        )
+        return delegate.newTableauSolver(model, cancellation, iterationLimit, workLimit, trackDegeneracy)
+    }
+
+    override fun newPersistentSolver(
+        model: LpModel,
+        cancellation: Cancellation,
+        refactorUpdateLimit: Int,
+        iterationLimit: Int,
+        workLimit: Long,
+        trackDegeneracy: Boolean,
+    ): PersistentLpSolver {
+        calls += EngineConstructionCall(
+            EngineConstruction.PERSISTENT,
+            iterationLimit = iterationLimit,
+            workLimit = workLimit,
+            refactorUpdateLimit = refactorUpdateLimit,
+            trackDegeneracy = trackDegeneracy,
+        )
+        return delegate.newPersistentSolver(
+            model,
+            cancellation,
+            refactorUpdateLimit,
+            iterationLimit,
+            workLimit,
+            trackDegeneracy,
+        )
+    }
+}
+
+private class SolveRecordingObserver : LpCertificationObserver {
+    val solves = ArrayList<Pair<LpSolveMetrics, Boolean>>()
+
+    override fun observe(certifier: LpCertifier, success: Boolean) = Unit
+
+    override fun observeExactInput(accepted: Boolean) = Unit
+
+    override fun observeSolve(metrics: LpSolveMetrics, component: Boolean) {
+        solves += metrics to component
+    }
+}
+
+class LpSolverInjectionTest {
+
+    @Test
+    fun `explicit production dependencies preserve result proof and metrics`() {
+        val builder = LpBuilder()
+        val x = builder.addVar(0L, 8L, cost = 2L)
+        builder.addRow(intArrayOf(x), longArrayOf(1L), Relation.GE, 3L)
+        val model = builder.build(Sense.MINIMIZE)
+        val defaultObserver = SolveRecordingObserver()
+        val explicitObserver = SolveRecordingObserver()
+
+        val baseline = solveAndCertify(model, observer = defaultObserver)
+        val explicit = solveAndCertify(
+            model,
+            observer = explicitObserver,
+            context = LpSolveContext(ProductionLpEngineFactory, ProductionLpCertificationPolicy),
+        )
+
+        assertEquals(baseline.verdict, explicit.verdict)
+        assertEquals(baseline.exactLowerBound, explicit.exactLowerBound)
+        assertEquals(baseline.float?.objective, explicit.float?.objective)
+        assertContentEquals(baseline.float?.basis?.basicVars, explicit.float?.basis?.basicVars)
+        assertContentEquals(baseline.farkasRay, explicit.farkasRay)
+        assertEquals(defaultObserver.solves, explicitObserver.solves)
+    }
+
+    @Test
+    fun `factory receives general component persistent and tableau construction`() {
+        val builder = LpBuilder()
+        val x = builder.addVar(0L, 4L, cost = 1L)
+        val y = builder.addVar(0L, 4L, cost = 1L)
+        builder.addRow(intArrayOf(x), longArrayOf(1L), Relation.GE, 1L)
+        builder.addRow(intArrayOf(y), longArrayOf(1L), Relation.GE, 2L)
+        val model = builder.build(Sense.MINIMIZE)
+        val factory = RecordingLpEngineFactory()
+
+        newLpSolver(model, factory = factory).close()
+        newTableauCutSolver(
+            model,
+            iterationLimit = 17,
+            workLimit = 1234L,
+            trackDegeneracy = true,
+            factory = factory,
+        ).close()
+        newPersistentLpSolver(
+            model,
+            refactorUpdateLimit = 71,
+            iterationLimit = 19,
+            workLimit = 4321L,
+            trackDegeneracy = true,
+            factory = factory,
+        ).use {
+            assertIs<PersistentLpSolver>(it)
+        }
+
+        assertEquals(2, factory.calls.count { it.kind == EngineConstruction.GENERAL })
+        assertEquals(1, factory.calls.count { it.kind == EngineConstruction.COMPONENT })
+        assertTrue(factory.calls.any { it == EngineConstructionCall(EngineConstruction.TABLEAU, 17, 1234L, 0, true) })
+        assertTrue(
+            factory.calls.any {
+                it == EngineConstructionCall(EngineConstruction.PERSISTENT, 19, 4321L, 71, true)
+            },
+        )
+    }
+
+    @Test
+    fun `thrown solve closes the injected solver and preserves cancellation`() {
+        val model = LpBuilder().apply { addVar(0L, 1L) }.build(Sense.MINIMIZE)
+        var closed = false
+        val token = Cancellation { true }
+        val solver = object : LpSolver {
+            override fun solve(warm: Basis?): FloatLpResult? = error("injected solve failure")
+            override fun solvePrimal(warm: Basis?): FloatLpResult? = null
+            override val infeasibleRay: DoubleArray? = null
+            override fun close() {
+                closed = true
+            }
+        }
+        val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+            override fun newGeneralSolver(model: LpModel, cancellation: Cancellation): LpSolver {
+                assertSame(token, cancellation)
+                return solver
+            }
+        }
+
+        assertFailsWith<IllegalStateException> {
+            solveAndCertify(
+                model,
+                cancellation = token,
+                componentSplit = false,
+                context = LpSolveContext(engineFactory = factory),
+            )
+        }
+        assertTrue(closed)
+    }
+}

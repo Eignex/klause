@@ -223,11 +223,17 @@ internal fun newLpSolver(
     model: LpModel,
     cancellation: Cancellation = Cancellation.Never,
     componentSplit: Boolean = true,
+    factory: LpEngineFactory = ProductionLpEngineFactory,
 ): LpSolver {
     if (componentSplit) {
-        componentLpSolverOrNull(model, cancellation, ::monolithicLpSolver)?.let { return it }
+        componentLpSolverOrNull(
+            model,
+            cancellation,
+            factory::newGeneralSolver,
+            factory::newComponentSolver,
+        )?.let { return it }
     }
-    return monolithicLpSolver(model, cancellation)
+    return factory.newGeneralSolver(model, cancellation)
 }
 
 /**
@@ -244,13 +250,8 @@ internal fun newTableauCutSolver(
     iterationLimit: Int = 0,
     workLimit: Long = 0L,
     trackDegeneracy: Boolean = false,
-): TableauCutSolver = RevisedSimplex(
-    model,
-    cancellation,
-    iterationLimit = iterationLimit,
-    workLimit = workLimit,
-    trackDegeneracy = trackDegeneracy,
-)
+    factory: LpEngineFactory = ProductionLpEngineFactory,
+): TableauCutSolver = factory.newTableauSolver(model, cancellation, iterationLimit, workLimit, trackDegeneracy)
 
 /**
  * Construct an engine to keep across solves ([PersistentLpSolver]). Monolithic by construction: a
@@ -267,15 +268,12 @@ internal fun newPersistentLpSolver(
     iterationLimit: Int = 0,
     workLimit: Long = 0L,
     trackDegeneracy: Boolean = false,
-): PersistentLpSolver = RevisedSimplex(
+    factory: LpEngineFactory = ProductionLpEngineFactory,
+): PersistentLpSolver = factory.newPersistentSolver(
     model,
     cancellation,
-    refactorUpdateLimit = refactorUpdateLimit,
-    iterationLimit = iterationLimit,
-    workLimit = workLimit,
-    trackDegeneracy = trackDegeneracy,
+    refactorUpdateLimit,
+    iterationLimit,
+    workLimit,
+    trackDegeneracy,
 )
-
-/** The single-model engine selection [newLpSolver] and each decomposed block share. */
-private fun monolithicLpSolver(model: LpModel, cancellation: Cancellation): LpSolver =
-    RevisedSimplex(model, cancellation)

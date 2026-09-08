@@ -8,12 +8,13 @@ import com.eignex.klause.lp.engine.LpBuilder
 import com.eignex.klause.lp.engine.LpCertificationObserver
 import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.LpNeighborhood
+import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.lp.engine.Relation
 import com.eignex.klause.lp.engine.Sense
+import com.eignex.klause.lp.engine.certifiedTightVariableBound
 import com.eignex.klause.lp.engine.columnNeighborhood
 import com.eignex.klause.lp.engine.newLpSolver
 import com.eignex.klause.lp.engine.rowIndex
-import com.eignex.klause.lp.engine.tightVariableBound
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.CheckedLongOverflowException
 import com.eignex.klause.util.EmptyDoubleArray
@@ -79,6 +80,7 @@ internal class TightenedIntBounds(val bounds: Array<OpenIntBounds>, val refuted:
  * @param realLower per-real-variable declared lower bounds (`-inf` for open); indexed by real id.
  * @param realUpper per-real-variable declared upper bounds (`+inf` for open); indexed by real id.
  * @param observer optional sink for the probe's float and exact-bound certification attempts.
+ * @param context solver construction and proof-acceptance dependencies for this probe pass.
  * @return fresh bounds with every provable open side closed, or the prefilter's refutation of the system.
  */
 internal fun tightenOpenIntBounds(
@@ -89,6 +91,7 @@ internal fun tightenOpenIntBounds(
     realLower: DoubleArray = EmptyDoubleArray,
     realUpper: DoubleArray = EmptyDoubleArray,
     observer: LpCertificationObserver? = null,
+    context: LpSolveContext = LpSolveContext.Production,
 ): TightenedIntBounds {
     val n = bounds.size
     // Working real-variable bounds the prefilter tightens alongside the integers (outward-rounded, so
@@ -122,7 +125,7 @@ internal fun tightenOpenIntBounds(
     // derivable finite bounds instead of falling to the clamp.
     if (base.m > OBBT_MAX_LP_ROWS) {
         return TightenedIntBounds(
-            tightenByNeighborhoodProbes(base, work, posCol, negCol, cancellation, observer),
+            tightenByNeighborhoodProbes(base, work, posCol, negCol, cancellation, observer, context),
         )
     }
 
@@ -149,7 +152,7 @@ internal fun tightenOpenIntBounds(
             )
             prevPos = posCol[v]
             prevNeg = negCol[v]
-            val solver = newLpSolver(model, cancellation)
+            val solver = newLpSolver(model, cancellation, factory = context.engineFactory)
             val result = try {
                 solver.solvePrimal(warm)
             } catch (_: CheckedLongOverflowException) {
@@ -166,12 +169,13 @@ internal fun tightenOpenIntBounds(
                 // The open direction's probe: the upper probe of x⁺ when maximizing, of x⁻ (whose growth
                 // is x's descent) when minimizing an open-below variable.
                 val probeCol = if (maximize || negCol[v] < 0) posCol[v] else negCol[v]
-                val bound = model.tightVariableBound(
+                val bound = model.certifiedTightVariableBound(
                     result,
                     v,
                     maximize,
                     model.probeClampedHi[probeCol],
                     observer,
+                    context.certificationPolicy,
                 )
                 if (maximize) newHi = bound else newLo = bound
             }
@@ -196,6 +200,7 @@ private fun tightenByNeighborhoodProbes(
     negCol: IntArray,
     cancellation: Cancellation,
     observer: LpCertificationObserver?,
+    context: LpSolveContext,
 ): Array<OpenIntBounds> {
     val rowIndex = base.rowIndex()
     var solves = 0
@@ -213,7 +218,7 @@ private fun tightenByNeighborhoodProbes(
             if (if (maximize) cur.hi != null else cur.lo != null) continue
             solves++
             val model = nb.model.withSingleColumnObjective(p, if (maximize) -1L else 1L, prevCol = -1, negCol = q)
-            val solver = newLpSolver(model, cancellation)
+            val solver = newLpSolver(model, cancellation, factory = context.engineFactory)
             val result = try {
                 solver.solvePrimal(null)
             } catch (_: CheckedLongOverflowException) {
@@ -227,12 +232,13 @@ private fun tightenByNeighborhoodProbes(
             }
             if (result != null) {
                 val probeCol = if (maximize || q < 0) p else q
-                val bound = model.tightVariableBound(
+                val bound = model.certifiedTightVariableBound(
                     result,
                     p,
                     maximize,
                     model.probeClampedHi[probeCol],
                     observer,
+                    context.certificationPolicy,
                 )
                 if (maximize) newHi = bound else newLo = bound
             }

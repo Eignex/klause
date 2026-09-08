@@ -30,6 +30,7 @@ import com.eignex.klause.lp.engine.Cut
 import com.eignex.klause.lp.engine.LpBuilder
 import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.LpRowPremises
+import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.lp.engine.LpVerdict
 import com.eignex.klause.lp.engine.Relation
 import com.eignex.klause.lp.engine.Sense
@@ -287,6 +288,7 @@ internal fun leafRealFeasibility(
     cancellation: Cancellation = Cancellation.Never,
     componentSplit: Boolean = true,
     sink: LpStatsSink? = null,
+    context: LpSolveContext = LpSolveContext.Production,
 ): LeafRealResult {
     val relaxation = CpToLpRelaxation(problem, objective).build(SampleDomains(sample))
     // Bound the residual-LP solve by the search deadline: on a continuous-heavy model a single leaf LP is a
@@ -297,6 +299,7 @@ internal fun leafRealFeasibility(
         cancellation = cancellation,
         componentSplit = componentSplit,
         observer = sink?.certificationObserver(LpRoute.STANDALONE),
+        context = context,
     )
     certified.float?.let { sink?.observeComponentSplit(it.blocks) }
     if (certified.verdict != LpVerdict.OPTIMAL) return LeafRealResult(certified.verdict, EmptyDoubleArray)

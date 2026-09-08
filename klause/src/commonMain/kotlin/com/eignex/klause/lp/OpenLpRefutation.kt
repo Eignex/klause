@@ -2,6 +2,7 @@ package com.eignex.klause.lp
 
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.lp.engine.LpCertificationObserver
+import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.lp.engine.LpVerdict
 import com.eignex.klause.lp.engine.Sense
 import com.eignex.klause.lp.engine.solveAndCertify
@@ -33,6 +34,7 @@ internal fun openLpInfeasible(
     constraints: List<Linear>,
     cancellation: Cancellation = Cancellation.Never,
     observer: LpCertificationObserver? = null,
+    context: LpSolveContext = LpSolveContext.Production,
 ): Boolean {
     if (constraints.isEmpty()) return false
     // Nothing open ⇒ the ordinary search already decides the real model; this has nothing to add.
@@ -50,5 +52,10 @@ internal fun openLpInfeasible(
         return false
     }
     if (model.n == 0 || cancellation()) return false
-    return solveAndCertify(model, cancellation = cancellation, observer = observer).verdict == LpVerdict.INFEASIBLE
+    return solveAndCertify(
+        model,
+        cancellation = cancellation,
+        observer = observer,
+        context = context,
+    ).verdict == LpVerdict.INFEASIBLE
 }

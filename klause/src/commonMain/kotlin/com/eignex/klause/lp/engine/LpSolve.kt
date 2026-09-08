@@ -41,6 +41,7 @@ internal class CertifiedLpResult internal constructor(
      *  exists for a strictness-carried proof); null otherwise. */
     val infeasibleRows: IntArray? = null,
     private val componentExactLowerBound: Long? = null,
+    private val certificationPolicy: LpCertificationPolicy = ProductionLpCertificationPolicy,
 ) {
     /** The exact 128-bit integer lower bound `⌈optimum⌉` on the true objective, or null when the LP was
      *  not certified or the bound does not fit a `Long`. */
@@ -52,7 +53,7 @@ internal class CertifiedLpResult internal constructor(
     val safeLowerBound: Double? by lazy {
         val f = float ?: return@lazy null
         val m = model ?: return@lazy null
-        safeObjectiveLowerBound(m, f.duals)
+        certificationPolicy.acceptNullable(LpCertifier.SAFE_OBJECTIVE, safeObjectiveLowerBound(m, f.duals))
     }
 }
 
@@ -73,8 +74,10 @@ internal fun solveAndCertify(
     cancellation: Cancellation = Cancellation.Never,
     componentSplit: Boolean = true,
     observer: LpCertificationObserver? = null,
+    context: LpSolveContext = LpSolveContext.Production,
 ): CertifiedLpResult {
-    val solver = newLpSolver(model, cancellation, componentSplit)
+    val policy = context.certificationPolicy
+    val solver = newLpSolver(model, cancellation, componentSplit, context.engineFactory)
     return solver.use {
         val result = try {
             solver.solve(warm)
@@ -86,12 +89,15 @@ internal fun solveAndCertify(
             // Farkas certificate. Any other failure (non-convergence / singular) is indeterminate.
             val floatRay = solver.infeasibleRay
             val ray = if (floatRay != null) {
-                integerFarkasRay(
-                    model,
-                    floatRay,
-                    basis = solver.infeasibleBasis,
-                    basisRow = solver.infeasibleRow,
-                    observer = observer,
+                policy.acceptNullable(
+                    LpCertifier.EXACT_FARKAS,
+                    integerFarkasRay(
+                        model,
+                        floatRay,
+                        basis = solver.infeasibleBasis,
+                        basisRow = solver.infeasibleRow,
+                        observer = observer,
+                    ),
                 )
             } else {
                 null
@@ -103,13 +109,18 @@ internal fun solveAndCertify(
                     certificate = null,
                     farkasRay = ray,
                     model = null,
+                    certificationPolicy = policy,
                 )
             }
             val outcome = rationalOutcome(model, cancellation).also {
                 observer?.observe(LpCertifier.RATIONAL, it.feasibility != RationalFeasibility.UNKNOWN)
             }
+            val acceptedOutcome = policy.acceptNullable(
+                LpCertifier.RATIONAL,
+                outcome.takeIf { it.feasibility != RationalFeasibility.UNKNOWN },
+            )
             return@use CertifiedLpResult(
-                when (outcome.feasibility) {
+                when (acceptedOutcome?.feasibility ?: RationalFeasibility.UNKNOWN) {
                     RationalFeasibility.FEASIBLE -> LpVerdict.OPTIMAL
                     RationalFeasibility.INFEASIBLE -> LpVerdict.INFEASIBLE
                     RationalFeasibility.UNKNOWN -> LpVerdict.INDETERMINATE
@@ -118,8 +129,9 @@ internal fun solveAndCertify(
                 certificate = null,
                 farkasRay = null,
                 model = null,
-                exactPrimal = outcome.witness,
-                infeasibleRows = outcome.rows,
+                exactPrimal = acceptedOutcome?.witness,
+                infeasibleRows = acceptedOutcome?.rows,
+                certificationPolicy = policy,
             )
         }
 
@@ -129,8 +141,12 @@ internal fun solveAndCertify(
         // so its feasibility is certified by reconstructing the reported basis's point exactly
         // ([exactBasisFeasible]) — enough for a definitive SAT verdict at a leaf.
         val componentSolver = solver as? ComponentLpSolver
-        val certificate = integerCertify(model, result.duals, observer = observer)
-        val componentExactLowerBound = if (certificate == null) componentSolver?.exactLowerBound(observer) else null
+        val certificate = policy.acceptNullable(
+            LpCertifier.INTEGER,
+            integerCertify(model, result.duals, observer = observer),
+        )
+        val componentExactLowerBound =
+            if (certificate == null) componentSolver?.exactLowerBound(observer, policy) else null
         // Strict rows are relaxed to non-strict in the float model, so the basis/point certificates would
         // bless a boundary point a strict row forbids; those models go straight to the delta-aware
         // rational decider.
@@ -142,9 +158,15 @@ internal fun solveAndCertify(
 
             model.hasContinuous && !anyStrict &&
                 (
-                    componentSolver?.exactBasisFeasible(observer) == true ||
-                        exactBasisFeasible(model, result.basis, observer) == true ||
-                        exactPointFeasible(model, result.primal, observer)
+                    componentSolver?.exactBasisFeasible(observer, policy) == true ||
+                        policy.acceptBoolean(
+                            LpCertifier.EXACT_BASIS,
+                            exactBasisFeasible(model, result.basis, observer) == true,
+                        ) ||
+                        policy.acceptBoolean(
+                            LpCertifier.EXACT_POINT,
+                            exactPointFeasible(model, result.primal, observer),
+                        )
                     ) ->
                 LpVerdict.OPTIMAL
 
@@ -156,9 +178,13 @@ internal fun solveAndCertify(
                 val outcome = rationalOutcome(model, cancellation).also {
                     observer?.observe(LpCertifier.RATIONAL, it.feasibility != RationalFeasibility.UNKNOWN)
                 }
-                exactPrimal = outcome.witness
-                infeasibleRows = outcome.rows
-                when (outcome.feasibility) {
+                val acceptedOutcome = policy.acceptNullable(
+                    LpCertifier.RATIONAL,
+                    outcome.takeIf { it.feasibility != RationalFeasibility.UNKNOWN },
+                )
+                exactPrimal = acceptedOutcome?.witness
+                infeasibleRows = acceptedOutcome?.rows
+                when (acceptedOutcome?.feasibility ?: RationalFeasibility.UNKNOWN) {
                     RationalFeasibility.FEASIBLE -> LpVerdict.OPTIMAL
                     RationalFeasibility.INFEASIBLE -> LpVerdict.INFEASIBLE
                     RationalFeasibility.UNKNOWN -> LpVerdict.INDETERMINATE
@@ -176,6 +202,7 @@ internal fun solveAndCertify(
             exactPrimal = exactPrimal,
             infeasibleRows = infeasibleRows,
             componentExactLowerBound = componentExactLowerBound,
+            certificationPolicy = policy,
         )
     }
 }

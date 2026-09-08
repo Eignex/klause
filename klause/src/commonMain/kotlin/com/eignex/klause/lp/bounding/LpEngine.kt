@@ -26,6 +26,7 @@ import com.eignex.klause.lp.cut.KnapsackCoverSeparator
 import com.eignex.klause.lp.cut.SharedCut
 import com.eignex.klause.lp.engine.Basis
 import com.eignex.klause.lp.engine.Cut
+import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.lp.engine.LpSolver
 import com.eignex.klause.lp.engine.LpVerdict
 import com.eignex.klause.lp.engine.PersistentLpSolver
@@ -82,6 +83,7 @@ internal class LpEngine(
     private val objective: LinearObjective,
     params0: LpParams,
     private val sink: SolveStatsSink,
+    internal val solveContext: LpSolveContext = LpSolveContext.Production,
 ) {
     /** Attribute an auxiliary root/presolve simplex invocation to this solve's shared sink. */
     internal fun observeRootSolve(solver: LpSolver) {
@@ -469,7 +471,12 @@ internal class LpEngine(
                     // A long eta chain: the persistent instance's pivots accumulate ACROSS nodes
                     // (reconciliation + dual repair after each pin flip), so the default limit would
                     // refactorize the full basis every few nodes — the exact cost this filter removes.
-                    newPersistentLpSolver(built.model, params.cancellation, refactorUpdateLimit = GATED_UPDATE_LIMIT),
+                    newPersistentLpSolver(
+                        built.model,
+                        params.cancellation,
+                        refactorUpdateLimit = GATED_UPDATE_LIMIT,
+                        factory = solveContext.engineFactory,
+                    ),
                     BooleanArray(built.model.m),
                 )
             }
@@ -514,6 +521,7 @@ internal class LpEngine(
             cancellation = params.cancellation,
             componentSplit = params.lpPlan.componentSplit,
             observer = sink.lp.certificationObserver(LpRoute.STANDALONE),
+            context = solveContext,
         )
         certified.float?.let { sink.lp.observeComponentSplit(it.blocks) }
         return when (certified.verdict) {
