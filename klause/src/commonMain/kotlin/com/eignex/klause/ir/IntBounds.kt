@@ -86,12 +86,15 @@ class IntBounds internal constructor(
         private var openLo: Bits?,
         private var openHi: Bits?,
     ) {
+        private var built = false
+
         /** Whether any call actually narrowed a range. */
         var changed: Boolean = false
             private set
 
         /** Raise column [v]'s lower bound to [value], or close its open lower side at [value]. */
         fun atLeast(v: Int, value: Long) {
+            check(!built) { "cannot tighten bounds after build" }
             if (openLo?.get(v) == true) {
                 openLo?.clear(v)
             } else if (value <= lowerBounds[v]) {
@@ -103,6 +106,7 @@ class IntBounds internal constructor(
 
         /** Lower column [v]'s upper bound to [value], or close its open upper side at [value]. */
         fun atMost(v: Int, value: Long) {
+            check(!built) { "cannot tighten bounds after build" }
             if (openHi?.get(v) == true) {
                 openHi?.clear(v)
             } else if (value >= upperBounds[v]) {
@@ -112,8 +116,12 @@ class IntBounds internal constructor(
             changed = true
         }
 
-        /** The narrowed ranges, or null when nothing was narrowed. */
-        fun build(): IntBounds? = if (!changed) null else fromModelBounds(lowerBounds, upperBounds, openLo, openHi)
+        /** Finish this tightening and return its ranges, or null when nothing was narrowed. */
+        fun build(): IntBounds? {
+            check(!built) { "bounds already built" }
+            built = true
+            return if (!changed) null else fromModelBounds(lowerBounds, upperBounds, openLo, openHi)
+        }
     }
 
     /** Internal constructor for source-model storage. */

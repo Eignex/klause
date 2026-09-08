@@ -21,6 +21,7 @@ internal object PresolveShared {
      * neither endpoint crossed.
      */
     fun Problem.withSourcePassDelta(delta: SourceDelta): Problem? {
+        if (delta.infeasible) return null
         if (delta.isEmpty) return this
         val rebounded = delta.bounds?.let {
             if (it.crossedColumn() >= 0) return null

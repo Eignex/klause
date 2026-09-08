@@ -3,6 +3,7 @@ package com.eignex.klause.ir
 import com.eignex.klause.util.Bits
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -75,5 +76,14 @@ class IntBoundsTest {
         declared.tightening().also { it.atLeast(0, 3) }.build()
 
         assertEquals(0, declared.lower(0), "the pass narrows its own copy")
+    }
+
+    @Test
+    fun `a tightening cannot mutate ranges it has built`() {
+        val tightening = bounds().tightening().also { it.atLeast(0, 3) }
+        val proved = tightening.build()
+
+        assertFailsWith<IllegalStateException> { tightening.atLeast(0, 5) }
+        assertEquals(3, proved!!.lower(0))
     }
 }
