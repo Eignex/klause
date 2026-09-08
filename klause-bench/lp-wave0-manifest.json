@@ -1,7 +1,57 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "baseSha": "848cfef9b6661a5b3eb941de006b2050bca44c5b",
-  "artifactDirectory": "klause-bench/output/lp-wave0-validation-v3-<git-sha>",
+  "campaignPrerequisiteSha": "72d81101f71773ec38b8c6b84aacd5c09b5a9867",
+  "artifactDirectory": "klause-bench/output/lp-wave0-campaign-<measured-sha>",
+  "campaignContract": {
+    "fullInventoryPerFamily": 2147483647,
+    "oracleCoverage": "frozen representative slices; full IDL/RDL coverage deferred",
+    "referenceTimeoutMs": 30000,
+    "referenceJobs": 1,
+    "referenceWorkers": 1,
+    "baselineRepetitions": 3,
+    "baselineProcessors": 1,
+    "baselineSeed": 3,
+    "cpMipBaselineTimeoutMs": 3000,
+    "smtBaselineTimeoutMs": 30000,
+    "fullSmtMembership": {
+      "smtlib-qflra": {
+        "instances": 1753,
+        "sortedIdsSha256": "7b62baf4aa9a2970df6e9f723b86330edeb2fdc0294f04f41c703c9f08bf16f0",
+        "missingAtPrerequisite": 0
+      },
+      "smtlib-qflira": {
+        "instances": 7,
+        "sortedIdsSha256": "dc33e9a5407bee1eb3e4bc929bbdbf3cc287913d91ee3ec03ac5ddc88ff6b923",
+        "missingAtPrerequisite": 0
+      },
+      "smtlib-qflia": {
+        "instances": 13306,
+        "sortedIdsSha256": "3e3dc0fc5332eab72cee3d0bebb80fac8f6d23793d17baf423ba7a353c7f9680",
+        "missingAtPrerequisite": 0
+      },
+      "smtlib-qfidl": {
+        "instances": 2528,
+        "sortedIdsSha256": "89b0d645a8dbe99d0506883cffc4cf81ea643c5b5f0454b64ddca1ce6cbcfc77",
+        "missingAtPrerequisite": 2528
+      },
+      "smtlib-qfrdl": {
+        "instances": 255,
+        "sortedIdsSha256": "2ef4e5360e22981c5f9dce331bd892c6a7396123393128787d91fd236b83592d",
+        "missingAtPrerequisite": 255
+      }
+    },
+    "expectedAttempts": {
+      "frozenReference": 43,
+      "baselineCpMip": 234,
+      "baselineSmt": 222
+    },
+    "worstCaseCpuSeconds": {
+      "frozenReference": 1290,
+      "baselineCpMip": 702,
+      "baselineSmt": 6660
+    }
+  },
   "instrumentationContracts": [
     {
       "label": "w0-instrumentation-v1",
@@ -269,10 +319,9 @@
     }
   ],
   "openCoverage": [
-    "Full SMT-LIB suite/reference coverage is not retained or run by this task.",
-    "The Z3 table has no smtlib-qf_idl or smtlib-qf_rdl rows.",
-    "The CP-SAT table has no current mzn-challenge or xcsp3-core rows.",
-    "The SCIP table has no mps-core rows.",
-    "Oracle generation writes committed reference CSV files and remains outside this task's frozen paths."
+    "At campaign preflight the Z3 table has no smtlib-qf_idl or smtlib-qf_rdl rows.",
+    "At campaign preflight the CP-SAT table has no current mzn-challenge or xcsp3-core rows.",
+    "At campaign preflight the SCIP table has no mps-core rows.",
+    "Campaign results and any external blockers are recorded after execution; UNKNOWN rows remain non-proofs."
   ]
 }

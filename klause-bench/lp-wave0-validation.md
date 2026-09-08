@@ -1,6 +1,7 @@
 # LP Wave 0 baseline and reference reconciliation
 
-This audit was prepared from base `848cfef9b6661a5b3eb941de006b2050bca44c5b`. It preserves the
+This audit was prepared from base `848cfef9b6661a5b3eb941de006b2050bca44c5b` and the campaign
+starts from integrated prerequisite `72d81101f71773ec38b8c6b84aacd5c09b5a9867`. It preserves the
 reported Wave 0 baselines, freezes reproducible slices, corrects the test-only independent validator,
 and separates the production observer overhead gate from capture, codec and validation costs.
 
@@ -40,8 +41,8 @@ are in `lp-wave0-manifest.json`.
 | `smtlib-qflra` | `bench reference` → Z3 | 1,753 `smtlib-qf_lra` rows | Existing broad oracle coverage; frozen 10-instance check slice. |
 | `smtlib-qflira` | `bench reference` → Z3 | 7 `smtlib-qf_lira` rows | All seven rows exist, but the deterministic per-family slice selects one family representative. |
 | `smtlib-qflia` | `bench reference` → Z3 | 13,306 `smtlib-qf_lia` rows | Existing broad oracle coverage; frozen 10-instance check slice. |
-| `smtlib-qfidl` | `bench reference` → Z3 | 0 | Missing. The frozen 10-instance slice and full-suite command are prepared. |
-| `smtlib-qfrdl` | `bench reference` → Z3 | 0 | Missing. The corpus has six families; all six are frozen. |
+| `smtlib-qfidl` | `bench reference` → Z3 | 0 | Missing. The frozen slice has 10 instances; the full corpus has 2,528. |
+| `smtlib-qfrdl` | `bench reference` → Z3 | 0 | Missing. The frozen slice has six instances; the full corpus has 255. |
 | `mzn-bench` | `bench reference` → MiniZinc CP-SAT | 0 current `mzn-challenge` rows | Missing for the current suite. The 16,292 `minizinc-benchmarks` rows belong to the retired corpus ID and do not cover it. |
 | `xcsp3-core` | `bench reference` → CPMpy/CP-SAT container | 0 | Missing. The four static fixtures are frozen. |
 | `mps-core` | `bench reference` → SCIP container | 0 | Missing. The four static fixtures are frozen. |
@@ -52,9 +53,26 @@ No missing adapter logic was found. The gaps are missing oracle executions or a 
 this task does not change production benchmark adapters or oracle tables. In particular, SMT reference
 generation must use `bench reference`; `backend=z3` is not an equivalent `bench solve` baseline.
 
-Full SMT reference coverage remains open. The bounded slices make the missing formats executable and
-reviewable, but they do not claim to replace the full commands printed by the runner. Generating those
-oracles writes committed CSV files and must happen in a task that explicitly owns them.
+The original printed "full" commands were not full: every dynamic suite is constructed with a default
+one-instance-per-family cap, even when no `per-family=` filter appears in the command. Read-only
+preflight established the true inventories as 1,753 LRA, seven LIRA, 13,306 LIA, 2,528 IDL and 255
+RDL instances. Sorted membership hashes live in the manifest and are rechecked from `preview`. The
+existing table covers every current LRA, LIRA and LIA ID. Full IDL/RDL coverage would require 2,783
+runs and is explicitly deferred as unreasonable for Wave 0; the bounded gate does not claim it.
+
+Oracle execution uses the frozen `per-family=1 max=10 seed=1` slices: ten IDL and six RDL instances,
+plus 19 current MiniZinc Challenge, four XCSP3 core and four MPS core instances. That is 43 attempts
+and 1,290 seconds (21 min 30 s) worst-case CPU time at `jobs=1 workers=1`. Existing valid LRA, LIRA,
+LIA and selected MIPLIB rows are not rerun merely to produce new labels. Unknown and timeout rows are
+retained and count as coverage rows, but never as proofs.
+
+The baseline matrix contains 39 CP/MIP instances: all 19 selected MiniZinc entries, including the four
+known source-incompatible Klause cases, plus four XCSP3, four MPS and twelve MIPLIB entries. Three
+uncached default/off repetitions therefore make 234 CP/MIP attempts (702 seconds worst case). The five
+SMT slices contain 37 instances and make 222 attempts (6,660 seconds worst case). The four MiniZinc
+source incompatibilities remain in the 39-instance denominator; the compatible shared denominator is
+35. SMT exact-theory solving does not reach the floating LP engine, so its default/off pair is a route
+and semantic consistency control rather than a float-LP performance comparison.
 
 ## Independent reference semantics
 
@@ -181,6 +199,7 @@ klause-bench/scripts/lp-wave0-validation.sh preview
 klause-bench/scripts/lp-wave0-validation.sh check
 klause-bench/scripts/lp-wave0-validation.sh print-reference-commands
 klause-bench/scripts/lp-wave0-validation.sh print-baseline-commands
+klause-bench/scripts/lp-wave0-validation.sh init-campaign
 ```
 
 After reserving an idle host window:
@@ -196,6 +215,17 @@ The reference and baseline commands freeze `jobs=1`, `workers=1`, `processors=1`
 LP default/off controls and three uncached repetitions where timing is involved. Use
 `klause-bench/output/compare.sh` on each paired default/off result directory; timeouts and declines
 remain in the denominator.
+
+Campaign commands retain evidence under
+`klause-bench/output/lp-wave0-campaign-<measured-sha>/`. Initialization refuses an existing campaign
+directory. Reference and baseline subcommands refuse an existing run directory. Baseline result
+directories and result CSV files are written through temporary symlinks at the bench's standard
+generated paths and live only in their campaign run directory; the symlinks are removed after each
+arm. Every run retains its command, raw runner stdout, exit status, result CSV, per-instance `.out` and
+`.json` files where the bench emits them, selected IDs, source hashes where applicable, and checksums.
+The campaign root also retains the manifest, exact preview inventories, host/runtime/tool versions,
+container image metadata and MiniZinc corpus commit. Machine-specific detail stays in that artifact
+tree rather than this report.
 
 Per the user's direct instruction for this task, no Opus review is run. This is a task-specific review
 exception, not a completed integrated Wave 0 review.
