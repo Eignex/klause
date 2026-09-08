@@ -95,7 +95,6 @@ private class DecliningPolicy : LpCertificationPolicy {
 private class ConsumerRecordingFactory : LpEngineFactory {
     val calls = ArrayList<DeclineCall>()
     val cancellations = ArrayList<Cancellation>()
-    private val persistentSolvers = ArrayList<PersistentLpSolver>()
 
     override fun newGeneralSolver(model: LpModel, cancellation: Cancellation): LpSolver {
         calls += DeclineCall.GENERAL
@@ -151,10 +150,8 @@ private class ConsumerRecordingFactory : LpEngineFactory {
             workLimit,
             trackDegeneracy,
         )
-        return RecordingPersistentSolver(delegate, calls).also(persistentSolvers::add)
+        return RecordingPersistentSolver(delegate, calls)
     }
-
-    fun closePersistentSolvers() = persistentSolvers.forEach(PersistentLpSolver::close)
 }
 
 private open class RecordingSolver(protected val delegate: LpSolver, private val calls: MutableList<DeclineCall>) :
@@ -267,17 +264,13 @@ class LpDeclineDisciplineTest {
             val gatedSession = PropagationSession(gatedProblem)
             gatedSession.implyBool(0, true)
             val factory = ConsumerRecordingFactory()
-            try {
-                LpEngine(
-                    gatedProblem,
-                    LinearObjective(intCoefficients = LongArray(0)),
-                    LpParams(lpPlan = LpPlan(bounding = true, realResidual = true)),
-                    SolveStatsSink("runtime-warmup"),
-                    LpSolveContext(engineFactory = factory),
-                ).pruneNode(gatedSession, Double.POSITIVE_INFINITY, -1, true)
-            } finally {
-                factory.closePersistentSolvers()
-            }
+            LpEngine(
+                gatedProblem,
+                LinearObjective(intCoefficients = LongArray(0)),
+                LpParams(lpPlan = LpPlan(bounding = true, realResidual = true)),
+                SolveStatsSink("runtime-warmup"),
+                LpSolveContext(engineFactory = factory),
+            ).use { engine -> engine.pruneNode(gatedSession, Double.POSITIVE_INFINITY, -1, true) }
         }
 
         private fun gatedRealProblem(): Problem = Problem(
@@ -461,7 +454,7 @@ class LpDeclineDisciplineTest {
             assertTrue(nodeHarness.policy.observedSuccess(LpCertifier.INTEGER))
             assertTrue(nodeHarness.policy.observedSuccess(LpCertifier.SAFE_OBJECTIVE))
         } finally {
-            nodeHarness.factory.closePersistentSolvers()
+            node.close()
         }
 
         val rootHarness = harness()
@@ -501,7 +494,7 @@ class LpDeclineDisciplineTest {
             assertTrue(positive.pruneNode(PropagationSession(problem), 1.5, -1, true))
             assertTrue(positive.rootLpRelaxationBound(checkNotNull(positive.lpRelaxer), emptyList()).isFinite())
         } finally {
-            positiveFactory.closePersistentSolvers()
+            positive.close()
         }
     }
 
@@ -544,7 +537,7 @@ class LpDeclineDisciplineTest {
             assertTrue(harness.factory.calls.contains(DeclineCall.RESOLVE_GATED))
             assertTrue(harness.policy.observedSuccess(LpCertifier.EXACT_FARKAS))
         } finally {
-            harness.factory.closePersistentSolvers()
+            rejecting.close()
         }
     }
 

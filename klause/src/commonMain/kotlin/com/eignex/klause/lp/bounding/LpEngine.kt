@@ -84,7 +84,38 @@ internal class LpEngine(
     params0: LpParams,
     private val sink: SolveStatsSink,
     internal val solveContext: LpSolveContext = LpSolveContext.Production,
-) {
+) : AutoCloseable {
+    private var closed = false
+
+    // Retain the model and discrete warm-start caches; only native factor-owning solvers are released.
+    @Suppress("TooGenericExceptionCaught") // cleanup must preserve arbitrary failures from owned solvers
+    internal fun releasePersistentSolvers() {
+        var failure: Throwable? = null
+        val node = nodeSimplex
+        nodeSimplex = null
+        val gated = gatedFilter?.simplex
+        gatedFilter = null
+        gatedResolved = false
+        for (solver in listOfNotNull(node, gated)) {
+            try {
+                solver.close()
+            } catch (closeFailure: Throwable) {
+                failure?.addSuppressed(closeFailure) ?: run { failure = closeFailure }
+            }
+        }
+        failure?.let { throw it }
+    }
+
+    override fun close() {
+        if (closed) return
+        closed = true
+        releasePersistentSolvers()
+    }
+
+    internal fun requireOpen() {
+        check(!closed) { "LP engine is closed" }
+    }
+
     /** Attribute an auxiliary root/presolve simplex invocation to this solve's shared sink. */
     internal fun observeRootSolve(solver: LpSolver) {
         sink.lp.observeEngineCost(LpRoute.ROOT, solver.lastMetrics)
@@ -460,24 +491,33 @@ internal class LpEngine(
 
     /** The gated residual filter with its enforcement refreshed to [session]'s pins, or null when the
      *  model does not qualify (not pure-real, oversized, or no gated rows). */
+    @Suppress("TooGenericExceptionCaught") // failed acquisition must restore ownership state for every throwable
     internal fun gatedResidual(session: PropagationSession): GatedResidual? {
+        requireOpen()
         if (!params.lpPlan.realResidual || residualOversized) return null
         if (!gatedResolved) {
             gatedResolved = true
             val built = lpRelaxer?.buildGatedResidual()
             if (built != null && built.gatedRows.isNotEmpty() && built.model.n > 0) {
-                gatedFilter = GatedResidual(
-                    built,
-                    // A long eta chain: the persistent instance's pivots accumulate ACROSS nodes
-                    // (reconciliation + dual repair after each pin flip), so the default limit would
-                    // refactorize the full basis every few nodes — the exact cost this filter removes.
+                val enforced = BooleanArray(built.model.m)
+                val simplex = try {
                     newPersistentLpSolver(
                         built.model,
                         params.cancellation,
                         refactorUpdateLimit = GATED_UPDATE_LIMIT,
                         factory = solveContext.engineFactory,
-                    ),
-                    BooleanArray(built.model.m),
+                    )
+                } catch (failure: Throwable) {
+                    gatedResolved = false
+                    throw failure
+                }
+                gatedFilter = GatedResidual(
+                    built,
+                    // A long eta chain: the persistent instance's pivots accumulate ACROSS nodes
+                    // (reconciliation + dual repair after each pin flip), so the default limit would
+                    // refactorize the full basis every few nodes — the exact cost this filter removes.
+                    simplex,
+                    enforced,
                 )
             }
         }
@@ -510,6 +550,7 @@ internal class LpEngine(
      * reals complete the assignment into a full solution.
      */
     fun leafCertify(session: PropagationSession): LeafRealResult {
+        requireOpen()
         lpBackjump = null
         if (residualOversized) return LeafRealResult(LpVerdict.INDETERMINATE, EmptyDoubleArray)
         val relaxer = lpRelaxer ?: return LeafRealResult(LpVerdict.INDETERMINATE, EmptyDoubleArray)
@@ -575,6 +616,7 @@ internal class LpEngine(
         objectiveVar: Int,
         objectiveAscending: Boolean,
     ): Boolean {
+        requireOpen()
         lpBackjump = null
         for (b in bounds) {
             if (b.applicable && b.prune(session, effectiveBound, objectiveVar, objectiveAscending)) return true

@@ -98,14 +98,17 @@ internal fun roundUpToResidue(lb: Long, g: Long, r: Long): Long = lb + (r - lb).
 /** A budgeted [TableauCutSolver] over [model]. The simplex always uses Devex pricing, the Harris
  *  two-pass ratio test, the bound-flipping long step and basis equilibration — all correctness-neutral
  *  (they change only the pivot path / conditioning, never the certified optimum). */
-internal fun LpEngine.dualSimplex(model: LpModel, cancellation: Cancellation): TableauCutSolver = newTableauCutSolver(
-    model,
-    cancellation,
-    iterationLimit = nodePivotBudget(),
-    workLimit = nodeWorkBudget(),
-    trackDegeneracy = adaptiveWork,
-    factory = solveContext.engineFactory,
-)
+internal fun LpEngine.dualSimplex(model: LpModel, cancellation: Cancellation): TableauCutSolver {
+    requireOpen()
+    return newTableauCutSolver(
+        model,
+        cancellation,
+        iterationLimit = nodePivotBudget(),
+        workLimit = nodeWorkBudget(),
+        trackDegeneracy = adaptiveWork,
+        factory = solveContext.engineFactory,
+    )
+}
 
 /**
  * The node bound's engine and its solve.
@@ -119,6 +122,7 @@ internal fun LpEngine.dualSimplex(model: LpModel, cancellation: Cancellation): T
  * [warm] is used only on the fresh path: a kept engine already has that basis seated, and better, has it
  * factorized.
  */
+@Suppress("TooGenericExceptionCaught") // replacement cleanup must preserve arbitrary solve and close failures
 private fun LpEngine.solveNode(
     model: LpModel,
     warm: Basis?,
@@ -135,11 +139,30 @@ private fun LpEngine.solveNode(
         trackDegeneracy = adaptiveWork,
         factory = solveContext.engineFactory,
     )
-    // The engine this displaces holds a basis factorization, which can be a native object. Releasing it
-    // here rather than leaving it to a cleaner keeps a long search from carrying one per rebuilt matrix.
-    nodeSimplex?.close()
+    val displaced = nodeSimplex
+    try {
+        displaced?.close()
+    } catch (closeFailure: Throwable) {
+        nodeSimplex = null
+        try {
+            fresh.close()
+        } catch (freshCloseFailure: Throwable) {
+            closeFailure.addSuppressed(freshCloseFailure)
+        }
+        throw closeFailure
+    }
     nodeSimplex = fresh
-    return fresh to fresh.solve(warm)
+    return try {
+        fresh to fresh.solve(warm)
+    } catch (failure: Throwable) {
+        nodeSimplex = null
+        try {
+            fresh.close()
+        } catch (closeFailure: Throwable) {
+            failure.addSuppressed(closeFailure)
+        }
+        throw failure
+    }
 }
 
 /**
@@ -864,7 +887,7 @@ internal fun LpEngine.rootLpObjective(
  * harvested cut is valid at *every* solution of the problem, so it is forced [Cut.global] = true and
  * stays sound when applied at any node. Determinant overflow keeps whatever cuts stayed within 64 bits.
  */
-@Suppress("LongParameterList")
+@Suppress("LongParameterList", "TooGenericExceptionCaught") // root ownership must preserve arbitrary solver failures
 internal fun LpEngine.harvestRootCuts(
     relaxer: CpToLpRelaxation,
     session: PropagationSession,
@@ -880,6 +903,8 @@ internal fun LpEngine.harvestRootCuts(
         var relaxation = relaxer.build(session)
         if (relaxation.model.n == 0) return emptyList()
         var simplex = dualSimplex(relaxation.model, cancellation)
+        var ownedSimplex: TableauCutSolver? = simplex
+        var primaryFailure: Throwable? = null
         try {
             val initial = try {
                 simplex.solve()
@@ -906,6 +931,7 @@ internal fun LpEngine.harvestRootCuts(
                 val selected = pool.cuts()
                 relaxation = observeRootCutBuild(selected.size) { relaxer.build(session, selected) }
                 val replacement = dualSimplex(relaxation.model, cancellation)
+                ownedSimplex = replacement
                 simplex.close()
                 simplex = replacement
                 val next = try {
@@ -919,8 +945,21 @@ internal fun LpEngine.harvestRootCuts(
             // Bound the pool the search nodes inherit by per-cut activity (tightness at the final LP point):
             // a large harvest is trimmed to the most-active cuts, the rest evicted (sound — all global).
             pool.retainMostActive()
+        } catch (failure: Throwable) {
+            primaryFailure = failure
+            throw failure
         } finally {
-            simplex.close()
+            val owned = ownedSimplex
+            ownedSimplex = null
+            if (primaryFailure == null) {
+                owned?.close()
+            } else {
+                try {
+                    owned?.close()
+                } catch (closeFailure: Throwable) {
+                    primaryFailure.addSuppressed(closeFailure)
+                }
+            }
         }
     } catch (_: CheckedLongOverflowException) {
         return pool.cuts() // keep whatever stayed within 64-bit determinants — still globally valid

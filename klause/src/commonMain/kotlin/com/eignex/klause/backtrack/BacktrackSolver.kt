@@ -85,6 +85,7 @@ class BacktrackSolver internal constructor(
      * keeps that cutoff monotone (see [RepairSearch.repair]). [params] is the base repair config (its own
      * `objectiveBoundSupplier` is overridden here).
      */
+    @Suppress("TooGenericExceptionCaught") // the repair owner must preserve arbitrary primary and cleanup failures
     internal fun openRepair(objective: LinearObjective, params: BacktrackParams): RepairSearch {
         var activeCutoff = Double.POSITIVE_INFINITY
         val handle = ResumableMinimize(
@@ -92,17 +93,27 @@ class BacktrackSolver internal constructor(
             objective,
             params.copy(objectiveBoundSupplier = { activeCutoff }),
             pausable = false,
+            rebindable = true,
         )
         return object : RepairSearch {
             override fun repair(assumptions: Assumptions, decisionBudget: Long, cutoff: Double): Sample? {
                 activeCutoff = cutoff
-                handle.rebind(assumptions, decisionBudget)
-                var best: Sample? = null
-                while (!handle.isDone) {
-                    val terminal = handle.runSlice(Cancellation.Never, Long.MAX_VALUE) { best = it.sample }
-                    if (terminal != null) break
+                try {
+                    handle.rebind(assumptions, decisionBudget)
+                    var best: Sample? = null
+                    while (!handle.isDone) {
+                        val terminal = handle.runSlice(Cancellation.Never, Long.MAX_VALUE) { best = it.sample }
+                        if (terminal != null) break
+                    }
+                    return best
+                } catch (failure: Throwable) {
+                    try {
+                        handle.close()
+                    } catch (closeFailure: Throwable) {
+                        failure.addSuppressed(closeFailure)
+                    }
+                    throw failure
                 }
-                return best
             }
 
             override fun close() = handle.close()
@@ -288,23 +299,36 @@ class BacktrackSolver internal constructor(
      * problem contains. The objective is statically linear, so no objective-shape check is involved —
      * LP enablement is purely a params decision.
      */
+    @Suppress("TooGenericExceptionCaught") // a lazy callback failure remains primary if cleanup also fails
     override fun improvements(objective: LinearObjective, params: BacktrackParams): Sequence<MinimizeResult> =
         sequence {
             // The single B&B orchestration ([ResumableMinimize]), driven lazily: one incumbent surfaced
             // per step, then the terminal verdict. lpConfig is resolved inside the search. `pausable = false`
             // makes a fired cancellation a hard terminal stop (no resume) — a one-shot stream's contract.
             val search = ResumableMinimize(this@BacktrackSolver, objective, params, pausable = false)
-            while (true) {
-                when (val event = search.runUntilEvent()) {
-                    is StepEvent.Incumbent -> yield(event.result)
+            try {
+                while (true) {
+                    when (val event = search.runUntilEvent()) {
+                        is StepEvent.Incumbent -> {
+                            search.releaseForSequenceYield()
+                            yield(event.result)
+                        }
 
-                    is StepEvent.Terminal -> {
-                        yield(event.result)
-                        break
+                        is StepEvent.Terminal -> {
+                            yield(event.result)
+                            break
+                        }
+
+                        StepEvent.Paused -> break // unreachable when pausable = false
                     }
-
-                    StepEvent.Paused -> break // unreachable when pausable = false
                 }
+            } catch (failure: Throwable) {
+                try {
+                    search.close()
+                } catch (closeFailure: Throwable) {
+                    failure.addSuppressed(closeFailure)
+                }
+                throw failure
             }
         }
 }

@@ -13,14 +13,141 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.localsearch.LocalSearchSolver
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.solver.ResumableOptimizer
+import com.eignex.klause.solver.ResumableSearch
+import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
+import com.eignex.klause.solver.result.SolveStats
+import com.eignex.klause.solver.result.TerminationReason
+import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 
+private class TrackingResumableSearch(
+    private val result: MinimizeResult?,
+    private val incumbent: MinimizeResult.WithSample? = null,
+    private val onRun: () -> Unit = {},
+    private val statsFailure: String? = null,
+    private val closeFailure: String? = null,
+) : ResumableSearch {
+    var closes = 0
+    private var done = false
+
+    override fun runSlice(
+        global: Cancellation,
+        sliceMillis: Long,
+        sliceNodes: Long,
+        onIncumbent: (MinimizeResult.WithSample) -> Unit,
+    ): MinimizeResult? {
+        onRun()
+        incumbent?.let(onIncumbent)
+        done = result != null
+        return result
+    }
+
+    override val isDone: Boolean get() = done
+    override val stats: SolveStats
+        get() {
+            statsFailure?.let(::error)
+            return SolveStats.EMPTY
+        }
+
+    override fun close() {
+        closes++
+        closeFailure?.let(::error)
+    }
+}
+
+private class TrackingResumableOptimizer(private val handle: ResumableSearch) :
+    ResumableOptimizer<BacktrackParams> {
+    override val problem = Problem(0, 0, emptyArray(), emptyArray()).bake()
+
+    override fun solve(params: BacktrackParams): SolveResult = SolveResult.Unknown(TerminationReason.BudgetExhausted)
+
+    override fun samples(params: BacktrackParams): Sequence<Sample> = emptySequence()
+    override fun enumerate(params: BacktrackParams): Sequence<Sample> = emptySequence()
+
+    override fun minimize(objective: LinearObjective, params: BacktrackParams): MinimizeResult = error("not used")
+
+    override fun resumable(objective: LinearObjective, params: BacktrackParams): ResumableSearch = handle
+}
+
+private fun trackingWorker(label: String, armId: Int, handle: ResumableSearch): PortfolioWorker = PortfolioWorker.of(
+    label,
+    armId,
+    TrackingResumableOptimizer(handle).session(),
+    BacktrackParams(),
+    objective = LinearObjective(),
+)
+
 class SequentialPortfolioTest {
+
+    @Test
+    fun `terminal arm closes a paused sibling handle`() {
+        val paused = TrackingResumableSearch(null)
+        val sample = Sample(BooleanArray(0), LongArray(0))
+        val terminal = TrackingResumableSearch(
+            result = MinimizeResult.Optimal(sample, 0.0),
+            incumbent = MinimizeResult.BestFound(sample, 0.0, TerminationReason.BudgetExhausted),
+        )
+        val portfolio = SequentialPortfolio.exp3(
+            listOf(trackingWorker("paused", 0, paused), trackingWorker("terminal", 1, terminal)),
+        )
+
+        assertIs<MinimizeResult.Optimal>(portfolio.minimize())
+
+        assertEquals(1, paused.closes)
+        assertEquals(1, terminal.closes)
+    }
+
+    @Test
+    fun `global cancellation closes a paused handle`() {
+        var cancelled = false
+        val paused = TrackingResumableSearch(null, onRun = { cancelled = true })
+        val portfolio = SequentialPortfolio.exp3(listOf(trackingWorker("paused", 0, paused)))
+
+        assertIs<MinimizeResult.Unknown>(portfolio.minimize(Cancellation { cancelled }))
+
+        assertEquals(1, paused.closes)
+    }
+
+    @Test
+    fun `owner failure remains primary when handle close fails`() {
+        val handle = TrackingResumableSearch(
+            result = null,
+            statsFailure = "stats failure",
+            closeFailure = "close failure",
+        )
+        val portfolio = SequentialPortfolio.exp3(listOf(trackingWorker("failing", 0, handle)))
+
+        val failure = assertFailsWith<IllegalStateException> { portfolio.minimize() }
+
+        assertEquals("stats failure", failure.message)
+        assertEquals(1, handle.closes)
+    }
+
+    @Test
+    fun `handle close failure does not prevent closing remaining handles`() {
+        val failing = TrackingResumableSearch(null, closeFailure = "close failure")
+        val sample = Sample(BooleanArray(0), LongArray(0))
+        val terminal = TrackingResumableSearch(
+            result = MinimizeResult.Optimal(sample, 0.0),
+            incumbent = MinimizeResult.BestFound(sample, 0.0, TerminationReason.BudgetExhausted),
+        )
+        val portfolio = SequentialPortfolio.exp3(
+            listOf(trackingWorker("failing", 0, failing), trackingWorker("terminal", 1, terminal)),
+        )
+
+        val failure = assertFailsWith<IllegalStateException> { portfolio.minimize() }
+
+        assertEquals("close failure", failure.message)
+        assertEquals(1, failing.closes)
+        assertEquals(1, terminal.closes)
+    }
 
     private fun exactlyOneOver(n: Int): Problem = Problem(
         numBoolVars = n,
