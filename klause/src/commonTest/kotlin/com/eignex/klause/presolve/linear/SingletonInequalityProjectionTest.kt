@@ -7,14 +7,30 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.PropagationResult
+import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.propagation.propagate
+import com.eignex.klause.propagation.propagatorProjection
 import com.eignex.klause.solver.Sample
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class SingletonInequalityProjectionTest {
+
+    @Test
+    fun `a declared singleton inequality reconstructs its projected variable`() {
+        val source = Linear(longArrayOf(2, 1), intArrayOf(0, 1), LinearOp.LE, 10)
+        val factor = object : Factor by source, Propagator by source.propagatorProjection() {}
+        val model = problem(arrayOf(IntDomain(0, 5), IntDomain(0, 20)), factor)
+
+        val delta = SingletonInequalityProjection.project(model, objectiveIntVars = setOf(1))
+
+        assertEquals(1, delta.droppedIndices.size)
+        val sample = delta.reconstruct!!(Sample(bools = booleanArrayOf(), ints = longArrayOf(99, 5)))
+        assertEquals(0L, sample.ints[0])
+        assertTrue(isFeasible(model, sample))
+    }
 
     private fun problem(domains: Array<IntDomain>, vararg factors: Factor) =
         Problem(numBoolVars = 0, numIntVars = domains.size, intDomains = domains, factors = factors.toList()).bake()

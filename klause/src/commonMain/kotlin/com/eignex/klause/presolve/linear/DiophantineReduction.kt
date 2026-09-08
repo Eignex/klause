@@ -5,6 +5,7 @@ import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.presolve.PassDelta
+import com.eignex.klause.presolve.presolveLinearRows
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.util.LongArrayList
 import kotlin.math.abs
@@ -70,8 +71,8 @@ internal object DiophantineReduction {
 
     fun reduce(problem: BakedProblem): PassDelta {
         var out: Array<IntDomain>? = null
-        for (f in problem.factors) {
-            if (f !is Linear || f.op != LinearOp.EQ) continue
+        for (f in presolveLinearRows(problem.factors.asList())) {
+            if (f.op != LinearOp.EQ) continue
             val row = f.integerConstants ?: continue
             if (f.vars.size < 2 || !fitsHalfLong(row.bound)) continue
             if (f.vars.indices.any { !fitsHalfLong(row.coeff(it)) }) continue

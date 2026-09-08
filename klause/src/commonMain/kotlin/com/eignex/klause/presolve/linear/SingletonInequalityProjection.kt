@@ -4,6 +4,7 @@ import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.presolve.PassDelta
+import com.eignex.klause.presolve.equivalentLinear
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.util.IntArrayList
@@ -32,8 +33,9 @@ internal object SingletonInequalityProjection {
         val dropped = IntArrayList()
         val added = ArrayList<Factor>()
         val pinned = HashMap<Int, Long>()
-        problem.factors.forEachIndexed { i, f ->
-            if (f !is Linear || (f.op != LinearOp.LE && f.op != LinearOp.GE) || f.vars.size < 2) {
+        problem.factors.forEachIndexed { i, factor ->
+            val f = factor.equivalentLinear() ?: return@forEachIndexed
+            if ((f.op != LinearOp.LE && f.op != LinearOp.GE) || f.vars.size < 2) {
                 return@forEachIndexed
             }
             val row = f.integerConstants ?: return@forEachIndexed

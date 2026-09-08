@@ -13,12 +13,35 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.presolve.BakeConfig
 import com.eignex.klause.presolve.Presolve
 import com.eignex.klause.presolve.PresolveShared.withPassDelta
+import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.propagation.propagatorProjection
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class ComparisonClauseFoldTest {
+
+    @Test
+    fun `declared reified comparisons fold without changing integer solutions`() {
+        val first = reif(0, 0, LinearOp.LE, 1)
+        val second = reif(1, 1, LinearOp.LE, 1)
+        val model = problemOf(
+            2,
+            Array(2) { IntDomain(0, 2) },
+            listOf(
+                object : Factor by first, Propagator by first.propagatorProjection() {},
+                object : Factor by second, Propagator by second.propagatorProjection() {},
+                Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
+            ),
+        )
+        val baked = model.bake()
+
+        val delta = Presolve.foldComparisonClauses(baked)
+
+        assertEquals(3, delta.droppedIndices.size)
+        assertEquals(intSolutions(model), intSolutions(baked.withPassDelta(delta, BakeConfig.NONE)))
+    }
 
     private fun reif(aux: Int, v: Int, op: LinearOp, bound: Int) =
         ReifiedLinear(auxBoolVar = aux, coeffs = intArrayOf(1), vars = intArrayOf(v), op = op, bound = bound)

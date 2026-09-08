@@ -6,6 +6,7 @@ import com.eignex.klause.ir.IntegerConstants
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.presolve.PassDelta
+import com.eignex.klause.presolve.equivalentLinear
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.MutableIntLongMap
 import com.eignex.klause.util.MutableIntObjectMap
@@ -37,15 +38,16 @@ internal object LinearSubSumAggregation {
         val factors = problem.factors
         if (factors.size > MAX_FACTORS) return PassDelta()
 
-        val definitions = collectDefinitions(factors)
+        val rows = Array(factors.size) { factors[it].equivalentLinear() }
+        val definitions = collectDefinitions(rows)
         if (definitions.isEmpty()) return PassDelta()
 
         // Index Linear rows by variable, so a definition is matched only against rows that mention its
         // rarest partner rather than the whole model.
         val rowsByVar = MutableIntObjectMap<IntArrayList>()
         for (i in factors.indices) {
-            val f = factors[i]
-            if (f is Linear && f.integerConstants != null) {
+            val f = rows[i]
+            if (f != null && f.integerConstants != null) {
                 for (v in f.vars) rowsByVar.getOrPut(v) { IntArrayList() }.add(i)
             }
         }
@@ -58,7 +60,7 @@ internal object LinearSubSumAggregation {
             for (r in 0 until anchor.size) {
                 val i = anchor[r]
                 if (i == def.defIndex || i in rewritten) continue
-                val row = factors[i] as Linear
+                val row = rows[i] ?: continue
                 val constants = row.integerConstants ?: continue
                 val k = matchMultiplier(row, constants, def) ?: continue
                 if (overflowsBoundShift(k, def.b, constants.bound)) continue
@@ -74,11 +76,11 @@ internal object LinearSubSumAggregation {
     /** Every unit-pivot sub-sum definition among the equality [Linear]s: an equality `Σ c_j·v_j = b` with
      *  a variable `v_p` of coefficient `±1` and at least two other terms yields `v_p = c_p·b + Σ_{j≠p}
      *  (−c_p·c_j)·v_j`. The lowest-id unit-coefficient variable is the pivot (deterministic). */
-    private fun collectDefinitions(factors: Array<Factor>): List<Definition> {
+    private fun collectDefinitions(factors: Array<Linear?>): List<Definition> {
         val out = ArrayList<Definition>()
         for (i in factors.indices) {
-            val f = factors[i]
-            if (f !is Linear || f.op != LinearOp.EQ || f.vars.size < 3) continue
+            val f = factors[i] ?: continue
+            if (f.op != LinearOp.EQ || f.vars.size < 3) continue
             val c = f.integerConstants ?: continue
             val p = unitPivotIndex(f.vars, c) ?: continue
             val sign = c.coeff(p) // ±1

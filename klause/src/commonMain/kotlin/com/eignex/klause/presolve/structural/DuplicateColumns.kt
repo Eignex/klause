@@ -6,6 +6,7 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.presolve.PassDelta
 import com.eignex.klause.presolve.Presolve
 import com.eignex.klause.presolve.SharedIntOccurrence
+import com.eignex.klause.presolve.equivalentLinear
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.util.IntArrayList
@@ -134,18 +135,18 @@ internal object DuplicateColumns {
      *  in that row). A row mentioning no dropped variable, and every non-[Linear] factor (none mention
      *  a dropped variable — they were ineligible), is returned unchanged. */
     private fun aggregateColumns(factor: Factor, keepOf: IntArray): Factor {
-        if (factor !is Linear) return factor
-        val row = factor.integerConstants ?: return factor
-        if (factor.vars.none { keepOf[it] != it }) return factor
-        val keptVars = IntArrayList(factor.vars.size)
-        val keptCoeffs = LongArrayList(factor.vars.size)
-        for (i in factor.vars.indices) {
-            val v = factor.vars[i]
+        val linear = factor.equivalentLinear() ?: return factor
+        val row = linear.integerConstants ?: return factor
+        if (linear.vars.none { keepOf[it] != it }) return factor
+        val keptVars = IntArrayList(linear.vars.size)
+        val keptCoeffs = LongArrayList(linear.vars.size)
+        for (i in linear.vars.indices) {
+            val v = linear.vars[i]
             if (keepOf[v] != v) continue // a dropped duplicate: its term is absorbed by the representative's
             keptVars.add(v)
             keptCoeffs.add(row.coeff(i))
         }
-        return Linear(keptCoeffs.toLongArray(), keptVars.toIntArray(), factor.op, row.bound)
+        return Linear(keptCoeffs.toLongArray(), keptVars.toIntArray(), linear.op, row.bound)
     }
 
     /** Whether any variable in [touched] is column-eligible with at least one [Linear] occurrence — the
@@ -167,7 +168,7 @@ internal object DuplicateColumns {
             var onlyLinear = true
             for (k in start until end) {
                 val g = problem.factors[occ.flat[k]]
-                if (g !is Linear || g.integerConstants == null) {
+                if (g.equivalentLinear()?.integerConstants == null) {
                     onlyLinear = false
                     break
                 }
@@ -193,7 +194,7 @@ internal object DuplicateColumns {
         for (f in factors) {
             // Only integer [Linear] columns are aggregatable; a variable in any other factor — including a
             // continuous (real-bearing) Linear, whose reals the integer rewrite would drop — is ineligible.
-            if (f is Linear && f.integerConstants != null) continue
+            if (f.equivalentLinear()?.integerConstants != null) continue
             for (v in f.intVars) eligible[v] = false
         }
         return eligible
@@ -205,8 +206,8 @@ internal object DuplicateColumns {
      *  Ineligible variables, and variables in no factor, get a `null` signature and never match. */
     private fun columnSignatures(factors: Array<Factor>, numIntVars: Int, eligible: BooleanArray): Array<List<Long>?> {
         val entries = Array(numIntVars) { if (eligible[it]) ArrayList<Long>() else null }
-        factors.forEachIndexed { fid, f ->
-            if (f !is Linear) return@forEachIndexed
+        factors.forEachIndexed { fid, factor ->
+            val f = factor.equivalentLinear() ?: return@forEachIndexed
             val row = f.integerConstants ?: return@forEachIndexed
             val coeffByVar = MutableIntLongMap(f.vars.size)
             for (i in f.vars.indices) coeffByVar.put(f.vars[i], row.coeff(i))

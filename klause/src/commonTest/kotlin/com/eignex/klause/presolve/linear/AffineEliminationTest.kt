@@ -7,6 +7,7 @@ import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.factor.table.Element
 import com.eignex.klause.factor.table.Table
+import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
@@ -15,8 +16,10 @@ import com.eignex.klause.presolve.Presolve
 import com.eignex.klause.presolve.PresolveShared.withPassDelta
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.PropagationResult
+import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.propagation.propagate
+import com.eignex.klause.propagation.propagatorProjection
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import kotlin.test.Test
@@ -29,6 +32,18 @@ import kotlin.test.assertTrue
  * including folding the affine relation into other linear factors and chained eliminations.
  */
 class AffineEliminationTest {
+
+    @Test
+    fun `affine elimination folds declared rows and reconstructs a feasible assignment`() {
+        val rows = listOf(
+            Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 1),
+            Linear(intArrayOf(2, 1), intArrayOf(0, 1), LinearOp.LE, 7),
+        )
+        val factors = rows.map { object : Factor by it, Propagator by it.propagatorProjection() {} }
+        val model = Problem(0, 2, Array(2) { IntDomain(0, 3) }, factors)
+
+        checkRoundTrip("declared rows", model, expectEliminated = true, expectSat = true)
+    }
 
     private fun isFeasible(problem: Problem, sample: Sample): Boolean {
         var a = Assumptions.None

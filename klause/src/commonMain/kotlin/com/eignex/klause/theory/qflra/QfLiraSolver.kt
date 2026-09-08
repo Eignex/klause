@@ -401,7 +401,7 @@ private class ExactIntegerSearch(
                                 Array(model.numIntVars) { integer -> source[model.numRealVars + integer].num },
                                 List(model.numRealVars) { real -> source[real] },
                             ).also {
-                                telemetry?.let { (strict, wide) -> observer?.observeWitnessAccepted(strict, wide) }
+                                telemetry?.let { (strict, wide) -> observer.observeWitnessAccepted(strict, wide) }
                             }
                         } else {
                             null

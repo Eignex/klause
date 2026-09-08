@@ -6,6 +6,7 @@ import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.bool.PseudoBoolean
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.factor.global.Increasing
+import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
@@ -72,6 +73,38 @@ class RedundantConstraintsTest {
     private fun dom(n: Int, hi: Int) = Array(n) { IntDomain(0, hi.toLong()) }
     private fun le(b: Int, vararg vc: Int) =
         Linear(IntArray(vc.size / 2) { vc[2 * it + 1] }, IntArray(vc.size / 2) { vc[2 * it] }, LinearOp.LE, b)
+
+    @Test
+    fun `a declared knapsack implied by a clique is dropped without finite domains`() {
+        val source = PseudoBoolean(longArrayOf(5, 2, 2), intArrayOf(pos(0), pos(1), pos(2)), PbOp.LE, 7)
+        val model = Problem(
+            3,
+            0,
+            emptyArray(),
+            listOf(Cardinality(intArrayOf(pos(1), pos(2)), 0, 1), object : Factor by source {}),
+        )
+
+        val delta = Presolve.removeRedundantSourceConstraints(model, Cancellation.Never)
+
+        assertEquals(listOf(1), delta.droppedIndices.toList())
+    }
+
+    @Test
+    fun `a clique cover counts every repeated literal coefficient`() {
+        val model = Problem(
+            2,
+            0,
+            emptyArray(),
+            listOf(
+                Cardinality(intArrayOf(pos(0), pos(1)), 0, 1),
+                PseudoBoolean(longArrayOf(2, 2, 1), intArrayOf(pos(0), pos(0), pos(1)), PbOp.LE, 3),
+            ),
+        )
+
+        val delta = Presolve.removeRedundantSourceConstraints(model, Cancellation.Never)
+
+        assertTrue(1 !in delta.droppedIndices)
+    }
 
     @Test
     fun `dominated less-equal constraint is dropped`() {

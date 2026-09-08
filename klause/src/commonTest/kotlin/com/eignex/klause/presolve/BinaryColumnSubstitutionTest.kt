@@ -13,8 +13,10 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.values
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.PropagationResult
+import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.propagation.propagate
+import com.eignex.klause.propagation.propagatorProjection
 import com.eignex.klause.solver.Sample
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -28,6 +30,19 @@ import kotlin.test.assertTrue
  * integer values the literals carry.
  */
 class BinaryColumnSubstitutionTest {
+
+    @Test
+    fun `a declared binary row becomes a clause with a feasible reconstruction`() {
+        val source = Linear(longArrayOf(1, 1, 1), intArrayOf(0, 1, 2), LinearOp.GE, 1)
+        val model = problem(3, listOf(object : Factor by source, Propagator by source.propagatorProjection() {}))
+
+        val result = checkNotNull(substitute(model))
+
+        assertEquals(3, result.columns)
+        assertEquals(1, result.problem.factors.count { it is Clause })
+        val sample = result.reconstruct(Sample(booleanArrayOf(true, false, false), longArrayOf(0, 0, 0)))
+        assertTrue(satisfies(model, sample.bools, sample.ints))
+    }
 
     private fun binary(n: Int) = Array<IntDomain>(n) { IntDomain(0, 1) }
 

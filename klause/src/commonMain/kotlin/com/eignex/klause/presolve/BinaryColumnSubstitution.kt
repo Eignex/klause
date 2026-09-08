@@ -81,10 +81,11 @@ internal object BinaryColumnSubstitution {
 
         // The `≥`-form right-hand side of each row after positive-weight normalisation, computed once here
         // and reused by the rewrite; `null` marks a factor that cannot become a pseudo-Boolean relation.
+        val rows = Array(factors.size) { factors[it].equivalentLinear() }
         val normalizedBound = arrayOfNulls<Long>(factors.size)
         for (i in factors.indices) {
-            val f = factors[i]
-            if (f is Linear) normalizedBound[i] = normalizedBound(f)
+            val row = rows[i]
+            if (row != null) normalizedBound[i] = normalizedBound(row)
         }
         val occurrence = intOccurrence(problem)
         disqualifyToFixpoint(problem, substitutable, normalizedBound, occurrence)
@@ -105,11 +106,12 @@ internal object BinaryColumnSubstitution {
         for (i in factors.indices) {
             val f = factors[i]
             val bound = normalizedBound[i]
-            if (bound == null || f !is Linear || !f.vars.all { boolOf[it] >= 0 }) {
+            val row = rows[i]
+            if (bound == null || row == null || !row.vars.all { boolOf[it] >= 0 }) {
                 out.add(f)
                 continue
             }
-            out.addAll(lower(f, boolOf, bound))
+            out.addAll(lower(row, boolOf, bound))
         }
         val domains = problem.rootIntDomains()
         for (k in 0 until columns.size) domains[columns[k]] = IntDomain(0, 0)

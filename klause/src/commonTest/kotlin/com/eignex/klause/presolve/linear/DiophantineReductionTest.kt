@@ -3,14 +3,18 @@ package com.eignex.klause.presolve.linear
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.LinearForm
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.linearRows
 import com.eignex.klause.presolve.BakeConfig
 import com.eignex.klause.presolve.PresolveShared.withPassDelta
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.PropagationResult
+import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.propagation.propagate
+import com.eignex.klause.propagation.propagatorProjection
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertIs
@@ -19,6 +23,22 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class DiophantineReductionTest {
+
+    @Test
+    fun `an implied equality carves off-residue values without replacing its factor`() {
+        val source = Linear(longArrayOf(2, 3, 3), intArrayOf(0, 1, 2), LinearOp.EQ, 10)
+        val factor = object : Factor by source, Propagator by source.propagatorProjection() {
+            override val linearForm: LinearForm = LinearForm.Relaxation(source.linearRows)
+        }
+        val model = problem(arrayOf(IntDomain(0, 5), IntDomain(0, 2), IntDomain(0, 2)), factor)
+
+        val delta = DiophantineReduction.reduce(model)
+
+        val domain = assertNotNull(delta.domains)[0]
+        assertTrue(3L !in domain && 4L !in domain)
+        assertTrue(2L in domain && 5L in domain)
+        assertTrue(delta.droppedIndices.isEmpty())
+    }
 
     private fun problem(domains: Array<IntDomain>, vararg factors: Factor) =
         Problem(numBoolVars = 0, numIntVars = domains.size, intDomains = domains, factors = factors.toList()).bake()

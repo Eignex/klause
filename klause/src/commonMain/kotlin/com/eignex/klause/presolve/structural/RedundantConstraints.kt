@@ -16,7 +16,6 @@ import com.eignex.klause.ir.StructuralKey
 import com.eignex.klause.ir.Term
 import com.eignex.klause.ir.impliedLinearRows
 import com.eignex.klause.ir.linearRows
-import com.eignex.klause.model.PbOp
 import com.eignex.klause.presolve.ColumnRanges
 import com.eignex.klause.presolve.PassDelta
 import com.eignex.klause.presolve.PresolveShared
@@ -24,11 +23,13 @@ import com.eignex.klause.presolve.SourceDelta
 import com.eignex.klause.presolve.SubsumeState
 import com.eignex.klause.presolve.asSourceDelta
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.CheckedLongOverflowException
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.MutableIntLongMap
 import com.eignex.klause.util.MutableLongIntMap
 import com.eignex.klause.util.MutableLongObjectMap
+import com.eignex.klause.util.addExact
 import com.eignex.kumulant.math.splitmix64
 
 /** Marks a bool var id into a range disjoint from int var ids in [RedundantConstraints.shallowKey]'s
@@ -613,7 +614,12 @@ internal object RedundantConstraints {
         if (cliques.isEmpty()) return factors
         val out = ArrayList<Factor>(factors.size)
         for (f in factors) {
-            if (f is PseudoBoolean && f.op == PbOp.LE && cliqueImpliesKnapsack(f, cliques)) continue
+            val row = (f.linearForm as? LinearForm.Conjunction)?.rows?.singleOrNull()
+            if (row != null && row.relation == LinearOp.LE && row.isLongUnconditional &&
+                (0 until row.size).all { Term.isBool(row.ref(it)) } && cliqueImpliesKnapsack(row, cliques)
+            ) {
+                continue
+            }
             out.add(f)
         }
         return out
@@ -622,12 +628,21 @@ internal object RedundantConstraints {
     /** Whether the AMO [cliques] force `Σ wⱼ·lⱼ ≤ bound` (all weights > 0): greedily cover the
      *  knapsack literals with cliques (each contributing only its max assigned weight) and compare the
      *  resulting activity upper bound to the bound. */
-    private fun cliqueImpliesKnapsack(knapsack: PseudoBoolean, cliques: List<Set<Int>>): Boolean {
-        if (knapsack.weights.any { it <= 0 }) return false
+    private fun cliqueImpliesKnapsack(knapsack: LinearRow, cliques: List<Set<Int>>): Boolean = try {
+        cliqueActivityWithinBound(knapsack, cliques)
+    } catch (_: CheckedLongOverflowException) {
+        false
+    }
+
+    private fun cliqueActivityWithinBound(knapsack: LinearRow, cliques: List<Set<Int>>): Boolean {
+        if ((0 until knapsack.size).any { knapsack.coeff(it) <= 0L }) return false
         // Every weight is > 0 (guarded above), so 0 doubles as the "literal not in the knapsack"
         // sentinel for [MutableIntLongMap.getOrDefault].
-        val weightByLit = MutableIntLongMap(knapsack.literals.size)
-        for (i in knapsack.literals.indices) weightByLit.put(knapsack.literals[i], knapsack.weights[i])
+        val weightByLit = MutableIntLongMap(knapsack.size)
+        for (i in 0 until knapsack.size) {
+            val literal = Term.lit(knapsack.ref(i))
+            weightByLit.put(literal, addExact(weightByLit.getOrDefault(literal, 0L), knapsack.coeff(i)))
+        }
         val assigned = IntHashSet()
         var activity = 0L
         for (clique in cliques) {
@@ -641,9 +656,9 @@ internal object RedundantConstraints {
                 assigned.add(lit)
                 if (w > maxW) maxW = w
             }
-            if (any) activity += maxW
+            if (any) activity = addExact(activity, maxW)
         }
-        for (lit in knapsack.literals) if (lit !in assigned) activity += weightByLit.getOrDefault(lit, 0L)
+        weightByLit.forEach { lit, weight -> if (lit !in assigned) activity = addExact(activity, weight) }
         return activity <= knapsack.bound
     }
 
