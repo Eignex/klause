@@ -1,7 +1,7 @@
 package com.eignex.klause.presolve.linear
 
-import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.presolve.AffinePivotOrder
+import com.eignex.klause.presolve.equivalentLinear
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.LongArrayList
@@ -112,10 +112,10 @@ internal object AffinePivotOrders {
         }
 
         private fun estimatedCost(id: Int): Long {
-            val f = ws.factorAt(id) ?: return 0L
+            val f = ws.factorAt(id)?.equivalentLinear() ?: return 0L
             val vars = f.intVars
             if (vars.size < 2) return 0L
-            val row = (f as? Linear)?.integerConstants
+            val row = f.integerConstants
             if (row != null) {
                 for (xi in f.vars.indices) {
                     val x = f.vars[xi]

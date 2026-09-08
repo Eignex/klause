@@ -4,17 +4,21 @@ import com.eignex.klause.factor.litVars
 import com.eignex.klause.ir.BoolVars
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.FactorKind
+import com.eignex.klause.ir.IntegerConstants
 import com.eignex.klause.ir.KeySink
+import com.eignex.klause.ir.LinearForm
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.LinearRow
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.StructuralKey
 import com.eignex.klause.ir.Term
+import com.eignex.klause.ir.UnitConsts
 import com.eignex.klause.ir.VarList
 import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.ir.hashRemappedKey
 import com.eignex.klause.ir.materializeKey
 import com.eignex.klause.util.IntHashSet
+import kotlin.concurrent.Volatile
 
 /**
  * Disjunction of Boolean literals.
@@ -55,10 +59,6 @@ class Clause(literals: IntArray) :
 
     override val variables: VarList = BoolVars(literals.litVars())
 
-    override val integerTheoryOwnable: Boolean get() = true
-
-    override val exactTheoryOwnable: Boolean get() = true
-
     /** CP-only memo: are all literals plain bool vars (no atom-lits)? Encoded as a primitive
      *  tri-state (−1 unknown / 0 no / 1 yes) rather than a boxed `Boolean?`, since this is read
      *  once per clause fire on the BCP hot path and a boxed read costs a load + null-check +
@@ -92,7 +92,17 @@ class Clause(literals: IntArray) :
     override fun ref(k: Int): Int = Term.ofLit(literals[k])
     override fun coeff(k: Int): Long = 1L
     override val isIntegerOnly: Boolean get() = false
-    override val linearRows: List<LinearRow> get() = listOf(this)
+
+    @Volatile
+    private var cachedConstants: IntegerConstants? = null
+
+    @Volatile
+    private var cachedForm: LinearForm? = null
+
+    override val constants: IntegerConstants
+        get() = cachedConstants ?: IntegerConstants(UnitConsts(size), 1L).also { cachedConstants = it }
+    override val linearForm: LinearForm
+        get() = cachedForm ?: LinearForm.Conjunction(listOf(this)).also { cachedForm = it }
 
     private companion object {
         fun distinctLiterals(literals: IntArray): IntArray {

@@ -1,5 +1,12 @@
 package com.eignex.klause.solver
 
+import com.eignex.klause.ir.IntConsts
+import com.eignex.klause.ir.LongConsts
+import com.eignex.klause.ir.RealConsts
+import com.eignex.klause.ir.UnitConsts
+import com.eignex.klause.ir.WideConsts
+import com.eignex.klause.ir.constsOf
+import com.eignex.klause.ir.longsOrNull
 import com.ionspin.kotlin.bignum.integer.BigInteger
 import kotlin.test.Test
 import kotlin.test.assertEquals

@@ -1,15 +1,15 @@
 package com.eignex.klause.lp
 
-import com.eignex.klause.factor.arithmetic.FactorRow
 import com.eignex.klause.factor.arithmetic.internals.predecessorOrNull
 import com.eignex.klause.factor.arithmetic.internals.successorOrNull
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.LinearRow
 import com.eignex.klause.util.CheckedLongOverflowException
 import com.eignex.klause.util.addExact
 import com.eignex.klause.util.mulExact
 import com.eignex.klause.util.subExact
 
-internal fun FactorRow.Doubles.emitReifiedIntegerLpRelaxation(builder: RelaxationBuilder) {
+internal fun LinearRow.emitReifiedIntegerLpRelaxation(builder: RelaxationBuilder) {
     val coeffs = integerCoeffs ?: return
     val row = IntegerRow(coeffs, requireNotNull(integerBound))
     try {
@@ -23,16 +23,17 @@ internal fun FactorRow.Doubles.emitReifiedIntegerLpRelaxation(builder: Relaxatio
 /** Exact convex-hull rows for `aux ⇔ (c·v == bound)` when `v` has a two-value root box the model
  *  itself states — over an invented endpoint the box is a search restriction, and the equality it
  *  linearizes would hold only inside it. */
-private fun FactorRow.Doubles.emitExactBinaryEquality(builder: RelaxationBuilder, row: IntegerRow): Boolean {
-    if (op != LinearOp.EQ || intVars.size != 1) return false
+private fun LinearRow.emitExactBinaryEquality(builder: RelaxationBuilder, row: IntegerRow): Boolean {
+    val variables = intVars
+    if (relation != LinearOp.EQ || variables.size != 1) return false
     val c = row.coeffs[0]
     if (c == 0L) return false
-    if (!builder.statesBothBounds(intVars[0])) return false
-    val dec = builder.rootDomain(intVars[0])
+    if (!builder.statesBothBounds(variables[0])) return false
+    val dec = builder.rootDomain(variables[0])
     if (dec.valueCount != 2L) return false
     val loValue = mulExact(c, dec.min)
     val hiValue = mulExact(c, dec.max)
-    val vCol = builder.intColumn(intVars[0])
+    val vCol = builder.intColumn(variables[0])
     val auxCol = builder.boolColumn(activator)
     when (row.bound) {
         hiValue -> builder.row(
@@ -57,7 +58,7 @@ private fun FactorRow.Doubles.emitExactBinaryEquality(builder: RelaxationBuilder
 /**
  * Indicator rows via big-M, each side gated on the row's own activation bound being one the model states.
  *
- * `lMax` and `lMin` are what the big-M is: the row is `Σ c·x ⟨op⟩ bound` slackened by the widest the left
+ * `lMax` and `lMin` are what the big-M is: the row is `Σ c·x ⟨relation⟩ bound` slackened by the widest the left
  * side can reach, so an endpoint the model never stated makes the slack an invention. The row then holds
  * inside the search box only — and at the root the column enters the LP genuinely open, where it holds
  * nowhere.
@@ -66,13 +67,14 @@ private fun FactorRow.Doubles.emitExactBinaryEquality(builder: RelaxationBuilder
  * and `≥` the two rows are the reification's two independent implications, and on `=` and `≠` they are
  * the two halves of a single one, which the survivor then states in one direction alone.
  */
-private fun FactorRow.Doubles.emitBigMRows(builder: RelaxationBuilder, row: IntegerRow) {
+private fun LinearRow.emitBigMRows(builder: RelaxationBuilder, row: IntegerRow) {
+    val variables = intVars
     var maxStated = true
     var minStated = true
-    for (k in intVars.indices) {
+    for (k in variables.indices) {
         val c = row.coeffs[k]
         if (c == 0L) continue // a zero coefficient reads neither endpoint
-        val v = intVars[k]
+        val v = variables[k]
         maxStated = maxStated && if (c > 0L) builder.statesUpperBound(v) else builder.statesLowerBound(v)
         minStated = minStated && if (c > 0L) builder.statesLowerBound(v) else builder.statesUpperBound(v)
     }
@@ -83,9 +85,9 @@ private fun FactorRow.Doubles.emitBigMRows(builder: RelaxationBuilder, row: Inte
     var lMax = 0L
     var lMinD = 0L
     var lMaxD = 0L
-    for (k in intVars.indices) {
+    for (k in variables.indices) {
         val c = row.coeffs[k]
-        val v = intVars[k]
+        val v = variables[k]
         val dom = builder.liveDomain(v)
         val dec = builder.rootDomain(v)
         if (maxStated) {
@@ -101,18 +103,18 @@ private fun FactorRow.Doubles.emitBigMRows(builder: RelaxationBuilder, row: Inte
     val b = row.bound
 
     fun emit(auxCoeff: Long, rowOp: LinearOp, rhs: Long, global: Boolean, maxSide: Boolean) {
-        val cols = IntArray(intVars.size + 1)
-        val vals = LongArray(intVars.size + 1)
-        for (k in intVars.indices) {
-            cols[k] = builder.intColumn(intVars[k])
+        val cols = IntArray(variables.size + 1)
+        val vals = LongArray(variables.size + 1)
+        for (k in variables.indices) {
+            cols[k] = builder.intColumn(variables[k])
             vals[k] = row.coeffs[k]
         }
-        cols[intVars.size] = a
-        vals[intVars.size] = auxCoeff
+        cols[variables.size] = a
+        vals[variables.size] = auxCoeff
         builder.bigMRow(cols, vals, rowOp, rhs, global, maxSide)
     }
 
-    when (op) {
+    when (relation) {
         LinearOp.LE -> {
             if (maxStated) {
                 val m1 = maxOf(0L, subExact(lMax, b))

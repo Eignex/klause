@@ -7,12 +7,15 @@ import com.eignex.klause.factor.bool.PseudoBoolean
 import com.eignex.klause.factor.bool.internals.maximalPersistentAmoCliques
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.ir.Factor
+import com.eignex.klause.ir.IntegerConstants
+import com.eignex.klause.ir.LinearForm
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.LinearRow
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.StructuralKey
 import com.eignex.klause.ir.Term
-import com.eignex.klause.model.PbOp
+import com.eignex.klause.ir.impliedLinearRows
+import com.eignex.klause.ir.linearRows
 import com.eignex.klause.presolve.ColumnRanges
 import com.eignex.klause.presolve.PassDelta
 import com.eignex.klause.presolve.PresolveShared
@@ -20,11 +23,13 @@ import com.eignex.klause.presolve.SourceDelta
 import com.eignex.klause.presolve.SubsumeState
 import com.eignex.klause.presolve.asSourceDelta
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.CheckedLongOverflowException
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.MutableIntLongMap
 import com.eignex.klause.util.MutableLongIntMap
 import com.eignex.klause.util.MutableLongObjectMap
+import com.eignex.klause.util.addExact
 import com.eignex.kumulant.math.splitmix64
 
 /** Marks a bool var id into a range disjoint from int var ids in [RedundantConstraints.shallowKey]'s
@@ -482,6 +487,12 @@ internal object RedundantConstraints {
      *  plain put per index is faithful; zero coefficients carry no support (and would divide by zero in
      *  the dominance ratio check), so skip them. */
     private fun leRowOf(row: LinearRow, factorIndex: Int): LeRow? {
+        if (!row.isLongUnconditional || row.bound == Long.MIN_VALUE ||
+            (0 until row.size).any { row.coeff(it) == Long.MIN_VALUE }
+        ) {
+            return null
+        }
+        if ((0 until row.size).map(row::ref).toSet().size != row.size) return null
         val raw = LongArray(row.size) { row.coeff(it) }
         val (coeffs, bound) = when (row.relation) {
             LinearOp.LE -> raw to row.bound
@@ -521,10 +532,10 @@ internal object RedundantConstraints {
         val candidates = ArrayList<LeRow>()
         for (i in factors.indices) {
             val f = factors[i]
-            val fRows = f.linearRows
+            val fRows = f.impliedLinearRows
             // This monotone-domination scan reads the integer side; skip Boolean-literal rows for now.
             if (fRows.isEmpty() || fRows.any { !it.isIntegerOnly }) continue
-            val droppable = f is Linear
+            val droppable = f.linearForm is LinearForm.Conjunction && f.linearRows.size == 1
             for (row in fRows) {
                 val le = leRowOf(row, i) ?: continue
                 dominators.add(le)
@@ -603,7 +614,12 @@ internal object RedundantConstraints {
         if (cliques.isEmpty()) return factors
         val out = ArrayList<Factor>(factors.size)
         for (f in factors) {
-            if (f is PseudoBoolean && f.op == PbOp.LE && cliqueImpliesKnapsack(f, cliques)) continue
+            val row = (f.linearForm as? LinearForm.Conjunction)?.rows?.singleOrNull()
+            if (row != null && row.relation == LinearOp.LE && row.isLongUnconditional &&
+                (0 until row.size).all { Term.isBool(row.ref(it)) } && cliqueImpliesKnapsack(row, cliques)
+            ) {
+                continue
+            }
             out.add(f)
         }
         return out
@@ -612,12 +628,21 @@ internal object RedundantConstraints {
     /** Whether the AMO [cliques] force `Σ wⱼ·lⱼ ≤ bound` (all weights > 0): greedily cover the
      *  knapsack literals with cliques (each contributing only its max assigned weight) and compare the
      *  resulting activity upper bound to the bound. */
-    private fun cliqueImpliesKnapsack(knapsack: PseudoBoolean, cliques: List<Set<Int>>): Boolean {
-        if (knapsack.weights.any { it <= 0 }) return false
+    private fun cliqueImpliesKnapsack(knapsack: LinearRow, cliques: List<Set<Int>>): Boolean = try {
+        cliqueActivityWithinBound(knapsack, cliques)
+    } catch (_: CheckedLongOverflowException) {
+        false
+    }
+
+    private fun cliqueActivityWithinBound(knapsack: LinearRow, cliques: List<Set<Int>>): Boolean {
+        if ((0 until knapsack.size).any { knapsack.coeff(it) <= 0L }) return false
         // Every weight is > 0 (guarded above), so 0 doubles as the "literal not in the knapsack"
         // sentinel for [MutableIntLongMap.getOrDefault].
-        val weightByLit = MutableIntLongMap(knapsack.literals.size)
-        for (i in knapsack.literals.indices) weightByLit.put(knapsack.literals[i], knapsack.weights[i])
+        val weightByLit = MutableIntLongMap(knapsack.size)
+        for (i in 0 until knapsack.size) {
+            val literal = Term.lit(knapsack.ref(i))
+            weightByLit.put(literal, addExact(weightByLit.getOrDefault(literal, 0L), knapsack.coeff(i)))
+        }
         val assigned = IntHashSet()
         var activity = 0L
         for (clique in cliques) {
@@ -631,9 +656,9 @@ internal object RedundantConstraints {
                 assigned.add(lit)
                 if (w > maxW) maxW = w
             }
-            if (any) activity += maxW
+            if (any) activity = addExact(activity, maxW)
         }
-        for (lit in knapsack.literals) if (lit !in assigned) activity += weightByLit.getOrDefault(lit, 0L)
+        weightByLit.forEach { lit, weight -> if (lit !in assigned) activity = addExact(activity, weight) }
         return activity <= knapsack.bound
     }
 
@@ -647,12 +672,13 @@ internal object RedundantConstraints {
 
     /** Every exact [LinearRow] of [f] as `≤`-normalised [IneqForm]s (each `=` row carries its opposite
      *  direction), for offering into the dominator buckets. Clause-shaped rows are skipped (see [rowForm]). */
-    private fun offerForms(f: Factor): List<IneqForm> = f.linearRows.mapNotNull { rowForm(it) }
+    private fun offerForms(f: Factor): List<IneqForm> = f.impliedLinearRows.mapNotNull { rowForm(it) }
 
     /** The `≤`-normalised [IneqForm] of [f] when it is a single-row inequality (the only shape this pass
      *  drops as dominated), else `null` — a multi-row factor (cardinality, increasing chain) offers its
      *  rows but is never itself dropped here. */
-    private fun dropForm(f: Factor): IneqForm? = f.linearRows.singleOrNull()?.let { rowForm(it) }
+    private fun dropForm(f: Factor): IneqForm? =
+        if (f.linearForm is LinearForm.Conjunction) f.impliedLinearRows.singleOrNull()?.let { rowForm(it) } else null
 
     /**
      * A single exact [LinearRow] as its `≤`-normalised [IneqForm], keyed uniformly over the row's tagged
@@ -663,7 +689,13 @@ internal object RedundantConstraints {
      * phase-2 no-op (clause subsumption is BVE's job).
      */
     private fun rowForm(row: LinearRow): IneqForm? {
+        if (row.constants !is IntegerConstants) return null
         if (isPureClause(row)) return null
+        if (!row.isLongUnconditional || row.bound == Long.MIN_VALUE ||
+            (0 until row.size).any { row.coeff(it) == Long.MIN_VALUE }
+        ) {
+            return null
+        }
         val refs = IntArray(row.size) { row.ref(it) }
         val coeffs = LongArray(row.size) { row.coeff(it) }
         return when (row.relation) {

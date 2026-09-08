@@ -151,14 +151,7 @@ internal fun Problem.closeOpenBounds(
 }
 
 /** Unconditional integer rows plus the integer rows a root unit clause asserts. */
-private fun Problem.openPresolveRows(): List<Linear> {
-    val rows = ArrayList<Linear>()
-    for (factor in factors) {
-        if (factor is Linear) rows += roundIntegerRow(factor)
-    }
-    for (row in rootFixedReifiedRows(factors.asList())) rows += roundIntegerRow(row)
-    return rows
-}
+private fun Problem.openPresolveRows(): List<Linear> = presolveLinearRows(factors.asList()).map(::roundIntegerRow)
 
 /** Divide a whole integer inequality by its coefficient gcd, rounding its bound inward. */
 private fun roundIntegerRow(row: Linear): Linear {

@@ -1,6 +1,7 @@
 package com.eignex.klause.solver
 
 import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.indices
 import com.eignex.klause.ir.randomValue
 import com.eignex.klause.util.Bits
 import com.eignex.klause.util.EmptyDoubleArray

@@ -2,11 +2,14 @@ package com.eignex.klause.presolve.linear
 
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.bool.PseudoBoolean
+import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.LinearForm
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.linearRows
 import com.eignex.klause.ir.values
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.presolve.BakeConfig
@@ -32,6 +35,80 @@ import kotlin.test.assertTrue
  * enumerating the whole assignment space.
  */
 class CoefficientStrengtheningTest {
+
+    @Test
+    fun `a declared Boolean row is strengthened without changing its solutions`() {
+        val source = PseudoBoolean(longArrayOf(2, 4), intArrayOf(Lit.make(0, true), Lit.make(1, true)), PbOp.LE, 5)
+        val model = Problem(2, 0, emptyArray(), listOf(object : Factor by source {}))
+
+        val delta = CoefficientStrengthening.strengthenCoefficients(model)
+
+        assertEquals(listOf(0), delta.droppedIndices.toList())
+        val rewritten = assertIs<PseudoBoolean>(delta.addedFactors.single())
+        for (mask in 0..3) {
+            val assignment = BooleanArray(2) { (mask and (1 shl it)) != 0 }
+            assertEquals(evalPb(source, assignment), evalPb(rewritten, assignment))
+        }
+    }
+
+    @Test
+    fun `declared integer rows are strengthened with finite and open source bounds`() {
+        val source = Linear(intArrayOf(2, 4), intArrayOf(0, 1), LinearOp.LE, 5)
+        val factor = object : Factor by source {}
+        for (open in listOf(false, true)) {
+            val flags = if (open) Bits(2).also { bits -> repeat(2, bits::set) } else null
+            val model = Problem(
+                numBoolVars = 0,
+                intBounds = IntBounds.fromModelBounds(longArrayOf(0, 0), longArrayOf(5, 5), flags, flags),
+                factors = arrayOf(factor),
+            )
+
+            val delta = CoefficientStrengthening.strengthenCoefficients(model)
+
+            assertEquals(listOf(0), delta.droppedIndices.toList())
+            val reduced = assertIs<Linear>(delta.addedFactors.single())
+            assertEquals(listOf(1L, 2L), checkNotNull(reduced.integerConstants).coeffs.toList())
+            assertEquals(2L, reduced.integerConstants?.bound)
+        }
+    }
+
+    @Test
+    fun `an unchanged declared row does not replace its factor`() {
+        val factor = object : Factor by Linear(intArrayOf(1, 2), intArrayOf(0, 1), LinearOp.LE, 5) {}
+        val model = Problem(0, 2, Array(2) { IntDomain(0, 5) }, listOf(factor))
+
+        val delta = CoefficientStrengthening.strengthenCoefficients(model)
+
+        assertTrue(delta.isEmpty)
+    }
+
+    @Test
+    fun `strengthening an implied row does not replace its enclosing factor`() {
+        val source = Linear(intArrayOf(2, 4), intArrayOf(0, 1), LinearOp.LE, 5)
+        for (form in listOf(LinearForm.Relaxation(source.linearRows), LinearForm.Disjunction(source.linearRows))) {
+            val factor = object : Factor by source {
+                override val linearForm: LinearForm = form
+            }
+            val model = Problem(0, 2, Array(2) { IntDomain(0, 5) }, listOf(factor))
+
+            val delta = CoefficientStrengthening.strengthenCoefficients(model)
+
+            assertTrue(delta.isEmpty)
+        }
+    }
+
+    @Test
+    fun `an indivisible implied equality refutes its enclosing factor`() {
+        val source = Linear(intArrayOf(2, 4), intArrayOf(0, 1), LinearOp.EQ, 3)
+        val factor = object : Factor by source {
+            override val linearForm: LinearForm = LinearForm.Relaxation(source.linearRows)
+        }
+        val model = Problem(0, 2, Array(2) { IntDomain(0, 5) }, listOf(factor))
+
+        val delta = CoefficientStrengthening.strengthenCoefficients(model)
+
+        assertTrue(delta.infeasible)
+    }
 
     private fun strengthened(problem: BakedProblem): Problem =
         problem.withPassDelta(Presolve.strengthenCoefficients(problem), BakeConfig.NONE)

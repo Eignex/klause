@@ -1,11 +1,11 @@
 package com.eignex.klause.lp
 
-import com.eignex.klause.factor.arithmetic.ComparisonClause
-import com.eignex.klause.factor.arithmetic.FactorRow
-import com.eignex.klause.factor.arithmetic.linearRow
 import com.eignex.klause.ir.Factor
+import com.eignex.klause.ir.LinearForm
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.LinearRow
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.linearRows
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ExactRationalInequality
 import com.eignex.klause.simplex.exact.RationalSimplexObserver
@@ -63,9 +63,9 @@ internal fun Problem.objectiveUnboundedBelow(
  */
 internal fun Problem.statesOneBranch(): Boolean = factors.all { factor ->
     if (movesNoRay(factor)) return@all true
-    if (factor is ComparisonClause) return@all false
-    val row = factor.linearRow() ?: return@all false
-    row.activator == FactorRow.ALWAYS && row.op != LinearOp.NE
+    factor.linearForm is LinearForm.Conjunction && factor.linearRows.all { row ->
+        row.activator == LinearRow.ALWAYS && row.relation != LinearOp.NE
+    }
 }
 
 /** Whether every column the objective descends along is bounded on that side. */
@@ -95,21 +95,22 @@ private fun Problem.branchRowsAt(witness: ExactWitness): List<ExactRationalInequ
     }
     for (factor in factors) {
         if (movesNoRay(factor)) continue
-        val comparison = comparisonAt(factor, witness) ?: return null
-        comparison.rowsInto(rows, witness)
+        if (factor.linearForm is LinearForm.Relaxation || factor.linearForm == null) return null
+        val comparisons = factor.linearRows.map { row ->
+            row.exactComparison(
+                numRealVars,
+                row.activator == LinearRow.ALWAYS || witness.truth(row.activator),
+                witness::truth,
+            )
+        }
+        if (factor.linearForm is LinearForm.Disjunction) {
+            val selected = comparisons.firstOrNull { it.holdsAt(witness) } ?: return null
+            selected.rowsInto(rows, witness)
+        } else {
+            for (comparison in comparisons) comparison.rowsInto(rows, witness)
+        }
     }
     return rows
-}
-
-/** The comparison [factor] states in the branch [witness] lies in, or `null` when it states none. */
-private fun Problem.comparisonAt(factor: Factor, witness: ExactWitness): ExactComparison? {
-    if (factor is ComparisonClause) {
-        val literal = factor.satisfiedLiteralAt(numRealVars, witness) ?: return null
-        return factor.exactComparison(numRealVars, literal)
-    }
-    val row = factor.linearRow() ?: return null
-    val activator = row.activator
-    return row.exactComparison(numRealVars, activator == FactorRow.ALWAYS || witness.truth(activator))
 }
 
 /**
@@ -124,15 +125,12 @@ private fun Problem.movesNoRay(factor: Factor): Boolean =
     factor.intVars.all { intBounds.hasLower(it) && intBounds.hasUpper(it) } &&
         factor.variables.reals.all { realLower[it].isFinite() && realUpper[it].isFinite() }
 
-/** The clause's first literal [witness] satisfies. */
-private fun ComparisonClause.satisfiedLiteralAt(realColumns: Int, witness: ExactWitness): Int? =
-    vars.indices.firstOrNull { literal ->
-        val value = witness.at(realColumns + vars[literal])
-        val constant = BigFraction.ofLong(consts[literal])
-        when (ops[literal]) {
-            LinearOp.LE -> value <= constant
-            LinearOp.GE -> value >= constant
-            LinearOp.EQ -> value == constant
-            LinearOp.NE -> value != constant
-        }
+private fun ExactComparison.holdsAt(witness: ExactWitness): Boolean {
+    val value = activityAt(witness)
+    return when (op) {
+        LinearOp.LE -> if (strict) value < bound else value <= bound
+        LinearOp.GE -> if (strict) value > bound else value >= bound
+        LinearOp.EQ -> value == bound
+        LinearOp.NE -> value != bound
     }
+}

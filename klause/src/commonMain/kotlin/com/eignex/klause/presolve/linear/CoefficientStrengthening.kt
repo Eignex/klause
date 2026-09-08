@@ -3,13 +3,20 @@ package com.eignex.klause.presolve.linear
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.bool.PseudoBoolean
 import com.eignex.klause.ir.Factor
+import com.eignex.klause.ir.IntegerConstants
+import com.eignex.klause.ir.LinearForm
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.Term
+import com.eignex.klause.ir.UnitConsts
+import com.eignex.klause.ir.impliedLinearRows
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.presolve.ColumnRanges
 import com.eignex.klause.presolve.PassDelta
 import com.eignex.klause.presolve.PresolveShared
+import com.eignex.klause.presolve.equivalentLinear
+import com.eignex.klause.presolve.equivalentPseudoBoolean
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.CheckedLongOverflowException
 import com.eignex.klause.util.IntArrayList
@@ -20,7 +27,7 @@ import com.eignex.klause.util.subExact
 internal object CoefficientStrengthening {
 
     /**
-     * GCD coefficient strengthening for [Linear] and [PseudoBoolean] constraints. If the
+     * GCD coefficient strengthening for exact integer and Boolean row declarations. If the
      * coefficients of an integer linear (or pseudo-Boolean) constraint share a common divisor
      * `g > 1`, dividing through by `g` shrinks the coefficients and, because the left-hand side
      * is then a multiple of `g`, lets the bound be tightened by flooring/ceiling:
@@ -31,7 +38,7 @@ internal object CoefficientStrengthening {
      *  - `Σ aⱼxⱼ ≠ b`: divisible ⟹ divide; otherwise the constraint is always true and is dropped.
      *
      * Exact (feasible-set-preserving) and it tightens the LP relaxation the bound participates in.
-     * Other factor types pass through untouched.
+     * Replacing a factor requires an equivalent single-row declaration.
      */
     fun strengthenCoefficients(
         problem: Problem,
@@ -52,17 +59,17 @@ internal object CoefficientStrengthening {
                 infeasible = true
                 break
             }
+            val linear = factor.equivalentLinear()
+            val pb = if (linear == null && canStrengthenBoolean(factor)) factor.equivalentPseudoBoolean() else null
+            val input = linear ?: pb ?: factor
             val rewritten = when {
-                factor is Linear && factor.integerConstants != null ->
-                    strengthenLinear(factor, ranges)
-
-                factor is PseudoBoolean -> strengthenPb(factor)
-
-                else -> factor
+                linear?.integerConstants != null -> strengthenLinear(linear, ranges)
+                pb != null -> strengthenPb(pb)
+                else -> input
             }
             // A rewrite replaces the input factor; a `null` drops it (always satisfied); an unchanged
             // factor contributes nothing to the delta.
-            if (rewritten !== factor) {
+            if (rewritten !== input) {
                 dropped.add(i)
                 if (rewritten != null) added.add(rewritten)
             }
@@ -71,23 +78,29 @@ internal object CoefficientStrengthening {
         return PassDelta(dropped.toIntArray(), added, infeasible = infeasible)
     }
 
+    private fun canStrengthenBoolean(factor: Factor): Boolean {
+        val row = (factor.linearForm as? LinearForm.Conjunction)?.rows?.singleOrNull() ?: return false
+        val constants = row.constants as? IntegerConstants ?: return false
+        val unit = constants.coefficients is UnitConsts || (0 until row.size).all { row.coeff(it) == 1L }
+        // Unit rows cannot be GCD-reduced or lifted; only a vacuous bound can remove them.
+        if (unit && when (row.relation) {
+                LinearOp.LE -> row.bound < row.size
+                LinearOp.GE -> row.bound > 0L
+                LinearOp.EQ, LinearOp.NE -> true
+            }
+        ) {
+            return false
+        }
+        return row.isLongUnconditional && (0 until row.size).all { Term.isBool(row.ref(it)) }
+    }
+
     /** Poll the cancellation once per this many strengthened factors (power-of-two mask for a cheap test). */
     private const val STRENGTHEN_CANCEL_POLL_MASK = 0x3FF
 
     /** Whether [factor] has an integer equality its coefficient GCD refutes without finite domains. */
-    private fun indivisibleEquality(factor: Factor): Boolean = when (factor) {
-        is Linear -> factor.integerConstants.let { row ->
-            if (row != null && factor.op == LinearOp.EQ && indivisible(row.coeffs, row.bound)) {
-                true
-            } else {
-                false
-            }
-        }
-
-        is PseudoBoolean ->
-            factor.op == PbOp.EQ && indivisible(factor.weights, factor.bound)
-
-        else -> false
+    private fun indivisibleEquality(factor: Factor): Boolean = factor.impliedLinearRows.any { row ->
+        row.relation == LinearOp.EQ && row.isLongUnconditional &&
+            indivisible((row.constants as IntegerConstants).coeffs, row.bound)
     }
 
     /** Whether `gcd(|coeffs|) > 1` fails to divide [bound] — the modular obstruction that makes an

@@ -3,16 +3,20 @@ package com.eignex.klause.solver.pipeline
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.global.AllDifferent
+import com.eignex.klause.factor.global.Increasing
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.FactorKind
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.IntVars
+import com.eignex.klause.ir.LinearForm
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.LinearRow
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.StructuralKey
 import com.eignex.klause.ir.VarList
 import com.eignex.klause.ir.VarRemap
+import com.eignex.klause.theory.qflra.exactTheoryOwnable
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -22,10 +26,12 @@ import kotlin.test.assertEquals
  */
 class TheoryOwnableTest {
 
-    private fun factorDeclaring(integer: Boolean, exact: Boolean) = object : Factor {
+    private fun factorDeclaring(complete: Boolean) = object : Factor {
         override val variables: VarList = IntVars(intArrayOf(0))
-        override val integerTheoryOwnable: Boolean get() = integer
-        override val exactTheoryOwnable: Boolean get() = exact
+        override val linearForm: LinearForm =
+            listOf(LinearRow.ofInts(intArrayOf(0), longArrayOf(1), LinearOp.LE, 5)).let { rows ->
+                if (complete) LinearForm.Conjunction(rows) else LinearForm.Relaxation(rows)
+            }
         override fun remap(mapping: VarRemap): Factor = this
         override fun structuralKey(): StructuralKey = StructuralKey.of(FactorKind.LINEAR) { int(0) }
     }
@@ -38,7 +44,7 @@ class TheoryOwnableTest {
 
     @Test
     fun `an unknown factor kind that declares an integer theory can hold it is theory-owned`() {
-        val plan = specOf(factorDeclaring(integer = true, exact = false)).componentPlan()
+        val plan = specOf(factorDeclaring(complete = true)).componentPlan()
 
         assertEquals(FactorOwner.THEORY, plan.factorOwner(0))
         assertEquals(IntVariableOwner.THEORY, plan.intOwner(0))
@@ -46,7 +52,7 @@ class TheoryOwnableTest {
 
     @Test
     fun `an unknown factor kind that declares nothing is held by CP`() {
-        val plan = specOf(factorDeclaring(integer = false, exact = false)).componentPlan()
+        val plan = specOf(factorDeclaring(complete = false)).componentPlan()
 
         assertEquals(FactorOwner.CP, plan.factorOwner(0))
         assertEquals(IntVariableOwner.CP, plan.intOwner(0), "CP has to own the column of a factor it holds")
@@ -75,7 +81,7 @@ class TheoryOwnableTest {
     }
 
     @Test
-    fun `a row whose coefficients no double states exactly is not exact`() {
+    fun `finite rational coefficients on integer terms are accepted by the exact reader`() {
         val exact = Linear(
             intVars = intArrayOf(0),
             intCoeffs = doubleArrayOf(2.0),
@@ -94,6 +100,19 @@ class TheoryOwnableTest {
         )
 
         assertEquals(true, exact.exactTheoryOwnable)
-        assertEquals(false, fractional.exactTheoryOwnable, "a fractional integer-side coefficient is not exact")
+        assertEquals(true, fractional.exactTheoryOwnable)
+    }
+
+    @Test
+    fun `finite component planning keeps the specialized increasing propagator`() {
+        val model = Problem(
+            0,
+            2,
+            Array(2) { com.eignex.klause.ir.IntDomain(0, 9) },
+            listOf(Increasing(intArrayOf(0, 1), strict = true)),
+        )
+
+        assertEquals(FactorOwner.CP, model.componentPlan(preferFinite = true).factorOwner(0))
+        assertEquals(FactorOwner.THEORY, model.componentPlan().factorOwner(0))
     }
 }

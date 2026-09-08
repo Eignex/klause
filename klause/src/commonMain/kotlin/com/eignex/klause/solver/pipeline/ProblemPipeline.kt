@@ -9,6 +9,7 @@ import com.eignex.klause.solver.pipeline.componentPlan
 import com.eignex.klause.solver.result.LpRoute
 import com.eignex.klause.solver.result.LpStats
 import com.eignex.klause.solver.result.LpStatsSink
+import com.eignex.klause.theory.qflra.exactTheoryOwnable
 import com.eignex.klause.theory.qflra.supportsExactLra
 import com.eignex.klause.util.Cancellation
 

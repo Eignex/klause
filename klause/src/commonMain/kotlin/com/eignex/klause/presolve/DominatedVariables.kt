@@ -5,12 +5,16 @@ import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.bool.PseudoBoolean
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.LinearForm
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.LinearRow
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Term
-import com.eignex.klause.model.PbOp
+import com.eignex.klause.ir.impliedLinearRows
 import com.eignex.klause.propagation.BakedProblem
+import com.eignex.klause.util.CheckedLongOverflowException
 import com.eignex.klause.util.IntHashSet
+import com.eignex.klause.util.addExact
 
 internal object DominatedVariables {
 
@@ -28,8 +32,8 @@ internal object DominatedVariables {
      * Booleans: the pure-literal mirror, extended past [Clause] to every
      * *monotone* pseudo-Boolean row — a [Cardinality] `min ≤ Σ ≤ max` (each active side fixes a safe
      * direction per literal) and a [PseudoBoolean] `≤`/`≥`. In all of these, flipping a literal moves
-     * the row's sum one known way, so one value of the variable is safe; an `=` pseudo-Boolean, a
-     * reified row, or any other bool factor couples both directions and excludes the variable. A
+     * the row's sum one known way, so one value of the variable is safe; an equality, a
+     * reified row, or a factor with no exact monotone declaration couples both directions and excludes the variable. A
      * safe-direction bool is pinned with a unit clause (a bool already unit-pinned is skipped, keeping
      * the pass idempotent). Coefficients come from [objectiveIntCoeffs] / [objectiveBoolCoeffs]
      * (minimize sense, absent ⇒ 0).
@@ -70,15 +74,16 @@ internal object DominatedVariables {
         for (f in problem.factors) {
             for (v in f.boolVars) boolSeen[v] = true
             for (v in f.intVars) intSeen[v] = true
-            val rows = f.linearRows
-            // The integer monotonicity analysis reads the integer side of a row; a row carrying Boolean
-            // literals is left to the bool-side [markBoolSafety] (unifying the two is a follow-up).
-            val monotoneIntRows = rows.isNotEmpty() &&
-                rows.all { (it.relation == LinearOp.LE || it.relation == LinearOp.GE) && it.isIntegerOnly }
+            val rows = f.impliedLinearRows
+            val monotoneIntRows = (f.linearForm is LinearForm.Conjunction) && rows.isNotEmpty() &&
+                rows.all {
+                    (it.relation == LinearOp.LE || it.relation == LinearOp.GE) && it.isLongUnconditional
+                }
             if (monotoneIntRows) {
                 // Every exact row is monotone ≤/≥, so each variable has one safe direction per row.
                 for (row in rows) {
                     for (i in 0 until row.size) {
+                        if (!Term.isInt(row.ref(i))) continue
                         val a = row.coeff(i)
                         if (a == 0L) continue
                         val v = Term.intVar(row.ref(i))
@@ -129,11 +134,7 @@ internal object DominatedVariables {
         return PassDelta(addedFactors = extra, domains = if (domainsNarrowed) domains else null)
     }
 
-    /** Fold [f]'s contribution to the Boolean pure-literal safety analysis. A bool var is
-     *  pinnable only if it occurs solely in *monotone* rows — [Clause] (an at-least-one lower bound),
-     *  [Cardinality] (its active lower/upper sides), and [PseudoBoolean] `≤`/`≥` — where flipping a
-     *  literal moves the row's sum in one known direction. Any other bool factor (a reified row, a
-     *  `=` pseudo-Boolean, …) couples the two directions, so it excludes its bool vars outright. */
+    // Every row must be an unconditional monotone comparison equivalent to the complete factor.
     private fun markBoolSafety(
         f: Factor,
         trueSafe: BooleanArray,
@@ -141,31 +142,47 @@ internal object DominatedVariables {
         boolEligible: BooleanArray,
         alreadyPinned: IntHashSet,
     ) {
-        when {
-            f is Clause -> {
-                if (f.literals.size == 1) alreadyPinned.add(Lit.variable(f.literals[0]))
-                // A clause is `Σ lit ≥ 1`: unsatisfying a literal lowers the count toward violation.
-                for (lit in f.literals) markBoolMonotoneLiteral(lit, 1, false, fallUnsafe = true, trueSafe, falseSafe)
+        if (f is Clause && f.literals.size == 1) alreadyPinned.add(Lit.variable(f.literals[0]))
+        val rows = (f.linearForm as? LinearForm.Conjunction)?.rows
+        if (rows == null || rows.isEmpty() || rows.any {
+                !it.isLongUnconditional || (it.relation != LinearOp.LE && it.relation != LinearOp.GE)
             }
-
-            f is Cardinality -> {
-                // `min ≤ Σ lit ≤ max`: the lower side (min > 0) makes unsatisfying risky, the upper
-                // side (max < #lits) makes satisfying risky. A two-sided row clears both directions.
-                val fallUnsafe = f.min > 0
-                val riseUnsafe = f.max < f.literals.size
-                for (lit in f.literals) markBoolMonotoneLiteral(lit, 1, riseUnsafe, fallUnsafe, trueSafe, falseSafe)
+        ) {
+            for (v in f.boolVars) boolEligible[v] = false
+            return
+        }
+        for (row in rows) {
+            if (row.isVacuousBooleanRow()) continue
+            val riseUnsafe = row.relation == LinearOp.LE
+            for (i in 0 until row.size) {
+                if (!Term.isBool(row.ref(i))) continue
+                markBoolMonotoneLiteral(
+                    Term.lit(row.ref(i)),
+                    row.coeff(i),
+                    riseUnsafe,
+                    !riseUnsafe,
+                    trueSafe,
+                    falseSafe,
+                )
             }
+        }
+    }
 
-            f is PseudoBoolean && (f.op == PbOp.LE || f.op == PbOp.GE) -> {
-                // `Σ w·lit ≤ b` (rising sum violates) / `≥ b` (falling sum violates).
-                val riseUnsafe = f.op == PbOp.LE
-                for (i in f.literals.indices) {
-                    markBoolMonotoneLiteral(f.literals[i], f.weights[i], riseUnsafe, !riseUnsafe, trueSafe, falseSafe)
+    private fun LinearRow.isVacuousBooleanRow(): Boolean {
+        if ((0 until size).any { !Term.isBool(ref(it)) }) return false
+        val upper = relation == LinearOp.LE
+        var extreme = 0L
+        try {
+            for (i in 0 until size) {
+                val coefficient = coeff(i)
+                if ((upper && coefficient > 0L) || (!upper && coefficient < 0L)) {
+                    extreme = addExact(extreme, coefficient)
                 }
             }
-
-            else -> for (v in f.boolVars) boolEligible[v] = false
+        } catch (_: CheckedLongOverflowException) {
+            return false
         }
+        return if (upper) extreme <= bound else extreme >= bound
     }
 
     /** Clear the unsafe pin direction(s) for the variable behind [lit] in a monotone row. [weight] is
@@ -181,10 +198,10 @@ internal object DominatedVariables {
         falseSafe: BooleanArray,
     ) {
         val v = Lit.variable(lit)
-        val signedW = if (Lit.isPositive(lit)) weight else -weight
-        if (signedW == 0L) return
-        // The value that raises the sum: true if signedW > 0, else false. Mirror for lowering.
-        if (riseUnsafe) (if (signedW > 0) trueSafe else falseSafe)[v] = false
-        if (fallUnsafe) (if (signedW > 0) falseSafe else trueSafe)[v] = false
+        if (weight == 0L) return
+        val positive = (weight > 0L) == Lit.isPositive(lit)
+        // The value that raises the sum: true if positive, else false. Mirror for lowering.
+        if (riseUnsafe) (if (positive) trueSafe else falseSafe)[v] = false
+        if (fallUnsafe) (if (positive) falseSafe else trueSafe)[v] = false
     }
 }

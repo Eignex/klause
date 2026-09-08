@@ -1,17 +1,19 @@
 package com.eignex.klause.presolve.linear
 
-import com.eignex.klause.factor.arithmetic.IntegerConstants
 import com.eignex.klause.factor.arithmetic.Linear
-import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.IntegerConstants
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.Term
 import com.eignex.klause.ir.VarRemap
+import com.eignex.klause.ir.linearRows
 import com.eignex.klause.presolve.AffinePivotOrder
 import com.eignex.klause.presolve.PassDelta
 import com.eignex.klause.presolve.Presolve
 import com.eignex.klause.presolve.PresolveShared
 import com.eignex.klause.presolve.SharedIntOccurrence
+import com.eignex.klause.presolve.equivalentLinear
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.util.Cancellation
@@ -256,8 +258,8 @@ internal object AffineSingletons {
         objectiveIntVars: IntHashSet,
         domains: Array<IntDomain>,
     ): ResidueCandidate? {
-        val f = ws.factorAt(di) ?: return null
-        if (f !is Linear || f.op != LinearOp.EQ || f.vars.size != 2) return null
+        val f = ws.factorAt(di)?.equivalentLinear() ?: return null
+        if (f.op != LinearOp.EQ || f.vars.size != 2) return null
         val row = f.integerConstants ?: return null
         val fBound = row.bound
         for (xi in 0..1) {
@@ -382,8 +384,8 @@ internal object AffineSingletons {
         capWide: Boolean,
         cancellation: Cancellation = Cancellation.Never,
     ): AffineCandidate? {
-        val f = ws.factorAt(di) ?: return null
-        if (f !is Linear || f.op != LinearOp.EQ || f.vars.size < 2) return null
+        val f = ws.factorAt(di)?.equivalentLinear() ?: return null
+        if (f.op != LinearOp.EQ || f.vars.size < 2) return null
         val row = f.integerConstants ?: return null
         for (xi in f.vars.indices) {
             // A single wide row can carry thousands of pivot candidates each running an O(occurrences)
@@ -552,25 +554,24 @@ internal object AffineSingletons {
     }
 
     /** Whether [f] could head an affine or residue pivot: a [Linear] equality of arity >= 2. */
-    private fun isEqCand(f: Factor?): Boolean =
-        f is Linear && f.integerConstants != null && f.op == LinearOp.EQ && f.vars.size >= 2
+    private fun isEqCand(f: Factor?): Boolean = f?.equivalentLinear()?.let { row ->
+        row.integerConstants != null && row.op == LinearOp.EQ && row.vars.size >= 2
+    } == true
 
     private fun aliasOverflowsLong(factor: Factor?, x: Int, replacement: Int): Boolean {
-        val (vars, coefficients) = when (factor) {
-            is Linear -> factor.integerConstants?.let { factor.vars to it }
-            is ReifiedLinear -> factor.integerConstants?.let { factor.vars to it }
-            else -> null
-        } ?: return false
-        var xCoeff = 0L
-        var replacementCoeff = 0L
-        for (i in vars.indices) {
-            when (vars[i]) {
-                x -> xCoeff = coefficients.coeff(i)
-                replacement -> replacementCoeff = coefficients.coeff(i)
+        for (row in factor?.linearRows.orEmpty()) {
+            if (row.constants !is IntegerConstants) continue
+            var sum = 0L
+            for (i in 0 until row.size) {
+                val ref = row.ref(i)
+                if (!Term.isInt(ref) || (Term.intVar(ref) != x && Term.intVar(ref) != replacement)) continue
+                val coefficient = row.coeff(i)
+                val next = sum + coefficient
+                if (((sum xor next) and (coefficient xor next)) < 0L) return true
+                sum = next
             }
         }
-        val sum = xCoeff + replacementCoeff
-        return ((xCoeff xor sum) and (replacementCoeff xor sum)) < 0L
+        return false
     }
 
     /** Stable ids (ascending) of the pristine [factors] that could ever head an affine/residue pivot. */
@@ -623,9 +624,8 @@ internal object AffineSingletons {
             for (k in occ.offsets[x] until occ.offsets[x + 1]) {
                 val id = occ.flat[k]
                 val f = factors[id]
-                // A continuous (real-bearing) Linear folds through the real double view, not the integer
-                // path this pass rewrites, so it is not "plain linear" for elimination purposes.
-                if (id != defIdx && (f !is Linear || f.integerConstants == null)) return false
+                // The integer kernel cannot replace a factor whose complete declaration needs real arithmetic.
+                if (id != defIdx && (f.equivalentLinear()?.integerConstants == null)) return false
             }
             return true
         }
@@ -645,8 +645,8 @@ internal object AffineSingletons {
                 // check cannot outrun the budget. Treat a bail as "would overflow" — skipping the fold is sound.
                 if ((polled++ and CANCEL_POLL_MASK) == 0 && cancellation()) return true
                 val id = occ.flat[k]
-                val f = factors[id]
-                if (id != defIdx && f is Linear && f.integerConstants != null && foldRowOverflowsLong(
+                val f = factors[id].equivalentLinear()
+                if (id != defIdx && f?.integerConstants != null && foldRowOverflowsLong(
                         f,
                         x,
                         termVars,
@@ -680,10 +680,8 @@ internal object AffineSingletons {
                 val id = occ.flat[k]
                 if (id == defIdx) continue
                 val f = factors[id]
-                // A real-bearing Linear cannot be folded on the integer path and does not override
-                // substituteAffine, so it is treated like any non-Linear factor — the var is eliminated
-                // only if every such occurrence can absorb the affine substitution exactly.
-                if ((f !is Linear || f.integerConstants == null) && !f.canSubstituteAffine(
+                // Every occurrence must support an exact replacement or its own affine substitution.
+                if ((f.equivalentLinear()?.integerConstants == null) && !f.canSubstituteAffine(
                         x,
                         scale,
                         offset,
@@ -759,7 +757,7 @@ internal object AffineSingletons {
         // of every candidate pivot. Only integer-core [Linear] rows are counted, matching that predicate.
         private val atCapCount = IntArray(nVars)
 
-        private fun isCappable(f: Factor?): Boolean = f is Linear && f.integerConstants != null
+        private fun isCappable(f: Factor?): Boolean = f?.equivalentLinear()?.integerConstants != null
 
         init {
             // The seed's CSR is over the pristine input in input (= stable-id) order, so its dense indices
@@ -830,7 +828,7 @@ internal object AffineSingletons {
             for (k in 0 until occ.size) {
                 val id = occ[k]
                 val f = slots[id]
-                if (id != defIdx && (f !is Linear || f.integerConstants == null)) return false
+                if (id != defIdx && (f?.equivalentLinear()?.integerConstants == null)) return false
             }
             return true
         }
@@ -851,8 +849,8 @@ internal object AffineSingletons {
                 // check cannot outrun the budget. Treat a bail as "would overflow" — skipping the fold is sound.
                 if ((polled++ and CANCEL_POLL_MASK) == 0 && cancellation()) return true
                 val id = occ[k]
-                val f = slots[id]
-                if (id != defIdx && f is Linear && f.integerConstants != null && foldRowOverflowsLong(
+                val f = slots[id]?.equivalentLinear()
+                if (id != defIdx && f?.integerConstants != null && foldRowOverflowsLong(
                         f,
                         x,
                         termVars,
@@ -891,7 +889,7 @@ internal object AffineSingletons {
                 val id = occ[k]
                 if (id == defIdx) continue
                 val f = slots[id] ?: continue
-                if ((f !is Linear || f.integerConstants == null) && !f.canSubstituteAffine(
+                if ((f.equivalentLinear()?.integerConstants == null) && !f.canSubstituteAffine(
                         x,
                         scale,
                         offset,
@@ -934,8 +932,9 @@ internal object AffineSingletons {
             for (id in toRewrite) {
                 if (id == c.defIdx) continue
                 val f = slots[id] ?: continue
+                val linear = f.equivalentLinear()
                 val next = when {
-                    f is Linear && f.integerConstants != null && c.x in f.vars -> foldAffineIntoLinear(f, c)
+                    linear?.integerConstants != null && c.x in linear.vars -> foldAffineIntoLinear(linear, c)
 
                     // Single-partner affine into a global the gate accepted (non-null substitute). The
                     // gate only admits this path for an Int-range scale/offset, so the narrowing is safe.

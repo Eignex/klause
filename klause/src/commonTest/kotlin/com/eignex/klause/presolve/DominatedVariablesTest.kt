@@ -5,6 +5,7 @@ import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.bool.PseudoBoolean
 import com.eignex.klause.factor.global.AllDifferent
+import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
@@ -13,8 +14,10 @@ import com.eignex.klause.model.PbOp
 import com.eignex.klause.presolve.PresolveShared.withPassDelta
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.PropagationResult
+import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.propagation.propagate
+import com.eignex.klause.propagation.propagatorProjection
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -25,6 +28,18 @@ import kotlin.test.assertTrue
  * asserts they match (and that the expected variables were pinned).
  */
 class DominatedVariablesTest {
+
+    @Test
+    fun `a declared Boolean inequality permits a safe pure-literal fixing`() {
+        val source = PseudoBoolean(longArrayOf(2, 3), intArrayOf(Lit.make(0, true), Lit.make(1, false)), PbOp.LE, 3)
+        val factor = object : Factor by source, Propagator by source.propagatorProjection() {}
+        val model = Problem(2, 0, emptyArray(), listOf(factor)).bake()
+
+        val delta = Presolve.fixDominatedVariables(model, emptyMap())
+
+        val units = delta.addedFactors.map { (it as Clause).literals.single() }.toSet()
+        assertEquals(setOf(Lit.make(0, false), Lit.make(1, true)), units)
+    }
 
     private fun isFeasible(problem: Problem, ints: LongArray): Boolean {
         var a = Assumptions.None

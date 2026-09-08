@@ -1,12 +1,15 @@
 package com.eignex.klause.presolve.structural
 
 import com.eignex.klause.factor.arithmetic.ComparisonClause
-import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.IntegerConstants
+import com.eignex.klause.ir.LinearForm
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.LinearRow
 import com.eignex.klause.ir.Lit
+import com.eignex.klause.ir.Term
 import com.eignex.klause.presolve.PassDelta
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.PropagationProblem
@@ -20,7 +23,7 @@ import com.eignex.klause.util.subExact
 /**
  * Folds the reified encoding of an intension comparison disjunction into one [ComparisonClause]. A
  * `Clause` over indicator literals, where each indicator is the sole-use aux of a single-variable
- * [ReifiedLinear] comparison (`b ⇔ (c·x ⟨op⟩ k)`, `|c| = 1`, `b` used only by that reified factor and
+ * reified comparison (`b ⇔ (c·x ⟨op⟩ k)`, `|c| = 1`, `b` used only by that reified factor and
  * this clause), is exactly the disjunction of those comparisons — so it becomes one factor and the
  * indicator auxiliaries drop out. The front-ends that build such a clause directly (XCSP3 intension)
  * already emit [ComparisonClause]; this pass catches the reified form any front-end (FlatZinc, SMT-LIB)
@@ -34,12 +37,11 @@ internal object ComparisonClauseFold {
 
     fun fold(problem: BakedProblem): PassDelta {
         val factors = problem.factors
-        // Index each indicator bool var to its (index, ReifiedLinear) definition. Aux vars are unique, so
-        // a var maps to at most one reified factor.
-        val defByAux = MutableIntObjectMap<Pair<Int, ReifiedLinear>>()
+        // A consumed definition must be equivalent to its single reified row.
+        val defByAux = MutableIntObjectMap<Pair<Int, LinearRow>>()
         for (i in factors.indices) {
-            val f = factors[i]
-            if (f is ReifiedLinear) defByAux.put(f.auxBoolVar, i to f)
+            val row = (factors[i].linearForm as? LinearForm.Conjunction)?.rows?.singleOrNull() ?: continue
+            if (row.activator != LinearRow.ALWAYS) defByAux.put(row.activator, i to row)
         }
         if (defByAux.isEmpty()) return PassDelta()
 
@@ -64,7 +66,7 @@ internal object ComparisonClauseFold {
      *  `null` when any literal is not a sole-use single-variable reified comparison. */
     private fun foldClause(
         clause: Clause,
-        defByAux: MutableIntObjectMap<Pair<Int, ReifiedLinear>>,
+        defByAux: MutableIntObjectMap<Pair<Int, LinearRow>>,
         occ: Array<IntArray>,
         domains: Array<IntDomain>,
     ): Pair<ComparisonClause, IntArray>? {
@@ -91,20 +93,21 @@ internal object ComparisonClauseFold {
     }
 
     /**
-     * A [ReifiedLinear] body reduced to `(var, op, const)` — one free variable with unit coefficient
+     * A reified row body reduced to `(var, op, const)` — one free variable with unit coefficient
      * against a constant. Fixed variables (singleton root domain, e.g. a FlatZinc constant lifted to a
      * `{c}` var) are substituted into the bound, so `b ⇔ (x − k ≤ 0)` with `k` fixed at 1 becomes
      * `x ≤ 1`. A `-1` coefficient on the free variable flips the operator and negates the bound. `null`
      * when more than one variable stays free, the free coefficient is not `±1`, or the bound overflows.
      */
-    private fun singleVarComparison(r: ReifiedLinear, domains: Array<IntDomain>): Triple<Int, LinearOp, Long>? {
-        val row = r.integerConstants ?: return null
+    private fun singleVarComparison(r: LinearRow, domains: Array<IntDomain>): Triple<Int, LinearOp, Long>? {
+        val row = r.constants as? IntegerConstants ?: return null
+        if (r.strict || !r.isIntegerOnly) return null
         var freeVar = -1
         var freeCoeff = 0L
         var bound = row.bound
         try {
-            for (i in r.vars.indices) {
-                val v = r.vars[i]
+            for (i in 0 until r.size) {
+                val v = Term.intVar(r.ref(i))
                 val d = domains[v]
                 if (d.min == d.max) {
                     bound = subExact(bound, mulExact(row.coeff(i), d.min)) // move the fixed term to the RHS
@@ -122,8 +125,8 @@ internal object ComparisonClauseFold {
         // coefficient other than ±1 is not foldable into a bare `x op const` literal.
         return when {
             freeVar < 0 -> null
-            freeCoeff == 1L -> Triple(freeVar, r.op, bound)
-            freeCoeff == -1L -> Triple(freeVar, r.op.flipSign(), -bound)
+            freeCoeff == 1L -> Triple(freeVar, r.relation, bound)
+            freeCoeff == -1L -> Triple(freeVar, r.relation.flipSign(), -bound)
             else -> null
         }
     }

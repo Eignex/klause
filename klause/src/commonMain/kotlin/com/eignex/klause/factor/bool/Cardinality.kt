@@ -9,6 +9,7 @@ import com.eignex.klause.ir.FactorReduction.Rewrite
 import com.eignex.klause.ir.FactorReduction.Unchanged
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.KeySink
+import com.eignex.klause.ir.LinearForm
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.LinearRow
 import com.eignex.klause.ir.StructuralKey
@@ -52,19 +53,12 @@ class Cardinality(literals: IntArray, val min: Int, val max: Int) : Factor {
         if (min == 0 && max == literals.size) Rewrite(emptyList()) else Unchanged
 
     /** Exact linear view: the bounds `min ≤ Σ literals ≤ max` over its Boolean literals (unit-weight views). */
-    override val linearRows: List<LinearRow>
-        get() = listOf(
+    override val linearForm: LinearForm = LinearForm.Conjunction(
+        listOf(
             LinearRow.ofBools(literals, LinearOp.GE, min.toLong()),
             LinearRow.ofBools(literals, LinearOp.LE, max.toLong()),
-        )
-
-    // Unit weights and integer bounds are exactly representable, and the shared session's counting
-    // component holds the constraint whole — the same division a clause is placed by, where the exact
-    // core reads the arithmetic and the Boolean side enforces the skeleton. Undeclared, one cardinality
-    // makes a whole model inexact, which stands a finite component up beside a theory that needs none
-    // and, for a model of continuous columns, prefers the finite lane that cannot search them at all.
-    // [integerTheoryOwnable] stays false so a finite projection keeps its own watched propagator.
-    override val exactTheoryOwnable: Boolean get() = true
+        ),
+    )
 
     /** Factory methods for this factor. */
     companion object {

@@ -1,9 +1,12 @@
 package com.eignex.klause.lp
 
-import com.eignex.klause.factor.arithmetic.ComparisonClause
-import com.eignex.klause.factor.arithmetic.FactorRow
-import com.eignex.klause.factor.arithmetic.complemented
+import com.eignex.klause.ir.IntegralConstants
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.LinearRow
+import com.eignex.klause.ir.Lit
+import com.eignex.klause.ir.RealConstants
+import com.eignex.klause.ir.Term
+import com.eignex.klause.ir.complemented
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ExactRationalInequality
 import com.ionspin.kotlin.bignum.integer.BigInteger
@@ -72,6 +75,16 @@ internal class ExactComparison(
      * real bound.
      */
     fun rowsInto(rows: MutableList<ExactRationalInequality>, direction: LinearOp? = null) {
+        if (terms.isEmpty()) {
+            val holds = when (op) {
+                LinearOp.LE -> if (strict) BigFraction.ZERO < bound else BigFraction.ZERO <= bound
+                LinearOp.GE -> if (strict) BigFraction.ZERO > bound else BigFraction.ZERO >= bound
+                LinearOp.EQ -> bound.isZero
+                LinearOp.NE -> !bound.isZero
+            }
+            if (!holds) rows += exactRow(emptyMap(), BigFraction.MINUS_ONE)
+            return
+        }
         when (op) {
             LinearOp.LE -> rows += exactRow(terms, bound, strict)
 
@@ -103,51 +116,47 @@ internal class ExactComparison(
  * A row read under a false activator states its complement exactly, which is what separates an exact
  * lane from a relaxation that weakens the same row through a big-M.
  */
-internal fun FactorRow.exactComparison(realColumns: Int, truth: Boolean): ExactComparison {
+internal fun LinearRow.exactComparison(
+    realColumns: Int,
+    truth: Boolean,
+    booleanValue: (Int) -> Boolean,
+): ExactComparison {
     val terms = HashMap<Int, BigFraction>()
-    val actualOp = if (truth) op else op.complemented()
-    return when (this) {
-        is FactorRow.Wide -> {
-            for (index in intVars.indices) terms.add(realColumns + intVars[index], coefficients[index].asFraction())
-            // The complement of `a·x ≤ b` is `a·x > b`, and stating it as `a·x ≥ b` would readmit the very
-            // point the false activator excludes — the boundary the row itself sits on.
-            ExactComparison(terms, bound.asFraction(), actualOp, strict = !truth, hasReals = false)
-        }
+    val c = constants
+    var rhs = when (c) {
+        is IntegralConstants -> c.exactBound.asFraction()
+        is RealConstants -> c.bound.asFraction()
+    }
+    for (k in 0 until size) {
+        val coefficient = when (c) {
+            is IntegralConstants -> c.exactCoeff(k).asFraction()
 
-        is FactorRow.Doubles -> {
-            val exactCoeffs = integerCoeffs
-            for (index in intVars.indices) {
-                terms.add(
-                    realColumns + intVars[index],
-                    if (exactCoeffs != null) {
-                        BigFraction.ofLong(exactCoeffs[index])
-                    } else {
-                        requireNotNull(BigFraction.ofDouble(intCoeffs[index]))
-                    },
-                )
+            is RealConstants -> if (k < c.intCoefficients.size) {
+                c.intCoefficients.at(k).asFraction()
+            } else {
+                c.realCoefficients.at(k - c.intCoefficients.size).asFraction()
             }
-            for (index in realVars.indices) {
-                terms.add(realVars[index], requireNotNull(BigFraction.ofDouble(realCoeffs[index])))
+        }
+        val reference = ref(k)
+        when {
+            Term.isBool(reference) -> {
+                val literal = Term.lit(reference)
+                if (booleanValue(Lit.variable(literal)) == Lit.isPositive(literal)) rhs -= coefficient
             }
-            ExactComparison(
-                terms,
-                integerBound?.let(BigFraction::ofLong) ?: requireNotNull(BigFraction.ofDouble(bound)),
-                actualOp,
-                strict = if (truth) strict else !strict,
-                hasReals = realVars.isNotEmpty(),
-            )
+
+            Term.isInt(reference) -> terms.add(realColumns + Term.intVar(reference), coefficient)
+
+            else -> terms.add(Term.realVar(reference), coefficient)
         }
     }
+    return ExactComparison(
+        terms,
+        rhs,
+        if (truth) relation else relation.complemented(),
+        strict = if (truth) strict else !strict,
+        hasReals = c is RealConstants || (0 until size).any { Term.isReal(ref(it)) },
+    )
 }
-
-/** The comparison literal [literal] of this clause states. */
-internal fun ComparisonClause.exactComparison(realColumns: Int, literal: Int): ExactComparison = ExactComparison(
-    mapOf(realColumns + vars[literal] to BigFraction.ONE),
-    BigFraction.ofLong(consts[literal]),
-    ops[literal],
-    strict = false,
-    hasReals = false,
-)
 
 /** One exact `Σ terms·x ≤ bound` row over the columns carrying a nonzero coefficient. */
 internal fun exactRow(

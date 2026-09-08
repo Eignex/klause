@@ -8,7 +8,9 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.presolve.BakeConfig
 import com.eignex.klause.presolve.Presolve
 import com.eignex.klause.presolve.PresolveShared.withPassDelta
+import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.propagation.propagatorProjection
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -19,6 +21,20 @@ import kotlin.test.assertTrue
  * matching — the pass must be solution-set preserving.
  */
 class LinearSubSumAggregationTest {
+
+    @Test
+    fun `a declared sub-sum folds into a declared target row`() {
+        val equality = sumDef()
+        val inequality = Linear(intArrayOf(1, 1, 1), intArrayOf(1, 2, 3), LinearOp.LE, 10)
+        val definition = object : Factor by equality, Propagator by equality.propagatorProjection() {}
+        val target = object : Factor by inequality, Propagator by inequality.propagatorProjection() {}
+
+        val out = run(definition, target)
+
+        val reduced = theInequality(out)
+        assertEquals(setOf(0, 3), reduced.vars.toSet())
+        assertEquals(10L, reduced.integerConstants?.bound)
+    }
 
     // s = x + y, encoded as s − x − y = 0 with s the lowest-id (and pivot) variable.
     private fun sumDef() = Linear(intArrayOf(1, -1, -1), intArrayOf(0, 1, 2), LinearOp.EQ, 0)
