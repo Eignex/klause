@@ -1,1 +1,1 @@
-minizinc --solver cp-sat --time-limit 30000 --output-mode dzn -s -a --output-objective -f -p 1 /home/rasmus/.cache/klause-bench/corpus/mzn-challenge/2009/still_life/still_life.mzn /home/rasmus/.cache/klause-bench/corpus/mzn-challenge/2009/still_life/still_life_5.dzn 
+minizinc --solver cp-sat --time-limit 30000 --output-mode dzn -s -a --output-objective -f -p 1 /home/rasmus/.cache/klause-bench/corpus/mzn-challenge/2009/still_life/still_life.mzn /home/rasmus/.cache/klause-bench/corpus/mzn-challenge/2009/still_life/still_life_5.dzn

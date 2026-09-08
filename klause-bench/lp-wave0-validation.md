@@ -135,7 +135,8 @@ baseline command and stdout log, the preflight ID inventories and source hashes,
 metadata, repair provenance for the two corpus-path snapshot keys, per-run checksums and a final
 campaign checksum. The campaign audit checks exact reference additions, exact baseline identities,
 CSV/JSON agreement, measured SHA and deterministic settings, oracle outcomes, stable SMT signatures,
-the six documented objective-sense metadata mismatches, and every nested checksum.
+the six documented objective-sense metadata mismatches, exact reference-solver arguments and
+content-addressed keys derived from the frozen model/data bytes, and every nested checksum.
 
 ## Independent reference semantics
 

@@ -445,6 +445,7 @@ import hashlib
 import json
 import math
 import pathlib
+import re
 import shlex
 import subprocess
 import sys
@@ -479,6 +480,47 @@ def normalized(value):
         return float(value)
     except ValueError:
         return value
+
+def expected_mzn_sources(problem):
+    parts = problem.split("/")
+    family = corpus_root / "mzn-challenge" / parts[0] / parts[1]
+    candidates = list(family.glob("*.mzn"))
+    if not candidates:
+        candidates = [path for path in family.rglob("*.mzn") if len(path.relative_to(family).parts) <= 3]
+    lower = parts[1].lower()
+    priorities = (
+        lambda path: path.stem.lower() == lower,
+        lambda path: path.stem.lower() == f"{lower}_model",
+        lambda path: path.stem.lower() == "model",
+        lambda path: path.stem.lower() == "main",
+        lambda path: path.stem.lower().startswith(lower) and not path.stem.lower().startswith("mznc"),
+    )
+    model = None
+    for predicate in priorities:
+        model = next((path for path in sorted(candidates) if predicate(path)), None)
+        if model is not None:
+            break
+    if model is None and candidates:
+        model = sorted(candidates)[0]
+    if model is None:
+        fail(f"no MiniZinc model for frozen problem {problem}")
+    sources = [model]
+    if len(parts) > 2:
+        data = family.joinpath(*parts[2:]).with_name(parts[-1] + ".dzn")
+        if not data.is_file():
+            fail(f"no exact MiniZinc data file for frozen problem {problem}")
+        sources.append(data)
+    return sources
+
+def expected_minizinc_command(sources):
+    text = re.sub(r"%[^\n]*", "", sources[0].read_text())
+    solve = re.search(r"\bsolve\b.*?\b(satisfy|minimize|maximize)\b", text, flags=re.DOTALL)
+    if solve is None:
+        fail(f"cannot classify MiniZinc solve item in {sources[0]}")
+    command = ["minizinc", "--solver", "cp-sat", "--time-limit", "30000", "--output-mode", "dzn", "-s"]
+    if solve.group(1) != "satisfy":
+        command += ["-a", "--output-objective"]
+    return command + ["-f", "-p", "1"] + [str(source) for source in sources]
 
 reference_layout = {
     "smtlib-qfidl": ("z3.csv", "smtlib-qf_idl"),
@@ -620,6 +662,7 @@ for checksum_file in campaign.rglob("SHA256SUMS"):
             fail(f"checksum mismatch in {checksum_file.relative_to(campaign)}: {rel}")
 
 raw_cache = list((campaign / "reference-raw-rerun/cache").glob("*.json"))
+recovery_worktree = pathlib.Path((campaign / "reference-raw-rerun/temporary-worktree.txt").read_text().strip())
 expected_raw_count = manifest["campaignResult"]["referenceRawRecovery"]["successfulSolverRecords"]
 if len(raw_cache) != expected_raw_count:
     fail(f"raw reference recovery has {len(raw_cache)} cache records, expected {expected_raw_count}")
@@ -637,6 +680,7 @@ expected_raw_ids -= {
 if {(row["suite"], row["problem"]) for row in index} != expected_raw_ids:
     fail("raw reference cache index identities differ from the 39 successful frozen attempts")
 successful_mzn = {problem for suite, problem in expected_raw_ids if suite == "mzn-bench"}
+mzn_sources = {problem: expected_mzn_sources(problem) for problem in successful_mzn}
 for path in raw_cache:
     record = json.loads(path.read_text())
     command = record.get("command")
@@ -648,31 +692,58 @@ for path in raw_cache:
     row = rows[0]
     tokens = shlex.split(command)
     sources = []
-    if command.startswith("z3 "):
-        source = next(pathlib.Path(token) for token in tokens if token.endswith(".smt2"))
-        marker = "QF_IDL" if "QF_IDL" in source.parts else "QF_RDL"
-        suite = "smtlib-qfidl" if marker == "QF_IDL" else "smtlib-qfrdl"
-        marker_index = source.parts.index(marker)
-        problem = pathlib.PurePosixPath(*source.parts[marker_index + 1:]).as_posix()[:-5]
+    if tokens[0] == "z3":
+        matches = []
+        for candidate_suite, corpus_dir, logic in (
+            ("smtlib-qfidl", "smtlib-qf_idl", "QF_IDL"),
+            ("smtlib-qfrdl", "smtlib-qf_rdl", "QF_RDL"),
+        ):
+            for candidate_problem in ids_for(candidate_suite):
+                candidate_source = corpus_root / corpus_dir / logic / f"{candidate_problem}.smt2"
+                expected = [
+                    "z3", "-T:30", "-memory:2048", "-smt2", "sat.threads=1",
+                    "parallel.enable=false", str(candidate_source),
+                ]
+                if tokens == expected:
+                    matches.append((candidate_suite, candidate_problem, candidate_source))
+        if len(matches) != 1:
+            fail(f"raw Z3 command is not an exact frozen route: {path.name}")
+        suite, problem, source = matches[0]
         sources = [source]
         cache_tag = "z3"
-    elif "klause-xcsp3-ref" in command:
-        container_source = next(token for token in tokens if token.startswith("/in/") and token.endswith(".xml"))
+    elif tokens[:2] == ["docker", "run"] and len(tokens) == 19 and tokens[15] == "klause-xcsp3-cpsat:latest":
+        container_source = tokens[16]
         problem = pathlib.Path(container_source).stem
         suite = "xcsp3-core"
         sources = [repo / "klause-bench/smoke-corpus/xcsp3" / f"{problem}.xml"]
+        mount = tokens[14]
+        host_mount, separator, container_mount = mount.partition(":")
+        expected = [
+            "docker", "run", "--rm", "--name", tokens[4], "--memory", "6g", "--memory-swap",
+            "6g", "--cpus", "1", "--label", "klause-xcsp3-ref", "-v", mount,
+            "klause-xcsp3-cpsat:latest", f"/in/{problem}.xml", "30", "1",
+        ]
+        if (
+            tokens != expected
+            or not re.fullmatch(r"klause-xcsp3-ref-[1-4]", tokens[4])
+            or separator != ":"
+            or container_mount != "/in:ro"
+            or pathlib.Path(host_mount) != recovery_worktree / "klause-bench/smoke-corpus/xcsp3"
+            or problem not in ids_for(suite)
+        ):
+            fail(f"raw XCSP3 command is not an exact frozen route: {path.name}")
         cache_tag = "cp-sat-xcsp3"
-    elif command.startswith("minizinc "):
+    elif tokens[0] == "minizinc":
         sources = [pathlib.Path(token) for token in tokens if token.endswith((".mzn", ".dzn"))]
-        model = next(source for source in sources if source.suffix == ".mzn")
-        relative = model.relative_to(corpus_root / "mzn-challenge")
-        matches = {problem for problem in successful_mzn if problem.split("/")[:2] == list(relative.parts[:2])}
+        matches = {problem for problem, expected in mzn_sources.items() if sources == expected}
         if len(matches) != 1:
-            fail(f"cannot derive a frozen MiniZinc identity from {path.name}")
+            fail(f"raw MiniZinc sources do not identify one exact frozen problem: {path.name}")
         suite = "mzn-bench"
         problem = matches.pop()
+        if tokens != expected_minizinc_command(sources):
+            fail(f"raw MiniZinc command is not the exact CP-SAT route for {problem}")
         cache_tag = "cp-sat"
-    elif "klause-scip-ref" in command:
+    elif tokens[:2] == ["docker", "run"] and len(tokens) == 33 and tokens[14] == "klause-scip:latest":
         suite = "mps-core"
         candidates = []
         for problem in ids_for(suite):
@@ -684,6 +755,15 @@ for path in raw_cache:
             fail(f"cannot derive a frozen MPS identity from {path.name}")
         problem, source = candidates[0]
         sources = [source]
+        expected = [
+            "docker", "run", "--rm", "-i", "--name", tokens[5], "--memory", "6g",
+            "--memory-swap", "6g", "--cpus", "1", "--label", "klause-scip-ref",
+            "klause-scip:latest", "-c", "set", "limits", "time", "30", "-c", "set",
+            "limits", "memory", "6000", "-c", "read", "/dev/stdin", "mps", "-c",
+            "optimize", "-c", "quit",
+        ]
+        if tokens != expected or not re.fullmatch(r"klause-scip-ref-[1-4]", tokens[5]):
+            fail(f"raw SCIP command is not the exact frozen route for {problem}")
         cache_tag = "scip"
     else:
         fail(f"raw reference command is not a frozen solver route: {path.name}")
@@ -729,11 +809,11 @@ for row in error_index:
     if not (error_dir / "exit-status.txt").is_file() or (error_dir / "exit-status.txt").read_text().strip() == "0":
         fail(f"raw source-error process did not fail for {row['problem']}")
     tokens = shlex.split((error_dir / "command.txt").read_text())
-    sources = [pathlib.Path(token) for token in tokens if token.endswith((".mzn", ".dzn"))]
-    model = next(source for source in sources if source.suffix == ".mzn")
-    relative = model.relative_to(corpus_root / "mzn-challenge")
-    if row["problem"].split("/")[:2] != list(relative.parts[:2]):
-        fail(f"raw source-error index relabels {row['directory']}")
+    sources = expected_mzn_sources(row["problem"])
+    if tokens != expected_minizinc_command(sources):
+        fail(f"raw source-error command is not the exact CP-SAT route for {row['problem']}")
+    if not (error_dir / "stderr.txt").is_file() or not (error_dir / "stderr.txt").read_text():
+        fail(f"raw source-error stderr is absent for {row['problem']}")
     declared = {
         pathlib.Path(line.split("  ", 1)[1]): line.split("  ", 1)[0]
         for line in (error_dir / "source-SHA256SUMS").read_text().splitlines()
