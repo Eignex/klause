@@ -116,6 +116,16 @@ internal class LpReferenceAdapter(
         return data.accepts(shifted)
     }
 
+    fun objective(model: LpModel, primalBits: LongArray?, enforcedRows: BooleanArray? = null): BigFraction? {
+        if (primalBits == null || primalBits.size < model.n) return null
+        val data = exactData(model, enforcedRows) ?: return null
+        val shifted = List(model.n) { column ->
+            val value = BigFraction.ofDouble(Double.fromBits(primalBits[column])) ?: return null
+            value - data.shifts[column]
+        }
+        return data.objective(shifted) + data.objectiveConstant
+    }
+
     private fun interrupted(): LpReferenceResult.Declined =
         LpReferenceResult.Declined(LpReferenceDecline.CANCELLED_OR_PIVOT_LIMIT)
 }

@@ -74,6 +74,17 @@ class LpReferenceAdapterTest {
     }
 
     @Test
+    fun `witness objective restores the lower bound shift`() {
+        val model = LpBuilder().apply {
+            addRealVar(2.0, 4.0, cost = 3.0)
+        }.build(Sense.MINIMIZE)
+
+        val objective = LpReferenceAdapter().objective(model, longArrayOf(2.5.toRawBits()))
+
+        assertEquals(BigFraction.ofDouble(7.5), objective)
+    }
+
+    @Test
     fun `active row mask changes the exact reference problem`() {
         val model = LpBuilder().apply {
             val x = addVar(0L, 1L)

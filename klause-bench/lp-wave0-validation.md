@@ -73,7 +73,10 @@ The independent claims are deliberately distinct:
   proof; an uncertified gated result validates only the float candidate hint;
 - a certified integral lower bound remains `CERTIFIED_BOUND`, not a claim that the integer optimum is
   the continuous LP optimum;
-- an exact feasible witness at an attained reference bound can validate `PROVED_OPTIMUM`;
+- an exact feasible witness validates `PROVED_OPTIMUM` only when its independently reconstructed
+  source objective equals the attained reference bound;
+- a valid feasibility-only witness remains `FEASIBLE_WITNESS` when the objective is unbounded, even if
+  the legacy production verdict is labelled `OPTIMAL`;
 - a strict, unattained infimum validates only `FEASIBLE_WITNESS`;
 - probe-bounded feasibility can validate a witness, but open-model infeasibility or objective
   comparison declines;

@@ -108,6 +108,57 @@ class LpReplayHarnessTest {
         assertEquals(LpIndependentClaim.FEASIBLE_WITNESS, step.independentCheck.claim)
     }
 
+    @Test
+    fun `nonoptimal feasible witness is not upgraded by an attained reference optimum`() {
+        val model = LpBuilder().apply {
+            val x = addRealVar(0.0, 1.0, cost = 1.0)
+            addRealRow(intArrayOf(x), doubleArrayOf(2.0), Relation.GE, 1.0)
+        }.build(Sense.MINIMIZE)
+
+        listOf(LpCandidateKind.FLOAT_OPTIMUM, LpCandidateKind.FLOAT_BOUND).forEach { candidate ->
+            val check = IndependentExactValidator.validate(
+                model,
+                fabricatedStep(candidate, objective = 0.5, primal = 1.0),
+            )
+
+            assertEquals(LpIndependentValidation.VALIDATED, check.validation, candidate.name)
+            assertEquals(LpIndependentClaim.FEASIBLE_WITNESS, check.claim, candidate.name)
+        }
+    }
+
+    @Test
+    fun `unbounded objective preserves a valid feasibility witness`() {
+        val model = LpBuilder().apply {
+            addOpenAboveVar(0L, cost = -1L)
+        }.build(Sense.MINIMIZE)
+
+        val check = IndependentExactValidator.validate(
+            model,
+            fabricatedStep(LpCandidateKind.NONE, objective = null, primal = 0.0),
+        )
+
+        assertEquals(LpIndependentValidation.VALIDATED, check.validation)
+        assertEquals(LpIndependentClaim.FEASIBLE_WITNESS, check.claim)
+    }
+
+    private fun fabricatedStep(candidate: LpCandidateKind, objective: Double?, primal: Double): LpReplayStep =
+        LpReplayStep(
+            eventIndex = 0,
+            operation = LpReplayOperation.SOLVE,
+            candidate = candidate,
+            productionVerdict = LpVerdict.OPTIMAL,
+            objectiveBits = objective?.toRawBits(),
+            primalBits = longArrayOf(primal.toRawBits()),
+            exactLowerBound = null,
+            hasFeasibleWitness = true,
+            hasCertifiedBound = false,
+            hasInfeasibilityProof = false,
+            metrics = LpSolveMetrics(),
+            certifiers = emptyList(),
+            exactInputAttempts = 0,
+            exactInputAccepted = 0,
+        )
+
     private fun reportLine(reports: List<LpReplayReport>): String {
         val steps = reports.flatMap { it.steps }
         val verdicts = LpVerdict.entries.joinToString(",") { verdict ->
@@ -131,13 +182,14 @@ class LpReplayHarnessTest {
             if (step.productionVerdict == null || step.certificationCapability == LpCertificationCapability.NO_CLAIM) {
                 return LpIndependentCheck(LpIndependentValidation.DECLINED, LpIndependentClaim.NONE)
             }
-            return when (val reference = LpReferenceAdapter().solve(model, step.enforcedRows)) {
+            val adapter = LpReferenceAdapter()
+            return when (val reference = adapter.solve(model, step.enforcedRows)) {
                 is LpReferenceResult.Declined ->
                     LpIndependentCheck(LpIndependentValidation.DECLINED, candidateClaim(step))
 
                 LpReferenceResult.Infeasible -> validateInfeasible(step)
 
-                is LpReferenceResult.Feasible -> validateFeasible(model, step, reference)
+                is LpReferenceResult.Feasible -> validateFeasible(model, step, reference, adapter)
             }
         }
 
@@ -163,24 +215,41 @@ class LpReplayHarnessTest {
             model: LpModel,
             step: LpReplayStep,
             reference: LpReferenceResult.Feasible,
+            adapter: LpReferenceAdapter,
         ): LpIndependentCheck {
             if (step.productionVerdict == LpVerdict.INFEASIBLE) {
                 return LpIndependentCheck(LpIndependentValidation.REFUTED, LpIndependentClaim.PROVED_INFEASIBLE)
             }
-            if (step.hasFeasibleWitness &&
-                LpReferenceAdapter().accepts(model, step.primalBits, step.enforcedRows) != true
-            ) {
-                return LpIndependentCheck(LpIndependentValidation.REFUTED, LpIndependentClaim.FEASIBLE_WITNESS)
+            val witnessObjective = if (step.hasFeasibleWitness) {
+                if (adapter.accepts(model, step.primalBits, step.enforcedRows) != true) {
+                    return LpIndependentCheck(
+                        LpIndependentValidation.REFUTED,
+                        LpIndependentClaim.FEASIBLE_WITNESS,
+                    )
+                }
+                checkNotNull(adapter.objective(model, step.primalBits, step.enforcedRows))
+            } else {
+                null
             }
             val expected = reference.objective as? LpReferenceObjective.Bound ?: return when (reference.objective) {
-                LpReferenceObjective.Unbounded -> LpIndependentCheck(
-                    if (step.productionVerdict == LpVerdict.OPTIMAL) {
-                        LpIndependentValidation.REFUTED
-                    } else {
-                        LpIndependentValidation.DECLINED
-                    },
-                    candidateClaim(step),
-                )
+                LpReferenceObjective.Unbounded -> when {
+                    step.hasCertifiedBound -> LpIndependentCheck(
+                        LpIndependentValidation.REFUTED,
+                        LpIndependentClaim.CERTIFIED_BOUND,
+                    )
+
+                    witnessObjective != null -> LpIndependentCheck(
+                        LpIndependentValidation.VALIDATED,
+                        LpIndependentClaim.FEASIBLE_WITNESS,
+                    )
+
+                    step.candidate == LpCandidateKind.FLOAT_OPTIMUM -> LpIndependentCheck(
+                        LpIndependentValidation.REFUTED,
+                        LpIndependentClaim.CANDIDATE_HINT,
+                    )
+
+                    else -> LpIndependentCheck(LpIndependentValidation.DECLINED, candidateClaim(step))
+                }
 
                 LpReferenceObjective.ProbeBoundDecline ->
                     LpIndependentCheck(LpIndependentValidation.DECLINED, candidateClaim(step))
@@ -191,10 +260,12 @@ class LpReplayHarnessTest {
             if (lower != null && exceedsCeiling(lower, expected.lower)) {
                 return LpIndependentCheck(LpIndependentValidation.REFUTED, LpIndependentClaim.CERTIFIED_BOUND)
             }
-            val objective = step.objectiveBits?.let(Double::fromBits)?.let(BigFraction::ofDouble)
-                ?: return LpIndependentCheck(LpIndependentValidation.DECLINED, candidateClaim(step))
-            if (step.candidate == LpCandidateKind.FLOAT_OPTIMUM && objective != expected.lower) {
-                return LpIndependentCheck(LpIndependentValidation.REFUTED, candidateClaim(step))
+            if (step.candidate == LpCandidateKind.FLOAT_OPTIMUM) {
+                val objective = step.objectiveBits?.let(Double::fromBits)?.let(BigFraction::ofDouble)
+                    ?: return LpIndependentCheck(LpIndependentValidation.DECLINED, candidateClaim(step))
+                if (objective != expected.lower) {
+                    return LpIndependentCheck(LpIndependentValidation.REFUTED, candidateClaim(step))
+                }
             }
             if (step.certificationCapability == LpCertificationCapability.GATED_ACTIVE_STATE_UNAVAILABLE) {
                 return LpIndependentCheck(
@@ -207,12 +278,12 @@ class LpReplayHarnessTest {
                 )
             }
             val claim = when {
-                step.hasFeasibleWitness && expected.attained -> LpIndependentClaim.PROVED_OPTIMUM
+                witnessObjective == expected.lower && expected.attained -> LpIndependentClaim.PROVED_OPTIMUM
                 step.hasFeasibleWitness -> LpIndependentClaim.FEASIBLE_WITNESS
                 step.hasCertifiedBound -> LpIndependentClaim.CERTIFIED_BOUND
-                else -> LpIndependentClaim.CANDIDATE_HINT
+                else -> candidateClaim(step)
             }
-            val validation = if (step.productionVerdict == LpVerdict.OPTIMAL ||
+            val validation = if (step.candidate == LpCandidateKind.FLOAT_OPTIMUM ||
                 step.hasFeasibleWitness || step.hasCertifiedBound
             ) {
                 LpIndependentValidation.VALIDATED
