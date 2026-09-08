@@ -112,6 +112,70 @@ class LpReplayTest {
     }
 
     @Test
+    fun `rebind without an override preserves the lifetime cancellation budget`() {
+        val model = pivotModel(160)
+        val capture = LpCapture.capture(
+            model,
+            LpReplaySettings(
+                "cancel-rebind",
+                20L,
+                LpReplaySolverKind.PERSISTENT,
+                componentSplit = false,
+                cancellationPollLimit = 1,
+            ),
+            listOf(
+                LpReplayEvent.Rebind(LongArray(model.n), LongArray(model.n) { 9L }),
+                LpReplayEvent.ResolveBounds(),
+            ),
+        )
+
+        val report = LpReplay.replay(LpCapture.decode(capture.encode()))
+
+        assertEquals(LpReplayOperation.REBIND, report.steps[0].operation)
+        assertEquals(LpVerdict.INDETERMINATE, report.steps[1].productionVerdict)
+        assertFalse(report.steps[1].hasCertifiedBound)
+    }
+
+    @Test
+    fun `strict rational refutation records its exact infeasibility proof`() {
+        val builder = LpBuilder()
+        val x = builder.addRealVar(-1.0, 1.0)
+        builder.addRealRow(intArrayOf(x), doubleArrayOf(1.0), Relation.LE, 0.0, strict = true)
+        builder.addRealRow(intArrayOf(x), doubleArrayOf(1.0), Relation.GE, 0.0)
+        val capture = LpCapture.capture(
+            builder.build(Sense.MINIMIZE),
+            LpReplaySettings("strict-refutation", 21L, componentSplit = false),
+            listOf(LpReplayEvent.Solve()),
+        )
+
+        val step = LpReplay.replay(capture).steps.single()
+
+        assertEquals(LpVerdict.INFEASIBLE, step.productionVerdict)
+        assertTrue(step.hasInfeasibilityProof)
+        assertTrue(step.certifiers.any { it.certifier == LpCertifier.RATIONAL && it.successes == 1 })
+    }
+
+    @Test
+    fun `component replay retains the exact assembled lower bound`() {
+        val builder = LpBuilder()
+        val x = builder.addVar(0L, 5L, cost = 1L)
+        val y = builder.addVar(0L, 5L, cost = 1L)
+        builder.addRow(intArrayOf(x), longArrayOf(1L), Relation.GE, 2L)
+        builder.addRow(intArrayOf(y), longArrayOf(1L), Relation.GE, 3L)
+        val capture = LpCapture.capture(
+            builder.build(Sense.MINIMIZE),
+            LpReplaySettings("components", 22L),
+            listOf(LpReplayEvent.Solve()),
+        )
+
+        val step = LpReplay.replay(capture).steps.single()
+
+        assertEquals(LpVerdict.OPTIMAL, step.productionVerdict)
+        assertEquals(5L, step.exactLowerBound)
+        assertTrue(step.hasCertifiedBound)
+    }
+
+    @Test
     fun `pivot budget reports a certified bound without promoting the candidate to optimum`() {
         val capture = LpCapture.capture(
             coveringModel(),
@@ -197,6 +261,22 @@ class LpReplayTest {
         )
         assertFails {
             LpReplay.replay(LpCapture(LP_CAPTURE_VERSION, persistentSettings("bad"), malformed, emptyList()))
+        }
+
+        assertFails {
+            LpReplay.replay(
+                LpCapture.capture(
+                    valid.toModel(),
+                    LpReplaySettings(
+                        "tableau-refactor",
+                        0L,
+                        LpReplaySolverKind.TABLEAU,
+                        componentSplit = false,
+                        refactorUpdateLimit = DEFAULT_REFACTOR_UPDATE_LIMIT + 1,
+                    ),
+                    emptyList(),
+                ),
+            )
         }
 
         val integerBuilder = LpBuilder()

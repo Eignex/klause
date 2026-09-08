@@ -90,7 +90,7 @@ internal object LpReplay {
                         model,
                         solver,
                         cancellation,
-                    ) { solver.solve(event.warm?.toBasis(model.numVars, model.m)) }
+                    ) { solver.solve(event.warm?.toBasis(model.hasUpper, model.m)) }
 
                     is LpReplayEvent.SolvePrimal -> replaySolve(
                         index,
@@ -98,11 +98,13 @@ internal object LpReplay {
                         model,
                         solver,
                         cancellation,
-                    ) { solver.solvePrimal(event.warm?.toBasis(model.numVars, model.m)) }
+                    ) { solver.solvePrimal(event.warm?.toBasis(model.hasUpper, model.m)) }
 
                     is LpReplayEvent.Rebind -> {
                         val next = model.rebind(event.lo, event.hi)
-                        cancellation = PollBudgetCancellation(event.cancellationPollLimit)
+                        if (event.cancellationPollLimit != null) {
+                            cancellation = PollBudgetCancellation(event.cancellationPollLimit)
+                        }
                         check((solver as PersistentLpSolver).rebind(next, cancellation)) {
                             "persistent solver rejected replay rebind at event $index"
                         }
@@ -149,38 +151,32 @@ internal object LpReplay {
             return replayNullResult(eventIndex, operation, model, solver, cancellation, metrics, observer)
         }
 
+        val componentSolver = solver as? ComponentLpSolver
         val certificate = integerCertify(model, result.duals, observer = observer)
+        val componentExactLowerBound = if (certificate == null) componentSolver?.exactLowerBound(observer) else null
         var witness = false
         var exactPrimal: DoubleArray? = null
         var rationalVerdict: LpVerdict? = null
-        if (result.optimal) {
-            if (model.rowStrict.any { it }) {
+        if (result.optimal && certificate == null && componentExactLowerBound == null && model.hasContinuous) {
+            if (model.rowStrict.none { it }) {
+                witness = componentSolver?.exactBasisFeasible(observer) == true ||
+                    exactBasisFeasible(model, result.basis, observer) == true ||
+                    exactPointFeasible(model, result.primal, observer)
+            }
+            if (!witness) {
                 val outcome = rationalOutcome(model, cancellation).also {
                     observer.observe(LpCertifier.RATIONAL, it.feasibility != RationalFeasibility.UNKNOWN)
                 }
                 exactPrimal = outcome.witness
                 witness = outcome.feasibility == RationalFeasibility.FEASIBLE
                 rationalVerdict = outcome.feasibility.toVerdict()
-            } else {
-                witness = exactBasisFeasible(model, result.basis, observer) == true
-                if (!witness) witness = exactPointFeasible(model, result.primal, observer)
             }
         }
         val productionVerdict = when {
             !result.optimal -> LpVerdict.INDETERMINATE
-
-            rationalVerdict != null -> rationalVerdict
-
-            certificate != null -> LpVerdict.OPTIMAL
-
+            certificate != null || componentExactLowerBound != null -> LpVerdict.OPTIMAL
             model.hasContinuous && witness -> LpVerdict.OPTIMAL
-
-            model.hasContinuous -> rationalOutcome(model, cancellation).also {
-                observer.observe(LpCertifier.RATIONAL, it.feasibility != RationalFeasibility.UNKNOWN)
-                exactPrimal = it.witness
-                witness = it.feasibility == RationalFeasibility.FEASIBLE
-            }.feasibility.toVerdict()
-
+            rationalVerdict != null -> rationalVerdict
             else -> LpVerdict.INDETERMINATE
         }
         return LpReplayStep(
@@ -190,10 +186,10 @@ internal object LpReplay {
             productionVerdict,
             result.objective.toRawBits(),
             (exactPrimal ?: result.primal).toRawBitsArray(),
-            certificate?.objectiveBoundCeil(0L),
+            certificate?.objectiveBoundCeil(0L) ?: componentExactLowerBound,
             witness,
-            certificate != null,
-            false,
+            certificate != null || componentExactLowerBound != null,
+            productionVerdict == LpVerdict.INFEASIBLE,
             metrics,
             observer.counts(),
             observer.exactInputAttempts,
@@ -332,6 +328,11 @@ private fun validateForReplay(capture: LpCapture) {
         }
         require(settings.refactorUpdateLimit == DEFAULT_REFACTOR_UPDATE_LIMIT && !settings.trackDegeneracy) {
             "general solver factory does not expose refactor/degeneracy settings"
+        }
+    }
+    if (settings.solverKind == LpReplaySolverKind.TABLEAU) {
+        require(settings.refactorUpdateLimit == DEFAULT_REFACTOR_UPDATE_LIMIT) {
+            "tableau solver factory does not expose a refactor update limit"
         }
     }
     if (settings.solverKind != LpReplaySolverKind.GENERAL) {

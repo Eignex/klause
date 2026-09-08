@@ -66,8 +66,28 @@ class LpCaptureTest {
             trackDegeneracy = true,
         )
 
+        val warm = LpCapturedBasis.capture(
+            Basis(
+                intArrayOf(2, 3),
+                arrayOf(VarStatus.AT_LOWER, VarStatus.AT_LOWER, VarStatus.BASIC, VarStatus.BASIC),
+            ),
+        )
+        val doubleCostBits = longArrayOf(nanBits, (-0.0).toRawBits(), 0L, Double.POSITIVE_INFINITY.toRawBits())
         val decoded = LpCapture.decode(
-            LpCapture.capture(model, settings, listOf(LpReplayEvent.Solve())).encode(),
+            LpCapture.capture(
+                model,
+                settings,
+                listOf(
+                    LpReplayEvent.Solve(warm),
+                    LpReplayEvent.ObjectiveSwap(
+                        longArrayOf(1L, 2L, 0L, 0L),
+                        doubleCostBits,
+                        large + 8L,
+                        nanBits,
+                    ),
+                    LpReplayEvent.Rebind(longArrayOf(0L, 0L), longArrayOf(1L, 1L), 7),
+                ),
+            ).encode(),
         )
         val restored = decoded.model.toModel()
 
@@ -83,6 +103,13 @@ class LpCaptureTest {
         assertFalse(restored.rowGlobal[0])
         assertContentEquals(intArrayOf(8, 3), assertNotNull(restored.rowPremises[0]).vars)
         assertNull(restored.rowPremises[1])
+        val decodedWarm = assertNotNull((decoded.events[0] as LpReplayEvent.Solve).warm)
+        assertContentEquals(warm.basicVars, decodedWarm.basicVars)
+        assertContentEquals(warm.statuses, decodedWarm.statuses)
+        val objectiveSwap = decoded.events[1] as LpReplayEvent.ObjectiveSwap
+        assertContentEquals(doubleCostBits, assertNotNull(objectiveSwap.doubleCostBits))
+        assertEquals(nanBits, objectiveSwap.doubleObjConstantBits)
+        assertEquals(7, (decoded.events[2] as LpReplayEvent.Rebind).cancellationPollLimit)
     }
 
     @Test
@@ -106,7 +133,7 @@ class LpCaptureTest {
             Sense.MINIMIZE,
             intArrayOf(99),
             booleanArrayOf(false),
-            booleanArrayOf(true),
+            booleanArrayOf(false),
             arrayOf(LpRowPremises(premiseVars, premiseSides, premiseThresholds, premiseLits)),
         )
         val rebindLo = longArrayOf(2L)
@@ -170,10 +197,18 @@ class LpCaptureTest {
             bytes[eventOffset + 2] = 0
             bytes[eventOffset + 3] = 99
         }
+        val unknownSolverKind = capture.encode().also { bytes ->
+            val solverKindOffset = 8 + 4 + 4 + "versions".encodeToByteArray().size + 8
+            bytes[solverKindOffset] = 0
+            bytes[solverKindOffset + 1] = 0
+            bytes[solverKindOffset + 2] = 0
+            bytes[solverKindOffset + 3] = 99
+        }
 
         assertFailsWith<IllegalArgumentException> { LpCapture.decode(unknownCapture) }
         assertFailsWith<IllegalArgumentException> { LpCapture.decode(truncated) }
         assertFails { LpCapture.decode(unknownEvent) }
+        assertFails { LpCapture.decode(unknownSolverKind) }
         assertFailsWith<IllegalArgumentException> {
             LpCapture(
                 LP_CAPTURE_VERSION,
@@ -181,6 +216,28 @@ class LpCaptureTest {
                 capture.model,
                 listOf(LpReplayEvent.Solve(eventVersion = LP_EVENT_VERSION + 1)),
             ).validateFormat()
+        }
+    }
+
+    @Test
+    fun `malformed sparse columns and warm bases are rejected`() {
+        val builder = LpBuilder()
+        val x = builder.addOpenAboveVar(0L)
+        builder.addRow(intArrayOf(x), longArrayOf(1L), Relation.LE, 1L)
+        builder.addRow(intArrayOf(x), longArrayOf(2L), Relation.LE, 2L)
+        val model = builder.build(Sense.MINIMIZE)
+        val duplicateRows = LpCapturedModel.capture(model)
+        duplicateRows.rowIdx[1] = duplicateRows.rowIdx[0]
+        val strictWithoutDouble = LpCapturedModel.capture(model)
+        strictWithoutDouble.rowStrict[0] = true
+
+        assertFailsWith<IllegalArgumentException> { duplicateRows.validate() }
+        assertFailsWith<IllegalArgumentException> { strictWithoutDouble.validate() }
+        assertFailsWith<IllegalArgumentException> {
+            LpCapturedBasis(
+                intArrayOf(model.slackCol(0), model.slackCol(1)),
+                intArrayOf(3, 1, 1),
+            ).toBasis(model.hasUpper, model.m)
         }
     }
 

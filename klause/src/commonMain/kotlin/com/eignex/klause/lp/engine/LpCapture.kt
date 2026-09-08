@@ -5,16 +5,21 @@ internal const val LP_EVENT_VERSION: Int = 1
 
 /** Which captured numeric view is authoritative. A double view preserves the IEEE bits presented to
  * the engine; it deliberately does not claim to reconstruct source decimal or rational input. */
-internal enum class LpNumericAuthority {
-    LONG_EXACT,
-    IEEE754_BITS_SOURCE_RATIONAL_ABSENT,
+internal enum class LpNumericAuthority(val wireCode: Int) {
+    LONG_EXACT(1),
+    IEEE754_BITS_SOURCE_RATIONAL_ABSENT(2),
 }
 
-internal enum class LpReplaySolverKind { GENERAL, TABLEAU, PERSISTENT }
+internal enum class LpReplaySolverKind(val wireCode: Int) {
+    GENERAL(1),
+    TABLEAU(2),
+    PERSISTENT(3),
+}
 
 /** Fixed engine capabilities and budgets for one solver lifetime. A replay creates exactly one engine;
  * persistent events reuse its basis/factors, while a portable warm start contains only discrete basis
- * columns and statuses. [cancellationPollLimit] is deterministic and zero means never cancel. */
+ * columns and statuses. [cancellationPollLimit] is the initial deterministic token, zero means never
+ * cancel, and a rebind replaces it only when that event carries an explicit override. */
 internal class LpReplaySettings(
     val label: String,
     val seed: Long,
@@ -41,6 +46,8 @@ internal class LpCapturedPremises(
     )
 }
 
+/** Authoritative IEEE-754 input. Its CSC is independent of the Long placeholder CSC because a
+ * real-only coefficient can be absent from the integer view; both stores preserve ascending rows. */
 internal class LpCapturedDoubleView(
     val colPtr: IntArray,
     val rowIdx: IntArray,
@@ -171,6 +178,7 @@ internal class LpCapturedModel(
         val nnz = colPtr.last()
         require(nnz >= 0 && rowIdx.size == nnz && colVal.size == nnz) { "sparse array lengths disagree" }
         require(rowIdx.all { it in 0 until m }) { "sparse row index outside 0 until $m" }
+        requireStrictlyAscendingRows(colPtr, rowIdx, "Long")
         val numVars = checkedNumVars()
         require(rhs.size == m && flippedRhs.size == m) { "right-hand side length differs from $m" }
         require(cost.size == numVars && upper.size == numVars && hasUpper.size == numVars) {
@@ -197,6 +205,7 @@ internal class LpCapturedModel(
         require(doubleView != null || colContinuous.none { it }) {
             "continuous column flags require an authoritative double view"
         }
+        require(doubleView != null || rowStrict.none { it }) { "strict rows require an authoritative double view" }
         doubleView?.validate(n, m, numVars)
     }
 
@@ -274,6 +283,7 @@ private fun LpCapturedDoubleView.validate(n: Int, m: Int, numVars: Int) {
         "double sparse arrays disagree"
     }
     require(rowIdx.all { it in 0 until m }) { "double sparse row index outside 0 until $m" }
+    requireStrictlyAscendingRows(colPtr, rowIdx, "double")
     require(rhsBits.size == m) { "double right-hand side length differs from $m" }
     require(costBits.size == numVars && upperBits.size == numVars && hasUpper.size == numVars) {
         "double column data length differs from $numVars"
@@ -284,23 +294,31 @@ private fun LpCapturedDoubleView.validate(n: Int, m: Int, numVars: Int) {
 internal class LpCapturedBasis(val basicVars: IntArray, val statuses: IntArray) {
     fun copy(): LpCapturedBasis = LpCapturedBasis(basicVars.copyOf(), statuses.copyOf())
 
-    fun toBasis(numVars: Int, rows: Int): Basis {
+    fun toBasis(hasUpper: BooleanArray, rows: Int): Basis {
+        val numVars = hasUpper.size
         require(basicVars.size == rows) { "warm basis has ${basicVars.size} rows, expected $rows" }
         require(statuses.size == numVars) { "warm status count ${statuses.size}, expected $numVars" }
         require(basicVars.all { it in 0 until numVars }) { "warm basis column outside 0 until $numVars" }
-        require(basicVars.toSet().size == basicVars.size) { "warm basis repeats a column" }
+        val basicSeen = BooleanArray(numVars)
+        for (column in basicVars) {
+            require(!basicSeen[column]) { "warm basis repeats column $column" }
+            basicSeen[column] = true
+        }
         val decoded = Array(numVars) { i ->
-            VarStatus.entries.getOrNull(statuses[i]) ?: error("unknown variable status ${statuses[i]}")
+            statusFromWireCode(statuses[i])
         }
         require(basicVars.all { decoded[it] == VarStatus.BASIC }) { "warm basic column is not BASIC" }
         require(decoded.count { it == VarStatus.BASIC } == rows) { "warm status vector has the wrong basis size" }
+        require(decoded.indices.all { decoded[it] != VarStatus.AT_UPPER || hasUpper[it] }) {
+            "warm basis seats an unbounded column at its upper bound"
+        }
         return Basis(basicVars.copyOf(), decoded)
     }
 
     companion object {
         fun capture(basis: Basis): LpCapturedBasis = LpCapturedBasis(
             basis.basicVars.copyOf(),
-            IntArray(basis.status.size) { basis.status[it].ordinal },
+            IntArray(basis.status.size) { statusWireCode(basis.status[it]) },
         )
     }
 }
@@ -315,7 +333,9 @@ internal sealed class LpReplayEvent(open val eventVersion: Int) {
     class Rebind(
         val lo: LongArray,
         val hi: LongArray,
-        val cancellationPollLimit: Int = 0,
+        /** Optional replacement cancellation budget for this and later events; null preserves the
+         * lifetime token and its consumed poll count. */
+        val cancellationPollLimit: Int? = null,
         override val eventVersion: Int = LP_EVENT_VERSION,
     ) : LpReplayEvent(eventVersion)
 
@@ -386,7 +406,6 @@ internal class LpCapture internal constructor(
         require(settings.pivotLimit >= 0 && settings.workLimit >= 0L) { "negative solve budget" }
         require(settings.refactorUpdateLimit > 0) { "non-positive refactor update limit" }
         model.validate()
-        require(events.size <= MAX_CAPTURE_ITEMS) { "too many replay events" }
         events.forEachIndexed { index, event ->
             require(event.eventVersion == LP_EVENT_VERSION) {
                 "unsupported LP event version ${event.eventVersion} at event $index"
@@ -396,8 +415,9 @@ internal class LpCapture internal constructor(
     }
 
     companion object {
-        /** Freeze [model] and [events] at this call. The capture contains no factorization snapshot or
-         * other solver-private cache, so it remains meaningful across compatible solver backends. */
+        /** Freeze [model] and caller-recorded [events] at this call. Wave 0.4 intentionally has no
+         * instrumented producer: callers record only events exposed by their public engine seam. The
+         * capture contains no factorization snapshot or other solver-private cache. */
         fun capture(model: LpModel, settings: LpReplaySettings, events: List<LpReplayEvent>): LpCapture = LpCapture(
             LP_CAPTURE_VERSION,
             settings.copy(),
@@ -480,9 +500,9 @@ private fun LpReplayEvent.copyForCapture(): LpReplayEvent = when (this) {
 private fun validateEventShape(event: LpReplayEvent, model: LpCapturedModel, index: Int) {
     val numVars = model.cost.size
     when (event) {
-        is LpReplayEvent.Solve -> event.warm?.toBasis(numVars, model.m)
+        is LpReplayEvent.Solve -> event.warm?.toBasis(model.hasUpper, model.m)
 
-        is LpReplayEvent.SolvePrimal -> event.warm?.toBasis(numVars, model.m)
+        is LpReplayEvent.SolvePrimal -> event.warm?.toBasis(model.hasUpper, model.m)
 
         is LpReplayEvent.Rebind -> {
             require(
@@ -491,7 +511,9 @@ private fun validateEventShape(event: LpReplayEvent, model: LpCapturedModel, ind
             require(
                 event.lo.indices.all { event.lo[it] <= event.hi[it] },
             ) { "event $index contains an empty rebind bound" }
-            require(event.cancellationPollLimit >= 0) { "event $index has a negative cancellation poll limit" }
+            require(event.cancellationPollLimit == null || event.cancellationPollLimit >= 0) {
+                "event $index has a negative cancellation poll limit"
+            }
         }
 
         is LpReplayEvent.ResolveGated -> require(event.enforced.size == model.m) {
@@ -523,8 +545,7 @@ private fun validateEventShape(event: LpReplayEvent, model: LpCapturedModel, ind
     }
 }
 
-private val CAPTURE_MAGIC: ByteArray = byteArrayOf(0x4b, 0x4c, 0x50, 0x43, 0x41, 0x50, 0x30, 0x34)
-private const val MAX_CAPTURE_ITEMS: Int = 10_000_000
+private val CAPTURE_MAGIC: ByteArray = byteArrayOf(0x4b, 0x4c, 0x50, 0x43, 0x41, 0x50, 0x54, 0x52)
 
 private class CaptureWriter {
     private var data = ByteArray(256)
@@ -560,7 +581,7 @@ private class CaptureWriter {
     fun settings(value: LpReplaySettings) {
         string(value.label)
         long(value.seed)
-        int(value.solverKind.ordinal)
+        int(value.solverKind.wireCode)
         bool(value.componentSplit)
         int(value.cancellationPollLimit)
         int(value.pivotLimit)
@@ -581,7 +602,7 @@ private class CaptureWriter {
         bools(value.hasUpper)
         longs(value.loShift)
         long(value.objConstant)
-        int(value.sense.ordinal)
+        int(senseWireCode(value.sense))
         ints(value.tag)
         bools(value.rowGlobal)
         bools(value.rowStrict)
@@ -599,7 +620,7 @@ private class CaptureWriter {
         bools(value.probeClampedLo)
         bools(value.probeClampedHi)
         bools(value.colContinuous)
-        int(value.numericAuthority.ordinal)
+        int(value.numericAuthority.wireCode)
         bool(value.doubleView != null)
         value.doubleView?.let {
             ints(it.colPtr)
@@ -633,7 +654,7 @@ private class CaptureWriter {
             is LpReplayEvent.Rebind -> {
                 longs(value.lo)
                 longs(value.hi)
-                int(value.cancellationPollLimit)
+                nullableInt(value.cancellationPollLimit)
             }
 
             is LpReplayEvent.ResolveBounds -> Unit
@@ -680,6 +701,11 @@ private class CaptureWriter {
         if (value != null) long(value)
     }
 
+    private fun nullableInt(value: Int?) {
+        bool(value != null)
+        if (value != null) int(value)
+    }
+
     private fun nullableLongs(value: LongArray?) {
         bool(value != null)
         if (value != null) longs(value)
@@ -696,9 +722,11 @@ private class CaptureWriter {
     }
 
     private fun ensure(extra: Int) {
-        if (size + extra <= data.size) return
+        val required = size.toLong() + extra.toLong()
+        require(required <= Int.MAX_VALUE) { "LP capture exceeds the maximum encodable size" }
+        if (required <= data.size.toLong()) return
         var next = data.size
-        while (next < size + extra) next = next * 2
+        while (next.toLong() < required) next = minOf(Int.MAX_VALUE.toLong(), next.toLong() * 2L).toInt()
         data = data.copyOf(next)
     }
 }
@@ -744,7 +772,7 @@ private class CaptureReader(private val data: ByteArray) {
     fun settings(): LpReplaySettings = LpReplaySettings(
         string(),
         long(),
-        enumValue<LpReplaySolverKind>(int(), "solver kind"),
+        solverKindFromWireCode(int()),
         bool(),
         int(),
         int(),
@@ -765,11 +793,12 @@ private class CaptureReader(private val data: ByteArray) {
         val hasUpper = bools()
         val loShift = longs()
         val objConstant = long()
-        val sense = enumValue<Sense>(int(), "objective sense")
+        val sense = senseFromWireCode(int())
         val tag = ints()
         val rowGlobal = bools()
         val rowStrict = bools()
         val premiseCount = count()
+        requireItems(premiseCount, 1)
         val premises = Array<LpCapturedPremises?>(premiseCount) {
             if (bool()) LpCapturedPremises(ints(), bools(), longs(), ints()) else null
         }
@@ -777,7 +806,7 @@ private class CaptureReader(private val data: ByteArray) {
         val probeLo = bools()
         val probeHi = bools()
         val continuous = bools()
-        val authority = enumValue<LpNumericAuthority>(int(), "numeric authority")
+        val authority = numericAuthorityFromWireCode(int())
         val dv = if (bool()) {
             LpCapturedDoubleView(ints(), ints(), longs(), longs(), longs(), longs(), bools(), long(), longs())
         } else {
@@ -799,7 +828,7 @@ private class CaptureReader(private val data: ByteArray) {
             when (id) {
                 1 -> LpReplayEvent.Solve(basis(), version)
                 2 -> LpReplayEvent.SolvePrimal(basis(), version)
-                3 -> LpReplayEvent.Rebind(longs(), longs(), int(), version)
+                3 -> LpReplayEvent.Rebind(longs(), longs(), nullableInt(), version)
                 4 -> LpReplayEvent.ResolveBounds(version)
                 5 -> LpReplayEvent.ResolveGated(bools(), version)
                 6 -> LpReplayEvent.BoundWrite(int(), bool(), long(), bool(), int(), version)
@@ -815,12 +844,13 @@ private class CaptureReader(private val data: ByteArray) {
     }
 
     private fun basis(): LpCapturedBasis? = if (bool()) LpCapturedBasis(ints(), ints()) else null
+    private fun nullableInt(): Int? = if (bool()) int() else null
     private fun nullableLong(): Long? = if (bool()) long() else null
     private fun nullableLongs(): LongArray? = if (bool()) longs() else null
 
     private fun count(): Int {
         val value = int()
-        require(value in 0..MAX_CAPTURE_ITEMS) { "invalid capture item count $value" }
+        require(value >= 0) { "invalid capture item count $value" }
         return value
     }
 
@@ -848,8 +878,45 @@ private class CaptureReader(private val data: ByteArray) {
     }
 }
 
-private inline fun <reified T : Enum<T>> enumValue(ordinal: Int, name: String): T =
-    enumValues<T>().getOrNull(ordinal) ?: error("unknown $name $ordinal")
+private fun solverKindFromWireCode(code: Int): LpReplaySolverKind =
+    LpReplaySolverKind.entries.firstOrNull { it.wireCode == code } ?: error("unknown solver kind $code")
+
+private fun numericAuthorityFromWireCode(code: Int): LpNumericAuthority =
+    LpNumericAuthority.entries.firstOrNull { it.wireCode == code } ?: error("unknown numeric authority $code")
+
+private fun senseWireCode(sense: Sense): Int = when (sense) {
+    Sense.MINIMIZE -> 1
+    Sense.MAXIMIZE -> 2
+}
+
+private fun senseFromWireCode(code: Int): Sense = when (code) {
+    1 -> Sense.MINIMIZE
+    2 -> Sense.MAXIMIZE
+    else -> error("unknown objective sense $code")
+}
+
+private fun statusWireCode(status: VarStatus): Int = when (status) {
+    VarStatus.BASIC -> 1
+    VarStatus.AT_LOWER -> 2
+    VarStatus.AT_UPPER -> 3
+}
+
+private fun statusFromWireCode(code: Int): VarStatus = when (code) {
+    1 -> VarStatus.BASIC
+    2 -> VarStatus.AT_LOWER
+    3 -> VarStatus.AT_UPPER
+    else -> error("unknown variable status $code")
+}
+
+private fun requireStrictlyAscendingRows(colPtr: IntArray, rowIdx: IntArray, label: String) {
+    for (column in 0 until colPtr.lastIndex) {
+        for (position in colPtr[column] + 1 until colPtr[column + 1]) {
+            require(rowIdx[position - 1] < rowIdx[position]) {
+                "$label CSC row indices are not strictly ascending in column $column"
+            }
+        }
+    }
+}
 
 private fun eventId(event: LpReplayEvent): Int = when (event) {
     is LpReplayEvent.Solve -> 1
