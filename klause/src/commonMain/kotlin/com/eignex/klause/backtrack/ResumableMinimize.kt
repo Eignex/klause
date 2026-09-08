@@ -184,7 +184,7 @@ internal class ResumableMinimize(
     // Built once; persists across slices, so warm starts roll forward. Always constructed so the
     // always-on linear lower bound runs; its internal bounds are null/empty when their feature flag
     // is off.
-    private val lpEngine = LpEngine(problem, objective, params.lpParams(), sink)
+    private val lpEngine = LpEngine(problem, objective, params.lpParams(), sink, solver.lpSolveContext)
     private val rootLpDutyCycle = RootLpDutyCycle()
 
     // LP-guided branching hints (search-only): owned here so the engine depends only on the record sink.
@@ -360,6 +360,9 @@ internal class ResumableMinimize(
                 MinimizeResult.BestFound(b.assignment, b.objective, TerminationReason.SearchExhausted, stats)
 
             externalShared -> MinimizeResult.Unknown(TerminationReason.SearchExhausted, stats)
+
+            b != null && sawIndeterminateLeaf ->
+                MinimizeResult.BestFound(b.assignment, b.objective, TerminationReason.Unsupported, stats)
 
             b != null -> MinimizeResult.Optimal(b.assignment, b.objective, stats)
 
@@ -755,6 +758,7 @@ internal class ResumableMinimize(
                     Cancellation { sliceCancelled() },
                     componentSplit = params.lpPlan.componentSplit,
                     sink = sink.lp,
+                    context = solver.lpSolveContext,
                 )
                 when (real.verdict) {
                     LpVerdict.INFEASIBLE -> null

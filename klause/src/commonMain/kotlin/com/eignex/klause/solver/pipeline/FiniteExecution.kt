@@ -4,11 +4,13 @@ import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackRecipe
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.backtrack.NodeBudget
+import com.eignex.klause.backtrack.SearchOutcome
 import com.eignex.klause.backtrack.toBacktrackParams
 import com.eignex.klause.formats.flatzinc.FlatZincSearchHints
 import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.localsearch.strategy.LocalSearchRecipe
 import com.eignex.klause.lp.bounding.LpConfig
+import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.portfolio.AttributedImprovement
 import com.eignex.klause.portfolio.BacktrackCatalog
 import com.eignex.klause.portfolio.Kind
@@ -194,6 +196,8 @@ internal class FiniteExecutionRequest(
     val onEvent: ((SearchEvent) -> Unit)?,
     /** Optional per-worker portfolio engine event sink. */
     val onPortfolioEvent: ((worker: String, event: SearchEvent) -> Unit)?,
+    /** LP dependencies for the fixed complete route. */
+    val lpSolveContext: LpSolveContext,
 )
 
 /** Streaming hooks owned by a rendering frontend. */
@@ -273,7 +277,18 @@ private fun FinitePipeline.execute(
 }
 
 /** Prepare a finite model once, then execute the selected engine route. */
-fun FinitePipeline.solve(request: FiniteSolveRequest, callbacks: FiniteSolveCallbacks): FiniteSolveResult {
+fun FinitePipeline.solve(request: FiniteSolveRequest, callbacks: FiniteSolveCallbacks): FiniteSolveResult =
+    solve(request, callbacks, LpSolveContext.Production)
+
+/** Execute the fixed finite route with per-invocation LP dependencies. */
+internal fun FinitePipeline.solve(
+    request: FiniteSolveRequest,
+    callbacks: FiniteSolveCallbacks,
+    lpSolveContext: LpSolveContext,
+): FiniteSolveResult {
+    require(request.engine == FiniteEngine.FIXED || lpSolveContext == LpSolveContext.Production) {
+        "custom LP dependencies require the fixed finite route"
+    }
     val preparationStart = TimeSource.Monotonic.markNow()
     val preparation = prepare(
         FinitePipelineRequest(
@@ -325,6 +340,7 @@ fun FinitePipeline.solve(request: FiniteSolveRequest, callbacks: FiniteSolveCall
             deadlineExceeded = request.deadlineExceeded,
             onEvent = request.onEvent,
             onPortfolioEvent = request.onPortfolioEvent,
+            lpSolveContext = lpSolveContext,
         ),
         FiniteExecutionCallbacks(
             onSample = { sample -> callbacks.onSample(preparation.reconstruct(sample)) },
@@ -399,7 +415,7 @@ private fun executeFixed(request: FiniteExecutionRequest, callbacks: FiniteExecu
             onEvent = request.onEvent,
         ),
     )
-    val solver = BacktrackSolver(request.problem)
+    val solver = BacktrackSolver(request.problem, request.lpSolveContext)
     if (plan.dryRun) return FiniteExecutionResult.DryRun("solver dry-run:", solver.describe(plan.params).lines())
 
     val start = TimeSource.Monotonic.markNow()
@@ -441,17 +457,32 @@ private fun executeFixedSatisfy(
 
     var solutions = 0L
     var timedOut = false
-    for (sample in solver.enumerate(params)) {
-        if (request.deadlineExceeded()) {
-            timedOut = true
-            break
+    var indeterminate = false
+    for (outcome in solver.enumerationOutcomes(params)) {
+        when (outcome) {
+            is SearchOutcome.Found -> {
+                if (request.deadlineExceeded()) {
+                    timedOut = true
+                    break
+                }
+                callbacks.onSample(outcome.sample)
+                solutions++
+                if (solutions >= limit) break
+            }
+
+            is SearchOutcome.Exhausted -> {
+                indeterminate = outcome.indeterminate
+                break
+            }
+
+            SearchOutcome.BudgetCapped -> {
+                timedOut = true
+                break
+            }
         }
-        callbacks.onSample(sample)
-        solutions++
-        if (solutions >= limit) break
     }
     val verdict = when {
-        timedOut && solutions == 0L -> FiniteExecutionVerdict.UNKNOWN
+        (timedOut || indeterminate) && solutions == 0L -> FiniteExecutionVerdict.UNKNOWN
         solutions == 0L -> FiniteExecutionVerdict.UNSAT
         else -> FiniteExecutionVerdict.SAT
     }

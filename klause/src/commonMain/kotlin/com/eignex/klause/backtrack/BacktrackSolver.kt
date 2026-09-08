@@ -3,6 +3,7 @@ package com.eignex.klause.backtrack
 import com.eignex.klause.compile.CompiledSchema
 import com.eignex.klause.compile.compile
 import com.eignex.klause.lp.bounding.LpAutoConfig
+import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.PropagationSession
@@ -38,16 +39,21 @@ import kotlin.random.Random
  *  Complete enumeration on `n` unpinned bools walks up to `2^n` branches. Use
  *  [BacktrackParams.maxDecisions] to cap exploration on large problems.
  */
-class BacktrackSolver(override val problem: BakedProblem) :
-    Solver<BacktrackParams>,
+class BacktrackSolver internal constructor(
+    override val problem: BakedProblem,
+    internal val lpSolveContext: LpSolveContext,
+) : Solver<BacktrackParams>,
     Optimizer<BacktrackParams>,
     ResumableOptimizer<BacktrackParams> {
 
+    /** Solve a baked problem with production LP dependencies. */
+    constructor(problem: BakedProblem) : this(problem, LpSolveContext.Production)
+
     /** Solve a [CompiledSchema]'s problem. */
-    constructor(compiled: CompiledSchema) : this(compiled.problem.bake())
+    constructor(compiled: CompiledSchema) : this(compiled.problem.bake(), LpSolveContext.Production)
 
     /** Compile [schema] with the default config and solve the resulting problem. */
-    constructor(schema: VariableSchema) : this(schema.compile().problem.bake())
+    constructor(schema: VariableSchema) : this(schema.compile().problem.bake(), LpSolveContext.Production)
 
     /** Solve once and return a [SolveResult]. */
     fun solve(): SolveResult = solve(BacktrackParams())
@@ -219,13 +225,20 @@ class BacktrackSolver(override val problem: BakedProblem) :
      * with-replacement) and de-duplicate client-side, e.g. `samples(p).distinct().take(n)`.
      */
     override fun enumerate(params: BacktrackParams): Sequence<Sample> = sequence {
+        for (outcome in enumerationOutcomes(params)) {
+            if (outcome is SearchOutcome.Found) yield(outcome.sample)
+        }
+    }
+
+    /** Enumerate accepted samples while preserving the terminal search outcome for finite orchestration. */
+    internal fun enumerationOutcomes(params: BacktrackParams): Sequence<SearchOutcome> = sequence {
         val window = ArrayDeque<Sample>()
         for (outcome in driveSearch(params)) {
             when (outcome) {
                 is SearchOutcome.Found -> {
                     val snap = outcome.sample
                     if (farEnough(snap, window, params.minHammingDistance)) {
-                        yield(snap)
+                        yield(outcome)
                         if (params.recentWindow > 0) {
                             if (window.size >= params.recentWindow) window.removeFirst()
                             window.addLast(snap)
@@ -233,7 +246,10 @@ class BacktrackSolver(override val problem: BakedProblem) :
                     }
                 }
 
-                is SearchOutcome.Exhausted, SearchOutcome.BudgetCapped -> return@sequence
+                is SearchOutcome.Exhausted, SearchOutcome.BudgetCapped -> {
+                    yield(outcome)
+                    return@sequence
+                }
             }
         }
     }

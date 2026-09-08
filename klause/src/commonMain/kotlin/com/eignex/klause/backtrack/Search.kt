@@ -6,6 +6,7 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.values
 import com.eignex.klause.lp.bounding.LpEngine
 import com.eignex.klause.lp.bounding.LpParams
+import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.lp.engine.LpVerdict
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.BakedProblem
@@ -100,7 +101,7 @@ internal sealed interface SearchOutcome {
 internal fun BacktrackSolver.driveSearch(
     params: BacktrackParams,
     sink: SolveStatsSink? = null,
-): Sequence<SearchOutcome> = CpSatisfactionTraversal(problem, params, sink).outcomes()
+): Sequence<SearchOutcome> = CpSatisfactionTraversal(problem, params, sink, lpSolveContext).outcomes()
 
 /**
  * Satisfaction path for a CP/theory search.
@@ -112,6 +113,7 @@ private class CpSatisfactionTraversal(
     private val problem: BakedProblem,
     private val params: BacktrackParams,
     private val sink: SolveStatsSink?,
+    private val solveContext: LpSolveContext,
 ) {
     fun outcomes(): Sequence<SearchOutcome> = sequence {
         val cp = CpSearchComponent(
@@ -124,7 +126,7 @@ private class CpSatisfactionTraversal(
             ),
             branching = CpBranching.None,
         )
-        val completion = BacktrackCompletion.of(problem, cp, params, sink)
+        val completion = BacktrackCompletion.of(problem, cp, params, sink, solveContext)
         val traversal = CpSatisfactionTraversalPolicy(
             cp.session,
             params,
@@ -136,7 +138,9 @@ private class CpSatisfactionTraversal(
         completion.addTo(components)
         // Only an arm that asked for the relaxation pays for it; the engine itself then declines on a
         // model with no LP-emittable structure.
-        if (params.lpConfig != null) components += LpFeasibilityComponent(problem, cp, params, sink)
+        if (params.lpConfig != null) {
+            components += LpFeasibilityComponent(problem, cp, params, sink, solveContext)
+        }
         components += params.componentFactory?.invoke().orEmpty()
         val session = SearchComponentSet(components, branchers = listOf(traversal.brancher)).session(
             cancellation = params.cancellation,
@@ -408,8 +412,12 @@ private sealed interface BacktrackCompletion {
             cp: CpSearchComponent,
             params: BacktrackParams,
             sink: SolveStatsSink?,
-        ): BacktrackCompletion =
-            if (problem.numRealVars == 0) Discrete else ResidualReal(ResidualRealComponent(problem, cp, params, sink))
+            solveContext: LpSolveContext,
+        ): BacktrackCompletion = if (problem.numRealVars == 0) {
+            Discrete
+        } else {
+            ResidualReal(ResidualRealComponent(problem, cp, params, sink, solveContext))
+        }
     }
 }
 
@@ -431,6 +439,7 @@ private class LpFeasibilityComponent(
     private val cp: CpSearchComponent,
     params: BacktrackParams,
     sink: SolveStatsSink?,
+    solveContext: LpSolveContext,
 ) : SearchComponent {
     private val engine = LpEngine(
         problem,
@@ -443,6 +452,7 @@ private class LpFeasibilityComponent(
             randomSeed = params.randomSeed,
         ),
         sink ?: SolveStatsSink(backend = "backtrack"),
+        solveContext,
     )
 
     override fun propagate(context: SearchContext): ComponentResult {
@@ -463,6 +473,7 @@ private class ResidualRealComponent(
     private val cp: CpSearchComponent,
     params: BacktrackParams,
     sink: SolveStatsSink?,
+    solveContext: LpSolveContext,
 ) : SearchComponent {
     private val engine = LpEngine(
         problem,
@@ -475,6 +486,7 @@ private class ResidualRealComponent(
             randomSeed = params.randomSeed,
         ),
         sink ?: SolveStatsSink(backend = "backtrack"),
+        solveContext,
     )
     private var completed: Sample? = null
 
