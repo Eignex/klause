@@ -1,0 +1,201 @@
+# LP Wave 0 baseline and reference reconciliation
+
+This audit was prepared from base `848cfef9b6661a5b3eb941de006b2050bca44c5b`. It preserves the
+reported Wave 0 baselines, freezes reproducible slices, corrects the test-only independent validator,
+and separates the production observer overhead gate from capture, codec and validation costs.
+
+## Evidence provenance
+
+The raw result directories named by the earlier tasks are not present in this checkout, the saved
+workspace, any current Codex worktree or `/tmp`. They therefore cannot be independently re-analysed.
+The commands and reported results below survive in merged PR descriptions and archived local Codex
+session logs. The logs are supporting audit material, not repository artifacts and not a substitute
+for retained raw results.
+
+| Evidence | Retained report | Raw artifacts |
+|---|---|---|
+| CP/MILP counters, [PR #1935](https://github.com/Eignex/klause/pull/1935) | Source `45900aea6bf0800571dd261952aa93f13ae9abe9`; 35 shared instances, 3 paired repetitions, 3 s timeout. LP default solved 18 vs 17, proved 4 vs 4, Borda 9.57 vs 8.43, comparable time +0.58%. LP off solved 18 vs 17, proved 3 vs 3, Borda 8.94 vs 9.06, comparable time -0.01%. Zero crashes or unsound results. | Absent. The `pr1935-final4-r1..3` and base directories are no longer retained. |
+| SMT counters, [PR #1940](https://github.com/Eignex/klause/pull/1940) | Source `9f0e6f2582fc41e028ad7f5845d51dc0da11684e`; one 30 s run over six `smtlib-core` fixtures. Four SAT, one UNSAT, and `lia-wide-span` errored while attempting to enumerate `[1, 9223372036854775806]`. | Absent. `klause-fixed-p1-t30s-9f0e6f258` is no longer retained. |
+| Replay, [PR #1943](https://github.com/Eignex/klause/pull/1943) | Label `w0.4-replay-v1`; six workloads, eight result events, seven validated, one declined, zero refuted. Three repetitions reported 5.80 ms with codec persistence versus 3.68 ms in memory. | Absent. The timing was codec persistence and never satisfied the instrumentation-overhead gate. |
+
+The archived task logs used for the audit are:
+
+- `/home/rasmus/.codex/archived_sessions/rollout-2026-09-07T09-55-23-01a07add-5f5c-76f2-9bc6-fab229c78afb.jsonl`
+- `/home/rasmus/.codex/archived_sessions/rollout-2026-09-07T21-10-09-01a07d47-25b6-7961-a130-574518a6d1de.jsonl`
+- `/home/rasmus/.codex/archived_sessions/rollout-2026-09-08T08-10-50-01a07fa4-034b-78d2-8cdf-d32f394219f1.jsonl`
+
+The CP/MILP selection contained 19 MiniZinc instances, four of which were excluded for source
+incompatibility: `2008/nmseq/020`, `2009/still_life/still_life_5`,
+`2010/wwtp_random/ex05100_2600_100`, and `2026/tdtsp`. The 15 shared MiniZinc instances, four
+`xcsp3-core` instances, four `mps-core` instances and twelve MIPLIB instances are frozen in
+`lp-wave0-manifest.json`.
+
+## Reference coverage at the base
+
+Table hashes, exact frozen instance IDs, source hashes, tool versions and the MiniZinc corpus commit
+are in `lp-wave0-manifest.json`.
+
+| Required suite | Adapter route | Committed oracle coverage | Reconciliation |
+|---|---|---:|---|
+| `smtlib-qflra` | `bench reference` → Z3 | 1,753 `smtlib-qf_lra` rows | Existing broad oracle coverage; frozen 10-instance check slice. |
+| `smtlib-qflira` | `bench reference` → Z3 | 7 `smtlib-qf_lira` rows | All seven rows exist, but the deterministic per-family slice selects one family representative. |
+| `smtlib-qflia` | `bench reference` → Z3 | 13,306 `smtlib-qf_lia` rows | Existing broad oracle coverage; frozen 10-instance check slice. |
+| `smtlib-qfidl` | `bench reference` → Z3 | 0 | Missing. The frozen 10-instance slice and full-suite command are prepared. |
+| `smtlib-qfrdl` | `bench reference` → Z3 | 0 | Missing. The corpus has six families; all six are frozen. |
+| `mzn-bench` | `bench reference` → MiniZinc CP-SAT | 0 current `mzn-challenge` rows | Missing for the current suite. The 16,292 `minizinc-benchmarks` rows belong to the retired corpus ID and do not cover it. |
+| `xcsp3-core` | `bench reference` → CPMpy/CP-SAT container | 0 | Missing. The four static fixtures are frozen. |
+| `mps-core` | `bench reference` → SCIP container | 0 | Missing. The four static fixtures are frozen. |
+| frozen `miplib2017` | `bench reference` → SCIP container | All 12 selected rows | Covered at 10 s in the 1,007-row table. Several are timeout/unproved rows, which remain in the denominator. |
+
+The format adapters already route SMT-LIB to Z3, XCSP3 and MiniZinc to CP-SAT, and MPS to SCIP.
+No missing adapter logic was found. The gaps are missing oracle executions or a corpus-ID mismatch, so
+this task does not change production benchmark adapters or oracle tables. In particular, SMT reference
+generation must use `bench reference`; `backend=z3` is not an equivalent `bench solve` baseline.
+
+Full SMT reference coverage remains open. The bounded slices make the missing formats executable and
+reviewable, but they do not claim to replace the full commands printed by the runner. Generating those
+oracles writes committed CSV files and must happen in a task that explicitly owns them.
+
+## Independent reference semantics
+
+`LpReferenceAdapter` is the single test-only independent exact LP reference. It reconstructs an exact
+rational model from the normalized `LpModel` seam, using exact `Long` values and exact IEEE-754 values.
+It does not call the float engine or production certifiers.
+
+The replay validator previously enumerated integer assignments for integer-backed models. That could
+compare a continuous LP result with a bare integer optimum. It now delegates every replay problem to
+the exact rational adapter, including active-row masks. Directed coverage fixes `2x >= 1`, `0 <= x <=
+1` at the LP optimum `1/2`, rejects the wrong integer optimum `1`, and verifies active-row behavior.
+
+The independent claims are deliberately distinct:
+
+- exact infeasibility validates a production infeasibility only when the production step carries its
+  proof; an uncertified gated result validates only the float candidate hint;
+- a certified integral lower bound remains `CERTIFIED_BOUND`, not a claim that the integer optimum is
+  the continuous LP optimum;
+- an exact feasible witness validates `PROVED_OPTIMUM` only when its independently reconstructed
+  source objective equals the attained reference bound;
+- a valid feasibility-only witness remains `FEASIBLE_WITNESS` when the objective is unbounded, even if
+  the legacy production verdict is labelled `OPTIMAL`;
+- a strict, unattained infimum validates only `FEASIBLE_WITNESS`;
+- probe-bounded feasibility can validate a witness, but open-model infeasibility or objective
+  comparison declines;
+- cancellation, pivot exhaustion and non-finite input decline instead of deciding.
+
+`LpTestSupport.exactLpOptimum` remains a read-only production-simplex test helper despite its name. It
+is not used as an independent exact oracle and was outside this task's frozen paths.
+
+## Instrumentation evidence and contract
+
+The v1 run measured only the optional production `LpCertificationObserver` seam at source
+`1f1bd19a24cd181dcae27013a2465a51cc23b1b1`. The host was 96.8% idle immediately before the
+coordinated window. Both arms had the same semantic digest, 1,300 pivots and 268,500 work operations.
+The median paired delta was -2.08%, but the baseline samples were only 6.45–22.26 ms, the active
+samples were 6.85–30.85 ms, and the paired range was -21.16%..67.75%. That timing scale and spread are
+inconclusive, so v1 is not a 5% gate pass even though its raw median is below 5%.
+
+The complete v1 samples are preserved in the ignored local artifact directory
+`klause-bench/output/lp-wave0-validation-1f1bd19a24cd181dcae27013a2465a51cc23b1b1/`:
+
+- baseline ns: `[18392788, 19974485, 22260151, 10313531, 6899133, 8682755, 6446782, 7651630, 8105646]`;
+- active ns: `[30854005, 17389746, 18315129, 11954063, 9638230, 6845356, 7892940, 7492182, 7298727]`;
+- paired delta %: `[67.75, -12.94, -17.72, 15.91, 39.7, -21.16, 22.43, -2.08, -9.96]`.
+
+The v1 auxiliary medians, excluded from the observer gate, were 2.42 ms for 100 capture batches,
+5.98 ms for 50 codec round-trips, and +3,928.65% for exact independent validation over one replay
+slice. These quantify different work and are not instrumentation overhead.
+
+The v2 contract used v1 only as duration calibration and ran once at source
+`a51dcab07fe77802fbd2bbfd720d884c65dcc2b9` in a coordinated window after the host measured 96.4%
+idle. Both arms had the same semantic digest, 65,000 pivots and 13,425,000 work operations. The
+baseline median was 275.45 ms and the active median was 272.29 ms. Its paired median was -0.77% and
+paired IQR was 2.08 percentage points, but both medians missed the predeclared 300 ms validity floor.
+V2 is therefore inconclusive and is not a 5% gate pass.
+
+The complete v2 samples are preserved in the ignored local artifact directory
+`klause-bench/output/lp-wave0-validation-v2-a51dcab07fe77802fbd2bbfd720d884c65dcc2b9/`:
+
+- baseline ns: `[271931284, 274533352, 282503578, 274133499, 324225634, 284448459, 276344454, 275448337, 266359239]`;
+- active ns: `[269832122, 272294240, 283713572, 273638602, 281635335, 296033031, 270095688, 265051633, 265201142]`;
+- paired delta %: `[-0.77, -0.82, 0.43, -0.18, -13.14, 4.07, -2.26, -3.77, -0.43]`.
+
+The v2 auxiliary medians, excluded from the observer gate, were 3.32 ms for 100 capture batches,
+2.95 ms for 50 codec round-trips, and +3,564.65% for exact independent validation over one replay
+slice. These quantify different work and are not instrumentation overhead.
+
+The v3 contract doubled only the observer batch to 10,000, predicting roughly 0.55 s arms from the v2
+medians. Before any v3 results, it fixed these rules:
+
+- label `w0-instrumentation-v3`; one standalone solve over each of the six `w0.4-replay-v1` model
+  shapes per batch (the replay-only cancellation, pivot and gated-event controls are not available at
+  the production observer seam);
+- `ProductionLpEngineFactory` / `RevisedSimplex`, `componentSplit=false`, identical models and solve
+  settings in both arms;
+- baseline arm passes no observer; active arm counts certification, exact-input and solve-metric
+  events;
+- both arms use an identical test-only metrics wrapper, and every pair asserts equal semantic digest,
+  pivot count and work count;
+- 10,000 batches per arm, three warm-ups and nine alternating paired repetitions;
+- validity requires both arm medians to be at least 300 ms and paired-delta IQR to be at most 10
+  percentage points; no pair is discarded;
+- statistic: median of the nine paired percentage deltas; pass threshold remains at most 5%;
+- no Gradle build-cache reuse, no benchmark cache and no external solver process.
+
+V3 ran once at source `9cc50232e69936868d864897ce70b25f3dd037f4` in a fresh coordinated
+window after the host measured 96.92% idle. Both arms had the same semantic digest, 130,000 pivots
+and 26,850,000 work operations. The baseline median was 536.09 ms and the active median was 531.26
+ms. Its paired median overhead was +0.27%, with a 3.11 percentage-point IQR. Both arm medians exceed
+300 ms, the IQR is below 10 percentage points and the overhead is below 5%, so the production
+observer overhead gate passes.
+
+The complete v3 samples are preserved in the checksummed ignored local artifact directory
+`klause-bench/output/lp-wave0-validation-v3-9cc50232e69936868d864897ce70b25f3dd037f4/`:
+
+- baseline ns: `[561239552, 542558082, 547170631, 529565820, 537264076, 536093549, 523696503, 508183033, 500458939]`;
+- active ns: `[547200134, 547569226, 531661340, 531256808, 530986108, 537523027, 512238244, 516932501, 510318538]`;
+- paired delta %: `[-2.50, 0.92, -2.83, 0.32, -1.17, 0.27, -2.19, 1.72, 1.97]`.
+
+The v3 auxiliary medians, excluded from the observer gate, were 3.02 ms for 100 capture batches,
+2.77 ms for 50 codec round-trips, and +4,413.72% for exact independent validation over one replay
+slice. These quantify different work and are not instrumentation overhead.
+
+Capture construction, codec round-trip, and exact replay-validator incremental cost are reported as
+three separate `LP_AUXILIARY_COST` lines. None is included in the 5% observer gate. The ordinary JVM
+test returns immediately unless `KLAUSE_LP_INSTRUMENTATION=1`, keeping the default test below 300 ms.
+
+The Wave 0 observer overhead gate is closed by v3. Full Wave 0 remains open on the missing reference
+coverage described above. The runner records the source SHA, host, runtime, raw log, extracted result
+lines and checksums under a distinct run-specific directory. It refuses to overwrite an existing
+directory and retains those artifacts even when a validity or overhead assertion rejects the run. An
+earlier v3 invocation at source `09c04268e4fb7eddfe9dfa4129fd0324dfd40b7e` restored an ordinary
+test result from Gradle's build cache; the runner rejected the missing instrumentation line, and that
+invocation supplied no timing sample.
+
+## Reproduction
+
+From the repository root:
+
+```text
+klause-bench/scripts/lp-wave0-validation.sh verify
+klause-bench/scripts/lp-wave0-validation.sh preview
+klause-bench/scripts/lp-wave0-validation.sh check
+klause-bench/scripts/lp-wave0-validation.sh print-reference-commands
+klause-bench/scripts/lp-wave0-validation.sh print-baseline-commands
+```
+
+After reserving an idle host window:
+
+```text
+KLAUSE_LP_IDLE_WINDOW=1 klause-bench/scripts/lp-wave0-validation.sh instrument
+```
+
+The v3 generated-artifact path is
+`klause-bench/output/lp-wave0-validation-v3-<git-sha>/`. This task does not overwrite the preserved v1
+or v2 artifacts or historical labels.
+The reference and baseline commands freeze `jobs=1`, `workers=1`, `processors=1`, seeds, timeouts,
+LP default/off controls and three uncached repetitions where timing is involved. Use
+`klause-bench/output/compare.sh` on each paired default/off result directory; timeouts and declines
+remain in the denominator.
+
+Per the user's direct instruction for this task, no Opus review is run. This is a task-specific review
+exception, not a completed integrated Wave 0 review.
