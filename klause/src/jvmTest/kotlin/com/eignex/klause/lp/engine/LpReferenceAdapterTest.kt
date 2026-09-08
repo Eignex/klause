@@ -60,6 +60,31 @@ class LpReferenceAdapterTest {
     }
 
     @Test
+    fun `integer storage is validated as a continuous relaxation`() {
+        val model = LpBuilder().apply {
+            val x = addVar(0L, 1L, cost = 1L)
+            addRow(intArrayOf(x), longArrayOf(2L), Relation.GE, 1L)
+        }.build(Sense.MINIMIZE)
+
+        val reference = assertIs<LpReferenceResult.Feasible>(LpReferenceAdapter().solve(model))
+        val referenceBound = assertIs<LpReferenceObjective.Bound>(reference.objective)
+
+        assertEquals(BigFraction.ofDouble(0.5), referenceBound.lower)
+        assertTrue(referenceBound.attained)
+    }
+
+    @Test
+    fun `active row mask changes the exact reference problem`() {
+        val model = LpBuilder().apply {
+            val x = addVar(0L, 1L)
+            addRow(intArrayOf(x), longArrayOf(1L), Relation.GE, 2L)
+        }.build(Sense.MINIMIZE)
+
+        assertIs<LpReferenceResult.Infeasible>(LpReferenceAdapter().solve(model, booleanArrayOf(true)))
+        assertIs<LpReferenceResult.Feasible>(LpReferenceAdapter().solve(model, booleanArrayOf(false)))
+    }
+
+    @Test
     fun `strict objective infimum is not promoted to an attained optimum`() {
         val model = LpBuilder().apply {
             val x = addRealVar(0.0, 1.0, cost = 1.0)

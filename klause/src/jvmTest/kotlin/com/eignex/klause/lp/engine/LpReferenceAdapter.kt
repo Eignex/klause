@@ -43,8 +43,8 @@ internal class LpReferenceAdapter(
     private val cancellation: Cancellation = Cancellation.Never,
     private val maxPivots: Int = Int.MAX_VALUE,
 ) {
-    fun solve(model: LpModel): LpReferenceResult {
-        val data = exactData(model)
+    fun solve(model: LpModel, enforcedRows: BooleanArray? = null): LpReferenceResult {
+        val data = exactData(model, enforcedRows)
             ?: return LpReferenceResult.Declined(LpReferenceDecline.NON_FINITE_INPUT)
         val referenceModel = ExactRationalFeasibilityModel(model.n, data.rows, data.upper)
         val feasibility = bigRationalOutcome(referenceModel, cancellation, maxPivots)
@@ -106,6 +106,16 @@ internal class LpReferenceAdapter(
         )
     }
 
+    fun accepts(model: LpModel, primalBits: LongArray?, enforcedRows: BooleanArray? = null): Boolean? {
+        if (primalBits == null || primalBits.size < model.n) return false
+        val data = exactData(model, enforcedRows) ?: return null
+        val shifted = List(model.n) { column ->
+            val value = BigFraction.ofDouble(Double.fromBits(primalBits[column])) ?: return null
+            value - data.shifts[column]
+        }
+        return data.accepts(shifted)
+    }
+
     private fun interrupted(): LpReferenceResult.Declined =
         LpReferenceResult.Declined(LpReferenceDecline.CANCELLED_OR_PIVOT_LIMIT)
 }
@@ -149,7 +159,10 @@ private class ExactModelData(
     }
 }
 
-private fun exactData(model: LpModel): ExactModelData? {
+private fun exactData(model: LpModel, enforcedRows: BooleanArray?): ExactModelData? {
+    require(enforcedRows == null || enforcedRows.size == model.m) {
+        "active row mask has ${enforcedRows?.size} entries for ${model.m} rows"
+    }
     val view = model.doubleView
     val costs = if (view == null) {
         List(model.n) { BigFraction.ofLong(model.cost[it]) }
@@ -196,6 +209,7 @@ private fun exactData(model: LpModel): ExactModelData? {
     }
     val rows = ArrayList<ExactRationalInequality>(2 * model.m)
     for (row in 0 until model.m) {
+        if (enforcedRows?.get(row) == false) continue
         val columns = rowColumns[row].toIntArray()
         val coefficients = rowCoefficients[row].toList()
         rows.add(ExactRationalInequality(columns, coefficients, rhs[row], model.rowStrict[row]))
