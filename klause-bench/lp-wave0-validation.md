@@ -120,8 +120,8 @@ The v2 auxiliary medians, excluded from the observer gate, were 3.32 ms for 100 
 2.95 ms for 50 codec round-trips, and +3,564.65% for exact independent validation over one replay
 slice. These quantify different work and are not instrumentation overhead.
 
-The unmeasured v3 contract doubles only the observer batch to 10,000, predicting roughly 0.55 s arms
-from the v2 medians. Before any v3 results, it fixes these rules:
+The v3 contract doubled only the observer batch to 10,000, predicting roughly 0.55 s arms from the v2
+medians. Before any v3 results, it fixed these rules:
 
 - label `w0-instrumentation-v3`; one standalone solve over each of the six `w0.4-replay-v1` model
   shapes per batch (the replay-only cancellation, pivot and gated-event controls are not available at
@@ -138,14 +138,35 @@ from the v2 medians. Before any v3 results, it fixes these rules:
 - statistic: median of the nine paired percentage deltas; pass threshold remains at most 5%;
 - no Gradle build-cache reuse, no benchmark cache and no external solver process.
 
+V3 ran once at source `9cc50232e69936868d864897ce70b25f3dd037f4` in a fresh coordinated
+window after the host measured 96.92% idle. Both arms had the same semantic digest, 130,000 pivots
+and 26,850,000 work operations. The baseline median was 536.09 ms and the active median was 531.26
+ms. Its paired median overhead was +0.27%, with a 3.11 percentage-point IQR. Both arm medians exceed
+300 ms, the IQR is below 10 percentage points and the overhead is below 5%, so the production
+observer overhead gate passes.
+
+The complete v3 samples are preserved in the checksummed ignored local artifact directory
+`klause-bench/output/lp-wave0-validation-v3-9cc50232e69936868d864897ce70b25f3dd037f4/`:
+
+- baseline ns: `[561239552, 542558082, 547170631, 529565820, 537264076, 536093549, 523696503, 508183033, 500458939]`;
+- active ns: `[547200134, 547569226, 531661340, 531256808, 530986108, 537523027, 512238244, 516932501, 510318538]`;
+- paired delta %: `[-2.50, 0.92, -2.83, 0.32, -1.17, 0.27, -2.19, 1.72, 1.97]`.
+
+The v3 auxiliary medians, excluded from the observer gate, were 3.02 ms for 100 capture batches,
+2.77 ms for 50 codec round-trips, and +4,413.72% for exact independent validation over one replay
+slice. These quantify different work and are not instrumentation overhead.
+
 Capture construction, codec round-trip, and exact replay-validator incremental cost are reported as
 three separate `LP_AUXILIARY_COST` lines. None is included in the 5% observer gate. The ordinary JVM
 test returns immediately unless `KLAUSE_LP_INSTRUMENTATION=1`, keeping the default test below 300 ms.
 
-V3 remains unmeasured and the Wave 0 overhead gate remains open. Its runner records the source SHA,
-host, runtime, raw log, extracted result lines and checksums under a distinct run-specific directory.
-It refuses to overwrite an existing directory and retains those artifacts even when a validity or
-overhead assertion rejects the run.
+The Wave 0 observer overhead gate is closed by v3. Full Wave 0 remains open on the missing reference
+coverage described above. The runner records the source SHA, host, runtime, raw log, extracted result
+lines and checksums under a distinct run-specific directory. It refuses to overwrite an existing
+directory and retains those artifacts even when a validity or overhead assertion rejects the run. An
+earlier v3 invocation at source `09c04268e4fb7eddfe9dfa4129fd0324dfd40b7e` restored an ordinary
+test result from Gradle's build cache; the runner rejected the missing instrumentation line, and that
+invocation supplied no timing sample.
 
 ## Reproduction
 

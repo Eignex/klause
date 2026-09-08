@@ -29,6 +29,7 @@
     },
     {
       "label": "w0-instrumentation-v3",
+      "sourceSha": "9cc50232e69936868d864897ce70b25f3dd037f4",
       "batch": 10000,
       "warmups": 3,
       "repetitions": 9,
@@ -37,7 +38,7 @@
       "minimumArmMedianNanos": 300000000,
       "maximumPairedIqrPercentagePoints": 10.0,
       "maximumOverheadPercent": 5.0,
-      "outcome": "unmeasured"
+      "outcome": "pass: 0.27% median paired overhead, 3.11 percentage-point IQR, baseline median 536093549 ns, active median 531256808 ns"
     }
   ],
   "replaySlice": {
