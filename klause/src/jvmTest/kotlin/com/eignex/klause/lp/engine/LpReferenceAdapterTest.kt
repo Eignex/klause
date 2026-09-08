@@ -1,5 +1,6 @@
 package com.eignex.klause.lp.engine
 
+import com.eignex.klause.lp.LpBoundaryScanner
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.Cancellation
 import java.nio.file.Files
@@ -9,7 +10,6 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
-import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class LpReferenceAdapterTest {
@@ -28,12 +28,12 @@ class LpReferenceAdapterTest {
 
         val referenceFeasible = assertIs<LpReferenceResult.Feasible>(LpReferenceAdapter().solve(feasible))
         val certifiedFeasible = solveAndCertify(feasible)
+        val referenceBound = assertIs<LpReferenceObjective.Bound>(referenceFeasible.objective)
 
         assertEquals(LpVerdict.OPTIMAL, certifiedFeasible.verdict)
         assertEquals(3L, certifiedFeasible.exactLowerBound)
-        assertEquals(BigFraction.ofLong(3L), referenceFeasible.objectiveLowerBound)
-        assertTrue(referenceFeasible.lowerBoundAttained)
-        assertNull(referenceFeasible.objectiveDecline)
+        assertEquals(BigFraction.ofLong(3L), referenceBound.lower)
+        assertTrue(referenceBound.attained)
         assertEquals(LpVerdict.INFEASIBLE, solveAndCertify(infeasible).verdict)
         assertIs<LpReferenceResult.Infeasible>(LpReferenceAdapter().solve(infeasible))
     }
@@ -47,15 +47,16 @@ class LpReferenceAdapterTest {
 
         val reference = assertIs<LpReferenceResult.Feasible>(LpReferenceAdapter().solve(model))
         val certified = solveAndCertify(model)
+        val referenceBound = assertIs<LpReferenceObjective.Bound>(reference.objective)
 
         assertEquals(LpVerdict.OPTIMAL, certified.verdict)
         assertEquals(
-            checkNotNull(reference.objectiveLowerBound).toDouble(),
+            referenceBound.lower.toDouble(),
             checkNotNull(certified.float).objective,
             1e-9,
         )
-        assertEquals(BigFraction.ofDouble(1.5), reference.objectiveLowerBound)
-        assertTrue(reference.lowerBoundAttained)
+        assertEquals(BigFraction.ofDouble(1.5), referenceBound.lower)
+        assertTrue(referenceBound.attained)
     }
 
     @Test
@@ -66,12 +67,12 @@ class LpReferenceAdapterTest {
         }.build(Sense.MINIMIZE)
 
         val reference = assertIs<LpReferenceResult.Feasible>(LpReferenceAdapter().solve(model))
+        val referenceBound = assertIs<LpReferenceObjective.Bound>(reference.objective)
 
         assertEquals(LpVerdict.OPTIMAL, solveAndCertify(model).verdict)
-        assertEquals(BigFraction.ZERO, reference.objectiveLowerBound)
-        assertFalse(reference.lowerBoundAttained)
+        assertEquals(BigFraction.ZERO, referenceBound.lower)
+        assertFalse(referenceBound.attained)
         assertTrue(reference.witness.single() > BigFraction.ZERO)
-        assertNull(reference.objectiveDecline)
     }
 
     @Test
@@ -83,9 +84,10 @@ class LpReferenceAdapterTest {
         }.build(Sense.MINIMIZE)
 
         val reference = assertIs<LpReferenceResult.Feasible>(LpReferenceAdapter().solve(model))
+        val referenceBound = assertIs<LpReferenceObjective.Bound>(reference.objective)
 
-        assertEquals(BigFraction.ZERO, reference.objectiveLowerBound)
-        assertTrue(reference.lowerBoundAttained)
+        assertEquals(BigFraction.ZERO, referenceBound.lower)
+        assertTrue(referenceBound.attained)
         assertEquals(BigFraction.ZERO, reference.witness[0])
     }
 
@@ -97,9 +99,7 @@ class LpReferenceAdapterTest {
 
         val reference = assertIs<LpReferenceResult.Feasible>(LpReferenceAdapter().solve(model))
 
-        assertNull(reference.objectiveLowerBound)
-        assertFalse(reference.lowerBoundAttained)
-        assertNull(reference.objectiveDecline)
+        assertIs<LpReferenceObjective.Unbounded>(reference.objective)
     }
 
     @Test
@@ -110,9 +110,7 @@ class LpReferenceAdapterTest {
 
         val reference = assertIs<LpReferenceResult.Feasible>(LpReferenceAdapter().solve(model))
 
-        assertNull(reference.objectiveLowerBound)
-        assertFalse(reference.lowerBoundAttained)
-        assertEquals(LpReferenceDecline.PROBE_BOUND_OBJECTIVE, reference.objectiveDecline)
+        assertIs<LpReferenceObjective.ProbeBoundDecline>(reference.objective)
     }
 
     @Test
@@ -125,8 +123,7 @@ class LpReferenceAdapterTest {
 
         val reference = assertIs<LpReferenceResult.Feasible>(LpReferenceAdapter().solve(model))
 
-        assertNull(reference.objectiveLowerBound)
-        assertEquals(LpReferenceDecline.PROBE_BOUND_OBJECTIVE, reference.objectiveDecline)
+        assertIs<LpReferenceObjective.ProbeBoundDecline>(reference.objective)
     }
 
     @Test
@@ -149,10 +146,11 @@ class LpReferenceAdapterTest {
         }.build(Sense.MINIMIZE)
 
         val reference = assertIs<LpReferenceResult.Feasible>(LpReferenceAdapter().solve(model))
+        val referenceBound = assertIs<LpReferenceObjective.Bound>(reference.objective)
 
         assertEquals(BigFraction.ofLong(fixed), reference.witness.single())
-        assertEquals(BigFraction.ofLong(fixed), reference.objectiveLowerBound)
-        assertTrue(reference.lowerBoundAttained)
+        assertEquals(BigFraction.ofLong(fixed), referenceBound.lower)
+        assertTrue(referenceBound.attained)
     }
 
     @Test
@@ -194,17 +192,22 @@ class LpReferenceAdapterTest {
             .first { Files.exists(it.resolve("klause/src/jvmTest")) }
         val adapter = root.resolve(
             "klause/src/jvmTest/kotlin/com/eignex/klause/lp/engine/LpReferenceAdapter.kt",
-        ).readText()
+        ).readText().let(LpBoundaryScanner::codeOnly)
         val declaration = Regex(
-            "^(?:internal\\s+|private\\s+|public\\s+)?" +
-                "(?:data\\s+class|sealed\\s+interface|enum\\s+class|class|interface|" +
-                "object|fun|typealias|const\\s+val)" +
+            "^(?:(?:internal|private|public|protected|inline|suspend|abstract|sealed|data|value|" +
+                "open|expect|actual|external|tailrec|operator|infix)\\s+)*" +
+                "(?:fun\\s+interface|enum\\s+class|annotation\\s+class|class|interface|object|fun|" +
+                "typealias|const\\s+val)" +
                 "\\s+([A-Za-z_]\\w*)",
         )
         val engineRoot = root.resolve("klause/src/commonMain/kotlin/com/eignex/klause/lp/engine")
-        val engineNames = Files.list(engineRoot).use { files ->
-            files.toList().flatMap { file ->
-                file.readText().lineSequence().mapNotNull(declaration::find).map { it.groupValues[1] }.toList()
+        val engineNames = Files.walk(engineRoot).use { files ->
+            files.filter { Files.isRegularFile(it) && it.toString().endsWith(".kt") }.toList().flatMap { file ->
+                LpBoundaryScanner.codeOnly(file.readText())
+                    .lineSequence()
+                    .mapNotNull(declaration::find)
+                    .map { it.groupValues[1] }
+                    .toList()
             }
         }
         val referencedEngineNames = engineNames

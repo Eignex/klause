@@ -1,13 +1,13 @@
 package com.eignex.klause.lp
 
 import java.io.IOException
-import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
 import kotlin.io.path.extension
 import kotlin.io.path.isDirectory
 import kotlin.io.path.name
+import kotlin.io.path.readText
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -15,21 +15,16 @@ import kotlin.test.assertTrue
 class LpArchitectureTest {
 
     @Test
-    fun `production clients do not bypass LP implementations`() {
+    fun `production sources respect the LP kernel boundary`() {
         val root = repositoryRoot()
-        val violations = productionKotlinSources(root)
-            .filterNot { source -> source.isKernelOrBoundSource(root) }
-            .flatMap { source -> LpBoundaryScanner.scan(root.relativize(source).toString(), source) }
-
-        assertEquals(emptyList(), violations, violations.joinToString("\n"))
-    }
-
-    @Test
-    fun `LP kernels respect outbound dependency allowlists`() {
-        val root = repositoryRoot()
-        val violations = productionKotlinSources(root)
-            .filter { source -> source.isKernelOrBoundSource(root) }
-            .flatMap { source -> LpBoundaryScanner.scan(root.relativize(source).toString(), source) }
+        val sources = productionKotlinSources(root)
+        val coveredPaths = sources.map { root.relativize(it).toString().replace('\\', '/') }
+        for (required in listOf("/lp/engine/", "/lp/lattice/", "/simplex/exact/", "/bound/")) {
+            assertTrue(coveredPaths.any { required in it }, "candidate discovery missed $required")
+        }
+        val violations = sources.flatMap { source ->
+            LpBoundaryScanner.scan(root.relativize(source).toString(), source.readText())
+        }
 
         assertEquals(emptyList(), violations, violations.joinToString("\n"))
     }
@@ -114,7 +109,7 @@ class LpArchitectureTest {
     }
 }
 
-private object LpBoundaryScanner {
+internal object LpBoundaryScanner {
     private val packagePattern = Regex("(?m)^\\s*package\\s+([A-Za-z_]\\w*(?:\\s*\\.\\s*[A-Za-z_]\\w*)*)")
     private val importPattern = Regex(
         "(?m)^\\s*import\\s+([A-Za-z_]\\w*(?:\\s*\\.\\s*(?:[A-Za-z_]\\w*|\\*))*)(?:\\s+as\\s+[A-Za-z_]\\w*)?",
@@ -126,26 +121,8 @@ private object LpBoundaryScanner {
     private val forbiddenSymbolPatterns = forbiddenEngineSymbols.associateWith { Regex("\\b$it\\b") }
     private const val ENGINE_PACKAGE = "com.eignex.klause.lp.engine"
     private const val BASIS_PACKAGE = "com.eignex.klause.simplex.basis"
-    private val scanNeedles = (
-        forbiddenEngineSymbols + listOf(
-            "com.eignex.koblas",
-            "package com.eignex.klause.lp.engine",
-            "package com.eignex.klause.lp.lattice",
-            "package com.eignex.klause.simplex.exact",
-            "package com.eignex.klause.simplex.basis",
-            "package com.eignex.klause.bound",
-        )
-        ).map { it.toByteArray(StandardCharsets.UTF_8) }
-
-    fun scan(path: String, source: Path): List<String> {
-        val bytes = Files.readAllBytes(source)
-        if (scanNeedles.none { needle -> bytes.containsNeedle(needle) }) return emptyList()
-        return scan(path, String(bytes, StandardCharsets.UTF_8))
-    }
-
     fun scan(path: String, source: String): List<String> {
-        if (!needsScan(source)) return emptyList()
-        val code = stripCommentsAndLiterals(source)
+        val code = codeOnly(source)
         val packageName = packagePattern.find(code)?.groupValues?.get(1)?.normalizedName().orEmpty()
         val imports = importPattern.findAll(code).map { it.groupValues[1].normalizedName() }.toList()
         val body = withoutDirectives(code)
@@ -178,9 +155,7 @@ private object LpBoundaryScanner {
         return violations.toList()
     }
 
-    private fun forbiddenImport(name: String): Boolean =
-        name.startsWith("com.eignex.koblas.") || name == "com.eignex.koblas" ||
-            forbiddenEngineSymbols.any { name == "$ENGINE_PACKAGE.$it" || name.startsWith("$ENGINE_PACKAGE.$it.") }
+    private fun forbiddenImport(name: String): Boolean = forbiddenQualifiedUse(name)
 
     private fun forbiddenQualifiedUse(name: String): Boolean =
         name.startsWith("com.eignex.koblas.") || name == "com.eignex.koblas" ||
@@ -225,31 +200,13 @@ private object LpBoundaryScanner {
         return allowed.none { dependency == it || dependency.startsWith("$it.") }
     }
 
-    private fun needsScan(source: String): Boolean = forbiddenEngineSymbols.any(source::contains) ||
-        "com.eignex.koblas" in source ||
-        "package com.eignex.klause.lp.engine" in source ||
-        "package com.eignex.klause.lp.lattice" in source ||
-        "package com.eignex.klause.simplex.exact" in source ||
-        "package com.eignex.klause.simplex.basis" in source ||
-        "package com.eignex.klause.bound" in source
-
-    private fun ByteArray.containsNeedle(needle: ByteArray): Boolean {
-        if (needle.isEmpty()) return true
-        for (start in 0..size - needle.size) {
-            var offset = 0
-            while (offset < needle.size && this[start + offset] == needle[offset]) offset++
-            if (offset == needle.size) return true
-        }
-        return false
-    }
-
     private fun withoutDirectives(code: String): String = code.lineSequence()
         .filterNot { line -> line.trimStart().startsWith("package ") || line.trimStart().startsWith("import ") }
         .joinToString("\n")
 
     private fun String.normalizedName(): String = replace(Regex("\\s+"), "")
 
-    private fun stripCommentsAndLiterals(source: String): String {
+    fun codeOnly(source: String): String {
         val out = StringBuilder(source.length)
         var index = 0
         var blockDepth = 0
@@ -423,10 +380,13 @@ private fun productionKotlinSources(root: Path): List<Path> {
             "**/*Main/kotlin/**/*.kt",
             PRODUCTION_CANDIDATE_PATTERN,
             sourceRoot.toString(),
-        ).redirectErrorStream(true).start()
+        ).redirectError(ProcessBuilder.Redirect.INHERIT).start()
         val paths = process.inputStream.bufferedReader().use { it.readLines() }
-        check(process.waitFor() == 0) { paths.joinToString("\n") }
-        paths.map(Paths::get).sorted()
+        when (val exit = process.waitFor()) {
+            0 -> paths.map(Paths::get).sorted()
+            1 -> allProductionKotlinSources(sourceRoot)
+            else -> error("rg source discovery failed with exit $exit")
+        }
     } catch (_: IOException) {
         allProductionKotlinSources(sourceRoot)
     }
@@ -447,17 +407,6 @@ private fun allProductionKotlinSources(sourceRoot: Path): List<Path> = Files.lis
 private const val PRODUCTION_CANDIDATE_PATTERN =
     "RevisedSimplex|\\bCsc\\b|\\bLpWork\\b|com\\.eignex\\.koblas|" +
         "package\\s+com\\.eignex\\.klause\\.(lp\\.engine|lp\\.lattice|simplex\\.exact|simplex\\.basis|bound)"
-
-private fun Path.isKernelOrBoundSource(root: Path): Boolean {
-    val path = root.relativize(this).toString().replace('\\', '/')
-    return listOf(
-        "/lp/engine/",
-        "/lp/lattice/",
-        "/simplex/exact/",
-        "/simplex/basis/",
-        "/bound/",
-    ).any(path::contains)
-}
 
 private fun repositoryRoot(): Path = generateSequence(Paths.get("").toAbsolutePath().normalize()) { it.parent }
     .first { Files.isDirectory(it.resolve("klause/src")) && Files.exists(it.resolve("settings.gradle.kts")) }
