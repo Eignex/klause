@@ -218,11 +218,11 @@ class OpenTheoryMinimizer internal constructor(
 
             is OpenPresolveResult.Tightened -> closed.spec
         }
+        val state = OpenTheorySolveState(params)
         fun finish(round: SolveStats): SolveStats {
             stats.stop()
-            return round.withOptimizationEnvelope(stats.snapshot())
+            return round.withOptimizationEnvelope(stats.snapshot()).copy(smt = state.smt.snapshot())
         }
-        val state = OpenTheorySolveState(params)
         // One incumbent for the whole descent: every witness a round proves feasible is offered here with
         // the value read off it, and the bound the next round refutes is whatever the offer installed.
         val incumbents = minimizingWitnessExchange()
