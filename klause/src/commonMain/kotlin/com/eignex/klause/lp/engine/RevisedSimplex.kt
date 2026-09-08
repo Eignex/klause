@@ -6,9 +6,9 @@ import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.argsortBy
 import com.eignex.koblas.SparseMatrix
 import com.eignex.koblas.koblas
+import com.eignex.koblas.sparse.basis.BasisSolver
 import com.eignex.koblas.sparse.basis.BasisUpdate
-import com.eignex.koblas.sparse.basis.F64BasisSolver
-import com.eignex.koblas.sparse.basis.F64IndexedVector
+import com.eignex.koblas.sparse.basis.IndexedVector
 import kotlin.math.abs
 
 /**
@@ -65,7 +65,7 @@ internal const val DEFAULT_REFACTOR_UPDATE_LIMIT: Int = 50
  * singular basis); its [FloatLpResult.basis] is then certified exactly downstream, so float rounding is never
  * safety-critical.
  *
- * The basis itself is held by a koblas `F64BasisSolver`, which owns the factors, the pivot order and
+ * The basis itself is held by a koblas [BasisSolver], which owns the factors, the pivot order and
  * the updates while this owns pricing, the ratio tests and the refactorization policy. A basis is named
  * by index into `columns`, whose columns are fixed for the solver's lifetime, so a pivot hands the solver the
  * spike it already computed for the ratio test rather than a rebuilt square matrix. Which backend fills
@@ -164,7 +164,7 @@ internal class RevisedSimplex(
      * engines a search discards without ever solving — a component split that declines, a shave that
      * its caller drops — would otherwise each take one.
      */
-    private var basisSolver: F64BasisSolver? = null
+    private var basisSolver: BasisSolver? = null
 
     /** Whether [basisSolver] currently factorizes the seated [basicVar]. False before the first
      *  factorization and after one came back singular. */
@@ -172,13 +172,13 @@ internal class RevisedSimplex(
 
     // The solve carriers, one per role and reused for this engine's whole life. Reuse is not only
     // about allocation: a solver may recognise the vector its own solve filled and reuse the form it
-    // kept when the same one comes back to [F64BasisSolver.update], which is what makes an update cost
+    // kept when the same one comes back to [BasisSolver.update], which is what makes an update cost
     // one FTRAN. So the entering spike and the pivotal row each keep a vector of their own, and the
     // dual/rhs solves keep theirs, rather than sharing one and defeating that.
-    private val spikeVec = F64IndexedVector(m)
-    private val pivotEtaVec = F64IndexedVector(m)
-    private val rhsVec = F64IndexedVector(m)
-    private val dualVec = F64IndexedVector(m)
+    private val spikeVec = IndexedVector(m)
+    private val pivotEtaVec = IndexedVector(m)
+    private val rhsVec = IndexedVector(m)
+    private val dualVec = IndexedVector(m)
 
     /**
      * Nonzeros in the basis matrix `B` — `Σ_t nnz(A_{basicVar(t)})`, maintained across pivots.
@@ -283,7 +283,7 @@ internal class RevisedSimplex(
 
     /** Column [j] of `columns` scattered into [into], which is emptied first. Costs the column's nonzeros
      *  rather than `m`, since an indexed vector clears only what it stored. */
-    private fun scatterColumn(j: Int, into: F64IndexedVector) {
+    private fun scatterColumn(j: Int, into: IndexedVector) {
         work.add(columnNnz(j))
         into.clear()
         for (k in colPtr[j] until colPtr[j + 1]) {
@@ -306,9 +306,9 @@ internal class RevisedSimplex(
     }
 
     /** This engine's basis solver, built on first use. */
-    private fun solver(): F64BasisSolver = basisSolver ?: newSolver()
+    private fun solver(): BasisSolver = basisSolver ?: newSolver()
 
-    private fun newSolver(): F64BasisSolver {
+    private fun newSolver(): BasisSolver {
         ensureKoblasBackends()
         return koblas.basisSolver(columns).also { basisSolver = it }
     }
@@ -372,7 +372,7 @@ internal class RevisedSimplex(
     }
 
     /** `B x = b` for a dense right-hand side, into [out] through [carrier]. */
-    private fun ftranDense(b: DoubleArray, out: DoubleArray, carrier: F64IndexedVector): DoubleArray {
+    private fun ftranDense(b: DoubleArray, out: DoubleArray, carrier: IndexedVector): DoubleArray {
         chargeSolve()
         carrier.scatter(b)
         solver().ftran(carrier, expectedDensity = 1.0)
@@ -380,7 +380,7 @@ internal class RevisedSimplex(
     }
 
     /** `Bᵀ x = b` for a dense right-hand side, into [out] through [carrier]. */
-    private fun btranDense(b: DoubleArray, out: DoubleArray, carrier: F64IndexedVector): DoubleArray {
+    private fun btranDense(b: DoubleArray, out: DoubleArray, carrier: IndexedVector): DoubleArray {
         chargeSolve()
         carrier.scatter(b)
         solver().btran(carrier, expectedDensity = 1.0)
@@ -471,7 +471,7 @@ internal class RevisedSimplex(
      * of the new row norm), and the pivot row takes `max(γᵣ/αᵣ², 1)`. Costs the already-computed
      * spike's nonzeros. Indexed by row position, so it is applied before the basis-column reassignment.
      */
-    private fun updateGamma(alpha: F64IndexedVector, r: Int) {
+    private fun updateGamma(alpha: IndexedVector, r: Int) {
         val pivot = alpha[r]
         val tau = gamma[r]
         val pivotSq = pivot * pivot
