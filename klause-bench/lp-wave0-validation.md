@@ -89,6 +89,38 @@ so a default/off A/B is neither runnable nor an LP comparison. The baseline free
 worst case. It measures exact-theory stability only. The combined baseline ceiling is 3,984 seconds
 (1 h 6 min 24 s); bounded independent suites may overlap under the scheduling policy above.
 
+## Campaign result
+
+The retained campaign measured `3378fa6e2aa3dbeab2e34d203ffe41f90284c4db`. It issued all 43
+missing-reference attempts and committed 43 rows: 16 Z3, 23 CP-SAT and four SCIP. Thirty-six rows are
+decisive; the other seven are two IDL UNKNOWNs, one MiniZinc UNKNOWN and four explicit MiniZinc source
+incompatibilities. The full-coverage gaps that remain are 2,518 IDL and 249 RDL instances. Reference
+serialization temporarily added an empty `logic` column; the retained raw snapshots preserve that
+output, while the committed tables remove the empty column so all prerequisite rows remain unchanged.
+
+| Suite | Reference outcome | Measured baseline outcome per repetition |
+|---|---|---|
+| `smtlib-qflra` | Existing 1,753-row full oracle; no rerun. | Stable: 3 SAT, 1 UNSAT, 6 UNKNOWN. |
+| `smtlib-qflira` | Existing seven-row full oracle; no rerun. | Stable: 1 UNKNOWN. |
+| `smtlib-qflia` | Existing 13,306-row full oracle; no rerun. | Stable: 4 SAT, 6 UNKNOWN. |
+| `smtlib-qfidl` | 10 rows added: 8 decisive, 2 UNKNOWN. | Stable: 2 SAT, 1 UNSAT, 7 UNKNOWN. |
+| `smtlib-qfrdl` | 6 decisive rows added. | Stable: 1 SAT, 1 UNSAT, 4 UNKNOWN. |
+| `mzn-bench` | 19 rows added: 14 decisive, 1 UNKNOWN, 4 source-incompatible. | LP default feasible `[5, 1, 4]`; LP off `[5, 3, 5]`, over the 15 compatible instances. |
+| `xcsp3-core` | 4 decisive rows added. | Both arms stable at 4 feasible and 1 proven. |
+| `mps-core` | 4 decisive rows added. | Both arms stable at 3 feasible and 2 proven. |
+| frozen `miplib2017` | All 12 existing rows reused. | LP default feasible `[3, 0, 1]`; LP off `[1, 0, 3]`; neither arm proved an instance. |
+
+The CP/MIP aggregate over the 35 compatible instances was feasible `[15, 8, 12]` for LP default and
+`[13, 10, 15]` for LP off, with three proofs in each arm in every repetition. The 210 result rows plus
+eight recorded MiniZinc source-incompatible attempts account for the planned 218 attempts. SMT
+contributed 111 rows, with an identical result signature in all repetitions. Across all 321 solver
+result rows there were zero oracle verdict, objective-sense or proof conflicts. Busy-host elapsed times
+are intentionally not promoted to a speedup or regression claim.
+
+The campaign directory retains 321 `.out` files, 321 `.json` files, 39 baseline CSVs, every command
+and stdout log, the preflight ID inventories and source hashes, tool/container/host metadata, repair
+provenance for the two corpus-path snapshot keys, per-run checksums and a final campaign checksum.
+
 ## Independent reference semantics
 
 `LpReferenceAdapter` is the single test-only independent exact LP reference. It reconstructs an exact

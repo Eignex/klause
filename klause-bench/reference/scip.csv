@@ -1,4 +1,8 @@
 suite,problem,maximize,objective,feasible,proven,elapsedMs,budgetMs,format,structure,numGlobal,numLinear,boolHeavy
+klause-bench/smoke-corpus/mps,blend-tiny,false,9.0,true,true,477,30000,,,,,
+klause-bench/smoke-corpus/mps,feasible-tiny,false,0.0,true,true,404,30000,,,,,
+klause-bench/smoke-corpus/mps,float-tiny,false,0.0,true,true,413,30000,,,,,
+klause-bench/smoke-corpus/mps,infeasible-tiny,false,,false,true,412,30000,,,,,
 miplib2017,10teams,false,,,false,10000,10000,,,,,
 miplib2017,22433,false,21477.0,true,true,2570,10000,,,,,
 miplib2017,23588,false,8090.0,true,true,4676,10000,,,,,

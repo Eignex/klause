@@ -77,6 +77,44 @@
       "baselineSmt": 3330
     }
   },
+  "campaignResult": {
+    "measuredSha": "3378fa6e2aa3dbeab2e34d203ffe41f90284c4db",
+    "reference": {
+      "attempts": 43,
+      "rows": 43,
+      "decisive": 36,
+      "nonDecisive": 7,
+      "fullCoverageDeferred": {
+        "smtlib-qfidl": 2518,
+        "smtlib-qfrdl": 249
+      }
+    },
+    "baseline": {
+      "cpMipPlannedAttempts": 218,
+      "cpMipResultRows": 210,
+      "mznSourceIncompatibleAttempts": 8,
+      "smtResultRows": 111,
+      "resultRows": 321,
+      "rawJsonFiles": 321,
+      "rawOutFiles": 321,
+      "oracleConflicts": 0,
+      "timingOutcome": "not evaluated as a performance signal on the busy shared host",
+      "cpMipFeasibleByRepetition": {
+        "default": [15, 8, 12],
+        "off": [13, 10, 15]
+      },
+      "cpMipProvenByRepetition": {
+        "default": [3, 3, 3],
+        "off": [3, 3, 3]
+      },
+      "smtStablePerRepetition": {
+        "instances": 37,
+        "satWitnesses": 10,
+        "unsatProofs": 3,
+        "unknown": 24
+      }
+    }
+  },
   "instrumentationContracts": [
     {
       "label": "w0-instrumentation-v1",
@@ -188,6 +226,29 @@
       "file": "klause-bench/reference/clasp.csv",
       "sha256": "a7d3662d0a012c1aaea3b4a5bd682bef819976e68b791332a7b0965cdf36a950",
       "rows": 712
+    }
+  ],
+  "referenceTablesAfterCampaign": [
+    {
+      "file": "klause-bench/reference/z3.csv",
+      "sha256": "40c5ddf66fab8b06f2b2ddc0a36633af5c253b044acc7a82ff51b3e7bcb3e493",
+      "rows": 15082,
+      "added": 16,
+      "existingRowsChanged": 0
+    },
+    {
+      "file": "klause-bench/reference/cp-sat.csv",
+      "sha256": "c87f8208aa115192ea5bb8def49a18659b27d50168dfee47604b72288f59b308",
+      "rows": 19255,
+      "added": 23,
+      "existingRowsChanged": 0
+    },
+    {
+      "file": "klause-bench/reference/scip.csv",
+      "sha256": "a5b0927a20da0b89f1c93485bc9281711de93b4ca40e1b95d650568508edd693",
+      "rows": 1011,
+      "added": 4,
+      "existingRowsChanged": 0
     }
   ],
   "suiteSlices": [

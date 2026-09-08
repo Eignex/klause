@@ -80,11 +80,18 @@ verify_pairs() {
 verify() {
     require_tools
     jq empty "$manifest"
-    while IFS=$'\t' read -r file expected; do
+    while IFS=$'\t' read -r file base_expected campaign_expected; do
         local actual
         actual=$(sha256sum "$repo_root/$file" | cut -d' ' -f1)
-        [[ "$actual" == "$expected" ]] || die "reference table hash mismatch for $file: $actual"
-    done < <(jq -r '.referenceTablesAtBase[] | [.file, .sha256] | @tsv' "$manifest")
+        [[ "$actual" == "$base_expected" || "$actual" == "$campaign_expected" ]] ||
+            die "reference table hash mismatch for $file: $actual"
+    done < <(jq -r '
+        . as $root |
+        .referenceTablesAtBase[] as $base |
+        [$base.file, $base.sha256,
+         ([$root.referenceTablesAfterCampaign[]? | select(.file == $base.file) | .sha256][0] // $base.sha256)] |
+        @tsv
+    ' "$manifest")
 
     verify_corpora
     printf 'manifest, prerequisite reference tables and frozen corpus inputs verified\n'
@@ -427,6 +434,47 @@ repair_reference_snapshot() {
     checksum_dir "$run_dir"
 }
 
+finalize_campaign() {
+    local measured_sha=$1
+    require_campaign "$measured_sha"
+    verify
+    local dir reference_rows baseline_files baseline_rows json_files out_files bad_status
+    dir=$(campaign_dir "$measured_sha")
+    [[ ! -e "$dir/final-manifest.json" ]] || die "refusing to overwrite $dir/final-manifest.json"
+    reference_rows=$(find "$dir/reference" -name results.csv -type f -exec awk 'FNR > 1 { n++ } END { print n + 0 }' {} + |
+        awk '{ n += $1 } END { print n + 0 }')
+    baseline_files=$(find "$dir/baseline" -name results.csv -type f | wc -l)
+    baseline_rows=$(find "$dir/baseline" -name results.csv -type f -exec awk 'FNR > 1 { n++ } END { print n + 0 }' {} + |
+        awk '{ n += $1 } END { print n + 0 }')
+    json_files=$(find "$dir/baseline" -name '*.json' -type f | wc -l)
+    out_files=$(find "$dir/baseline" -name '*.out' -type f | wc -l)
+    bad_status=$(find "$dir" -name exit-status.txt -type f -exec awk '$0 != 0 { n++ } END { print n + 0 }' {} + |
+        awk '{ n += $1 } END { print n + 0 }')
+    [[ "$reference_rows" == 43 ]] || die "campaign has $reference_rows reference rows, expected 43"
+    [[ "$baseline_files" == 39 ]] || die "campaign has $baseline_files baseline CSVs, expected 39"
+    [[ "$baseline_rows" == 321 ]] || die "campaign has $baseline_rows baseline rows, expected 321"
+    [[ "$json_files" == 321 && "$out_files" == 321 ]] ||
+        die "campaign has $json_files JSON and $out_files OUT files, expected 321 each"
+    [[ "$bad_status" == 0 ]] || die "campaign has $bad_status nonzero retained exit statuses"
+    cp "$manifest" "$dir/final-manifest.json"
+    {
+        printf 'measuredSha=%s\n' "$measured_sha"
+        printf 'finalizerSha=%s\n' "$(git -C "$repo_root" rev-parse HEAD)"
+        printf 'referenceRows=%s\n' "$reference_rows"
+        printf 'baselineCsvFiles=%s\n' "$baseline_files"
+        printf 'baselineRows=%s\n' "$baseline_rows"
+        printf 'baselineJsonFiles=%s\n' "$json_files"
+        printf 'baselineOutFiles=%s\n' "$out_files"
+        printf 'nonzeroExitStatuses=%s\n' "$bad_status"
+    } >"$dir/campaign-audit.txt"
+    (
+        cd "$dir"
+        find . -type f ! -name FINAL_SHA256SUMS -print0 |
+            LC_ALL=C sort -z |
+            xargs -0 sha256sum
+    ) >"$dir/FINAL_SHA256SUMS"
+}
+
 write_smt_source_hashes() {
     local suite=$1
     local ids_file=$2
@@ -664,6 +712,7 @@ usage() {
         "usage: $0 verify|preview|check|instrument|init-campaign|prepare-cli SHA" \
         "       $0 reference-frozen SHA SUITE" \
         "       $0 repair-reference-snapshot SHA SUITE" \
+        "       $0 finalize-campaign SHA" \
         "       $0 baseline-pair SHA SUITE REP" \
         "       $0 baseline-smt SHA SUITE REP" \
         "       $0 print-reference-commands|print-baseline-commands"
@@ -678,6 +727,7 @@ case "${1:-}" in
     prepare-cli) [[ $# == 2 ]] || die "prepare-cli requires SHA"; prepare_cli "$2" ;;
     reference-frozen) [[ $# == 3 ]] || die "reference-frozen requires SHA SUITE"; reference_frozen "$2" "$3" ;;
     repair-reference-snapshot) [[ $# == 3 ]] || die "repair-reference-snapshot requires SHA SUITE"; repair_reference_snapshot "$2" "$3" ;;
+    finalize-campaign) [[ $# == 2 ]] || die "finalize-campaign requires SHA"; finalize_campaign "$2" ;;
     baseline-pair) [[ $# == 4 ]] || die "baseline-pair requires SHA SUITE REP"; baseline_pair "$2" "$3" "$4" ;;
     baseline-smt) [[ $# == 4 ]] || die "baseline-smt requires SHA SUITE REP"; baseline_smt "$2" "$3" "$4" ;;
     print-reference-commands) print_reference_commands ;;
