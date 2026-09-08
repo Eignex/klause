@@ -439,17 +439,19 @@ audit_campaign() {
     local measured_sha=$1
     require_campaign "$measured_sha"
     require_tools
-    python3 - "$repo_root" "$(campaign_dir "$measured_sha")" "$manifest" "$measured_sha" <<'PY'
+    python3 - "$repo_root" "$(campaign_dir "$measured_sha")" "$manifest" "$measured_sha" "$corpus_root" <<'PY'
 import csv
 import hashlib
 import json
 import math
 import pathlib
+import shlex
 import subprocess
 import sys
 
 repo, campaign, manifest_path = map(pathlib.Path, sys.argv[1:4])
 measured_sha = sys.argv[4]
+corpus_root = pathlib.Path(sys.argv[5])
 manifest = json.loads(manifest_path.read_text())
 prerequisite = manifest["campaignPrerequisiteSha"]
 
@@ -618,48 +620,128 @@ for checksum_file in campaign.rglob("SHA256SUMS"):
             fail(f"checksum mismatch in {checksum_file.relative_to(campaign)}: {rel}")
 
 raw_cache = list((campaign / "reference-raw-rerun/cache").glob("*.json"))
-if raw_cache:
-    if len(raw_cache) != 39:
-        fail(f"raw reference recovery has {len(raw_cache)} cache records, expected 39")
-    with (campaign / "reference-raw-rerun/cache-index.tsv").open(newline="") as stream:
-        index = list(csv.DictReader(stream, delimiter="\t"))
-    expected_raw_ids = {
-        (suite, problem)
-        for suite in ("smtlib-qfidl", "smtlib-qfrdl", "mzn-bench", "xcsp3-core", "mps-core")
-        for problem in ids_for(suite)
+expected_raw_count = manifest["campaignResult"]["referenceRawRecovery"]["successfulSolverRecords"]
+if len(raw_cache) != expected_raw_count:
+    fail(f"raw reference recovery has {len(raw_cache)} cache records, expected {expected_raw_count}")
+with (campaign / "reference-raw-rerun/cache-index.tsv").open(newline="") as stream:
+    index = list(csv.DictReader(stream, delimiter="\t"))
+expected_raw_ids = {
+    (suite, problem)
+    for suite in ("smtlib-qfidl", "smtlib-qfrdl", "mzn-bench", "xcsp3-core", "mps-core")
+    for problem in ids_for(suite)
+}
+expected_raw_ids -= {
+    ("mzn-bench", item[0])
+    for item in next(s for s in manifest["suiteSlices"] if s["suite"] == "mzn-bench")["excluded"]
+}
+if {(row["suite"], row["problem"]) for row in index} != expected_raw_ids:
+    fail("raw reference cache index identities differ from the 39 successful frozen attempts")
+successful_mzn = {problem for suite, problem in expected_raw_ids if suite == "mzn-bench"}
+for path in raw_cache:
+    record = json.loads(path.read_text())
+    command = record.get("command")
+    if not command or "rawOutput" not in record:
+        fail(f"raw reference recovery record lacks command/output: {path.name}")
+    rows = [row for row in index if row["cacheFile"] == path.name]
+    if len(rows) != 1:
+        fail(f"raw reference cache index does not uniquely name {path.name}")
+    row = rows[0]
+    tokens = shlex.split(command)
+    sources = []
+    if command.startswith("z3 "):
+        source = next(pathlib.Path(token) for token in tokens if token.endswith(".smt2"))
+        marker = "QF_IDL" if "QF_IDL" in source.parts else "QF_RDL"
+        suite = "smtlib-qfidl" if marker == "QF_IDL" else "smtlib-qfrdl"
+        marker_index = source.parts.index(marker)
+        problem = pathlib.PurePosixPath(*source.parts[marker_index + 1:]).as_posix()[:-5]
+        sources = [source]
+        cache_tag = "z3"
+    elif "klause-xcsp3-ref" in command:
+        container_source = next(token for token in tokens if token.startswith("/in/") and token.endswith(".xml"))
+        problem = pathlib.Path(container_source).stem
+        suite = "xcsp3-core"
+        sources = [repo / "klause-bench/smoke-corpus/xcsp3" / f"{problem}.xml"]
+        cache_tag = "cp-sat-xcsp3"
+    elif command.startswith("minizinc "):
+        sources = [pathlib.Path(token) for token in tokens if token.endswith((".mzn", ".dzn"))]
+        model = next(source for source in sources if source.suffix == ".mzn")
+        relative = model.relative_to(corpus_root / "mzn-challenge")
+        matches = {problem for problem in successful_mzn if problem.split("/")[:2] == list(relative.parts[:2])}
+        if len(matches) != 1:
+            fail(f"cannot derive a frozen MiniZinc identity from {path.name}")
+        suite = "mzn-bench"
+        problem = matches.pop()
+        cache_tag = "cp-sat"
+    elif "klause-scip-ref" in command:
+        suite = "mps-core"
+        candidates = []
+        for problem in ids_for(suite):
+            source = repo / "klause-bench/smoke-corpus/mps" / f"{problem}.mps"
+            digest = hashlib.sha256(source.read_bytes() + b"|scip|t=30000").hexdigest()
+            if digest == path.stem:
+                candidates.append((problem, source))
+        if len(candidates) != 1:
+            fail(f"cannot derive a frozen MPS identity from {path.name}")
+        problem, source = candidates[0]
+        sources = [source]
+        cache_tag = "scip"
+    else:
+        fail(f"raw reference command is not a frozen solver route: {path.name}")
+    if (suite, problem) != (row["suite"], row["problem"]):
+        fail(f"raw reference index relabels {path.name} as {row['suite']} {row['problem']}")
+    cache_digest = hashlib.sha256()
+    for source in sources:
+        cache_digest.update(source.read_bytes())
+    cache_digest.update(f"|{cache_tag}|t=30000".encode())
+    if cache_digest.hexdigest() != path.stem:
+        fail(f"raw reference cache key does not match source identity for {path.name}")
+    if hashlib.sha256(command.encode()).hexdigest() != row["commandSha256"]:
+        fail(f"raw reference command hash mismatch for {path.name}")
+    if hashlib.sha256(record["rawOutput"].encode()).hexdigest() != row["rawOutputSha256"]:
+        fail(f"raw reference output hash mismatch for {path.name}")
+    oracle = reference_by_problem[problem]
+    oracle_feasible = normalized(oracle["feasible"])
+    oracle_proven = normalized(oracle["proven"])
+    oracle_objective = normalized(oracle["objective"])
+    recovered_objective = normalized(record["objective"])
+    if record["feasible"] != oracle_feasible or record["proven"] != oracle_proven:
+        fail(f"raw reference semantics differ from the committed row for {suite} {problem}")
+    if (oracle_objective is None) != (recovered_objective is None):
+        fail(f"raw reference objective presence differs for {suite} {problem}")
+    if oracle_objective is not None:
+        oracle_maximize = normalized(oracle["maximize"])
+        weaker = recovered_objective < oracle_objective if oracle_maximize else recovered_objective > oracle_objective
+        if oracle_proven and not math.isclose(recovered_objective, oracle_objective, rel_tol=1e-8, abs_tol=1e-8):
+            fail(f"raw proved objective differs for {suite} {problem}")
+        if not oracle_proven and not weaker and not math.isclose(recovered_objective, oracle_objective, rel_tol=1e-8, abs_tol=1e-8):
+            fail(f"raw incumbent is stronger than the committed row for {suite} {problem}")
+
+with (campaign / "reference-raw-rerun/source-error-index.tsv").open(newline="") as stream:
+    error_index = list(csv.DictReader(stream, delimiter="\t"))
+expected_errors = {
+    ("mzn-bench", item[0])
+    for item in next(s for s in manifest["suiteSlices"] if s["suite"] == "mzn-bench")["excluded"]
+}
+if {(row["suite"], row["problem"]) for row in error_index} != expected_errors:
+    fail("raw source-error index identities differ from the four frozen incompatibilities")
+for row in error_index:
+    error_dir = campaign / "reference-raw-rerun/source-errors" / row["directory"]
+    if not (error_dir / "exit-status.txt").is_file() or (error_dir / "exit-status.txt").read_text().strip() == "0":
+        fail(f"raw source-error process did not fail for {row['problem']}")
+    tokens = shlex.split((error_dir / "command.txt").read_text())
+    sources = [pathlib.Path(token) for token in tokens if token.endswith((".mzn", ".dzn"))]
+    model = next(source for source in sources if source.suffix == ".mzn")
+    relative = model.relative_to(corpus_root / "mzn-challenge")
+    if row["problem"].split("/")[:2] != list(relative.parts[:2]):
+        fail(f"raw source-error index relabels {row['directory']}")
+    declared = {
+        pathlib.Path(line.split("  ", 1)[1]): line.split("  ", 1)[0]
+        for line in (error_dir / "source-SHA256SUMS").read_text().splitlines()
     }
-    expected_raw_ids -= {
-        ("mzn-bench", item[0])
-        for item in next(s for s in manifest["suiteSlices"] if s["suite"] == "mzn-bench")["excluded"]
-    }
-    if {(row["suite"], row["problem"]) for row in index} != expected_raw_ids:
-        fail("raw reference cache index identities differ from the 39 successful frozen attempts")
-    for path in raw_cache:
-        record = json.loads(path.read_text())
-        if not record.get("command") or "rawOutput" not in record:
-            fail(f"raw reference recovery record lacks command/output: {path.name}")
-        rows = [row for row in index if row["cacheFile"] == path.name]
-        if len(rows) != 1:
-            fail(f"raw reference cache index does not uniquely name {path.name}")
-        row = rows[0]
-        if hashlib.sha256(record["command"].encode()).hexdigest() != row["commandSha256"]:
-            fail(f"raw reference command hash mismatch for {path.name}")
-        if hashlib.sha256(record["rawOutput"].encode()).hexdigest() != row["rawOutputSha256"]:
-            fail(f"raw reference output hash mismatch for {path.name}")
-    with (campaign / "reference-raw-rerun/source-error-index.tsv").open(newline="") as stream:
-        error_index = list(csv.DictReader(stream, delimiter="\t"))
-    expected_errors = {
-        ("mzn-bench", item[0])
-        for item in next(s for s in manifest["suiteSlices"] if s["suite"] == "mzn-bench")["excluded"]
-    }
-    if {(row["suite"], row["problem"]) for row in error_index} != expected_errors:
-        fail("raw source-error index identities differ from the four frozen incompatibilities")
-    error_dirs = [
-        campaign / "reference-raw-rerun/source-errors" / row["directory"] / "exit-status.txt"
-        for row in error_index
-    ]
-    if any(not path.is_file() or path.read_text().strip() == "0" for path in error_dirs):
-        fail("raw reference recovery does not retain four source-incompatible failures")
+    if set(declared) != set(sources):
+        fail(f"raw source-error source list differs from its command for {row['problem']}")
+    if any(hashlib.sha256(source.read_bytes()).hexdigest() != declared[source] for source in sources):
+        fail(f"raw source-error source hash differs for {row['problem']}")
 
 print(f"measuredSha={measured_sha}")
 print(f"auditorSha={subprocess.check_output(['git', '-C', str(repo), 'rev-parse', 'HEAD'], text=True).strip()}")
