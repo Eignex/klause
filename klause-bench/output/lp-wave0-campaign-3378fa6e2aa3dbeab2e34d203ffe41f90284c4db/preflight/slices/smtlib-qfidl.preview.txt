@@ -1,0 +1,11 @@
+=== preview: solve over 10 instance(s) ===
+  20210312-Bouvier/vlsat3_c00  [SMTLIB/CSP]
+  20220214-RVpredict-BohanLi/RVpredict_1  [SMTLIB/CSP]
+  20220214-jobshop-BohanLi/jobshop10-2-5-5-2-4-12  [SMTLIB/CSP]
+  Averest/binary_search/BinarySearch_live_bgmc000  [SMTLIB/CSP]
+  DTP/DTP_k2_n35_c175_s1  [SMTLIB/CSP]
+  RTCL/b01_tf_15/ckt_PROP0_tf_15  [SMTLIB/CSP]
+  asp/15Puzzle/15-puzzle.init10  [SMTLIB/CSP]
+  bcnscheduling/bcnscheduling100  [SMTLIB/CSP]
+  cellar/CELAR6_SUB0  [SMTLIB/CSP]
+  check/bignum_idl1  [SMTLIB/CSP]

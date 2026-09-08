@@ -1,0 +1,37 @@
+Calculating task graph as no cached configuration is available for tasks: :klause-bench:bench --args=solve suite=mps-core  processors=1 timeout=3000 label=w0-3378fa6e2aa3-mps-off-r1 lp=off
+
+> Configure project :klause
+Signing skipped: SNAPSHOT is a snapshot.
+
+> Task :klause-bench:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :klause:kmpPartiallyResolvedDependenciesChecker
+> Task :klause:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :klause-bench:protobufDummy UP-TO-DATE
+> Task :klause:jvmProcessResources NO-SOURCE
+> Task :klause:processJvmMainResources SKIPPED
+> Task :klause-bench:extractProto UP-TO-DATE
+> Task :klause-bench:processResources UP-TO-DATE
+> Task :klause:compileKotlinJvm UP-TO-DATE
+> Task :klause:compileJvmMainJava NO-SOURCE
+> Task :klause:jvmMainClasses UP-TO-DATE
+> Task :klause:jvmJar UP-TO-DATE
+> Task :klause-bench:extractIncludeProto UP-TO-DATE
+> Task :klause-bench:generateProto UP-TO-DATE
+> Task :klause-bench:compileKotlin UP-TO-DATE
+> Task :klause-bench:compileJava UP-TO-DATE
+> Task :klause-bench:classes UP-TO-DATE
+
+> Task :klause-bench:bench
+=== solve over 4 instance(s) ===
+
+=== solve (klause-p1-t3s-lp-off-w0-3378fa6e2aa3-mps-off-r1; 3000ms budget) -> output/klause-p1-t3s-lp-off-w0-3378fa6e2aa3-mps-off-r1/ ===
+ok [blend-tiny] optimize = opt=9.0@164ms
+ok [feasible-tiny] satisfy = SAT@757ms
+ok [float-tiny] satisfy = SAT@1117ms
+ok [infeasible-tiny] satisfy = UNSAT
+
+3/4 feasible, 2 proved  (output/klause-p1-t3s-lp-off-w0-3378fa6e2aa3-mps-off-r1/, output/klause-p1-t3s-lp-off-w0-3378fa6e2aa3-mps-off-r1.csv)
+
+BUILD SUCCESSFUL in 7s
+10 actionable tasks: 2 executed, 8 up-to-date
+Configuration cache entry stored.

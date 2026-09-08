@@ -1,0 +1,43 @@
+Calculating task graph as no cached configuration is available for tasks: :klause-bench:bench --args=solve suite=smtlib-qflia per-family=1 max=10 seed=1 processors=1 timeout=30000 label=w0-3378fa6e2aa3-qflia-single-r3 engine=fixed
+
+> Configure project :klause
+Signing skipped: SNAPSHOT is a snapshot.
+
+> Task :klause:kmpPartiallyResolvedDependenciesChecker
+> Task :klause:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :klause-bench:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :klause-bench:protobufDummy UP-TO-DATE
+> Task :klause:jvmProcessResources NO-SOURCE
+> Task :klause:processJvmMainResources SKIPPED
+> Task :klause-bench:extractProto UP-TO-DATE
+> Task :klause:compileKotlinJvm UP-TO-DATE
+> Task :klause:compileJvmMainJava NO-SOURCE
+> Task :klause-bench:processResources UP-TO-DATE
+> Task :klause:jvmMainClasses UP-TO-DATE
+> Task :klause:jvmJar UP-TO-DATE
+> Task :klause-bench:extractIncludeProto UP-TO-DATE
+> Task :klause-bench:generateProto UP-TO-DATE
+> Task :klause-bench:compileKotlin UP-TO-DATE
+> Task :klause-bench:compileJava UP-TO-DATE
+> Task :klause-bench:classes UP-TO-DATE
+
+> Task :klause-bench:bench
+=== solve over 10 instance(s) ===
+
+=== solve (klause-fixed-p1-t30s-w0-3378fa6e2aa3-qflia-single-r3; 30000ms budget) -> output/klause-fixed-p1-t30s-w0-3378fa6e2aa3-qflia-single-r3/ ===
+ok [20180326-Bromberger/more_slacked/CAV_2009_benchmarks/coef-size/smt/size-10/c10_problem__001.smt2.slack] satisfy = SAT@1670ms
+?? [2019-cmodelsdiff/boundsmodels/dp_10.formula1-i-O2-b12.smo2] satisfy = ?
+?? [2019-ezsmt/Labyrinth/SCC/0003-labyrinth-11-0] satisfy = ?
+?? [20210219-Dartagnan/ConcurrencySafety-Main/03_incdec-O0] satisfy = ?
+ok [20220307-SMPT/2PhLockVParam/RC-00] satisfy = SAT@1619ms
+ok [20230321-UltimateAutomizerSvcomp2023/jain_5-2.c_1] satisfy = SAT@1574ms
+?? [20231117-c_inference/100_100_20_11_sat] satisfy = ?
+?? [Averest/parallel_prefix_sum/ParallelPrefixSum_live_bgmc000] satisfy = ?
+ok [CAV_2009_benchmarks/coef-size/smt/size-10/problem__001] satisfy = SAT@900ms
+?? [CIRC/multiplier/MULTIPLIER_10.msat] satisfy = ?
+
+4/10 feasible, 0 proved  (output/klause-fixed-p1-t30s-w0-3378fa6e2aa3-qflia-single-r3/, output/klause-fixed-p1-t30s-w0-3378fa6e2aa3-qflia-single-r3.csv)
+
+BUILD SUCCESSFUL in 4m 16s
+10 actionable tasks: 2 executed, 8 up-to-date
+Configuration cache entry stored.

@@ -1,0 +1,5 @@
+suite,problem,maximize,objective,feasible,proven,elapsedMs,budgetMs,format,structure,numGlobal,numLinear,boolHeavy,logic
+klause-bench/smoke-corpus/mps,blend-tiny,false,9.0,true,true,477,30000,,,,,,
+klause-bench/smoke-corpus/mps,feasible-tiny,false,0.0,true,true,404,30000,,,,,,
+klause-bench/smoke-corpus/mps,float-tiny,false,0.0,true,true,413,30000,,,,,,
+klause-bench/smoke-corpus/mps,infeasible-tiny,false,,false,true,412,30000,,,,,,

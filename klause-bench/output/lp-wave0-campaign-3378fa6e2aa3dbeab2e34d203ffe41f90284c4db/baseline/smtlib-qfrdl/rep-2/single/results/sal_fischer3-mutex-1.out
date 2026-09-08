@@ -1,0 +1,19 @@
+unsat
+; solveTime=0.139
+; solutions=0
+; nodes=0
+; failures=0
+; propagations=0
+; openBoolDecisions=2
+; openIntDecisions=0
+; openTheoryDecisions=0
+; openTheoryChecks=0
+; openWork=2
+; openLearned=4
+; openRelearned=0
+; openRestarts=0
+; openReductions=0
+; openDropped=0
+; openRetained=4
+; openPeakRetained=4
+; openLearnedWatchVisits=1

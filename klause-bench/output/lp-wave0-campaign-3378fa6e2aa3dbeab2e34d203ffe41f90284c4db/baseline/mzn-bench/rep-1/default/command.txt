@@ -1,0 +1,1 @@
+./gradlew -Dklause.bench.cache=false :klause-bench:bench --args=solve\ suite=mzn-bench\ per-family=1\ max=60\ seed=1\ processors=1\ timeout=3000\ label=w0-3378fa6e2aa3-mzn-default-r1\ lp=default 

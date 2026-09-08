@@ -1,0 +1,12 @@
+3ba2fa1d1b8d67d17d519bfe9733cc23fa7af8ac52b3b8f21eb6287fa0e1ad6a  ./command.txt
+9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa  ./exit-status.txt
+d745599747abccb49a91643f35578d3e3e45eabbf80fe95d8aa52def1c83ab53  ./results.csv
+90dc0588fcb369fc51225dd2569f460d881b8c774afbc2fb1a84417a532787c5  ./results/blend-tiny.json
+a7e14f25bea62ebb33994d29dbddd850f3b55f2627d525cbeebeefffe4a6563f  ./results/blend-tiny.out
+bd7f796f2f25e4acc4127675087ae797177da46598fa524a9bf5aa7f9e6318ea  ./results/feasible-tiny.json
+ef392a8fe7d5a2edd278f58e0533d12a900adb35c2f2d3e340b67f5c17116892  ./results/feasible-tiny.out
+05124d5e983b508e9cf491eb36c1d35495c2cf4f55b6b3b6795d54e465e3b865  ./results/float-tiny.json
+2bf0f439d5403404f18d8982dc4958b352cb8d291ed96eb85e28ccba792401e5  ./results/float-tiny.out
+da28039a213196b335b8e4431e957b9bf5e4f55c43afd6bbffbe14dd7afef7a3  ./results/infeasible-tiny.json
+51d6fa5e53dda58f73e092d72fde38c1cbc964d26cc32e2cb6b6c3093e3369af  ./results/infeasible-tiny.out
+912096e800aed37bafd45d4091d780735e5a9c7f4d026b98771a9fc9ea5c5316  ./stdout.log

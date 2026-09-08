@@ -1,0 +1,26 @@
+{
+    "problem": "infeasible-tiny",
+    "solver": "klause",
+    "engine": null,
+    "processors": 1,
+    "search": "free",
+    "seed": 3,
+    "budgetMs": 3000,
+    "kind": "satisfy",
+    "maximize": false,
+    "feasible": false,
+    "objective": null,
+    "timeToBestMs": null,
+    "timeToFirstFeasibleMs": null,
+    "proven": true,
+    "stats": {
+        "solveTime": "0.019",
+        "solutions": "0",
+        "presolvePasses": "fuse-bounds",
+        "presolveInfeasible": "true"
+    },
+    "attribution": [],
+    "gitSha": "3378fa6e2aa3dbeab2e34d203ffe41f90284c4db",
+    "timestamp": "2026-09-08T20:38:39.270337715Z",
+    "command": "/home/rasmus/.codex/worktrees/81fa/klause/klause-cli/build/install/klause-cli-jvm/bin/klause-cli --format mps /home/rasmus/.codex/worktrees/81fa/klause/klause-bench/smoke-corpus/mps/infeasible-tiny.mps -t 3000 -r 3 -s --lp off"
+}

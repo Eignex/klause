@@ -1,0 +1,5 @@
+=== preview: solve over 4 instance(s) ===
+  magic-series-tiny  [XCSP3/CSP]
+  sum-opt-tiny  [XCSP3/OPTIMIZATION]
+  magic-square-3  [XCSP3/CSP]
+  graph-coloring-tiny  [XCSP3/CSP]

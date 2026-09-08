@@ -1,0 +1,5 @@
+=== preview: solve over 4 instance(s) ===
+  blend-tiny  [MPS/OPTIMIZATION]
+  feasible-tiny  [MPS/CSP]
+  float-tiny  [MPS/CSP]
+  infeasible-tiny  [MPS/UNSAT]

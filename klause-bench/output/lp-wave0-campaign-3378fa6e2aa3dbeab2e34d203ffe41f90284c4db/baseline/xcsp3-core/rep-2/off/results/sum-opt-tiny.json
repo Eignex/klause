@@ -1,0 +1,71 @@
+{
+    "problem": "sum-opt-tiny",
+    "solver": "klause",
+    "engine": null,
+    "processors": 1,
+    "search": "free",
+    "seed": 3,
+    "budgetMs": 3000,
+    "kind": "optimize",
+    "maximize": false,
+    "feasible": true,
+    "objective": 10.0,
+    "timeToBestMs": 52,
+    "timeToFirstFeasibleMs": 52,
+    "proven": true,
+    "stats": {
+        "solveTime": "0.073",
+        "solutions": "4",
+        "nodes": "21",
+        "failures": "6",
+        "restarts": "0",
+        "propagations": "0",
+        "peakDepth": "5",
+        "openBoolDecisions": "0",
+        "openIntDecisions": "0",
+        "openTheoryDecisions": "0",
+        "openTheoryChecks": "0",
+        "openWork": "0",
+        "openLearned": "0",
+        "openRelearned": "0",
+        "openRestarts": "0",
+        "openReductions": "0",
+        "openDropped": "0",
+        "openRetained": "0",
+        "openPeakRetained": "0",
+        "openLearnedWatchVisits": "0"
+    },
+    "attribution": [
+        {
+            "label": "backtrack#0",
+            "objective": null,
+            "exactObjective": "6",
+            "continuousObjective": null,
+            "elapsedMs": 52
+        },
+        {
+            "label": "backtrack#0",
+            "objective": null,
+            "exactObjective": "7",
+            "continuousObjective": null,
+            "elapsedMs": 63
+        },
+        {
+            "label": "backtrack#0",
+            "objective": null,
+            "exactObjective": "9",
+            "continuousObjective": null,
+            "elapsedMs": 66
+        },
+        {
+            "label": "backtrack#0",
+            "objective": null,
+            "exactObjective": "10",
+            "continuousObjective": null,
+            "elapsedMs": 70
+        }
+    ],
+    "gitSha": "3378fa6e2aa3dbeab2e34d203ffe41f90284c4db",
+    "timestamp": "2026-09-08T20:39:41.125334451Z",
+    "command": "/home/rasmus/.codex/worktrees/81fa/klause/klause-cli/build/install/klause-cli-jvm/bin/klause-cli /home/rasmus/.codex/worktrees/81fa/klause/klause-bench/smoke-corpus/xcsp3/sum-opt-tiny.xml -t 3000 -r 3 -s -a --output-objective --lp off"
+}

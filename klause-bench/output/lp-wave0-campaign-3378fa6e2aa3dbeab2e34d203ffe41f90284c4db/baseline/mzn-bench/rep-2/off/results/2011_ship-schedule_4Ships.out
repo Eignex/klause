@@ -1,0 +1,30 @@
+=====UNKNOWN=====
+% budget exhausted
+%%%mzn-stat: solveTime=0.768
+%%%mzn-stat: solutions=0
+%%%mzn-stat: presolvePasses=strengthen,difference-system
+%%%mzn-stat: presolveConstraintsRemoved=592
+%%%mzn-stat: nodes=17
+%%%mzn-stat: failures=1
+%%%mzn-stat: restarts=0
+%%%mzn-stat: propagations=0
+%%%mzn-stat: learned=0
+%%%mzn-stat: relearned=0
+%%%mzn-stat: peakDepth=17
+%%%mzn-stat: caNotApplicable=0
+%%%mzn-stat: caNonAsserting=0
+%%%mzn-stat: caRejectedTrueLit=0
+%%%mzn-stat: openBoolDecisions=0
+%%%mzn-stat: openIntDecisions=0
+%%%mzn-stat: openTheoryDecisions=0
+%%%mzn-stat: openTheoryChecks=0
+%%%mzn-stat: openWork=0
+%%%mzn-stat: openLearned=0
+%%%mzn-stat: openRelearned=0
+%%%mzn-stat: openRestarts=0
+%%%mzn-stat: openReductions=0
+%%%mzn-stat: openDropped=0
+%%%mzn-stat: openRetained=0
+%%%mzn-stat: openPeakRetained=0
+%%%mzn-stat: openLearnedWatchVisits=0
+%%%mzn-stat-end

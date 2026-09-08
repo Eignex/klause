@@ -1,0 +1,8 @@
+measuredSha=3378fa6e2aa3dbeab2e34d203ffe41f90284c4db
+finalizerSha=060014f4430a4a65e2c53010314efb5100879d17
+referenceRows=43
+baselineCsvFiles=39
+baselineRows=321
+baselineJsonFiles=321
+baselineOutFiles=321
+nonzeroExitStatuses=0

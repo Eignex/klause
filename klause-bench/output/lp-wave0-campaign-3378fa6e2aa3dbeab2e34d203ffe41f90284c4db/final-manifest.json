@@ -1,0 +1,413 @@
+{
+  "schemaVersion": 2,
+  "baseSha": "848cfef9b6661a5b3eb941de006b2050bca44c5b",
+  "campaignPrerequisiteSha": "72d81101f71773ec38b8c6b84aacd5c09b5a9867",
+  "artifactDirectory": "klause-bench/output/lp-wave0-campaign-<measured-sha>",
+  "campaignContract": {
+    "fullInventoryPerFamily": 2147483647,
+    "oracleCoverage": "frozen representative slices; full IDL/RDL coverage deferred",
+    "referenceTimeoutMs": 30000,
+    "referenceJobs": 1,
+    "referenceWorkers": 1,
+    "baselineRepetitions": 3,
+    "baselineProcessors": 1,
+    "baselineSeed": 3,
+    "scheduling": {
+      "hostPolicy": "busy shared host; no exclusive reservation or idle-host gate",
+      "maximumConcurrentSuites": 2,
+      "perSolverWorkers": 1,
+      "referenceWritePolicy": "concurrent reference commands must write different CSV tables; commands targeting the same table run serially",
+      "timingInterpretation": "wall times are descriptive and noisy, not regression or performance gates",
+      "primaryEvidence": "oracle verdicts, witnesses, coverage, frozen membership and deterministic work counts"
+    },
+    "smtBaseline": {
+      "engine": "fixed",
+      "lp": "omitted",
+      "reason": "fixed search is propagation/exact-theory only; --lp default is rejected and --lp does not control SMT routing bound closure"
+    },
+    "mznUnsupportedRepetitionPolicy": "the four frozen source-incompatible instances run in both controls of repetition 1 only; repetitions 2 and 3 contain the 15 compatible instances",
+    "cpMipBaselineTimeoutMs": 3000,
+    "smtBaselineTimeoutMs": 30000,
+    "fullSmtMembership": {
+      "smtlib-qflra": {
+        "instances": 1753,
+        "sortedIdsSha256": "7b62baf4aa9a2970df6e9f723b86330edeb2fdc0294f04f41c703c9f08bf16f0",
+        "missingAtPrerequisite": 0
+      },
+      "smtlib-qflira": {
+        "instances": 7,
+        "sortedIdsSha256": "dc33e9a5407bee1eb3e4bc929bbdbf3cc287913d91ee3ec03ac5ddc88ff6b923",
+        "missingAtPrerequisite": 0
+      },
+      "smtlib-qflia": {
+        "instances": 13306,
+        "sortedIdsSha256": "3e3dc0fc5332eab72cee3d0bebb80fac8f6d23793d17baf423ba7a353c7f9680",
+        "missingAtPrerequisite": 0
+      },
+      "smtlib-qfidl": {
+        "instances": 2528,
+        "sortedIdsSha256": "89b0d645a8dbe99d0506883cffc4cf81ea643c5b5f0454b64ddca1ce6cbcfc77",
+        "missingAtPrerequisite": 2528
+      },
+      "smtlib-qfrdl": {
+        "instances": 255,
+        "sortedIdsSha256": "2ef4e5360e22981c5f9dce331bd892c6a7396123393128787d91fd236b83592d",
+        "missingAtPrerequisite": 255
+      }
+    },
+    "sliceMissingAtPrerequisite": {
+      "smtlib-qflra": 0,
+      "smtlib-qflira": 0,
+      "smtlib-qflia": 0,
+      "smtlib-qfidl": 10,
+      "smtlib-qfrdl": 6,
+      "mzn-bench": 19,
+      "xcsp3-core": 4,
+      "mps-core": 4,
+      "miplib2017": 0
+    },
+    "expectedAttempts": {
+      "frozenReference": 43,
+      "baselineCpMip": 218,
+      "baselineSmt": 111
+    },
+    "worstCaseCpuSeconds": {
+      "frozenReference": 1290,
+      "baselineCpMip": 654,
+      "baselineSmt": 3330
+    }
+  },
+  "campaignResult": {
+    "measuredSha": "3378fa6e2aa3dbeab2e34d203ffe41f90284c4db",
+    "reference": {
+      "attempts": 43,
+      "rows": 43,
+      "decisive": 36,
+      "nonDecisive": 7,
+      "fullCoverageDeferred": {
+        "smtlib-qfidl": 2518,
+        "smtlib-qfrdl": 249
+      }
+    },
+    "baseline": {
+      "cpMipPlannedAttempts": 218,
+      "cpMipResultRows": 210,
+      "mznSourceIncompatibleAttempts": 8,
+      "smtResultRows": 111,
+      "resultRows": 321,
+      "rawJsonFiles": 321,
+      "rawOutFiles": 321,
+      "oracleConflicts": 0,
+      "timingOutcome": "not evaluated as a performance signal on the busy shared host",
+      "cpMipFeasibleByRepetition": {
+        "default": [15, 8, 12],
+        "off": [13, 10, 15]
+      },
+      "cpMipProvenByRepetition": {
+        "default": [3, 3, 3],
+        "off": [3, 3, 3]
+      },
+      "smtStablePerRepetition": {
+        "instances": 37,
+        "satWitnesses": 10,
+        "unsatProofs": 3,
+        "unknown": 24
+      }
+    }
+  },
+  "instrumentationContracts": [
+    {
+      "label": "w0-instrumentation-v1",
+      "sourceSha": "1f1bd19a24cd181dcae27013a2465a51cc23b1b1",
+      "batch": 100,
+      "warmups": 3,
+      "repetitions": 9,
+      "ordering": "alternating-paired",
+      "statistic": "median-paired-percent",
+      "maximumOverheadPercent": 5.0,
+      "outcome": "inconclusive: arm medians below a stable timing scale and paired range -21.16%..67.75%"
+    },
+    {
+      "label": "w0-instrumentation-v2",
+      "sourceSha": "a51dcab07fe77802fbd2bbfd720d884c65dcc2b9",
+      "batch": 5000,
+      "warmups": 3,
+      "repetitions": 9,
+      "ordering": "alternating-paired",
+      "statistic": "median-paired-percent",
+      "minimumArmMedianNanos": 300000000,
+      "maximumPairedIqrPercentagePoints": 10.0,
+      "maximumOverheadPercent": 5.0,
+      "outcome": "inconclusive: baseline median 275448337 ns and active median 272294240 ns were below the 300000000 ns validity floor"
+    },
+    {
+      "label": "w0-instrumentation-v3",
+      "sourceSha": "9cc50232e69936868d864897ce70b25f3dd037f4",
+      "batch": 10000,
+      "warmups": 3,
+      "repetitions": 9,
+      "ordering": "alternating-paired",
+      "statistic": "median-paired-percent",
+      "minimumArmMedianNanos": 300000000,
+      "maximumPairedIqrPercentagePoints": 10.0,
+      "maximumOverheadPercent": 5.0,
+      "outcome": "pass: 0.27% median paired overhead, 3.11 percentage-point IQR, baseline median 536093549 ns, active median 531256808 ns"
+    }
+  ],
+  "replaySlice": {
+    "label": "w0.4-replay-v1",
+    "seed": 327765405748,
+    "solver": "persistent",
+    "componentSplit": false,
+    "refactorUpdateLimit": 50,
+    "workloads": [
+      "empty",
+      "feasible-bounded",
+      "infeasible-bounded",
+      "cancelled",
+      "continuous-witness",
+      "pivot-bounded"
+    ],
+    "resultEvents": 8
+  },
+  "toolchainSnapshot": {
+    "host": "LTHCL001",
+    "os": "Linux 6.17.0-41-generic x86_64",
+    "cpu": "12th Gen Intel(R) Core(TM) i9-12900H",
+    "logicalProcessors": 20,
+    "memoryGiB": 61,
+    "gradle": "9.7.0",
+    "gradleLauncherJvm": "OpenJDK 22.0.2 Homebrew",
+    "z3": "4.16.0",
+    "minizinc": "2.9.7 build 2490193457",
+    "minizincCpSat": "OR Tools CP-SAT 9.15",
+    "xcsp3Image": "sha256:a243cf86fda02e9f606cdfb7016dfc1dc656a14852f3e6e8adc24e5f162f43ca",
+    "xcsp3Cpmpy": "0.10.1",
+    "xcsp3Ortools": "9.14.6206",
+    "scipImage": "sha256:537a4c17e595fb7106d533d5e19120c439734fcbf5c0d9c014ccf58bdd21e098",
+    "scip": "10.0.3 d409edf9f6",
+    "soplex": "8.0.3 13e2ab24"
+  },
+  "referenceTablesAtBase": [
+    {
+      "file": "klause-bench/reference/z3.csv",
+      "sha256": "961e7d79417b223313ae9d87967cb4806fdbcfafda10239a02c7d6b86bea69d5",
+      "rows": 15066,
+      "coverage": {
+        "smtlib-qf_lia": 13306,
+        "smtlib-qf_lira": 7,
+        "smtlib-qf_lra": 1753,
+        "smtlib-qf_idl": 0,
+        "smtlib-qf_rdl": 0
+      }
+    },
+    {
+      "file": "klause-bench/reference/cp-sat.csv",
+      "sha256": "fa6f040bd3b3a94c6da5ab484e1a12c2ca79cc2b0905a9b77eb3c3cd95508d71",
+      "rows": 19232,
+      "coverage": {
+        "mzn-challenge": 0,
+        "minizinc-benchmarks": 16292,
+        "xcsp3-core": 0,
+        "xcsp3-cop-22to25": 1000,
+        "xcsp3-csp-22to25": 800
+      }
+    },
+    {
+      "file": "klause-bench/reference/scip.csv",
+      "sha256": "caa871f5adf2c7d05efebc39d72b25071f6722c91d51c8946588912cc8c9c1e7",
+      "rows": 1007,
+      "coverage": {
+        "miplib2017": 1007,
+        "mps-core": 0
+      }
+    },
+    {
+      "file": "klause-bench/reference/clasp.csv",
+      "sha256": "a7d3662d0a012c1aaea3b4a5bd682bef819976e68b791332a7b0965cdf36a950",
+      "rows": 712
+    }
+  ],
+  "referenceTablesAfterCampaign": [
+    {
+      "file": "klause-bench/reference/z3.csv",
+      "sha256": "40c5ddf66fab8b06f2b2ddc0a36633af5c253b044acc7a82ff51b3e7bcb3e493",
+      "rows": 15082,
+      "added": 16,
+      "existingRowsChanged": 0
+    },
+    {
+      "file": "klause-bench/reference/cp-sat.csv",
+      "sha256": "c87f8208aa115192ea5bb8def49a18659b27d50168dfee47604b72288f59b308",
+      "rows": 19255,
+      "added": 23,
+      "existingRowsChanged": 0
+    },
+    {
+      "file": "klause-bench/reference/scip.csv",
+      "sha256": "a5b0927a20da0b89f1c93485bc9281711de93b4ca40e1b95d650568508edd693",
+      "rows": 1011,
+      "added": 4,
+      "existingRowsChanged": 0
+    }
+  ],
+  "suiteSlices": [
+    {
+      "suite": "smtlib-qflra",
+      "reference": "z3",
+      "selection": "per-family=1 max=10 seed=1",
+      "corpus": "Zenodo record 15493090 QF_LRA.tar.zst",
+      "instances": [
+        ["2017-Heizmann-UltimateInvariantSynthesis/_array1.i_3_2_2.bpl_11", "8e731d199494716749274ca2f1a5bbc02e2efca7569b2f1f739ac67d8b585508"],
+        ["2019-ezsmt/Labyrinth/SCC_Strong/0003-labyrinth-11-0", "cbe74f03391b8f2e8f94d6ae97da08219ed71c626057c074593dfe70ab293fdd"],
+        ["DTP-Scheduling/constraints-cooking01", "fa7a5d2cef4daf5da44908dd7ce0d32f6e2d264282a7afd4ddbfc004143effb3"],
+        ["LassoRanker/CooperatingT2/afagp-fail.t2.c_Iteration1_Lasso_3-pieceTemplate", "d1c8c2220d41d723b1222e0477db5d4ab83ac492f11d21a2c9b17b3d6fcf1822"],
+        ["TM/p-0-bucket_s10", "958b1cbefb7bcd6d5730efc3191ed105ae7b6e6b1279c205f10a47df1d8282a6"],
+        ["check/bignum_lra1", "e420831670683c464148a12e0acbbcbc8848b32abd0a2d6e083a910c02dc022d"],
+        ["clock_synchro/clocksynchro_10clocks.main_invar.base", "5766a28aef15448baf0374decdc6b5bd7f4514b5eff7ed1fbac8f7ae735dbbf3"],
+        ["keymaera/bouncing-ball-inv-node1886", "9a40e72275700974d90ea80778c60055d3f874008dd6ca1c13da1cd824b47fde"],
+        ["latendresse/ecoliFBAyicesTest-15875-16", "8c673bcbd2bb499b626b4f34a5621073a4dc45d6b6ab5743be5fc350cfc7056f"],
+        ["meti-tarski/Arthan/1A/Arthan1A-chunk-0015", "5b99491521da927d23b60a53724f27f5041acc6bb76556da949da35408541d9d"]
+      ]
+    },
+    {
+      "suite": "smtlib-qflira",
+      "reference": "z3",
+      "selection": "per-family=1 max=10 seed=1",
+      "corpus": "Zenodo record 15493090 QF_LIRA.tar.zst",
+      "instances": [
+        ["LCTES/cruise-control.nosummaries", "ce7e2db0883812a4621e8a6af6d4b3936559b024103f8f3cee5a1e9d580ad4b3"]
+      ]
+    },
+    {
+      "suite": "smtlib-qflia",
+      "reference": "z3",
+      "selection": "per-family=1 max=10 seed=1",
+      "corpus": "Zenodo record 15493090 QF_LIA.tar.zst",
+      "instances": [
+        ["20180326-Bromberger/more_slacked/CAV_2009_benchmarks/coef-size/smt/size-10/c10_problem__001.smt2.slack", "5e7bbd1b311fd0cc8235a7527fef07e273a31291e93eef8e3e758d8f4eaa1875"],
+        ["2019-cmodelsdiff/boundsmodels/dp_10.formula1-i-O2-b12.smo2", "93d52f1dcacab65ac3a09bc80c47b3759469da22a8d9312313a1c8f4d2890009"],
+        ["2019-ezsmt/Labyrinth/SCC/0003-labyrinth-11-0", "5b9bd99a937961c3fabc164e6e0a25792056f36821607c222bbf59c72564f030"],
+        ["20210219-Dartagnan/ConcurrencySafety-Main/03_incdec-O0", "157bf070a07984f54e5868adbe91acbd91608774d3c29cbc4c6ab89c7322f0e9"],
+        ["20220307-SMPT/2PhLockVParam/RC-00", "1f751f8b7773c11495b1998d32df0908d81cead0ff8da3ebeb53dec2cee644f2"],
+        ["20230321-UltimateAutomizerSvcomp2023/jain_5-2.c_1", "10752ab4a014ce6a0b8c0bda466cdc1e67387d8b683a091195442e41d3e1c495"],
+        ["20231117-c_inference/100_100_20_11_sat", "7e23692cbb02bf922d085a78a7a269b598a39c5ffeafb013f51a1addd2417c28"],
+        ["Averest/parallel_prefix_sum/ParallelPrefixSum_live_bgmc000", "6213aee6ef744f290f7da387e100f2859ac61d49aabde19d802f533a68f09132"],
+        ["CAV_2009_benchmarks/coef-size/smt/size-10/problem__001", "0b7ceffad2e4d5fbd9bd5dfde863479fbe47e192a21b420ada44b7f8bb48fdf8"],
+        ["CIRC/multiplier/MULTIPLIER_10.msat", "9618d1eb431b0d5a2ccd7c8790950ee272b47a49dff5d332abdf38ea63779d70"]
+      ]
+    },
+    {
+      "suite": "smtlib-qfidl",
+      "reference": "z3",
+      "selection": "per-family=1 max=10 seed=1",
+      "corpus": "Zenodo record 15493090 QF_IDL.tar.zst",
+      "instances": [
+        ["20210312-Bouvier/vlsat3_c00", "50531954bfaec5c240a5ef55851e5861efe1b3be9757ea4f422d236e01cff7fe"],
+        ["20220214-RVpredict-BohanLi/RVpredict_1", "dade4cad1976d58bfe08d4b6e3b68643e18b83888a963644c08ed5fa3bd11594"],
+        ["20220214-jobshop-BohanLi/jobshop10-2-5-5-2-4-12", "8f672b7238494993639ff11b00ccc44e9bbefc1b32a881aa80b2c8895b522d98"],
+        ["Averest/binary_search/BinarySearch_live_bgmc000", "1d1c0a2331c9fb153c10ed0ef1aeec529e0ed4276d477da5f35d1bbced70088f"],
+        ["DTP/DTP_k2_n35_c175_s1", "871bbec42102064ea52691a56284e71d9eb88fe38b929b43c5393bbcba129456"],
+        ["RTCL/b01_tf_15/ckt_PROP0_tf_15", "10286e5c77658c0fe02cfafc5a489ac1dcc8fc94c2ef1fe77587f2af6c4e954a"],
+        ["asp/15Puzzle/15-puzzle.init10", "e4c9bfcffa910d098cb24045e9aa82244b1175a8fe94d365ac0006961f85f280"],
+        ["bcnscheduling/bcnscheduling100", "ab016ecb4875ce87a840a8aa2345761702d9440711e9ef01389536d1afbef4ed"],
+        ["cellar/CELAR6_SUB0", "c7cb31a216469b8ef3aef843af5ff5017a30193b01f580cab3362ca4f12c96b2"],
+        ["check/bignum_idl1", "c81c38fec4f5c7f562958f9538e4d71d27188b004ea5333269cccd79d0b4b086"]
+      ]
+    },
+    {
+      "suite": "smtlib-qfrdl",
+      "reference": "z3",
+      "selection": "per-family=1 max=10 seed=1",
+      "corpus": "Zenodo record 15493090 QF_RDL.tar.zst",
+      "instances": [
+        ["SMT-Temporal-Planning-Benchmarks/cooking01", "d6d169bf68da8eda2ae18c28d4a0dfe1c965bd11ecbaf5181142305473c8f4f8"],
+        ["check/bignum_rdl1", "f4dce616c3c2d980836e213153e94ea9f64c5902e7d1cecb66f2538fae3c9e35"],
+        ["sal/fischer3-mutex-1", "ca3cbd2c9e197888d9250bfd086405b7509047054fea51473067fd8c8cb36e3f"],
+        ["scheduling/abz5_1000", "718be14fa93a8d2f55c1b58fcf09b704aa994c6272dfd608d9677244d259342e"],
+        ["skdmxa/skdmxa-3x3-10", "3fdc52a4296b7edcd52f918e3cc14e984a4887539f4d45b1e3d4d8dc27843745"],
+        ["skdmxa2/skdmxa-3x3-10.base.cvc", "a638dadf9077dcccf7e31047cffcc099bb2de601451a7e435a1305401d8e4f26"]
+      ]
+    },
+    {
+      "suite": "mzn-bench",
+      "reference": "cp-sat",
+      "selection": "per-family=1 max=60 seed=1",
+      "corpus": "https://github.com/MiniZinc/mzn-challenge.git",
+      "corpusCommit": "a8448864fc56162583f24aaf9c25653d93f83765",
+      "instances": [
+        "2008/nmseq/020",
+        "2009/still_life/still_life_5",
+        "2010/wwtp_random/ex05100_2600_100",
+        "2011/ship-schedule/4Ships",
+        "2012/vrp/A-n38-k5.vrp",
+        "2013/proteindesign12/1HZ5.12p.19aa.usingEref_self",
+        "2014/spot5/1502",
+        "2015/roster/chicroster_dataset_11",
+        "2016/prize-collecting/28-4-7-1",
+        "2017/routing-flexible",
+        "2018/steiner-tree/es10fst03.stp",
+        "2019/stack-cuttingstock/d14",
+        "2020/skill-allocation/skill_allocation_mzn_1m_1",
+        "2021/seat-moving/sm-10-11-00",
+        "2022/traveling-tppv/circ14cnonbal",
+        "2023/travelling-thief/data/n10_k15_c5000_l10000_u11000_r49",
+        "2024/tiny-cvrp/easy_instance_04",
+        "2025/skill-allocation/skill_allocation_mzn_1m_2",
+        "2026/tdtsp"
+      ],
+      "excluded": [
+        ["2008/nmseq/020", "source incompatibility"],
+        ["2009/still_life/still_life_5", "source incompatibility"],
+        ["2010/wwtp_random/ex05100_2600_100", "source incompatibility"],
+        ["2026/tdtsp", "source incompatibility"]
+      ]
+    },
+    {
+      "suite": "xcsp3-core",
+      "reference": "cp-sat",
+      "instances": [
+        ["magic-series-tiny", "3b9fd70ed5ea95d2c024553b6c3c293271e9e15b4abe4c53591fb097a4db3f2c"],
+        ["sum-opt-tiny", "cec450c49c2ed5a07b87ebc790163204e4647bb55f0ffcfebe1ec4b0d1048355"],
+        ["magic-square-3", "ace0ff6c92b40ab11f3195ee74a86819157ec7ed0942516a2daadad1dae3cbc9"],
+        ["graph-coloring-tiny", "dd534877e647cf21f1a92d5b3423fab5822cbdabb3bb2d5900ec8ebf3d5987c6"]
+      ]
+    },
+    {
+      "suite": "mps-core",
+      "reference": "scip",
+      "instances": [
+        ["blend-tiny", "8404a1ddbd3809eab6054322880feb57fcc65bb567fcde0f6d2bb6eb299dd0a7"],
+        ["feasible-tiny", "b9162826039ba2243712daafe3e0433aec15ccef783e53ecb2230ae402043e74"],
+        ["float-tiny", "7bb48ec9fd86f12ad51cbbb60b2c2933348ea010a3bdb09ed535a1006d7cb955"],
+        ["infeasible-tiny", "3c0fa5629913496a268c4516522a68b8a6668314984cdca1b451f93df41d926b"]
+      ]
+    },
+    {
+      "suite": "miplib2017",
+      "reference": "scip",
+      "selection": "frozen 12-instance PR #1935 slice",
+      "corpus": "https://miplib.zib.de/downloads/collection.zip",
+      "instances": [
+        ["10teams", "cc5d351ee5e56c64b2931d2205afcd4463e93d587abe546856cf601894b6ec43"],
+        ["22433", "395621d0c47bea253f5023448a11e1a89d19a7fba1802db6c7ef626ceede1f95"],
+        ["23588", "b3e24a0b587d268c29fc0388adf4bdc32b1604c536b8c001c4f509dd17f67c5a"],
+        ["2club200v15p5scn", "39af07737dada7370105d268bcdedf8d8e9a5e84ce7610c5fe9d958bd12b7793"],
+        ["30_70_45_05_100", "fd7d2361434554b39d2ea59c24a13d971638bd220c9ee364956a1026b7094309"],
+        ["30_70_45_095_100", "77c1016aa169ba1a4e21fbbcca2ed7b9178c6cf04040ad20bad403a3efb06b76"],
+        ["30n20b8", "152b62344fb15ee3e080137ea304d998c351f56c3b3bcea3f2a421cdbb7a55f9"],
+        ["50v-10", "ab32c42d0b916c3b858dae1f160f4367f0dbe17016b0714955765ff4d8471133"],
+        ["8div-n59k10", "76d0a60328be9be53c1ea2584c14e7c6a56e6250e29c38378301a05e7be53cfb"],
+        ["8div-n59k11", "e501989812e3de86cdd704591c446ac6d7bf029327b6a8068c3a0f3004328a57"],
+        ["CMS750_4", "959fbfbc27e4aef8f5206e336aab7d3dd5f238ae2c4f698a2043fbb34fac5cfa"],
+        ["Test3", "a61a40648cb64c4920a895474bddb18d13c67226c5f149b802dd114902f24924"]
+      ]
+    }
+  ],
+  "openCoverage": [
+    "At campaign preflight the Z3 table has no smtlib-qf_idl or smtlib-qf_rdl rows.",
+    "At campaign preflight the CP-SAT table has no current mzn-challenge or xcsp3-core rows.",
+    "At campaign preflight the SCIP table has no mps-core rows.",
+    "Campaign results and any external blockers are recorded after execution; UNKNOWN rows remain non-proofs."
+  ]
+}

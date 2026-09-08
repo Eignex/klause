@@ -1,0 +1,54 @@
+Calculating task graph as no cached configuration is available for tasks: :klause-bench:bench --args=solve suite=mzn-bench per-family=1 max=60 seed=1 processors=1 timeout=3000 label=w0-3378fa6e2aa3-mzn-off-r1 lp=off
+
+> Configure project :klause
+Signing skipped: SNAPSHOT is a snapshot.
+
+> Task :klause-bench:protobufDummy UP-TO-DATE
+> Task :klause-bench:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :klause:kmpPartiallyResolvedDependenciesChecker
+> Task :klause:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :klause:jvmProcessResources NO-SOURCE
+> Task :klause:processJvmMainResources SKIPPED
+> Task :klause-bench:extractProto UP-TO-DATE
+> Task :klause-bench:processResources UP-TO-DATE
+> Task :klause:compileKotlinJvm UP-TO-DATE
+> Task :klause:compileJvmMainJava NO-SOURCE
+> Task :klause:jvmMainClasses UP-TO-DATE
+> Task :klause:jvmJar UP-TO-DATE
+> Task :klause-bench:extractIncludeProto UP-TO-DATE
+> Task :klause-bench:generateProto UP-TO-DATE
+> Task :klause-bench:compileKotlin UP-TO-DATE
+> Task :klause-bench:compileJava UP-TO-DATE
+> Task :klause-bench:classes UP-TO-DATE
+
+> Task :klause-bench:bench
+=== solve over 19 instance(s) ===
+[load] skipped 4/19 unresolvable instance(s):
+  - 2008/nmseq/020: minizinc compile failed (exit 1) for nmseq.mzn: Error: type error: no function or predicate with thi
+  - 2009/still_life/still_life_5: minizinc compile failed (exit 1) for still_life.mzn: Error: type error: undefined identifier `is_out
+  - 2010/wwtp_random/ex05100_2600_100: minizinc compile failed (exit 1) for wwtpp.mzn: Error: type error: undefined identifier `is_output',
+  - 2026/tdtsp: minizinc compile failed (exit 1) for tdtsp.mzn: Multiple type errors:
+Error: type error:   symbol er
+
+=== solve (klause-p1-t3s-lp-off-w0-3378fa6e2aa3-mzn-off-r1; 3000ms budget) -> output/klause-p1-t3s-lp-off-w0-3378fa6e2aa3-mzn-off-r1/ ===
+ok [2011/ship-schedule/4Ships] optimize = best=367530.0@1534ms
+?? [2012/vrp/A-n38-k5.vrp] optimize = ?
+?? [2013/proteindesign12/1HZ5.12p.19aa.usingEref_self] optimize = ?
+ok [2014/spot5/1502] optimize = best=54112.0@2097ms
+ok [2015/roster/chicroster_dataset_11] optimize = best=57.0@1542ms
+?? [2016/prize-collecting/28-4-7-1] optimize = ?
+ok [2017/routing-flexible] optimize = best=204297.0@1052ms
+?? [2018/steiner-tree/es10fst03.stp] optimize = ?
+ok [2019/stack-cuttingstock/d14] optimize = best=26.0@581ms
+?? [2020/skill-allocation/skill_allocation_mzn_1m_1] optimize = ?
+?? [2021/seat-moving/sm-10-11-00] optimize = ?
+?? [2022/traveling-tppv/circ14cnonbal] optimize = ?
+?? [2023/travelling-thief/data/n10_k15_c5000_l10000_u11000_r49] optimize = ?
+?? [2024/tiny-cvrp/easy_instance_04] optimize = ?
+?? [2025/skill-allocation/skill_allocation_mzn_1m_2] optimize = ?
+
+5/15 feasible, 0 proved  (output/klause-p1-t3s-lp-off-w0-3378fa6e2aa3-mzn-off-r1/, output/klause-p1-t3s-lp-off-w0-3378fa6e2aa3-mzn-off-r1.csv)
+
+BUILD SUCCESSFUL in 1m 7s
+10 actionable tasks: 2 executed, 8 up-to-date
+Configuration cache entry stored.

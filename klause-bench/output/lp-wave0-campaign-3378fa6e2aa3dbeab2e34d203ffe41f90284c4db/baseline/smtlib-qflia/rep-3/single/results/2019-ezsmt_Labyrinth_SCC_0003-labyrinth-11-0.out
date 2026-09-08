@@ -1,0 +1,22 @@
+unknown
+; budget exhausted
+; solveTime=21.249
+; solutions=0
+; presolvePasses=strengthen,subsume,amo-clique,difference-system
+; presolveConstraintsRemoved=5315
+; nodes=18346
+; failures=2540
+; propagations=0
+; openBoolDecisions=0
+; openIntDecisions=0
+; openTheoryDecisions=0
+; openTheoryChecks=0
+; openWork=0
+; openLearned=0
+; openRelearned=0
+; openRestarts=0
+; openReductions=0
+; openDropped=0
+; openRetained=0
+; openPeakRetained=0
+; openLearnedWatchVisits=0

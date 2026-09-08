@@ -1,0 +1,34 @@
+Calculating task graph as no cached configuration is available for tasks: :klause-bench:bench --args=solve suite=smtlib-qflira per-family=1 max=10 seed=1 processors=1 timeout=30000 label=w0-3378fa6e2aa3-qflira-single-r2 engine=fixed
+
+> Configure project :klause
+Signing skipped: SNAPSHOT is a snapshot.
+
+> Task :klause-bench:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :klause-bench:protobufDummy UP-TO-DATE
+> Task :klause:kmpPartiallyResolvedDependenciesChecker
+> Task :klause:jvmProcessResources NO-SOURCE
+> Task :klause:processJvmMainResources SKIPPED
+> Task :klause:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :klause-bench:extractProto UP-TO-DATE
+> Task :klause-bench:processResources UP-TO-DATE
+> Task :klause:compileKotlinJvm UP-TO-DATE
+> Task :klause:compileJvmMainJava NO-SOURCE
+> Task :klause:jvmMainClasses UP-TO-DATE
+> Task :klause:jvmJar UP-TO-DATE
+> Task :klause-bench:extractIncludeProto UP-TO-DATE
+> Task :klause-bench:generateProto UP-TO-DATE
+> Task :klause-bench:compileKotlin UP-TO-DATE
+> Task :klause-bench:compileJava UP-TO-DATE
+> Task :klause-bench:classes UP-TO-DATE
+
+> Task :klause-bench:bench
+=== solve over 1 instance(s) ===
+
+=== solve (klause-fixed-p1-t30s-w0-3378fa6e2aa3-qflira-single-r2; 30000ms budget) -> output/klause-fixed-p1-t30s-w0-3378fa6e2aa3-qflira-single-r2/ ===
+?? [LCTES/cruise-control.nosummaries] satisfy = ?
+
+0/1 feasible, 0 proved  (output/klause-fixed-p1-t30s-w0-3378fa6e2aa3-qflira-single-r2/, output/klause-fixed-p1-t30s-w0-3378fa6e2aa3-qflira-single-r2.csv)
+
+BUILD SUCCESSFUL in 33s
+10 actionable tasks: 2 executed, 8 up-to-date
+Configuration cache entry stored.

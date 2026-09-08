@@ -1,0 +1,1 @@
+./gradlew -Dklause.bench.cache=false :klause-bench:bench --args=solve\ suite=smtlib-qfidl\ per-family=1\ max=10\ seed=1\ processors=1\ timeout=30000\ label=w0-3378fa6e2aa3-qfidl-single-r1\ engine=fixed 

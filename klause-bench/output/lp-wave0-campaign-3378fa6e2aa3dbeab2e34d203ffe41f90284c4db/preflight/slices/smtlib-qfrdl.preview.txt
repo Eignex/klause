@@ -1,0 +1,7 @@
+=== preview: solve over 6 instance(s) ===
+  SMT-Temporal-Planning-Benchmarks/cooking01  [SMTLIB/CSP]
+  check/bignum_rdl1  [SMTLIB/CSP]
+  sal/fischer3-mutex-1  [SMTLIB/CSP]
+  scheduling/abz5_1000  [SMTLIB/CSP]
+  skdmxa/skdmxa-3x3-10  [SMTLIB/CSP]
+  skdmxa2/skdmxa-3x3-10.base.cvc  [SMTLIB/CSP]

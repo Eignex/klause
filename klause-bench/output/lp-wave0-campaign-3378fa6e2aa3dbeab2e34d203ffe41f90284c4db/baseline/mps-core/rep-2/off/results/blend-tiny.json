@@ -1,0 +1,80 @@
+{
+    "problem": "blend-tiny",
+    "solver": "klause",
+    "engine": null,
+    "processors": 1,
+    "search": "free",
+    "seed": 3,
+    "budgetMs": 3000,
+    "kind": "optimize",
+    "maximize": false,
+    "feasible": true,
+    "objective": 9.0,
+    "timeToBestMs": 79,
+    "timeToFirstFeasibleMs": 60,
+    "proven": true,
+    "stats": {
+        "solveTime": "0.108",
+        "solutions": "5",
+        "nodes": "30",
+        "failures": "13",
+        "restarts": "0",
+        "propagations": "0",
+        "learned": "0",
+        "relearned": "0",
+        "peakDepth": "5",
+        "openBoolDecisions": "0",
+        "openIntDecisions": "0",
+        "openTheoryDecisions": "0",
+        "openTheoryChecks": "0",
+        "openWork": "0",
+        "openLearned": "0",
+        "openRelearned": "0",
+        "openRestarts": "0",
+        "openReductions": "0",
+        "openDropped": "0",
+        "openRetained": "0",
+        "openPeakRetained": "0",
+        "openLearnedWatchVisits": "0"
+    },
+    "attribution": [
+        {
+            "label": "backtrack#0",
+            "objective": null,
+            "exactObjective": "15",
+            "continuousObjective": null,
+            "elapsedMs": 60
+        },
+        {
+            "label": "backtrack#0",
+            "objective": null,
+            "exactObjective": "12",
+            "continuousObjective": null,
+            "elapsedMs": 69
+        },
+        {
+            "label": "backtrack#0",
+            "objective": null,
+            "exactObjective": "11",
+            "continuousObjective": null,
+            "elapsedMs": 75
+        },
+        {
+            "label": "backtrack#0",
+            "objective": null,
+            "exactObjective": "10",
+            "continuousObjective": null,
+            "elapsedMs": 77
+        },
+        {
+            "label": "backtrack#0",
+            "objective": null,
+            "exactObjective": "9",
+            "continuousObjective": null,
+            "elapsedMs": 79
+        }
+    ],
+    "gitSha": "3378fa6e2aa3dbeab2e34d203ffe41f90284c4db",
+    "timestamp": "2026-09-08T20:39:28.931178742Z",
+    "command": "/home/rasmus/.codex/worktrees/81fa/klause/klause-cli/build/install/klause-cli-jvm/bin/klause-cli --format mps /home/rasmus/.codex/worktrees/81fa/klause/klause-bench/smoke-corpus/mps/blend-tiny.mps -t 3000 -r 3 -s -a --output-objective --lp off"
+}

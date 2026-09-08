@@ -1,0 +1,11 @@
+=== preview: solve over 10 instance(s) ===
+  20180326-Bromberger/more_slacked/CAV_2009_benchmarks/coef-size/smt/size-10/c10_problem__001.smt2.slack  [SMTLIB/CSP]
+  2019-cmodelsdiff/boundsmodels/dp_10.formula1-i-O2-b12.smo2  [SMTLIB/CSP]
+  2019-ezsmt/Labyrinth/SCC/0003-labyrinth-11-0  [SMTLIB/CSP]
+  20210219-Dartagnan/ConcurrencySafety-Main/03_incdec-O0  [SMTLIB/CSP]
+  20220307-SMPT/2PhLockVParam/RC-00  [SMTLIB/CSP]
+  20230321-UltimateAutomizerSvcomp2023/jain_5-2.c_1  [SMTLIB/CSP]
+  20231117-c_inference/100_100_20_11_sat  [SMTLIB/CSP]
+  Averest/parallel_prefix_sum/ParallelPrefixSum_live_bgmc000  [SMTLIB/CSP]
+  CAV_2009_benchmarks/coef-size/smt/size-10/problem__001  [SMTLIB/CSP]
+  CIRC/multiplier/MULTIPLIER_10.msat  [SMTLIB/CSP]

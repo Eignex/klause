@@ -1,0 +1,9 @@
+=== MiniZinc Challenge complete scoring:  results  vs  results   (4 shared) ===
+  A 0.45 [graph-coloring-tiny] A=true!@414ms  B=true!@333ms
+  A+0.54 [magic-series-tiny] A=true!@381ms  B=true!@446ms
+  A 0.47 [magic-square-3] A=true!@438ms  B=true!@381ms
+  A 0.35 [sum-opt-tiny] A=10.0!@96ms  B=10.0!@52ms
+
+  BORDA SCORE:  results = 1.8   results = 2.2   (of 4)
+  A strict wins 0, strict losses 0, ties 4, A-unsolved 0
+  B-solved that A did not: 0

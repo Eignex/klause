@@ -1,0 +1,1 @@
+./gradlew -Dklause.bench.cache=false :klause-bench:bench --args=solve\ suite=mps-core\ \ processors=1\ timeout=3000\ label=w0-3378fa6e2aa3-mps-default-r1\ lp=default 

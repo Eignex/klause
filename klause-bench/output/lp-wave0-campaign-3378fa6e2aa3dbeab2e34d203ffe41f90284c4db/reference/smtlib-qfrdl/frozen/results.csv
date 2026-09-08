@@ -1,0 +1,7 @@
+suite,problem,maximize,objective,feasible,proven,elapsedMs,budgetMs,format,structure,numGlobal,numLinear,boolHeavy,logic
+smtlib-qf_rdl,SMT-Temporal-Planning-Benchmarks/cooking01,false,,true,true,51,30000,,,,,,
+smtlib-qf_rdl,check/bignum_rdl1,false,,true,true,20,30000,,,,,,
+smtlib-qf_rdl,sal/fischer3-mutex-1,false,,false,true,19,30000,,,,,,
+smtlib-qf_rdl,scheduling/abz5_1000,false,,false,true,68,30000,,,,,,
+smtlib-qf_rdl,skdmxa/skdmxa-3x3-10,false,,false,true,981,30000,,,,,,
+smtlib-qf_rdl,skdmxa2/skdmxa-3x3-10.base.cvc,false,,false,true,2497,30000,,,,,,

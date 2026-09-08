@@ -1,0 +1,7 @@
+8639129bb6e7d43e2e2524c32418ff03d56938e887f74d5dc1d28a46e2c1b975  ./command.txt
+9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa  ./exit-status.txt
+7bc595cabd6f2df4247a9c3f7bf345c0f07f99567c5b990c0fe18725fe4c1a5e  ./ids.txt
+48afb6be0f0460d1d17e0123c5f2facd40d29bbd0ed23fad19db2bd5fd5c8bf0  ./reference-table-after.sha256
+e48b96fe4b68135aa0a4bb9a8cd14ba418e79fad9ce8c6683ec5c34ccb4e08b1  ./reference-table-before.sha256
+7f59745b621ab5d1fa9749e59284bbbb44fe6a8e2024348de688c3e7cecebf98  ./results.csv
+93f2863c2da948562c529ee7818c4a61fcc7e956ef0b8c14f30ad68d440fc550  ./stdout.log

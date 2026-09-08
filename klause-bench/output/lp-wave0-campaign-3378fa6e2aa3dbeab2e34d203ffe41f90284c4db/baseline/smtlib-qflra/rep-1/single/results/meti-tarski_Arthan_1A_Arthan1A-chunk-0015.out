@@ -1,0 +1,57 @@
+sat
+(
+  (define-fun skoSINS () Real 0)
+  (define-fun skoS () Real 89247779/60000000)
+  (define-fun pi () Real 94247779/30000000)
+  (define-fun skoCOSS () Real 0)
+)
+; solveTime=0.152
+; solutions=1
+; nodes=0
+; failures=0
+; propagations=0
+; openBoolDecisions=0
+; openIntDecisions=0
+; openTheoryDecisions=0
+; openTheoryChecks=1
+; openWork=1
+; openLearned=0
+; openRelearned=0
+; openRestarts=0
+; openReductions=0
+; openDropped=0
+; openRetained=0
+; openPeakRetained=0
+; openLearnedWatchVisits=0
+; smtPrivateChecks=0
+; smtSharedChecks=1
+; smtTheoryChecks=1
+; smtTheoryChecksPerSec=6.5789
+; smtConflicts=0
+; smtExplainedConflicts=0
+; smtUnexplainedConflicts=0
+; smtConflictLiterals=0
+; smtReductionRequests=0
+; smtReductionCacheHits=0
+; smtReductionAccepted=0
+; smtReductionDeclined=0
+; smtReductionMs=0
+; smtSimplexAttempts=1
+; smtSimplexAccepted=1
+; smtSimplexDeclined=0
+; smtSimplexMs=15.1164
+; smtFrac128Attempts=0
+; smtFrac128Eligible=0
+; smtFrac128Accepted=0
+; smtFrac128Escalations=0
+; smtFrac128OverflowEscalations=0
+; smtFrac128InputEscalations=0
+; smtEscalationMs=0
+; smtWitnessCandidates=1
+; smtWitnessAccepted=1
+; smtStrictWitnessCandidates=1
+; smtStrictWitnessAccepted=1
+; smtWideWitnessCandidates=0
+; smtWideWitnessAccepted=0
+; smtWitnessAcceptance=1
+; smtStrictWitnessAcceptance=1

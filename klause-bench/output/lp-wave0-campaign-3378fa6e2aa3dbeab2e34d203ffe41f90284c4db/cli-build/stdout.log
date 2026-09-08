@@ -1,0 +1,28 @@
+Calculating task graph as no cached configuration is available for tasks: :klause-cli:installJvmDist
+
+> Configure project :klause
+Signing skipped: SNAPSHOT is a snapshot.
+
+> Task :klause:jvmProcessResources NO-SOURCE
+> Task :klause:kmpPartiallyResolvedDependenciesChecker
+> Task :klause:processJvmMainResources SKIPPED
+> Task :klause:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :klause-cli:kmpPartiallyResolvedDependenciesChecker
+> Task :klause-cli:jvmProcessResources NO-SOURCE
+> Task :klause-cli:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :klause-cli:processJvmMainResources SKIPPED
+> Task :klause:compileKotlinJvm UP-TO-DATE
+> Task :klause-cli:generateCliBuildInfo
+> Task :klause:compileJvmMainJava NO-SOURCE
+> Task :klause:jvmMainClasses UP-TO-DATE
+> Task :klause:jvmJar UP-TO-DATE
+> Task :klause-cli:compileKotlinJvm FROM-CACHE
+> Task :klause-cli:compileJvmMainJava NO-SOURCE
+> Task :klause-cli:jvmMainClasses UP-TO-DATE
+> Task :klause-cli:jvmJar
+> Task :klause-cli:startScriptsForJvm
+> Task :klause-cli:installJvmDist
+
+BUILD SUCCESSFUL in 4s
+9 actionable tasks: 6 executed, 1 from cache, 2 up-to-date
+Configuration cache entry stored.

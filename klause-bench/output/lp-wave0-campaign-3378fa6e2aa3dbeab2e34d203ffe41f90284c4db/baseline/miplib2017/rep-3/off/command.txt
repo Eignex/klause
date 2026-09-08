@@ -1,0 +1,1 @@
+./gradlew -Dklause.bench.cache=false :klause-bench:bench --args=solve\ suite=miplib2017\ name=10teams\,22433\,23588\,2club200v15p5scn\,30_70_45_05_100\,30_70_45_095_100\,30n20b8\,50v-10\,8div-n59k10\,8div-n59k11\,CMS750_4\,Test3\ processors=1\ timeout=3000\ label=w0-3378fa6e2aa3-miplib12-off-r3\ lp=off 

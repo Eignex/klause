@@ -1,0 +1,148 @@
+{
+    "problem": "2015/roster/chicroster_dataset_11",
+    "solver": "klause",
+    "engine": null,
+    "processors": 1,
+    "search": "free",
+    "seed": 3,
+    "budgetMs": 3000,
+    "kind": "optimize",
+    "maximize": false,
+    "feasible": true,
+    "objective": 48.0,
+    "timeToBestMs": 1970,
+    "timeToFirstFeasibleMs": 500,
+    "proven": false,
+    "stats": {
+        "solveTime": "2.05",
+        "solutions": "14",
+        "presolvePasses": "strengthen,affine,difference-system",
+        "presolveConstraintsRemoved": "560",
+        "nodes": "5052",
+        "failures": "41",
+        "restarts": "0",
+        "propagations": "0",
+        "learned": "0",
+        "relearned": "0",
+        "peakDepth": "398",
+        "caNotApplicable": "0",
+        "caNonAsserting": "0",
+        "caRejectedTrueLit": "0",
+        "openBoolDecisions": "0",
+        "openIntDecisions": "0",
+        "openTheoryDecisions": "0",
+        "openTheoryChecks": "0",
+        "openWork": "0",
+        "openLearned": "0",
+        "openRelearned": "0",
+        "openRestarts": "0",
+        "openReductions": "0",
+        "openDropped": "0",
+        "openRetained": "0",
+        "openPeakRetained": "0",
+        "openLearnedWatchVisits": "0"
+    },
+    "attribution": [
+        {
+            "label": "backtrack#0",
+            "objective": null,
+            "exactObjective": "61",
+            "continuousObjective": null,
+            "elapsedMs": 500
+        },
+        {
+            "label": "backtrack#0",
+            "objective": null,
+            "exactObjective": "60",
+            "continuousObjective": null,
+            "elapsedMs": 733
+        },
+        {
+            "label": "backtrack#0",
+            "objective": null,
+            "exactObjective": "59",
+            "continuousObjective": null,
+            "elapsedMs": 850
+        },
+        {
+            "label": "backtrack#0",
+            "objective": null,
+            "exactObjective": "58",
+            "continuousObjective": null,
+            "elapsedMs": 978
+        },
+        {
+            "label": "backtrack#0",
+            "objective": null,
+            "exactObjective": "57",
+            "continuousObjective": null,
+            "elapsedMs": 1079
+        },
+        {
+            "label": "backtrack#0",
+            "objective": null,
+            "exactObjective": "56",
+            "continuousObjective": null,
+            "elapsedMs": 1186
+        },
+        {
+            "label": "backtrack#0",
+            "objective": null,
+            "exactObjective": "55",
+            "continuousObjective": null,
+            "elapsedMs": 1295
+        },
+        {
+            "label": "backtrack#0",
+            "objective": null,
+            "exactObjective": "54",
+            "continuousObjective": null,
+            "elapsedMs": 1390
+        },
+        {
+            "label": "backtrack#0",
+            "objective": null,
+            "exactObjective": "53",
+            "continuousObjective": null,
+            "elapsedMs": 1486
+        },
+        {
+            "label": "backtrack#0",
+            "objective": null,
+            "exactObjective": "52",
+            "continuousObjective": null,
+            "elapsedMs": 1589
+        },
+        {
+            "label": "backtrack#0",
+            "objective": null,
+            "exactObjective": "51",
+            "continuousObjective": null,
+            "elapsedMs": 1685
+        },
+        {
+            "label": "backtrack#0",
+            "objective": null,
+            "exactObjective": "50",
+            "continuousObjective": null,
+            "elapsedMs": 1777
+        },
+        {
+            "label": "backtrack#0",
+            "objective": null,
+            "exactObjective": "49",
+            "continuousObjective": null,
+            "elapsedMs": 1874
+        },
+        {
+            "label": "backtrack#0",
+            "objective": null,
+            "exactObjective": "48",
+            "continuousObjective": null,
+            "elapsedMs": 1970
+        }
+    ],
+    "gitSha": "3378fa6e2aa3dbeab2e34d203ffe41f90284c4db",
+    "timestamp": "2026-09-08T20:46:38.207337459Z",
+    "command": "/home/rasmus/.codex/worktrees/81fa/klause/klause-cli/build/install/klause-cli-jvm/bin/klause-cli /home/rasmus/.codex/worktrees/81fa/klause/klause-bench/build/mzn-fzn/2015_roster_chicroster_dataset_11.fzn -t 3000 -r 3 -s -a --output-objective --lp off"
+}

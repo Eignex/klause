@@ -1,0 +1,11 @@
+suite,problem,maximize,objective,feasible,proven,elapsedMs,budgetMs,format,structure,numGlobal,numLinear,boolHeavy,logic
+smtlib-qf_idl,20210312-Bouvier/vlsat3_c00,false,,false,true,19918,30000,,,,,,
+smtlib-qf_idl,20220214-RVpredict-BohanLi/RVpredict_1,false,,,false,30000,30000,,,,,,
+smtlib-qf_idl,20220214-jobshop-BohanLi/jobshop10-2-5-5-2-4-12,false,,true,true,52,30000,,,,,,
+smtlib-qf_idl,Averest/binary_search/BinarySearch_live_bgmc000,false,,true,true,16,30000,,,,,,
+smtlib-qf_idl,DTP/DTP_k2_n35_c175_s1,false,,true,true,27,30000,,,,,,
+smtlib-qf_idl,RTCL/b01_tf_15/ckt_PROP0_tf_15,false,,false,true,21,30000,,,,,,
+smtlib-qf_idl,asp/15Puzzle/15-puzzle.init10,false,,,false,30000,30000,,,,,,
+smtlib-qf_idl,bcnscheduling/bcnscheduling100,false,,false,true,3531,30000,,,,,,
+smtlib-qf_idl,cellar/CELAR6_SUB0,false,,false,true,61,30000,,,,,,
+smtlib-qf_idl,check/bignum_idl1,false,,false,true,23,30000,,,,,,
