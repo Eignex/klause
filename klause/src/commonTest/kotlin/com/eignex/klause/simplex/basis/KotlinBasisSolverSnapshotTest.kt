@@ -19,6 +19,7 @@ class KotlinBasisSolverSnapshotTest {
         assertTrue(solver.refactorize(basis))
         val initial = assertNotNull(solver.snapshot())
         replace(solver, source, basis, 1, 6)
+        replace(solver, source, basis, 4, 9)
         assertBasisSolves(solver, source, basis, IntArray(5) { -1 })
         val updated = assertNotNull(solver.snapshot())
         val updatedWork = solver.lastUpdateWork
@@ -29,12 +30,17 @@ class KotlinBasisSolverSnapshotTest {
         assertEquals(0, solver.updateCount)
         assertMatchesFresh(solver, source, IntArray(5) { it }, IntArray(5) { -1 })
         assertTrue(solver.restore(updated))
-        assertEquals(1, solver.updateCount)
+        assertEquals(2, solver.updateCount)
         assertEquals(updatedWork, solver.lastUpdateWork)
         assertEquals(updatedSolveWork, solver.lastSolveWork)
-        assertBasisSolves(solver, source, intArrayOf(0, 6, 2, 3, 4), IntArray(5) { -1 })
+        val restoredBasis = intArrayOf(0, 6, 2, 3, 9)
+        assertBasisSolves(solver, source, restoredBasis, IntArray(5) { -1 })
+        replace(solver, source, restoredBasis, 3, 8)
+        assertEquals(3, solver.updateCount)
+        assertMatchesFresh(solver, source, restoredBasis, IntArray(5) { -1 })
         assertTrue(solver.restore(updated))
-        assertMatchesFresh(solver, source, intArrayOf(0, 6, 2, 3, 4), IntArray(5) { -1 })
+        assertEquals(2, solver.updateCount)
+        assertMatchesFresh(solver, source, intArrayOf(0, 6, 2, 3, 9), IntArray(5) { -1 })
     }
 
     @Test
@@ -51,6 +57,14 @@ class KotlinBasisSolverSnapshotTest {
         )
         val solver = KotlinBasisSolver(source)
         val repair = assertNotNull(solver.refactorizeRepairing(intArrayOf(0, 1, 2)))
+        val columns = repair.columns.copyOf()
+        val unitRows = repair.unitRows.copyOf()
+        val logical = unitRows.indexOfFirst { it >= 0 }
+        val spike = IndexedVector(3).also { it.scatterColumn(source, 3) }
+        solver.ftran(spike)
+        assertEquals(BasisUpdate.APPLIED, solver.update(logical, 3, spike))
+        columns[logical] = 3
+        unitRows[logical] = -1
         val snapshot = assertNotNull(solver.snapshot())
         assertFalse(solver.refactorize(intArrayOf(0, 1, 2)))
         assertTrue(solver.singular)
@@ -59,10 +73,11 @@ class KotlinBasisSolverSnapshotTest {
         assertTrue(solver.restore(snapshot))
 
         assertFalse(solver.singular)
-        assertBasisSolves(solver, source, repair.columns, repair.unitRows)
+        assertEquals(1, solver.updateCount)
+        assertBasisSolves(solver, source, columns, unitRows)
         val repeated = assertNotNull(solver.snapshot())
         assertTrue(solver.restore(repeated))
-        assertMatchesFresh(solver, source, repair.columns, repair.unitRows)
+        assertMatchesFresh(solver, source, columns, unitRows)
     }
 
     @Test
