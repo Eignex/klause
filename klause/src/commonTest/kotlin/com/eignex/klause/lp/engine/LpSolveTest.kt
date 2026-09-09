@@ -7,6 +7,7 @@ import com.eignex.klause.lp.engine.Sense
 import com.eignex.klause.lp.engine.solveAndCertify
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.Cancellation
+import com.ionspin.kotlin.bignum.integer.BigInteger
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -14,6 +15,102 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class LpSolveTest {
+    @Test
+    fun `raw objective mutation invalidates counters but not an existing lazy snapshot`() {
+        val model = LpBuilder().apply { addVar(0L, 3L, cost = 1L) }.build(Sense.MINIMIZE)
+        val cache = LpCounterResults()
+        val result = solveAndCertify(model, counterResults = cache)
+
+        model.cost[0] = -1L
+
+        assertNull(cache.read(model, ProductionLpCertificationPolicy))
+        assertTrue(assertNotNull(result.safeLowerBound) > -1.0)
+        assertEquals(BigFraction.ofLong(-3L), solveAndCertify(model).lowerBound)
+    }
+
+    @Test
+    fun `an uncapturable remember attempt retires earlier evidence`() {
+        val model = LpBuilder().apply { addVar(0L, 1L) }.build(Sense.MINIMIZE)
+        val cache = LpCounterResults()
+        val result = solveAndCertify(model, counterResults = cache)
+        model.colContinuous[0] = true
+
+        cache.remember(model, result, ProductionLpCertificationPolicy)
+        model.colContinuous[0] = false
+
+        assertTrue(cache.storageDeclined)
+        assertNull(cache.read(model, ProductionLpCertificationPolicy))
+    }
+
+    @Test
+    fun `uncapturable legacy input withholds key and lazy safe bound`() {
+        val model = LpBuilder().apply { addVar(0L, 3L, cost = 1L) }.build(Sense.MINIMIZE)
+        model.colContinuous[0] = true
+
+        val result = solveAndCertify(model)
+
+        assertNull(exactLpStateKey(model))
+        assertNull(result.safeLowerBound)
+    }
+
+    @Test
+    fun `same double with different exact authority cannot reuse counters`() {
+        val zero = ExactLpNumber.of(0L)
+        val one = ExactLpNumber.of(1L)
+        val model = ExactLpModel(listOf(emptyList()), emptyList(),
+            listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(one)))),
+            emptyList(), ExactLpObjective(listOf(ExactLpNumber.of(-1L))))
+        val nextBound = ExactLpNumber.of(BigFraction.ONE + BigFraction.of(
+            BigInteger.ONE, BigInteger.ONE shl 54))
+        val next = model.copy(columns = listOf(model.column(0).copy(
+            bounds = ExactLpBounds(ExactLpSide(zero), ExactLpSide(nextBound)))))
+        val cache = LpCounterResults()
+        assertEquals(LpVerdict.ATTAINED_OPTIMUM, solveAndCertify(model, counterResults = cache).verdict)
+
+        val result = solveAndCertify(next, counterResults = cache)
+
+        assertEquals(one.value.toDouble(), nextBound.value.toDouble())
+        assertTrue(!model.sameAuthority(next))
+        assertNotNull(exactLpStateKey(model))
+        assertNull(exactLpStateKey(next))
+        assertEquals(LpVerdict.INDETERMINATE, result.verdict)
+        assertNull(result.safeLowerBound)
+        assertTrue(cache.storageDeclined)
+        assertNull(cache.read(assertNotNull(model.toLegacy()), ProductionLpCertificationPolicy))
+    }
+
+    @Test
+    fun `unsupported exact metadata declines before engine injection`() {
+        val zero = ExactLpNumber.of(0L)
+        val model = ExactLpModel(listOf(emptyList()), emptyList(),
+            listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(ExactLpNumber.of(1L))))),
+            emptyList(), ExactLpObjective(listOf(zero)))
+        val variants = listOf(
+            model.copy(columns = listOf(model.column(0).copy(integral = false))),
+            model.copy(columns = listOf(model.column(0).copy(bounds = ExactLpBounds(
+                ExactLpSide(zero, premises = ExactLpPremises(emptyList(), listOf(7))))))),
+            model.copy(objective = ExactLpObjective(listOf(zero), scale = ExactLpNumber.of(2L))),
+            model.copy(objective = ExactLpObjective(listOf(zero), externalConstant = ExactLpNumber.of(1L))),
+            model.copy(objective = ExactLpObjective(listOf(ExactLpNumber.ofIeee(0.0)))),
+        )
+        val context = LpSolveContext(engineFactory = object : LpEngineFactory by ProductionLpEngineFactory {
+            override fun newGeneralSolver(model: LpModel, cancellation: Cancellation): LpSolver = error("unsupported engine entry")
+            override fun newComponentSolver(
+                model: LpModel, parts: List<LpNeighborhood>, solvers: List<LpSolver>, isolated: IntArray,
+            ): ComponentLpSolverCapability = error("unsupported component entry")
+        })
+        for (variant in variants) {
+            assertNull(variant.toLegacy())
+            assertNull(exactLpStateKey(variant))
+            val result = solveAndCertify(variant, context = context)
+            assertEquals(LpVerdict.INDETERMINATE, result.verdict)
+            assertNull(result.float)
+            assertNull(result.bound)
+            assertNull(result.witness)
+            assertNull(result.safeLowerBound)
+        }
+    }
+
 
     @Test
     fun `a feasible LP certifies an optimum matching the float optimum`() {
@@ -199,13 +296,14 @@ class LpSolveTest {
     }
 
     @Test
-    fun `in place objective replacement invalidates exact counter authority`() {
+    fun `objective replacement invalidates only the replacement counter authority`() {
         val model = LpBuilder().apply { addVar(0L, 3L, cost = 1L) }.build(Sense.MINIMIZE)
         val cache = LpCounterResults()
         assertEquals(BigFraction.ZERO, solveAndCertify(model, counterResults = cache).lowerBound)
         val next = model.withSingleColumnObjective(0, -1L, 0)
 
-        assertNull(cache.read(model, ProductionLpCertificationPolicy))
+        assertNotNull(cache.read(model, ProductionLpCertificationPolicy))
+        assertNull(cache.read(next, ProductionLpCertificationPolicy))
         val result = solveAndCertify(next, counterResults = cache)
         assertEquals(BigFraction.ofLong(-3L), result.lowerBound)
         assertEquals(listOf(BigFraction.ofLong(3L)), result.exactPrimal)

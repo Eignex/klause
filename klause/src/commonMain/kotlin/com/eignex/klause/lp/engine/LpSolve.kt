@@ -45,6 +45,22 @@ internal class CertifiedLpResult(
     val safeLowerBound: Double? by lazy(safeBound)
 }
 
+internal fun solveAndCertify(
+    model: ExactLpModel,
+    warm: ExactLpBasis? = null,
+    cancellation: Cancellation = Cancellation.Never,
+    context: LpSolveContext = LpSolveContext.Production,
+    counterResults: LpCounterResults? = null,
+): CertifiedLpResult {
+    val bridge = warm?.toLegacy(model)
+    val legacy = if (warm == null) model.toLegacy() else bridge?.model
+    if (legacy == null) {
+        counterResults?.declineStorage()
+        return CertifiedLpResult(null, null, null, null, null, false, { null })
+    }
+    return solveAndCertify(legacy, bridge?.basis, cancellation, context = context, counterResults = counterResults)
+}
+
 // Float termination hints never determine the proof strength.
 internal fun solveAndCertify(
     model: LpModel,
@@ -156,10 +172,12 @@ internal fun certifyLpResult(
         conflict,
         model.hasIntegralObjective(),
         safeBound = result?.let {
-            val snapshot = LpCapturedModel.capture(model).toModel()
+            val snapshot = LpCapturedModel.captureOrNull(model)?.toModel()
             val duals = it.duals.copyOf()
             val compute: () -> Double? = {
-                policy.acceptNullable(LpCertifier.SAFE_OBJECTIVE, safeObjectiveLowerBound(snapshot, duals))
+                snapshot?.let { frozen ->
+                    policy.acceptNullable(LpCertifier.SAFE_OBJECTIVE, safeObjectiveLowerBound(frozen, duals))
+                }
             }
             compute
         } ?: { null },
@@ -421,6 +439,13 @@ internal class LpCounterResults {
     var storageDeclined: Boolean = false
         private set
 
+    fun declineStorage() {
+        storageDeclined = true
+        key = null
+        evidence = null
+        acceptedBy = null
+    }
+
     fun read(model: LpModel, policy: LpCertificationPolicy): CertifiedLpResult? {
         val current = keyOf(model)
         if (policy !== ProductionLpCertificationPolicy || current == null ||
@@ -434,8 +459,11 @@ internal class LpCounterResults {
     }
 
     fun remember(model: LpModel, result: CertifiedLpResult, policy: LpCertificationPolicy) {
+        val current = keyOf(model) ?: run {
+            declineStorage()
+            return
+        }
         if (policy !== ProductionLpCertificationPolicy || (result.witness == null && result.bound == null)) return
-        val current = keyOf(model) ?: return
         key = current
         // No float vectors, lazy model views, candidate rejections or infeasibility claims are cached.
         evidence = CertifiedLpResult(null, result.bound, result.witness, null, null, false, { null })
@@ -454,7 +482,13 @@ internal fun exactLpStateKey(model: LpModel): ByteArray? {
         }
     }
     if (size > MAX_COUNTER_KEY_VALUES) return null
-    return LpCapture.capture(model, LpReplaySettings("exact-counter", 0L), emptyList()).encode()
+    val captured = LpCapturedModel.captureOrNull(model) ?: return null
+    return LpCapture(LP_CAPTURE_VERSION, LpReplaySettings("exact-counter", 0L), captured, emptyList()).encode()
+}
+
+internal fun exactLpStateKey(model: ExactLpModel): ByteArray? {
+    if (model.keySize > MAX_COUNTER_KEY_VALUES) return null
+    return model.toLegacy()?.let { exactLpStateKey(it) }
 }
 
 private const val MAX_COUNTER_KEY_VALUES = 4096L
