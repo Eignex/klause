@@ -3,12 +3,17 @@ package com.eignex.klause.formats.mps
 import com.eignex.klause.formats.FormatException
 import com.eignex.klause.formats.splitWhitespace
 import com.eignex.klause.ir.ObjectiveSense
+import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.CharSource
 import com.eignex.klause.util.StringCharSource
 import com.eignex.klause.util.lineSequence
+import com.ionspin.kotlin.bignum.integer.BigInteger
 
 /** Raised when an MPS file is malformed or uses a construct outside the supported subset. */
 class MpsFormatException(msg: String) : FormatException("MPS", msg)
+
+// Exact decimal powers beyond this scale are disproportionate parser inputs even when Double underflows.
+private const val MAX_EXACT_DECIMAL_SCALE = 100_000
 
 /** Reject a malformed line with a clean [MpsFormatException]; `Nothing`-typed so call sites stay
  *  expression-friendly (an elvis branch reads as a value, not a statement). */
@@ -47,16 +52,16 @@ object Mps {
 
     private class Row(val name: String, val type: RowType) {
         /** Sparse column coefficients, keyed by variable index. */
-        val coeffs = LinkedHashMap<Int, Double>()
-        var rhs = 0.0
-        var range: Double? = null
+        val coeffs = LinkedHashMap<Int, MpsSourceNumber>()
+        var rhs = MpsSourceNumber.parsed(BigFraction.ZERO)
+        var range: MpsSourceNumber? = null
         var indicator: MpsIndicator? = null
     }
 
     private class Var(val name: String, val index: Int) {
         var integer = false
-        var lower: Double? = 0.0
-        var upper: Double? = null // +infinity by default
+        var lower: MpsSourceNumber? = MpsSourceNumber.parsed(BigFraction.ZERO)
+        var upper: MpsSourceNumber? = null // +infinity by default
         var explicitLower = false
         var explicitUpper = false
     }
@@ -204,7 +209,8 @@ object Mps {
             val value = fields.getOrNull(i + 1)
                 ?: throw MpsFormatException("COLUMNS entry '$colName' missing value for row '$rowName'")
             val row = rowByName[rowName] ?: throw MpsFormatException("COLUMNS entry references unknown row '$rowName'")
-            row.coeffs[v.index] = (row.coeffs[v.index] ?: 0.0) + parseNum(value, "coefficient")
+            val number = parseNum(value, "coefficient")
+            row.coeffs[v.index] = row.coeffs[v.index]?.plus(number) ?: number
             i += 2
         }
         return inMarker
@@ -225,7 +231,7 @@ object Mps {
         fields: List<String>,
         rowByName: Map<String, Row>,
         section: String,
-        apply: (Row, Double) -> Unit,
+        apply: (Row, MpsSourceNumber) -> Unit,
     ) {
         if (fields.size < 2) mpsError("$section line needs a row and a value: '${fields.joinToString(" ")}'")
         // Set names are optional, and may coincide with row names. Field parity is unambiguous: an
@@ -251,7 +257,7 @@ object Mps {
         }
         val row = rowByName[rest[0]] ?: mpsError("INDICATORS references unknown row '${rest[0]}'")
         val v = varByName[rest[1]] ?: mpsError("INDICATORS references unknown column '${rest[1]}'")
-        val whenOne = when (parseNum(rest[2], "INDICATORS value")) {
+        val whenOne = when (parseNum(rest[2], "INDICATORS value").double) {
             1.0 -> true
             0.0 -> false
             else -> mpsError("INDICATORS value must be 0 or 1, got '${rest[2]}'")
@@ -279,17 +285,21 @@ object Mps {
             else -> fields[fields.size - 2]
         }
         val v = varByName[col] ?: throw MpsFormatException("BOUNDS references unknown column '$col'")
-        applyBound(v, type, if (valueless) 0.0 else parseNum(fields.last(), "bound value"))
+        applyBound(
+            v,
+            type,
+            if (valueless) MpsSourceNumber.parsed(BigFraction.ZERO) else parseNum(fields.last(), "bound value"),
+        )
     }
 
     /** Apply one BOUNDS entry of [type] with [value] to variable [v] (the standard MPS bound types;
      *  a `null` bound is left standing for infinity). */
-    private fun applyBound(v: Var, type: String, value: Double) {
+    private fun applyBound(v: Var, type: String, value: MpsSourceNumber) {
         when (type) {
             "UP" -> {
                 v.upper = value
                 v.explicitUpper = true
-                if (value < 0 && !v.explicitLower) v.lower = null
+                if (value.fraction.signum() < 0 && !v.explicitLower) v.lower = null
             }
 
             "LO" -> {
@@ -323,8 +333,8 @@ object Mps {
 
             "BV" -> {
                 v.integer = true
-                v.lower = 0.0
-                v.upper = 1.0
+                v.lower = MpsSourceNumber.parsed(BigFraction.ZERO)
+                v.upper = MpsSourceNumber.parsed(BigFraction.ONE)
                 v.explicitLower = true
                 v.explicitUpper = true
             }
@@ -352,27 +362,36 @@ object Mps {
         vars: List<Var>,
         objectiveRow: Row?,
     ): MpsModel {
-        val variables = vars.map { MpsVar(it.name, it.integer, it.lower, it.upper) }
+        val variables = vars.map { MpsVar(it.name, it.integer, it.lower?.double, it.upper?.double) }
         val constraints = rows.filter { it.type == RowType.LE || it.type == RowType.GE || it.type == RowType.EQ }
             .map { row ->
                 val indices = row.coeffs.keys.toIntArray()
-                val coeffs = DoubleArray(indices.size) { row.coeffs.getValue(indices[it]) }
+                val coeffs = DoubleArray(indices.size) { row.coeffs.getValue(indices[it]).double }
                 val (lo, hi) = bounds(row)
-                MpsConstraint(row.name, indices, coeffs, lo, hi, row.indicator)
+                MpsConstraint(row.name, indices, coeffs, lo?.double, hi?.double, row.indicator)
             }
         val objective = if (objectiveRow == null) {
             MpsObjective("", IntArray(0), DoubleArray(0), 0.0)
         } else {
             val indices = objectiveRow.coeffs.keys.toIntArray()
-            val coeffs = DoubleArray(indices.size) { objectiveRow.coeffs.getValue(indices[it]) }
+            val coeffs = DoubleArray(indices.size) { objectiveRow.coeffs.getValue(indices[it]).double }
             // An objective RHS `b` names a constant `-b` on the objective's value (it sits on the rhs side).
-            MpsObjective(objectiveRow.name, indices, coeffs, -objectiveRow.rhs)
+            MpsObjective(objectiveRow.name, indices, coeffs, objectiveRow.rhs.negated().double)
         }
-        return MpsModel(name, sense, objective, variables, constraints)
+        val source = MpsSourceNumbers(
+            vars.map { it.lower to it.upper },
+            rows.filter { it.type == RowType.LE || it.type == RowType.GE || it.type == RowType.EQ }
+                .map { row -> row.coeffs.values.toList() },
+            rows.filter { it.type == RowType.LE || it.type == RowType.GE || it.type == RowType.EQ }
+                .map(::bounds),
+            objectiveRow?.coeffs?.values?.toList() ?: emptyList(),
+            objectiveRow?.rhs?.negated() ?: MpsSourceNumber.parsed(BigFraction.ZERO),
+        )
+        return MpsModel(name, sense, objective, variables, constraints).withSourceNumbers(source)
     }
 
     /** Resolve a row's `[lower, upper]` from its type, rhs and optional range (`null` = open side). */
-    private fun bounds(row: Row): Pair<Double?, Double?> {
+    private fun bounds(row: Row): Pair<MpsSourceNumber?, MpsSourceNumber?> {
         val r = row.range
         if (r == null) {
             return when (row.type) {
@@ -391,22 +410,71 @@ object Mps {
      *  - `G` (`≥ rhs`): `[rhs, rhs + |R|]`
      *  - `E` (`= rhs`): `[rhs, rhs + R]` when `R ≥ 0`, else `[rhs + R, rhs]`.
      */
-    private fun applyRange(type: RowType, rhs: Double, range: Double): Pair<Double?, Double?> {
-        val abs = if (range < 0) -range else range
+    private fun applyRange(
+        type: RowType,
+        rhs: MpsSourceNumber,
+        range: MpsSourceNumber,
+    ): Pair<MpsSourceNumber?, MpsSourceNumber?> {
+        val abs = range.absolute()
         return when (type) {
-            RowType.LE -> (rhs - abs) to rhs
-            RowType.GE -> rhs to (rhs + abs)
-            RowType.EQ -> if (range >= 0) rhs to (rhs + range) else (rhs + range) to rhs
+            RowType.LE -> rhs.minus(abs) to rhs
+            RowType.GE -> rhs to rhs.plus(abs)
+            RowType.EQ -> if (range.fraction.signum() >= 0) rhs to rhs.plus(range) else rhs.plus(range) to rhs
             else -> null to null
         }
     }
 
-    private fun parseNum(token: String, role: String): Double = token
-        .replace('D', 'E')
-        .replace('d', 'E')
-        .toDoubleOrNull()
-        ?.takeIf { it.isFinite() }
-        ?: throw MpsFormatException("$role must be a finite number: '$token'")
+    private fun parseNum(token: String, role: String): MpsSourceNumber {
+        val normalized = token.replace('D', 'E').replace('d', 'E')
+        val finite = normalized.toDoubleOrNull()?.takeIf { it.isFinite() }
+            ?: invalidNumber(role, token)
+        val exponentAt = normalized.indexOfFirst { it == 'e' || it == 'E' }
+        val mantissa = if (exponentAt < 0) normalized else normalized.substring(0, exponentAt)
+        val exponent = if (exponentAt < 0) {
+            0L
+        } else {
+            normalized.substring(exponentAt + 1).toLongOrNull()
+                ?: invalidNumber(role, token)
+        }
+        val negative = mantissa.startsWith('-')
+        val unsigned = mantissa.removePrefix("-").removePrefix("+")
+        val dot = unsigned.indexOf('.')
+        val digits = if (dot < 0) unsigned else unsigned.removeRange(dot, dot + 1)
+        if (digits.isEmpty() || digits.any { it !in '0'..'9' }) {
+            invalidNumber(role, token)
+        }
+        var numerator = BigInteger.parseString(digits, 10)
+        if (negative) numerator = -numerator
+        if (numerator == BigInteger.ZERO) return MpsSourceNumber.parsed(BigFraction.ZERO, finite)
+        val decimalPlaces = if (dot < 0) 0L else (unsigned.length - dot - 1).toLong()
+        if (exponent < Long.MIN_VALUE + decimalPlaces) invalidNumber(role, token)
+        val scale = exponent - decimalPlaces
+        if (scale !in -MAX_EXACT_DECIMAL_SCALE.toLong()..MAX_EXACT_DECIMAL_SCALE.toLong()) {
+            invalidNumber(role, token)
+        }
+        val power = decimalPower(kotlin.math.abs(scale).toInt())
+        val fraction = if (scale >= 0) {
+            BigFraction.of(numerator * power, BigInteger.ONE)
+        } else {
+            BigFraction.of(numerator, power)
+        }
+        return MpsSourceNumber.parsed(fraction, finite)
+    }
+
+    private fun invalidNumber(role: String, token: String): Nothing =
+        throw MpsFormatException("$role must be a finite number: '$token'")
+
+    private fun decimalPower(exponent: Int): BigInteger {
+        var remaining = exponent
+        var factor = BigInteger.TEN
+        var result = BigInteger.ONE
+        while (remaining > 0) {
+            if (remaining and 1 == 1) result *= factor
+            remaining = remaining ushr 1
+            if (remaining > 0) factor *= factor
+        }
+        return result
+    }
 }
 
 private inline fun mpsErrorIf(condition: Boolean, message: () -> String) {
