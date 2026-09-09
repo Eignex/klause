@@ -97,7 +97,11 @@ internal fun checkExactLinear(
         ).run()
     ) {
         is IntegerSearchResult.Found -> TheoryCheck.Sat(checkNotNull(result.assignment))
-        IntegerSearchResult.Infeasible -> TheoryCheck.Infeasible()
+
+        IntegerSearchResult.Infeasible -> TheoryCheck.Infeasible(
+            sourceExplanation(model, bools.toStates(), cancellation, stats),
+        )
+
         IntegerSearchResult.Cancelled, IntegerSearchResult.Budget -> TheoryCheck.Cancelled
     }
 }
@@ -183,7 +187,12 @@ class ExactLiraSearchComponent(
         return when (result) {
             is IntegerSearchResult.Found -> ComponentResult.Consistent
 
-            IntegerSearchResult.Infeasible -> partialExplanation().let { explanation ->
+            IntegerSearchResult.Infeasible -> sourceExplanation(
+                model,
+                bools,
+                Cancellation(context::cancelled),
+                smtStats,
+            ).let { explanation ->
                 smtStats?.observeConflict(explanation)
                 ComponentResult.Conflict(explanation)
             }
@@ -236,8 +245,9 @@ class ExactLiraSearchComponent(
         }
         val reduced = reduction.reduce(bools, current, Cancellation(context::cancelled), smtStats)
         if (reduced == ExactLiraReduction.Infeasible) {
-            outcome = ComponentCheck.Infeasible()
-            smtStats?.observeConflict(null)
+            val explanation = sourceExplanation(model, bools, Cancellation(context::cancelled), smtStats)
+            outcome = ComponentCheck.Infeasible(explanation)
+            smtStats?.observeConflict(explanation)
             return null
         }
         if (reduced == ExactLiraReduction.Interrupted) {
@@ -263,8 +273,9 @@ class ExactLiraSearchComponent(
             }
 
             ExactReducedSearchResult.Infeasible -> {
-                outcome = ComponentCheck.Infeasible()
-                smtStats?.observeConflict(null)
+                val explanation = sourceExplanation(model, bools, Cancellation(context::cancelled), smtStats)
+                outcome = ComponentCheck.Infeasible(explanation)
+                smtStats?.observeConflict(explanation)
                 return null
             }
 
@@ -312,16 +323,25 @@ class ExactLiraSearchComponent(
     private fun decision(node: SearchNode): SearchDecision = SearchDecision.Theory(ExactLiraDecision(node))
 
     private fun hasActiveExactConstraint(): Boolean = arithmeticRows.any { it.truthUnder(bools) != null }
+}
 
-    private fun partialExplanation(): SearchExplanation = SearchExplanation(
-        bools.indices.mapNotNull { variable ->
-            when (bools[variable]) {
-                TRUE -> Lit.make(variable, positive = false)
-                FALSE -> Lit.make(variable, positive = true)
-                else -> null
-            }
-        }.toIntArray(),
-    )
+private fun sourceExplanation(
+    model: Problem,
+    bools: IntArray,
+    cancellation: Cancellation,
+    observer: RationalSimplexObserver?,
+): SearchExplanation? {
+    if (cancellation()) return null
+    // Refute the original active rows independently of private splits, reductions and shared bounds.
+    val relaxation = QfLraSystem(model).build { variable ->
+        when (bools[variable]) {
+            TRUE -> true
+            FALSE -> false
+            else -> null
+        }
+    }
+    val outcome = bigRationalOutcome(relaxation.model, cancellation, observer = observer)
+    return relaxation.explanation(outcome.conflict)
 }
 
 private class ExactIntegerSearch(

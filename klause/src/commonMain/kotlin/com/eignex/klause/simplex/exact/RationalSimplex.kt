@@ -72,7 +72,19 @@ internal class BigRationalOutcome(
      * mixed-integer clients can separate a cut without rebuilding a floating basis.
      */
     val tableau: List<BigRationalTableauRow>? = null,
+    /** Source row weights and blocking bound sides, including the violated basic bound. */
+    val conflict: BigRationalConflict? = null,
 )
+
+// Multipliers orient the equality so its RHS is below the minimum selected by the cited bounds.
+// Strict rows contribute -multiplier to the infinitesimal RHS; a negative delta breaks an exact tie.
+internal class BigRationalConflict(
+    val rows: IntArray,
+    val multipliers: List<BigFraction>,
+    val bounds: List<ExactSimplexBound>,
+)
+
+internal data class ExactSimplexBound(val column: Int, val upper: Boolean)
 
 /** Exact outcome of minimizing a linear activity over an [ExactSimplexModel]. */
 internal class BigRationalOptimizationOutcome(
@@ -570,7 +582,13 @@ private fun bigRationalOutcomeUnobserved(
             )
         }
         val enter = state.selectEnteringColumn(row)
-        if (enter < 0) return BigRationalOutcome(RationalFeasibility.INFEASIBLE)
+        if (enter < 0) {
+            val refutation = state.refutation(row) ?: return BigRationalOutcome(RationalFeasibility.UNKNOWN)
+            return BigRationalOutcome(
+                refutation.feasibility,
+                conflict = refutation.rows?.let { rows -> bigConflict(state, row, rows) },
+            )
+        }
         state.pivot(row, enter)
         pivots++
     }
@@ -881,13 +899,10 @@ private class SimplexState<F>(
      */
     fun refutation(row: Int): RationalOutcome? {
         val leaving = basis[row]
-        if (leaving < model.n && (model.probeClampedHi[leaving] || model.probeClampedLo[leaving])) {
-            return unknownOutcome()
-        }
-        for (k in 0 until tab.rowSize(row)) {
-            val j = tab.colAt(row, k)
-            if (inBasisRow[j] >= 0 || ops.isZero(tab.valAt(row, k))) continue
-            if (atUpper[j] && j < model.n && model.probeClampedHi[j]) return unknownOutcome()
+        for (bound in blockingBounds(row)) {
+            if (bound.column >= model.n) continue
+            val clamped = if (bound.upper) model.probeClampedHi else model.probeClampedLo
+            if (clamped[bound.column]) return unknownOutcome()
         }
         val certRows = ArrayList<Int>()
         if (leaving >= model.n) certRows.add(leaving - model.n)
@@ -898,6 +913,16 @@ private class SimplexState<F>(
         }
         if (ops.overflowed()) return null
         return RationalOutcome(RationalFeasibility.INFEASIBLE, rows = certRows.toIntArray())
+    }
+
+    fun blockingBounds(row: Int): List<ExactSimplexBound> = buildList {
+        add(ExactSimplexBound(basis[row], targetUpper))
+        for (k in 0 until tab.rowSize(row)) {
+            val column = tab.colAt(row, k)
+            if (inBasisRow[column] < 0 && !ops.isZero(tab.valAt(row, k))) {
+                add(ExactSimplexBound(column, atUpper[column]))
+            }
+        }
     }
 
     /** Pivot fully: the leaving variable lands exactly on its violated bound; solve [row] for [enter]. */
@@ -1283,6 +1308,15 @@ private fun structuralBigWitness(st: SimplexState<BigFraction>): List<BigFractio
             else -> BigFraction.ZERO
         }
     }
+}
+
+private fun bigConflict(state: SimplexState<BigFraction>, row: Int, rows: IntArray): BigRationalConflict {
+    val sign = if (state.targetUpper) BigFraction.MINUS_ONE else BigFraction.ONE
+    val multipliers = rows.map { source ->
+        val slack = state.model.n + source
+        sign * if (slack == state.basis[row]) BigFraction.ONE else state.tab.get(row, slack)
+    }
+    return BigRationalConflict(rows, multipliers, state.blockingBounds(row))
 }
 
 /** Exact final rows in the same delta instantiation used for [structuralBigWitness]. */

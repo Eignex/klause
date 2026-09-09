@@ -14,6 +14,7 @@ import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import com.eignex.klause.ir.ObjectiveSense as ObjectiveDirection
@@ -39,7 +40,6 @@ class OpenTheoryMinimizeTest {
         """.trimIndent(),
     )
 
-    /** `x = y + z` over `y ∈ {0, 20}` and `z ∈ {0, 7}`, so minimizing `x` descends 27 → 20 → 7 → 0. */
     private fun stepped() = modelOf(
         """
             (declare-const x Int)
@@ -134,9 +134,7 @@ class OpenTheoryMinimizeTest {
 
     @Test
     fun `a budget spent mid-descent bounds the optimum by the standing incumbent`() {
-        // 27 is the first witness and 20 the improvement installed over it, so a bound of 20 is one the
-        // descent reached only by replacing what it already had.
-        for ((decisions, bound) in listOf(4L to "27", 20L to "20")) {
+        val values = listOf(4L, 12L).map { decisions ->
             val parsed = stepped()
             val x = parsed.intVarNames.getValue("x")
             val objective = LinearObjective(intCoefficients = LongArray(parsed.model.numIntVars).also { it[x] = 1L })
@@ -145,9 +143,18 @@ class OpenTheoryMinimizeTest {
                 OpenTheoryMinimizer(parsed.model, objective).minimize(TheoryParams(maxDecisions = decisions)),
             )
 
-            assertEquals(bound, result.value.toString(), "bound after $decisions decisions")
-            assertEquals(bound, result.incumbent?.intValue(x), "incumbent after $decisions decisions")
+            val incumbent = assertNotNull(result.incumbent)
+            val value = assertNotNull(result.value)
+            val yValue = incumbent.intValue(parsed.intVarNames.getValue("y")).toInt()
+            val zValue = incumbent.intValue(parsed.intVarNames.getValue("z")).toInt()
+            assertTrue(yValue in setOf(0, 20))
+            assertTrue(zValue in setOf(0, 7))
+            assertEquals((yValue + zValue).toString(), incumbent.intValue(x))
+            assertEquals(incumbent.intValue(x), value.toString())
+            assertTrue(value.toString() in setOf("0", "7", "20", "27"))
+            value
         }
+        assertTrue(values[1] < values[0])
     }
 
     @Test

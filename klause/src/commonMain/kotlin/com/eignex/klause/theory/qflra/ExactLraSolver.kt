@@ -56,9 +56,9 @@ class ExactLraSolver(override val model: Problem) : Theory<ExactLraAssignment> {
             }
         }
         if (!context.consumeCheck()) return TheoryCheck.Cancelled
-        val relaxation = QfLraSystem(model).build(bools)
+        val relaxation = QfLraSystem(model).build { bools[it] }
         val outcome = bigRationalOutcome(
-            relaxation,
+            relaxation.model,
             Cancellation(context::cancelled),
             maxPivots = Int.MAX_VALUE,
             observer = smtStats,
@@ -66,7 +66,7 @@ class ExactLraSolver(override val model: Problem) : Theory<ExactLraAssignment> {
         return when (outcome.feasibility) {
             RationalFeasibility.FEASIBLE -> {
                 val telemetry = smtStats?.let { stats ->
-                    relaxation.rowStrict.any { it }.also { strict ->
+                    relaxation.model.rowStrict.any { it }.also { strict ->
                         stats.observeWitnessCandidate(strict, wide = false)
                     }
                 }
@@ -83,7 +83,7 @@ class ExactLraSolver(override val model: Problem) : Theory<ExactLraAssignment> {
 
             RationalFeasibility.UNKNOWN -> TheoryCheck.Cancelled
 
-            RationalFeasibility.INFEASIBLE -> TheoryCheck.Infeasible()
+            RationalFeasibility.INFEASIBLE -> TheoryCheck.Infeasible(relaxation.explanation(outcome.conflict))
         }
     }
 

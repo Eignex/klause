@@ -40,6 +40,45 @@ import kotlin.test.assertTrue
 class ExactLiraSearchComponentTest {
 
     @Test
+    fun `repeated partial conflicts omit an irrelevant assertion after retraction`() {
+        val source = partialModel()
+        val model = Problem(3, intBounds = source.intBounds, factors = source.factors)
+        val stats = SmtStatsSink()
+        val component = ExactLiraSearchComponent(model).also { it.observeWith(stats) }
+        val session = SearchSession(listOf(component))
+        assertIs<ComponentResult.Consistent>(session.initialize())
+        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, true))))
+
+        repeat(3) {
+            val conflict = assertIs<ComponentResult.Conflict>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+            assertContentEquals(intArrayOf(Lit.make(0, false)), conflict.explanation?.literals)
+            session.popTo(1)
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, false))))
+            session.popTo(1)
+        }
+
+        assertEquals(3L, stats.snapshot().explainedConflicts)
+        assertEquals(3L, stats.snapshot().conflictLiterals)
+    }
+
+    @Test
+    fun `partial integer-only conflicts retain chronological handling`() {
+        val model = Problem(
+            2,
+            intBounds = openBounds(),
+            factors = arrayOf(ReifiedLinear(0, intArrayOf(2), intArrayOf(0), LinearOp.EQ, 1)),
+        )
+        val session = SearchSession(listOf(ExactLiraSearchComponent(model)))
+        assertIs<ComponentResult.Consistent>(session.initialize())
+
+        val conflict = assertIs<ComponentResult.Conflict>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+
+        assertNull(conflict.explanation)
+        session.popTo(0)
+        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, false))))
+    }
+
+    @Test
     fun `a clause-only Boolean decision does not spend an arithmetic check`() {
         val model = Problem(
             numBoolVars = 3,
