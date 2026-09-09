@@ -1,12 +1,12 @@
 package com.eignex.klause.lp.engine
 
-import com.eignex.klause.lp.engine.Cut
+import com.eignex.klause.simplex.basis.KotlinBasisSolver
 import com.eignex.klause.util.Int128
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.LongArrayList
 import com.eignex.klause.util.LongHashSet
 import com.eignex.koblas.SparseMatrix
-import com.eignex.koblas.sparse.lu
+import com.eignex.koblas.sparse.basis.IndexedVector
 import kotlin.math.abs
 import kotlin.math.round
 import kotlin.math.sqrt
@@ -60,37 +60,45 @@ internal fun integerTableauCuts(
             listOf((col - n) to 1.0) // slack column is the unit vector e_{col−n}
         }
     }
-    ensureKoblasBackends()
-    val lu = SparseMatrix.ofColumns(m, m, columns).lu()
-    if (lu.singular) return emptyList()
+    val solver = KotlinBasisSolver(SparseMatrix.ofColumns(m, m, columns))
+    try {
+        if (!solver.refactorize(IntArray(m) { it })) return emptyList()
 
-    val isLeRow = BooleanArray(m) { !model.hasUpper[model.slackCol(it)] } // ≤-row slack is free above
-    val zStar = DoubleArray(n) { primal[it] - model.loShift[it].toDouble() } // shifted LP point
+        val isLeRow = BooleanArray(m) { !model.hasUpper[model.slackCol(it)] } // ≤-row slack is free above
+        val zStar = DoubleArray(n) { primal[it] - model.loShift[it].toDouble() } // shifted LP point
 
-    val cuts = ArrayList<Cut>()
-    val unit = DoubleArray(m)
-    for (i in 0 until m) {
-        if (cuts.size >= maxCuts) break
-        val bvar = basis.basicVars[i]
-        if (bvar >= n) continue // cut on fractional structural variables only
-        if (abs(primal[bvar] - round(primal[bvar])) < TABLEAU_FRAC_TOL) continue // integral ⇒ no cut
+        val cuts = ArrayList<Cut>()
+        val unit = IndexedVector(m)
+        for (i in 0 until m) {
+            if (cuts.size >= maxCuts) break
+            val bvar = basis.basicVars[i]
+            if (bvar >= n) continue // cut on fractional structural variables only
+            if (abs(primal[bvar] - round(primal[bvar])) < TABLEAU_FRAC_TOL) continue // integral ⇒ no cut
 
-        for (r in 0 until m) unit[r] = if (r == i) 1.0 else 0.0
-        val w = roundDuals(model, lu.solve(unit, transpose = true))?.mult ?: continue
+            unit.unit(i)
+            try {
+                solver.btran(unit)
+            } catch (_: ArithmeticException) {
+                return emptyList()
+            }
+            val w = roundDuals(model, unit.toDoubleArray())?.mult ?: continue
 
-        var global = true
-        var anyWeight = false
-        for (r in 0 until m) {
-            if (w[r] == 0L) continue
-            anyWeight = true
-            if (!model.rowGlobal[r]) global = false
+            var global = true
+            var anyWeight = false
+            for (r in 0 until m) {
+                if (w[r] == 0L) continue
+                anyWeight = true
+                if (!model.rowGlobal[r]) global = false
+            }
+            if (!anyWeight) continue
+
+            val cut = bestRoundedCut(model, w, isLeRow, zStar, mir, global) ?: continue
+            cuts.add(cut)
         }
-        if (!anyWeight) continue
-
-        val cut = bestRoundedCut(model, w, isLeRow, zStar, mir, global) ?: continue
-        cuts.add(cut)
+        return cuts
+    } finally {
+        solver.close()
     }
-    return cuts
 }
 
 /** Aggregated coefficient `gₖ = Σ_r w_r·A_{rk}` of structural column [k] (exact, [Int128]). */

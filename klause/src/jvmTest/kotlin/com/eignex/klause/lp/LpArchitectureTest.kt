@@ -63,6 +63,8 @@ class LpArchitectureTest {
             """.trimIndent(),
             """
                 package com.eignex.klause.simplex.basis
+                import com.eignex.koblas.ExperimentalKoblasApi
+                import com.eignex.koblas.sparse.SparseWorkspace
                 import com.eignex.koblas.sparse.basis.BasisSolver
                 import com.eignex.koblas.sparse.basis.IndexedVector
                 import com.eignex.koblas.sparse.basis.BasisUpdate
@@ -189,6 +191,8 @@ internal object LpBoundaryScanner {
             if (dependency == "com.eignex.koblas" || dependency.startsWith("com.eignex.koblas.")) {
                 val allowedTypes = listOf(
                     "com.eignex.koblas.SparseMatrix",
+                    "com.eignex.koblas.ExperimentalKoblasApi",
+                    "com.eignex.koblas.sparse.SparseWorkspace",
                     "com.eignex.koblas.sparse.basis.BasisSolver",
                     "com.eignex.koblas.sparse.basis.IndexedVector",
                     "com.eignex.koblas.sparse.basis.BasisUpdate",

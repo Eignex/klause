@@ -53,7 +53,7 @@ class KotlinBasisSolverTest {
             var previousReports: List<BasisSolveWork>? = null
             repeat(3) { repetition ->
                 val start = TimeSource.Monotonic.markNow()
-                val solver = KotlinBasisSolver(source, etaLimit = 4)
+                val solver = KotlinBasisSolver(source, updateLimit = 4, fillFactor = 100.0)
                 val basis = IntArray(n) { n - 1 - it }
                 assertTrue(solver.refactorize(basis))
                 val reports = mutableListOf<BasisSolveWork>()
@@ -103,10 +103,10 @@ class KotlinBasisSolverTest {
                 val visits = reports.sumOf { it.first.pivotVisits + it.second.pivotVisits }
                 val reach = reports.sumOf { it.first.reachEntries + it.second.reachEntries }
                 val arithmetic = reports.sumOf {
-                    it.first.arithmeticEntries + it.second.arithmeticEntries + it.etaEntries
+                    it.first.arithmeticEntries + it.second.arithmeticEntries + it.transformEntries
                 }
                 println(
-                    "B2b $shape repetition=$repetition residual=$maxResidual " +
+                    "B3 $shape repetition=$repetition residual=$maxResidual " +
                         "applied=$applied advisory=$advisory declines=0 sparse=$sparse " +
                         "visits=$visits reach=$reach arithmetic=$arithmetic " +
                         "support=${reports.sumOf { it.outputSupport }} elapsed=${start.elapsedNow()}",
@@ -145,9 +145,11 @@ class KotlinBasisSolverTest {
             assertEquals(before, solver.nnz)
             assertNull(solver.refactorizeReason)
             val rhs = doubleArrayOf(3.0, 4.0)
-            val solved = IndexedVector(2).also { it.scatter(rhs) }
-            solver.ftran(solved)
-            assertEquals(0.0, sourceResidual(source, intArrayOf(2, 1), rhs, solved, false))
+            for (transpose in listOf(false, true)) {
+                val solved = IndexedVector(2).also { it.scatter(rhs) }
+                if (transpose) solver.btran(solved) else solver.ftran(solved)
+                assertEquals(0.0, sourceResidual(source, intArrayOf(2, 1), rhs, solved, transpose))
+            }
         }
     }
 
@@ -171,7 +173,7 @@ class KotlinBasisSolverTest {
     }
 
     @Test
-    fun `solver owns source headings and eta copies while solves overwrite only their argument`() {
+    fun `solver owns source headings and update copies while solves overwrite only their argument`() {
         val source = SparseMatrix.ofColumns(
             2,
             3,
@@ -261,7 +263,7 @@ class KotlinBasisSolverTest {
     }
 
     @Test
-    fun `configured tiny eta pivots solve against the entering source column`() {
+    fun `configured tiny update pivots solve against the entering source column`() {
         val source = SparseMatrix.ofColumns(1, 2, listOf(listOf(0 to 1.0), listOf(0 to 1e-200)))
         val solver = KotlinBasisSolver(source, LuPivotPolicy(absoluteTolerance = 0.0))
         assertTrue(solver.refactorize(intArrayOf(0)))
@@ -279,7 +281,7 @@ class KotlinBasisSolverTest {
     }
 
     @Test
-    fun `unrepresentable eta normalization declines without changing the basis`() {
+    fun `unrepresentable spike normalization declines without changing the basis`() {
         for ((pivot, offDiagonal) in listOf(1e-200 to 1e200, 1e200 to 1e-200, 1e-320 to 1.0)) {
             val source = SparseMatrix.ofColumns(
                 2,
@@ -328,6 +330,40 @@ class KotlinBasisSolverTest {
         vector.unit(0)
         solver.ftran(vector)
         assertEquals(1.0, vector[0])
+    }
+
+    @Test
+    fun `unrepresentable update products preserve original headings and both solve directions`() {
+        for (magnitude in listOf(1e200, 1e-200)) {
+            val source = SparseMatrix.ofColumns(
+                2, 3, listOf(
+                    listOf(0 to magnitude),
+                    listOf(0 to magnitude, 1 to 1.0),
+                    listOf(1 to magnitude),
+                ),
+            )
+            val solver = KotlinBasisSolver(source, LuPivotPolicy(absoluteTolerance = 0.0))
+            assertTrue(solver.refactorize(intArrayOf(0, 1)))
+            // Exact products cancel in the source equation; individual floating products are unrepresentable.
+            val spike = IndexedVector(2).also { it.scatter(doubleArrayOf(-magnitude, magnitude)) }
+            val before = solver.nnz
+
+            assertEquals(BasisUpdate.SINGULAR, solver.update(0, 2, spike, spike))
+
+            assertEquals(before, solver.nnz)
+            assertEquals(0, solver.updateCount)
+            assertContentEquals(doubleArrayOf(-magnitude, magnitude), spike.toDoubleArray())
+            val rhs = doubleArrayOf(magnitude, 0.0)
+            for (transpose in listOf(false, true)) {
+                val vector = IndexedVector(2).also { it.scatter(rhs) }
+                if (transpose) solver.btran(vector) else solver.ftran(vector)
+                assertEquals(0.0, sourceResidual(source, intArrayOf(0, 1), rhs, vector, transpose))
+                assertEquals(0.0, solver.solveQuality(rhs, vector, transpose).relativeResidual)
+            }
+            spike.unit(0)
+            assertEquals(BasisUpdate.APPLIED, solver.update(0, 0, spike))
+            solver.close()
+        }
     }
 
     private fun sourceResidual(
