@@ -75,6 +75,7 @@ class CliStatsTest {
                         warmStartAttempts = SumResult(2.0),
                         warmStartHits = SumResult(1.0),
                         initialRefactorizations = SumResult(1.0),
+                        numericalRecoveryRefactorizations = SumResult(2.0),
                         singularRefactorizations = SumResult(3.0),
                         smallPivotBails = SumResult(4.0),
                     ),
@@ -83,7 +84,9 @@ class CliStatsTest {
         ).toMap()
 
         assertEquals("0.5", pairs["lpRootWarmStartHitRate"])
+        assertEquals("3", pairs["lpRootRefactorizations"])
         assertEquals("1", pairs["lpRootRefactorInitial"])
+        assertEquals("2", pairs["lpRootRefactorNumericalRecovery"])
         assertEquals("3", pairs["lpRootSingularRefactorizations"])
         assertEquals("4", pairs["lpRootSmallPivotBails"])
     }

@@ -87,6 +87,28 @@ class RevisedSimplexNumericsTest {
     }
 
     @Test
+    fun `exhausted boxed capacity does not enter a nonfinishing column`() {
+        val b = LpBuilder()
+        val x = b.addVar(0L, 1L)
+        b.addRow(intArrayOf(x), longArrayOf(1L), Relation.GE, 10L)
+        val model = b.build(Sense.MINIMIZE)
+        val simplex = RevisedSimplex(model)
+
+        assertNull(simplex.solve())
+
+        assertEquals(0, simplex.lastPivots)
+        assertEquals(VarStatus.AT_LOWER, assertNotNull(simplex.infeasibleBasis).status[x])
+        assertNotNull(
+            integerFarkasRay(
+                model,
+                assertNotNull(simplex.infeasibleRay),
+                basis = simplex.infeasibleBasis,
+                basisRow = simplex.infeasibleRow,
+            ),
+        )
+    }
+
+    @Test
     fun `near tolerance infeasibility rebuilds once before producing a certificate`() {
         val model = nearToleranceInfeasibleModel()
         val simplex = RevisedSimplex(model, iterationLimit = 2)

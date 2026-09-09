@@ -756,7 +756,8 @@ internal class RevisedSimplex(
                 ratioBuf[j] = abs((model.costD(j) - dotColumn(y, j)) / a)
                 elig.add(j)
             }
-            if (elig.isEmpty()) {
+            val q = if (elig.isEmpty()) null else chooseEntering(elig, eligOrdered, ratioBuf, pivotRowEntry, worst)
+            if (q == null) {
                 // An update chain can turn a tiny violation into a false infeasibility candidate even
                 // though β is recomputed every iteration. Rebuild the factors—not merely the RHS solve—
                 // and retry once per solve. A basis with no folded updates is already fresh.
@@ -777,7 +778,6 @@ internal class RevisedSimplex(
                 basisKept = true // the seated basis stays dual-feasible for the next [resolve]
                 return null
             }
-            val q = chooseEntering(elig, eligOrdered, ratioBuf, pivotRowEntry, worst)
 
             spike(q) // spike η = B⁻¹ A_q in the pre-pivot factorization
             if (abs(spikeVec[r]) < TOL) {
@@ -890,20 +890,21 @@ internal class RevisedSimplex(
         ratioBuf: DoubleArray,
         pivotRowEntry: DoubleArray,
         delta: Double,
-    ): Int {
+    ): Int? {
         // Stable ascending order by ratio, matching the tie order a stable sort by the same key gives.
         val order = argsortBy(elig.size) { a, b -> ratioBuf[elig[a]].compareTo(ratioBuf[elig[b]]) }
         for (position in order.indices) ordered[position] = elig[order[position]]
         for (position in order.indices) elig[position] = ordered[position]
         var acc = 0.0
+        var flipCount = 0
         for (idx in 0 until elig.size) {
             val j = elig[idx]
             val range = if (model.hasFiniteUpper(j)) model.upperD(j) else Double.MAX_VALUE
             val cap = abs(pivotRowEntry[j]) * range
             val last = idx == elig.size - 1
             if (!last && range < Double.MAX_VALUE && acc + cap < delta - TOL) {
-                status[j] = if (status[j] == VarStatus.AT_LOWER) VarStatus.AT_UPPER else VarStatus.AT_LOWER
                 acc += cap
+                flipCount++
             } else {
                 val remaining = maxOf(delta - acc, 0.0)
                 var harrisBound = Double.POSITIVE_INFINITY
@@ -926,13 +927,21 @@ internal class RevisedSimplex(
                     k++
                 }
                 if (best != -1) {
+                    for (f in 0 until flipCount) {
+                        val flipped = elig[f]
+                        status[flipped] = if (status[flipped] == VarStatus.AT_LOWER) {
+                            VarStatus.AT_UPPER
+                        } else {
+                            VarStatus.AT_LOWER
+                        }
+                    }
                     if (ratioBuf[best] > ratioBuf[j] + HARRIS_TOL) lastHarrisMinistepSelections++
                     return best
                 }
-                return j
+                return null
             }
         }
-        return elig[elig.size - 1] // defensive: the loop returns on the last element
+        return null // defensive: the loop handles the last element
     }
 
     private fun optimal(beta: DoubleArray): FloatLpResult {

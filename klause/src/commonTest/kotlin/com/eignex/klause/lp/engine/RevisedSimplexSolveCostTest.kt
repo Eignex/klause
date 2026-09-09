@@ -15,12 +15,13 @@ import kotlin.test.assertTrue
  */
 class RevisedSimplexSolveCostTest {
 
-    /** `x + y >= 20` over `[0, 5]²` — infeasible, so the dual pass runs to dual-unbounded. */
+    /** `x + y >= 8` and `x + y <= 7` over `[0, 5]²` — infeasible after one valid pivot. */
     private fun infeasible(): LpModel {
         val b = LpBuilder()
         val x = b.addVar(0L, 5L, cost = 1L)
         val y = b.addVar(0L, 5L, cost = 1L)
-        b.addRow(intArrayOf(x, y), longArrayOf(1L, 1L), Relation.GE, 20L)
+        b.addRow(intArrayOf(x, y), longArrayOf(1L, 1L), Relation.GE, 8L)
+        b.addRow(intArrayOf(x, y), longArrayOf(1L, 1L), Relation.LE, 7L)
         return b.build(Sense.MINIMIZE)
     }
 
