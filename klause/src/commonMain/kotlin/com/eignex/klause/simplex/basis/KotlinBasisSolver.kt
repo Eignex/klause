@@ -12,17 +12,18 @@ import kotlin.math.min
 internal data class BasisSolveWork(
     val first: TriangularSolveWork,
     val second: TriangularSolveWork,
-    val etaEntries: Long,
+    val transformEntries: Long,
     val outputSupport: Int,
 )
 
-// Single-threaded owner of source, factors, etas and scratch. Caller vectors never become retained buffers.
+// Single-threaded owner of source, factors, row transforms and scratch. Caller vectors never become retained buffers.
 // Mandatory operations/reports reject close; n and the last refactorization's singular flag remain readable.
 // Optional repair/snapshot behavior is exactly the seam default. No cancellation or resource API is exposed.
 internal class KotlinBasisSolver(
     matrix: SparseMatrix,
     private val policy: LuPivotPolicy = LuPivotPolicy(),
-    private val etaLimit: Int = 50,
+    private val updateLimit: Int = 50,
+    private val fillFactor: Double = 5.0,
     private val densityThreshold: Double = 0.2,
 ) : BasisSolver {
     private val source = SparseMatrix.wrap(
@@ -37,7 +38,6 @@ internal class KotlinBasisSolver(
     private val work = BasisWorkspace(n)
     private val mapped = BasisWorkspace(n)
     private var cache: BasisSolveCache? = null
-    private val etas = mutableListOf<BasisEta>()
     private var columns = IntArray(0)
     private var closed = false
     override var singular = true
@@ -46,35 +46,32 @@ internal class KotlinBasisSolver(
         private set
 
     init {
-        require(etaLimit > 0)
+        require(updateLimit > 0)
+        require(fillFactor.isFinite() && fillFactor >= 1.0)
         require(densityThreshold.isFinite() && densityThreshold in 0.0..1.0)
     }
 
     override val nnz: Int
         get() {
             requireOpen()
-            val factors = cache?.factors ?: return 0
-            return factors.lower.nnz + factors.upper.nnz + etas.sumOf { it.indices.size }
+            val current = cache ?: return 0
+            return current.factors.lower.nnz + current.ft.upperEntries + current.ft.transformEntries
         }
     override val updateCount: Int
         get() {
             requireOpen()
-            return etas.size
+            return cache?.ft?.updateCount ?: 0
         }
     override val rcond: Double
         get() {
             requireOpen()
-            val factors = cache?.factors ?: return 0.0
+            val current = cache ?: return 0.0
             var smallest = Double.POSITIVE_INFINITY
             var largest = 0.0
             for (j in 0 until n) {
-                val pivot = abs(factors.upper[j, j])
+                val pivot = abs(current.ft.upper.columns[j][j])
                 smallest = min(smallest, pivot)
                 largest = max(largest, pivot)
-            }
-            for (eta in etas) {
-                smallest = min(smallest, abs(eta.pivot))
-                largest = max(largest, abs(eta.pivot))
             }
             return if (n == 0) 1.0 else smallest / largest
         }
@@ -86,7 +83,6 @@ internal class KotlinBasisSolver(
         cache = null
         singular = true
         columns = IntArray(0)
-        etas.clear()
         lastSolveWork = null
         val result = builder.build(basicIndex, policy)
         if (result !is LuBuildResult.Built) return false
@@ -109,57 +105,51 @@ internal class KotlinBasisSolver(
         val symbolic = current.factors.symbolic
         val first: TriangularSolveWork
         val second: TriangularSolveWork
-        var etaEntries = 0L
+        val transformEntries: Long
         if (transpose) {
-            work.load(x)
-            // B = B0 E1 ... Ek; B^-T = B0^-T E1^-T ... Ek^-T.
-            for (k in etas.size - 1 downTo 0) etaEntries += etas[k].transpose(work)
-            permute(work, mapped, symbolic.columnPosition)
-            first = current.upperTranspose.solve(mapped, expectedDensity)
-            second = current.lowerTranspose.solve(mapped, expectedDensity)
-            mapped.write(x, symbolic.rowOrder)
+            work.load(x, symbolic.columnPosition)
+            first = current.upperTranspose.solve(work, expectedDensity)
+            transformEntries = current.ft.backward(work)
+            second = current.lowerTranspose.solve(work, expectedDensity)
+            work.write(x, symbolic.rowOrder)
         } else {
             work.load(x, symbolic.rowPosition)
             first = current.lower.solve(work, expectedDensity)
+            transformEntries = current.ft.forward(work)
             second = current.upper.solve(work, expectedDensity)
-            permute(work, mapped, symbolic.columnOrder)
-            for (eta in etas) etaEntries += eta.forward(mapped)
-            mapped.write(x)
+            work.write(x, symbolic.columnOrder)
         }
-        lastSolveWork = BasisSolveWork(first, second, etaEntries, x.count)
+        lastSolveWork = BasisSolveWork(first, second, transformEntries, x.count)
     }
 
     override fun update(pivotRow: Int, entering: Int, spike: IndexedVector, pivotEta: IndexedVector?): BasisUpdate {
         requireOpen()
         require(pivotRow in 0 until n && entering in 0 until source.cols)
         require(spike.size == n && (pivotEta == null || pivotEta.size == n))
-        if (cache == null) return BasisUpdate.SINGULAR
+        val current = cache ?: return BasisUpdate.SINGULAR
         val pivot = spike[pivotRow]
         if (!pivot.isFinite() || pivot == 0.0 || abs(pivot) < policy.absoluteTolerance) return BasisUpdate.SINGULAR
         var usable = (1.0 / pivot).isFinite()
-        var count = 0
         spike.forEachStored { _, value ->
             if (!value.isFinite()) usable = false
             if (value != 0.0) {
                 val ratio = value / pivot
                 if (!ratio.isFinite() || ratio == 0.0) usable = false
-                count++
             }
         }
         if (!usable) return BasisUpdate.SINGULAR
-        val indices = IntArray(count)
-        val values = DoubleArray(count)
-        var next = 0
-        spike.forEachStored { i, value ->
-            if (value != 0.0) {
-                indices[next] = i
-                values[next++] = value
-            }
-        }
-        etas.add(BasisEta(pivotRow, pivot, indices, values))
+        mapped.load(spike, current.factors.symbolic.columnPosition)
+        val pivotLabel = current.factors.symbolic.columnPosition[pivotRow]
+        if (!current.ft.update(pivotLabel, mapped, policy.absoluteTolerance)) return BasisUpdate.SINGULAR
         columns[pivotRow] = entering
-        return if (etas.size >= etaLimit) BasisUpdate.REFACTORIZE else BasisUpdate.APPLIED
+        return if (current.ft.updateCount >= updateLimit || current.ft.fillAdvice(fillFactor)) {
+            BasisUpdate.REFACTORIZE
+        } else {
+            BasisUpdate.APPLIED
+        }
     }
+
+    internal val lastUpdateWork: ForrestTomlinWork? get() = cache?.ft?.lastUpdateWork
 
     override fun solveQuality(rhs: DoubleArray, solution: IndexedVector, transpose: Boolean): BasisSolveQuality {
         requireOpen()
@@ -188,49 +178,18 @@ internal class KotlinBasisSolver(
         closed = true
         cache = null
         columns = IntArray(0)
-        etas.clear()
         work.clear()
         mapped.clear()
         lastSolveWork = null
     }
 
     private fun requireOpen() = check(!closed) { "basis solver is closed" }
-
-    private fun permute(from: BasisWorkspace, to: BasisWorkspace, position: IntArray) {
-        to.clear()
-        for (k in 0 until from.count) {
-            val i = from.indices[k]
-            if (from.values[i] != 0.0) to.set(position[i], from.values[i])
-        }
-    }
 }
 
 private class BasisSolveCache(val factors: LuFactors, threshold: Double) {
+    val ft = ForrestTomlinFactors(factors)
     val lower = HyperSparseSolve(factors.lower, lower = true, unitDiagonal = true, threshold)
-    val upper = HyperSparseSolve(factors.upper, lower = false, unitDiagonal = false, threshold)
+    val upper = HyperSparseSolve(ft.upper, lower = false, unitDiagonal = false, threshold)
     val lowerTranspose = HyperSparseSolve(factors.lowerTranspose, lower = false, unitDiagonal = true, threshold)
-    val upperTranspose = HyperSparseSolve(factors.upperTranspose, lower = true, unitDiagonal = false, threshold)
-}
-
-private class BasisEta(val row: Int, val pivot: Double, val indices: IntArray, val values: DoubleArray) {
-    fun forward(work: BasisWorkspace): Long {
-        if (work.values[row] == 0.0) return 0
-        val value = basisQuotient(work.values[row], pivot)
-        for (k in indices.indices) {
-            val i = indices[k]
-            if (i != row) work.set(i, basisFinite(work.values[i] - basisProduct(values[k], value)))
-        }
-        work.set(row, value)
-        return indices.size.toLong()
-    }
-
-    fun transpose(work: BasisWorkspace): Long {
-        var value = work.values[row]
-        for (k in indices.indices) {
-            val i = indices[k]
-            if (i != row) value = basisFinite(value - basisProduct(values[k], work.values[i]))
-        }
-        work.set(row, basisQuotient(value, pivot))
-        return indices.size.toLong()
-    }
+    val upperTranspose = HyperSparseSolve(ft.transpose, lower = true, unitDiagonal = false, threshold)
 }

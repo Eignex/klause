@@ -5,6 +5,7 @@ import com.eignex.koblas.sparse.basis.IndexedVector
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
@@ -81,5 +82,34 @@ class HyperSparseSolveTest {
         assertEquals(0, report.reachEntries)
         assertEquals(10, report.pivotVisits)
         assertEquals(1, work.count)
+    }
+
+    @Test
+    fun `checked scatter failures preserve caller vectors and recover on the next solve`() {
+        for ((coefficient, rhs) in listOf(1e200 to 1e200, 1e-200 to 1e-200)) {
+            val matrix = SparseMatrix.ofColumns(
+                2,
+                2,
+                listOf(listOf(0 to 1.0), listOf(0 to coefficient, 1 to 1.0)),
+            )
+            val solver = KotlinBasisSolver(matrix)
+            assertTrue(solver.refactorize(intArrayOf(0, 1)))
+            for (transpose in listOf(false, true)) {
+                val vector = IndexedVector(2).also { it.store(if (transpose) 0 else 1, rhs) }
+                val before = vector.toDoubleArray()
+
+                assertFailsWith<ArithmeticException> {
+                    if (transpose) solver.btran(vector, 0.0) else solver.ftran(vector, 0.0)
+                }
+
+                assertContentEquals(before, vector.toDoubleArray())
+                assertEquals(1, vector.count)
+                vector.unit(if (transpose) 1 else 0)
+                if (transpose) solver.btran(vector, 0.0) else solver.ftran(vector, 0.0)
+                assertEquals(1.0, vector[if (transpose) 1 else 0])
+                assertEquals(1, vector.count)
+            }
+            solver.close()
+        }
     }
 }
