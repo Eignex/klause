@@ -88,6 +88,10 @@ internal interface LpSolver : AutoCloseable {
      *  and certify; null unless the last [solve] returned null on infeasibility. */
     val infeasibleRay: DoubleArray?
 
+    /** Optional structural recession candidate in original coordinates. Null means unsupported or
+     * unavailable; unboundedness also requires an independently checked feasible point. */
+    val recessionDirection: DoubleArray? get() = null
+
     /** The dual-unbounded basis behind [infeasibleRay], for the exact ray solve that a model with an
      *  unbounded column needs. Null on an engine that keeps no basis; certification then falls back to
      *  rounding [infeasibleRay]. */
@@ -175,15 +179,16 @@ internal interface LpSolver : AutoCloseable {
  * component engine cannot accidentally hide the certification routes from its consumers.
  */
 internal interface ComponentLpSolverCapability : LpSolver {
-    fun exactLowerBound(
+    fun exactBound(
         observer: LpCertificationObserver? = null,
         policy: LpCertificationPolicy = ProductionLpCertificationPolicy,
-    ): Long?
+    ): CertifiedLpBound?
 
-    fun exactBasisFeasible(
+    fun exactWitness(
         observer: LpCertificationObserver? = null,
         policy: LpCertificationPolicy = ProductionLpCertificationPolicy,
-    ): Boolean
+    ): ExactLpWitness?
+
 }
 
 /**
@@ -261,7 +266,7 @@ internal fun newLpSolver(
  * budget the solve itself — both simplex-specific, so this never decomposes.
  *
  * [iterationLimit] and [workLimit] bound the dual solve, each 0 leaving it to the engine; a truncated
- * dual iterate still carries a valid bound. [trackDegeneracy] turns on the dual-degeneracy measurement
+ * dual iterate supplies only a candidate to certify against the true objective. [trackDegeneracy] turns on the dual-degeneracy measurement
  * an adaptive budget reads back.
  */
 internal fun newTableauCutSolver(

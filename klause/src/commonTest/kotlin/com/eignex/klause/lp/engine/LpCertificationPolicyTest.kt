@@ -115,8 +115,8 @@ class LpCertificationPolicyTest {
         val rejectedAgain = solveAndCertify(model, context = LpSolveContext(certificationPolicy = decline))
 
         assertEquals(LpVerdict.INDETERMINATE, rejected.verdict)
-        assertEquals(LpVerdict.OPTIMAL, accepted.verdict)
-        assertEquals(2L, accepted.exactLowerBound)
+        assertEquals(LpVerdict.ATTAINED_OPTIMUM, accepted.verdict)
+        assertEquals(2L, accepted.integerObjectiveLowerBound)
         assertEquals(LpVerdict.INDETERMINATE, rejectedAgain.verdict)
     }
 

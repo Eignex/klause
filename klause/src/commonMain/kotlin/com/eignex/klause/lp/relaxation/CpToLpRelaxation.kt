@@ -46,6 +46,7 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.LpRoute
 import com.eignex.klause.solver.result.LpStatsSink
+import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.EmptyDoubleArray
 import com.eignex.klause.util.EmptyIntArray
@@ -272,7 +273,7 @@ private class SampleDomains(private val sample: Sample) : RelaxationDomains {
 /**
  * The certified feasibility verdict of the LP-only continuous relaxation at a full-assignment leaf
  * [sample], with every discrete variable pinned to its assigned value so the LP decides only the
- * continuous columns. [LpVerdict.OPTIMAL] means the reals have a feasible completion — the leaf is a
+ * continuous columns. [LpVerdict.FEASIBLE] means the reals have a feasible completion — the leaf is a
  * genuine solution; [LpVerdict.INFEASIBLE] (exact Farkas) means none exists — the leaf must be rejected;
  * [LpVerdict.INDETERMINATE] means neither could be certified within the 128-bit budget, so the leaf's
  * status is unknown and the terminal verdict must degrade to `unknown` rather than claim UNSAT/SAT.
@@ -302,23 +303,27 @@ internal fun leafRealFeasibility(
         context = context,
     )
     certified.float?.let { sink?.observeComponentSplit(it.blocks) }
-    if (certified.verdict != LpVerdict.OPTIMAL) return LeafRealResult(certified.verdict, EmptyDoubleArray)
-    val primal = certified.exactPrimal ?: certified.float?.primal
-        ?: return LeafRealResult(LpVerdict.INDETERMINATE, EmptyDoubleArray)
+    if (certified.verdict == LpVerdict.INFEASIBLE) return LeafRealResult(LpVerdict.INFEASIBLE, EmptyDoubleArray)
+    val primal = certified.exactPrimal ?: return LeafRealResult(LpVerdict.INDETERMINATE, EmptyDoubleArray)
     // Read each continuous column's solved value back onto its real variable (see [LpRelaxation.colRealId]);
     // a split (lower-unbounded) variable accumulates x⁺ − x⁻ across its two columns.
-    val reals = DoubleArray(problem.numRealVars)
+    val exactReals = MutableList(problem.numRealVars) { BigFraction.ZERO }
     val colRealId = relaxation.colRealId
     for (col in colRealId.indices) {
         val r = colRealId[col]
-        if (r >= 0 && col < primal.size) reals[r] += relaxation.colRealSign[col] * primal[col]
+        if (r >= 0 && col < primal.size) exactReals[r] +=
+            BigFraction.ofLong(relaxation.colRealSign[col].toLong()) * primal[col]
     }
-    return LeafRealResult(LpVerdict.OPTIMAL, reals)
+    return LeafRealResult(certified.verdict, DoubleArray(exactReals.size) { exactReals[it].toDouble() }, exactReals)
 }
 
-/** The residual-LP verdict at a leaf plus, on [LpVerdict.OPTIMAL], the continuous variables' solved
+/** The residual-LP verdict at a leaf plus, on [LpVerdict.FEASIBLE], the continuous variables' solved
  *  values (indexed by real var id) that complete the discrete assignment into a full solution. */
-internal class LeafRealResult(val verdict: LpVerdict, val reals: DoubleArray)
+internal class LeafRealResult(
+    val verdict: LpVerdict,
+    val reals: DoubleArray,
+    val exactReals: List<BigFraction>? = null,
+)
 
 /**
  * Walks `Problem.factors` and emits an [LpModel] relaxation for the LP-emittable factor types,

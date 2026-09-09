@@ -6,7 +6,7 @@ import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.lp.engine.LpVerdict
+import com.eignex.klause.lp.engine.FloatLpStatus
 import com.eignex.klause.lp.engine.solveLp
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.objective.LinearObjective
@@ -32,7 +32,7 @@ class CpToLpRelaxationDiffnTest {
         val obj = LinearObjective(intCoefficients = LongArray(p.numIntVars) { if (it == lVar) 1L else 0L })
         val r = CpToLpRelaxation(p, obj, diffn = diffn).build(PropagationSession(p))
         val sol = solveLp(r.model)
-        assertEquals(LpVerdict.OPTIMAL, sol.status)
+        assertEquals(FloatLpStatus.OPTIMAL, sol.status)
         return sol.objectiveValue
     }
 

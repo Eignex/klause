@@ -28,6 +28,7 @@ import com.eignex.klause.lp.engine.Basis
 import com.eignex.klause.lp.engine.Cut
 import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.lp.engine.LpSolver
+import com.eignex.klause.lp.engine.LpCounterResults
 import com.eignex.klause.lp.engine.LpVerdict
 import com.eignex.klause.lp.engine.PersistentLpSolver
 import com.eignex.klause.lp.engine.newPersistentLpSolver
@@ -43,6 +44,7 @@ import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.LpRoute
 import com.eignex.klause.solver.result.SolveStatsSink
+import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.EmptyDoubleArray
 import com.eignex.klause.util.EmptyIntArray
@@ -477,6 +479,8 @@ internal class LpEngine(
         return relaxer.build(session)
     }
 
+    internal val lpCounterResults = LpCounterResults()
+
     // Pin-fingerprint cache for the residual real relaxation (realResidual plans, no integer columns).
     private var residualCacheKey: IntArray? = null
     private var residualCache: LpRelaxation? = null
@@ -546,7 +550,7 @@ internal class LpEngine(
      * [session] — the strict-aware decider with the
      * rows premise-cited, so an [LpVerdict.INFEASIBLE] leaf also derives a theory lemma over the
      * activating literals (a Farkas-ray clause when the certificate carries an integer ray, else the
-     * active rows' premises) and stashes it for [lastBackjump]. On [LpVerdict.OPTIMAL] the returned
+     * active rows' premises) and stashes it for [lastBackjump]. On [LpVerdict.FEASIBLE] the returned
      * reals complete the assignment into a full solution.
      */
     fun leafCertify(session: PropagationSession): LeafRealResult {
@@ -556,25 +560,28 @@ internal class LpEngine(
         val relaxer = lpRelaxer ?: return LeafRealResult(LpVerdict.INDETERMINATE, EmptyDoubleArray)
         val relaxation = nodeRelaxation(relaxer, session)
         val model = relaxation.model
-        if (model.n == 0) return LeafRealResult(LpVerdict.OPTIMAL, DoubleArray(problem.numRealVars))
         val certified = solveAndCertify(
             model,
             cancellation = params.cancellation,
             componentSplit = params.lpPlan.componentSplit,
             observer = sink.lp.certificationObserver(LpRoute.STANDALONE),
             context = solveContext,
+            counterResults = lpCounterResults,
         )
         certified.float?.let { sink.lp.observeComponentSplit(it.blocks) }
         return when (certified.verdict) {
-            LpVerdict.OPTIMAL -> {
-                val primal = certified.exactPrimal ?: certified.float?.primal
+            LpVerdict.FEASIBLE, LpVerdict.ATTAINED_OPTIMUM, LpVerdict.UNBOUNDED -> {
+                val primal = certified.exactPrimal
                     ?: return LeafRealResult(LpVerdict.INDETERMINATE, EmptyDoubleArray)
-                val reals = DoubleArray(problem.numRealVars)
+                val exactReals = MutableList(problem.numRealVars) { BigFraction.ZERO }
                 for (col in relaxation.colRealId.indices) {
                     val r = relaxation.colRealId[col]
-                    if (r >= 0 && col < primal.size) reals[r] += relaxation.colRealSign[col] * primal[col]
+                    if (r >= 0 && col < primal.size) exactReals[r] +=
+                        BigFraction.ofLong(relaxation.colRealSign[col].toLong()) * primal[col]
                 }
-                LeafRealResult(LpVerdict.OPTIMAL, reals)
+                LeafRealResult(
+                    certified.verdict, DoubleArray(exactReals.size) { exactReals[it].toDouble() }, exactReals,
+                )
             }
 
             LpVerdict.INFEASIBLE -> {
@@ -589,7 +596,7 @@ internal class LpEngine(
                 LeafRealResult(LpVerdict.INFEASIBLE, EmptyDoubleArray)
             }
 
-            LpVerdict.INDETERMINATE -> LeafRealResult(LpVerdict.INDETERMINATE, EmptyDoubleArray)
+            LpVerdict.INDETERMINATE, LpVerdict.CERTIFIED_BOUND -> LeafRealResult(LpVerdict.INDETERMINATE, EmptyDoubleArray)
         }
     }
 

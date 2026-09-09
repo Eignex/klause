@@ -5,7 +5,7 @@ import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.engine.LpSolution
-import com.eignex.klause.lp.engine.LpVerdict
+import com.eignex.klause.lp.engine.FloatLpStatus
 import com.eignex.klause.lp.engine.solveLp
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.objective.LinearObjective
@@ -48,7 +48,7 @@ class CpToLpRelaxationVarElementTest {
             Triple(IntDomain(6, 9), IntDomain(5, 7), 5.0),
         ).forEach { (a0, a1, optimum) ->
             val sol = minResult(IntDomain(0, 1), a0, a1)
-            assertEquals(LpVerdict.OPTIMAL, sol.status)
+            assertEquals(FloatLpStatus.OPTIMAL, sol.status)
             assertTrue(
                 sol.objectiveValue <= optimum + eps,
                 "UNSOUND: LP min ${sol.objectiveValue} exceeds integer optimum $optimum",
@@ -62,7 +62,7 @@ class CpToLpRelaxationVarElementTest {
         // is exactly the pinned entry's own minimum.
         listOf(0 to 4.0, 1 to 2.0).forEach { (position, expected) ->
             val sol = minResult(IntDomain(position.toLong(), position.toLong()), IntDomain(4, 10), IntDomain(2, 8))
-            assertEquals(LpVerdict.OPTIMAL, sol.status, "idx=$position: status")
+            assertEquals(FloatLpStatus.OPTIMAL, sol.status, "idx=$position: status")
             assertEquals(expected, sol.objectiveValue, eps, "idx=$position: LP min is arr[$position]'s minimum")
         }
     }

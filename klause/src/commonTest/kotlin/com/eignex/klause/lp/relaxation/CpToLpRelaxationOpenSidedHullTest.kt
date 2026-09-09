@@ -9,7 +9,7 @@ import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.bounding.LpPlan
-import com.eignex.klause.lp.engine.LpVerdict
+import com.eignex.klause.lp.engine.FloatLpStatus
 import com.eignex.klause.lp.engine.solveLp
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.objective.LinearObjective
@@ -44,7 +44,7 @@ class CpToLpRelaxationOpenSidedHullTest {
         )
         val obj = LinearObjective(intCoefficients = longArrayOf(0L, 0L, -1L)) // maximize result
         val sol = solveLp(CpToLpRelaxation(p, obj, productMcCormick = true).build(RootDomains(p)).model)
-        assertEquals(LpVerdict.OPTIMAL, sol.status)
+        assertEquals(FloatLpStatus.OPTIMAL, sol.status)
         assertTrue(-sol.objectiveValue >= 100.0 - eps, "UNSOUND: LP max ${-sol.objectiveValue} below result = 100")
     }
 
@@ -64,7 +64,7 @@ class CpToLpRelaxationOpenSidedHullTest {
         )
         val obj = LinearObjective(intCoefficients = longArrayOf(0L, -1L)) // maximize result
         val sol = solveLp(CpToLpRelaxation(p, obj, elementHull = true).build(RootDomains(p)).model)
-        assertEquals(LpVerdict.OPTIMAL, sol.status)
+        assertEquals(FloatLpStatus.OPTIMAL, sol.status)
         assertTrue(-sol.objectiveValue >= 9.0 - eps, "UNSOUND: LP max ${-sol.objectiveValue} below arr[2] = 9")
     }
 
@@ -81,7 +81,7 @@ class CpToLpRelaxationOpenSidedHullTest {
         )
         val obj = LinearObjective(intCoefficients = longArrayOf(1L, 0L)) // minimize x0
         val sol = solveLp(CpToLpRelaxation(p, obj, tableHull = true).build(RootDomains(p)).model)
-        assertEquals(LpVerdict.OPTIMAL, sol.status)
+        assertEquals(FloatLpStatus.OPTIMAL, sol.status)
         assertTrue(sol.objectiveValue <= eps, "UNSOUND: LP min ${sol.objectiveValue} above the tuple's x0 = 0")
     }
 

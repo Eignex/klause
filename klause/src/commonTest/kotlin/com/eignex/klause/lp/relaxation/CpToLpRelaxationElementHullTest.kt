@@ -5,7 +5,7 @@ import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.engine.LpSolution
-import com.eignex.klause.lp.engine.LpVerdict
+import com.eignex.klause.lp.engine.FloatLpStatus
 import com.eignex.klause.lp.engine.solveLp
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.objective.LinearObjective
@@ -65,7 +65,7 @@ class CpToLpRelaxationElementHullTest {
         )
         val (sol, r) = solve(p, LinearObjective(intCoefficients = longArrayOf(0L, 1L)))
 
-        assertEquals(LpVerdict.OPTIMAL, sol.status)
+        assertEquals(FloatLpStatus.OPTIMAL, sol.status)
         assertEquals(3.0, sol.objectiveValue, eps)
         assertEquals(3.0, sol.primal(intCol(r, 1)), eps)
     }
@@ -83,7 +83,7 @@ class CpToLpRelaxationElementHullTest {
         )
         val (sol, _) = solve(p, LinearObjective(intCoefficients = longArrayOf(0L, 1L)))
 
-        assertEquals(LpVerdict.OPTIMAL, sol.status)
+        assertEquals(FloatLpStatus.OPTIMAL, sol.status)
         assertEquals(5.0, sol.objectiveValue, eps)
     }
 
@@ -100,7 +100,7 @@ class CpToLpRelaxationElementHullTest {
         // maximize result <=> minimize -result; hull caps it at the largest entry 9.
         val (sol, _) = solve(p, LinearObjective(intCoefficients = longArrayOf(0L, -1L)))
 
-        assertEquals(LpVerdict.OPTIMAL, sol.status)
+        assertEquals(FloatLpStatus.OPTIMAL, sol.status)
         assertEquals(-9.0, sol.objectiveValue, eps)
     }
 

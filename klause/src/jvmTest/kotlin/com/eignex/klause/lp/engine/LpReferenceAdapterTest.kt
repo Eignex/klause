@@ -30,8 +30,8 @@ class LpReferenceAdapterTest {
         val certifiedFeasible = solveAndCertify(feasible)
         val referenceBound = assertIs<LpReferenceObjective.Bound>(referenceFeasible.objective)
 
-        assertEquals(LpVerdict.OPTIMAL, certifiedFeasible.verdict)
-        assertEquals(3L, certifiedFeasible.exactLowerBound)
+        assertEquals(LpVerdict.ATTAINED_OPTIMUM, certifiedFeasible.verdict)
+        assertEquals(3L, certifiedFeasible.integerObjectiveLowerBound)
         assertEquals(BigFraction.ofLong(3L), referenceBound.lower)
         assertTrue(referenceBound.attained)
         assertEquals(LpVerdict.INFEASIBLE, solveAndCertify(infeasible).verdict)
@@ -49,7 +49,7 @@ class LpReferenceAdapterTest {
         val certified = solveAndCertify(model)
         val referenceBound = assertIs<LpReferenceObjective.Bound>(reference.objective)
 
-        assertEquals(LpVerdict.OPTIMAL, certified.verdict)
+        assertEquals(LpVerdict.ATTAINED_OPTIMUM, certified.verdict)
         assertEquals(
             referenceBound.lower.toDouble(),
             checkNotNull(certified.float).objective,
@@ -105,7 +105,7 @@ class LpReferenceAdapterTest {
         val reference = assertIs<LpReferenceResult.Feasible>(LpReferenceAdapter().solve(model))
         val referenceBound = assertIs<LpReferenceObjective.Bound>(reference.objective)
 
-        assertEquals(LpVerdict.OPTIMAL, solveAndCertify(model).verdict)
+        assertEquals(LpVerdict.FEASIBLE, solveAndCertify(model).verdict)
         assertEquals(BigFraction.ZERO, referenceBound.lower)
         assertFalse(referenceBound.attained)
         assertTrue(reference.witness.single() > BigFraction.ZERO)
@@ -253,7 +253,7 @@ class LpReferenceAdapterTest {
             .filter { name -> Regex("\\b$name\\b").containsMatchIn(adapter) }
             .toSet()
 
-        assertTrue("toVerdict" in engineNames)
+        assertTrue("certifyLpResult" in engineNames)
         assertFalse("RationalFeasibility" in engineNames)
         assertEquals(setOf("LpModel"), referencedEngineNames)
     }

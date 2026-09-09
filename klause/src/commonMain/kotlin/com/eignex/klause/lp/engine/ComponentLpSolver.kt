@@ -1,7 +1,7 @@
 package com.eignex.klause.lp.engine
 
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.Int128
+import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.IntArrayList
 
 /**
@@ -28,6 +28,7 @@ internal class ComponentLpSolver(
     private val solvers: List<LpSolver>,
     private val isolated: IntArray,
 ) : ComponentLpSolverCapability {
+    private val certificationKey = exactLpStateKey(model)
     private var blockResults: List<FloatLpResult>? = null
     private var metrics = LpSolveMetrics()
 
@@ -111,53 +112,49 @@ internal class ComponentLpSolver(
             luMaxFill = maxFill,
             luMaxDensity = maxDensity,
             blocks = parts.size,
+            optimal = results.all { it.optimal },
         )
     }
 
-    /** Exact lower bound assembled from the independently certified block objectives. */
-    override fun exactLowerBound(observer: LpCertificationObserver?, policy: LpCertificationPolicy): Long? {
-        if (model.hasContinuous) return null
+    override fun exactBound(observer: LpCertificationObserver?, policy: LpCertificationPolicy): CertifiedLpBound? {
+        val sourceKey = certificationKey ?: return null
+        if (exactLpStateKey(model)?.contentEquals(sourceKey) != true) return null
         val results = blockResults ?: return null
-        val certificates = ArrayList<IntegerCertificate>(parts.size)
+        var value = model.exactConstant()
         for (index in parts.indices) {
-            val certificate = policy.acceptNullable(
-                LpCertifier.INTEGER,
-                integerCertify(parts[index].model, results[index].duals, observer = observer),
-            ) ?: return null
-            certificates.add(certificate)
+            val bound = certifyLpBound(parts[index].model, results[index].duals, observer, policy) ?: return null
+            value += bound.value - parts[index].model.exactConstant()
         }
-        var scaleBits = 0
-        for (certificate in certificates) scaleBits = maxOf(scaleBits, certificate.objectiveScaleBits)
-        val numerator = Int128()
-        for (certificate in certificates) {
-            val part = certificate.objectiveNumerator()
-            part.shiftLeft(scaleBits - certificate.objectiveScaleBits)
-            numerator.add(part)
-        }
-        val isolatedObjective = Int128()
         for (column in isolated) {
-            val cost = model.cost[column]
-            if (cost < 0L) {
-                if (!model.hasFiniteUpper(column)) return null
-                isolatedObjective.addProduct(cost, model.upper[column])
-            }
-            isolatedObjective.addProduct(cost, model.loShift[column])
+            val cost = model.exactCost(column)
+            if (cost.signum() < 0) {
+                if (!model.hasFiniteUpper(column) || model.probeClampedHi[column]) return null
+                value += cost * model.exactUpper(column)
+            } else if (cost.signum() > 0 && model.probeClampedLo[column]) return null
         }
-        isolatedObjective.shiftLeft(scaleBits)
-        numerator.add(isolatedObjective)
-        return numerator.ceilDivPow2(scaleBits)
+        return CertifiedLpBound(value)
     }
 
-    /** Whether every independently solved continuous block has an exact feasible basis. */
-    override fun exactBasisFeasible(observer: LpCertificationObserver?, policy: LpCertificationPolicy): Boolean {
-        val results = blockResults ?: return false
-        return parts.indices.all {
-            policy.acceptBoolean(
-                LpCertifier.EXACT_BASIS,
-                exactBasisFeasible(parts[it].model, results[it].basis, observer) == true,
-            )
+    override fun exactWitness(observer: LpCertificationObserver?, policy: LpCertificationPolicy): ExactLpWitness? {
+        val results = blockResults ?: return null
+        val point = MutableList(model.n) { model.exactShift(it) }
+        for (index in parts.indices) {
+            val part = parts[index]
+            val witness = policy.acceptNullable(
+                LpCertifier.EXACT_BASIS, exactBasisWitness(part.model, results[index].basis, observer),
+            ) ?: policy.acceptNullable(
+                LpCertifier.EXACT_POINT, exactPointWitness(part.model, results[index].primal, observer),
+            ) ?: return null
+            for (column in part.cols.indices) point[part.cols[column]] = witness.primal[column]
         }
+        for (column in isolated) {
+            if (model.exactCost(column).signum() < 0 && model.hasFiniteUpper(column)) {
+                point[column] += model.exactUpper(column)
+            }
+        }
+        return checkedLpWitness(model, point)
     }
+
 }
 
 /**

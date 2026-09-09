@@ -11,6 +11,7 @@ import com.eignex.klause.lp.engine.newLpSolver
 import com.eignex.klause.solver.result.LpStatsSink
 import kotlin.math.abs
 import kotlin.random.Random
+import com.eignex.klause.simplex.exact.BigFraction
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -51,7 +52,7 @@ class LpComponentsTest {
 
         val result = solveAndCertify(b.build(Sense.MINIMIZE), observer = sink.certificationObserver())
 
-        assertEquals(LpVerdict.OPTIMAL, result.verdict)
+        assertEquals(LpVerdict.ATTAINED_OPTIMUM, result.verdict)
         assertEquals(1.0, sink.snapshot().componentPasses.sum)
     }
 
@@ -175,8 +176,8 @@ class LpComponentsTest {
         val result = assertNotNull(solver.solve())
 
         assertEquals(null, exactBasisFeasible(model, result.basis))
-        assertTrue(solver.exactBasisFeasible())
-        assertEquals(LpVerdict.OPTIMAL, solveAndCertify(model).verdict)
+        assertNotNull(solver.exactWitness())
+        assertEquals(LpVerdict.ATTAINED_OPTIMUM, solveAndCertify(model).verdict)
     }
 
     @Test
@@ -190,6 +191,56 @@ class LpComponentsTest {
         val solver = assertIs<ComponentLpSolver>(newLpSolver(model))
 
         assertNotNull(solver.solve())
-        assertEquals(1L, solver.exactLowerBound())
+        assertEquals(BigFraction.ONE, solver.exactBound()?.value)
+    }
+
+    @Test
+    fun `an interrupted component cannot promote a mixed proof to an attained optimum`() {
+        val model = LpBuilder().apply {
+            repeat(2) {
+                val x = addVar(0L, 3L, cost = 1L)
+                addRow(intArrayOf(x), longArrayOf(1L), Relation.GE, 1L)
+            }
+        }.build(Sense.MINIMIZE)
+        var index = 0
+        val solver = assertNotNull(componentLpSolverOrNull(model, com.eignex.klause.util.Cancellation.Never, { part, token ->
+            if (index++ == 0) ProductionLpEngineFactory.newGeneralSolver(part, token)
+            else object : LpSolver {
+                override val infeasibleRay: DoubleArray? = null
+                override fun solve(warm: Basis?) = FloatLpResult(
+                    Basis(intArrayOf(1), arrayOf(VarStatus.AT_UPPER, VarStatus.BASIC)),
+                    3.0, doubleArrayOf(0.0), doubleArrayOf(3.0), optimal = false,
+                )
+                override fun solvePrimal(warm: Basis?) = solve(warm)
+            }
+        }))
+
+        solver.use {
+            val hint = assertNotNull(it.solve())
+            assertEquals(false, hint.optimal)
+            val result = certifyLpResult(model, it, hint)
+            assertEquals(LpVerdict.FEASIBLE, result.verdict)
+            assertEquals(listOf(BigFraction.ONE, BigFraction.ofLong(3L)), result.exactPrimal)
+            assertEquals(BigFraction.ofLong(4L), result.witness?.objective)
+            assertEquals(BigFraction.ONE, result.lowerBound)
+        }
+    }
+
+    @Test
+    fun `a component bound loses authority when the shared objective changes`() {
+        val model = LpBuilder().apply {
+            repeat(2) {
+                val x = addVar(0L, 3L, cost = 1L)
+                addRow(intArrayOf(x), longArrayOf(1L), Relation.GE, 1L)
+            }
+        }.build(Sense.MINIMIZE)
+
+        assertIs<ComponentLpSolver>(newLpSolver(model)).use { solver ->
+            assertNotNull(solver.solve())
+            assertEquals(BigFraction.ofLong(2L), solver.exactBound()?.value)
+            model.cost[0] = -1L
+            assertEquals(null, solver.exactBound())
+        }
+        assertEquals(BigFraction.ofLong(-2L), solveAndCertify(model).lowerBound)
     }
 }

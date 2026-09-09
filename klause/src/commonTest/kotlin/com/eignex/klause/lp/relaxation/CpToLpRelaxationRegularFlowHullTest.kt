@@ -4,7 +4,7 @@ import com.eignex.klause.factor.table.Regular
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.lp.engine.LpVerdict
+import com.eignex.klause.lp.engine.FloatLpStatus
 import com.eignex.klause.lp.engine.solveLp
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.objective.LinearObjective
@@ -84,7 +84,7 @@ class CpToLpRelaxationRegularFlowHullTest {
         val obj = LinearObjective(intCoefficients = longArrayOf(1, 1, 1)) // minimize Σ seq
         val r = CpToLpRelaxation(p, obj, regularHull = true).build(PropagationSession(p))
         val sol = solveLp(r.model)
-        assertEquals(LpVerdict.OPTIMAL, sol.status)
+        assertEquals(FloatLpStatus.OPTIMAL, sol.status)
         // Cheapest accepted string is 1,1,1 (zero 2s, even), Σ = 3.
         assertEquals(3.0, sol.objectiveValue, eps)
     }
@@ -142,7 +142,7 @@ class CpToLpRelaxationRegularFlowHullTest {
             val sol = solveLp(r.model)
             val opt = brute ?: return@repeat // no accepting string: the hull is skipped (a relaxation may loosen)
             checked++
-            assertEquals(LpVerdict.OPTIMAL, sol.status, "accepted string exists but LP not optimal")
+            assertEquals(FloatLpStatus.OPTIMAL, sol.status, "accepted string exists but LP not optimal")
             // Integral flow polytope ⇒ the LP optimum equals the true optimum over accepted strings.
             assertEquals(
                 opt.toDouble(),

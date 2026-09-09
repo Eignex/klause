@@ -22,6 +22,8 @@ import com.eignex.klause.lp.bounding.rootLpBoundsNoBake
 import com.eignex.klause.lp.bounding.rootLpInfeasibleNoBake
 import com.eignex.klause.lp.bounding.rootLpRelaxationBound
 import com.eignex.klause.lp.bounding.sparseCertifiedPrune
+import com.eignex.klause.lp.engine.CertifiedLpBound
+import com.eignex.klause.lp.engine.ExactLpWitness
 import com.eignex.klause.lp.engine.Basis
 import com.eignex.klause.lp.engine.ComponentLpSolverCapability
 import com.eignex.klause.lp.engine.Cut
@@ -177,11 +179,11 @@ private class RecordingComponentSolver(
     calls: MutableList<DeclineCall>,
 ) : RecordingSolver(component, calls),
     ComponentLpSolverCapability {
-    override fun exactLowerBound(observer: LpCertificationObserver?, policy: LpCertificationPolicy): Long? =
-        component.exactLowerBound(observer, policy)
+    override fun exactBound(observer: LpCertificationObserver?, policy: LpCertificationPolicy): CertifiedLpBound? =
+        component.exactBound(observer, policy)
 
-    override fun exactBasisFeasible(observer: LpCertificationObserver?, policy: LpCertificationPolicy): Boolean =
-        component.exactBasisFeasible(observer, policy)
+    override fun exactWitness(observer: LpCertificationObserver?, policy: LpCertificationPolicy): ExactLpWitness? =
+        component.exactWitness(observer, policy)
 }
 
 private class RecordingTableauSolver(private val tableau: TableauCutSolver, calls: MutableList<DeclineCall>) :
@@ -325,9 +327,9 @@ class LpDeclineDisciplineTest {
 
         val declined = solveAndCertify(model, componentSplit = false, context = harness.context)
 
-        assertEquals(LpVerdict.OPTIMAL, solveAndCertify(model, componentSplit = false).verdict)
+        assertEquals(LpVerdict.ATTAINED_OPTIMUM, solveAndCertify(model, componentSplit = false).verdict)
         assertEquals(LpVerdict.INDETERMINATE, declined.verdict)
-        assertNull(declined.exactLowerBound)
+        assertNull(declined.integerObjectiveLowerBound)
         assertNull(declined.exactPrimal)
         assertNull(declined.safeLowerBound)
         assertTrue(harness.policy.observedSuccess(LpCertifier.EXACT_BASIS))
@@ -349,10 +351,10 @@ class LpDeclineDisciplineTest {
         val declined = solveAndCertify(model, context = harness.context)
 
         val accepted = solveAndCertify(model)
-        assertEquals(LpVerdict.OPTIMAL, accepted.verdict)
-        assertEquals(3L, accepted.exactLowerBound)
+        assertEquals(LpVerdict.ATTAINED_OPTIMUM, accepted.verdict)
+        assertEquals(3L, accepted.integerObjectiveLowerBound)
         assertEquals(LpVerdict.INDETERMINATE, declined.verdict)
-        assertNull(declined.exactLowerBound)
+        assertNull(declined.integerObjectiveLowerBound)
         assertEquals(2, harness.factory.calls.count { it == DeclineCall.GENERAL })
         assertEquals(1, harness.factory.calls.count { it == DeclineCall.COMPONENT })
         assertEquals(3, harness.factory.calls.count { it == DeclineCall.CLOSE })
@@ -380,7 +382,7 @@ class LpDeclineDisciplineTest {
 
         val leaf = engine.leafCertify(PropagationSession(problem))
 
-        assertEquals(LpVerdict.OPTIMAL, leafRealFeasibility(problem, null, sample).verdict)
+        assertEquals(LpVerdict.ATTAINED_OPTIMUM, leafRealFeasibility(problem, null, sample).verdict)
         assertEquals(LpVerdict.INDETERMINATE, standalone.verdict)
         assertEquals(LpVerdict.INDETERMINATE, leaf.verdict)
         assertTrue(standalone.reals.isEmpty())
@@ -409,9 +411,9 @@ class LpDeclineDisciplineTest {
                     context = harness.context,
                 ).verdict
             ) {
-                LpVerdict.OPTIMAL -> ComponentCheck.Feasible
+                LpVerdict.ATTAINED_OPTIMUM, LpVerdict.FEASIBLE, LpVerdict.UNBOUNDED -> ComponentCheck.Feasible
                 LpVerdict.INFEASIBLE -> ComponentCheck.Infeasible()
-                LpVerdict.INDETERMINATE -> ComponentCheck.Indeterminate
+                LpVerdict.INDETERMINATE, LpVerdict.CERTIFIED_BOUND -> ComponentCheck.Indeterminate
             }
         }
 
@@ -424,7 +426,7 @@ class LpDeclineDisciplineTest {
             sample = Sample(booleanArrayOf(), longArrayOf()),
         )
 
-        assertEquals(LpVerdict.OPTIMAL, accepted.verdict)
+        assertEquals(LpVerdict.ATTAINED_OPTIMUM, accepted.verdict)
         assertEquals(TerminationReason.Unsupported, assertIs<SolveResult.Unknown>(declined).reason)
         assertTrue(harness.factory.calls.contains(DeclineCall.GENERAL))
         assertTrue(harness.policy.observedSuccess(LpCertifier.EXACT_BASIS))
@@ -654,8 +656,8 @@ class LpDeclineDisciplineTest {
         val search = source(root, "klause/src/commonMain/kotlin/com/eignex/klause/backtrack/Search.kt")
         val optimize = source(root, "klause/src/commonMain/kotlin/com/eignex/klause/backtrack/ResumableMinimize.kt")
 
-        assertTrue("LpVerdict.INDETERMINATE -> ComponentCheck.Indeterminate" in search)
-        assertTrue("LpVerdict.INDETERMINATE -> {\n                        sawIndeterminateLeaf = true" in optimize)
+        assertTrue("LpVerdict.INDETERMINATE, LpVerdict.CERTIFIED_BOUND -> ComponentCheck.Indeterminate" in search)
+        assertTrue("LpVerdict.INDETERMINATE, LpVerdict.CERTIFIED_BOUND -> {\n                        sawIndeterminateLeaf = true" in optimize)
         assertTrue("sawIndeterminateLeaf -> MinimizeResult.Unknown" in optimize)
     }
 

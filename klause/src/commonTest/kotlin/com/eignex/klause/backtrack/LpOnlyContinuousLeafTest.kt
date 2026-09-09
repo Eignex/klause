@@ -62,7 +62,7 @@ class LpOnlyContinuousLeafTest {
 
         val result = leafRealFeasibility(p, objective = null, sample = Sample(booleanArrayOf(), longArrayOf()))
 
-        assertEquals(LpVerdict.OPTIMAL, result.verdict)
+        assertEquals(LpVerdict.ATTAINED_OPTIMUM, result.verdict)
         assertEquals(9.0, result.reals[0], absoluteTolerance = 1e-9)
     }
 
@@ -79,7 +79,7 @@ class LpOnlyContinuousLeafTest {
             sink = sink,
         )
 
-        assertEquals(LpVerdict.OPTIMAL, result.verdict)
+        assertEquals(LpVerdict.ATTAINED_OPTIMUM, result.verdict)
         val stats = sink.snapshot()
         assertEquals(1.0, stats.standalonePasses.sum)
         assertEquals(0.0, stats.solves.sum)

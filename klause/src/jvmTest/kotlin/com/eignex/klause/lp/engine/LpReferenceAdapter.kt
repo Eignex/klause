@@ -126,6 +126,18 @@ internal class LpReferenceAdapter(
         return data.objective(shifted) + data.objectiveConstant
     }
 
+    fun acceptsExact(model: LpModel, witness: List<BigFraction>, enforcedRows: BooleanArray? = null): Boolean? {
+        if (witness.size != model.n) return false
+        val data = exactData(model, enforcedRows) ?: return null
+        return data.accepts(witness.mapIndexed { column, value -> value - data.shifts[column] })
+    }
+
+    fun exactObjective(model: LpModel, witness: List<BigFraction>, enforcedRows: BooleanArray? = null): BigFraction? {
+        if (witness.size != model.n) return null
+        val data = exactData(model, enforcedRows) ?: return null
+        return data.objective(witness.mapIndexed { column, value -> value - data.shifts[column] }) + data.objectiveConstant
+    }
+
     private fun interrupted(): LpReferenceResult.Declined =
         LpReferenceResult.Declined(LpReferenceDecline.CANCELLED_OR_PIVOT_LIMIT)
 }
