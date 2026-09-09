@@ -47,7 +47,10 @@ class LpOperationTraceTest {
         )
     }
 
-    private fun observedPivotTrace(pivots: Int, factory: ((SparseMatrix) -> BasisSolver)?): List<BasisState> = (1..pivots).map { limit ->
+    private fun observedPivotTrace(
+        pivots: Int,
+        factory: ((SparseMatrix) -> BasisSolver)?,
+    ): List<BasisState> = (1..pivots).map { limit ->
         val solver = RevisedSimplex(
             pivotingModel(), refactorUpdateLimit = 1, iterationLimit = limit, basisSolverFactory = factory,
         )
