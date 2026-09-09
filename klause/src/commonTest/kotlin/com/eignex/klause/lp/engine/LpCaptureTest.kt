@@ -15,9 +15,13 @@ class LpCaptureTest {
     @Test
     fun `fixed capture decline survives zero pivot warm chains and close reuse`() {
         val zero = ExactLpNumber.of(0L)
-        val model = ExactLpModel(listOf(emptyList()), emptyList(),
-            listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(zero)))), emptyList(),
-            ExactLpObjective(listOf(zero)))
+        val model = ExactLpModel(
+            listOf(emptyList()),
+            emptyList(),
+            listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(zero)))),
+            emptyList(),
+            ExactLpObjective(listOf(zero)),
+        )
         val bridge = assertNotNull(ExactLpBasis(emptyList(), listOf(ExactLpStatus.FIXED)).toLegacy(model))
         val solver = newPersistentLpSolver(bridge.model)
         try {
@@ -47,14 +51,29 @@ class LpCaptureTest {
     fun `fixed capture decline survives infeasible and truncated basis exports`() {
         val zero = ExactLpNumber.of(0L)
         for (infeasible in listOf(true, false)) {
-            val model = ExactLpModel(listOf(emptyList(), listOf(ExactLpEntry(0, ExactLpNumber.of(-1L)))),
+            val model = ExactLpModel(
+                listOf(emptyList(), listOf(ExactLpEntry(0, ExactLpNumber.of(-1L)))),
                 listOf(ExactLpNumber.of(-2L)),
-                listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(zero))),
-                    ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(ExactLpNumber.of(if (infeasible) 0L else 3L)))),
-                    ExactLpColumn(ExactLpBounds(ExactLpSide(zero)))), listOf(ExactLpRow()),
-                ExactLpObjective(listOf(zero, ExactLpNumber.of(1L), zero)))
-            val bridge = assertNotNull(ExactLpBasis(listOf(2), listOf(
-                ExactLpStatus.FIXED, ExactLpStatus.AT_LOWER, ExactLpStatus.BASIC)).toLegacy(model))
+                listOf(
+                    ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(zero))),
+                    ExactLpColumn(
+                        ExactLpBounds(ExactLpSide(zero), ExactLpSide(ExactLpNumber.of(if (infeasible) 0L else 3L))),
+                    ),
+                    ExactLpColumn(ExactLpBounds(ExactLpSide(zero))),
+                ),
+                listOf(ExactLpRow()),
+                ExactLpObjective(listOf(zero, ExactLpNumber.of(1L), zero)),
+            )
+            val bridge = assertNotNull(
+                ExactLpBasis(
+                    listOf(2),
+                    listOf(
+                        ExactLpStatus.FIXED,
+                        ExactLpStatus.AT_LOWER,
+                        ExactLpStatus.BASIC,
+                    ),
+                ).toLegacy(model),
+            )
 
             newPersistentLpSolver(bridge.model, iterationLimit = 1).use { solver ->
                 val result = solver.solve(bridge.basis)
@@ -73,9 +92,13 @@ class LpCaptureTest {
     @Test
     fun `fixed bridge declines v1 status capture while lower declaration roundtrips`() {
         val zero = ExactLpNumber.of(0L)
-        val model = ExactLpModel(listOf(emptyList()), emptyList(),
-            listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(zero)))), emptyList(),
-            ExactLpObjective(listOf(zero)))
+        val model = ExactLpModel(
+            listOf(emptyList()),
+            emptyList(),
+            listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(zero)))),
+            emptyList(),
+            ExactLpObjective(listOf(zero)),
+        )
         val fixed = assertNotNull(ExactLpBasis(emptyList(), listOf(ExactLpStatus.FIXED)).toLegacy(model))
         val lower = assertNotNull(ExactLpBasis(emptyList(), listOf(ExactLpStatus.AT_LOWER)).toLegacy(model))
 
@@ -89,20 +112,34 @@ class LpCaptureTest {
     @Test
     fun `general authority is rejected before capture v1 projection`() {
         val zero = ExactLpNumber.of(0L)
-        val model = ExactLpModel(listOf(emptyList()), emptyList(),
+        val model = ExactLpModel(
+            listOf(emptyList()),
+            emptyList(),
             listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(ExactLpNumber.ofIeee(0.1))))),
-            emptyList(), ExactLpObjective(listOf(zero)))
+            emptyList(),
+            ExactLpObjective(listOf(zero)),
+        )
 
         assertFailsWith<IllegalArgumentException> { LpCapturedModel.capture(model) }
-        assertFailsWith<IllegalArgumentException> { LpCapture.capture(model, LpReplaySettings("unsupported", 0L), emptyList()) }
+        assertFailsWith<IllegalArgumentException> {
+            LpCapture.capture(
+                model,
+                LpReplaySettings("unsupported", 0L),
+                emptyList(),
+            )
+        }
     }
 
     @Test
     fun `checked integral bridge uses unchanged capture v1 bytes`() {
         val zero = ExactLpNumber.of(0L)
-        val model = ExactLpModel(listOf(emptyList()), emptyList(),
+        val model = ExactLpModel(
+            listOf(emptyList()),
+            emptyList(),
             listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(ExactLpNumber.of(4L))))),
-            emptyList(), ExactLpObjective(listOf(ExactLpNumber.of(3L))))
+            emptyList(),
+            ExactLpObjective(listOf(ExactLpNumber.of(3L))),
+        )
         val legacy = assertNotNull(model.toLegacy())
         val settings = LpReplaySettings("integral", 0L)
 

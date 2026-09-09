@@ -16,10 +16,21 @@ class LpModelTest {
     fun `IEEE recenter cannot erase source authority by deriving integral values`() {
         val zero = ExactLpNumber.of(0L)
         val one = ExactLpNumber.of(1L)
-        val model = ExactLpModel(listOf(listOf(ExactLpEntry(0, one))), listOf(ExactLpNumber.ofIeee(2.0)),
-            listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(ExactLpNumber.ofIeee(1.0)),
-                ExactLpSide(ExactLpNumber.ofIeee(3.0)))), ExactLpColumn(ExactLpBounds(ExactLpSide(zero)))),
-            listOf(ExactLpRow()), ExactLpObjective(listOf(one, zero), ExactLpNumber.ofIeee(0.0)))
+        val model = ExactLpModel(
+            listOf(listOf(ExactLpEntry(0, one))),
+            listOf(ExactLpNumber.ofIeee(2.0)),
+            listOf(
+                ExactLpColumn(
+                    ExactLpBounds(
+                        ExactLpSide(ExactLpNumber.ofIeee(1.0)),
+                        ExactLpSide(ExactLpNumber.ofIeee(3.0)),
+                    ),
+                ),
+                ExactLpColumn(ExactLpBounds(ExactLpSide(zero))),
+            ),
+            listOf(ExactLpRow()),
+            ExactLpObjective(listOf(one, zero), ExactLpNumber.ofIeee(0.0)),
+        )
 
         assertFailsWith<IllegalArgumentException> { model.recentered(listOf(one)) }
         assertTrue(model.sameAuthority(model.recentered(listOf(zero))))
@@ -32,9 +43,16 @@ class LpModelTest {
     fun `integral recenter can produce a lossless normalized bridge`() {
         val zero = ExactLpNumber.of(0L)
         val one = ExactLpNumber.of(1L)
-        val model = ExactLpModel(listOf(listOf(ExactLpEntry(0, one))), listOf(ExactLpNumber.of(2L)),
-            listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(one), ExactLpSide(ExactLpNumber.of(3L)))),
-                ExactLpColumn(ExactLpBounds(ExactLpSide(zero)))), listOf(ExactLpRow()), ExactLpObjective(listOf(one, zero)))
+        val model = ExactLpModel(
+            listOf(listOf(ExactLpEntry(0, one))),
+            listOf(ExactLpNumber.of(2L)),
+            listOf(
+                ExactLpColumn(ExactLpBounds(ExactLpSide(one), ExactLpSide(ExactLpNumber.of(3L)))),
+                ExactLpColumn(ExactLpBounds(ExactLpSide(zero))),
+            ),
+            listOf(ExactLpRow()),
+            ExactLpObjective(listOf(one, zero)),
+        )
 
         val recentered = model.recentered(listOf(one))
         val legacy = assertNotNull(recentered.toLegacy())
@@ -48,11 +66,23 @@ class LpModelTest {
     @Test
     fun `adjacent integral authority retains distinct legacy keys`() {
         val zero = ExactLpNumber.of(0L)
-        val model = ExactLpModel(listOf(emptyList()), emptyList(),
+        val model = ExactLpModel(
+            listOf(emptyList()),
+            emptyList(),
             listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(ExactLpNumber.of(9007199254740992L))))),
-            emptyList(), ExactLpObjective(listOf(zero)))
-        val next = model.copy(columns = listOf(model.column(0).copy(bounds = ExactLpBounds(
-            ExactLpSide(zero), ExactLpSide(ExactLpNumber.of(9007199254740993L))))))
+            emptyList(),
+            ExactLpObjective(listOf(zero)),
+        )
+        val next = model.copy(
+            columns = listOf(
+                model.column(0).copy(
+                    bounds = ExactLpBounds(
+                        ExactLpSide(zero),
+                        ExactLpSide(ExactLpNumber.of(9007199254740993L)),
+                    ),
+                ),
+            ),
+        )
 
         assertFalse(assertNotNull(exactLpStateKey(model)).contentEquals(assertNotNull(exactLpStateKey(next))))
         assertFalse(model.sameAuthority(next))
@@ -69,10 +99,18 @@ class LpModelTest {
                 val model = ExactLpModel(
                     listOf(listOf(ExactLpEntry(0, if (slot == 0) value else ExactLpNumber.of(1L)))),
                     listOf(if (slot == 1) value else zero),
-                    listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(if (slot == 2) value else zero)),
-                        if (slot == 3) value else zero), ExactLpColumn(ExactLpBounds(ExactLpSide(zero)))),
-                    listOf(ExactLpRow()), ExactLpObjective(listOf(if (slot == 4) value else zero, zero),
-                        if (slot == 5) value else zero),
+                    listOf(
+                        ExactLpColumn(
+                            ExactLpBounds(ExactLpSide(zero), ExactLpSide(if (slot == 2) value else zero)),
+                            if (slot == 3) value else zero,
+                        ),
+                        ExactLpColumn(ExactLpBounds(ExactLpSide(zero))),
+                    ),
+                    listOf(ExactLpRow()),
+                    ExactLpObjective(
+                        listOf(if (slot == 4) value else zero, zero),
+                        if (slot == 5) value else zero,
+                    ),
                 )
 
                 assertNull(model.toLegacy(), "slot $slot")
@@ -85,9 +123,13 @@ class LpModelTest {
     @Test
     fun `source metadata and objective units participate in exact authority`() {
         val zero = ExactLpNumber.of(0L)
-        val model = ExactLpModel(listOf(emptyList()), listOf(zero),
-            listOf(ExactLpColumn(ExactLpBounds()), ExactLpColumn(ExactLpBounds())), listOf(ExactLpRow()),
-            ExactLpObjective(listOf(zero, zero)))
+        val model = ExactLpModel(
+            listOf(emptyList()),
+            listOf(zero),
+            listOf(ExactLpColumn(ExactLpBounds()), ExactLpColumn(ExactLpBounds())),
+            listOf(ExactLpRow()),
+            ExactLpObjective(listOf(zero, zero)),
+        )
         val variants = listOf(
             model.copy(columns = listOf(model.column(0).copy(tag = 7), model.column(1))),
             model.copy(columns = listOf(model.column(0).copy(integral = false), model.column(1))),
@@ -96,9 +138,13 @@ class LpModelTest {
             model.copy(objective = ExactLpObjective(listOf(zero, zero), scale = ExactLpNumber.of(2L))),
             model.copy(objective = ExactLpObjective(listOf(zero, zero), externalConstant = ExactLpNumber.of(1L))),
             model.copy(objective = ExactLpObjective(listOf(zero, zero), sense = Sense.MAXIMIZE)),
-            ExactLpModel(listOf(emptyList()), listOf(zero),
+            ExactLpModel(
+                listOf(emptyList()),
+                listOf(zero),
                 listOf(model.column(0).copy(origin = ExactLpNumber.ofIeee(-0.0)), model.column(1)),
-                listOf(ExactLpRow()), model.objective),
+                listOf(ExactLpRow()),
+                model.objective,
+            ),
         )
 
         for (variant in variants) assertFalse(model.sameAuthority(variant))
@@ -177,9 +223,11 @@ class LpModelTest {
         for (value in values) {
             val number = ExactLpNumber.of(value)
             val model = ExactLpModel(
-                listOf(listOf(ExactLpEntry(0, number))), listOf(number),
+                listOf(listOf(ExactLpEntry(0, number))),
+                listOf(number),
                 listOf(ExactLpColumn(ExactLpBounds(upper = ExactLpSide(number))), ExactLpColumn(ExactLpBounds())),
-                listOf(ExactLpRow()), ExactLpObjective(listOf(number, ExactLpNumber.of(0L)), number),
+                listOf(ExactLpRow()),
+                ExactLpObjective(listOf(number, ExactLpNumber.of(0L)), number),
             )
 
             val copy = model.copy()
@@ -225,12 +273,20 @@ class LpModelTest {
         val zero = ExactLpNumber.of(0L)
         val third = ExactLpNumber.of(BigFraction.of(BigInteger.ONE, BigInteger.fromInt(3)))
         val model = ExactLpModel(
-            listOf(listOf(ExactLpEntry(0, ExactLpNumber.of(2L)))), listOf(ExactLpNumber.of(10L)),
-            listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(ExactLpNumber.of(9L)))) ,
-                ExactLpColumn(ExactLpBounds(ExactLpSide(zero)))),
+            listOf(listOf(ExactLpEntry(0, ExactLpNumber.of(2L)))),
+            listOf(ExactLpNumber.of(10L)),
+            listOf(
+                ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(ExactLpNumber.of(9L)))),
+                ExactLpColumn(ExactLpBounds(ExactLpSide(zero))),
+            ),
             listOf(ExactLpRow(strict = true)),
-            ExactLpObjective(listOf(ExactLpNumber.of(3L), zero), ExactLpNumber.of(5L), ExactLpNumber.of(2L),
-                ExactLpNumber.of(7L), Sense.MAXIMIZE),
+            ExactLpObjective(
+                listOf(ExactLpNumber.of(3L), zero),
+                ExactLpNumber.of(5L),
+                ExactLpNumber.of(2L),
+                ExactLpNumber.of(7L),
+                Sense.MAXIMIZE,
+            ),
         )
 
         val next = model.recentered(listOf(third))
@@ -255,10 +311,14 @@ class LpModelTest {
         val costs = mutableListOf(ExactLpNumber.of(3L), zero)
         val premises = mutableListOf(ExactLpPremise(4, true, ExactLpNumber.of(9L)))
         val model = ExactLpModel(
-            listOf(entries), rhs,
-            listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(ExactLpNumber.of(4L)))),
-                ExactLpColumn(ExactLpBounds(ExactLpSide(zero)))),
-            listOf(ExactLpRow(global = false, premises = ExactLpPremises(premises))), ExactLpObjective(costs),
+            listOf(entries),
+            rhs,
+            listOf(
+                ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(ExactLpNumber.of(4L)))),
+                ExactLpColumn(ExactLpBounds(ExactLpSide(zero))),
+            ),
+            listOf(ExactLpRow(global = false, premises = ExactLpPremises(premises))),
+            ExactLpObjective(costs),
         )
         val copy = model.copy()
         val legacy = assertNotNull(model.toLegacy())
@@ -282,9 +342,16 @@ class LpModelTest {
     fun `bridge preserves an independent model constant through integral rebind`() {
         val zero = ExactLpNumber.of(0L)
         val model = ExactLpModel(
-            listOf(emptyList()), emptyList(),
-            listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(ExactLpNumber.of(4L))), ExactLpNumber.of(2L))),
-            emptyList(), ExactLpObjective(listOf(ExactLpNumber.of(3L)), ExactLpNumber.of(11L)),
+            listOf(emptyList()),
+            emptyList(),
+            listOf(
+                ExactLpColumn(
+                    ExactLpBounds(ExactLpSide(zero), ExactLpSide(ExactLpNumber.of(4L))),
+                    ExactLpNumber.of(2L),
+                ),
+            ),
+            emptyList(),
+            ExactLpObjective(listOf(ExactLpNumber.of(3L)), ExactLpNumber.of(11L)),
         )
 
         val rebound = assertNotNull(model.toLegacy()).rebind(longArrayOf(3L), longArrayOf(5L))
