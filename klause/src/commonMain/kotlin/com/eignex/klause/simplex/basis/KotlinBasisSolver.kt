@@ -124,7 +124,7 @@ internal class KotlinBasisSolver(
         }
         var accepted: LuBuildResult.Built = initial
         var installedReport = accepted.report
-        proposedOrder = accepted.factors.symbolic
+        proposedOrder = accepted.factors.symbolic.takeIf { reusePivotOrder }
         for (requestedSlot in basicIndex.indices) {
             val entering = basicIndex[requestedSlot]
             for (offset in repairedUnits.indices) {
@@ -141,7 +141,7 @@ internal class KotlinBasisSolver(
                     trialUnits.copyInto(repairedUnits)
                     accepted = trial
                     installedReport = trial.report
-                    proposedOrder = trial.factors.symbolic
+                    proposedOrder = trial.factors.symbolic.takeIf { reusePivotOrder }
                     break
                 }
             }
@@ -162,25 +162,31 @@ internal class KotlinBasisSolver(
         require(expectedDensity.isFinite() && expectedDensity in 0.0..1.0)
         lastSolveWork = null
         recordSolveAttempt(transpose)
-        val symbolic = current.factors.symbolic
-        val first: TriangularSolveWork
-        val second: TriangularSolveWork
-        val transformEntries: Long
-        if (transpose) {
-            solveWorkspace.load(x, symbolic.columnPosition)
-            first = current.upperTranspose.solve(solveWorkspace, expectedDensity)
-            transformEntries = current.ft.backward(solveWorkspace)
-            second = current.lowerTranspose.solve(solveWorkspace, expectedDensity)
-            solveWorkspace.write(x, symbolic.rowOrder)
-        } else {
-            solveWorkspace.load(x, symbolic.rowPosition)
-            first = current.lower.solve(solveWorkspace, expectedDensity)
-            transformEntries = current.ft.forward(solveWorkspace)
-            second = current.upper.solve(solveWorkspace, expectedDensity)
-            solveWorkspace.write(x, symbolic.columnOrder)
+        var successful = false
+        try {
+            val symbolic = current.factors.symbolic
+            val first: TriangularSolveWork
+            val second: TriangularSolveWork
+            val transformEntries: Long
+            if (transpose) {
+                solveWorkspace.load(x, symbolic.columnPosition)
+                first = current.upperTranspose.solve(solveWorkspace, expectedDensity)
+                transformEntries = current.ft.backward(solveWorkspace)
+                second = current.lowerTranspose.solve(solveWorkspace, expectedDensity)
+                solveWorkspace.write(x, symbolic.rowOrder)
+            } else {
+                solveWorkspace.load(x, symbolic.rowPosition)
+                first = current.lower.solve(solveWorkspace, expectedDensity)
+                transformEntries = current.ft.forward(solveWorkspace)
+                second = current.upper.solve(solveWorkspace, expectedDensity)
+                solveWorkspace.write(x, symbolic.columnOrder)
+            }
+            lastSolveWork = BasisSolveWork(first, second, transformEntries, x.count)
+            recordSolveSuccess(transpose, checkNotNull(lastSolveWork).units)
+            successful = true
+        } finally {
+            if (!successful) workMeter.solveDecline(transpose)
         }
-        lastSolveWork = BasisSolveWork(first, second, transformEntries, x.count)
-        recordSolveSuccess(transpose, checkNotNull(lastSolveWork).units)
     }
 
     override fun update(pivotRow: Int, entering: Int, spike: IndexedVector, pivotEta: IndexedVector?): BasisUpdate {

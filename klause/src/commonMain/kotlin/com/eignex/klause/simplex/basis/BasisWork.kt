@@ -7,9 +7,12 @@ internal enum class BasisBuildKind {
 
 // A unit is one reported entry visit, pivot visit, candidate test, Schur update, or copied entry.
 // It is deterministic implementation-relative work, not elapsed time or a backend-comparable total.
-internal data class BasisPhaseWork(val attempts: Long = 0, val successes: Long = 0, val units: Long = 0) {
-    val declines: Long get() = attempts - successes
-}
+internal data class BasisPhaseWork(
+    val attempts: Long = 0,
+    val successes: Long = 0,
+    val units: Long = 0,
+    val declines: Long = attempts - successes,
+)
 
 internal data class BasisBuildWork(
     val kind: BasisBuildKind,
@@ -37,24 +40,30 @@ internal class BasisWorkMeter {
     private var build: BasisBuildWork? = null
     private var ftranAttempts = 0L
     private var ftranSuccesses = 0L
+    private var ftranDeclines = 0L
     private var ftranUnits = 0L
     private var btranAttempts = 0L
     private var btranSuccesses = 0L
+    private var btranDeclines = 0L
     private var btranUnits = 0L
     private var updateAttempts = 0L
     private var updateSuccesses = 0L
+    private var updateDeclines = 0L
     private var updateUnits = 0L
 
     fun reset(build: BasisBuildWork?) {
         this.build = build
         ftranAttempts = 0
         ftranSuccesses = 0
+        ftranDeclines = 0
         ftranUnits = 0
         btranAttempts = 0
         btranSuccesses = 0
+        btranDeclines = 0
         btranUnits = 0
         updateAttempts = 0
         updateSuccesses = 0
+        updateDeclines = 0
         updateUnits = 0
     }
 
@@ -62,12 +71,15 @@ internal class BasisWorkMeter {
         build = work.build
         ftranAttempts = work.ftran.attempts
         ftranSuccesses = work.ftran.successes
+        ftranDeclines = work.ftran.declines
         ftranUnits = work.ftran.units
         btranAttempts = work.btran.attempts
         btranSuccesses = work.btran.successes
+        btranDeclines = work.btran.declines
         btranUnits = work.btran.units
         updateAttempts = work.update.attempts
         updateSuccesses = work.update.successes
+        updateDeclines = work.update.declines
         updateUnits = work.update.units
     }
 
@@ -89,6 +101,14 @@ internal class BasisWorkMeter {
         }
     }
 
+    fun solveDecline(transpose: Boolean) {
+        if (transpose) {
+            btranDeclines = saturatedAdd(btranDeclines, 1)
+        } else {
+            ftranDeclines = saturatedAdd(ftranDeclines, 1)
+        }
+    }
+
     fun updateAttempt() {
         updateAttempts = saturatedAdd(updateAttempts, 1)
     }
@@ -99,14 +119,15 @@ internal class BasisWorkMeter {
     }
 
     fun updateDecline(units: Long) {
+        updateDeclines = saturatedAdd(updateDeclines, 1)
         updateUnits = saturatedAdd(updateUnits, units)
     }
 
     fun snapshot(): BasisWork = BasisWork(
         build,
-        BasisPhaseWork(ftranAttempts, ftranSuccesses, ftranUnits),
-        BasisPhaseWork(btranAttempts, btranSuccesses, btranUnits),
-        BasisPhaseWork(updateAttempts, updateSuccesses, updateUnits),
+        BasisPhaseWork(ftranAttempts, ftranSuccesses, ftranUnits, ftranDeclines),
+        BasisPhaseWork(btranAttempts, btranSuccesses, btranUnits, btranDeclines),
+        BasisPhaseWork(updateAttempts, updateSuccesses, updateUnits, updateDeclines),
     )
 }
 

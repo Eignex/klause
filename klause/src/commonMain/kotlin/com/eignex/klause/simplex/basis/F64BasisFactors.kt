@@ -96,7 +96,7 @@ internal class F64BasisFactors(matrix: SparseMatrix) {
         }
         val columns = basisColumns.copyOf()
         val units = unitRows.copyOf()
-        val proposal = proposedOrder?.let { SymbolicLu(it.rowOrder.copyOf(), it.columnOrder.copyOf()) }
+        val proposal = proposedOrder?.let { copyProposal(it, dimension) }
         if (proposal != null) {
             val proposed = LuConstruction(source, columns, units, policy, proposal).build()
             if (proposed is LuAttemptResult.Built) {
@@ -117,9 +117,41 @@ internal class F64BasisFactors(matrix: SparseMatrix) {
                 ),
             )
         }
+        if (proposedOrder != null) {
+            val fallback = LuConstruction(source, columns, units, policy, null).build()
+            return fallback.result(
+                LuBuildReport(
+                    true,
+                    false,
+                    true,
+                    LuBuildRejection.NO_USABLE_PIVOT,
+                    EMPTY_LU_BUILD_WORK,
+                    fallback.work,
+                ),
+            )
+        }
         val fresh = LuConstruction(source, columns, units, policy, null).build()
         return fresh.result(LuBuildReport(false, false, false, null, null, fresh.work))
     }
+}
+
+private val EMPTY_LU_BUILD_WORK = LuBuildWork(0, 0, 0, 0, 0, 0, 0, 0, 0)
+
+private fun copyProposal(proposal: SymbolicLu, dimension: Int): SymbolicLu? {
+    val rows = proposal.rowOrder.copyOf()
+    val columns = proposal.columnOrder.copyOf()
+    if (!rows.isPermutation(dimension) || !columns.isPermutation(dimension)) return null
+    return SymbolicLu(rows, columns)
+}
+
+private fun IntArray.isPermutation(dimension: Int): Boolean {
+    if (size != dimension) return false
+    val seen = BooleanArray(dimension)
+    for (value in this) {
+        if (value !in 0 until dimension || seen[value]) return false
+        seen[value] = true
+    }
+    return true
 }
 
 private sealed interface LuAttemptResult {
