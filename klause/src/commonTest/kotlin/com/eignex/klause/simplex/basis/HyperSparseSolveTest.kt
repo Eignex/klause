@@ -1,0 +1,85 @@
+package com.eignex.klause.simplex.basis
+
+import com.eignex.koblas.SparseMatrix
+import com.eignex.koblas.sparse.basis.IndexedVector
+import kotlin.test.Test
+import kotlin.test.assertContentEquals
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
+
+class HyperSparseSolveTest {
+    @Test
+    fun `DFS reaches only dependencies and switches when support grows`() {
+        for (lower in listOf(false, true)) {
+            val n = 40
+            val matrix = SparseMatrix.ofColumns(
+                n,
+                n,
+                List(n) { j ->
+                    buildList {
+                        add(j to 2.0)
+                        if (lower && j < 2) add(j + 1 to -1.0)
+                        if (!lower && j > n - 3) add(j - 1 to -1.0)
+                    }
+                },
+            )
+            for (threshold in listOf(0.05, 0.2)) {
+                val solver = HyperSparseSolve(matrix, lower, unitDiagonal = false, threshold)
+                val work = BasisWorkspace(n)
+                val root = if (lower) 0 else n - 1
+                work.set(root, 8.0)
+
+                val report = solver.solve(work, 0.0)
+
+                assertEquals(threshold == 0.2, report.sparse)
+                assertEquals(if (report.sparse) 3 else n, report.pivotVisits)
+                for (i in 0 until n) {
+                    var product = 0.0
+                    for (j in 0 until n) product += matrix[i, j] * work.values[j]
+                    assertEquals(if (i == root) 8.0 else 0.0, product)
+                }
+                val first = work.values.copyOf()
+                work.clear()
+                work.set(root, 8.0)
+                assertEquals(report, solver.solve(work, 0.0))
+                assertContentEquals(first, work.values)
+            }
+        }
+    }
+
+    @Test
+    fun `exact cancellation removes output support and workspace clears every touched entry`() {
+        val matrix = SparseMatrix.ofColumns(4, 4, listOf(listOf(1 to 2.0), emptyList(), emptyList(), emptyList()))
+        val solver = HyperSparseSolve(matrix, lower = true, unitDiagonal = true, densityThreshold = 1.0)
+        val work = BasisWorkspace(4)
+        val vector = IndexedVector(4)
+        vector.store(0, 1.0)
+        vector.store(1, 2.0)
+        vector.store(3, -0.0)
+        work.load(vector)
+
+        assertTrue(solver.solve(work, 0.0).sparse)
+        work.write(vector)
+
+        assertEquals(1, vector.count)
+        assertContentEquals(doubleArrayOf(1.0, 0.0, 0.0, 0.0), vector.toDoubleArray())
+        work.clear()
+        assertContentEquals(DoubleArray(4), work.values)
+        assertEquals(0, work.count)
+    }
+
+    @Test
+    fun `dense hint skips graph traversal even for a sparse right hand side`() {
+        val matrix = SparseMatrix.ofColumns(10, 10, List(10) { listOf(it to 1.0) })
+        val work = BasisWorkspace(10)
+        work.set(7, 3.0)
+
+        val report = HyperSparseSolve(matrix, lower = false, unitDiagonal = false).solve(work, 1.0)
+
+        assertFalse(report.sparse)
+        assertEquals(0, report.reachEntries)
+        assertEquals(10, report.pivotVisits)
+        assertEquals(1, work.count)
+    }
+}
