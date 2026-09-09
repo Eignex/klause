@@ -216,6 +216,16 @@ internal class LpCapturedModel(
     }
 
     companion object {
+        fun capture(model: ExactLpModel): LpCapturedModel = capture(
+            requireNotNull(model.toLegacy()) { "exact model is outside capture v1 authority" },
+        )
+
+        fun captureOrNull(model: LpModel): LpCapturedModel? = try {
+            capture(model).also { it.validate() }
+        } catch (_: IllegalArgumentException) {
+            null
+        }
+
         fun capture(model: LpModel): LpCapturedModel {
             val dv = model.doubleView?.let {
                 LpCapturedDoubleView(
@@ -418,6 +428,10 @@ internal class LpCapture internal constructor(
         /** Freeze [model] and caller-recorded [events] at this call. Wave 0.4 intentionally has no
          * instrumented producer: callers record only events exposed by their public engine seam. The
          * capture contains no factorization snapshot or other solver-private cache. */
+        fun capture(model: ExactLpModel, settings: LpReplaySettings, events: List<LpReplayEvent>): LpCapture = capture(
+            requireNotNull(model.toLegacy()) { "exact model is outside capture v1 authority" }, settings, events,
+        )
+
         fun capture(model: LpModel, settings: LpReplaySettings, events: List<LpReplayEvent>): LpCapture = LpCapture(
             LP_CAPTURE_VERSION,
             settings.copy(),

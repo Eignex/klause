@@ -12,6 +12,33 @@ import kotlin.test.assertTrue
 
 class LpCaptureTest {
     @Test
+    fun `general authority is rejected before capture v1 projection`() {
+        val zero = ExactLpNumber.of(0L)
+        val model = ExactLpModel(listOf(emptyList()), emptyList(),
+            listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(ExactLpNumber.ofIeee(0.1))))),
+            emptyList(), ExactLpObjective(listOf(zero)))
+
+        assertFailsWith<IllegalArgumentException> { LpCapturedModel.capture(model) }
+        assertFailsWith<IllegalArgumentException> { LpCapture.capture(model, LpReplaySettings("unsupported", 0L), emptyList()) }
+    }
+
+    @Test
+    fun `checked integral bridge uses unchanged capture v1 bytes`() {
+        val zero = ExactLpNumber.of(0L)
+        val model = ExactLpModel(listOf(emptyList()), emptyList(),
+            listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(ExactLpNumber.of(4L))))),
+            emptyList(), ExactLpObjective(listOf(ExactLpNumber.of(3L))))
+        val legacy = assertNotNull(model.toLegacy())
+        val settings = LpReplaySettings("integral", 0L)
+
+        val bytes = LpCapture.capture(model, settings, emptyList()).encode()
+
+        assertEquals(1, LP_CAPTURE_VERSION)
+        assertContentEquals(LpCapture.capture(legacy, settings, emptyList()).encode(), bytes)
+        assertContentEquals(bytes, LpCapture.decode(bytes).encode())
+    }
+
+    @Test
     fun `capture round trips every authoritative model field losslessly`() {
         val large = (1L shl 53) + 19L
         val nanBits = 0x7ff8000000000042L
