@@ -46,6 +46,7 @@ internal sealed interface LuBuildResult {
 // L omits its unit diagonal; U includes its diagonal. Transposes provide row adjacency for reach.
 internal class LuFactors(
     val basisColumns: IntArray,
+    val basisUnitRows: IntArray,
     val symbolic: SymbolicLu,
     val lower: SparseMatrix,
     val upper: SparseMatrix,
@@ -63,16 +64,25 @@ internal class F64BasisFactors(matrix: SparseMatrix) {
     )
     val dimension: Int = source.rows
 
-    fun build(basisColumns: IntArray, policy: LuPivotPolicy = LuPivotPolicy()): LuBuildResult {
+    fun build(basisColumns: IntArray, policy: LuPivotPolicy = LuPivotPolicy()): LuBuildResult =
+        build(basisColumns, IntArray(dimension) { -1 }, policy)
+
+    fun build(basisColumns: IntArray, unitRows: IntArray, policy: LuPivotPolicy = LuPivotPolicy()): LuBuildResult {
         require(basisColumns.size == dimension)
-        require(basisColumns.all { it in 0 until source.cols })
-        return LuConstruction(source, basisColumns.copyOf(), policy).build()
+        require(unitRows.size == dimension)
+        for (slot in basisColumns.indices) {
+            require(basisColumns[slot] == -1 || basisColumns[slot] in 0 until source.cols)
+            require(unitRows[slot] == -1 || unitRows[slot] in 0 until dimension)
+            require((basisColumns[slot] in 0 until source.cols) != (unitRows[slot] in 0 until dimension))
+        }
+        return LuConstruction(source, basisColumns.copyOf(), unitRows.copyOf(), policy).build()
     }
 }
 
 private class LuConstruction(
     private val source: SparseMatrix,
     private val basisColumns: IntArray,
+    private val unitRows: IntArray,
     private val policy: LuPivotPolicy,
 ) {
     private val n = source.rows
@@ -115,18 +125,25 @@ private class LuConstruction(
         val u = upper.matrix(n, null, symbolic.columnPosition)
         val lt = lower.matrix(n, symbolic.rowPosition, null, transpose = true)
         val ut = upper.matrix(n, null, symbolic.columnPosition, transpose = true)
-        return LuBuildResult.Built(LuFactors(basisColumns, symbolic, l, u, lt, ut), work())
+        return LuBuildResult.Built(LuFactors(basisColumns, unitRows, symbolic, l, u, lt, ut), work())
     }
 
     private fun load(): Boolean {
         var finite = true
         for (j in 0 until n) {
-            source.forEachInColumn(basisColumns[j]) { i, value ->
+            val unitRow = unitRows[j]
+            if (unitRow >= 0) {
                 inputEntries++
-                if (!value.isFinite()) finite = false
-                if (value != 0.0) {
-                    columns[j].put(i, value)
-                    rows[i].add(j)
+                columns[j].put(unitRow, 1.0)
+                rows[unitRow].add(j)
+            } else {
+                source.forEachInColumn(basisColumns[j]) { i, value ->
+                    inputEntries++
+                    if (!value.isFinite()) finite = false
+                    if (value != 0.0) {
+                        columns[j].put(i, value)
+                        rows[i].add(j)
+                    }
                 }
             }
             refreshMaximum(j)
@@ -279,6 +296,24 @@ private class LuConstruction(
 
     private fun rejected(reason: LuBuildRejection) = LuBuildResult.Rejected(reason, work())
 }
+
+internal fun LuFactors.copyOwned(): LuFactors = LuFactors(
+    basisColumns.copyOf(),
+    basisUnitRows.copyOf(),
+    SymbolicLu(symbolic.rowOrder.copyOf(), symbolic.columnOrder.copyOf()),
+    lower.copyOwned(),
+    upper.copyOwned(),
+    lowerTranspose.copyOwned(),
+    upperTranspose.copyOwned(),
+)
+
+private fun SparseMatrix.copyOwned(): SparseMatrix = SparseMatrix.wrap(
+    rows,
+    cols,
+    copyColumnPointers(),
+    copyRowIndices(),
+    values.copyOf(),
+)
 
 private class LuPivot(val row: Int, val column: Int)
 
