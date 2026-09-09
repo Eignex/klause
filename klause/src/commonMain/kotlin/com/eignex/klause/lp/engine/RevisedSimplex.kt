@@ -1,6 +1,7 @@
 package com.eignex.klause.lp.engine
 
 import com.eignex.klause.lp.engine.Cut
+import com.eignex.klause.simplex.basis.BasisArithmeticException
 import com.eignex.klause.simplex.basis.BasisSolver
 import com.eignex.klause.simplex.basis.BasisUpdate
 import com.eignex.klause.simplex.basis.IndexedVector
@@ -314,8 +315,8 @@ internal class RevisedSimplex(
     /** This engine's basis solver, built on first use. */
     private fun solver(): BasisSolver = basisSolver ?: newSolver()
 
-    private fun newSolver(): BasisSolver {
-        return (basisSolverFactory?.invoke(columns) ?: KotlinBasisSolver(columns)).also { basisSolver = it }
+    private fun newSolver(): BasisSolver = (basisSolverFactory?.invoke(columns) ?: KotlinBasisSolver(columns)).also {
+        basisSolver = it
     }
 
     override fun close() {
@@ -380,6 +381,7 @@ internal class RevisedSimplex(
     /** `B x = b` for a dense right-hand side, into [out] through [carrier]. */
     private fun ftranDense(b: DoubleArray, out: DoubleArray, carrier: IndexedVector): DoubleArray {
         chargeSolve()
+        if (b.any { !it.isFinite() }) throw BasisArithmeticException("nonfinite basis right-hand side")
         carrier.scatter(b)
         solver().ftran(carrier, expectedDensity = 1.0)
         return carrier.gather(out)
@@ -388,6 +390,7 @@ internal class RevisedSimplex(
     /** `Bᵀ x = b` for a dense right-hand side, into [out] through [carrier]. */
     private fun btranDense(b: DoubleArray, out: DoubleArray, carrier: IndexedVector): DoubleArray {
         chargeSolve()
+        if (b.any { !it.isFinite() }) throw BasisArithmeticException("nonfinite basis right-hand side")
         carrier.scatter(b)
         solver().btran(carrier, expectedDensity = 1.0)
         return carrier.gather(out)
@@ -521,7 +524,7 @@ internal class RevisedSimplex(
      * a structural mismatch or a singular factorization silently falls back to a cold start, so reuse is
      * sound regardless of how the basis was obtained.
      */
-    override fun solve(warm: Basis?): FloatLpResult? = solveCore(warm, reuse = false)
+    override fun solve(warm: Basis?): FloatLpResult? = numericalSolve { solveCore(warm, reuse = false) }
 
     /**
      * Re-solve with per-row enforcement, keeping the basis AND its LU factorization from this
@@ -538,7 +541,7 @@ internal class RevisedSimplex(
      * ordinary cold start — whose all-slack basis has every unenforced slack basic already.
      */
     override fun resolveGated(enforced: BooleanArray): FloatLpResult? =
-        solveCore(null, reuse = true, enforced = enforced)
+        numericalSolve { solveCore(null, reuse = true, enforced = enforced) }
 
     /**
      * Re-point this engine at [next] and [token], keeping the seated basis and its factorization, then
@@ -564,14 +567,29 @@ internal class RevisedSimplex(
     }
 
     /** Re-solve after a [rebind], continuing from the kept basis and factorization. */
-    override fun resolveBounds(): FloatLpResult? = solveCore(null, reuse = true)
+    override fun resolveBounds(): FloatLpResult? = numericalSolve { solveCore(null, reuse = true) }
 
     /** Whether the previous solve terminated with its basis still factorized, so [resolveGated] and
      *  [resolveBounds] may continue from it; the seated [basicVar]/[status] are still in place. False
      *  after a bailed solve. */
     private var basisKept = false
 
+    // A checked basis failure cannot supply a terminal claim or a factorization safe to keep.
+    private inline fun numericalSolve(block: () -> FloatLpResult?): FloatLpResult? = try {
+        block()
+    } catch (_: BasisArithmeticException) {
+        close()
+        optimalBasis = null
+        optimalPrimal = null
+        infeasibleBasis = null
+        infeasibleRow = -1
+        infeasibleRay = null
+        null
+    }
+
     private fun resetSolveState(warmAttempted: Boolean) {
+        optimalBasis = null
+        optimalPrimal = null
         infeasibleBasis = null
         infeasibleRow = -1
         infeasibleRay = null
@@ -1226,8 +1244,10 @@ internal class RevisedSimplex(
      * returns is certified exactly downstream, so this never affects soundness, only which vertex is
      * reached.
      */
+    override fun solvePrimal(warm: Basis?): FloatLpResult? = numericalSolve { solvePrimalCore(warm) }
+
     @Suppress("CyclomaticComplexMethod", "NestedBlockDepth", "ReturnCount", "LongMethod")
-    override fun solvePrimal(warm: Basis?): FloatLpResult? {
+    private fun solvePrimalCore(warm: Basis?): FloatLpResult? {
         resetSolveState(warm != null)
         if (warm == null || !tryWarmStart(warm)) {
             lowerStart()

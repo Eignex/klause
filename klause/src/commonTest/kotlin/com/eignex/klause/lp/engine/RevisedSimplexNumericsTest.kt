@@ -1,14 +1,18 @@
 package com.eignex.klause.lp.engine
 
+import com.eignex.klause.simplex.basis.BasisArithmeticException
 import com.eignex.klause.simplex.basis.BasisSolver
 import com.eignex.klause.simplex.basis.IndexedVector
 import com.eignex.klause.simplex.basis.KotlinBasisSolver
+import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class RevisedSimplexNumericsTest {
@@ -210,6 +214,136 @@ class RevisedSimplexNumericsTest {
         assertEquals(0, simplex.lastMetrics.numericalRecoveryRefactorizations)
         assertNull(simplex.infeasibleBasis)
         assertNull(simplex.infeasibleRay)
+    }
+
+    @Test
+    fun `an unrepresentable warm basis solve declines and permits a cold recovery`() {
+        val builder = LpBuilder()
+        val n = 22
+        repeat(n) { builder.addVar(0, 1) }
+        for (i in 0 until n) {
+            val row = mutableMapOf(i to 1L)
+            if (i + 1 < n) row[i + 1] = Long.MAX_VALUE / 8
+            builder.addRow(row, Relation.LE, 1)
+        }
+        val model = builder.build(Sense.MINIMIZE)
+        val warm = Basis(IntArray(n) { it }, Array(2 * n) { if (it < n) VarStatus.BASIC else VarStatus.AT_LOWER })
+        for (primal in listOf(false, true)) {
+            val simplex = RevisedSimplex(model)
+
+            val result = if (primal) simplex.solvePrimal(warm) else simplex.solve(warm)
+
+            assertNull(result)
+            assertNull(simplex.infeasibleBasis)
+            assertNull(simplex.infeasibleRay)
+            assertEquals(-1, simplex.infeasibleRow)
+            assertTrue(simplex.gomoryCuts(4).isEmpty())
+            val recovered = assertNotNull(simplex.solve())
+            assertTrue(recovered.optimal)
+            assertTrue(recovered.primal.all { it == 0.0 })
+            assertEquals(1, recovered.refactorizations)
+            simplex.close()
+        }
+    }
+
+    @Test
+    fun `nonfinite adjusted right hand side reaches exact feasibility recovery`() {
+        val builder = LpBuilder()
+        val x = builder.addRealVar(0.0, 1e308, cost = -1.0)
+        builder.addRealRow(intArrayOf(x), doubleArrayOf(2.0), Relation.LE, 1.0)
+        val model = builder.build(Sense.MINIMIZE)
+
+        val result = solveAndCertify(model, componentSplit = false)
+
+        assertNull(result.float)
+        assertEquals(LpVerdict.FEASIBLE, result.verdict)
+        assertNull(result.farkasRay)
+        assertNull(result.rationalConflict)
+        val point = assertNotNull(result.witness).primal.single()
+        assertTrue(point >= BigFraction.ZERO && point + point <= BigFraction.ONE)
+    }
+
+    @Test
+    fun `basis failure after a pivot discards the partial solve`() {
+        var fail = true
+        val model = multiPivotFeasibilityModel()
+        val simplex = RevisedSimplex(model, basisSolverFactory = { matrix ->
+            val delegate = KotlinBasisSolver(matrix)
+            object : BasisSolver by delegate {
+                override fun btran(x: IndexedVector, expectedDensity: Double) {
+                    if (fail && delegate.updateCount > 0) throw BasisArithmeticException("injected after pivot")
+                    delegate.btran(x, expectedDensity)
+                }
+            }
+        })
+
+        assertNull(simplex.solve())
+
+        assertTrue(simplex.lastPivots > 0)
+        assertNull(simplex.infeasibleBasis)
+        assertNull(simplex.infeasibleRay)
+        fail = false
+        val recovered = assertNotNull(simplex.resolveBounds())
+        assertTrue(recovered.optimal)
+        assertEquals(1, recovered.refactorizations)
+        simplex.close()
+    }
+
+    @Test
+    fun `a failed retained solve retires its factors and optimal cut state`() {
+        val builder = LpBuilder()
+        repeat(3) { builder.addVar(0, 2) }
+        builder.addRow(mapOf(0 to 1L, 1 to 1L), Relation.EQ, 1)
+        builder.addRow(mapOf(1 to 1L, 2 to 1L), Relation.EQ, 1)
+        builder.addRow(mapOf(0 to 1L, 2 to 1L), Relation.EQ, 1)
+        val model = builder.build(Sense.MINIMIZE)
+        for (gated in listOf(false, true)) {
+            var fail = false
+            var closed = 0
+            val simplex = RevisedSimplex(model, basisSolverFactory = { matrix ->
+                val delegate = KotlinBasisSolver(matrix)
+                object : BasisSolver by delegate {
+                    override fun ftran(x: IndexedVector, expectedDensity: Double) {
+                        if (fail) throw BasisArithmeticException("injected retained solve")
+                        delegate.ftran(x, expectedDensity)
+                    }
+
+                    override fun close() {
+                        closed++
+                        delegate.close()
+                    }
+                }
+            })
+            assertNotNull(simplex.solve())
+            assertTrue(simplex.gomoryCuts(4).isNotEmpty())
+            assertTrue(simplex.rebind(model.rebind(LongArray(3), LongArray(3) { 2L }), Cancellation.Never))
+            fail = true
+
+            val result = if (gated) simplex.resolveGated(BooleanArray(3) { true }) else simplex.resolveBounds()
+
+            assertNull(result)
+            assertEquals(1, closed)
+            assertTrue(simplex.gomoryCuts(4).isEmpty())
+            assertTrue(simplex.mirCuts(4).isEmpty())
+            assertNull(simplex.infeasibleBasis)
+            assertNull(simplex.infeasibleRay)
+            fail = false
+            val recovered = assertNotNull(simplex.resolveBounds())
+            assertTrue(recovered.primal.all { it == 0.5 })
+            assertEquals(1, recovered.refactorizations)
+            simplex.close()
+        }
+    }
+
+    @Test
+    fun `unrelated factory errors are not classified as numerical declines`() {
+        for (failure in listOf(ArithmeticException("unrelated"), IllegalArgumentException("invalid"))) {
+            val simplex = RevisedSimplex(multiPivotFeasibilityModel(), basisSolverFactory = { throw failure })
+
+            val thrown = assertFailsWith<RuntimeException> { simplex.solve() }
+
+            assertSame(failure, thrown)
+        }
     }
 
     private fun multiPivotFeasibilityModel(): LpModel {

@@ -3,16 +3,33 @@ package com.eignex.klause.lp.engine
 import com.eignex.klause.simplex.basis.BasisSolver
 import com.eignex.klause.simplex.basis.HfactorBasisSolver
 import com.eignex.koblas.SparseMatrix
+import com.eignex.koblas.hfactor.BundledHfactor
+import org.junit.BeforeClass
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class LpOperationTraceTest {
+    companion object {
+        private lateinit var hfactor: BundledHfactor
+
+        @BeforeClass
+        @JvmStatic
+        fun loadHfactor() {
+            val start = System.nanoTime()
+            hfactor = BundledHfactor()
+            check(hfactor.isAvailable) { hfactor.unavailableReason.orEmpty() }
+            println("HFactor fixture setup nanos=${System.nanoTime() - start}")
+        }
+    }
 
     @Test
     fun `fixed backend replays charge deterministic work for the same pivot trace`() {
-        val factories: List<((SparseMatrix) -> BasisSolver)?> = listOf(null, ::HfactorBasisSolver)
+        val factories: List<((SparseMatrix) -> BasisSolver)?> = listOf(
+            null,
+            { matrix -> HfactorBasisSolver(matrix, hfactor) },
+        )
         for (factory in factories) {
             val trace = replayTrace(factory)
 
@@ -47,17 +64,18 @@ class LpOperationTraceTest {
         )
     }
 
-    private fun observedPivotTrace(
-        pivots: Int,
-        factory: ((SparseMatrix) -> BasisSolver)?,
-    ): List<BasisState> = (1..pivots).map { limit ->
-        val solver = RevisedSimplex(
-            pivotingModel(), refactorUpdateLimit = 1, iterationLimit = limit, basisSolverFactory = factory,
-        )
-        val result = solver.use { assertNotNull(it.solve()) }
-        assertEquals(limit, result.pivots)
-        result.basis.state()
-    }
+    private fun observedPivotTrace(pivots: Int, factory: ((SparseMatrix) -> BasisSolver)?): List<BasisState> =
+        (1..pivots).map { limit ->
+            val solver = RevisedSimplex(
+                pivotingModel(),
+                refactorUpdateLimit = 1,
+                iterationLimit = limit,
+                basisSolverFactory = factory,
+            )
+            val result = solver.use { assertNotNull(it.solve()) }
+            assertEquals(limit, result.pivots)
+            result.basis.state()
+        }
 
     private fun Basis.state() = BasisState(basicVars.toList(), status.toList())
 
