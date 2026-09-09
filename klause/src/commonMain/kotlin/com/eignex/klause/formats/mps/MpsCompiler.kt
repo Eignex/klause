@@ -14,10 +14,23 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.lowering.RowScale
 import com.eignex.klause.lowering.RowScaleBuilder
 import com.eignex.klause.lowering.channelBoolTo01
+import com.eignex.klause.lp.engine.ExactLpBounds
+import com.eignex.klause.lp.engine.ExactLpColumn
+import com.eignex.klause.lp.engine.ExactLpEntry
+import com.eignex.klause.lp.engine.ExactLpModel
+import com.eignex.klause.lp.engine.ExactLpNumber
+import com.eignex.klause.lp.engine.ExactLpObjective
+import com.eignex.klause.lp.engine.ExactLpPremise
+import com.eignex.klause.lp.engine.ExactLpPremises
+import com.eignex.klause.lp.engine.ExactLpRow
+import com.eignex.klause.lp.engine.ExactLpSide
+import com.eignex.klause.lp.engine.Sense
+import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.Bits
 import com.eignex.klause.util.EmptyDoubleArray
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.EmptyLongArray
+import com.ionspin.kotlin.bignum.integer.BigInteger
 import kotlin.math.abs
 import kotlin.math.ceil
 import kotlin.math.floor
@@ -39,7 +52,8 @@ data class MpsColumn(
 )
 
 /** An [MpsModel] lowered to a klause model. */
-data class MpsCompiled(
+@Suppress("UndocumentedPublicFunction")
+class MpsCompiled(
     /** The compiled solver problem — an integer variable per integer MPS column, an LP-only continuous
      *  variable per (bounded or unbounded) float column. */
     val model: Problem,
@@ -61,7 +75,89 @@ data class MpsCompiled(
     val hasInnerConstraintApproximation: Boolean,
     /** Count of LP-only continuous (real) columns (zero for a pure-integer instance). */
     val floatColumns: Int,
-)
+) {
+    private var exactLpSource: (() -> ExactLpModel)? = null
+    private var exactLpCache: ExactLpModel? = null
+    internal val exactLpModel: ExactLpModel?
+        get() {
+            exactLpCache?.let { return it }
+            return exactLpSource?.invoke()?.also { exactLpCache = it }
+        }
+
+    internal fun withExactLpModel(source: () -> ExactLpModel): MpsCompiled = apply {
+        check(exactLpSource == null) { "exact MPS LP model is already attached" }
+        exactLpSource = source
+    }
+
+    fun copy(
+        model: Problem = this.model,
+        objective: LinearObjectiveSpec? = this.objective,
+        maximize: Boolean = this.maximize,
+        columns: List<MpsColumn> = this.columns,
+        objectiveScale: Long = this.objectiveScale,
+        objectiveErrorBound: Double? = this.objectiveErrorBound,
+        hasInnerConstraintApproximation: Boolean = this.hasInnerConstraintApproximation,
+        floatColumns: Int = this.floatColumns,
+    ): MpsCompiled {
+        val result = MpsCompiled(
+            model,
+            objective,
+            maximize,
+            columns,
+            objectiveScale,
+            objectiveErrorBound,
+            hasInnerConstraintApproximation,
+            floatColumns,
+        )
+        if (model === this.model && objective === this.objective && columns === this.columns &&
+            maximize == this.maximize && objectiveScale == this.objectiveScale &&
+            objectiveErrorBound.sameDataValue(this.objectiveErrorBound) &&
+            hasInnerConstraintApproximation == this.hasInnerConstraintApproximation &&
+            floatColumns == this.floatColumns
+        ) {
+            result.exactLpSource = exactLpSource
+            result.exactLpCache = exactLpCache
+        }
+        return result
+    }
+
+    operator fun component1(): Problem = model
+    operator fun component2(): LinearObjectiveSpec? = objective
+    operator fun component3(): Boolean = maximize
+    operator fun component4(): List<MpsColumn> = columns
+    operator fun component5(): Long = objectiveScale
+    operator fun component6(): Double? = objectiveErrorBound
+    operator fun component7(): Boolean = hasInnerConstraintApproximation
+    operator fun component8(): Int = floatColumns
+
+    override fun equals(other: Any?): Boolean = other is MpsCompiled &&
+        model == other.model && objective == other.objective && maximize == other.maximize &&
+        columns == other.columns && objectiveScale == other.objectiveScale &&
+        objectiveErrorBound.sameDataValue(other.objectiveErrorBound) &&
+        hasInnerConstraintApproximation == other.hasInnerConstraintApproximation &&
+        floatColumns == other.floatColumns
+
+    override fun hashCode(): Int {
+        var result = model.hashCode()
+        result = 31 * result + (objective?.hashCode() ?: 0)
+        result = 31 * result + maximize.hashCode()
+        result = 31 * result + columns.hashCode()
+        result = 31 * result + objectiveScale.hashCode()
+        result = 31 * result + (objectiveErrorBound?.hashCode() ?: 0)
+        result = 31 * result + hasInnerConstraintApproximation.hashCode()
+        return 31 * result + floatColumns
+    }
+
+    override fun toString(): String = "MpsCompiled(model=$model, objective=$objective, maximize=$maximize, " +
+        "columns=$columns, objectiveScale=$objectiveScale, objectiveErrorBound=$objectiveErrorBound, " +
+        "hasInnerConstraintApproximation=$hasInnerConstraintApproximation, floatColumns=$floatColumns)"
+}
+
+private fun Double?.sameDataValue(other: Double?): Boolean = when {
+    this == null -> other == null
+    other == null -> false
+    else -> toBits() == other.toBits()
+}
 
 /** Bounds at or beyond this magnitude are the MPS "infinity" convention (`1e30`), not a literal bound. */
 private const val MPS_INFINITY = 1e20
@@ -80,6 +176,7 @@ private const val MPS_INFINITY = 1e20
  *    of the decimals it is written with, so the integer row restates the source rather than rounding it.
  */
 fun MpsModel.toProblem(): MpsCompiled {
+    val exactInput = exactAdapterSnapshot()
     val isFloat = BooleanArray(variables.size) { !variables[it].integer }
     val intVarOf = IntArray(variables.size) { -1 }
     val realVarOf = IntArray(variables.size) { -1 }
@@ -180,8 +277,161 @@ fun MpsModel.toProblem(): MpsCompiled {
         objectiveErrorBound,
         hasInnerConstraintApproximation,
         numReal,
+    ).withExactLpModel { exactInput.toExactLpModel() }
+}
+
+// Build the authoritative source LP beside the compatible hybrid Problem lowering.
+internal fun MpsModel.toExactLpModel(source: MpsSourceNumbers = sourceNumbers()): ExactLpModel {
+    val zero = ExactLpNumber.of(0L)
+    val origins = source.variableBounds.map { (lower, _) ->
+        lower.finiteMps()?.takeUnless(MpsSourceNumber::isIeee)?.toExactLpNumber() ?: zero
+    }
+    val columns = variables.mapIndexed { index, variable ->
+        val (lower, upper) = source.variableBounds[index]
+        ExactLpColumn(
+            ExactLpBounds(
+                lower.finiteMps()?.shiftedBy(origins[index])?.let(::ExactLpSide),
+                upper.finiteMps()?.shiftedBy(origins[index])?.let(::ExactLpSide),
+            ),
+            origin = origins[index],
+            integral = variable.integer,
+            tag = index,
+        )
+    }.toMutableList()
+    val matrix = List(variables.size) { ArrayList<ExactLpEntry>() }
+    val rows = ArrayList<ExactLpRow>()
+    val rhs = ArrayList<ExactLpNumber>()
+    for (rowIndex in constraints.indices) {
+        val constraint = constraints[rowIndex]
+        val coefficients = source.constraintCoefficients[rowIndex]
+        val (lower, upper) = source.constraintBounds[rowIndex]
+        val finiteLower = lower.finiteMps()
+        val finiteUpper = upper.finiteMps()
+        val premises = constraint.indicator?.let { indicator ->
+            val trigger = ExactLpNumber.of(if (indicator.whenOne) 1L else 0L)
+            ExactLpPremises(
+                listOf(
+                    ExactLpPremise(indicator.column, upper = false, threshold = trigger),
+                    ExactLpPremise(indicator.column, upper = true, threshold = trigger),
+                ),
+            )
+        }
+        fun addRow(bound: MpsSourceNumber, negate: Boolean, equality: Boolean) {
+            var shifted = bound.fraction
+            var recentered = false
+            val terms = LinkedHashMap<Int, ExactLpNumber>()
+            for (entry in constraint.indices.indices) {
+                val column = constraint.indices[entry]
+                val coefficient = coefficients[entry].fraction
+                val contribution = coefficient * origins[column].value
+                shifted -= contribution
+                recentered = recentered || !contribution.isZero
+                val signed = if (negate) coefficient.negated() else coefficient
+                if (!signed.isZero) {
+                    val number = coefficients[entry].toExactLpNumber(negate)
+                    val previous = terms[column]
+                    val combined = if (previous == null) number else ExactLpNumber.of(previous.value + number.value)
+                    if (combined.value.isZero) terms.remove(column) else terms[column] = combined
+                }
+            }
+            if (negate) shifted = shifted.negated()
+            val nextRow = rows.size
+            for ((column, number) in terms) matrix[column].add(ExactLpEntry(nextRow, number))
+            rhs.add(if (recentered) ExactLpNumber.of(shifted) else bound.toExactLpNumber(negate))
+            rows.add(ExactLpRow(global = premises == null, premises = premises))
+            val slackIntegral = equality || (
+                constraint.indices.indices.all { entry ->
+                    variables[constraint.indices[entry]].integer && coefficients[entry].fraction.den.isOne()
+                } && bound.fraction.den.isOne()
+                )
+            columns.add(
+                ExactLpColumn(
+                    if (equality) {
+                        ExactLpBounds(ExactLpSide(zero), ExactLpSide(zero))
+                    } else {
+                        ExactLpBounds(lower = ExactLpSide(zero))
+                    },
+                    integral = slackIntegral,
+                ),
+            )
+        }
+        if (finiteLower != null && finiteUpper != null && finiteLower.fraction == finiteUpper.fraction) {
+            addRow(finiteLower, negate = false, equality = true)
+        } else {
+            finiteUpper?.let { addRow(it, negate = false, equality = false) }
+            finiteLower?.let { addRow(it, negate = true, equality = false) }
+        }
+    }
+    val sourceCosts = MutableList(variables.size) { zero }
+    objective.indices.forEachIndexed { entry, column ->
+        val number = source.objectiveCoefficients[entry]
+            .toExactLpNumber(negated = sense == ObjectiveSense.MAXIMIZE)
+        sourceCosts[column] = if (sourceCosts[column].value.isZero) {
+            number
+        } else {
+            ExactLpNumber.of(sourceCosts[column].value + number.value)
+        }
+    }
+    repeat(rows.size) { sourceCosts.add(zero) }
+    var shiftedConstant = source.objectiveConstant.fraction
+    var objectiveRecentered = false
+    for (column in variables.indices) {
+        val sourceCost = sourceCosts[column].value
+        val signedSourceCost = if (sense == ObjectiveSense.MAXIMIZE) sourceCost.negated() else sourceCost
+        val contribution = signedSourceCost * origins[column].value
+        shiftedConstant += contribution
+        objectiveRecentered = objectiveRecentered || !contribution.isZero
+    }
+    if (sense == ObjectiveSense.MAXIMIZE) shiftedConstant = shiftedConstant.negated()
+    val objectiveConstant = if (objectiveRecentered) {
+        ExactLpNumber.of(shiftedConstant)
+    } else {
+        source.objectiveConstant.toExactLpNumber(negated = sense == ObjectiveSense.MAXIMIZE)
+    }
+    return ExactLpModel(
+        matrix,
+        rhs,
+        columns,
+        rows,
+        ExactLpObjective(
+            sourceCosts,
+            objectiveConstant,
+            sense = if (sense == ObjectiveSense.MAXIMIZE) Sense.MAXIMIZE else Sense.MINIMIZE,
+        ),
     )
 }
+
+private fun MpsModel.exactAdapterSnapshot(): MpsModel = MpsModel(
+    name,
+    sense,
+    MpsObjective(objective.name, objective.indices.copyOf(), objective.coeffs.copyOf(), objective.constant),
+    variables.toList(),
+    constraints.map { row ->
+        MpsConstraint(
+            row.name,
+            row.indices.copyOf(),
+            row.coeffs.copyOf(),
+            row.lower,
+            row.upper,
+            row.indicator?.copy(),
+        )
+    },
+).withSourceNumbers(sourceNumbers())
+
+private val MPS_INFINITY_EXACT = BigFraction.of(
+    BigInteger.parseString("100000000000000000000", 10),
+    BigInteger.ONE,
+)
+
+private fun MpsSourceNumber?.finiteMps(): MpsSourceNumber? = this?.takeIf {
+    it.fraction > MPS_INFINITY_EXACT.negated() && it.fraction < MPS_INFINITY_EXACT
+}
+
+private fun MpsSourceNumber.shiftedBy(origin: ExactLpNumber): ExactLpNumber =
+    if (origin.value.isZero) toExactLpNumber() else ExactLpNumber.of(fraction - origin.value)
+
+private fun com.ionspin.kotlin.bignum.integer.BigInteger.isOne(): Boolean =
+    this == com.ionspin.kotlin.bignum.integer.BigInteger.ONE
 
 /** Emit a purely-integer row over integer-variable ids, multiplied onto the scale that carries its
  *  coefficients and bounds onto whole numbers. */

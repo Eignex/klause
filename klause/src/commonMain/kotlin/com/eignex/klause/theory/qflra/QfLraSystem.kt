@@ -11,6 +11,7 @@ import com.eignex.klause.lp.asFraction
 import com.eignex.klause.lp.exactColumnLower
 import com.eignex.klause.lp.exactColumnUpper
 import com.eignex.klause.lp.exactComparison
+import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.BigRationalConflict
 import com.eignex.klause.simplex.exact.ExactRationalFeasibilityModel
 import com.eignex.klause.simplex.exact.ExactRationalInequality
@@ -19,6 +20,7 @@ import com.eignex.klause.solver.search.SearchExplanation
 internal class QfLraSystem(private val model: Problem) {
     fun build(booleanValue: (Int) -> Boolean?): QfLraRelaxation {
         val rows = ArrayList<ExactRationalInequality>()
+        val exactRows = ArrayList<ExactLpSourceRow>()
         for (integer in 0 until model.numIntVars) {
             val column = model.numRealVars + integer
             model.intBounds.lowerAsBigInteger(integer)?.let { rows += exactColumnLower(column, it.asFraction()) }
@@ -42,23 +44,83 @@ internal class QfLraSystem(private val model: Problem) {
                 comparison.rowsInto(rows)
                 val literals = variables.map { Lit.make(it, positive = booleanValue(it) != true) }.toIntArray()
                 repeat(rows.size - start) { premises.add(literals) }
+                val validity = variables.map { Lit.make(it, positive = booleanValue(it) == true) }
+                for (rowIndex in start until rows.size) {
+                    exactRows.add(ExactLpSourceRow(rows[rowIndex], validity))
+                }
             }
         }
         val columns = model.numRealVars + model.numIntVars
         return QfLraRelaxation(
             ExactRationalFeasibilityModel(2 * columns, rows.map { it.overFreeColumns(columns) }),
             premises,
+            model.exactLpSourceColumns(),
+            exactRows,
         )
     }
 }
 
-internal class QfLraRelaxation(val model: ExactRationalFeasibilityModel, private val rowPremises: List<IntArray>) {
+internal class QfLraRelaxation(
+    val model: ExactRationalFeasibilityModel,
+    private val rowPremises: List<IntArray>,
+    sourceColumns: List<ExactLpSourceColumn>,
+    sourceRows: List<ExactLpSourceRow>,
+) {
+    internal val sourceColumns = sourceColumns.toList()
+    internal val sourceRows = sourceRows.toList()
+
     fun explanation(conflict: BigRationalConflict?): SearchExplanation? {
         if (conflict == null) return null
         // Split columns have only their intrinsic nonnegative lower bound; every source bound is a row.
         if (conflict.bounds.any { it.column < model.n && it.upper }) return null
         return SearchExplanation(
             conflict.rows.flatMap { rowPremises[it].asIterable() }.distinct().sorted().toIntArray(),
+        )
+    }
+}
+
+internal data class ExactLpSourceRow(
+    val inequality: ExactRationalInequality,
+    val premiseLiterals: List<Int> = emptyList(),
+)
+
+internal data class ExactLpSourceNumber(val value: BigFraction, val ieeeBits: Long? = null)
+
+internal data class ExactLpSourceColumn(
+    val lower: ExactLpSourceNumber?,
+    val upper: ExactLpSourceNumber?,
+    val origin: ExactLpSourceNumber,
+    val integral: Boolean,
+    val tag: Int,
+)
+
+internal fun Problem.exactLpSourceColumns(): List<ExactLpSourceColumn> {
+    val zero = ExactLpSourceNumber(BigFraction.ZERO)
+    return List(numRealVars + numIntVars) { column ->
+        val lower: ExactLpSourceNumber?
+        val upper: ExactLpSourceNumber?
+        val integral: Boolean
+        if (column < numRealVars) {
+            lower = realLower[column].takeIf(Double::isFinite)?.let {
+                ExactLpSourceNumber(it.asFraction(), it.toRawBits())
+            }
+            upper = realUpper[column].takeIf(Double::isFinite)?.let {
+                ExactLpSourceNumber(it.asFraction(), it.toRawBits())
+            }
+            integral = false
+        } else {
+            val integer = column - numRealVars
+            lower = intBounds.lowerAsBigInteger(integer)?.let { ExactLpSourceNumber(it.asFraction()) }
+            upper = intBounds.upperAsBigInteger(integer)?.let { ExactLpSourceNumber(it.asFraction()) }
+            integral = true
+        }
+        val origin = lower?.takeIf { it.ieeeBits == null } ?: zero
+        ExactLpSourceColumn(
+            lower?.let { if (origin.value.isZero) it else ExactLpSourceNumber(it.value - origin.value) },
+            upper?.let { if (origin.value.isZero) it else ExactLpSourceNumber(it.value - origin.value) },
+            origin,
+            integral,
+            column,
         )
     }
 }

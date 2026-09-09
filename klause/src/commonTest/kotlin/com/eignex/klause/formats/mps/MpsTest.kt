@@ -142,6 +142,55 @@ class MpsTest {
     }
 
     @Test
+    fun `parsed numeric fields retain decimal and scientific authority`() {
+        val text = "ROWS\n N COST\n E C1\nCOLUMNS\n X COST 0.1 C1 9.007199254740993D15\n" +
+            "RHS\n RHS C1 1.208925819614629174706176E24\nENDATA"
+
+        val source = Mps.parse(text).sourceNumbers()
+
+        assertEquals("1/10", source.objectiveCoefficients.single().fraction.toString())
+        assertEquals("9007199254740993", source.constraintCoefficients.single().single().fraction.toString())
+        assertEquals("1208925819614629174706176", source.constraintBounds.single().first?.fraction.toString())
+    }
+
+    @Test
+    fun `long and subnormal decimals retain their legacy projections`() {
+        val tokens = listOf("0.6169532649852302182", "1e-310", "1e-320")
+        val text = "ROWS\n N COST\nCOLUMNS\n" + tokens.mapIndexed { index, token ->
+            " X$index COST $token"
+        }.joinToString("\n") + "\nENDATA"
+
+        val model = Mps.parse(text)
+        val source = model.sourceNumbers()
+        val exact = model.toExactLpModel()
+
+        assertEquals(tokens.map { it.toDouble().toRawBits() }, model.objective.coeffs.map { it.toRawBits() })
+        assertTrue(source.objectiveCoefficients.none(MpsSourceNumber::isIeee))
+        assertTrue(tokens.indices.all { !exact.objective.cost(it).value.isZero })
+        assertTrue(tokens.indices.all { exact.objective.cost(it).ieeeBits == null })
+    }
+
+    @Test
+    fun `unsupported exact decimal scales decline cleanly`() {
+        val tokens = listOf("1e-2147483648", "0.1e-9223372036854775808")
+
+        for (token in tokens) {
+            assertFailsWith<MpsFormatException>(token) {
+                Mps.parse("ROWS\n N COST\nCOLUMNS\n X COST $token\nENDATA")
+            }
+        }
+    }
+
+    @Test
+    fun `unchanged copies retain exact sums with overflowing projections`() {
+        val parsed = Mps.parse("ROWS\n N COST\nCOLUMNS\n X COST 1e308\n X COST 1e308\nENDATA")
+
+        val exact = parsed.copy(name = "copy").toExactLpModel()
+
+        assertEquals("2" + "0".repeat(308), exact.objective.cost(0).value.toString())
+    }
+
+    @Test
     fun `rejects a value bound with no value`() {
         val ex = assertFailsWith<MpsFormatException> {
             Mps.parse("ROWS\n N COST\nCOLUMNS\n X1 COST 1\nBOUNDS\n UP X1\nENDATA")
