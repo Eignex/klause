@@ -5,7 +5,7 @@ import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.engine.LpSolution
-import com.eignex.klause.lp.engine.LpVerdict
+import com.eignex.klause.lp.engine.FloatLpStatus
 import com.eignex.klause.lp.engine.solveLp
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.objective.LinearObjective
@@ -68,7 +68,7 @@ class CpToLpRelaxationTableHullTest {
         val p = tableProblem(IntDomain(0, 4), IntDomain(0, 5))
         val (sol, r) = solve(p, LinearObjective(intCoefficients = longArrayOf(1L, 1L)))
 
-        assertEquals(LpVerdict.OPTIMAL, sol.status)
+        assertEquals(FloatLpStatus.OPTIMAL, sol.status)
         assertEquals(4.0, sol.objectiveValue, eps)
         assertEquals(4.0, sol.primal(intCol(r, 0)) + sol.primal(intCol(r, 1)), eps)
     }
@@ -90,7 +90,7 @@ class CpToLpRelaxationTableHullTest {
         val p = tableProblem(IntDomain(0, 4), IntDomain(0, 1))
         val (sol, r) = solve(p, LinearObjective(intCoefficients = longArrayOf(1L, 1L)))
 
-        assertEquals(LpVerdict.OPTIMAL, sol.status)
+        assertEquals(FloatLpStatus.OPTIMAL, sol.status)
         assertEquals(4.0, sol.objectiveValue, eps)
         assertEquals(4.0, sol.primal(intCol(r, 0)), eps)
         assertEquals(0.0, sol.primal(intCol(r, 1)), eps)
@@ -102,7 +102,7 @@ class CpToLpRelaxationTableHullTest {
         // direction lands on a vertex tuple, confirming the hull is exactly those tuples' convex set.
         val p = tableProblem(IntDomain(0, 4), IntDomain(0, 5))
         val (sol, r) = solve(p, LinearObjective(intCoefficients = longArrayOf(-1L, 0L))) // maximize x0
-        assertEquals(LpVerdict.OPTIMAL, sol.status)
+        assertEquals(FloatLpStatus.OPTIMAL, sol.status)
         assertEquals(4.0, sol.primal(intCol(r, 0)), eps) // (4,0) is the max-x0 vertex
         // x0+x1 of any LP point lies within the tuple range; the three tuples all sum to <= 5.
         assertTrue(sol.primal(intCol(r, 0)) + sol.primal(intCol(r, 1)) <= 5.0 + eps)

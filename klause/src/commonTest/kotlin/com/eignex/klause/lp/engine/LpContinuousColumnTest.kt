@@ -25,10 +25,7 @@ class LpContinuousColumnTest {
 
         val result = solveAndCertify(model)
 
-        // The float solve finds the real optimum; the exact basis reconstruction certifies the point is
-        // primal-feasible, so the verdict is OPTIMAL (a definitive SAT). No integer dual certificate is
-        // produced for a real model — the feasibility proof stands in for it.
-        assertEquals(LpVerdict.OPTIMAL, result.verdict)
+        assertEquals(LpVerdict.ATTAINED_OPTIMUM, result.verdict)
         assertNull(result.certificate)
         val float = assertNotNull(result.float)
         assertEquals(1.5, float.objective, 1e-9)
@@ -87,6 +84,6 @@ class LpContinuousColumnTest {
         val x = b.addRealVar(0.0, 1.0, cost = 0.0)
         b.addRealRow(intArrayOf(x), doubleArrayOf(1.0), Relation.LE, 0.5)
         b.addRealRow(intArrayOf(x), doubleArrayOf(1.0), Relation.EQ, 0.5)
-        assertEquals(LpVerdict.OPTIMAL, solveAndCertify(b.build(Sense.MINIMIZE)).verdict)
+        assertEquals(LpVerdict.ATTAINED_OPTIMUM, solveAndCertify(b.build(Sense.MINIMIZE)).verdict)
     }
 }

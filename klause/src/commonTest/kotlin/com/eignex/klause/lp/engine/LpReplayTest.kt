@@ -28,11 +28,11 @@ class LpReplayTest {
         val report = LpReplay.replay(LpCapture.decode(capture.encode()))
 
         assertEquals(3, report.steps.size)
-        assertEquals(LpVerdict.OPTIMAL, report.steps[0].productionVerdict)
+        assertEquals(LpVerdict.ATTAINED_OPTIMUM, report.steps[0].productionVerdict)
         assertEquals(3.0, Double.fromBits(assertNotNull(report.steps[0].objectiveBits)), 1e-9)
         assertEquals(LpReplayOperation.REBIND, report.steps[1].operation)
         assertNull(report.steps[1].productionVerdict)
-        assertEquals(LpVerdict.OPTIMAL, report.steps[2].productionVerdict)
+        assertEquals(LpVerdict.ATTAINED_OPTIMUM, report.steps[2].productionVerdict)
         assertEquals(5.0, Double.fromBits(assertNotNull(report.steps[2].objectiveBits)), 1e-9)
         assertTrue(report.steps[2].metrics.warmHits > 0)
         assertTrue(report.steps[2].hasCertifiedBound)
@@ -85,7 +85,7 @@ class LpReplayTest {
         val step = LpReplay.replay(capture).steps.single()
 
         assertEquals(LpReplayOperation.SOLVE_PRIMAL, step.operation)
-        assertEquals(LpVerdict.OPTIMAL, step.productionVerdict)
+        assertEquals(LpVerdict.ATTAINED_OPTIMUM, step.productionVerdict)
         assertEquals(1, step.metrics.warmAttempts)
     }
 
@@ -170,8 +170,8 @@ class LpReplayTest {
 
         val step = LpReplay.replay(capture).steps.single()
 
-        assertEquals(LpVerdict.OPTIMAL, step.productionVerdict)
-        assertEquals(5L, step.exactLowerBound)
+        assertEquals(LpVerdict.ATTAINED_OPTIMUM, step.productionVerdict)
+        assertEquals(5L, step.integerObjectiveLowerBound)
         assertTrue(step.hasCertifiedBound)
     }
 
@@ -192,7 +192,7 @@ class LpReplayTest {
         val step = LpReplay.replay(capture).steps.single()
 
         assertEquals(LpCandidateKind.FLOAT_BOUND, step.candidate)
-        assertEquals(LpVerdict.INDETERMINATE, step.productionVerdict)
+        assertEquals(LpVerdict.CERTIFIED_BOUND, step.productionVerdict)
         assertTrue(step.hasCertifiedBound)
         assertFalse(step.hasFeasibleWitness)
         assertTrue(step.metrics.pivots <= 1)

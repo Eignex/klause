@@ -4,7 +4,7 @@ import com.eignex.klause.factor.arithmetic.Product
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.lp.engine.LpVerdict
+import com.eignex.klause.lp.engine.FloatLpStatus
 import com.eignex.klause.lp.engine.solveLp
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.objective.LinearObjective
@@ -36,11 +36,11 @@ class CpToLpRelaxationProductTest {
         // a ∈ [1,3], b ∈ [2,4], result = a·b ∈ [2,12].
         val p = problem(IntDomain(1, 3), IntDomain(2, 4))
         val min = solveLp(build(p, LinearObjective(intCoefficients = longArrayOf(0L, 0L, 1L)), mcCormick = true).model)
-        assertEquals(LpVerdict.OPTIMAL, min.status)
+        assertEquals(FloatLpStatus.OPTIMAL, min.status)
         assertTrue(min.objectiveValue <= 2.0 + eps, "UNSOUND: LP min ${min.objectiveValue} above bilinear min 2")
         // maximize result ⇔ minimize −result; true bilinear max = 12.
         val max = solveLp(build(p, LinearObjective(intCoefficients = longArrayOf(0L, 0L, -1L)), mcCormick = true).model)
-        assertEquals(LpVerdict.OPTIMAL, max.status)
+        assertEquals(FloatLpStatus.OPTIMAL, max.status)
         assertTrue(max.objectiveValue <= -12.0 + eps, "UNSOUND: LP max ${-max.objectiveValue} below bilinear max 12")
     }
 
@@ -57,7 +57,7 @@ class CpToLpRelaxationProductTest {
             CpToLpRelaxation(p, LinearObjective(intCoefficients = longArrayOf(0L, 1L)), productMcCormick = true)
                 .build(PropagationSession(p)).model,
         )
-        assertEquals(LpVerdict.OPTIMAL, sol.status)
+        assertEquals(FloatLpStatus.OPTIMAL, sol.status)
         assertTrue(sol.objectiveValue <= 1.0 + eps, "UNSOUND: square LP min ${sol.objectiveValue} above a² min 1")
     }
 
@@ -104,7 +104,7 @@ class CpToLpRelaxationProductTest {
         val without = CpToLpRelaxation(p, obj, productMcCormick = false).build(RootDomains(p))
         assertEquals(without.model.m + 3, withMc.model.m, "only the envelopes whose constants fit survive")
         val sol = solveLp(withMc.model)
-        assertEquals(LpVerdict.OPTIMAL, sol.status)
+        assertEquals(FloatLpStatus.OPTIMAL, sol.status)
         assertTrue(sol.objectiveValue <= eps, "UNSOUND: LP min ${sol.objectiveValue} above the product's 0")
     }
 

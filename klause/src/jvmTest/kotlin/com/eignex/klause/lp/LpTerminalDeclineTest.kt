@@ -327,6 +327,37 @@ class LpTerminalDeclineTest {
     }
 
     @Test
+    fun `a feasible continuous incumbent without an objective proof stays best found`() {
+        val factory = TerminalRecordingFactory()
+        val policy = TerminalPolicy { certifier, successful ->
+            successful && certifier != LpCertifier.INTEGER && certifier != LpCertifier.SAFE_OBJECTIVE &&
+                certifier != LpCertifier.RATIONAL
+        }
+
+        val result = run(continuous, optimize = true, context = LpSolveContext(factory, policy))
+
+        assertEquals(FiniteSolveVerdict.BEST_FOUND, result.verdict)
+        assertEquals(0.5, assertNotNull(result.bestSample).reals.single())
+        assertTrue(policy.observedSuccessful(LpCertifier.EXACT_BASIS))
+        assertEquals(factory.generalSolvers, factory.generalCloses)
+        assertEquals(factory.persistentSolversCreated, factory.persistentCloses)
+    }
+
+    @Test
+    fun `a bound alone cannot accept a continuous satisfaction leaf`() {
+        val factory = TerminalRecordingFactory()
+        val policy = TerminalPolicy { certifier, successful -> successful && certifier == LpCertifier.INTEGER }
+
+        val result = run(continuous, optimize = false, context = LpSolveContext(factory, policy))
+
+        assertEquals(FiniteSolveVerdict.UNKNOWN, result.verdict)
+        assertEquals(0L, result.solutions)
+        assertTrue(policy.observedSuccessful(LpCertifier.INTEGER))
+        assertEquals(factory.generalSolvers, factory.generalCloses)
+        assertEquals(factory.persistentSolversCreated, factory.persistentCloses)
+    }
+
+    @Test
     fun `cancellation during proof fallback stays unknown without leaking context`() {
         var cancelled = false
         val token = Cancellation { cancelled }

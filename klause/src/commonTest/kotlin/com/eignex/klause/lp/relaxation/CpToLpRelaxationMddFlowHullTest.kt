@@ -4,7 +4,7 @@ import com.eignex.klause.factor.table.Mdd
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.lp.engine.LpVerdict
+import com.eignex.klause.lp.engine.FloatLpStatus
 import com.eignex.klause.lp.engine.solveLp
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.objective.LinearObjective
@@ -84,7 +84,7 @@ class CpToLpRelaxationMddFlowHullTest {
         val obj = LinearObjective(intCoefficients = longArrayOf(0, 0, 1)) // minimize the cost var
         val r = CpToLpRelaxation(p, obj, mddHull = true).build(PropagationSession(p))
         val sol = solveLp(r.model)
-        assertEquals(LpVerdict.OPTIMAL, sol.status)
+        assertEquals(FloatLpStatus.OPTIMAL, sol.status)
         assertEquals(2.0, sol.objectiveValue, eps, "minimum accepted-path cost is 2")
     }
 
@@ -118,7 +118,7 @@ class CpToLpRelaxationMddFlowHullTest {
         val obj = LinearObjective(intCoefficients = longArrayOf(0, 0, 1)) // minimize the cost var
         val r = CpToLpRelaxation(p, obj, mddHull = true).build(PropagationSession(p))
         val sol = solveLp(r.model)
-        assertEquals(LpVerdict.OPTIMAL, sol.status)
+        assertEquals(FloatLpStatus.OPTIMAL, sol.status)
         assertEquals(2_000_000_000.0, sol.objectiveValue, 1.0, "minimum accepted-path cost is 2e9")
     }
 
@@ -202,7 +202,7 @@ class CpToLpRelaxationMddFlowHullTest {
             val sol = solveLp(r.model)
             val opt = brute ?: return@repeat // no accepting string: the hull soundly adds no rows
             checked++
-            assertEquals(LpVerdict.OPTIMAL, sol.status, "accepted string exists but LP not optimal")
+            assertEquals(FloatLpStatus.OPTIMAL, sol.status, "accepted string exists but LP not optimal")
             assertEquals(
                 opt.toDouble(),
                 sol.objectiveValue,

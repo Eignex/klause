@@ -4,7 +4,7 @@ import com.eignex.klause.factor.global.GlobalCardinality
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.lp.engine.LpVerdict
+import com.eignex.klause.lp.engine.FloatLpStatus
 import com.eignex.klause.lp.engine.solveLp
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.objective.LinearObjective
@@ -68,7 +68,7 @@ class CpToLpRelaxationGccCountHullTest {
         val hull = solveLp(
             CpToLpRelaxation(p, maximizeTotalCount, gccCountHull = true).build(session).model,
         )
-        assertEquals(LpVerdict.OPTIMAL, hull.status)
+        assertEquals(FloatLpStatus.OPTIMAL, hull.status)
         assertEquals(-2.0, hull.objectiveValue, eps, "the two vars contribute exactly 2 to the cover counts")
         assertTrue(hull.objectiveValue > bare.objectiveValue + eps, "the hull beats the per-count domain bound")
     }
@@ -136,7 +136,7 @@ class CpToLpRelaxationGccCountHullTest {
             val r = CpToLpRelaxation(p, obj, gccCountHull = true).build(PropagationSession(p))
             val sol = solveLp(r.model)
             checked++
-            assertEquals(LpVerdict.OPTIMAL, sol.status, "feasible assignment exists but LP not optimal")
+            assertEquals(FloatLpStatus.OPTIMAL, sol.status, "feasible assignment exists but LP not optimal")
             assertEquals(
                 brute!!.toDouble(),
                 sol.objectiveValue,

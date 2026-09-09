@@ -111,7 +111,7 @@ class LpSolverInjectionTest {
         )
 
         assertEquals(baseline.verdict, explicit.verdict)
-        assertEquals(baseline.exactLowerBound, explicit.exactLowerBound)
+        assertEquals(baseline.integerObjectiveLowerBound, explicit.integerObjectiveLowerBound)
         assertEquals(baseline.float?.objective, explicit.float?.objective)
         assertContentEquals(baseline.float?.basis?.basicVars, explicit.float?.basis?.basicVars)
         assertContentEquals(baseline.farkasRay, explicit.farkasRay)
@@ -174,22 +174,22 @@ class LpSolverInjectionTest {
             ): ComponentLpSolverCapability {
                 val delegate = ProductionLpEngineFactory.newComponentSolver(model, parts, solvers, isolated)
                 return object : ComponentLpSolverCapability, LpSolver by delegate {
-                    override fun exactLowerBound(
+                    override fun exactBound(
                         observer: LpCertificationObserver?,
                         policy: LpCertificationPolicy,
-                    ): Long? = delegate.exactLowerBound(observer, policy)
+                    ): CertifiedLpBound? = delegate.exactBound(observer, policy)
 
-                    override fun exactBasisFeasible(
+                    override fun exactWitness(
                         observer: LpCertificationObserver?,
                         policy: LpCertificationPolicy,
-                    ): Boolean = delegate.exactBasisFeasible(observer, policy)
+                    ): ExactLpWitness? = delegate.exactWitness(observer, policy)
                 }
             }
         }
 
         val result = solveAndCertify(model, context = LpSolveContext(engineFactory = factory))
 
-        assertEquals(LpVerdict.OPTIMAL, result.verdict)
+        assertEquals(LpVerdict.ATTAINED_OPTIMUM, result.verdict)
     }
 
     @Test

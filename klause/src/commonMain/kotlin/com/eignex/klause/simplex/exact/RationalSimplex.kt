@@ -58,6 +58,9 @@ internal class RationalOutcome(
      *  violated row's tableau slack coefficients are exactly `B⁻ᵀe_r` — so an explanation cites only
      *  the load-bearing rows. Null otherwise. */
     val rows: IntArray? = null,
+    /** Rational structural values in normalized, shifted coordinates. */
+    val exactWitness: List<BigFraction>? = null,
+    val conflict: BigRationalConflict? = null,
 )
 
 /** Exact feasibility outcome for consumers that must retain a rational witness rather than round it
@@ -516,7 +519,14 @@ internal fun rationalOutcome(
     maxPivots: Int = defaultRationalPivotCap(model),
     observer: RationalSimplexObserver? = null,
 ): RationalOutcome {
-    if (model.m == 0) return RationalOutcome(RationalFeasibility.FEASIBLE, DoubleArray(model.n))
+    if (model.m == 0) {
+        val point = List(model.n) { BigFraction.ZERO }
+        return RationalOutcome(
+            RationalFeasibility.FEASIBLE,
+            DoubleArray(model.n) { model.loShiftD(it) },
+            exactWitness = point,
+        )
+    }
     // Fixed-width level first; a voided run (latched overflow / unrepresentable input) escalates.
     val fracMark = observer?.let { Monotonic.markNow() }
     val frac = runSimplex(Frac128Ops(), model, cancellation, maxPivots)
@@ -586,7 +596,7 @@ private fun bigRationalOutcomeUnobserved(
             val refutation = state.refutation(row) ?: return BigRationalOutcome(RationalFeasibility.UNKNOWN)
             return BigRationalOutcome(
                 refutation.feasibility,
-                conflict = refutation.rows?.let { rows -> bigConflict(state, row, rows) },
+                conflict = refutation.conflict,
             )
         }
         state.pivot(row, enter)
@@ -692,7 +702,11 @@ private fun <F> runSimplex(
             // the point does not, and the big-level rerun produces both consistently.
             if (ops.overflowed()) return SimplexRun(null, eligible = true, overflowed = true)
             return SimplexRun(
-                RationalOutcome(RationalFeasibility.FEASIBLE, witness),
+                RationalOutcome(
+                    RationalFeasibility.FEASIBLE,
+                    DoubleArray(witness.size) { witness[it].toDouble() + model.loShiftD(it) },
+                    exactWitness = witness,
+                ),
                 eligible = true,
                 overflowed = false,
             )
@@ -912,7 +926,10 @@ private class SimplexState<F>(
             certRows.add(j - model.n)
         }
         if (ops.overflowed()) return null
-        return RationalOutcome(RationalFeasibility.INFEASIBLE, rows = certRows.toIntArray())
+        val rows = certRows.toIntArray()
+        val conflict = bigConflict(this, row, rows)
+        if (ops.overflowed()) return null
+        return RationalOutcome(RationalFeasibility.INFEASIBLE, rows = rows, conflict = conflict)
     }
 
     fun blockingBounds(row: Int): List<ExactSimplexBound> = buildList {
@@ -1260,13 +1277,13 @@ private class SparseTableau<F>(private val ops: FracOps<F>, m: Int, total: Int) 
 }
 
 /**
- * Concrete structural-column values in the source model's coordinates from a lex-feasible final
+ * Exact structural-column values in normalized coordinates from a lex-feasible final
  * state, with δ instantiated at a positive rational small enough that every delta-dependent basic
  * value stays inside its box.
  * Every constraint is affine in δ, so any δ below the per-constraint thresholds works; the
  * thresholds are computed exactly and halved once to sit strictly inside.
  */
-private fun <F> structuralWitness(ops: FracOps<F>, st: SimplexState<F>): DoubleArray {
+private fun <F> structuralWitness(ops: FracOps<F>, st: SimplexState<F>): List<BigFraction> {
     // δ threshold: each basic value a + d·δ needing `>= 0` (d < 0 ⇒ δ ≤ a/(−d)) and, with a finite
     // upper u, `<= u` (d > 0 ⇒ δ ≤ (u − a)/d). Lex-feasibility guarantees each ratio is positive.
     var delta = ops.one
@@ -1284,20 +1301,27 @@ private fun <F> structuralWitness(ops: FracOps<F>, st: SimplexState<F>): DoubleA
         }
     }
     delta = ops.times(delta, ops.half)
-    val out = DoubleArray(st.model.n)
-    for (j in 0 until st.model.n) {
+    return List(st.model.n) { j ->
         val row = st.inBasisRow[j]
         val value = when {
             row >= 0 -> ops.plus(st.basicA[row], ops.times(st.rhsD[row], delta))
             st.atUpper[j] -> st.uppers[j] ?: ops.zero
             else -> ops.zero
         }
-        out[j] = ops.toDouble(value) + st.model.loShiftD(j)
+        exactWitnessFraction(value)
     }
-    return out
 }
 
-/** [structuralWitness] without the final lossy conversion for exact-theory clients. */
+private fun <F> exactWitnessFraction(value: F): BigFraction = when (value) {
+    is BigFraction -> value
+    is Frac128 -> BigFraction.of(
+        (BigInteger.fromLong(value.nHi) shl 64) + BigInteger.fromULong(value.nLo.toULong()),
+        (BigInteger.fromLong(value.dHi) shl 64) + BigInteger.fromULong(value.dLo.toULong()),
+    )
+    else -> error("unsupported exact witness arithmetic")
+}
+
+/** Rational structural values in the normalized coordinates used by exact-theory clients. */
 private fun structuralBigWitness(st: SimplexState<BigFraction>): List<BigFraction> {
     val delta = bigWitnessDelta(st)
     return List(st.model.n) { j ->
@@ -1310,11 +1334,12 @@ private fun structuralBigWitness(st: SimplexState<BigFraction>): List<BigFractio
     }
 }
 
-private fun bigConflict(state: SimplexState<BigFraction>, row: Int, rows: IntArray): BigRationalConflict {
-    val sign = if (state.targetUpper) BigFraction.MINUS_ONE else BigFraction.ONE
+private fun <F> bigConflict(state: SimplexState<F>, row: Int, rows: IntArray): BigRationalConflict {
+    val ops = state.ops
+    val sign = if (state.targetUpper) ops.minusOne else ops.one
     val multipliers = rows.map { source ->
         val slack = state.model.n + source
-        sign * if (slack == state.basis[row]) BigFraction.ONE else state.tab.get(row, slack)
+        exactWitnessFraction(ops.times(sign, if (slack == state.basis[row]) ops.one else state.tab.get(row, slack)))
     }
     return BigRationalConflict(rows, multipliers, state.blockingBounds(row))
 }

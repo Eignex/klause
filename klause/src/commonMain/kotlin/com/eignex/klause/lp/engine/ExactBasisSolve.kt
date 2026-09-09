@@ -1,8 +1,44 @@
 package com.eignex.klause.lp.engine
 
+import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.Int128
+import com.ionspin.kotlin.bignum.integer.BigInteger
 import kotlin.math.abs
 import kotlin.math.roundToLong
+
+internal fun exactPointWitness(
+    model: LpModel,
+    primal: DoubleArray,
+    observer: LpCertificationObserver? = null,
+): ExactLpWitness? {
+    val point = if (primal.size == model.n && primal.all { it.isFinite() }) {
+        checkedLpWitness(model, primal.map { checkNotNull(BigFraction.ofDouble(it)) }) ?: run {
+            val z = DoubleArray(model.n) { primal[it] - model.loShiftD(it) }
+            decimalScaleBits(model, z)?.let { k ->
+                val denominator = BigInteger.fromLong(pow10Long(k))
+                checkedLpWitness(model, List(model.n) { j ->
+                    BigFraction.of(BigInteger.fromLong((z[j] * pow10(k)).roundToLong()), denominator) +
+                        model.exactShift(j)
+                })
+            }
+        }
+    } else null
+    observer?.observe(LpCertifier.EXACT_POINT, point != null)
+    return point
+}
+
+internal fun exactBasisWitness(
+    model: LpModel,
+    basis: Basis,
+    observer: LpCertificationObserver? = null,
+): ExactLpWitness? {
+    var point: ExactLpWitness? = null
+    exactBasisFeasibleUnchecked(model, basis, observer) { candidate ->
+        point = checkedLpWitness(model, candidate)
+    }
+    observer?.observe(LpCertifier.EXACT_BASIS, point != null)
+    return point
+}
 
 /**
  * Exact feasibility of the float primal **point** itself: when every structural value the
@@ -140,14 +176,27 @@ internal fun exactBasisFeasible(model: LpModel, basis: Basis, observer: LpCertif
         observer?.observe(LpCertifier.EXACT_BASIS, it == true)
     }
 
-private fun exactBasisFeasibleUnchecked(model: LpModel, basis: Basis, observer: LpCertificationObserver?): Boolean? {
+private fun exactBasisFeasibleUnchecked(
+    model: LpModel,
+    basis: Basis,
+    observer: LpCertificationObserver?,
+    onPoint: ((List<BigFraction>) -> Unit)? = null,
+): Boolean? {
     val integral = rationalizeToIntegerModel(
         model,
         outwardRealUppers = false,
         observer = observer,
     )?.model ?: return null
     val m = integral.m
-    if (m == 0) return true // no rows ⇒ the box `0 ≤ x ≤ u` (all nonbasic at a valid bound) is feasible
+    if (basis.status.size != model.numVars || basis.basicVars.any { it !in 0 until model.numVars }) return null
+    if (basis.status.indices.any { basis.status[it] == VarStatus.AT_UPPER && !model.hasFiniteUpper(it) }) return null
+    val point = if (onPoint != null) MutableList(model.numVars) { j ->
+        if (basis.status[j] == VarStatus.AT_UPPER) model.exactUpper(j) else BigFraction.ZERO
+    } else null
+    if (m == 0) {
+        point?.let { onPoint?.invoke(List(model.n) { j -> it[j] + model.exactShift(j) }) }
+        return true
+    }
     if (m > MAX_EXACT_BASIS) return null // beyond this the fraction-free minors cannot stay in 128 bits
     val basic = basis.basicVars
     if (basic.size != m) return null
@@ -186,6 +235,7 @@ private fun exactBasisFeasibleUnchecked(model: LpModel, basis: Basis, observer: 
         val bt = Array(m) { r -> b[r].copyOf() }
         for (i in 0 until m) bt[i][t] = rhsAdj[i]
         val detT = bareissDet(bt) ?: return null
+        point?.set(basic[t], BigFraction.of(BigInteger.fromLong(detT), BigInteger.fromLong(det)))
 
         // x_t ≥ 0  ⟺  detT/det ≥ 0  ⟺  detT and det share sign (or detT == 0).
         if (detT != 0L && (detT > 0L) != detPositive) return false
@@ -205,6 +255,7 @@ private fun exactBasisFeasibleUnchecked(model: LpModel, basis: Basis, observer: 
             if (!detPositive && sign < 0) return false
         }
     }
+    point?.let { onPoint?.invoke(List(model.n) { j -> it[j] + model.exactShift(j) }) }
     return true
 }
 

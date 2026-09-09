@@ -1,7 +1,6 @@
 package com.eignex.klause.lp.engine
 
-import com.eignex.klause.simplex.exact.RationalFeasibility
-import com.eignex.klause.simplex.exact.rationalOutcome
+import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.Cancellation
 
 internal enum class LpReplayOperation { SOLVE, SOLVE_PRIMAL, REBIND, RESOLVE_BOUNDS, RESOLVE_GATED }
@@ -34,7 +33,7 @@ internal class LpReplayStep(
     val productionVerdict: LpVerdict?,
     val objectiveBits: Long?,
     val primalBits: LongArray?,
-    val exactLowerBound: Long?,
+    val integerObjectiveLowerBound: Long?,
     val hasFeasibleWitness: Boolean,
     val hasCertifiedBound: Boolean,
     val hasInfeasibilityProof: Boolean,
@@ -44,6 +43,8 @@ internal class LpReplayStep(
     val exactInputAccepted: Int,
     val certificationCapability: LpCertificationCapability = LpCertificationCapability.ELIGIBLE,
     val enforcedRows: BooleanArray? = null,
+    val exactWitness: List<BigFraction>? = null,
+    val rationalLowerBound: BigFraction? = null,
     var independentCheck: LpIndependentCheck = LpIndependentCheck(
         LpIndependentValidation.DECLINED,
         if (candidate == LpCandidateKind.NONE) LpIndependentClaim.NONE else LpIndependentClaim.CANDIDATE_HINT,
@@ -147,101 +148,29 @@ internal object LpReplay {
         val observer = ReplayObserver()
         val result = solve()
         val metrics = solver.lastMetrics
-        if (result == null) {
-            return replayNullResult(eventIndex, operation, model, solver, cancellation, metrics, observer)
-        }
-
-        val componentSolver = solver as? ComponentLpSolver
-        val certificate = integerCertify(model, result.duals, observer = observer)
-        val componentExactLowerBound = if (certificate == null) componentSolver?.exactLowerBound(observer) else null
-        var witness = false
-        var exactPrimal: DoubleArray? = null
-        var rationalVerdict: LpVerdict? = null
-        if (result.optimal && certificate == null && componentExactLowerBound == null && model.hasContinuous) {
-            if (model.rowStrict.none { it }) {
-                witness = componentSolver?.exactBasisFeasible(observer) == true ||
-                    exactBasisFeasible(model, result.basis, observer) == true ||
-                    exactPointFeasible(model, result.primal, observer)
-            }
-            if (!witness) {
-                val outcome = rationalOutcome(model, cancellation).also {
-                    observer.observe(LpCertifier.RATIONAL, it.feasibility != RationalFeasibility.UNKNOWN)
-                }
-                exactPrimal = outcome.witness
-                witness = outcome.feasibility == RationalFeasibility.FEASIBLE
-                rationalVerdict = outcome.feasibility.toVerdict()
-            }
-        }
-        val productionVerdict = when {
-            !result.optimal -> LpVerdict.INDETERMINATE
-            certificate != null || componentExactLowerBound != null -> LpVerdict.OPTIMAL
-            model.hasContinuous && witness -> LpVerdict.OPTIMAL
-            rationalVerdict != null -> rationalVerdict
-            else -> LpVerdict.INDETERMINATE
-        }
+        val certified = certifyLpResult(model, solver, result, cancellation, observer)
         return LpReplayStep(
             eventIndex,
             operation,
-            if (result.optimal) LpCandidateKind.FLOAT_OPTIMUM else LpCandidateKind.FLOAT_BOUND,
-            productionVerdict,
-            result.objective.toRawBits(),
-            (exactPrimal ?: result.primal).toRawBitsArray(),
-            certificate?.objectiveBoundCeil(0L) ?: componentExactLowerBound,
-            witness,
-            certificate != null || componentExactLowerBound != null,
-            productionVerdict == LpVerdict.INFEASIBLE,
+            when {
+                result == null && solver.infeasibleRay != null -> LpCandidateKind.FLOAT_INFEASIBILITY
+                result == null -> LpCandidateKind.NONE
+                result.optimal -> LpCandidateKind.FLOAT_OPTIMUM
+                else -> LpCandidateKind.FLOAT_BOUND
+            },
+            certified.verdict,
+            result?.objective?.toRawBits(),
+            certified.exactPrimal?.map { it.toDouble().toRawBits() }?.toLongArray() ?: result?.primal?.toRawBitsArray(),
+            certified.integerObjectiveLowerBound,
+            certified.witness != null,
+            certified.bound != null,
+            certified.verdict == LpVerdict.INFEASIBLE,
             metrics,
             observer.counts(),
             observer.exactInputAttempts,
             observer.exactInputAccepted,
-        )
-    }
-
-    private fun replayNullResult(
-        eventIndex: Int,
-        operation: LpReplayOperation,
-        model: LpModel,
-        solver: LpSolver,
-        cancellation: Cancellation,
-        metrics: LpSolveMetrics,
-        observer: ReplayObserver,
-    ): LpReplayStep {
-        val floatRay = solver.infeasibleRay
-        val exactRay = floatRay?.let {
-            integerFarkasRay(
-                model,
-                it,
-                basis = solver.infeasibleBasis,
-                basisRow = solver.infeasibleRow,
-                observer = observer,
-            )
-        }
-        var verdict = if (exactRay != null) LpVerdict.INFEASIBLE else LpVerdict.INDETERMINATE
-        var witness = false
-        var exactPrimal: DoubleArray? = null
-        if (exactRay == null) {
-            val outcome = rationalOutcome(model, cancellation).also {
-                observer.observe(LpCertifier.RATIONAL, it.feasibility != RationalFeasibility.UNKNOWN)
-            }
-            verdict = outcome.feasibility.toVerdict()
-            witness = outcome.feasibility == RationalFeasibility.FEASIBLE
-            exactPrimal = outcome.witness
-        }
-        return LpReplayStep(
-            eventIndex,
-            operation,
-            if (floatRay == null) LpCandidateKind.NONE else LpCandidateKind.FLOAT_INFEASIBILITY,
-            verdict,
-            null,
-            exactPrimal?.toRawBitsArray(),
-            null,
-            witness,
-            false,
-            exactRay != null || verdict == LpVerdict.INFEASIBLE,
-            metrics,
-            observer.counts(),
-            observer.exactInputAttempts,
-            observer.exactInputAccepted,
+            exactWitness = certified.exactPrimal,
+            rationalLowerBound = certified.lowerBound,
         )
     }
 
@@ -421,10 +350,5 @@ private class ReplayObserver : LpCertificationObserver {
     }
 }
 
-private fun RationalFeasibility.toVerdict(): LpVerdict = when (this) {
-    RationalFeasibility.FEASIBLE -> LpVerdict.OPTIMAL
-    RationalFeasibility.INFEASIBLE -> LpVerdict.INFEASIBLE
-    RationalFeasibility.UNKNOWN -> LpVerdict.INDETERMINATE
-}
 
 private fun DoubleArray.toRawBitsArray(): LongArray = LongArray(size) { this[it].toRawBits() }

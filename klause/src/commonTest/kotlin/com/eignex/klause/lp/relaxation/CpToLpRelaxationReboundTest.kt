@@ -13,7 +13,7 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.engine.LpModel
-import com.eignex.klause.lp.engine.LpVerdict
+import com.eignex.klause.lp.engine.FloatLpStatus
 import com.eignex.klause.lp.engine.solveLp
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.objective.LinearObjective
@@ -87,7 +87,7 @@ class CpToLpRelaxationReboundTest {
         val r = CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(1)))
             .build(PropagationSession(problem))
         val sol = solveLp(r.model)
-        assertEquals(LpVerdict.OPTIMAL, sol.status)
+        assertEquals(FloatLpStatus.OPTIMAL, sol.status)
         assertEquals(2.0, sol.objectiveValue, 1e-6, "3e9·x >= 6e9 gives min x = 2")
     }
 

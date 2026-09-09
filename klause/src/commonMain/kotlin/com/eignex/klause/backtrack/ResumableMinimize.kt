@@ -809,12 +809,13 @@ internal class ResumableMinimize(
                 when (real.verdict) {
                     LpVerdict.INFEASIBLE -> null
 
-                    LpVerdict.INDETERMINATE -> {
+                    LpVerdict.INDETERMINATE, LpVerdict.CERTIFIED_BOUND -> {
                         sawIndeterminateLeaf = true
                         null
                     }
 
-                    LpVerdict.OPTIMAL -> {
+                    LpVerdict.FEASIBLE, LpVerdict.ATTAINED_OPTIMUM, LpVerdict.UNBOUNDED -> {
+                        if (real.verdict != LpVerdict.ATTAINED_OPTIMUM) sawIndeterminateLeaf = true
                         val full = sample.copy(reals = real.reals)
                         recordIfImproving(full, objective.evaluate(full))
                     }

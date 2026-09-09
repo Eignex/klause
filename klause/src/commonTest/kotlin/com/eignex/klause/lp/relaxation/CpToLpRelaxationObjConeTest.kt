@@ -9,7 +9,7 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.bounding.LpPlan
-import com.eignex.klause.lp.engine.LpVerdict
+import com.eignex.klause.lp.engine.FloatLpStatus
 import com.eignex.klause.lp.engine.solveLp
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.bake
@@ -77,8 +77,8 @@ class CpToLpRelaxationObjConeTest {
 
         val coneSol = solveLp(cone.model)
         val fullSol = solveLp(full.model)
-        assertEquals(LpVerdict.OPTIMAL, coneSol.status)
-        assertEquals(LpVerdict.OPTIMAL, fullSol.status)
+        assertEquals(FloatLpStatus.OPTIMAL, coneSol.status)
+        assertEquals(FloatLpStatus.OPTIMAL, fullSol.status)
         val coneBound = coneSol.objectiveValue
         val fullBound = fullSol.objectiveValue
         // Critical path: s0=0 → s1≥3 → s2≥7 → M≥12.

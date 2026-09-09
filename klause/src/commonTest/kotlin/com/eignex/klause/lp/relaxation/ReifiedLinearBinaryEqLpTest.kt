@@ -5,7 +5,7 @@ import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.lp.engine.LpVerdict
+import com.eignex.klause.lp.engine.FloatLpStatus
 import com.eignex.klause.lp.engine.solveLp
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.objective.LinearObjective
@@ -41,7 +41,7 @@ class ReifiedLinearBinaryEqLpTest {
     private fun lp(p: Problem, intC: Long, boolW: Long): Double {
         val obj = LinearObjective(boolWeights = longArrayOf(boolW), intCoefficients = longArrayOf(intC))
         val sol = solveLp(CpToLpRelaxation(p, obj).build(PropagationSession(p)).model)
-        assertEquals(LpVerdict.OPTIMAL, sol.status)
+        assertEquals(FloatLpStatus.OPTIMAL, sol.status)
         return sol.objectiveValue
     }
 
@@ -70,6 +70,6 @@ class ReifiedLinearBinaryEqLpTest {
 
         val relaxation = CpToLpRelaxation(problem, null).build(PropagationSession(problem))
 
-        assertEquals(LpVerdict.OPTIMAL, solveLp(relaxation.model).status)
+        assertEquals(FloatLpStatus.OPTIMAL, solveLp(relaxation.model).status)
     }
 }

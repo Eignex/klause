@@ -4,6 +4,7 @@ import com.eignex.klause.lp.cut.CutContext
 import com.eignex.klause.lp.cut.CutPool
 import com.eignex.klause.lp.cut.CutSeparator
 import com.eignex.klause.lp.engine.Basis
+import com.eignex.klause.lp.engine.CertifiedLpResult
 import com.eignex.klause.lp.engine.Cut
 import com.eignex.klause.lp.engine.FarkasRoute
 import com.eignex.klause.lp.engine.FloatLpResult
@@ -16,8 +17,11 @@ import com.eignex.klause.lp.engine.TableauCutSolver
 import com.eignex.klause.lp.engine.VarStatus
 import com.eignex.klause.lp.engine.acceptNullable
 import com.eignex.klause.lp.engine.certifiedTightObjectiveLowerBound
+import com.eignex.klause.lp.engine.checkedLpConflict
+import com.eignex.klause.lp.engine.checkedLpWitness
+import com.eignex.klause.lp.engine.exactShift
 import com.eignex.klause.lp.engine.integerCertify
-import com.eignex.klause.lp.engine.integerFarkasRay
+import com.eignex.klause.lp.engine.certifyLpFarkas
 import com.eignex.klause.lp.engine.lpConditioning
 import com.eignex.klause.lp.engine.newPersistentLpSolver
 import com.eignex.klause.lp.engine.newTableauCutSolver
@@ -357,7 +361,7 @@ internal fun LpEngine.sparseSafePrune(
                 for (i in 0 until gatedModel.m) if (!filter.enforced[i]) gatedRay[i] = 0.0
                 val ray = solveContext.certificationPolicy.acceptNullable(
                     LpCertifier.EXACT_FARKAS,
-                    integerFarkasRay(gatedModel, gatedRay, onRoute = {
+                    certifyLpFarkas(gatedModel, gatedRay, onRoute = {
                         sink.lp.observeFarkasRoute(
                             it == FarkasRoute.RECONSTRUCTED,
                             it == FarkasRoute.EXACT_BASIS,
@@ -421,6 +425,9 @@ internal fun LpEngine.sparseSafePrune(
         observeNodeWork(it.optimal, simplex.lastDegenerateColumns, simplex.lastColumns, model.m)
     }
     val result = floatResult ?: run {
+        if (lpCounterResults.read(model, solveContext.certificationPolicy)?.witness != null) {
+            return LpNodeOutcome(false, null)
+        }
         // Infeasibility prune: a dual-unbounded termination is only a *candidate* infeasibility —
         // confirm it with an exact Farkas certificate before pruning (the float ray alone is not sound).
         // Any other failure (non-convergence / singular) keeps the node.
@@ -428,7 +435,7 @@ internal fun LpEngine.sparseSafePrune(
         val ray = if (floatRay != null) {
             solveContext.certificationPolicy.acceptNullable(
                 LpCertifier.EXACT_FARKAS,
-                integerFarkasRay(model, floatRay, onRoute = {
+                certifyLpFarkas(model, floatRay, onRoute = {
                     sink.lp.observeFarkasRoute(
                         it == FarkasRoute.RECONSTRUCTED,
                         it == FarkasRoute.EXACT_BASIS,
@@ -458,7 +465,19 @@ internal fun LpEngine.sparseSafePrune(
                 LpCertifier.RATIONAL,
                 outcome.takeIf { it.feasibility != RationalFeasibility.UNKNOWN },
             )
-            if (acceptedOutcome?.feasibility == RationalFeasibility.INFEASIBLE) {
+            if (acceptedOutcome?.feasibility == RationalFeasibility.FEASIBLE) {
+                val witness = acceptedOutcome.exactWitness?.let { shifted ->
+                    checkedLpWitness(model, shifted.mapIndexed { j, value -> value + model.exactShift(j) })
+                }
+                if (witness != null) lpCounterResults.remember(
+                    model,
+                    CertifiedLpResult(null, null, witness, null, null, false, { null }),
+                    solveContext.certificationPolicy,
+                )
+            }
+            if (acceptedOutcome?.feasibility == RationalFeasibility.INFEASIBLE &&
+                acceptedOutcome.conflict?.let { checkedLpConflict(model, it) } == true
+            ) {
                 sink.lp.observeInfeasiblePrune()
                 // No integer ray exists for a strictness-only conflict; cite the rational decider's
                 // load-bearing rows (their premises plus touched integer bound atoms), falling back to

@@ -236,7 +236,7 @@ class LpInstrumentationHarness {
                 )
                 digest = digest * 31L + result.verdict.ordinal
                 digest = digest * 31L + (result.float?.objective?.toRawBits() ?: 0L)
-                digest = digest * 31L + (result.exactLowerBound ?: 0L)
+                digest = digest * 31L + (result.integerObjectiveLowerBound ?: 0L)
                 digest = digest * 31L + (result.farkasRay?.size ?: 0)
                 digest = digest * 31L + (result.exactPrimal?.size ?: 0)
             }
