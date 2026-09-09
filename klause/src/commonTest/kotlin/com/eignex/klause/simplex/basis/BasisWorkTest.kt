@@ -115,6 +115,42 @@ class BasisWorkTest {
     }
 
     @Test
+    fun `disabled reuse keeps every repair trial on fresh ordering`() {
+        val solver = KotlinBasisSolver(ftSource("sparse", 5), reusePivotOrder = false)
+
+        assertNotNull(solver.refactorizeRepairing(IntArray(5) { it }))
+
+        val build = assertNotNull(solver.basisWork.build)
+        assertTrue(build.builds > 1)
+        assertEquals(0, build.orderingAttempts)
+        assertEquals(0, build.reusedOrders)
+    }
+
+    @Test
+    fun `saturated phase counters preserve recorded declines`() {
+        val meter = BasisWorkMeter()
+        meter.restore(
+            BasisWork(
+                ftran = BasisPhaseWork(
+                    attempts = Long.MAX_VALUE,
+                    successes = Long.MAX_VALUE - 1,
+                    declines = 1,
+                ),
+            ),
+        )
+
+        meter.solveAttempt(transpose = false)
+        meter.solveSuccess(transpose = false, units = 1)
+        meter.solveAttempt(transpose = false)
+        meter.solveDecline(transpose = false)
+
+        val phase = meter.snapshot().ftran
+        assertEquals(Long.MAX_VALUE, phase.attempts)
+        assertEquals(Long.MAX_VALUE, phase.successes)
+        assertEquals(2, phase.declines)
+    }
+
+    @Test
     fun `zero dimension reuses an empty order with zero work`() {
         val source = SparseMatrix.ofColumns(0, 0, emptyList())
         val solver = KotlinBasisSolver(source)

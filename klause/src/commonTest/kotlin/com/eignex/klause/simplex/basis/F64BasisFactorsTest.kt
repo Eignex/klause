@@ -251,6 +251,32 @@ class F64BasisFactorsTest {
     }
 
     @Test
+    fun `malformed proposed orders fall back to ordinary ordering`() {
+        val builder = F64BasisFactors(sparse(arrayOf(doubleArrayOf(1.0, 0.0), doubleArrayOf(0.0, 1.0))))
+        val duplicate = SymbolicLu(intArrayOf(0, 1), intArrayOf(0, 1)).also { it.rowOrder[1] = 0 }
+        val outOfRange = SymbolicLu(intArrayOf(0, 1), intArrayOf(0, 1)).also { it.columnOrder[1] = 2 }
+        val proposals = listOf(
+            SymbolicLu(intArrayOf(0), intArrayOf(0)),
+            SymbolicLu(intArrayOf(0, 1, 2), intArrayOf(0, 1, 2)),
+            duplicate,
+            outOfRange,
+        )
+
+        for (proposal in proposals) {
+            val result = assertIs<LuBuildResult.Built>(
+                builder.build(intArrayOf(0, 1), IntArray(2) { -1 }, proposedOrder = proposal),
+            )
+
+            assertTrue(result.report.proposedOrder)
+            assertFalse(result.report.reusedOrder)
+            assertTrue(result.report.fallback)
+            assertEquals(LuBuildRejection.NO_USABLE_PIVOT, result.report.proposedRejection)
+            assertNotNull(result.report.proposedWork)
+            assertTrue(reconstructionResidual(builderSource(), intArrayOf(0, 1), result.factors) <= 1e-12)
+        }
+    }
+
+    @Test
     fun `input and returned cache mutation cannot change later builds`() {
         val pointers = intArrayOf(0, 2, 4)
         val indices = intArrayOf(0, 1, 0, 1)
@@ -319,6 +345,8 @@ class F64BasisFactorsTest {
             },
         )
     }
+
+    private fun builderSource(): SparseMatrix = sparse(arrayOf(doubleArrayOf(1.0, 0.0), doubleArrayOf(0.0, 1.0)))
 
     private fun reconstructionResidual(source: SparseMatrix, basis: IntArray, factors: LuFactors): Double {
         val n = basis.size
