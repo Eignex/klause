@@ -8,7 +8,7 @@ plugins {
 
 val enableNativeAccess = "--enable-native-access=ALL-UNNAMED"
 
-// koblas ships its sparse-LU work as a snapshot ahead of the next release; the snapshot endpoint is
+// koblas ships its sparse kernels as a snapshot ahead of the next release; the snapshot endpoint is
 // not part of the conventions' default repository set, so declare it here.
 allprojects {
     repositories {
@@ -16,7 +16,7 @@ allprojects {
             mavenContent { snapshotsOnly() }
         }
     }
-    // koblas reaches the host OpenBLAS / SuiteSparse through java.lang.foreign; undeclared, that warns
+    // koblas kernels and the test-only HFactor binding use java.lang.foreign; undeclared, that warns
     // per run and is set to become an error.
     tasks.withType<Test>().configureEach { jvmArgs(enableNativeAccess) }
     tasks.withType<JavaExec>().configureEach { jvmArgs(enableNativeAccess) }

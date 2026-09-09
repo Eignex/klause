@@ -1,13 +1,10 @@
 package com.eignex.klause.lp.engine
 
-import com.eignex.koblas.Capabilities
-import com.eignex.koblas.ContextBuilder
-import com.eignex.koblas.backendNamed
-import com.eignex.koblas.installBackends
-import com.eignex.koblas.koblas
+import com.eignex.klause.simplex.basis.BasisSolver
+import com.eignex.klause.simplex.basis.HfactorBasisSolver
+import com.eignex.koblas.SparseMatrix
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
@@ -15,54 +12,45 @@ class LpOperationTraceTest {
 
     @Test
     fun `fixed backend replays charge deterministic work for the same pivot trace`() {
-        ensureKoblasBackends()
-        val original = koblas
-        val portable = ContextBuilder().resolve()
-        val hfactor = assertNotNull(
-            backendNamed("hfactor-bundled", Capabilities.basisSolvers)
-                ?: backendNamed("hfactor", Capabilities.basisSolvers),
-            "the JVM test runtime must provide HFactor",
-        )
-        assertTrue(portable.basisSolvers.isPortable)
-        assertFalse(hfactor.isPortable)
-        assertTrue(portable.basisSolvers.name != hfactor.name)
-        try {
-            installBackends(portable)
-            val portableTrace = replayTrace()
-            assertEquals(portableTrace, replayTrace(), "portable replay must be deterministic")
-            installBackends(original.with(basisSolvers = hfactor))
-            val hfactorTrace = replayTrace()
-            assertEquals(hfactorTrace, replayTrace(), "HFactor replay must be deterministic")
-            val noBackendContingencies = BackendContingencies(0, 0, 0, 0)
+        val factories: List<((SparseMatrix) -> BasisSolver)?> = listOf(null, ::HfactorBasisSolver)
+        for (factory in factories) {
+            val trace = replayTrace(factory)
 
-            assertEquals(noBackendContingencies, portableTrace.backendContingencies)
-            assertEquals(noBackendContingencies, hfactorTrace.backendContingencies)
-            assertTrue(portableTrace.operations.pivots >= 2)
-            assertTrue(hfactorTrace.operations.pivots >= 2)
-            assertTrue(portableTrace.operations.updateLimitRefactorizations > 0)
-            assertTrue(hfactorTrace.operations.updateLimitRefactorizations > 0)
-            assertTrue(portableTrace.workOps > 0L)
-            assertTrue(hfactorTrace.workOps > 0L)
-        } finally {
-            installBackends(original)
+            assertEquals(trace, replayTrace(factory))
+            assertEquals(BackendContingencies(0, 0, 0, 0), trace.backendContingencies)
+            assertTrue(trace.operations.pivots >= 2)
+            assertTrue(trace.operations.updateLimitRefactorizations > 0)
+            assertTrue(trace.workOps > 0L)
         }
     }
 
-    private fun replayTrace(): WorkTrace {
-        val solver = RevisedSimplex(pivotingModel(), refactorUpdateLimit = 1)
+    private fun replayTrace(factory: ((SparseMatrix) -> BasisSolver)?): WorkTrace {
+        val model = pivotingModel()
+        val solver = RevisedSimplex(model, refactorUpdateLimit = 1, basisSolverFactory = factory)
         val result = solver.use { assertNotNull(it.solve()) }
+        assertTrue(result.optimal)
+        val x = result.primal
+        assertTrue(x.all { it >= -1e-9 && it <= 10.0 + 1e-9 })
+        assertTrue(x[0] + x[1] >= 3.0 - 1e-9)
+        assertTrue(x[1] + x[2] >= 4.0 - 1e-9)
+        assertTrue(x[2] + x[3] >= 5.0 - 1e-9)
+        assertTrue(x[0] + x[3] >= 2.0 - 1e-9)
+        assertEquals(8.0, x.sum(), 1e-9)
+        assertEquals(8L, integerDualLowerBoundCeil(model, result.duals))
         val metrics = solver.lastMetrics
         return WorkTrace(
             metrics.prescribedOperations(),
             metrics.backendContingencies(),
             metrics.workOps,
             result.basis.state(),
-            observedPivotTrace(metrics.pivots),
+            observedPivotTrace(metrics.pivots, factory),
         )
     }
 
-    private fun observedPivotTrace(pivots: Int): List<BasisState> = (1..pivots).map { limit ->
-        val solver = RevisedSimplex(pivotingModel(), refactorUpdateLimit = 1, iterationLimit = limit)
+    private fun observedPivotTrace(pivots: Int, factory: ((SparseMatrix) -> BasisSolver)?): List<BasisState> = (1..pivots).map { limit ->
+        val solver = RevisedSimplex(
+            pivotingModel(), refactorUpdateLimit = 1, iterationLimit = limit, basisSolverFactory = factory,
+        )
         val result = solver.use { assertNotNull(it.solve()) }
         assertEquals(limit, result.pivots)
         result.basis.state()

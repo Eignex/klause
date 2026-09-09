@@ -1,14 +1,14 @@
 package com.eignex.klause.lp.engine
 
 import com.eignex.klause.lp.engine.Cut
+import com.eignex.klause.simplex.basis.BasisSolver
+import com.eignex.klause.simplex.basis.BasisUpdate
+import com.eignex.klause.simplex.basis.IndexedVector
+import com.eignex.klause.simplex.basis.KotlinBasisSolver
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.argsortBy
 import com.eignex.koblas.SparseMatrix
-import com.eignex.koblas.koblas
-import com.eignex.koblas.sparse.basis.BasisSolver
-import com.eignex.koblas.sparse.basis.BasisUpdate
-import com.eignex.koblas.sparse.basis.IndexedVector
 import kotlin.math.abs
 
 /**
@@ -65,12 +65,11 @@ internal const val DEFAULT_REFACTOR_UPDATE_LIMIT: Int = 50
  * singular basis); its [FloatLpResult.basis] is then certified exactly downstream, so float rounding is never
  * safety-critical.
  *
- * The basis itself is held by a koblas [BasisSolver], which owns the factors, the pivot order and
+ * The basis itself is held by a [BasisSolver], which owns the factors, the pivot order and
  * the updates while this owns pricing, the ratio tests and the refactorization policy. A basis is named
  * by index into `columns`, whose columns are fixed for the solver's lifetime, so a pivot hands the solver the
- * spike it already computed for the ratio test rather than a rebuilt square matrix. Which backend fills
- * the seam is a deployment question: HFactor where its binding loaded, koblas's portable product-form
- * solver otherwise, and the pivot path is the same either way.
+ * spike it already computed for the ratio test rather than a rebuilt square matrix. The default is klause's
+ * Kotlin factorization on every platform; an injected factory can supply another implementation.
  *
  * [refactorUpdateLimit] caps the updates folded in before the basis is rebuilt, bounding fill and
  * rounding drift beyond whatever the solver itself advises through [BasisUpdate.REFACTORIZE]. It is a
@@ -164,7 +163,7 @@ internal class RevisedSimplex(
     private var maxLuDensity = 0.0 // max (nnz of the held factors) / m² — 1.0 means the factors are dense
 
     /**
-     * The basis, held across pivots by whichever backend fills koblas's basis seam.
+     * The basis, held across pivots by this engine's factorization owner.
      *
      * Built on first use rather than in the constructor: a native solver owns a handle, and the
      * engines a search discards without ever solving — a component split that declines, a shave that
@@ -316,9 +315,7 @@ internal class RevisedSimplex(
     private fun solver(): BasisSolver = basisSolver ?: newSolver()
 
     private fun newSolver(): BasisSolver {
-        basisSolverFactory?.let { return it(columns).also { solver -> basisSolver = solver } }
-        ensureKoblasBackends()
-        return koblas.basisSolver(columns).also { basisSolver = it }
+        return (basisSolverFactory?.invoke(columns) ?: KotlinBasisSolver(columns)).also { basisSolver = it }
     }
 
     override fun close() {
