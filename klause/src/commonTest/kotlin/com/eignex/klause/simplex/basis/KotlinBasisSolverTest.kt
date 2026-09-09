@@ -231,6 +231,7 @@ class KotlinBasisSolverTest {
         assertFailsWith<IllegalStateException> { solver.nnz }
         assertFailsWith<IllegalStateException> { solver.rcond }
         assertFailsWith<IllegalStateException> { solver.updateCount }
+        assertFailsWith<IllegalStateException> { solver.basisWork }
         assertFailsWith<IllegalStateException> { solver.refactorize(intArrayOf()) }
         assertFailsWith<IllegalStateException> { solver.ftran(vector) }
         assertFailsWith<IllegalStateException> { solver.btran(vector) }
@@ -246,13 +247,20 @@ class KotlinBasisSolverTest {
             assertTrue(solver.refactorize(intArrayOf(0)))
             for (transpose in listOf(false, true)) {
                 val vector = IndexedVector(1).also { it.store(0, rhs) }
-                assertFailsWith<ArithmeticException> {
+                val before = if (transpose) solver.basisWork.btran else solver.basisWork.ftran
+                assertFailsWith<BasisArithmeticException> {
                     if (transpose) solver.btran(vector) else solver.ftran(vector)
                 }
                 assertEquals(rhs, vector[0])
+                val declined = if (transpose) solver.basisWork.btran else solver.basisWork.ftran
+                assertEquals(before.attempts + 1, declined.attempts)
+                assertEquals(before.successes, declined.successes)
                 vector.scatter(doubleArrayOf(pivot))
                 if (transpose) solver.btran(vector) else solver.ftran(vector)
                 assertEquals(1.0, vector[0])
+                val recovered = if (transpose) solver.basisWork.btran else solver.basisWork.ftran
+                assertEquals(before.attempts + 2, recovered.attempts)
+                assertEquals(before.successes + 1, recovered.successes)
             }
         }
     }

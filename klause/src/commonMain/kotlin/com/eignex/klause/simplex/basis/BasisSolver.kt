@@ -43,6 +43,7 @@ internal interface BasisSolver : AutoCloseable {
     val rcond: Double
     val refactorizeReason: RefactorizeReason? get() = null
     val kernel: BasisKernel? get() = null
+    val basisWork: BasisWork? get() = null
 
     fun refactorize(basicIndex: IntArray): Boolean
     fun ftran(x: IndexedVector, expectedDensity: Double = 1.0)

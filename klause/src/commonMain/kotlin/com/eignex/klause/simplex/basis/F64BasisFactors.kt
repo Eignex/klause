@@ -31,15 +31,29 @@ internal data class LuBuildWork(
     val factorEntries: Int,
 )
 
+internal data class LuBuildReport(
+    val proposedOrder: Boolean,
+    val reusedOrder: Boolean,
+    val fallback: Boolean,
+    val proposedRejection: LuBuildRejection?,
+    val proposedWork: LuBuildWork?,
+    val selectedWork: LuBuildWork,
+) {
+    val units: Long = saturatedAdd(proposedWork?.units ?: 0, selectedWork.units)
+}
+
 // These are floating-point declines, including exhausted numerical pivots, never exact rank claims.
 internal enum class LuBuildRejection { NO_USABLE_PIVOT, NONFINITE_INPUT, ARITHMETIC_BREAKDOWN }
 
 internal sealed interface LuBuildResult {
     val work: LuBuildWork
+    val report: LuBuildReport
 
-    class Built(val factors: LuFactors, override val work: LuBuildWork) : LuBuildResult
+    class Built(val factors: LuFactors, override val work: LuBuildWork, override val report: LuBuildReport) :
+        LuBuildResult
 
-    class Rejected(val reason: LuBuildRejection, override val work: LuBuildWork) : LuBuildResult
+    class Rejected(val reason: LuBuildRejection, override val work: LuBuildWork, override val report: LuBuildReport) :
+        LuBuildResult
 }
 
 // Buffers belong exclusively to this cache; updates must not alias another build.
@@ -67,7 +81,12 @@ internal class F64BasisFactors(matrix: SparseMatrix) {
     fun build(basisColumns: IntArray, policy: LuPivotPolicy = LuPivotPolicy()): LuBuildResult =
         build(basisColumns, IntArray(dimension) { -1 }, policy)
 
-    fun build(basisColumns: IntArray, unitRows: IntArray, policy: LuPivotPolicy = LuPivotPolicy()): LuBuildResult {
+    fun build(
+        basisColumns: IntArray,
+        unitRows: IntArray,
+        policy: LuPivotPolicy = LuPivotPolicy(),
+        proposedOrder: SymbolicLu? = null,
+    ): LuBuildResult {
         require(basisColumns.size == dimension)
         require(unitRows.size == dimension)
         for (slot in basisColumns.indices) {
@@ -75,8 +94,44 @@ internal class F64BasisFactors(matrix: SparseMatrix) {
             require(unitRows[slot] == -1 || unitRows[slot] in 0 until dimension)
             require((basisColumns[slot] in 0 until source.cols) != (unitRows[slot] in 0 until dimension))
         }
-        return LuConstruction(source, basisColumns.copyOf(), unitRows.copyOf(), policy).build()
+        val columns = basisColumns.copyOf()
+        val units = unitRows.copyOf()
+        val proposal = proposedOrder?.let { SymbolicLu(it.rowOrder.copyOf(), it.columnOrder.copyOf()) }
+        if (proposal != null) {
+            val proposed = LuConstruction(source, columns, units, policy, proposal).build()
+            if (proposed is LuAttemptResult.Built) {
+                return proposed.result(
+                    LuBuildReport(true, true, false, null, null, proposed.work),
+                )
+            }
+            val rejected = proposed as LuAttemptResult.Rejected
+            val fallback = LuConstruction(source, columns, units, policy, null).build()
+            return fallback.result(
+                LuBuildReport(
+                    true,
+                    false,
+                    true,
+                    rejected.reason,
+                    rejected.work,
+                    fallback.work,
+                ),
+            )
+        }
+        val fresh = LuConstruction(source, columns, units, policy, null).build()
+        return fresh.result(LuBuildReport(false, false, false, null, null, fresh.work))
     }
+}
+
+private sealed interface LuAttemptResult {
+    val work: LuBuildWork
+
+    class Built(val factors: LuFactors, override val work: LuBuildWork) : LuAttemptResult
+    class Rejected(val reason: LuBuildRejection, override val work: LuBuildWork) : LuAttemptResult
+}
+
+private fun LuAttemptResult.result(report: LuBuildReport): LuBuildResult = when (this) {
+    is LuAttemptResult.Built -> LuBuildResult.Built(factors, work, report)
+    is LuAttemptResult.Rejected -> LuBuildResult.Rejected(reason, work, report)
 }
 
 private class LuConstruction(
@@ -84,6 +139,7 @@ private class LuConstruction(
     private val basisColumns: IntArray,
     private val unitRows: IntArray,
     private val policy: LuPivotPolicy,
+    private val proposedOrder: SymbolicLu?,
 ) {
     private val n = source.rows
     private val columns = Array(n) { MutableIntDoubleMap() }
@@ -104,16 +160,21 @@ private class LuConstruction(
     private var schurUpdates = 0L
     private var fillCreated = 0L
 
-    fun build(): LuBuildResult {
+    fun build(): LuAttemptResult {
         if (!load()) return rejected(LuBuildRejection.NONFINITE_INPUT)
         var inKernel = false
         while (pivots < n) {
-            val singleton = singleton()
-            if (singleton == null && !inKernel) {
+            val proposed = proposedOrder?.let {
+                LuPivot(it.rowOrder[pivots], it.columnOrder[pivots]).takeIf { pivot ->
+                    acceptable(pivot.row, pivot.column)
+                } ?: return rejected(LuBuildRejection.NO_USABLE_PIVOT)
+            }
+            val singleton = if (proposed == null) singleton() else null
+            if (proposed == null && singleton == null && !inKernel) {
                 inKernel = true
                 kernelDimension = n - pivots
             }
-            val pivot = singleton ?: markowitz() ?: return rejected(LuBuildRejection.NO_USABLE_PIVOT)
+            val pivot = proposed ?: singleton ?: markowitz() ?: return rejected(LuBuildRejection.NO_USABLE_PIVOT)
             if (!eliminate(pivot)) return rejected(LuBuildRejection.ARITHMETIC_BREAKDOWN)
             if (singleton != null) singletonPivots++
             rowOrder[pivots] = pivot.row
@@ -125,7 +186,7 @@ private class LuConstruction(
         val u = upper.matrix(n, null, symbolic.columnPosition)
         val lt = lower.matrix(n, symbolic.rowPosition, null, transpose = true)
         val ut = upper.matrix(n, null, symbolic.columnPosition, transpose = true)
-        return LuBuildResult.Built(LuFactors(basisColumns, unitRows, symbolic, l, u, lt, ut), work())
+        return LuAttemptResult.Built(LuFactors(basisColumns, unitRows, symbolic, l, u, lt, ut), work())
     }
 
     private fun load(): Boolean {
@@ -294,7 +355,7 @@ private class LuConstruction(
         schurUpdates, fillCreated, lower.size + upper.size,
     )
 
-    private fun rejected(reason: LuBuildRejection) = LuBuildResult.Rejected(reason, work())
+    private fun rejected(reason: LuBuildRejection) = LuAttemptResult.Rejected(reason, work())
 }
 
 internal fun LuFactors.copyOwned(): LuFactors = LuFactors(
