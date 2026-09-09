@@ -1,5 +1,7 @@
 package com.eignex.klause.simplex.basis
 
+internal class BasisArithmeticException(message: String) : ArithmeticException(message)
+
 internal enum class BasisUpdate {
     APPLIED,
     REFACTORIZE,

@@ -51,7 +51,11 @@ class IndexedVectorTest {
     @Test
     fun `scattering a column replaces the previous support`() {
         val matrix = SparseMatrix.wrap(
-            3, 2, intArrayOf(0, 1, 3), intArrayOf(0, 1, 2), doubleArrayOf(1.0, 0.0, 4.0),
+            3,
+            2,
+            intArrayOf(0, 1, 3),
+            intArrayOf(0, 1, 2),
+            doubleArrayOf(1.0, 0.0, 4.0),
         )
         val vector = IndexedVector(3)
         vector.unit(0)

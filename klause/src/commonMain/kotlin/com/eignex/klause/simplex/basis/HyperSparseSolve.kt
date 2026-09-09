@@ -46,7 +46,7 @@ internal class BasisWorkspace(val size: Int) {
             alpha, slice.indices, slice.offset + start, slice.values, slice.offset + start, length,
             values, marks, 1, indices, 0, count, arithmeticStatus, 0,
         )
-        if (arithmeticStatus[0] != 0) throw ArithmeticException("checked basis scatter breakdown")
+        if (arithmeticStatus[0] != 0) throw BasisArithmeticException("checked basis scatter breakdown")
     }
 
     fun load(vector: IndexedVector, position: IntArray? = null) {
@@ -173,19 +173,19 @@ internal class HyperSparseSolve(
 }
 
 internal fun basisFinite(value: Double): Double {
-    if (!value.isFinite()) throw ArithmeticException("nonfinite basis arithmetic")
+    if (!value.isFinite()) throw BasisArithmeticException("nonfinite basis arithmetic")
     return value
 }
 
 internal fun basisProduct(a: Double, b: Double): Double {
     val result = basisFinite(a * b)
-    if (result == 0.0 && a != 0.0 && b != 0.0) throw ArithmeticException("basis product underflow")
+    if (result == 0.0 && a != 0.0 && b != 0.0) throw BasisArithmeticException("basis product underflow")
     return result
 }
 
 internal fun basisQuotient(a: Double, b: Double): Double {
     val result = basisFinite(a / b)
-    if (result == 0.0 && a != 0.0) throw ArithmeticException("basis quotient underflow")
+    if (result == 0.0 && a != 0.0) throw BasisArithmeticException("basis quotient underflow")
     return result
 }
 
