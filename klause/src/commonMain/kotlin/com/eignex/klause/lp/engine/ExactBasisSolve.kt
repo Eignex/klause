@@ -16,13 +16,18 @@ internal fun exactPointWitness(
             val z = DoubleArray(model.n) { primal[it] - model.loShiftD(it) }
             decimalScaleBits(model, z)?.let { k ->
                 val denominator = BigInteger.fromLong(pow10Long(k))
-                checkedLpWitness(model, List(model.n) { j ->
-                    BigFraction.of(BigInteger.fromLong((z[j] * pow10(k)).roundToLong()), denominator) +
-                        model.exactShift(j)
-                })
+                checkedLpWitness(
+                    model,
+                    List(model.n) { j ->
+                        BigFraction.of(BigInteger.fromLong((z[j] * pow10(k)).roundToLong()), denominator) +
+                            model.exactShift(j)
+                    },
+                )
             }
         }
-    } else null
+    } else {
+        null
+    }
     observer?.observe(LpCertifier.EXACT_POINT, point != null)
     return point
 }
@@ -190,9 +195,13 @@ private fun exactBasisFeasibleUnchecked(
     val m = integral.m
     if (basis.status.size != model.numVars || basis.basicVars.any { it !in 0 until model.numVars }) return null
     if (basis.status.indices.any { basis.status[it] == VarStatus.AT_UPPER && !model.hasFiniteUpper(it) }) return null
-    val point = if (onPoint != null) MutableList(model.numVars) { j ->
-        if (basis.status[j] == VarStatus.AT_UPPER) model.exactUpper(j) else BigFraction.ZERO
-    } else null
+    val point = if (onPoint != null) {
+        MutableList(model.numVars) { j ->
+            if (basis.status[j] == VarStatus.AT_UPPER) model.exactUpper(j) else BigFraction.ZERO
+        }
+    } else {
+        null
+    }
     if (m == 0) {
         point?.let { onPoint?.invoke(List(model.n) { j -> it[j] + model.exactShift(j) }) }
         return true

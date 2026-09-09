@@ -188,7 +188,6 @@ internal interface ComponentLpSolverCapability : LpSolver {
         observer: LpCertificationObserver? = null,
         policy: LpCertificationPolicy = ProductionLpCertificationPolicy,
     ): ExactLpWitness?
-
 }
 
 /**
@@ -266,7 +265,8 @@ internal fun newLpSolver(
  * budget the solve itself — both simplex-specific, so this never decomposes.
  *
  * [iterationLimit] and [workLimit] bound the dual solve, each 0 leaving it to the engine; a truncated
- * dual iterate supplies only a candidate to certify against the true objective. [trackDegeneracy] turns on the dual-degeneracy measurement
+ * dual iterate supplies only a candidate to certify against the true objective. [trackDegeneracy]
+ * turns on the dual-degeneracy measurement
  * an adaptive budget reads back.
  */
 internal fun newTableauCutSolver(

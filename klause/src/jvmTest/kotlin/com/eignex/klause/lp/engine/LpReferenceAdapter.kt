@@ -135,7 +135,9 @@ internal class LpReferenceAdapter(
     fun exactObjective(model: LpModel, witness: List<BigFraction>, enforcedRows: BooleanArray? = null): BigFraction? {
         if (witness.size != model.n) return null
         val data = exactData(model, enforcedRows) ?: return null
-        return data.objective(witness.mapIndexed { column, value -> value - data.shifts[column] }) + data.objectiveConstant
+        return data.objective(
+            witness.mapIndexed { column, value -> value - data.shifts[column] },
+        ) + data.objectiveConstant
     }
 
     private fun interrupted(): LpReferenceResult.Declined =

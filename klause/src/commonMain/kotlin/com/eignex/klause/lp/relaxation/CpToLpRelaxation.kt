@@ -42,11 +42,11 @@ import com.eignex.klause.lp.statesBothBounds
 import com.eignex.klause.lp.statesLowerBound
 import com.eignex.klause.lp.statesUpperBound
 import com.eignex.klause.propagation.PropagationSession
+import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.LpRoute
 import com.eignex.klause.solver.result.LpStatsSink
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.EmptyDoubleArray
 import com.eignex.klause.util.EmptyIntArray
@@ -311,8 +311,10 @@ internal fun leafRealFeasibility(
     val colRealId = relaxation.colRealId
     for (col in colRealId.indices) {
         val r = colRealId[col]
-        if (r >= 0 && col < primal.size) exactReals[r] +=
-            BigFraction.ofLong(relaxation.colRealSign[col].toLong()) * primal[col]
+        if (r >= 0 && col < primal.size) {
+            exactReals[r] +=
+                BigFraction.ofLong(relaxation.colRealSign[col].toLong()) * primal[col]
+        }
     }
     return LeafRealResult(certified.verdict, DoubleArray(exactReals.size) { exactReals[it].toDouble() }, exactReals)
 }

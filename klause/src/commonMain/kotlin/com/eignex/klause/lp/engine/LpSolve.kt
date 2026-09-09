@@ -92,7 +92,11 @@ internal fun certifyLpResult(
             policy.acceptNullable(
                 LpCertifier.EXACT_FARKAS,
                 certifyLpFarkas(
-                    model, it, basis = solver.infeasibleBasis, basisRow = solver.infeasibleRow, observer = observer,
+                    model,
+                    it,
+                    basis = solver.infeasibleBasis,
+                    basisRow = solver.infeasibleRow,
+                    observer = observer,
                 ),
             )
         }
@@ -100,16 +104,23 @@ internal fun certifyLpResult(
     // Retain the migration fallback; this is feasibility recovery, not an optimization solve.
     if (witness == null && ray == null && (result == null || model.hasContinuous)) {
         val outcome = rationalOutcome(model, cancellation)
-        observer?.observe(LpCertifier.RATIONAL, outcome.feasibility != RationalFeasibility.UNKNOWN)
-        val accepted = policy.acceptNullable(
-            LpCertifier.RATIONAL, outcome.takeIf { it.feasibility != RationalFeasibility.UNKNOWN },
-        )
-        if (accepted?.feasibility == RationalFeasibility.FEASIBLE) {
-            witness = accepted.exactWitness?.let { shifted ->
+        val point = if (outcome.feasibility == RationalFeasibility.FEASIBLE) {
+            outcome.exactWitness?.let { shifted ->
                 checkedLpWitness(model, shifted.mapIndexed { j, value -> value + model.exactShift(j) })
             }
-        } else if (accepted?.feasibility == RationalFeasibility.INFEASIBLE) {
-            conflict = accepted.conflict?.takeIf { checkedLpConflict(model, it) }
+        } else {
+            null
+        }
+        val refutation = if (outcome.feasibility == RationalFeasibility.INFEASIBLE) {
+            outcome.conflict?.takeIf { checkedLpConflict(model, it) }
+        } else {
+            null
+        }
+        val success = point != null || refutation != null
+        observer?.observe(LpCertifier.RATIONAL, success)
+        if (policy.acceptNullable(LpCertifier.RATIONAL, outcome.takeIf { success }) != null) {
+            witness = point
+            conflict = refutation
         }
     }
     if (result != null && witness != null && bound?.value != witness.objective && !cancellation()) {
@@ -123,15 +134,27 @@ internal fun certifyLpResult(
         solver.recessionDirection?.let { direction ->
             policy.acceptNullable(LpCertifier.EXACT_POINT, checkedLpUnboundedness(model, witness, direction))
         }
-    } else null
+    } else {
+        null
+    }
     val certified = CertifiedLpResult(
-        result, bound, witness, ray, conflict, model.hasIntegralObjective(),
+        result,
+        bound,
+        witness,
+        ray,
+        conflict,
+        model.hasIntegralObjective(),
         // Freeze the value before mutable objective/bound arrays can change; evaluation is opt-in.
         safeBound = { null },
     )
     counterResults?.remember(model, certified, policy)
     return CertifiedLpResult(
-        result, bound, witness, ray, conflict, model.hasIntegralObjective(),
+        result,
+        bound,
+        witness,
+        ray,
+        conflict,
+        model.hasIntegralObjective(),
         safeBound = result?.let {
             val snapshot = LpCapturedModel.capture(model).toModel()
             val duals = it.duals.copyOf()
@@ -230,7 +253,12 @@ internal fun certifyLpFarkas(
         }
     }
     val ray = integerFarkasRay(
-        model, candidate, basis = basis, basisRow = basisRow, onRoute = { route = it }, observer = mechanismObserver,
+        model,
+        candidate,
+        basis = basis,
+        basisRow = basisRow,
+        onRoute = { route = it },
+        observer = mechanismObserver,
     )?.takeIf { sourceFarkasValid(model, it) }
     observer?.observe(LpCertifier.EXACT_FARKAS, ray != null)
     onRoute?.invoke(if (ray != null) route else FarkasRoute.NONE)
@@ -360,8 +388,11 @@ private inline fun LpModel.forEachRationalColumn(j: Int, action: (Int, BigFracti
         action(j - n, BigFraction.ONE)
     } else {
         val dv = doubleView
-        if (dv == null) forEachInColumn(j) { row, a -> action(row, BigFraction.ofLong(a)) }
-        else for (p in dv.colPtr[j] until dv.colPtr[j + 1]) action(dv.rowIdx[p], exactDouble(dv.colVal[p]))
+        if (dv == null) {
+            forEachInColumn(j) { row, a -> action(row, BigFraction.ofLong(a)) }
+        } else {
+            for (p in dv.colPtr[j] until dv.colPtr[j + 1]) action(dv.rowIdx[p], exactDouble(dv.colVal[p]))
+        }
     }
 }
 
@@ -392,7 +423,9 @@ internal class LpCounterResults {
 
     fun read(model: LpModel, policy: LpCertificationPolicy): CertifiedLpResult? {
         val current = keyOf(model)
-        if (policy !== ProductionLpCertificationPolicy || current == null || key?.contentEquals(current) != true || acceptedBy !== policy) {
+        if (policy !== ProductionLpCertificationPolicy || current == null ||
+            key?.contentEquals(current) != true || acceptedBy !== policy
+        ) {
             key = null
             evidence = null
             return null
@@ -415,8 +448,10 @@ internal class LpCounterResults {
 internal fun exactLpStateKey(model: LpModel): ByteArray? {
     var size = model.n.toLong() * 16 + model.m.toLong() * 16 + model.csc.colVal.size.toLong() * 3
     model.doubleView?.let { size += it.colVal.size.toLong() * 3 }
-    for (premises in model.rowPremises) if (premises != null) {
-        size += premises.vars.size.toLong() * 3 + premises.boolLits.size
+    for (premises in model.rowPremises) {
+        if (premises != null) {
+            size += premises.vars.size.toLong() * 3 + premises.boolLits.size
+        }
     }
     if (size > MAX_COUNTER_KEY_VALUES) return null
     return LpCapture.capture(model, LpReplaySettings("exact-counter", 0L), emptyList()).encode()

@@ -22,11 +22,11 @@ import com.eignex.klause.lp.bounding.rootLpBoundsNoBake
 import com.eignex.klause.lp.bounding.rootLpInfeasibleNoBake
 import com.eignex.klause.lp.bounding.rootLpRelaxationBound
 import com.eignex.klause.lp.bounding.sparseCertifiedPrune
-import com.eignex.klause.lp.engine.CertifiedLpBound
-import com.eignex.klause.lp.engine.ExactLpWitness
 import com.eignex.klause.lp.engine.Basis
+import com.eignex.klause.lp.engine.CertifiedLpBound
 import com.eignex.klause.lp.engine.ComponentLpSolverCapability
 import com.eignex.klause.lp.engine.Cut
+import com.eignex.klause.lp.engine.ExactLpWitness
 import com.eignex.klause.lp.engine.FloatLpResult
 import com.eignex.klause.lp.engine.LpBuilder
 import com.eignex.klause.lp.engine.LpCertificationObserver
@@ -657,7 +657,10 @@ class LpDeclineDisciplineTest {
         val optimize = source(root, "klause/src/commonMain/kotlin/com/eignex/klause/backtrack/ResumableMinimize.kt")
 
         assertTrue("LpVerdict.INDETERMINATE, LpVerdict.CERTIFIED_BOUND -> ComponentCheck.Indeterminate" in search)
-        assertTrue("LpVerdict.INDETERMINATE, LpVerdict.CERTIFIED_BOUND -> {\n                        sawIndeterminateLeaf = true" in optimize)
+        assertTrue(
+            ("LpVerdict.INDETERMINATE, LpVerdict.CERTIFIED_BOUND -> {\n" +
+                "                        sawIndeterminateLeaf = true") in optimize,
+        )
         assertTrue("sawIndeterminateLeaf -> MinimizeResult.Unknown" in optimize)
     }
 
