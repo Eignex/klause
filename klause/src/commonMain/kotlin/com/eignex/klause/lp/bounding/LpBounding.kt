@@ -471,10 +471,10 @@ internal fun LpEngine.sparseSafePrune(
                 }
                 if (witness != null) {
                     lpCounterResults.remember(
-                    model,
-                    CertifiedLpResult(null, null, witness, null, null, false, { null }),
-                    solveContext.certificationPolicy,
-                )
+                        model,
+                        CertifiedLpResult(null, null, witness, null, null, false, { null }),
+                        solveContext.certificationPolicy,
+                    )
                 }
             }
             if (acceptedOutcome?.feasibility == RationalFeasibility.INFEASIBLE &&
