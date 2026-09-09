@@ -26,6 +26,9 @@ class LpExplanationReducedCostReasonTest {
     fun `reduced-cost fixing reason never excludes a feasible improving point`() {
         val rng = Random(20260610)
         var checks = 0
+        var basicTargets = 0
+        var positiveTargets = 0
+        var negativeTargets = 0
         repeat(3000) {
             val n = rng.nextInt(2, 4)
             val hi = rng.nextInt(2, 6)
@@ -49,33 +52,37 @@ class LpExplanationReducedCostReasonTest {
             }
             val model = b.build(Sense.MINIMIZE)
             val sol = RevisedSimplex(model).solve() ?: return@repeat
-            val cert = integerCertify(model, sol.duals) ?: return@repeat
+            val scaleBits = rng.nextInt(0, 9)
+            val cert = integerCertify(model, sol.duals, scaleBits) ?: return@repeat
+            val sourceConstant = rng.nextInt(-3, 4).toLong()
             // Incumbent target: an integer bound on the objective at or above ⌈L⌉ (some slack).
-            val m = (cert.objectiveBoundCeil(0L) ?: return@repeat) + rng.nextInt(0, 3)
-            if (!cert.improvingGapNonNegative(m)) return@repeat
+            val m = (cert.objectiveBoundCeil(sourceConstant) ?: return@repeat) + rng.nextInt(0, 3)
+            if (!cert.improvingGapNonNegative(m, sourceConstant)) return@repeat
 
-            // Support: nonbasic structural columns with a nonzero reduced cost.
+            // Support: every structural column with a nonzero exact reduced cost. Rounding the dual
+            // multipliers can leave a basic column in support too.
             val support = (0 until n).filter { c -> cert.reducedCostSign(c) != 0 }
             for (col in support) {
                 val djSign = cert.reducedCostSign(col)
                 val seatLo = model.loShift[col]
                 val seatHi = model.loShift[col] + model.upper[col]
-                val atLower = sol.basis.status[col] == VarStatus.AT_LOWER
-                // Mirror applySparseReducedCostFixing's step bound; only the side dual feasibility allows.
                 val fixUpper: Long
                 val fixLower: Long
-                if (atLower && djSign > 0) {
-                    val dMax = cert.fixSteps(col, m) ?: continue
+                if (djSign > 0) {
+                    val dMax = cert.fixSteps(col, m, sourceConstant) ?: continue
                     fixUpper = seatLo + dMax
                     fixLower = Long.MIN_VALUE
-                } else if (!atLower && djSign < 0) {
-                    val dMax = cert.fixSteps(col, m) ?: continue
+                    positiveTargets++
+                } else if (djSign < 0) {
+                    val dMax = cert.fixSteps(col, m, sourceConstant) ?: continue
                     fixLower = seatHi - dMax
                     fixUpper = Long.MAX_VALUE
+                    negativeTargets++
                 } else {
                     continue
                 }
                 checks++
+                if (sol.basis.status[col] == VarStatus.BASIC) basicTargets++
                 // Verify: any point in the declared box satisfying the constraints, the OTHER support
                 // columns' seated bounds, and objective ≤ m, honours the fixed bound on col.
                 val point = IntArray(n)
@@ -91,12 +98,12 @@ class LpExplanationReducedCostReasonTest {
                             }
                             if (!ok) return
                         }
-                        var obj = 0L
+                        var obj = sourceConstant
                         for (k in 0 until n) obj += cost[k] * point[k]
                         if (obj > m) return // objective ≤ m is part of the reason
                         for (j in support) {
                             if (j == col) continue
-                            val seated = if (sol.basis.status[j] == VarStatus.AT_UPPER) {
+                            val seated = if (cert.reducedCostSign(j) < 0) {
                                 point[j] <= model.loShift[j] + model.upper[j]
                             } else {
                                 point[j] >= model.loShift[j]
@@ -118,5 +125,8 @@ class LpExplanationReducedCostReasonTest {
             }
         }
         assertTrue(checks > 100, "covered only $checks fixings")
+        assertTrue(basicTargets > 10, "covered only $basicTargets basic-column deductions")
+        assertTrue(positiveTargets > 50, "covered only $positiveTargets positive reduced costs")
+        assertTrue(negativeTargets > 50, "covered only $negativeTargets negative reduced costs")
     }
 }
