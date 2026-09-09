@@ -130,6 +130,7 @@ internal class RevisedSimplex(
 
     private val basicVar = IntArray(m)
     private val status = Array(numVars) { VarStatus.BASIC }
+
     // v1 cannot recover an imported general status declaration; keep this conservative through reuse.
     private var basisCaptureEligible = true
     private var pivots = 0

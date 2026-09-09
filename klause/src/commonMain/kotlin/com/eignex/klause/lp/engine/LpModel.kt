@@ -811,8 +811,6 @@ internal data class ExactLpBounds(val lower: ExactLpSide? = null, val upper: Exa
         (lower.number.value == upper.number.value && !lower.strict && !upper.strict)
     val fixed: Boolean get() = lower != null && upper != null && consistent &&
         lower.number.value == upper.number.value
-
-
 }
 
 internal data class ExactLpColumn(

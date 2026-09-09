@@ -17,9 +17,11 @@ import kotlin.test.assertTrue
 class LpSolveTest {
     @Test
     fun `short premise metadata declines keys and safe snapshots without throwing`() {
-        val model = LpModel(1, 1, Csc(intArrayOf(0, 1), intArrayOf(0), longArrayOf(1L)),
+        val model = LpModel(
+            1, 1, Csc(intArrayOf(0, 1), intArrayOf(0), longArrayOf(1L)),
             longArrayOf(1L), longArrayOf(1L, 0L), longArrayOf(1L, 0L), booleanArrayOf(true, false),
-            longArrayOf(0L), 0L, Sense.MINIMIZE, intArrayOf(0), rowPremises = emptyArray())
+            longArrayOf(0L), 0L, Sense.MINIMIZE, intArrayOf(0), rowPremises = emptyArray(),
+        )
 
         assertNull(LpCapturedModel.captureOrNull(model))
         assertNull(exactLpStateKey(model))
@@ -68,13 +70,26 @@ class LpSolveTest {
     fun `same double with different exact authority cannot reuse counters`() {
         val zero = ExactLpNumber.of(0L)
         val one = ExactLpNumber.of(1L)
-        val model = ExactLpModel(listOf(emptyList()), emptyList(),
+        val model = ExactLpModel(
+            listOf(emptyList()),
+            emptyList(),
             listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(one)))),
-            emptyList(), ExactLpObjective(listOf(ExactLpNumber.of(-1L))))
-        val nextBound = ExactLpNumber.of(BigFraction.ONE + BigFraction.of(
-            BigInteger.ONE, BigInteger.ONE shl 54))
-        val next = model.copy(columns = listOf(model.column(0).copy(
-            bounds = ExactLpBounds(ExactLpSide(zero), ExactLpSide(nextBound)))))
+            emptyList(),
+            ExactLpObjective(listOf(ExactLpNumber.of(-1L))),
+        )
+        val nextBound = ExactLpNumber.of(
+            BigFraction.ONE + BigFraction.of(
+                BigInteger.ONE,
+                BigInteger.ONE shl 54,
+            ),
+        )
+        val next = model.copy(
+            columns = listOf(
+                model.column(0).copy(
+                    bounds = ExactLpBounds(ExactLpSide(zero), ExactLpSide(nextBound)),
+                ),
+            ),
+        )
         val cache = LpCounterResults()
         assertEquals(LpVerdict.ATTAINED_OPTIMUM, solveAndCertify(model, counterResults = cache).verdict)
 
@@ -93,23 +108,41 @@ class LpSolveTest {
     @Test
     fun `unsupported exact metadata declines before engine injection`() {
         val zero = ExactLpNumber.of(0L)
-        val model = ExactLpModel(listOf(emptyList()), emptyList(),
+        val model = ExactLpModel(
+            listOf(emptyList()),
+            emptyList(),
             listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(ExactLpNumber.of(1L))))),
-            emptyList(), ExactLpObjective(listOf(zero)))
+            emptyList(),
+            ExactLpObjective(listOf(zero)),
+        )
         val variants = listOf(
             model.copy(columns = listOf(model.column(0).copy(integral = false))),
-            model.copy(columns = listOf(model.column(0).copy(bounds = ExactLpBounds(
-                ExactLpSide(zero, premises = ExactLpPremises(emptyList(), listOf(7))))))),
+            model.copy(
+                columns = listOf(
+                    model.column(0).copy(
+                        bounds = ExactLpBounds(
+                            ExactLpSide(zero, premises = ExactLpPremises(emptyList(), listOf(7))),
+                        ),
+                    ),
+                ),
+            ),
             model.copy(objective = ExactLpObjective(listOf(zero), scale = ExactLpNumber.of(2L))),
             model.copy(objective = ExactLpObjective(listOf(zero), externalConstant = ExactLpNumber.of(1L))),
             model.copy(objective = ExactLpObjective(listOf(ExactLpNumber.ofIeee(0.0)))),
         )
-        val context = LpSolveContext(engineFactory = object : LpEngineFactory by ProductionLpEngineFactory {
-            override fun newGeneralSolver(model: LpModel, cancellation: Cancellation): LpSolver = error("unsupported engine entry")
-            override fun newComponentSolver(
-                model: LpModel, parts: List<LpNeighborhood>, solvers: List<LpSolver>, isolated: IntArray,
-            ): ComponentLpSolverCapability = error("unsupported component entry")
-        })
+        val context = LpSolveContext(
+            engineFactory = object : LpEngineFactory by ProductionLpEngineFactory {
+                override fun newGeneralSolver(model: LpModel, cancellation: Cancellation): LpSolver = error(
+                    "unsupported engine entry",
+                )
+                override fun newComponentSolver(
+                    model: LpModel,
+                    parts: List<LpNeighborhood>,
+                    solvers: List<LpSolver>,
+                    isolated: IntArray,
+                ): ComponentLpSolverCapability = error("unsupported component entry")
+            },
+        )
         for (variant in variants) {
             assertNull(variant.toLegacy())
             assertNull(exactLpStateKey(variant))
@@ -121,7 +154,6 @@ class LpSolveTest {
             assertNull(result.safeLowerBound)
         }
     }
-
 
     @Test
     fun `a feasible LP certifies an optimum matching the float optimum`() {

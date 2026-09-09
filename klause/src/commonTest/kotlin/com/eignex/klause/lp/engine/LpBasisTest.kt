@@ -22,7 +22,12 @@ class LpBasisTest {
         assertEquals(2, basis.heading(0))
         assertEquals(1, basis.heading(1))
         assertEquals(ExactLpStatus.BASIC, basis.status(1))
-        assertFailsWith<IllegalArgumentException> { ExactLpBasis(listOf(1, 1), listOf(ExactLpStatus.AT_LOWER, ExactLpStatus.BASIC)) }
+        assertFailsWith<IllegalArgumentException> {
+            ExactLpBasis(
+                listOf(1, 1),
+                listOf(ExactLpStatus.AT_LOWER, ExactLpStatus.BASIC),
+            )
+        }
         assertFailsWith<IllegalArgumentException> { ExactLpBasis(listOf(2), listOf(ExactLpStatus.BASIC)) }
         assertFailsWith<IllegalArgumentException> { ExactLpBasis(emptyList(), listOf(ExactLpStatus.BASIC)) }
     }
@@ -44,8 +49,13 @@ class LpBasisTest {
             Triple(ExactLpBounds(zero, one.copy(strict = true)), ExactLpStatus.AT_UPPER, false),
         )
         for ((bounds, status, valid) in cases) {
-            val model = ExactLpModel(listOf(emptyList()), emptyList(), listOf(ExactLpColumn(bounds)), emptyList(),
-                ExactLpObjective(listOf(ExactLpNumber.of(0L))))
+            val model = ExactLpModel(
+                listOf(emptyList()),
+                emptyList(),
+                listOf(ExactLpColumn(bounds)),
+                emptyList(),
+                ExactLpObjective(listOf(ExactLpNumber.of(0L))),
+            )
             val basis = ExactLpBasis(emptyList(), listOf(status))
 
             assertEquals(valid, basis.validFor(model), "$bounds at $status")
@@ -57,10 +67,18 @@ class LpBasisTest {
     @Test
     fun `crossed or strict equal bounds cannot supply any valid basis`() {
         val zero = ExactLpSide(ExactLpNumber.of(0L))
-        for (bounds in listOf(ExactLpBounds(zero.copy(strict = true), zero),
-            ExactLpBounds(zero, zero.copy(strict = true)), ExactLpBounds(ExactLpSide(ExactLpNumber.of(1L)), zero))) {
-            val model = ExactLpModel(listOf(emptyList()), emptyList(), listOf(ExactLpColumn(bounds)), emptyList(),
-                ExactLpObjective(listOf(ExactLpNumber.of(0L))))
+        for (bounds in listOf(
+            ExactLpBounds(zero.copy(strict = true), zero),
+            ExactLpBounds(zero, zero.copy(strict = true)),
+            ExactLpBounds(ExactLpSide(ExactLpNumber.of(1L)), zero),
+        )) {
+            val model = ExactLpModel(
+                listOf(emptyList()),
+                emptyList(),
+                listOf(ExactLpColumn(bounds)),
+                emptyList(),
+                ExactLpObjective(listOf(ExactLpNumber.of(0L))),
+            )
 
             assertFalse(bounds.consistent)
             assertFalse(bounds.fixed)
@@ -72,9 +90,13 @@ class LpBasisTest {
     @Test
     fun `fixed conversion retains exact source status and basis order`() {
         val zero = ExactLpSide(ExactLpNumber.of(0L))
-        val model = ExactLpModel(listOf(emptyList()), listOf(ExactLpNumber.of(0L)),
-            listOf(ExactLpColumn(ExactLpBounds(zero, zero)), ExactLpColumn(ExactLpBounds(zero))), listOf(ExactLpRow()),
-            ExactLpObjective(listOf(ExactLpNumber.of(0L), ExactLpNumber.of(0L))))
+        val model = ExactLpModel(
+            listOf(emptyList()),
+            listOf(ExactLpNumber.of(0L)),
+            listOf(ExactLpColumn(ExactLpBounds(zero, zero)), ExactLpColumn(ExactLpBounds(zero))),
+            listOf(ExactLpRow()),
+            ExactLpObjective(listOf(ExactLpNumber.of(0L), ExactLpNumber.of(0L))),
+        )
         val basis = ExactLpBasis(listOf(1), listOf(ExactLpStatus.FIXED, ExactLpStatus.BASIC))
 
         val converted = assertNotNull(basis.toLegacy(model))
@@ -89,10 +111,17 @@ class LpBasisTest {
 
     @Test
     fun `free and upper only declarations cannot enter legacy solver`() {
-        for ((bounds, status) in listOf(ExactLpBounds() to ExactLpStatus.FREE,
-            ExactLpBounds(upper = ExactLpSide(ExactLpNumber.of(1L))) to ExactLpStatus.AT_UPPER)) {
-            val model = ExactLpModel(listOf(emptyList()), emptyList(), listOf(ExactLpColumn(bounds)), emptyList(),
-                ExactLpObjective(listOf(ExactLpNumber.of(0L))))
+        for ((bounds, status) in listOf(
+            ExactLpBounds() to ExactLpStatus.FREE,
+            ExactLpBounds(upper = ExactLpSide(ExactLpNumber.of(1L))) to ExactLpStatus.AT_UPPER,
+        )) {
+            val model = ExactLpModel(
+                listOf(emptyList()),
+                emptyList(),
+                listOf(ExactLpColumn(bounds)),
+                emptyList(),
+                ExactLpObjective(listOf(ExactLpNumber.of(0L))),
+            )
             val basis = ExactLpBasis(emptyList(), listOf(status))
 
             assertTrue(basis.validFor(model))
