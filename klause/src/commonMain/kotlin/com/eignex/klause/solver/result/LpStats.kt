@@ -84,6 +84,8 @@ data class LpRouteSolveStats(
     val backendRequestedRefactorizations: SumResult = ZERO_COUNT,
     /** Refactorizations restoring unenforced gated rows. */
     val reconcileRecoveryRefactorizations: SumResult = ZERO_COUNT,
+    /** Refactorizations retrying a near-tolerance infeasibility candidate. */
+    val numericalRecoveryRefactorizations: SumResult = ZERO_COUNT,
     /** Refactorizations during primal simplex. */
     val primalRefactorizations: SumResult = ZERO_COUNT,
     /** Factorizations that came back singular. */
@@ -104,6 +106,7 @@ data class LpRouteSolveStats(
         SumResult(updateLimitRefactorizations.sum + other.updateLimitRefactorizations.sum),
         SumResult(backendRequestedRefactorizations.sum + other.backendRequestedRefactorizations.sum),
         SumResult(reconcileRecoveryRefactorizations.sum + other.reconcileRecoveryRefactorizations.sum),
+        SumResult(numericalRecoveryRefactorizations.sum + other.numericalRecoveryRefactorizations.sum),
         SumResult(primalRefactorizations.sum + other.primalRefactorizations.sum),
         SumResult(singularRefactorizations.sum + other.singularRefactorizations.sum),
         SumResult(smallPivotBails.sum + other.smallPivotBails.sum),
@@ -200,6 +203,8 @@ data class LpStats(
     val backendRequestedRefactorizations: SumResult = ZERO_COUNT,
     /** Refactorizations restoring unenforced gated rows. */
     val reconcileRecoveryRefactorizations: SumResult = ZERO_COUNT,
+    /** Refactorizations retrying a near-tolerance infeasibility candidate. */
+    val numericalRecoveryRefactorizations: SumResult = ZERO_COUNT,
     /** Refactorizations during primal simplex. */
     val primalRefactorizations: SumResult = ZERO_COUNT,
     /** Whether the wall-clock backstop demoted the node LP — the one policy input that is not
@@ -327,6 +332,9 @@ data class LpStats(
         reconcileRecoveryRefactorizations = SumResult(
             reconcileRecoveryRefactorizations.sum + o.reconcileRecoveryRefactorizations.sum,
         ),
+        numericalRecoveryRefactorizations = SumResult(
+            numericalRecoveryRefactorizations.sum + o.numericalRecoveryRefactorizations.sum,
+        ),
         primalRefactorizations = SumResult(primalRefactorizations.sum + o.primalRefactorizations.sum),
         wallBackstop = wallBackstop || o.wallBackstop,
         demoted = demoted || o.demoted,
@@ -406,6 +414,7 @@ internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
     private var updateLimitRefactorizations = 0L
     private var backendRequestedRefactorizations = 0L
     private var reconcileRecoveryRefactorizations = 0L
+    private var numericalRecoveryRefactorizations = 0L
     private var primalRefactorizations = 0L
     private var cutCandidates = 0L
     private var cutSelected = 0L
@@ -530,7 +539,8 @@ internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
             metrics.initialRefactorizations + metrics.warmStartRefactorizations +
                 metrics.singularRecoveryRefactorizations +
                 metrics.updateLimitRefactorizations + metrics.backendRequestedRefactorizations +
-                metrics.reconcileRecoveryRefactorizations + metrics.primalRefactorizations,
+                metrics.reconcileRecoveryRefactorizations + metrics.numericalRecoveryRefactorizations +
+                metrics.primalRefactorizations,
         ) { refactorizations.update(1.0) }
         initialRefactorizations += metrics.initialRefactorizations
         warmStartRefactorizations += metrics.warmStartRefactorizations
@@ -538,6 +548,7 @@ internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
         updateLimitRefactorizations += metrics.updateLimitRefactorizations
         backendRequestedRefactorizations += metrics.backendRequestedRefactorizations
         reconcileRecoveryRefactorizations += metrics.reconcileRecoveryRefactorizations
+        numericalRecoveryRefactorizations += metrics.numericalRecoveryRefactorizations
         primalRefactorizations += metrics.primalRefactorizations
         observeNumericalTrouble(metrics.singularRefactorizations, metrics.smallPivotBails)
     }
@@ -722,6 +733,7 @@ internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
         updateLimitRefactorizations = SumResult(updateLimitRefactorizations.toDouble()),
         backendRequestedRefactorizations = SumResult(backendRequestedRefactorizations.toDouble()),
         reconcileRecoveryRefactorizations = SumResult(reconcileRecoveryRefactorizations.toDouble()),
+        numericalRecoveryRefactorizations = SumResult(numericalRecoveryRefactorizations.toDouble()),
         primalRefactorizations = SumResult(primalRefactorizations.toDouble()),
         componentSplits = componentSplits.read(),
         componentBlocks = componentBlocks.read(),
@@ -783,6 +795,7 @@ private class LpRouteSolveStatsSink {
     private var updateLimitRefactorizations = 0L
     private var backendRequestedRefactorizations = 0L
     private var reconcileRecoveryRefactorizations = 0L
+    private var numericalRecoveryRefactorizations = 0L
     private var primalRefactorizations = 0L
 
     fun observe(value: LpSolveMetrics) {
@@ -799,6 +812,7 @@ private class LpRouteSolveStatsSink {
         updateLimitRefactorizations += value.updateLimitRefactorizations
         backendRequestedRefactorizations += value.backendRequestedRefactorizations
         reconcileRecoveryRefactorizations += value.reconcileRecoveryRefactorizations
+        numericalRecoveryRefactorizations += value.numericalRecoveryRefactorizations
         primalRefactorizations += value.primalRefactorizations
     }
 
@@ -814,6 +828,7 @@ private class LpRouteSolveStatsSink {
         updateLimitRefactorizations = SumResult(updateLimitRefactorizations.toDouble()),
         backendRequestedRefactorizations = SumResult(backendRequestedRefactorizations.toDouble()),
         reconcileRecoveryRefactorizations = SumResult(reconcileRecoveryRefactorizations.toDouble()),
+        numericalRecoveryRefactorizations = SumResult(numericalRecoveryRefactorizations.toDouble()),
         primalRefactorizations = SumResult(primalRefactorizations.toDouble()),
         singularRefactorizations = SumResult(singularRefactorizations.toDouble()),
         smallPivotBails = SumResult(smallPivotBails.toDouble()),

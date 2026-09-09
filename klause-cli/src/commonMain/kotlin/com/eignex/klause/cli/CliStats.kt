@@ -94,6 +94,7 @@ internal fun lpStatPairs(stats: SolveStats): List<Pair<String, String>> {
         out += "lpRefactorUpdateLimit" to "${stats.lp.updateLimitRefactorizations.sum.toLong()}"
         out += "lpRefactorBackendRequested" to "${stats.lp.backendRequestedRefactorizations.sum.toLong()}"
         out += "lpRefactorReconcileRecovery" to "${stats.lp.reconcileRecoveryRefactorizations.sum.toLong()}"
+        out += "lpRefactorNumericalRecovery" to "${stats.lp.numericalRecoveryRefactorizations.sum.toLong()}"
         out += "lpRefactorPrimal" to "${stats.lp.primalRefactorizations.sum.toLong()}"
     }
     // The decline rate: certified against the two causes it can fail for. Printed whenever any
@@ -175,7 +176,7 @@ private fun appendRouteSolveStats(out: MutableList<Pair<String, String>>, name: 
     val refactorizations = stats.initialRefactorizations.sum + stats.warmStartRefactorizations.sum +
         stats.singularRecoveryRefactorizations.sum + stats.updateLimitRefactorizations.sum +
         stats.backendRequestedRefactorizations.sum + stats.reconcileRecoveryRefactorizations.sum +
-        stats.primalRefactorizations.sum
+        stats.numericalRecoveryRefactorizations.sum + stats.primalRefactorizations.sum
     out += "lp${name}Refactorizations" to "${refactorizations.toLong()}"
     out += "lp${name}RefactorInitial" to "${stats.initialRefactorizations.sum.toLong()}"
     out += "lp${name}RefactorWarmStart" to "${stats.warmStartRefactorizations.sum.toLong()}"
@@ -183,6 +184,7 @@ private fun appendRouteSolveStats(out: MutableList<Pair<String, String>>, name: 
     out += "lp${name}RefactorUpdateLimit" to "${stats.updateLimitRefactorizations.sum.toLong()}"
     out += "lp${name}RefactorBackendRequested" to "${stats.backendRequestedRefactorizations.sum.toLong()}"
     out += "lp${name}RefactorReconcileRecovery" to "${stats.reconcileRecoveryRefactorizations.sum.toLong()}"
+    out += "lp${name}RefactorNumericalRecovery" to "${stats.numericalRecoveryRefactorizations.sum.toLong()}"
     out += "lp${name}RefactorPrimal" to "${stats.primalRefactorizations.sum.toLong()}"
     out += "lp${name}SingularRefactorizations" to "${stats.singularRefactorizations.sum.toLong()}"
     out += "lp${name}SmallPivotBails" to "${stats.smallPivotBails.sum.toLong()}"
