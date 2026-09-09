@@ -6,6 +6,7 @@ import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class HyperSparseSolveTest {
@@ -110,5 +111,22 @@ class HyperSparseSolveTest {
             }
             solver.close()
         }
+    }
+
+    @Test
+    fun `declined solves report completed traversal and pivot work`() {
+        val matrix = SparseMatrix.ofColumns(
+            2,
+            2,
+            listOf(listOf(0 to 1.0), listOf(0 to 1e200, 1 to 1.0)),
+        )
+        val solver = HyperSparseSolve(matrix, lower = false, unitDiagonal = false)
+        val work = BasisWorkspace(2).also { it.set(1, 1e200) }
+
+        assertFailsWith<BasisArithmeticException> { solver.solve(work, 1.0) }
+
+        val declined = assertNotNull(solver.lastWork)
+        assertEquals(1, declined.pivotVisits)
+        assertTrue(declined.units > 0)
     }
 }

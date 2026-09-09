@@ -127,6 +127,58 @@ class KotlinBasisSolverSnapshotTest {
     }
 
     @Test
+    fun `declined solve work survives snapshots and resets on build`() {
+        val source = SparseMatrix.ofColumns(1, 1, listOf(listOf(0 to 1e-200)))
+        val solver = KotlinBasisSolver(source, LuPivotPolicy(absoluteTolerance = 0.0))
+        assertTrue(solver.refactorize(intArrayOf(0)))
+        val vector = IndexedVector(1).also { it.store(0, 1e200) }
+        assertFailsWith<BasisArithmeticException> { solver.ftran(vector) }
+        val declined = solver.basisWork
+        assertEquals(1, declined.ftran.declines)
+        assertTrue(declined.ftran.units > 0)
+        val snapshot = assertNotNull(solver.snapshot())
+        vector.scatter(doubleArrayOf(1e-200))
+        solver.ftran(vector)
+
+        assertTrue(solver.restore(snapshot))
+
+        assertEquals(declined, solver.basisWork)
+        assertTrue(solver.refactorize(intArrayOf(0)))
+        assertEquals(BasisPhaseWork(), solver.basisWork.ftran)
+    }
+
+    @Test
+    fun `declined update work survives snapshots and resets on build`() {
+        val source = SparseMatrix.ofColumns(
+            2,
+            3,
+            listOf(
+                listOf(0 to 1.0),
+                listOf(0 to 1e200, 1 to 1e-200),
+                emptyList(),
+            ),
+        )
+        val solver = KotlinBasisSolver(source, LuPivotPolicy(absoluteTolerance = 0.0))
+        assertTrue(solver.refactorize(intArrayOf(0, 1)))
+        val spike = IndexedVector(2).also { it.scatter(doubleArrayOf(1.0, 1.0)) }
+        assertEquals(BasisUpdate.SINGULAR, solver.update(0, 2, spike))
+        val declined = solver.basisWork
+        assertEquals(1, declined.update.declines)
+        assertTrue(declined.update.units > 1 + spike.count)
+        assertTrue(assertNotNull(solver.lastUpdateWork).units > 0)
+        val snapshot = assertNotNull(solver.snapshot())
+        assertEquals(BasisUpdate.SINGULAR, solver.update(0, 2, spike))
+        assertTrue(solver.basisWork.update.attempts > declined.update.attempts)
+
+        assertTrue(solver.restore(snapshot))
+
+        assertEquals(declined, solver.basisWork)
+        assertTrue(assertNotNull(solver.lastUpdateWork).units > 0)
+        assertTrue(solver.refactorize(intArrayOf(0, 1)))
+        assertEquals(BasisPhaseWork(), solver.basisWork.update)
+    }
+
+    @Test
     fun `bounded snapshot restore and fresh build operations are measured separately`() {
         val source = ftSource("dense", 8)
         val basis = IntArray(8) { it }

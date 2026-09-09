@@ -30,7 +30,7 @@ internal class KotlinBasisSolver(
         matrix.copyRowIndices(),
         matrix.values.copyOf(),
     )
-    private val builder = F64BasisFactors(source)
+    private val builder = BasisFactors(source)
     override val n = source.rows
     private val solveWorkspace = BasisWorkspace(n)
     private val mapped = BasisWorkspace(n)
@@ -163,6 +163,9 @@ internal class KotlinBasisSolver(
         lastSolveWork = null
         recordSolveAttempt(transpose)
         var successful = false
+        var completedUnits = 0L
+        var activeSolve: HyperSparseSolve? = null
+        var transformStarted = false
         try {
             val symbolic = current.factors.symbolic
             val first: TriangularSolveWork
@@ -170,22 +173,47 @@ internal class KotlinBasisSolver(
             val transformEntries: Long
             if (transpose) {
                 solveWorkspace.load(x, symbolic.columnPosition)
-                first = current.upperTranspose.solve(solveWorkspace, expectedDensity)
+                activeSolve = current.upperTranspose
+                first = checkNotNull(activeSolve).solve(solveWorkspace, expectedDensity)
+                completedUnits = saturatedAdd(completedUnits, first.units)
+                activeSolve = null
+                transformStarted = true
                 transformEntries = current.ft.backward(solveWorkspace)
-                second = current.lowerTranspose.solve(solveWorkspace, expectedDensity)
+                completedUnits = saturatedAdd(completedUnits, transformEntries)
+                transformStarted = false
+                activeSolve = current.lowerTranspose
+                second = checkNotNull(activeSolve).solve(solveWorkspace, expectedDensity)
+                completedUnits = saturatedAdd(completedUnits, second.units)
+                activeSolve = null
                 solveWorkspace.write(x, symbolic.rowOrder)
             } else {
                 solveWorkspace.load(x, symbolic.rowPosition)
-                first = current.lower.solve(solveWorkspace, expectedDensity)
+                activeSolve = current.lower
+                first = checkNotNull(activeSolve).solve(solveWorkspace, expectedDensity)
+                completedUnits = saturatedAdd(completedUnits, first.units)
+                activeSolve = null
+                transformStarted = true
                 transformEntries = current.ft.forward(solveWorkspace)
-                second = current.upper.solve(solveWorkspace, expectedDensity)
+                completedUnits = saturatedAdd(completedUnits, transformEntries)
+                transformStarted = false
+                activeSolve = current.upper
+                second = checkNotNull(activeSolve).solve(solveWorkspace, expectedDensity)
+                completedUnits = saturatedAdd(completedUnits, second.units)
+                activeSolve = null
                 solveWorkspace.write(x, symbolic.columnOrder)
             }
             lastSolveWork = BasisSolveWork(first, second, transformEntries, x.count)
             recordSolveSuccess(transpose, checkNotNull(lastSolveWork).units)
             successful = true
         } finally {
-            if (!successful) workMeter.solveDecline(transpose)
+            if (!successful) {
+                val triangularUnits = activeSolve?.lastWork?.units ?: 0
+                val transformUnits = if (transformStarted) current.ft.lastSolveEntries else 0
+                workMeter.solveDecline(
+                    transpose,
+                    saturatedAdd(completedUnits, saturatedAdd(triangularUnits, transformUnits)),
+                )
+            }
         }
     }
 
@@ -209,7 +237,10 @@ internal class KotlinBasisSolver(
         if (!usable) return declineUpdate(validationUnits)
         mapped.load(spike, current.factors.symbolic.columnPosition)
         val pivotLabel = current.factors.symbolic.columnPosition[pivotRow]
-        if (!current.ft.update(pivotLabel, mapped, policy.absoluteTolerance)) return declineUpdate(validationUnits)
+        if (!current.ft.update(pivotLabel, mapped, policy.absoluteTolerance)) {
+            val attemptedUnits = current.ft.lastUpdateWork?.units ?: 0
+            return declineUpdate(saturatedAdd(validationUnits, attemptedUnits))
+        }
         columns[pivotRow] = entering
         unitRows[pivotRow] = -1
         val updateUnits = saturatedAdd(validationUnits, checkNotNull(current.ft.lastUpdateWork).units)

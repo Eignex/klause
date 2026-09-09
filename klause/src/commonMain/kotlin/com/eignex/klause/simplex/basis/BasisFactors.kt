@@ -68,7 +68,7 @@ internal class LuFactors(
     val upperTranspose: SparseMatrix,
 )
 
-internal class F64BasisFactors(matrix: SparseMatrix) {
+internal class BasisFactors(matrix: SparseMatrix) {
     private val source = SparseMatrix.wrap(
         matrix.rows,
         matrix.cols,

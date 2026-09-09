@@ -13,7 +13,7 @@ import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
-class F64BasisFactorsTest {
+class BasisFactorsTest {
     @Test
     fun `factors reconstruct each directed shape in original coordinates`() {
         val shapes = listOf("empty", "unit", "triangular", "sparse", "spiked", "dense", "dense16")
@@ -43,7 +43,7 @@ class F64BasisFactorsTest {
             val basis = IntArray(n) { n - 1 - it }
             val matrix = sparse(permuted)
 
-            val result = assertIs<LuBuildResult.Built>(F64BasisFactors(matrix).build(basis), shape)
+            val result = assertIs<LuBuildResult.Built>(BasisFactors(matrix).build(basis), shape)
             val residual = reconstructionResidual(matrix, basis, result.factors)
 
             assertTrue(residual <= 1e-12, "$shape residual $residual")
@@ -68,7 +68,7 @@ class F64BasisFactorsTest {
         )
         val basis = intArrayOf(2, 0, 1)
 
-        val result = assertIs<LuBuildResult.Built>(F64BasisFactors(matrix).build(basis))
+        val result = assertIs<LuBuildResult.Built>(BasisFactors(matrix).build(basis))
 
         assertEquals(0, result.factors.symbolic.rowOrder[0])
         assertEquals(1, result.factors.symbolic.columnOrder[0])
@@ -81,7 +81,7 @@ class F64BasisFactorsTest {
             val matrix = sparse(arrayOf(doubleArrayOf(1.0, 1.0), doubleArrayOf(1.0, 1.0 + delta)))
             val basis = intArrayOf(0, 1)
 
-            val result = F64BasisFactors(matrix).build(basis)
+            val result = BasisFactors(matrix).build(basis)
 
             if (accepted) {
                 val built = assertIs<LuBuildResult.Built>(result)
@@ -98,7 +98,7 @@ class F64BasisFactorsTest {
         val matrix = sparse(arrayOf(doubleArrayOf(1.0, 1.0), doubleArrayOf(1.0, 1.0 + 1e-12)))
         val basis = intArrayOf(0, 1)
 
-        val result = F64BasisFactors(matrix).build(basis, LuPivotPolicy(absoluteTolerance = 1e-14))
+        val result = BasisFactors(matrix).build(basis, LuPivotPolicy(absoluteTolerance = 1e-14))
 
         val built = assertIs<LuBuildResult.Built>(result)
         assertTrue(reconstructionResidual(matrix, basis, built.factors) <= 1e-12)
@@ -109,7 +109,7 @@ class F64BasisFactorsTest {
         val matrix = sparse(arrayOf(doubleArrayOf(1e-8, 0.0), doubleArrayOf(1.0, 1.0)))
         val basis = intArrayOf(0, 1)
 
-        val built = assertIs<LuBuildResult.Built>(F64BasisFactors(matrix).build(basis))
+        val built = assertIs<LuBuildResult.Built>(BasisFactors(matrix).build(basis))
 
         assertEquals(1, built.factors.symbolic.rowOrder[0])
         assertTrue(reconstructionResidual(matrix, basis, built.factors) <= 1e-12)
@@ -125,7 +125,7 @@ class F64BasisFactorsTest {
             ),
         )
 
-        val result = F64BasisFactors(matrix).build(intArrayOf(0, 1, 2))
+        val result = BasisFactors(matrix).build(intArrayOf(0, 1, 2))
 
         val rejected = assertIs<LuBuildResult.Rejected>(result)
         assertEquals(LuBuildRejection.NO_USABLE_PIVOT, rejected.reason)
@@ -135,7 +135,7 @@ class F64BasisFactorsTest {
     @Test
     fun `rank deficient selections decline and a later valid build recovers`() {
         val matrix = sparse(arrayOf(doubleArrayOf(1.0, 0.0, 0.0), doubleArrayOf(0.0, 1.0, 0.0)))
-        val builder = F64BasisFactors(matrix)
+        val builder = BasisFactors(matrix)
         val valid = intArrayOf(1, 0)
         val first = assertIs<LuBuildResult.Built>(builder.build(valid))
         for (basis in listOf(intArrayOf(0, 0), intArrayOf(0, 2))) {
@@ -156,7 +156,7 @@ class F64BasisFactorsTest {
     fun `nonfinite selected inputs decline and finite selections remain usable`() {
         for (value in listOf(Double.NaN, Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY)) {
             val matrix = sparse(arrayOf(doubleArrayOf(value, 1.0)))
-            val builder = F64BasisFactors(matrix)
+            val builder = BasisFactors(matrix)
 
             val failure = assertIs<LuBuildResult.Rejected>(builder.build(intArrayOf(0)))
             val success = assertIs<LuBuildResult.Built>(builder.build(intArrayOf(1)))
@@ -174,7 +174,7 @@ class F64BasisFactorsTest {
             arrayOf(doubleArrayOf(1.0, 1e-200), doubleArrayOf(1e-200, 1e-200)),
         )
         for (matrix in matrices) {
-            val builder = F64BasisFactors(sparse(matrix))
+            val builder = BasisFactors(sparse(matrix))
 
             val result = builder.build(intArrayOf(0, 1), LuPivotPolicy(absoluteTolerance = 0.0))
 
@@ -190,7 +190,7 @@ class F64BasisFactorsTest {
                 DoubleArray(8) { j -> if (i == j) 10.0 else ((i * 3 + j * 5) % 7 - 3).toDouble() }
             },
         )
-        val builder = F64BasisFactors(matrix)
+        val builder = BasisFactors(matrix)
         val basis = IntArray(8) { 7 - it }
         val first = assertIs<LuBuildResult.Built>(builder.build(basis))
 
@@ -212,7 +212,7 @@ class F64BasisFactorsTest {
                 doubleArrayOf(0.0, 1.0, 1.0, 1.0),
             ),
         )
-        val builder = F64BasisFactors(matrix)
+        val builder = BasisFactors(matrix)
         val old = assertIs<LuBuildResult.Built>(builder.build(intArrayOf(0, 1)))
         val changedBasis = intArrayOf(2, 3)
 
@@ -237,7 +237,7 @@ class F64BasisFactorsTest {
                 doubleArrayOf(0.0, 1.0, 0.0),
             ),
         )
-        val builder = F64BasisFactors(matrix)
+        val builder = BasisFactors(matrix)
         val old = assertIs<LuBuildResult.Built>(builder.build(intArrayOf(0, 1)))
 
         val rejected = assertIs<LuBuildResult.Rejected>(
@@ -252,7 +252,7 @@ class F64BasisFactorsTest {
 
     @Test
     fun `malformed proposed orders fall back to ordinary ordering`() {
-        val builder = F64BasisFactors(sparse(arrayOf(doubleArrayOf(1.0, 0.0), doubleArrayOf(0.0, 1.0))))
+        val builder = BasisFactors(sparse(arrayOf(doubleArrayOf(1.0, 0.0), doubleArrayOf(0.0, 1.0))))
         val duplicate = SymbolicLu(intArrayOf(0, 1), intArrayOf(0, 1)).also { it.rowOrder[1] = 0 }
         val outOfRange = SymbolicLu(intArrayOf(0, 1), intArrayOf(0, 1)).also { it.columnOrder[1] = 2 }
         val proposals = listOf(
@@ -282,7 +282,7 @@ class F64BasisFactorsTest {
         val indices = intArrayOf(0, 1, 0, 1)
         val values = doubleArrayOf(2.0, 1.0, 1.0, 3.0)
         val matrix = SparseMatrix.wrap(2, 2, pointers, indices, values)
-        val builder = F64BasisFactors(matrix)
+        val builder = BasisFactors(matrix)
         val basis = intArrayOf(1, 0)
         val first = assertIs<LuBuildResult.Built>(builder.build(basis))
         val expectedUpper = first.factors.upper.values.copyOf()
@@ -314,7 +314,7 @@ class F64BasisFactorsTest {
             doubleArrayOf(0.0, 1.0, 1.0, -0.0),
         )
 
-        val result = assertIs<LuBuildResult.Built>(F64BasisFactors(matrix).build(intArrayOf(0, 1)))
+        val result = assertIs<LuBuildResult.Built>(BasisFactors(matrix).build(intArrayOf(0, 1)))
 
         assertEquals(2, result.work.factorEntries)
         assertTrue(reconstructionResidual(matrix, intArrayOf(0, 1), result.factors) <= 1e-12)
@@ -322,7 +322,7 @@ class F64BasisFactorsTest {
 
     @Test
     fun `invalid basis dimensions columns and pivot policies are rejected`() {
-        val builder = F64BasisFactors(sparse(arrayOf(doubleArrayOf(1.0))))
+        val builder = BasisFactors(sparse(arrayOf(doubleArrayOf(1.0))))
         for (basis in listOf(intArrayOf(), intArrayOf(-1), intArrayOf(1))) {
             assertFailsWith<IllegalArgumentException> { builder.build(basis) }
         }

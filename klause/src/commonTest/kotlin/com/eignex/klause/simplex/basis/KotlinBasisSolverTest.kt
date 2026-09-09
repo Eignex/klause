@@ -255,6 +255,7 @@ class KotlinBasisSolverTest {
                 val declined = if (transpose) solver.basisWork.btran else solver.basisWork.ftran
                 assertEquals(before.attempts + 1, declined.attempts)
                 assertEquals(before.successes, declined.successes)
+                assertTrue(declined.units > before.units)
                 vector.scatter(doubleArrayOf(pivot))
                 if (transpose) solver.btran(vector) else solver.ftran(vector)
                 assertEquals(1.0, vector[0])
