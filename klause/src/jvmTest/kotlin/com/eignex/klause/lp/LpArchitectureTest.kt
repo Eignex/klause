@@ -19,7 +19,7 @@ class LpArchitectureTest {
         val root = repositoryRoot()
         val sources = productionKotlinSources(root)
         val coveredPaths = sources.map { root.relativize(it).toString().replace('\\', '/') }
-        for (required in listOf("/lp/engine/", "/lp/lattice/", "/simplex/exact/", "/bound/")) {
+        for (required in listOf("/lp/engine/", "/lp/lattice/", "/simplex/exact/", "/simplex/basis/", "/bound/")) {
             assertTrue(coveredPaths.any { required in it }, "candidate discovery missed $required")
         }
         val violations = sources.flatMap { source ->
@@ -63,7 +63,7 @@ class LpArchitectureTest {
             """.trimIndent(),
             """
                 package com.eignex.klause.simplex.basis
-                val solver: com.eignex.koblas.sparse.basis.BasisSolver? = null
+                val matrix: com.eignex.koblas.SparseMatrix? = null
             """.trimIndent(),
             """
                 package com.eignex.klause.lp.bounding
@@ -78,6 +78,22 @@ class LpArchitectureTest {
 
         for (fixture in fixtures) {
             assertEquals(emptyList(), LpBoundaryScanner.scan("Allowed.kt", fixture), fixture)
+        }
+    }
+
+    @Test
+    fun `basis leaf rejects factorization and backend dependencies`() {
+        for (dependency in listOf(
+            "import com.eignex.koblas.sparse.factorization.lu.F64SparseMarkowitzLu",
+            "import com.eignex.koblas.sparse.basis.*",
+            "import com.eignex.koblas.corex.Matrix as Matrix",
+            "import com.eignex.koblas.*",
+            "import com.eignex.koblas.SparseMatrixFactory",
+            "val backend = com.eignex.koblas.koblas",
+            "val solver: com.eignex.klause.lp.engine.LpModel? = null",
+        )) {
+            val source = "package com.eignex.klause.simplex.basis\n$dependency"
+            assertTrue(LpBoundaryScanner.scan("Basis.kt", source).any { "outbound dependency" in it })
         }
     }
 
@@ -162,6 +178,13 @@ internal object LpBoundaryScanner {
             forbiddenEngineSymbols.any { name == "$ENGINE_PACKAGE.$it" || name.startsWith("$ENGINE_PACKAGE.$it.") }
 
     private fun forbiddenOutboundDependency(packageName: String, dependency: String): Boolean {
+        if (packageName == BASIS_PACKAGE || packageName.startsWith("$BASIS_PACKAGE.")) {
+            if (dependency == "com.eignex.koblas" || dependency.startsWith("com.eignex.koblas.")) {
+                val sparseMatrix = "com.eignex.koblas.SparseMatrix"
+                return !dependency.startsWith("com.eignex.koblas.core.") &&
+                    dependency != sparseMatrix && !dependency.startsWith("$sparseMatrix.")
+            }
+        }
         if (!dependency.startsWith("com.eignex.klause.")) return false
         if (
             (packageName == "com.eignex.klause.bound" || packageName.startsWith("com.eignex.klause.bound.")) &&
