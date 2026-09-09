@@ -750,18 +750,22 @@ internal class ExactLpNumber private constructor(val value: BigFraction, val iee
     fun legacyLong(): Long? {
         if (ieeeBits != null || value.den != BigInteger.ONE ||
             value < BigFraction.ofLong(Long.MIN_VALUE) || value > BigFraction.ofLong(Long.MAX_VALUE)
-        ) return null
+        ) {
+            return null
+        }
         return value.num.longValue(exactRequired = true)
     }
 
-    override fun equals(other: Any?): Boolean = other is ExactLpNumber && value == other.value && ieeeBits == other.ieeeBits
+    override fun equals(other: Any?): Boolean =
+        other is ExactLpNumber && value == other.value && ieeeBits == other.ieeeBits
     override fun hashCode(): Int = 31 * value.hashCode() + (ieeeBits?.hashCode() ?: 0)
 
     companion object {
         fun of(value: Long): ExactLpNumber = ExactLpNumber(BigFraction.ofLong(value), null)
         fun of(value: BigFraction): ExactLpNumber = ExactLpNumber(value, null)
         fun ofIeee(value: Double): ExactLpNumber = ExactLpNumber(
-            requireNotNull(BigFraction.ofDouble(value)) { "exact input must be finite" }, value.toRawBits(),
+            requireNotNull(BigFraction.ofDouble(value)) { "exact input must be finite" },
+            value.toRawBits(),
         )
     }
 }
@@ -776,13 +780,16 @@ internal class ExactLpPremises(bounds: List<ExactLpPremise>, literals: List<Int>
     private val bounds = bounds.toList()
     private val literals = literals.toList()
     val size: Long get() = bounds.size.toLong() * 3 + literals.size
+    val hasIeeeInput: Boolean get() = bounds.any { it.threshold.ieeeBits != null }
 
     fun toLegacy(): LpRowPremises? {
         val thresholds = LongArray(bounds.size)
         for (i in bounds.indices) thresholds[i] = bounds[i].threshold.legacyLong() ?: return null
         return LpRowPremises(
-            IntArray(bounds.size) { bounds[it].variable }, BooleanArray(bounds.size) { bounds[it].upper },
-            thresholds, literals.toIntArray(),
+            IntArray(bounds.size) { bounds[it].variable },
+            BooleanArray(bounds.size) { bounds[it].upper },
+            thresholds,
+            literals.toIntArray(),
         )
     }
 
@@ -805,11 +812,7 @@ internal data class ExactLpBounds(val lower: ExactLpSide? = null, val upper: Exa
     val fixed: Boolean get() = lower != null && upper != null && consistent &&
         lower.number.value == upper.number.value
 
-    fun recentered(delta: BigFraction): ExactLpBounds {
-        if (delta.isZero) return this
-        fun shift(side: ExactLpSide?): ExactLpSide? = side?.copy(number = ExactLpNumber.of(side.number.value - delta))
-        return ExactLpBounds(shift(lower), shift(upper))
-    }
+
 }
 
 internal data class ExactLpColumn(
@@ -856,11 +859,16 @@ internal class ExactLpObjective(
         BigFraction.ofLong(if (sense == Sense.MINIMIZE) 1L else -1L)
 
     fun withConstant(value: ExactLpNumber): ExactLpObjective = ExactLpObjective(
-        costs, value, scale, externalConstant, sense,
+        costs,
+        value,
+        scale,
+        externalConstant,
+        sense,
     )
 
     override fun equals(other: Any?): Boolean = other is ExactLpObjective && costs == other.costs &&
-        constant == other.constant && scale == other.scale && externalConstant == other.externalConstant && sense == other.sense
+        constant == other.constant && scale == other.scale && externalConstant == other.externalConstant &&
+        sense == other.sense
 
     override fun hashCode(): Int = listOf(costs, constant, scale, externalConstant, sense).hashCode()
 }
@@ -909,6 +917,10 @@ internal class ExactLpModel(
 
     fun recentered(origins: List<ExactLpNumber>): ExactLpModel {
         require(origins.size == n)
+        if ((0 until n).all { origins[it] == columns[it].origin }) return copy()
+        require(!hasIeeeInput() && origins.none { it.ieeeBits != null }) {
+            "IEEE source recenter requires retained input history"
+        }
         val rhs = rightHandSide.toMutableList()
         val columns = this.columns.toMutableList()
         var constant = objective.constant.value
@@ -922,13 +934,27 @@ internal class ExactLpModel(
             }
             columns[j] = columns[j].copy(bounds = columns[j].bounds.recentered(delta), origin = origins[j])
         }
-        val nextObjective = if (constant == objective.constant.value) objective else objective.withConstant(ExactLpNumber.of(constant))
+        val nextObjective = if (constant == objective.constant.value) {
+            objective
+        } else {
+            objective.withConstant(ExactLpNumber.of(constant))
+        }
         return ExactLpModel(matrix, rhs, columns, rows, nextObjective)
     }
 
+    private fun hasIeeeInput(): Boolean = matrix.any { entries -> entries.any { it.number.ieeeBits != null } } ||
+        rightHandSide.any { it.ieeeBits != null } || columns.any { column ->
+            column.origin.ieeeBits != null || listOfNotNull(column.bounds.lower, column.bounds.upper).any {
+                it.number.ieeeBits != null || it.premises?.hasIeeeInput == true
+            }
+        } || rows.any { it.premises?.hasIeeeInput == true } ||
+        (0 until objective.size).any { objective.cost(it).ieeeBits != null } ||
+        listOf(objective.constant, objective.scale, objective.externalConstant).any { it.ieeeBits != null }
+
     // Full immutable value comparison includes raw input bits, provenance and objective units.
     fun sameAuthority(other: ExactLpModel): Boolean = matrix == other.matrix &&
-        rightHandSide == other.rightHandSide && columns == other.columns && rows == other.rows && objective == other.objective
+        rightHandSide == other.rightHandSide && columns == other.columns && rows == other.rows &&
+        objective == other.objective
 
     fun toLegacy(): LpModel? {
         if (columns.any { !it.bounds.consistent || !it.integral } || rows.any { it.strict }) return null
@@ -946,8 +972,11 @@ internal class ExactLpModel(
                 hasUpper[j] = true
             }
             if (j >= n && hasUpper[j] && upper[j] != 0L) return null
-            if (j < n) origin[j] = columns[j].origin.legacyLong() ?: return null
-            else if (columns[j].origin != ExactLpNumber.of(0L) || columns[j].tag != -1) return null
+            if (j < n) {
+                origin[j] = columns[j].origin.legacyLong() ?: return null
+            } else if (columns[j].origin != ExactLpNumber.of(0L) || columns[j].tag != -1) {
+                return null
+            }
             cost[j] = objective.cost(j).legacyLong() ?: return null
         }
         val constant = objective.constant.legacyLong() ?: return null
@@ -961,14 +990,18 @@ internal class ExactLpModel(
         for (j in 0 until n) pointers[j + 1] = pointers[j] + matrix[j].size
         val indices = IntArray(pointers[n])
         val values = LongArray(pointers[n])
-        for (j in 0 until n) for ((k, entry) in matrix[j].withIndex()) {
-            indices[pointers[j] + k] = entry.row
-            values[pointers[j] + k] = entry.number.legacyLong() ?: return null
+        for (j in 0 until n) {
+            for ((k, entry) in matrix[j].withIndex()) {
+                indices[pointers[j] + k] = entry.row
+                values[pointers[j] + k] = entry.number.legacyLong() ?: return null
+            }
         }
         val flipped = rhs.copyOf()
         try {
-            for (j in 0 until n) for (k in pointers[j] until pointers[j + 1]) {
-                flipped[indices[k]] = addExact(flipped[indices[k]], mulExact(values[k], origin[j]))
+            for (j in 0 until n) {
+                for (k in pointers[j] until pointers[j + 1]) {
+                    flipped[indices[k]] = addExact(flipped[indices[k]], mulExact(values[k], origin[j]))
+                }
             }
         } catch (_: ArithmeticException) {
             return null
@@ -979,4 +1012,10 @@ internal class ExactLpModel(
             rowGlobal = BooleanArray(m) { rows[it].global }, rowPremises = premises, flippedRhs = flipped,
         )
     }
+}
+
+private fun ExactLpBounds.recentered(delta: BigFraction): ExactLpBounds {
+    if (delta.isZero) return this
+    fun shift(side: ExactLpSide?): ExactLpSide? = side?.copy(number = ExactLpNumber.of(side.number.value - delta))
+    return ExactLpBounds(shift(lower), shift(upper))
 }

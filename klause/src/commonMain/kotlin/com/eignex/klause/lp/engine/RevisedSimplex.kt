@@ -130,6 +130,8 @@ internal class RevisedSimplex(
 
     private val basicVar = IntArray(m)
     private val status = Array(numVars) { VarStatus.BASIC }
+    // v1 cannot recover an imported general status declaration; keep this conservative through reuse.
+    private var basisCaptureEligible = true
     private var pivots = 0
     private var warmStarted = false
     private var refactorizations = 0
@@ -786,7 +788,7 @@ internal class RevisedSimplex(
                 }
                 // Dual unbounded ⇒ primal infeasible. Record the basis + leaving row so the caller can
                 // certify infeasibility exactly (the float ray alone is not sound to prune on).
-                infeasibleBasis = Basis(basicVar.copyOf(), status.copyOf())
+                infeasibleBasis = Basis(basicVar.copyOf(), status.copyOf(), captureEligible = basisCaptureEligible)
                 infeasibleRow = r
                 // float ρ = B⁻ᵀeᵣ densely; integerFarkasRay rounds + certifies it.
                 infeasibleRay = pivotEtaVec.toDoubleArray()
@@ -980,7 +982,7 @@ internal class RevisedSimplex(
             val v = basicVar[i]
             if (v < n) primal[v] = model.loShiftD(v) + beta[i]
         }
-        val basis = Basis(basicVar.copyOf(), status.copyOf())
+        val basis = Basis(basicVar.copyOf(), status.copyOf(), captureEligible = basisCaptureEligible)
         optimalBasis = basis
         optimalPrimal = primal
         val y = duals()
@@ -1027,7 +1029,7 @@ internal class RevisedSimplex(
         val y = duals()
         recordDegeneracy(y)
         return FloatLpResult(
-            Basis(basicVar.copyOf(), status.copyOf()),
+            Basis(basicVar.copyOf(), status.copyOf(), captureEligible = basisCaptureEligible),
             obj,
             y,
             primal,
@@ -1067,6 +1069,7 @@ internal class RevisedSimplex(
     /** Seed the basis from a prior [warm] basis; false (⇒ cold start) on a structural mismatch or an
      *  out-of-range column. A singular warm factorization is caught by [solve]'s refactor fallback. */
     private fun tryWarmStart(warm: Basis): Boolean {
+        basisCaptureEligible = basisCaptureEligible && warm.captureEligible
         if (warm.basicVars.size != m || warm.status.size != numVars) return false
         for (t in 0 until m) if (warm.basicVars[t] !in 0 until numVars) return false
         warm.basicVars.copyInto(basicVar)

@@ -13,6 +13,39 @@ import kotlin.test.assertTrue
 
 class LpModelTest {
     @Test
+    fun `IEEE recenter cannot erase source authority by deriving integral values`() {
+        val zero = ExactLpNumber.of(0L)
+        val one = ExactLpNumber.of(1L)
+        val model = ExactLpModel(listOf(listOf(ExactLpEntry(0, one))), listOf(ExactLpNumber.ofIeee(2.0)),
+            listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(ExactLpNumber.ofIeee(1.0)),
+                ExactLpSide(ExactLpNumber.ofIeee(3.0)))), ExactLpColumn(ExactLpBounds(ExactLpSide(zero)))),
+            listOf(ExactLpRow()), ExactLpObjective(listOf(one, zero), ExactLpNumber.ofIeee(0.0)))
+
+        assertFailsWith<IllegalArgumentException> { model.recentered(listOf(one)) }
+        assertTrue(model.sameAuthority(model.recentered(listOf(zero))))
+        assertEquals(2.0.toRawBits(), model.rhs(0).ieeeBits)
+        assertNull(model.toLegacy())
+        assertNull(exactLpStateKey(model))
+    }
+
+    @Test
+    fun `integral recenter can produce a lossless normalized bridge`() {
+        val zero = ExactLpNumber.of(0L)
+        val one = ExactLpNumber.of(1L)
+        val model = ExactLpModel(listOf(listOf(ExactLpEntry(0, one))), listOf(ExactLpNumber.of(2L)),
+            listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(one), ExactLpSide(ExactLpNumber.of(3L)))),
+                ExactLpColumn(ExactLpBounds(ExactLpSide(zero)))), listOf(ExactLpRow()), ExactLpObjective(listOf(one, zero)))
+
+        val recentered = model.recentered(listOf(one))
+        val legacy = assertNotNull(recentered.toLegacy())
+
+        assertEquals(1L, legacy.rhs[0])
+        assertEquals(2L, legacy.upper[0])
+        assertEquals(1L, legacy.objConstant)
+        assertNotNull(exactLpStateKey(recentered))
+    }
+
+    @Test
     fun `adjacent integral authority retains distinct legacy keys`() {
         val zero = ExactLpNumber.of(0L)
         val model = ExactLpModel(listOf(emptyList()), emptyList(),
@@ -63,7 +96,9 @@ class LpModelTest {
             model.copy(objective = ExactLpObjective(listOf(zero, zero), scale = ExactLpNumber.of(2L))),
             model.copy(objective = ExactLpObjective(listOf(zero, zero), externalConstant = ExactLpNumber.of(1L))),
             model.copy(objective = ExactLpObjective(listOf(zero, zero), sense = Sense.MAXIMIZE)),
-            model.recentered(listOf(ExactLpNumber.ofIeee(-0.0))),
+            ExactLpModel(listOf(emptyList()), listOf(zero),
+                listOf(model.column(0).copy(origin = ExactLpNumber.ofIeee(-0.0)), model.column(1)),
+                listOf(ExactLpRow()), model.objective),
         )
 
         for (variant in variants) assertFalse(model.sameAuthority(variant))

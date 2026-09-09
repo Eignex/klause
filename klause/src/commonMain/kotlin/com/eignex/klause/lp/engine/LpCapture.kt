@@ -220,10 +220,13 @@ internal class LpCapturedModel(
             requireNotNull(model.toLegacy()) { "exact model is outside capture v1 authority" },
         )
 
-        fun captureOrNull(model: LpModel): LpCapturedModel? = try {
-            capture(model).also { it.validate() }
-        } catch (_: IllegalArgumentException) {
-            null
+        fun captureOrNull(model: LpModel): LpCapturedModel? {
+            if (model.rowPremises.size != model.m) return null
+            return try {
+                capture(model).also { it.validate() }
+            } catch (_: IllegalArgumentException) {
+                null
+            }
         }
 
         fun capture(model: LpModel): LpCapturedModel {
@@ -326,10 +329,13 @@ internal class LpCapturedBasis(val basicVars: IntArray, val statuses: IntArray) 
     }
 
     companion object {
-        fun capture(basis: Basis): LpCapturedBasis = LpCapturedBasis(
-            basis.basicVars.copyOf(),
-            IntArray(basis.status.size) { statusWireCode(basis.status[it]) },
-        )
+        fun capture(basis: Basis): LpCapturedBasis {
+            require(basis.captureEligible) { "basis declaration is outside capture v1 statuses" }
+            return LpCapturedBasis(
+                basis.basicVars.copyOf(),
+                IntArray(basis.status.size) { statusWireCode(basis.status[it]) },
+            )
+        }
     }
 }
 
@@ -429,7 +435,9 @@ internal class LpCapture internal constructor(
          * instrumented producer: callers record only events exposed by their public engine seam. The
          * capture contains no factorization snapshot or other solver-private cache. */
         fun capture(model: ExactLpModel, settings: LpReplaySettings, events: List<LpReplayEvent>): LpCapture = capture(
-            requireNotNull(model.toLegacy()) { "exact model is outside capture v1 authority" }, settings, events,
+            requireNotNull(model.toLegacy()) { "exact model is outside capture v1 authority" },
+            settings,
+            events,
         )
 
         fun capture(model: LpModel, settings: LpReplaySettings, events: List<LpReplayEvent>): LpCapture = LpCapture(

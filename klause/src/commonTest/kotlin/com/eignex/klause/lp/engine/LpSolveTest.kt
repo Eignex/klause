@@ -16,6 +16,17 @@ import kotlin.test.assertTrue
 
 class LpSolveTest {
     @Test
+    fun `short premise metadata declines keys and safe snapshots without throwing`() {
+        val model = LpModel(1, 1, Csc(intArrayOf(0, 1), intArrayOf(0), longArrayOf(1L)),
+            longArrayOf(1L), longArrayOf(1L, 0L), longArrayOf(1L, 0L), booleanArrayOf(true, false),
+            longArrayOf(0L), 0L, Sense.MINIMIZE, intArrayOf(0), rowPremises = emptyArray())
+
+        assertNull(LpCapturedModel.captureOrNull(model))
+        assertNull(exactLpStateKey(model))
+        assertNull(solveAndCertify(model).safeLowerBound)
+    }
+
+    @Test
     fun `raw objective mutation invalidates counters but not an existing lazy snapshot`() {
         val model = LpBuilder().apply { addVar(0L, 3L, cost = 1L) }.build(Sense.MINIMIZE)
         val cache = LpCounterResults()
