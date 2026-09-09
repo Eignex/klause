@@ -202,7 +202,6 @@ class ForrestTomlinFactorsTest {
             assertEquals(expected, assertNotNull(ft.lastUpdateWork).copiedEntries)
         }
     }
-
 }
 
 internal fun ftSource(shape: String, n: Int = 8): SparseMatrix {
