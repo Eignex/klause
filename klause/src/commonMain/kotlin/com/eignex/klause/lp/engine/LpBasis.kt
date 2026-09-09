@@ -23,6 +23,8 @@ internal class Basis(
     val basicVars: IntArray,
     /** Per-variable status (length `numVars`): [VarStatus.BASIC], [VarStatus.AT_LOWER] or `AT_UPPER`. */
     val status: Array<VarStatus>,
+    // A solver projection can be valid while its original status declaration has no v1 wire code.
+    val captureEligible: Boolean = true,
 )
 
 internal enum class ExactLpStatus { BASIC, AT_LOWER, AT_UPPER, FIXED, FREE }
@@ -68,7 +70,8 @@ internal class ExactLpBasis(headings: List<Int>, statuses: List<ExactLpStatus>) 
                 ExactLpStatus.FREE -> return null
             }
         }
-        return LegacyLpBasis(model, this, legacy, Basis(headings.toIntArray(), status))
+        val basis = Basis(headings.toIntArray(), status, captureEligible = ExactLpStatus.FIXED !in statuses)
+        return LegacyLpBasis(model, this, legacy, basis)
     }
 }
 

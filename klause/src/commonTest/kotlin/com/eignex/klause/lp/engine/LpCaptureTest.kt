@@ -1,5 +1,6 @@
 package com.eignex.klause.lp.engine
 
+import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -11,6 +12,80 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class LpCaptureTest {
+    @Test
+    fun `fixed capture decline survives zero pivot warm chains and close reuse`() {
+        val zero = ExactLpNumber.of(0L)
+        val model = ExactLpModel(listOf(emptyList()), emptyList(),
+            listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(zero)))), emptyList(),
+            ExactLpObjective(listOf(zero)))
+        val bridge = assertNotNull(ExactLpBasis(emptyList(), listOf(ExactLpStatus.FIXED)).toLegacy(model))
+        val solver = newPersistentLpSolver(bridge.model)
+        try {
+            val first = assertNotNull(solver.solve(bridge.basis))
+            assertEquals(0, first.pivots)
+            assertFailsWith<IllegalArgumentException> { LpCapturedBasis.capture(first.basis) }
+            newLpSolver(bridge.model).use { next ->
+                val chained = assertNotNull(next.solvePrimal(first.basis))
+                assertFailsWith<IllegalArgumentException> { LpCapturedBasis.capture(chained.basis) }
+            }
+            assertTrue(solver.rebind(bridge.model.rebind(longArrayOf(0L), longArrayOf(0L)), Cancellation.Never))
+            val reused = assertNotNull(solver.resolveBounds())
+            assertFailsWith<IllegalArgumentException> { LpCapturedBasis.capture(reused.basis) }
+            solver.close()
+            val reopened = assertNotNull(solver.solve())
+            assertFailsWith<IllegalArgumentException> { LpCapturedBasis.capture(reopened.basis) }
+        } finally {
+            solver.close()
+        }
+        newLpSolver(bridge.model).use { fresh ->
+            val cold = assertNotNull(fresh.solve())
+            assertNotNull(LpCapturedBasis.capture(cold.basis))
+        }
+    }
+
+    @Test
+    fun `fixed capture decline survives infeasible and truncated basis exports`() {
+        val zero = ExactLpNumber.of(0L)
+        for (infeasible in listOf(true, false)) {
+            val model = ExactLpModel(listOf(emptyList(), listOf(ExactLpEntry(0, ExactLpNumber.of(-1L)))),
+                listOf(ExactLpNumber.of(-2L)),
+                listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(zero))),
+                    ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(ExactLpNumber.of(if (infeasible) 0L else 3L)))),
+                    ExactLpColumn(ExactLpBounds(ExactLpSide(zero)))), listOf(ExactLpRow()),
+                ExactLpObjective(listOf(zero, ExactLpNumber.of(1L), zero)))
+            val bridge = assertNotNull(ExactLpBasis(listOf(2), listOf(
+                ExactLpStatus.FIXED, ExactLpStatus.AT_LOWER, ExactLpStatus.BASIC)).toLegacy(model))
+
+            newPersistentLpSolver(bridge.model, iterationLimit = 1).use { solver ->
+                val result = solver.solve(bridge.basis)
+                val exported = if (infeasible) {
+                    assertNull(result)
+                    assertNotNull(solver.infeasibleBasis)
+                } else {
+                    assertFalse(assertNotNull(result).optimal)
+                    result.basis
+                }
+                assertFailsWith<IllegalArgumentException> { LpCapturedBasis.capture(exported) }
+            }
+        }
+    }
+
+    @Test
+    fun `fixed bridge declines v1 status capture while lower declaration roundtrips`() {
+        val zero = ExactLpNumber.of(0L)
+        val model = ExactLpModel(listOf(emptyList()), emptyList(),
+            listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(zero)))), emptyList(),
+            ExactLpObjective(listOf(zero)))
+        val fixed = assertNotNull(ExactLpBasis(emptyList(), listOf(ExactLpStatus.FIXED)).toLegacy(model))
+        val lower = assertNotNull(ExactLpBasis(emptyList(), listOf(ExactLpStatus.AT_LOWER)).toLegacy(model))
+
+        assertFailsWith<IllegalArgumentException> { LpCapturedBasis.capture(fixed.basis) }
+        val captured = LpCapturedBasis.capture(lower.basis)
+        val restored = captured.toBasis(lower.model.hasUpper, 0)
+        assertEquals(VarStatus.AT_LOWER, restored.status[0])
+        assertEquals(ExactLpStatus.FIXED, fixed.exactBasis.status(0))
+    }
+
     @Test
     fun `general authority is rejected before capture v1 projection`() {
         val zero = ExactLpNumber.of(0L)
