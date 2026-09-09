@@ -63,6 +63,10 @@ class LpArchitectureTest {
             """.trimIndent(),
             """
                 package com.eignex.klause.simplex.basis
+                import com.eignex.koblas.sparse.basis.BasisSolver
+                import com.eignex.koblas.sparse.basis.IndexedVector
+                import com.eignex.koblas.sparse.basis.BasisUpdate
+                import com.eignex.koblas.sparse.basis.BasisSolveQuality
                 val matrix: com.eignex.koblas.SparseMatrix? = null
             """.trimIndent(),
             """
@@ -86,6 +90,9 @@ class LpArchitectureTest {
         for (dependency in listOf(
             "import com.eignex.koblas.sparse.factorization.lu.F64SparseMarkowitzLu",
             "import com.eignex.koblas.sparse.basis.*",
+            "import com.eignex.koblas.sparse.basis.ProductFormBasisSolver",
+            "import com.eignex.koblas.sparse.basis.BasisSolvers",
+            "import com.eignex.koblas.sparse.basis.BasisSolverFactory",
             "import com.eignex.koblas.corex.Matrix as Matrix",
             "import com.eignex.koblas.*",
             "import com.eignex.koblas.SparseMatrixFactory",
@@ -180,9 +187,15 @@ internal object LpBoundaryScanner {
     private fun forbiddenOutboundDependency(packageName: String, dependency: String): Boolean {
         if (packageName == BASIS_PACKAGE || packageName.startsWith("$BASIS_PACKAGE.")) {
             if (dependency == "com.eignex.koblas" || dependency.startsWith("com.eignex.koblas.")) {
-                val sparseMatrix = "com.eignex.koblas.SparseMatrix"
+                val allowedTypes = listOf(
+                    "com.eignex.koblas.SparseMatrix",
+                    "com.eignex.koblas.sparse.basis.BasisSolver",
+                    "com.eignex.koblas.sparse.basis.IndexedVector",
+                    "com.eignex.koblas.sparse.basis.BasisUpdate",
+                    "com.eignex.koblas.sparse.basis.BasisSolveQuality",
+                )
                 return !dependency.startsWith("com.eignex.koblas.core.") &&
-                    dependency != sparseMatrix && !dependency.startsWith("$sparseMatrix.")
+                    allowedTypes.none { dependency == it || dependency.startsWith("$it.") }
             }
         }
         if (!dependency.startsWith("com.eignex.klause.")) return false
