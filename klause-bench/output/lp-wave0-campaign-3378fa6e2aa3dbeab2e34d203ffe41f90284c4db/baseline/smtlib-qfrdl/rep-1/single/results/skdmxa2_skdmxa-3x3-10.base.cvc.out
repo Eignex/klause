@@ -1,0 +1,22 @@
+unknown
+; wall timeout
+; solveTime=29.906
+; solutions=0
+; presolvePasses=subsume
+; presolveConstraintsRemoved=3
+; nodes=0
+; failures=0
+; propagations=0
+; openBoolDecisions=2536
+; openIntDecisions=0
+; openTheoryDecisions=0
+; openTheoryChecks=0
+; openWork=2536
+; openLearned=367
+; openRelearned=45
+; openRestarts=0
+; openReductions=0
+; openDropped=0
+; openRetained=367
+; openPeakRetained=367
+; openLearnedWatchVisits=22370

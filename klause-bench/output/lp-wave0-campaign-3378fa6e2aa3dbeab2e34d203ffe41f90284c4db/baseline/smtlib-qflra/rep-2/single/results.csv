@@ -1,0 +1,11 @@
+suite,problem,maximize,objective,feasible,proven,elapsedMs,budgetMs,format,structure,numGlobal,numLinear,boolHeavy,logic
+smtlib-qf_lra,2017-Heizmann-UltimateInvariantSynthesis/_array1.i_3_2_2.bpl_11,false,,,false,30000,30000,,,,,,
+smtlib-qf_lra,2019-ezsmt/Labyrinth/SCC_Strong/0003-labyrinth-11-0,false,,,false,30000,30000,,,,,,
+smtlib-qf_lra,DTP-Scheduling/constraints-cooking01,false,,true,false,561,30000,,,,,,
+smtlib-qf_lra,LassoRanker/CooperatingT2/afagp-fail.t2.c_Iteration1_Lasso_3-pieceTemplate,false,,,false,30000,30000,,,,,,
+smtlib-qf_lra,TM/p-0-bucket_s10,false,,,false,30000,30000,,,,,,
+smtlib-qf_lra,check/bignum_lra1,false,,true,false,8131,30000,,,,,,
+smtlib-qf_lra,clock_synchro/clocksynchro_10clocks.main_invar.base,false,,,false,30000,30000,,,,,,
+smtlib-qf_lra,keymaera/bouncing-ball-inv-node1886,false,,false,true,30000,30000,,,,,,
+smtlib-qf_lra,latendresse/ecoliFBAyicesTest-15875-16,false,,,false,30000,30000,,,,,,
+smtlib-qf_lra,meti-tarski/Arthan/1A/Arthan1A-chunk-0015,false,,true,false,454,30000,,,,,,

@@ -1,0 +1,14 @@
+{
+    "feasible": true,
+    "objective": null,
+    "timeToBestMs": 17,
+    "timeToFirstFeasibleMs": 17,
+    "proven": true,
+    "stats": {
+        "solveTime": "0.017",
+        "maximize": "false"
+    },
+    "attribution": [],
+    "rawOutput": "sat\n",
+    "command": "z3 -T:30 -memory:2048 -smt2 sat.threads=1 parallel.enable=false /home/rasmus/.cache/klause-bench/corpus/smtlib-qf_rdl/QF_RDL/check/bignum_rdl1.smt2"
+}

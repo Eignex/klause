@@ -1,0 +1,66 @@
+sat
+(
+  (define-fun t_COOKING_LARDON_o1_l1_3 () Real 13/2)
+  (define-fun t_BREAKING_EGGS_e1_1 () Real 19/2)
+  (define-fun St_spy_variable () Real 1)
+  (define-fun t_FIRE_COOKING_PLATE_p1_1 () Real 0)
+  (define-fun t_Init_0 () Real 0)
+  (define-fun t_COOKING_CARBONARA_n1_l1_e1_4 () Real 23/2)
+  (define-fun t_EATING_CARBONARA_n1_l1_e1_5 () Real 25/2)
+  (define-fun t_COOKING_NOODLES_w1_n1_3 () Real 3)
+  (define-fun t_BOILING_OIL_p1_o1_2 () Real 9/2)
+  (define-fun t_BOILING_WATER_p1_w1_2 () Real 1)
+  (define-fun t_Goal_6 () Real 39/2)
+)
+; solveTime=0.104
+; solutions=1
+; presolvePasses=subsume
+; presolveConstraintsRemoved=1
+; nodes=0
+; failures=0
+; propagations=0
+; openBoolDecisions=0
+; openIntDecisions=0
+; openTheoryDecisions=0
+; openTheoryChecks=1
+; openWork=1
+; openLearned=0
+; openRelearned=0
+; openRestarts=0
+; openReductions=0
+; openDropped=0
+; openRetained=0
+; openPeakRetained=0
+; openLearnedWatchVisits=0
+; smtPrivateChecks=0
+; smtSharedChecks=1
+; smtTheoryChecks=1
+; smtTheoryChecksPerSec=9.6154
+; smtConflicts=0
+; smtExplainedConflicts=0
+; smtUnexplainedConflicts=0
+; smtConflictLiterals=0
+; smtReductionRequests=0
+; smtReductionCacheHits=0
+; smtReductionAccepted=0
+; smtReductionDeclined=0
+; smtReductionMs=0
+; smtSimplexAttempts=1
+; smtSimplexAccepted=1
+; smtSimplexDeclined=0
+; smtSimplexMs=11.8096
+; smtFrac128Attempts=0
+; smtFrac128Eligible=0
+; smtFrac128Accepted=0
+; smtFrac128Escalations=0
+; smtFrac128OverflowEscalations=0
+; smtFrac128InputEscalations=0
+; smtEscalationMs=0
+; smtWitnessCandidates=1
+; smtWitnessAccepted=1
+; smtStrictWitnessCandidates=1
+; smtStrictWitnessAccepted=1
+; smtWideWitnessCandidates=0
+; smtWideWitnessAccepted=0
+; smtWitnessAcceptance=1
+; smtStrictWitnessAcceptance=1

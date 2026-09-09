@@ -1,0 +1,17 @@
+=== MiniZinc Challenge complete scoring:  results  vs  results   (12 shared) ===
+  A+0 [10teams] A=-@3000ms  B=-@3000ms
+  A+0 [22433] A=-@3000ms  B=-@3000ms
+  A+0 [23588] A=-@3000ms  B=-@3000ms
+  A+0 [2club200v15p5scn] A=-@3000ms  B=-@3000ms
+  A+1 [30_70_45_05_100] A=2672.0@1559ms  B=-@3000ms
+  A+1 [30_70_45_095_100] A=2513.0@1528ms  B=-@3000ms
+  A+0 [30n20b8] A=-@3000ms  B=-@3000ms
+  A+1 [50v-10] A=426147.64892190695@2547ms  B=427077.8389185518@2257ms
+  A+0 [8div-n59k10] A=-@3000ms  B=-@3000ms
+  A+0 [8div-n59k11] A=-@3000ms  B=-@3000ms
+  A+0 [CMS750_4] A=-@3000ms  B=-@3000ms
+  A+0 [Test3] A=-@3000ms  B=-@3000ms
+
+  BORDA SCORE:  results = 3   results = 0   (of 12)
+  A strict wins 3, strict losses 0, ties 0, A-unsolved 9
+  B-solved that A did not: 0

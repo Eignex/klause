@@ -1,0 +1,20 @@
+Error: type error: no function or predicate with this signature found: `int_search(array[int] of var int,string,string,string)'
+Cannot use the following functions or predicates with the same identifier:
+annotation int_search(array [$X] of var $$E: x,ann: select,ann: choice);
+    (requires 3 arguments, but 4 given)
+annotation int_search(array [$X] of var opt $$E: x,ann: select,ann: choice);
+    (requires 3 arguments, but 4 given)
+annotation int_search(array [int] of var int: x,ann: select,ann: choice,ann: explore);
+    (argument 2 expects type ann, but type string given)
+    (argument 3 expects type ann, but type string given)
+    (argument 4 expects type ann, but type string given)
+annotation int_search(array [$X] of var $$E: x,ann: select,ann: choice,ann: explore);
+    (argument 2 expects type ann, but type string given)
+    (argument 3 expects type ann, but type string given)
+    (argument 4 expects type ann, but type string given)
+annotation int_search(array [$X] of var opt $$E: x,ann: select,ann: choice,ann: explore);
+    (argument 2 expects type ann, but type string given)
+    (argument 3 expects type ann, but type string given)
+    (argument 4 expects type ann, but type string given)
+
+/home/rasmus/.cache/klause-bench/corpus/mzn-challenge/2008/nmseq/nmseq.mzn:28.10-65

@@ -1,0 +1,1 @@
+./gradlew -Dklause.bench.cache=false :klause-bench:bench --args=reference\ suite=mzn-bench\ per-family=1\ max=60\ seed=1\ jobs=1\ workers=1\ timeout=30000 

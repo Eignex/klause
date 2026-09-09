@@ -1,0 +1,7 @@
+=====UNKNOWN=====
+% budget exhausted
+%%%mzn-stat: solveTime=0.008
+%%%mzn-stat: solutions=0
+%%%mzn-stat: presolvePasses=strengthen,difference-system
+%%%mzn-stat: presolveConstraintsRemoved=540
+%%%mzn-stat-end

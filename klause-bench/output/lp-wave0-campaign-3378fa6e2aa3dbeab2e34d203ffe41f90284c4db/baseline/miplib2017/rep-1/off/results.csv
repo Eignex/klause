@@ -1,0 +1,13 @@
+suite,problem,maximize,objective,feasible,proven,elapsedMs,budgetMs,format,structure,numGlobal,numLinear,boolHeavy,logic
+miplib2017,10teams,false,,,false,3000,3000,,,,,,
+miplib2017,22433,false,,,false,3000,3000,,,,,,
+miplib2017,23588,false,,,false,3000,3000,,,,,,
+miplib2017,2club200v15p5scn,false,,,false,3000,3000,,,,,,
+miplib2017,30_70_45_05_100,false,,,false,3000,3000,,,,,,
+miplib2017,30_70_45_095_100,false,,,false,3000,3000,,,,,,
+miplib2017,30n20b8,false,,,false,3000,3000,,,,,,
+miplib2017,50v-10,false,427077.8389185518,true,false,2257,3000,,,,,,
+miplib2017,8div-n59k10,false,,,false,3000,3000,,,,,,
+miplib2017,8div-n59k11,false,,,false,3000,3000,,,,,,
+miplib2017,CMS750_4,false,,,false,3000,3000,,,,,,
+miplib2017,Test3,false,,,false,3000,3000,,,,,,

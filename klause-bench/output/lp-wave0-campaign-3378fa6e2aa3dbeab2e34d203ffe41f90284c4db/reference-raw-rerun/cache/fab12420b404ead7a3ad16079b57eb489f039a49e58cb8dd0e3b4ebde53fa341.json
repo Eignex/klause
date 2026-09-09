@@ -1,0 +1,14 @@
+{
+    "feasible": true,
+    "objective": null,
+    "timeToBestMs": 36,
+    "timeToFirstFeasibleMs": 36,
+    "proven": true,
+    "stats": {
+        "solveTime": "0.036",
+        "maximize": "false"
+    },
+    "attribution": [],
+    "rawOutput": "sat\n",
+    "command": "z3 -T:30 -memory:2048 -smt2 sat.threads=1 parallel.enable=false /home/rasmus/.cache/klause-bench/corpus/smtlib-qf_idl/QF_IDL/DTP/DTP_k2_n35_c175_s1.smt2"
+}

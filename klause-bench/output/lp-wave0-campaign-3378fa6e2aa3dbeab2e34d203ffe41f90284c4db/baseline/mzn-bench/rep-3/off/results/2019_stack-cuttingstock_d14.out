@@ -1,0 +1,42 @@
+objective = 27;
+X_INTRODUCED_0_ = [1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 2, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 1, 0, 1, 0, 0, 0];
+m = [7, 2, 1, 8, 1, 8];
+used = [1, 1, 1, 1, 1, 1];
+_objective = 27;
+----------
+%%%klause-arm: label=backtrack#0 objective=27 time=355
+objective = 26;
+X_INTRODUCED_0_ = [2, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 0];
+m = [7, 2, 4, 4, 1, 8];
+used = [1, 1, 1, 1, 1, 1];
+_objective = 26;
+----------
+%%%klause-arm: label=backtrack#0 objective=26 time=383
+%%%mzn-stat: solveTime=2.577
+%%%mzn-stat: solutions=2
+%%%mzn-stat: presolvePasses=strengthen,diophantine,affine,difference-system
+%%%mzn-stat: presolveConstraintsRemoved=143
+%%%mzn-stat: nodes=4299
+%%%mzn-stat: failures=4206
+%%%mzn-stat: restarts=0
+%%%mzn-stat: propagations=0
+%%%mzn-stat: learned=0
+%%%mzn-stat: relearned=0
+%%%mzn-stat: peakDepth=51
+%%%mzn-stat: caNotApplicable=0
+%%%mzn-stat: caNonAsserting=0
+%%%mzn-stat: caRejectedTrueLit=0
+%%%mzn-stat: openBoolDecisions=0
+%%%mzn-stat: openIntDecisions=0
+%%%mzn-stat: openTheoryDecisions=0
+%%%mzn-stat: openTheoryChecks=0
+%%%mzn-stat: openWork=0
+%%%mzn-stat: openLearned=0
+%%%mzn-stat: openRelearned=0
+%%%mzn-stat: openRestarts=0
+%%%mzn-stat: openReductions=0
+%%%mzn-stat: openDropped=0
+%%%mzn-stat: openRetained=0
+%%%mzn-stat: openPeakRetained=0
+%%%mzn-stat: openLearnedWatchVisits=0
+%%%mzn-stat-end

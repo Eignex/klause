@@ -1,0 +1,260 @@
+TransitStartTimeSlot = [73, 73, 74, 72];
+ShipSails = [0, 0, 0, 0];
+Draft_cm = [1708, 1708, 1702, 1715];
+_objective = 0;
+----------
+%%%klause-arm: label=backtrack#0 objective=0 time=278
+TransitStartTimeSlot = [73, 73, 74, 72];
+ShipSails = [0, 0, 0, 1];
+Draft_cm = [1708, 1708, 1702, 1715];
+_objective = 102900;
+----------
+%%%klause-arm: label=backtrack#0 objective=102900 time=431
+TransitStartTimeSlot = [73, 73, 74, 36];
+ShipSails = [0, 0, 0, 1];
+Draft_cm = [1708, 1708, 1702, 1759];
+_objective = 105540;
+----------
+%%%klause-arm: label=backtrack#0 objective=105540 time=533
+TransitStartTimeSlot = [73, 73, 74, 62];
+ShipSails = [0, 0, 0, 1];
+Draft_cm = [1708, 1708, 1702, 1767];
+_objective = 106020;
+----------
+%%%klause-arm: label=backtrack#0 objective=106020 time=627
+TransitStartTimeSlot = [73, 73, 74, 49];
+ShipSails = [0, 0, 0, 1];
+Draft_cm = [1708, 1708, 1702, 1770];
+_objective = 106200;
+----------
+%%%klause-arm: label=backtrack#0 objective=106200 time=683
+TransitStartTimeSlot = [1, 14, 74, 62];
+ShipSails = [0, 1, 0, 1];
+Draft_cm = [0, 1604, 1702, 1767];
+_objective = 186220;
+----------
+%%%klause-arm: label=backtrack#0 objective=186220 time=733
+TransitStartTimeSlot = [3, 62, 74, 49];
+ShipSails = [0, 1, 0, 1];
+Draft_cm = [0, 1767, 1702, 1770];
+_objective = 194550;
+----------
+%%%klause-arm: label=backtrack#0 objective=194550 time=779
+TransitStartTimeSlot = [3, 61, 74, 49];
+ShipSails = [0, 1, 0, 1];
+Draft_cm = [0, 1770, 1702, 1770];
+_objective = 194700;
+----------
+%%%klause-arm: label=backtrack#0 objective=194700 time=824
+TransitStartTimeSlot = [3, 60, 74, 49];
+ShipSails = [0, 1, 0, 1];
+Draft_cm = [0, 1774, 1702, 1770];
+_objective = 194900;
+----------
+%%%klause-arm: label=backtrack#0 objective=194900 time=864
+TransitStartTimeSlot = [3, 47, 74, 62];
+ShipSails = [0, 1, 0, 1];
+Draft_cm = [0, 1780, 1702, 1767];
+_objective = 195020;
+----------
+%%%klause-arm: label=backtrack#0 objective=195020 time=896
+TransitStartTimeSlot = [3, 21, 26, 62];
+ShipSails = [0, 1, 1, 1];
+Draft_cm = [0, 1664, 1702, 1767];
+_objective = 282830;
+----------
+%%%klause-arm: label=backtrack#0 objective=282830 time=972
+TransitStartTimeSlot = [3, 47, 56, 62];
+ShipSails = [0, 1, 1, 1];
+Draft_cm = [0, 1780, 1780, 1767];
+_objective = 292920;
+----------
+%%%klause-arm: label=backtrack#0 objective=292920 time=1019
+TransitStartTimeSlot = [14, 47, 56, 62];
+ShipSails = [1, 1, 1, 1];
+Draft_cm = [1604, 1780, 1780, 1767];
+_objective = 365100;
+----------
+%%%klause-arm: label=backtrack#0 objective=365100 time=1084
+TransitStartTimeSlot = [68, 74, 50, 37];
+ShipSails = [1, 1, 1, 1];
+Draft_cm = [1739, 1702, 1780, 1763];
+_objective = 367035;
+----------
+%%%klause-arm: label=backtrack#0 objective=367035 time=1158
+TransitStartTimeSlot = [67, 74, 50, 37];
+ShipSails = [1, 1, 1, 1];
+Draft_cm = [1744, 1702, 1780, 1763];
+_objective = 367260;
+----------
+%%%klause-arm: label=backtrack#0 objective=367260 time=1195
+TransitStartTimeSlot = [66, 74, 50, 37];
+ShipSails = [1, 1, 1, 1];
+Draft_cm = [1749, 1702, 1780, 1763];
+_objective = 367485;
+----------
+%%%klause-arm: label=backtrack#0 objective=367485 time=1230
+TransitStartTimeSlot = [65, 74, 50, 37];
+ShipSails = [1, 1, 1, 1];
+Draft_cm = [1750, 1702, 1780, 1763];
+_objective = 367530;
+----------
+%%%klause-arm: label=backtrack#0 objective=367530 time=1261
+TransitStartTimeSlot = [45, 74, 50, 62];
+ShipSails = [1, 1, 1, 1];
+Draft_cm = [1750, 1702, 1780, 1767];
+_objective = 367770;
+----------
+%%%klause-arm: label=backtrack#0 objective=367770 time=1334
+TransitStartTimeSlot = [37, 61, 50, 66];
+ShipSails = [1, 1, 1, 1];
+Draft_cm = [1750, 1770, 1780, 1749];
+_objective = 370090;
+----------
+%%%klause-arm: label=backtrack#0 objective=370090 time=1472
+%%%mzn-stat: solveTime=1.821
+%%%mzn-stat: solutions=19
+%%%mzn-stat: presolvePasses=strengthen,difference-system
+%%%mzn-stat: presolveConstraintsRemoved=592
+%%%mzn-stat: nodes=593
+%%%mzn-stat: failures=106
+%%%mzn-stat: restarts=0
+%%%mzn-stat: propagations=0
+%%%mzn-stat: learned=0
+%%%mzn-stat: relearned=0
+%%%mzn-stat: peakDepth=46
+%%%mzn-stat: caNotApplicable=0
+%%%mzn-stat: caNonAsserting=0
+%%%mzn-stat: caRejectedTrueLit=0
+%%%mzn-stat: openBoolDecisions=0
+%%%mzn-stat: openIntDecisions=0
+%%%mzn-stat: openTheoryDecisions=0
+%%%mzn-stat: openTheoryChecks=0
+%%%mzn-stat: openWork=0
+%%%mzn-stat: openLearned=0
+%%%mzn-stat: openRelearned=0
+%%%mzn-stat: openRestarts=0
+%%%mzn-stat: openReductions=0
+%%%mzn-stat: openDropped=0
+%%%mzn-stat: openRetained=0
+%%%mzn-stat: openPeakRetained=0
+%%%mzn-stat: openLearnedWatchVisits=0
+%%%mzn-stat: lpSolves=0
+%%%mzn-stat: lpPruned=0
+%%%mzn-stat: lpInfeasible=0
+%%%mzn-stat: lpBoundPruned=0
+%%%mzn-stat: lpFixed=0
+%%%mzn-stat: lpCuts=0
+%%%mzn-stat: lpPivots=0
+%%%mzn-stat: lpWorkOps=0
+%%%mzn-stat: lpNodePasses=0
+%%%mzn-stat: lpRootPasses=3
+%%%mzn-stat: lpRootPivots=27
+%%%mzn-stat: lpRootWorkOps=10152125
+%%%mzn-stat: lpRootWarmStartAttempts=0
+%%%mzn-stat: lpRootWarmStartHits=0
+%%%mzn-stat: lpRootRefactorizations=3
+%%%mzn-stat: lpRootRefactorInitial=1
+%%%mzn-stat: lpRootRefactorWarmStart=0
+%%%mzn-stat: lpRootRefactorSingularRecovery=0
+%%%mzn-stat: lpRootRefactorUpdateLimit=0
+%%%mzn-stat: lpRootRefactorBackendRequested=0
+%%%mzn-stat: lpRootRefactorReconcileRecovery=0
+%%%mzn-stat: lpRootRefactorPrimal=2
+%%%mzn-stat: lpRootSingularRefactorizations=0
+%%%mzn-stat: lpRootSmallPivotBails=0
+%%%mzn-stat: lpIntegerCertifyAttempts=0
+%%%mzn-stat: lpIntegerCertifySuccesses=0
+%%%mzn-stat: lpIntegerCertifyDeclines=0
+%%%mzn-stat: lpIntegerCertifyNodeAttempts=0
+%%%mzn-stat: lpIntegerCertifyNodeSuccesses=0
+%%%mzn-stat: lpIntegerCertifyNodeDeclines=0
+%%%mzn-stat: lpIntegerCertifyStandaloneAttempts=0
+%%%mzn-stat: lpIntegerCertifyStandaloneSuccesses=0
+%%%mzn-stat: lpIntegerCertifyStandaloneDeclines=0
+%%%mzn-stat: lpIntegerCertifyComponentAttempts=0
+%%%mzn-stat: lpIntegerCertifyComponentSuccesses=0
+%%%mzn-stat: lpIntegerCertifyComponentDeclines=0
+%%%mzn-stat: lpIntegerCertifyRootAttempts=0
+%%%mzn-stat: lpIntegerCertifyRootSuccesses=0
+%%%mzn-stat: lpIntegerCertifyRootDeclines=0
+%%%mzn-stat: lpSafeObjectiveLowerBoundAttempts=0
+%%%mzn-stat: lpSafeObjectiveLowerBoundSuccesses=0
+%%%mzn-stat: lpSafeObjectiveLowerBoundDeclines=0
+%%%mzn-stat: lpSafeObjectiveLowerBoundNodeAttempts=0
+%%%mzn-stat: lpSafeObjectiveLowerBoundNodeSuccesses=0
+%%%mzn-stat: lpSafeObjectiveLowerBoundNodeDeclines=0
+%%%mzn-stat: lpSafeObjectiveLowerBoundStandaloneAttempts=0
+%%%mzn-stat: lpSafeObjectiveLowerBoundStandaloneSuccesses=0
+%%%mzn-stat: lpSafeObjectiveLowerBoundStandaloneDeclines=0
+%%%mzn-stat: lpSafeObjectiveLowerBoundComponentAttempts=0
+%%%mzn-stat: lpSafeObjectiveLowerBoundComponentSuccesses=0
+%%%mzn-stat: lpSafeObjectiveLowerBoundComponentDeclines=0
+%%%mzn-stat: lpSafeObjectiveLowerBoundRootAttempts=0
+%%%mzn-stat: lpSafeObjectiveLowerBoundRootSuccesses=0
+%%%mzn-stat: lpSafeObjectiveLowerBoundRootDeclines=0
+%%%mzn-stat: lpExactBasisFeasibleAttempts=0
+%%%mzn-stat: lpExactBasisFeasibleSuccesses=0
+%%%mzn-stat: lpExactBasisFeasibleDeclines=0
+%%%mzn-stat: lpExactBasisFeasibleNodeAttempts=0
+%%%mzn-stat: lpExactBasisFeasibleNodeSuccesses=0
+%%%mzn-stat: lpExactBasisFeasibleNodeDeclines=0
+%%%mzn-stat: lpExactBasisFeasibleStandaloneAttempts=0
+%%%mzn-stat: lpExactBasisFeasibleStandaloneSuccesses=0
+%%%mzn-stat: lpExactBasisFeasibleStandaloneDeclines=0
+%%%mzn-stat: lpExactBasisFeasibleComponentAttempts=0
+%%%mzn-stat: lpExactBasisFeasibleComponentSuccesses=0
+%%%mzn-stat: lpExactBasisFeasibleComponentDeclines=0
+%%%mzn-stat: lpExactBasisFeasibleRootAttempts=0
+%%%mzn-stat: lpExactBasisFeasibleRootSuccesses=0
+%%%mzn-stat: lpExactBasisFeasibleRootDeclines=0
+%%%mzn-stat: lpExactFarkasRayAttempts=0
+%%%mzn-stat: lpExactFarkasRaySuccesses=0
+%%%mzn-stat: lpExactFarkasRayDeclines=0
+%%%mzn-stat: lpExactFarkasRayNodeAttempts=0
+%%%mzn-stat: lpExactFarkasRayNodeSuccesses=0
+%%%mzn-stat: lpExactFarkasRayNodeDeclines=0
+%%%mzn-stat: lpExactFarkasRayStandaloneAttempts=0
+%%%mzn-stat: lpExactFarkasRayStandaloneSuccesses=0
+%%%mzn-stat: lpExactFarkasRayStandaloneDeclines=0
+%%%mzn-stat: lpExactFarkasRayComponentAttempts=0
+%%%mzn-stat: lpExactFarkasRayComponentSuccesses=0
+%%%mzn-stat: lpExactFarkasRayComponentDeclines=0
+%%%mzn-stat: lpExactFarkasRayRootAttempts=0
+%%%mzn-stat: lpExactFarkasRayRootSuccesses=0
+%%%mzn-stat: lpExactFarkasRayRootDeclines=0
+%%%mzn-stat: lpExactPointFeasibleAttempts=0
+%%%mzn-stat: lpExactPointFeasibleSuccesses=0
+%%%mzn-stat: lpExactPointFeasibleDeclines=0
+%%%mzn-stat: lpExactPointFeasibleNodeAttempts=0
+%%%mzn-stat: lpExactPointFeasibleNodeSuccesses=0
+%%%mzn-stat: lpExactPointFeasibleNodeDeclines=0
+%%%mzn-stat: lpExactPointFeasibleStandaloneAttempts=0
+%%%mzn-stat: lpExactPointFeasibleStandaloneSuccesses=0
+%%%mzn-stat: lpExactPointFeasibleStandaloneDeclines=0
+%%%mzn-stat: lpExactPointFeasibleComponentAttempts=0
+%%%mzn-stat: lpExactPointFeasibleComponentSuccesses=0
+%%%mzn-stat: lpExactPointFeasibleComponentDeclines=0
+%%%mzn-stat: lpExactPointFeasibleRootAttempts=0
+%%%mzn-stat: lpExactPointFeasibleRootSuccesses=0
+%%%mzn-stat: lpExactPointFeasibleRootDeclines=0
+%%%mzn-stat: lpRationalOutcomeAttempts=0
+%%%mzn-stat: lpRationalOutcomeSuccesses=0
+%%%mzn-stat: lpRationalOutcomeDeclines=0
+%%%mzn-stat: lpRationalOutcomeNodeAttempts=0
+%%%mzn-stat: lpRationalOutcomeNodeSuccesses=0
+%%%mzn-stat: lpRationalOutcomeNodeDeclines=0
+%%%mzn-stat: lpRationalOutcomeStandaloneAttempts=0
+%%%mzn-stat: lpRationalOutcomeStandaloneSuccesses=0
+%%%mzn-stat: lpRationalOutcomeStandaloneDeclines=0
+%%%mzn-stat: lpRationalOutcomeComponentAttempts=0
+%%%mzn-stat: lpRationalOutcomeComponentSuccesses=0
+%%%mzn-stat: lpRationalOutcomeComponentDeclines=0
+%%%mzn-stat: lpRationalOutcomeRootAttempts=0
+%%%mzn-stat: lpRationalOutcomeRootSuccesses=0
+%%%mzn-stat: lpRationalOutcomeRootDeclines=0
+%%%mzn-stat: lpBackjumps=0
+%%%mzn-stat: lpLagrangianPruned=0
+%%%mzn-stat: lpEnergeticPruned=0
+%%%mzn-stat: lpMs=0
+%%%mzn-stat-end

@@ -1,0 +1,26 @@
+{
+    "feasible": true,
+    "objective": 19.0,
+    "timeToBestMs": 383,
+    "timeToFirstFeasibleMs": 158,
+    "proven": false,
+    "stats": {
+        "paths": "0",
+        "flatBoolVars": "72",
+        "flatIntVars": "398",
+        "flatIntConstraints": "494",
+        "evaluatedReifiedConstraints": "72",
+        "method": "\"minimize\"",
+        "flatTime": "0.0845216",
+        "objective": "19",
+        "objectiveBound": "3",
+        "boolVariables": "0",
+        "failures": "0",
+        "propagations": "0",
+        "solveTime": "0.279372",
+        "nSolutions": "3"
+    },
+    "attribution": [],
+    "rawOutput": "% Generated FlatZinc statistics:\n%%%mzn-stat: paths=0\n%%%mzn-stat: flatBoolVars=72\n%%%mzn-stat: flatIntVars=398\n%%%mzn-stat: flatIntConstraints=494\n%%%mzn-stat: evaluatedReifiedConstraints=72\n%%%mzn-stat: method=\"minimize\"\n%%%mzn-stat: flatTime=0.0845216\n%%%mzn-stat-end\n%%%mzn-stat: objective=26\n%%%mzn-stat: objectiveBound=3\n%%%mzn-stat: boolVariables=0\n%%%mzn-stat: failures=0\n%%%mzn-stat: propagations=0\n%%%mzn-stat: solveTime=0.0541588\nx = \n[| 1, 0, 0, 0, 1, 0, 1, 1, 0, 0, 0, 0\n | 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1\n | 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0\n | 0, 1, 1, 2, 0, 1, 0, 0, 0, 0, 0, 0\n | 1, 0, 0, 0, 0, 2, 1, 0, 0, 0, 0, 0\n | 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0\n |];\nm = [3, 3, 8, 2, 3, 7];\nused = [1, 1, 1, 1, 1, 1];\nobjective = 26;\n_objective = 26;\n----------\n%%%mzn-stat: objective=25\n%%%mzn-stat: objectiveBound=3\n%%%mzn-stat: boolVariables=0\n%%%mzn-stat: failures=0\n%%%mzn-stat: propagations=0\n%%%mzn-stat: solveTime=0.0578418\nx = \n[| 1, 0, 0, 0, 1, 0, 1, 1, 0, 0, 0, 0\n | 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1\n | 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0\n | 0, 1, 1, 2, 0, 1, 0, 0, 0, 0, 0, 0\n | 1, 0, 0, 0, 0, 2, 1, 0, 0, 0, 0, 0\n | 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0\n |];\nm = [2, 3, 8, 2, 3, 7];\nused = [1, 1, 1, 1, 1, 1];\nobjective = 25;\n_objective = 25;\n----------\n%%%mzn-stat: objective=19\n%%%mzn-stat: objectiveBound=3\n%%%mzn-stat: boolVariables=0\n%%%mzn-stat: failures=0\n%%%mzn-stat: propagations=0\n%%%mzn-stat: solveTime=0.279372\nx = \n[| 0, 0, 0, 0, 0, 2, 0, 1, 0, 0, 0, 0\n | 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1\n | 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0\n | 1, 0, 0, 1, 1, 0, 0, 0, 0, 1, 0, 0\n | 1, 0, 0, 0, 0, 1, 2, 0, 0, 0, 0, 0\n | 1, 2, 1, 1, 0, 1, 0, 0, 0, 0, 0, 0\n |];\nm = [2, 3, 8, 2, 3, 1];\nused = [1, 1, 1, 1, 1, 1];\nobjective = 19;\n_objective = 19;\n----------\n%%%mzn-stat: nSolutions=3\n%%%mzn-stat-end\n",
+    "command": "minizinc --solver cp-sat --time-limit 30000 --output-mode dzn -s -a --output-objective -f -p 1 /home/rasmus/.cache/klause-bench/corpus/mzn-challenge/2019/stack-cuttingstock/stack-cutstock-cumu.mzn /home/rasmus/.cache/klause-bench/corpus/mzn-challenge/2019/stack-cuttingstock/d14.dzn"
+}

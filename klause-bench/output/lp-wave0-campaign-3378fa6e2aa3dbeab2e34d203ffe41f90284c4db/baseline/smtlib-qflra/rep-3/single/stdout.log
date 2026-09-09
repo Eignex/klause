@@ -1,0 +1,43 @@
+Calculating task graph as no cached configuration is available for tasks: :klause-bench:bench --args=solve suite=smtlib-qflra per-family=1 max=10 seed=1 processors=1 timeout=30000 label=w0-3378fa6e2aa3-qflra-single-r3 engine=fixed
+
+> Configure project :klause
+Signing skipped: SNAPSHOT is a snapshot.
+
+> Task :klause-bench:protobufDummy UP-TO-DATE
+> Task :klause:jvmProcessResources NO-SOURCE
+> Task :klause:kmpPartiallyResolvedDependenciesChecker
+> Task :klause-bench:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :klause:processJvmMainResources SKIPPED
+> Task :klause:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :klause-bench:extractProto UP-TO-DATE
+> Task :klause-bench:processResources UP-TO-DATE
+> Task :klause:compileKotlinJvm UP-TO-DATE
+> Task :klause:compileJvmMainJava NO-SOURCE
+> Task :klause:jvmMainClasses UP-TO-DATE
+> Task :klause:jvmJar UP-TO-DATE
+> Task :klause-bench:extractIncludeProto UP-TO-DATE
+> Task :klause-bench:generateProto UP-TO-DATE
+> Task :klause-bench:compileKotlin UP-TO-DATE
+> Task :klause-bench:compileJava UP-TO-DATE
+> Task :klause-bench:classes UP-TO-DATE
+
+> Task :klause-bench:bench
+=== solve over 10 instance(s) ===
+
+=== solve (klause-fixed-p1-t30s-w0-3378fa6e2aa3-qflra-single-r3; 30000ms budget) -> output/klause-fixed-p1-t30s-w0-3378fa6e2aa3-qflra-single-r3/ ===
+?? [2017-Heizmann-UltimateInvariantSynthesis/_array1.i_3_2_2.bpl_11] satisfy = ?
+?? [2019-ezsmt/Labyrinth/SCC_Strong/0003-labyrinth-11-0] satisfy = ?
+ok [DTP-Scheduling/constraints-cooking01] satisfy = SAT@333ms
+?? [LassoRanker/CooperatingT2/afagp-fail.t2.c_Iteration1_Lasso_3-pieceTemplate] satisfy = ?
+?? [TM/p-0-bucket_s10] satisfy = ?
+ok [check/bignum_lra1] satisfy = SAT@10918ms
+?? [clock_synchro/clocksynchro_10clocks.main_invar.base] satisfy = ?
+ok [keymaera/bouncing-ball-inv-node1886] satisfy = UNSAT
+?? [latendresse/ecoliFBAyicesTest-15875-16] satisfy = ?
+ok [meti-tarski/Arthan/1A/Arthan1A-chunk-0015] satisfy = SAT@555ms
+
+3/10 feasible, 1 proved  (output/klause-fixed-p1-t30s-w0-3378fa6e2aa3-qflra-single-r3/, output/klause-fixed-p1-t30s-w0-3378fa6e2aa3-qflra-single-r3.csv)
+
+BUILD SUCCESSFUL in 3m 24s
+10 actionable tasks: 2 executed, 8 up-to-date
+Configuration cache entry stored.

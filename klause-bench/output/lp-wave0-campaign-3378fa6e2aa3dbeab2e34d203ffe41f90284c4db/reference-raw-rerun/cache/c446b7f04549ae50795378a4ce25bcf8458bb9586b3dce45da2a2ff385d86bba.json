@@ -1,0 +1,14 @@
+{
+    "feasible": false,
+    "objective": null,
+    "timeToBestMs": null,
+    "timeToFirstFeasibleMs": null,
+    "proven": true,
+    "stats": {
+        "solveTime": "1.469",
+        "maximize": "false"
+    },
+    "attribution": [],
+    "rawOutput": "unsat\n",
+    "command": "z3 -T:30 -memory:2048 -smt2 sat.threads=1 parallel.enable=false /home/rasmus/.cache/klause-bench/corpus/smtlib-qf_rdl/QF_RDL/skdmxa/skdmxa-3x3-10.smt2"
+}

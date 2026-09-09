@@ -1,0 +1,48 @@
+Calculating task graph as no cached configuration is available for tasks: :klause-bench:bench --args=solve suite=mzn-bench per-family=1 max=60 seed=1 name=2011/ship-schedule/4Ships,2012/vrp/A-n38-k5.vrp,2013/proteindesign12/1HZ5.12p.19aa.usingEref_self,2014/spot5/1502,2015/roster/chicroster_dataset_11,2016/prize-collecting/28-4-7-1,2017/routing-flexible,2018/steiner-tree/es10fst03.stp,2019/stack-cuttingstock/d14,2020/skill-allocation/skill_allocation_mzn_1m_1,2021/seat-moving/sm-10-11-00,2022/traveling-tppv/circ14cnonbal,2023/travelling-thief/data/n10_k15_c5000_l10000_u11000_r49,2024/tiny-cvrp/easy_instance_04,2025/skill-allocation/skill_allocation_mzn_1m_2 processors=1 timeout=3000 label=w0-3378fa6e2aa3-mzn-off-r2 lp=off
+
+> Configure project :klause
+Signing skipped: SNAPSHOT is a snapshot.
+
+> Task :klause-bench:protobufDummy UP-TO-DATE
+> Task :klause-bench:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :klause:kmpPartiallyResolvedDependenciesChecker
+> Task :klause:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :klause-bench:extractProto UP-TO-DATE
+> Task :klause:jvmProcessResources NO-SOURCE
+> Task :klause:processJvmMainResources SKIPPED
+> Task :klause-bench:processResources UP-TO-DATE
+> Task :klause:compileKotlinJvm UP-TO-DATE
+> Task :klause:compileJvmMainJava NO-SOURCE
+> Task :klause:jvmMainClasses UP-TO-DATE
+> Task :klause:jvmJar UP-TO-DATE
+> Task :klause-bench:extractIncludeProto UP-TO-DATE
+> Task :klause-bench:generateProto UP-TO-DATE
+> Task :klause-bench:compileKotlin UP-TO-DATE
+> Task :klause-bench:compileJava UP-TO-DATE
+> Task :klause-bench:classes UP-TO-DATE
+
+> Task :klause-bench:bench
+=== solve over 15 instance(s) ===
+
+=== solve (klause-p1-t3s-lp-off-w0-3378fa6e2aa3-mzn-off-r2; 3000ms budget) -> output/klause-p1-t3s-lp-off-w0-3378fa6e2aa3-mzn-off-r2/ ===
+?? [2024/tiny-cvrp/easy_instance_04] optimize = ?
+?? [2025/skill-allocation/skill_allocation_mzn_1m_2] optimize = ?
+?? [2021/seat-moving/sm-10-11-00] optimize = ?
+?? [2022/traveling-tppv/circ14cnonbal] optimize = ?
+?? [2023/travelling-thief/data/n10_k15_c5000_l10000_u11000_r49] optimize = ?
+?? [2011/ship-schedule/4Ships] optimize = ?
+?? [2013/proteindesign12/1HZ5.12p.19aa.usingEref_self] optimize = ?
+ok [2014/spot5/1502] optimize = best=56112.0@1504ms
+ok [2015/roster/chicroster_dataset_11] optimize = best=61.0@1430ms
+?? [2016/prize-collecting/28-4-7-1] optimize = ?
+ok [2019/stack-cuttingstock/d14] optimize = best=26.0@1673ms
+?? [2020/skill-allocation/skill_allocation_mzn_1m_1] optimize = ?
+?? [2017/routing-flexible] optimize = ?
+?? [2018/steiner-tree/es10fst03.stp] optimize = ?
+?? [2012/vrp/A-n38-k5.vrp] optimize = ?
+
+3/15 feasible, 0 proved  (output/klause-p1-t3s-lp-off-w0-3378fa6e2aa3-mzn-off-r2/, output/klause-p1-t3s-lp-off-w0-3378fa6e2aa3-mzn-off-r2.csv)
+
+BUILD SUCCESSFUL in 1m 20s
+10 actionable tasks: 2 executed, 8 up-to-date
+Configuration cache entry stored.

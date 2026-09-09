@@ -1,0 +1,14 @@
+{
+    "feasible": false,
+    "objective": null,
+    "timeToBestMs": null,
+    "timeToFirstFeasibleMs": null,
+    "proven": true,
+    "stats": {
+        "solveTime": "2.803",
+        "maximize": "false"
+    },
+    "attribution": [],
+    "rawOutput": "unsat\n",
+    "command": "z3 -T:30 -memory:2048 -smt2 sat.threads=1 parallel.enable=false /home/rasmus/.cache/klause-bench/corpus/smtlib-qf_idl/QF_IDL/bcnscheduling/bcnscheduling100.smt2"
+}

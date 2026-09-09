@@ -1,0 +1,41 @@
+Calculating task graph as no cached configuration is available for tasks: :klause-bench:bench --args=reference suite=smtlib-qfidl per-family=1 max=10 seed=1 jobs=1 workers=1 timeout=30000
+
+> Configure project :klause
+Signing skipped: SNAPSHOT is a snapshot.
+
+> Task :klause-bench:protobufDummy UP-TO-DATE
+> Task :klause-bench:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :klause:jvmProcessResources NO-SOURCE
+> Task :klause:kmpPartiallyResolvedDependenciesChecker
+> Task :klause:processJvmMainResources SKIPPED
+> Task :klause:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :klause-bench:extractProto UP-TO-DATE
+> Task :klause-bench:processResources UP-TO-DATE
+> Task :klause:compileKotlinJvm UP-TO-DATE
+> Task :klause:compileJvmMainJava NO-SOURCE
+> Task :klause:jvmMainClasses UP-TO-DATE
+> Task :klause:jvmJar UP-TO-DATE
+> Task :klause-bench:extractIncludeProto UP-TO-DATE
+> Task :klause-bench:generateProto UP-TO-DATE
+> Task :klause-bench:compileKotlin UP-TO-DATE
+> Task :klause-bench:compileJava UP-TO-DATE
+> Task :klause-bench:classes UP-TO-DATE
+
+> Task :klause-bench:bench
+=== reference (cp-sat, 30000ms budget, jobs=1 × workers=1): 10 instance(s) ===
+[1/10] 20210312-Bouvier/vlsat3_c00 = UNSAT
+[2/10] 20220214-RVpredict-BohanLi/RVpredict_1 = ??
+[3/10] 20220214-jobshop-BohanLi/jobshop10-2-5-5-2-4-12 = opt=sat
+[4/10] Averest/binary_search/BinarySearch_live_bgmc000 = opt=sat
+[5/10] DTP/DTP_k2_n35_c175_s1 = opt=sat
+[6/10] RTCL/b01_tf_15/ckt_PROP0_tf_15 = UNSAT
+[7/10] asp/15Puzzle/15-puzzle.init10 = ??
+[8/10] bcnscheduling/bcnscheduling100 = UNSAT
+[9/10] cellar/CELAR6_SUB0 = UNSAT
+[10/10] check/bignum_idl1 = UNSAT
+
+reference table: +10 new, 0 tightened, 0 unchanged (8 decisive, 10 rows of 10 from z3)
+
+BUILD SUCCESSFUL in 1m 8s
+10 actionable tasks: 2 executed, 8 up-to-date
+Configuration cache entry stored.

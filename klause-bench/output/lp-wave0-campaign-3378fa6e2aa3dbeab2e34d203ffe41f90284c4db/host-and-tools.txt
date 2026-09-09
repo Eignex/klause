@@ -1,0 +1,259 @@
+measuredSha=3378fa6e2aa3dbeab2e34d203ffe41f90284c4db
+utc=2026-09-08T20:33:01Z
+Linux LTHCL001 6.17.0-41-generic #41-Ubuntu SMP PREEMPT_DYNAMIC Sat Jun 20 18:01:40 UTC 2026 x86_64 GNU/Linux
+Architecture:                            x86_64
+CPU op-mode(s):                          32-bit, 64-bit
+Address sizes:                           46 bits physical, 48 bits virtual
+Byte Order:                              Little Endian
+CPU(s):                                  20
+On-line CPU(s) list:                     0-19
+Vendor ID:                               GenuineIntel
+Model name:                              12th Gen Intel(R) Core(TM) i9-12900H
+CPU family:                              6
+Model:                                   154
+Thread(s) per core:                      2
+Core(s) per socket:                      14
+Socket(s):                               1
+Stepping:                                3
+Microcode version:                       0x43b
+CPU(s) scaling MHz:                      29%
+CPU max MHz:                             5000.0000
+CPU min MHz:                             400.0000
+BogoMIPS:                                5836.80
+Flags:                                   fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush dts acpi mmx fxsr sse sse2 ss ht tm pbe syscall nx pdpe1gb rdtscp lm constant_tsc art arch_perfmon pebs bts rep_good nopl xtopology nonstop_tsc cpuid aperfmperf tsc_known_freq pni pclmulqdq dtes64 monitor ds_cpl vmx smx est tm2 ssse3 sdbg fma cx16 xtpr pdcm pcid sse4_1 sse4_2 x2apic movbe popcnt tsc_deadline_timer aes xsave avx f16c rdrand lahf_lm abm 3dnowprefetch cpuid_fault epb cat_l2 cdp_l2 ssbd ibrs ibpb stibp ibrs_enhanced tpr_shadow flexpriority ept vpid ept_ad fsgsbase tsc_adjust bmi1 avx2 smep bmi2 erms invpcid rdt_a rdseed adx smap clflushopt clwb intel_pt sha_ni xsaveopt xsavec xgetbv1 xsaves split_lock_detect user_shstk avx_vnni dtherm ida arat pln pts hwp hwp_notify hwp_act_window hwp_epp hwp_pkg_req hfi vnmi umip pku ospke waitpkg gfni vaes vpclmulqdq rdpid movdiri movdir64b fsrm md_clear serialize pconfig arch_lbr ibt flush_l1d arch_capabilities
+Virtualization:                          VT-x
+L1d cache:                               544 KiB (14 instances)
+L1i cache:                               704 KiB (14 instances)
+L2 cache:                                11.5 MiB (8 instances)
+L3 cache:                                24 MiB (1 instance)
+NUMA node(s):                            1
+NUMA node0 CPU(s):                       0-19
+Vulnerability Gather data sampling:      Not affected
+Vulnerability Ghostwrite:                Not affected
+Vulnerability Indirect target selection: Not affected
+Vulnerability Itlb multihit:             Not affected
+Vulnerability L1tf:                      Not affected
+Vulnerability Mds:                       Not affected
+Vulnerability Meltdown:                  Not affected
+Vulnerability Mmio stale data:           Not affected
+Vulnerability Old microcode:             Not affected
+Vulnerability Reg file data sampling:    Mitigation; Clear Register File
+Vulnerability Retbleed:                  Not affected
+Vulnerability Spec rstack overflow:      Not affected
+Vulnerability Spec store bypass:         Mitigation; Speculative Store Bypass disabled via prctl
+Vulnerability Spectre v1:                Mitigation; usercopy/swapgs barriers and __user pointer sanitization
+Vulnerability Spectre v2:                Mitigation; Enhanced / Automatic IBRS; IBPB conditional; PBRSB-eIBRS SW sequence; BHI BHI_DIS_S
+Vulnerability Srbds:                     Not affected
+Vulnerability Tsa:                       Not affected
+Vulnerability Tsx async abort:           Not affected
+Vulnerability Vmscape:                   Mitigation; IBPB before exit to userspace
+               total        used        free      shared  buff/cache   available
+Mem:            61Gi        36Gi        15Gi       4.4Gi        13Gi        24Gi
+Swap:           29Gi        13Gi        16Gi
+openjdk version "25.0.1" 2025-10-21 LTS
+OpenJDK Runtime Environment Temurin-25.0.1+8 (build 25.0.1+8-LTS)
+OpenJDK 64-Bit Server VM Temurin-25.0.1+8 (build 25.0.1+8-LTS, mixed mode, sharing)
+
+------------------------------------------------------------
+Gradle 9.7.0
+------------------------------------------------------------
+
+Build time:    2026-08-06 14:07:35 UTC
+Revision:      3defbfc59d757b873d787b2261de5c7f8a00970a
+
+Kotlin:        2.4.0
+Groovy:        4.0.32
+Ant:           Apache Ant(TM) version 1.10.17 compiled on April 6 2026
+Launcher JVM:  25.0.1 (Eclipse Adoptium 25.0.1+8-LTS)
+Daemon JVM:    /home/rasmus/.gradle/jdks/eclipse_adoptium-25-amd64-linux.2 (no Daemon JVM specified, using current Java home)
+OS:            Linux 6.17.0-41-generic amd64
+
+Z3 version 4.16.0 - 64 bit
+MiniZinc to FlatZinc converter, version 2.9.7, build 2490193457
+Copyright (C) 2014-2026 Monash University, NICTA, Data61
+MiniZinc driver.
+Available solver configurations:
+  Choco 6.0.1 (org.choco.choco, cp, int, choco)
+  Chuffed 0.13.2 (org.chuffed.chuffed, cp, lcg, int)
+  COIN-BC 2.10.13/1.17.11 (org.minizinc.mip.coin-bc, mip, float, api, osicbc, coinbc, cbc)
+  CPLEX <unknown version> (org.minizinc.mip.cplex, mip, float, api)
+  findMUS 0.7.0 (org.minizinc.findmus)
+  Gecode 6.3.0 (org.gecode.gecode, default solver, cp, int, float, set, restart)
+  Gecode 6.3.0 (org.gecode.gecode, default solver, cp, int, float, set, restart)
+  Gecode Gist 6.3.0 (org.gecode.gist, cp, int, float, set, restart)
+  Gecode Gist 6.3.0 (org.gecode.gist, cp, int, float, set, restart)
+  Globalizer 0.1.7.2 (org.minizinc.globalizer, experimental, tool)
+  Gurobi <unknown version> (org.minizinc.mip.gurobi, mip, float, api)
+  HiGHS 1.14.0 (org.minizinc.mip.highs, mip, float, api, highs)
+  OR Tools CP-SAT 9.15 (cp-sat, cp-sat, cp, lcg, int)
+  SCIP <unknown version> (org.minizinc.mip.scip, mip, float, api)
+  Xpress <unknown version> (org.minizinc.mip.xpress, mip, float, api, float_times)
+  Yuck 20251106 (yuck, cbls, int, set, restart)
+Search path for solver configurations:
+  /home/rasmus/.minizinc/solvers
+  /home/rasmus/opt/MiniZinc-2.9.7/share/minizinc/solvers
+  /usr/local/share/minizinc/solvers
+  /usr/share/minizinc/solvers
+  /home/linuxbrew/.linuxbrew/share/minizinc/solvers
+Client: Docker Engine - Community
+ Version:           28.1.1
+ API version:       1.49
+ Go version:        go1.23.8
+ Git commit:        4eba377
+ Built:             Fri Apr 18 09:52:14 2025
+ OS/Arch:           linux/amd64
+ Context:           default
+
+Server: Docker Engine - Community
+ Engine:
+  Version:          28.1.1
+  API version:      1.49 (minimum version 1.24)
+  Go version:       go1.23.8
+  Git commit:       01f442b
+  Built:            Fri Apr 18 09:52:14 2025
+  OS/Arch:          linux/amd64
+  Experimental:     false
+ containerd:
+  Version:          1.7.27
+  GitCommit:        05044ec0a9a75232cad458027ca83437aae3f4da
+ runc:
+  Version:          1.2.5
+  GitCommit:        v1.2.5-0-g59923ef
+ docker-init:
+  Version:          0.19.0
+  GitCommit:        de40ad0
+[
+    {
+        "Id": "sha256:a243cf86fda02e9f606cdfb7016dfc1dc656a14852f3e6e8adc24e5f162f43ca",
+        "RepoTags": [
+            "klause-xcsp3-cpsat:latest"
+        ],
+        "RepoDigests": [],
+        "Parent": "",
+        "Comment": "buildkit.dockerfile.v0",
+        "Created": "2026-07-06T23:17:29.409033378+02:00",
+        "DockerVersion": "",
+        "Author": "",
+        "Config": {
+            "Hostname": "",
+            "Domainname": "",
+            "User": "",
+            "AttachStdin": false,
+            "AttachStdout": false,
+            "AttachStderr": false,
+            "Tty": false,
+            "OpenStdin": false,
+            "StdinOnce": false,
+            "Env": [
+                "PATH=/usr/local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+                "LANG=C.UTF-8",
+                "GPG_KEY=7169605F62C751356D054A26A821E680E5FA6305",
+                "PYTHON_VERSION=3.12.13",
+                "PYTHON_SHA256=c08bc65a81971c1dd5783182826503369466c7e67374d1646519adf05207b684"
+            ],
+            "Cmd": null,
+            "Image": "",
+            "Volumes": null,
+            "WorkingDir": "",
+            "Entrypoint": [
+                "python",
+                "/solve.py"
+            ],
+            "OnBuild": null,
+            "Labels": null
+        },
+        "Architecture": "amd64",
+        "Os": "linux",
+        "Size": 476173873,
+        "GraphDriver": {
+            "Data": {
+                "LowerDir": "/var/lib/docker/overlay2/no49kz1xa0c2o7z0siaodhziz/diff:/var/lib/docker/overlay2/852f982e6732074d0cac3e30a5265dddef4b6d674a5bac14d5d7f399d7aeee28/diff:/var/lib/docker/overlay2/3f73f8f1c96f15aec796a9062725e6b98387eef536359171c93ac17a2671cab4/diff:/var/lib/docker/overlay2/10765c7c6f23f7ebc10b03093113b9266a15743a2bc8a0852d8bcbbd3ff76846/diff:/var/lib/docker/overlay2/f2ac806f1d256c9f3326c3e1e3af5d1da08f61de8cf4213f55473edb7237ca39/diff",
+                "MergedDir": "/var/lib/docker/overlay2/wad5hkyqd0wnklh267d5edklh/merged",
+                "UpperDir": "/var/lib/docker/overlay2/wad5hkyqd0wnklh267d5edklh/diff",
+                "WorkDir": "/var/lib/docker/overlay2/wad5hkyqd0wnklh267d5edklh/work"
+            },
+            "Name": "overlay2"
+        },
+        "RootFS": {
+            "Type": "layers",
+            "Layers": [
+                "sha256:3edb2192497af6e965b9b7e57dc6dbdce1f3ea721d14a98110419d4ded523298",
+                "sha256:1899ce896d030c84bb2f6e1ac89ea6cb680a1b0999818590493f1f53740b36ed",
+                "sha256:96499d37fade3a1a8732c225117f8b813dc83892c7a9d1dc577a2610e0cc3fa6",
+                "sha256:aa898a312ca08ceee46584cc10e708ca5b2d0d558b1d7a44c35a8634aecc6065",
+                "sha256:8e43a70749551d317e77ecfe10b2cf067aacf69a8393efa402d4432c9dc6efb1",
+                "sha256:e3f29f1bb37afac5df19e0a0784981fccda75155db518700bdd038c99ce241af"
+            ]
+        },
+        "Metadata": {
+            "LastTagTime": "2026-07-06T23:17:29.47496002+02:00"
+        }
+    }
+]
+[
+    {
+        "Id": "sha256:537a4c17e595fb7106d533d5e19120c439734fcbf5c0d9c014ccf58bdd21e098",
+        "RepoTags": [
+            "klause-scip:latest"
+        ],
+        "RepoDigests": [],
+        "Parent": "",
+        "Comment": "buildkit.dockerfile.v0",
+        "Created": "2026-07-15T10:21:17.903559877+02:00",
+        "DockerVersion": "",
+        "Author": "",
+        "Config": {
+            "Hostname": "",
+            "Domainname": "",
+            "User": "",
+            "AttachStdin": false,
+            "AttachStdout": false,
+            "AttachStderr": false,
+            "Tty": false,
+            "OpenStdin": false,
+            "StdinOnce": false,
+            "Env": [
+                "PATH=/opt/conda/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+                "CONDA_DIR=/opt/conda",
+                "LANG=C.UTF-8",
+                "LC_ALL=C.UTF-8"
+            ],
+            "Cmd": null,
+            "ArgsEscaped": true,
+            "Image": "",
+            "Volumes": null,
+            "WorkingDir": "",
+            "Entrypoint": [
+                "scip"
+            ],
+            "OnBuild": null,
+            "Labels": {
+                "org.opencontainers.image.version": "24.04"
+            }
+        },
+        "Architecture": "amd64",
+        "Os": "linux",
+        "Size": 601113610,
+        "GraphDriver": {
+            "Data": {
+                "LowerDir": "/var/lib/docker/overlay2/d277e28f519180ff86a3e9de061aaee2a2798ae4ccd84b58a286b49aa89fe987/diff:/var/lib/docker/overlay2/6d04bd9bedc3c3e9ee6c9ed61e75dd40fb108eb146507c4bb5883ecff60a12e6/diff",
+                "MergedDir": "/var/lib/docker/overlay2/ezk9t1pha6ihkb1a91vhntbkg/merged",
+                "UpperDir": "/var/lib/docker/overlay2/ezk9t1pha6ihkb1a91vhntbkg/diff",
+                "WorkDir": "/var/lib/docker/overlay2/ezk9t1pha6ihkb1a91vhntbkg/work"
+            },
+            "Name": "overlay2"
+        },
+        "RootFS": {
+            "Type": "layers",
+            "Layers": [
+                "sha256:538812a4b9bd45adaac2b5e5b967daa6999aa44eb110aa32ae7c69702b906475",
+                "sha256:7f6b956bb331cd852caaac5910d6781a74d537bb5fffbe3adc189ede34b14dc3",
+                "sha256:18f70e4ccd6e1b99d7dfe9386f391cbc0be1a03b1133a72a7583d2a49e5f780a"
+            ]
+        },
+        "Metadata": {
+            "LastTagTime": "2026-07-15T10:21:18.282946427+02:00"
+        }
+    }
+]
+a8448864fc56162583f24aaf9c25653d93f83765

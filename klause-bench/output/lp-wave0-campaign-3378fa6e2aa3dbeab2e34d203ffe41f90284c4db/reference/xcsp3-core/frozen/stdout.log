@@ -1,0 +1,36 @@
+Starting a Gradle Daemon, 1 busy and 2 incompatible and 1 stopped Daemons could not be reused, use --status for details
+Calculating task graph as no cached configuration is available for tasks: :klause-bench:bench --args=reference suite=xcsp3-core  jobs=1 workers=1 timeout=30000
+
+> Configure project :klause
+Signing skipped: SNAPSHOT is a snapshot.
+
+> Task :klause-bench:protobufDummy UP-TO-DATE
+> Task :klause-bench:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :klause:jvmProcessResources NO-SOURCE
+> Task :klause:kmpPartiallyResolvedDependenciesChecker
+> Task :klause:processJvmMainResources SKIPPED
+> Task :klause:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :klause-bench:extractProto UP-TO-DATE
+> Task :klause-bench:processResources UP-TO-DATE
+> Task :klause:compileKotlinJvm UP-TO-DATE
+> Task :klause:compileJvmMainJava NO-SOURCE
+> Task :klause:jvmMainClasses UP-TO-DATE
+> Task :klause:jvmJar UP-TO-DATE
+> Task :klause-bench:extractIncludeProto UP-TO-DATE
+> Task :klause-bench:generateProto UP-TO-DATE
+> Task :klause-bench:compileKotlin UP-TO-DATE
+> Task :klause-bench:compileJava UP-TO-DATE
+> Task :klause-bench:classes UP-TO-DATE
+
+> Task :klause-bench:bench
+=== reference (cp-sat, 30000ms budget, jobs=1 × workers=1): 4 instance(s) ===
+[1/4] magic-series-tiny = best=sat
+[2/4] sum-opt-tiny = opt=10.0
+[3/4] magic-square-3 = best=sat
+[4/4] graph-coloring-tiny = best=sat
+
+reference table: +4 new, 0 tightened, 0 unchanged (4 decisive, 4 rows of 4 from cp-sat)
+
+BUILD SUCCESSFUL in 14s
+10 actionable tasks: 2 executed, 8 up-to-date
+Configuration cache entry stored.

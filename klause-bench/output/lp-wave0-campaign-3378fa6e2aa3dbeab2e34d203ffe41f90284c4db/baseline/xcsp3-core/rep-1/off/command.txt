@@ -1,0 +1,1 @@
+./gradlew -Dklause.bench.cache=false :klause-bench:bench --args=solve\ suite=xcsp3-core\ \ processors=1\ timeout=3000\ label=w0-3378fa6e2aa3-xcsp3-off-r1\ lp=off 

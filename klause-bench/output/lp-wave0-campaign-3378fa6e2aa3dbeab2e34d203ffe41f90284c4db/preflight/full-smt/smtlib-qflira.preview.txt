@@ -1,0 +1,8 @@
+=== preview: solve over 7 instance(s) ===
+  LCTES/cruise-control.nosummaries  [SMTLIB/CSP]
+  LCTES/cruise-control  [SMTLIB/CSP]
+  LCTES/fly-by-wire.locals.nosummaries  [SMTLIB/CSP]
+  LCTES/fly-by-wire.locals  [SMTLIB/CSP]
+  LCTES/smtopt  [SMTLIB/CSP]
+  LCTES/tdf.locals.nosummaries  [SMTLIB/CSP]
+  LCTES/tdf.locals  [SMTLIB/CSP]

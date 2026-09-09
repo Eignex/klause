@@ -1,0 +1,2 @@
+suite,problem,maximize,objective,feasible,proven,elapsedMs,budgetMs,format,structure,numGlobal,numLinear,boolHeavy,logic
+smtlib-qf_lira,LCTES/cruise-control.nosummaries,false,,,false,30000,30000,,,,,,

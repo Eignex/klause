@@ -1,0 +1,24 @@
+{
+    "problem": "2013/proteindesign12/1HZ5.12p.19aa.usingEref_self",
+    "solver": "klause",
+    "engine": null,
+    "processors": 1,
+    "search": "free",
+    "seed": 3,
+    "budgetMs": 3000,
+    "kind": "optimize",
+    "maximize": false,
+    "feasible": null,
+    "objective": null,
+    "timeToBestMs": null,
+    "timeToFirstFeasibleMs": null,
+    "proven": false,
+    "stats": {
+        "solveTime": "0.014",
+        "solutions": "0"
+    },
+    "attribution": [],
+    "gitSha": "3378fa6e2aa3dbeab2e34d203ffe41f90284c4db",
+    "timestamp": "2026-09-08T20:44:13.338921025Z",
+    "command": "/home/rasmus/.codex/worktrees/81fa/klause/klause-cli/build/install/klause-cli-jvm/bin/klause-cli /home/rasmus/.codex/worktrees/81fa/klause/klause-bench/build/mzn-fzn/2013_proteindesign12_1HZ5.12p.19aa.usingEref_self.fzn -t 3000 -r 3 -s -a --output-objective --lp off"
+}

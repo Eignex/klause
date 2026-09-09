@@ -1,0 +1,179 @@
+sat
+(
+  (define-fun x8 () Int -170)
+  (define-fun x9 () Int -220)
+  (define-fun x30 () Int -313)
+  (define-fun x10 () Int -115)
+  (define-fun x32 () Int -173)
+  (define-fun x31 () Int -160)
+  (define-fun x12 () Int 0)
+  (define-fun x34 () Int -159)
+  (define-fun x11 () Int -171)
+  (define-fun x33 () Int -164)
+  (define-fun x14 () Int -190)
+  (define-fun x13 () Int -222)
+  (define-fun x16 () Int -155)
+  (define-fun x15 () Int -263)
+  (define-fun x18 () Int -219)
+  (define-fun x17 () Int -258)
+  (define-fun x19 () Int -52)
+  (define-fun x21 () Int -65)
+  (define-fun x20 () Int -214)
+  (define-fun x0 () Int -289)
+  (define-fun x23 () Int -136)
+  (define-fun x1 () Int -101)
+  (define-fun x22 () Int -247)
+  (define-fun x2 () Int -211)
+  (define-fun x25 () Int -266)
+  (define-fun x24 () Int 0)
+  (define-fun x3 () Int 0)
+  (define-fun x27 () Int -107)
+  (define-fun x4 () Int -226)
+  (define-fun x26 () Int -228)
+  (define-fun x5 () Int -82)
+  (define-fun x29 () Int -259)
+  (define-fun x6 () Int -218)
+  (define-fun x28 () Int -138)
+  (define-fun x7 () Int -165)
+)
+; solveTime=10.891
+; solutions=1
+; nodes=0
+; failures=0
+; propagations=0
+; openBoolDecisions=40539
+; openIntDecisions=0
+; openTheoryDecisions=0
+; openTheoryChecks=1
+; openWork=40540
+; openLearned=7733
+; openRelearned=1609
+; openRestarts=0
+; openReductions=0
+; openDropped=0
+; openRetained=7733
+; openPeakRetained=7733
+; openLearnedWatchVisits=6062374
+; lpSolves=0
+; lpPruned=0
+; lpInfeasible=0
+; lpBoundPruned=0
+; lpFixed=0
+; lpCuts=0
+; lpPivots=0
+; lpWorkOps=0
+; lpNodePasses=0
+; lpStandalonePasses=140
+; lpStandalonePivots=0
+; lpStandaloneWorkOps=0
+; lpStandaloneWarmStartAttempts=138
+; lpStandaloneWarmStartHits=138
+; lpStandaloneWarmStartHitRate=1
+; lpStandaloneRefactorizations=140
+; lpStandaloneRefactorInitial=0
+; lpStandaloneRefactorWarmStart=0
+; lpStandaloneRefactorSingularRecovery=0
+; lpStandaloneRefactorUpdateLimit=0
+; lpStandaloneRefactorBackendRequested=0
+; lpStandaloneRefactorReconcileRecovery=0
+; lpStandaloneRefactorPrimal=140
+; lpStandaloneSingularRefactorizations=0
+; lpStandaloneSmallPivotBails=0
+; lpIntegerCertifyAttempts=140
+; lpIntegerCertifySuccesses=140
+; lpIntegerCertifyDeclines=0
+; lpIntegerCertifySuccessRate=1
+; lpIntegerCertifyNodeAttempts=0
+; lpIntegerCertifyNodeSuccesses=0
+; lpIntegerCertifyNodeDeclines=0
+; lpIntegerCertifyStandaloneAttempts=140
+; lpIntegerCertifyStandaloneSuccesses=140
+; lpIntegerCertifyStandaloneDeclines=0
+; lpIntegerCertifyStandaloneSuccessRate=1
+; lpIntegerCertifyComponentAttempts=0
+; lpIntegerCertifyComponentSuccesses=0
+; lpIntegerCertifyComponentDeclines=0
+; lpIntegerCertifyRootAttempts=0
+; lpIntegerCertifyRootSuccesses=0
+; lpIntegerCertifyRootDeclines=0
+; lpSafeObjectiveLowerBoundAttempts=140
+; lpSafeObjectiveLowerBoundSuccesses=140
+; lpSafeObjectiveLowerBoundDeclines=0
+; lpSafeObjectiveLowerBoundSuccessRate=1
+; lpSafeObjectiveLowerBoundNodeAttempts=0
+; lpSafeObjectiveLowerBoundNodeSuccesses=0
+; lpSafeObjectiveLowerBoundNodeDeclines=0
+; lpSafeObjectiveLowerBoundStandaloneAttempts=140
+; lpSafeObjectiveLowerBoundStandaloneSuccesses=140
+; lpSafeObjectiveLowerBoundStandaloneDeclines=0
+; lpSafeObjectiveLowerBoundStandaloneSuccessRate=1
+; lpSafeObjectiveLowerBoundComponentAttempts=0
+; lpSafeObjectiveLowerBoundComponentSuccesses=0
+; lpSafeObjectiveLowerBoundComponentDeclines=0
+; lpSafeObjectiveLowerBoundRootAttempts=0
+; lpSafeObjectiveLowerBoundRootSuccesses=0
+; lpSafeObjectiveLowerBoundRootDeclines=0
+; lpExactBasisFeasibleAttempts=0
+; lpExactBasisFeasibleSuccesses=0
+; lpExactBasisFeasibleDeclines=0
+; lpExactBasisFeasibleNodeAttempts=0
+; lpExactBasisFeasibleNodeSuccesses=0
+; lpExactBasisFeasibleNodeDeclines=0
+; lpExactBasisFeasibleStandaloneAttempts=0
+; lpExactBasisFeasibleStandaloneSuccesses=0
+; lpExactBasisFeasibleStandaloneDeclines=0
+; lpExactBasisFeasibleComponentAttempts=0
+; lpExactBasisFeasibleComponentSuccesses=0
+; lpExactBasisFeasibleComponentDeclines=0
+; lpExactBasisFeasibleRootAttempts=0
+; lpExactBasisFeasibleRootSuccesses=0
+; lpExactBasisFeasibleRootDeclines=0
+; lpExactFarkasRayAttempts=0
+; lpExactFarkasRaySuccesses=0
+; lpExactFarkasRayDeclines=0
+; lpExactFarkasRayNodeAttempts=0
+; lpExactFarkasRayNodeSuccesses=0
+; lpExactFarkasRayNodeDeclines=0
+; lpExactFarkasRayStandaloneAttempts=0
+; lpExactFarkasRayStandaloneSuccesses=0
+; lpExactFarkasRayStandaloneDeclines=0
+; lpExactFarkasRayComponentAttempts=0
+; lpExactFarkasRayComponentSuccesses=0
+; lpExactFarkasRayComponentDeclines=0
+; lpExactFarkasRayRootAttempts=0
+; lpExactFarkasRayRootSuccesses=0
+; lpExactFarkasRayRootDeclines=0
+; lpExactPointFeasibleAttempts=0
+; lpExactPointFeasibleSuccesses=0
+; lpExactPointFeasibleDeclines=0
+; lpExactPointFeasibleNodeAttempts=0
+; lpExactPointFeasibleNodeSuccesses=0
+; lpExactPointFeasibleNodeDeclines=0
+; lpExactPointFeasibleStandaloneAttempts=0
+; lpExactPointFeasibleStandaloneSuccesses=0
+; lpExactPointFeasibleStandaloneDeclines=0
+; lpExactPointFeasibleComponentAttempts=0
+; lpExactPointFeasibleComponentSuccesses=0
+; lpExactPointFeasibleComponentDeclines=0
+; lpExactPointFeasibleRootAttempts=0
+; lpExactPointFeasibleRootSuccesses=0
+; lpExactPointFeasibleRootDeclines=0
+; lpRationalOutcomeAttempts=0
+; lpRationalOutcomeSuccesses=0
+; lpRationalOutcomeDeclines=0
+; lpRationalOutcomeNodeAttempts=0
+; lpRationalOutcomeNodeSuccesses=0
+; lpRationalOutcomeNodeDeclines=0
+; lpRationalOutcomeStandaloneAttempts=0
+; lpRationalOutcomeStandaloneSuccesses=0
+; lpRationalOutcomeStandaloneDeclines=0
+; lpRationalOutcomeComponentAttempts=0
+; lpRationalOutcomeComponentSuccesses=0
+; lpRationalOutcomeComponentDeclines=0
+; lpRationalOutcomeRootAttempts=0
+; lpRationalOutcomeRootSuccesses=0
+; lpRationalOutcomeRootDeclines=0
+; lpBackjumps=0
+; lpLagrangianPruned=0
+; lpEnergeticPruned=0
+; lpMs=0

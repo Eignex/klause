@@ -1,0 +1,34 @@
+o 15
+%%%klause-arm: label=backtrack#0 objective=15 time=165
+o 12
+%%%klause-arm: label=backtrack#0 objective=12 time=191
+o 11
+%%%klause-arm: label=backtrack#0 objective=11 time=203
+o 10
+%%%klause-arm: label=backtrack#0 objective=10 time=212
+o 9
+%%%klause-arm: label=backtrack#0 objective=9 time=228
+s OPTIMUM FOUND
+v X1=3 X2=1
+c solveTime=0.263
+c solutions=5
+c nodes=30
+c failures=13
+c restarts=0
+c propagations=0
+c learned=0
+c relearned=0
+c peakDepth=5
+c openBoolDecisions=0
+c openIntDecisions=0
+c openTheoryDecisions=0
+c openTheoryChecks=0
+c openWork=0
+c openLearned=0
+c openRelearned=0
+c openRestarts=0
+c openReductions=0
+c openDropped=0
+c openRetained=0
+c openPeakRetained=0
+c openLearnedWatchVisits=0

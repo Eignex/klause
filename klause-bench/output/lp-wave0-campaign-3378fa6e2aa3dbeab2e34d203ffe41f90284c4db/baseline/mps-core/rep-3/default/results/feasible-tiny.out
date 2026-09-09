@@ -1,0 +1,25 @@
+s SATISFIABLE
+v A=1 B=1 C=3
+c solveTime=0.024
+c solutions=1
+c presolvePasses=affine,dup-columns,symmetry,strengthen
+c presolveConstraintsRemoved=-1
+c nodes=0
+c failures=0
+c restarts=0
+c propagations=0
+c learned=0
+c relearned=0
+c openBoolDecisions=0
+c openIntDecisions=0
+c openTheoryDecisions=0
+c openTheoryChecks=0
+c openWork=0
+c openLearned=0
+c openRelearned=0
+c openRestarts=0
+c openReductions=0
+c openDropped=0
+c openRetained=0
+c openPeakRetained=0
+c openLearnedWatchVisits=0

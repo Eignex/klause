@@ -1,0 +1,20 @@
+=== MiniZinc Challenge complete scoring:  results  vs  results   (15 shared) ===
+  A+0 [2011/ship-schedule/4Ships] (max) A=-@3000ms  B=-@3000ms
+  A+0 [2012/vrp/A-n38-k5.vrp] A=-@3000ms  B=-@3000ms
+  A+0 [2013/proteindesign12/1HZ5.12p.19aa.usingEref_self] A=-@3000ms  B=-@3000ms
+  A 0 [2014/spot5/1502] A=58113.0@1011ms  B=56112.0@1504ms
+  A 0 [2015/roster/chicroster_dataset_11] A=-@3000ms  B=61.0@1430ms
+  A+0 [2016/prize-collecting/28-4-7-1] (max) A=-@3000ms  B=-@3000ms
+  A+0 [2017/routing-flexible] A=-@3000ms  B=-@3000ms
+  A+0 [2018/steiner-tree/es10fst03.stp] A=-@3000ms  B=-@3000ms
+  A 0 [2019/stack-cuttingstock/d14] A=-@3000ms  B=26.0@1673ms
+  A+0 [2020/skill-allocation/skill_allocation_mzn_1m_1] A=-@3000ms  B=-@3000ms
+  A+0 [2021/seat-moving/sm-10-11-00] A=-@3000ms  B=-@3000ms
+  A+0 [2022/traveling-tppv/circ14cnonbal] A=-@3000ms  B=-@3000ms
+  A+0 [2023/travelling-thief/data/n10_k15_c5000_l10000_u11000_r49] (max) A=-@3000ms  B=-@3000ms
+  A+0 [2024/tiny-cvrp/easy_instance_04] A=-@3000ms  B=-@3000ms
+  A+0 [2025/skill-allocation/skill_allocation_mzn_1m_2] A=-@3000ms  B=-@3000ms
+
+  BORDA SCORE:  results = 0   results = 3   (of 15)
+  A strict wins 0, strict losses 3, ties 0, A-unsolved 14
+  B-solved that A did not: 2  -> 2015/roster/chicroster_dataset_11, 2019/stack-cuttingstock/d14

@@ -1,0 +1,12 @@
+measuredSha=3378fa6e2aa3dbeab2e34d203ffe41f90284c4db
+auditorSha=7d7a1f19ee14b5bffe0647f308df7bc9a0c59245
+referenceRows=43
+baselineCsvFiles=39
+baselineRows=321
+baselineJsonFiles=321
+baselineOutFiles=321
+oracleVerdictConflicts=0
+oracleObjectiveConflicts=0
+objectiveSenseMetadataMismatches=6
+smtSignaturesStable=true
+nestedChecksumsVerified=true

@@ -1,0 +1,5 @@
+suite,problem,maximize,objective,feasible,proven,elapsedMs,budgetMs,format,structure,numGlobal,numLinear,boolHeavy,logic
+klause-bench/smoke-corpus/xcsp3,graph-coloring-tiny,false,,true,false,383,3000,,,,,,
+klause-bench/smoke-corpus/xcsp3,magic-series-tiny,false,,true,false,383,3000,,,,,,
+klause-bench/smoke-corpus/xcsp3,magic-square-3,false,,true,false,423,3000,,,,,,
+klause-bench/smoke-corpus/xcsp3,sum-opt-tiny,false,10.0,true,true,43,3000,,,,,,

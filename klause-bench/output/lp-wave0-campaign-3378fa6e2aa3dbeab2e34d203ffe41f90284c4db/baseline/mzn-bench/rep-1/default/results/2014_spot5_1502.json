@@ -1,0 +1,127 @@
+{
+    "problem": "2014/spot5/1502",
+    "solver": "klause",
+    "engine": null,
+    "processors": 1,
+    "search": "free",
+    "seed": 3,
+    "budgetMs": 3000,
+    "kind": "optimize",
+    "maximize": false,
+    "feasible": true,
+    "objective": 52110.0,
+    "timeToBestMs": 1938,
+    "timeToFirstFeasibleMs": 285,
+    "proven": false,
+    "stats": {
+        "solveTime": "2.282",
+        "solutions": "11",
+        "presolvePasses": "strengthen,difference-system",
+        "presolveConstraintsRemoved": "418",
+        "nodes": "4273",
+        "failures": "1586",
+        "restarts": "0",
+        "propagations": "0",
+        "learned": "0",
+        "relearned": "0",
+        "peakDepth": "234",
+        "caNotApplicable": "0",
+        "caNonAsserting": "0",
+        "caRejectedTrueLit": "0",
+        "openBoolDecisions": "0",
+        "openIntDecisions": "0",
+        "openTheoryDecisions": "0",
+        "openTheoryChecks": "0",
+        "openWork": "0",
+        "openLearned": "0",
+        "openRelearned": "0",
+        "openRestarts": "0",
+        "openReductions": "0",
+        "openDropped": "0",
+        "openRetained": "0",
+        "openPeakRetained": "0",
+        "openLearnedWatchVisits": "0"
+    },
+    "attribution": [
+        {
+            "label": "backtrack#0",
+            "objective": null,
+            "exactObjective": "58113",
+            "continuousObjective": null,
+            "elapsedMs": 285
+        },
+        {
+            "label": "backtrack#0",
+            "objective": null,
+            "exactObjective": "57113",
+            "continuousObjective": null,
+            "elapsedMs": 377
+        },
+        {
+            "label": "backtrack#0",
+            "objective": null,
+            "exactObjective": "56113",
+            "continuousObjective": null,
+            "elapsedMs": 454
+        },
+        {
+            "label": "backtrack#0",
+            "objective": null,
+            "exactObjective": "56112",
+            "continuousObjective": null,
+            "elapsedMs": 529
+        },
+        {
+            "label": "backtrack#0",
+            "objective": null,
+            "exactObjective": "56111",
+            "continuousObjective": null,
+            "elapsedMs": 603
+        },
+        {
+            "label": "backtrack#0",
+            "objective": null,
+            "exactObjective": "56110",
+            "continuousObjective": null,
+            "elapsedMs": 643
+        },
+        {
+            "label": "backtrack#0",
+            "objective": null,
+            "exactObjective": "55111",
+            "continuousObjective": null,
+            "elapsedMs": 1191
+        },
+        {
+            "label": "backtrack#0",
+            "objective": null,
+            "exactObjective": "54113",
+            "continuousObjective": null,
+            "elapsedMs": 1257
+        },
+        {
+            "label": "backtrack#0",
+            "objective": null,
+            "exactObjective": "54112",
+            "continuousObjective": null,
+            "elapsedMs": 1336
+        },
+        {
+            "label": "backtrack#0",
+            "objective": null,
+            "exactObjective": "54110",
+            "continuousObjective": null,
+            "elapsedMs": 1508
+        },
+        {
+            "label": "backtrack#0",
+            "objective": null,
+            "exactObjective": "52110",
+            "continuousObjective": null,
+            "elapsedMs": 1938
+        }
+    ],
+    "gitSha": "3378fa6e2aa3dbeab2e34d203ffe41f90284c4db",
+    "timestamp": "2026-09-08T20:40:32.339038258Z",
+    "command": "/home/rasmus/.codex/worktrees/81fa/klause/klause-cli/build/install/klause-cli-jvm/bin/klause-cli /home/rasmus/.codex/worktrees/81fa/klause/klause-bench/build/mzn-fzn/2014_spot5_1502.fzn -t 3000 -r 3 -s -a --output-objective --lp default"
+}

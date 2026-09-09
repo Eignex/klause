@@ -1,0 +1,45 @@
+Calculating task graph as no cached configuration is available for tasks: :klause-bench:bench --args=solve suite=miplib2017 name=10teams,22433,23588,2club200v15p5scn,30_70_45_05_100,30_70_45_095_100,30n20b8,50v-10,8div-n59k10,8div-n59k11,CMS750_4,Test3 processors=1 timeout=3000 label=w0-3378fa6e2aa3-miplib12-off-r3 lp=off
+
+> Configure project :klause
+Signing skipped: SNAPSHOT is a snapshot.
+
+> Task :klause:kmpPartiallyResolvedDependenciesChecker
+> Task :klause-bench:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :klause-bench:protobufDummy UP-TO-DATE
+> Task :klause:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :klause:jvmProcessResources NO-SOURCE
+> Task :klause:processJvmMainResources SKIPPED
+> Task :klause-bench:extractProto UP-TO-DATE
+> Task :klause-bench:processResources UP-TO-DATE
+> Task :klause:compileKotlinJvm UP-TO-DATE
+> Task :klause:compileJvmMainJava NO-SOURCE
+> Task :klause:jvmMainClasses UP-TO-DATE
+> Task :klause:jvmJar UP-TO-DATE
+> Task :klause-bench:extractIncludeProto UP-TO-DATE
+> Task :klause-bench:generateProto UP-TO-DATE
+> Task :klause-bench:compileKotlin UP-TO-DATE
+> Task :klause-bench:compileJava UP-TO-DATE
+> Task :klause-bench:classes UP-TO-DATE
+
+> Task :klause-bench:bench
+=== solve over 12 instance(s) ===
+
+=== solve (klause-p1-t3s-lp-off-w0-3378fa6e2aa3-miplib12-off-r3; 3000ms budget) -> output/klause-p1-t3s-lp-off-w0-3378fa6e2aa3-miplib12-off-r3/ ===
+?? [10teams] optimize = ?
+?? [22433] optimize = ?
+?? [23588] optimize = ?
+?? [2club200v15p5scn] optimize = ?
+ok [30_70_45_05_100] optimize = best=2670.0@1086ms
+ok [30_70_45_095_100] optimize = best=2513.0@1109ms
+?? [30n20b8] optimize = ?
+ok [50v-10] optimize = best=418601.51894412935@2695ms
+?? [8div-n59k10] satisfy = ?
+?? [8div-n59k11] satisfy = ?
+?? [CMS750_4] optimize = ?
+?? [Test3] optimize = ?
+
+3/12 feasible, 0 proved  (output/klause-p1-t3s-lp-off-w0-3378fa6e2aa3-miplib12-off-r3/, output/klause-p1-t3s-lp-off-w0-3378fa6e2aa3-miplib12-off-r3.csv)
+
+BUILD SUCCESSFUL in 51s
+10 actionable tasks: 2 executed, 8 up-to-date
+Configuration cache entry stored.

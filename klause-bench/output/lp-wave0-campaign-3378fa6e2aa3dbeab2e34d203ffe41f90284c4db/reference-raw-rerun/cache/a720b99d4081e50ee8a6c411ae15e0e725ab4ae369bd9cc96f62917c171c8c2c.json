@@ -1,0 +1,14 @@
+{
+    "feasible": true,
+    "objective": null,
+    "timeToBestMs": 2,
+    "timeToFirstFeasibleMs": 2,
+    "proven": false,
+    "stats": {
+        "solveTime": "0.002748378",
+        "maximize": "null"
+    },
+    "attribution": [],
+    "rawOutput": "{\"exit\": \"FEASIBLE\", \"runtime\": 0.002748378, \"objective\": null, \"maximize\": null}\n",
+    "command": "docker run --rm --name klause-xcsp3-ref-3 --memory 6g --memory-swap 6g --cpus 1 --label klause-xcsp3-ref -v /tmp/tmp.bD4f0jflkw/worktree/klause-bench/smoke-corpus/xcsp3:/in:ro klause-xcsp3-cpsat:latest /in/magic-square-3.xml 30 1"
+}

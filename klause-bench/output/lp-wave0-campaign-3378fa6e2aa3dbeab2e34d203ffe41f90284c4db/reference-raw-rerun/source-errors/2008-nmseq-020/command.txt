@@ -1,0 +1,1 @@
+minizinc --solver cp-sat --time-limit 30000 --output-mode dzn -s -f -p 1 /home/rasmus/.cache/klause-bench/corpus/mzn-challenge/2008/nmseq/nmseq.mzn /home/rasmus/.cache/klause-bench/corpus/mzn-challenge/2008/nmseq/020.dzn

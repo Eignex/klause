@@ -1,0 +1,11 @@
+=== preview: solve over 10 instance(s) ===
+  2017-Heizmann-UltimateInvariantSynthesis/_array1.i_3_2_2.bpl_11  [SMTLIB/CSP]
+  2019-ezsmt/Labyrinth/SCC_Strong/0003-labyrinth-11-0  [SMTLIB/CSP]
+  DTP-Scheduling/constraints-cooking01  [SMTLIB/CSP]
+  LassoRanker/CooperatingT2/afagp-fail.t2.c_Iteration1_Lasso_3-pieceTemplate  [SMTLIB/CSP]
+  TM/p-0-bucket_s10  [SMTLIB/CSP]
+  check/bignum_lra1  [SMTLIB/CSP]
+  clock_synchro/clocksynchro_10clocks.main_invar.base  [SMTLIB/CSP]
+  keymaera/bouncing-ball-inv-node1886  [SMTLIB/CSP]
+  latendresse/ecoliFBAyicesTest-15875-16  [SMTLIB/CSP]
+  meti-tarski/Arthan/1A/Arthan1A-chunk-0015  [SMTLIB/CSP]

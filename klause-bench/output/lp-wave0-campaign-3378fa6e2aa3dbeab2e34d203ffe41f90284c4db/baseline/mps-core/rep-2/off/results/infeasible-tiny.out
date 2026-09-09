@@ -1,0 +1,5 @@
+s UNSATISFIABLE
+c solveTime=0.02
+c solutions=0
+c presolvePasses=fuse-bounds
+c presolveInfeasible=true

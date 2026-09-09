@@ -1,0 +1,104 @@
+Calculating task graph as no cached configuration is available for tasks: :klause-bench:bench --args=reference suite=mzn-bench per-family=1 max=60 seed=1 jobs=1 workers=1 timeout=30000
+
+> Configure project :klause
+Signing skipped: SNAPSHOT is a snapshot.
+
+> Task :klause-bench:protobufDummy UP-TO-DATE
+> Task :klause-bench:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :klause:jvmProcessResources NO-SOURCE
+> Task :klause:kmpPartiallyResolvedDependenciesChecker
+> Task :klause:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :klause:processJvmMainResources SKIPPED
+> Task :klause-bench:extractProto UP-TO-DATE
+> Task :klause-bench:processResources UP-TO-DATE
+> Task :klause:compileKotlinJvm UP-TO-DATE
+> Task :klause:compileJvmMainJava NO-SOURCE
+> Task :klause:jvmMainClasses UP-TO-DATE
+> Task :klause:jvmJar UP-TO-DATE
+> Task :klause-bench:extractIncludeProto UP-TO-DATE
+> Task :klause-bench:generateProto UP-TO-DATE
+> Task :klause-bench:compileKotlin UP-TO-DATE
+> Task :klause-bench:compileJava UP-TO-DATE
+> Task :klause-bench:classes UP-TO-DATE
+
+> Task :klause-bench:bench
+=== reference (cp-sat, 30000ms budget, jobs=1 × workers=1): 19 instance(s) ===
+?? 2008/nmseq/020 ERROR: minizinc failed (exit 1): Error: type error: no function or predicate with this signature found: `int_search(array[int] of var int,string,string,string)'
+Cannot use the following functions or predicates with the same identifier:
+annotation int_search(array [$X] of var $$E: x,ann: select,ann: choice);
+    (requires 3 arguments, but 4 given)
+annotation int_search(array [$X] of var opt $$E: x,ann: select,ann: choice);
+    (requires 3 arguments, but 4 given)
+annotation int_search(array [int] of var int: x,ann: select,ann: choice,ann: explore);
+    (argument 2 expects type ann, but type string given)
+    (argument 3 expects type ann, but type string given)
+    (argument 4 expects type ann, but type string given)
+annotation int_search(array [$X] of var $$E: x,ann: select,ann: choice,ann: explore);
+    (argument 2 expects type ann, but type string given)
+    (argument 3 expects type ann, but type string given)
+    (argument 4 expects type ann, but type string given)
+annotation int_search(array [$X] of var opt $$E: x,ann: select,ann: choice,ann: explore);
+    (argument 2 expects type ann, but type string given)
+    (argument 3 expects type ann, but type string given)
+    (argument 4 expects type ann, but type string given)
+
+/home/rasmus/.cache/klause-bench/corpus/mzn-challenge/2008/nmseq/nmseq.mzn:28.10-65
+
+?? 2009/still_life/still_life_5 ERROR: minizinc failed (exit 1): Error: type error: undefined identifier `is_output', did you mean `no_output'?
+/home/rasmus/.cache/klause-bench/corpus/mzn-challenge/2009/still_life/still_life.mzn:36.38-46
+
+?? 2010/wwtp_random/ex05100_2600_100 ERROR: minizinc failed (exit 1): Error: type error: undefined identifier `is_output', did you mean `no_output'?
+/home/rasmus/.cache/klause-bench/corpus/mzn-challenge/2010/wwtp_random/wwtpp.mzn:10.52-60
+
+[1/19] 2011/ship-schedule/4Ships = opt=371850.0
+[2/19] 2012/vrp/A-n38-k5.vrp = best=757.0
+[3/19] 2013/proteindesign12/1HZ5.12p.19aa.usingEref_self = ??
+[4/19] 2014/spot5/1502 = opt=28042.0
+[5/19] 2015/roster/chicroster_dataset_11 = opt=17.0
+[6/19] 2016/prize-collecting/28-4-7-1 = opt=65.0
+[7/19] 2017/routing-flexible = opt=115729.0
+[8/19] 2018/steiner-tree/es10fst03.stp = opt=2.6003678E7
+[9/19] 2019/stack-cuttingstock/d14 = best=19.0
+[10/19] 2020/skill-allocation/skill_allocation_mzn_1m_1 = opt=2.0
+[11/19] 2021/seat-moving/sm-10-11-00 = best=730.0
+[12/19] 2022/traveling-tppv/circ14cnonbal = best=512.0
+[13/19] 2023/travelling-thief/data/n10_k15_c5000_l10000_u11000_r49 = opt=5134100.0
+[14/19] 2024/tiny-cvrp/easy_instance_04 = opt=454.0
+[15/19] 2025/skill-allocation/skill_allocation_mzn_1m_2 = opt=2.0
+?? 2026/tdtsp ERROR: minizinc failed (exit 1): Multiple type errors:
+Error: type error:   symbol error: variable `n' must be defined (did you forget to specify a data file?)
+/home/rasmus/.cache/klause-bench/corpus/mzn-challenge/2026/tdtsp/tdtsp.mzn:9.1-6
+
+Error: type error:   symbol error: variable `D' must be defined (did you forget to specify a data file?)
+/home/rasmus/.cache/klause-bench/corpus/mzn-challenge/2026/tdtsp/tdtsp.mzn:12.1-22
+
+Error: type error:   symbol error: variable `q' must be defined (did you forget to specify a data file?)
+/home/rasmus/.cache/klause-bench/corpus/mzn-challenge/2026/tdtsp/tdtsp.mzn:14.1-6
+
+Error: type error:   symbol error: variable `prec' must be defined (did you forget to specify a data file?)
+/home/rasmus/.cache/klause-bench/corpus/mzn-challenge/2026/tdtsp/tdtsp.mzn:16.1-31
+
+Error: type error:   symbol error: variable `steps' must be defined (did you forget to specify a data file?)
+/home/rasmus/.cache/klause-bench/corpus/mzn-challenge/2026/tdtsp/tdtsp.mzn:18.1-10
+
+Error: type error:   symbol error: variable `l' must be defined (did you forget to specify a data file?)
+/home/rasmus/.cache/klause-bench/corpus/mzn-challenge/2026/tdtsp/tdtsp.mzn:19.1-6
+
+Error: type error:   symbol error: variable `r' must be defined (did you forget to specify a data file?)
+/home/rasmus/.cache/klause-bench/corpus/mzn-challenge/2026/tdtsp/tdtsp.mzn:23.1-6
+
+Error: type error:   symbol error: variable `which' must be defined (did you forget to specify a data file?)
+/home/rasmus/.cache/klause-bench/corpus/mzn-challenge/2026/tdtsp/tdtsp.mzn:25.1-29
+
+Error: type error:   symbol error: variable `interval' must be defined (did you forget to specify a data file?)
+/home/rasmus/.cache/klause-bench/corpus/mzn-challenge/2026/tdtsp/tdtsp.mzn:26.1-36
+
+Error: type error:   symbol error: variable `T' must be defined (did you forget to specify a data file?)
+/home/rasmus/.cache/klause-bench/corpus/mzn-challenge/2026/tdtsp/tdtsp.mzn:28.1-39
+
+
+reference table: +19 new, 0 tightened, 0 unchanged (14 decisive, 19 rows of 19 from cp-sat)
+
+BUILD SUCCESSFUL in 3m 18s
+10 actionable tasks: 2 executed, 8 up-to-date
+Configuration cache entry stored.

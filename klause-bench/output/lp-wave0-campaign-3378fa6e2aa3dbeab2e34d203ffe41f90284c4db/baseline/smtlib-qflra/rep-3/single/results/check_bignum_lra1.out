@@ -1,0 +1,59 @@
+sat
+(
+  (define-fun x1 () Real 1/100002)
+  (define-fun x2 () Real 1/1000320006)
+  (define-fun x3 () Real 1/199963969199400)
+  (define-fun x4 () Real 1/159971175359520000000)
+  (define-fun x5 () Real -1/1279769402876160000000000)
+  (define-fun x6 () Real 1/2559538805752320000000000000)
+)
+; solveTime=10.197
+; solutions=1
+; nodes=0
+; failures=0
+; propagations=0
+; openBoolDecisions=36820
+; openIntDecisions=0
+; openTheoryDecisions=0
+; openTheoryChecks=36815
+; openWork=73635
+; openLearned=0
+; openRelearned=0
+; openRestarts=0
+; openReductions=0
+; openDropped=0
+; openRetained=0
+; openPeakRetained=0
+; openLearnedWatchVisits=0
+; smtPrivateChecks=0
+; smtSharedChecks=36815
+; smtTheoryChecks=36815
+; smtTheoryChecksPerSec=3610.3756
+; smtConflicts=36814
+; smtExplainedConflicts=0
+; smtUnexplainedConflicts=36814
+; smtConflictLiterals=0
+; smtReductionRequests=0
+; smtReductionCacheHits=0
+; smtReductionAccepted=0
+; smtReductionDeclined=0
+; smtReductionMs=0
+; smtSimplexAttempts=36815
+; smtSimplexAccepted=36815
+; smtSimplexDeclined=0
+; smtSimplexMs=3501.5401
+; smtFrac128Attempts=0
+; smtFrac128Eligible=0
+; smtFrac128Accepted=0
+; smtFrac128Escalations=0
+; smtFrac128OverflowEscalations=0
+; smtFrac128InputEscalations=0
+; smtEscalationMs=0
+; smtWitnessCandidates=1
+; smtWitnessAccepted=1
+; smtStrictWitnessCandidates=1
+; smtStrictWitnessAccepted=1
+; smtWideWitnessCandidates=0
+; smtWideWitnessAccepted=0
+; smtWitnessAcceptance=1
+; smtStrictWitnessAcceptance=1

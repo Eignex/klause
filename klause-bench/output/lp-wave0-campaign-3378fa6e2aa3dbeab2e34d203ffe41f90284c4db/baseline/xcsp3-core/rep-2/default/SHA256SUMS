@@ -1,0 +1,12 @@
+fcb88d2a7d05ac4cce01d1391abd735b9f8c4a5a97c125fd22c7a08cd8d880a9  ./command.txt
+9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa  ./exit-status.txt
+c1498fb2080c5b28bd991c4efbdff101c9aea44796ba00b652d548971ec7f8f8  ./results.csv
+c6a67d96ddb8ee3d1f37a481c35791809fc79c45959644a9cbd70313420f8dab  ./results/graph-coloring-tiny.json
+30ee7700dfefe90dd825fc37a643296163ddb85abb678aeaaeb24eab8a565062  ./results/graph-coloring-tiny.out
+77fa993578d0a42261e7dfb6ab7bf3eec4fc77062d25d07e4a31844cf0ea6830  ./results/magic-series-tiny.json
+738a54eb06d9f1fb7d75161d9ec81fced83b80872aa700784e7d2ce3c2a35d30  ./results/magic-series-tiny.out
+3e9a68db1f2e9b5bdcdd04ce40ca6ea45736a4ae32f28a4febe69bfa03810ab7  ./results/magic-square-3.json
+2ddbb2de3d14fc760f0e89d657b4bc5ee7370cbc2cffd7d33c9206d8a258635b  ./results/magic-square-3.out
+450ee0f9e1cf9841dc060ed9d9aa6bb5bfba9a1756488b6d6c99e47a84ceb488  ./results/sum-opt-tiny.json
+a0b783e6d2b823d313412661a7c218becb1499f2c192000d6deb14e916b898a3  ./results/sum-opt-tiny.out
+c40996dbd9c770d4f6fba781aadb28f766387bda0e8b1b12f702c16f26065133  ./stdout.log

@@ -1,0 +1,43 @@
+Calculating task graph as no cached configuration is available for tasks: :klause-bench:bench --args=solve suite=smtlib-qfidl per-family=1 max=10 seed=1 processors=1 timeout=30000 label=w0-3378fa6e2aa3-qfidl-single-r2 engine=fixed
+
+> Configure project :klause
+Signing skipped: SNAPSHOT is a snapshot.
+
+> Task :klause-bench:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :klause-bench:protobufDummy UP-TO-DATE
+> Task :klause:kmpPartiallyResolvedDependenciesChecker
+> Task :klause:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :klause:jvmProcessResources NO-SOURCE
+> Task :klause:processJvmMainResources SKIPPED
+> Task :klause-bench:extractProto UP-TO-DATE
+> Task :klause-bench:processResources UP-TO-DATE
+> Task :klause:compileKotlinJvm UP-TO-DATE
+> Task :klause:compileJvmMainJava NO-SOURCE
+> Task :klause:jvmMainClasses UP-TO-DATE
+> Task :klause:jvmJar UP-TO-DATE
+> Task :klause-bench:extractIncludeProto UP-TO-DATE
+> Task :klause-bench:generateProto UP-TO-DATE
+> Task :klause-bench:compileKotlin UP-TO-DATE
+> Task :klause-bench:compileJava UP-TO-DATE
+> Task :klause-bench:classes UP-TO-DATE
+
+> Task :klause-bench:bench
+=== solve over 10 instance(s) ===
+
+=== solve (klause-fixed-p1-t30s-w0-3378fa6e2aa3-qfidl-single-r2; 30000ms budget) -> output/klause-fixed-p1-t30s-w0-3378fa6e2aa3-qfidl-single-r2/ ===
+?? [20210312-Bouvier/vlsat3_c00] satisfy = ?
+?? [20220214-RVpredict-BohanLi/RVpredict_1] satisfy = ?
+?? [20220214-jobshop-BohanLi/jobshop10-2-5-5-2-4-12] satisfy = ?
+ok [Averest/binary_search/BinarySearch_live_bgmc000] satisfy = SAT@7374ms
+ok [DTP/DTP_k2_n35_c175_s1] satisfy = SAT@11311ms
+?? [RTCL/b01_tf_15/ckt_PROP0_tf_15] satisfy = ?
+?? [asp/15Puzzle/15-puzzle.init10] satisfy = ?
+?? [bcnscheduling/bcnscheduling100] satisfy = ?
+?? [cellar/CELAR6_SUB0] satisfy = ?
+ok [check/bignum_idl1] satisfy = UNSAT
+
+2/10 feasible, 1 proved  (output/klause-fixed-p1-t30s-w0-3378fa6e2aa3-qfidl-single-r2/, output/klause-fixed-p1-t30s-w0-3378fa6e2aa3-qfidl-single-r2.csv)
+
+BUILD SUCCESSFUL in 4m 3s
+10 actionable tasks: 2 executed, 8 up-to-date
+Configuration cache entry stored.
