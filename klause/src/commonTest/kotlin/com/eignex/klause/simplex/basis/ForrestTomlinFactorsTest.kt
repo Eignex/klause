@@ -188,6 +188,21 @@ class ForrestTomlinFactorsTest {
         assertEquals(0, ft.updateCount)
         assertEquals(0, ft.transformEntries)
     }
+
+    @Test
+    fun `copy work includes both staged diagonal adjacency views`() {
+        val matrix = SparseMatrix.ofColumns(1, 1, listOf(listOf(0 to 1.0)))
+        val initial = assertIs<LuBuildResult.Built>(F64BasisFactors(matrix).build(intArrayOf(0))).factors
+        for ((value, expected) in listOf(1.0 to 2L, 2.0 to 3L)) {
+            val ft = ForrestTomlinFactors(initial)
+            val spike = BasisWorkspace(1).also { it.set(0, value) }
+
+            assertTrue(ft.update(0, spike, 1e-10))
+
+            assertEquals(expected, assertNotNull(ft.lastUpdateWork).copiedEntries)
+        }
+    }
+
 }
 
 internal fun ftSource(shape: String, n: Int = 8): SparseMatrix {
@@ -195,29 +210,30 @@ internal fun ftSource(shape: String, n: Int = 8): SparseMatrix {
     val rows = (0 until n).shuffled(random)
     val slots = (0 until n).shuffled(random)
     return SparseMatrix.ofColumns(
-        n, 2 * n,
+        n,
+        2 * n,
         List(2 * n) { column ->
-        List(n) { row ->
-            val i = rows[row]
-            val j = slots[column % n]
-            val base = when {
-                i == j -> if (shape == "near" && i == n - 1) 1e-7 else (n + 2).toDouble()
-                shape == "near" && i < j -> 1.0
-                shape == "sparse" && (i == (j + 1) % n || j == (i + 1) % n) -> -1.0
-                shape == "spiked" && (i == 2 || j == 5) -> 1.0
-                shape == "dense" -> ((i * 3 + j * 5) % 7 - 3).toDouble()
-                else -> 0.0
+            List(n) { row ->
+                val i = rows[row]
+                val j = slots[column % n]
+                val base = when {
+                    i == j -> if (shape == "near" && i == n - 1) 1e-7 else (n + 2).toDouble()
+                    shape == "near" && i < j -> 1.0
+                    shape == "sparse" && (i == (j + 1) % n || j == (i + 1) % n) -> -1.0
+                    shape == "spiked" && (i == 2 || j == 5) -> 1.0
+                    shape == "dense" -> ((i * 3 + j * 5) % 7 - 3).toDouble()
+                    else -> 0.0
+                }
+                val extra = when {
+                    column < n -> 0.0
+                    shape == "near" -> 0.125 * base
+                    i == j -> 0.5
+                    i == (j + 3) % n -> 0.125
+                    else -> 0.0
+                }
+                row to (base + extra)
             }
-            val extra = when {
-                column < n -> 0.0
-                shape == "near" -> 0.125 * base
-                i == j -> 0.5
-                i == (j + 3) % n -> 0.125
-                else -> 0.0
-            }
-            row to (base + extra)
-        }
-    }
+        },
     )
 }
 

@@ -336,7 +336,9 @@ class KotlinBasisSolverTest {
     fun `unrepresentable update products preserve original headings and both solve directions`() {
         for (magnitude in listOf(1e200, 1e-200)) {
             val source = SparseMatrix.ofColumns(
-                2, 3, listOf(
+                2,
+                3,
+                listOf(
                     listOf(0 to magnitude),
                     listOf(0 to magnitude, 1 to 1.0),
                     listOf(1 to magnitude),
