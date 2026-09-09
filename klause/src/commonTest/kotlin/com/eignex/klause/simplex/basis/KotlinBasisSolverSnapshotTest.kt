@@ -24,6 +24,7 @@ class KotlinBasisSolverSnapshotTest {
         val updated = assertNotNull(solver.snapshot())
         val updatedWork = solver.lastUpdateWork
         val updatedSolveWork = solver.lastSolveWork
+        val updatedBasisWork = solver.basisWork
         replace(solver, source, basis, 3, 8)
 
         assertTrue(solver.restore(initial))
@@ -33,6 +34,7 @@ class KotlinBasisSolverSnapshotTest {
         assertEquals(2, solver.updateCount)
         assertEquals(updatedWork, solver.lastUpdateWork)
         assertEquals(updatedSolveWork, solver.lastSolveWork)
+        assertEquals(updatedBasisWork, solver.basisWork)
         val restoredBasis = intArrayOf(0, 6, 2, 3, 9)
         assertBasisSolves(solver, source, restoredBasis, IntArray(5) { -1 })
         replace(solver, source, restoredBasis, 3, 8)

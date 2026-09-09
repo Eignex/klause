@@ -8,7 +8,9 @@ import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class F64BasisFactorsTest {
@@ -200,6 +202,52 @@ class F64BasisFactorsTest {
         assertEquals(first.factors.lower, second.factors.lower)
         assertEquals(first.factors.upper, second.factors.upper)
         assertTrue(reconstructionResidual(matrix, basis, second.factors) <= 1e-12)
+    }
+
+    @Test
+    fun `a deficient proposed pivot falls back to ordinary ordering`() {
+        val matrix = sparse(
+            arrayOf(
+                doubleArrayOf(1.0, 0.0, 0.0, 1.0),
+                doubleArrayOf(0.0, 1.0, 1.0, 1.0),
+            ),
+        )
+        val builder = F64BasisFactors(matrix)
+        val old = assertIs<LuBuildResult.Built>(builder.build(intArrayOf(0, 1)))
+        val changedBasis = intArrayOf(2, 3)
+
+        val rebuilt = assertIs<LuBuildResult.Built>(
+            builder.build(changedBasis, IntArray(2) { -1 }, proposedOrder = old.factors.symbolic),
+        )
+
+        assertTrue(rebuilt.report.proposedOrder)
+        assertFalse(rebuilt.report.reusedOrder)
+        assertTrue(rebuilt.report.fallback)
+        assertEquals(LuBuildRejection.NO_USABLE_PIVOT, rebuilt.report.proposedRejection)
+        assertTrue(assertNotNull(rebuilt.report.proposedWork).pivots < changedBasis.size)
+        assertTrue(rebuilt.report.units > rebuilt.work.units)
+        assertTrue(reconstructionResidual(matrix, changedBasis, rebuilt.factors) <= 1e-12)
+    }
+
+    @Test
+    fun `fresh ordering alone decides failure after a rejected proposal`() {
+        val matrix = sparse(
+            arrayOf(
+                doubleArrayOf(1.0, 0.0, 0.0),
+                doubleArrayOf(0.0, 1.0, 0.0),
+            ),
+        )
+        val builder = F64BasisFactors(matrix)
+        val old = assertIs<LuBuildResult.Built>(builder.build(intArrayOf(0, 1)))
+
+        val rejected = assertIs<LuBuildResult.Rejected>(
+            builder.build(intArrayOf(0, 2), IntArray(2) { -1 }, proposedOrder = old.factors.symbolic),
+        )
+
+        assertEquals(LuBuildRejection.NO_USABLE_PIVOT, rejected.reason)
+        assertTrue(rejected.report.fallback)
+        assertEquals(LuBuildRejection.NO_USABLE_PIVOT, rejected.report.proposedRejection)
+        assertTrue(rejected.report.units > rejected.work.units)
     }
 
     @Test

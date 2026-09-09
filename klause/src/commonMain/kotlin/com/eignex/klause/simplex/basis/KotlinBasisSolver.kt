@@ -21,6 +21,7 @@ internal class KotlinBasisSolver(
     private val updateLimit: Int = 50,
     private val fillFactor: Double = 5.0,
     private val densityThreshold: Double = 0.2,
+    private val reusePivotOrder: Boolean = true,
 ) : BasisSolver {
     private val source = SparseMatrix.wrap(
         matrix.rows,
@@ -31,18 +32,25 @@ internal class KotlinBasisSolver(
     )
     private val builder = F64BasisFactors(source)
     override val n = source.rows
-    private val work = BasisWorkspace(n)
+    private val solveWorkspace = BasisWorkspace(n)
     private val mapped = BasisWorkspace(n)
     private val identity = Any()
     private val liveSnapshots = mutableSetOf<KotlinBasisSnapshot>()
     private var cache: BasisSolveCache? = null
     private var columns = IntArray(0)
     private var unitRows = IntArray(0)
+    private var retainedOrder: SymbolicLu? = null
     private var closed = false
     override var singular = true
         private set
     var lastSolveWork: BasisSolveWork? = null
         private set
+    private val workMeter = BasisWorkMeter()
+    override val basisWork: BasisWork
+        get() {
+            requireOpen()
+            return workMeter.snapshot()
+        }
 
     init {
         require(updateLimit > 0)
@@ -78,9 +86,23 @@ internal class KotlinBasisSolver(
     override fun refactorize(basicIndex: IntArray): Boolean {
         requireOpen()
         validateBasis(basicIndex)
+        val proposedOrder = retainedOrder.takeIf { reusePivotOrder }
         // Invalidate before a numerical attempt: even an exceptional build cannot expose stale factors.
         invalidate()
-        val result = builder.build(basicIndex, policy)
+        val meter = BasisBuildAccumulator(BasisBuildKind.REFACTORIZATION)
+        val result = builder.build(
+            basicIndex,
+            IntArray(n) { -1 },
+            policy,
+            proposedOrder,
+        )
+        meter.add(result.report)
+        workMeter.reset(
+            meter.report(
+                result is LuBuildResult.Built,
+                result.report.takeIf { result is LuBuildResult.Built },
+            ),
+        )
         if (result !is LuBuildResult.Built) return false
         install(result, basicIndex, IntArray(n) { -1 })
         return true
@@ -89,10 +111,20 @@ internal class KotlinBasisSolver(
     override fun refactorizeRepairing(basicIndex: IntArray): BasisRepair? {
         requireOpen()
         validateBasis(basicIndex)
+        var proposedOrder = retainedOrder.takeIf { reusePivotOrder }
         invalidate()
+        val meter = BasisBuildAccumulator(BasisBuildKind.REPAIR)
         val repairedColumns = IntArray(n) { -1 }
         val repairedUnits = IntArray(n) { it }
-        var accepted = builder.build(repairedColumns, repairedUnits, policy) as? LuBuildResult.Built ?: return null
+        val initial = builder.build(repairedColumns, repairedUnits, policy, proposedOrder)
+        meter.add(initial.report)
+        if (initial !is LuBuildResult.Built) {
+            workMeter.reset(meter.report(false))
+            return null
+        }
+        var accepted: LuBuildResult.Built = initial
+        var installedReport = accepted.report
+        proposedOrder = accepted.factors.symbolic
         for (requestedSlot in basicIndex.indices) {
             val entering = basicIndex[requestedSlot]
             for (offset in repairedUnits.indices) {
@@ -102,15 +134,19 @@ internal class KotlinBasisSolver(
                 val trialUnits = repairedUnits.copyOf()
                 trialColumns[slot] = entering
                 trialUnits[slot] = -1
-                val trial = builder.build(trialColumns, trialUnits, policy)
+                val trial = builder.build(trialColumns, trialUnits, policy, proposedOrder)
+                meter.add(trial.report)
                 if (trial is LuBuildResult.Built) {
                     trialColumns.copyInto(repairedColumns)
                     trialUnits.copyInto(repairedUnits)
                     accepted = trial
+                    installedReport = trial.report
+                    proposedOrder = trial.factors.symbolic
                     break
                 }
             }
         }
+        workMeter.reset(meter.report(true, installedReport))
         install(accepted, repairedColumns, repairedUnits)
         return BasisRepair(repairedColumns, repairedUnits)
     }
@@ -125,33 +161,36 @@ internal class KotlinBasisSolver(
         require(x.size == n)
         require(expectedDensity.isFinite() && expectedDensity in 0.0..1.0)
         lastSolveWork = null
+        recordSolveAttempt(transpose)
         val symbolic = current.factors.symbolic
         val first: TriangularSolveWork
         val second: TriangularSolveWork
         val transformEntries: Long
         if (transpose) {
-            work.load(x, symbolic.columnPosition)
-            first = current.upperTranspose.solve(work, expectedDensity)
-            transformEntries = current.ft.backward(work)
-            second = current.lowerTranspose.solve(work, expectedDensity)
-            work.write(x, symbolic.rowOrder)
+            solveWorkspace.load(x, symbolic.columnPosition)
+            first = current.upperTranspose.solve(solveWorkspace, expectedDensity)
+            transformEntries = current.ft.backward(solveWorkspace)
+            second = current.lowerTranspose.solve(solveWorkspace, expectedDensity)
+            solveWorkspace.write(x, symbolic.rowOrder)
         } else {
-            work.load(x, symbolic.rowPosition)
-            first = current.lower.solve(work, expectedDensity)
-            transformEntries = current.ft.forward(work)
-            second = current.upper.solve(work, expectedDensity)
-            work.write(x, symbolic.columnOrder)
+            solveWorkspace.load(x, symbolic.rowPosition)
+            first = current.lower.solve(solveWorkspace, expectedDensity)
+            transformEntries = current.ft.forward(solveWorkspace)
+            second = current.upper.solve(solveWorkspace, expectedDensity)
+            solveWorkspace.write(x, symbolic.columnOrder)
         }
         lastSolveWork = BasisSolveWork(first, second, transformEntries, x.count)
+        recordSolveSuccess(transpose, checkNotNull(lastSolveWork).units)
     }
 
     override fun update(pivotRow: Int, entering: Int, spike: IndexedVector, pivotEta: IndexedVector?): BasisUpdate {
         requireOpen()
         require(pivotRow in 0 until n && entering in 0 until source.cols)
         require(spike.size == n && (pivotEta == null || pivotEta.size == n))
-        val current = cache ?: return BasisUpdate.SINGULAR
+        workMeter.updateAttempt()
+        val current = cache ?: return declineUpdate(1)
         val pivot = spike[pivotRow]
-        if (!pivot.isFinite() || pivot == 0.0 || abs(pivot) < policy.absoluteTolerance) return BasisUpdate.SINGULAR
+        if (!pivot.isFinite() || pivot == 0.0 || abs(pivot) < policy.absoluteTolerance) return declineUpdate(1)
         var usable = (1.0 / pivot).isFinite()
         spike.forEachStored { _, value ->
             if (!value.isFinite()) usable = false
@@ -160,12 +199,15 @@ internal class KotlinBasisSolver(
                 if (!ratio.isFinite() || ratio == 0.0) usable = false
             }
         }
-        if (!usable) return BasisUpdate.SINGULAR
+        val validationUnits = saturatedAdd(1, spike.count.toLong())
+        if (!usable) return declineUpdate(validationUnits)
         mapped.load(spike, current.factors.symbolic.columnPosition)
         val pivotLabel = current.factors.symbolic.columnPosition[pivotRow]
-        if (!current.ft.update(pivotLabel, mapped, policy.absoluteTolerance)) return BasisUpdate.SINGULAR
+        if (!current.ft.update(pivotLabel, mapped, policy.absoluteTolerance)) return declineUpdate(validationUnits)
         columns[pivotRow] = entering
         unitRows[pivotRow] = -1
+        val updateUnits = saturatedAdd(validationUnits, checkNotNull(current.ft.lastUpdateWork).units)
+        workMeter.updateSuccess(updateUnits)
         return if (current.ft.updateCount >= updateLimit || current.ft.fillAdvice(fillFactor)) {
             BasisUpdate.REFACTORIZE
         } else {
@@ -214,10 +256,12 @@ internal class KotlinBasisSolver(
             updateLimit,
             fillFactor,
             densityThreshold,
+            reusePivotOrder,
             current.snapshot(),
             columns.copyOf(),
             unitRows.copyOf(),
             lastSolveWork,
+            workMeter.snapshot(),
         ).also { liveSnapshots.add(it) }
     }
 
@@ -228,7 +272,8 @@ internal class KotlinBasisSolver(
         if (
             own.owner !== identity || own !in liveSnapshots || own.dimension != n ||
             own.sourceColumns != source.cols || own.policy != policy || own.updateLimit != updateLimit ||
-            own.fillFactor != fillFactor || own.densityThreshold != densityThreshold
+            own.fillFactor != fillFactor || own.densityThreshold != densityThreshold ||
+            own.reusePivotOrder != reusePivotOrder
         ) {
             return false
         }
@@ -238,7 +283,12 @@ internal class KotlinBasisSolver(
         unitRows = own.unitRows.copyOf()
         singular = false
         lastSolveWork = own.lastSolveWork
-        work.clear()
+        workMeter.restore(own.work)
+        retainedOrder = SymbolicLu(
+            restored.factors.symbolic.rowOrder.copyOf(),
+            restored.factors.symbolic.columnOrder.copyOf(),
+        )
+        solveWorkspace.clear()
         mapped.clear()
         return true
     }
@@ -250,9 +300,11 @@ internal class KotlinBasisSolver(
         cache = null
         columns = IntArray(0)
         unitRows = IntArray(0)
-        work.clear()
+        retainedOrder = null
+        solveWorkspace.clear()
         mapped.clear()
         lastSolveWork = null
+        workMeter.reset(null)
     }
 
     private fun validateBasis(basicIndex: IntArray) =
@@ -264,13 +316,31 @@ internal class KotlinBasisSolver(
         columns = IntArray(0)
         unitRows = IntArray(0)
         lastSolveWork = null
+        workMeter.reset(null)
     }
 
     private fun install(result: LuBuildResult.Built, columns: IntArray, unitRows: IntArray) {
         cache = BasisSolveCache(result.factors, densityThreshold)
         this.columns = columns.copyOf()
         this.unitRows = unitRows.copyOf()
+        retainedOrder = SymbolicLu(
+            result.factors.symbolic.rowOrder.copyOf(),
+            result.factors.symbolic.columnOrder.copyOf(),
+        )
         singular = false
+    }
+
+    private fun recordSolveAttempt(transpose: Boolean) {
+        workMeter.solveAttempt(transpose)
+    }
+
+    private fun recordSolveSuccess(transpose: Boolean, units: Long) {
+        workMeter.solveSuccess(transpose, units)
+    }
+
+    private fun declineUpdate(units: Long): BasisUpdate {
+        workMeter.updateDecline(units)
+        return BasisUpdate.SINGULAR
     }
 
     private fun requireOpen() = check(!closed) { "basis solver is closed" }
@@ -283,10 +353,12 @@ internal class KotlinBasisSolver(
         val updateLimit: Int,
         val fillFactor: Double,
         val densityThreshold: Double,
+        val reusePivotOrder: Boolean,
         state: BasisCacheState,
         columns: IntArray,
         unitRows: IntArray,
         val lastSolveWork: BasisSolveWork?,
+        val work: BasisWork,
     ) : BasisSnapshot {
         var state: BasisCacheState? = state
             private set
