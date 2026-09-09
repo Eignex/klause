@@ -1,9 +1,9 @@
 package com.eignex.klause.lp.engine
 
+import com.eignex.klause.simplex.basis.BasisSolver
+import com.eignex.klause.simplex.basis.IndexedVector
+import com.eignex.klause.simplex.basis.KotlinBasisSolver
 import com.eignex.klause.util.Cancellation
-import com.eignex.koblas.koblas
-import com.eignex.koblas.sparse.basis.BasisSolver
-import com.eignex.koblas.sparse.basis.IndexedVector
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -19,7 +19,7 @@ class RevisedSimplexNumericsTest {
         val simplex = RevisedSimplex(
             multiPivotFeasibilityModel(),
             basisSolverFactory = { matrix ->
-                DistortingBasisSolver(koblas.basisSolver(matrix)).also { factors = it }
+                DistortingBasisSolver(KotlinBasisSolver(matrix)).also { factors = it }
             },
         )
 
@@ -39,7 +39,7 @@ class RevisedSimplexNumericsTest {
             multiPivotFeasibilityModel(),
             cancellation = Cancellation { ++polls == 2 },
             basisSolverFactory = { matrix ->
-                DistortingBasisSolver(koblas.basisSolver(matrix)).also { factors = it }
+                DistortingBasisSolver(KotlinBasisSolver(matrix)).also { factors = it }
             },
         )
 
@@ -181,7 +181,7 @@ class RevisedSimplexNumericsTest {
         val simplex = RevisedSimplex(
             nearToleranceInfeasibleModel(),
             basisSolverFactory = { matrix ->
-                FailingRefactorBasisSolver(koblas.basisSolver(matrix), failAt = 2).also { factors = it }
+                FailingRefactorBasisSolver(KotlinBasisSolver(matrix), failAt = 2).also { factors = it }
             },
         )
 

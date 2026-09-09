@@ -1,8 +1,10 @@
 package com.eignex.klause.lp.engine
 
+import com.eignex.klause.simplex.basis.KotlinBasisSolver
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
@@ -63,5 +65,24 @@ class RevisedSimplexResolveBoundsTest {
             simplex.rebind(base(), Cancellation.Never),
             "only a shared matrix and objective may reuse the factorization",
         )
+    }
+
+    @Test
+    fun `closing a rebound engine releases its injected basis`() {
+        val model = base()
+        lateinit var factors: KotlinBasisSolver
+        val simplex = RevisedSimplex(model, basisSolverFactory = { matrix ->
+            KotlinBasisSolver(matrix).also { factors = it }
+        })
+        assertNotNull(simplex.solve())
+        assertTrue(simplex.rebind(model.rebind(longArrayOf(2L, 1L), longArrayOf(10L, 10L)), Cancellation.Never))
+        val result = assertNotNull(simplex.resolveBounds())
+        assertEquals(4.0, result.objective, 1e-9)
+        assertEquals(0, result.refactorizations)
+
+        simplex.close()
+        simplex.close()
+
+        assertFailsWith<IllegalStateException> { factors.refactorize(intArrayOf(0)) }
     }
 }

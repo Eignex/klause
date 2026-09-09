@@ -58,17 +58,17 @@ class LpArchitectureTest {
         val fixtures = listOf(
             """
                 package com.eignex.klause.lp.engine
-                import com.eignex.koblas.sparse.basis.BasisSolver
+                import com.eignex.klause.simplex.basis.BasisSolver
                 val solver: RevisedSimplex? = null
             """.trimIndent(),
             """
                 package com.eignex.klause.simplex.basis
                 import com.eignex.koblas.ExperimentalKoblasApi
                 import com.eignex.koblas.sparse.SparseWorkspace
-                import com.eignex.koblas.sparse.basis.BasisSolver
-                import com.eignex.koblas.sparse.basis.IndexedVector
-                import com.eignex.koblas.sparse.basis.BasisUpdate
-                import com.eignex.koblas.sparse.basis.BasisSolveQuality
+                import com.eignex.klause.simplex.basis.BasisSolver
+                import com.eignex.klause.simplex.basis.IndexedVector
+                import com.eignex.klause.simplex.basis.BasisUpdate
+                import com.eignex.klause.simplex.basis.BasisSolveQuality
                 val matrix: com.eignex.koblas.SparseMatrix? = null
             """.trimIndent(),
             """
@@ -193,10 +193,6 @@ internal object LpBoundaryScanner {
                     "com.eignex.koblas.SparseMatrix",
                     "com.eignex.koblas.ExperimentalKoblasApi",
                     "com.eignex.koblas.sparse.SparseWorkspace",
-                    "com.eignex.koblas.sparse.basis.BasisSolver",
-                    "com.eignex.koblas.sparse.basis.IndexedVector",
-                    "com.eignex.koblas.sparse.basis.BasisUpdate",
-                    "com.eignex.koblas.sparse.basis.BasisSolveQuality",
                 )
                 return !dependency.startsWith("com.eignex.koblas.core.") &&
                     allowedTypes.none { dependency == it || dependency.startsWith("$it.") }

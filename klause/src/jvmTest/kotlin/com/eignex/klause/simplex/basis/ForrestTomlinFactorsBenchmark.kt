@@ -1,9 +1,5 @@
 package com.eignex.klause.simplex.basis
 
-import com.eignex.koblas.hfactor.BundledHfactor
-import com.eignex.koblas.sparse.basis.BasisSolver
-import com.eignex.koblas.sparse.basis.BasisUpdate
-import com.eignex.koblas.sparse.basis.IndexedVector
 import com.sun.management.ThreadMXBean
 import java.lang.management.ManagementFactory
 import kotlin.math.max
@@ -48,7 +44,7 @@ private fun ftMeasure(shape: String, arm: String, rebuild: Boolean, bean: Thread
     val solver: BasisSolver = when (arm) {
         "ft" -> KotlinBasisSolver(source, updateLimit = 100)
         "eta" -> BasisEtaReference(source)
-        else -> BundledHfactor().basisSolver(source)
+        else -> HfactorBasisSolver(source)
     }
     val basis = IntArray(n) { n - 1 - it }
     val buildBefore = bean.getThreadAllocatedBytes(thread)

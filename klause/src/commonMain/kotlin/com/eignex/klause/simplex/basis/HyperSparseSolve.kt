@@ -4,7 +4,6 @@ import com.eignex.klause.util.binarySearchInt
 import com.eignex.koblas.ExperimentalKoblasApi
 import com.eignex.koblas.SparseMatrix
 import com.eignex.koblas.sparse.SparseWorkspace
-import com.eignex.koblas.sparse.basis.IndexedVector
 
 internal data class TriangularSolveWork(
     val sparse: Boolean,

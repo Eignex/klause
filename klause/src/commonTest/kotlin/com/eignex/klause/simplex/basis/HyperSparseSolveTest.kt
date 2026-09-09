@@ -1,7 +1,6 @@
 package com.eignex.klause.simplex.basis
 
 import com.eignex.koblas.SparseMatrix
-import com.eignex.koblas.sparse.basis.IndexedVector
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals

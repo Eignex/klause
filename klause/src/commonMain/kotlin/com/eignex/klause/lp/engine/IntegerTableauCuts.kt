@@ -1,12 +1,12 @@
 package com.eignex.klause.lp.engine
 
+import com.eignex.klause.simplex.basis.IndexedVector
 import com.eignex.klause.simplex.basis.KotlinBasisSolver
 import com.eignex.klause.util.Int128
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.LongArrayList
 import com.eignex.klause.util.LongHashSet
 import com.eignex.koblas.SparseMatrix
-import com.eignex.koblas.sparse.basis.IndexedVector
 import kotlin.math.abs
 import kotlin.math.round
 import kotlin.math.sqrt

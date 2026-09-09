@@ -1,10 +1,6 @@
 package com.eignex.klause.simplex.basis
 
 import com.eignex.koblas.SparseMatrix
-import com.eignex.koblas.sparse.basis.BasisSolveQuality
-import com.eignex.koblas.sparse.basis.BasisSolver
-import com.eignex.koblas.sparse.basis.BasisUpdate
-import com.eignex.koblas.sparse.basis.IndexedVector
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.random.Random
