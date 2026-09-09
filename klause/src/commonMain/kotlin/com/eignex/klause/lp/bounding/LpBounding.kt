@@ -14,7 +14,6 @@ import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.LpSolver
 import com.eignex.klause.lp.engine.PersistentLpSolver
 import com.eignex.klause.lp.engine.TableauCutSolver
-import com.eignex.klause.lp.engine.VarStatus
 import com.eignex.klause.lp.engine.acceptNullable
 import com.eignex.klause.lp.engine.certifiedTightObjectiveLowerBound
 import com.eignex.klause.lp.engine.certifyLpFarkas
@@ -37,10 +36,12 @@ import com.eignex.klause.solver.result.LpRoute
 import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.CheckedLongOverflowException
+import com.eignex.klause.util.Int128
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.addExact
 import com.eignex.klause.util.mulExact
+import com.eignex.klause.util.subExact
 import kotlin.math.abs
 import kotlin.math.ceil
 import kotlin.math.round
@@ -641,12 +642,19 @@ internal fun LpEngine.sparseSafePrune(
             }
         }
     }
-    // Reduced-cost fixing on the exact certified reduced costs — needs a finite incumbent for
-    // the improving gap, so it runs only when pruning is possible. It also argues from the *optimum*,
-    // so a solve that stopped short may bound but may not fix.
-    if (canPrune && cert != null && boundRes.optimal &&
+    // Reduced-cost fixing on the exact certified Lagrangian and reduced costs needs a finite incumbent
+    // for the improving gap, but not an attained LP optimum: the certificate inequality holds for any
+    // rounded dual vector.
+    if (canPrune && cert != null &&
         applySparseReducedCostFixing(
-            boundRel, cert, boundRes.basis, session, bound, sink, objectiveVar, objectiveAscending, learn,
+            boundRel,
+            cert,
+            session,
+            bound,
+            sink,
+            objectiveVar,
+            objectiveAscending,
+            learn,
         )
     ) {
         return LpNodeOutcome(true, null)
@@ -655,11 +663,11 @@ internal fun LpEngine.sparseSafePrune(
 }
 
 /**
- * Reduced-cost fixing from the [IntegerCertificate], over exact scaled integers. At the LP
- * optimum a nonbasic column sits at a bound; moving it Δ integer steps raises the
- * objective by `|reducedCost|·Δ`, and any incumbent-beating solution has objective `≤ ⌈bound⌉ − 1`, so
- * the column can move at most `floor((improvingMax − lpOptimum) / |reducedCost|)` steps before it alone
- * overshoots. With [learn] each integer fixing carries the LP dual-decomposition reason (the other
+ * Reduced-cost fixing from one [IntegerCertificate], over exact scaled integers. For any column with
+ * nonzero reduced cost, moving Δ integer steps from that certificate term's minimizing endpoint raises
+ * its Lagrangian by `|reducedCost|·Δ`. Any incumbent-beating solution has source objective
+ * `≤ ⌈bound⌉ − 1`, so the column can move at most the exact unrounded certificate gap divided by
+ * `|reducedCost|`. With [learn] each integer fixing carries the LP dual-decomposition reason (the other
  * support columns' seated bounds + the incumbent bound + any dual-weighted non-global row's premises);
  * when the reason is inexpressible the fixing falls back to a reason-less level-local tightening (a
  * conflict-analysis leaf). Returns true if a reduction empties a domain (the node is then pruned).
@@ -668,7 +676,6 @@ internal fun LpEngine.sparseSafePrune(
 internal fun LpEngine.applySparseReducedCostFixing(
     relaxation: LpRelaxation,
     cert: IntegerCertificate,
-    basis: Basis,
     session: PropagationSession,
     bound: Double,
     sink: SolveStatsSink,
@@ -676,56 +683,17 @@ internal fun LpEngine.applySparseReducedCostFixing(
     objectiveAscending: Boolean = true,
     learn: Boolean = false,
 ): Boolean {
-    val improvingMax = ceil(bound).toLong() - 1L // best objective that still beats the incumbent
-    if (!cert.improvingGapNonNegative(improvingMax)) return false // gap ≥ 0 (node not bound-pruned)
-    val status = basis.status
-    // Learnable reason support: a fixing of column `col` is justified
-    // by the OTHER support columns' seated bounds (premise side = reduced-cost sign) + the incumbent
-    // bound `objVar ≤ improvingMax` + the validity premises of any dual-weighted non-global row.
-    // Expressible only with a single-var ascending objective whose live upper bound already meets the
-    // incumbent atom, all dual-weighted non-global rows premise-backed, and no support on an aux column.
-    var canLearn = learn && objectiveVar >= 0 && objectiveAscending &&
-        session.intDomain(objectiveVar).max <= improvingMax
-    val supportCols = IntArrayList()
-    val supportLits = IntArrayList()
-    if (canLearn) {
-        val seen = IntHashSet()
-        val premLits = IntArrayList()
-        if (LpExplanation.addDualRowPremiseLits(premLits, seen, relaxation, cert, session)) {
-            for (k in 0 until premLits.size) {
-                supportCols.add(-1) // row premise: part of every fixing's reason, never excluded
-                supportLits.add(premLits[k])
-            }
-            for (c in relaxation.colVarId.indices) {
-                if (status[c] == VarStatus.BASIC) continue
-                val sign = cert.reducedCostSign(c)
-                if (sign == 0) continue
-                val lit = LpExplanation.premiseLit(relaxation, session, c, lowerSide = sign > 0)
-                if (lit == LpExplanation.PREMISE_AUX) {
-                    canLearn = false
-                    break
-                }
-                if (lit == LpExplanation.PREMISE_NONE || !seen.add(lit)) continue
-                supportCols.add(c)
-                supportLits.add(lit)
-            }
-        } else {
-            canLearn = false
-        }
+    if (!bound.isFinite() || bound <= Long.MIN_VALUE.toDouble() || bound >= Long.MAX_VALUE.toDouble()) return false
+    val improvingMax = ceil(bound).toLong() - 1L // greatest integer objective strictly below the incumbent
+    val sourceConstant = relaxation.objectiveConstant
+    if (!cert.improvingGapNonNegative(improvingMax, sourceConstant)) return false
+    val reasonSupport = if (learn && objectiveVar >= 0 && objectiveAscending) {
+        reducedCostFixingReasons(relaxation, cert, session, objectiveVar, improvingMax)
+    } else {
+        null
     }
-    val incumbentLit = if (canLearn) session.boundLeLit(objectiveVar, improvingMax, positive = false) else 0
-
-    // Reason for fixing `col`: every support column's seated-bound negation except col's own, plus the
-    // incumbent objective bound. (col's own bound is the variable moving, not a premise.)
-    fun reasonFor(col: Int): IntArray {
-        val out = IntArrayList(supportCols.size + 1)
-        for (k in 0 until supportCols.size) if (supportCols[k] != col) out.add(supportLits[k])
-        out.add(incumbentLit)
-        return out.toIntArray()
-    }
+    val canLearn = reasonSupport != null
     for (col in relaxation.colVarId.indices) {
-        val st = status[col]
-        if (st == VarStatus.BASIC) continue
         val varId = relaxation.colVarId[col]
         if (varId < 0) continue // auxiliary column — no CP variable to fix
         val isBool = relaxation.colIsBool[col]
@@ -741,35 +709,41 @@ internal fun LpEngine.applySparseReducedCostFixing(
             liveMax = d.max
         }
         if (liveMin == liveMax) continue
-        val span = liveMax - liveMin
-        val res = when (st) {
-            // At lower bound: reducedCost ≥ 0; it can rise at most floor(gap / d) steps.
-            VarStatus.AT_LOWER -> {
-                if (cert.reducedCostSign(col) <= 0) continue
-                val dMax = cert.fixSteps(col, improvingMax) ?: continue // overflow ⇒ skip (sound)
-                if (dMax >= span) continue
-                val hi = liveMin + dMax
+        val sign = cert.reducedCostSign(col)
+        val dMax = cert.fixSteps(col, improvingMax, sourceConstant) ?: continue
+        val res = when {
+            // A positive reduced cost is minimized at the certificate model's lower endpoint.
+            sign > 0 -> {
+                val hi = try {
+                    addExact(relaxation.model.loShift[col], dMax)
+                } catch (_: CheckedLongOverflowException) {
+                    continue
+                }
+                if (hi >= liveMax) continue
                 when {
                     isBool -> session.implyBool(varId, false)
-                    canLearn -> session.implyIntAtMostWithReason(varId, hi, reasonFor(col))
+                    canLearn -> session.implyIntAtMostWithReason(varId, hi, reasonSupport.reasonFor(col))
                     else -> session.implyIntAtMost(varId, hi)
                 }
             }
 
-            // At upper bound: reducedCost ≤ 0; symmetric, tighten the lower bound.
-            VarStatus.AT_UPPER -> {
-                if (cert.reducedCostSign(col) >= 0) continue
-                val dMax = cert.fixSteps(col, improvingMax) ?: continue
-                if (dMax >= span) continue
-                val lo = liveMax - dMax
+            // A negative reduced cost is minimized at the certificate model's upper endpoint.
+            sign < 0 -> {
+                val lo = try {
+                    val certificateMax = addExact(relaxation.model.loShift[col], relaxation.model.upper[col])
+                    subExact(certificateMax, dMax)
+                } catch (_: CheckedLongOverflowException) {
+                    continue
+                }
+                if (lo <= liveMin) continue
                 when {
                     isBool -> session.implyBool(varId, true)
-                    canLearn -> session.implyIntAtLeastWithReason(varId, lo, reasonFor(col))
+                    canLearn -> session.implyIntAtLeastWithReason(varId, lo, reasonSupport.reasonFor(col))
                     else -> session.implyIntAtLeast(varId, lo)
                 }
             }
 
-            VarStatus.BASIC -> continue
+            else -> continue
         }
         if (res is PropagationResult.Unsat) {
             sink.lp.observePrune()
@@ -779,6 +753,78 @@ internal fun LpEngine.applySparseReducedCostFixing(
         if (session.decisionLevel == 0) sink.lp.observeRootReducedCostFixes(1)
     }
     return false
+}
+
+/** One certificate's reusable support for local reduced-cost deductions under a named cutoff. */
+internal class ReducedCostFixingReasons(
+    private val supportCols: IntArray,
+    private val supportLits: IntArray,
+    private val incumbentLit: Int,
+) {
+    /** Reason for [col], excluding its own minimizing endpoint because that is the value being bounded. */
+    fun reasonFor(col: Int): IntArray {
+        val out = IntArrayList(supportCols.size + 1)
+        for (k in supportCols.indices) if (supportCols[k] != col) out.add(supportLits[k])
+        out.add(incumbentLit)
+        return out.toIntArray()
+    }
+}
+
+/**
+ * Build the complete reusable premise set for one certificate: all dual-weighted row premises, every
+ * structural column's minimizing endpoint with nonzero reduced cost (including basic columns), and the
+ * source-objective cutoff. For a single affine source objective `a·x + c`, the cutoff is converted to
+ * the exact variable atom `x ≤ ⌊(improvingMax − c) / a⌋`; that atom must already hold. Null means some
+ * premise cannot be named; the deduction may still be applied locally without a reusable reason.
+ */
+internal fun reducedCostFixingReasons(
+    relaxation: LpRelaxation,
+    cert: IntegerCertificate,
+    session: PropagationSession,
+    objectiveVar: Int,
+    improvingMax: Long,
+): ReducedCostFixingReasons? {
+    val objectiveCol = relaxation.intColOf.getOrNull(objectiveVar) ?: return null
+    if (objectiveCol !in relaxation.colVarId.indices || relaxation.colVarId[objectiveCol] != objectiveVar ||
+        relaxation.colIsBool[objectiveCol]
+    ) {
+        return null
+    }
+    val objectiveCoefficient = relaxation.model.cost[objectiveCol]
+    if (objectiveCoefficient <= 0L || relaxation.model.cost.indices.any {
+            it != objectiveCol && relaxation.model.cost[it] != 0L
+        }
+    ) {
+        return null
+    }
+    val cutoffNumerator = Int128().also { it.addLong(improvingMax) }
+    val sourceConstant = Int128().also { it.addLong(relaxation.objectiveConstant) }
+    cutoffNumerator.subtract(sourceConstant)
+    val objectiveVarMax = cutoffNumerator.floorDivPositive(objectiveCoefficient) ?: return null
+    if (session.intDomain(objectiveVar).max > objectiveVarMax) return null
+    val supportCols = IntArrayList()
+    val supportLits = IntArrayList()
+    val seen = IntHashSet()
+    val premLits = IntArrayList()
+    if (!LpExplanation.addDualRowPremiseLits(premLits, seen, relaxation, cert, session)) return null
+    for (k in 0 until premLits.size) {
+        supportCols.add(-1) // row premise: part of every fixing's reason, never excluded
+        supportLits.add(premLits[k])
+    }
+    for (col in relaxation.colVarId.indices) {
+        val sign = cert.reducedCostSign(col)
+        if (sign == 0) continue
+        val lit = LpExplanation.premiseLit(relaxation, session, col, lowerSide = sign > 0)
+        if (lit == LpExplanation.PREMISE_AUX) return null
+        if (lit == LpExplanation.PREMISE_NONE || !seen.add(lit)) continue
+        supportCols.add(col)
+        supportLits.add(lit)
+    }
+    return ReducedCostFixingReasons(
+        supportCols.toIntArray(),
+        supportLits.toIntArray(),
+        session.boundLeLit(objectiveVar, objectiveVarMax, positive = false),
+    )
 }
 
 /**

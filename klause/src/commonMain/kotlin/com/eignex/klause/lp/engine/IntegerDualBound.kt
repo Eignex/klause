@@ -98,7 +98,7 @@ internal fun roundDuals(model: LpModel, y: DoubleArray, scaleBits: Int = DEFAULT
 }
 
 /**
- * The integer-multiplier LP-optimum data a node deduction needs (objective lower bound, per-column
+ * The integer-multiplier Lagrangian data a node deduction needs (objective lower bound, per-column
  * reduced cost, dual-row support), carried as exact
  * scaled integers from rounded duals at scale `2ᵏ`. Every quantity is a valid deduction for **any**
  * integer multipliers, so rounding only weakens it — never makes it unsound (see [integerCertify]).
@@ -108,7 +108,8 @@ internal class IntegerCertificate(
     private val scale: Long,
     /** Scaled integer duals `2ᵏ·yᵢ`, one per row. */
     private val mult: LongArray,
-    /** Scaled reduced cost `Dⱼ = 2ᵏ·cⱼ − Σᵢ multᵢ·Aᵢⱼ`, one per column (`0` for basic columns). */
+    /** Scaled reduced cost `Dⱼ = 2ᵏ·cⱼ − Σᵢ multᵢ·Aᵢⱼ`, one per column. Rounded
+     *  multipliers can leave a nonzero exact reduced cost even on a float-basic column. */
     private val reduced: LongArray,
     /** `N = 2ᵏ · objective` (the Lagrangian lower bound, including `model.objConstant`). */
     private val numerator: Int128,
@@ -142,27 +143,33 @@ internal class IntegerCertificate(
         return n.ceilDivPow2(scaleBits)
     }
 
-    /** The scaled improving gap `G = improvingMax·2ᵏ − N` (`= 2ᵏ·(improvingMax − objective)`). */
-    private fun gapNumerator(improvingMax: Long): Int128 {
+    /** The scaled source-objective improving gap
+     * `G = improvingMax·2ᵏ − (N + sourceConstant·2ᵏ)`. */
+    private fun gapNumerator(improvingMax: Long, sourceConstant: Long): Int128 {
         val g = Int128()
         g.addProduct(improvingMax, scale)
         g.subtract(numerator)
+        val constant = Int128()
+        constant.addProduct(sourceConstant, scale)
+        g.subtract(constant)
         return g
     }
 
-    /** Whether `improvingMax ≥ objective`, i.e. the reduced-cost-fixing gap is non-negative. */
-    fun improvingGapNonNegative(improvingMax: Long): Boolean = gapNumerator(improvingMax).isNonNegative()
+    /** Whether `improvingMax ≥ objective + sourceConstant`, i.e. the fixing gap is non-negative. */
+    fun improvingGapNonNegative(improvingMax: Long, sourceConstant: Long): Boolean =
+        gapNumerator(improvingMax, sourceConstant).isNonNegative()
 
     /**
-     * Max integer steps column [col] may move from its seated bound before it alone pushes the objective
-     * past [improvingMax]: `⌊ (improvingMax − objective) / |reducedCost| ⌋`. Sound for any duals because
-     * `cz = y·rhs + Σₖ rcₖzₖ` and every other box term is `≥ 0`, so `|rcⱼ|·Δⱼ ≤ improvingMax − objective`.
+     * Max integer steps column [col] may move from its reduced-cost-minimizing endpoint before it pushes the objective
+     * past [improvingMax]: `⌊ (improvingMax − sourceConstant − objective) / |reducedCost| ⌋`.
+     * Sound for any duals because `sourceObjective = sourceConstant + y·rhs + Σₖ rcₖzₖ` and every
+     * other box term is `≥ 0`, so `|rcⱼ|·Δⱼ ≤ improvingMax − sourceConstant − objective`.
      * Null on a zero reduced cost or on overflow (the caller then skips the fix, which is sound).
      */
-    fun fixSteps(col: Int, improvingMax: Long): Long? {
+    fun fixSteps(col: Int, improvingMax: Long, sourceConstant: Long): Long? {
         val dj = reduced[col]
         if (dj == 0L || dj == Long.MIN_VALUE) return null
-        return gapNumerator(improvingMax).floorDivPositive(if (dj < 0L) -dj else dj)
+        return gapNumerator(improvingMax, sourceConstant).floorDivPositive(if (dj < 0L) -dj else dj)
     }
 }
 
