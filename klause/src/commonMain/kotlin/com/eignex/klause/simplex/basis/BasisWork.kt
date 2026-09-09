@@ -101,11 +101,13 @@ internal class BasisWorkMeter {
         }
     }
 
-    fun solveDecline(transpose: Boolean) {
+    fun solveDecline(transpose: Boolean, units: Long = 0) {
         if (transpose) {
             btranDeclines = saturatedAdd(btranDeclines, 1)
+            btranUnits = saturatedAdd(btranUnits, units)
         } else {
             ftranDeclines = saturatedAdd(ftranDeclines, 1)
+            ftranUnits = saturatedAdd(ftranUnits, units)
         }
     }
 
@@ -173,7 +175,7 @@ internal val BasisSolveWork.units: Long
         saturatedAdd(transformEntries, outputSupport.toLong()),
     )
 
-private val TriangularSolveWork.units: Long
+internal val TriangularSolveWork.units: Long
     get() = saturatedAdd(saturatedAdd(reachEntries, pivotVisits.toLong()), arithmeticEntries)
 
 internal val ForrestTomlinWork.units: Long

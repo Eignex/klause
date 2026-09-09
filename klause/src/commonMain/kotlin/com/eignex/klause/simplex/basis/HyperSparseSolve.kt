@@ -90,6 +90,8 @@ internal class HyperSparseSolve(
     private var reachCount = 0
     private var postCount = 0
     private var reachEntries = 0L
+    var lastWork: TriangularSolveWork? = null
+        private set
 
     init {
         require(densityThreshold.isFinite() && densityThreshold in 0.0..1.0)
@@ -101,21 +103,28 @@ internal class HyperSparseSolve(
         reachCount = 0
         postCount = 0
         reachEntries = 0
-        val sparse = expectedDensity <= densityThreshold && reach(work)
+        lastWork = null
+        var sparse = false
         var visits = 0
         var arithmetic = 0L
-        if (sparse) {
-            for (k in postCount - 1 downTo 0) {
-                arithmetic += eliminate(postorder[k], work)
-                visits++
+        try {
+            sparse = expectedDensity <= densityThreshold && reach(work)
+            if (sparse) {
+                for (k in postCount - 1 downTo 0) {
+                    visits++
+                    arithmetic += eliminate(postorder[k], work)
+                }
+            } else {
+                for (k in 0 until n) {
+                    visits++
+                    arithmetic += eliminate(matrix.order[if (lower) k else n - 1 - k], work)
+                }
             }
-        } else {
-            for (k in 0 until n) {
-                arithmetic += eliminate(matrix.order[if (lower) k else n - 1 - k], work)
-                visits++
-            }
+            return TriangularSolveWork(sparse, reachCount, reachEntries, visits, arithmetic).also { lastWork = it }
+        } catch (failure: BasisArithmeticException) {
+            lastWork = TriangularSolveWork(sparse, reachCount, reachEntries, visits, arithmetic)
+            throw failure
         }
-        return TriangularSolveWork(sparse, reachCount, reachEntries, visits, arithmetic)
     }
 
     private fun reach(work: BasisWorkspace): Boolean {

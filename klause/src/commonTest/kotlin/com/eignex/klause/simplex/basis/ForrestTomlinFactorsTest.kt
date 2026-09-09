@@ -76,7 +76,7 @@ class ForrestTomlinFactorsTest {
     fun `updated row and column adjacency describe the same permuted triangular matrix`() {
         val source = ftSource("dense")
         val basis = IntArray(source.rows) { source.rows - 1 - it }
-        val initial = assertIs<LuBuildResult.Built>(F64BasisFactors(source).build(basis)).factors
+        val initial = assertIs<LuBuildResult.Built>(BasisFactors(source).build(basis)).factors
         val ft = ForrestTomlinFactors(initial)
         val solver = KotlinBasisSolver(source, updateLimit = 100, fillFactor = 100.0)
         assertTrue(solver.refactorize(basis))
@@ -138,7 +138,7 @@ class ForrestTomlinFactorsTest {
         for ((diagonal, incoming) in listOf(1e200 to 1e200, 1e-200 to 1e-200)) {
             val matrix = SparseMatrix.ofColumns(2, 2, listOf(listOf(0 to diagonal), listOf(1 to 1.0)))
             val initial = assertIs<LuBuildResult.Built>(
-                F64BasisFactors(matrix).build(intArrayOf(0, 1), LuPivotPolicy(absoluteTolerance = 0.0)),
+                BasisFactors(matrix).build(intArrayOf(0, 1), LuPivotPolicy(absoluteTolerance = 0.0)),
             ).factors
             val ft = ForrestTomlinFactors(initial)
             val before = ft.upper.columns
@@ -168,7 +168,7 @@ class ForrestTomlinFactorsTest {
             listOf(listOf(0 to 1.0), listOf(0 to 1e200, 1 to 1e-200)),
         )
         val initial = assertIs<LuBuildResult.Built>(
-            F64BasisFactors(matrix).build(intArrayOf(0, 1), LuPivotPolicy(absoluteTolerance = 0.0)),
+            BasisFactors(matrix).build(intArrayOf(0, 1), LuPivotPolicy(absoluteTolerance = 0.0)),
         ).factors
         val ft = ForrestTomlinFactors(initial)
         val before = ft.upper.columns
@@ -183,12 +183,13 @@ class ForrestTomlinFactorsTest {
         assertTrue(rows === ft.transpose.columns)
         assertEquals(0, ft.updateCount)
         assertEquals(0, ft.transformEntries)
+        assertTrue(assertNotNull(ft.lastUpdateWork).units > 0)
     }
 
     @Test
     fun `copy work includes both staged diagonal adjacency views`() {
         val matrix = SparseMatrix.ofColumns(1, 1, listOf(listOf(0 to 1.0)))
-        val initial = assertIs<LuBuildResult.Built>(F64BasisFactors(matrix).build(intArrayOf(0))).factors
+        val initial = assertIs<LuBuildResult.Built>(BasisFactors(matrix).build(intArrayOf(0))).factors
         for ((value, expected) in listOf(1.0 to 2L, 2.0 to 3L)) {
             val ft = ForrestTomlinFactors(initial)
             val spike = BasisWorkspace(1).also { it.set(0, value) }

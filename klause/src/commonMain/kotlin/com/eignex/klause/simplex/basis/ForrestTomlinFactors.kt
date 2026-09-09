@@ -39,6 +39,8 @@ internal class ForrestTomlinFactors private constructor(factors: LuFactors, stat
     val updateCount: Int get() = transforms.size
     var lastUpdateWork: ForrestTomlinWork? = state?.lastUpdateWork
         private set
+    var lastSolveEntries = 0L
+        private set
 
     fun snapshot(): ForrestTomlinState = ForrestTomlinState(
         upper.columns.map { it.copyOwned() }.toTypedArray(),
@@ -52,15 +54,28 @@ internal class ForrestTomlinFactors private constructor(factors: LuFactors, stat
     )
 
     fun forward(work: BasisWorkspace): Long {
-        var entries = 0L
-        for (transform in transforms) entries += transform.forward(work)
-        return entries
+        lastSolveEntries = 0
+        for (transform in transforms) {
+            try {
+                transform.forward(work)
+            } finally {
+                lastSolveEntries = saturatedAdd(lastSolveEntries, transform.lastWork)
+            }
+        }
+        return lastSolveEntries
     }
 
     fun backward(work: BasisWorkspace): Long {
-        var entries = 0L
-        for (i in transforms.size - 1 downTo 0) entries += transforms[i].transpose(work)
-        return entries
+        lastSolveEntries = 0
+        for (i in transforms.size - 1 downTo 0) {
+            val transform = transforms[i]
+            try {
+                transform.transpose(work)
+            } finally {
+                lastSolveEntries = saturatedAdd(lastSolveEntries, transform.lastWork)
+            }
+        }
+        return lastSolveEntries
     }
 
     fun fillAdvice(factor: Double): Boolean = upperEntries.toDouble() + transformEntries > factor * initialEntries
@@ -72,6 +87,8 @@ internal class ForrestTomlinFactors private constructor(factors: LuFactors, stat
         var columnProducts = 0L
         var rowProducts = 0L
         var copiedEntries = 0L
+        var published = false
+        lastUpdateWork = null
         try {
             for (k in 0 until spike.count) {
                 val j = spike.indices[k]
@@ -138,9 +155,20 @@ internal class ForrestTomlinFactors private constructor(factors: LuFactors, stat
             upperEntries = entries
             transformEntries = report.transformEntries
             lastUpdateWork = report
+            published = true
             return true
         } catch (_: ArithmeticException) {
             return false
+        } finally {
+            if (!published) {
+                lastUpdateWork = ForrestTomlinWork(
+                    columnProducts,
+                    rowProducts,
+                    copiedEntries,
+                    upperEntries,
+                    transformEntries,
+                )
+            }
         }
     }
 
@@ -185,22 +213,29 @@ internal class ForrestTomlinFactors private constructor(factors: LuFactors, stat
 }
 
 internal class ForrestTomlinRow(val pivot: Int, val entries: BasisSlice) {
+    var lastWork = 0L
+        private set
+
     fun snapshot() = ForrestTomlinRowState(pivot, entries.copyOwned())
 
     fun forward(work: BasisWorkspace): Long {
+        lastWork = 0
         var value = work.values[pivot]
         for (k in 0 until entries.count) {
+            lastWork = saturatedAdd(lastWork, 1)
             value = basisFinite(value - basisProduct(entries.values[k], work.values[entries.indices[k]]))
         }
         work.set(pivot, value)
-        return entries.count.toLong()
+        return lastWork
     }
 
     fun transpose(work: BasisWorkspace): Long {
+        lastWork = 0
         val value = work.values[pivot]
         if (value == 0.0) return 0
         work.scatter(-value, entries)
-        return entries.count.toLong()
+        lastWork = entries.count.toLong()
+        return lastWork
     }
 }
 
