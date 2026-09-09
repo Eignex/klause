@@ -83,6 +83,7 @@ internal class ForrestTomlinFactors(factors: LuFactors) {
             if (!diagonal.isFinite() || diagonal == 0.0 || abs(diagonal) < tolerance) return false
             basisQuotient(1.0, diagonal)
             rows[pivot] = BasisSlice(intArrayOf(pivot), doubleArrayOf(diagonal))
+            copiedEntries++
             column.set(pivot, diagonal)
             val columns = upper.columns.copyOf()
             for (j in 0 until n) {

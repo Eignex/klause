@@ -24,10 +24,14 @@ fun main(args: Array<String>) {
             repeat(if (countsOnly) 1 else 3) { repetition ->
                 for (arm in listOf("ft", "eta", "hfactor")) {
                     val report = ftMeasure(shape, arm, rebuild, bean)
-                    val fields = if (countsOnly) report.split(" ").filterNot {
-                        it.substringBefore("=").endsWith("Bytes") || it.substringBefore("=").endsWith("Nanos") ||
-                            it.startsWith("nanos=")
-                    }.joinToString(" ") else report
+                    val fields = if (countsOnly) {
+                        report.split(" ").filterNot {
+                            it.substringBefore("=").endsWith("Bytes") || it.substringBefore("=").endsWith("Nanos") ||
+                                it.startsWith("nanos=")
+                        }.joinToString(" ")
+                    } else {
+                        report
+                    }
                     println("B3bench shape=$shape arm=$arm rebuild=$rebuild repetition=$repetition $fields")
                 }
             }
@@ -90,7 +94,9 @@ private fun ftMeasure(shape: String, arm: String, rebuild: Boolean, bean: Thread
                 is KotlinBasisSolver -> solver.lastSolveWork!!.let {
                     it.first.arithmeticEntries + it.second.arithmeticEntries + it.transformEntries
                 }
+
                 is BasisEtaReference -> solver.solveEntries
+
                 else -> 0
             }
         }
