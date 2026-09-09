@@ -658,8 +658,10 @@ class LpDeclineDisciplineTest {
 
         assertTrue("LpVerdict.INDETERMINATE, LpVerdict.CERTIFIED_BOUND -> ComponentCheck.Indeterminate" in search)
         assertTrue(
-            ("LpVerdict.INDETERMINATE, LpVerdict.CERTIFIED_BOUND -> {\n" +
-                "                        sawIndeterminateLeaf = true") in optimize,
+            (
+                "LpVerdict.INDETERMINATE, LpVerdict.CERTIFIED_BOUND -> {\n" +
+                "                        sawIndeterminateLeaf = true"
+            ) in optimize,
         )
         assertTrue("sawIndeterminateLeaf -> MinimizeResult.Unknown" in optimize)
     }
