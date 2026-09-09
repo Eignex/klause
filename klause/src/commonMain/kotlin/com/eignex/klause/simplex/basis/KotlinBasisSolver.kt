@@ -14,7 +14,7 @@ internal data class BasisSolveWork(
 
 // Single-threaded owner of source, factors, row transforms and scratch. Caller vectors never become retained buffers.
 // Mandatory operations/reports reject close; n and the last refactorization's singular flag remain readable.
-// Optional repair/snapshot behavior is exactly the seam default. No cancellation or resource API is exposed.
+// Repair and snapshots stay within this fixed source identity. No cancellation or resource API is exposed.
 internal class KotlinBasisSolver(
     matrix: SparseMatrix,
     private val policy: LuPivotPolicy = LuPivotPolicy(),
@@ -33,8 +33,11 @@ internal class KotlinBasisSolver(
     override val n = source.rows
     private val work = BasisWorkspace(n)
     private val mapped = BasisWorkspace(n)
+    private val identity = Any()
+    private val liveSnapshots = mutableSetOf<KotlinBasisSnapshot>()
     private var cache: BasisSolveCache? = null
     private var columns = IntArray(0)
+    private var unitRows = IntArray(0)
     private var closed = false
     override var singular = true
         private set
@@ -74,18 +77,42 @@ internal class KotlinBasisSolver(
 
     override fun refactorize(basicIndex: IntArray): Boolean {
         requireOpen()
-        require(basicIndex.size == n && basicIndex.all { it in 0 until source.cols })
+        validateBasis(basicIndex)
         // Invalidate before a numerical attempt: even an exceptional build cannot expose stale factors.
-        cache = null
-        singular = true
-        columns = IntArray(0)
-        lastSolveWork = null
+        invalidate()
         val result = builder.build(basicIndex, policy)
         if (result !is LuBuildResult.Built) return false
-        cache = BasisSolveCache(result.factors, densityThreshold)
-        columns = basicIndex.copyOf()
-        singular = false
+        install(result, basicIndex, IntArray(n) { -1 })
         return true
+    }
+
+    override fun refactorizeRepairing(basicIndex: IntArray): BasisRepair? {
+        requireOpen()
+        validateBasis(basicIndex)
+        invalidate()
+        val repairedColumns = IntArray(n) { -1 }
+        val repairedUnits = IntArray(n) { it }
+        var accepted = builder.build(repairedColumns, repairedUnits, policy) as? LuBuildResult.Built ?: return null
+        for (requestedSlot in basicIndex.indices) {
+            val entering = basicIndex[requestedSlot]
+            for (offset in repairedUnits.indices) {
+                val slot = (requestedSlot + offset) % n
+                if (repairedUnits[slot] < 0) continue
+                val trialColumns = repairedColumns.copyOf()
+                val trialUnits = repairedUnits.copyOf()
+                trialColumns[slot] = entering
+                trialUnits[slot] = -1
+                val trial = builder.build(trialColumns, trialUnits, policy)
+                if (trial is LuBuildResult.Built) {
+                    trialColumns.copyInto(repairedColumns)
+                    trialUnits.copyInto(repairedUnits)
+                    accepted = trial
+                    break
+                }
+            }
+        }
+        install(accepted, repairedColumns, repairedUnits)
+        return BasisRepair(repairedColumns, repairedUnits)
     }
 
     override fun ftran(x: IndexedVector, expectedDensity: Double) = solve(x, expectedDensity, transpose = false)
@@ -138,6 +165,7 @@ internal class KotlinBasisSolver(
         val pivotLabel = current.factors.symbolic.columnPosition[pivotRow]
         if (!current.ft.update(pivotLabel, mapped, policy.absoluteTolerance)) return BasisUpdate.SINGULAR
         columns[pivotRow] = entering
+        unitRows[pivotRow] = -1
         return if (current.ft.updateCount >= updateLimit || current.ft.fillAdvice(fillFactor)) {
             BasisUpdate.REFACTORIZE
         } else {
@@ -153,8 +181,13 @@ internal class KotlinBasisSolver(
         require(rhs.size == n && solution.size == n)
         val product = DoubleArray(n)
         for (j in 0 until n) {
-            source.forEachInColumn(columns[j]) { i, value ->
-                if (transpose) product[j] += value * solution[i] else product[i] += value * solution[j]
+            val unitRow = unitRows[j]
+            if (unitRow >= 0) {
+                if (transpose) product[j] += solution[unitRow] else product[unitRow] += solution[j]
+            } else {
+                source.forEachInColumn(columns[j]) { i, value ->
+                    if (transpose) product[j] += value * solution[i] else product[i] += value * solution[j]
+                }
             }
         }
         var residual = 0.0
@@ -169,23 +202,129 @@ internal class KotlinBasisSolver(
         return BasisSolveQuality(residual, residual / scale)
     }
 
+    override fun snapshot(): BasisSnapshot? {
+        requireOpen()
+        val current = cache ?: return null
+        if (singular) return null
+        return KotlinBasisSnapshot(
+            identity,
+            n,
+            source.cols,
+            policy,
+            updateLimit,
+            fillFactor,
+            densityThreshold,
+            current.snapshot(),
+            columns.copyOf(),
+            unitRows.copyOf(),
+            lastSolveWork,
+        ).also { liveSnapshots.add(it) }
+    }
+
+    override fun restore(snapshot: BasisSnapshot): Boolean {
+        requireOpen()
+        val own = snapshot as? KotlinBasisSnapshot ?: return false
+        val state = own.state ?: return false
+        if (
+            own.owner !== identity || own !in liveSnapshots || own.dimension != n ||
+            own.sourceColumns != source.cols || own.policy != policy || own.updateLimit != updateLimit ||
+            own.fillFactor != fillFactor || own.densityThreshold != densityThreshold
+        ) {
+            return false
+        }
+        val restored = BasisSolveCache.restore(state, densityThreshold)
+        cache = restored
+        columns = own.columns.copyOf()
+        unitRows = own.unitRows.copyOf()
+        singular = false
+        lastSolveWork = own.lastSolveWork
+        work.clear()
+        mapped.clear()
+        return true
+    }
+
     override fun close() {
         if (closed) return
+        for (snapshot in liveSnapshots.toList()) snapshot.close()
         closed = true
         cache = null
         columns = IntArray(0)
+        unitRows = IntArray(0)
         work.clear()
         mapped.clear()
         lastSolveWork = null
     }
 
+    private fun validateBasis(basicIndex: IntArray) =
+        require(basicIndex.size == n && basicIndex.all { it in 0 until source.cols })
+
+    private fun invalidate() {
+        cache = null
+        singular = true
+        columns = IntArray(0)
+        unitRows = IntArray(0)
+        lastSolveWork = null
+    }
+
+    private fun install(result: LuBuildResult.Built, columns: IntArray, unitRows: IntArray) {
+        cache = BasisSolveCache(result.factors, densityThreshold)
+        this.columns = columns.copyOf()
+        this.unitRows = unitRows.copyOf()
+        singular = false
+    }
+
     private fun requireOpen() = check(!closed) { "basis solver is closed" }
+
+    private inner class KotlinBasisSnapshot(
+        val owner: Any,
+        val dimension: Int,
+        val sourceColumns: Int,
+        val policy: LuPivotPolicy,
+        val updateLimit: Int,
+        val fillFactor: Double,
+        val densityThreshold: Double,
+        state: BasisCacheState,
+        columns: IntArray,
+        unitRows: IntArray,
+        val lastSolveWork: BasisSolveWork?,
+    ) : BasisSnapshot {
+        var state: BasisCacheState? = state
+            private set
+        var columns = columns
+            private set
+        var unitRows = unitRows
+            private set
+
+        override fun close() {
+            if (state == null) return
+            state = null
+            columns = IntArray(0)
+            unitRows = IntArray(0)
+            liveSnapshots.remove(this)
+        }
+    }
 }
 
-private class BasisSolveCache(val factors: LuFactors, threshold: Double) {
-    val ft = ForrestTomlinFactors(factors)
+private class BasisSolveCache private constructor(
+    val factors: LuFactors,
+    val ft: ForrestTomlinFactors,
+    threshold: Double,
+) {
+    constructor(factors: LuFactors, threshold: Double) : this(factors, ForrestTomlinFactors(factors), threshold)
+
     val lower = HyperSparseSolve(factors.lower, lower = true, unitDiagonal = true, threshold)
     val upper = HyperSparseSolve(ft.upper, lower = false, unitDiagonal = false, threshold)
     val lowerTranspose = HyperSparseSolve(factors.lowerTranspose, lower = false, unitDiagonal = true, threshold)
     val upperTranspose = HyperSparseSolve(ft.transpose, lower = true, unitDiagonal = false, threshold)
+
+    fun snapshot() = BasisCacheState(factors.copyOwned(), ft.snapshot())
+
+    companion object {
+        fun restore(state: BasisCacheState, threshold: Double): BasisSolveCache {
+            val factors = state.factors.copyOwned()
+            return BasisSolveCache(factors, ForrestTomlinFactors.restore(factors, state.ft), threshold)
+        }
+    }
 }
+
+private class BasisCacheState(val factors: LuFactors, val ft: ForrestTomlinState)

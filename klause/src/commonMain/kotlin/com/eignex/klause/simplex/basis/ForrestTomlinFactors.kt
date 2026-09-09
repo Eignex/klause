@@ -12,22 +12,44 @@ internal data class ForrestTomlinWork(
 
 // T L^-1 P B Q0 = V; V(order, order) is triangular. Labels are initial LU coordinates.
 // Row transforms multiply on the left, so their transposes apply in reverse order in BTRAN.
-internal class ForrestTomlinFactors(factors: LuFactors) {
-    val upper = BasisTriangularMatrix(factors.upper)
-    val transpose = BasisTriangularMatrix(factors.upperTranspose)
-    private val transforms = mutableListOf<ForrestTomlinRow>()
+internal class ForrestTomlinFactors private constructor(factors: LuFactors, state: ForrestTomlinState?) {
+    constructor(factors: LuFactors) : this(factors, null)
+
+    private val sharedOrder = state?.order?.copyOf()
+    val upper = if (state == null) {
+        BasisTriangularMatrix(factors.upper)
+    } else {
+        BasisTriangularMatrix(state.upper.map { it.copyOwned() }.toTypedArray(), checkNotNull(sharedOrder))
+    }
+    val transpose = if (state == null) {
+        BasisTriangularMatrix(factors.upperTranspose)
+    } else {
+        BasisTriangularMatrix(state.transpose.map { it.copyOwned() }.toTypedArray(), checkNotNull(sharedOrder))
+    }
+    private val transforms = state?.transforms?.map { it.restore() }?.toMutableList() ?: mutableListOf()
     private val n = upper.columns.size
     private val column = BasisWorkspace(n)
     private val row = BasisWorkspace(n)
     private val multipliers = BasisWorkspace(n)
-    private val initialEntries = factors.upper.nnz
-    var upperEntries = initialEntries
+    private val initialEntries = state?.initialEntries ?: factors.upper.nnz
+    var upperEntries = state?.upperEntries ?: initialEntries
         private set
-    var transformEntries = 0
+    var transformEntries = state?.transformEntries ?: 0
         private set
     val updateCount: Int get() = transforms.size
-    var lastUpdateWork: ForrestTomlinWork? = null
+    var lastUpdateWork: ForrestTomlinWork? = state?.lastUpdateWork
         private set
+
+    fun snapshot(): ForrestTomlinState = ForrestTomlinState(
+        upper.columns.map { it.copyOwned() }.toTypedArray(),
+        transpose.columns.map { it.copyOwned() }.toTypedArray(),
+        upper.order.copyOf(),
+        transforms.map { it.snapshot() },
+        initialEntries,
+        upperEntries,
+        transformEntries,
+        lastUpdateWork,
+    )
 
     fun forward(work: BasisWorkspace): Long {
         var entries = 0L
@@ -155,9 +177,16 @@ internal class ForrestTomlinFactors(factors: LuFactors) {
         indices.sort()
         return BasisSlice(indices, DoubleArray(indices.size) { work.values[indices[it]] })
     }
+
+    companion object {
+        fun restore(factors: LuFactors, state: ForrestTomlinState): ForrestTomlinFactors =
+            ForrestTomlinFactors(factors, state)
+    }
 }
 
-private class ForrestTomlinRow(val pivot: Int, val entries: BasisSlice) {
+internal class ForrestTomlinRow(val pivot: Int, val entries: BasisSlice) {
+    fun snapshot() = ForrestTomlinRowState(pivot, entries.copyOwned())
+
     fun forward(work: BasisWorkspace): Long {
         var value = work.values[pivot]
         for (k in 0 until entries.count) {
@@ -173,4 +202,19 @@ private class ForrestTomlinRow(val pivot: Int, val entries: BasisSlice) {
         work.scatter(-value, entries)
         return entries.count.toLong()
     }
+}
+
+internal class ForrestTomlinState(
+    val upper: Array<BasisSlice>,
+    val transpose: Array<BasisSlice>,
+    val order: IntArray,
+    val transforms: List<ForrestTomlinRowState>,
+    val initialEntries: Int,
+    val upperEntries: Int,
+    val transformEntries: Int,
+    val lastUpdateWork: ForrestTomlinWork?,
+)
+
+internal class ForrestTomlinRowState(private val pivot: Int, private val entries: BasisSlice) {
+    fun restore() = ForrestTomlinRow(pivot, entries.copyOwned())
 }

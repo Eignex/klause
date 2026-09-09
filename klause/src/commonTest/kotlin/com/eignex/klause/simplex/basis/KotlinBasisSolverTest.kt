@@ -207,16 +207,15 @@ class KotlinBasisSolverTest {
     }
 
     @Test
-    fun `unsupported optional operations retain seam defaults`() {
+    fun `empty repair and snapshot retain a usable empty basis`() {
         val solver: BasisSolver = KotlinBasisSolver(SparseMatrix.ofColumns(0, 0, emptyList()))
         assertTrue(solver.refactorize(intArrayOf()))
         assertNull(solver.kernel)
-        assertNull(solver.snapshot())
-        val snapshot = object : BasisSnapshot {
-            override fun close() = Unit
-        }
-        assertFalse(solver.restore(snapshot))
         assertFalse(assertNotNull(solver.refactorizeRepairing(intArrayOf())).repaired)
+        val snapshot = assertNotNull(solver.snapshot())
+        assertTrue(solver.restore(snapshot))
+        snapshot.close()
+        assertFalse(solver.restore(snapshot))
         solver.close()
     }
 
@@ -311,6 +310,7 @@ class KotlinBasisSolverTest {
         assertTrue(solver.refactorize(intArrayOf(0)))
         for (basis in listOf(intArrayOf(), intArrayOf(-1), intArrayOf(1))) {
             assertFailsWith<IllegalArgumentException> { solver.refactorize(basis) }
+            assertFailsWith<IllegalArgumentException> { solver.refactorizeRepairing(basis) }
         }
         for (density in listOf(-1.0, 1.1, Double.NaN, Double.POSITIVE_INFINITY)) {
             assertFailsWith<IllegalArgumentException> { solver.ftran(vector, density) }
