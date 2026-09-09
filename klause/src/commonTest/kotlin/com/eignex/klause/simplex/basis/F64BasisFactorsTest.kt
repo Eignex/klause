@@ -59,10 +59,10 @@ class F64BasisFactorsTest {
     fun `row singletons and a permuted dense kernel reconstruct together`() {
         val matrix = sparse(
             arrayOf(
-            doubleArrayOf(1.0, 0.0, 0.0),
-            doubleArrayOf(2.0, 3.0, 4.0),
-            doubleArrayOf(0.0, 5.0, 6.0),
-        )
+                doubleArrayOf(1.0, 0.0, 0.0),
+                doubleArrayOf(2.0, 3.0, 4.0),
+                doubleArrayOf(0.0, 5.0, 6.0),
+            ),
         )
         val basis = intArrayOf(2, 0, 1)
 
@@ -117,10 +117,10 @@ class F64BasisFactorsTest {
     fun `unusable singleton columns do not hide usable kernel pivots`() {
         val matrix = sparse(
             arrayOf(
-            doubleArrayOf(1e-12, 0.0, 0.0),
-            doubleArrayOf(0.0, 2.0, 1.0),
-            doubleArrayOf(0.0, 1.0, 2.0),
-        )
+                doubleArrayOf(1e-12, 0.0, 0.0),
+                doubleArrayOf(0.0, 2.0, 1.0),
+                doubleArrayOf(0.0, 1.0, 2.0),
+            ),
         )
 
         val result = F64BasisFactors(matrix).build(intArrayOf(0, 1, 2))
@@ -185,8 +185,8 @@ class F64BasisFactorsTest {
     fun `repeated kernel builds preserve factors permutations and work`() {
         val matrix = sparse(
             Array(8) { i ->
-            DoubleArray(8) { j -> if (i == j) 10.0 else ((i * 3 + j * 5) % 7 - 3).toDouble() }
-        }
+                DoubleArray(8) { j -> if (i == j) 10.0 else ((i * 3 + j * 5) % 7 - 3).toDouble() }
+            },
         )
         val builder = F64BasisFactors(matrix)
         val basis = IntArray(8) { 7 - it }
@@ -264,10 +264,11 @@ class F64BasisFactorsTest {
     private fun sparse(values: Array<DoubleArray>): SparseMatrix {
         val cols = values.firstOrNull()?.size ?: 0
         return SparseMatrix.ofColumns(
-            values.size, cols,
+            values.size,
+            cols,
             List(cols) { j ->
-            values.indices.filter { values[it][j] != 0.0 }.map { it to values[it][j] }
-        }
+                values.indices.filter { values[it][j] != 0.0 }.map { it to values[it][j] }
+            },
         )
     }
 
