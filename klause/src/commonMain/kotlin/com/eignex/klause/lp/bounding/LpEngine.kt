@@ -26,9 +26,9 @@ import com.eignex.klause.lp.cut.KnapsackCoverSeparator
 import com.eignex.klause.lp.cut.SharedCut
 import com.eignex.klause.lp.engine.Basis
 import com.eignex.klause.lp.engine.Cut
+import com.eignex.klause.lp.engine.LpCounterResults
 import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.lp.engine.LpSolver
-import com.eignex.klause.lp.engine.LpCounterResults
 import com.eignex.klause.lp.engine.LpVerdict
 import com.eignex.klause.lp.engine.PersistentLpSolver
 import com.eignex.klause.lp.engine.newPersistentLpSolver
@@ -41,10 +41,10 @@ import com.eignex.klause.lp.relaxation.gatedEnforcement
 import com.eignex.klause.lp.relaxation.rebound
 import com.eignex.klause.propagation.ConflictAnalyzer.AnalysisResult.Learned
 import com.eignex.klause.propagation.PropagationSession
+import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.LpRoute
 import com.eignex.klause.solver.result.SolveStatsSink
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.EmptyDoubleArray
 import com.eignex.klause.util.EmptyIntArray
@@ -576,11 +576,15 @@ internal class LpEngine(
                 val exactReals = MutableList(problem.numRealVars) { BigFraction.ZERO }
                 for (col in relaxation.colRealId.indices) {
                     val r = relaxation.colRealId[col]
-                    if (r >= 0 && col < primal.size) exactReals[r] +=
-                        BigFraction.ofLong(relaxation.colRealSign[col].toLong()) * primal[col]
+                    if (r >= 0 && col < primal.size) {
+                        exactReals[r] +=
+                            BigFraction.ofLong(relaxation.colRealSign[col].toLong()) * primal[col]
+                    }
                 }
                 LeafRealResult(
-                    certified.verdict, DoubleArray(exactReals.size) { exactReals[it].toDouble() }, exactReals,
+                    certified.verdict,
+                    DoubleArray(exactReals.size) { exactReals[it].toDouble() },
+                    exactReals,
                 )
             }
 
@@ -596,7 +600,10 @@ internal class LpEngine(
                 LeafRealResult(LpVerdict.INFEASIBLE, EmptyDoubleArray)
             }
 
-            LpVerdict.INDETERMINATE, LpVerdict.CERTIFIED_BOUND -> LeafRealResult(LpVerdict.INDETERMINATE, EmptyDoubleArray)
+            LpVerdict.INDETERMINATE, LpVerdict.CERTIFIED_BOUND -> LeafRealResult(
+                LpVerdict.INDETERMINATE,
+                EmptyDoubleArray,
+            )
         }
     }
 

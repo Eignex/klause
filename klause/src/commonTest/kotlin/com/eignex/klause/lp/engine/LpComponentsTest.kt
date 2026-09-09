@@ -8,10 +8,10 @@ import com.eignex.klause.lp.engine.Sense
 import com.eignex.klause.lp.engine.integerDualLowerBoundCeil
 import com.eignex.klause.lp.engine.integerFarkasRay
 import com.eignex.klause.lp.engine.newLpSolver
+import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.result.LpStatsSink
 import kotlin.math.abs
 import kotlin.random.Random
-import com.eignex.klause.simplex.exact.BigFraction
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -203,17 +203,29 @@ class LpComponentsTest {
             }
         }.build(Sense.MINIMIZE)
         var index = 0
-        val solver = assertNotNull(componentLpSolverOrNull(model, com.eignex.klause.util.Cancellation.Never, { part, token ->
-            if (index++ == 0) ProductionLpEngineFactory.newGeneralSolver(part, token)
-            else object : LpSolver {
-                override val infeasibleRay: DoubleArray? = null
-                override fun solve(warm: Basis?) = FloatLpResult(
-                    Basis(intArrayOf(1), arrayOf(VarStatus.AT_UPPER, VarStatus.BASIC)),
-                    3.0, doubleArrayOf(0.0), doubleArrayOf(3.0), optimal = false,
-                )
-                override fun solvePrimal(warm: Basis?) = solve(warm)
-            }
-        }))
+        val solver = assertNotNull(
+            componentLpSolverOrNull(
+                model,
+                com.eignex.klause.util.Cancellation.Never,
+                { part, token ->
+                    if (index++ == 0) {
+                        ProductionLpEngineFactory.newGeneralSolver(part, token)
+                    } else {
+                        object : LpSolver {
+                            override val infeasibleRay: DoubleArray? = null
+                            override fun solve(warm: Basis?) = FloatLpResult(
+                                Basis(intArrayOf(1), arrayOf(VarStatus.AT_UPPER, VarStatus.BASIC)),
+                                3.0,
+                                doubleArrayOf(0.0),
+                                doubleArrayOf(3.0),
+                                optimal = false,
+                            )
+                            override fun solvePrimal(warm: Basis?) = solve(warm)
+                        }
+                    }
+                },
+            ),
+        )
 
         solver.use {
             val hint = assertNotNull(it.solve())
@@ -223,6 +235,24 @@ class LpComponentsTest {
             assertEquals(listOf(BigFraction.ONE, BigFraction.ofLong(3L)), result.exactPrimal)
             assertEquals(BigFraction.ofLong(4L), result.witness?.objective)
             assertEquals(BigFraction.ONE, result.lowerBound)
+        }
+    }
+
+    @Test
+    fun `component bounds decline objectives with omitted slack costs`() {
+        val model = LpBuilder().apply {
+            repeat(2) {
+                val x = addVar(0L, 3L)
+                addRow(intArrayOf(x), longArrayOf(1L), Relation.GE, 1L)
+            }
+        }.build(Sense.MINIMIZE)
+        for (column in model.n until model.numVars) model.cost[column] = -1L
+
+        assertIs<ComponentLpSolver>(newLpSolver(model)).use { solver ->
+            assertNotNull(solver.solve())
+            assertNull(solver.exactBound())
+            val point = assertNotNull(checkedLpWitness(model, List(2) { BigFraction.ofLong(3L) }))
+            assertEquals(BigFraction.ofLong(-4L), point.objective)
         }
     }
 

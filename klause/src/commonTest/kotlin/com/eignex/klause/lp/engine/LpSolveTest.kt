@@ -54,7 +54,12 @@ class LpSolveTest {
     @Test
     fun `a nonoptimal feasible point retains its exact witness and a separate bound`() {
         val model = LpBuilder().apply { addVar(0L, 5L, cost = 1L) }.build(Sense.MINIMIZE)
-        val hint = FloatLpResult(Basis(intArrayOf(), arrayOf(VarStatus.AT_UPPER)), 0.0, doubleArrayOf(), doubleArrayOf(5.0))
+        val hint = FloatLpResult(
+            Basis(intArrayOf(), arrayOf(VarStatus.AT_UPPER)),
+            0.0,
+            doubleArrayOf(),
+            doubleArrayOf(5.0),
+        )
 
         val result = newLpSolver(model).use { certifyLpResult(model, it, hint) }
 
@@ -72,7 +77,9 @@ class LpSolveTest {
         }.build(Sense.MINIMIZE)
         val hint = FloatLpResult(
             Basis(intArrayOf(1), arrayOf(VarStatus.AT_LOWER, VarStatus.BASIC)),
-            2.0, doubleArrayOf(-1.0), doubleArrayOf(0.0),
+            2.0,
+            doubleArrayOf(-1.0),
+            doubleArrayOf(0.0),
         )
 
         val result = newLpSolver(model).use { certifyLpResult(model, it, hint) }
@@ -88,7 +95,10 @@ class LpSolveTest {
         val model = LpBuilder().apply { addVar(2L, 5L, cost = 3L) }.build(Sense.MINIMIZE)
         val hint = FloatLpResult(
             Basis(intArrayOf(), arrayOf(VarStatus.AT_LOWER)),
-            999.0, doubleArrayOf(), doubleArrayOf(999.0), optimal = false,
+            999.0,
+            doubleArrayOf(),
+            doubleArrayOf(999.0),
+            optimal = false,
         )
         val boundOnly = LpCertificationPolicy { certifier, success -> success && certifier == LpCertifier.INTEGER }
 
@@ -160,7 +170,9 @@ class LpSolveTest {
         }.build(Sense.MINIMIZE)
         val hint = FloatLpResult(
             Basis(intArrayOf(1), arrayOf(VarStatus.AT_LOWER, VarStatus.BASIC)),
-            0.0, doubleArrayOf(Double.NaN), doubleArrayOf(0.0),
+            0.0,
+            doubleArrayOf(Double.NaN),
+            doubleArrayOf(0.0),
         )
         val cache = LpCounterResults()
         val rejected = newLpSolver(model).use { certifyLpResult(model, it, hint, counterResults = cache) }
@@ -287,7 +299,11 @@ class LpSolveTest {
         val model = LpBuilder().apply { repeat(257) { addVar(0L, 1L) } }.build(Sense.MINIMIZE)
         val cache = LpCounterResults()
 
-        assertEquals(LpVerdict.ATTAINED_OPTIMUM, solveAndCertify(model, counterResults = cache).verdict)
+        val witness = assertNotNull(checkedLpWitness(model, List(model.n) { BigFraction.ZERO }))
+        val result = CertifiedLpResult(null, null, witness, null, null, true, { null })
+
+        cache.remember(model, result, ProductionLpCertificationPolicy)
+
         assertTrue(cache.storageDeclined)
         assertNull(cache.read(model, ProductionLpCertificationPolicy))
     }
@@ -316,7 +332,9 @@ class LpSolveTest {
         }.build(Sense.MINIMIZE)
         val hint = FloatLpResult(
             Basis(intArrayOf(0), arrayOf(VarStatus.BASIC, VarStatus.AT_LOWER)),
-            -1e-10, doubleArrayOf(-1e-10), doubleArrayOf(1.0),
+            -1e-10,
+            doubleArrayOf(-1e-10),
+            doubleArrayOf(1.0),
         )
 
         val attempts = ArrayList<Boolean>()
@@ -324,7 +342,12 @@ class LpSolveTest {
             if (certifier == LpCertifier.RATIONAL) attempts += success
             success
         }
-        val result = newLpSolver(model).use { certifyLpResult(model, it, hint, policy = policy) }
+        val solver = object : LpSolver {
+            override val infeasibleRay: DoubleArray? = null
+            override fun solve(warm: Basis?) = hint
+            override fun solvePrimal(warm: Basis?) = hint
+        }
+        val result = certifyLpResult(model, solver, hint, policy = policy)
 
         assertEquals(0L, assertNotNull(reconstructRational(-1e-10)).numerator)
         assertEquals(LpVerdict.FEASIBLE, result.verdict)

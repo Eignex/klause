@@ -17,11 +17,11 @@ import com.eignex.klause.lp.engine.TableauCutSolver
 import com.eignex.klause.lp.engine.VarStatus
 import com.eignex.klause.lp.engine.acceptNullable
 import com.eignex.klause.lp.engine.certifiedTightObjectiveLowerBound
+import com.eignex.klause.lp.engine.certifyLpFarkas
 import com.eignex.klause.lp.engine.checkedLpConflict
 import com.eignex.klause.lp.engine.checkedLpWitness
 import com.eignex.klause.lp.engine.exactShift
 import com.eignex.klause.lp.engine.integerCertify
-import com.eignex.klause.lp.engine.certifyLpFarkas
 import com.eignex.klause.lp.engine.lpConditioning
 import com.eignex.klause.lp.engine.newPersistentLpSolver
 import com.eignex.klause.lp.engine.newTableauCutSolver
@@ -469,11 +469,13 @@ internal fun LpEngine.sparseSafePrune(
                 val witness = acceptedOutcome.exactWitness?.let { shifted ->
                     checkedLpWitness(model, shifted.mapIndexed { j, value -> value + model.exactShift(j) })
                 }
-                if (witness != null) lpCounterResults.remember(
+                if (witness != null) {
+                    lpCounterResults.remember(
                     model,
                     CertifiedLpResult(null, null, witness, null, null, false, { null }),
                     solveContext.certificationPolicy,
                 )
+                }
             }
             if (acceptedOutcome?.feasibility == RationalFeasibility.INFEASIBLE &&
                 acceptedOutcome.conflict?.let { checkedLpConflict(model, it) } == true

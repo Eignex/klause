@@ -18,11 +18,11 @@ import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.lp.bounding.LpEngine
 import com.eignex.klause.lp.bounding.LpParams
 import com.eignex.klause.lp.bounding.LpPlan
-import com.eignex.klause.lp.engine.CertifiedLpBound
-import com.eignex.klause.lp.engine.ExactLpWitness
 import com.eignex.klause.lp.engine.Basis
+import com.eignex.klause.lp.engine.CertifiedLpBound
 import com.eignex.klause.lp.engine.ComponentLpSolverCapability
 import com.eignex.klause.lp.engine.Cut
+import com.eignex.klause.lp.engine.ExactLpWitness
 import com.eignex.klause.lp.engine.FloatLpResult
 import com.eignex.klause.lp.engine.LpBuilder
 import com.eignex.klause.lp.engine.LpCertificationObserver
@@ -125,8 +125,10 @@ private class LifecycleFactory : LpEngineFactory {
         val delegate = ProductionLpEngineFactory.newComponentSolver(model, parts, solvers, isolated)
         val record = record(LifecycleKind.COMPONENT)
         return object : ComponentLpSolverCapability, LpSolver by delegate {
-            override fun exactBound(observer: LpCertificationObserver?, policy: LpCertificationPolicy): CertifiedLpBound? =
-                delegate.exactBound(observer, policy)
+            override fun exactBound(
+                observer: LpCertificationObserver?,
+                policy: LpCertificationPolicy,
+            ): CertifiedLpBound? = delegate.exactBound(observer, policy)
 
             override fun exactWitness(
                 observer: LpCertificationObserver?,

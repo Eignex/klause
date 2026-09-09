@@ -1,7 +1,6 @@
 package com.eignex.klause.lp.engine
 
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.IntArrayList
 
 /**
@@ -117,6 +116,8 @@ internal class ComponentLpSolver(
     }
 
     override fun exactBound(observer: LpCertificationObserver?, policy: LpCertificationPolicy): CertifiedLpBound? {
+        // Neighborhood restrictions omit slack costs, so their bounds cannot certify that objective.
+        if ((model.n until model.numVars).any { !model.exactCost(it).isZero }) return null
         val sourceKey = certificationKey ?: return null
         if (exactLpStateKey(model)?.contentEquals(sourceKey) != true) return null
         val results = blockResults ?: return null
@@ -130,7 +131,9 @@ internal class ComponentLpSolver(
             if (cost.signum() < 0) {
                 if (!model.hasFiniteUpper(column) || model.probeClampedHi[column]) return null
                 value += cost * model.exactUpper(column)
-            } else if (cost.signum() > 0 && model.probeClampedLo[column]) return null
+            } else if (cost.signum() > 0 && model.probeClampedLo[column]) {
+                return null
+            }
         }
         return CertifiedLpBound(value)
     }
@@ -141,9 +144,11 @@ internal class ComponentLpSolver(
         for (index in parts.indices) {
             val part = parts[index]
             val witness = policy.acceptNullable(
-                LpCertifier.EXACT_BASIS, exactBasisWitness(part.model, results[index].basis, observer),
+                LpCertifier.EXACT_BASIS,
+                exactBasisWitness(part.model, results[index].basis, observer),
             ) ?: policy.acceptNullable(
-                LpCertifier.EXACT_POINT, exactPointWitness(part.model, results[index].primal, observer),
+                LpCertifier.EXACT_POINT,
+                exactPointWitness(part.model, results[index].primal, observer),
             ) ?: return null
             for (column in part.cols.indices) point[part.cols[column]] = witness.primal[column]
         }
@@ -154,7 +159,6 @@ internal class ComponentLpSolver(
         }
         return checkedLpWitness(model, point)
     }
-
 }
 
 /**

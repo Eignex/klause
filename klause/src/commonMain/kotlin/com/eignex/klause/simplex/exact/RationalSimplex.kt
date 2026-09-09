@@ -1314,10 +1314,12 @@ private fun <F> structuralWitness(ops: FracOps<F>, st: SimplexState<F>): List<Bi
 
 private fun <F> exactWitnessFraction(value: F): BigFraction = when (value) {
     is BigFraction -> value
+
     is Frac128 -> BigFraction.of(
         (BigInteger.fromLong(value.nHi) shl 64) + BigInteger.fromULong(value.nLo.toULong()),
         (BigInteger.fromLong(value.dHi) shl 64) + BigInteger.fromULong(value.dLo.toULong()),
     )
+
     else -> error("unsupported exact witness arithmetic")
 }
 

@@ -350,5 +350,4 @@ private class ReplayObserver : LpCertificationObserver {
     }
 }
 
-
 private fun DoubleArray.toRawBitsArray(): LongArray = LongArray(size) { this[it].toRawBits() }
