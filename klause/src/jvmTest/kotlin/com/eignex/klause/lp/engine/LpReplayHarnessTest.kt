@@ -165,6 +165,26 @@ class LpReplayHarnessTest {
     }
 
     @Test
+    fun `an infeasible reference leaves an evidence free indeterminate result unresolved`() {
+        val model = LpBuilder().apply {
+            val x = addVar(0L, 1L)
+            addRow(intArrayOf(x), longArrayOf(1L), Relation.GE, 2L)
+        }.build(Sense.MINIMIZE)
+        val step = fabricatedStep(
+            LpCandidateKind.NONE,
+            objective = null,
+            primal = 0.0,
+            verdict = LpVerdict.INDETERMINATE,
+            hasWitness = false,
+        )
+
+        val check = IndependentExactValidator.validate(model, step)
+
+        assertEquals(LpIndependentValidation.DECLINED, check.validation)
+        assertEquals(LpIndependentClaim.NONE, check.claim)
+    }
+
+    @Test
     fun `a bounded reference refutes an unbounded claim despite a feasible witness`() {
         val model = LpBuilder().apply { addVar(0L, 1L, cost = 1L) }.build(Sense.MINIMIZE)
         val step = fabricatedStep(LpCandidateKind.NONE, null, 0.0, verdict = LpVerdict.UNBOUNDED)
@@ -191,24 +211,23 @@ class LpReplayHarnessTest {
         verdict: LpVerdict = LpVerdict.FEASIBLE,
         lowerBound: BigFraction? = null,
         hasWitness: Boolean = true,
-    ): LpReplayStep =
-        LpReplayStep(
-            eventIndex = 0,
-            operation = LpReplayOperation.SOLVE,
-            candidate = candidate,
-            productionVerdict = verdict,
-            objectiveBits = objective?.toRawBits(),
-            primalBits = longArrayOf(primal.toRawBits()),
-            integerObjectiveLowerBound = null,
-            hasFeasibleWitness = hasWitness,
-            hasCertifiedBound = lowerBound != null,
-            hasInfeasibilityProof = false,
-            metrics = LpSolveMetrics(),
-            certifiers = emptyList(),
-            exactInputAttempts = 0,
-            exactInputAccepted = 0,
-            rationalLowerBound = lowerBound,
-        )
+    ): LpReplayStep = LpReplayStep(
+        eventIndex = 0,
+        operation = LpReplayOperation.SOLVE,
+        candidate = candidate,
+        productionVerdict = verdict,
+        objectiveBits = objective?.toRawBits(),
+        primalBits = longArrayOf(primal.toRawBits()),
+        integerObjectiveLowerBound = null,
+        hasFeasibleWitness = hasWitness,
+        hasCertifiedBound = lowerBound != null,
+        hasInfeasibilityProof = false,
+        metrics = LpSolveMetrics(),
+        certifiers = emptyList(),
+        exactInputAttempts = 0,
+        exactInputAccepted = 0,
+        rationalLowerBound = lowerBound,
+    )
 
     private fun reportLine(reports: List<LpReplayReport>): String {
         val steps = reports.flatMap { it.steps }
@@ -254,6 +273,12 @@ class LpReplayHarnessTest {
                     },
                     LpIndependentClaim.CANDIDATE_HINT,
                 )
+            }
+            if (step.productionVerdict == LpVerdict.INDETERMINATE &&
+                step.candidate == LpCandidateKind.NONE && !step.hasFeasibleWitness &&
+                !step.hasCertifiedBound && !step.hasInfeasibilityProof
+            ) {
+                return LpIndependentCheck(LpIndependentValidation.DECLINED, LpIndependentClaim.NONE)
             }
             if (step.productionVerdict == LpVerdict.CERTIFIED_BOUND &&
                 step.hasCertifiedBound && step.rationalLowerBound != null && !step.hasFeasibleWitness
