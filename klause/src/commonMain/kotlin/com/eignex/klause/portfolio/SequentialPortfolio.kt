@@ -185,6 +185,8 @@ class SequentialPortfolio(
      * with the arm that produced it (the segment is single-armed, so attribution is exact) and the
      * elapsed time — the anytime/credit telemetry, identical in shape to the parallel executor's.
      */
+    // Cleanup attempts every handle and preserves a primary failure.
+    @Suppress("TooGenericExceptionCaught", "ThrowingExceptionFromFinally")
     override fun minimize(
         cancellation: Cancellation,
         onImprovement: ((AttributedImprovement) -> Unit)?,
@@ -213,6 +215,7 @@ class SequentialPortfolio(
         // its terminal verdicts are merged. Folding only terminal verdicts loses every arm the deadline
         // paused instead of finishing — which, under a wall clock, is usually all of them.
         val perArm = arrayOfNulls<SolveStats>(workers.size)
+        var primaryFailure: Throwable? = null
         // Consecutive non-improving segments per arm; drives re-seeding (see [reseedStaleThreshold]).
         val staleSegments = IntArray(workers.size)
 
@@ -224,86 +227,105 @@ class SequentialPortfolio(
             }
         }
 
-        while (!cancellation()) {
-            // Round-robin warmup: force every arm once (at the short warmup slice) before the
-            // bandit free-selects, so a backtrack arm a COP needs can't be starved to zero budget.
-            val warming = segment < workers.size
-            val arm = if (warming) segment else bandit.choose()
-            val sliceMs = if (warming) warmupSliceMillis else slice
-            val hadIncumbent = incumbent.current() != null
-            val before = readBound()
-            val worker = workers[arm]
-            armLabel = worker.label
-            armId = worker.armId
-            val handle = handles[arm] ?: worker.newResumableSearch(readBound)?.also { handles[arm] = it }
-            var terminal: MinimizeResult? = null
-            if (handle != null) {
-                // Resume the arm's search for this slice; a terminal verdict means it finished, null
-                // means the slice elapsed (search paused, state retained for the next reschedule).
-                terminal = runCatching {
-                    handle.runSlice(cancellation, Long.MAX_VALUE, sliceNodes) { accept(it) }
-                }.getOrNull()
-            } else {
-                // Local-search segments restart from the shared incumbent but are bounded by their own
-                // counted work post-warmup; the whole-solve deadline remains the outer cancellation
-                // terminator. The forced warmup probe stays clock-sliced (see [segmentToken]).
-                val armToken = segmentToken(worker, warming, cancellation, sliceMs)
-                runCatching {
-                    for (r in worker.improvements(
-                        readBound,
-                        armToken,
-                        warmStart = incumbent.current()?.assignment,
-                        maxInstructions = sliceFlips,
-                    )) {
-                        terminal = r
-                        if (r is MinimizeResult.WithSample) accept(r)
+        try {
+            while (!cancellation()) {
+                // Round-robin warmup: force every arm once (at the short warmup slice) before the
+                // bandit free-selects, so a backtrack arm a COP needs can't be starved to zero budget.
+                val warming = segment < workers.size
+                val arm = if (warming) segment else bandit.choose()
+                val sliceMs = if (warming) warmupSliceMillis else slice
+                val hadIncumbent = incumbent.current() != null
+                val before = readBound()
+                val worker = workers[arm]
+                armLabel = worker.label
+                armId = worker.armId
+                val handle = handles[arm] ?: worker.newResumableSearch(readBound)?.also { handles[arm] = it }
+                var terminal: MinimizeResult? = null
+                if (handle != null) {
+                    // Resume the arm's search for this slice; a terminal verdict means it finished, null
+                    // means the slice elapsed (search paused, state retained for the next reschedule).
+                    terminal = runCatching {
+                        handle.runSlice(cancellation, Long.MAX_VALUE, sliceNodes) { accept(it) }
+                    }.getOrNull()
+                } else {
+                    // Local-search segments restart from the shared incumbent but are bounded by their own
+                    // counted work post-warmup; the whole-solve deadline remains the outer cancellation
+                    // terminator. The forced warmup probe stays clock-sliced (see [segmentToken]).
+                    val armToken = segmentToken(worker, warming, cancellation, sliceMs)
+                    runCatching {
+                        for (r in worker.improvements(
+                            readBound,
+                            armToken,
+                            warmStart = incumbent.current()?.assignment,
+                            maxInstructions = sliceFlips,
+                        )) {
+                            terminal = r
+                            if (r is MinimizeResult.WithSample) accept(r)
+                        }
                     }
                 }
-            }
-            if (handle != null) {
-                perArm[arm] = handle.stats
-            } else {
-                terminal?.let { perArm[arm] = (perArm[arm] ?: SolveStats.EMPTY).mergedWith(it.stats) }
-            }
+                if (handle != null) {
+                    perArm[arm] = handle.stats
+                } else {
+                    terminal?.let { perArm[arm] = (perArm[arm] ?: SolveStats.EMPTY).mergedWith(it.stats) }
+                }
 
-            val improvement = before - readBound()
-            val reward = if (!hadIncumbent) {
-                if (incumbent.current() != null) 1.0 else 0.0
-            } else {
-                if (improvement > rewardScale) rewardScale = improvement
-                if (rewardScale > 0.0) (improvement / rewardScale).coerceIn(0.0, 1.0) else 0.0
-            }
-            bandit.update(arm, reward)
+                val improvement = before - readBound()
+                val reward = if (!hadIncumbent) {
+                    if (incumbent.current() != null) 1.0 else 0.0
+                } else {
+                    if (improvement > rewardScale) rewardScale = improvement
+                    if (rewardScale > 0.0) (improvement / rewardScale).coerceIn(0.0, 1.0) else 0.0
+                }
+                bandit.update(arm, reward)
 
-            // Re-seed a plateaued resumable arm: after enough consecutive non-improving segments, drop
-            // its handle so the next schedule re-descends from the root under the tighter bound with the
-            // pool's clauses re-imported — restoring diversification without losing convergence.
-            // Guards keep it from disrupting productive search: only once an incumbent exists (the
-            // feasibility hunt is never reset), and never on a segment that already returned a terminal
-            // verdict (a completed optimality / infeasibility proof short-circuits to the return below).
-            if (handle != null && terminal == null && incumbent.current() != null) {
-                if (improvement > 0.0) {
-                    staleSegments[arm] = 0
-                } else if (reseedStaleThreshold > 0 && ++staleSegments[arm] >= reseedStaleThreshold) {
-                    runCatching { handle.close() }
-                    handles[arm] = null
-                    staleSegments[arm] = 0
+                // Re-seed a plateaued resumable arm: after enough consecutive non-improving segments, drop
+                // its handle so the next schedule re-descends from the root under the tighter bound with the
+                // pool's clauses re-imported — restoring diversification without losing convergence.
+                // Guards keep it from disrupting productive search: only once an incumbent exists (the
+                // feasibility hunt is never reset), and never on a segment that already returned a terminal
+                // verdict (a completed optimality / infeasibility proof short-circuits to the return below).
+                if (handle != null && terminal == null && incumbent.current() != null) {
+                    if (improvement > 0.0) {
+                        staleSegments[arm] = 0
+                    } else if (reseedStaleThreshold > 0 && ++staleSegments[arm] >= reseedStaleThreshold) {
+                        runCatching { handle.close() }
+                        handles[arm] = null
+                        staleSegments[arm] = 0
+                    }
+                }
+
+                // A clean segment exhaustion ends the run: any incumbent is optimal, else infeasible.
+                if (PortfolioReduction.isExhausted(terminal)) {
+                    return PortfolioReduction.terminal(incumbent.current(), dirty = false, foldArms(perArm))
+                }
+                if (!warming) {
+                    slice = grow(slice, maxSliceMillis)
+                    sliceNodes = grow(sliceNodes, maxSliceNodes)
+                    sliceFlips = grow(sliceFlips, maxSliceFlips)
+                }
+                segment++
+            }
+            // Cancellation stopped a still-open search: keep the incumbent (BestFound) or report Unknown.
+            return PortfolioReduction.terminal(incumbent.current(), dirty = true, foldArms(perArm))
+        } catch (failure: Throwable) {
+            primaryFailure = failure
+            throw failure
+        } finally {
+            var closeFailure: Throwable? = null
+            for (i in handles.indices) {
+                val handle = handles[i]
+                handles[i] = null
+                try {
+                    handle?.close()
+                } catch (failure: Throwable) {
+                    closeFailure?.addSuppressed(failure) ?: run { closeFailure = failure }
                 }
             }
-
-            // A clean segment exhaustion ends the run: any incumbent is optimal, else infeasible.
-            if (PortfolioReduction.isExhausted(terminal)) {
-                return PortfolioReduction.terminal(incumbent.current(), dirty = false, foldArms(perArm))
+            closeFailure?.let { failure ->
+                primaryFailure?.addSuppressed(failure) ?: throw failure
             }
-            if (!warming) {
-                slice = grow(slice, maxSliceMillis)
-                sliceNodes = grow(sliceNodes, maxSliceNodes)
-                sliceFlips = grow(sliceFlips, maxSliceFlips)
-            }
-            segment++
         }
-        // Cancellation stopped a still-open search: keep the incumbent (BestFound) or report Unknown.
-        return PortfolioReduction.terminal(incumbent.current(), dirty = true, foldArms(perArm))
     }
 
     /** The pool's total counters: every arm that did work, whether or not it reached a verdict. */

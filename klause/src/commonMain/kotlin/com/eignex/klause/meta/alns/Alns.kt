@@ -145,6 +145,7 @@ internal class Alns(
         val newBest: Boolean,
     )
 
+    @Suppress("TooGenericExceptionCaught", "ThrowingExceptionFromFinally") // cleanup never replaces a primary failure
     override fun minimize(objective: LinearObjective, params: LocalSearchParams): MinimizeResult {
         _iterationLog.clear()
         // Score with the caller's gradient view when one is supplied (it agrees with the linear
@@ -176,110 +177,121 @@ internal class Alns(
         val repairSearch = (backtrack as? BacktrackSolver)?.let { bt ->
             backtrackParams?.let { bp -> bt.openRepair(objective, bp) }
         }
+        var primaryFailure: Throwable? = null
 
-        // Counted-work allowance for the whole outer loop (see class KDoc); null leaves the loop bounded
-        // only by [maxIterations] and cancellation, as before this seam existed.
-        val instructionBudget = params.maxInstructions
-        var instructionsUsed = 0L
+        try {
+            // Counted-work allowance for the whole outer loop (see class KDoc); null leaves the loop bounded
+            // only by [maxIterations] and cancellation, as before this seam existed.
+            val instructionBudget = params.maxInstructions
+            var instructionsUsed = 0L
 
-        var iter = 0
-        while (iter < maxIterations && (instructionBudget == null || instructionsUsed < instructionBudget)) {
-            if (params.cancellation()) break
-            // This iteration's repair allowance: flipsPerIteration, clipped to whatever budget remains
-            // so the last counted iteration can't overshoot by a whole flipsPerIteration.
-            val iterFlips = if (instructionBudget != null) {
-                minOf(flipsPerIteration, instructionBudget - instructionsUsed)
-            } else {
-                flipsPerIteration
-            }
-            val perIterParams = params.copy(
-                maxFlips = iterFlips,
-                // Each iteration's RNG seed varies via the bandit's RNG; explicit null lets the
-                // inner solver draw its own per-call seed.
-                randomSeed = null,
-            )
-            // Charge the iteration's allowance up front — a destroy that frees nothing, or a repair
-            // that rejects, still consumed the bandit picks and (for a repair op that ran) whatever
-            // portion of iterFlips it used; charging the declared unit keeps counting deterministic
-            // and independent of what happened inside, same as LocalSearchSolver's counted restart.
-            instructionsUsed += iterFlips
-            pooled.poll(bestObj)?.let { (sample, obj) ->
-                bestSample = sample
-                bestObj = obj
-                incumbent = sample
-                incumbentObj = obj
-            }
-            val destroyIdx = destroyBandit.choose()
-            val repairIdx = repairBandit.choose()
-            // Randomized degree of destruction: a fresh fraction each iteration (textbook ALNS).
-            val destroyFraction = if (maxDestroyFraction > minDestroyFraction) {
-                minDestroyFraction + rng.nextDouble() * (maxDestroyFraction - minDestroyFraction)
-            } else {
-                minDestroyFraction
-            }
-            val freed = destroyOperators[destroyIdx]
-                .destroy(rng, inner.problem, incumbent, objective, destroyFraction)
-            if (freed.isEmpty) {
-                destroyBandit.update(destroyIdx, rejectedReward)
-                repairBandit.update(repairIdx, rejectedReward)
+            var iter = 0
+            while (iter < maxIterations && (instructionBudget == null || instructionsUsed < instructionBudget)) {
+                if (params.cancellation()) break
+                // This iteration's repair allowance: flipsPerIteration, clipped to whatever budget remains
+                // so the last counted iteration can't overshoot by a whole flipsPerIteration.
+                val iterFlips = if (instructionBudget != null) {
+                    minOf(flipsPerIteration, instructionBudget - instructionsUsed)
+                } else {
+                    flipsPerIteration
+                }
+                val perIterParams = params.copy(
+                    maxFlips = iterFlips,
+                    // Each iteration's RNG seed varies via the bandit's RNG; explicit null lets the
+                    // inner solver draw its own per-call seed.
+                    randomSeed = null,
+                )
+                // Charge the iteration's allowance up front — a destroy that frees nothing, or a repair
+                // that rejects, still consumed the bandit picks and (for a repair op that ran) whatever
+                // portion of iterFlips it used; charging the declared unit keeps counting deterministic
+                // and independent of what happened inside, same as LocalSearchSolver's counted restart.
+                instructionsUsed += iterFlips
+                pooled.poll(bestObj)?.let { (sample, obj) ->
+                    bestSample = sample
+                    bestObj = obj
+                    incumbent = sample
+                    incumbentObj = obj
+                }
+                val destroyIdx = destroyBandit.choose()
+                val repairIdx = repairBandit.choose()
+                // Randomized degree of destruction: a fresh fraction each iteration (textbook ALNS).
+                val destroyFraction = if (maxDestroyFraction > minDestroyFraction) {
+                    minDestroyFraction + rng.nextDouble() * (maxDestroyFraction - minDestroyFraction)
+                } else {
+                    minDestroyFraction
+                }
+                val freed = destroyOperators[destroyIdx]
+                    .destroy(rng, inner.problem, incumbent, objective, destroyFraction)
+                if (freed.isEmpty) {
+                    destroyBandit.update(destroyIdx, rejectedReward)
+                    repairBandit.update(repairIdx, rejectedReward)
+                    iter++
+                    continue
+                }
+
+                val pinAssumptions = buildPin(inner.problem, incumbent, freed)
+                val context = RepairContext(
+                    inner, perIterParams, objective, pinAssumptions, incumbent, freed, rng, session,
+                    backtrack = backtrack, backtrackParams = backtrackParams,
+                    repairSearch = repairSearch, bestObjective = bestObj,
+                )
+                val repaired = repairOperators[repairIdx].repair(context)
+                if (repaired == null) {
+                    destroyBandit.update(destroyIdx, rejectedReward)
+                    repairBandit.update(repairIdx, rejectedReward)
+                    iter++
+                    continue
+                }
+                val repairedObj = scoring.evaluate(repaired)
+
+                val isNewBest = repairedObj < bestObj
+                val accept = isNewBest || acceptancePolicy.accept(repairedObj, incumbentObj, rng)
+                val reward = when {
+                    isNewBest -> newBestReward
+                    accept -> acceptedReward
+                    else -> rejectedReward
+                }
+                destroyBandit.update(destroyIdx, reward)
+                repairBandit.update(repairIdx, reward)
+                _iterationLog.add(
+                    IterationRecord(
+                        destroyIdx,
+                        repairIdx,
+                        freed.bools.size + freed.ints.size,
+                        incumbentObj,
+                        repairedObj,
+                        accept,
+                        isNewBest,
+                    ),
+                )
+
+                if (isNewBest) {
+                    bestSample = repaired
+                    bestObj = repairedObj
+                    pooled.publish(repaired, repairedObj)
+                }
+                if (accept) {
+                    incumbent = repaired
+                    incumbentObj = repairedObj
+                }
                 iter++
-                continue
             }
-
-            val pinAssumptions = buildPin(inner.problem, incumbent, freed)
-            val context = RepairContext(
-                inner, perIterParams, objective, pinAssumptions, incumbent, freed, rng, session,
-                backtrack = backtrack, backtrackParams = backtrackParams,
-                repairSearch = repairSearch, bestObjective = bestObj,
+            // ALNS is incomplete — every successful run returns BestFound, never Optimal.
+            return MinimizeResult.BestFound(
+                sample = bestSample,
+                objective = bestObj,
+                reason = TerminationReason.BudgetExhausted,
             )
-            val repaired = repairOperators[repairIdx].repair(context)
-            if (repaired == null) {
-                destroyBandit.update(destroyIdx, rejectedReward)
-                repairBandit.update(repairIdx, rejectedReward)
-                iter++
-                continue
+        } catch (failure: Throwable) {
+            primaryFailure = failure
+            throw failure
+        } finally {
+            try {
+                repairSearch?.close()
+            } catch (closeFailure: Throwable) {
+                primaryFailure?.addSuppressed(closeFailure) ?: throw closeFailure
             }
-            val repairedObj = scoring.evaluate(repaired)
-
-            val isNewBest = repairedObj < bestObj
-            val accept = isNewBest || acceptancePolicy.accept(repairedObj, incumbentObj, rng)
-            val reward = when {
-                isNewBest -> newBestReward
-                accept -> acceptedReward
-                else -> rejectedReward
-            }
-            destroyBandit.update(destroyIdx, reward)
-            repairBandit.update(repairIdx, reward)
-            _iterationLog.add(
-                IterationRecord(
-                    destroyIdx,
-                    repairIdx,
-                    freed.bools.size + freed.ints.size,
-                    incumbentObj,
-                    repairedObj,
-                    accept,
-                    isNewBest,
-                ),
-            )
-
-            if (isNewBest) {
-                bestSample = repaired
-                bestObj = repairedObj
-                pooled.publish(repaired, repairedObj)
-            }
-            if (accept) {
-                incumbent = repaired
-                incumbentObj = repairedObj
-            }
-            iter++
         }
-        repairSearch?.close()
-        // ALNS is incomplete — every successful run returns BestFound, never Optimal.
-        return MinimizeResult.BestFound(
-            sample = bestSample,
-            objective = bestObj,
-            reason = TerminationReason.BudgetExhausted,
-        )
     }
 
     /**

@@ -92,6 +92,7 @@ private val LP_VERIFY_BUDGET = 100.milliseconds
  *    a fired slice deadline pauses ([StepEvent.Paused]); a later call resumes mid-tree so the
  *    arm never cold-restarts.
  */
+@Suppress("TooGenericExceptionCaught") // ownership boundaries preserve arbitrary primary and cleanup failures
 internal class ResumableMinimize(
     // Carries the immutable problem and shared search helpers; the solver holds no per-run state.
     private val solver: BacktrackSolver,
@@ -101,6 +102,8 @@ internal class ResumableMinimize(
     // it is a hard terminal stop ([BacktrackSolver.improvements] one-shot). The single difference between the two
     // ways this one engine is driven.
     private val pausable: Boolean = true,
+    // Repair owns the handle across fragment terminals and explicitly closes it after the final fragment.
+    private val rebindable: Boolean = false,
 ) : ResumableSearch {
     private val problem: BakedProblem = solver.problem
 
@@ -239,6 +242,7 @@ internal class ResumableMinimize(
     /** Terminal verdict once the search completes; null while still pending. */
     private var done: MinimizeResult? = null
     private var pendingIncumbent: MinimizeResult.WithSample? = null
+    private var closed = false
     override val isDone: Boolean get() = done != null
 
     /** Live counters; [SolveStatsSink.snapshot] reads elapsed time without needing the sink stopped, so
@@ -268,6 +272,7 @@ internal class ResumableMinimize(
         onIncumbent: (MinimizeResult.WithSample) -> Unit,
     ): MinimizeResult? {
         done?.let { return it }
+        check(!closed) { "search is closed" }
         globalToken = global
         sliceEnd = TimeSource.Monotonic.markNow() + sliceMillis.milliseconds
         sliceNodeEnd = if (sliceNodes >= 0L) sink.search.nodeCount + sliceNodes else -1L
@@ -275,17 +280,49 @@ internal class ResumableMinimize(
         // where it polls, and the default cadence is tuned by elapsed time, so the pause would land on a
         // different node on a faster machine and every counter downstream would follow.
         run.fixedCancellationCadence = sliceNodeEnd >= 0L
-        while (true) {
-            when (val e = runUntilEvent()) {
-                is StepEvent.Incumbent -> onIncumbent(e.result)
-                is StepEvent.Terminal -> return e.result
-                StepEvent.Paused -> return null
+        try {
+            while (true) {
+                when (val e = runUntilEvent()) {
+                    is StepEvent.Incumbent -> onIncumbent(e.result)
+                    is StepEvent.Terminal -> return e.result
+                    StepEvent.Paused -> return null
+                }
             }
+        } catch (failure: Throwable) {
+            closeAfter(failure)
+            throw failure
         }
     }
 
     override fun close() {
-        runCatching { sink.stop() }
+        if (closed) return
+        closed = true
+        var failure: Throwable? = null
+        try {
+            lpEngine.close()
+        } catch (closeFailure: Throwable) {
+            failure = closeFailure
+        }
+        try {
+            sink.stop()
+        } catch (closeFailure: Throwable) {
+            failure?.addSuppressed(closeFailure) ?: run { failure = closeFailure }
+        }
+        failure?.let { throw it }
+    }
+
+    // A lazy sequence can be abandoned while suspended, so it must not carry native factors across a yield.
+    internal fun releaseForSequenceYield() {
+        check(!closed) { "search is closed" }
+        lpEngine.releasePersistentSolvers()
+    }
+
+    private fun closeAfter(failure: Throwable) {
+        try {
+            close()
+        } catch (closeFailure: Throwable) {
+            failure.addSuppressed(closeFailure)
+        }
     }
 
     /**
@@ -295,6 +332,8 @@ internal class ResumableMinimize(
      * successive repairs against a monotone non-increasing objective cutoff.
      */
     fun rebind(assumptions: Assumptions, decisionBudget: Long) {
+        check(rebindable) { "search is not rebindable" }
+        check(!closed) { "search is closed" }
         searchSession.popTo(0)
         val seeded = session.reseedFrom(assumptions)
         cp.rebase()
@@ -325,29 +364,36 @@ internal class ResumableMinimize(
      * Visible to the enclosing solver, which streams it from [BacktrackSolver.improvements].
      */
     fun runUntilEvent(): StepEvent {
-        done?.let { return StepEvent.Terminal(it) }
-        if (rootIsExhausted) return terminal(terminalExhausted(rootExhausted))
-        if (firstRun) {
-            firstRun = false
-            firstRunWork()?.let { return StepEvent.Incumbent(it) }
-        }
-        return when (val e = run.next()) {
-            is SearchRunEvent.Satisfied -> StepEvent.Incumbent(checkNotNull(pendingIncumbent))
-
-            SearchRunEvent.Exhausted -> terminal(terminalExhausted(null))
-
-            SearchRunEvent.Paused -> StepEvent.Paused
-
-            is SearchRunEvent.Indeterminate -> if (pausable && sliceCancelled()) {
-                StepEvent.Paused
-            } else {
-                terminal(terminalBudget())
+        try {
+            done?.let { return StepEvent.Terminal(it) }
+            check(!closed) { "search is closed" }
+            if (rootIsExhausted) return terminal(terminalExhausted(rootExhausted))
+            if (firstRun) {
+                firstRun = false
+                firstRunWork()?.let { return StepEvent.Incumbent(it) }
             }
+            return when (val e = run.next()) {
+                is SearchRunEvent.Satisfied -> StepEvent.Incumbent(checkNotNull(pendingIncumbent))
+
+                SearchRunEvent.Exhausted -> terminal(terminalExhausted(null))
+
+                SearchRunEvent.Paused -> StepEvent.Paused
+
+                is SearchRunEvent.Indeterminate -> if (pausable && sliceCancelled()) {
+                    StepEvent.Paused
+                } else {
+                    terminal(terminalBudget())
+                }
+            }
+        } catch (failure: Throwable) {
+            closeAfter(failure)
+            throw failure
         }
     }
 
     private fun terminal(result: MinimizeResult): StepEvent {
         done = result
+        if (!rebindable) close()
         return StepEvent.Terminal(result)
     }
 

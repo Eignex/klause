@@ -49,8 +49,9 @@ private class TerminalRecordingFactory : LpEngineFactory {
         private set
     var persistentSolversCreated = 0
         private set
+    var persistentCloses = 0
+        private set
     val cancellations = ArrayList<Cancellation>()
-    private val persistentSolvers = ArrayList<PersistentLpSolver>()
 
     override fun newGeneralSolver(model: LpModel, cancellation: Cancellation): LpSolver {
         generalSolvers++
@@ -99,17 +100,25 @@ private class TerminalRecordingFactory : LpEngineFactory {
         trackDegeneracy: Boolean,
     ): PersistentLpSolver {
         persistentSolversCreated++
-        return ProductionLpEngineFactory.newPersistentSolver(
+        val delegate = ProductionLpEngineFactory.newPersistentSolver(
             model,
             cancellation,
             refactorUpdateLimit,
             iterationLimit,
             workLimit,
             trackDegeneracy,
-        ).also(persistentSolvers::add)
-    }
+        )
+        return object : PersistentLpSolver by delegate {
+            private var closed = false
 
-    fun closePersistentSolvers() = persistentSolvers.forEach(PersistentLpSolver::close)
+            override fun close() {
+                if (closed) return
+                closed = true
+                persistentCloses++
+                delegate.close()
+            }
+        }
+    }
 }
 
 private class TerminalPolicy(private val accept: (certifier: LpCertifier, successful: Boolean) -> Boolean) :
@@ -205,58 +214,52 @@ class LpTerminalDeclineTest {
         val rejectingPolicy = TerminalPolicy { _, _ -> false }
         val acceptingFactory = TerminalRecordingFactory()
         val acceptedSamples = ArrayList<Sample>()
-        try {
-            val declined = run(
-                continuous,
-                optimize = false,
-                context = LpSolveContext(rejectingFactory, rejectingPolicy),
-            )
-            val accepted = run(
-                continuous,
-                optimize = false,
-                context = LpSolveContext(acceptingFactory, ProductionLpCertificationPolicy),
-                samples = acceptedSamples,
-            )
-            assertEquals(FiniteSolveVerdict.UNKNOWN, declined.verdict)
-            assertEquals(0L, declined.solutions)
-            assertEquals(FiniteSolveVerdict.SAT, accepted.verdict)
-            assertEquals(1L, accepted.solutions)
-            assertEquals(0.5, acceptedSamples.single().reals.single())
-            assertTrue(rejectingFactory.generalSolves >= 1)
-            assertTrue(acceptingFactory.generalSolves >= 1)
-            assertTrue(rejectingFactory.persistentSolversCreated >= 1)
-            assertTrue(acceptingFactory.persistentSolversCreated >= 1)
-            assertTrue(rejectingPolicy.observedSuccessful(LpCertifier.EXACT_BASIS))
-            assertTrue(rejectingPolicy.observedSuccessful(LpCertifier.EXACT_POINT))
-            assertTrue(rejectingPolicy.observedSuccessful(LpCertifier.RATIONAL))
-            assertEquals(rejectingFactory.generalSolvers, rejectingFactory.generalCloses)
-            assertEquals(acceptingFactory.generalSolvers, acceptingFactory.generalCloses)
-        } finally {
-            rejectingFactory.closePersistentSolvers()
-            acceptingFactory.closePersistentSolvers()
-        }
+        val declined = run(
+            continuous,
+            optimize = false,
+            context = LpSolveContext(rejectingFactory, rejectingPolicy),
+        )
+        val accepted = run(
+            continuous,
+            optimize = false,
+            context = LpSolveContext(acceptingFactory, ProductionLpCertificationPolicy),
+            samples = acceptedSamples,
+        )
+        assertEquals(FiniteSolveVerdict.UNKNOWN, declined.verdict)
+        assertEquals(0L, declined.solutions)
+        assertEquals(FiniteSolveVerdict.SAT, accepted.verdict)
+        assertEquals(1L, accepted.solutions)
+        assertEquals(0.5, acceptedSamples.single().reals.single())
+        assertTrue(rejectingFactory.generalSolves >= 1)
+        assertTrue(acceptingFactory.generalSolves >= 1)
+        assertTrue(rejectingFactory.persistentSolversCreated >= 1)
+        assertTrue(acceptingFactory.persistentSolversCreated >= 1)
+        assertTrue(rejectingPolicy.observedSuccessful(LpCertifier.EXACT_BASIS))
+        assertTrue(rejectingPolicy.observedSuccessful(LpCertifier.EXACT_POINT))
+        assertTrue(rejectingPolicy.observedSuccessful(LpCertifier.RATIONAL))
+        assertEquals(rejectingFactory.generalSolvers, rejectingFactory.generalCloses)
+        assertEquals(acceptingFactory.generalSolvers, acceptingFactory.generalCloses)
+        assertEquals(rejectingFactory.persistentSolversCreated, rejectingFactory.persistentCloses)
+        assertEquals(acceptingFactory.persistentSolversCreated, acceptingFactory.persistentCloses)
     }
 
     @Test
     fun `finite MPS enumeration decline is unknown`() {
         val factory = TerminalRecordingFactory()
         val policy = TerminalPolicy { _, _ -> false }
-        try {
-            val result = run(
-                continuous,
-                optimize = false,
-                context = LpSolveContext(factory, policy),
-                allSolutions = true,
-            )
+        val result = run(
+            continuous,
+            optimize = false,
+            context = LpSolveContext(factory, policy),
+            allSolutions = true,
+        )
 
-            assertEquals(FiniteSolveVerdict.UNKNOWN, result.verdict)
-            assertEquals(0L, result.solutions)
-            assertTrue(factory.generalSolves >= 1)
-            assertTrue(policy.observedSuccessful(LpCertifier.RATIONAL))
-            assertEquals(factory.generalSolvers, factory.generalCloses)
-        } finally {
-            factory.closePersistentSolvers()
-        }
+        assertEquals(FiniteSolveVerdict.UNKNOWN, result.verdict)
+        assertEquals(0L, result.solutions)
+        assertTrue(factory.generalSolves >= 1)
+        assertTrue(policy.observedSuccessful(LpCertifier.RATIONAL))
+        assertEquals(factory.generalSolvers, factory.generalCloses)
+        assertEquals(factory.persistentSolversCreated, factory.persistentCloses)
     }
 
     @Test
@@ -264,72 +267,63 @@ class LpTerminalDeclineTest {
         val rejectingFactory = TerminalRecordingFactory()
         val rejectingPolicy = TerminalPolicy { _, _ -> false }
         val acceptingFactory = TerminalRecordingFactory()
-        try {
-            val first = run(
-                continuous,
-                optimize = false,
-                context = LpSolveContext(rejectingFactory, rejectingPolicy),
-            )
-            val middle = run(
-                continuous,
-                optimize = false,
-                context = LpSolveContext(acceptingFactory, ProductionLpCertificationPolicy),
-            )
-            val last = run(
-                continuous,
-                optimize = false,
-                context = LpSolveContext(rejectingFactory, rejectingPolicy),
-            )
+        val first = run(
+            continuous,
+            optimize = false,
+            context = LpSolveContext(rejectingFactory, rejectingPolicy),
+        )
+        val middle = run(
+            continuous,
+            optimize = false,
+            context = LpSolveContext(acceptingFactory, ProductionLpCertificationPolicy),
+        )
+        val last = run(
+            continuous,
+            optimize = false,
+            context = LpSolveContext(rejectingFactory, rejectingPolicy),
+        )
 
-            assertEquals(FiniteSolveVerdict.UNKNOWN, first.verdict)
-            assertEquals(FiniteSolveVerdict.SAT, middle.verdict)
-            assertEquals(FiniteSolveVerdict.UNKNOWN, last.verdict)
-            assertTrue(rejectingFactory.generalSolves >= 2)
-            assertTrue(acceptingFactory.generalSolves >= 1)
-            assertEquals(rejectingFactory.generalSolvers, rejectingFactory.generalCloses)
-            assertEquals(acceptingFactory.generalSolvers, acceptingFactory.generalCloses)
-        } finally {
-            rejectingFactory.closePersistentSolvers()
-            acceptingFactory.closePersistentSolvers()
-        }
+        assertEquals(FiniteSolveVerdict.UNKNOWN, first.verdict)
+        assertEquals(FiniteSolveVerdict.SAT, middle.verdict)
+        assertEquals(FiniteSolveVerdict.UNKNOWN, last.verdict)
+        assertTrue(rejectingFactory.generalSolves >= 2)
+        assertTrue(acceptingFactory.generalSolves >= 1)
+        assertEquals(rejectingFactory.generalSolvers, rejectingFactory.generalCloses)
+        assertEquals(acceptingFactory.generalSolvers, acceptingFactory.generalCloses)
+        assertEquals(rejectingFactory.persistentSolversCreated, rejectingFactory.persistentCloses)
+        assertEquals(acceptingFactory.persistentSolversCreated, acceptingFactory.persistentCloses)
     }
 
     @Test
     fun `finite MPS optimizer decline without incumbent is unknown`() {
         val factory = TerminalRecordingFactory()
         val policy = TerminalPolicy { _, _ -> false }
-        try {
-            val declined = run(continuous, optimize = true, context = LpSolveContext(factory, policy))
-            val accepted = run(continuous, optimize = true)
+        val declined = run(continuous, optimize = true, context = LpSolveContext(factory, policy))
+        val accepted = run(continuous, optimize = true)
 
-            assertEquals(FiniteSolveVerdict.UNKNOWN, declined.verdict)
-            assertEquals(0L, declined.solutions)
-            assertEquals(FiniteSolveVerdict.OPTIMAL, accepted.verdict)
-            assertTrue(factory.generalSolves >= 1)
-            assertTrue(policy.observedSuccessful(LpCertifier.RATIONAL))
-            assertEquals(factory.generalSolvers, factory.generalCloses)
-        } finally {
-            factory.closePersistentSolvers()
-        }
+        assertEquals(FiniteSolveVerdict.UNKNOWN, declined.verdict)
+        assertEquals(0L, declined.solutions)
+        assertEquals(FiniteSolveVerdict.OPTIMAL, accepted.verdict)
+        assertTrue(factory.generalSolves >= 1)
+        assertTrue(policy.observedSuccessful(LpCertifier.RATIONAL))
+        assertEquals(factory.generalSolvers, factory.generalCloses)
+        assertEquals(factory.persistentSolversCreated, factory.persistentCloses)
     }
 
     @Test
     fun `finite MPS optimizer keeps incumbent non optimal after a later decline`() {
         val factory = TerminalRecordingFactory()
         val policy = TerminalPolicy { _, successful -> successful && factory.generalSolvers == 1 }
-        try {
-            val result = run(mixed, optimize = true, context = LpSolveContext(factory, policy))
-            val accepted = run(mixed, optimize = true)
+        val result = run(mixed, optimize = true, context = LpSolveContext(factory, policy))
+        val accepted = run(mixed, optimize = true)
 
-            assertEquals(FiniteSolveVerdict.BEST_FOUND, result.verdict)
-            assertNotNull(result.bestSample)
-            assertEquals(FiniteSolveVerdict.OPTIMAL, accepted.verdict)
-            assertTrue(factory.generalSolvers >= 2)
-            assertTrue(policy.observedSuccessful(LpCertifier.RATIONAL))
-            assertEquals(factory.generalSolvers, factory.generalCloses)
-        } finally {
-            factory.closePersistentSolvers()
-        }
+        assertEquals(FiniteSolveVerdict.BEST_FOUND, result.verdict)
+        assertNotNull(result.bestSample)
+        assertEquals(FiniteSolveVerdict.OPTIMAL, accepted.verdict)
+        assertTrue(factory.generalSolvers >= 2)
+        assertTrue(policy.observedSuccessful(LpCertifier.RATIONAL))
+        assertEquals(factory.generalSolvers, factory.generalCloses)
+        assertEquals(factory.persistentSolversCreated, factory.persistentCloses)
     }
 
     @Test
@@ -341,24 +335,21 @@ class LpTerminalDeclineTest {
             if (successful) cancelled = true
             false
         }
-        try {
-            val declined = run(
-                continuous,
-                optimize = false,
-                context = LpSolveContext(factory, policy),
-                cancellation = token,
-            )
-            val accepted = run(continuous, optimize = false)
+        val declined = run(
+            continuous,
+            optimize = false,
+            context = LpSolveContext(factory, policy),
+            cancellation = token,
+        )
+        val accepted = run(continuous, optimize = false)
 
-            assertEquals(FiniteSolveVerdict.UNKNOWN, declined.verdict)
-            assertEquals(FiniteSolveVerdict.SAT, accepted.verdict)
-            assertTrue(factory.generalSolves >= 1)
-            assertTrue(factory.cancellations.all { it === token })
-            assertTrue(LpCertifier.RATIONAL to false in policy.attempts)
-            assertFalse(policy.observedSuccessful(LpCertifier.RATIONAL))
-            assertEquals(factory.generalSolvers, factory.generalCloses)
-        } finally {
-            factory.closePersistentSolvers()
-        }
+        assertEquals(FiniteSolveVerdict.UNKNOWN, declined.verdict)
+        assertEquals(FiniteSolveVerdict.SAT, accepted.verdict)
+        assertTrue(factory.generalSolves >= 1)
+        assertTrue(factory.cancellations.all { it === token })
+        assertTrue(LpCertifier.RATIONAL to false in policy.attempts)
+        assertFalse(policy.observedSuccessful(LpCertifier.RATIONAL))
+        assertEquals(factory.generalSolvers, factory.generalCloses)
+        assertEquals(factory.persistentSolversCreated, factory.persistentCloses)
     }
 }
