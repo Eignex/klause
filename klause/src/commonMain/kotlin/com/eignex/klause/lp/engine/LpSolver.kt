@@ -16,6 +16,7 @@ internal enum class LpRefactorReason {
     UPDATE_LIMIT,
     BACKEND_REQUESTED,
     RECONCILE_RECOVERY,
+    NUMERICAL_RECOVERY,
     PRIMAL,
 }
 
@@ -41,6 +42,7 @@ internal data class LpSolveMetrics(
     val updateLimitRefactorizations: Int = 0,
     val backendRequestedRefactorizations: Int = 0,
     val reconcileRecoveryRefactorizations: Int = 0,
+    val numericalRecoveryRefactorizations: Int = 0,
     val primalRefactorizations: Int = 0,
 ) {
     operator fun plus(other: LpSolveMetrics) = LpSolveMetrics(
@@ -52,6 +54,7 @@ internal data class LpSolveMetrics(
         updateLimitRefactorizations + other.updateLimitRefactorizations,
         backendRequestedRefactorizations + other.backendRequestedRefactorizations,
         reconcileRecoveryRefactorizations + other.reconcileRecoveryRefactorizations,
+        numericalRecoveryRefactorizations + other.numericalRecoveryRefactorizations,
         primalRefactorizations + other.primalRefactorizations,
     )
 }

@@ -96,6 +96,7 @@ internal class RevisedSimplex(
     private val iterationLimit: Int = 0,
     private val workLimit: Long = 0L,
     private val trackDegeneracy: Boolean = false,
+    private val basisSolverFactory: ((SparseMatrix) -> BasisSolver)? = null,
 ) : TableauCutSolver,
     PersistentLpSolver {
     private val m = model.m
@@ -138,8 +139,13 @@ internal class RevisedSimplex(
     private var updateLimitRefactorizations = 0
     private var backendRequestedRefactorizations = 0
     private var reconcileRecoveryRefactorizations = 0
+    private var numericalRecoveryRefactorizations = 0
     private var primalRefactorizations = 0
     private var warmAttempts = 0
+    internal var lastDevexWeightCorrections: Int = 0
+        private set
+    internal var lastHarrisMinistepSelections: Int = 0
+        private set
 
     /**
      * Numerical trouble this solve met, counted rather than only acted on.
@@ -257,6 +263,7 @@ internal class RevisedSimplex(
         updateLimitRefactorizations = updateLimitRefactorizations,
         backendRequestedRefactorizations = backendRequestedRefactorizations,
         reconcileRecoveryRefactorizations = reconcileRecoveryRefactorizations,
+        numericalRecoveryRefactorizations = numericalRecoveryRefactorizations,
         primalRefactorizations = primalRefactorizations,
     )
 
@@ -309,6 +316,7 @@ internal class RevisedSimplex(
     private fun solver(): BasisSolver = basisSolver ?: newSolver()
 
     private fun newSolver(): BasisSolver {
+        basisSolverFactory?.let { return it(columns).also { solver -> basisSolver = solver } }
         ensureKoblasBackends()
         return koblas.basisSolver(columns).also { basisSolver = it }
     }
@@ -334,6 +342,7 @@ internal class RevisedSimplex(
             LpRefactorReason.UPDATE_LIMIT -> updateLimitRefactorizations++
             LpRefactorReason.BACKEND_REQUESTED -> backendRequestedRefactorizations++
             LpRefactorReason.RECONCILE_RECOVERY -> reconcileRecoveryRefactorizations++
+            LpRefactorReason.NUMERICAL_RECOVERY -> numericalRecoveryRefactorizations++
             LpRefactorReason.PRIMAL -> primalRefactorizations++
         }
         nnzB = 0
@@ -487,6 +496,26 @@ internal class RevisedSimplex(
         gamma[r] = maxOf(tau / pivotSq, 1.0)
     }
 
+    /** Squared Euclidean norm of the pivotal row, accumulated without overflowing intermediate squares. */
+    private fun pivotalRowSquaredNorm(): Double {
+        var scale = 0.0
+        var scaledSquares = 1.0
+        pivotEtaVec.forEachStored { _, rho ->
+            val magnitude = abs(rho)
+            if (magnitude != 0.0) {
+                if (scale < magnitude) {
+                    val ratio = scale / magnitude
+                    scaledSquares = 1.0 + scaledSquares * ratio * ratio
+                    scale = magnitude
+                } else {
+                    val ratio = magnitude / scale
+                    scaledSquares += ratio * ratio
+                }
+            }
+        }
+        return if (scale == 0.0) 0.0 else scale * scale * scaledSquares
+    }
+
     /**
      * Solve the relaxation, optionally warm-started from [warm] — a prior **optimal** basis of the same
      * model structure (cross-node basis reuse). Tightening a child's variable bounds leaves the
@@ -559,10 +588,13 @@ internal class RevisedSimplex(
         updateLimitRefactorizations = 0
         backendRequestedRefactorizations = 0
         reconcileRecoveryRefactorizations = 0
+        numericalRecoveryRefactorizations = 0
         primalRefactorizations = 0
         warmAttempts = if (warmAttempted) 1 else 0
         singularRefactorizations = 0
         smallPivotBails = 0
+        lastDevexWeightCorrections = 0
+        lastHarrisMinistepSelections = 0
         work.reset()
         warmStarted = false
     }
@@ -613,6 +645,7 @@ internal class RevisedSimplex(
         val touchEpoch = IntArray(numVars)
         var epoch = 0
         var iter = 0
+        var numericalRecoveryTried = false
         // Whether an iterate's basic values are in [beta], so a solve that stops short can still hand
         // back its bound. The buffer is reused, and holds the last iterate the loop completed.
         var haveBeta = false
@@ -636,39 +669,51 @@ internal class RevisedSimplex(
             ftranDense(rhsAdj, beta, rhsVec)
             haveBeta = true
             // Leaving: the most infeasible basic bound, scored by Devex — violation² / γ_i (approximate
-            // dual steepest edge). `worst` keeps the *raw* violation of the chosen row for the
-            // bound-flipping ratio test.
+            // dual steepest edge). Verify the chosen weight against the pivotal row which this iteration
+            // needs anyway. Correcting an underestimate and reselecting is bounded by the row count:
+            // every retry makes at least one selected weight exact in this reference frame.
             var r = -1
-            var bestScore = 0.0
             var worst = 0.0
             var belowLower = false
-            for (i in 0 until m) {
-                val v = basicVar[i]
-                // An unenforced row's basic slack is free: its value is never a violation.
-                if (enforced != null && v >= n && !enforced[v - n]) continue
-                val below = -beta[i]
-                val above = if (model.hasFiniteUpper(v)) beta[i] - model.upperD(v) else Double.NEGATIVE_INFINITY
-                val isBelow = below >= above
-                val viol = if (isBelow) below else above
-                if (viol <= TOL) continue
-                val score = viol * viol / gamma[i]
-                if (score > bestScore) {
-                    bestScore = score
-                    r = i
-                    worst = viol
-                    belowLower = isBelow
+            while (true) {
+                r = -1
+                var bestScore = 0.0
+                for (i in 0 until m) {
+                    val v = basicVar[i]
+                    // An unenforced row's basic slack is free: its value is never a violation.
+                    if (enforced != null && v >= n && !enforced[v - n]) continue
+                    val below = -beta[i]
+                    val above = if (model.hasFiniteUpper(v)) {
+                        beta[i] - model.upperD(v)
+                    } else {
+                        Double.NEGATIVE_INFINITY
+                    }
+                    val isBelow = below >= above
+                    val viol = if (isBelow) below else above
+                    if (viol <= TOL) continue
+                    val score = viol * viol / gamma[i]
+                    if (r == -1 || score > bestScore) {
+                        bestScore = score
+                        r = i
+                        worst = viol
+                        belowLower = isBelow
+                    }
                 }
-            }
-            if (r == -1) {
-                basisKept = true // terminated cleanly: [resolve] may continue from here
-                return optimal(beta) // primal feasible ⇒ optimal
+                if (r == -1) {
+                    basisKept = true // terminated cleanly: [resolve] may continue from here
+                    return optimal(beta) // primal feasible ⇒ optimal
+                }
+                // Pivot row ρ = e_r^T B⁻¹ = B⁻ᵀ e_r, kept indexed: it is the hypersparse vector of a
+                // simplex iteration, and its true norm verifies the chosen Devex weight at no extra solve.
+                pivotalRow(r)
+                val trueWeight = pivotalRowSquaredNorm()
+                if (!(gamma[r] < DEVEX_WEIGHT_THRESHOLD * trueWeight)) break
+                gamma[r] = trueWeight
+                lastDevexWeightCorrections++
+                if ((workLimit > 0L && work.ops >= workLimit) || cancellation()) return truncated(beta)
             }
 
             val y = duals()
-            // Pivot row ρ = e_r^T B⁻¹ = B⁻ᵀ e_r, kept indexed: it is the hypersparse vector of a simplex
-            // iteration, and the row is formed from its nonzeros below rather than by dotting it against
-            // every column.
-            pivotalRow(r)
             // ρ·A_j for every column ρ reaches, accumulated over the rows ρ stores. Costs those rows'
             // entries instead of nnz(A), which is the whole point of ρ staying sparse. A column ρ misses
             // has ρ·A_j = 0 exactly, so the eligibility pass below loses no candidate by skipping it.
@@ -712,6 +757,17 @@ internal class RevisedSimplex(
                 elig.add(j)
             }
             if (elig.isEmpty()) {
+                // An update chain can turn a tiny violation into a false infeasibility candidate even
+                // though β is recomputed every iteration. Rebuild the factors—not merely the RHS solve—
+                // and retry once per solve. A basis with no folded updates is already fresh.
+                if (!numericalRecoveryTried && worst <= FEAS_TOL && solver().updateCount > 0) {
+                    numericalRecoveryTried = true
+                    if ((workLimit > 0L && work.ops >= workLimit) || cancellation()) return truncated(beta)
+                    if (!refactorize(LpRefactorReason.NUMERICAL_RECOVERY)) return null
+                    resetGamma()
+                    iter-- // recovery is not a pivot and must not consume [iterationLimit]
+                    continue
+                }
                 // Dual unbounded ⇒ primal infeasible. Record the basis + leaving row so the caller can
                 // certify infeasibility exactly (the float ray alone is not sound to prune on).
                 infeasibleBasis = Basis(basicVar.copyOf(), status.copyOf())
@@ -823,10 +879,10 @@ internal class RevisedSimplex(
      * coefficients in [pivotRowEntry]). The bound-flipping long step walks the eligible breakpoints in
      * ratio order, flipping each bounded nonbasic whose breakpoint is passed — accumulating `|a_j|·u_j`
      * toward the leaving variable's violation [delta] — until that capacity covers the violation or an
-     * unbounded column is reached; that column enters. Among the contiguous ratio-cluster within
-     * [HARRIS_TOL] of the stopping ratio (all valid entering choices) it takes the largest pivot
-     * magnitude (Harris, numerical stability). Mutates [status] for the flips; sound regardless, since
-     * the basis is certified downstream.
+     * unbounded column is reached; that column enters. Harris admits finishing columns below the running
+     * scaled bound `max(MINIMUM_DELTA / |α|, ratio + HARRIS_TOL / |α|)` and takes the largest pivot.
+     * A boxed column whose remaining range cannot finish the step stays flip-only and cannot enter.
+     * Mutates [status] for the flips; sound regardless, since the basis is certified downstream.
      */
     private fun chooseEntering(
         elig: IntArrayList,
@@ -849,22 +905,31 @@ internal class RevisedSimplex(
                 status[j] = if (status[j] == VarStatus.AT_LOWER) VarStatus.AT_UPPER else VarStatus.AT_LOWER
                 acc += cap
             } else {
-                // The long step stops at column j (ratio θ). Harris: among the contiguous ratio-cluster
-                // [idx..] within tolerance of θ — all valid entering choices — take the largest pivot.
-                val theta = ratioBuf[j]
-                var best = j
-                var bestMag = abs(pivotRowEntry[j])
-                var k = idx + 1
-                while (k < elig.size && ratioBuf[elig[k]] <= theta + HARRIS_TOL) {
+                val remaining = maxOf(delta - acc, 0.0)
+                var harrisBound = Double.POSITIVE_INFINITY
+                var best = -1
+                var bestMag = -1.0
+                var k = idx
+                while (k < elig.size && ratioBuf[elig[k]] <= harrisBound) {
                     val cand = elig[k]
                     val mag = abs(pivotRowEntry[cand])
-                    if (mag > bestMag) {
-                        bestMag = mag
-                        best = cand
+                    val candRange = if (model.hasFiniteUpper(cand)) model.upperD(cand) else Double.MAX_VALUE
+                    val canFinish = candRange == Double.MAX_VALUE || mag * candRange >= remaining - TOL
+                    if (canFinish) {
+                        val relaxed = maxOf(MINIMUM_DELTA / mag, ratioBuf[cand] + HARRIS_TOL / mag)
+                        harrisBound = minOf(harrisBound, relaxed)
+                        if (mag > bestMag) {
+                            bestMag = mag
+                            best = cand
+                        }
                     }
                     k++
                 }
-                return best
+                if (best != -1) {
+                    if (ratioBuf[best] > ratioBuf[j] + HARRIS_TOL) lastHarrisMinistepSelections++
+                    return best
+                }
+                return j
             }
         }
         return elig[elig.size - 1] // defensive: the loop returns on the last element
@@ -1261,9 +1326,14 @@ internal class RevisedSimplex(
     private companion object {
         const val TOL: Double = 1e-7
 
-        /** Ratio-tolerance band for the Harris two-pass entering test: columns whose dual ratio is
-         *  within this of the minimum are all valid pivots, so the largest-magnitude one is chosen. */
-        const val HARRIS_TOL: Double = 1e-9
+        /** Reduced-cost feasibility allowance in the scaled Harris ratio bound. */
+        const val HARRIS_TOL: Double = 0.5 * TOL
+
+        /** GLOP's 0.01 ministep factor applied to the dual feasibility tolerance. */
+        const val MINIMUM_DELTA: Double = 0.01 * TOL
+
+        /** A Devex weight below this fraction of the computed pivotal-row norm is corrected. */
+        const val DEVEX_WEIGHT_THRESHOLD: Double = 0.25
 
         /** Slack tolerance on the initial primal-feasibility check ([solvePrimal]). */
         const val FEAS_TOL: Double = 1e-6

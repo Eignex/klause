@@ -166,14 +166,16 @@ class LpStatsTest {
                 initialRefactorizations = 1,
                 updateLimitRefactorizations = 2,
                 backendRequestedRefactorizations = 1,
+                numericalRecoveryRefactorizations = 1,
             ),
         )
 
         val stats = sink.snapshot()
-        assertEquals(4.0, stats.refactorizations.sum)
+        assertEquals(5.0, stats.refactorizations.sum)
         assertEquals(1.0, stats.initialRefactorizations.sum)
         assertEquals(2.0, stats.updateLimitRefactorizations.sum)
         assertEquals(1.0, stats.backendRequestedRefactorizations.sum)
+        assertEquals(1.0, stats.numericalRecoveryRefactorizations.sum)
     }
 
     @Test
