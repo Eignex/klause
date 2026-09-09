@@ -916,9 +916,9 @@ internal class RevisedSimplex(
                     val mag = abs(pivotRowEntry[cand])
                     val candRange = if (model.hasFiniteUpper(cand)) model.upperD(cand) else Double.MAX_VALUE
                     val canFinish = candRange == Double.MAX_VALUE || mag * candRange >= remaining - TOL
+                    val relaxed = maxOf(MINIMUM_DELTA / mag, ratioBuf[cand] + HARRIS_TOL / mag)
+                    harrisBound = minOf(harrisBound, relaxed)
                     if (canFinish) {
-                        val relaxed = maxOf(MINIMUM_DELTA / mag, ratioBuf[cand] + HARRIS_TOL / mag)
-                        harrisBound = minOf(harrisBound, relaxed)
                         if (mag > bestMag) {
                             bestMag = mag
                             best = cand

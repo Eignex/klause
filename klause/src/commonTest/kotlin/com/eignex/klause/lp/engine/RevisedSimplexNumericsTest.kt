@@ -69,6 +69,35 @@ class RevisedSimplexNumericsTest {
     }
 
     @Test
+    fun `a nonfinishing boxed column still limits the Harris step`() {
+        val b = LpBuilder()
+        val narrow = b.addRealVar(0.0, 2_000_000.0, cost = 1e-6)
+        val boxed = b.addRealVar(0.0, 0.01, cost = 10.00001)
+        val late = b.addRealVar(0.0, 2.0, cost = 1.0001)
+        b.addRealRow(
+            intArrayOf(narrow, boxed, late),
+            doubleArrayOf(1e-6, 10.0, 1.0),
+            Relation.GE,
+            1.0,
+        )
+        val model = b.build(Sense.MINIMIZE)
+
+        val result = assertNotNull(RevisedSimplex(model).solve())
+
+        assertEquals(narrow, result.basis.basicVars.single())
+        assertEquals(VarStatus.AT_LOWER, result.basis.status[boxed])
+        assertEquals(VarStatus.AT_LOWER, result.basis.status[late])
+        val sourceActivity = 1e-6 * result.primal[narrow] +
+            10.0 * result.primal[boxed] + result.primal[late]
+        val sourceObjective = 1e-6 * result.primal[narrow] +
+            10.00001 * result.primal[boxed] + 1.0001 * result.primal[late]
+        assertTrue(sourceActivity >= 1.0 - 1e-7)
+        assertEquals(1.0, sourceObjective, 1e-9)
+        assertEquals(1.0, result.objective, 1e-9)
+        assertDualFeasible(model, result)
+    }
+
+    @Test
     fun `Harris does not enter a boxed column that cannot finish the long step`() {
         val b = LpBuilder()
         val flip = b.addRealVar(0.0, 1.0, cost = 0.0)
