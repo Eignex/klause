@@ -15,7 +15,6 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-/** #246: LP-guided value ordering (round-toward-LP diving) and the rounding probe must not shift the optimum. */
 class LpBranchingOptimumTest {
 
     @Test

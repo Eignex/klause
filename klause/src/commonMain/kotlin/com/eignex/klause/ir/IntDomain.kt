@@ -91,8 +91,7 @@ interface IntDomain {
     /**
      * This domain's values when there are at most [maxValues] of them, else null.
      *
-     * The only way to obtain values, so a caller states what it can afford before it walks anything —
-     * the question the old `sizeLong <= cap` guards asked separately from the walk they guarded.
+     * The only way to obtain values, so a caller states what it can afford before it walks anything.
      * Returns the domain itself, so asking allocates nothing and keeps the packed representation.
      */
     fun spanOrNull(maxValues: Long = Int.MAX_VALUE.toLong()): IntSpan?
@@ -202,9 +201,8 @@ interface IntDomain {
 
 /**
  * The values of a domain whose constraint only holds over an enumerable one — a table, a value graph,
- * an all-different. Fails loudly on a domain too wide to walk, where the old saturating `size` returned
- * a number that silently meant "very large". A caller that can decline instead should ask
- * `IntDomain.spanOrNull`.
+ * an all-different. Fails loudly on a domain too wide to walk. A caller that can decline instead should
+ * ask `IntDomain.spanOrNull`.
  */
 val IntDomain.values: IntSpan get() = span()
 

@@ -11,7 +11,6 @@ import com.eignex.klause.solver.objective.LinearObjective
 import kotlin.test.Test
 import kotlin.test.assertTrue
 
-/** #23: deflected (conjugate) subgradient stabilization of the Lagrangian dual ascent. */
 class LagrangianBoundSubgradientTest {
 
     // min Σ x_i over AllDifferent(3) in [0,5] with the binding linking constraint 2·x0 + x1 + x2 >= 10.

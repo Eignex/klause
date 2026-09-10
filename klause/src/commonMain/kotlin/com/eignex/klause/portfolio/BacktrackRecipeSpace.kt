@@ -54,9 +54,7 @@ internal class BtObjGuidedOption(val label: String, val enabled: Boolean)
  * Cross-product recipe space over the backtrack tuning axes — variable order × value order × restart
  * cadence × LP emphasis × objective-guided values — mirroring the local-search [RecipeSpace]. A generator
  * for a backtrack credit campaign: [all] enumerates the full product, [sample] draws a deterministic
- * distinct subset to seed a bench sweep. The curated [BacktrackWorkerConfig] ranking is not yet *derived*
- * from a campaign over this space; running that campaign and folding its credit back into the ranked order
- * is a follow-up.
+ * distinct subset to seed a bench sweep.
  */
 internal class BacktrackRecipeSpace(
     val variables: List<BtVarOption> = DEFAULT_VARIABLES,

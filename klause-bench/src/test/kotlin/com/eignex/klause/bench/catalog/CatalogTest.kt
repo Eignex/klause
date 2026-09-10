@@ -12,7 +12,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
-/** Catalog + in-process resolution coverage. */
 class CatalogTest {
 
     private fun ref(suite: String, name: String): ProblemRef = Catalog.suite(suite).problems.first { it.name == name }
@@ -41,7 +40,6 @@ class CatalogTest {
         assertEquals(3, resolved.problem.factors.size)
         assertTrue(resolved.problem.factors.all { it is PseudoBoolean })
 
-        // Objective comes from the OPB parse, surfaced through the format layer.
         val opb = OpbFormat.ingest(CorpusFetcher.resolve(ref("opb-core", "setcover-tiny").source))
         val obj = assertNotNull(opb.objective)
         assertTrue(obj.toString().isNotEmpty())
@@ -50,17 +48,14 @@ class CatalogTest {
     @Test
     fun `wcnf-core resolves the maxsat instance with a soft-clause objective`() {
         val ingested = WcnfFormat.ingest(CorpusFetcher.resolve(ref("wcnf-core", "maxsat-tiny").source))
-        // 2 original variables plus one relaxation variable per soft clause.
         assertEquals(4, ingested.problem.numBoolVars)
         val obj = assertNotNull(ingested.objective)
-        // The relaxation variables carry the soft-clause costs 3 and 1.
         assertEquals(listOf(3L, 1L), obj.boolWeights.toList().takeLast(2))
     }
 
     @Test
     fun `opb-core resolves the non-linear instance to product indicators`() {
         val problem = InProcessRunner.resolve(ref("opb-core", "sporttournament06")).problem
-        // 15 declared variables plus one indicator per distinct product.
         assertEquals(39, problem.numBoolVars)
         assertTrue(problem.factors.any { it is Clause }, "products lower to Tseitin clauses")
         assertNotNull(OpbFormat.ingest(CorpusFetcher.resolve(ref("opb-core", "sporttournament06").source)).objective)
@@ -69,7 +64,6 @@ class CatalogTest {
     @Test
     fun `opb-core resolves the wbo instance with soft-constraint reification`() {
         val opb = OpbFormat.ingest(CorpusFetcher.resolve(ref("opb-core", "queens4-soft").source))
-        // Soft constraints reify to indicators, so the objective is present and vars exceed the 16 declared.
         assertNotNull(opb.objective)
         assertTrue(opb.problem.numBoolVars > 16)
         assertTrue(opb.problem.factors.any { it is ReifiedPseudoBoolean }, "soft constraints reify to indicators")
@@ -90,7 +84,7 @@ class CatalogTest {
         for (ref in hw) {
             assertEquals(Format.IN_CODE, ref.format)
             assertTrue(InProcessRunner.supports(ref))
-            InProcessRunner.resolve(ref) // must not throw
+            InProcessRunner.resolve(ref)
         }
     }
 
@@ -100,16 +94,12 @@ class CatalogTest {
         assertEquals(4, byName.size)
         assertEquals(Expected.Unsat, byName.getValue("infeasible-tiny").expected)
 
-        // Integer optimisation: two integer columns and an objective.
         val blend = InProcessRunner.resolve(ref("mps-core", "blend-tiny"))
         assertEquals(2, blend.problem.numIntVars)
         assertNotNull(blend.objective)
 
-        // Pure feasibility: three integer columns.
         assertEquals(3, InProcessRunner.resolve(ref("mps-core", "feasible-tiny")).problem.numIntVars)
 
-        // A bounded float column is an LP-only continuous variable: no integer column, one real
-        // column the simplex resolves.
         val floatTiny = InProcessRunner.resolve(ref("mps-core", "float-tiny")).problem
         assertEquals(0, floatTiny.numIntVars)
         assertEquals(1, floatTiny.numRealVars)

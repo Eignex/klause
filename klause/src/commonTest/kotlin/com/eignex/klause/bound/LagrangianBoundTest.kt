@@ -12,7 +12,6 @@ import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertTrue
 
-/** #23: the subgradient Lagrangian bound over an AllDifferent global. */
 class LagrangianBoundTest {
 
     @Test

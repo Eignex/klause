@@ -15,7 +15,6 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-/** #287: the LP-rounding primal heuristic (`lpRoundingProbe`) that seeds an incumbent before search. */
 class LpRoundingProbeTest {
 
     /** Triangle covering: minimize x0+x1+x2 with each pair summing to >= 2 over [0,5]; optimum 3 at (1,1,1). */

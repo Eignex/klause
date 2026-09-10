@@ -5,7 +5,6 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-/** #23: exact min-cost bipartite assignment (the AllDifferent Lagrangian subproblem). */
 class MinCostAssignmentTest {
 
     @Test

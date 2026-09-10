@@ -5,7 +5,7 @@ import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.withAppendedFactor
 import com.eignex.klause.solver.differenceFragmentOf
 
-/**
+/*
  * This propagation projection with a [DifferenceSystem] over its difference rows appended, or the
  * projection unchanged when it carries none the joint propagator could act on.
  *
@@ -16,8 +16,8 @@ import com.eignex.klause.solver.differenceFragmentOf
  *
  * The graph holds only weights it can sum safely in `Long`. Declared-range edges outside that range stay
  * enforced by CP but are omitted here, which weakens this redundant propagator without weakening the
- * model. This makes guarded refutations available on a large finite domain without reviving the invented
- * open-model clamp that used to produce those ranges.
+ * model. This makes guarded refutations available on a large finite domain while preserving the model's
+ * declared ranges.
  *
  * The first gate is a *guarded* edge — a reified difference row. Unconditional difference rows already
  * propagate exactly through their own [com.eignex.klause.factor.arithmetic.Linear] factors, so a system

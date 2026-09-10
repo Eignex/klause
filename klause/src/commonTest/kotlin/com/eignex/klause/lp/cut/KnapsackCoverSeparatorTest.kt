@@ -18,7 +18,6 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-/** #286: knapsack cover cuts for `Σ w_i·x_i ≤ b` PseudoBoolean rows. */
 class KnapsackCoverSeparatorTest {
 
     private fun posLits(n: Int) = IntArray(n) { Lit.make(it, true) }

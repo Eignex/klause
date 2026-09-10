@@ -6,22 +6,12 @@ import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 
-/**
- * The classical clause resolvent: the accumulating disjunction of literals that 1UIP resolution builds,
- * resolved by set union over the negated antecedent literals. This is the default (and, until pseudo-Boolean
- * cutting planes land, only) [ConflictResolvent].
- *
- * The frontier is the `seen` set of variables whose resolution is not yet finished; a variable leaves the
- * frontier either by being resolved through as a pivot ([resolveOut]) or by dropping into the nogood as a
- * lower-level literal. [ReasonGraph.levelOf] / [ReasonGraph.antecedentsOf] and the per-analysis atom-level
- * memo live on the driving [ReasonGraph]; this resolvent reads them through [graph] so the level view is
- * shared with the driver's pivot scan and the [ClauseMinimizer].
- */
+// Classical 1UIP clause resolvent. It shares the ReasonGraph level and antecedent view with the pivot
+// scan and minimizer.
 internal class ClauseResolvent(private val state: PropagationState, private val graph: ReasonGraph) :
     ConflictResolvent {
 
-    /** Learned-clause post-processing (self-subsuming + binary minimization); reads levels and
-     *  antecedents back through the shared [ReasonGraph] view so its atom-level memo is shared. */
+    // Reads through the shared ReasonGraph so its atom-level memo is reused.
     private val minimizer = ClauseMinimizer(state, graph)
 
     // Reusable per-analysis scratch — grown once and cleared per call instead of reallocating

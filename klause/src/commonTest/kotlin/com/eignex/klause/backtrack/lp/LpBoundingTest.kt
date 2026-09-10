@@ -28,7 +28,6 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
-/** #20: LP-relaxation bounding wired into BacktrackSolver branch-and-bound. */
 class LpBoundingTest {
 
     /**

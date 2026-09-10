@@ -7,7 +7,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
-/** #40: the activity-managed global cut pool — dedup, cap, and tightness-based eviction. */
 class CutPoolTest {
 
     private fun cut(col: Int, coeff: Long, rhs: Long) =

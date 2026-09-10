@@ -905,9 +905,7 @@ internal object AffineSingletons {
         override fun anyOtherLinearAtAbsorbCap(defIdx: Int, x: Int): Boolean {
             val total = atCapCount[x]
             if (total == 0) return false
-            // `defIdx` mentions `x` (x is a pivot in it), so subtract its own contribution to the count to
-            // leave "any OTHER at-cap row". `atCapCount` counts exactly the integer-core [Linear] rows the
-            // former per-occurrence scan tested.
+            // `defIdx` mentions `x`, so subtract its own contribution to leave any other at-cap row.
             val self = if (absorbed[defIdx] >= FOLD_ABSORB_CAP && isCappable(slots[defIdx])) 1 else 0
             return total - self > 0
         }

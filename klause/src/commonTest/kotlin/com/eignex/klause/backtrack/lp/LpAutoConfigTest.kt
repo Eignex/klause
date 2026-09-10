@@ -33,7 +33,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
-/** #245: structural auto-configuration of the LP-relaxation family. */
 class LpAutoConfigTest {
 
     private fun problem(vararg factors: Factor, intVars: Int = 3): Problem =

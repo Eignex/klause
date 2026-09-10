@@ -21,13 +21,6 @@ enum class OpenBranching(
     }
 }
 
-/**
- * Splits a hint waits for by default before it is drawn.
- *
- * Chosen from the gap in the measured corpus rather than tuned: the instances that branch reach
- * thousands of splits, the ones the theory dominates reach tens, so anything inside that gap separates
- * them and the exact value is not load-bearing.
- */
 private const val DEFAULT_HINT_MIN_SPLITS = 128L
 
 /** Cooperative limits shared by complete open-model theories. */
@@ -47,8 +40,7 @@ data class TheoryParams(
     /**
      * Local-search allowance for the request's one unverified Boolean hint draw, or null to draw none.
      *
-     * Null by default. A hint buys nothing but branch order, and buying it costs work before the first
-     * decision, so whether it pays is a measured question rather than a default. Zero is not that
+     * Null by default. A hint buys only branch order and costs work before the first decision. Zero is not that
      * switch: it runs the producer under an allowance it cannot reach a proposal within, which is what
      * separates the producer's own cost from the proposal's effect.
      *
@@ -61,10 +53,7 @@ data class TheoryParams(
      * Boolean branching for each feasibility traversal.
      *
      * Only the Boolean skeleton is branched here, so this is the whole variable-order lever the open
-     * route has; the theory decides the arithmetic residual at a leaf either way. Source order is the
-     * default because activity order settles no additional instance on the measured corpus: it moves
-     * the work a traversal does without moving the verdict, since the rows that remain open are
-     * bounded by the cost of each theory check rather than by the branch that reached it.
+     * route has; the theory decides the arithmetic residual at a leaf either way.
      */
     val openBranching: OpenBranching = OpenBranching.SourceOrder,
     /**

@@ -9,7 +9,6 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-/** #22: exact Gomory integrality cuts from the dual-simplex tableau. */
 class RevisedSimplexGomoryCutTest {
 
     private class Row(val coeffs: LongArray, val rel: Relation, val rhs: Long)

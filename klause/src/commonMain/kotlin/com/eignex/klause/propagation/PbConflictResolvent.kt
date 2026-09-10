@@ -7,22 +7,8 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 
-/**
- * Pseudo-Boolean cutting-planes conflict resolvent — the second [ConflictResolvent]
- * implementation the Phase 0 seam anticipated. The accumulating nogood is a [PbAccumulator] `≥`
- * constraint rather than a clause, and `resolve` is generalized resolution (coefficient cancellation)
- * followed by saturation and Chvátal-Gomory rounding, so the learned constraint can be strictly
- * stronger than the clause a 1UIP walk would yield.
- *
- * The 1UIP driver ([ConflictAnalyzer]) is unchanged: it selects pivots off the pin trail exactly as for
- * clauses. What differs is that this resolvent ignores the driver's clause-form `reason` array and
- * instead recovers the *coefficient-carrying* reason constraint for each step — the failing constraint
- * for the seed (from [seedFactorId]) and, for each resolved pivot, the constraint that forced it (from
- * [PropagationState.boolReason]). When a reason is not a loadable `≥` constraint (an `EQ` pseudo-Boolean,
- * a cardinality/xor factor, or an arithmetic overflow) it falls back to the clause-form reason, which is
- * always sound. If any step cannot proceed soundly it sets [failed]; the analyzer then re-runs the whole
- * conflict through the [ClauseResolvent], so a PB failure never loses a conflict or corrupts a nogood.
- */
+// Resolves pseudo-Boolean conflicts with coefficient-carrying reasons. If a sound PB derivation is not
+// available, [failed] sends the conflict through [ClauseResolvent].
 internal class PbConflictResolvent(private val state: PropagationState, private val graph: ReasonGraph) :
     ConflictResolvent {
 

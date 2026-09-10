@@ -197,10 +197,7 @@ internal class Lowering(val config: KlauseConfig) : CnfLowering {
         is IntCompare -> reifyIntCompare(expr)
 
         is FloatLinearConstraint -> {
-            // Reified float-linear: introduce an aux bool, assert one factor per
-            // truth side. Today we have FloatLinear but not ReifiedFloatLinear, so
-            // the implication is inert in the engine — usable as a top-level constraint
-            // but not yet as a sub-expression. Tracked as a follow-up.
+            // A float-linear implication cannot be lowered without a reified float-linear factor.
             error(
                 "FloatLinearConstraint at non-top-level position is not yet supported; " +
                     "ReifiedFloatLinear factor still TODO.",

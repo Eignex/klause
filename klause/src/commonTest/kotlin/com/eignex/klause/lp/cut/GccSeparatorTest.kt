@@ -14,7 +14,6 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-/** #248↔#22: GlobalCardinality sum cuts — value-multiplicity generalization of the AllDifferent Hall cut. */
 class GccSeparatorTest {
 
     /**

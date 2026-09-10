@@ -16,7 +16,6 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-/** #23: Lagrangian bounding wired into branch-and-bound. */
 class LagrangianBnbTest {
 
     @Test

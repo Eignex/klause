@@ -30,9 +30,9 @@ internal class IntEventMachinery(projection: PropagationProblem, incremental: Bo
      * CSR ([baseOffsets] / [baseFlat]) built once at construction rather than one [IntArrayList] per
      * `numIntVars * IntEvent.COUNT` slot: on a large model most slots have no subscriber, and the wide
      * array of tiny lists dominated [PropagationState] construction. The CSR is one prefix-sum pass plus
-     * one fill pass over the base propagators, both O(subscriptions); reads are a contiguous slice and the
-     * per-slot subscriber order is ascending base factor id — exactly the order the former per-slot list
-     * appends produced. Mid-life factors ([PropagationState.addMidlifeFactor]) subscribe into [overflow].
+     * one fill pass over the base propagators, both O(subscriptions); reads are a contiguous slice with
+     * ascending base factor ids. Mid-life factors ([PropagationState.addMidlifeFactor]) subscribe into
+     * [overflow].
      */
     internal val baseOffsets: IntArray
     internal val baseFlat: IntArray
@@ -77,7 +77,7 @@ internal class IntEventMachinery(projection: PropagationProblem, incremental: Bo
     }
 
     /** Visit every factor subscribed to event [packed]: base subscribers (CSR, ascending factor id) then
-     *  mid-life subscribers (overflow, add order) — the order the former single per-slot list held. */
+     *  mid-life subscribers (overflow, add order). */
     inline fun forEachWatcher(packed: Int, action: (Int) -> Unit) {
         for (k in baseOffsets[packed] until baseOffsets[packed + 1]) action(baseFlat[k])
         overflow?.get(packed)?.let { list -> for (i in 0 until list.size) action(list[i]) }

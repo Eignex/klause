@@ -59,8 +59,7 @@ sealed interface SatisfyResult {
  * is sound (jointly infeasible with the hard constraints) but not guaranteed minimal.
  * The [BacktrackSolver] override drives the seed phase manually so seed-time conflicts
  * yield a strict-subset core; deeper conflicts (after seed succeeded) fall back to the
- * full input assumption set — refining those needs assumption-resolution on learned
- * clauses, which is a follow-up.
+ * full input assumption set.
  */
 fun <P : SolverParams> Solver<P>.satisfyUnderAssumptions(
     assumptions: Assumptions,

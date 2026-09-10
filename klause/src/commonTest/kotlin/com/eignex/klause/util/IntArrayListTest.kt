@@ -6,7 +6,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
-/** #104: direct coverage for [IntArrayList], including its O(1) swap-remove semantics. */
 class IntArrayListTest {
 
     @Test

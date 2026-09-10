@@ -89,11 +89,7 @@ data class PortfolioScenario(
      *  cut analogue of the always-on learned-clause pool. On by default; sound either way (only global
      *  cuts cross arms, so it never changes any arm's optimum). */
     val shareCuts: Boolean = true,
-    /** LBD bound of the cross-arm glue-clause exchange filter. 6/12 measured best on the 4-core
-     *  backtrack pool at 10s: it beats the historical 4/8 by Borda 189–138 over dimacs-classic +
-     *  pb-comp combined (28–9 strict wins, +2 decided) and beats 9/20 by 186–141 — moderate widening
-     *  shares more useful clauses, past that the import volume costs more than it prunes. Both
-     *  halves stay exposed (`--param clause-share-lbd` / `clause-share-len`) for per-run tuning. */
+    /** LBD bound of the cross-arm glue-clause exchange filter. */
     val clauseShareMaxLbd: Int = 6,
     /** Length bound of the cross-arm glue-clause exchange filter; see [clauseShareMaxLbd]. */
     val clauseShareMaxLen: Int = 12,
@@ -282,8 +278,7 @@ internal object PortfolioComposition {
             arms += local
             arms += backtrack
         }
-        // Hybrid ALNS with CP repair: a mixed LS+backtrack engine, added last (lowest priority,
-        // pending its credit pass). COP only — it optimises an incumbent, so a CSP has nothing for it.
+        // Hybrid ALNS with CP repair. COP only — it optimises an incumbent, so a CSP has nothing for it.
         if (scenario.kind == Kind.COP) arms += AlnsWorkerConfig(nodeBudget = scenario.nodeBudget)
         return arms
     }

@@ -136,8 +136,7 @@ internal object PresolveShared {
         // An already-folded pass view never bakes (nothing reads `Problem.baked`), so [RootBaker.reseed] leaves
         // it untouched; with no probing tier enabled the plain base bake stands. Otherwise the reseed runs
         // [RootBaker] against the base-baked problem and returns a fresh eager `Problem` whose
-        // `Problem.baked` carries the failed-literal / SAC deductions — the kernel's former self-bake, now
-        // driven from the presolve lane.
+        // `Problem.baked` carries the failed-literal / SAC deductions.
         return RootBaker.reseed(base, bakeConfig)
     }
 

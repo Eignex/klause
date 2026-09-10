@@ -9,7 +9,6 @@ import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertTrue
 
-/** #22/#23: Cumulative energetic-reasoning infeasibility check. */
 class CumulativeEnergeticBoundTest {
 
     private fun problem(n: Int, spanHi: Int, durations: LongArray, resources: LongArray, capacity: Long): Problem =

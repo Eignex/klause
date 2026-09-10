@@ -20,13 +20,13 @@ import com.eignex.klause.util.ArmCatalog
 /**
  * The public catalog of backtrack (complete-search) arm recipes — the backtrack counterpart of
  * [LocalSearchCatalog]. It maps the string-label boundary (CLI
- * `bt-arm=`, a credit campaign, telemetry) to a fresh [BacktrackRecipe], and exposes the credit-ordered
+ * `bt-arm=`, telemetry) to a fresh [BacktrackRecipe], and exposes the credit-ordered
  * per-[Kind] pool. [BacktrackWorkerConfig] wraps these recipes into runnable portfolio arms; a caller
  * outside `klause` (the CLI) resolves named backtrack pools through here into `PortfolioScenario.btPool`.
  *
  * **Per-kind ranking** ([ranked]): SAT-optimized first (the pigeonhole guard), the conflict-driven
- * workhorse, the LP-intensity spread, LinUCB routing, the free engine, and — kept last, pending a credit
- * pass — the restart-level selector portfolio and the dom-wdeg / first-fail / activity heuristic arms. On
+ * workhorse, the LP-intensity spread, LinUCB routing, the free engine, the restart-level selector portfolio,
+ * and the dom-wdeg / first-fail / activity heuristic arms. On
  * a CSP the LP arms and LinUCB drop out (LP lives on the minimisation path; LinUCB has no bound to exploit).
  */
 object BacktrackCatalog {
@@ -105,14 +105,6 @@ object BacktrackCatalog {
         BacktrackPresets.conflictDriven(randomSeed = seed, onEvent = onEvent).copy(lpConfig = LpConfig(emphasis))
     }
 
-    /** A best-bound-dive LP arm: the DEFAULT LP stack plus the `lb_tree_search` primal subsolver, which
-     *  explores the branch-and-bound tree best-first to land good incumbents fast. It is the *fallback*
-     *  root heuristic, not an additional one: the LP-rounding probe is on whenever the LP is active, and
-     *  the root work stops at the first heuristic that seeds an incumbent, so the dive runs only where
-     *  rounding and the pump both come back empty. Measured on MIPLIB it earns nothing either way —
-     *  running it behind a successful probe costs 0.3-1.5s of root time and improves no objective, and
-     *  where it does run it seeds nothing the pool does not already reach. A no-op when the LP relaxation
-     *  is off (so a `--lp off` ceiling neutralises it). */
     private fun lpTreeSearchArm() = BacktrackRecipe("lp-lbtree") { seed, onEvent ->
         val base = BacktrackPresets.conflictDriven(randomSeed = seed, onEvent = onEvent)
         base.copy(lpConfig = LpConfig(LpEmphasis.DEFAULT), lpPlan = base.lpPlan.copy(lbTreeSearch = true))
@@ -174,13 +166,10 @@ object BacktrackCatalog {
         BacktrackArm.LpConservative,
         BacktrackArm.LinUcb,
         BacktrackArm.Free,
-        // Restart-level selector portfolio + latent-axis heuristic arms: kept last pending their
-        // cross-seed credit pass, so the tuned diverse(N) prefix is unchanged.
         BacktrackArm.SelectorSwitch,
         BacktrackArm.DomWdeg,
         BacktrackArm.FirstFail,
         BacktrackArm.Activity,
-        // Objective-guided value diving: last lever, COP-only, pending its cross-seed credit pass.
         BacktrackArm.ObjectiveGuided,
     )
     private val cspOrder = listOf(
