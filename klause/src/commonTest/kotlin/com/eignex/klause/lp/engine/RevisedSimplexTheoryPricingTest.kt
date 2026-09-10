@@ -38,6 +38,63 @@ class RevisedSimplexTheoryPricingTest {
     }
 
     @Test
+    fun `warm transformed support outranks source sparsity and ignores free basics`() {
+        val zero = ExactLpNumber.of(0L)
+        val one = ExactLpNumber.of(1L)
+        val minusOne = ExactLpNumber.of(-1L)
+        val box = ExactLpBounds(ExactLpSide(zero), ExactLpSide(ExactLpNumber.of(10L)))
+        val fixed = ExactLpBounds(ExactLpSide(zero), ExactLpSide(zero))
+        val boundedBasic = 0
+        val freeBasic = 1
+        val sparseCandidate = 2
+        val transformedCandidate = 3
+        val source = ExactLpModel(
+            listOf(
+                listOf(ExactLpEntry(0, one), ExactLpEntry(2, one)),
+                listOf(ExactLpEntry(0, one), ExactLpEntry(1, one)),
+                listOf(ExactLpEntry(0, minusOne)),
+                listOf(ExactLpEntry(1, one), ExactLpEntry(2, minusOne)),
+            ),
+            listOf(minusOne, zero, minusOne),
+            listOf(ExactLpColumn(box), ExactLpColumn(ExactLpBounds()), ExactLpColumn(box), ExactLpColumn(box)) +
+                List(3) { ExactLpColumn(fixed) },
+            List(3) { ExactLpRow() },
+            ExactLpObjective(List(7) { zero }),
+        )
+        val model = assertNotNull(LpExactState(source).toWorkingModel())
+        val warm = Basis(
+            intArrayOf(boundedBasic, freeBasic, model.slackCol(2)),
+            arrayOf(
+                VarStatus.BASIC,
+                VarStatus.BASIC,
+                VarStatus.AT_LOWER,
+                VarStatus.AT_LOWER,
+                VarStatus.FIXED,
+                VarStatus.FIXED,
+                VarStatus.BASIC,
+            ),
+            captureEligible = false,
+        )
+        val defaultUpdates = ArrayList<Int>()
+        val theoryUpdates = ArrayList<Int>()
+        val baseline = RevisedSimplex(model, basisSolverFactory = recordingFactory(defaultUpdates))
+        val theory = RevisedSimplex(
+            model,
+            basisSolverFactory = recordingFactory(theoryUpdates),
+            pricing = LpPricingOptions(LpZeroObjectivePricing.THEORY, 7L),
+        )
+
+        val baselineResult = assertNotNull(baseline.solve(warm))
+        val theoryResult = assertNotNull(theory.solve(warm))
+
+        assertTrue(baselineResult.warmStarted)
+        assertTrue(theoryResult.warmStarted)
+        assertEquals(sparseCandidate, defaultUpdates.first())
+        assertEquals(transformedCandidate, theoryUpdates.first())
+        assertEquals(transformedCandidate, theory.lastTheorySelectedColumn)
+    }
+
+    @Test
     fun `seeded ties are repeatable and can choose different columns`() {
         val first = solveTie(7L)
         val repeated = solveTie(7L)
@@ -89,7 +146,7 @@ class RevisedSimplexTheoryPricingTest {
 
         assertEquals(8, simplex.lastTheoryPricingSamples)
         assertEquals(1, checked.size)
-        assertTrue(simplex.lastTheoryPricingWorkOps > simplex.lastTheoryPricingFtranWorkOps)
+        assertTrue(simplex.lastTheoryPricingWorkOps > simplex.lastTheoryPricingEstimatedFtranWorkOps)
     }
 
     @Test
@@ -256,6 +313,50 @@ class RevisedSimplexTheoryPricingTest {
 
         assertEquals(1, simplex.lastTheoryPricingDeclines)
         assertTrue(updates.isNotEmpty(), "ordinary Harris must continue after the sample decline")
+    }
+
+    @Test
+    fun `cancellation during a failed sample stops before Harris fallback`() {
+        var cancelled = false
+        var ftrans = 0
+        val updates = ArrayList<Int>()
+        val simplex = RevisedSimplex(
+            disturbedSupportModel(),
+            cancellation = Cancellation { cancelled },
+            basisSolverFactory = { matrix ->
+                val delegate = KotlinBasisSolver(matrix)
+                object : BasisSolver by delegate {
+                    override fun ftran(x: IndexedVector, expectedDensity: Double) {
+                        ftrans++
+                        if (ftrans == 2) {
+                            cancelled = true
+                            throw BasisArithmeticException("cancelled sample decline")
+                        }
+                        delegate.ftran(x, expectedDensity)
+                    }
+
+                    override fun update(
+                        pivotRow: Int,
+                        entering: Int,
+                        spike: IndexedVector,
+                        pivotEta: IndexedVector?,
+                    ): BasisUpdate {
+                        updates += entering
+                        return delegate.update(pivotRow, entering, spike, pivotEta)
+                    }
+                }
+            },
+            pricing = LpPricingOptions(LpZeroObjectivePricing.THEORY, 7L),
+        )
+
+        val result = assertNotNull(simplex.solve())
+
+        assertFalse(result.optimal)
+        assertEquals(1, simplex.lastTheoryPricingResourceStops)
+        assertEquals(0, simplex.lastTheoryPricingDeclines)
+        assertTrue(updates.isEmpty())
+        assertNull(simplex.infeasibleBasis)
+        assertNull(simplex.infeasibleRay)
     }
 
     @Test
