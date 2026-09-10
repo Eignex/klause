@@ -272,6 +272,7 @@ internal class LpAppendReplacementAttempt(
     val replacement: LpAppendReplacement? = null,
     val decline: LpAppendTransferDecline? = null,
     val basisWork: Long? = null,
+    val basisWorkComplete: Boolean = basisWork != null,
 )
 
 /**

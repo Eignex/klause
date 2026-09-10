@@ -1,12 +1,15 @@
 package com.eignex.klause.lp.engine
 
+import com.eignex.klause.simplex.basis.BasisArithmeticException
 import com.eignex.klause.simplex.basis.BasisExtension
 import com.eignex.klause.simplex.basis.BasisExtensionResult
 import com.eignex.klause.simplex.basis.BasisOperationWork
+import com.eignex.klause.simplex.basis.BasisPhaseWork
 import com.eignex.klause.simplex.basis.BasisSolver
 import com.eignex.klause.simplex.basis.KotlinBasisSolver
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.Cancellation
+import com.eignex.koblas.SparseMatrix
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -211,6 +214,88 @@ class LpScopedBasisTransferTest {
             assertTrue(solver.metrics.appendBasisWork >= 7)
             assertEquals(0, solver.metrics.appendUnknownWork)
             B5bIndependentExactSourceValidator.validate(solver.state, assertNotNull(solver.solve()))
+        }
+    }
+
+    @Test
+    fun `typed arithmetic decline retains partial units and incomplete status`() {
+        val oldMatrix = SparseMatrix.ofColumns(1, 1, listOf(listOf(0 to 1.0)))
+        val newMatrix = SparseMatrix.ofColumns(
+            2,
+            2,
+            listOf(listOf(0 to 1.0), listOf(1 to 1.0)),
+        )
+        val delegate = KotlinBasisSolver(oldMatrix)
+        var reads = 0
+        val old = object : BasisSolver by delegate {
+            override val basisOperationWork: BasisOperationWork
+                get() = if (reads++ == 0) {
+                    BasisOperationWork()
+                } else {
+                    BasisOperationWork(
+                        extension = BasisPhaseWork(attempts = 1, units = 7, declines = 1),
+                        complete = false,
+                    )
+                }
+
+            override fun extend(matrix: SparseMatrix, extension: BasisExtension): BasisExtensionResult? {
+                throw BasisArithmeticException("injected extension")
+            }
+        }
+
+        val attempt = BasisExtensionAdapter().transfer(
+            old,
+            newMatrix,
+            intArrayOf(0, 1),
+            intArrayOf(0, 1),
+            BasisExtension(intArrayOf(0), intArrayOf(-1), intArrayOf(0), intArrayOf(0)),
+        )
+
+        assertTrue(attempt.arithmeticDeclined)
+        assertEquals(7L, attempt.workUnits)
+        assertTrue(!attempt.workComplete)
+        old.close()
+    }
+
+    @Test
+    fun `scoped incomplete decline keeps partial units and records unknown work`() {
+        val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+            override fun newPersistentSolver(
+                model: LpModel,
+                cancellation: Cancellation,
+                refactorUpdateLimit: Int,
+                iterationLimit: Int,
+                workLimit: Long,
+                trackDegeneracy: Boolean,
+            ): PersistentLpSolver {
+                val delegate = RevisedSimplex(model, cancellation)
+                return object : PersistentLpSolver by delegate {
+                    override fun appendReplacement(
+                        next: LpExactState,
+                        oldRowsInNew: IntArray,
+                        oldColumnsInNew: IntArray,
+                        mode: LpAppendReplacementMode,
+                        token: Cancellation,
+                    ) = LpAppendReplacementAttempt(
+                        decline = LpAppendTransferDecline.ARITHMETIC,
+                        basisWork = 7,
+                        basisWorkComplete = false,
+                    )
+                }
+            }
+        }
+        LpScopedSolver(
+            LpExactState(lowerBoundModel()),
+            context = LpSolveContext(engineFactory = factory),
+            appendSelection = LpAppendSelection.FORCE_TRANSFER,
+        ).use { solver ->
+            assertNotNull(solver.solve())
+
+            assertTrue(solver.append(lowerRow(1, 2), scoped = false))
+
+            assertTrue(solver.metrics.appendBasisWork >= 7)
+            assertEquals(1, solver.metrics.appendUnknownWork)
+            assertEquals(LpAppendTransferDecline.ARITHMETIC, solver.metrics.lastAppendDecline)
         }
     }
 

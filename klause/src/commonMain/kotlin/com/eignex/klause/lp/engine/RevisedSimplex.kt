@@ -675,6 +675,7 @@ internal class RevisedSimplex(
         val adapter = BasisExtensionAdapter { candidate.createBasisSolver() }
         val replacement: BasisReplacement
         var basisWork: Long? = null
+        var basisWorkComplete = false
         if (mode == LpAppendReplacementMode.TRANSFER) {
             val transfer = adapter.transfer(
                 oldSolver,
@@ -690,8 +691,10 @@ internal class RevisedSimplex(
                     LpAppendTransferDecline.STRUCTURAL
                 },
                 basisWork = transfer.workUnits,
+                basisWorkComplete = transfer.workComplete,
             )
             basisWork = transfer.workUnits
+            basisWorkComplete = transfer.workComplete
         } else {
             replacement = try {
                 adapter.replacement(oldSolver, candidate.columns, intended, logicalColumns)
@@ -703,14 +706,18 @@ internal class RevisedSimplex(
         var failure: Throwable? = null
         try {
             if (mode == LpAppendReplacementMode.FRESH_INTENDED) {
-                basisWork = replacement.solver.basisOperationWork?.let {
-                    if (!it.complete || it.saturated) null else it.units
+                replacement.solver.basisOperationWork?.let {
+                    if (!it.saturated) {
+                        basisWork = it.units
+                        basisWorkComplete = it.complete
+                    }
                 }
             }
             if (token()) {
                 return LpAppendReplacementAttempt(
                     decline = LpAppendTransferDecline.CANCELLED,
                     basisWork = basisWork,
+                    basisWorkComplete = basisWorkComplete,
                 )
             }
             val basis = candidate.installAppendReplacement(
@@ -719,11 +726,13 @@ internal class RevisedSimplex(
             ) ?: return LpAppendReplacementAttempt(
                 decline = LpAppendTransferDecline.INCONSISTENT_HEADINGS,
                 basisWork = basisWork,
+                basisWorkComplete = basisWorkComplete,
             )
             installed = true
             return LpAppendReplacementAttempt(
                 LpAppendReplacement(candidate, basis, replacement.transferred),
                 basisWork = basisWork,
+                basisWorkComplete = basisWorkComplete,
             )
         } catch (primary: Throwable) {
             failure = primary

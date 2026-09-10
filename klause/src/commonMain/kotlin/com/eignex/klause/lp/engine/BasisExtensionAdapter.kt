@@ -24,7 +24,10 @@ internal class BasisTransferAttempt(
     val replacement: BasisReplacement?,
     val arithmeticDeclined: Boolean,
     val workUnits: Long?,
+    val workComplete: Boolean,
 )
+
+private class BasisOperationDelta(val units: Long?, val complete: Boolean)
 
 internal class BasisExtensionAdapter(private val factory: (SparseMatrix) -> BasisSolver = { KotlinBasisSolver(it) }) {
     @Suppress("TooGenericExceptionCaught")
@@ -42,17 +45,21 @@ internal class BasisExtensionAdapter(private val factory: (SparseMatrix) -> Basi
         val extended = try {
             oldSolver.extend(newMatrix, extension)
         } catch (_: BasisArithmeticException) {
-            return BasisTransferAttempt(null, true, operationDelta(before, oldSolver.basisOperationWork))
+            val work = operationDelta(before, oldSolver.basisOperationWork)
+            return BasisTransferAttempt(null, true, work.units, work.complete)
         }
         if (extended == null) {
-            return BasisTransferAttempt(null, false, operationDelta(before, oldSolver.basisOperationWork))
+            val work = operationDelta(before, oldSolver.basisOperationWork)
+            return BasisTransferAttempt(null, false, work.units, work.complete)
         }
         var accepted = false
         var failure: Throwable? = null
         try {
-            val units = operationDelta(before, oldSolver.basisOperationWork)
+            val work = operationDelta(before, oldSolver.basisOperationWork)
             val headings = translate(extended.basis, logicalColumns)
-            if (!headings.contentEquals(intendedBasis)) return BasisTransferAttempt(null, false, units)
+            if (!headings.contentEquals(intendedBasis)) {
+                return BasisTransferAttempt(null, false, work.units, work.complete)
+            }
             val result = BasisTransferAttempt(
                 BasisReplacement(
                     extended.solver,
@@ -63,7 +70,8 @@ internal class BasisExtensionAdapter(private val factory: (SparseMatrix) -> Basi
                     transferArithmeticDeclined = false,
                 ),
                 arithmeticDeclined = false,
-                workUnits = units,
+                workUnits = work.units,
+                workComplete = work.complete,
             )
             accepted = true
             return result
@@ -162,14 +170,11 @@ internal class BasisExtensionAdapter(private val factory: (SparseMatrix) -> Basi
         if (basis.columns[it] >= 0) basis.columns[it] else logicalColumns[basis.unitRows[it]]
     }
 
-    private fun operationDelta(before: BasisOperationWork?, after: BasisOperationWork?): Long? {
-        if (
-            before == null || after == null || !before.complete || !after.complete ||
-            before.saturated || after.saturated || after.units < before.units
-        ) {
-            return null
+    private fun operationDelta(before: BasisOperationWork?, after: BasisOperationWork?): BasisOperationDelta {
+        if (before == null || after == null || before.saturated || after.saturated || after.units < before.units) {
+            return BasisOperationDelta(null, false)
         }
-        return after.units - before.units
+        return BasisOperationDelta(after.units - before.units, before.complete && after.complete)
     }
 
     @Suppress("TooGenericExceptionCaught")

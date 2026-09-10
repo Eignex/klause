@@ -67,6 +67,7 @@ internal class LpScopedSolver(
     private var appendUnknownWork = 0L
     private var lastAppendDecline: LpAppendTransferDecline? = null
     private var pendingAppendSolveWork: Long? = null
+    private var pendingAppendSolveWorkComplete = false
     private var pendingAppendSolve = false
 
     val state: LpExactState get() = trail.state
@@ -204,11 +205,12 @@ internal class LpScopedSolver(
             if (!replacement.second.basicVars.contentEquals(expected) || token()) return false
             val replacementWork = if (append) replacement.first.basisLifecycleWork else null
             if (append && selected == null) recordAppendWork(replacementWork)
-            val pendingWork = knownBasisWork(replacementWork)
+            val pendingWork = basisWorkUnits(replacementWork)
             val old = solver
             solver = replacement.first
             if (append) {
                 pendingAppendSolveWork = pendingWork
+                pendingAppendSolveWorkComplete = basisWorkComplete(replacementWork)
                 pendingAppendSolve = true
             }
             publish(next)
@@ -244,7 +246,7 @@ internal class LpScopedSolver(
             if (old < state.model.n) old else next.model.n + rowMap[old - state.model.n]
         }
         val attempt = current.appendReplacement(next, rowMap, columnMap, mode, token)
-        recordAppendWork(attempt.basisWork)
+        recordAppendWork(attempt.basisWork, attempt.basisWorkComplete)
         val accepted = attempt.replacement
         if (accepted == null) {
             lastAppendDecline = attempt.decline ?: LpAppendTransferDecline.UNSUPPORTED
@@ -286,34 +288,43 @@ internal class LpScopedSolver(
     private fun saturatingAdd(left: Long, right: Long): Long =
         if (left > Long.MAX_VALUE - right) Long.MAX_VALUE else left + right
 
-    private fun recordAppendWork(work: Long?) {
-        if (work == null) {
+    private fun recordAppendWork(work: Long?, complete: Boolean = work != null) {
+        if (work != null) appendBasisWork = saturatingAdd(appendBasisWork, work)
+        if (!complete || work == null) {
             appendUnknownWork = saturatingAdd(appendUnknownWork, 1)
-        } else {
-            appendBasisWork = saturatingAdd(appendBasisWork, work)
         }
     }
 
     private fun recordAppendWork(work: com.eignex.klause.simplex.basis.BasisOperationWork?) {
-        recordAppendWork(knownBasisWork(work))
+        recordAppendWork(basisWorkUnits(work), basisWorkComplete(work))
     }
 
     private fun knownBasisWork(work: com.eignex.klause.simplex.basis.BasisOperationWork?): Long? =
         work?.takeIf { it.complete && !it.saturated }?.units
 
+    private fun basisWorkUnits(work: com.eignex.klause.simplex.basis.BasisOperationWork?): Long? =
+        work?.takeUnless { it.saturated }?.units
+
+    private fun basisWorkComplete(work: com.eignex.klause.simplex.basis.BasisOperationWork?): Boolean =
+        work != null && work.complete && !work.saturated
+
     @Suppress("TooGenericExceptionCaught")
     private fun recordPendingAppendSolve(current: PersistentLpSolver) {
         if (!pendingAppendSolve) return
         val before = pendingAppendSolveWork
+        val beforeComplete = pendingAppendSolveWorkComplete
         try {
-            val after = knownBasisWork(current.basisLifecycleWork)
-            recordAppendWork(if (before != null && after != null && after >= before) after - before else null)
+            val afterWork = current.basisLifecycleWork
+            val after = basisWorkUnits(afterWork)
+            val delta = if (before != null && after != null && after >= before) after - before else null
+            recordAppendWork(delta, beforeComplete && basisWorkComplete(afterWork))
         } catch (failure: Throwable) {
             appendUnknownWork = saturatingAdd(appendUnknownWork, 1)
             throw failure
         } finally {
             pendingAppendSolve = false
             pendingAppendSolveWork = null
+            pendingAppendSolveWorkComplete = false
         }
     }
 
