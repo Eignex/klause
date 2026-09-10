@@ -310,11 +310,17 @@ internal sealed interface BasisRestartResult {
 }
 
 internal class EngineBasisRestartSnapshot private constructor(
-    private val owner: BasisSolver,
-    private val identity: BasisMatrixIdentity,
-    private val captured: EngineBasisState,
-    private val factors: BasisSnapshot?,
+    owner: BasisSolver,
+    identity: BasisMatrixIdentity,
+    captured: EngineBasisState,
+    factors: BasisSnapshot?,
+    onClose: ((EngineBasisRestartSnapshot) -> Unit)?,
 ) : AutoCloseable {
+    private var owner: BasisSolver? = owner
+    private var identity: BasisMatrixIdentity? = identity
+    private var captured: EngineBasisState? = captured
+    private var factors: BasisSnapshot? = factors
+    private var onClose: ((EngineBasisRestartSnapshot) -> Unit)? = onClose
     private var closed = false
 
     fun restore(
@@ -323,6 +329,10 @@ internal class EngineBasisRestartSnapshot private constructor(
         currentBounds: Array<BasisBoundState>,
         cancellation: Cancellation = Cancellation.Never,
     ): BasisRestartResult? {
+        val owner = owner ?: return null
+        val identity = identity ?: return null
+        val captured = captured ?: return null
+        val factors = factors
         if (closed || target !== owner || currentIdentity != identity) return null
         if (cancellation()) {
             close()
@@ -355,10 +365,29 @@ internal class EngineBasisRestartSnapshot private constructor(
         return BasisRestartResult.Restored(normalized, restored, !restored)
     }
 
+    @Suppress("TooGenericExceptionCaught")
     override fun close() {
         if (closed) return
         closed = true
-        factors?.close()
+        val factors = factors
+        val onClose = onClose
+        owner = null
+        identity = null
+        captured = null
+        this.factors = null
+        this.onClose = null
+        var failure: Throwable? = null
+        try {
+            factors?.close()
+        } catch (cleanup: Throwable) {
+            failure = cleanup
+        }
+        try {
+            onClose?.invoke(this)
+        } catch (cleanup: Throwable) {
+            if (failure == null) failure = cleanup else failure.addSuppressed(cleanup)
+        }
+        if (failure != null) throw failure
     }
 
     companion object {
@@ -367,6 +396,7 @@ internal class EngineBasisRestartSnapshot private constructor(
             identity: BasisMatrixIdentity,
             state: EngineBasisState,
             cancellation: Cancellation = Cancellation.Never,
+            onClose: ((EngineBasisRestartSnapshot) -> Unit)? = null,
         ): EngineBasisRestartSnapshot? {
             if (cancellation() || !validBasisSnapshotShape(owner, identity, state)) return null
             if (cancellation()) return null
@@ -386,6 +416,7 @@ internal class EngineBasisRestartSnapshot private constructor(
                 identity.copy(rowIds = identity.rowIds.toList()),
                 EngineBasisState(state.headings, state.statuses, state.ownerColumns, state.ownerUnitRows),
                 factors,
+                onClose,
             )
         }
     }

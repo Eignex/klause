@@ -9,6 +9,7 @@ import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
@@ -97,6 +98,33 @@ class RevisedSimplexSnapshotTest {
         }
     }
 
+    @Test
+    fun `restart cleanup unregisters closed handles and completes after failures`() {
+        val trail = LpBoundTrail(model(ExactLpNumber.of(1L)))
+        val tracker = SnapshotCleanupTracker()
+        val solver = RevisedSimplex(
+            assertNotNull(trail.state.toWorkingModel()),
+            basisSolverFactory = { matrix -> SnapshotCleanupSolver(KotlinBasisSolver(matrix), tracker) },
+        )
+        solveCurrent(solver, trail)
+        val first = assertNotNull(solver.captureBasisRestart())
+        assertNotNull(solver.captureBasisRestart())
+        assertNotNull(solver.captureBasisRestart())
+        assertEquals(3, solver.liveBasisRestartSnapshots)
+
+        first.close()
+        assertEquals(2, solver.liveBasisRestartSnapshots)
+        val failure = assertFailsWith<IllegalStateException> { solver.close() }
+
+        assertEquals("snapshot 2", failure.message)
+        assertEquals(listOf("snapshot 3", "owner"), failure.suppressedExceptions.map { it.message })
+        assertEquals(3, tracker.snapshotCloses)
+        assertEquals(1, tracker.ownerCloses)
+        assertEquals(0, solver.liveBasisRestartSnapshots)
+        solver.close()
+        assertEquals(1, tracker.ownerCloses)
+    }
+
     private fun model(cost: ExactLpNumber): ExactLpModel {
         val zero = ExactLpNumber.of(0L)
         val minusOne = ExactLpNumber.of(-1L)
@@ -128,4 +156,31 @@ private class StatusOnlySnapshotSolver(private val delegate: BasisSolver) : Basi
 private class BadQualitySolver(private val delegate: BasisSolver) : BasisSolver by delegate {
     override fun solveQuality(rhs: DoubleArray, solution: IndexedVector, transpose: Boolean): BasisSolveQuality =
         BasisSolveQuality(1e-4, 1e-4)
+}
+
+private class SnapshotCleanupTracker {
+    var snapshots = 0
+    var snapshotCloses = 0
+    var ownerCloses = 0
+}
+
+private class SnapshotCleanupSolver(
+    private val delegate: BasisSolver,
+    private val tracker: SnapshotCleanupTracker,
+) : BasisSolver by delegate {
+    override fun snapshot(): BasisSnapshot {
+        val id = ++tracker.snapshots
+        return object : BasisSnapshot {
+            override fun close() {
+                tracker.snapshotCloses++
+                if (id > 1) throw IllegalStateException("snapshot $id")
+            }
+        }
+    }
+
+    override fun close() {
+        tracker.ownerCloses++
+        delegate.close()
+        throw IllegalStateException("owner")
+    }
 }

@@ -6,6 +6,7 @@ import com.eignex.klause.simplex.basis.BasisExtensionResult
 import com.eignex.klause.simplex.basis.BasisOperationWork
 import com.eignex.klause.simplex.basis.BasisPhaseWork
 import com.eignex.klause.simplex.basis.BasisRepair
+import com.eignex.klause.simplex.basis.BasisSnapshot
 import com.eignex.klause.simplex.basis.BasisSolver
 import com.eignex.klause.simplex.basis.BasisUpdate
 import com.eignex.klause.simplex.basis.IndexedVector
@@ -23,6 +24,7 @@ class LpScopedBasisTransferTest {
     @Test
     fun `repaired mixed headings transfer and restore on the replacement owner`() {
         val repairedOwners = mutableListOf<MixedRepairBasisSolver>()
+        val transferredPolicyBaselines = mutableListOf<RefactorPolicyMetrics>()
         val factory = object : LpEngineFactory by ProductionLpEngineFactory {
             override fun newPersistentSolver(
                 model: LpModel,
@@ -31,17 +33,35 @@ class LpScopedBasisTransferTest {
                 iterationLimit: Int,
                 workLimit: Long,
                 trackDegeneracy: Boolean,
-            ): PersistentLpSolver = RevisedSimplex(
-                model,
-                cancellation,
-                refactorUpdateLimit = 1,
-                iterationLimit = iterationLimit,
-                workLimit = workLimit,
-                trackDegeneracy = trackDegeneracy,
-                basisSolverFactory = { matrix ->
-                    MixedRepairBasisSolver(KotlinBasisSolver(matrix), model.n).also { repairedOwners.add(it) }
-                },
-            )
+            ): PersistentLpSolver {
+                val delegate = RevisedSimplex(
+                    model,
+                    cancellation,
+                    refactorUpdateLimit = 64,
+                    iterationLimit = iterationLimit,
+                    workLimit = workLimit,
+                    trackDegeneracy = trackDegeneracy,
+                    basisSolverFactory = { matrix ->
+                        MixedRepairBasisSolver(KotlinBasisSolver(matrix)).also { repairedOwners.add(it) }
+                    },
+                )
+                return object : PersistentLpSolver by delegate {
+                    override fun appendReplacement(
+                        next: LpExactState,
+                        oldRowsInNew: IntArray,
+                        oldColumnsInNew: IntArray,
+                        mode: LpAppendReplacementMode,
+                        token: Cancellation,
+                    ): LpAppendReplacementAttempt {
+                        val attempt = delegate.appendReplacement(next, oldRowsInNew, oldColumnsInNew, mode, token)
+                        val replacement = attempt.replacement?.solver
+                        if (replacement is RevisedSimplex) {
+                            transferredPolicyBaselines.add(replacement.lastRefactorPolicyMetrics)
+                        }
+                        return attempt
+                    }
+                }
+            }
         }
         LpScopedSolver(
             LpExactState(repairCompositionModel()),
@@ -50,9 +70,16 @@ class LpScopedBasisTransferTest {
             appendSelection = LpAppendSelection.FORCE_TRANSFER,
         ).use { solver ->
             B5bIndependentExactSourceValidator.validate(solver.state, assertNotNull(solver.solve()))
-            assertTrue(repairedOwners.any { it.installedMixedRepair })
+            val recoverySnapshot = assertNotNull(solver.captureBasisRestart())
+            val repairedOwner = repairedOwners.single()
+            repairedOwner.armRepair()
+            assertTrue(solver.restoreBasisRestart(recoverySnapshot))
+            recoverySnapshot.close()
+            assertTrue(repairedOwner.installedMixedRepair)
 
             assertTrue(solver.append(lowerRow(3, 2), scoped = false))
+            assertTrue(repairedOwners.any { it.extendedMixedRepair })
+            assertNotNull(transferredPolicyBaselines.single().freshFactorNnz)
             val transferred = assertNotNull(solver.solve())
             B5bIndependentExactSourceValidator.validate(solver.state, transferred)
             assertEquals(1, solver.metrics.appendTransfers)
@@ -1207,34 +1234,43 @@ class LpScopedBasisTransferTest {
     }
 }
 
-private class MixedRepairBasisSolver(private val delegate: BasisSolver, private val structuralColumns: Int) :
-    BasisSolver by delegate {
-    private var ordinaryAttempts = 0
+private class MixedRepairBasisSolver(private val delegate: BasisSolver) : BasisSolver by delegate {
+    private var repairArmed = false
     var installedMixedRepair = false
         private set
+    var extendedMixedRepair = false
+        private set
+
+    fun armRepair() {
+        repairArmed = true
+    }
 
     override fun refactorize(basicIndex: IntArray): Boolean {
-        ordinaryAttempts++
-        return ordinaryAttempts != 2 && delegate.refactorize(basicIndex)
+        if (!repairArmed) return delegate.refactorize(basicIndex)
+        repairArmed = false
+        return false
     }
 
     override fun refactorizeRepairing(basicIndex: IntArray): BasisRepair? {
         if (n < 2) return null
-        val columns = IntArray(n) { -1 }
-        val unitRows = IntArray(n) { it }
-        columns[1] = 1
-        unitRows[1] = -1
-        val headings = IntArray(n) { slot ->
-            if (columns[slot] >= 0) columns[slot] else structuralColumns + unitRows[slot]
-        }
-        if (!delegate.refactorize(headings)) return null
-        installedMixedRepair = true
-        return BasisRepair(columns, unitRows)
+        val requested = IntArray(n)
+        requested[n - 1] = 1
+        val repair = delegate.refactorizeRepairing(requested) ?: return null
+        installedMixedRepair = repair.repaired
+        return repair
     }
 
-    override fun update(pivotRow: Int, entering: Int, spike: IndexedVector, pivotEta: IndexedVector?): BasisUpdate {
-        val outcome = delegate.update(pivotRow, entering, spike, pivotEta)
-        return if (outcome == BasisUpdate.SINGULAR) BasisUpdate.SINGULAR else BasisUpdate.REFACTORIZE
+    override fun snapshot(): BasisSnapshot? = null
+
+    override fun extend(matrix: SparseMatrix, extension: BasisExtension): BasisExtensionResult? {
+        val requested = extension.basis
+        assertTrue(installedMixedRepair)
+        assertTrue(
+            requested.repaired,
+            "columns=${requested.columns.contentToString()} units=${requested.unitRows.contentToString()}",
+        )
+        extendedMixedRepair = true
+        return delegate.extend(matrix, extension)
     }
 }
 

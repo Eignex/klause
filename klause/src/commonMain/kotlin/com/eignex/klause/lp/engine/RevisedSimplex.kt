@@ -194,6 +194,7 @@ internal class RevisedSimplex(
 
     internal val lastBasisRepairMetrics: BasisRepairMetrics get() = basisRepairer.metrics
     internal val lastRefactorPolicyMetrics: RefactorPolicyMetrics get() = refactorPolicy.metrics
+    internal val liveBasisRestartSnapshots: Int get() = restartSnapshots.size
 
     /** Whether [basisSolver] currently factorizes the seated [basicVar]. False before the first
      *  factorization and after one came back singular. */
@@ -346,10 +347,17 @@ internal class RevisedSimplex(
 
     @Suppress("TooGenericExceptionCaught")
     override fun close() {
-        restartSnapshots.forEach { it.close() }
+        val snapshots = restartSnapshots.toList()
         restartSnapshots.clear()
-        val current = basisSolver
         var failure: Throwable? = null
+        for (snapshot in snapshots) {
+            try {
+                snapshot.close()
+            } catch (cleanup: Throwable) {
+                if (failure == null) failure = cleanup else failure.addSuppressed(cleanup)
+            }
+        }
+        val current = basisSolver
         if (current != null) {
             try {
                 val work = current.basisOperationWork ?: BasisOperationWork(complete = false)
@@ -825,6 +833,7 @@ internal class RevisedSimplex(
             basisMatrixIdentity() ?: return null,
             EngineBasisState(basicVar, status, ownerColumns, ownerUnitRows),
             token,
+            onClose = { restartSnapshots.remove(it) },
         ) ?: return null
         restartSnapshots.add(snapshot)
         return snapshot
@@ -1062,11 +1071,7 @@ internal class RevisedSimplex(
         basisFactorized = true
         basisKept = true
         nnzB = basicVar.sumOf { columnNnz(it) }
-        if (m > 0 && nnzB > 0) {
-            val held = replacement.solver.nnz.toDouble()
-            maxLuFill = held / nnzB
-            maxLuDensity = held / (m.toDouble() * m.toDouble())
-        }
+        recordFactorization(replacement.solver, basisChanged = true)
         return Basis(basicVar.copyOf(), status.copyOf(), captureEligible = false)
     }
 
