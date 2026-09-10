@@ -39,6 +39,7 @@ import com.eignex.klause.lp.engine.Sense
 import com.eignex.klause.lp.engine.TableauCutSolver
 import com.eignex.klause.meta.alns.Alns
 import com.eignex.klause.meta.alns.DestroyOperator
+import com.eignex.klause.meta.alns.FreedVars
 import com.eignex.klause.meta.alns.RepairOperator
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.ClauseExchange
@@ -399,7 +400,11 @@ class LpLifecycleTest {
         }
         val alns = Alns(
             inner = LocalSearchSolver(problem),
-            destroyOperators = listOf(DestroyOperator.Random),
+            destroyOperators = listOf(
+                DestroyOperator { _, _, _, _, _ ->
+                    FreedVars(IntArray(0), intArrayOf(0, 1, 2))
+                },
+            ),
             repairOperators = listOf(repair),
             minDestroyFraction = 0.5,
             maxDestroyFraction = 0.5,
