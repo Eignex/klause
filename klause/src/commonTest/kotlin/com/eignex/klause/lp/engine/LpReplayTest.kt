@@ -1,5 +1,7 @@
 package com.eignex.klause.lp.engine
 
+import com.eignex.klause.simplex.exact.BigFraction
+import com.ionspin.kotlin.bignum.integer.BigInteger
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -10,6 +12,158 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class LpReplayTest {
+    @Test
+    fun `exact replay preserves active witnesses across objective and origin changes`() {
+        val zero = ExactLpNumber.of(0L)
+        val model = ExactLpModel(
+            listOf(emptyList()),
+            emptyList(),
+            listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(ExactLpNumber.of(10L))))),
+            emptyList(),
+            ExactLpObjective(listOf(ExactLpNumber.of(1L))),
+        )
+        val premises = ExactLpPremises(listOf(ExactLpPremise(3, false, ExactLpNumber.of(2L))), listOf(19))
+        val capture = LpExactCapture.capture(
+            model,
+            persistentSettings("exact edits"),
+            listOf(
+                LpExactReplayEvent.Solve(),
+                LpExactReplayEvent.Push(),
+                LpExactReplayEvent.Assert(0, false, ExactLpSide(ExactLpNumber.of(2L), premises = premises), 41L),
+                LpExactReplayEvent.Solve(),
+                LpExactReplayEvent.Objective(ExactLpObjective(listOf(ExactLpNumber.of(-1L)))),
+                LpExactReplayEvent.Recenter(listOf(ExactLpNumber.of(1L))),
+                LpExactReplayEvent.Solve(),
+                LpExactReplayEvent.Pop(0),
+                LpExactReplayEvent.Solve(),
+            ),
+        )
+
+        val report = LpExactReplay.replay(LpExactCapture.decode(capture.encode()))
+
+        assertNull(report.declinedEventIndex)
+        assertTrue(report.steps.all { it.accepted })
+        assertEquals(9, report.steps.size)
+        val asserted = report.steps[3]
+        assertEquals(1L, asserted.state.boundRevision)
+        assertEquals(0L, asserted.state.objectiveRevision)
+        assertEquals(listOf(0), asserted.state.scopes)
+        assertEquals(41L, asserted.state.assertions.single().witness)
+        assertEquals(premises, asserted.state.assertions.single().side.premises)
+        val tightened = assertNotNull(asserted.result)
+        assertEquals(BigFraction.ofLong(2L), assertNotNull(tightened.witness).primal.single())
+        assertEquals(BigFraction.ofLong(2L), tightened.lowerBound)
+        val shifted = report.steps[6]
+        assertEquals(0L, shifted.state.matrixRevision)
+        assertEquals(2L, shifted.state.boundRevision)
+        assertEquals(2L, shifted.state.objectiveRevision)
+        assertEquals(ExactLpNumber.of(1L), shifted.state.model.column(0).origin)
+        assertEquals(41L, shifted.state.assertions.single().witness)
+        assertEquals(BigFraction.ofLong(10L), assertNotNull(shifted.result?.witness).primal.single())
+        assertEquals(BigFraction.ofLong(-10L), shifted.result.lowerBound)
+        assertTrue(report.steps.last().state.assertions.isEmpty())
+        assertEquals(3L, report.steps.last().state.boundRevision)
+        assertEquals(1L, report.steps.last().state.popRevision)
+        assertEquals(2L, report.steps.last().state.objectiveRevision)
+        assertTrue(report.steps.last().state.popRevision > asserted.state.popRevision)
+    }
+
+    @Test
+    fun `exact replay preflight rejects unsupported later projection`() {
+        val zero = ExactLpNumber.of(0L)
+        val model = ExactLpModel(
+            listOf(emptyList()),
+            emptyList(),
+            listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero)))),
+            emptyList(),
+            ExactLpObjective(listOf(zero)),
+        )
+        val huge = ExactLpNumber.of(BigFraction.of(BigInteger.ONE shl 2048, BigInteger.ONE))
+        val capture = LpExactCapture.capture(
+            model,
+            persistentSettings("unsupported projection"),
+            listOf(LpExactReplayEvent.Solve(), LpExactReplayEvent.Assert(0, false, ExactLpSide(huge), 7L)),
+        )
+
+        assertFails { LpExactReplay.replay(capture) }
+    }
+
+    @Test
+    fun `exact replay preflight rejects invalid backjump after solve`() {
+        val zero = ExactLpNumber.of(0L)
+        val model = ExactLpModel(
+            listOf(emptyList()),
+            emptyList(),
+            listOf(ExactLpColumn(ExactLpBounds())),
+            emptyList(),
+            ExactLpObjective(listOf(zero)),
+        )
+        val capture = LpExactCapture.capture(
+            model,
+            persistentSettings("bad pop"),
+            listOf(LpExactReplayEvent.Solve(), LpExactReplayEvent.Pop(1)),
+        )
+
+        assertFails { LpExactReplay.replay(capture) }
+    }
+
+    @Test
+    fun `exact replay cancellation declines before any event claim`() {
+        val zero = ExactLpNumber.of(0L)
+        val model = ExactLpModel(
+            listOf(emptyList()),
+            emptyList(),
+            listOf(ExactLpColumn(ExactLpBounds())),
+            emptyList(),
+            ExactLpObjective(listOf(zero)),
+        )
+        val settings = LpReplaySettings(
+            "cancelled exact",
+            0L,
+            LpReplaySolverKind.PERSISTENT,
+            componentSplit = false,
+            cancellationPollLimit = 1,
+        )
+
+        val report = LpExactReplay.replay(LpExactCapture.capture(model, settings, listOf(LpExactReplayEvent.Solve())))
+
+        assertEquals(-1, report.declinedEventIndex)
+        assertTrue(report.steps.isEmpty())
+    }
+
+    @Test
+    fun `exact replay cancelled solve stops without publishing a claim`() {
+        val zero = ExactLpNumber.of(0L)
+        val model = ExactLpModel(
+            listOf(emptyList()),
+            emptyList(),
+            listOf(ExactLpColumn(ExactLpBounds())),
+            emptyList(),
+            ExactLpObjective(listOf(zero)),
+        )
+        val settings = LpReplaySettings(
+            "cancelled solve",
+            0L,
+            LpReplaySolverKind.PERSISTENT,
+            componentSplit = false,
+            cancellationPollLimit = 5,
+        )
+        val capture = LpExactCapture.capture(
+            model,
+            settings,
+            listOf(LpExactReplayEvent.Solve(), LpExactReplayEvent.Push()),
+        )
+
+        val report = LpExactReplay.replay(capture)
+
+        assertEquals(0, report.declinedEventIndex)
+        val step = report.steps.single()
+        assertFalse(step.accepted)
+        assertTrue(step.cancelled)
+        assertNull(step.result)
+        assertEquals(0, step.state.depth)
+    }
+
     @Test
     fun `persistent replay executes solve rebind and resolve through the seam`() {
         val builder = LpBuilder()

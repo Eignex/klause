@@ -6,10 +6,14 @@ import com.eignex.klause.lp.engine.Relation
 import com.eignex.klause.lp.engine.RevisedSimplex
 import com.eignex.klause.lp.engine.Sense
 import com.eignex.klause.lp.engine.integerDualLowerBoundCeil
+import com.eignex.klause.simplex.exact.BigFraction
 import kotlin.math.abs
 import kotlin.math.ceil
 import kotlin.random.Random
 import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 /**
@@ -18,6 +22,114 @@ import kotlin.test.assertTrue
  * bound-flipping ratio test must take the long step when an entering variable hits its own bound first.
  */
 class RevisedSimplexPrimalTest {
+
+    @Test
+    fun `native lower upper free and fixed seats certify their source optimum`() {
+        val zero = ExactLpNumber.of(0L)
+        val one = ExactLpNumber.of(1L)
+        val three = ExactLpNumber.of(3L)
+        val model = ExactLpModel(
+            List(4) { listOf(ExactLpEntry(0, one)) },
+            listOf(ExactLpNumber.of(10L)),
+            listOf(
+                ExactLpColumn(ExactLpBounds(lower = ExactLpSide(ExactLpNumber.of(2L)))),
+                ExactLpColumn(ExactLpBounds(upper = ExactLpSide(ExactLpNumber.of(-1L)))),
+                ExactLpColumn(ExactLpBounds()),
+                ExactLpColumn(ExactLpBounds(ExactLpSide(three), ExactLpSide(three))),
+                ExactLpColumn(ExactLpBounds()),
+            ),
+            listOf(ExactLpRow()),
+            ExactLpObjective(listOf(one, ExactLpNumber.of(-1L), zero, ExactLpNumber.of(7L), zero)),
+        )
+
+        val certified = solveAndCertify(model)
+
+        assertEquals(LpVerdict.ATTAINED_OPTIMUM, certified.verdict)
+        assertEquals(listOf(2L, -1L, 0L, 3L).map(BigFraction::ofLong), certified.exactPrimal)
+        assertEquals(BigFraction.ofLong(24L), certified.lowerBound)
+        val statuses = assertNotNull(certified.float).basis.status
+        assertEquals(VarStatus.AT_LOWER, statuses[0])
+        assertEquals(VarStatus.AT_UPPER, statuses[1])
+        assertEquals(VarStatus.FREE, statuses[2])
+        assertEquals(VarStatus.FIXED, statuses[3])
+        val support = assertNotNull(assertNotNull(certified.bound).support)
+        assertEquals(setOf(-1L, -4L, -7L), support.sides.map { it.witness }.toSet())
+    }
+
+    @Test
+    fun `nonzero logical cost repairs a feasible but dual infeasible initial basis`() {
+        val zero = ExactLpNumber.of(0L)
+        val one = ExactLpNumber.of(1L)
+        val box = ExactLpBounds(ExactLpSide(zero), ExactLpSide(one))
+        val model = ExactLpModel(
+            listOf(listOf(ExactLpEntry(0, one))),
+            listOf(one),
+            listOf(ExactLpColumn(box), ExactLpColumn(box)),
+            listOf(ExactLpRow()),
+            ExactLpObjective(listOf(zero, one)),
+        )
+
+        val certified = solveAndCertify(model)
+
+        assertEquals(LpVerdict.ATTAINED_OPTIMUM, certified.verdict)
+        assertEquals(listOf(BigFraction.ONE), certified.exactPrimal)
+        assertEquals(BigFraction.ZERO, certified.lowerBound)
+    }
+
+    @Test
+    fun `a free structural column can enter phase one against a fixed slack`() {
+        val zero = ExactLpNumber.of(0L)
+        val one = ExactLpNumber.of(1L)
+        val model = ExactLpModel(
+            listOf(listOf(ExactLpEntry(0, one))),
+            listOf(ExactLpNumber.of(2L)),
+            listOf(
+                ExactLpColumn(ExactLpBounds()),
+                ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(zero))),
+            ),
+            listOf(ExactLpRow()),
+            ExactLpObjective(listOf(one, zero)),
+        )
+        val working = assertNotNull(LpExactState(model).toWorkingModel())
+
+        RevisedSimplex(working).use { solver ->
+            val result = assertNotNull(solver.solvePrimal())
+            val certified = certifyLpResult(working, solver, result)
+
+            assertEquals(LpVerdict.ATTAINED_OPTIMUM, certified.verdict)
+            assertEquals(listOf(BigFraction.ofLong(2L)), certified.exactPrimal)
+            assertEquals(BigFraction.ofLong(2L), certified.lowerBound)
+            assertEquals(VarStatus.BASIC, result.basis.status[0])
+            assertEquals(VarStatus.FIXED, result.basis.status[1])
+        }
+    }
+
+    @Test
+    fun `distinct exact endpoints sharing a double do not export a fixed status`() {
+        val zero = ExactLpNumber.of(0L)
+        val one = ExactLpNumber.of(1L)
+        val lower = ExactLpNumber.of(9007199254740992L)
+        val upper = ExactLpNumber.of(9007199254740993L)
+        val model = ExactLpModel(
+            listOf(listOf(ExactLpEntry(0, one))),
+            listOf(lower),
+            listOf(
+                ExactLpColumn(ExactLpBounds(ExactLpSide(lower), ExactLpSide(upper))),
+                ExactLpColumn(ExactLpBounds()),
+            ),
+            listOf(ExactLpRow()),
+            ExactLpObjective(listOf(one, zero)),
+        )
+
+        val certified = solveAndCertify(model)
+
+        assertEquals(LpVerdict.ATTAINED_OPTIMUM, certified.verdict)
+        assertEquals(listOf(lower.value), certified.exactPrimal)
+        assertEquals(lower.value, certified.lowerBound)
+        assertEquals(VarStatus.AT_LOWER, assertNotNull(certified.float).basis.status[0])
+        assertFalse(model.column(0).bounds.fixed)
+        assertEquals(lower.value.toDouble(), upper.value.toDouble())
+    }
 
     /** `≤`-rows with nonnegative rhs over a bounded box: feasible at the all-lower start the primal
      *  pass begins from, and bounded since every variable has a finite upper bound. */

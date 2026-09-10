@@ -321,7 +321,13 @@ private fun unsupported(index: Int, operation: String): Nothing =
 
 private class PollBudgetCancellation(private val pollLimit: Int) : Cancellation {
     private var polls = 0
-    override fun isCancelled(): Boolean = pollLimit > 0 && ++polls >= pollLimit
+    var cancelled: Boolean = false
+        private set
+
+    override fun isCancelled(): Boolean {
+        if (pollLimit > 0 && ++polls >= pollLimit) cancelled = true
+        return cancelled
+    }
 }
 
 private class ReplayObserver : LpCertificationObserver {
@@ -351,3 +357,118 @@ private class ReplayObserver : LpCertificationObserver {
 }
 
 private fun DoubleArray.toRawBitsArray(): LongArray = LongArray(size) { this[it].toRawBits() }
+
+internal class LpExactReplayStep(
+    val eventIndex: Int,
+    val state: LpExactState,
+    val accepted: Boolean,
+    val result: CertifiedLpResult?,
+    val metrics: LpSolveMetrics,
+    val cancelled: Boolean = false,
+)
+
+internal class LpExactReplayReport(
+    val label: String,
+    val seed: Long,
+    val steps: List<LpExactReplayStep>,
+    val declinedEventIndex: Int? = null,
+)
+
+internal object LpExactReplay {
+    fun replay(capture: LpExactCapture): LpExactReplayReport {
+        val states = preflight(capture)
+        val settings = capture.settings
+        val cancellation = PollBudgetCancellation(settings.cancellationPollLimit)
+        var state = states.first()
+        var model = requireNotNull(state.toWorkingModel())
+        val steps = ArrayList<LpExactReplayStep>()
+        newPersistentLpSolver(
+            model,
+            cancellation,
+            settings.refactorUpdateLimit,
+            settings.pivotLimit,
+            settings.workLimit,
+            settings.trackDegeneracy,
+        ).use { solver ->
+            if (!solver.adopt(state, cancellation)) {
+                return LpExactReplayReport(settings.label, settings.seed, steps, -1)
+            }
+            var solved = false
+            capture.events.forEachIndexed { index, event ->
+                val next = states[index + 1]
+                if (!solver.adopt(next, cancellation)) {
+                    steps += LpExactReplayStep(index, state, false, null, LpSolveMetrics(), cancellation.cancelled)
+                    return LpExactReplayReport(settings.label, settings.seed, steps, index)
+                }
+                state = next
+                model = requireNotNull(state.toWorkingModel())
+                if (event is LpExactReplayEvent.Solve) {
+                    val warm = event.warm
+                    val result = if (!solved || warm != null) solver.solve(warm) else solver.resolveBounds()
+                    solved = true
+                    val metrics = solver.lastMetrics
+                    if (cancellation.cancelled) {
+                        steps += LpExactReplayStep(index, state, false, null, metrics, cancelled = true)
+                        return LpExactReplayReport(settings.label, settings.seed, steps, index)
+                    }
+                    val certified = certifyLpResult(model, solver, result, cancellation)
+                    if (cancellation.cancelled) {
+                        steps += LpExactReplayStep(index, state, false, null, metrics, cancelled = true)
+                        return LpExactReplayReport(settings.label, settings.seed, steps, index)
+                    }
+                    steps += LpExactReplayStep(index, state, true, certified, metrics)
+                } else {
+                    steps += LpExactReplayStep(index, state, true, null, LpSolveMetrics())
+                }
+            }
+        }
+        return LpExactReplayReport(settings.label, settings.seed, steps)
+    }
+
+    private fun preflight(capture: LpExactCapture): List<LpExactState> {
+        capture.validateFormat()
+        require(capture.settings.solverKind == LpReplaySolverKind.PERSISTENT && !capture.settings.componentSplit) {
+            "exact replay requires the persistent solver without component splitting"
+        }
+        val trail = LpBoundTrail(capture.model)
+        val states = ArrayList<LpExactState>(capture.events.size + 1)
+        requireNotNull(trail.state.toWorkingModel()) { "initial exact replay model has no supported projection" }
+        states += trail.state
+        capture.events.forEachIndexed { index, event ->
+            val accepted = when (event) {
+                is LpExactReplayEvent.Push -> trail.push(Cancellation.Never)
+
+                is LpExactReplayEvent.Assert ->
+                    trail.assertBound(event.column, event.upper, event.side, event.witness, Cancellation.Never)
+
+                is LpExactReplayEvent.Pop -> trail.pop(event.targetDepth, Cancellation.Never)
+
+                is LpExactReplayEvent.Objective -> trail.replaceObjective(event.objective, Cancellation.Never)
+
+                is LpExactReplayEvent.Recenter -> trail.recenter(event.origins, Cancellation.Never)
+
+                is LpExactReplayEvent.Solve -> {
+                    event.warm?.let { requireValidExactWarm(it, trail.state.model) }
+                    true
+                }
+            }
+            require(accepted) { "unsupported exact replay transition at event $index" }
+            requireNotNull(trail.state.toWorkingModel()) { "unsupported exact replay projection at event $index" }
+            states += trail.state
+        }
+        return states
+    }
+}
+
+private fun requireValidExactWarm(basis: Basis, model: ExactLpModel) {
+    val statuses = basis.status.map {
+        when (it) {
+            VarStatus.BASIC -> ExactLpStatus.BASIC
+            VarStatus.AT_LOWER -> ExactLpStatus.AT_LOWER
+            VarStatus.AT_UPPER -> ExactLpStatus.AT_UPPER
+            VarStatus.FIXED -> ExactLpStatus.FIXED
+            VarStatus.FREE -> ExactLpStatus.FREE
+        }
+    }
+    require(ExactLpBasis(basis.basicVars.toList(), statuses).validFor(model)) { "invalid exact replay warm basis" }
+}

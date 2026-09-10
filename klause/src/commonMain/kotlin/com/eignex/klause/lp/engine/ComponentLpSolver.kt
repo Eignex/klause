@@ -27,6 +27,9 @@ internal class ComponentLpSolver(
     private val solvers: List<LpSolver>,
     private val isolated: IntArray,
 ) : ComponentLpSolverCapability {
+    init {
+        require(model.exactState == null) { "exact state component reconstruction is unsupported" }
+    }
     private val certificationKey = exactLpStateKey(model)
     private var blockResults: List<FloatLpResult>? = null
     private var metrics = LpSolveMetrics()
@@ -175,6 +178,7 @@ internal fun componentLpSolverOrNull(
     component: (LpModel, List<LpNeighborhood>, List<LpSolver>, IntArray) -> ComponentLpSolverCapability =
         ::ComponentLpSolver,
 ): ComponentLpSolverCapability? {
+    if (model.exactState != null) return null
     val n = model.n
     val m = model.m
     if (n == 0 || m < 2) return null

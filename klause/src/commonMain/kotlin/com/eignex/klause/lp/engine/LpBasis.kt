@@ -10,6 +10,10 @@ internal enum class VarStatus {
 
     /** Nonbasic, pinned to its upper bound. */
     AT_UPPER,
+
+    FIXED,
+
+    FREE,
 }
 
 /**
@@ -51,8 +55,8 @@ internal class ExactLpBasis(headings: List<Int>, statuses: List<ExactLpStatus>) 
             val bounds = model.column(j).bounds
             bounds.consistent && when (statuses[j]) {
                 ExactLpStatus.BASIC -> true
-                ExactLpStatus.AT_LOWER -> bounds.lower != null && !bounds.lower.strict
-                ExactLpStatus.AT_UPPER -> bounds.upper != null && !bounds.upper.strict
+                ExactLpStatus.AT_LOWER -> bounds.lower != null
+                ExactLpStatus.AT_UPPER -> bounds.upper != null
                 ExactLpStatus.FIXED -> bounds.fixed
                 ExactLpStatus.FREE -> bounds.lower == null && bounds.upper == null
             }
