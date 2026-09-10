@@ -194,15 +194,17 @@ internal class LpScopedSolver(
             IntArray(next.state.model.m) { next.state.model.n + it }
         }
         val replacement = selected ?: prepared(next.state, token, append) ?: return false
-        if (append && selected == null) recordAppendWork(replacement.first.basisLifecycleWork)
         var published = false
         var failure: Throwable? = null
         try {
             if (!replacement.second.basicVars.contentEquals(expected) || token()) return false
+            val replacementWork = if (append) replacement.first.basisLifecycleWork else null
+            if (append && selected == null) recordAppendWork(replacementWork)
+            val pendingWork = knownBasisWork(replacementWork)
             val old = solver
             solver = replacement.first
             if (append) {
-                pendingAppendSolveWork = replacement.first.basisLifecycleWork?.takeUnless { it.saturated }?.units
+                pendingAppendSolveWork = pendingWork
                 pendingAppendSolve = true
             }
             publish(next)
@@ -253,7 +255,12 @@ internal class LpScopedSolver(
 
     private fun appendCandidate(current: LpExactState, next: LpExactState, owner: PersistentLpSolver): Boolean {
         val appendedRows = next.model.m - current.model.m
-        if (appendedRows < 1 || current.model.m < 16 || current.model.n <= 0 || !owner.appendTransferReady) return false
+        if (
+            appendedRows < 1 || current.model.m < 16 || current.model.n <= 0 || !owner.appendTransferReady ||
+            knownBasisWork(owner.basisLifecycleWork) == null
+        ) {
+            return false
+        }
         if (current.rows.entries().any { next.rows.index(it.id) < 0 }) return false
         var oldNonzeros = 0L
         var appendedNonzeros = 0L
@@ -284,15 +291,18 @@ internal class LpScopedSolver(
     }
 
     private fun recordAppendWork(work: com.eignex.klause.simplex.basis.BasisOperationWork?) {
-        recordAppendWork(work?.takeUnless { it.saturated }?.units)
+        recordAppendWork(knownBasisWork(work))
     }
+
+    private fun knownBasisWork(work: com.eignex.klause.simplex.basis.BasisOperationWork?): Long? =
+        work?.takeIf { it.complete && !it.saturated }?.units
 
     private fun recordPendingAppendSolve(current: PersistentLpSolver) {
         if (!pendingAppendSolve) return
         pendingAppendSolve = false
         val before = pendingAppendSolveWork
         pendingAppendSolveWork = null
-        val after = current.basisLifecycleWork?.takeUnless { it.saturated }?.units
+        val after = knownBasisWork(current.basisLifecycleWork)
         recordAppendWork(if (before != null && after != null && after >= before) after - before else null)
     }
 
@@ -342,10 +352,23 @@ internal class LpScopedSolver(
             throw primary
         } finally {
             if (!accepted && candidate != null) {
-                if (recordRejectedAppendWork) recordAppendWork(candidate.basisLifecycleWork)
-                closeOwner(candidate, failure)
+                closeRejectedCandidate(candidate, recordRejectedAppendWork, failure)
             }
         }
+    }
+
+    @Suppress("TooGenericExceptionCaught")
+    private fun closeRejectedCandidate(candidate: PersistentLpSolver, recordWork: Boolean, primary: Throwable?) {
+        var failure = primary
+        if (recordWork) {
+            try {
+                recordAppendWork(candidate.basisLifecycleWork)
+            } catch (telemetry: Throwable) {
+                if (failure == null) failure = telemetry else failure.addSuppressed(telemetry)
+            }
+        }
+        closeOwner(candidate, failure)
+        if (primary == null && failure != null) throw failure
     }
 
     private fun closeOwner(owner: PersistentLpSolver, primary: Throwable? = null) {

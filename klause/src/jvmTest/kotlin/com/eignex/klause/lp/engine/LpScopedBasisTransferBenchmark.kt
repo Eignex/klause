@@ -27,13 +27,18 @@ private fun measure(dimension: Int, arm: LpAppendSelection, bean: ThreadMXBean):
     val thread = Thread.currentThread().threadId()
     val beforeBytes = bean.getThreadAllocatedBytes(thread)
     val beforeNanos = System.nanoTime()
-    var engineWork = 0L
+    val basisWork = LongArray(APPENDS)
+    val engineWork = LongArray(APPENDS)
     var result = initial
     repeat(APPENDS) { sequence ->
+        val beforeBasisWork = solver.metrics.appendBasisWork
+        val beforeUnknownWork = solver.metrics.appendUnknownWork
         check(solver.append(denseAppendedRow(dimension, sequence), scoped = true))
         result = checkNotNull(solver.solve())
         B5bIndependentExactSourceValidator.validate(solver.state, result)
-        engineWork += solver.lastMetrics.workOps
+        check(solver.metrics.appendUnknownWork == beforeUnknownWork)
+        basisWork[sequence] = solver.metrics.appendBasisWork - beforeBasisWork
+        engineWork[sequence] = solver.lastMetrics.workOps
     }
     b5bSink = b5bSink xor checkNotNull(result.lowerBound).hashCode().toLong()
     solver.close()
@@ -43,8 +48,9 @@ private fun measure(dimension: Int, arm: LpAppendSelection, bean: ThreadMXBean):
     val metrics = solver.metrics
     check(metrics.currentOwners == 0L)
     return "dimension=$dimension arm=$arm elapsedNanos=$elapsedNanos allocatedBytes=$allocatedBytes " +
-        "basisWork=${metrics.appendBasisWork} unknownWork=${metrics.appendUnknownWork} " +
-        "engineWork=$engineWork attempts=${metrics.appendReplacementAttempts} " +
+        "basisWork=${metrics.appendBasisWork} basisByAppend=${basisWork.joinToString(",")} " +
+        "unknownWork=${metrics.appendUnknownWork} engineWork=${engineWork.sum()} " +
+        "engineByAppend=${engineWork.joinToString(",")} attempts=${metrics.appendReplacementAttempts} " +
         "transfers=${metrics.appendTransfers} intendedFresh=${metrics.appendIntendedFreshBuilds} " +
         "fallbacks=${metrics.appendFallbacks} decline=${metrics.lastAppendDecline ?: "NONE"} " +
         "created=${metrics.createdOwners} closed=${metrics.closedOwners} peak=${metrics.peakOwners}"

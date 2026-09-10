@@ -1,5 +1,6 @@
 package com.eignex.klause.lp.engine
 
+import com.eignex.klause.simplex.basis.BasisOperationWork
 import com.eignex.klause.simplex.basis.BasisSolver
 import com.eignex.klause.simplex.basis.KotlinBasisSolver
 import com.eignex.klause.simplex.exact.BigFraction
@@ -75,9 +76,9 @@ class LpScopedBasisTransferTest {
     }
 
     @Test
-    fun `candidate selects a dense structural class and declines a sparse one before transfer`() {
-        for ((dense, expected) in listOf(true to 1L, false to 0L)) {
-            val model = selectorModel(dense)
+    fun `candidate selects dense and rejects sparse spiked and near singular classes`() {
+        for ((shape, expected) in listOf("dense" to 1L, "sparse" to 0L, "spiked" to 0L, "near" to 0L)) {
+            val model = selectorModel(shape)
             LpScopedSolver(
                 LpExactState(model),
                 appendSelection = LpAppendSelection.CANDIDATE,
@@ -88,7 +89,11 @@ class LpScopedBasisTransferTest {
                     solver.append(
                         LpScopedRow(
                             16,
-                            if (dense) List(2) { it to ExactLpNumber.of(1L) } else listOf(0 to ExactLpNumber.of(1L)),
+                            if (shape == "dense") {
+                                List(2) { it to ExactLpNumber.of(1L) }
+                            } else {
+                                listOf(0 to ExactLpNumber.of(1L))
+                            },
                             ExactLpNumber.of(1L),
                             ExactLpColumn(ExactLpBounds()),
                         ),
@@ -98,7 +103,50 @@ class LpScopedBasisTransferTest {
 
                 assertEquals(expected, solver.metrics.appendReplacementAttempts)
                 assertEquals(expected, solver.metrics.appendTransfers)
+                B5bIndependentExactSourceValidator.validate(solver.state, assertNotNull(solver.solve()))
             }
+        }
+    }
+
+    @Test
+    fun `candidate rejects an incomplete owner ledger before transfer`() {
+        val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+            override fun newPersistentSolver(
+                model: LpModel,
+                cancellation: Cancellation,
+                refactorUpdateLimit: Int,
+                iterationLimit: Int,
+                workLimit: Long,
+                trackDegeneracy: Boolean,
+            ): PersistentLpSolver {
+                val delegate = RevisedSimplex(model, cancellation)
+                return object : PersistentLpSolver by delegate {
+                    override val basisLifecycleWork: BasisOperationWork get() = BasisOperationWork(complete = false)
+                }
+            }
+        }
+        LpScopedSolver(
+            LpExactState(selectorModel("dense")),
+            context = LpSolveContext(engineFactory = factory),
+            appendSelection = LpAppendSelection.CANDIDATE,
+        ).use { solver ->
+            assertTrue(solver.prepare())
+
+            assertTrue(
+                solver.append(
+                    LpScopedRow(
+                        16,
+                        List(2) { it to ExactLpNumber.of(1L) },
+                        ExactLpNumber.of(1L),
+                        ExactLpColumn(ExactLpBounds()),
+                    ),
+                    scoped = false,
+                ),
+            )
+
+            assertEquals(0, solver.metrics.appendReplacementAttempts)
+            assertEquals(0, solver.metrics.appendTransfers)
+            assertEquals(1, solver.metrics.appendUnknownWork)
         }
     }
 
@@ -312,6 +360,151 @@ class LpScopedBasisTransferTest {
     }
 
     @Test
+    fun `telemetry failure before publication closes replacement and preserves old owner`() {
+        val telemetry = IllegalStateException("telemetry")
+        var owners = 0
+        var closes = 0
+        val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+            override fun newPersistentSolver(
+                model: LpModel,
+                cancellation: Cancellation,
+                refactorUpdateLimit: Int,
+                iterationLimit: Int,
+                workLimit: Long,
+                trackDegeneracy: Boolean,
+            ): PersistentLpSolver {
+                owners++
+                val replacement = owners > 1
+                val delegate = RevisedSimplex(model, cancellation)
+                return object : PersistentLpSolver by delegate {
+                    override val basisLifecycleWork: BasisOperationWork
+                        get() = if (replacement) throw telemetry else checkNotNull(delegate.basisLifecycleWork)
+
+                    override fun close() {
+                        closes++
+                        delegate.close()
+                    }
+                }
+            }
+        }
+        val solver = LpScopedSolver(
+            LpExactState(lowerBoundModel()),
+            context = LpSolveContext(engineFactory = factory),
+        )
+        val initial = assertNotNull(solver.solve())
+        val state = solver.state
+
+        val thrown = assertFailsWith<IllegalStateException> {
+            solver.append(lowerRow(1, 2), scoped = false)
+        }
+
+        assertTrue(thrown === telemetry)
+        assertTrue(solver.state === state)
+        assertTrue(solver.lastResult === initial)
+        assertEquals(1, closes)
+        B5bIndependentExactSourceValidator.validate(solver.state, assertNotNull(solver.solve()))
+        solver.close()
+        assertEquals(2, closes)
+    }
+
+    @Test
+    fun `rejected candidate preserves primary failure over telemetry and cleanup`() {
+        val primary = IllegalStateException("primary")
+        val telemetry = IllegalArgumentException("telemetry")
+        val cleanup = UnsupportedOperationException("cleanup")
+        var owners = 0
+        val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+            override fun newPersistentSolver(
+                model: LpModel,
+                cancellation: Cancellation,
+                refactorUpdateLimit: Int,
+                iterationLimit: Int,
+                workLimit: Long,
+                trackDegeneracy: Boolean,
+            ): PersistentLpSolver {
+                owners++
+                val replacement = owners > 1
+                val delegate = RevisedSimplex(model, cancellation)
+                return object : PersistentLpSolver by delegate {
+                    override val basisLifecycleWork: BasisOperationWork
+                        get() = if (replacement) throw telemetry else checkNotNull(delegate.basisLifecycleWork)
+
+                    override fun adopt(state: LpExactState, token: Cancellation): Boolean {
+                        if (replacement) throw primary
+                        return delegate.adopt(state, token)
+                    }
+
+                    override fun close() {
+                        delegate.close()
+                        if (replacement) throw cleanup
+                    }
+                }
+            }
+        }
+        val solver = LpScopedSolver(
+            LpExactState(lowerBoundModel()),
+            context = LpSolveContext(engineFactory = factory),
+        )
+        val initial = assertNotNull(solver.solve())
+        val state = solver.state
+
+        val thrown = assertFailsWith<IllegalStateException> {
+            solver.append(lowerRow(1, 2), scoped = false)
+        }
+
+        assertTrue(thrown === primary)
+        assertEquals(listOf(telemetry, cleanup), thrown.suppressedExceptions.toList())
+        assertTrue(solver.state === state)
+        assertTrue(solver.lastResult === initial)
+        B5bIndependentExactSourceValidator.validate(solver.state, assertNotNull(solver.solve()))
+        solver.close()
+    }
+
+    @Test
+    fun `malformed transfer mapping declines before fresh fallback`() {
+        val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+            override fun newPersistentSolver(
+                model: LpModel,
+                cancellation: Cancellation,
+                refactorUpdateLimit: Int,
+                iterationLimit: Int,
+                workLimit: Long,
+                trackDegeneracy: Boolean,
+            ): PersistentLpSolver {
+                val delegate = RevisedSimplex(model, cancellation)
+                return object : PersistentLpSolver by delegate {
+                    override fun appendReplacement(
+                        next: LpExactState,
+                        oldRowsInNew: IntArray,
+                        oldColumnsInNew: IntArray,
+                        mode: LpAppendReplacementMode,
+                        token: Cancellation,
+                    ): LpAppendReplacementAttempt = delegate.appendReplacement(
+                        next,
+                        IntArray(oldRowsInNew.size) { -1 },
+                        oldColumnsInNew,
+                        mode,
+                        token,
+                    )
+                }
+            }
+        }
+        LpScopedSolver(
+            LpExactState(lowerBoundModel()),
+            context = LpSolveContext(engineFactory = factory),
+            appendSelection = LpAppendSelection.FORCE_TRANSFER,
+        ).use { solver ->
+            assertNotNull(solver.solve())
+
+            assertTrue(solver.append(lowerRow(1, 2), scoped = false))
+
+            assertEquals(1, solver.metrics.appendFallbacks)
+            assertEquals(LpAppendTransferDecline.INCOMPATIBLE_STATE, solver.metrics.lastAppendDecline)
+            B5bIndependentExactSourceValidator.validate(solver.state, assertNotNull(solver.solve()))
+        }
+    }
+
+    @Test
     fun `exact source validation uses shifted coordinates logical costs and minimized scale`() {
         val zero = ExactLpNumber.of(0L)
         val model = ExactLpModel(
@@ -365,14 +558,24 @@ class LpScopedBasisTransferTest {
         ExactLpColumn(ExactLpBounds(ExactLpSide(ExactLpNumber.of(0L)))),
     )
 
-    private fun selectorModel(dense: Boolean): ExactLpModel {
+    private fun selectorModel(shape: String): ExactLpModel {
         val zero = ExactLpNumber.of(0L)
         val one = ExactLpNumber.of(1L)
         val columns = List(8) { column ->
-            if (dense) {
-                List(16) { row -> ExactLpEntry(row, ExactLpNumber.of((column + row) % 3 + 1L)) }
-            } else {
-                listOf(ExactLpEntry(column * 2, one))
+            when (shape) {
+                "dense" -> List(16) { row -> ExactLpEntry(row, ExactLpNumber.of((column + row) % 3 + 1L)) }
+
+                "spiked" -> if (column == 0) {
+                    List(16) { row -> ExactLpEntry(row, ExactLpNumber.of(1_000_000L)) }
+                } else {
+                    listOf(ExactLpEntry(column * 2, one))
+                }
+
+                "near" -> listOf(
+                    ExactLpEntry(column * 2, if (column == 7) ExactLpNumber.ofIeee(1e-12) else one),
+                )
+
+                else -> listOf(ExactLpEntry(column * 2, one))
             }
         }
         return ExactLpModel(
