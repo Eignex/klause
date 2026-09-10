@@ -19,6 +19,54 @@ bench solve [filters…]      e.g.  bench solve suite=mzn-bench backend=choco
 ./gradlew :klause-bench:intDomainMicrobench                        host-sensitive IntDomain timing probes
 ```
 
+### Real LP basis corpus
+
+The `:klause:basisTrace` task operates on the committed, versioned basis corpus under
+`klause/src/jvmTest/resources/basis-corpus/`. It runs only when invoked explicitly; ordinary tests never perform
+capture or timing.
+
+```
+./gradlew :klause:basisTrace --args="list"
+./gradlew :klause:basisTrace --args="verify"
+./gradlew :klause:basisTrace --args="replay"
+./gradlew :klause:basisTrace --args="benchmark"
+./gradlew :klause:basisTrace --args="replay trace=/path/to/one.kbtrace"
+```
+
+`list`, `replay`, `benchmark`, and `verify` use committed fixtures by default and emit one NDJSON record per
+fixture/backend (or one corpus-verification record). Replay rebuilds identical portable headings on the custom
+Kotlin basis and comparison HFactor, recomputes each backend's update preparation on its own current factors,
+and checks `B*x=b` and `B^T*x=b` directly against the stored CSC matrix after builds and updates. A divergence
+stops both arms until the next complete checkpoint.
+
+`benchmark` performs one warmup and three paired repetitions. Backend setup, build/rebuild, FTRAN, BTRAN,
+update-only, preparation-plus-update, composed lifecycle and setup-plus-lifecycle totals are reported separately
+with median/min/max nanoseconds; setup, individual operations and preparation-plus-update also report Java
+thread allocations. Independent residual checks are outside the timed regions. HFactor times include the
+comparison adapter's carrier copies; its allocation count excludes native heap. The private adapter copy
+component is not subtracted or estimated, and work counters are not compared across backends.
+Preparation-plus-update is labelled `synthetic_prepared`: a shadow basis recomputes the referenced solves and
+applies the update, while shadow setup and checkpoint builds stay outside that metric and the composed lifecycle.
+Repair, snapshots and extension are reported as not comparable because the HFactor adapter does not expose
+equivalent capabilities.
+
+Capture is opt-in and bounded to the limits in `basis-corpus/manifest.json`. It records raw matrix/RHS IEEE bits,
+source/unit headings, source mappings, strictness, update evidence and checkpoints; it never stores LU state or
+native pointers. Examples for every supported source format:
+
+```
+./gradlew :klause:basisTrace --args="capture id=local-mps format=mps source=/corpus/model.mps source-label=collection/model.mps@REV license=LICENSE output=/path/to/evidence/local-mps.kbtrace"
+./gradlew :klause:basisTrace --args="capture id=local-mzn format=minizinc source=klause-mzn-lib/test-models/graph_coloring.mzn license=repository-internal output=/path/to/evidence/local-mzn.kbtrace"
+./gradlew :klause:basisTrace --args="capture id=local-smt format=smtlib source=klause-bench/smoke-corpus/smtlib/lia-wide-span.smt2 license=repository-internal output=/path/to/evidence/local-smt.kbtrace"
+```
+
+MiniZinc source is compiled through this repository's `klause.msc`; an already flattened `.fzn` is accepted
+directly. MPS and MiniZinc traces use the production LP-relaxation assembly. SMT traces are labelled
+`SMT_SOURCE_DERIVED`: the frontend's authoritative exact asserted state is projected into the float engine for
+this harness because production SMT theory does not yet own float factors. Boolean SMT branches and objectives
+decline instead of being silently selected or relaxed. See `basis-corpus/PROVENANCE.md` for source revisions,
+redistribution terms, hashes, exclusions and local regeneration inputs.
+
 Tune any knob with `-Dklause.*` properties (forwarded to the run JVM), e.g. `-Dklause.bench.mzn.timeoutSec=30`.
 
 Solving with klause needs `./gradlew :klause-cli:installJvmDist`, and that dist runs only on a JDK 25
