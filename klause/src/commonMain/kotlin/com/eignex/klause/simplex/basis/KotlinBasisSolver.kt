@@ -1,10 +1,9 @@
 package com.eignex.klause.simplex.basis
 
-import com.eignex.koblas.DenseVector
 import com.eignex.koblas.SparseMatrix
 import com.eignex.koblas.SparseVector
-import com.eignex.koblas.axpy
 import com.eignex.koblas.column
+import com.eignex.koblas.koblas
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
@@ -293,14 +292,17 @@ internal class KotlinBasisSolver(
         checkNotNull(cache) { "basis has no usable factors" }
         require(rhs.size == n && solution.size == n)
         val product = DoubleArray(n)
-        val denseProduct = DenseVector.wrap(product)
         for (j in 0 until n) {
             val unitRow = unitRows[j]
             if (unitRow >= 0) {
                 if (transpose) product[j] = solution[unitRow] else product[unitRow] += solution[j]
             } else {
                 val column = sourceColumn(columns[j])
-                if (transpose) product[j] = solution.dot(column) else denseProduct.axpy(solution[j], column)
+                if (transpose) {
+                    product[j] = solution.dot(column)
+                } else {
+                    koblas.sparseKernels.axpy(product, solution[j], column)
+                }
             }
         }
         var residual = 0.0
