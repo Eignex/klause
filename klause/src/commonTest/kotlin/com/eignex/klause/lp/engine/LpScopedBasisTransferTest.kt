@@ -238,9 +238,8 @@ class LpScopedBasisTransferTest {
                     )
                 }
 
-            override fun extend(matrix: SparseMatrix, extension: BasisExtension): BasisExtensionResult? {
+            override fun extend(matrix: SparseMatrix, extension: BasisExtension): BasisExtensionResult? =
                 throw BasisArithmeticException("injected extension")
-            }
         }
 
         val attempt = BasisExtensionAdapter().transfer(
