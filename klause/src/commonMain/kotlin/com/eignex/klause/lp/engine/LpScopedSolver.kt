@@ -202,10 +202,10 @@ internal class LpScopedSolver(
         var published = false
         var failure: Throwable? = null
         try {
-            if (!replacement.second.basicVars.contentEquals(expected) || token()) return false
             val replacementWork = if (append) replacement.first.basisLifecycleWork else null
             if (append && selected == null) recordAppendWork(replacementWork)
             val pendingWork = basisWorkUnits(replacementWork)
+            if (!replacement.second.basicVars.contentEquals(expected) || token()) return false
             val old = solver
             solver = replacement.first
             if (append) {

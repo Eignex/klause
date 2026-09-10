@@ -174,6 +174,100 @@ class LpScopedBasisTransferTest {
     }
 
     @Test
+    fun `failed intended fresh build retains work before production fallback`() {
+        var basisFactoryCalls = 0
+        val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+            override fun newPersistentSolver(
+                model: LpModel,
+                cancellation: Cancellation,
+                refactorUpdateLimit: Int,
+                iterationLimit: Int,
+                workLimit: Long,
+                trackDegeneracy: Boolean,
+            ): PersistentLpSolver = RevisedSimplex(model, cancellation, basisSolverFactory = { matrix ->
+                basisFactoryCalls++
+                val rejected = basisFactoryCalls == 2
+                val delegate = KotlinBasisSolver(matrix)
+                object : BasisSolver by delegate {
+                    override val basisOperationWork: BasisOperationWork
+                        get() = if (rejected) {
+                            BasisOperationWork(
+                                refactorization = BasisPhaseWork(attempts = 1, units = 9, declines = 1),
+                            )
+                        } else {
+                            delegate.basisOperationWork
+                        }
+
+                    override fun refactorize(basicIndex: IntArray): Boolean =
+                        !rejected && delegate.refactorize(basicIndex)
+                }
+            })
+        }
+        LpScopedSolver(
+            LpExactState(lowerBoundModel()),
+            context = LpSolveContext(engineFactory = factory),
+            appendSelection = LpAppendSelection.FRESH_INTENDED,
+        ).use { solver ->
+            assertNotNull(solver.solve())
+
+            assertTrue(solver.append(lowerRow(1, 2), scoped = false))
+
+            assertEquals(LpAppendTransferDecline.FRESH_FAILED, solver.metrics.lastAppendDecline)
+            assertEquals(1, solver.metrics.appendFallbacks)
+            assertTrue(solver.metrics.appendBasisWork >= 9)
+            assertEquals(0, solver.metrics.appendUnknownWork)
+        }
+    }
+
+    @Test
+    fun `cancellation after fresh preparation retains rejected owner work`() {
+        var owners = 0
+        var cancelled = false
+        val token = Cancellation { cancelled }
+        val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+            override fun newPersistentSolver(
+                model: LpModel,
+                cancellation: Cancellation,
+                refactorUpdateLimit: Int,
+                iterationLimit: Int,
+                workLimit: Long,
+                trackDegeneracy: Boolean,
+            ): PersistentLpSolver {
+                owners++
+                val replacement = owners > 1
+                val delegate = RevisedSimplex(model, cancellation)
+                return object : PersistentLpSolver by delegate {
+                    override val basisLifecycleWork: BasisOperationWork
+                        get() {
+                            if (replacement) cancelled = true
+                            return checkNotNull(delegate.basisLifecycleWork)
+                        }
+                }
+            }
+        }
+        val solver = LpScopedSolver(
+            LpExactState(lowerBoundModel()),
+            cancellation = token,
+            context = LpSolveContext(engineFactory = factory),
+        )
+        val initial = assertNotNull(solver.solve())
+        val state = solver.state
+
+        assertTrue(!solver.append(lowerRow(1, 2), scoped = false))
+
+        assertTrue(cancelled)
+        assertTrue(solver.metrics.appendBasisWork > 0)
+        assertEquals(0, solver.metrics.appendUnknownWork)
+        assertTrue(solver.state === state)
+        assertTrue(solver.lastResult === initial)
+        assertEquals(1, solver.metrics.currentOwners)
+        assertEquals(1, solver.metrics.closedOwners)
+        cancelled = false
+        B5bIndependentExactSourceValidator.validate(solver.state, assertNotNull(solver.solve()))
+        solver.close()
+    }
+
+    @Test
     fun `transfer decline work is retained when production fresh fallback publishes`() {
         val factory = object : LpEngineFactory by ProductionLpEngineFactory {
             override fun newPersistentSolver(

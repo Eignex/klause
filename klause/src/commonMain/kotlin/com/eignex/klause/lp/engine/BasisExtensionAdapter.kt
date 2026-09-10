@@ -27,6 +27,12 @@ internal class BasisTransferAttempt(
     val workComplete: Boolean,
 )
 
+internal class BasisReplacementAttempt(
+    val replacement: BasisReplacement?,
+    val workUnits: Long?,
+    val workComplete: Boolean,
+)
+
 private class BasisOperationDelta(val units: Long?, val complete: Boolean)
 
 internal class BasisExtensionAdapter(private val factory: (SparseMatrix) -> BasisSolver = { KotlinBasisSolver(it) }) {
@@ -90,7 +96,22 @@ internal class BasisExtensionAdapter(private val factory: (SparseMatrix) -> Basi
         intendedBasis: IntArray,
         logicalColumns: IntArray,
         extension: BasisExtension? = null,
-    ): BasisReplacement? {
+    ): BasisReplacement? = replacementAttempt(
+        oldSolver,
+        newMatrix,
+        intendedBasis,
+        logicalColumns,
+        extension,
+    ).replacement
+
+    @Suppress("TooGenericExceptionCaught")
+    fun replacementAttempt(
+        oldSolver: BasisSolver,
+        newMatrix: SparseMatrix,
+        intendedBasis: IntArray,
+        logicalColumns: IntArray,
+        extension: BasisExtension? = null,
+    ): BasisReplacementAttempt {
         require(intendedBasis.size == newMatrix.rows)
         require(intendedBasis.all { it in 0 until newMatrix.cols })
         validateLogicals(newMatrix, logicalColumns)
@@ -117,7 +138,7 @@ internal class BasisExtensionAdapter(private val factory: (SparseMatrix) -> Basi
                             transferArithmeticDeclined = false,
                         )
                         accepted = true
-                        return result
+                        return BasisReplacementAttempt(result, null, false)
                     }
                 } catch (primary: Throwable) {
                     failure = primary
@@ -130,8 +151,18 @@ internal class BasisExtensionAdapter(private val factory: (SparseMatrix) -> Basi
         val fresh = factory(newMatrix)
         var accepted = false
         var failure: Throwable? = null
+        var arithmeticFailure: BasisArithmeticException? = null
         try {
-            if (!fresh.refactorize(intendedBasis)) return null
+            val factorized = try {
+                fresh.refactorize(intendedBasis)
+            } catch (arithmetic: BasisArithmeticException) {
+                arithmeticFailure = arithmetic
+                false
+            }
+            val work = fresh.basisOperationWork
+            val workUnits = work?.takeUnless { it.saturated }?.units
+            val workComplete = work != null && work.complete && !work.saturated
+            if (!factorized) return BasisReplacementAttempt(null, workUnits, workComplete)
             val result = BasisReplacement(
                 fresh,
                 intendedBasis,
@@ -141,12 +172,12 @@ internal class BasisExtensionAdapter(private val factory: (SparseMatrix) -> Basi
                 transferArithmeticDeclined = arithmeticDeclined,
             )
             accepted = true
-            return result
+            return BasisReplacementAttempt(result, workUnits, workComplete)
         } catch (primary: Throwable) {
             failure = primary
             throw primary
         } finally {
-            if (!accepted) closeRejected(fresh, failure)
+            if (!accepted) closeRejected(fresh, failure ?: arithmeticFailure)
         }
     }
 

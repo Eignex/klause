@@ -696,23 +696,18 @@ internal class RevisedSimplex(
             basisWork = transfer.workUnits
             basisWorkComplete = transfer.workComplete
         } else {
-            replacement = try {
-                adapter.replacement(oldSolver, candidate.columns, intended, logicalColumns)
-            } catch (_: BasisArithmeticException) {
-                null
-            } ?: return LpAppendReplacementAttempt(decline = LpAppendTransferDecline.FRESH_FAILED)
+            val fresh = adapter.replacementAttempt(oldSolver, candidate.columns, intended, logicalColumns)
+            replacement = fresh.replacement ?: return LpAppendReplacementAttempt(
+                decline = LpAppendTransferDecline.FRESH_FAILED,
+                basisWork = fresh.workUnits,
+                basisWorkComplete = fresh.workComplete,
+            )
+            basisWork = fresh.workUnits
+            basisWorkComplete = fresh.workComplete
         }
         var installed = false
         var failure: Throwable? = null
         try {
-            if (mode == LpAppendReplacementMode.FRESH_INTENDED) {
-                replacement.solver.basisOperationWork?.let {
-                    if (!it.saturated) {
-                        basisWork = it.units
-                        basisWorkComplete = it.complete
-                    }
-                }
-            }
             if (token()) {
                 return LpAppendReplacementAttempt(
                     decline = LpAppendTransferDecline.CANCELLED,
