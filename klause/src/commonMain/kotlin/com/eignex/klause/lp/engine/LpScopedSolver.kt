@@ -202,7 +202,7 @@ internal class LpScopedSolver(
         var published = false
         var failure: Throwable? = null
         try {
-            val replacementWork = if (append) replacement.first.basisLifecycleWork else null
+            val replacementWork = if (append) appendBasisLifecycleWork(replacement.first) else null
             if (append && selected == null) recordAppendWork(replacementWork)
             val pendingWork = basisWorkUnits(replacementWork)
             if (!replacement.second.basicVars.contentEquals(expected) || token()) return false
@@ -314,6 +314,13 @@ internal class LpScopedSolver(
         }
     }
 
+    private fun appendBasisLifecycleWork(owner: PersistentLpSolver) = try {
+        owner.basisLifecycleWork
+    } catch (telemetry: Throwable) {
+        appendUnknownWork = saturatingAdd(appendUnknownWork, 1)
+        throw telemetry
+    }
+
     private fun recordAppendWork(work: com.eignex.klause.simplex.basis.BasisOperationWork?) {
         recordAppendWork(basisWorkUnits(work), basisWorkComplete(work))
     }
@@ -421,6 +428,7 @@ internal class LpScopedSolver(
             try {
                 recordAppendWork(candidate.basisLifecycleWork)
             } catch (telemetry: Throwable) {
+                appendUnknownWork = saturatingAdd(appendUnknownWork, 1)
                 if (failure == null) failure = telemetry else failure.addSuppressed(telemetry)
             }
         }

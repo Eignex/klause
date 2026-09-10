@@ -600,6 +600,15 @@ class LpScopedBasisTransferTest {
                 val target = basisFactoryCalls > 1
                 val delegate = KotlinBasisSolver(matrix)
                 object : BasisSolver by delegate {
+                    override val basisOperationWork: BasisOperationWork
+                        get() = if (target) {
+                            BasisOperationWork(
+                                refactorization = BasisPhaseWork(attempts = 1, units = 7, declines = 1),
+                            )
+                        } else {
+                            delegate.basisOperationWork
+                        }
+
                     override fun refactorize(basicIndex: IntArray): Boolean {
                         if (target) throw BasisArithmeticException("arithmetic")
                         return delegate.refactorize(basicIndex)
@@ -624,7 +633,8 @@ class LpScopedBasisTransferTest {
         }
 
         assertTrue(thrown === cleanup)
-        assertEquals(1, solver.metrics.appendUnknownWork)
+        assertEquals(7, solver.metrics.appendBasisWork)
+        assertEquals(0, solver.metrics.appendUnknownWork)
         solver.close()
     }
 
@@ -783,6 +793,7 @@ class LpScopedBasisTransferTest {
         assertTrue(solver.state === state)
         assertTrue(solver.lastResult === initial)
         assertEquals(1, closes)
+        assertEquals(1, solver.metrics.appendUnknownWork)
         B5bIndependentExactSourceValidator.validate(solver.state, assertNotNull(solver.solve()))
         solver.close()
         assertEquals(2, closes)
@@ -882,6 +893,7 @@ class LpScopedBasisTransferTest {
 
         assertTrue(thrown === primary)
         assertEquals(listOf(telemetry, cleanup), thrown.suppressedExceptions.toList())
+        assertEquals(1, solver.metrics.appendUnknownWork)
         assertTrue(solver.state === state)
         assertTrue(solver.lastResult === initial)
         B5bIndependentExactSourceValidator.validate(solver.state, assertNotNull(solver.solve()))

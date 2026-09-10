@@ -33,9 +33,14 @@ internal class BasisReplacementAttempt(
     val workComplete: Boolean,
 )
 
+internal data class BasisAttemptWork(val units: Long?, val complete: Boolean)
+
 private class BasisOperationDelta(val units: Long?, val complete: Boolean)
 
 internal class BasisExtensionAdapter(private val factory: (SparseMatrix) -> BasisSolver = { KotlinBasisSolver(it) }) {
+    var lastAttemptWork: BasisAttemptWork? = null
+        private set
+
     @Suppress("TooGenericExceptionCaught")
     fun transfer(
         oldSolver: BasisSolver,
@@ -44,6 +49,7 @@ internal class BasisExtensionAdapter(private val factory: (SparseMatrix) -> Basi
         logicalColumns: IntArray,
         extension: BasisExtension,
     ): BasisTransferAttempt {
+        lastAttemptWork = null
         require(intendedBasis.size == newMatrix.rows)
         require(intendedBasis.all { it in 0 until newMatrix.cols })
         validateLogicals(newMatrix, logicalColumns)
@@ -52,16 +58,19 @@ internal class BasisExtensionAdapter(private val factory: (SparseMatrix) -> Basi
             oldSolver.extend(newMatrix, extension)
         } catch (_: BasisArithmeticException) {
             val work = operationDelta(before, oldSolver.basisOperationWork)
+            remember(work)
             return BasisTransferAttempt(null, true, work.units, work.complete)
         }
         if (extended == null) {
             val work = operationDelta(before, oldSolver.basisOperationWork)
+            remember(work)
             return BasisTransferAttempt(null, false, work.units, work.complete)
         }
         var accepted = false
         var failure: Throwable? = null
         try {
             val work = operationDelta(before, oldSolver.basisOperationWork)
+            remember(work)
             val headings = translate(extended.basis, logicalColumns)
             if (!headings.contentEquals(intendedBasis)) {
                 return BasisTransferAttempt(null, false, work.units, work.complete)
@@ -112,6 +121,7 @@ internal class BasisExtensionAdapter(private val factory: (SparseMatrix) -> Basi
         logicalColumns: IntArray,
         extension: BasisExtension? = null,
     ): BasisReplacementAttempt {
+        lastAttemptWork = null
         require(intendedBasis.size == newMatrix.rows)
         require(intendedBasis.all { it in 0 until newMatrix.cols })
         validateLogicals(newMatrix, logicalColumns)
@@ -160,6 +170,7 @@ internal class BasisExtensionAdapter(private val factory: (SparseMatrix) -> Basi
             val work = fresh.basisOperationWork
             val workUnits = work?.takeUnless { it.saturated }?.units
             val workComplete = work != null && work.complete && !work.saturated
+            lastAttemptWork = BasisAttemptWork(workUnits, workComplete)
             if (!factorized) return BasisReplacementAttempt(null, workUnits, workComplete)
             val result = BasisReplacement(
                 fresh,
@@ -204,6 +215,10 @@ internal class BasisExtensionAdapter(private val factory: (SparseMatrix) -> Basi
             return BasisOperationDelta(null, false)
         }
         return BasisOperationDelta(after.units - before.units, before.complete && after.complete)
+    }
+
+    private fun remember(work: BasisOperationDelta) {
+        lastAttemptWork = BasisAttemptWork(work.units, work.complete)
     }
 
     @Suppress("TooGenericExceptionCaught")

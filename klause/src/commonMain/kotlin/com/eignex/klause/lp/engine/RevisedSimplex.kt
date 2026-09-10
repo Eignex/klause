@@ -680,13 +680,15 @@ internal class RevisedSimplex(
         var basisWork: Long? = null
         var basisWorkComplete = false
         if (mode == LpAppendReplacementMode.TRANSFER) {
-            val transfer = adapter.transfer(
-                oldSolver,
-                candidate.columns,
-                intended,
-                logicalColumns,
-                BasisExtension(ownerColumns, ownerUnitRows, oldRowsInNew, oldColumnsInNew),
-            )
+            val transfer = observeAdapterAttempt(adapter) {
+                adapter.transfer(
+                    oldSolver,
+                    candidate.columns,
+                    intended,
+                    logicalColumns,
+                    BasisExtension(ownerColumns, ownerUnitRows, oldRowsInNew, oldColumnsInNew),
+                )
+            }
             basisWork = transfer.workUnits
             basisWorkComplete = transfer.workComplete
             lastAppendReplacementWork = LpAppendBasisWork(basisWork, basisWorkComplete)
@@ -700,7 +702,9 @@ internal class RevisedSimplex(
                 basisWorkComplete = transfer.workComplete,
             )
         } else {
-            val fresh = adapter.replacementAttempt(oldSolver, candidate.columns, intended, logicalColumns)
+            val fresh = observeAdapterAttempt(adapter) {
+                adapter.replacementAttempt(oldSolver, candidate.columns, intended, logicalColumns)
+            }
             basisWork = fresh.workUnits
             basisWorkComplete = fresh.workComplete
             lastAppendReplacementWork = LpAppendBasisWork(basisWork, basisWorkComplete)
@@ -740,6 +744,14 @@ internal class RevisedSimplex(
         } finally {
             if (!installed) closeRejectedReplacement(replacement.solver, failure)
         }
+    }
+
+    @Suppress("TooGenericExceptionCaught")
+    private inline fun <T> observeAdapterAttempt(adapter: BasisExtensionAdapter, operation: () -> T): T = try {
+        operation()
+    } catch (primary: Throwable) {
+        lastAppendReplacementWork = adapter.lastAttemptWork?.let { LpAppendBasisWork(it.units, it.complete) }
+        throw primary
     }
 
     private fun appendCompatible(
