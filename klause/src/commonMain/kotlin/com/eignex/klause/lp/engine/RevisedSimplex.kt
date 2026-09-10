@@ -654,7 +654,8 @@ internal class RevisedSimplex(
         get() = basisKept && basisFactorized && basisSolver?.singular == false && trackedHeadingsConsistent()
     override val basisLifecycleWork: BasisOperationWork?
         get() {
-            val active = basisSolver?.basisOperationWork ?: return retiredBasisWork
+            val current = basisSolver ?: return retiredBasisWork
+            val active = current.basisOperationWork ?: BasisOperationWork(complete = false)
             return retiredBasisWork?.mergedWith(active) ?: active
         }
     override var lastAppendReplacementWork: LpAppendBasisWork? = null

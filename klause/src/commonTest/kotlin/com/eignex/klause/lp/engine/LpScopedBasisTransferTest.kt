@@ -642,10 +642,16 @@ class LpScopedBasisTransferTest {
     fun `disposed basis owner retains completed and failed solve work`() {
         var inject = false
         var unitsAtClose = 0L
+        var owners = 0
         val working = assertNotNull(LpExactState(lowerBoundModel()).toWorkingModel())
         val engine = RevisedSimplex(working, basisSolverFactory = { matrix ->
+            owners++
+            val unmetered = owners > 1
             val delegate = KotlinBasisSolver(matrix)
             object : BasisSolver by delegate {
+                override val basisOperationWork: BasisOperationWork?
+                    get() = if (unmetered) null else delegate.basisOperationWork
+
                 override fun ftran(x: IndexedVector, expectedDensity: Double) {
                     delegate.ftran(x, expectedDensity)
                     if (inject) throw BasisArithmeticException("after known work")
@@ -667,6 +673,11 @@ class LpScopedBasisTransferTest {
         assertTrue(retained.units > before)
         assertEquals(unitsAtClose, retained.units)
         assertTrue(retained.complete)
+        inject = false
+        assertNotNull(engine.resolveBounds())
+        val recreated = assertNotNull(engine.basisLifecycleWork)
+        assertTrue(recreated.units >= retained.units)
+        assertTrue(!recreated.complete)
         engine.close()
     }
 
