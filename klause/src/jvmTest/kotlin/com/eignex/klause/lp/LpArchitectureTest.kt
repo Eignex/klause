@@ -80,6 +80,9 @@ class LpArchitectureTest {
                 import com.eignex.klause.simplex.basis.IndexedVector
                 import com.eignex.klause.simplex.basis.BasisUpdate
                 import com.eignex.klause.simplex.basis.BasisSolveQuality
+                import com.eignex.klause.simplex.exact.BigFraction
+                import com.eignex.klause.simplex.exact.Frac128
+                import com.eignex.klause.simplex.exact.Frac128Ops
                 val matrix: com.eignex.koblas.SparseMatrix? = null
             """.trimIndent(),
             """
@@ -111,6 +114,9 @@ class LpArchitectureTest {
             "import com.eignex.koblas.SparseMatrixFactory",
             "val backend = com.eignex.koblas.koblas",
             "val solver: com.eignex.klause.lp.engine.LpModel? = null",
+            "import com.eignex.klause.simplex.exact.rationalOutcome",
+            "import com.eignex.klause.simplex.exact.RationalSimplex",
+            "import com.eignex.klause.simplex.exact.*",
         )) {
             val source = "package com.eignex.klause.simplex.basis\n$dependency"
             assertTrue(LpBoundaryScanner.scan("Basis.kt", source).any { "outbound dependency" in it })
@@ -297,6 +303,9 @@ internal object LpBoundaryScanner {
             packageName == BASIS_PACKAGE || packageName.startsWith("$BASIS_PACKAGE.") -> listOf(
                 BASIS_PACKAGE,
                 "com.eignex.klause.util",
+                "com.eignex.klause.simplex.exact.BigFraction",
+                "com.eignex.klause.simplex.exact.Frac128",
+                "com.eignex.klause.simplex.exact.Frac128Ops",
             )
 
             else -> return false
