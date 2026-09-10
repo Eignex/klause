@@ -27,6 +27,7 @@ import com.eignex.klause.lp.cut.SharedCut
 import com.eignex.klause.lp.engine.Basis
 import com.eignex.klause.lp.engine.Cut
 import com.eignex.klause.lp.engine.LpCounterResults
+import com.eignex.klause.lp.engine.LpPricingOptions
 import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.lp.engine.LpSolver
 import com.eignex.klause.lp.engine.LpVerdict
@@ -137,6 +138,9 @@ internal class LpEngine(
      *  the intent→plan step, so callers carry only the intent and never a separately-resolved copy. */
     val params: LpParams =
         params0.lpConfig?.let { params0.copy(lpPlan = LpAutoConfig.resolve(problem, it, params0.lpPlan)) } ?: params0
+
+    internal val pricingOptions: LpPricingOptions
+        get() = LpPricingOptions(params.zeroObjectivePricing, params.randomSeed ?: 0L)
 
     /** Construct the relaxer for [plan]'s hull flags, or null when bounding is off. Factored so the
      *  ineffective-hull probe can build variants with whole families ([plan]) or individual factor

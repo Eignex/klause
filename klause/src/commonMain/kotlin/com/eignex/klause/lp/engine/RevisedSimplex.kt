@@ -102,6 +102,7 @@ internal class RevisedSimplex(
     private val workLimit: Long = 0L,
     private val trackDegeneracy: Boolean = false,
     private val basisSolverFactory: ((SparseMatrix) -> BasisSolver)? = null,
+    private val pricing: LpPricingOptions = LpPricingOptions(),
 ) : TableauCutSolver,
     PersistentLpSolver {
     private val m = model.m
@@ -161,6 +162,24 @@ internal class RevisedSimplex(
         private set
     internal var lastHarrisMinistepSelections: Int = 0
         private set
+    internal var lastTheoryPricingAttempts: Int = 0
+        private set
+    internal var lastTheoryPricingSamples: Int = 0
+        private set
+    internal var lastTheoryPricingSuccessfulSamples: Int = 0
+        private set
+    internal var lastTheoryPricingDeclines: Int = 0
+        private set
+    internal var lastTheoryPricingResourceStops: Int = 0
+        private set
+    internal var lastTheoryPricingWorkOps: Long = 0L
+        private set
+    internal var lastTheoryPricingFtranWorkOps: Long = 0L
+        private set
+    internal var lastTheoryPricingSelections: Int = 0
+        private set
+    internal var lastTheorySelectedColumn: Int = -1
+        private set
 
     /**
      * Numerical trouble this solve met, counted rather than only acted on.
@@ -206,6 +225,7 @@ internal class RevisedSimplex(
     // one FTRAN. So the entering spike and the pivotal row each keep a vector of their own, and the
     // dual/rhs solves keep theirs, rather than sharing one and defeating that.
     private val spikeVec = IndexedVector(m)
+    private val pricingSpikeVec = IndexedVector(m)
     private val pivotEtaVec = IndexedVector(m)
     private val rhsVec = IndexedVector(m)
     private val dualVec = IndexedVector(m)
@@ -931,6 +951,7 @@ internal class RevisedSimplex(
             workLimit,
             trackDegeneracy,
             basisSolverFactory,
+            pricing,
         )
         val logicalColumns = IntArray(nextModel.m) { nextModel.n + it }
         val adapter = BasisExtensionAdapter { candidate.createBasisSolver() }
@@ -1179,6 +1200,15 @@ internal class RevisedSimplex(
         smallPivotBails = 0
         lastDevexWeightCorrections = 0
         lastHarrisMinistepSelections = 0
+        lastTheoryPricingAttempts = 0
+        lastTheoryPricingSamples = 0
+        lastTheoryPricingSuccessfulSamples = 0
+        lastTheoryPricingDeclines = 0
+        lastTheoryPricingResourceStops = 0
+        lastTheoryPricingWorkOps = 0L
+        lastTheoryPricingFtranWorkOps = 0L
+        lastTheoryPricingSelections = 0
+        lastTheorySelectedColumn = -1
         work.reset()
         warmStarted = false
     }
@@ -1253,6 +1283,7 @@ internal class RevisedSimplex(
         val ratioBuf = DoubleArray(numVars) // |d_j / a_j| per eligible nonbasic
         val elig = IntArrayList()
         val eligOrdered = IntArray(numVars) // scratch for the ratio-ordered permutation of [elig]
+        val theoryCandidates = IntArrayList()
         // The columns this iteration's pivot row reached, and the iteration that reached them. A stamp
         // rather than a clear: the row is formed over ρ's nonzeros, and zeroing [pivotRowEntry] between
         // iterations would reintroduce the pass over every column that forming it this way removes.
@@ -1402,7 +1433,25 @@ internal class RevisedSimplex(
                 ratioBuf[j] = abs((model.costD(j) - dotColumn(y, j)) / a)
                 elig.add(j)
             }
-            val q = if (elig.isEmpty()) null else chooseEntering(elig, eligOrdered, ratioBuf, pivotRowEntry, worst)
+            val entering = if (elig.isEmpty()) {
+                EnteringChoice.Selected(null)
+            } else {
+                chooseEntering(
+                    elig,
+                    eligOrdered,
+                    theoryCandidates,
+                    ratioBuf,
+                    pivotRowEntry,
+                    worst,
+                    r,
+                    enforced,
+                )
+            }
+            if (entering == EnteringChoice.ResourceStopped) {
+                lastTheoryPricingResourceStops++
+                return if (model.exactState == null) truncated(beta) else null
+            }
+            val q = (entering as EnteringChoice.Selected).column
             if (q == null) {
                 // An update chain can turn a tiny violation into a false infeasibility candidate even
                 // though β is recomputed every iteration. Rebuild the factors—not merely the RHS solve—
@@ -1678,10 +1727,13 @@ internal class RevisedSimplex(
     private fun chooseEntering(
         elig: IntArrayList,
         ordered: IntArray,
+        theoryCandidates: IntArrayList,
         ratioBuf: DoubleArray,
         pivotRowEntry: DoubleArray,
         delta: Double,
-    ): Int? {
+        leavingRow: Int,
+        enforced: BooleanArray?,
+    ): EnteringChoice {
         // Stable ascending order by ratio, matching the tie order a stable sort by the same key gives.
         val order = argsortBy(elig.size) { a, b -> ratioBuf[elig[a]].compareTo(ratioBuf[elig[b]]) }
         for (position in order.indices) ordered[position] = elig[order[position]]
@@ -1701,6 +1753,7 @@ internal class RevisedSimplex(
                 var harrisBound = Double.POSITIVE_INFINITY
                 var best = -1
                 var bestMag = -1.0
+                theoryCandidates.clear()
                 var k = idx
                 while (k < elig.size && ratioBuf[elig[k]] <= harrisBound) {
                     val cand = elig[k]
@@ -1714,10 +1767,19 @@ internal class RevisedSimplex(
                             bestMag = mag
                             best = cand
                         }
+                        if (mag >= THEORY_PIVOT_MAGNITUDE_FLOOR) theoryCandidates.add(cand)
                     }
                     k++
                 }
                 if (best != -1) {
+                    val selected = if (pricing.zeroObjective == LpZeroObjectivePricing.THEORY && allZeroCost) {
+                        when (val theory = chooseTheoryEntering(theoryCandidates, leavingRow, enforced)) {
+                            EnteringChoice.ResourceStopped -> return theory
+                            is EnteringChoice.Selected -> theory.column ?: best
+                        }
+                    } else {
+                        best
+                    }
                     for (f in 0 until flipCount) {
                         val flipped = elig[f]
                         status[flipped] = if (status[flipped] == VarStatus.AT_LOWER) {
@@ -1726,13 +1788,142 @@ internal class RevisedSimplex(
                             VarStatus.AT_LOWER
                         }
                     }
-                    if (ratioBuf[best] > ratioBuf[j] + HARRIS_TOL) lastHarrisMinistepSelections++
-                    return best
+                    if (ratioBuf[selected] > ratioBuf[j] + HARRIS_TOL) lastHarrisMinistepSelections++
+                    return EnteringChoice.Selected(selected)
                 }
-                return null
+                return EnteringChoice.Selected(null)
             }
         }
-        return null // defensive: the loop handles the last element
+        return EnteringChoice.Selected(null) // defensive: the loop handles the last element
+    }
+
+    private fun chooseTheoryEntering(
+        candidates: IntArrayList,
+        leavingRow: Int,
+        enforced: BooleanArray?,
+    ): EnteringChoice {
+        lastTheoryPricingAttempts++
+        if (candidates.isEmpty()) {
+            lastTheoryPricingDeclines++
+            return EnteringChoice.Selected(null)
+        }
+        addTheoryPricingWork(candidateOrderingWork(candidates.size))
+        if (pricingResourceStopped()) return EnteringChoice.ResourceStopped
+        val order = argsortBy(candidates.size) { a, b ->
+            val left = candidates[a]
+            val right = candidates[b]
+            val sparsity = columnNnz(left).compareTo(columnNnz(right))
+            if (sparsity != 0) sparsity else theoryTieRank(left).compareTo(theoryTieRank(right))
+        }
+        var best = -1
+        var bestSupport = Int.MAX_VALUE
+        var bestNnz = Int.MAX_VALUE
+        var bestTie = Long.MAX_VALUE
+        val samples = minOf(THEORY_SAMPLE_LIMIT, order.size)
+        for (position in 0 until samples) {
+            if (pricingResourceStopped()) return EnteringChoice.ResourceStopped
+            val candidate = candidates[order[position]]
+            val support = probeTheorySupport(candidate, leavingRow, enforced)
+            when (support) {
+                TheoryProbe.ArithmeticDeclined -> {
+                    lastTheoryPricingDeclines++
+                    return EnteringChoice.Selected(null)
+                }
+
+                TheoryProbe.ResourceStopped -> return EnteringChoice.ResourceStopped
+
+                is TheoryProbe.Success -> {
+                    val nnz = columnNnz(candidate)
+                    val tie = theoryTieRank(candidate)
+                    if (support.nonFreeBasics < bestSupport ||
+                        (support.nonFreeBasics == bestSupport && nnz < bestNnz) ||
+                        (support.nonFreeBasics == bestSupport && nnz == bestNnz && tie < bestTie)
+                    ) {
+                        best = candidate
+                        bestSupport = support.nonFreeBasics
+                        bestNnz = nnz
+                        bestTie = tie
+                    }
+                }
+            }
+        }
+        if (best == -1) {
+            lastTheoryPricingDeclines++
+            return EnteringChoice.Selected(null)
+        }
+        lastTheoryPricingSelections++
+        lastTheorySelectedColumn = best
+        return EnteringChoice.Selected(best)
+    }
+
+    private fun probeTheorySupport(candidate: Int, leavingRow: Int, enforced: BooleanArray?): TheoryProbe {
+        lastTheoryPricingSamples++
+        val solveCharge = nnzB.toLong() + (basisSolver?.updateCount ?: 0).toLong() * m
+        addTheoryPricingWork(solveCharge)
+        lastTheoryPricingFtranWorkOps += solveCharge
+        pricingSpikeVec.clear()
+        val nnz = columnNnz(candidate)
+        addTheoryPricingWork(nnz.toLong())
+        for (entry in colPtr[candidate] until colPtr[candidate + 1]) {
+            val value = colVal[entry]
+            if (value != 0.0) pricingSpikeVec.store(rowIdx[entry], value)
+        }
+        if (pricingResourceStopped()) return TheoryProbe.ResourceStopped
+        val solver = solver()
+        val before = operationWork(solver)
+        var failed = false
+        try {
+            solver.ftran(pricingSpikeVec, ftranDensity)
+        } catch (_: BasisArithmeticException) {
+            failed = true
+        } catch (_: ArithmeticException) {
+            failed = true
+        } finally {
+            refactorPolicy.recordBasisSolve(operationDelta(before, operationWork(solver)) { it.ftran })
+        }
+        if (failed) return TheoryProbe.ArithmeticDeclined
+        lastTheoryPricingSuccessfulSamples++
+        if (pricingResourceStopped()) return TheoryProbe.ResourceStopped
+        var support = 0
+        pricingSpikeVec.forEachStored { row, value ->
+            addTheoryPricingWork(1L)
+            if (row != leavingRow && abs(value) >= THEORY_SUPPORT_TOLERANCE &&
+                basicVariableIsNonFree(row, enforced)
+            ) {
+                support++
+            }
+        }
+        return if (pricingResourceStopped()) TheoryProbe.ResourceStopped else TheoryProbe.Success(support)
+    }
+
+    private fun basicVariableIsNonFree(row: Int, enforced: BooleanArray?): Boolean {
+        val variable = basicVar[row]
+        if (enforced != null && variable >= n && !enforced[variable - n]) return false
+        return model.hasFiniteLower(variable) || model.hasFiniteUpper(variable)
+    }
+
+    private fun addTheoryPricingWork(amount: Long) {
+        work.add(amount)
+        lastTheoryPricingWorkOps += amount
+    }
+
+    private fun pricingResourceStopped(): Boolean = cancellation() || (workLimit > 0L && work.ops >= workLimit)
+
+    private fun candidateOrderingWork(size: Int): Long {
+        var levels = 0
+        var remaining = size - 1
+        while (remaining > 0) {
+            remaining = remaining ushr 1
+            levels++
+        }
+        return size.toLong() * maxOf(levels, 1)
+    }
+
+    private fun theoryTieRank(column: Int): Long {
+        var value = pricing.tieSeed + GOLDEN_GAMMA * (column.toLong() + 1L)
+        value = (value xor (value ushr 30)) * MIX_MULTIPLIER_1
+        value = (value xor (value ushr 27)) * MIX_MULTIPLIER_2
+        return value xor (value ushr 31)
     }
 
     private fun optimal(beta: DoubleArray): FloatLpResult {
@@ -2215,6 +2406,17 @@ internal class RevisedSimplex(
         /** A Devex weight below this fraction of the computed pivotal-row norm is corrected. */
         const val DEVEX_WEIGHT_THRESHOLD: Double = 0.25
 
+        /** Theory pricing samples only pivots large enough to be meaningful at simplex tolerance. */
+        const val THEORY_PIVOT_MAGNITUDE_FLOOR: Double = 1e-6
+
+        const val THEORY_SUPPORT_TOLERANCE: Double = 1e-7
+
+        const val THEORY_SAMPLE_LIMIT: Int = 8
+
+        const val GOLDEN_GAMMA: Long = -7046029254386353131L
+        const val MIX_MULTIPLIER_1: Long = -4658895280553007687L
+        const val MIX_MULTIPLIER_2: Long = -7723592293110705685L
+
         /** Slack tolerance on the initial primal-feasibility check ([solvePrimal]). */
         const val FEAS_TOL: Double = 1e-6
 
@@ -2227,6 +2429,20 @@ internal class RevisedSimplex(
 
         const val MAX_SOLVE_RESTARTS: Int = 4
     }
+}
+
+private sealed interface EnteringChoice {
+    data class Selected(val column: Int?) : EnteringChoice
+
+    data object ResourceStopped : EnteringChoice
+}
+
+private sealed interface TheoryProbe {
+    data class Success(val nonFreeBasics: Int) : TheoryProbe
+
+    data object ArithmeticDeclined : TheoryProbe
+
+    data object ResourceStopped : TheoryProbe
 }
 
 // Recovery may replace factors or headings, but it remains part of one logical solve. Keeping these

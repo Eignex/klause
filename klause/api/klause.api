@@ -4617,6 +4617,8 @@ public final class com/eignex/klause/lp/bounding/LpParams {
 	public final fun getLpPlan ()Lcom/eignex/klause/lp/bounding/LpPlan;
 	public final fun getRandomSeed ()Ljava/lang/Long;
 	public final fun getSolveBudgetMillis ()Ljava/lang/Long;
+	public final fun getZeroObjectivePricing ()Lcom/eignex/klause/lp/engine/LpZeroObjectivePricing;
+	public final fun withZeroObjectivePricing (Lcom/eignex/klause/lp/engine/LpZeroObjectivePricing;)Lcom/eignex/klause/lp/bounding/LpParams;
 }
 
 public final class com/eignex/klause/lp/bounding/LpPlan {
@@ -4780,6 +4782,14 @@ public abstract interface class com/eignex/klause/lp/cut/CutSharing {
 }
 
 public final class com/eignex/klause/lp/cut/SharedCut {
+}
+
+public final class com/eignex/klause/lp/engine/LpZeroObjectivePricing : java/lang/Enum {
+	public static final field DEFAULT Lcom/eignex/klause/lp/engine/LpZeroObjectivePricing;
+	public static final field THEORY Lcom/eignex/klause/lp/engine/LpZeroObjectivePricing;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/eignex/klause/lp/engine/LpZeroObjectivePricing;
+	public static fun values ()[Lcom/eignex/klause/lp/engine/LpZeroObjectivePricing;
 }
 
 public final class com/eignex/klause/model/AllDifferent : com/eignex/klause/model/BoolExpr {

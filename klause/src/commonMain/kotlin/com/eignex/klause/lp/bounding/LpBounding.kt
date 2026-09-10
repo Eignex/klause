@@ -118,6 +118,7 @@ internal fun LpEngine.dualSimplex(model: LpModel, cancellation: Cancellation): T
         iterationLimit = nodePivotBudget(),
         workLimit = nodeWorkBudget(),
         trackDegeneracy = adaptiveWork,
+        pricing = pricingOptions,
         factory = solveContext.engineFactory,
     )
 }
@@ -149,6 +150,7 @@ private fun LpEngine.solveNode(
         iterationLimit = nodePivotBudget(),
         workLimit = nodeWorkBudget(),
         trackDegeneracy = adaptiveWork,
+        pricing = pricingOptions,
         factory = solveContext.engineFactory,
     )
     val displaced = nodeSimplex

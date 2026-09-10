@@ -9,6 +9,7 @@ import com.eignex.klause.lp.OpenIntBounds
 import com.eignex.klause.lp.engine.EngineConstruction
 import com.eignex.klause.lp.engine.LpCertificationPolicy
 import com.eignex.klause.lp.engine.LpSolveContext
+import com.eignex.klause.lp.engine.LpZeroObjectivePricing
 import com.eignex.klause.lp.engine.RecordingLpEngineFactory
 import com.eignex.klause.lp.tightenOpenIntBounds
 import com.eignex.klause.propagation.PropagationSession
@@ -39,7 +40,10 @@ class LpEngineInjectionTest {
     fun `node construction and certification stay isolated per engine`() {
         val problem = boundedProblem()
         val objective = LinearObjective(intCoefficients = longArrayOf(1L, 1L, 1L))
-        val params = LpParams(lpPlan = LpPlan(bounding = true))
+        val params = LpParams(
+            lpPlan = LpPlan(bounding = true),
+            randomSeed = 31L,
+        ).withZeroObjectivePricing(LpZeroObjectivePricing.THEORY)
         val rejectingFactory = RecordingLpEngineFactory()
         val rejecting = LpEngine(
             problem,
@@ -61,6 +65,9 @@ class LpEngineInjectionTest {
         assertFalse(rejected)
         assertTrue(accepted)
         assertEquals(1, rejectingFactory.calls.count { it.kind == EngineConstruction.PERSISTENT })
+        val construction = rejectingFactory.calls.single { it.kind == EngineConstruction.PERSISTENT }
+        assertEquals(LpZeroObjectivePricing.THEORY, construction.zeroObjectivePricing)
+        assertEquals(31L, construction.tieSeed)
     }
 
     @Test
@@ -76,7 +83,10 @@ class LpEngineInjectionTest {
         val engine = LpEngine(
             problem,
             objective,
-            LpParams(lpPlan = LpPlan(bounding = true)),
+            LpParams(
+                lpPlan = LpPlan(bounding = true),
+                randomSeed = 37L,
+            ).withZeroObjectivePricing(LpZeroObjectivePricing.THEORY),
             SolveStatsSink(backend = "root"),
             LpSolveContext(factory, decline),
         )
@@ -85,6 +95,9 @@ class LpEngineInjectionTest {
 
         assertTrue(bound.isNaN())
         assertEquals(1, factory.calls.count { it.kind == EngineConstruction.TABLEAU })
+        val construction = factory.calls.single { it.kind == EngineConstruction.TABLEAU }
+        assertEquals(LpZeroObjectivePricing.THEORY, construction.zeroObjectivePricing)
+        assertEquals(37L, construction.tieSeed)
     }
 
     @Test
