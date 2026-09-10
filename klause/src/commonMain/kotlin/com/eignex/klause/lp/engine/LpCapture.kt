@@ -1328,7 +1328,7 @@ private fun CaptureWriter.exactEvent(event: LpExactReplayEvent) {
             val terms = row.coefficients()
             int(terms.size)
             terms.forEach { (column, number) ->
-                int(column);
+                int(column)
                 exactNumber(number)
             }
             exactNumber(row.rhs)

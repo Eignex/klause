@@ -438,7 +438,7 @@ internal object LpExactReplay {
 
                 is LpExactReplayEvent.Append ->
                     trail.state.model.m < capture.maxRetainedRows &&
-                    trail.append(event.row, event.scoped)
+                        trail.append(event.row, event.scoped)
 
                 is LpExactReplayEvent.Deactivate -> trail.deactivate(event.id)
 

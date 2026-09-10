@@ -55,8 +55,8 @@ internal class LpBoundTrail(initial: LpExactState) {
             popRevision = state.popRevision + 1L,
             changedColumns = (
                 state.assertions.drop(retained).map { it.column } +
-                removed.map { state.model.n + it }
-            ).distinct().sorted(),
+                    removed.map { state.model.n + it }
+                ).distinct().sorted(),
         )
         return commit(next, token)
     }

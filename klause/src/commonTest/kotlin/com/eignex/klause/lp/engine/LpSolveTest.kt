@@ -118,9 +118,9 @@ class LpSolveTest {
         var cancelled = false
         val context = LpSolveContext(
             certificationPolicy = LpCertificationPolicy { _, success ->
-            cancelled = true
-            success
-        }
+                cancelled = true
+                success
+            },
         )
 
         val result = solveAndCertify(source, cancellation = Cancellation { cancelled }, context = context)

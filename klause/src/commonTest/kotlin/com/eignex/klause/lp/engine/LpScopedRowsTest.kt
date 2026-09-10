@@ -19,16 +19,29 @@ class LpScopedRowsTest {
         val ieee = ExactLpNumber.ofIeee(-0.0)
         val premises = ExactLpPremises(listOf(ExactLpPremise(42, false, third)), listOf(17))
         val source = ExactLpModel(
-            listOf(emptyList()), emptyList(),
-            listOf(ExactLpColumn(ExactLpBounds(), third, false, 42)), emptyList(),
+            listOf(emptyList()),
+            emptyList(),
+            listOf(ExactLpColumn(ExactLpBounds(), third, false, 42)),
+            emptyList(),
             ExactLpObjective(listOf(third), third, third, third, Sense.MAXIMIZE),
         )
         val trail = LpBoundTrail(source)
         val logical = ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(third)), tag = 71)
         assertTrue(trail.push())
         assertTrue(trail.append(LpScopedRow(10, listOf(0 to third), third, logical), scoped = true))
-        assertTrue(trail.append(LpScopedRow(11, listOf(0 to ieee), third, logical,
-            ExactLpRow(false, premises = premises), third), scoped = false))
+        assertTrue(
+            trail.append(
+                LpScopedRow(
+                    11,
+                    listOf(0 to ieee),
+                    third,
+                    logical,
+                    ExactLpRow(false, premises = premises),
+                    third,
+                ),
+                scoped = false,
+            ),
+        )
         assertTrue(trail.assertBound(2, true, ExactLpSide(zero, premises = premises), 101))
         assertTrue(trail.push())
         assertTrue(trail.append(LpScopedRow(12, listOf(0 to third), third, logical), scoped = true))
@@ -69,12 +82,21 @@ class LpScopedRowsTest {
     fun `deactivation removes both sides strictness and integer restrictions from every exact reader`() {
         val zero = ExactLpNumber.of(0L)
         val one = ExactLpNumber.of(1L)
-        val source = ExactLpModel(listOf(emptyList()), emptyList(),
-            listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(one)))), emptyList(),
-            ExactLpObjective(listOf(one)))
+        val source = ExactLpModel(
+            listOf(emptyList()),
+            emptyList(),
+            listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(one)))),
+            emptyList(),
+            ExactLpObjective(listOf(one)),
+        )
         val trail = LpBoundTrail(source)
-        val row = LpScopedRow(7, listOf(0 to one), zero,
-            ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(zero))), ExactLpRow(strict = true))
+        val row = LpScopedRow(
+            7,
+            listOf(0 to one),
+            zero,
+            ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(zero))),
+            ExactLpRow(strict = true),
+        )
         assertTrue(trail.append(row, scoped = false))
         val active = trail.state
         assertNotNull(active.conflict)
@@ -105,12 +127,27 @@ class LpScopedRowsTest {
     fun `priced logicals and surviving assertions block removal until explicitly released`() {
         val zero = ExactLpNumber.of(0L)
         val one = ExactLpNumber.of(1L)
-        val source = ExactLpModel(listOf(emptyList()), emptyList(), listOf(ExactLpColumn(ExactLpBounds())),
-            emptyList(), ExactLpObjective(listOf(one)))
+        val source = ExactLpModel(
+            listOf(emptyList()),
+            emptyList(),
+            listOf(ExactLpColumn(ExactLpBounds())),
+            emptyList(),
+            ExactLpObjective(listOf(one)),
+        )
         val trail = LpBoundTrail(source)
         assertTrue(trail.push())
-        assertTrue(trail.append(LpScopedRow(1, listOf(0 to one), one,
-            ExactLpColumn(ExactLpBounds(ExactLpSide(zero))), cost = one), scoped = true))
+        assertTrue(
+            trail.append(
+                LpScopedRow(
+                    1,
+                    listOf(0 to one),
+                    one,
+                    ExactLpColumn(ExactLpBounds(ExactLpSide(zero))),
+                    cost = one,
+                ),
+                scoped = true,
+            ),
+        )
         val priced = trail.state
         assertFalse(trail.pop(0))
         assertFalse(trail.deactivate(1))
@@ -135,8 +172,13 @@ class LpScopedRowsTest {
     fun `logical assertions remap and keep coordinates when structural columns recenter`() {
         val zero = ExactLpNumber.of(0L)
         val one = ExactLpNumber.of(1L)
-        val source = ExactLpModel(listOf(emptyList()), emptyList(), listOf(ExactLpColumn(ExactLpBounds())),
-            emptyList(), ExactLpObjective(listOf(one)))
+        val source = ExactLpModel(
+            listOf(emptyList()),
+            emptyList(),
+            listOf(ExactLpColumn(ExactLpBounds())),
+            emptyList(),
+            ExactLpObjective(listOf(one)),
+        )
         val trail = LpBoundTrail(source)
         val logical = ExactLpColumn(ExactLpBounds(ExactLpSide(zero)))
         assertTrue(trail.append(LpScopedRow(3, listOf(0 to one), one, logical), scoped = false))
@@ -164,8 +206,13 @@ class LpScopedRowsTest {
     fun `invalid cancelled overflowing and duplicate appends retain the original state`() {
         val zero = ExactLpNumber.of(0L)
         val one = ExactLpNumber.of(1L)
-        val source = ExactLpModel(listOf(emptyList()), emptyList(), listOf(ExactLpColumn(ExactLpBounds())),
-            emptyList(), ExactLpObjective(listOf(one)))
+        val source = ExactLpModel(
+            listOf(emptyList()),
+            emptyList(),
+            listOf(ExactLpColumn(ExactLpBounds())),
+            emptyList(),
+            ExactLpObjective(listOf(one)),
+        )
         val logical = ExactLpColumn(ExactLpBounds())
         val huge = ExactLpNumber.of(BigFraction.of(BigInteger.ONE shl 2048, BigInteger.ONE))
         val tiny = ExactLpNumber.of(BigFraction.of(BigInteger.ONE, BigInteger.ONE shl 2048))
@@ -194,10 +241,12 @@ class LpScopedRowsTest {
         assertTrue(trail.deactivate(row.id))
         assertTrue(trail.compact())
         assertFalse(trail.append(row, scoped = false))
-        for (state in listOf(LpExactState(source, matrixRevision = Long.MAX_VALUE),
+        for (state in listOf(
+            LpExactState(source, matrixRevision = Long.MAX_VALUE),
             LpExactState(source, boundRevision = Long.MAX_VALUE),
             LpExactState(source, objectiveRevision = Long.MAX_VALUE),
-            LpExactState(source, rowRevision = Long.MAX_VALUE))) {
+            LpExactState(source, rowRevision = Long.MAX_VALUE),
+        )) {
             val exhausted = LpBoundTrail(state)
             assertFalse(exhausted.append(row, scoped = false))
             assertSame(state, exhausted.state)

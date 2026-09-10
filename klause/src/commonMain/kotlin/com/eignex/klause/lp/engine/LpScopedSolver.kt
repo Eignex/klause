@@ -21,6 +21,7 @@ internal data class LpScopedMetrics(
     val currentOwners: Long get() = createdOwners - closedOwners
 }
 
+@Suppress("TooGenericExceptionCaught") // Ownership boundaries preserve arbitrary primary and cleanup failures.
 internal class LpScopedSolver(
     initial: LpExactState,
     private val cancellation: Cancellation = Cancellation.Never,
@@ -131,45 +132,55 @@ internal class LpScopedSolver(
             return true
         }
         if (next.state.matrixRevision != state.matrixRevision) {
-            if (!replace(next, token)) return false
-        } else {
-            val current = solver
-            if (current != null && !current.adopt(next.state, token)) return false
-            if (current == null && token()) return false
-            trail = next
+            return replace(next, token)
         }
+        val current = solver
+        if (current != null && !current.adopt(next.state, token)) return false
+        if (current == null && token()) return false
+        publish(next)
+        return true
+    }
+
+    private fun publish(next: LpBoundTrail) {
+        trail = next
         lastResult = null
         lastMetrics = LpSolveMetrics()
         editSuccesses++
-        return true
     }
 
     private fun replace(next: LpBoundTrail, token: Cancellation): Boolean {
         val expected = if (next.state.model.m < state.model.m) {
             // Seat the disappearing logicals in an isolated old-size owner before deleting their slots.
             val staging = prepared(state, token) ?: return false
+            var failure: Throwable? = null
             try {
                 val remap = LpRowRemap(state.model.n, state.rows)
                 staging.second.basicVars.map { remap.column(it) }.filter { it >= 0 }.toIntArray()
+            } catch (primary: Throwable) {
+                failure = primary
+                throw primary
             } finally {
-                closeOwner(staging.first)
+                closeOwner(staging.first, failure)
             }
         } else {
             IntArray(next.state.model.m) { next.state.model.n + it }
         }
         val replacement = prepared(next.state, token) ?: return false
         var published = false
+        var failure: Throwable? = null
         try {
             if (!replacement.second.basicVars.contentEquals(expected) || token()) return false
             val old = solver
-            trail = next
             solver = replacement.first
-            lastResult = null
+            publish(next)
             published = true
             if (old != null) closeOwner(old)
             return true
+        } catch (primary: Throwable) {
+            failure = primary
+            throw primary
         } finally {
-            if (!published) closeOwner(replacement.first)
+            if (!published) closeOwner(replacement.first, failure)
         }
     }
 
@@ -177,6 +188,7 @@ internal class LpScopedSolver(
         preparationAttempts++
         var candidate: PersistentLpSolver? = null
         var accepted = false
+        var failure: Throwable? = null
         try {
             if (token() || next.model.m > maxRetainedRows) return null
             val working = next.toWorkingModel() ?: return null
@@ -209,14 +221,20 @@ internal class LpScopedSolver(
             return candidate to basis
         } catch (_: BasisArithmeticException) {
             return null
+        } catch (primary: Throwable) {
+            failure = primary
+            throw primary
         } finally {
-            if (!accepted && candidate != null) closeOwner(candidate)
+            if (!accepted && candidate != null) closeOwner(candidate, failure)
         }
     }
 
-    private fun closeOwner(owner: PersistentLpSolver) {
+    private fun closeOwner(owner: PersistentLpSolver, primary: Throwable? = null) {
         try {
             owner.close()
+        } catch (failure: Throwable) {
+            if (primary == null) throw failure
+            primary.addSuppressed(failure)
         } finally {
             closedOwners++
         }

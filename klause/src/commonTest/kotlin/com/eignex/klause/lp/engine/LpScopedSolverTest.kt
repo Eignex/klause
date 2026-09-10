@@ -16,19 +16,148 @@ import kotlin.test.assertTrue
 
 class LpScopedSolverTest {
     @Test
+    fun `rejected preparation preserves the primary failure when cleanup also throws`() {
+        val zero = ExactLpNumber.of(0L)
+        val one = ExactLpNumber.of(1L)
+        val source = ExactLpModel(
+            listOf(emptyList()),
+            emptyList(),
+            listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(one)))),
+            emptyList(),
+            ExactLpObjective(listOf(one)),
+        )
+        val primary = IllegalStateException("preparation failure")
+        val cleanup = IllegalStateException("cleanup failure")
+        val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+            override fun newPersistentSolver(
+                model: LpModel,
+                cancellation: Cancellation,
+                refactorUpdateLimit: Int,
+                iterationLimit: Int,
+                workLimit: Long,
+                trackDegeneracy: Boolean,
+            ): PersistentLpSolver {
+                val delegate = RevisedSimplex(model, cancellation)
+                return object : PersistentLpSolver by delegate {
+                    override fun prepareLogicals(token: Cancellation): Basis? =
+                        if (model.m > 0) throw primary else delegate.prepareLogicals(token)
+
+                    override fun close() {
+                        delegate.close()
+                        if (model.m > 0) throw cleanup
+                    }
+                }
+            }
+        }
+        LpScopedSolver(LpExactState(source), context = LpSolveContext(engineFactory = factory)).use { solver ->
+            val original = assertNotNull(solver.solve())
+            val before = solver.state
+            val row = LpScopedRow(1, listOf(0 to one), one, ExactLpColumn(ExactLpBounds()))
+
+            val failure = assertFailsWith<IllegalStateException> { solver.append(row, false) }
+
+            assertSame(primary, failure)
+            assertSame(cleanup, failure.suppressedExceptions.single())
+            assertSame(before, solver.state)
+            assertSame(original, solver.lastResult)
+            assertEquals(1L, solver.metrics.editDeclines)
+            assertEquals(1L, solver.metrics.closedOwners)
+            assertEquals(1L, solver.metrics.currentOwners)
+        }
+    }
+
+    @Test
+    fun `published replacement stays accepted and clears solve metrics when old owner cleanup throws`() {
+        val zero = ExactLpNumber.of(0L)
+        val one = ExactLpNumber.of(1L)
+        val minusOne = ExactLpNumber.of(-1L)
+        val source = ExactLpModel(
+            listOf(listOf(ExactLpEntry(0, minusOne))),
+            listOf(minusOne),
+            listOf(
+                ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(ExactLpNumber.of(2L)))),
+                ExactLpColumn(ExactLpBounds(ExactLpSide(zero))),
+            ),
+            listOf(ExactLpRow()),
+            ExactLpObjective(listOf(one, zero)),
+        )
+        val cleanup = IllegalStateException("old owner cleanup failure")
+        val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+            override fun newPersistentSolver(
+                model: LpModel,
+                cancellation: Cancellation,
+                refactorUpdateLimit: Int,
+                iterationLimit: Int,
+                workLimit: Long,
+                trackDegeneracy: Boolean,
+            ): PersistentLpSolver {
+                val delegate = RevisedSimplex(model, cancellation)
+                return object : PersistentLpSolver by delegate {
+                    override fun close() {
+                        delegate.close()
+                        if (model.m == 1) throw cleanup
+                    }
+                }
+            }
+        }
+        LpScopedSolver(LpExactState(source), context = LpSolveContext(engineFactory = factory)).use { solver ->
+            assertNotNull(solver.solve())
+            assertTrue(solver.lastMetrics.workOps > 0L)
+            val row = LpScopedRow(2, listOf(0 to one), one, ExactLpColumn(ExactLpBounds()))
+
+            val failure = assertFailsWith<IllegalStateException> { solver.append(row, false) }
+
+            assertSame(cleanup, failure)
+            assertEquals(listOf(0L, 2L), solver.state.rows.entries().map { it.id })
+            assertNull(solver.lastResult)
+            assertEquals(LpSolveMetrics(), solver.lastMetrics)
+            assertEquals(1L, solver.metrics.editSuccesses)
+            assertEquals(0L, solver.metrics.editDeclines)
+            assertEquals(1L, solver.metrics.closedOwners)
+            assertEquals(1L, solver.metrics.currentOwners)
+            assertEquals(BigFraction.ONE, assertNotNull(solver.solve()).lowerBound)
+        }
+    }
+
+    @Test
     fun `appended row conflict cancels structural coefficients and preserves guarded proof after pop`() {
         val zero = ExactLpNumber.of(0L)
         val one = ExactLpNumber.of(1L)
         val minusOne = ExactLpNumber.of(-1L)
         val logical = ExactLpColumn(ExactLpBounds(ExactLpSide(zero)))
-        val source = ExactLpModel(listOf(emptyList()), emptyList(),
-            listOf(ExactLpColumn(ExactLpBounds())), emptyList(), ExactLpObjective(listOf(zero)))
+        val source = ExactLpModel(
+            listOf(emptyList()),
+            emptyList(),
+            listOf(ExactLpColumn(ExactLpBounds())),
+            emptyList(),
+            ExactLpObjective(listOf(zero)),
+        )
         LpScopedSolver(LpExactState(source)).use { solver ->
-            assertTrue(solver.append(LpScopedRow(2, listOf(0 to one), zero, logical,
-                ExactLpRow(false, premises = ExactLpPremises(emptyList(), listOf(41)))), false))
+            assertTrue(
+                solver.append(
+                    LpScopedRow(
+                        2,
+                        listOf(0 to one),
+                        zero,
+                        logical,
+                        ExactLpRow(false, premises = ExactLpPremises(emptyList(), listOf(41))),
+                    ),
+                    false,
+                ),
+            )
             assertTrue(solver.push())
-            assertTrue(solver.append(LpScopedRow(3, listOf(0 to minusOne), minusOne, logical,
-                ExactLpRow(false, premises = ExactLpPremises(emptyList(), listOf(42)))), true))
+            assertTrue(
+                solver.append(
+                    LpScopedRow(
+                        3,
+                        listOf(0 to minusOne),
+                        minusOne,
+                        logical,
+                        ExactLpRow(false, premises = ExactLpPremises(emptyList(), listOf(42))),
+                    ),
+                    true,
+                ),
+            )
 
             val result = assertNotNull(solver.solve())
 
@@ -50,7 +179,10 @@ class LpScopedSolverTest {
             assertTrue(rhs < BigFraction.ZERO)
             assertEquals(setOf(1, 2), proof.bounds.map { it.column }.toSet())
             assertTrue(proof.bounds.all { !it.upper })
-            assertEquals(setOf(41, 42), support.rows.map { assertNotNull(it.second.premises).literalEntries().single() }.toSet())
+            assertEquals(
+                setOf(41, 42),
+                support.rows.map { assertNotNull(it.second.premises).literalEntries().single() }.toSet(),
+            )
 
             assertTrue(solver.pop(0))
             assertTrue(solver.compact())
@@ -72,8 +204,13 @@ class LpScopedSolverTest {
         val half = ExactLpNumber.ofIeee(0.5)
         val logical = ExactLpColumn(ExactLpBounds(ExactLpSide(zero)))
         val column = ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(one)), origin = one)
-        val source = ExactLpModel(listOf(emptyList()), emptyList(), listOf(column), emptyList(),
-            ExactLpObjective(listOf(zero), third, third, third))
+        val source = ExactLpModel(
+            listOf(emptyList()),
+            emptyList(),
+            listOf(column),
+            emptyList(),
+            ExactLpObjective(listOf(zero), third, third, third),
+        )
         LpScopedSolver(LpExactState(source)).use { solver ->
             assertTrue(solver.push())
             assertTrue(solver.append(LpScopedRow(1, listOf(0 to one), one, logical), true))
@@ -92,9 +229,13 @@ class LpScopedSolverTest {
             assertEquals(third, solver.state.model.objective.cost(1))
             assertEquals(half, solver.state.model.entries(0)[1].number)
             assertEquals(half, solver.state.model.rhs(1))
-            val fresh = ExactLpModel(listOf(listOf(ExactLpEntry(0, third), ExactLpEntry(1, half))),
-                listOf(third, half), listOf(column, logical, logical), List(2) { ExactLpRow() },
-                ExactLpObjective(listOf(zero, third, zero), third, third, third))
+            val fresh = ExactLpModel(
+                listOf(listOf(ExactLpEntry(0, third), ExactLpEntry(1, half))),
+                listOf(third, half),
+                listOf(column, logical, logical),
+                List(2) { ExactLpRow() },
+                ExactLpObjective(listOf(zero, third, zero), third, third, third),
+            )
             val independent = solveAndCertify(fresh)
             assertEquals(independent.exactPrimal, result.exactPrimal)
             assertEquals(independent.lowerBound, result.lowerBound)
@@ -107,9 +248,13 @@ class LpScopedSolverTest {
         val one = ExactLpNumber.of(1L)
         val minusOne = ExactLpNumber.of(-1L)
         val logical = ExactLpColumn(ExactLpBounds(ExactLpSide(zero)))
-        val source = ExactLpModel(listOf(listOf(ExactLpEntry(0, minusOne))), listOf(minusOne),
+        val source = ExactLpModel(
+            listOf(listOf(ExactLpEntry(0, minusOne))),
+            listOf(minusOne),
             listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(ExactLpNumber.of(10L)))), logical),
-            listOf(ExactLpRow()), ExactLpObjective(listOf(one, zero)))
+            listOf(ExactLpRow()),
+            ExactLpObjective(listOf(one, zero)),
+        )
         val solver = LpScopedSolver(LpExactState(source))
         var solveWork = 0L
         var solveAttempts = 0
@@ -120,8 +265,18 @@ class LpScopedSolverTest {
                 val lower = 2L + cycle % 3
                 val premises = ExactLpPremises(emptyList(), listOf(101 + cycle))
                 assertTrue(solver.push())
-                assertTrue(solver.append(LpScopedRow(cycle + 1L, listOf(0 to minusOne), ExactLpNumber.of(-lower),
-                    logical, ExactLpRow(false, premises = premises)), scoped = true))
+                assertTrue(
+                    solver.append(
+                        LpScopedRow(
+                            cycle + 1L,
+                            listOf(0 to minusOne),
+                            ExactLpNumber.of(-lower),
+                            logical,
+                            ExactLpRow(false, premises = premises),
+                        ),
+                        scoped = true,
+                    ),
+                )
                 solveAttempts++
                 val local = assertNotNull(solver.solve(counterResults = counters))
                 solves++
@@ -137,7 +292,10 @@ class LpScopedSolverTest {
                 val duals = local.float.duals
                 assertEquals(-1.0, duals[1])
                 assertEquals(0.0, duals[0])
-                assertEquals(BigFraction.ZERO, point.negated() + (point - BigFraction.ofLong(lower)) + BigFraction.ofLong(lower))
+                assertEquals(
+                    BigFraction.ZERO,
+                    point.negated() + (point - BigFraction.ofLong(lower)) + BigFraction.ofLong(lower),
+                )
                 val localKey = assertNotNull(LpExactCapture.stateKey(solver.state))
 
                 assertTrue(solver.pop(0))
@@ -167,9 +325,13 @@ class LpScopedSolverTest {
                     val fresh = solveAndCertify(source)
                     assertEquals(compacted.lowerBound, fresh.lowerBound)
                     assertEquals(compacted.exactPrimal, fresh.exactPrimal)
-                    val freshLocal = ExactLpModel(listOf(listOf(ExactLpEntry(0, minusOne))),
-                        listOf(ExactLpNumber.of(-lower)), List(source.numVars) { source.column(it) },
-                        listOf(ExactLpRow(false, premises = premises)), source.objective)
+                    val freshLocal = ExactLpModel(
+                        listOf(listOf(ExactLpEntry(0, minusOne))),
+                        listOf(ExactLpNumber.of(-lower)),
+                        List(source.numVars) { source.column(it) },
+                        listOf(ExactLpRow(false, premises = premises)),
+                        source.objective,
+                    )
                     val checkedFresh = solveAndCertify(freshLocal)
                     assertEquals(local.lowerBound, checkedFresh.lowerBound)
                     assertEquals(local.exactPrimal, checkedFresh.exactPrimal)
@@ -194,12 +356,25 @@ class LpScopedSolverTest {
     fun `explicit deactivation of strict sides permits the exact boundary witness`() {
         val zero = ExactLpNumber.of(0L)
         val one = ExactLpNumber.of(1L)
-        val source = ExactLpModel(listOf(emptyList()), emptyList(),
-            listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(one)))), emptyList(),
-            ExactLpObjective(listOf(one)))
+        val source = ExactLpModel(
+            listOf(emptyList()),
+            emptyList(),
+            listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(one)))),
+            emptyList(),
+            ExactLpObjective(listOf(one)),
+        )
         LpScopedSolver(LpExactState(source)).use { solver ->
-            assertTrue(solver.append(LpScopedRow(4, listOf(0 to one), one,
-                ExactLpColumn(ExactLpBounds(upper = ExactLpSide(one, strict = true)))), scoped = false))
+            assertTrue(
+                solver.append(
+                    LpScopedRow(
+                        4,
+                        listOf(0 to one),
+                        one,
+                        ExactLpColumn(ExactLpBounds(upper = ExactLpSide(one, strict = true))),
+                    ),
+                    scoped = false,
+                ),
+            )
             val strict = assertNotNull(solver.solve())
             assertNull(strict.witness)
             assertEquals(BigFraction.ZERO, strict.lowerBound)
@@ -222,8 +397,13 @@ class LpScopedSolverTest {
         val zero = ExactLpNumber.of(0L)
         val one = ExactLpNumber.of(1L)
         val bounds = ExactLpBounds(ExactLpSide(zero), ExactLpSide(one))
-        val source = ExactLpModel(listOf(emptyList()), emptyList(), listOf(ExactLpColumn(bounds)),
-            emptyList(), ExactLpObjective(listOf(zero)))
+        val source = ExactLpModel(
+            listOf(emptyList()),
+            emptyList(),
+            listOf(ExactLpColumn(bounds)),
+            emptyList(),
+            ExactLpObjective(listOf(zero)),
+        )
         LpScopedSolver(LpExactState(source)).use { solver ->
             assertTrue(solver.push())
             assertTrue(solver.append(LpScopedRow(1, listOf(0 to one), one, ExactLpColumn(bounds), cost = one), true))
@@ -253,13 +433,27 @@ class LpScopedSolverTest {
         val guard = ExactLpPremises(emptyList(), listOf(31))
         val lowerPremises = ExactLpPremises(listOf(ExactLpPremise(5, false, zero)))
         val upperPremises = ExactLpPremises(emptyList(), listOf(32))
-        val source = ExactLpModel(listOf(emptyList()), emptyList(), listOf(ExactLpColumn(ExactLpBounds())),
-            emptyList(), ExactLpObjective(listOf(one)))
+        val source = ExactLpModel(
+            listOf(emptyList()),
+            emptyList(),
+            listOf(ExactLpColumn(ExactLpBounds())),
+            emptyList(),
+            ExactLpObjective(listOf(one)),
+        )
         LpScopedSolver(LpExactState(source)).use { solver ->
             assertTrue(solver.append(LpScopedRow(2, listOf(0 to one), one, ExactLpColumn(ExactLpBounds())), false))
-            assertTrue(solver.append(LpScopedRow(3, listOf(0 to one), ExactLpNumber.of(8L),
-                ExactLpColumn(ExactLpBounds(ExactLpSide(zero, premises = lowerPremises), ExactLpSide(zero))),
-                ExactLpRow(false, true, guard)), false))
+            assertTrue(
+                solver.append(
+                    LpScopedRow(
+                        3,
+                        listOf(0 to one),
+                        ExactLpNumber.of(8L),
+                        ExactLpColumn(ExactLpBounds(ExactLpSide(zero, premises = lowerPremises), ExactLpSide(zero))),
+                        ExactLpRow(false, true, guard),
+                    ),
+                    false,
+                ),
+            )
             val appended = assertNotNull(solver.solve())
             assertEquals(LpVerdict.INFEASIBLE, appended.verdict)
             assertTrue(assertNotNull(appended.boundConflict).lower.side.strict)
@@ -295,26 +489,38 @@ class LpScopedSolverTest {
     fun `failed append preparation closes staged owners and preserves the current solve`() {
         val zero = ExactLpNumber.of(0L)
         val one = ExactLpNumber.of(1L)
-        val source = ExactLpModel(listOf(emptyList()), emptyList(),
-            listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(one)))), emptyList(),
-            ExactLpObjective(listOf(one)))
+        val source = ExactLpModel(
+            listOf(emptyList()),
+            emptyList(),
+            listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(one)))),
+            emptyList(),
+            ExactLpObjective(listOf(one)),
+        )
         for (failure in listOf("unsupported", "singular", "arithmetic", "unexpected", "cancel")) {
             var fail = false
             var cancelled = false
             var closes = 0
             val token = Cancellation { cancelled }
             val factory = object : LpEngineFactory by ProductionLpEngineFactory {
-                override fun newPersistentSolver(model: LpModel, cancellation: Cancellation, refactorUpdateLimit: Int,
-                    iterationLimit: Int, workLimit: Long, trackDegeneracy: Boolean): PersistentLpSolver {
+                override fun newPersistentSolver(
+                    model: LpModel,
+                    cancellation: Cancellation,
+                    refactorUpdateLimit: Int,
+                    iterationLimit: Int,
+                    workLimit: Long,
+                    trackDegeneracy: Boolean,
+                ): PersistentLpSolver {
                     val delegate = RevisedSimplex(model, cancellation, basisSolverFactory = { matrix ->
                         val factors = KotlinBasisSolver(matrix)
                         object : BasisSolver by factors {
                             override fun refactorize(basicIndex: IntArray): Boolean {
-                                if (fail) when (failure) {
-                                    "singular" -> return false
-                                    "arithmetic" -> throw BasisArithmeticException("injected preparation")
-                                    "unexpected" -> error("injected preparation")
-                                    "cancel" -> cancelled = true
+                                if (fail) {
+                                    when (failure) {
+                                        "singular" -> return false
+                                        "arithmetic" -> throw BasisArithmeticException("injected preparation")
+                                        "unexpected" -> error("injected preparation")
+                                        "cancel" -> cancelled = true
+                                    }
                                 }
                                 return factors.refactorize(basicIndex)
                             }
@@ -323,7 +529,10 @@ class LpScopedSolverTest {
                     return object : PersistentLpSolver by delegate {
                         override fun prepareLogicals(token: Cancellation): Basis? =
                             if (fail && failure == "unsupported") null else delegate.prepareLogicals(token)
-                        override fun close() { closes++; delegate.close() }
+                        override fun close() {
+                            closes++
+                            delegate.close()
+                        }
                     }
                 }
             }
@@ -355,16 +564,26 @@ class LpScopedSolverTest {
     fun `construction failures and cancellation after an accepted append preserve source ownership`() {
         val zero = ExactLpNumber.of(0L)
         val one = ExactLpNumber.of(1L)
-        val source = ExactLpModel(listOf(emptyList()), emptyList(),
-            listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(one)))), emptyList(),
-            ExactLpObjective(listOf(one)))
+        val source = ExactLpModel(
+            listOf(emptyList()),
+            emptyList(),
+            listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(one)))),
+            emptyList(),
+            ExactLpObjective(listOf(one)),
+        )
         var failConstruction = false
         var cancelCertificate = false
         var cancelled = false
         val token = Cancellation { cancelled }
         val factory = object : LpEngineFactory by ProductionLpEngineFactory {
-            override fun newPersistentSolver(model: LpModel, cancellation: Cancellation, refactorUpdateLimit: Int,
-                iterationLimit: Int, workLimit: Long, trackDegeneracy: Boolean): PersistentLpSolver {
+            override fun newPersistentSolver(
+                model: LpModel,
+                cancellation: Cancellation,
+                refactorUpdateLimit: Int,
+                iterationLimit: Int,
+                workLimit: Long,
+                trackDegeneracy: Boolean,
+            ): PersistentLpSolver {
                 if (failConstruction) error("injected factory failure")
                 return RevisedSimplex(model, cancellation)
             }
@@ -378,8 +597,12 @@ class LpScopedSolverTest {
         LpScopedSolver(LpExactState(source), token, LpSolveContext(factory, policy)).use { solver ->
             assertNotNull(solver.solve())
             val before = solver.state
-            val row = LpScopedRow(2, listOf(0 to one), zero,
-                ExactLpColumn(ExactLpBounds(ExactLpSide(one), ExactLpSide(zero))))
+            val row = LpScopedRow(
+                2,
+                listOf(0 to one),
+                zero,
+                ExactLpColumn(ExactLpBounds(ExactLpSide(one), ExactLpSide(zero))),
+            )
             failConstruction = true
             assertFailsWith<IllegalStateException> { solver.append(row, true) }
             assertSame(before, solver.state)
@@ -405,15 +628,25 @@ class LpScopedSolverTest {
     fun `failed compaction staging or reduced build preserves tombstones and the live owner`() {
         val zero = ExactLpNumber.of(0L)
         val one = ExactLpNumber.of(1L)
-        val source = ExactLpModel(listOf(listOf(ExactLpEntry(0, one))), listOf(one),
+        val source = ExactLpModel(
+            listOf(listOf(ExactLpEntry(0, one))),
+            listOf(one),
             listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(one))), ExactLpColumn(ExactLpBounds())),
-            listOf(ExactLpRow()), ExactLpObjective(listOf(one, zero)))
+            listOf(ExactLpRow()),
+            ExactLpObjective(listOf(one, zero)),
+        )
         for (failureOffset in listOf(1, 2)) {
             var builds = 0
             var failAt = -1
             val factory = object : LpEngineFactory by ProductionLpEngineFactory {
-                override fun newPersistentSolver(model: LpModel, cancellation: Cancellation, refactorUpdateLimit: Int,
-                    iterationLimit: Int, workLimit: Long, trackDegeneracy: Boolean): PersistentLpSolver {
+                override fun newPersistentSolver(
+                    model: LpModel,
+                    cancellation: Cancellation,
+                    refactorUpdateLimit: Int,
+                    iterationLimit: Int,
+                    workLimit: Long,
+                    trackDegeneracy: Boolean,
+                ): PersistentLpSolver {
                     val delegate = RevisedSimplex(model, cancellation)
                     return object : PersistentLpSolver by delegate {
                         override fun prepareLogicals(token: Cancellation): Basis? =
@@ -446,13 +679,23 @@ class LpScopedSolverTest {
     fun `resource and adoption declines are atomic and cancelled solves withhold committed assertions`() {
         val zero = ExactLpNumber.of(0L)
         val one = ExactLpNumber.of(1L)
-        val source = ExactLpModel(listOf(emptyList()), emptyList(),
-            listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(one)))), emptyList(),
-            ExactLpObjective(listOf(one)))
+        val source = ExactLpModel(
+            listOf(emptyList()),
+            emptyList(),
+            listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(one)))),
+            emptyList(),
+            ExactLpObjective(listOf(one)),
+        )
         var reject = false
         val factory = object : LpEngineFactory by ProductionLpEngineFactory {
-            override fun newPersistentSolver(model: LpModel, cancellation: Cancellation, refactorUpdateLimit: Int,
-                iterationLimit: Int, workLimit: Long, trackDegeneracy: Boolean): PersistentLpSolver {
+            override fun newPersistentSolver(
+                model: LpModel,
+                cancellation: Cancellation,
+                refactorUpdateLimit: Int,
+                iterationLimit: Int,
+                workLimit: Long,
+                trackDegeneracy: Boolean,
+            ): PersistentLpSolver {
                 val delegate = RevisedSimplex(model, cancellation)
                 return object : PersistentLpSolver by delegate {
                     override fun adopt(state: LpExactState, token: Cancellation): Boolean =
@@ -460,8 +703,11 @@ class LpScopedSolverTest {
                 }
             }
         }
-        LpScopedSolver(LpExactState(source), context = LpSolveContext(engineFactory = factory),
-            maxRetainedRows = 0).use { solver ->
+        LpScopedSolver(
+            LpExactState(source),
+            context = LpSolveContext(engineFactory = factory),
+            maxRetainedRows = 0,
+        ).use { solver ->
             val original = assertNotNull(solver.solve())
             val before = solver.state
             assertFalse(solver.append(LpScopedRow(0, emptyList(), zero, ExactLpColumn(ExactLpBounds())), false))
