@@ -119,7 +119,9 @@ private fun verifyCorpus(paths: List<Path>) {
     val successful = traces.filter { trace ->
         trace.operations.any { it is BasisTraceOperation.Factorize && it.success }
     }
-    val acceptedChains = traces.maxOfOrNull { trace ->
+    val acceptedChains = traces.filter {
+        it.metadata.route == BasisTraceRoute.PRODUCTION_RELAXATION
+    }.maxOfOrNull { trace ->
         var chain = 0
         var longest = 0
         for (operation in trace.operations) {
