@@ -116,8 +116,28 @@ internal fun certifyLpResult(
         if (cancellation()) return CertifiedLpResult(null, null, null, null, null, false, { null })
         state.conflict?.let {
             observer?.observe(LpCertifier.EXACT_FARKAS, true)
-            val accepted = policy.acceptNullable(LpCertifier.EXACT_FARKAS, it)
-            return CertifiedLpResult(null, null, null, null, null, false, { null }, boundConflict = accepted)
+            val accepted = policy.acceptNullable(LpCertifier.EXACT_FARKAS, it)?.takeUnless { cancellation() }
+            val support = accepted?.let { conflict ->
+                LpExactSupport(
+                    state,
+                    emptyList(),
+                    listOf(
+                        LpExactCitedSide(conflict.column, false, conflict.lower.side, conflict.lower.witness),
+                        LpExactCitedSide(conflict.column, true, conflict.upper.side, conflict.upper.witness),
+                    ),
+                )
+            }
+            return CertifiedLpResult(
+                null,
+                null,
+                null,
+                null,
+                null,
+                false,
+                { null },
+                boundConflict = accepted,
+                conflictSupport = support,
+            )
         }
         if (solver.solvedExactState !== state || (result != null && result.exactState !== state)) {
             return CertifiedLpResult(null, null, null, null, null, false, { null })

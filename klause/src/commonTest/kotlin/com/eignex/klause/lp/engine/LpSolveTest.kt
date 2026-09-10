@@ -63,8 +63,71 @@ class LpSolveTest {
         assertEquals(LpVerdict.INFEASIBLE, accepted.verdict)
         assertEquals(7L, assertNotNull(accepted.boundConflict).lower.witness)
         assertEquals(-2L, accepted.boundConflict.upper.witness)
+        assertEquals(trail.state, assertNotNull(accepted.conflictSupport).state)
         assertEquals(LpVerdict.INDETERMINATE, rejected.verdict)
         assertNull(rejected.boundConflict)
+        assertNull(rejected.conflictSupport)
+    }
+
+    @Test
+    fun `recentered bound conflict retains source state and premises after pop`() {
+        val zero = ExactLpNumber.of(0L)
+        val lowerPremises = ExactLpPremises(emptyList(), listOf(11))
+        val upperPremises = ExactLpPremises(emptyList(), listOf(12))
+        val source = ExactLpModel(
+            listOf(emptyList()),
+            emptyList(),
+            listOf(ExactLpColumn(ExactLpBounds(upper = ExactLpSide(zero, premises = upperPremises)))),
+            emptyList(),
+            ExactLpObjective(listOf(zero)),
+        )
+        val trail = LpBoundTrail(source)
+        assertTrue(trail.push())
+        assertTrue(trail.assertBound(0, false, ExactLpSide(zero, strict = true, premises = lowerPremises), 7L))
+        assertTrue(trail.recenter(listOf(ExactLpNumber.of(1L))))
+        val state = trail.state
+
+        val result = solveAndCertify(assertNotNull(state.toWorkingModel()))
+        assertTrue(trail.pop(0))
+
+        val support = assertNotNull(result.conflictSupport)
+        assertEquals(LpVerdict.INFEASIBLE, result.verdict)
+        assertEquals(state, support.state)
+        assertEquals(ExactLpNumber.of(1L), support.state.model.column(0).origin)
+        assertEquals(2L, support.state.boundRevision)
+        assertEquals(1L, support.state.objectiveRevision)
+        assertEquals(0L, support.state.popRevision)
+        assertEquals(listOf(7L, -2L), support.sides.map { it.witness })
+        assertEquals(listOf(lowerPremises, upperPremises), support.sides.map { it.side.premises })
+        assertTrue(support.sides.all { it.side.number.value == BigFraction.MINUS_ONE })
+        assertTrue(support.rows.isEmpty())
+        assertEquals(1L, trail.state.popRevision)
+        assertNull(trail.state.conflict)
+    }
+
+    @Test
+    fun `cancellation during direct conflict acceptance withholds the proof`() {
+        val zero = ExactLpNumber.of(0L)
+        val source = ExactLpModel(
+            listOf(emptyList()),
+            emptyList(),
+            listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero, strict = true), ExactLpSide(zero)))),
+            emptyList(),
+            ExactLpObjective(listOf(zero)),
+        )
+        var cancelled = false
+        val context = LpSolveContext(
+            certificationPolicy = LpCertificationPolicy { _, success ->
+            cancelled = true
+            success
+        }
+        )
+
+        val result = solveAndCertify(source, cancellation = Cancellation { cancelled }, context = context)
+
+        assertEquals(LpVerdict.INDETERMINATE, result.verdict)
+        assertNull(result.boundConflict)
+        assertNull(result.conflictSupport)
     }
 
     @Test
@@ -160,9 +223,9 @@ class LpSolveTest {
         )
         val context = LpSolveContext(
             engineFactory = object : LpEngineFactory by ProductionLpEngineFactory {
-            override fun newGeneralSolver(model: LpModel, cancellation: Cancellation): LpSolver =
-                error("engine entered")
-        }
+                override fun newGeneralSolver(model: LpModel, cancellation: Cancellation): LpSolver =
+                    error("engine entered")
+            },
         )
 
         val result = solveAndCertify(model, context = context)
