@@ -14,6 +14,9 @@ import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.argsortBy
 import com.eignex.koblas.SparseMatrix
+import com.eignex.koblas.SparseVector
+import com.eignex.koblas.column
+import com.eignex.koblas.koblas
 import com.eignex.koblas.sparse.SparseWorkspace
 import kotlin.math.abs
 
@@ -122,6 +125,9 @@ internal class RevisedSimplex(
      */
     private val columns: SparseMatrix = lpColumns(model)
 
+    // Own each structural column once so repeated pricing dots reach Koblas without per-dot copies.
+    private val dotColumns: Array<SparseVector> = Array(n) { columns.column(it) }
+
     // The CSC of `columns` as flat arrays — the same structure the seam holds, read here for pricing rather
     // than copied into a second representation. Column j occupies colPtr(j) until colPtr(j+1).
     private val colPtr: IntArray = columns.copyColumnPointers()
@@ -133,6 +139,10 @@ internal class RevisedSimplex(
     // BTRAN worth having, since dotting ρ against all numVars columns would swamp it.
     private val rowCols: Array<IntArray>
     private val rowVals: Array<DoubleArray>
+
+    // A permanently active full support lets sparse AXPY update a pre-populated dense destination.
+    private val denseSupport = IntArray(m) { it }
+    private val denseMarks = IntArray(m) { 1 }
 
     private val basicVar = IntArray(m)
     private val status = Array(numVars) { VarStatus.BASIC }
@@ -321,12 +331,8 @@ internal class RevisedSimplex(
     }
 
     /** `y · A_j`, uncharged — for the passes that must not move the work meter. */
-    private fun columnDot(y: DoubleArray, j: Int): Double {
-        if (j >= n) return y[j - n]
-        var acc = 0.0
-        for (k in colPtr[j] until colPtr[j + 1]) acc += y[rowIdx[k]] * colVal[k]
-        return acc
-    }
+    private fun columnDot(y: DoubleArray, j: Int): Double =
+        if (j < n) koblas.sparseKernels.dot(dotColumns[j], y) else y[j - n]
 
     /** `y · A_j` for the dual vector [y], charged to the work meter. */
     private fun dotColumn(y: DoubleArray, j: Int): Double {
@@ -551,13 +557,14 @@ internal class RevisedSimplex(
     private fun shouldSampleQuality(): Boolean = refactorPolicy.shouldSample(cancelled = false) && !cancellation()
 
     private fun denseColumn(column: Int): DoubleArray = DoubleArray(m).also { dense ->
-        for (entry in colPtr[column] until colPtr[column + 1]) dense[rowIdx[entry]] = colVal[entry]
+        sparseAxpy(dense, 1.0, column)
     }
 
     private fun sparseAxpy(destination: DoubleArray, alpha: Double, column: Int) {
-        for (entry in colPtr[column] until colPtr[column + 1]) {
-            destination[rowIdx[entry]] += alpha * colVal[entry]
-        }
+        SparseWorkspace.scatterAxpy(
+            alpha, rowIdx, colPtr[column], colVal, colPtr[column], columnNnz(column),
+            destination, denseMarks, 1, denseSupport, 0, m,
+        )
     }
 
     /** `B x = b` for a dense right-hand side, into [out] through [carrier]. */
@@ -1597,7 +1604,7 @@ internal class RevisedSimplex(
         if (changed) {
             val change = DoubleArray(m)
             ftranDense(rhs, change, rhsVec, boundUpdateFtran = true)
-            for (i in 0 until m) out[i] += change[i]
+            koblas.vectorKernels.axpy(out, 0, 1.0, change, 0, m)
             work.add(m)
         }
         return out.all { it.isFinite() }
