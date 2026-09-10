@@ -6,6 +6,7 @@ import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.localsearch.strategy.LocalSearchRecipe
 import com.eignex.klause.lp.bounding.LpConfig
+import com.eignex.klause.lp.engine.LpZeroObjectivePricing
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective
@@ -72,6 +73,8 @@ data class PortfolioScenario(
      *  `LpConfig.AGGRESSIVE` (default, no overrides) leaves the arms uncapped — the pool spreads the
      *  LP-intensity itself; an `OFF` emphasis disables LP, and overrides force individual techniques. */
     val lpCeiling: LpConfig = LpConfig.AGGRESSIVE,
+    /** Entering-column policy used by every backtrack arm's zero-objective LP solves. */
+    val zeroObjectivePricing: LpZeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT,
     /** Optional override of the local-search arm pool — per-arm factories (a fresh recipe per slot).
      *  `null` uses the curated `LocalSearchCatalog` pool unchanged; a non-null pool is the CLI's resolved
      *  recipes (a named base, or the curated pool with axis edits applied). */
@@ -203,6 +206,7 @@ internal object PortfolioComposition {
                 scenario.btPool,
                 scenario.annotationArm,
                 scenario.nodeBudget,
+                scenario.zeroObjectivePricing,
             )
 
             EngineMix.MIXED -> mixedArms(scenario)
@@ -238,18 +242,22 @@ internal object PortfolioComposition {
         btPool: List<() -> BacktrackRecipe>?,
         annotationArm: BacktrackParams?,
         nodeBudget: NodeBudget?,
+        zeroObjectivePricing: LpZeroObjectivePricing,
     ): List<WorkerConfig> {
         if (btPool != null) {
             // The `--lp` ceiling bounds the pool, and an injected pool is still the pool: capping only the
             // curated one leaves `--lp` silently ignored whenever the caller names its arms.
             return List(count) {
-                BacktrackWorkerConfig(btPool[it % btPool.size]().capLp(lpCeiling).spending(nodeBudget))
+                BacktrackWorkerConfig(
+                    btPool[it % btPool.size]().capLp(lpCeiling).spending(nodeBudget),
+                    zeroObjectivePricing,
+                )
             }
         }
-        val base = BacktrackWorkerConfig.diverse(kind, count, lpCeiling, nodeBudget)
+        val base = BacktrackWorkerConfig.diverse(kind, count, lpCeiling, nodeBudget, zeroObjectivePricing)
         if (annotationArm == null || count < 2) return base
         val annotation = BacktrackWorkerConfig.ofParams("annotation", annotationArm.copy(nodeBudget = nodeBudget))
-        return base.dropLast(1) + BacktrackWorkerConfig(annotation)
+        return base.dropLast(1) + BacktrackWorkerConfig(annotation, zeroObjectivePricing)
     }
 
     private fun mixedArms(scenario: PortfolioScenario): List<WorkerConfig> {
@@ -267,6 +275,7 @@ internal object PortfolioComposition {
             scenario.btPool,
             scenario.annotationArm,
             scenario.nodeBudget,
+            scenario.zeroObjectivePricing,
         )
         if (scenario.kind == Kind.COP) {
             // Sequential portfolios warm every arm in list order. A complete arm must receive its first

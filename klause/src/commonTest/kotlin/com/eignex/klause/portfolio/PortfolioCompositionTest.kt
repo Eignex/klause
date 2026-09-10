@@ -2,6 +2,7 @@ package com.eignex.klause.portfolio
 
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.NodeBudget
+import com.eignex.klause.lp.engine.LpZeroObjectivePricing
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -57,6 +58,20 @@ class PortfolioCompositionTest {
 
         val annotation = arms.filterIsInstance<BacktrackWorkerConfig>().single { it.label == "annotation" }
         assertSame(budget, annotation.recipe.build(1L, null).nodeBudget)
+    }
+
+    @Test
+    fun `pricing override retains the annotation arm in the default pool`() {
+        val arms = PortfolioComposition.compose(
+            PortfolioScenario.sequential(Kind.CSP, engine = EngineMix.BACKTRACK, arms = 3).copy(
+                annotationArm = BacktrackParams(),
+                zeroObjectivePricing = LpZeroObjectivePricing.LARGEST_PIVOT,
+            ),
+        ).filterIsInstance<BacktrackWorkerConfig>()
+
+        assertEquals("satOptimized", arms.first().label)
+        assertEquals("annotation", arms.last().label)
+        assertTrue(arms.all { it.zeroObjectivePricing == LpZeroObjectivePricing.LARGEST_PIVOT })
     }
 
     @Test

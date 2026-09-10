@@ -25,9 +25,13 @@ internal class RecordingLpEngineFactory(private val delegate: LpEngineFactory = 
     LpEngineFactory {
     val calls = ArrayList<EngineConstructionCall>()
 
-    override fun newGeneralSolver(model: LpModel, cancellation: Cancellation): LpSolver {
-        calls += EngineConstructionCall(EngineConstruction.GENERAL)
-        return delegate.newGeneralSolver(model, cancellation)
+    override fun newGeneralSolver(model: LpModel, cancellation: Cancellation, pricing: LpPricingOptions): LpSolver {
+        calls += EngineConstructionCall(
+            EngineConstruction.GENERAL,
+            zeroObjectivePricing = pricing.zeroObjective,
+            tieSeed = pricing.tieSeed,
+        )
+        return delegate.newGeneralSolver(model, cancellation, pricing)
     }
 
     override fun newComponentSolver(
@@ -137,7 +141,11 @@ class LpSolverInjectionTest {
         val model = builder.build(Sense.MINIMIZE)
         val factory = RecordingLpEngineFactory()
 
-        newLpSolver(model, factory = factory).close()
+        newLpSolver(
+            model,
+            factory = factory,
+            pricing = LpPricingOptions(LpZeroObjectivePricing.LARGEST_PIVOT, 17L),
+        ).close()
         newTableauCutSolver(
             model,
             iterationLimit = 17,
@@ -159,6 +167,11 @@ class LpSolverInjectionTest {
         }
 
         assertEquals(2, factory.calls.count { it.kind == EngineConstruction.GENERAL })
+        assertTrue(
+            factory.calls.filter { it.kind == EngineConstruction.GENERAL }.all {
+                it.zeroObjectivePricing == LpZeroObjectivePricing.LARGEST_PIVOT && it.tieSeed == 17L
+            },
+        )
         assertEquals(1, factory.calls.count { it.kind == EngineConstruction.COMPONENT })
         assertTrue(
             factory.calls.any {
@@ -228,7 +241,11 @@ class LpSolverInjectionTest {
         var construction = 0
         var closed = 0
         val factory = object : LpEngineFactory by ProductionLpEngineFactory {
-            override fun newGeneralSolver(model: LpModel, cancellation: Cancellation): LpSolver {
+            override fun newGeneralSolver(
+                model: LpModel,
+                cancellation: Cancellation,
+                pricing: LpPricingOptions,
+            ): LpSolver {
                 construction++
                 if (construction == 2) error("injected construction failure")
                 return closeTrackingSolver { closed++ }
@@ -245,8 +262,11 @@ class LpSolverInjectionTest {
         val model = twoComponentModel()
         var closed = 0
         val factory = object : LpEngineFactory by ProductionLpEngineFactory {
-            override fun newGeneralSolver(model: LpModel, cancellation: Cancellation): LpSolver =
-                closeTrackingSolver { closed++ }
+            override fun newGeneralSolver(
+                model: LpModel,
+                cancellation: Cancellation,
+                pricing: LpPricingOptions,
+            ): LpSolver = closeTrackingSolver { closed++ }
 
             override fun newComponentSolver(
                 model: LpModel,
@@ -275,7 +295,11 @@ class LpSolverInjectionTest {
             }
         }
         val factory = object : LpEngineFactory by ProductionLpEngineFactory {
-            override fun newGeneralSolver(model: LpModel, cancellation: Cancellation): LpSolver {
+            override fun newGeneralSolver(
+                model: LpModel,
+                cancellation: Cancellation,
+                pricing: LpPricingOptions,
+            ): LpSolver {
                 assertSame(token, cancellation)
                 return solver
             }

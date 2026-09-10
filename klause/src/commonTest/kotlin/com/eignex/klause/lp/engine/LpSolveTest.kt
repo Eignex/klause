@@ -223,8 +223,11 @@ class LpSolveTest {
         )
         val context = LpSolveContext(
             engineFactory = object : LpEngineFactory by ProductionLpEngineFactory {
-                override fun newGeneralSolver(model: LpModel, cancellation: Cancellation): LpSolver =
-                    error("engine entered")
+                override fun newGeneralSolver(
+                    model: LpModel,
+                    cancellation: Cancellation,
+                    pricing: LpPricingOptions,
+                ): LpSolver = error("engine entered")
             },
         )
 
@@ -381,10 +384,14 @@ class LpSolveTest {
         var calls = 0
         val context = LpSolveContext(
             engineFactory = object : LpEngineFactory by ProductionLpEngineFactory {
-                override fun newGeneralSolver(model: LpModel, cancellation: Cancellation): LpSolver {
+                override fun newGeneralSolver(
+                    model: LpModel,
+                    cancellation: Cancellation,
+                    pricing: LpPricingOptions,
+                ): LpSolver {
                     calls++
                     assertNotNull(model.exactState)
-                    return ProductionLpEngineFactory.newGeneralSolver(model, cancellation)
+                    return ProductionLpEngineFactory.newGeneralSolver(model, cancellation, pricing)
                 }
                 override fun newComponentSolver(
                     model: LpModel,

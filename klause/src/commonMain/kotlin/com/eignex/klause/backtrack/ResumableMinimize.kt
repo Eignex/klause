@@ -14,6 +14,7 @@ import com.eignex.klause.lp.bounding.harvestRootCuts
 import com.eignex.klause.lp.bounding.rootLpRelaxationBound
 import com.eignex.klause.lp.bounding.shaveObjectiveLb
 import com.eignex.klause.lp.bounding.shaveVariableBounds
+import com.eignex.klause.lp.engine.LpPricingOptions
 import com.eignex.klause.lp.engine.LpVerdict
 import com.eignex.klause.lp.relaxation.leafRealFeasibility
 import com.eignex.klause.propagation.Assumptions
@@ -805,6 +806,7 @@ internal class ResumableMinimize(
                     componentSplit = params.lpPlan.componentSplit,
                     sink = sink.lp,
                     context = solver.lpSolveContext,
+                    pricing = LpPricingOptions(params.zeroObjectivePricing, params.randomSeed ?: 0L),
                 )
                 when (real.verdict) {
                     LpVerdict.INFEASIBLE -> null

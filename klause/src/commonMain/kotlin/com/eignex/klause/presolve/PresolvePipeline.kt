@@ -3,6 +3,7 @@ package com.eignex.klause.presolve
 import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.bounding.LpPlan
+import com.eignex.klause.lp.engine.LpZeroObjectivePricing
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.propagation.difference.withDifferenceSystem
@@ -92,12 +93,16 @@ object PresolvePipeline {
         solutionSetSensitive: Boolean,
         cancellation: Cancellation = Cancellation.Never,
         presolveBudget: PresolveBudget? = null,
+        zeroObjectivePricing: LpZeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT,
+        randomSeed: Long? = null,
     ): PresolveOutcome = run(
         prepareSource(problem, config, linearObjective, solutionSetSensitive, cancellation, presolveBudget),
         linearObjective,
         config,
         solutionSetSensitive,
         cancellation,
+        zeroObjectivePricing,
+        randomSeed,
     )
 
     /**
@@ -114,6 +119,8 @@ object PresolvePipeline {
         config: PresolveConfig,
         solutionSetSensitive: Boolean,
         cancellation: Cancellation = Cancellation.Never,
+        zeroObjectivePricing: LpZeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT,
+        randomSeed: Long? = null,
     ): PresolveOutcome {
         val problem = prepared.source
         val sourceProblem = prepared.problem
@@ -152,6 +159,8 @@ object PresolvePipeline {
                 objective,
                 LpPlan(bounding = true),
                 preBakeSlice(cancellation, presolveBudget),
+                zeroObjectivePricing,
+                randomSeed,
             )
         } else {
             LpRootInfeasibleResult(infeasible = false, stats = LpStats())
@@ -183,6 +192,8 @@ object PresolvePipeline {
                 objective,
                 LpPlan(bounding = true),
                 preBakeSlice(cancellation, presolveBudget),
+                zeroObjectivePricing,
+                randomSeed,
             )
         } else {
             LpRootBoundsResult(sourceProblem, LpStats())
@@ -227,7 +238,15 @@ object PresolvePipeline {
             val pre = Presolver.run(current, config, context, cancellation)
             infeasible = infeasible || pre.infeasible
             val harvestResult = harvestPlan?.let {
-                lpHarvestReporting(pre.problem, objective, it, bakeConfig, cancellation)
+                lpHarvestReporting(
+                    pre.problem,
+                    objective,
+                    it,
+                    bakeConfig,
+                    cancellation,
+                    zeroObjectivePricing,
+                    randomSeed,
+                )
             }
             harvestResult?.let {
                 harvestStats = harvestStats.mergedWith(it.stats)

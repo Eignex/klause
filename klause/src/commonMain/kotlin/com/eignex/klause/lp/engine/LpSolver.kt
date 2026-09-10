@@ -297,16 +297,17 @@ internal fun newLpSolver(
     cancellation: Cancellation = Cancellation.Never,
     componentSplit: Boolean = true,
     factory: LpEngineFactory = ProductionLpEngineFactory,
+    pricing: LpPricingOptions = LpPricingOptions(),
 ): LpSolver {
     if (componentSplit) {
         componentLpSolverOrNull(
             model,
             cancellation,
-            factory::newGeneralSolver,
+            { part, token -> factory.newGeneralSolver(part, token, pricing) },
             factory::newComponentSolver,
         )?.let { return it }
     }
-    return factory.newGeneralSolver(model, cancellation)
+    return factory.newGeneralSolver(model, cancellation, pricing)
 }
 
 /**

@@ -104,8 +104,8 @@ private class LifecycleFactory : LpEngineFactory {
 
     val persistent: List<LifecycleRecord> get() = records.filter { it.kind == LifecycleKind.PERSISTENT }
 
-    override fun newGeneralSolver(model: LpModel, cancellation: Cancellation): LpSolver {
-        val delegate = ProductionLpEngineFactory.newGeneralSolver(model, cancellation)
+    override fun newGeneralSolver(model: LpModel, cancellation: Cancellation, pricing: LpPricingOptions): LpSolver {
+        val delegate = ProductionLpEngineFactory.newGeneralSolver(model, cancellation, pricing)
         val record = record(LifecycleKind.GENERAL)
         return object : LpSolver by delegate {
             override fun solve(warm: Basis?): FloatLpResult? = record.solve(delegate) { delegate.solve(warm) }

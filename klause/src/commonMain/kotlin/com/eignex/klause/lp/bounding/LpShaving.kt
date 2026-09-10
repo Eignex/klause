@@ -320,7 +320,12 @@ internal fun LpEngine.rootLpInfeasibleNoBake(token: Cancellation): Boolean {
         return false // a relaxation the row arithmetic cannot express yields no verdict, never a crash
     }
     if (model.n == 0) return false
-    val simplex = newTableauCutSolver(model, token, factory = solveContext.engineFactory)
+    val simplex = newTableauCutSolver(
+        model,
+        token,
+        factory = solveContext.engineFactory,
+        pricing = pricingOptions,
+    )
     return simplex.use {
         // A non-null solve is a feasible optimum; null is infeasible or an inconclusive failure. Only a
         // dual-unbounded ray that survives exact 128-bit Farkas certification proves genuine infeasibility.

@@ -7015,25 +7015,26 @@ public final class com/eignex/klause/portfolio/PortfolioScenario {
 	public static final field Companion Lcom/eignex/klause/portfolio/PortfolioScenario$Companion;
 	public static final field DEFAULT_ARMS I
 	public static final field DEFAULT_SLICE_NODES J
-	public fun <init> (IILcom/eignex/klause/portfolio/Kind;Lcom/eignex/klause/portfolio/EngineMix;JDLcom/eignex/klause/lp/bounding/LpConfig;Ljava/util/List;Ljava/util/List;Lcom/eignex/klause/backtrack/BacktrackParams;ZIIJLcom/eignex/klause/backtrack/NodeBudget;)V
-	public synthetic fun <init> (IILcom/eignex/klause/portfolio/Kind;Lcom/eignex/klause/portfolio/EngineMix;JDLcom/eignex/klause/lp/bounding/LpConfig;Ljava/util/List;Ljava/util/List;Lcom/eignex/klause/backtrack/BacktrackParams;ZIIJLcom/eignex/klause/backtrack/NodeBudget;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (IILcom/eignex/klause/portfolio/Kind;Lcom/eignex/klause/portfolio/EngineMix;JDLcom/eignex/klause/lp/bounding/LpConfig;Lcom/eignex/klause/lp/engine/LpZeroObjectivePricing;Ljava/util/List;Ljava/util/List;Lcom/eignex/klause/backtrack/BacktrackParams;ZIIJLcom/eignex/klause/backtrack/NodeBudget;)V
+	public synthetic fun <init> (IILcom/eignex/klause/portfolio/Kind;Lcom/eignex/klause/portfolio/EngineMix;JDLcom/eignex/klause/lp/bounding/LpConfig;Lcom/eignex/klause/lp/engine/LpZeroObjectivePricing;Ljava/util/List;Ljava/util/List;Lcom/eignex/klause/backtrack/BacktrackParams;ZIIJLcom/eignex/klause/backtrack/NodeBudget;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()I
-	public final fun component10 ()Lcom/eignex/klause/backtrack/BacktrackParams;
-	public final fun component11 ()Z
-	public final fun component12 ()I
+	public final fun component10 ()Ljava/util/List;
+	public final fun component11 ()Lcom/eignex/klause/backtrack/BacktrackParams;
+	public final fun component12 ()Z
 	public final fun component13 ()I
-	public final fun component14 ()J
-	public final fun component15 ()Lcom/eignex/klause/backtrack/NodeBudget;
+	public final fun component14 ()I
+	public final fun component15 ()J
+	public final fun component16 ()Lcom/eignex/klause/backtrack/NodeBudget;
 	public final fun component2 ()I
 	public final fun component3 ()Lcom/eignex/klause/portfolio/Kind;
 	public final fun component4 ()Lcom/eignex/klause/portfolio/EngineMix;
 	public final fun component5 ()J
 	public final fun component6 ()D
 	public final fun component7 ()Lcom/eignex/klause/lp/bounding/LpConfig;
-	public final fun component8 ()Ljava/util/List;
+	public final fun component8 ()Lcom/eignex/klause/lp/engine/LpZeroObjectivePricing;
 	public final fun component9 ()Ljava/util/List;
-	public final fun copy (IILcom/eignex/klause/portfolio/Kind;Lcom/eignex/klause/portfolio/EngineMix;JDLcom/eignex/klause/lp/bounding/LpConfig;Ljava/util/List;Ljava/util/List;Lcom/eignex/klause/backtrack/BacktrackParams;ZIIJLcom/eignex/klause/backtrack/NodeBudget;)Lcom/eignex/klause/portfolio/PortfolioScenario;
-	public static synthetic fun copy$default (Lcom/eignex/klause/portfolio/PortfolioScenario;IILcom/eignex/klause/portfolio/Kind;Lcom/eignex/klause/portfolio/EngineMix;JDLcom/eignex/klause/lp/bounding/LpConfig;Ljava/util/List;Ljava/util/List;Lcom/eignex/klause/backtrack/BacktrackParams;ZIIJLcom/eignex/klause/backtrack/NodeBudget;ILjava/lang/Object;)Lcom/eignex/klause/portfolio/PortfolioScenario;
+	public final fun copy (IILcom/eignex/klause/portfolio/Kind;Lcom/eignex/klause/portfolio/EngineMix;JDLcom/eignex/klause/lp/bounding/LpConfig;Lcom/eignex/klause/lp/engine/LpZeroObjectivePricing;Ljava/util/List;Ljava/util/List;Lcom/eignex/klause/backtrack/BacktrackParams;ZIIJLcom/eignex/klause/backtrack/NodeBudget;)Lcom/eignex/klause/portfolio/PortfolioScenario;
+	public static synthetic fun copy$default (Lcom/eignex/klause/portfolio/PortfolioScenario;IILcom/eignex/klause/portfolio/Kind;Lcom/eignex/klause/portfolio/EngineMix;JDLcom/eignex/klause/lp/bounding/LpConfig;Lcom/eignex/klause/lp/engine/LpZeroObjectivePricing;Ljava/util/List;Ljava/util/List;Lcom/eignex/klause/backtrack/BacktrackParams;ZIIJLcom/eignex/klause/backtrack/NodeBudget;ILjava/lang/Object;)Lcom/eignex/klause/portfolio/PortfolioScenario;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getAnnotationArm ()Lcom/eignex/klause/backtrack/BacktrackParams;
 	public final fun getArms ()I
@@ -7050,6 +7051,7 @@ public final class com/eignex/klause/portfolio/PortfolioScenario {
 	public final fun getSeed ()J
 	public final fun getShareCuts ()Z
 	public final fun getSliceNodes ()J
+	public final fun getZeroObjectivePricing ()Lcom/eignex/klause/lp/engine/LpZeroObjectivePricing;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 }
@@ -7145,12 +7147,12 @@ public final class com/eignex/klause/presolve/BakeConfig$Companion {
 public final class com/eignex/klause/presolve/LpHarvestKt {
 	public static final fun lpHarvest (Lcom/eignex/klause/propagation/BakedProblem;Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/lp/bounding/LpPlan;Lcom/eignex/klause/presolve/BakeConfig;Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/ir/Problem;
 	public static synthetic fun lpHarvest$default (Lcom/eignex/klause/propagation/BakedProblem;Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/lp/bounding/LpPlan;Lcom/eignex/klause/presolve/BakeConfig;Lcom/eignex/klause/util/Cancellation;ILjava/lang/Object;)Lcom/eignex/klause/ir/Problem;
-	public static final fun lpHarvestReporting (Lcom/eignex/klause/propagation/BakedProblem;Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/lp/bounding/LpPlan;Lcom/eignex/klause/presolve/BakeConfig;Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/presolve/LpHarvestResult;
-	public static synthetic fun lpHarvestReporting$default (Lcom/eignex/klause/propagation/BakedProblem;Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/lp/bounding/LpPlan;Lcom/eignex/klause/presolve/BakeConfig;Lcom/eignex/klause/util/Cancellation;ILjava/lang/Object;)Lcom/eignex/klause/presolve/LpHarvestResult;
-	public static final fun lpRootBounds (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/lp/bounding/LpPlan;Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/ir/Problem;
-	public static synthetic fun lpRootBounds$default (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/lp/bounding/LpPlan;Lcom/eignex/klause/util/Cancellation;ILjava/lang/Object;)Lcom/eignex/klause/ir/Problem;
-	public static final fun lpRootInfeasible (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/lp/bounding/LpPlan;Lcom/eignex/klause/util/Cancellation;)Z
-	public static synthetic fun lpRootInfeasible$default (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/lp/bounding/LpPlan;Lcom/eignex/klause/util/Cancellation;ILjava/lang/Object;)Z
+	public static final fun lpHarvestReporting (Lcom/eignex/klause/propagation/BakedProblem;Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/lp/bounding/LpPlan;Lcom/eignex/klause/presolve/BakeConfig;Lcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/lp/engine/LpZeroObjectivePricing;Ljava/lang/Long;)Lcom/eignex/klause/presolve/LpHarvestResult;
+	public static synthetic fun lpHarvestReporting$default (Lcom/eignex/klause/propagation/BakedProblem;Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/lp/bounding/LpPlan;Lcom/eignex/klause/presolve/BakeConfig;Lcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/lp/engine/LpZeroObjectivePricing;Ljava/lang/Long;ILjava/lang/Object;)Lcom/eignex/klause/presolve/LpHarvestResult;
+	public static final fun lpRootBounds (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/lp/bounding/LpPlan;Lcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/lp/engine/LpZeroObjectivePricing;Ljava/lang/Long;)Lcom/eignex/klause/ir/Problem;
+	public static synthetic fun lpRootBounds$default (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/lp/bounding/LpPlan;Lcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/lp/engine/LpZeroObjectivePricing;Ljava/lang/Long;ILjava/lang/Object;)Lcom/eignex/klause/ir/Problem;
+	public static final fun lpRootInfeasible (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/lp/bounding/LpPlan;Lcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/lp/engine/LpZeroObjectivePricing;Ljava/lang/Long;)Z
+	public static synthetic fun lpRootInfeasible$default (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/lp/bounding/LpPlan;Lcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/lp/engine/LpZeroObjectivePricing;Ljava/lang/Long;ILjava/lang/Object;)Z
 }
 
 public final class com/eignex/klause/presolve/LpHarvestResult {
@@ -7402,8 +7404,8 @@ public final class com/eignex/klause/presolve/PresolvePass$Stage : java/lang/Enu
 
 public final class com/eignex/klause/presolve/PresolvePipeline {
 	public static final field INSTANCE Lcom/eignex/klause/presolve/PresolvePipeline;
-	public final fun run (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/presolve/PresolveConfig;ZLcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/presolve/PresolveBudget;)Lcom/eignex/klause/presolve/PresolveOutcome;
-	public static synthetic fun run$default (Lcom/eignex/klause/presolve/PresolvePipeline;Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/presolve/PresolveConfig;ZLcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/presolve/PresolveBudget;ILjava/lang/Object;)Lcom/eignex/klause/presolve/PresolveOutcome;
+	public final fun run (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/presolve/PresolveConfig;ZLcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/presolve/PresolveBudget;Lcom/eignex/klause/lp/engine/LpZeroObjectivePricing;Ljava/lang/Long;)Lcom/eignex/klause/presolve/PresolveOutcome;
+	public static synthetic fun run$default (Lcom/eignex/klause/presolve/PresolvePipeline;Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/presolve/PresolveConfig;ZLcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/presolve/PresolveBudget;Lcom/eignex/klause/lp/engine/LpZeroObjectivePricing;Ljava/lang/Long;ILjava/lang/Object;)Lcom/eignex/klause/presolve/PresolveOutcome;
 }
 
 public final class com/eignex/klause/presolve/PresolveTiming : java/lang/Enum {
@@ -8604,8 +8606,8 @@ public final class com/eignex/klause/solver/pipeline/EngineParamsKt {
 	public static final fun applyBacktrackParams (Lcom/eignex/klause/backtrack/BacktrackParams;Lcom/eignex/klause/solver/pipeline/EngineParams;)Lcom/eignex/klause/backtrack/BacktrackParams;
 	public static final fun autoArms (I)I
 	public static final fun backtrackOverride (Lcom/eignex/klause/solver/pipeline/EngineParams;Z)Lkotlin/jvm/functions/Function1;
-	public static final fun buildPortfolioScenario (Lcom/eignex/klause/solver/pipeline/EngineParams;Ljava/lang/Long;ILcom/eignex/klause/portfolio/Kind;Lcom/eignex/klause/portfolio/EngineMix;ILcom/eignex/klause/lp/bounding/LpConfig;Ljava/util/List;Ljava/util/List;Lcom/eignex/klause/backtrack/BacktrackParams;Lcom/eignex/klause/backtrack/NodeBudget;)Lcom/eignex/klause/portfolio/PortfolioScenario;
-	public static synthetic fun buildPortfolioScenario$default (Lcom/eignex/klause/solver/pipeline/EngineParams;Ljava/lang/Long;ILcom/eignex/klause/portfolio/Kind;Lcom/eignex/klause/portfolio/EngineMix;ILcom/eignex/klause/lp/bounding/LpConfig;Ljava/util/List;Ljava/util/List;Lcom/eignex/klause/backtrack/BacktrackParams;Lcom/eignex/klause/backtrack/NodeBudget;ILjava/lang/Object;)Lcom/eignex/klause/portfolio/PortfolioScenario;
+	public static final fun buildPortfolioScenario (Lcom/eignex/klause/solver/pipeline/EngineParams;Ljava/lang/Long;ILcom/eignex/klause/portfolio/Kind;Lcom/eignex/klause/portfolio/EngineMix;ILcom/eignex/klause/lp/bounding/LpConfig;Lcom/eignex/klause/lp/engine/LpZeroObjectivePricing;Ljava/util/List;Ljava/util/List;Lcom/eignex/klause/backtrack/BacktrackParams;Lcom/eignex/klause/backtrack/NodeBudget;)Lcom/eignex/klause/portfolio/PortfolioScenario;
+	public static synthetic fun buildPortfolioScenario$default (Lcom/eignex/klause/solver/pipeline/EngineParams;Ljava/lang/Long;ILcom/eignex/klause/portfolio/Kind;Lcom/eignex/klause/portfolio/EngineMix;ILcom/eignex/klause/lp/bounding/LpConfig;Lcom/eignex/klause/lp/engine/LpZeroObjectivePricing;Ljava/util/List;Ljava/util/List;Lcom/eignex/klause/backtrack/BacktrackParams;Lcom/eignex/klause/backtrack/NodeBudget;ILjava/lang/Object;)Lcom/eignex/klause/portfolio/PortfolioScenario;
 	public static final fun getBACKTRACK_OVERRIDE_KEYS ()Ljava/util/List;
 	public static final fun ineffectiveNumerics (Ljava/lang/String;Ljava/util/Set;Ljava/util/List;)Ljava/util/List;
 	public static final fun pipelineConfigError (Ljava/lang/String;)Ljava/lang/Void;
@@ -8662,8 +8664,8 @@ public final class com/eignex/klause/solver/pipeline/FinitePipelinePreparation {
 }
 
 public final class com/eignex/klause/solver/pipeline/FinitePipelineRequest {
-	public fun <init> (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/pipeline/FiniteEngine;Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/presolve/PresolveConfig;ZZLcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/presolve/PresolveBudget;Lcom/eignex/klause/solver/pipeline/ComponentPlan;)V
-	public synthetic fun <init> (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/pipeline/FiniteEngine;Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/presolve/PresolveConfig;ZZLcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/presolve/PresolveBudget;Lcom/eignex/klause/solver/pipeline/ComponentPlan;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/pipeline/FiniteEngine;Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/presolve/PresolveConfig;ZZLcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/presolve/PresolveBudget;Lcom/eignex/klause/lp/engine/LpZeroObjectivePricing;Ljava/lang/Long;Lcom/eignex/klause/solver/pipeline/ComponentPlan;)V
+	public synthetic fun <init> (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/pipeline/FiniteEngine;Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/presolve/PresolveConfig;ZZLcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/presolve/PresolveBudget;Lcom/eignex/klause/lp/engine/LpZeroObjectivePricing;Ljava/lang/Long;Lcom/eignex/klause/solver/pipeline/ComponentPlan;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun getCancellation ()Lcom/eignex/klause/util/Cancellation;
 	public final fun getComponentPlan ()Lcom/eignex/klause/solver/pipeline/ComponentPlan;
 	public final fun getEngine ()Lcom/eignex/klause/solver/pipeline/FiniteEngine;
@@ -8672,7 +8674,9 @@ public final class com/eignex/klause/solver/pipeline/FinitePipelineRequest {
 	public final fun getPresolveBudget ()Lcom/eignex/klause/presolve/PresolveBudget;
 	public final fun getPresolveConfig ()Lcom/eignex/klause/presolve/PresolveConfig;
 	public final fun getProblem ()Lcom/eignex/klause/ir/Problem;
+	public final fun getRandomSeed ()Ljava/lang/Long;
 	public final fun getSolutionSetSensitive ()Z
+	public final fun getZeroObjectivePricing ()Lcom/eignex/klause/lp/engine/LpZeroObjectivePricing;
 }
 
 public final class com/eignex/klause/solver/pipeline/FinitePortfolioExecutorKt {
@@ -9093,9 +9097,10 @@ public abstract class com/eignex/klause/solver/pipeline/PortfolioPlan {
 }
 
 public final class com/eignex/klause/solver/pipeline/PortfolioPlan$BacktrackDryRun : com/eignex/klause/solver/pipeline/PortfolioPlan {
-	public fun <init> (Ljava/util/List;Lcom/eignex/klause/portfolio/Kind;)V
+	public fun <init> (Ljava/util/List;Lcom/eignex/klause/portfolio/Kind;Lcom/eignex/klause/lp/engine/LpZeroObjectivePricing;)V
 	public final fun getKind ()Lcom/eignex/klause/portfolio/Kind;
 	public final fun getPool ()Ljava/util/List;
+	public final fun getZeroObjectivePricing ()Lcom/eignex/klause/lp/engine/LpZeroObjectivePricing;
 }
 
 public final class com/eignex/klause/solver/pipeline/PortfolioPlan$Execute : com/eignex/klause/solver/pipeline/PortfolioPlan {
