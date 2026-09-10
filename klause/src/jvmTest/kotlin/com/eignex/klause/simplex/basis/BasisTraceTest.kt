@@ -1,5 +1,7 @@
 package com.eignex.klause.simplex.basis
 
+import com.eignex.koblas.SparseMatrix
+import java.util.IdentityHashMap
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -81,6 +83,71 @@ class BasisTraceTest {
 
         assertTrue(result.custom.stateErrors > 0)
         assertTrue(result.hfactor.stateErrors > 0)
+    }
+
+    @Test
+    fun `replay stops a chain after a matched singular update`() {
+        val original = trace(simpleMatrix())
+        val operations = original.operations.toMutableList()
+        val update = operations[3] as BasisTraceOperation.Update
+        operations[3] = BasisTraceOperation.Update(
+            update.leavingSlot,
+            update.entering,
+            update.spikeOperation,
+            update.pivotOperation,
+            update.spikeEvidence,
+            update.pivotEvidence,
+            BasisUpdate.SINGULAR,
+        )
+        val fixture = original.copyWithOperations(operations)
+        val singularFactory: (SparseMatrix) -> BasisSolver = { matrix ->
+            val delegate = KotlinBasisSolver(matrix)
+            object : BasisSolver by delegate {
+                override fun update(
+                    pivotRow: Int,
+                    entering: Int,
+                    spike: IndexedVector,
+                    pivotEta: IndexedVector?,
+                ): BasisUpdate = BasisUpdate.SINGULAR
+            }
+        }
+
+        val result = BasisTraceReplay.replay(fixture, singularFactory, singularFactory)
+
+        assertEquals(1, result.custom.ftrans)
+        assertEquals(1, result.hfactor.ftrans)
+        assertEquals(1, result.custom.declinedUpdates)
+        assertEquals(1, result.hfactor.declinedUpdates)
+    }
+
+    @Test
+    fun `replay preserves carrier identity across checkpoints`() {
+        val original = trace(simpleMatrix())
+        val operations = original.operations + listOf(
+            BasisTraceOperation.Factorize(listOf(BasisHeading.Unit(0), BasisHeading.Unit(1)), true),
+            BasisTraceOperation.Solve(
+                2,
+                false,
+                BasisVectorRole.GENERAL,
+                0.0.toRawBits(),
+                BasisTraceVector(doubleArrayOf(2.0, 3.0), intArrayOf(0, 1)),
+            ),
+        )
+        val fixture = original.copyWithOperations(operations)
+        val calls = IdentityHashMap<IndexedVector, Int>()
+        val recordingFactory: (SparseMatrix) -> BasisSolver = { matrix ->
+            val delegate = KotlinBasisSolver(matrix)
+            object : BasisSolver by delegate {
+                override fun ftran(x: IndexedVector, expectedDensity: Double) {
+                    calls[x] = (calls[x] ?: 0) + 1
+                    delegate.ftran(x, expectedDensity)
+                }
+            }
+        }
+
+        BasisTraceReplay.replay(fixture, recordingFactory, ::KotlinBasisSolver)
+
+        assertTrue(calls.values.any { it >= 2 })
     }
 
     @Test
@@ -234,5 +301,14 @@ class BasisTraceTest {
         0,
         "completed",
         false,
+    )
+
+    private fun BasisTrace.copyWithOperations(operations: List<BasisTraceOperation>) = BasisTrace(
+        metadata,
+        matrix,
+        sourceColumns,
+        origins,
+        rowStrict(),
+        operations,
     )
 }

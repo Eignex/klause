@@ -143,7 +143,6 @@ internal object BasisTraceReplay {
 
         private fun factorize(index: Int, operation: BasisTraceOperation.Factorize) {
             checkpoints++
-            vectors.clear()
             solved.clear()
             lastAccepted = null
             val raw = operation.headings.map { headingColumn(it, trace.sourceColumns) }.toIntArray()
@@ -235,6 +234,8 @@ internal object BasisTraceReplay {
             }
             if (!armAccepted) {
                 declined++
+                active = false
+                headings = null
                 return
             }
             accepted++
