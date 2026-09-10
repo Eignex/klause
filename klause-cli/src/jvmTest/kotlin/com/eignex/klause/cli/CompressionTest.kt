@@ -1,6 +1,7 @@
 package com.eignex.klause.cli
 
 import java.io.File
+import java.util.zip.GZIPOutputStream
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -28,9 +29,8 @@ class CompressionTest {
     fun `readTextFile transparently decompresses a gzip-compressed instance`() {
         val plain = File.createTempFile("klause-cmp", ".cnf").apply { deleteOnExit() }
         val body = "p cnf 1 1\n1 0\n"
-        plain.writeText(body)
-        ProcessBuilder("gzip", "-kf", plain.absolutePath).start().waitFor()
         val gz = File(plain.absolutePath + ".gz").apply { deleteOnExit() }
+        GZIPOutputStream(gz.outputStream()).bufferedWriter().use { it.write(body) }
         assertEquals(body, readTextFile(gz.absolutePath))
     }
 }

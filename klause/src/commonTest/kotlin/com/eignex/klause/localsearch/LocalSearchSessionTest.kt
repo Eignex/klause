@@ -14,45 +14,38 @@ import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.objective.LinearObjective
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class LocalSearchSessionTest {
 
-    private fun weightLearningProblem(): Problem {
-        // 6 bool vars; an odd-cycle of three exactlyOne cardinality factors over vars 0-2
-        // ({0,1}, {1,2}, {0,2}). Since 2*(x0+x1+x2)=3 has no integer solution the problem is UNSAT,
-        // so a weight-learning strategy never reaches cost 0 and keeps scaling factor weights off
-        // their defaults — the learned state the session must capture. Vars 3-5 are unconstrained so
-        // the variable-activity assertions still see all 6 slots.
-        return Problem(
-            numBoolVars = 6,
-            numIntVars = 0,
-            intDomains = emptyArray(),
-            factors = arrayOf<Factor>(
-                Cardinality.exactlyOne(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
-                Cardinality.exactlyOne(intArrayOf(Lit.make(1, true), Lit.make(2, true))),
-                Cardinality.exactlyOne(intArrayOf(Lit.make(0, true), Lit.make(2, true))),
-            ),
-        )
-    }
+    private fun weightLearningProblem(): Problem = Problem(
+        numBoolVars = 6,
+        numIntVars = 0,
+        intDomains = emptyArray(),
+        factors = arrayOf<Factor>(
+            Cardinality.exactlyOne(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
+            Cardinality.exactlyOne(intArrayOf(Lit.make(1, true), Lit.make(2, true))),
+            Cardinality.exactlyOne(intArrayOf(Lit.make(0, true), Lit.make(2, true))),
+        ),
+    )
 
     @Test
     fun `maxInstructions tightens flip budget vs maxFlips when smaller`() {
         val problem = weightLearningProblem()
         val solver = LocalSearchSolver(problem.bake())
-        val tight = solver.solve(
-            LocalSearchParams(
-                maxFlips = Long.MAX_VALUE,
-                maxInstructions = 5L,
-                randomSeed = 0L,
+        val tight = assertIs<SolveResult.Unknown>(
+            solver.solve(
+                LocalSearchParams(
+                    maxFlips = Long.MAX_VALUE,
+                    maxInstructions = 5L,
+                    randomSeed = 0L,
+                ),
             ),
         )
-        assertTrue(
-            tight is SolveResult.Sat || tight is SolveResult.Unknown,
-            "tight maxInstructions must terminate cleanly, got $tight",
-        )
+        assertEquals(5.0, tight.stats.ls.moves.sum, "maxInstructions must cap local-search work")
     }
 
     @Test
@@ -157,8 +150,6 @@ class LocalSearchSessionTest {
 
     @Test
     fun `cbls smoothing bounds weight growth vs bump-only`() {
-        // On the UNSAT helper bump-only weights grow without bound; smoothing pulls them back toward
-        // baseWeight, so after the same flip budget the smoothed run's peak weight is strictly lower.
         fun peakWeightAfterRun(strategy: SourceDrivenStrategy): Double {
             val session = LocalSearchSession(LocalSearchSolver(weightLearningProblem().bake(), strategy = strategy))
             session.sample(LocalSearchParams(maxFlips = 3_000L, randomSeed = 4L))
@@ -175,12 +166,7 @@ class LocalSearchSessionTest {
 
     @Test
     fun `engine drives per-round feedback to an adaptive cooling schedule`() {
-        // AdaptiveCooling retunes its rate only when the engine calls observe at round boundaries; on
-        // the UNSAT helper the satisfy loop spans several rounds, so its rate must move off the
-        // initial value — proving the loop drives the per-round feedback channel.
         val cooling = AdaptiveCooling(initialRate = 0.999)
-        // Tabu disabled so the tiny problem never starves the pick into a restart, which would reset
-        // the round before it completes.
         val strategy = SimulatedAnnealing.withSchedule(cooling, tabu = TabuFilter.Disabled)
         val solver = LocalSearchSolver(weightLearningProblem().bake(), strategy = strategy)
         LocalSearchSession(solver).sample(LocalSearchParams(maxFlips = 6_000L, randomSeed = 4L))

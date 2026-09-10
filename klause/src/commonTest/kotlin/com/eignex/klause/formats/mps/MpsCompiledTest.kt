@@ -445,7 +445,6 @@ class MpsCompiledTest {
         val secondNaN = source.copy(objectiveErrorBound = Double.NaN)
 
         assertNotEquals(positiveZero, negativeZero)
-        assertEquals(firstNaN, firstNaN)
         assertEquals(firstNaN, secondNaN)
         assertEquals(firstNaN.hashCode(), secondNaN.hashCode())
     }

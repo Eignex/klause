@@ -12,7 +12,6 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
-import kotlin.time.TimeSource
 
 /**
  * Re-solving a bound-only revision of the model on the same engine.
@@ -219,7 +218,6 @@ class RevisedSimplexResolveBoundsTest {
             val certified = certifyLpResult(assertNotNull(trail.state.toWorkingModel()), solver, result)
             assertEquals(listOf(BigFraction.ofLong(3L)), certified.exactPrimal)
             assertEquals(BigFraction.ofLong(3L), certified.lowerBound)
-            println("bound-basic-only updates=1 solved=1 declined=0 ftran=0 factors=0 solveWork=${solver.lastWorkOps}")
         }
     }
 
@@ -253,11 +251,8 @@ class RevisedSimplexResolveBoundsTest {
                     var attempts = 0L
                     var nativeSolved = 0L
                     var legacySolved = 0L
-                    var nativeNanos = 0L
-                    var legacyNanos = 0L
                     repeat(8) { cycle ->
                         for (step in 0..4) {
-                            val nativeStart = TimeSource.Monotonic.markNow()
                             when (step) {
                                 0 -> {
                                     assertTrue(trail.push())
@@ -286,18 +281,15 @@ class RevisedSimplexResolveBoundsTest {
                             }
                             assertTrue(native.adopt(trail.state, Cancellation.Never))
                             val nativeResult = native.resolveBounds()
-                            nativeNanos += nativeStart.elapsedNow().inWholeNanoseconds
                             val lower = longArrayOf(if (step == 2) 1L else 0L, if (step in 1..2) 3L else 0L)
                             val upper = longArrayOf(if (step == 4) 10L else 1L, 10L)
                             val expectedX = maxOf(lower[0], minOf(upper[0], 3L - lower[1]))
                             val expectedY = maxOf(lower[1], 3L - expectedX)
                             val expectedPoint = listOf(expectedX, expectedY).map(BigFraction::ofLong)
                             val expectedBound = BigFraction.ofLong(expectedX + 2L * expectedY)
-                            val legacyStart = TimeSource.Monotonic.markNow()
                             val legacyModel = legacySource.rebind(lower, upper)
                             assertTrue(legacy.rebind(legacyModel, Cancellation.Never))
                             val legacyResult = legacy.resolveBounds()
-                            legacyNanos += legacyStart.elapsedNow().inWholeNanoseconds
                             attempts++
                             if (nativeResult != null) nativeSolved++
                             if (legacyResult != null) legacySolved++
@@ -336,17 +328,6 @@ class RevisedSimplexResolveBoundsTest {
                         attempts, nativeSolved, legacySolved,
                     )
                     measurements += measurement
-                    println(
-                        "bound-trace repetition=$repetition attempts=$attempts " +
-                            "nativeSolved=$nativeSolved nativeDeclined=${attempts - nativeSolved} " +
-                            "legacySolved=$legacySolved legacyDeclined=${attempts - legacySolved} " +
-                            "nativeInitialWork=$nativeInitialWork legacyInitialWork=$legacyInitialWork " +
-                            "nativeUpdateFloatWork=$nativeWork legacyUpdateFloatWork=$legacyWork " +
-                            "nativeTotalFactors=$nativeFactors legacyTotalFactors=$legacyFactors " +
-                            "nativeUpdateFactors=${nativeFactors - nativeInitialFactors} " +
-                            "legacyUpdateFactors=${legacyFactors - legacyInitialFactors} " +
-                            "nativePrepSolveNanos=$nativeNanos legacyPrepSolveNanos=$legacyNanos",
-                    )
                     assertEquals(40L, attempts)
                     assertEquals(attempts, nativeSolved)
                     assertEquals(attempts, legacySolved)

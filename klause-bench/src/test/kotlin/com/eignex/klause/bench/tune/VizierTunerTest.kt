@@ -1,23 +1,15 @@
 package com.eignex.klause.bench.tune
 
 import kotlin.math.abs
+import kotlin.test.Ignore
 import kotlin.test.Test
 import kotlin.test.assertTrue
 
-/**
- * Live ask-tell round-trip against the OSS Vizier service (`klause-bench/vizier/run.sh`), driven
- * entirely through the backend-agnostic [Tuner] / [TuningStudy] seam — so this also proves nothing
- * Vizier-specific is needed to use it. The service is optional infrastructure, so the test
- * short-circuits (passes) when localhost:6789 is unreachable; the permanent guarantee is that
- * [VizierTuner] compiles against the generated stubs.
- */
+@Ignore("integration coverage; run explicitly with klause-bench/vizier/run.sh active")
 class VizierTunerTest {
     @Test
     fun `ask-tell round-trip suggests, completes, and re-suggests through the Tuner seam`() {
-        if (!VizierTuner.reachable()) {
-            println("[skip] vizier service not reachable at localhost:6789")
-            return
-        }
+        assertTrue(VizierTuner.reachable(), "Vizier must be running at localhost:6789")
         val space = ConfigSpace(
             listOf(
                 CategoricalParam("family", listOf("cbls", "probsat", "walksat")),
@@ -43,10 +35,7 @@ class VizierTunerTest {
 
     @Test
     fun `observe injects a pre-evaluated prior without the requested-trial rejection`() {
-        if (!VizierTuner.reachable()) {
-            println("[skip] vizier service not reachable at localhost:6789")
-            return
-        }
+        assertTrue(VizierTuner.reachable(), "Vizier must be running at localhost:6789")
         val space = ConfigSpace(
             listOf(
                 CategoricalParam("family", listOf("cbls", "probsat", "walksat")),
@@ -56,8 +45,6 @@ class VizierTunerTest {
         val tuner: Tuner = VizierTuner()
         tuner.use {
             it.openStudy(space, maximize = true, studyId = "klause-warmstart-test").use { study ->
-                // The warm-start path: a known result goes in as a SUCCEEDED trial via CreateTrial, not
-                // through suggest→complete (which rejects a non-ACTIVE trial). Must not throw.
                 study.observe(mapOf("family" to "cbls", "noise" to 0.3), objective = 0.9)
                 study.observe(mapOf("family" to "walksat", "noise" to 0.7), objective = 0.4)
                 val suggested = study.suggest(3)

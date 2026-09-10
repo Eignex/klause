@@ -89,19 +89,24 @@ internal class MiniZincRunner(
             add(mzn.absolutePath)
             if (dzn != null) add(dzn.absolutePath)
         }
-        val proc = ProcessBuilder(cmd).redirectErrorStream(true).start()
-        val finished = proc.waitFor(timeoutSec.toLong(), TimeUnit.SECONDS)
-        if (!finished) {
-            proc.destroyForcibly()
-            tmp.delete()
-            error("minizinc compile timed out after ${timeoutSec}s for ${mzn.name}")
+        val log = File.createTempFile("${out.nameWithoutExtension}-", ".log", out.parentFile)
+        val proc = ProcessBuilder(cmd).redirectErrorStream(true).redirectOutput(log).start()
+        try {
+            val finished = proc.waitFor(timeoutSec.toLong(), TimeUnit.SECONDS)
+            if (!finished) {
+                proc.destroyForcibly()
+                tmp.delete()
+                error("minizinc compile timed out after ${timeoutSec}s for ${mzn.name}")
+            }
+            val output = log.readText()
+            require(proc.exitValue() == 0) {
+                tmp.delete()
+                "minizinc compile failed (exit ${proc.exitValue()}) for ${mzn.name}: ${output.take(500)}"
+            }
+            require(tmp.exists()) { "minizinc compile produced no .fzn for ${mzn.name}" }
+            Files.move(tmp.toPath(), out.toPath(), StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
+        } finally {
+            log.delete()
         }
-        val output = proc.inputStream.bufferedReader().readText()
-        require(proc.exitValue() == 0) {
-            tmp.delete()
-            "minizinc compile failed (exit ${proc.exitValue()}) for ${mzn.name}: ${output.take(500)}"
-        }
-        require(tmp.exists()) { "minizinc compile produced no .fzn for ${mzn.name}" }
-        Files.move(tmp.toPath(), out.toPath(), StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
     }
 }

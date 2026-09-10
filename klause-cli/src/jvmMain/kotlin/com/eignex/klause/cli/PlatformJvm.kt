@@ -6,6 +6,7 @@ import java.io.Reader
 import java.lang.management.ManagementFactory
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
+import java.util.zip.GZIPInputStream
 import kotlin.system.exitProcess
 
 internal actual fun cliProp(name: String): String? =
@@ -17,6 +18,7 @@ internal actual fun exitCli(code: Int): Nothing = exitProcess(code)
 
 internal actual fun openFileSource(path: String): CharSource {
     val ext = compressionExtension(path) ?: return ReaderCharSource(File(path).bufferedReader())
+    if (ext == "gz") return ReaderCharSource(GZIPInputStream(File(path).inputStream()).bufferedReader())
     val cmd = DECOMPRESSORS.getValue(ext) + path
     val proc = ProcessBuilder(cmd).redirectError(ProcessBuilder.Redirect.DISCARD).start()
     return ReaderCharSource(proc.inputStream.bufferedReader()) {

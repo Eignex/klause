@@ -1,7 +1,8 @@
-package com.eignex.klause.lowering.minizinc
+package com.eignex.klause.solver.pipeline
 
-import com.eignex.klause.formats.minizinc.*
-import com.eignex.klause.solver.pipeline.OznEvaluator
+import com.eignex.klause.formats.minizinc.OznLexer
+import com.eignex.klause.formats.minizinc.OznParseException
+import com.eignex.klause.formats.minizinc.OznParser
 import kotlin.test.Test
 import kotlin.test.assertFailsWith
 
@@ -12,15 +13,14 @@ class OznEvalRobustnessTest {
 
     @Test
     fun `comprehension generator variables do not leak into later output`() {
-        // `i` is scoped to the comprehension; a later reference must be unresolved, not the stale
-        // last loop value.
         assertFailsWith<OznParseException> { render("output [show([i | i in 1..3]), show(i)];") }
     }
 
     @Test
-    fun `integer division by zero is an eval error not a raw arithmetic exception`() {
-        assertFailsWith<OznParseException> { render("output [show(4 div 0)];") }
-        assertFailsWith<OznParseException> { render("output [show(4 mod 0)];") }
+    fun `division by zero is reported as an evaluation error`() {
+        for (operator in listOf("div", "mod")) {
+            assertFailsWith<OznParseException> { render("output [show(4 $operator 0)];") }
+        }
     }
 
     @Test

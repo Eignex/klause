@@ -42,7 +42,7 @@ class CatalogTest {
 
         val opb = OpbFormat.ingest(CorpusFetcher.resolve(ref("opb-core", "setcover-tiny").source))
         val obj = assertNotNull(opb.objective)
-        assertTrue(obj.toString().isNotEmpty())
+        assertTrue(obj.boolWeights.contentEquals(longArrayOf(1L, 2L, 3L, 4L)))
     }
 
     @Test

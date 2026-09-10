@@ -490,16 +490,14 @@ class IntOperatorsTest {
 
     @Test
     fun `threshold above max is unsat at solve time`() {
-        // `rate ge 5.0` with rate in [0, 1] is unsatisfiable. The native-float path leaves this for
-        // the solver / propagator to surface rather than rejecting it at compile time.
         class S : VariableSchema() {
             val rate by floatVar(min = 0.0, max = 1.0)
             val c by constraint { rate ge 5.0 }
         }
         val compiled = S().compile()
-        val solver = LocalSearchSolver(compiled.problem.bake())
-        val samples = solver.samples(LocalSearchParams(maxFlips = 1_000, randomSeed = 1)).take(1).toList()
-        assertTrue(samples.isEmpty(), "rate ge 5.0 on rate in [0,1] should yield no samples")
+        assertIs<SolveResult.Unsat>(
+            BacktrackSolver(compiled.problem.bake()).solve(BacktrackParams(randomSeed = 1)),
+        )
     }
 
     @Test

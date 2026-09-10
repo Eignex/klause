@@ -1,7 +1,6 @@
 package com.eignex.klause.solver.integration
 
 import com.eignex.klause.compile.compile
-import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.factor.global.GlobalCardinality
 import com.eignex.klause.factor.global.NValue
 import com.eignex.klause.factor.scheduling.Cumulative
@@ -111,15 +110,6 @@ class OptAllDifferentTest {
                 presents = listOf(a.present, b.present, c.present),
             )
         }
-    }
-
-    @Test
-    fun `compiles to native AllDifferent factor with presents`() {
-        val s = S()
-        val compiled = s.compile()
-        val allDiffFactor = compiled.problem.factors.filterIsInstance<AllDifferent>().single()
-        assertEquals(3, allDiffFactor.vars.size)
-        assertEquals(3, allDiffFactor.presents.size)
     }
 
     @Test

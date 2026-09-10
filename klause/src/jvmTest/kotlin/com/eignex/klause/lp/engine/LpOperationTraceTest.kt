@@ -17,10 +17,8 @@ class LpOperationTraceTest {
         @BeforeClass
         @JvmStatic
         fun loadHfactor() {
-            val start = System.nanoTime()
             hfactor = BundledHfactor()
             check(hfactor.isAvailable) { hfactor.unavailableReason.orEmpty() }
-            println("HFactor fixture setup nanos=${System.nanoTime() - start}")
         }
     }
 

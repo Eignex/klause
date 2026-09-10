@@ -10,25 +10,16 @@ import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.util.Cancellation
 import kotlin.random.Random
+import kotlin.test.Ignore
 import kotlin.test.Test
 import kotlin.test.assertTrue
 
-/**
- * Exercises the MiniZinc pipeline end-to-end: compile `.mzn`→`.fzn` via the `minizinc` CLI, parse
- * in-process, and solve the resulting klause [Problem] with klause's backtracker. Asserts the
- * satisfiable smoke models are reached and that the returned assignment validates under klause's
- * own constraint checker — i.e. the FlatZinc→Problem translation is faithful and solvable.
- *
- * Skips silently when `minizinc` isn't on PATH so bare CI images stay green.
- */
+@Ignore("integration coverage; run explicitly on a host with minizinc installed")
 class MiniZincRunnerTest {
 
     @Test
     fun `klause solves the minizinc smoke set`() {
-        if (!minizincOnPath()) {
-            println("[skip] minizinc not on PATH")
-            return
-        }
+        assertTrue(minizincOnPath(), "minizinc must be installed to run this integration test")
         val runner = MiniZincRunner()
         for (ref in Catalog.suite("mzn-smoke").problems) {
             val resolved = runner.resolve(ref)

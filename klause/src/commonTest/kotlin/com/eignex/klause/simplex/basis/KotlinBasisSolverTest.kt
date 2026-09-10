@@ -12,104 +12,36 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
-import kotlin.time.TimeSource
 
 class KotlinBasisSolverTest {
     @Test
-    fun `seeded updates solve permuted rectangular source bases in both directions`() {
-        for (shape in listOf("unit", "triangular", "sparse", "spiked", "dense", "dense16")) {
-            val n = if (shape == "dense16") 16 else 8
-            val original = Array(n) { i ->
-                DoubleArray(n) { j ->
-                    when {
-                        shape == "unit" -> if (i == j) 1.0 else 0.0
-                        i == j -> (n + 2).toDouble()
-                        shape == "triangular" && i < j -> ((i + j) % 3 - 1).toDouble()
-                        shape == "sparse" && (j == (i + 1) % n || i == (j + 1) % n) -> -1.0
-                        shape == "spiked" && (i == 2 || j == 5) -> 1.0
-                        shape.startsWith("dense") -> ((i * 3 + j * 5) % 7 - 3).toDouble()
-                        else -> 0.0
-                    }
-                }
-            }
-            val permutation = Random(23)
-            val rows = (0 until n).shuffled(permutation)
-            val slots = (0 until n).shuffled(permutation)
-            val source = SparseMatrix.ofColumns(
-                n,
-                2 * n,
-                List(2 * n) { j ->
-                    List(n) { i ->
-                        val slot = j % n
-                        val extra = if (j >= n && rows[i] == slots[slot]) 0.5 else 0.0
-                        i to (original[rows[i]][slots[slot]] + extra)
-                    }
-                },
-            )
-            var previousReports: List<BasisSolveWork>? = null
-            repeat(3) { repetition ->
-                val start = TimeSource.Monotonic.markNow()
-                val solver = KotlinBasisSolver(source, updateLimit = 4, fillFactor = 100.0)
-                val basis = IntArray(n) { n - 1 - it }
-                assertTrue(solver.refactorize(basis))
-                val reports = mutableListOf<BasisSolveWork>()
-                var maxResidual = 0.0
-                var applied = 0
-                var advisory = 0
-                val random = Random(71)
-                for (step in 0..12) {
-                    for (dense in listOf(false, true)) {
-                        val rhs = DoubleArray(n) {
-                            when {
-                                dense -> (it % 3 - 1).toDouble()
-                                it == step % n -> 1.0
-                                else -> 0.0
-                            }
-                        }
-                        for (hint in listOf(0.0, 1.0)) {
-                            for (transpose in listOf(false, true)) {
-                                val vector = IndexedVector(n).also { it.scatter(rhs) }
-                                if (transpose) solver.btran(vector, hint) else solver.ftran(vector, hint)
-                                val residual = sourceResidual(source, basis, rhs, vector, transpose)
-                                assertTrue(
-                                    residual <= 1e-11,
-                                    "$shape step=$step transpose=$transpose residual=$residual",
-                                )
-                                maxResidual = max(maxResidual, residual)
-                                assertTrue(solver.solveQuality(rhs, vector, transpose).relativeResidual <= 1e-11)
-                                assertEquals(vector.toDoubleArray().count { it != 0.0 }, vector.count)
-                                reports.add(assertNotNull(solver.lastSolveWork))
-                            }
-                        }
-                    }
-                    if (step == 12) break
-                    val row = random.nextInt(n)
-                    val entering = (basis[row] + n) % (2 * n)
-                    val spike = IndexedVector(n).also { it.scatterColumn(source, entering) }
-                    solver.ftran(spike, 0.0)
-                    val outcome = solver.update(row, entering, spike, spike)
-                    assertEquals(if (step < 3) BasisUpdate.APPLIED else BasisUpdate.REFACTORIZE, outcome)
-                    if (outcome == BasisUpdate.APPLIED) applied++ else advisory++
-                    basis[row] = entering
-                    spike.clear()
-                }
-                if (previousReports != null) assertEquals(previousReports, reports)
-                previousReports = reports
-                val sparse = reports.count { it.first.sparse }
-                val visits = reports.sumOf { it.first.pivotVisits + it.second.pivotVisits }
-                val reach = reports.sumOf { it.first.reachEntries + it.second.reachEntries }
-                val arithmetic = reports.sumOf {
-                    it.first.arithmeticEntries + it.second.arithmeticEntries + it.transformEntries
-                }
-                println(
-                    "B3 $shape repetition=$repetition residual=$maxResidual " +
-                        "applied=$applied advisory=$advisory declines=0 sparse=$sparse " +
-                        "visits=$visits reach=$reach arithmetic=$arithmetic " +
-                        "support=${reports.sumOf { it.outputSupport }} elapsed=${start.elapsedNow()}",
-                )
-                solver.close()
-            }
-        }
+    fun `seeded updates solve permuted unit bases in both directions`() {
+        assertSeededUpdatesSolve("unit", 8)
+    }
+
+    @Test
+    fun `seeded updates solve permuted triangular bases in both directions`() {
+        assertSeededUpdatesSolve("triangular", 8)
+    }
+
+    @Test
+    fun `seeded updates solve permuted sparse bases in both directions`() {
+        assertSeededUpdatesSolve("sparse", 8)
+    }
+
+    @Test
+    fun `seeded updates solve permuted spiked bases in both directions`() {
+        assertSeededUpdatesSolve("spiked", 8)
+    }
+
+    @Test
+    fun `seeded updates solve permuted dense bases in both directions`() {
+        assertSeededUpdatesSolve("dense", 8)
+    }
+
+    @Test
+    fun `seeded updates solve permuted large dense bases in both directions`() {
+        assertSeededUpdatesSolve("dense", 16)
     }
 
     @Test
@@ -369,6 +301,81 @@ class KotlinBasisSolverTest {
             }
             spike.unit(0)
             assertEquals(BasisUpdate.APPLIED, solver.update(0, 0, spike))
+            solver.close()
+        }
+    }
+
+    private fun assertSeededUpdatesSolve(shape: String, n: Int) {
+        val original = Array(n) { i ->
+            DoubleArray(n) { j ->
+                when {
+                    shape == "unit" -> if (i == j) 1.0 else 0.0
+                    i == j -> (n + 2).toDouble()
+                    shape == "triangular" && i < j -> ((i + j) % 3 - 1).toDouble()
+                    shape == "sparse" && (j == (i + 1) % n || i == (j + 1) % n) -> -1.0
+                    shape == "spiked" && (i == 2 || j == 5) -> 1.0
+                    shape == "dense" -> ((i * 3 + j * 5) % 7 - 3).toDouble()
+                    else -> 0.0
+                }
+            }
+        }
+        val permutation = Random(23)
+        val rows = (0 until n).shuffled(permutation)
+        val slots = (0 until n).shuffled(permutation)
+        val source = SparseMatrix.ofColumns(
+            n,
+            2 * n,
+            List(2 * n) { j ->
+                List(n) { i ->
+                    val slot = j % n
+                    val extra = if (j >= n && rows[i] == slots[slot]) 0.5 else 0.0
+                    i to (original[rows[i]][slots[slot]] + extra)
+                }
+            },
+        )
+        var previousReports: List<BasisSolveWork>? = null
+        repeat(3) {
+            val solver = KotlinBasisSolver(source, updateLimit = 4, fillFactor = 100.0)
+            val basis = IntArray(n) { n - 1 - it }
+            assertTrue(solver.refactorize(basis))
+            val reports = mutableListOf<BasisSolveWork>()
+            val random = Random(71)
+            for (step in 0..12) {
+                for (dense in listOf(false, true)) {
+                    val rhs = DoubleArray(n) {
+                        when {
+                            dense -> (it % 3 - 1).toDouble()
+                            it == step % n -> 1.0
+                            else -> 0.0
+                        }
+                    }
+                    for (hint in listOf(0.0, 1.0)) {
+                        for (transpose in listOf(false, true)) {
+                            val vector = IndexedVector(n).also { it.scatter(rhs) }
+                            if (transpose) solver.btran(vector, hint) else solver.ftran(vector, hint)
+                            val residual = sourceResidual(source, basis, rhs, vector, transpose)
+                            assertTrue(
+                                residual <= 1e-11,
+                                "$shape step=$step transpose=$transpose residual=$residual",
+                            )
+                            assertTrue(solver.solveQuality(rhs, vector, transpose).relativeResidual <= 1e-11)
+                            assertEquals(vector.toDoubleArray().count { it != 0.0 }, vector.count)
+                            reports.add(assertNotNull(solver.lastSolveWork))
+                        }
+                    }
+                }
+                if (step == 12) break
+                val row = random.nextInt(n)
+                val entering = (basis[row] + n) % (2 * n)
+                val spike = IndexedVector(n).also { it.scatterColumn(source, entering) }
+                solver.ftran(spike, 0.0)
+                val outcome = solver.update(row, entering, spike, spike)
+                assertEquals(if (step < 3) BasisUpdate.APPLIED else BasisUpdate.REFACTORIZE, outcome)
+                basis[row] = entering
+                spike.clear()
+            }
+            previousReports?.let { assertEquals(it, reports) }
+            previousReports = reports
             solver.close()
         }
     }

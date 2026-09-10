@@ -19,15 +19,7 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
-/**
- * The joint difference system as a propagator. Every model here leaves the integer variables unbounded,
- * so a row-at-a-time propagator can deduce nothing from them at all: what the tests pin down is exactly
- * the reasoning the graph adds — refuting a reified row from a path the asserted rows already carry, and
- * refusing a set of rows whose cycle is negative.
- */
 class DifferenceSystemPropagatorTest {
-
-    /** `aux ↔ (hi − lo ≤ bound)`, over unbounded integers. */
     private fun row(aux: Int, hi: Int, lo: Int, bound: Long) =
         ReifiedLinear(aux, longArrayOf(1, -1), intArrayOf(hi, lo), LinearOp.LE, bound)
 
@@ -56,13 +48,10 @@ class DifferenceSystemPropagatorTest {
         )
     }
 
-    /** Every column ranging over `0..hi`, which is what puts the declared sides into the fragment. */
     private fun boxed(numInts: Int, hi: Long) = Array(numInts) { IntDomain(0, hi) }
 
-    /** The index of the system [problemOf] appends last. */
     private fun systemId(problem: Problem) = problem.factors.size - 1
 
-    /** A three-row cycle `x0 < x1 < x2 < x0`, each row reified on its own aux. */
     private fun triangle() = problemOf(
         numBools = 3,
         numInts = 3,
@@ -173,8 +162,6 @@ class DifferenceSystemPropagatorTest {
 
     @Test
     fun `refuting over bounded columns never contradicts a solution`() {
-        // The oracle the issue's history demands: #1534 and #1540 were both false unsat from a wrong
-        // difference deduction, and both hid behind the clamp as `unknown`.
         val rng = Random(0x1529)
         repeat(120) { iter ->
             val hi = 1L + rng.nextInt(3)

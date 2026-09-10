@@ -8,7 +8,6 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
-import kotlin.time.TimeSource
 
 class KotlinBasisSolverSnapshotTest {
     @Test
@@ -203,7 +202,7 @@ class KotlinBasisSolverSnapshotTest {
     }
 
     @Test
-    fun `bounded snapshot restore and fresh build operations are measured separately`() {
+    fun `bounded snapshots restore and repaired bases rebuild`() {
         val source = ftSource("dense", 8)
         val basis = IntArray(8) { it }
         val solver = KotlinBasisSolver(source)
@@ -215,34 +214,18 @@ class KotlinBasisSolverSnapshotTest {
         val repairedHeadings = IntArray(8) {
             if (repaired.columns[it] >= 0) repaired.columns[it] else source.cols + repaired.unitRows[it]
         }
-        var snapshotNanos = 0L
-        var restoreNanos = 0L
-        var repairNanos = 0L
-        var freshNanos = 0L
         repeat(8) {
-            var mark = TimeSource.Monotonic.markNow()
             val snapshot = assertNotNull(solver.snapshot())
-            snapshotNanos += mark.elapsedNow().inWholeNanoseconds
-            mark = TimeSource.Monotonic.markNow()
             assertTrue(solver.restore(snapshot))
-            restoreNanos += mark.elapsedNow().inWholeNanoseconds
             snapshot.close()
             val repair = KotlinBasisSolver(source)
-            mark = TimeSource.Monotonic.markNow()
             assertNotNull(repair.refactorizeRepairing(requested))
-            repairNanos += mark.elapsedNow().inWholeNanoseconds
             repair.close()
             val fresh = KotlinBasisSolver(augmented)
-            mark = TimeSource.Monotonic.markNow()
             assertTrue(fresh.refactorize(repairedHeadings))
-            freshNanos += mark.elapsedNow().inWholeNanoseconds
             fresh.close()
         }
         repairProbe.close()
-        println(
-            "B4a bounded snapshotNanos=$snapshotNanos restoreNanos=$restoreNanos " +
-                "repairNanos=$repairNanos freshBuildNanos=$freshNanos",
-        )
     }
 
     private fun replace(solver: KotlinBasisSolver, source: SparseMatrix, basis: IntArray, slot: Int, entering: Int) {

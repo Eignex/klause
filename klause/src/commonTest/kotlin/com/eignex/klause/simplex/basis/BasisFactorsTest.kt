@@ -53,7 +53,6 @@ class BasisFactorsTest {
                 assertEquals(0, result.work.schurUpdates, shape)
                 assertEquals(0, result.work.kernelDimension, shape)
             }
-            println("B2a $shape residual=$residual ${result.work}")
         }
     }
 
