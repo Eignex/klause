@@ -239,9 +239,22 @@ internal class ForrestTomlinFactors private constructor(
             gatheredIndices, 0, gatheredValues, 0,
             compactExactZeros = true,
         )
-        val indices = gatheredIndices.copyOf(gathered)
-        indices.sort()
-        return BasisSlice(indices, DoubleArray(indices.size) { work.values[indices[it]] })
+        for (i in 1 until gathered) {
+            val index = gatheredIndices[i]
+            val value = gatheredValues[i]
+            var position = i
+            while (position > 0 && gatheredIndices[position - 1] > index) {
+                gatheredIndices[position] = gatheredIndices[position - 1]
+                gatheredValues[position] = gatheredValues[position - 1]
+                position--
+            }
+            gatheredIndices[position] = index
+            gatheredValues[position] = value
+        }
+        return BasisSlice(
+            gatheredIndices.copyOf(gathered),
+            gatheredValues.copyOf(gathered),
+        )
     }
 
     companion object {
