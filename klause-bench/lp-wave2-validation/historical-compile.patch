@@ -1,0 +1,20 @@
+diff --git a/klause/src/commonMain/kotlin/com/eignex/klause/simplex/basis/HyperSparseSolve.kt b/klause/src/commonMain/kotlin/com/eignex/klause/simplex/basis/HyperSparseSolve.kt
+index fc9b671c6..29244b445 100644
+--- a/klause/src/commonMain/kotlin/com/eignex/klause/simplex/basis/HyperSparseSolve.kt
++++ b/klause/src/commonMain/kotlin/com/eignex/klause/simplex/basis/HyperSparseSolve.kt
+@@ -1,7 +1,6 @@
+ package com.eignex.klause.simplex.basis
+ 
+ import com.eignex.klause.util.binarySearchInt
+-import com.eignex.koblas.ExperimentalKoblasApi
+ import com.eignex.koblas.SparseMatrix
+ import com.eignex.koblas.sparse.SparseWorkspace
+ 
+@@ -13,7 +12,6 @@ internal data class TriangularSolveWork(
+ )
+ 
+ // Exclusive scratch storage. Membership survives exact cancellation until clear; no tolerance dropping.
+-@OptIn(ExperimentalKoblasApi::class)
+ internal class BasisWorkspace(val size: Int) {
+     val values = DoubleArray(size)
+     val indices = IntArray(size)

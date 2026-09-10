@@ -1,0 +1,50 @@
+{
+  "schema": 1,
+  "historicalRevision": "cd66668668851eea37350db5af0d416fb27a7a0e",
+  "initialStackedRevision": "a899863d7e183c6e51edf68a9d4ae29ee5d807c2",
+  "candidatePolicy": "MIN_BOUND_SUPPORT",
+  "candidateSeed": 21,
+  "historicalPolicy": "HARRIS_LARGEST_PIVOT_IMPLICIT",
+  "basisBackend": "KOTLIN_PRODUCT_FORM",
+  "koblasArtifacts": {
+    "koblas": {
+      "version": "0.1.1-20260910.200234-195",
+      "sha256": "2efba2a3a6371be4b445dac12e38a056fafc3c5c79f00ff37dfafa388144e3d7"
+    },
+    "koblas-jvm": {
+      "version": "0.1.1-20260910.200234-198",
+      "sha256": "7d01a039365d13bb6934c938550bb1309305c1a2bc291b2f395027ea5e314020"
+    },
+    "koblas-hfactor": {
+      "version": "0.1.1-20260910.200234-95",
+      "sha256": "6ddd5dcbb474b2216690c7ac4f9ec6c05d384ea1e7cbd3ff3cbab03a3ee14d22"
+    }
+  },
+  "warmups": 1,
+  "repetitions": 3,
+  "workers": 2,
+  "armTimeoutSeconds": 60,
+  "workloads": [
+    {
+      "id": "session-2.1a-40-update",
+      "route": "DIRECT_ENGINE_SOURCE_DERIVED",
+      "attempts": 40,
+      "seed": 21,
+      "definition": "x,y in [0,10]; x+y>=3; min x+2y; 8 cycles of push x<=1, push y>=3, push x>=1, pop(1), pop(0)"
+    },
+    {
+      "id": "session-2.2-32-revision",
+      "route": "DIRECT_ENGINE_SOURCE_DERIVED",
+      "attempts": 32,
+      "seed": 21,
+      "definition": "8x12 integer model a(i,j)=17 if i=j else ((3*i+5*j)%7)-3; x in [0,40]; cost 1+j%4; row i >= 11+2*i; 16 push lower((5*p+1)%12)=1+p%5 then pop(0) pairs"
+    }
+  ],
+  "acceptance": {
+    "maximumCandidateEngineWorkRatio": 0.95,
+    "maximumCandidateWallTimeRatio": 1.05,
+    "requiredCapturedCpFactorizationReduction": 1,
+    "unknownOrSaturatedWorkFails": true,
+    "lostSolveFails": true
+  }
+}
