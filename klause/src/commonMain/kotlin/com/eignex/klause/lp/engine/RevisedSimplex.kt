@@ -174,7 +174,7 @@ internal class RevisedSimplex(
         private set
     internal var lastTheoryPricingWorkOps: Long = 0L
         private set
-    internal var lastTheoryPricingFtranWorkOps: Long = 0L
+    internal var lastTheoryPricingEstimatedFtranWorkOps: Long = 0L
         private set
     internal var lastTheoryPricingSelections: Int = 0
         private set
@@ -1206,7 +1206,7 @@ internal class RevisedSimplex(
         lastTheoryPricingDeclines = 0
         lastTheoryPricingResourceStops = 0
         lastTheoryPricingWorkOps = 0L
-        lastTheoryPricingFtranWorkOps = 0L
+        lastTheoryPricingEstimatedFtranWorkOps = 0L
         lastTheoryPricingSelections = 0
         lastTheorySelectedColumn = -1
         work.reset()
@@ -1860,7 +1860,7 @@ internal class RevisedSimplex(
         lastTheoryPricingSamples++
         val solveCharge = nnzB.toLong() + (basisSolver?.updateCount ?: 0).toLong() * m
         addTheoryPricingWork(solveCharge)
-        lastTheoryPricingFtranWorkOps += solveCharge
+        lastTheoryPricingEstimatedFtranWorkOps += solveCharge
         pricingSpikeVec.clear()
         val nnz = columnNnz(candidate)
         addTheoryPricingWork(nnz.toLong())
@@ -1881,9 +1881,9 @@ internal class RevisedSimplex(
         } finally {
             refactorPolicy.recordBasisSolve(operationDelta(before, operationWork(solver)) { it.ftran })
         }
+        if (pricingResourceStopped()) return TheoryProbe.ResourceStopped
         if (failed) return TheoryProbe.ArithmeticDeclined
         lastTheoryPricingSuccessfulSamples++
-        if (pricingResourceStopped()) return TheoryProbe.ResourceStopped
         var support = 0
         pricingSpikeVec.forEachStored { row, value ->
             addTheoryPricingWork(1L)
