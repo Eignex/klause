@@ -542,8 +542,7 @@ internal class RevisedSimplex(
         }
     }
 
-    private fun shouldSampleQuality(): Boolean =
-        refactorPolicy.shouldSample(cancelled = false) && !cancellation()
+    private fun shouldSampleQuality(): Boolean = refactorPolicy.shouldSample(cancelled = false) && !cancellation()
 
     private fun denseColumn(column: Int): DoubleArray = DoubleArray(m).also { dense ->
         for (entry in colPtr[column] until colPtr[column + 1]) dense[rowIdx[entry]] = colVal[entry]
