@@ -332,28 +332,28 @@ private class RationalLayout(val n: Int, order: RationalBasisOrder?, meter: Rati
         }
         for (i in k until n) {
             for (j in k until n) {
-            meter.step()
-            if (nonzero(index(i, j))) {
-                rowCounts[i]++
-                columnCounts[j]++
+                meter.step()
+                if (nonzero(index(i, j))) {
+                    rowCounts[i]++
+                    columnCounts[j]++
+                }
             }
-        }
         }
         var bestRow = -1
         var bestColumn = -1
         var bestCost = Long.MAX_VALUE
         for (i in k until n) {
             for (j in k until n) {
-            meter.step()
-            if (nonzero(index(i, j))) {
-                val cost = (rowCounts[i] - 1L) * (columnCounts[j] - 1L)
-                if (cost < bestCost) {
-                    bestCost = cost
-                    bestRow = i
-                    bestColumn = j
+                meter.step()
+                if (nonzero(index(i, j))) {
+                    val cost = (rowCounts[i] - 1L) * (columnCounts[j] - 1L)
+                    if (cost < bestCost) {
+                        bestCost = cost
+                        bestRow = i
+                        bestColumn = j
+                    }
                 }
             }
-        }
         }
         if (bestRow < 0) throw RationalRank(k)
         meter.step(2)
