@@ -228,8 +228,7 @@ private class RestoreCleanupSnapshot(val delegate: BasisSnapshot, private val tr
 
 private class RestoreCleanupSolver(private val delegate: BasisSolver, private val tracker: RestoreCleanupTracker) :
     BasisSolver by delegate {
-    override fun snapshot(): BasisSnapshot? =
-        delegate.snapshot()?.let { RestoreCleanupSnapshot(it, tracker) }
+    override fun snapshot(): BasisSnapshot? = delegate.snapshot()?.let { RestoreCleanupSnapshot(it, tracker) }
 
     override fun restore(snapshot: BasisSnapshot): Boolean {
         tracker.restores++
