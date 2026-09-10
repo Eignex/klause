@@ -58,3 +58,15 @@ dokka {
         }
     }
 }
+
+val jvmTestCompilation = kotlin.targets.getByName("jvm").compilations.getByName("test")
+
+tasks.register<JavaExec>("basisTrace") {
+    group = "bench"
+    description = "Capture, list, replay, or benchmark the persistent real LP basis corpus."
+    dependsOn(jvmTestCompilation.compileTaskProvider)
+    classpath(jvmTestCompilation.output.allOutputs, jvmTestCompilation.runtimeDependencyFiles)
+    mainClass.set("com.eignex.klause.simplex.basis.BasisTraceBenchmarkKt")
+    workingDir(rootDir)
+    systemProperty("klause.workspace.root", rootDir.absolutePath)
+}

@@ -74,7 +74,6 @@ class LpArchitectureTest {
             """.trimIndent(),
             """
                 package com.eignex.klause.simplex.basis
-                import com.eignex.koblas.ExperimentalKoblasApi
                 import com.eignex.koblas.sparse.SparseWorkspace
                 import com.eignex.klause.simplex.basis.BasisSolver
                 import com.eignex.klause.simplex.basis.IndexedVector
