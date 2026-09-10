@@ -5,7 +5,9 @@ import com.eignex.klause.simplex.basis.BasisExtension
 import com.eignex.klause.simplex.basis.BasisExtensionResult
 import com.eignex.klause.simplex.basis.BasisOperationWork
 import com.eignex.klause.simplex.basis.BasisPhaseWork
+import com.eignex.klause.simplex.basis.BasisRepair
 import com.eignex.klause.simplex.basis.BasisSolver
+import com.eignex.klause.simplex.basis.BasisUpdate
 import com.eignex.klause.simplex.basis.IndexedVector
 import com.eignex.klause.simplex.basis.KotlinBasisSolver
 import com.eignex.klause.simplex.exact.BigFraction
@@ -18,6 +20,60 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class LpScopedBasisTransferTest {
+    @Test
+    fun `repaired mixed headings transfer and restore on the replacement owner`() {
+        val repairedOwners = mutableListOf<MixedRepairBasisSolver>()
+        val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+            override fun newPersistentSolver(
+                model: LpModel,
+                cancellation: Cancellation,
+                refactorUpdateLimit: Int,
+                iterationLimit: Int,
+                workLimit: Long,
+                trackDegeneracy: Boolean,
+            ): PersistentLpSolver = RevisedSimplex(
+                model,
+                cancellation,
+                refactorUpdateLimit = 1,
+                iterationLimit = iterationLimit,
+                workLimit = workLimit,
+                trackDegeneracy = trackDegeneracy,
+                basisSolverFactory = { matrix ->
+                    MixedRepairBasisSolver(KotlinBasisSolver(matrix), model.n).also { repairedOwners.add(it) }
+                },
+            )
+        }
+        LpScopedSolver(
+            LpExactState(repairCompositionModel()),
+            context = LpSolveContext(engineFactory = factory),
+            refactorUpdateLimit = 1,
+            appendSelection = LpAppendSelection.FORCE_TRANSFER,
+        ).use { solver ->
+            B5bIndependentExactSourceValidator.validate(solver.state, assertNotNull(solver.solve()))
+            assertTrue(repairedOwners.any { it.installedMixedRepair })
+
+            assertTrue(solver.append(lowerRow(3, 2), scoped = false))
+            val transferred = assertNotNull(solver.solve())
+            B5bIndependentExactSourceValidator.validate(solver.state, transferred)
+            assertEquals(1, solver.metrics.appendTransfers)
+            assertEquals(0, solver.metrics.appendFallbacks)
+
+            val snapshot = assertNotNull(solver.captureBasisRestart())
+            val before = assertNotNull(solver.basisLifecycleWork).units
+            assertTrue(solver.assertBound(0, false, ExactLpSide(ExactLpNumber.of(4L)), witness = 99L))
+            B5bIndependentExactSourceValidator.validate(solver.state, assertNotNull(solver.solve()))
+            assertTrue(solver.restoreBasisRestart(snapshot))
+            val restored = assertNotNull(solver.solve())
+            B5bIndependentExactSourceValidator.validate(solver.state, restored)
+            assertTrue(assertNotNull(solver.basisLifecycleWork).units > before)
+
+            LpScopedSolver(solver.state).use { fresh ->
+                assertEquals(assertNotNull(fresh.solve()).lowerBound, restored.lowerBound)
+            }
+            snapshot.close()
+        }
+    }
+
     @Test
     fun `successive appends transfer accepted source and extension unit headings`() {
         val zero = ExactLpNumber.of(0L)
@@ -786,6 +842,7 @@ class LpScopedBasisTransferTest {
         )
         val initial = assertNotNull(solver.solve())
         val state = solver.state
+        ledgerReads = 0
 
         val thrown = assertFailsWith<IllegalStateException> {
             solver.append(lowerRow(1, 2), scoped = false)
@@ -1092,6 +1149,26 @@ class LpScopedBasisTransferTest {
         )
     }
 
+    private fun repairCompositionModel(): ExactLpModel {
+        val zero = ExactLpNumber.of(0L)
+        val minusOne = ExactLpNumber.of(-1L)
+        val structural = ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(ExactLpNumber.of(10L))))
+        val logical = ExactLpColumn(ExactLpBounds(ExactLpSide(zero)))
+        return ExactLpModel(
+            listOf(
+                listOf(ExactLpEntry(0, minusOne), ExactLpEntry(2, minusOne)),
+                listOf(ExactLpEntry(0, minusOne), ExactLpEntry(1, minusOne)),
+                listOf(ExactLpEntry(1, minusOne), ExactLpEntry(2, minusOne)),
+            ),
+            listOf(ExactLpNumber.of(-3L), ExactLpNumber.of(-4L), ExactLpNumber.of(-5L)),
+            List(3) { structural } + List(3) { logical },
+            List(3) { ExactLpRow() },
+            ExactLpObjective(
+                listOf(ExactLpNumber.of(1L), ExactLpNumber.of(2L), ExactLpNumber.of(3L), zero, zero, zero),
+            ),
+        )
+    }
+
     private fun lowerRow(id: Long, lower: Long): LpScopedRow = LpScopedRow(
         id,
         listOf(0 to ExactLpNumber.of(-1L)),
@@ -1127,6 +1204,37 @@ class LpScopedBasisTransferTest {
             List(16) { ExactLpRow() },
             ExactLpObjective(List(24) { zero }),
         )
+    }
+}
+
+private class MixedRepairBasisSolver(private val delegate: BasisSolver, private val structuralColumns: Int) :
+    BasisSolver by delegate {
+    private var ordinaryAttempts = 0
+    var installedMixedRepair = false
+        private set
+
+    override fun refactorize(basicIndex: IntArray): Boolean {
+        ordinaryAttempts++
+        return ordinaryAttempts != 2 && delegate.refactorize(basicIndex)
+    }
+
+    override fun refactorizeRepairing(basicIndex: IntArray): BasisRepair? {
+        if (n < 2) return null
+        val columns = IntArray(n) { -1 }
+        val unitRows = IntArray(n) { it }
+        columns[1] = 1
+        unitRows[1] = -1
+        val headings = IntArray(n) { slot ->
+            if (columns[slot] >= 0) columns[slot] else structuralColumns + unitRows[slot]
+        }
+        if (!delegate.refactorize(headings)) return null
+        installedMixedRepair = true
+        return BasisRepair(columns, unitRows)
+    }
+
+    override fun update(pivotRow: Int, entering: Int, spike: IndexedVector, pivotEta: IndexedVector?): BasisUpdate {
+        val outcome = delegate.update(pivotRow, entering, spike, pivotEta)
+        return if (outcome == BasisUpdate.SINGULAR) BasisUpdate.SINGULAR else BasisUpdate.REFACTORIZE
     }
 }
 

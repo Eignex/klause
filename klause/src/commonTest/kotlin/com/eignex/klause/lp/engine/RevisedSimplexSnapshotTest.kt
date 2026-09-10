@@ -1,0 +1,131 @@
+package com.eignex.klause.lp.engine
+
+import com.eignex.klause.simplex.basis.BasisSnapshot
+import com.eignex.klause.simplex.basis.BasisSolveQuality
+import com.eignex.klause.simplex.basis.BasisSolver
+import com.eignex.klause.simplex.basis.IndexedVector
+import com.eignex.klause.simplex.basis.KotlinBasisSolver
+import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.util.Cancellation
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
+
+class RevisedSimplexSnapshotTest {
+    @Test
+    fun `objective adoption follows zero nonzero zero revisions`() {
+        val zero = ExactLpNumber.of(0L)
+        val one = ExactLpNumber.of(1L)
+        val minusOne = ExactLpNumber.of(-1L)
+        val source = ExactLpModel(
+            listOf(listOf(ExactLpEntry(0, minusOne))),
+            listOf(ExactLpNumber.of(-3L)),
+            listOf(
+                ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(ExactLpNumber.of(10L)))),
+                ExactLpColumn(ExactLpBounds(ExactLpSide(zero))),
+            ),
+            listOf(ExactLpRow()),
+            ExactLpObjective(listOf(zero, zero)),
+        )
+        val trail = LpBoundTrail(source)
+        RevisedSimplex(assertNotNull(trail.state.toWorkingModel())).use { solver ->
+            assertEquals(BigFraction.ZERO, solveCurrent(solver, trail))
+
+            assertTrue(trail.replaceObjective(ExactLpObjective(listOf(minusOne, zero))))
+            assertEquals(BigFraction.ofLong(-10L), solveCurrent(solver, trail))
+
+            assertTrue(trail.replaceObjective(ExactLpObjective(listOf(zero, zero))))
+            assertEquals(BigFraction.ZERO, solveCurrent(solver, trail))
+        }
+    }
+
+    @Test
+    fun `factor restart restores on its owner and solves the current objective`() {
+        val zero = ExactLpNumber.of(0L)
+        val minusOne = ExactLpNumber.of(-1L)
+        val trail = LpBoundTrail(model(zero))
+        RevisedSimplex(assertNotNull(trail.state.toWorkingModel())).use { solver ->
+            solveCurrent(solver, trail)
+            val snapshot = assertNotNull(solver.captureBasisRestart())
+            val beforeRestore = assertNotNull(solver.basisLifecycleWork).units
+
+            assertTrue(trail.replaceObjective(ExactLpObjective(listOf(minusOne, zero))))
+            assertEquals(BigFraction.ofLong(-10L), solveCurrent(solver, trail))
+            assertTrue(solver.restoreBasisRestart(snapshot))
+            assertEquals(BigFraction.ofLong(-10L), solveCurrent(solver, trail))
+            assertTrue(assertNotNull(solver.basisLifecycleWork).units > beforeRestore)
+
+            snapshot.close()
+            assertTrue(!solver.restoreBasisRestart(snapshot))
+        }
+    }
+
+    @Test
+    fun `status only restart refactorizes and rejects a foreign owner`() {
+        val zero = ExactLpNumber.of(0L)
+        val trail = LpBoundTrail(model(zero))
+        val factory: (com.eignex.koblas.SparseMatrix) -> BasisSolver = { matrix ->
+            StatusOnlySnapshotSolver(KotlinBasisSolver(matrix))
+        }
+        RevisedSimplex(assertNotNull(trail.state.toWorkingModel()), basisSolverFactory = factory).use { first ->
+            RevisedSimplex(assertNotNull(trail.state.toWorkingModel()), basisSolverFactory = factory).use { second ->
+                solveCurrent(first, trail)
+                solveCurrent(second, trail)
+                val snapshot = assertNotNull(first.captureBasisRestart())
+
+                assertTrue(!second.restoreBasisRestart(snapshot))
+                assertTrue(first.restoreBasisRestart(snapshot))
+                assertEquals(BigFraction.ZERO, solveCurrent(first, trail))
+            }
+        }
+    }
+
+    @Test
+    fun `persistent bad residual requests one rebuild per unchanged basis`() {
+        val trail = LpBoundTrail(model(ExactLpNumber.of(1L)))
+        RevisedSimplex(
+            assertNotNull(trail.state.toWorkingModel()),
+            basisSolverFactory = { matrix -> BadQualitySolver(KotlinBasisSolver(matrix)) },
+        ).use { solver ->
+            repeat(24) { assertEquals(BigFraction.ofLong(3L), solveCurrent(solver, trail)) }
+
+            val metrics = solver.lastRefactorPolicyMetrics
+            assertTrue(metrics.qualitySamples >= 2L)
+            assertEquals(1L, metrics.residualTriggers)
+            assertTrue(metrics.cooldownDeclines >= 1L)
+        }
+    }
+
+    private fun model(cost: ExactLpNumber): ExactLpModel {
+        val zero = ExactLpNumber.of(0L)
+        val minusOne = ExactLpNumber.of(-1L)
+        return ExactLpModel(
+            listOf(listOf(ExactLpEntry(0, minusOne))),
+            listOf(ExactLpNumber.of(-3L)),
+            listOf(
+                ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(ExactLpNumber.of(10L)))),
+                ExactLpColumn(ExactLpBounds(ExactLpSide(zero))),
+            ),
+            listOf(ExactLpRow()),
+            ExactLpObjective(listOf(cost, zero)),
+        )
+    }
+
+    private fun solveCurrent(solver: RevisedSimplex, trail: LpBoundTrail): BigFraction {
+        assertTrue(solver.adopt(trail.state, Cancellation.Never))
+        val result = assertNotNull(solver.resolveBounds())
+        val certified = certifyLpResult(assertNotNull(trail.state.toWorkingModel()), solver, result)
+        assertEquals(LpVerdict.ATTAINED_OPTIMUM, certified.verdict)
+        return assertNotNull(certified.lowerBound)
+    }
+}
+
+private class StatusOnlySnapshotSolver(private val delegate: BasisSolver) : BasisSolver by delegate {
+    override fun snapshot(): BasisSnapshot? = null
+}
+
+private class BadQualitySolver(private val delegate: BasisSolver) : BasisSolver by delegate {
+    override fun solveQuality(rhs: DoubleArray, solution: IndexedVector, transpose: Boolean): BasisSolveQuality =
+        BasisSolveQuality(1e-4, 1e-4)
+}

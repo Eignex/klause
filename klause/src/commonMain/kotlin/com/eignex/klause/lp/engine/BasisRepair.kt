@@ -1,17 +1,13 @@
 package com.eignex.klause.lp.engine
 
 import com.eignex.klause.simplex.basis.BasisArithmeticException
-import com.eignex.klause.simplex.basis.BasisRepair as SolverBasisRepair
 import com.eignex.klause.simplex.basis.BasisSnapshot
 import com.eignex.klause.simplex.basis.BasisSolver
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.simplex.basis.BasisRepair as SolverBasisRepair
 
-internal data class BasisBoundState(
-    val hasLower: Boolean,
-    val hasUpper: Boolean,
-    val fixed: Boolean,
-) {
+internal data class BasisBoundState(val hasLower: Boolean, val hasUpper: Boolean, val fixed: Boolean) {
     init {
         require(!fixed || hasLower && hasUpper)
     }
@@ -71,15 +67,11 @@ internal sealed interface BasisRecoveryResult {
         override val rankEvidence: ExactBasisRankEvidence,
     ) : BasisRecoveryResult
 
-    class Failed(
-        val decline: BasisRepairDecline,
-        override val rankEvidence: ExactBasisRankEvidence,
-    ) : BasisRecoveryResult
+    class Failed(val decline: BasisRepairDecline, override val rankEvidence: ExactBasisRankEvidence) :
+        BasisRecoveryResult
 }
 
-internal class EngineBasisRepairer(
-    private val exactRankLimits: ExactRankLimits = ExactRankLimits(),
-) {
+internal class EngineBasisRepairer(private val exactRankLimits: ExactRankLimits = ExactRankLimits()) {
     private var attempts = 0L
     private var successes = 0L
     private var repairedUnitSuccesses = 0L
@@ -115,6 +107,7 @@ internal class EngineBasisRepairer(
         attempts = saturatingIncrement(attempts)
         val evidence = exactBasisRankEvidence(exactModel, requested, exactRankLimits, cancellation)
         rankEvidence[evidence] = saturatingIncrement(rankEvidence[evidence] ?: 0L)
+        if (evidence == ExactBasisRankEvidence.RESOURCE_DECLINED) recordDecline(BasisRepairDecline.RESOURCE_DECLINED)
         if (evidence == ExactBasisRankEvidence.CANCELLED || cancellation()) {
             return failed(BasisRepairDecline.CANCELLED, evidence)
         }
@@ -307,18 +300,11 @@ internal fun LpModel.basisBoundStates(): Array<BasisBoundState> = Array(numVars)
     )
 }
 
-internal data class BasisMatrixIdentity(
-    val matrixRevision: Long,
-    val structuralColumns: Int,
-    val rowIds: List<Long>,
-)
+internal data class BasisMatrixIdentity(val matrixRevision: Long, val structuralColumns: Int, val rowIds: List<Long>)
 
 internal sealed interface BasisRestartResult {
-    class Restored(
-        val state: EngineBasisState,
-        val factorsRestored: Boolean,
-        val factorRestoreDeclined: Boolean,
-    ) : BasisRestartResult
+    class Restored(val state: EngineBasisState, val factorsRestored: Boolean, val factorRestoreDeclined: Boolean) :
+        BasisRestartResult
 
     class Cancelled(val factorsMayHaveChanged: Boolean) : BasisRestartResult
 }
@@ -424,8 +410,7 @@ private fun validBasisSnapshotShape(
     if (headings.distinct().size != owner.n || headings.any { it !in statuses.indices }) return false
     val basic = BooleanArray(statuses.size)
     headings.forEach { basic[it] = true }
-    if (statuses.indices.any { (statuses[it] == VarStatus.BASIC) != basic[it] }
-    ) {
+    if (statuses.indices.any { (statuses[it] == VarStatus.BASIC) != basic[it] }) {
         return false
     }
     return headings.indices.all { slot ->
@@ -491,15 +476,15 @@ internal fun exactBasisRankEvidence(
         for (row in column + 1 until matrix.size) {
             if (cancellation()) return ExactBasisRankEvidence.CANCELLED
             if (matrix[row][column].isZero) continue
-            val factor = safeDivide(matrix[row][column], matrix[column][column], limits) ?:
-                return ExactBasisRankEvidence.RESOURCE_DECLINED
+            val factor = safeDivide(matrix[row][column], matrix[column][column], limits)
+                ?: return ExactBasisRankEvidence.RESOURCE_DECLINED
             for (entry in column until matrix.size) {
                 if (++updates > limits.maxUpdates) return ExactBasisRankEvidence.RESOURCE_DECLINED
                 if (updates % 32 == 0 && cancellation()) return ExactBasisRankEvidence.CANCELLED
-                val product = safeMultiply(factor, matrix[column][entry], limits) ?:
-                    return ExactBasisRankEvidence.RESOURCE_DECLINED
-                matrix[row][entry] = safeSubtract(matrix[row][entry], product, limits) ?:
-                    return ExactBasisRankEvidence.RESOURCE_DECLINED
+                val product = safeMultiply(factor, matrix[column][entry], limits)
+                    ?: return ExactBasisRankEvidence.RESOURCE_DECLINED
+                matrix[row][entry] = safeSubtract(matrix[row][entry], product, limits)
+                    ?: return ExactBasisRankEvidence.RESOURCE_DECLINED
             }
         }
     }
@@ -546,7 +531,6 @@ private fun fractionDigits(value: BigFraction): Int =
 
 private fun decimalDigits(value: String): Int = value.length - if (value.startsWith('-')) 1 else 0
 
-private fun boundedAdd(left: Int, right: Int, cap: Int): Int =
-    if (left > cap - right) cap else left + right
+private fun boundedAdd(left: Int, right: Int, cap: Int): Int = if (left > cap - right) cap else left + right
 
 private fun saturatingIncrement(value: Long): Long = if (value == Long.MAX_VALUE) value else value + 1L

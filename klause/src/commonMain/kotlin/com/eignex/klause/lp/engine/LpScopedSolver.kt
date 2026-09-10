@@ -1,6 +1,7 @@
 package com.eignex.klause.lp.engine
 
 import com.eignex.klause.simplex.basis.BasisArithmeticException
+import com.eignex.klause.simplex.basis.BasisOperationWork
 import com.eignex.klause.util.Cancellation
 
 internal data class LpScopedMetrics(
@@ -120,6 +121,14 @@ internal class LpScopedSolver(
     fun deactivate(id: Long, token: Cancellation = cancellation): Boolean = edit(token) { it.deactivate(id, token) }
 
     fun compact(token: Cancellation = cancellation): Boolean = edit(token) { it.compact(token) }
+
+    fun captureBasisRestart(token: Cancellation = cancellation): EngineBasisRestartSnapshot? =
+        if (closed || token()) null else solver?.captureBasisRestart(token)
+
+    fun restoreBasisRestart(snapshot: EngineBasisRestartSnapshot, token: Cancellation = cancellation): Boolean =
+        !closed && !token() && solver?.restoreBasisRestart(snapshot, token) == true
+
+    val basisLifecycleWork: BasisOperationWork? get() = solver?.basisLifecycleWork
 
     @Suppress("TooGenericExceptionCaught")
     fun solve(

@@ -45,9 +45,7 @@ internal data class RefactorPolicyMetrics(
     val triggers: Map<EngineRefactorTrigger, Long> = emptyMap(),
 )
 
-internal class RefactorPolicy(
-    private val config: RefactorPolicyConfig = RefactorPolicyConfig(),
-) {
+internal class RefactorPolicy(private val config: RefactorPolicyConfig = RefactorPolicyConfig()) {
     private var successfulBasisSolves = 0L
     private var basisSolvesSinceFactorization = 0L
     private var acceptedUpdates = 0L
@@ -87,12 +85,7 @@ internal class RefactorPolicy(
             triggers.toMap(),
         )
 
-    fun recordFactorization(
-        factorNnz: Int,
-        buildWork: Long?,
-        pivotSpread: Double,
-        basisChanged: Boolean = false,
-    ) {
+    fun recordFactorization(factorNnz: Int, buildWork: Long?, pivotSpread: Double, basisChanged: Boolean = false) {
         require(factorNnz >= 0 && (buildWork == null || buildWork >= 0L))
         freshFactorNnz = factorNnz
         freshBuildWork = buildWork?.takeUnless { it == Long.MAX_VALUE }
@@ -140,15 +133,22 @@ internal class RefactorPolicy(
             (!quality.relativeResidual.isFinite() || quality.relativeResidual > config.relativeResidualTolerance)
         val trigger = when {
             backendSingular -> EngineRefactorTrigger.BACKEND_SINGULAR
+
             backendRequested -> EngineRefactorTrigger.BACKEND_REQUESTED
+
             updateCount >= config.hardUpdateCap -> EngineRefactorTrigger.HARD_UPDATE_CAP
+
             residualBad -> EngineRefactorTrigger.RESIDUAL
+
             updatesSinceFactorization >= config.minimumUpdatesForAdaptiveTrigger && fillExceeded(factorNnz) ->
                 EngineRefactorTrigger.FILL_GROWTH
+
             updatesSinceFactorization >= config.minimumUpdatesForAdaptiveTrigger && solveWorkExceeded() ->
                 EngineRefactorTrigger.SOLVE_WORK_GROWTH
+
             updatesSinceFactorization >= config.minimumUpdatesForAdaptiveTrigger && syntheticWorkExceeded() ->
                 EngineRefactorTrigger.SYNTHETIC_WORK
+
             else -> return null
         }
         val cooldownApplies = trigger !in setOf(

@@ -35,7 +35,8 @@ class BasisRepairTest {
         assertContentEquals(intArrayOf(-1, 1, -1), decoded.ownerUnitRows)
         assertEquals(VarStatus.AT_LOWER, decoded.statuses[1])
         assertEquals(VarStatus.BASIC, decoded.statuses[4])
-        assertEquals(setOf(0, 2, 4), decoded.statuses.indices.filter { decoded.statuses[it] == VarStatus.BASIC }.toSet())
+        val basicColumns = decoded.statuses.indices.filter { decoded.statuses[it] == VarStatus.BASIC }
+        assertEquals(setOf(0, 2, 4), basicColumns.toSet())
     }
 
     @Test
@@ -210,11 +211,13 @@ class BasisRepairTest {
             override fun restore(snapshot: BasisSnapshot): Boolean = false
         }
         val identity = BasisMatrixIdentity(0L, 0, listOf(0L))
-        val snapshot = assertNotNull(EngineBasisRestartSnapshot.capture(
-            solver,
-            identity,
-            EngineBasisState(intArrayOf(0), arrayOf(VarStatus.BASIC)),
-        ))
+        val snapshot = assertNotNull(
+            EngineBasisRestartSnapshot.capture(
+                solver,
+                identity,
+                EngineBasisState(intArrayOf(0), arrayOf(VarStatus.BASIC)),
+            ),
+        )
 
         val restored = assertNotNull(
             snapshot.restore(solver, identity, arrayOf(BasisBoundState(true, false, false))),

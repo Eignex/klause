@@ -4,6 +4,8 @@ import com.eignex.klause.lp.engine.Cut
 import com.eignex.klause.simplex.basis.BasisArithmeticException
 import com.eignex.klause.simplex.basis.BasisExtension
 import com.eignex.klause.simplex.basis.BasisOperationWork
+import com.eignex.klause.simplex.basis.BasisPhaseWork
+import com.eignex.klause.simplex.basis.BasisSolveQuality
 import com.eignex.klause.simplex.basis.BasisSolver
 import com.eignex.klause.simplex.basis.BasisUpdate
 import com.eignex.klause.simplex.basis.IndexedVector
@@ -54,7 +56,7 @@ internal class FloatLpResult(
 )
 
 /** Updates folded into the basis before it is rebuilt; bounds fill and rounding drift. */
-internal const val DEFAULT_REFACTOR_UPDATE_LIMIT: Int = 50
+internal const val DEFAULT_REFACTOR_UPDATE_LIMIT: Int = 64
 
 /**
  * Double-precision bounded-variable **dual** simplex in *revised* form: the basis is held as a
@@ -185,6 +187,13 @@ internal class RevisedSimplex(
      */
     private var basisSolver: BasisSolver? = null
     private var retiredBasisWork: BasisOperationWork? = null
+    private val basisRepairer = EngineBasisRepairer()
+    private val restartSnapshots = mutableListOf<EngineBasisRestartSnapshot>()
+    private val refactorPolicy = RefactorPolicy(RefactorPolicyConfig(hardUpdateCap = refactorUpdateLimit))
+    private var pendingSolveQuality: BasisSolveQuality? = null
+
+    internal val lastBasisRepairMetrics: BasisRepairMetrics get() = basisRepairer.metrics
+    internal val lastRefactorPolicyMetrics: RefactorPolicyMetrics get() = refactorPolicy.metrics
 
     /** Whether [basisSolver] currently factorizes the seated [basicVar]. False before the first
      *  factorization and after one came back singular. */
@@ -337,6 +346,8 @@ internal class RevisedSimplex(
 
     @Suppress("TooGenericExceptionCaught")
     override fun close() {
+        restartSnapshots.forEach { it.close() }
+        restartSnapshots.clear()
         val current = basisSolver
         var failure: Throwable? = null
         if (current != null) {
@@ -370,7 +381,7 @@ internal class RevisedSimplex(
      * folded into it. False when it came back singular, which leaves this engine unable to solve until
      * a later call succeeds.
      */
-    private fun refactorize(reason: LpRefactorReason): Boolean {
+    private fun refactorize(reason: LpRefactorReason): RefactorResult {
         refactorizations++
         when (reason) {
             LpRefactorReason.INITIAL -> initialRefactorizations++
@@ -388,13 +399,45 @@ internal class RevisedSimplex(
         // is the backend's fill, which [nnzB] deliberately does not follow.
         work.add(nnzB)
         val solver = solver()
-        basisFactorized = solver.refactorize(basicVar)
+        basisFactorized = try {
+            solver.refactorize(basicVar)
+        } catch (_: BasisArithmeticException) {
+            false
+        } catch (_: ArithmeticException) {
+            false
+        }
         if (!basisFactorized) {
             singularRefactorizations++
-            return false
+            return when (
+                val recovery = basisRepairer.recover(
+                solver,
+                basicVar,
+                n,
+                model.basisBoundStates(),
+                status,
+                model,
+                cancellation,
+            )
+            ) {
+                is BasisRecoveryResult.Failed -> {
+                    invalidateBasisDependentState()
+                    RefactorResult.FAILED
+                }
+
+                is BasisRecoveryResult.Recovered -> {
+                    installRecoveredBasis(recovery.state)
+                    recordFactorization(solver, basisChanged = true)
+                    RefactorResult.BASIS_CHANGED
+                }
+            }
         }
         ownerColumns = basicVar.copyOf()
         ownerUnitRows = IntArray(m) { -1 }
+        recordFactorization(solver, basisChanged = false)
+        return RefactorResult.UNCHANGED
+    }
+
+    private fun recordFactorization(solver: BasisSolver, basisChanged: Boolean) {
         // Fill of the factors the solver now holds: how much they grow the basis, and how dense they
         // become. Read off the solver, so unlike the work meter this measures the backend in play — a
         // density approaching 1 on real bases says the sparse factors are dense after all.
@@ -405,7 +448,42 @@ internal class RevisedSimplex(
             val density = held / (m.toDouble() * m.toDouble())
             if (density > maxLuDensity) maxLuDensity = density
         }
-        return true
+        refactorPolicy.recordFactorization(
+            solver.nnz,
+            solver.basisWork?.build?.installedBuildUnits,
+            solver.rcond,
+            basisChanged,
+        )
+        pendingSolveQuality = null
+    }
+
+    private fun installRecoveredBasis(recovered: EngineBasisState) {
+        recovered.headings.copyInto(basicVar)
+        recovered.statuses.copyInto(status)
+        ownerColumns = recovered.ownerColumns
+        ownerUnitRows = recovered.ownerUnitRows
+        basisFactorized = true
+        nnzB = 0
+        for (slot in 0 until m) nnzB += columnNnz(basicVar[slot])
+        invalidateBasisDependentState()
+        basisFactorized = true
+        basisKept = true
+    }
+
+    private fun invalidateBasisDependentState() {
+        cachedBeta = null
+        cachedModel = null
+        cachedStatus = null
+        solvedExactState = null
+        optimalBasis = null
+        optimalPrimal = null
+        infeasibleBasis = null
+        infeasibleRow = -1
+        infeasibleRay = null
+        ftranDensity = 1.0
+        btranDensity = 1.0
+        resetGamma()
+        basisKept = false
     }
 
     /**
@@ -419,12 +497,73 @@ internal class RevisedSimplex(
         work.add(nnzB.toLong() + (basisSolver?.updateCount ?: 0).toLong() * m)
     }
 
+    private fun operationDelta(
+        before: BasisOperationWork?,
+        after: BasisOperationWork?,
+        phase: (BasisOperationWork) -> BasisPhaseWork,
+    ): Long? {
+        if (before == null || after == null || !before.complete || !after.complete || before.saturated ||
+            after.saturated
+        ) {
+            return null
+        }
+        val start = phase(before).units
+        val end = phase(after).units
+        return if (end >= start) end - start else null
+    }
+
+    @Suppress("TooGenericExceptionCaught")
+    private fun operationWork(solver: BasisSolver): BasisOperationWork? = try {
+        solver.basisOperationWork
+    } catch (_: Throwable) {
+        null
+    }
+
+    private fun sampleSolveQuality(
+        solver: BasisSolver,
+        rhs: DoubleArray,
+        solution: IndexedVector,
+        transpose: Boolean,
+        cadenceChecked: Boolean = false,
+    ) {
+        if ((!cadenceChecked && !refactorPolicy.shouldSample(cancellation())) || cancellation()) return
+        val quality = try {
+            solver.solveQuality(rhs, solution, transpose)
+        } catch (_: BasisArithmeticException) {
+            BasisSolveQuality(Double.POSITIVE_INFINITY, Double.POSITIVE_INFINITY)
+        } catch (_: ArithmeticException) {
+            BasisSolveQuality(Double.POSITIVE_INFINITY, Double.POSITIVE_INFINITY)
+        }
+        val pending = pendingSolveQuality
+        if (pending == null || quality.relativeResidual > pending.relativeResidual ||
+            !quality.relativeResidual.isFinite()
+        ) {
+            pendingSolveQuality = quality
+        }
+    }
+
+    private fun denseColumn(column: Int): DoubleArray = DoubleArray(m).also { dense ->
+        for (entry in colPtr[column] until colPtr[column + 1]) dense[rowIdx[entry]] = colVal[entry]
+    }
+
     /** `B x = b` for a dense right-hand side, into [out] through [carrier]. */
-    private fun ftranDense(b: DoubleArray, out: DoubleArray, carrier: IndexedVector): DoubleArray {
+    private fun ftranDense(
+        b: DoubleArray,
+        out: DoubleArray,
+        carrier: IndexedVector,
+        boundUpdateFtran: Boolean = false,
+    ): DoubleArray {
         chargeSolve()
         if (b.any { !it.isFinite() }) throw BasisArithmeticException("nonfinite basis right-hand side")
         carrier.scatter(b)
-        solver().ftran(carrier, expectedDensity = 1.0)
+        val solver = solver()
+        val before = operationWork(solver)
+        solver.ftran(carrier, expectedDensity = 1.0)
+        refactorPolicy.recordBasisSolve(
+            operationDelta(before, operationWork(solver)) { it.ftran },
+            boundUpdateFtran,
+        )
+        sampleSolveQuality(solver, b, carrier, transpose = false)
         return carrier.gather(out)
     }
 
@@ -433,7 +572,11 @@ internal class RevisedSimplex(
         chargeSolve()
         if (b.any { !it.isFinite() }) throw BasisArithmeticException("nonfinite basis right-hand side")
         carrier.scatter(b)
-        solver().btran(carrier, expectedDensity = 1.0)
+        val solver = solver()
+        val before = operationWork(solver)
+        solver.btran(carrier, expectedDensity = 1.0)
+        refactorPolicy.recordBasisSolve(operationDelta(before, operationWork(solver)) { it.btran })
+        sampleSolveQuality(solver, b, carrier, transpose = true)
         return carrier.gather(out)
     }
 
@@ -446,7 +589,13 @@ internal class RevisedSimplex(
     private fun spike(q: Int) {
         chargeSolve()
         scatterColumn(q, spikeVec)
-        solver().ftran(spikeVec, ftranDensity)
+        val solver = solver()
+        val before = operationWork(solver)
+        solver.ftran(spikeVec, ftranDensity)
+        refactorPolicy.recordBasisSolve(operationDelta(before, operationWork(solver)) { it.ftran })
+        if (refactorPolicy.shouldSample(cancellation())) {
+            sampleSolveQuality(solver, denseColumn(q), spikeVec, transpose = false, cadenceChecked = true)
+        }
         ftranDensity = spikeVec.density
     }
 
@@ -467,7 +616,14 @@ internal class RevisedSimplex(
     private fun pivotalRow(r: Int) {
         chargeSolve()
         pivotEtaVec.unit(r)
-        solver().btran(pivotEtaVec, btranDensity)
+        val solver = solver()
+        val before = operationWork(solver)
+        solver.btran(pivotEtaVec, btranDensity)
+        refactorPolicy.recordBasisSolve(operationDelta(before, operationWork(solver)) { it.btran })
+        if (refactorPolicy.shouldSample(cancellation())) {
+            val rhs = DoubleArray(m).also { it[r] = 1.0 }
+            sampleSolveQuality(solver, rhs, pivotEtaVec, transpose = true, cadenceChecked = true)
+        }
         btranDensity = pivotEtaVec.density
     }
 
@@ -482,7 +638,11 @@ internal class RevisedSimplex(
         work.add(m)
         nnzB += columnNnz(q) - columnNnz(leaving)
         val solver = solver()
+        val before = operationWork(solver)
         val outcome = solver.update(r, q, spikeVec, if (withPivotEta) pivotEtaVec else null)
+        if (outcome != BasisUpdate.SINGULAR) {
+            refactorPolicy.recordAcceptedUpdate(operationDelta(before, operationWork(solver)) { it.update })
+        }
         // APPLIED leaves the factors fit to carry on; REFACTORIZE leaves them fit but worn, which is
         // advisory, and SINGULAR parted them from the basis so only a rebuild recovers. Rebuild on
         // anything but an APPLIED still inside the chain limit.
@@ -490,13 +650,20 @@ internal class RevisedSimplex(
             ownerColumns[r] = q
             ownerUnitRows[r] = -1
         }
-        if (outcome == BasisUpdate.APPLIED && solver.updateCount < refactorUpdateLimit) return PivotFold.UPDATED
-        val reason = when (outcome) {
-            BasisUpdate.APPLIED -> LpRefactorReason.UPDATE_LIMIT
-            BasisUpdate.SINGULAR -> LpRefactorReason.SINGULAR_RECOVERY
-            BasisUpdate.REFACTORIZE -> LpRefactorReason.BACKEND_REQUESTED
+        val trigger = refactorPolicy.chooseAtSafePoint(
+            solver.updateCount,
+            solver.nnz,
+            backendRequested = outcome == BasisUpdate.REFACTORIZE,
+            backendSingular = outcome == BasisUpdate.SINGULAR,
+            quality = pendingSolveQuality.also { pendingSolveQuality = null },
+        )
+        if (trigger == null) return PivotFold.UPDATED
+        val reason = trigger.refactorReason()
+        return when (refactorize(reason)) {
+            RefactorResult.UNCHANGED -> PivotFold.REBUILT
+            RefactorResult.BASIS_CHANGED -> PivotFold.BASIS_CHANGED
+            RefactorResult.FAILED -> PivotFold.FAILED
         }
-        return if (refactorize(reason)) PivotFold.REBUILT else PivotFold.FAILED
     }
 
     /** Duals `y` solving `Bᵀ y = c_B` (BTRAN). */
@@ -508,11 +675,7 @@ internal class RevisedSimplex(
     }
 
     /** Whether every objective coefficient is zero (pure feasibility): [duals] is then identically 0. */
-    private val allZeroCost: Boolean = run {
-        var zero = true
-        for (j in 0 until numVars) if (model.costD(j) != 0.0) zero = false
-        zero
-    }
+    private val allZeroCost: Boolean get() = (0 until numVars).all { model.costD(it) == 0.0 }
 
     /** Reset the Devex reference weights to 1 (a fresh reference frame). */
     private fun resetGamma() {
@@ -622,7 +785,9 @@ internal class RevisedSimplex(
         cancellation = token
         return try {
             coldStart()
-            if (!refactorize(LpRefactorReason.INITIAL) || token() || (workLimit > 0L && work.ops > workLimit)) {
+            if (refactorize(LpRefactorReason.INITIAL) == RefactorResult.FAILED || token() ||
+                (workLimit > 0L && work.ops > workLimit)
+            ) {
                 null
             } else {
                 basisKept = true
@@ -648,6 +813,53 @@ internal class RevisedSimplex(
         infeasibleRow = -1
         infeasibleRay = null
         return true
+    }
+
+    override fun captureBasisRestart(token: Cancellation): EngineBasisRestartSnapshot? {
+        val current = basisSolver ?: return null
+        if (!basisFactorized || current.singular || !trackedHeadingsConsistent() || token()) return null
+        val snapshot = EngineBasisRestartSnapshot.capture(
+            current,
+            basisMatrixIdentity() ?: return null,
+            EngineBasisState(basicVar, status, ownerColumns, ownerUnitRows),
+            token,
+        ) ?: return null
+        restartSnapshots.add(snapshot)
+        return snapshot
+    }
+
+    override fun restoreBasisRestart(snapshot: EngineBasisRestartSnapshot, token: Cancellation): Boolean {
+        val current = basisSolver ?: return false
+        val restored = snapshot.restore(
+            current,
+            basisMatrixIdentity() ?: return false,
+            model.basisBoundStates(),
+            token,
+        ) ?: return false
+        return when (restored) {
+            is BasisRestartResult.Cancelled -> {
+                if (restored.factorsMayHaveChanged) {
+                    basisFactorized = false
+                    invalidateBasisDependentState()
+                }
+                false
+            }
+
+            is BasisRestartResult.Restored -> {
+                installRecoveredBasis(restored.state)
+                if (restored.factorsRestored) {
+                    recordFactorization(current, basisChanged = true)
+                    true
+                } else {
+                    refactorize(LpRefactorReason.NUMERICAL_RECOVERY) != RefactorResult.FAILED
+                }
+            }
+        }
+    }
+
+    private fun basisMatrixIdentity(): BasisMatrixIdentity? {
+        val exact = model.exactState ?: return null
+        return BasisMatrixIdentity(exact.matrixRevision, n, exact.rows.entries().map { it.id })
     }
 
     override val appendTransferReady: Boolean
@@ -953,10 +1165,16 @@ internal class RevisedSimplex(
         warmStarted = false
     }
 
-    private fun solveCore(warm: Basis?, reuse: Boolean, enforced: BooleanArray? = null): FloatLpResult? {
+    private fun solveCore(
+        warm: Basis?,
+        reuse: Boolean,
+        enforced: BooleanArray? = null,
+        reset: Boolean = true,
+        basisRestarts: Int = 0,
+    ): FloatLpResult? {
         // Per-solve state: the infeasibility certificate slots and counters must not leak across a
         // persistent instance's solves.
-        resetSolveState(reuse || warm != null)
+        if (reset) resetSolveState(reuse || warm != null)
         if (model.exactState != null &&
             (enforced != null || cancellation() || model.exactState?.conflict != null)
         ) {
@@ -974,19 +1192,30 @@ internal class RevisedSimplex(
             } else {
                 if (!tryWarmStart(warm)) coldStart() else warmStarted = true
             }
-            if (!refactorize(if (warmStarted) LpRefactorReason.WARM_START else LpRefactorReason.INITIAL)) {
+            if (refactorize(
+                    if (warmStarted) LpRefactorReason.WARM_START else LpRefactorReason.INITIAL,
+                ) == RefactorResult.FAILED
+            ) {
                 // The warm basis factorized singular, so the solve runs from the slack start after all.
                 coldStart()
                 warmStarted = false
-                if (!refactorize(LpRefactorReason.SINGULAR_RECOVERY)) return null
+                if (refactorize(LpRefactorReason.SINGULAR_RECOVERY) == RefactorResult.FAILED) return null
             }
         }
         if (enforced != null) {
             // Every unenforced row's slack must be basic before the main loop. A failed reconciliation
             // resets to the all-slack cold start, where the invariant holds trivially.
-            if (!reconcileUnenforced(enforced)) {
-                coldStart()
-                if (!refactorize(LpRefactorReason.RECONCILE_RECOVERY)) return null
+            when (reconcileUnenforced(enforced)) {
+                IterationResult.CONTINUE -> Unit
+
+                IterationResult.RESTART -> return restartDual(enforced, basisRestarts, basisChanged = false)
+
+                IterationResult.BASIS_CHANGED -> return restartDual(enforced, basisRestarts)
+
+                IterationResult.FAILED -> {
+                    coldStart()
+                    if (refactorize(LpRefactorReason.RECONCILE_RECOVERY) == RefactorResult.FAILED) return null
+                }
             }
         }
         if (model.exactState != null) {
@@ -1038,6 +1267,19 @@ internal class RevisedSimplex(
                 ftranDense(rhsAdj, beta, rhsVec)
             }
             useCached = false
+            when (refactorAtQualitySafePoint()) {
+                null -> Unit
+
+                RefactorResult.UNCHANGED -> {
+                    resetGamma()
+                    iter--
+                    continue
+                }
+
+                RefactorResult.BASIS_CHANGED -> return restartDual(enforced, basisRestarts)
+
+                RefactorResult.FAILED -> return null
+            }
             haveBeta = true
             // Leaving: the most infeasible basic bound, scored by Devex — violation² / γ_i (approximate
             // dual steepest edge). Verify the chosen weight against the pivotal row which this iteration
@@ -1086,6 +1328,19 @@ internal class RevisedSimplex(
             }
 
             val y = duals()
+            when (refactorAtQualitySafePoint()) {
+                null -> Unit
+
+                RefactorResult.UNCHANGED -> {
+                    resetGamma()
+                    iter--
+                    continue
+                }
+
+                RefactorResult.BASIS_CHANGED -> return restartDual(enforced, basisRestarts)
+
+                RefactorResult.FAILED -> return null
+            }
             // ρ·A_j for every column ρ reaches, accumulated over the rows ρ stores. Costs those rows'
             // entries instead of nnz(A), which is the whole point of ρ staying sparse. A column ρ misses
             // has ρ·A_j = 0 exactly, so the eligibility pass below loses no candidate by skipping it.
@@ -1139,7 +1394,11 @@ internal class RevisedSimplex(
                     numericalRecoveryTried = true
                     if (cancellation()) return if (model.exactState == null) truncated(beta) else null
                     if (workLimit > 0L && work.ops >= workLimit) return truncated(beta)
-                    if (!refactorize(LpRefactorReason.NUMERICAL_RECOVERY)) return null
+                    when (refactorize(LpRefactorReason.NUMERICAL_RECOVERY)) {
+                        RefactorResult.UNCHANGED -> Unit
+                        RefactorResult.BASIS_CHANGED -> return restartDual(enforced, basisRestarts)
+                        RefactorResult.FAILED -> return null
+                    }
                     resetGamma()
                     iter-- // recovery is not a pivot and must not consume [iterationLimit]
                     continue
@@ -1175,12 +1434,39 @@ internal class RevisedSimplex(
             when (foldPivot(r, q, leaving, withPivotEta = true)) {
                 PivotFold.UPDATED -> Unit
                 PivotFold.REBUILT -> resetGamma()
+                PivotFold.BASIS_CHANGED -> return restartDual(enforced, basisRestarts)
                 PivotFold.FAILED -> return null
             }
         }
         // Iteration budget spent. Same reasoning as the cancellation exit: the iterate bounds, so hand
         // it back rather than discarding the work.
         return if (haveBeta) truncated(beta) else null
+    }
+
+    private fun restartDual(
+        enforced: BooleanArray?,
+        basisRestarts: Int,
+        basisChanged: Boolean = true,
+    ): FloatLpResult? {
+        if ((basisChanged && basisRestarts >= MAX_BASIS_RESTARTS) || cancellation()) return null
+        basisKept = true
+        return solveCore(
+            warm = null,
+            reuse = true,
+            enforced = enforced,
+            reset = false,
+            basisRestarts = basisRestarts + if (basisChanged) 1 else 0,
+        )
+    }
+
+    private fun refactorAtQualitySafePoint(): RefactorResult? {
+        val current = solver()
+        val trigger = refactorPolicy.chooseAtSafePoint(
+            current.updateCount,
+            current.nnz,
+            quality = pendingSolveQuality.also { pendingSolveQuality = null },
+        ) ?: return null
+        return refactorize(trigger.refactorReason())
     }
 
     /** `b − Σ_{j nonbasic at upper} A_j·u_j` into [out], the right-hand side the basic values solve. */
@@ -1296,7 +1582,7 @@ internal class RevisedSimplex(
         work.add(numVars)
         if (changed) {
             val change = DoubleArray(m)
-            ftranDense(rhs, change, rhsVec)
+            ftranDense(rhs, change, rhsVec, boundUpdateFtran = true)
             for (i in 0 until m) out[i] += change[i]
             work.add(m)
         }
@@ -1311,7 +1597,7 @@ internal class RevisedSimplex(
      * all-slack basis seats every slack trivially). Only called with an all-zero objective, where any
      * basis is dual-feasible, so the arbitrary evicted-to-lower statuses never break the dual simplex.
      */
-    private fun reconcileUnenforced(enforced: BooleanArray): Boolean {
+    private fun reconcileUnenforced(enforced: BooleanArray): IterationResult {
         val alphaBuf = DoubleArray(m)
         var guard = 0
         var i = 0
@@ -1320,11 +1606,11 @@ internal class RevisedSimplex(
             val row = when {
                 i < m -> i++
                 requeued.isNotEmpty() -> requeued.removeFirst()
-                else -> return true
+                else -> return IterationResult.CONTINUE
             }
             val sc = n + row
             if (enforced[row] || status[sc] == VarStatus.BASIC) continue
-            if (guard++ > 2 * m) return false
+            if (guard++ > 2 * m) return IterationResult.FAILED
             val alpha = spikeDense(sc, alphaBuf)
             // Pivot the slack in where its spike is largest, preferring not to evict another
             // unenforced slack (which would only re-queue it).
@@ -1347,7 +1633,7 @@ internal class RevisedSimplex(
             if (r == -1) r = rAny
             if (r == -1) {
                 smallPivotBails++
-                return false // singular spike: no pivotable row
+                return IterationResult.FAILED // singular spike: no pivotable row
             }
             val evicted = basicVar[r]
             if (evicted >= n && !enforced[evicted - n]) requeued.add(evicted - n)
@@ -1357,7 +1643,11 @@ internal class RevisedSimplex(
             pivots++
             // No pivotal row here: this is a designated primal-style pivot, so the solver computes the
             // transposed solve itself if its update needs one.
-            if (foldPivot(r, sc, evicted, withPivotEta = false) == PivotFold.FAILED) return false
+            when (foldPivot(r, sc, evicted, withPivotEta = false)) {
+                PivotFold.UPDATED, PivotFold.REBUILT -> Unit
+                PivotFold.BASIS_CHANGED -> return IterationResult.BASIS_CHANGED
+                PivotFold.FAILED -> return IterationResult.FAILED
+            }
         }
     }
 
@@ -1617,7 +1907,7 @@ internal class RevisedSimplex(
      * singular pivot / cancellation / budget. Mutates [basicVar] / [status].
      */
     @Suppress("CyclomaticComplexMethod", "NestedBlockDepth", "ReturnCount", "LongMethod")
-    private fun primalPhase1(): Boolean {
+    private fun primalPhase1(): IterationResult {
         val beta = basicValues()
         val gamma = DoubleArray(m)
         val pi = DoubleArray(m)
@@ -1625,7 +1915,7 @@ internal class RevisedSimplex(
         val maxIter = 50 * (m + numVars) + 200
         var iter = 0
         while (iter++ < maxIter) {
-            if ((iter - 1) % CANCEL_POLL == 0 && cancellation()) return false
+            if ((iter - 1) % CANCEL_POLL == 0 && cancellation()) return IterationResult.FAILED
             var w = 0.0
             for (i in 0 until m) {
                 val v = basicVar[i]
@@ -1645,9 +1935,15 @@ internal class RevisedSimplex(
                     else -> 0.0
                 }
             }
-            if (w <= FEAS_TOL) return true // feasible
+            if (w <= FEAS_TOL) return IterationResult.CONTINUE // feasible
 
             btranDense(gamma, pi, dualVec)
+            when (refactorAtQualitySafePoint()) {
+                null -> Unit
+                RefactorResult.UNCHANGED -> return IterationResult.RESTART
+                RefactorResult.BASIS_CHANGED -> return IterationResult.BASIS_CHANGED
+                RefactorResult.FAILED -> return IterationResult.FAILED
+            }
             // Entering reduces w: from lower if π·A_j > 0, from upper if π·A_j < 0; pick the steepest.
             var q = -1
             var qAtLower = true
@@ -1670,7 +1966,7 @@ internal class RevisedSimplex(
                     basisKept = true
                     retainBasicValues(beta)
                 }
-                return false
+                return IterationResult.FAILED
             }
 
             val alpha = spikeDense(q, alphaBuf)
@@ -1710,7 +2006,7 @@ internal class RevisedSimplex(
                     leavingToUpper = toUpper
                 }
             }
-            if (tMax >= Double.MAX_VALUE) return false // no blocker (degenerate/unbounded direction)
+            if (tMax >= Double.MAX_VALUE) return IterationResult.FAILED // no blocker
             if (leaving == -1) {
                 status[q] = if (qAtLower) VarStatus.AT_UPPER else VarStatus.AT_LOWER
                 basicValues(beta)
@@ -1718,17 +2014,21 @@ internal class RevisedSimplex(
             }
             if (abs(alpha[leaving]) < TOL) {
                 smallPivotBails++
-                return false
+                return IterationResult.FAILED
             }
             val evicted = basicVar[leaving]
             status[evicted] = sideStatus(evicted, leavingToUpper)
             basicVar[leaving] = q
             status[q] = VarStatus.BASIC
             pivots++
-            if (foldPivot(leaving, q, evicted, withPivotEta = false) == PivotFold.FAILED) return false
+            when (foldPivot(leaving, q, evicted, withPivotEta = false)) {
+                PivotFold.UPDATED, PivotFold.REBUILT -> Unit
+                PivotFold.BASIS_CHANGED -> return IterationResult.BASIS_CHANGED
+                PivotFold.FAILED -> return IterationResult.FAILED
+            }
             basicValues(beta)
         }
-        return false // budget exhausted
+        return IterationResult.FAILED // budget exhausted
     }
 
     /**
@@ -1745,7 +2045,12 @@ internal class RevisedSimplex(
     override fun solvePrimal(warm: Basis?): FloatLpResult? = numericalSolve { solvePrimalCore(warm) }
 
     @Suppress("CyclomaticComplexMethod", "NestedBlockDepth", "ReturnCount", "LongMethod")
-    private fun solvePrimalCore(warm: Basis?, reuse: Boolean = false, reset: Boolean = true): FloatLpResult? {
+    private fun solvePrimalCore(
+        warm: Basis?,
+        reuse: Boolean = false,
+        reset: Boolean = true,
+        basisRestarts: Int = 0,
+    ): FloatLpResult? {
         if (reset) resetSolveState(warm != null || reuse)
         if (model.exactState != null && (cancellation() || model.exactState?.conflict != null)) return null
         basisKept = false
@@ -1755,16 +2060,27 @@ internal class RevisedSimplex(
             } else {
                 warmStarted = true
             }
-            if (!refactorize(LpRefactorReason.PRIMAL)) {
+            if (refactorize(LpRefactorReason.PRIMAL) == RefactorResult.FAILED) {
                 lowerStart()
                 warmStarted = false
-                if (!refactorize(LpRefactorReason.SINGULAR_RECOVERY)) return null
+                if (refactorize(LpRefactorReason.SINGULAR_RECOVERY) == RefactorResult.FAILED) return null
             }
         }
         if (model.exactState != null) repairNonbasicStatuses()
         val beta = basicValues()
+        when (refactorAtQualitySafePoint()) {
+            null -> Unit
+            RefactorResult.UNCHANGED -> return restartPrimal(basisRestarts, basisChanged = false)
+            RefactorResult.BASIS_CHANGED -> return restartPrimal(basisRestarts)
+            RefactorResult.FAILED -> return null
+        }
         if (!primalFeasible(beta)) {
-            if (!primalPhase1()) return null
+            when (primalPhase1()) {
+                IterationResult.CONTINUE -> Unit
+                IterationResult.RESTART -> return restartPrimal(basisRestarts, basisChanged = false)
+                IterationResult.BASIS_CHANGED -> return restartPrimal(basisRestarts)
+                IterationResult.FAILED -> return null
+            }
             basicValues(beta)
             if (!primalFeasible(beta)) return null // phase-1 could not reach feasibility
         }
@@ -1779,6 +2095,12 @@ internal class RevisedSimplex(
             // tie-break. Guarantees termination on a degenerate LP that the Dantzig rule could cycle on.
             val bland = degenerate >= blandStall
             val y = duals()
+            when (refactorAtQualitySafePoint()) {
+                null -> Unit
+                RefactorResult.UNCHANGED -> return restartPrimal(basisRestarts, basisChanged = false)
+                RefactorResult.BASIS_CHANGED -> return restartPrimal(basisRestarts)
+                RefactorResult.FAILED -> return null
+            }
             var q = -1
             var qAtLower = true
             var best = TOL
@@ -1846,10 +2168,25 @@ internal class RevisedSimplex(
             basicVar[leaving] = q
             status[q] = VarStatus.BASIC
             pivots++
-            if (foldPivot(leaving, q, evicted, withPivotEta = false) == PivotFold.FAILED) return null
+            when (foldPivot(leaving, q, evicted, withPivotEta = false)) {
+                PivotFold.UPDATED, PivotFold.REBUILT -> Unit
+                PivotFold.BASIS_CHANGED -> return restartPrimal(basisRestarts)
+                PivotFold.FAILED -> return null
+            }
             basicValues(beta)
         }
         return null // budget exhausted
+    }
+
+    private fun restartPrimal(basisRestarts: Int, basisChanged: Boolean = true): FloatLpResult? {
+        if ((basisChanged && basisRestarts >= MAX_BASIS_RESTARTS) || cancellation()) return null
+        basisKept = true
+        return solvePrimalCore(
+            null,
+            reuse = true,
+            reset = false,
+            basisRestarts = basisRestarts + if (basisChanged) 1 else 0,
+        )
     }
 
     private companion object {
@@ -1873,7 +2210,36 @@ internal class RevisedSimplex(
 
         /** Iterations between cooperative cancellation polls. */
         const val CANCEL_POLL: Int = 32
+
+        const val MAX_BASIS_RESTARTS: Int = 4
     }
+}
+
+private enum class RefactorResult {
+    UNCHANGED,
+    BASIS_CHANGED,
+    FAILED,
+}
+
+private enum class IterationResult {
+    CONTINUE,
+    RESTART,
+    BASIS_CHANGED,
+    FAILED,
+}
+
+private fun EngineRefactorTrigger.refactorReason(): LpRefactorReason = when (this) {
+    EngineRefactorTrigger.BACKEND_SINGULAR -> LpRefactorReason.SINGULAR_RECOVERY
+
+    EngineRefactorTrigger.BACKEND_REQUESTED -> LpRefactorReason.BACKEND_REQUESTED
+
+    EngineRefactorTrigger.HARD_UPDATE_CAP -> LpRefactorReason.UPDATE_LIMIT
+
+    EngineRefactorTrigger.RESIDUAL,
+    EngineRefactorTrigger.FILL_GROWTH,
+    EngineRefactorTrigger.SOLVE_WORK_GROWTH,
+    EngineRefactorTrigger.SYNTHETIC_WORK,
+    -> LpRefactorReason.NUMERICAL_RECOVERY
 }
 
 /** What folding a pivot into the basis did to it. */
@@ -1883,6 +2249,9 @@ private enum class PivotFold {
 
     /** The basis was rebuilt — because the solver asked for it, or because the chain reached its limit. */
     REBUILT,
+
+    /** Numerical repair installed a different ordered basis; iteration-local state must be abandoned. */
+    BASIS_CHANGED,
 
     /** Neither the update nor the rebuild behind it left a usable basis. */
     FAILED,
