@@ -16,12 +16,14 @@ class RationalBasisFactorsTest {
     fun `nonsymmetric solves preserve both source permutations`() {
         val matrix = matrix(listOf(3, 2, 1), listOf(1, 4, 3), listOf(2, 1, 5))
         val orders = listOf(intArrayOf(0, 1, 2), intArrayOf(2, 0, 1), intArrayOf(1, 2, 0))
-        for (rows in orders) for (columns in orders) {
-            val built = ready(matrix, RationalBasisOrder(rows, columns))
-            assertEquals(0, built.stats.fallbacks)
-            assertContentEquals(rows, built.factors.ordering().rows)
-            assertContentEquals(columns, built.factors.ordering().columns)
-            checkSolves(matrix, built.factors)
+        for (rows in orders) {
+            for (columns in orders) {
+                val built = ready(matrix, RationalBasisOrder(rows, columns))
+                assertEquals(0, built.stats.fallbacks)
+                assertContentEquals(rows, built.factors.ordering().rows)
+                assertContentEquals(columns, built.factors.ordering().columns)
+                checkSolves(matrix, built.factors)
+            }
         }
     }
 
@@ -63,11 +65,17 @@ class RationalBasisFactorsTest {
             matrix(listOf(1, 2), listOf(2, 4)) to 1,
             matrix(listOf(1, 0, 1), listOf(0, 1, 1), listOf(1, 1, 2)) to 2,
         )
-        for ((matrix, rank) in cases) for (hint in listOf(null, identityOrder(matrix.size))) {
-            val result = assertIs<RationalBasisBuild.Singular>(RationalBasisFactors.factor(matrix, hint))
-            assertEquals(rank, result.rank)
-            val limited = RationalBasisFactors.factor(matrix, hint, RationalBasisLimits(work = result.stats.work - 1))
-            assertEquals(RationalBasisDecline.WORK, assertIs<RationalBasisBuild.Declined>(limited).reason)
+        for ((matrix, rank) in cases) {
+            for (hint in listOf(null, identityOrder(matrix.size))) {
+                val result = assertIs<RationalBasisBuild.Singular>(RationalBasisFactors.factor(matrix, hint))
+                assertEquals(rank, result.rank)
+                val limited = RationalBasisFactors.factor(
+                    matrix,
+                    hint,
+                    RationalBasisLimits(work = result.stats.work - 1),
+                )
+                assertEquals(RationalBasisDecline.WORK, assertIs<RationalBasisBuild.Declined>(limited).reason)
+            }
         }
     }
 
@@ -114,8 +122,13 @@ class RationalBasisFactorsTest {
     fun `signed word boundaries convert without losing exact bits`() {
         val wide = power(100) + BigFraction.ofLong(7)
         val values = listOf(
-            power(64), power(100), power(127), power(127).negated(), power(127) - BigFraction.ONE,
-            wide.negated(), wide.reciprocal(),
+            power(64),
+            power(100),
+            power(127),
+            power(127).negated(),
+            power(127) - BigFraction.ONE,
+            wide.negated(),
+            wide.reciprocal(),
         )
         for (value in values) {
             val matrix = listOf(listOf(value))
@@ -142,7 +155,10 @@ class RationalBasisFactorsTest {
 
     @Test
     fun `input hint output and RHS mutations cannot alter retained factors`() {
-        val matrix = mutableListOf(mutableListOf(BigFraction.ofLong(2), BigFraction.ONE), mutableListOf(BigFraction.ZERO, BigFraction.ofLong(3)))
+        val matrix = mutableListOf(
+            mutableListOf(BigFraction.ofLong(2), BigFraction.ONE),
+            mutableListOf(BigFraction.ZERO, BigFraction.ofLong(3)),
+        )
         val original = matrix.map { it.toList() }
         val hint = identityOrder(2)
         val factors = ready(matrix, hint).factors
@@ -191,11 +207,13 @@ class RationalBasisFactorsTest {
             RationalBasisLimits(bits = 0) to RationalBasisDecline.BITS,
             RationalBasisLimits(time = Duration.ZERO) to RationalBasisDecline.TIME,
         )
-        for ((limits, reason) in cases) for (transpose in listOf(false, true)) {
-            val declined = assertIs<RationalBasisSolve.Declined>(factors.solve(rhs, transpose, limits))
-            assertEquals(reason, declined.reason)
-            assertTrue(declined.stats.work <= limits.work)
-            assertTrue(declined.stats.allocationBytes <= limits.allocationBytes)
+        for ((limits, reason) in cases) {
+            for (transpose in listOf(false, true)) {
+                val declined = assertIs<RationalBasisSolve.Declined>(factors.solve(rhs, transpose, limits))
+                assertEquals(reason, declined.reason)
+                assertTrue(declined.stats.work <= limits.work)
+                assertTrue(declined.stats.allocationBytes <= limits.allocationBytes)
+            }
         }
         checkSolves(matrix, factors)
     }
@@ -212,7 +230,11 @@ class RationalBasisFactorsTest {
         val factors = ready(matrix).factors
         for (transpose in listOf(false, true)) {
             var polls = 0
-            val result = factors.solve(List(3) { BigFraction.ONE }, transpose, cancellation = Cancellation { polls++ >= 80 })
+            val result = factors.solve(
+                List(3) { BigFraction.ONE },
+                transpose,
+                cancellation = Cancellation { polls++ >= 80 },
+            )
             assertEquals(RationalBasisDecline.CANCELLED, assertIs<RationalBasisSolve.Declined>(result).reason)
             assertTrue(result.stats.work > 0)
         }
@@ -223,14 +245,20 @@ class RationalBasisFactorsTest {
     fun `resource reservations are repeatable at successful boundaries`() {
         val matrix = matrix(listOf(3, 2, 1), listOf(1, 4, 2), listOf(2, 1, 5))
         val baseline = ready(matrix)
-        val limits = RationalBasisLimits(work = baseline.stats.work, allocationBytes = baseline.stats.allocationBytes, fill = baseline.stats.peakFill)
+        val limits = RationalBasisLimits(
+            work = baseline.stats.work,
+            allocationBytes = baseline.stats.allocationBytes,
+            fill = baseline.stats.peakFill,
+        )
         val repeated = assertIs<RationalBasisBuild.Ready>(RationalBasisFactors.factor(matrix, limits = limits))
         assertEquals(baseline.stats, repeated.stats)
         for (limits in listOf(
             limits.copy(work = limits.work - 1),
             limits.copy(allocationBytes = limits.allocationBytes - 1),
             limits.copy(fill = limits.fill - 1),
-        )) assertIs<RationalBasisBuild.Declined>(RationalBasisFactors.factor(matrix, limits = limits))
+        )) {
+            assertIs<RationalBasisBuild.Declined>(RationalBasisFactors.factor(matrix, limits = limits))
+        }
         assertEquals(0, baseline.stats.restarts)
     }
 
@@ -252,7 +280,9 @@ class RationalBasisFactorsTest {
         assertEquals(3, result.stats.maxBits)
         assertTrue(result.stats.maxIntermediateBits <= 3)
         val factors = ready(listOf(listOf(BigFraction.ONE))).factors
-        val solved = assertIs<RationalBasisSolve.Solved>(factors.solve(listOf(BigFraction.ONE), limits = RationalBasisLimits(bits = 2)))
+        val solved = assertIs<RationalBasisSolve.Solved>(
+            factors.solve(listOf(BigFraction.ONE), limits = RationalBasisLimits(bits = 2)),
+        )
         assertEquals(listOf(BigFraction.ONE), solved.values)
     }
 
@@ -285,8 +315,18 @@ class RationalBasisFactorsTest {
         assertFailsWith<IllegalArgumentException> { RationalBasisFactors.factor(listOf(emptyList())) }
         val matrix = matrix(listOf(1, 0), listOf(0, 1))
         for (order in listOf(intArrayOf(0), intArrayOf(0, 0), intArrayOf(-1, 1), intArrayOf(0, 2))) {
-            assertFailsWith<IllegalArgumentException> { RationalBasisFactors.factor(matrix, RationalBasisOrder(order, intArrayOf(0, 1))) }
-            assertFailsWith<IllegalArgumentException> { RationalBasisFactors.factor(matrix, RationalBasisOrder(intArrayOf(0, 1), order)) }
+            assertFailsWith<IllegalArgumentException> {
+                RationalBasisFactors.factor(
+                    matrix,
+                    RationalBasisOrder(order, intArrayOf(0, 1)),
+                )
+            }
+            assertFailsWith<IllegalArgumentException> {
+                RationalBasisFactors.factor(
+                    matrix,
+                    RationalBasisOrder(intArrayOf(0, 1), order),
+                )
+            }
         }
         assertFailsWith<IllegalArgumentException> { ready(matrix).factors.solve(emptyList()) }
     }
@@ -360,13 +400,20 @@ class RationalBasisFactorsTest {
     }
 
     private fun checkSolves(matrix: List<List<BigFraction>>, factors: RationalBasisFactors) {
-        for (transpose in listOf(false, true)) for (offset in 0..1) {
-            val rhs = List(matrix.size) { BigFraction.ofLong(it * 2L - offset) }
-            checkAnswer(matrix, rhs, transpose, solved(factors, rhs, transpose).values)
+        for (transpose in listOf(false, true)) {
+            for (offset in 0..1) {
+                val rhs = List(matrix.size) { BigFraction.ofLong(it * 2L - offset) }
+                checkAnswer(matrix, rhs, transpose, solved(factors, rhs, transpose).values)
+            }
         }
     }
 
-    private fun checkAnswer(matrix: List<List<BigFraction>>, rhs: List<BigFraction>, transpose: Boolean, answer: List<BigFraction>) {
+    private fun checkAnswer(
+        matrix: List<List<BigFraction>>,
+        rhs: List<BigFraction>,
+        transpose: Boolean,
+        answer: List<BigFraction>,
+    ) {
         val source = if (transpose) List(matrix.size) { i -> List(matrix.size) { j -> matrix[j][i] } } else matrix
         assertEquals(reference(source, rhs), answer)
         for (i in source.indices) {
@@ -385,9 +432,11 @@ class RationalBasisFactorsTest {
             augmented[pivot] = row
             val inverse = augmented[column][column].reciprocal()
             for (j in column..n) augmented[column][j] = augmented[column][j] * inverse
-            for (i in 0 until n) if (i != column) {
-                val multiplier = augmented[i][column]
-                for (j in column..n) augmented[i][j] = augmented[i][j] - multiplier * augmented[column][j]
+            for (i in 0 until n) {
+                if (i != column) {
+                    val multiplier = augmented[i][column]
+                    for (j in column..n) augmented[i][j] = augmented[i][j] - multiplier * augmented[column][j]
+                }
             }
         }
         return List(n) { augmented[it][n] }
@@ -399,7 +448,9 @@ class RationalBasisFactorsTest {
     private fun solved(factors: RationalBasisFactors, rhs: List<BigFraction>, transpose: Boolean = false) =
         assertIs<RationalBasisSolve.Solved>(factors.solve(rhs, transpose))
 
-    private fun matrix(vararg rows: List<Int>): List<List<BigFraction>> = rows.map { row -> row.map { BigFraction.ofLong(it.toLong()) } }
+    private fun matrix(vararg rows: List<Int>): List<List<BigFraction>> =
+        rows.map { row -> row.map { BigFraction.ofLong(it.toLong()) } }
+
     private fun identityOrder(n: Int) = RationalBasisOrder(IntArray(n) { it }, IntArray(n) { it })
     private fun power(bits: Int) = BigFraction.of(BigInteger.ONE shl bits, BigInteger.ONE)
 
@@ -408,5 +459,4 @@ class RationalBasisFactorsTest {
             RationalBasisFactors.factor(emptyList(), RationalBasisOrder(intArrayOf(), intArrayOf())),
         ).factors
     }
-
 }
