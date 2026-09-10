@@ -1,6 +1,9 @@
 package com.eignex.klause.simplex.basis
 
+import com.eignex.koblas.DenseVector
 import com.eignex.koblas.SparseMatrix
+import com.eignex.koblas.SparseVector
+import com.eignex.koblas.dot
 import com.eignex.koblas.sparse.SparseWorkspace
 
 // Dense values with unique sparse support. Explicit zeros stay stored until clear; arrays never escape.
@@ -10,6 +13,7 @@ internal class IndexedVector(val size: Int) {
     }
 
     private val values = DoubleArray(size)
+    private val denseValues = DenseVector.wrap(values)
     private val indices = IntArray(size)
     private val stored = IntArray(size)
     var count: Int = 0
@@ -17,6 +21,8 @@ internal class IndexedVector(val size: Int) {
     val density: Double get() = if (size == 0) 0.0 else count.toDouble() / size
 
     operator fun get(i: Int): Double = values[i]
+
+    fun dot(vector: SparseVector): Double = vector dot denseValues
 
     fun forEachStored(block: (Int, Double) -> Unit) {
         for (k in 0 until count) {

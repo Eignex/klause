@@ -13,7 +13,12 @@ import com.eignex.klause.simplex.basis.KotlinBasisSolver
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.argsortBy
+import com.eignex.koblas.DenseVector
 import com.eignex.koblas.SparseMatrix
+import com.eignex.koblas.SparseVector
+import com.eignex.koblas.axpy
+import com.eignex.koblas.column
+import com.eignex.koblas.dot
 import com.eignex.koblas.sparse.SparseWorkspace
 import kotlin.math.abs
 
@@ -121,6 +126,9 @@ internal class RevisedSimplex(
      * assembled for the occasion.
      */
     private val columns: SparseMatrix = lpColumns(model)
+
+    // Own each structural column once so repeated pricing dots reach Koblas without per-dot copies.
+    private val dotColumns: Array<SparseVector> = Array(n) { columns.column(it) }
 
     // The CSC of `columns` as flat arrays — the same structure the seam holds, read here for pricing rather
     // than copied into a second representation. Column j occupies colPtr(j) until colPtr(j+1).
@@ -263,10 +271,11 @@ internal class RevisedSimplex(
      */
     private fun recordDegeneracy(y: DoubleArray) {
         if (!trackDegeneracy) return
+        val denseY = DenseVector.wrap(y)
         var count = 0
         for (j in 0 until numVars) {
             if (status[j] == VarStatus.BASIC) continue
-            if (abs(model.costD(j) - columnDot(y, j)) <= TOL) count++
+            if (abs(model.costD(j) - columnDot(denseY, j)) <= TOL) count++
         }
         degenerateColumns = count
     }
@@ -325,14 +334,10 @@ internal class RevisedSimplex(
     }
 
     /** `y · A_j`, uncharged — for the passes that must not move the work meter. */
-    private fun columnDot(y: DoubleArray, j: Int): Double {
-        var acc = 0.0
-        for (k in colPtr[j] until colPtr[j + 1]) acc += y[rowIdx[k]] * colVal[k]
-        return acc
-    }
+    private fun columnDot(y: DenseVector, j: Int): Double = if (j < n) dotColumns[j] dot y else y[j - n]
 
     /** `y · A_j` for the dual vector [y], charged to the work meter. */
-    private fun dotColumn(y: DoubleArray, j: Int): Double {
+    private fun dotColumn(y: DenseVector, j: Int): Double {
         work.add(columnNnz(j))
         return columnDot(y, j)
     }
@@ -1367,6 +1372,7 @@ internal class RevisedSimplex(
 
                 RefactorResult.FAILED -> return null
             }
+            val denseY = DenseVector.wrap(y)
             // ρ·A_j for every column ρ reaches, accumulated over the rows ρ stores. Costs those rows'
             // entries instead of nnz(A), which is the whole point of ρ staying sparse. A column ρ misses
             // has ρ·A_j = 0 exactly, so the eligibility pass below loses no candidate by skipping it.
@@ -1403,7 +1409,7 @@ internal class RevisedSimplex(
                     (atLower && a > 0) || (!atLower && a < 0)
                 }
                 if (!eligible) continue
-                ratioBuf[j] = abs((model.costD(j) - dotColumn(y, j)) / a)
+                ratioBuf[j] = abs((model.costD(j) - dotColumn(denseY, j)) / a)
                 elig.add(j)
             }
             val q = if (elig.isEmpty()) null else chooseEntering(elig, eligOrdered, ratioBuf, pivotRowEntry, worst)
@@ -1550,9 +1556,10 @@ internal class RevisedSimplex(
 
     private fun dualFeasible(): Boolean {
         val y = duals()
+        val denseY = DenseVector.wrap(y)
         for (j in 0 until numVars) {
             if (status[j] == VarStatus.BASIC || model.fixed(j)) continue
-            val reduced = model.costD(j) - dotColumn(y, j)
+            val reduced = model.costD(j) - dotColumn(denseY, j)
             if (!reduced.isFinite()) return false
             when (status[j]) {
                 VarStatus.AT_LOWER -> if (reduced < -TOL) return false
@@ -1601,7 +1608,7 @@ internal class RevisedSimplex(
         if (changed) {
             val change = DoubleArray(m)
             ftranDense(rhs, change, rhsVec, boundUpdateFtran = true)
-            for (i in 0 until m) out[i] += change[i]
+            DenseVector.wrap(out).axpy(1.0, DenseVector.wrap(change))
             work.add(m)
         }
         return out.all { it.isFinite() }
@@ -1962,13 +1969,14 @@ internal class RevisedSimplex(
                 RefactorResult.BASIS_CHANGED -> return IterationResult.BASIS_CHANGED
                 RefactorResult.FAILED -> return IterationResult.FAILED
             }
+            val densePi = DenseVector.wrap(pi)
             // Entering reduces w: from lower if π·A_j > 0, from upper if π·A_j < 0; pick the steepest.
             var q = -1
             var qAtLower = true
             var best = TOL
             for (j in 0 until numVars) {
                 if (status[j] == VarStatus.BASIC || model.fixed(j)) continue
-                val pj = dotColumn(pi, j)
+                val pj = dotColumn(densePi, j)
                 val atLower = status[j] == VarStatus.AT_LOWER || (status[j] == VarStatus.FREE && pj > 0.0)
                 val gain = if (atLower) pj else -pj
                 if (gain > best) {
@@ -2118,12 +2126,13 @@ internal class RevisedSimplex(
                 RefactorResult.BASIS_CHANGED -> return restartPrimal(progress)
                 RefactorResult.FAILED -> return null
             }
+            val denseY = DenseVector.wrap(y)
             var q = -1
             var qAtLower = true
             var best = TOL
             for (j in 0 until numVars) {
                 if (status[j] == VarStatus.BASIC || model.fixed(j)) continue
-                val dj = model.costD(j) - dotColumn(y, j)
+                val dj = model.costD(j) - dotColumn(denseY, j)
                 val atLower = status[j] == VarStatus.AT_LOWER || (status[j] == VarStatus.FREE && dj < 0.0)
                 // From lower, increasing improves iff d_j < 0; from upper, decreasing improves iff d_j > 0.
                 val gain = if (atLower) -dj else dj
