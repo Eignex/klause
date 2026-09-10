@@ -2,7 +2,7 @@
 
 These version-1 `.kbtrace` files are portable observations of basis-owner matrices and operation streams,
 not serialized backend factors. `manifest.json` fixes source and artifact hashes, dimensions, operation counts,
-limits and exclusions. The total committed payload is 219,956 bytes.
+limits and exclusions. The total committed payload is 219,993 bytes.
 
 `mps-afiro` and `mps-adlittle` come from the HiGHS repository at
 `73cac48c5340d775a477087198611862559be250`. HiGHS distributes these test instances under its MIT license.
