@@ -37,6 +37,96 @@ internal data class BasisWork(
     val workSinceBuild: Long get() = saturatedAdd(saturatedAdd(ftran.units, btran.units), update.units)
 }
 
+// Monotonic owner-lifetime work. Unlike [BasisWork], this is neither reset by a build nor rewound by
+// snapshot restore, so a caller can account for rejected operations and their fallbacks.
+internal data class BasisOperationWork(
+    val refactorization: BasisPhaseWork = BasisPhaseWork(),
+    val repair: BasisPhaseWork = BasisPhaseWork(),
+    val extension: BasisPhaseWork = BasisPhaseWork(),
+    val snapshot: BasisPhaseWork = BasisPhaseWork(),
+    val restore: BasisPhaseWork = BasisPhaseWork(),
+    val ftran: BasisPhaseWork = BasisPhaseWork(),
+    val btran: BasisPhaseWork = BasisPhaseWork(),
+    val update: BasisPhaseWork = BasisPhaseWork(),
+) {
+    val units: Long get() = listOf(
+        refactorization,
+        repair,
+        extension,
+        snapshot,
+        restore,
+        ftran,
+        btran,
+        update,
+    ).fold(0L) { total, phase -> saturatedAdd(total, phase.units) }
+    val saturated: Boolean get() = listOf(
+        refactorization,
+        repair,
+        extension,
+        snapshot,
+        restore,
+        ftran,
+        btran,
+        update,
+    ).any { phase ->
+        phase.attempts == Long.MAX_VALUE || phase.successes == Long.MAX_VALUE ||
+            phase.declines == Long.MAX_VALUE || phase.units == Long.MAX_VALUE
+    }
+}
+
+internal class BasisOperationMeter {
+    private val phases = Array(BasisOperationKind.entries.size) { MutableBasisPhase() }
+
+    fun attempt(kind: BasisOperationKind) {
+        phases[kind.ordinal].attempts = saturatedAdd(phases[kind.ordinal].attempts, 1)
+    }
+
+    fun success(kind: BasisOperationKind, units: Long) {
+        val phase = phases[kind.ordinal]
+        phase.successes = saturatedAdd(phase.successes, 1)
+        phase.units = saturatedAdd(phase.units, units)
+    }
+
+    fun decline(kind: BasisOperationKind, units: Long) {
+        val phase = phases[kind.ordinal]
+        phase.declines = saturatedAdd(phase.declines, 1)
+        phase.units = saturatedAdd(phase.units, units)
+    }
+
+    fun snapshot(): BasisOperationWork = BasisOperationWork(
+        phase(BasisOperationKind.REFACTORIZATION),
+        phase(BasisOperationKind.REPAIR),
+        phase(BasisOperationKind.EXTENSION),
+        phase(BasisOperationKind.SNAPSHOT),
+        phase(BasisOperationKind.RESTORE),
+        phase(BasisOperationKind.FTRAN),
+        phase(BasisOperationKind.BTRAN),
+        phase(BasisOperationKind.UPDATE),
+    )
+
+    private fun phase(kind: BasisOperationKind): BasisPhaseWork = phases[kind.ordinal].let {
+        BasisPhaseWork(it.attempts, it.successes, it.units, it.declines)
+    }
+}
+
+internal enum class BasisOperationKind {
+    REFACTORIZATION,
+    REPAIR,
+    EXTENSION,
+    SNAPSHOT,
+    RESTORE,
+    FTRAN,
+    BTRAN,
+    UPDATE,
+}
+
+private class MutableBasisPhase(
+    var attempts: Long = 0,
+    var successes: Long = 0,
+    var declines: Long = 0,
+    var units: Long = 0,
+)
+
 internal class BasisWorkMeter {
     private var build: BasisBuildWork? = null
     private var ftranAttempts = 0L

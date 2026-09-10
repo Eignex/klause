@@ -2,6 +2,7 @@ package com.eignex.klause.lp.engine
 
 import com.eignex.klause.simplex.basis.BasisArithmeticException
 import com.eignex.klause.simplex.basis.BasisExtension
+import com.eignex.klause.simplex.basis.BasisOperationWork
 import com.eignex.klause.simplex.basis.BasisRepair
 import com.eignex.klause.simplex.basis.BasisSolver
 import com.eignex.klause.simplex.basis.KotlinBasisSolver
@@ -19,7 +20,50 @@ internal class BasisReplacement(
     val ownerBasis = BasisRepair(ownerColumns, ownerUnitRows)
 }
 
+internal class BasisTransferAttempt(
+    val replacement: BasisReplacement?,
+    val arithmeticDeclined: Boolean,
+    val workUnits: Long?,
+)
+
 internal class BasisExtensionAdapter(private val factory: (SparseMatrix) -> BasisSolver = { KotlinBasisSolver(it) }) {
+    fun transfer(
+        oldSolver: BasisSolver,
+        newMatrix: SparseMatrix,
+        intendedBasis: IntArray,
+        logicalColumns: IntArray,
+        extension: BasisExtension,
+    ): BasisTransferAttempt {
+        require(intendedBasis.size == newMatrix.rows)
+        require(intendedBasis.all { it in 0 until newMatrix.cols })
+        validateLogicals(newMatrix, logicalColumns)
+        val before = oldSolver.basisOperationWork
+        val extended = try {
+            oldSolver.extend(newMatrix, extension)
+        } catch (_: BasisArithmeticException) {
+            return BasisTransferAttempt(null, true, operationDelta(before, oldSolver.basisOperationWork))
+        }
+        val units = operationDelta(before, oldSolver.basisOperationWork)
+        if (extended == null) return BasisTransferAttempt(null, false, units)
+        val headings = translate(extended.basis, logicalColumns)
+        if (!headings.contentEquals(intendedBasis)) {
+            extended.solver.close()
+            return BasisTransferAttempt(null, false, units)
+        }
+        return BasisTransferAttempt(
+            BasisReplacement(
+                extended.solver,
+                headings,
+                extended.basis.columns,
+                extended.basis.unitRows,
+                transferred = true,
+                transferArithmeticDeclined = false,
+            ),
+            arithmeticDeclined = false,
+            workUnits = units,
+        )
+    }
+
     fun replacement(
         oldSolver: BasisSolver,
         newMatrix: SparseMatrix,
@@ -90,5 +134,12 @@ internal class BasisExtensionAdapter(private val factory: (SparseMatrix) -> Basi
 
     private fun translate(basis: BasisRepair, logicalColumns: IntArray): IntArray = IntArray(basis.columns.size) {
         if (basis.columns[it] >= 0) basis.columns[it] else logicalColumns[basis.unitRows[it]]
+    }
+
+    private fun operationDelta(before: BasisOperationWork?, after: BasisOperationWork?): Long? {
+        if (before == null || after == null || before.saturated || after.saturated || after.units < before.units) {
+            return null
+        }
+        return after.units - before.units
     }
 }

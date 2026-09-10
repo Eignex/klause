@@ -36,13 +36,29 @@ internal data class BasisExtensionState(
     val validationEntries: Long,
 )
 
+internal data class BasisExtensionVerification(val state: BasisExtensionState?, val units: Long)
+
 internal fun verifyBasisExtension(
     oldSource: SparseMatrix,
     newSource: SparseMatrix,
     acceptedColumns: IntArray,
     acceptedUnitRows: IntArray,
     request: BasisExtension,
-): BasisExtensionState? {
+): BasisExtensionState? = inspectBasisExtension(
+    oldSource,
+    newSource,
+    acceptedColumns,
+    acceptedUnitRows,
+    request,
+).state
+
+internal fun inspectBasisExtension(
+    oldSource: SparseMatrix,
+    newSource: SparseMatrix,
+    acceptedColumns: IntArray,
+    acceptedUnitRows: IntArray,
+    request: BasisExtension,
+): BasisExtensionVerification {
     val oldRows = request.oldRowsInNew
     val oldColumns = request.oldColumnsInNew
     val requestedBasis = request.basis
@@ -54,8 +70,8 @@ internal fun verifyBasisExtension(
     require(oldRows.isInjectionInto(newSource.rows))
     require(oldColumns.isInjectionInto(newSource.cols))
     require(requestedBasis.columns.all { it == -1 || it in 0 until oldSource.cols })
-    if (!requestedBasis.columns.contentEquals(acceptedColumns)) return null
-    if (!requestedBasis.unitRows.contentEquals(acceptedUnitRows)) return null
+    if (!requestedBasis.columns.contentEquals(acceptedColumns)) return BasisExtensionVerification(null, 0)
+    if (!requestedBasis.unitRows.contentEquals(acceptedUnitRows)) return BasisExtensionVerification(null, 0)
 
     val oldRowAtNew = IntArray(newSource.rows) { -1 }
     for (oldRow in oldRows.indices) oldRowAtNew[oldRows[oldRow]] = oldRow
@@ -96,7 +112,7 @@ internal fun verifyBasisExtension(
             if (expected[row]) compatible = false
             expected[row] = false
         }
-        if (!compatible) return null
+        if (!compatible) return BasisExtensionVerification(null, validationEntries)
         crossByOldColumn[oldColumn] = BasisSlice(
             crossRows.copyOf(crossCount),
             crossValues.copyOf(crossCount),
@@ -113,7 +129,7 @@ internal fun verifyBasisExtension(
         }
     }
     for (offset in extensionRows.indices) unitRows[oldSource.rows + offset] = extensionRows[offset]
-    return BasisExtensionState(
+    val state = BasisExtensionState(
         oldRows,
         oldColumns,
         extensionRows,
@@ -124,6 +140,7 @@ internal fun verifyBasisExtension(
         crossByOldColumn,
         validationEntries,
     )
+    return BasisExtensionVerification(state, validationEntries)
 }
 
 internal fun buildExtendedCache(

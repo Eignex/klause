@@ -2,6 +2,7 @@ package com.eignex.klause.lp.engine
 
 import com.eignex.klause.lp.engine.Cut
 import com.eignex.klause.simplex.basis.BasisArithmeticException
+import com.eignex.klause.simplex.basis.BasisExtension
 import com.eignex.klause.simplex.basis.BasisSolver
 import com.eignex.klause.simplex.basis.BasisUpdate
 import com.eignex.klause.simplex.basis.IndexedVector
@@ -131,6 +132,8 @@ internal class RevisedSimplex(
 
     private val basicVar = IntArray(m)
     private val status = Array(numVars) { VarStatus.BASIC }
+    private var ownerColumns = IntArray(0)
+    private var ownerUnitRows = IntArray(0)
 
     // v1 cannot recover an imported general status declaration; keep this conservative through reuse.
     private var basisCaptureEligible = model.exactState == null
@@ -324,7 +327,9 @@ internal class RevisedSimplex(
     /** This engine's basis solver, built on first use. */
     private fun solver(): BasisSolver = basisSolver ?: newSolver()
 
-    private fun newSolver(): BasisSolver = (basisSolverFactory?.invoke(columns) ?: KotlinBasisSolver(columns)).also {
+    private fun createBasisSolver(): BasisSolver = basisSolverFactory?.invoke(columns) ?: KotlinBasisSolver(columns)
+
+    private fun newSolver(): BasisSolver = createBasisSolver().also {
         basisSolver = it
     }
 
@@ -333,6 +338,8 @@ internal class RevisedSimplex(
         basisSolver = null
         basisFactorized = false
         basisKept = false
+        ownerColumns = IntArray(0)
+        ownerUnitRows = IntArray(0)
         cachedBeta = null
         cachedModel = null
         cachedStatus = null
@@ -367,6 +374,8 @@ internal class RevisedSimplex(
             singularRefactorizations++
             return false
         }
+        ownerColumns = basicVar.copyOf()
+        ownerUnitRows = IntArray(m) { -1 }
         // Fill of the factors the solver now holds: how much they grow the basis, and how dense they
         // become. Read off the solver, so unlike the work meter this measures the backend in play — a
         // density approaching 1 on real bases says the sparse factors are dense after all.
@@ -458,6 +467,10 @@ internal class RevisedSimplex(
         // APPLIED leaves the factors fit to carry on; REFACTORIZE leaves them fit but worn, which is
         // advisory, and SINGULAR parted them from the basis so only a rebuild recovers. Rebuild on
         // anything but an APPLIED still inside the chain limit.
+        if (outcome != BasisUpdate.SINGULAR) {
+            ownerColumns[r] = q
+            ownerUnitRows[r] = -1
+        }
         if (outcome == BasisUpdate.APPLIED && solver.updateCount < refactorUpdateLimit) return PivotFold.UPDATED
         val reason = when (outcome) {
             BasisUpdate.APPLIED -> LpRefactorReason.UPDATE_LIMIT
@@ -616,6 +629,195 @@ internal class RevisedSimplex(
         infeasibleRow = -1
         infeasibleRay = null
         return true
+    }
+
+    override val appendTransferReady: Boolean
+        get() = basisKept && basisFactorized && basisSolver?.singular == false && trackedHeadingsConsistent()
+    override val basisLifecycleWork get() = basisSolver?.basisOperationWork
+
+    @Suppress("ReturnCount")
+    override fun appendReplacement(
+        next: LpExactState,
+        oldRowsInNew: IntArray,
+        oldColumnsInNew: IntArray,
+        mode: LpAppendReplacementMode,
+        token: Cancellation,
+    ): LpAppendReplacementAttempt {
+        val current = model.exactState
+            ?: return LpAppendReplacementAttempt(decline = LpAppendTransferDecline.INCOMPATIBLE_STATE)
+        if (token()) return LpAppendReplacementAttempt(decline = LpAppendTransferDecline.CANCELLED)
+        if (!appendCompatible(current, next, oldRowsInNew, oldColumnsInNew)) {
+            return LpAppendReplacementAttempt(decline = LpAppendTransferDecline.INCOMPATIBLE_STATE)
+        }
+        val oldSolver = basisSolver
+        if (!basisKept || !basisFactorized || oldSolver == null || oldSolver.singular) {
+            return LpAppendReplacementAttempt(decline = LpAppendTransferDecline.NOT_READY)
+        }
+        if (!trackedHeadingsConsistent()) {
+            return LpAppendReplacementAttempt(decline = LpAppendTransferDecline.INCONSISTENT_HEADINGS)
+        }
+        val nextModel = next.toWorkingModel()
+            ?: return LpAppendReplacementAttempt(decline = LpAppendTransferDecline.INCOMPATIBLE_STATE)
+        val intended = mappedAppendBasis(nextModel, oldRowsInNew, oldColumnsInNew)
+            ?: return LpAppendReplacementAttempt(decline = LpAppendTransferDecline.INCONSISTENT_HEADINGS)
+        val intendedStatus = mappedAppendStatus(nextModel, oldColumnsInNew, intended)
+            ?: return LpAppendReplacementAttempt(decline = LpAppendTransferDecline.INCONSISTENT_HEADINGS)
+        val candidate = RevisedSimplex(
+            nextModel,
+            token,
+            refactorUpdateLimit,
+            iterationLimit,
+            workLimit,
+            trackDegeneracy,
+            basisSolverFactory,
+        )
+        val logicalColumns = IntArray(nextModel.m) { nextModel.n + it }
+        val adapter = BasisExtensionAdapter { candidate.createBasisSolver() }
+        val replacement: BasisReplacement
+        val basisWork: Long?
+        if (mode == LpAppendReplacementMode.TRANSFER) {
+            val transfer = adapter.transfer(
+                oldSolver,
+                candidate.columns,
+                intended,
+                logicalColumns,
+                BasisExtension(ownerColumns, ownerUnitRows, oldRowsInNew, oldColumnsInNew),
+            )
+            replacement = transfer.replacement ?: return LpAppendReplacementAttempt(
+                decline = if (transfer.arithmeticDeclined) {
+                    LpAppendTransferDecline.ARITHMETIC
+                } else {
+                    LpAppendTransferDecline.STRUCTURAL
+                },
+                basisWork = transfer.workUnits,
+            )
+            basisWork = transfer.workUnits
+        } else {
+            replacement = try {
+                adapter.replacement(oldSolver, candidate.columns, intended, logicalColumns)
+            } catch (_: BasisArithmeticException) {
+                null
+            } ?: return LpAppendReplacementAttempt(decline = LpAppendTransferDecline.FRESH_FAILED)
+            basisWork = replacement.solver.basisOperationWork?.let { if (it.saturated) null else it.units }
+        }
+        var installed = false
+        try {
+            if (token()) {
+                return LpAppendReplacementAttempt(
+                    decline = LpAppendTransferDecline.CANCELLED,
+                    basisWork = basisWork,
+                )
+            }
+            val basis = candidate.installAppendReplacement(
+                replacement,
+                intendedStatus,
+            ) ?: return LpAppendReplacementAttempt(
+                decline = LpAppendTransferDecline.INCONSISTENT_HEADINGS,
+                basisWork = basisWork,
+            )
+            installed = true
+            return LpAppendReplacementAttempt(
+                LpAppendReplacement(candidate, basis, replacement.transferred),
+                basisWork = basisWork,
+            )
+        } finally {
+            if (!installed) replacement.solver.close()
+        }
+    }
+
+    private fun appendCompatible(
+        current: LpExactState,
+        next: LpExactState,
+        oldRowsInNew: IntArray,
+        oldColumnsInNew: IntArray,
+    ): Boolean {
+        if (next.model.n != n || next.model.m <= m || oldRowsInNew.size != m || oldColumnsInNew.size != numVars) {
+            return false
+        }
+        if (oldRowsInNew.toSet().size != m || oldRowsInNew.any { it !in 0 until next.model.m }) return false
+        if (oldColumnsInNew.toSet().size != numVars || oldColumnsInNew.any { it !in 0 until next.model.numVars }) {
+            return false
+        }
+        if ((0 until n).any { oldColumnsInNew[it] != it }) return false
+        return oldRowsInNew.indices.all { oldRow ->
+            current.rows.row(oldRow).id == next.rows.row(oldRowsInNew[oldRow]).id &&
+                oldColumnsInNew[n + oldRow] == next.model.n + oldRowsInNew[oldRow]
+        }
+    }
+
+    private fun trackedHeadingsConsistent(): Boolean {
+        if (ownerColumns.size != m || ownerUnitRows.size != m || basicVar.distinct().size != m) return false
+        if (!basisStatusConsistent(model, basicVar, status)) return false
+        return basicVar.indices.all { slot ->
+            val column = ownerColumns[slot]
+            val unit = ownerUnitRows[slot]
+            (column >= 0) != (unit >= 0) &&
+                (if (column >= 0) column else n + unit) == basicVar[slot]
+        }
+    }
+
+    private fun mappedAppendBasis(next: LpModel, oldRowsInNew: IntArray, oldColumnsInNew: IntArray): IntArray? {
+        val mapped = IntArray(next.m)
+        for (slot in basicVar.indices) mapped[slot] = oldColumnsInNew[basicVar[slot]]
+        val oldAtNew = BooleanArray(next.m)
+        for (row in oldRowsInNew) oldAtNew[row] = true
+        var slot = m
+        for (row in 0 until next.m) {
+            if (!oldAtNew[row]) mapped[slot++] = next.n + row
+        }
+        return mapped.takeIf { slot == next.m && it.distinct().size == next.m }
+    }
+
+    private fun mappedAppendStatus(next: LpModel, oldColumnsInNew: IntArray, headings: IntArray): Array<VarStatus>? {
+        val mapped = Array(next.numVars) { VarStatus.BASIC }
+        for (column in oldColumnsInNew.indices) mapped[oldColumnsInNew[column]] = status[column]
+        val oldColumns = oldColumnsInNew.toSet()
+        for (column in mapped.indices) if (column !in oldColumns) mapped[column] = VarStatus.BASIC
+        for (heading in headings) mapped[heading] = VarStatus.BASIC
+        return mapped.takeIf { basisStatusConsistent(next, headings, it) }
+    }
+
+    private fun installAppendReplacement(replacement: BasisReplacement, nextStatus: Array<VarStatus>): Basis? {
+        if (basisSolver != null || replacement.sourceHeadings.size != m || replacement.ownerBasis.columns.size != m) {
+            return null
+        }
+        if (!basisStatusConsistent(model, replacement.sourceHeadings, nextStatus)) return null
+        replacement.sourceHeadings.copyInto(basicVar)
+        nextStatus.copyInto(status)
+        ownerColumns = replacement.ownerBasis.columns.copyOf()
+        ownerUnitRows = replacement.ownerBasis.unitRows.copyOf()
+        if (!trackedHeadingsConsistent()) {
+            ownerColumns = IntArray(0)
+            ownerUnitRows = IntArray(0)
+            return null
+        }
+        basisSolver = replacement.solver
+        basisFactorized = true
+        basisKept = true
+        nnzB = basicVar.sumOf { columnNnz(it) }
+        if (m > 0 && nnzB > 0) {
+            val held = replacement.solver.nnz.toDouble()
+            maxLuFill = held / nnzB
+            maxLuDensity = held / (m.toDouble() * m.toDouble())
+        }
+        return Basis(basicVar.copyOf(), status.copyOf(), captureEligible = false)
+    }
+
+    private fun basisStatusConsistent(source: LpModel, headings: IntArray, seats: Array<VarStatus>): Boolean {
+        if (headings.size != source.m || seats.size != source.numVars || headings.distinct().size != source.m) {
+            return false
+        }
+        if (headings.any { it !in seats.indices || seats[it] != VarStatus.BASIC }) return false
+        if (seats.count { it == VarStatus.BASIC } != source.m) return false
+        return seats.indices.all { column ->
+            when (seats[column]) {
+                VarStatus.BASIC -> true
+                VarStatus.AT_LOWER -> source.hasFiniteLower(column)
+                VarStatus.AT_UPPER -> source.hasFiniteUpper(column)
+                VarStatus.FIXED -> source.fixed(column)
+                VarStatus.FREE -> !source.hasFiniteLower(column) && !source.hasFiniteUpper(column)
+            }
+        }
     }
 
     /** Re-solve after a [rebind], continuing from the kept basis and factorization. */

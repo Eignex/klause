@@ -196,6 +196,11 @@ class BasisWorkTest {
         )
 
         val extension = assertNotNull(result.solver.basisWork?.build)
+        val operation = old.basisOperationWork.extension
+        assertEquals(1, operation.attempts)
+        assertEquals(1, operation.successes)
+        assertEquals(0, operation.declines)
+        assertTrue(operation.units > 0)
         assertEquals(BasisBuildKind.EXTENSION, extension.kind)
         assertEquals(0, extension.builds)
         assertEquals(null, extension.installedBuildUnits)
@@ -206,6 +211,56 @@ class BasisWorkTest {
         assertTrue(result.solver.basisWork!!.workSinceBuild > 0)
         assertTrue(result.solver.restore(snapshot))
         assertEquals(0, result.solver.basisWork?.workSinceBuild)
+    }
+
+    @Test
+    fun `operation work retains failed extension and survives snapshot restore`() {
+        val source = ftSource("dense", 5)
+        val solver = KotlinBasisSolver(source)
+        assertTrue(solver.refactorize(IntArray(5) { it }))
+        val snapshot = assertNotNull(solver.snapshot())
+        solver.ftran(IndexedVector(5).also { it.unit(0) }, 0.0)
+        val beforeRestore = solver.basisOperationWork
+
+        assertTrue(solver.restore(snapshot))
+
+        val afterRestore = solver.basisOperationWork
+        assertTrue(afterRestore.units > beforeRestore.units)
+        assertEquals(1, afterRestore.refactorization.successes)
+        assertEquals(1, afterRestore.snapshot.successes)
+        assertEquals(1, afterRestore.restore.successes)
+        assertEquals(1, afterRestore.ftran.successes)
+        val incompatible = SparseMatrix.ofColumns(
+            6,
+            source.cols,
+            List(source.cols) { column ->
+                buildList {
+                    source.forEachInColumn(column) { row, value ->
+                        add(row to if (column == 0) value + 1.0 else value)
+                    }
+                    if (column == 0) add(5 to 1.0)
+                }
+            },
+        )
+
+        assertEquals(
+            null,
+            solver.extend(
+                incompatible,
+                BasisExtension(
+                    IntArray(5) { it },
+                    IntArray(5) { -1 },
+                    IntArray(5) { it },
+                    IntArray(source.cols) { it },
+                ),
+            ),
+        )
+
+        val declined = solver.basisOperationWork.extension
+        assertEquals(1, declined.attempts)
+        assertEquals(0, declined.successes)
+        assertEquals(1, declined.declines)
+        assertTrue(declined.units > 0)
     }
 
     private fun measuredTrace(source: SparseMatrix): BasisWork {

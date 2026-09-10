@@ -1,6 +1,7 @@
 package com.eignex.klause.lp.engine
 
 import com.eignex.klause.lp.engine.Cut
+import com.eignex.klause.simplex.basis.BasisOperationWork
 import com.eignex.klause.util.Cancellation
 
 /** Exact checks that may decline a float candidate.  This is deliberately engine-local: consumers
@@ -223,6 +224,17 @@ internal interface PersistentLpSolver : LpSolver {
 
     fun adopt(state: LpExactState, token: Cancellation = Cancellation.Never): Boolean = false
 
+    val appendTransferReady: Boolean get() = false
+    val basisLifecycleWork: BasisOperationWork? get() = null
+
+    fun appendReplacement(
+        next: LpExactState,
+        oldRowsInNew: IntArray,
+        oldColumnsInNew: IntArray,
+        mode: LpAppendReplacementMode,
+        token: Cancellation = Cancellation.Never,
+    ): LpAppendReplacementAttempt = LpAppendReplacementAttempt(decline = LpAppendTransferDecline.UNSUPPORTED)
+
     /**
      * Re-point this engine at [next] and [token], keeping the seated basis and its factorization; false
      * when [next] is not a bound-only revision of the current model, which is the caller's signal to
@@ -240,6 +252,27 @@ internal interface PersistentLpSolver : LpSolver {
      */
     fun resolveGated(enforced: BooleanArray): FloatLpResult?
 }
+
+internal enum class LpAppendReplacementMode { TRANSFER, FRESH_INTENDED }
+
+internal enum class LpAppendTransferDecline {
+    UNSUPPORTED,
+    NOT_READY,
+    INCOMPATIBLE_STATE,
+    INCONSISTENT_HEADINGS,
+    STRUCTURAL,
+    ARITHMETIC,
+    CANCELLED,
+    FRESH_FAILED,
+}
+
+internal class LpAppendReplacement(val solver: PersistentLpSolver, val basis: Basis, val transferred: Boolean)
+
+internal class LpAppendReplacementAttempt(
+    val replacement: LpAppendReplacement? = null,
+    val decline: LpAppendTransferDecline? = null,
+    val basisWork: Long? = null,
+)
 
 /**
  * Construct the LP engine for the general solve/certify path — the swap point for an alternative engine

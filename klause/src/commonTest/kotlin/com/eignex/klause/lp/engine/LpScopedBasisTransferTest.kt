@@ -1,0 +1,289 @@
+package com.eignex.klause.lp.engine
+
+import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.util.Cancellation
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
+
+class LpScopedBasisTransferTest {
+    @Test
+    fun `successive appends transfer accepted source and extension unit headings`() {
+        val zero = ExactLpNumber.of(0L)
+        val one = ExactLpNumber.of(1L)
+        val minusOne = ExactLpNumber.of(-1L)
+        val structural = ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(ExactLpNumber.of(10L))))
+        val logical = ExactLpColumn(ExactLpBounds(ExactLpSide(zero)))
+        val source = ExactLpModel(
+            listOf(listOf(ExactLpEntry(0, minusOne))),
+            listOf(minusOne),
+            listOf(structural, logical),
+            listOf(ExactLpRow()),
+            ExactLpObjective(listOf(one, zero)),
+        )
+        LpScopedSolver(
+            LpExactState(source),
+            appendSelection = LpAppendSelection.FORCE_TRANSFER,
+        ).use { solver ->
+            B5bIndependentExactSourceValidator.validate(solver.state, assertNotNull(solver.solve()))
+
+            assertTrue(solver.append(lowerRow(1, 2), scoped = true))
+            B5bIndependentExactSourceValidator.validate(solver.state, assertNotNull(solver.solve()))
+            assertTrue(
+                solver.append(
+                    LpScopedRow(
+                        2,
+                        listOf(0 to ExactLpNumber.ofIeee(-0.5)),
+                        ExactLpNumber.ofIeee(-1.5),
+                        ExactLpColumn(ExactLpBounds(ExactLpSide(zero))),
+                    ),
+                    scoped = false,
+                ),
+            )
+            B5bIndependentExactSourceValidator.validate(solver.state, assertNotNull(solver.solve()))
+
+            assertEquals(2, solver.metrics.appendReplacementAttempts)
+            assertEquals(2, solver.metrics.appendTransfers)
+            assertEquals(0, solver.metrics.appendFallbacks)
+            assertEquals(0, solver.metrics.appendUnknownWork)
+            assertTrue(solver.metrics.appendBasisWork > 0)
+            assertEquals(listOf(0L, 1L, 2L), solver.state.rows.entries().map { it.id })
+        }
+    }
+
+    @Test
+    fun `production default and compaction retain fresh replacement behavior`() {
+        val source = lowerBoundModel()
+        LpScopedSolver(LpExactState(source)).use { solver ->
+            assertNotNull(solver.solve())
+            assertTrue(solver.push())
+            assertTrue(solver.append(lowerRow(1, 2), scoped = true))
+            assertEquals(0, solver.metrics.appendReplacementAttempts)
+            assertTrue(solver.pop(0))
+
+            assertTrue(solver.compact())
+
+            assertEquals(0, solver.metrics.appendReplacementAttempts)
+            assertEquals(0, solver.metrics.appendTransfers)
+            assertEquals(1, solver.state.model.m)
+            B5bIndependentExactSourceValidator.validate(solver.state, assertNotNull(solver.solve()))
+        }
+    }
+
+    @Test
+    fun `candidate selects a dense structural class and declines a sparse one before transfer`() {
+        for ((dense, expected) in listOf(true to 1L, false to 0L)) {
+            val model = selectorModel(dense)
+            LpScopedSolver(
+                LpExactState(model),
+                appendSelection = LpAppendSelection.CANDIDATE,
+            ).use { solver ->
+                assertTrue(solver.prepare())
+
+                assertTrue(
+                    solver.append(
+                        LpScopedRow(
+                            16,
+                            if (dense) List(2) { it to ExactLpNumber.of(1L) } else listOf(0 to ExactLpNumber.of(1L)),
+                            ExactLpNumber.of(1L),
+                            ExactLpColumn(ExactLpBounds()),
+                        ),
+                        scoped = false,
+                    ),
+                )
+
+                assertEquals(expected, solver.metrics.appendReplacementAttempts)
+                assertEquals(expected, solver.metrics.appendTransfers)
+            }
+        }
+    }
+
+    @Test
+    fun `intended fresh control uses the mapped basis without reporting a transfer`() {
+        LpScopedSolver(
+            LpExactState(lowerBoundModel()),
+            appendSelection = LpAppendSelection.FRESH_INTENDED,
+        ).use { solver ->
+            assertNotNull(solver.solve())
+
+            assertTrue(solver.append(lowerRow(1, 2), scoped = false))
+
+            assertEquals(1, solver.metrics.appendReplacementAttempts)
+            assertEquals(0, solver.metrics.appendTransfers)
+            assertEquals(1, solver.metrics.appendIntendedFreshBuilds)
+            assertEquals(0, solver.metrics.appendFallbacks)
+            B5bIndependentExactSourceValidator.validate(solver.state, assertNotNull(solver.solve()))
+        }
+    }
+
+    @Test
+    fun `transfer decline work is retained when production fresh fallback publishes`() {
+        val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+            override fun newPersistentSolver(
+                model: LpModel,
+                cancellation: Cancellation,
+                refactorUpdateLimit: Int,
+                iterationLimit: Int,
+                workLimit: Long,
+                trackDegeneracy: Boolean,
+            ): PersistentLpSolver {
+                val delegate = RevisedSimplex(model, cancellation)
+                return object : PersistentLpSolver by delegate {
+                    override val appendTransferReady: Boolean get() = true
+                    override fun appendReplacement(
+                        next: LpExactState,
+                        oldRowsInNew: IntArray,
+                        oldColumnsInNew: IntArray,
+                        mode: LpAppendReplacementMode,
+                        token: Cancellation,
+                    ) = LpAppendReplacementAttempt(
+                        decline = LpAppendTransferDecline.STRUCTURAL,
+                        basisWork = 7,
+                    )
+                }
+            }
+        }
+        LpScopedSolver(
+            LpExactState(lowerBoundModel()),
+            context = LpSolveContext(engineFactory = factory),
+            appendSelection = LpAppendSelection.FORCE_TRANSFER,
+        ).use { solver ->
+            assertNotNull(solver.solve())
+
+            assertTrue(solver.append(lowerRow(1, 2), scoped = false))
+
+            assertEquals(1, solver.metrics.appendFallbacks)
+            assertEquals(LpAppendTransferDecline.STRUCTURAL, solver.metrics.lastAppendDecline)
+            assertTrue(solver.metrics.appendBasisWork >= 7)
+            assertEquals(0, solver.metrics.appendUnknownWork)
+            B5bIndependentExactSourceValidator.validate(solver.state, assertNotNull(solver.solve()))
+        }
+    }
+
+    @Test
+    fun `cancellation after transfer construction preserves the published owner and exact state`() {
+        var cancelled = false
+        val token = Cancellation { cancelled }
+        val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+            override fun newPersistentSolver(
+                model: LpModel,
+                cancellation: Cancellation,
+                refactorUpdateLimit: Int,
+                iterationLimit: Int,
+                workLimit: Long,
+                trackDegeneracy: Boolean,
+            ): PersistentLpSolver {
+                val delegate = RevisedSimplex(model, cancellation)
+                return object : PersistentLpSolver by delegate {
+                    override fun appendReplacement(
+                        next: LpExactState,
+                        oldRowsInNew: IntArray,
+                        oldColumnsInNew: IntArray,
+                        mode: LpAppendReplacementMode,
+                        token: Cancellation,
+                    ): LpAppendReplacementAttempt = delegate.appendReplacement(
+                        next,
+                        oldRowsInNew,
+                        oldColumnsInNew,
+                        mode,
+                        Cancellation.Never,
+                    ).also { cancelled = it.replacement != null }
+                }
+            }
+        }
+        LpScopedSolver(
+            LpExactState(lowerBoundModel()),
+            cancellation = token,
+            context = LpSolveContext(engineFactory = factory),
+            appendSelection = LpAppendSelection.FORCE_TRANSFER,
+        ).use { solver ->
+            val initial = assertNotNull(solver.solve())
+            val state = solver.state
+
+            assertTrue(!solver.append(lowerRow(1, 2), scoped = false))
+
+            assertTrue(cancelled)
+            assertTrue(solver.state === state)
+            assertTrue(solver.lastResult === initial)
+            assertEquals(1, solver.metrics.currentOwners)
+            assertEquals(1, solver.metrics.closedOwners)
+            cancelled = false
+            B5bIndependentExactSourceValidator.validate(solver.state, assertNotNull(solver.solve()))
+        }
+    }
+
+    private fun lowerBoundModel(): ExactLpModel {
+        val zero = ExactLpNumber.of(0L)
+        val one = ExactLpNumber.of(1L)
+        val minusOne = ExactLpNumber.of(-1L)
+        return ExactLpModel(
+            listOf(listOf(ExactLpEntry(0, minusOne))),
+            listOf(minusOne),
+            listOf(
+                ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(ExactLpNumber.of(10L)))),
+                ExactLpColumn(ExactLpBounds(ExactLpSide(zero))),
+            ),
+            listOf(ExactLpRow()),
+            ExactLpObjective(listOf(one, zero)),
+        )
+    }
+
+    private fun lowerRow(id: Long, lower: Long): LpScopedRow = LpScopedRow(
+        id,
+        listOf(0 to ExactLpNumber.of(-1L)),
+        ExactLpNumber.of(-lower),
+        ExactLpColumn(ExactLpBounds(ExactLpSide(ExactLpNumber.of(0L)))),
+    )
+
+    private fun selectorModel(dense: Boolean): ExactLpModel {
+        val zero = ExactLpNumber.of(0L)
+        val one = ExactLpNumber.of(1L)
+        val columns = List(8) { column ->
+            if (dense) {
+                List(16) { row -> ExactLpEntry(row, ExactLpNumber.of((column + row) % 3 + 1L)) }
+            } else {
+                listOf(ExactLpEntry(column * 2, one))
+            }
+        }
+        return ExactLpModel(
+            columns,
+            List(16) { one },
+            List(8) { ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(one))) } +
+                List(16) { ExactLpColumn(ExactLpBounds()) },
+            List(16) { ExactLpRow() },
+            ExactLpObjective(List(24) { zero }),
+        )
+    }
+}
+
+private object B5bIndependentExactSourceValidator {
+    fun validate(state: LpExactState, result: CertifiedLpResult) {
+        val primal = assertNotNull(result.exactPrimal)
+        assertEquals(state.model.n, primal.size)
+        for (column in 0 until state.model.n) validateBounds(primal[column], state.model.column(column).bounds)
+        for (row in 0 until state.model.m) {
+            var logical = state.model.rhs(row).value
+            for (column in 0 until state.model.n) {
+                val coefficient = state.model.entries(column).firstOrNull { it.row == row }?.number?.value
+                    ?: BigFraction.ZERO
+                logical -= coefficient * primal[column]
+            }
+            validateBounds(logical, state.model.column(state.model.n + row).bounds)
+        }
+        var objective = state.model.objective.constant.value
+        for (column in primal.indices) objective += state.model.objective.cost(column).value * primal[column]
+        objective *= state.model.objective.scale.value
+        objective += state.model.objective.externalConstant.value
+        assertEquals(objective, assertNotNull(result.witness).objective)
+    }
+
+    private fun validateBounds(value: BigFraction, bounds: ExactLpBounds) {
+        bounds.lower?.let { side ->
+            if (side.strict) assertTrue(value > side.number.value) else assertTrue(value >= side.number.value)
+        }
+        bounds.upper?.let { side ->
+            if (side.strict) assertTrue(value < side.number.value) else assertTrue(value <= side.number.value)
+        }
+    }
+}
