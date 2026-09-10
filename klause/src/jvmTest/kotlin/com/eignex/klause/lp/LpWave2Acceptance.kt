@@ -29,6 +29,8 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardOpenOption
 import java.security.MessageDigest
+import kotlin.test.Test
+import kotlin.test.assertFalse
 
 private const val SCHEMA = 1
 private const val POLICY_SEED = 21L
@@ -374,26 +376,32 @@ private fun compare(options: Map<String, String>) {
             val proposed = candidateByRepetition[key]?.singleOrNull()
             if (control == null || proposed == null) null else control to proposed
         }
+        var pairsComparable = true
         pairs.forEach { (control, proposed) ->
             if (control.attempts != expectedAttempts || proposed.attempts != expectedAttempts) {
                 failures += "$workload repetition ${proposed.repetition} violates the fixed attempt denominator"
+                pairsComparable = false
             }
             if (control.stateSha256 != proposed.stateSha256) {
                 failures += "$workload repetition ${proposed.repetition} source state mismatch"
+                pairsComparable = false
             }
             if (control.outcomeSha256 != proposed.outcomeSha256) {
                 failures += "$workload repetition ${proposed.repetition} exact outcome mismatch"
+                pairsComparable = false
             }
             if (control.solved != control.attempts || proposed.solved != proposed.attempts ||
                 control.exactAccepted != control.attempts || proposed.exactAccepted != proposed.attempts
             ) {
                 failures += "$workload repetition ${proposed.repetition} has a solve or exact decline"
+                pairsComparable = false
             }
             if (proposed.policy != "MIN_BOUND_SUPPORT_NONZERO_OBJECTIVE_INACTIVE" || proposed.seed != "21" ||
                 control.policy != "HARRIS_LARGEST_PIVOT_IMPLICIT" || control.seed != "UNSUPPORTED_INACTIVE" ||
                 control.backend != proposed.backend
             ) {
                 failures += "$workload repetition ${proposed.repetition} execution identity mismatch"
+                pairsComparable = false
             }
             if (control.arm != "historical" || proposed.arm != "candidate" ||
                 control.provenance != expectedHistorical ||
@@ -401,20 +409,38 @@ private fun compare(options: Map<String, String>) {
                 proposed.provenance.manifestSha256 != expectedManifest
             ) {
                 failures += "$workload repetition ${proposed.repetition} provenance mismatch"
+                pairsComparable = false
             }
             if (!proposed.basisWorkAvailable || !proposed.basisWorkComplete || proposed.unknownWork != 0L ||
                 proposed.saturatedWork != 0L || !proposed.ownerClosed
             ) {
                 failures += "$workload repetition ${proposed.repetition} candidate work or owner accounting incomplete"
+                pairsComparable = false
             }
         }
         val fixedCountComplete = controls.size == 3 && candidates.size == 3 && pairs.size == 3
-        val historicalWork = if (fixedCountComplete) controls.map(Measurement::engineWork).median() else 0L
-        val candidateWork = if (fixedCountComplete) candidates.map(Measurement::engineWork).median() else 0L
-        val historicalTime = if (fixedCountComplete) controls.map(Measurement::prepSolveNanos).median() else 0L
-        val candidateTime = if (fixedCountComplete) candidates.map(Measurement::prepSolveNanos).median() else 0L
-        val workInputsValid = fixedCountComplete && historicalWork > 0L && candidateWork >= 0L
-        val timeInputsValid = fixedCountComplete && historicalTime > 0L && candidateTime > 0L
+        val historicalComplete = controls.map { record ->
+            record.attempts == expectedAttempts && record.solved == expectedAttempts &&
+                record.exactAccepted == expectedAttempts && record.engineWork >= 0L &&
+                record.prepSolveNanos > 0L && record.ownerClosed
+        }
+        val candidateComplete = candidates.map { record ->
+            record.attempts == expectedAttempts && record.solved == expectedAttempts &&
+                record.exactAccepted == expectedAttempts && record.engineWork >= 0L &&
+                record.prepSolveNanos > 0L && record.basisWorkAvailable && record.basisWorkComplete &&
+                record.unknownWork == 0L && record.saturatedWork == 0L && record.ownerClosed
+        }
+        val allRecordsComplete = allMetricsRecordsComplete(
+            fixedCountComplete && pairsComparable,
+            historicalComplete,
+            candidateComplete,
+        )
+        val historicalWork = if (allRecordsComplete) controls.map(Measurement::engineWork).median() else 0L
+        val candidateWork = if (allRecordsComplete) candidates.map(Measurement::engineWork).median() else 0L
+        val historicalTime = if (allRecordsComplete) controls.map(Measurement::prepSolveNanos).median() else 0L
+        val candidateTime = if (allRecordsComplete) candidates.map(Measurement::prepSolveNanos).median() else 0L
+        val workInputsValid = allRecordsComplete && historicalWork > 0L
+        val timeInputsValid = allRecordsComplete && historicalTime > 0L
         if (!workInputsValid) failures += "$workload engine-work comparison has invalid failed-arm values"
         if (!timeInputsValid) failures += "$workload wall-time comparison has invalid failed-arm values"
         val workRatio = if (workInputsValid) candidateWork.toDouble() / historicalWork else 0.0
@@ -422,7 +448,7 @@ private fun compare(options: Map<String, String>) {
         if (workInputsValid && workRatio > 0.95) failures += "$workload engine-work ratio $workRatio exceeds 0.95"
         if (timeInputsValid && timeRatio > 1.05) failures += "$workload wall-time ratio $timeRatio exceeds 1.05"
         rows += Comparison(
-            workload, controls.size, candidates.size, fixedCountComplete && workInputsValid && timeInputsValid,
+            workload, controls.size, candidates.size, allRecordsComplete && workInputsValid && timeInputsValid,
             historicalWork, candidateWork, workRatio, historicalTime, candidateTime, timeRatio,
         )
     }
@@ -570,6 +596,11 @@ private fun JsonObject.string(name: String): String = checkNotNull(this[name]).j
 private fun JsonObject.long(name: String): Long = checkNotNull(this[name]).jsonPrimitive.long
 private fun JsonObject.boolean(name: String): Boolean = checkNotNull(this[name]).jsonPrimitive.boolean
 private fun List<Long>.median(): Long = sorted()[size / 2]
+private fun allMetricsRecordsComplete(
+    pairsComparable: Boolean,
+    historicalComplete: List<Boolean>,
+    candidateComplete: List<Boolean>,
+): Boolean = pairsComparable && historicalComplete.all { it } && candidateComplete.all { it }
 private fun Map<String, String>.required(name: String): String = requireNotNull(this[name]) { "missing $name" }
 
 private inline fun measureSafely(
@@ -675,5 +706,18 @@ private fun escape(value: String): String = buildString {
             '\t' -> append("\\t")
             else -> if (character.code < 0x20) append("\\u%04x".format(character.code)) else append(character)
         }
+    }
+}
+
+class LpWave2AcceptanceTest {
+    @Test
+    fun `failed repetition invalidates measurement set`() {
+        assertFalse(
+            allMetricsRecordsComplete(
+                pairsComparable = true,
+                historicalComplete = listOf(true, true, true),
+                candidateComplete = listOf(false, true, true),
+            ),
+        )
     }
 }
