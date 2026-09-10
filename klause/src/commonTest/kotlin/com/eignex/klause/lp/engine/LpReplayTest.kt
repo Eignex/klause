@@ -13,6 +13,190 @@ import kotlin.test.assertTrue
 
 class LpReplayTest {
     @Test
+    fun `row replay preserves interleaved persistent guards through nested backjumps`() {
+        val zero = ExactLpNumber.of(0L)
+        val one = ExactLpNumber.of(1L)
+        val minusOne = ExactLpNumber.of(-1L)
+        val source = ExactLpModel(
+            listOf(emptyList()),
+            emptyList(),
+            listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(ExactLpNumber.of(10L))))),
+            emptyList(),
+            ExactLpObjective(listOf(one)),
+        )
+        val logical = ExactLpColumn(ExactLpBounds(ExactLpSide(zero)))
+        val localGuard = ExactLpPremises(emptyList(), listOf(30))
+        val events = listOf(
+            LpExactReplayEvent.Push(),
+            LpExactReplayEvent.Append(
+                LpScopedRow(
+                    1,
+                    listOf(0 to minusOne),
+                    ExactLpNumber.of(-4L),
+                    logical,
+                    ExactLpRow(false, premises = ExactLpPremises(emptyList(), listOf(10))),
+                ),
+                true,
+            ),
+            LpExactReplayEvent.Append(
+                LpScopedRow(
+                    2,
+                    listOf(0 to minusOne),
+                    ExactLpNumber.of(-2L),
+                    logical,
+                    ExactLpRow(false, premises = ExactLpPremises(emptyList(), listOf(20))),
+                ),
+                false,
+            ),
+            LpExactReplayEvent.Push(),
+            LpExactReplayEvent.Append(
+                LpScopedRow(
+                    3,
+                    listOf(0 to minusOne),
+                    ExactLpNumber.of(-6L),
+                    logical,
+                    ExactLpRow(false, premises = localGuard),
+                ),
+                true,
+            ),
+            LpExactReplayEvent.Append(LpScopedRow(4, listOf(0 to minusOne), ExactLpNumber.of(-3L), logical), false),
+            LpExactReplayEvent.Solve(),
+            LpExactReplayEvent.Pop(1),
+            LpExactReplayEvent.Solve(),
+            LpExactReplayEvent.Pop(0),
+            LpExactReplayEvent.Solve(),
+            LpExactReplayEvent.Compact(),
+            LpExactReplayEvent.Solve(),
+        )
+        val capture = LpExactCapture.capture(source, persistentSettings("scoped rows"), events)
+
+        val replay = LpExactReplay.replay(LpExactCapture.decode(capture.encode()))
+
+        assertNull(replay.declinedEventIndex)
+        assertEquals(0L, assertNotNull(replay.rowMetrics).currentOwners)
+        assertEquals(0L, replay.rowMetrics.preparationDeclines)
+        assertTrue(replay.steps.all { it.accepted })
+        val results = replay.steps.mapNotNull { it.result }
+        assertEquals(listOf(6L, 4L, 3L, 3L).map { BigFraction.ofLong(it) }, results.map { it.lowerBound })
+        assertEquals(results.map { it.lowerBound }, results.map { assertNotNull(it.exactPrimal).single() })
+        val deep = assertNotNull(results.first().bound?.support)
+        assertEquals(3L, deep.state.rows.row(deep.rows.single().first).id)
+        assertEquals(localGuard, deep.rows.single().second.premises)
+        val final = replay.steps.last().state
+        assertEquals(listOf(2L, 4L), final.rows.entries().map { it.id })
+        val support = assertNotNull(results.last().bound?.support)
+        assertEquals(4L, support.state.rows.row(support.rows.single().first).id)
+        val fresh = ExactLpModel(
+            listOf(listOf(ExactLpEntry(0, minusOne), ExactLpEntry(1, minusOne))),
+            listOf(ExactLpNumber.of(-2L), ExactLpNumber.of(-3L)),
+            listOf(source.column(0), logical, logical),
+            listOf(ExactLpRow(false, premises = ExactLpPremises(emptyList(), listOf(20))), ExactLpRow()),
+            ExactLpObjective(listOf(one, zero, zero)),
+        )
+        val independent = solveAndCertify(fresh)
+        assertEquals(independent.exactPrimal, results.last().exactPrimal)
+        assertEquals(independent.lowerBound, results.last().lowerBound)
+        assertEquals(3.0, results.last().float?.primal?.single())
+        assertEquals(-1.0, results.last().float?.duals?.get(1))
+    }
+
+    @Test
+    fun `replay resumes compacted identities assertions and objective coordinates`() {
+        val zero = ExactLpNumber.of(0L)
+        val one = ExactLpNumber.of(1L)
+        val minusOne = ExactLpNumber.of(-1L)
+        val source = ExactLpModel(
+            listOf(emptyList()),
+            emptyList(),
+            listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(ExactLpNumber.of(10L))))),
+            emptyList(),
+            ExactLpObjective(listOf(one)),
+        )
+        val trail = LpBoundTrail(source)
+        val logical = ExactLpColumn(ExactLpBounds(ExactLpSide(zero)))
+        assertTrue(trail.push())
+        assertTrue(trail.append(LpScopedRow(5, listOf(0 to minusOne), minusOne, logical), true))
+        assertTrue(trail.pop(0))
+        assertTrue(trail.compact())
+        assertTrue(trail.assertBound(0, false, ExactLpSide(ExactLpNumber.of(2L)), 8))
+        assertTrue(trail.recenter(listOf(one)))
+        val events = listOf(
+            LpExactReplayEvent.Append(LpScopedRow(6, listOf(0 to minusOne), ExactLpNumber.of(-3L), logical), false),
+            LpExactReplayEvent.Solve(),
+            LpExactReplayEvent.Deactivate(6),
+            LpExactReplayEvent.Compact(),
+            LpExactReplayEvent.Solve(),
+        )
+        val capture = LpExactCapture.capture(trail.state, persistentSettings("resume scoped"), events, 1)
+
+        val report = LpExactReplay.replay(LpExactCapture.decode(capture.encode()))
+
+        assertNull(report.declinedEventIndex)
+        val results = report.steps.mapNotNull { it.result }
+        assertEquals(listOf(BigFraction.ofLong(4L), BigFraction.ofLong(2L)), results.map { it.lowerBound })
+        assertEquals(results.map { it.lowerBound }, results.map { assertNotNull(it.exactPrimal).single() })
+        val final = report.steps.last().state
+        assertEquals(6L, final.rows.lastId)
+        assertEquals(one, final.model.column(0).origin)
+        assertEquals(one, final.model.objective.constant)
+        assertEquals(8L, final.assertions.single().witness)
+        assertEquals(one, final.assertions.single().side.number)
+        assertFalse(LpBoundTrail(final).append(LpScopedRow(5, emptyList(), zero, logical), false))
+        assertEquals(0L, assertNotNull(report.rowMetrics).currentOwners)
+    }
+
+    @Test
+    fun `invalid later row transitions are rejected before any factory construction`() {
+        val zero = ExactLpNumber.of(0L)
+        val one = ExactLpNumber.of(1L)
+        val source = ExactLpModel(
+            listOf(emptyList()),
+            emptyList(),
+            listOf(ExactLpColumn(ExactLpBounds())),
+            emptyList(),
+            ExactLpObjective(listOf(zero)),
+        )
+        val logical = ExactLpColumn(ExactLpBounds())
+        val row = LpScopedRow(0, listOf(0 to one), zero, logical)
+        val histories = listOf(
+            listOf(
+                LpExactReplayEvent.Append(row, true),
+                LpExactReplayEvent.Deactivate(0),
+                LpExactReplayEvent.Compact(),
+                LpExactReplayEvent.Append(row, false),
+            ),
+            listOf(
+                LpExactReplayEvent.Push(),
+                LpExactReplayEvent.Append(LpScopedRow(0, listOf(0 to one), zero, logical, cost = one), true),
+                LpExactReplayEvent.Pop(0),
+            ),
+            listOf(
+                LpExactReplayEvent.Append(row, false),
+                LpExactReplayEvent.Assert(1, true, ExactLpSide(zero), 1),
+                LpExactReplayEvent.Deactivate(0),
+            ),
+            listOf(
+                LpExactReplayEvent.Append(row, false),
+                LpExactReplayEvent.Deactivate(0),
+                LpExactReplayEvent.Compact(),
+                LpExactReplayEvent.Solve(Basis(intArrayOf(1), arrayOf(VarStatus.FREE, VarStatus.BASIC))),
+            ),
+        )
+        for (history in histories) {
+            val factory = RecordingLpEngineFactory()
+            val capture = LpExactCapture.capture(
+                source,
+                persistentSettings("invalid rows"),
+                listOf(LpExactReplayEvent.Solve()) + history,
+            )
+
+            assertFails { LpExactReplay.replay(capture, LpSolveContext(engineFactory = factory)) }
+
+            assertTrue(factory.calls.isEmpty())
+        }
+    }
+
+    @Test
     fun `exact replay preserves active witnesses across objective and origin changes`() {
         val zero = ExactLpNumber.of(0L)
         val model = ExactLpModel(
@@ -146,7 +330,7 @@ class LpReplayTest {
             0L,
             LpReplaySolverKind.PERSISTENT,
             componentSplit = false,
-            cancellationPollLimit = 5,
+            cancellationPollLimit = 12,
         )
         val capture = LpExactCapture.capture(
             model,

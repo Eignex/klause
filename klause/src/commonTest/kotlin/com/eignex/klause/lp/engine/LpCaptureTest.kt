@@ -15,6 +15,108 @@ import kotlin.test.assertTrue
 
 class LpCaptureTest {
     @Test
+    fun `row capture resumes complete state after compaction and preserves every append field`() {
+        val zero = ExactLpNumber.of(0L)
+        val one = ExactLpNumber.of(1L)
+        val third = ExactLpNumber.of(BigFraction.of(BigInteger.ONE, BigInteger.fromInt(3)))
+        val ieee = ExactLpNumber.ofIeee(-0.0)
+        val premises = ExactLpPremises(listOf(ExactLpPremise(8, true, third)), listOf(11))
+        val source = ExactLpModel(
+            listOf(emptyList()),
+            emptyList(),
+            listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(one)), integral = false, tag = 8)),
+            emptyList(),
+            ExactLpObjective(listOf(one)),
+        )
+        val trail = LpBoundTrail(source)
+        val logical = ExactLpColumn(ExactLpBounds(ExactLpSide(zero)), integral = false, tag = 19)
+        assertTrue(trail.push())
+        assertTrue(trail.append(LpScopedRow(7, listOf(0 to third), third, logical), true))
+        assertTrue(
+            trail.append(
+                LpScopedRow(
+                    9,
+                    listOf(0 to third),
+                    third,
+                    logical,
+                    ExactLpRow(false, premises = premises),
+                ),
+                false,
+            ),
+        )
+        assertTrue(trail.pop(0))
+        assertTrue(trail.compact())
+        assertTrue(trail.push())
+        assertTrue(trail.assertBound(1, true, ExactLpSide(third, true, premises), 55))
+        assertTrue(trail.recenter(listOf(third)))
+        val row = LpScopedRow(
+            20,
+            listOf(0 to third),
+            ieee,
+            ExactLpColumn(
+                ExactLpBounds(ExactLpSide(zero, true, premises), ExactLpSide(third, true, premises)),
+                origin = ieee,
+            ),
+            ExactLpRow(false, true, premises),
+            third,
+        )
+        val events = listOf(
+            LpExactReplayEvent.Append(row, true),
+            LpExactReplayEvent.Deactivate(9),
+            LpExactReplayEvent.Compact(),
+        )
+        val capture = LpExactCapture.capture(trail.state, LpReplaySettings("resumed", 17L), events, 10)
+
+        val decoded = LpExactCapture.decode(capture.encode())
+
+        assertTrue(trail.state.fullAuthorityEquals(decoded.initialState))
+        assertContentEquals(LpExactCapture.stateKey(trail.state), LpExactCapture.stateKey(decoded.initialState))
+        assertEquals(trail.state.changedColumns, decoded.initialState.changedColumns)
+        assertEquals(9L, decoded.initialState.rows.lastId)
+        assertEquals(9L, decoded.initialState.rows.row(0).id)
+        assertEquals(55L, decoded.initialState.assertions.single().witness)
+        assertEquals(10, decoded.maxRetainedRows)
+        val append = decoded.events[0] as LpExactReplayEvent.Append
+        assertTrue(append.scoped)
+        assertEquals(row.id, append.row.id)
+        assertEquals(row.coefficients(), append.row.coefficients())
+        assertEquals(row.rhs, append.row.rhs)
+        assertEquals(row.logical, append.row.logical)
+        assertEquals(row.metadata, append.row.metadata)
+        assertEquals(row.cost, append.row.cost)
+        assertEquals(9L, (decoded.events[1] as LpExactReplayEvent.Deactivate).id)
+        assertTrue(decoded.events[2] is LpExactReplayEvent.Compact)
+        assertContentEquals(capture.encode(), decoded.encode())
+        val oldVersion = capture.encode().also { it[11] = 1 }
+        assertFails { LpExactCapture.decode(oldVersion) }
+    }
+
+    @Test
+    fun `row state keys distinguish identity lifetime tombstones and retired high water`() {
+        val zero = ExactLpNumber.of(0L)
+        val source = ExactLpModel(
+            listOf(emptyList()),
+            listOf(zero),
+            listOf(ExactLpColumn(ExactLpBounds()), ExactLpColumn(ExactLpBounds())),
+            listOf(ExactLpRow()),
+            ExactLpObjective(listOf(zero, zero)),
+        )
+        val original = LpExactState(source)
+        val key = assertNotNull(LpExactCapture.stateKey(original))
+        val variants = listOf(
+            LpExactState(source, rows = LpScopedRows(listOf(LpRowIdentity(1, null)), 1)),
+            LpExactState(source, rows = LpScopedRows(listOf(LpRowIdentity(0, 0)), 0)),
+            LpExactState(source, rows = LpScopedRows(listOf(LpRowIdentity(0, null, false)), 0)),
+            LpExactState(source, rows = LpScopedRows(listOf(LpRowIdentity(0, null)), 2)),
+            LpExactState(source, rowRevision = 1),
+        )
+        for (variant in variants) {
+            assertFalse(original.fullAuthorityEquals(variant))
+            assertFalse(key.contentEquals(assertNotNull(LpExactCapture.stateKey(variant))))
+        }
+    }
+
+    @Test
     fun `exact capture preserves all numeric and source authority`() {
         val third = ExactLpNumber.of(BigFraction.of(BigInteger.ONE, BigInteger.fromInt(3)))
         val negativeZero = ExactLpNumber.ofIeee(-0.0)

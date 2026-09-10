@@ -136,7 +136,7 @@ class LpBoundTrailTest {
 
         assertSame(before, trail.state)
         assertEquals(3, polls)
-        assertFalse(trail.assertBound(1, false, ExactLpSide(zero), 1L))
+        assertFalse(trail.assertBound(2, false, ExactLpSide(zero), 1L))
         assertFalse(trail.assertBound(0, false, ExactLpSide(zero), -1L))
         assertFalse(trail.pop(1))
         assertFalse(trail.recenter(emptyList()))
