@@ -37,8 +37,9 @@ class LpScopedSolverTest {
                 iterationLimit: Int,
                 workLimit: Long,
                 trackDegeneracy: Boolean,
+                pricing: LpPricingOptions,
             ): PersistentLpSolver {
-                val delegate = RevisedSimplex(model, cancellation)
+                val delegate = RevisedSimplex(model, cancellation, pricing = pricing)
                 return object : PersistentLpSolver by delegate {
                     override fun prepareLogicals(token: Cancellation): Basis? =
                         if (model.m > 0) throw primary else delegate.prepareLogicals(token)
@@ -91,8 +92,9 @@ class LpScopedSolverTest {
                 iterationLimit: Int,
                 workLimit: Long,
                 trackDegeneracy: Boolean,
+                pricing: LpPricingOptions,
             ): PersistentLpSolver {
-                val delegate = RevisedSimplex(model, cancellation)
+                val delegate = RevisedSimplex(model, cancellation, pricing = pricing)
                 return object : PersistentLpSolver by delegate {
                     override fun close() {
                         delegate.close()
@@ -501,35 +503,41 @@ class LpScopedSolverTest {
                     iterationLimit: Int,
                     workLimit: Long,
                     trackDegeneracy: Boolean,
+                    pricing: LpPricingOptions,
                 ): PersistentLpSolver {
-                    val delegate = RevisedSimplex(model, cancellation, basisSolverFactory = { matrix ->
-                        val factors = KotlinBasisSolver(matrix)
-                        object : BasisSolver by factors {
-                            override fun refactorize(basicIndex: IntArray): Boolean {
-                                if (fail) {
-                                    when (failure) {
-                                        "singular" -> return false
-                                        "arithmetic" -> throw BasisArithmeticException("injected preparation")
-                                        "unexpected" -> error("injected preparation")
-                                        "cancel" -> cancelled = true
+                    val delegate = RevisedSimplex(
+                        model,
+                        cancellation,
+                        pricing = pricing,
+                        basisSolverFactory = { matrix ->
+                            val factors = KotlinBasisSolver(matrix)
+                            object : BasisSolver by factors {
+                                override fun refactorize(basicIndex: IntArray): Boolean {
+                                    if (fail) {
+                                        when (failure) {
+                                            "singular" -> return false
+                                            "arithmetic" -> throw BasisArithmeticException("injected preparation")
+                                            "unexpected" -> error("injected preparation")
+                                            "cancel" -> cancelled = true
+                                        }
                                     }
+                                    return factors.refactorize(basicIndex)
                                 }
-                                return factors.refactorize(basicIndex)
-                            }
 
-                            override fun refactorizeRepairing(basicIndex: IntArray): BasisRepair? {
-                                if (fail) {
-                                    when (failure) {
-                                        "singular" -> return null
-                                        "arithmetic" -> throw BasisArithmeticException("injected preparation")
-                                        "unexpected" -> error("injected preparation")
-                                        "cancel" -> cancelled = true
+                                override fun refactorizeRepairing(basicIndex: IntArray): BasisRepair? {
+                                    if (fail) {
+                                        when (failure) {
+                                            "singular" -> return null
+                                            "arithmetic" -> throw BasisArithmeticException("injected preparation")
+                                            "unexpected" -> error("injected preparation")
+                                            "cancel" -> cancelled = true
+                                        }
                                     }
+                                    return factors.refactorizeRepairing(basicIndex)
                                 }
-                                return factors.refactorizeRepairing(basicIndex)
                             }
-                        }
-                    })
+                        },
+                    )
                     return object : PersistentLpSolver by delegate {
                         override fun prepareLogicals(token: Cancellation): Basis? =
                             if (fail && failure == "unsupported") null else delegate.prepareLogicals(token)
@@ -587,9 +595,10 @@ class LpScopedSolverTest {
                 iterationLimit: Int,
                 workLimit: Long,
                 trackDegeneracy: Boolean,
+                pricing: LpPricingOptions,
             ): PersistentLpSolver {
                 if (failConstruction) error("injected factory failure")
-                return RevisedSimplex(model, cancellation)
+                return RevisedSimplex(model, cancellation, pricing = pricing)
             }
         }
         val policy = object : LpCertificationPolicy by ProductionLpCertificationPolicy {
@@ -650,8 +659,9 @@ class LpScopedSolverTest {
                     iterationLimit: Int,
                     workLimit: Long,
                     trackDegeneracy: Boolean,
+                    pricing: LpPricingOptions,
                 ): PersistentLpSolver {
-                    val delegate = RevisedSimplex(model, cancellation)
+                    val delegate = RevisedSimplex(model, cancellation, pricing = pricing)
                     return object : PersistentLpSolver by delegate {
                         override fun prepareLogicals(token: Cancellation): Basis? =
                             if (++builds == failAt) null else delegate.prepareLogicals(token)
@@ -699,8 +709,9 @@ class LpScopedSolverTest {
                 iterationLimit: Int,
                 workLimit: Long,
                 trackDegeneracy: Boolean,
+                pricing: LpPricingOptions,
             ): PersistentLpSolver {
-                val delegate = RevisedSimplex(model, cancellation)
+                val delegate = RevisedSimplex(model, cancellation, pricing = pricing)
                 return object : PersistentLpSolver by delegate {
                     override fun adopt(state: LpExactState, token: Cancellation): Boolean =
                         !reject && delegate.adopt(state, token)

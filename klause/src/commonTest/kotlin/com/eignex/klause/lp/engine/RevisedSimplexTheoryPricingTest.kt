@@ -21,11 +21,15 @@ class RevisedSimplexTheoryPricingTest {
         val model = disturbedSupportModel()
         val defaultUpdates = ArrayList<Int>()
         val theoryUpdates = ArrayList<Int>()
-        val baseline = RevisedSimplex(model, basisSolverFactory = recordingFactory(defaultUpdates))
+        val baseline = RevisedSimplex(
+            model,
+            basisSolverFactory = recordingFactory(defaultUpdates),
+            pricing = LpPricingOptions(LpZeroObjectivePricing.LARGEST_PIVOT),
+        )
         val candidate = RevisedSimplex(
             model,
             basisSolverFactory = recordingFactory(theoryUpdates),
-            pricing = LpPricingOptions(LpZeroObjectivePricing.THEORY, 7L),
+            pricing = LpPricingOptions(LpZeroObjectivePricing.MIN_BOUND_SUPPORT, 7L),
         )
 
         val baselineResult = assertNotNull(baseline.solve())
@@ -77,11 +81,15 @@ class RevisedSimplexTheoryPricingTest {
         )
         val defaultUpdates = ArrayList<Int>()
         val theoryUpdates = ArrayList<Int>()
-        val baseline = RevisedSimplex(model, basisSolverFactory = recordingFactory(defaultUpdates))
+        val baseline = RevisedSimplex(
+            model,
+            basisSolverFactory = recordingFactory(defaultUpdates),
+            pricing = LpPricingOptions(LpZeroObjectivePricing.LARGEST_PIVOT),
+        )
         val theory = RevisedSimplex(
             model,
             basisSolverFactory = recordingFactory(theoryUpdates),
-            pricing = LpPricingOptions(LpZeroObjectivePricing.THEORY, 7L),
+            pricing = LpPricingOptions(LpZeroObjectivePricing.MIN_BOUND_SUPPORT, 7L),
         )
 
         val baselineResult = assertNotNull(baseline.solve(warm))
@@ -115,11 +123,15 @@ class RevisedSimplexTheoryPricingTest {
         val model = b.build(Sense.MINIMIZE)
         val baselineUpdates = ArrayList<Int>()
         val theoryUpdates = ArrayList<Int>()
-        val baseline = RevisedSimplex(model, basisSolverFactory = recordingFactory(baselineUpdates))
+        val baseline = RevisedSimplex(
+            model,
+            basisSolverFactory = recordingFactory(baselineUpdates),
+            pricing = LpPricingOptions(LpZeroObjectivePricing.LARGEST_PIVOT),
+        )
         val theory = RevisedSimplex(
             model,
             basisSolverFactory = recordingFactory(theoryUpdates),
-            pricing = LpPricingOptions(LpZeroObjectivePricing.THEORY, 7L),
+            pricing = LpPricingOptions(LpZeroObjectivePricing.MIN_BOUND_SUPPORT, 7L),
         )
 
         assertNotNull(baseline.solve())
@@ -139,7 +151,7 @@ class RevisedSimplexTheoryPricingTest {
         val simplex = RevisedSimplex(
             b.build(Sense.MINIMIZE),
             basisSolverFactory = recordingFactory(checked, requireFreshSpike = true),
-            pricing = LpPricingOptions(LpZeroObjectivePricing.THEORY, 7L),
+            pricing = LpPricingOptions(LpZeroObjectivePricing.MIN_BOUND_SUPPORT, 7L),
         )
 
         assertNotNull(simplex.solve())
@@ -179,7 +191,7 @@ class RevisedSimplexTheoryPricingTest {
         )
         val simplex = RevisedSimplex(
             model,
-            pricing = LpPricingOptions(LpZeroObjectivePricing.THEORY, 7L),
+            pricing = LpPricingOptions(LpZeroObjectivePricing.MIN_BOUND_SUPPORT, 7L),
         )
 
         val result = assertNotNull(simplex.solve(warm))
@@ -199,7 +211,7 @@ class RevisedSimplexTheoryPricingTest {
             disturbedSupportModel(),
             cancellation = Cancellation { ++polls == 2 },
             basisSolverFactory = recordingFactory(updates),
-            pricing = LpPricingOptions(LpZeroObjectivePricing.THEORY, 7L),
+            pricing = LpPricingOptions(LpZeroObjectivePricing.MIN_BOUND_SUPPORT, 7L),
         )
 
         val result = assertNotNull(simplex.solve())
@@ -237,7 +249,7 @@ class RevisedSimplexTheoryPricingTest {
                     }
                 }
             },
-            pricing = LpPricingOptions(LpZeroObjectivePricing.THEORY, 7L),
+            pricing = LpPricingOptions(LpZeroObjectivePricing.MIN_BOUND_SUPPORT, 7L),
         )
 
         val result = assertNotNull(simplex.solve())
@@ -254,7 +266,7 @@ class RevisedSimplexTheoryPricingTest {
     fun `work exhaustion after a successful probe stops before pivot`() {
         val full = RevisedSimplex(
             disturbedSupportModel(),
-            pricing = LpPricingOptions(LpZeroObjectivePricing.THEORY, 7L),
+            pricing = LpPricingOptions(LpZeroObjectivePricing.MIN_BOUND_SUPPORT, 7L),
         )
         assertNotNull(full.solve())
         var stopped: RevisedSimplex? = null
@@ -262,7 +274,7 @@ class RevisedSimplexTheoryPricingTest {
             val attempt = RevisedSimplex(
                 disturbedSupportModel(),
                 workLimit = limit,
-                pricing = LpPricingOptions(LpZeroObjectivePricing.THEORY, 7L),
+                pricing = LpPricingOptions(LpZeroObjectivePricing.MIN_BOUND_SUPPORT, 7L),
             )
             attempt.solve()
             if (attempt.lastTheoryPricingSamples > 0 && attempt.lastTheoryPricingResourceStops == 1 &&
@@ -306,7 +318,7 @@ class RevisedSimplexTheoryPricingTest {
                     }
                 }
             },
-            pricing = LpPricingOptions(LpZeroObjectivePricing.THEORY, 7L),
+            pricing = LpPricingOptions(LpZeroObjectivePricing.MIN_BOUND_SUPPORT, 7L),
         )
 
         assertNotNull(simplex.solve())
@@ -346,7 +358,7 @@ class RevisedSimplexTheoryPricingTest {
                     }
                 }
             },
-            pricing = LpPricingOptions(LpZeroObjectivePricing.THEORY, 7L),
+            pricing = LpPricingOptions(LpZeroObjectivePricing.MIN_BOUND_SUPPORT, 7L),
         )
 
         val result = assertNotNull(simplex.solve())
@@ -360,13 +372,10 @@ class RevisedSimplexTheoryPricingTest {
     }
 
     @Test
-    fun `nonzero objective adoption disables theory pricing`() {
+    fun `nonzero objective adoption disables minimum bound support pricing`() {
         val source = exactCoverModel()
         val trail = LpBoundTrail(source)
-        RevisedSimplex(
-            assertNotNull(trail.state.toWorkingModel()),
-            pricing = LpPricingOptions(LpZeroObjectivePricing.THEORY, 7L),
-        ).use { simplex ->
+        RevisedSimplex(assertNotNull(trail.state.toWorkingModel())).use { simplex ->
             assertNotNull(simplex.solve())
             val one = ExactLpNumber.of(1L)
             val zero = ExactLpNumber.of(0L)
@@ -394,7 +403,7 @@ class RevisedSimplexTheoryPricingTest {
         b.addRow(columns, longArrayOf(1L, 1L, 1L), Relation.GE, 1L)
         val simplex = RevisedSimplex(
             b.build(Sense.MINIMIZE),
-            pricing = LpPricingOptions(LpZeroObjectivePricing.THEORY, seed),
+            pricing = LpPricingOptions(LpZeroObjectivePricing.MIN_BOUND_SUPPORT, seed),
         )
         assertNotNull(simplex.solve())
         return simplex.lastTheorySelectedColumn

@@ -32,6 +32,7 @@ class LpScopedBasisTransferTest {
                 iterationLimit: Int,
                 workLimit: Long,
                 trackDegeneracy: Boolean,
+                pricing: LpPricingOptions,
             ): PersistentLpSolver {
                 val delegate = RevisedSimplex(
                     model,
@@ -40,6 +41,7 @@ class LpScopedBasisTransferTest {
                     iterationLimit = iterationLimit,
                     workLimit = workLimit,
                     trackDegeneracy = trackDegeneracy,
+                    pricing = pricing,
                     basisSolverFactory = { matrix ->
                         MixedRepairBasisSolver(KotlinBasisSolver(matrix)).also { repairedOwners.add(it) }
                     },
@@ -209,8 +211,9 @@ class LpScopedBasisTransferTest {
                 iterationLimit: Int,
                 workLimit: Long,
                 trackDegeneracy: Boolean,
+                pricing: LpPricingOptions,
             ): PersistentLpSolver {
-                val delegate = RevisedSimplex(model, cancellation)
+                val delegate = RevisedSimplex(model, cancellation, pricing = pricing)
                 return object : PersistentLpSolver by delegate {
                     override val basisLifecycleWork: BasisOperationWork get() = BasisOperationWork(complete = false)
                 }
@@ -270,24 +273,30 @@ class LpScopedBasisTransferTest {
                 iterationLimit: Int,
                 workLimit: Long,
                 trackDegeneracy: Boolean,
-            ): PersistentLpSolver = RevisedSimplex(model, cancellation, basisSolverFactory = { matrix ->
-                basisFactoryCalls++
-                val rejected = basisFactoryCalls == 2
-                val delegate = KotlinBasisSolver(matrix)
-                object : BasisSolver by delegate {
-                    override val basisOperationWork: BasisOperationWork
-                        get() = if (rejected) {
-                            BasisOperationWork(
-                                refactorization = BasisPhaseWork(attempts = 1, units = 9, declines = 1),
-                            )
-                        } else {
-                            delegate.basisOperationWork
-                        }
+                pricing: LpPricingOptions,
+            ): PersistentLpSolver = RevisedSimplex(
+                model,
+                cancellation,
+                pricing = pricing,
+                basisSolverFactory = { matrix ->
+                    basisFactoryCalls++
+                    val rejected = basisFactoryCalls == 2
+                    val delegate = KotlinBasisSolver(matrix)
+                    object : BasisSolver by delegate {
+                        override val basisOperationWork: BasisOperationWork
+                            get() = if (rejected) {
+                                BasisOperationWork(
+                                    refactorization = BasisPhaseWork(attempts = 1, units = 9, declines = 1),
+                                )
+                            } else {
+                                delegate.basisOperationWork
+                            }
 
-                    override fun refactorize(basicIndex: IntArray): Boolean =
-                        !rejected && delegate.refactorize(basicIndex)
-                }
-            })
+                        override fun refactorize(basicIndex: IntArray): Boolean =
+                            !rejected && delegate.refactorize(basicIndex)
+                    }
+                },
+            )
         }
         LpScopedSolver(
             LpExactState(lowerBoundModel()),
@@ -318,10 +327,11 @@ class LpScopedBasisTransferTest {
                 iterationLimit: Int,
                 workLimit: Long,
                 trackDegeneracy: Boolean,
+                pricing: LpPricingOptions,
             ): PersistentLpSolver {
                 owners++
                 val replacement = owners > 1
-                val delegate = RevisedSimplex(model, cancellation)
+                val delegate = RevisedSimplex(model, cancellation, pricing = pricing)
                 return object : PersistentLpSolver by delegate {
                     override val basisLifecycleWork: BasisOperationWork
                         get() {
@@ -363,8 +373,9 @@ class LpScopedBasisTransferTest {
                 iterationLimit: Int,
                 workLimit: Long,
                 trackDegeneracy: Boolean,
+                pricing: LpPricingOptions,
             ): PersistentLpSolver {
-                val delegate = RevisedSimplex(model, cancellation)
+                val delegate = RevisedSimplex(model, cancellation, pricing = pricing)
                 return object : PersistentLpSolver by delegate {
                     override val appendTransferReady: Boolean get() = true
                     override fun appendReplacement(
@@ -488,8 +499,9 @@ class LpScopedBasisTransferTest {
                 iterationLimit: Int,
                 workLimit: Long,
                 trackDegeneracy: Boolean,
+                pricing: LpPricingOptions,
             ): PersistentLpSolver {
-                val delegate = RevisedSimplex(model, cancellation)
+                val delegate = RevisedSimplex(model, cancellation, pricing = pricing)
                 return object : PersistentLpSolver by delegate {
                     override fun appendReplacement(
                         next: LpExactState,
@@ -531,8 +543,9 @@ class LpScopedBasisTransferTest {
                 iterationLimit: Int,
                 workLimit: Long,
                 trackDegeneracy: Boolean,
+                pricing: LpPricingOptions,
             ): PersistentLpSolver {
-                val delegate = RevisedSimplex(model, cancellation)
+                val delegate = RevisedSimplex(model, cancellation, pricing = pricing)
                 return object : PersistentLpSolver by delegate {
                     override fun appendReplacement(
                         next: LpExactState,
@@ -574,8 +587,9 @@ class LpScopedBasisTransferTest {
                 iterationLimit: Int,
                 workLimit: Long,
                 trackDegeneracy: Boolean,
+                pricing: LpPricingOptions,
             ): PersistentLpSolver {
-                val delegate = RevisedSimplex(model, cancellation)
+                val delegate = RevisedSimplex(model, cancellation, pricing = pricing)
                 return object : PersistentLpSolver by delegate {
                     override fun appendReplacement(
                         next: LpExactState,
@@ -632,18 +646,24 @@ class LpScopedBasisTransferTest {
                 iterationLimit: Int,
                 workLimit: Long,
                 trackDegeneracy: Boolean,
-            ): PersistentLpSolver = RevisedSimplex(model, cancellation, basisSolverFactory = { matrix ->
-                basisFactoryCalls++
-                val target = basisFactoryCalls > 1
-                val delegate = KotlinBasisSolver(matrix)
-                if (target) targetConstructed = true
-                object : BasisSolver by delegate {
-                    override fun close() {
-                        delegate.close()
-                        if (target) throw cleanup
+                pricing: LpPricingOptions,
+            ): PersistentLpSolver = RevisedSimplex(
+                model,
+                cancellation,
+                pricing = pricing,
+                basisSolverFactory = { matrix ->
+                    basisFactoryCalls++
+                    val target = basisFactoryCalls > 1
+                    val delegate = KotlinBasisSolver(matrix)
+                    if (target) targetConstructed = true
+                    object : BasisSolver by delegate {
+                        override fun close() {
+                            delegate.close()
+                            if (target) throw cleanup
+                        }
                     }
-                }
-            })
+                },
+            )
         }
         val solver = LpScopedSolver(
             LpExactState(lowerBoundModel()),
@@ -678,32 +698,38 @@ class LpScopedBasisTransferTest {
                 iterationLimit: Int,
                 workLimit: Long,
                 trackDegeneracy: Boolean,
-            ): PersistentLpSolver = RevisedSimplex(model, cancellation, basisSolverFactory = { matrix ->
-                basisFactoryCalls++
-                val target = basisFactoryCalls > 1
-                val delegate = KotlinBasisSolver(matrix)
-                object : BasisSolver by delegate {
-                    override val basisOperationWork: BasisOperationWork
-                        get() = if (target) {
-                            BasisOperationWork(
-                                refactorization = BasisPhaseWork(attempts = 1, units = 7, declines = 1),
-                                complete = false,
-                            )
-                        } else {
-                            delegate.basisOperationWork
+                pricing: LpPricingOptions,
+            ): PersistentLpSolver = RevisedSimplex(
+                model,
+                cancellation,
+                pricing = pricing,
+                basisSolverFactory = { matrix ->
+                    basisFactoryCalls++
+                    val target = basisFactoryCalls > 1
+                    val delegate = KotlinBasisSolver(matrix)
+                    object : BasisSolver by delegate {
+                        override val basisOperationWork: BasisOperationWork
+                            get() = if (target) {
+                                BasisOperationWork(
+                                    refactorization = BasisPhaseWork(attempts = 1, units = 7, declines = 1),
+                                    complete = false,
+                                )
+                            } else {
+                                delegate.basisOperationWork
+                            }
+
+                        override fun refactorize(basicIndex: IntArray): Boolean {
+                            if (target) throw primary
+                            return delegate.refactorize(basicIndex)
                         }
 
-                    override fun refactorize(basicIndex: IntArray): Boolean {
-                        if (target) throw primary
-                        return delegate.refactorize(basicIndex)
+                        override fun close() {
+                            delegate.close()
+                            if (target) throw cleanup
+                        }
                     }
-
-                    override fun close() {
-                        delegate.close()
-                        if (target) throw cleanup
-                    }
-                }
-            })
+                },
+            )
         }
         val solver = LpScopedSolver(
             LpExactState(lowerBoundModel()),
@@ -778,31 +804,37 @@ class LpScopedBasisTransferTest {
                 iterationLimit: Int,
                 workLimit: Long,
                 trackDegeneracy: Boolean,
-            ): PersistentLpSolver = RevisedSimplex(model, cancellation, basisSolverFactory = { matrix ->
-                basisFactoryCalls++
-                val target = basisFactoryCalls > 1
-                val delegate = KotlinBasisSolver(matrix)
-                object : BasisSolver by delegate {
-                    override val basisOperationWork: BasisOperationWork
-                        get() = if (target) {
-                            BasisOperationWork(
-                                refactorization = BasisPhaseWork(attempts = 1, units = 7, declines = 1),
-                            )
-                        } else {
-                            delegate.basisOperationWork
+                pricing: LpPricingOptions,
+            ): PersistentLpSolver = RevisedSimplex(
+                model,
+                cancellation,
+                pricing = pricing,
+                basisSolverFactory = { matrix ->
+                    basisFactoryCalls++
+                    val target = basisFactoryCalls > 1
+                    val delegate = KotlinBasisSolver(matrix)
+                    object : BasisSolver by delegate {
+                        override val basisOperationWork: BasisOperationWork
+                            get() = if (target) {
+                                BasisOperationWork(
+                                    refactorization = BasisPhaseWork(attempts = 1, units = 7, declines = 1),
+                                )
+                            } else {
+                                delegate.basisOperationWork
+                            }
+
+                        override fun refactorize(basicIndex: IntArray): Boolean {
+                            if (target) throw BasisArithmeticException("arithmetic")
+                            return delegate.refactorize(basicIndex)
                         }
 
-                    override fun refactorize(basicIndex: IntArray): Boolean {
-                        if (target) throw BasisArithmeticException("arithmetic")
-                        return delegate.refactorize(basicIndex)
+                        override fun close() {
+                            delegate.close()
+                            if (target) throw cleanup
+                        }
                     }
-
-                    override fun close() {
-                        delegate.close()
-                        if (target) throw cleanup
-                    }
-                }
-            })
+                },
+            )
         }
         val solver = LpScopedSolver(
             LpExactState(lowerBoundModel()),
@@ -835,31 +867,37 @@ class LpScopedBasisTransferTest {
                 iterationLimit: Int,
                 workLimit: Long,
                 trackDegeneracy: Boolean,
-            ): PersistentLpSolver = RevisedSimplex(model, cancellation, basisSolverFactory = { matrix ->
-                val delegate = KotlinBasisSolver(matrix)
-                object : BasisSolver by delegate {
-                    override val basisOperationWork: BasisOperationWork
-                        get() {
-                            ledgerReads++
-                            if (ledgerReads > 1) throw telemetry
-                            return delegate.basisOperationWork
-                        }
-
-                    override fun extend(
-                        matrix: com.eignex.koblas.SparseMatrix,
-                        extension: BasisExtension,
-                    ): BasisExtensionResult? = delegate.extend(matrix, extension)?.let { result ->
-                        val extended = object : BasisSolver by result.solver {
-                            override fun close() {
-                                extendedCloses++
-                                result.solver.close()
-                                throw cleanup
+                pricing: LpPricingOptions,
+            ): PersistentLpSolver = RevisedSimplex(
+                model,
+                cancellation,
+                pricing = pricing,
+                basisSolverFactory = { matrix ->
+                    val delegate = KotlinBasisSolver(matrix)
+                    object : BasisSolver by delegate {
+                        override val basisOperationWork: BasisOperationWork
+                            get() {
+                                ledgerReads++
+                                if (ledgerReads > 1) throw telemetry
+                                return delegate.basisOperationWork
                             }
+
+                        override fun extend(
+                            matrix: com.eignex.koblas.SparseMatrix,
+                            extension: BasisExtension,
+                        ): BasisExtensionResult? = delegate.extend(matrix, extension)?.let { result ->
+                            val extended = object : BasisSolver by result.solver {
+                                override fun close() {
+                                    extendedCloses++
+                                    result.solver.close()
+                                    throw cleanup
+                                }
+                            }
+                            BasisExtensionResult(extended, result.basis.columns, result.basis.unitRows)
                         }
-                        BasisExtensionResult(extended, result.basis.columns, result.basis.unitRows)
                     }
-                }
-            })
+                },
+            )
         }
         val solver = LpScopedSolver(
             LpExactState(lowerBoundModel()),
@@ -897,21 +935,27 @@ class LpScopedBasisTransferTest {
                 iterationLimit: Int,
                 workLimit: Long,
                 trackDegeneracy: Boolean,
-            ): PersistentLpSolver = RevisedSimplex(model, cancellation, basisSolverFactory = { matrix ->
-                basisFactoryCalls++
-                val target = basisFactoryCalls > 1
-                val delegate = KotlinBasisSolver(matrix)
-                object : BasisSolver by delegate {
-                    override val basisOperationWork: BasisOperationWork
-                        get() = if (target) throw telemetry else delegate.basisOperationWork
+                pricing: LpPricingOptions,
+            ): PersistentLpSolver = RevisedSimplex(
+                model,
+                cancellation,
+                pricing = pricing,
+                basisSolverFactory = { matrix ->
+                    basisFactoryCalls++
+                    val target = basisFactoryCalls > 1
+                    val delegate = KotlinBasisSolver(matrix)
+                    object : BasisSolver by delegate {
+                        override val basisOperationWork: BasisOperationWork
+                            get() = if (target) throw telemetry else delegate.basisOperationWork
 
-                    override fun close() {
-                        if (target) targetCloses++
-                        delegate.close()
-                        if (target) throw cleanup
+                        override fun close() {
+                            if (target) targetCloses++
+                            delegate.close()
+                            if (target) throw cleanup
+                        }
                     }
-                }
-            })
+                },
+            )
         }
         val solver = LpScopedSolver(
             LpExactState(lowerBoundModel()),
@@ -947,10 +991,11 @@ class LpScopedBasisTransferTest {
                 iterationLimit: Int,
                 workLimit: Long,
                 trackDegeneracy: Boolean,
+                pricing: LpPricingOptions,
             ): PersistentLpSolver {
                 owners++
                 val replacement = owners > 1
-                val delegate = RevisedSimplex(model, cancellation)
+                val delegate = RevisedSimplex(model, cancellation, pricing = pricing)
                 return object : PersistentLpSolver by delegate {
                     override val basisLifecycleWork: BasisOperationWork
                         get() = if (replacement) throw telemetry else checkNotNull(delegate.basisLifecycleWork)
@@ -997,10 +1042,11 @@ class LpScopedBasisTransferTest {
                 iterationLimit: Int,
                 workLimit: Long,
                 trackDegeneracy: Boolean,
+                pricing: LpPricingOptions,
             ): PersistentLpSolver {
                 owners++
                 val replacement = owners > 1
-                val delegate = RevisedSimplex(model, cancellation)
+                val delegate = RevisedSimplex(model, cancellation, pricing = pricing)
                 return object : PersistentLpSolver by delegate {
                     override val basisLifecycleWork: BasisOperationWork
                         get() {
@@ -1044,10 +1090,11 @@ class LpScopedBasisTransferTest {
                 iterationLimit: Int,
                 workLimit: Long,
                 trackDegeneracy: Boolean,
+                pricing: LpPricingOptions,
             ): PersistentLpSolver {
                 owners++
                 val replacement = owners > 1
-                val delegate = RevisedSimplex(model, cancellation)
+                val delegate = RevisedSimplex(model, cancellation, pricing = pricing)
                 return object : PersistentLpSolver by delegate {
                     override val basisLifecycleWork: BasisOperationWork
                         get() = if (replacement) throw telemetry else checkNotNull(delegate.basisLifecycleWork)
@@ -1094,8 +1141,9 @@ class LpScopedBasisTransferTest {
                 iterationLimit: Int,
                 workLimit: Long,
                 trackDegeneracy: Boolean,
+                pricing: LpPricingOptions,
             ): PersistentLpSolver {
-                val delegate = RevisedSimplex(model, cancellation)
+                val delegate = RevisedSimplex(model, cancellation, pricing = pricing)
                 return object : PersistentLpSolver by delegate {
                     override fun appendReplacement(
                         next: LpExactState,

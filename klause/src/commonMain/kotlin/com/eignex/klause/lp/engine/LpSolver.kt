@@ -326,11 +326,7 @@ internal fun newTableauCutSolver(
     trackDegeneracy: Boolean = false,
     factory: LpEngineFactory = ProductionLpEngineFactory,
     pricing: LpPricingOptions = LpPricingOptions(),
-): TableauCutSolver = if (pricing.zeroObjective == LpZeroObjectivePricing.DEFAULT) {
-    factory.newTableauSolver(model, cancellation, iterationLimit, workLimit, trackDegeneracy)
-} else {
-    factory.newTableauSolver(model, cancellation, iterationLimit, workLimit, trackDegeneracy, pricing)
-}
+): TableauCutSolver = factory.newTableauSolver(model, cancellation, iterationLimit, workLimit, trackDegeneracy, pricing)
 
 /**
  * Construct an engine to keep across solves ([PersistentLpSolver]). Monolithic by construction: a
@@ -349,23 +345,12 @@ internal fun newPersistentLpSolver(
     trackDegeneracy: Boolean = false,
     factory: LpEngineFactory = ProductionLpEngineFactory,
     pricing: LpPricingOptions = LpPricingOptions(),
-): PersistentLpSolver = if (pricing.zeroObjective == LpZeroObjectivePricing.DEFAULT) {
-    factory.newPersistentSolver(
-        model,
-        cancellation,
-        refactorUpdateLimit,
-        iterationLimit,
-        workLimit,
-        trackDegeneracy,
-    )
-} else {
-    factory.newPersistentSolver(
-        model,
-        cancellation,
-        refactorUpdateLimit,
-        iterationLimit,
-        workLimit,
-        trackDegeneracy,
-        pricing,
-    )
-}
+): PersistentLpSolver = factory.newPersistentSolver(
+    model,
+    cancellation,
+    refactorUpdateLimit,
+    iterationLimit,
+    workLimit,
+    trackDegeneracy,
+    pricing,
+)

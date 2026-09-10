@@ -17,6 +17,7 @@ import com.eignex.klause.lp.bounding.LpEmphasis
 import com.eignex.klause.lp.bounding.LpParams
 import com.eignex.klause.lp.bounding.LpPlan
 import com.eignex.klause.lp.cut.CutExchange
+import com.eignex.klause.lp.engine.LpZeroObjectivePricing
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.ClauseExchange
 import com.eignex.klause.propagation.PROPAGATION_CANCEL_FLOOR
@@ -300,6 +301,8 @@ data class BacktrackParams(
      * all-off [LpPlan] (no LP unless a field is set or [lpConfig] resolves one on).
      */
     val lpPlan: LpPlan = LpPlan(),
+    /** Entering-column policy for exactly zero-objective LP solves. */
+    val zeroObjectivePricing: LpZeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT,
     /** Cooperative cancellation predicate; see [Cancellation]. */
     val cancellation: Cancellation = Cancellation.Never,
     /** Per-call fire floor before propagation polls [cancellation]; see [PROPAGATION_CANCEL_FLOOR].
@@ -385,7 +388,8 @@ data class BacktrackParams(
     override fun withCancellation(cancellation: Cancellation): BacktrackParams = copy(cancellation = cancellation)
 
     /** The LP-bounding runtime's slice of these params (see [LpParams]) — what `LpEngine` consumes. */
-    fun lpParams(): LpParams = LpParams(lpPlan, lpConfig, cancellation, solveBudgetMillis, randomSeed)
+    fun lpParams(): LpParams =
+        LpParams(lpPlan, lpConfig, cancellation, solveBudgetMillis, randomSeed, zeroObjectivePricing)
 
     private companion object {
         private fun merge(a: Assumptions, b: Assumptions): Assumptions = a.mergedWith(b)

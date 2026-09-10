@@ -11,6 +11,7 @@ import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.localsearch.strategy.LocalSearchRecipe
 import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.lp.engine.LpSolveContext
+import com.eignex.klause.lp.engine.LpZeroObjectivePricing
 import com.eignex.klause.portfolio.AttributedImprovement
 import com.eignex.klause.portfolio.BacktrackCatalog
 import com.eignex.klause.portfolio.Kind
@@ -60,6 +61,8 @@ class FiniteSolveRequest(
     val defaultArms: Int,
     /** Maximum LP emphasis for the selected route. */
     val lpConfig: LpConfig,
+    /** Entering-column policy for exactly zero-objective LP solves. */
+    val zeroObjectivePricing: LpZeroObjectivePricing,
     /** Invocation-wide node allowance. */
     val nodeBudget: NodeBudget?,
     /** Advisory wall-clock allowance supplied to fixed-backtrack LP components. */
@@ -180,6 +183,8 @@ internal class FiniteExecutionRequest(
     val defaultArms: Int,
     /** Maximum LP emphasis for the selected route. */
     val lpConfig: LpConfig,
+    /** Entering-column policy for exactly zero-objective LP solves. */
+    val zeroObjectivePricing: LpZeroObjectivePricing,
     /** Cancellation shared by every engine worker. */
     val cancellation: Cancellation,
     /** Invocation-wide node allowance. */
@@ -332,6 +337,7 @@ internal fun FinitePipeline.solve(
             randomSeed = request.randomSeed,
             defaultArms = request.defaultArms,
             lpConfig = request.lpConfig,
+            zeroObjectivePricing = request.zeroObjectivePricing,
             cancellation = request.cancellation,
             nodeBudget = request.nodeBudget,
             solveBudgetMillis = request.solveBudgetMillis,
@@ -412,6 +418,7 @@ private fun executeFixed(request: FiniteExecutionRequest, callbacks: FiniteExecu
             nodeBudget = request.nodeBudget,
             solveBudgetMillis = request.solveBudgetMillis,
             lpConfig = request.lpConfig,
+            zeroObjectivePricing = request.zeroObjectivePricing,
             onEvent = request.onEvent,
         ),
     )
@@ -566,6 +573,7 @@ private fun executePortfolio(
             randomSeed = request.randomSeed,
             defaultArms = request.defaultArms,
             lpCeiling = request.lpConfig,
+            zeroObjectivePricing = request.zeroObjectivePricing,
             nodeBudget = request.nodeBudget,
             annotationArm = request.searchHints?.toBacktrackParams(
                 request.problem.numBoolVars,

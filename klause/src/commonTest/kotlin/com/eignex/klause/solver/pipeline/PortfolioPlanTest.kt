@@ -2,6 +2,7 @@ package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.lp.bounding.LpConfig
+import com.eignex.klause.lp.engine.LpZeroObjectivePricing
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertFalse
@@ -19,6 +20,7 @@ class PortfolioPlanTest {
                 nodeBudget = null,
                 solveBudgetMillis = null,
                 lpConfig = LpConfig.AUTO,
+                zeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT,
                 onEvent = null,
             ),
         )

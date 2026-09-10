@@ -17,7 +17,7 @@ internal data class EngineConstructionCall(
     val workLimit: Long = 0L,
     val refactorUpdateLimit: Int = 0,
     val trackDegeneracy: Boolean = false,
-    val zeroObjectivePricing: LpZeroObjectivePricing = LpZeroObjectivePricing.DEFAULT,
+    val zeroObjectivePricing: LpZeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT,
     val tieSeed: Long = 0L,
 )
 
@@ -46,22 +46,6 @@ internal class RecordingLpEngineFactory(private val delegate: LpEngineFactory = 
         iterationLimit: Int,
         workLimit: Long,
         trackDegeneracy: Boolean,
-    ): TableauCutSolver {
-        calls += EngineConstructionCall(
-            EngineConstruction.TABLEAU,
-            iterationLimit = iterationLimit,
-            workLimit = workLimit,
-            trackDegeneracy = trackDegeneracy,
-        )
-        return delegate.newTableauSolver(model, cancellation, iterationLimit, workLimit, trackDegeneracy)
-    }
-
-    override fun newTableauSolver(
-        model: LpModel,
-        cancellation: Cancellation,
-        iterationLimit: Int,
-        workLimit: Long,
-        trackDegeneracy: Boolean,
         pricing: LpPricingOptions,
     ): TableauCutSolver {
         calls += EngineConstructionCall(
@@ -73,31 +57,6 @@ internal class RecordingLpEngineFactory(private val delegate: LpEngineFactory = 
             tieSeed = pricing.tieSeed,
         )
         return delegate.newTableauSolver(model, cancellation, iterationLimit, workLimit, trackDegeneracy, pricing)
-    }
-
-    override fun newPersistentSolver(
-        model: LpModel,
-        cancellation: Cancellation,
-        refactorUpdateLimit: Int,
-        iterationLimit: Int,
-        workLimit: Long,
-        trackDegeneracy: Boolean,
-    ): PersistentLpSolver {
-        calls += EngineConstructionCall(
-            EngineConstruction.PERSISTENT,
-            iterationLimit = iterationLimit,
-            workLimit = workLimit,
-            refactorUpdateLimit = refactorUpdateLimit,
-            trackDegeneracy = trackDegeneracy,
-        )
-        return delegate.newPersistentSolver(
-            model,
-            cancellation,
-            refactorUpdateLimit,
-            iterationLimit,
-            workLimit,
-            trackDegeneracy,
-        )
     }
 
     override fun newPersistentSolver(
@@ -185,6 +144,7 @@ class LpSolverInjectionTest {
             workLimit = 1234L,
             trackDegeneracy = true,
             factory = factory,
+            pricing = LpPricingOptions(LpZeroObjectivePricing.LARGEST_PIVOT),
         ).close()
         newPersistentLpSolver(
             model,
@@ -193,14 +153,25 @@ class LpSolverInjectionTest {
             workLimit = 4321L,
             trackDegeneracy = true,
             factory = factory,
-            pricing = LpPricingOptions(LpZeroObjectivePricing.THEORY, 23L),
+            pricing = LpPricingOptions(LpZeroObjectivePricing.MIN_BOUND_SUPPORT, 23L),
         ).use {
             assertIs<PersistentLpSolver>(it)
         }
 
         assertEquals(2, factory.calls.count { it.kind == EngineConstruction.GENERAL })
         assertEquals(1, factory.calls.count { it.kind == EngineConstruction.COMPONENT })
-        assertTrue(factory.calls.any { it == EngineConstructionCall(EngineConstruction.TABLEAU, 17, 1234L, 0, true) })
+        assertTrue(
+            factory.calls.any {
+                it == EngineConstructionCall(
+                    EngineConstruction.TABLEAU,
+                    17,
+                    1234L,
+                    0,
+                    true,
+                    LpZeroObjectivePricing.LARGEST_PIVOT,
+                )
+            },
+        )
         assertTrue(
             factory.calls.any {
                 it == EngineConstructionCall(
@@ -209,7 +180,7 @@ class LpSolverInjectionTest {
                     4321L,
                     71,
                     true,
-                    LpZeroObjectivePricing.THEORY,
+                    LpZeroObjectivePricing.MIN_BOUND_SUPPORT,
                     23L,
                 )
             },
