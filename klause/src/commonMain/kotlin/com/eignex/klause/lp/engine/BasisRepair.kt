@@ -9,7 +9,7 @@ import com.eignex.klause.simplex.basis.BasisRepair as SolverBasisRepair
 
 internal data class BasisBoundState(val hasLower: Boolean, val hasUpper: Boolean, val fixed: Boolean) {
     init {
-        require(!fixed || hasLower && hasUpper)
+        require(!fixed || (hasLower && hasUpper))
     }
 }
 

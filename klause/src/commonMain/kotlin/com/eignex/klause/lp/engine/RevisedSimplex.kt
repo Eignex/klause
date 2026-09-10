@@ -410,14 +410,14 @@ internal class RevisedSimplex(
             singularRefactorizations++
             return when (
                 val recovery = basisRepairer.recover(
-                solver,
-                basicVar,
-                n,
-                model.basisBoundStates(),
-                status,
-                model,
-                cancellation,
-            )
+                    solver,
+                    basicVar,
+                    n,
+                    model.basisBoundStates(),
+                    status,
+                    model,
+                    cancellation,
+                )
             ) {
                 is BasisRecoveryResult.Failed -> {
                     invalidateBasisDependentState()
@@ -526,7 +526,7 @@ internal class RevisedSimplex(
         transpose: Boolean,
         cadenceChecked: Boolean = false,
     ) {
-        if ((!cadenceChecked && !refactorPolicy.shouldSample(cancellation())) || cancellation()) return
+        if ((!cadenceChecked && !shouldSampleQuality()) || (cadenceChecked && cancellation())) return
         val quality = try {
             solver.solveQuality(rhs, solution, transpose)
         } catch (_: BasisArithmeticException) {
@@ -541,6 +541,9 @@ internal class RevisedSimplex(
             pendingSolveQuality = quality
         }
     }
+
+    private fun shouldSampleQuality(): Boolean =
+        refactorPolicy.shouldSample(cancelled = false) && !cancellation()
 
     private fun denseColumn(column: Int): DoubleArray = DoubleArray(m).also { dense ->
         for (entry in colPtr[column] until colPtr[column + 1]) dense[rowIdx[entry]] = colVal[entry]
@@ -593,7 +596,7 @@ internal class RevisedSimplex(
         val before = operationWork(solver)
         solver.ftran(spikeVec, ftranDensity)
         refactorPolicy.recordBasisSolve(operationDelta(before, operationWork(solver)) { it.ftran })
-        if (refactorPolicy.shouldSample(cancellation())) {
+        if (shouldSampleQuality()) {
             sampleSolveQuality(solver, denseColumn(q), spikeVec, transpose = false, cadenceChecked = true)
         }
         ftranDensity = spikeVec.density
@@ -620,7 +623,7 @@ internal class RevisedSimplex(
         val before = operationWork(solver)
         solver.btran(pivotEtaVec, btranDensity)
         refactorPolicy.recordBasisSolve(operationDelta(before, operationWork(solver)) { it.btran })
-        if (refactorPolicy.shouldSample(cancellation())) {
+        if (shouldSampleQuality()) {
             val rhs = DoubleArray(m).also { it[r] = 1.0 }
             sampleSolveQuality(solver, rhs, pivotEtaVec, transpose = true, cadenceChecked = true)
         }
