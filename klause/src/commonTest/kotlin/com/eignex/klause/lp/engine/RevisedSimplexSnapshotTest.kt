@@ -125,6 +125,35 @@ class RevisedSimplexSnapshotTest {
         assertEquals(1, tracker.ownerCloses)
     }
 
+    @Test
+    fun `throwing cleanup after cancelled factor restore invalidates the retained basis`() {
+        val zero = ExactLpNumber.of(0L)
+        val minusOne = ExactLpNumber.of(-1L)
+        val trail = LpBoundTrail(model(zero))
+        val tracker = RestoreCleanupTracker()
+        RevisedSimplex(
+            assertNotNull(trail.state.toWorkingModel()),
+            basisSolverFactory = { matrix -> RestoreCleanupSolver(KotlinBasisSolver(matrix), tracker) },
+        ).use { solver ->
+            assertEquals(BigFraction.ZERO, solveCurrent(solver, trail))
+            val snapshot = assertNotNull(solver.captureBasisRestart())
+            assertTrue(trail.replaceObjective(ExactLpObjective(listOf(minusOne, zero))))
+            assertEquals(BigFraction.ofLong(-10L), solveCurrent(solver, trail))
+            var cancellationPolls = 0
+
+            val failure = assertFailsWith<IllegalStateException> {
+                solver.restoreBasisRestart(snapshot) { ++cancellationPolls >= 3 }
+            }
+
+            assertEquals("snapshot cleanup", failure.message)
+            assertEquals(1, tracker.restores)
+            assertEquals(1, tracker.closes)
+            assertEquals(0, solver.liveBasisRestartSnapshots)
+            assertTrue(!solver.appendTransferReady)
+            assertEquals(BigFraction.ofLong(-10L), solveCurrent(solver, trail))
+        }
+    }
+
     private fun model(cost: ExactLpNumber): ExactLpModel {
         val zero = ExactLpNumber.of(0L)
         val minusOne = ExactLpNumber.of(-1L)
@@ -180,5 +209,30 @@ private class SnapshotCleanupSolver(private val delegate: BasisSolver, private v
         tracker.ownerCloses++
         delegate.close()
         throw IllegalStateException("owner")
+    }
+}
+
+private class RestoreCleanupTracker {
+    var restores = 0
+    var closes = 0
+}
+
+private class RestoreCleanupSnapshot(val delegate: BasisSnapshot, private val tracker: RestoreCleanupTracker) :
+    BasisSnapshot {
+    override fun close() {
+        tracker.closes++
+        delegate.close()
+        throw IllegalStateException("snapshot cleanup")
+    }
+}
+
+private class RestoreCleanupSolver(private val delegate: BasisSolver, private val tracker: RestoreCleanupTracker) :
+    BasisSolver by delegate {
+    override fun snapshot(): BasisSnapshot? =
+        delegate.snapshot()?.let { RestoreCleanupSnapshot(it, tracker) }
+
+    override fun restore(snapshot: BasisSnapshot): Boolean {
+        tracker.restores++
+        return delegate.restore((snapshot as RestoreCleanupSnapshot).delegate)
     }
 }

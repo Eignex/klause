@@ -839,20 +839,23 @@ internal class RevisedSimplex(
         return snapshot
     }
 
+    @Suppress("TooGenericExceptionCaught")
     override fun restoreBasisRestart(snapshot: EngineBasisRestartSnapshot, token: Cancellation): Boolean {
         val current = basisSolver ?: return false
-        val restored = snapshot.restore(
-            current,
-            basisMatrixIdentity() ?: return false,
-            model.basisBoundStates(),
-            token,
-        ) ?: return false
+        val restored = try {
+            snapshot.restore(
+                current,
+                basisMatrixIdentity() ?: return false,
+                model.basisBoundStates(),
+                token,
+            ) ?: return false
+        } catch (primary: Throwable) {
+            invalidateUncertainBasisState()
+            throw primary
+        }
         return when (restored) {
             is BasisRestartResult.Cancelled -> {
-                if (restored.factorsMayHaveChanged) {
-                    basisFactorized = false
-                    invalidateBasisDependentState()
-                }
+                if (restored.factorsMayHaveChanged) invalidateUncertainBasisState()
                 false
             }
 
@@ -866,6 +869,14 @@ internal class RevisedSimplex(
                 }
             }
         }
+    }
+
+    private fun invalidateUncertainBasisState() {
+        basisFactorized = false
+        basisKept = false
+        ownerColumns = IntArray(0)
+        ownerUnitRows = IntArray(0)
+        invalidateBasisDependentState()
     }
 
     private fun basisMatrixIdentity(): BasisMatrixIdentity? {
