@@ -69,10 +69,10 @@ internal fun verifyBasisExtension(
     var validationEntries = 0L
     val expected = BooleanArray(oldSource.rows)
     val expectedBits = LongArray(oldSource.rows)
+    val crossRows = IntArray(extensionRows.size)
+    val crossValues = DoubleArray(extensionRows.size)
     val crossByOldColumn = Array(oldSource.cols) { BasisSlice(IntArray(0), DoubleArray(0)) }
     for (oldColumn in 0 until oldSource.cols) {
-        val crossRows = IntArray(extensionRows.size)
-        val crossValues = DoubleArray(extensionRows.size)
         var crossCount = 0
         oldSource.forEachInColumn(oldColumn) { row, value ->
             expected[row] = true
@@ -160,10 +160,12 @@ internal fun buildExtendedCache(
     val lower = shiftedSquare(oldFactors.lower, offset)
     val lowerTranspose = shiftedSquare(oldFactors.lowerTranspose, offset)
     val upper = extendedUpper(oldFactors.upper, initialCross, offset)
-    val upperTranspose = transpose(upper)
+    val initialCrossEntries = initialCross.sumOf { it.count }
+    val upperTranspose = extendedTranspose(oldFactors.upperTranspose, initialCross, offset)
     val factors = LuFactors(initialColumns, initialUnits, symbolic, lower, upper, lowerTranspose, upperTranspose)
     val currentUpper = extendedSlices(oldFt.upper.columns, currentCross, offset)
-    val currentTranspose = transposeSlices(currentUpper)
+    val currentCrossEntries = currentCross.sumOf { it.count }
+    val currentTranspose = extendedTransposeSlices(oldFt.transpose.columns, currentCross, offset)
     val currentEntries = currentUpper.sumOf { it.count }
     val initialEntries = upper.nnz
     val ft = oldFt.extensionState(
@@ -175,15 +177,21 @@ internal fun buildExtendedCache(
     )
     val crossEntries = extension.crossByOldColumn.sumOf { it.count.toLong() }
     val copiedEntries = saturatedAdd(
-        factors.lower.nnz.toLong() * 2 + factors.lowerTranspose.nnz.toLong() * 2 + oldFactors.upper.nnz,
+        factors.lower.nnz.toLong() * 2 + factors.lowerTranspose.nnz.toLong() * 2,
         saturatedAdd(
-            initialEntries.toLong() * 5,
-            saturatedAdd(currentEntries.toLong() * 2, oldFt.transformEntries.toLong()),
+            initialEntries.toLong() * 2 + initialCrossEntries,
+            saturatedAdd(
+                currentEntries.toLong() * 2 + currentCrossEntries,
+                oldFt.transformEntries.toLong(),
+            ),
         ),
     )
     val units = saturatedAdd(
         extension.validationEntries,
-        saturatedAdd(crossEntries * 2, copiedEntries),
+        saturatedAdd(
+            crossEntries * 2 + initialCrossEntries + currentCrossEntries,
+            copiedEntries,
+        ),
     )
     return BasisSolveCache.transfer(factors, ft, threshold) to units
 }
@@ -229,16 +237,32 @@ private fun shiftedSquare(matrix: SparseMatrix, offset: Int): SparseMatrix {
 }
 
 private fun extendedUpper(old: SparseMatrix, cross: Array<BasisSlice>, offset: Int): SparseMatrix {
-    val oldColumns = slices(old)
-    val slices = Array(old.cols + offset) { column ->
-        if (column < offset) {
-            BasisSlice(intArrayOf(column), doubleArrayOf(1.0))
-        } else {
-            val original = oldColumns[column - offset]
-            combine(cross[column - offset], original, offset)
+    val oldPointers = old.copyColumnPointers()
+    val pointers = IntArray(old.cols + offset + 1)
+    for (column in 0 until offset) pointers[column + 1] = column + 1
+    for (column in 0 until old.cols) {
+        pointers[column + offset + 1] = pointers[column + offset] +
+            cross[column].count + oldPointers[column + 1] - oldPointers[column]
+    }
+    val rows = IntArray(pointers.last())
+    val values = DoubleArray(rows.size)
+    for (column in 0 until offset) {
+        rows[column] = column
+        values[column] = 1.0
+    }
+    for (column in 0 until old.cols) {
+        var position = pointers[column + offset]
+        val top = cross[column]
+        for (k in 0 until top.count) {
+            rows[position] = top.indices[top.offset + k]
+            values[position++] = top.values[top.offset + k]
+        }
+        old.forEachInColumn(column) { row, value ->
+            rows[position] = row + offset
+            values[position++] = value
         }
     }
-    return matrix(slices)
+    return SparseMatrix.wrap(old.rows + offset, old.cols + offset, pointers, rows, values)
 }
 
 private fun extendedSlices(old: Array<BasisSlice>, cross: Array<BasisSlice>, offset: Int): Array<BasisSlice> =
@@ -264,48 +288,75 @@ private fun combine(top: BasisSlice, bottom: BasisSlice, offset: Int): BasisSlic
     return BasisSlice(indices, values)
 }
 
-private fun slices(matrix: SparseMatrix): Array<BasisSlice> {
-    val pointers = matrix.copyColumnPointers()
-    val rows = matrix.copyRowIndices()
-    val values = matrix.values.copyOf()
-    return Array(matrix.cols) { column ->
-        BasisSlice(rows, values, pointers[column], pointers[column + 1] - pointers[column])
+private fun extendedTranspose(old: SparseMatrix, cross: Array<BasisSlice>, offset: Int): SparseMatrix {
+    val crossCounts = IntArray(offset)
+    for (slice in cross) {
+        for (k in 0 until slice.count) crossCounts[slice.indices[slice.offset + k]]++
     }
-}
-
-private fun matrix(columns: Array<BasisSlice>): SparseMatrix {
-    val pointers = IntArray(columns.size + 1)
-    for (column in columns.indices) pointers[column + 1] = pointers[column] + columns[column].count
+    val oldPointers = old.copyColumnPointers()
+    val pointers = IntArray(old.cols + offset + 1)
+    for (column in 0 until offset) pointers[column + 1] = pointers[column] + crossCounts[column] + 1
+    for (column in 0 until old.cols) {
+        pointers[column + offset + 1] = pointers[column + offset] + oldPointers[column + 1] - oldPointers[column]
+    }
     val rows = IntArray(pointers.last())
     val values = DoubleArray(rows.size)
-    for (column in columns.indices) {
-        val slice = columns[column]
+    val positions = pointers.copyOf()
+    for (column in 0 until offset) {
+        rows[positions[column]] = column
+        values[positions[column]++] = 1.0
+    }
+    for (sourceColumn in cross.indices) {
+        val slice = cross[sourceColumn]
         for (k in 0 until slice.count) {
-            rows[pointers[column] + k] = slice.indices[slice.offset + k]
-            values[pointers[column] + k] = slice.values[slice.offset + k]
+            val column = slice.indices[slice.offset + k]
+            rows[positions[column]] = sourceColumn + offset
+            values[positions[column]++] = slice.values[slice.offset + k]
         }
     }
-    return SparseMatrix.wrap(columns.size, columns.size, pointers, rows, values)
+    for (column in 0 until old.cols) {
+        old.forEachInColumn(column) { row, value ->
+            rows[positions[column + offset]] = row + offset
+            values[positions[column + offset]++] = value
+        }
+    }
+    return SparseMatrix.wrap(old.rows + offset, old.cols + offset, pointers, rows, values)
 }
 
-private fun transpose(matrix: SparseMatrix): SparseMatrix = matrix(transposeSlices(slices(matrix)))
-
-private fun transposeSlices(columns: Array<BasisSlice>): Array<BasisSlice> {
-    val counts = IntArray(columns.size)
-    for (column in columns) for (k in 0 until column.count) counts[column.indices[column.offset + k]]++
-    val indices = Array(columns.size) { IntArray(counts[it]) }
-    val values = Array(columns.size) { DoubleArray(counts[it]) }
-    counts.fill(0)
-    for (column in columns.indices) {
-        val slice = columns[column]
+private fun extendedTransposeSlices(old: Array<BasisSlice>, cross: Array<BasisSlice>, offset: Int): Array<BasisSlice> {
+    val crossCounts = IntArray(offset)
+    for (slice in cross) {
         for (k in 0 until slice.count) {
-            val row = slice.indices[slice.offset + k]
-            val position = counts[row]++
-            indices[row][position] = column
-            values[row][position] = slice.values[slice.offset + k]
+            crossCounts[slice.indices[slice.offset + k]]++
         }
     }
-    return Array(columns.size) { BasisSlice(indices[it], values[it]) }
+    val result = Array(old.size + offset) { column ->
+        val count = if (column < offset) crossCounts[column] + 1 else old[column - offset].count
+        BasisSlice(IntArray(count), DoubleArray(count))
+    }
+    val positions = IntArray(offset)
+    for (column in 0 until offset) {
+        result[column].indices[0] = column
+        result[column].values[0] = 1.0
+        positions[column] = 1
+    }
+    for (sourceColumn in cross.indices) {
+        val slice = cross[sourceColumn]
+        for (k in 0 until slice.count) {
+            val column = slice.indices[slice.offset + k]
+            result[column].indices[positions[column]] = sourceColumn + offset
+            result[column].values[positions[column]++] = slice.values[slice.offset + k]
+        }
+    }
+    for (column in old.indices) {
+        val source = old[column]
+        val target = result[column + offset]
+        for (k in 0 until source.count) {
+            target.indices[k] = source.indices[source.offset + k] + offset
+            target.values[k] = source.values[source.offset + k]
+        }
+    }
+    return result
 }
 
 private fun IntArray.isInjectionInto(size: Int): Boolean {
