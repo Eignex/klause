@@ -260,7 +260,9 @@ internal class KotlinBasisSolver(
         val updated = try {
             current.ft.update(pivotLabel, mapped, policy.absoluteTolerance)
         } catch (failure: BasisArithmeticException) {
-            declineUpdate(saturatedAdd(validationUnits, current.ft.lastUpdateWork?.units ?: 0))
+            val units = saturatedAdd(validationUnits, current.ft.lastUpdateWork?.units ?: 0)
+            workMeter.updateDecline(units)
+            operationMeter.declineUnknown(BasisOperationKind.UPDATE, units)
             throw failure
         }
         if (!updated) {
@@ -316,7 +318,8 @@ internal class KotlinBasisSolver(
             operationMeter.decline(BasisOperationKind.SNAPSHOT, 0)
             return null
         }
-        val units = ownerCopyUnits()
+        val copied = current.snapshot()
+        val units = snapshotCopyUnits(copied)
         return KotlinBasisSnapshot(
             identity,
             n,
@@ -326,7 +329,7 @@ internal class KotlinBasisSolver(
             fillFactor,
             densityThreshold,
             reusePivotOrder,
-            current.snapshot(),
+            copied,
             columns.copyOf(),
             unitRows.copyOf(),
             lastSolveWork,
@@ -355,11 +358,11 @@ internal class KotlinBasisSolver(
             operationMeter.decline(BasisOperationKind.RESTORE, 8)
             return false
         }
-        val units = ownerCopyUnits()
+        val units = own.restoreCopyUnits
         val restored = try {
             BasisSolveCache.restore(state, densityThreshold)
         } catch (failure: BasisArithmeticException) {
-            operationMeter.decline(BasisOperationKind.RESTORE, ownerCopyUnits())
+            operationMeter.declineUnknown(BasisOperationKind.RESTORE, units)
             throw failure
         }
         cache = restored
@@ -402,12 +405,12 @@ internal class KotlinBasisSolver(
             target.installExtension(extended, state.basisColumns, state.basisUnitRows, units)
             operationMeter.success(
                 BasisOperationKind.EXTENSION,
-                saturatedAdd(verification.units, units),
+                units,
             )
             transferred = true
             return BasisExtensionResult(target, state.basisColumns, state.basisUnitRows)
         } catch (failure: BasisArithmeticException) {
-            operationMeter.decline(BasisOperationKind.EXTENSION, verification.units)
+            operationMeter.declineUnknown(BasisOperationKind.EXTENSION, verification.units)
             throw failure
         } finally {
             if (!transferred) target.close()
@@ -490,7 +493,27 @@ internal class KotlinBasisSolver(
         return BasisUpdate.SINGULAR
     }
 
-    private fun ownerCopyUnits(): Long = saturatedAdd(nnz.toLong(), columns.size.toLong() * 2L)
+    private fun snapshotCopyUnits(state: BasisCacheState): Long {
+        val factors = state.factors
+        val matrices = listOf(factors.lower, factors.upper, factors.lowerTranspose, factors.upperTranspose)
+        val factorEntries = matrices.fold(0L) { total, matrix ->
+            saturatedAdd(total, matrix.cols + 1L + matrix.nnz.toLong() * 2L)
+        }
+        val triangularEntries = (state.ft.upper.asSequence() + state.ft.transpose.asSequence()).fold(0L) {
+                total,
+                slice,
+            ->
+            saturatedAdd(total, slice.count.toLong() * 2L)
+        }
+        val ftEntries = saturatedAdd(
+            triangularEntries,
+            saturatedAdd(state.ft.order.size.toLong(), state.ft.transformEntries.toLong() * 2L),
+        )
+        return saturatedAdd(
+            factorEntries,
+            saturatedAdd(ftEntries, n.toLong() * 6L),
+        )
+    }
 
     private fun requireOpen() = check(!closed) { "basis solver is closed" }
 
@@ -508,6 +531,7 @@ internal class KotlinBasisSolver(
         unitRows: IntArray,
         val lastSolveWork: BasisSolveWork?,
         val work: BasisWork,
+        val restoreCopyUnits: Long = saturatedAdd(snapshotCopyUnits(state), dimension.toLong() * 4L),
     ) : BasisSnapshot {
         var state: BasisCacheState? = state
             private set

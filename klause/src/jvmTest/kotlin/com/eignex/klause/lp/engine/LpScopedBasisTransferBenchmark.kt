@@ -23,26 +23,31 @@ private fun measure(dimension: Int, arm: LpAppendSelection, bean: ThreadMXBean):
     val state = LpExactState(denseAppendModel(dimension))
     val solver = LpScopedSolver(state, refactorUpdateLimit = 100, maxRetainedRows = 64, appendSelection = arm)
     val initial = checkNotNull(solver.solve())
-    check(initial.exactPrimal != null)
-    val row = denseAppendedRow(dimension)
+    B5bIndependentExactSourceValidator.validate(solver.state, initial)
     val thread = Thread.currentThread().threadId()
     val beforeBytes = bean.getThreadAllocatedBytes(thread)
     val beforeNanos = System.nanoTime()
-    check(solver.append(row, scoped = true))
-    val result = checkNotNull(solver.solve())
-    val elapsedNanos = System.nanoTime() - beforeNanos
-    val allocatedBytes = bean.getThreadAllocatedBytes(thread) - beforeBytes
-    check(result.exactPrimal != null && result.verdict == LpVerdict.ATTAINED_OPTIMUM)
-    val metrics = solver.metrics
+    var engineWork = 0L
+    var result = initial
+    repeat(APPENDS) { sequence ->
+        check(solver.append(denseAppendedRow(dimension, sequence), scoped = true))
+        result = checkNotNull(solver.solve())
+        B5bIndependentExactSourceValidator.validate(solver.state, result)
+        engineWork += solver.lastMetrics.workOps
+    }
     b5bSink = b5bSink xor checkNotNull(result.lowerBound).hashCode().toLong()
     solver.close()
-    check(metrics.currentOwners == 1L)
+    val elapsedNanos = System.nanoTime() - beforeNanos
+    val allocatedBytes = bean.getThreadAllocatedBytes(thread) - beforeBytes
+    check(result.verdict == LpVerdict.ATTAINED_OPTIMUM)
+    val metrics = solver.metrics
+    check(metrics.currentOwners == 0L)
     return "dimension=$dimension arm=$arm elapsedNanos=$elapsedNanos allocatedBytes=$allocatedBytes " +
         "basisWork=${metrics.appendBasisWork} unknownWork=${metrics.appendUnknownWork} " +
-        "engineWork=${solver.lastMetrics.workOps} attempts=${metrics.appendReplacementAttempts} " +
+        "engineWork=$engineWork attempts=${metrics.appendReplacementAttempts} " +
         "transfers=${metrics.appendTransfers} intendedFresh=${metrics.appendIntendedFreshBuilds} " +
         "fallbacks=${metrics.appendFallbacks} decline=${metrics.lastAppendDecline ?: "NONE"} " +
-        "created=${metrics.createdOwners} closed=${metrics.closedOwners + 1} peak=${metrics.peakOwners}"
+        "created=${metrics.createdOwners} closed=${metrics.closedOwners} peak=${metrics.peakOwners}"
 }
 
 private fun denseAppendModel(dimension: Int): ExactLpModel {
@@ -64,14 +69,17 @@ private fun denseAppendModel(dimension: Int): ExactLpModel {
     )
 }
 
-private fun denseAppendedRow(dimension: Int): LpScopedRow = LpScopedRow(
-    dimension.toLong(),
-    List((dimension + 3) / 4) { it to ExactLpNumber.of(-1L) },
-    ExactLpNumber.of(-1L),
+private fun denseAppendedRow(dimension: Int, sequence: Int): LpScopedRow = LpScopedRow(
+    (dimension + sequence).toLong(),
+    List((dimension + 3) / 4) { offset ->
+        (sequence * ((dimension + 3) / 4) + offset) % dimension to ExactLpNumber.of(-1L)
+    }.sortedBy { it.first },
+    ExactLpNumber.of(-(sequence + 1L)),
     ExactLpColumn(ExactLpBounds(ExactLpSide(ExactLpNumber.of(0L)))),
 )
 
 private const val REPETITIONS = 3
+private const val APPENDS = 2
 private val DIMENSIONS = listOf(16, 20)
 private val ARMS = listOf(
     LpAppendSelection.FORCE_TRANSFER,

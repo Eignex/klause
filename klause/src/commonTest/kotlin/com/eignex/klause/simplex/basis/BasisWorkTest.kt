@@ -151,6 +151,17 @@ class BasisWorkTest {
     }
 
     @Test
+    fun `aggregate operation work reports saturation across finite phases`() {
+        val work = BasisOperationWork(
+            refactorization = BasisPhaseWork(units = Long.MAX_VALUE - 1),
+            repair = BasisPhaseWork(units = 2),
+        )
+
+        assertEquals(Long.MAX_VALUE, work.units)
+        assertTrue(work.saturated)
+    }
+
+    @Test
     fun `zero dimension reuses an empty order with zero work`() {
         val source = SparseMatrix.ofColumns(0, 0, emptyList())
         val solver = KotlinBasisSolver(source)

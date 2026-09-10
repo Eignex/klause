@@ -48,6 +48,7 @@ internal data class BasisOperationWork(
     val ftran: BasisPhaseWork = BasisPhaseWork(),
     val btran: BasisPhaseWork = BasisPhaseWork(),
     val update: BasisPhaseWork = BasisPhaseWork(),
+    val complete: Boolean = true,
 ) {
     val units: Long get() = listOf(
         refactorization,
@@ -59,7 +60,7 @@ internal data class BasisOperationWork(
         btran,
         update,
     ).fold(0L) { total, phase -> saturatedAdd(total, phase.units) }
-    val saturated: Boolean get() = listOf(
+    val saturated: Boolean get() = units == Long.MAX_VALUE || listOf(
         refactorization,
         repair,
         extension,
@@ -76,6 +77,7 @@ internal data class BasisOperationWork(
 
 internal class BasisOperationMeter {
     private val phases = Array(BasisOperationKind.entries.size) { MutableBasisPhase() }
+    private var complete = true
 
     fun attempt(kind: BasisOperationKind) {
         phases[kind.ordinal].attempts = saturatedAdd(phases[kind.ordinal].attempts, 1)
@@ -93,6 +95,11 @@ internal class BasisOperationMeter {
         phase.units = saturatedAdd(phase.units, units)
     }
 
+    fun declineUnknown(kind: BasisOperationKind, units: Long) {
+        decline(kind, units)
+        complete = false
+    }
+
     fun snapshot(): BasisOperationWork = BasisOperationWork(
         phase(BasisOperationKind.REFACTORIZATION),
         phase(BasisOperationKind.REPAIR),
@@ -102,6 +109,7 @@ internal class BasisOperationMeter {
         phase(BasisOperationKind.FTRAN),
         phase(BasisOperationKind.BTRAN),
         phase(BasisOperationKind.UPDATE),
+        complete,
     )
 
     private fun phase(kind: BasisOperationKind): BasisPhaseWork = phases[kind.ordinal].let {

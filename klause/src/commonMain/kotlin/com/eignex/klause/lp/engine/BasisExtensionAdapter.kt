@@ -64,6 +64,7 @@ internal class BasisExtensionAdapter(private val factory: (SparseMatrix) -> Basi
         )
     }
 
+    @Suppress("TooGenericExceptionCaught")
     fun replacement(
         oldSolver: BasisSolver,
         newMatrix: SparseMatrix,
@@ -99,6 +100,7 @@ internal class BasisExtensionAdapter(private val factory: (SparseMatrix) -> Basi
         }
         val fresh = factory(newMatrix)
         var accepted = false
+        var failure: Throwable? = null
         try {
             if (!fresh.refactorize(intendedBasis)) return null
             val result = BasisReplacement(
@@ -111,8 +113,11 @@ internal class BasisExtensionAdapter(private val factory: (SparseMatrix) -> Basi
             )
             accepted = true
             return result
+        } catch (primary: Throwable) {
+            failure = primary
+            throw primary
         } finally {
-            if (!accepted) fresh.close()
+            if (!accepted) closeRejected(fresh, failure)
         }
     }
 
@@ -137,9 +142,22 @@ internal class BasisExtensionAdapter(private val factory: (SparseMatrix) -> Basi
     }
 
     private fun operationDelta(before: BasisOperationWork?, after: BasisOperationWork?): Long? {
-        if (before == null || after == null || before.saturated || after.saturated || after.units < before.units) {
+        if (
+            before == null || after == null || !before.complete || !after.complete ||
+            before.saturated || after.saturated || after.units < before.units
+        ) {
             return null
         }
         return after.units - before.units
+    }
+
+    @Suppress("TooGenericExceptionCaught")
+    private fun closeRejected(solver: BasisSolver, primary: Throwable?) {
+        try {
+            solver.close()
+        } catch (cleanup: Throwable) {
+            if (primary == null) throw cleanup
+            primary.addSuppressed(cleanup)
+        }
     }
 }

@@ -635,7 +635,7 @@ internal class RevisedSimplex(
         get() = basisKept && basisFactorized && basisSolver?.singular == false && trackedHeadingsConsistent()
     override val basisLifecycleWork get() = basisSolver?.basisOperationWork
 
-    @Suppress("ReturnCount")
+    @Suppress("ReturnCount", "TooGenericExceptionCaught")
     override fun appendReplacement(
         next: LpExactState,
         oldRowsInNew: IntArray,
@@ -698,9 +698,12 @@ internal class RevisedSimplex(
             } catch (_: BasisArithmeticException) {
                 null
             } ?: return LpAppendReplacementAttempt(decline = LpAppendTransferDecline.FRESH_FAILED)
-            basisWork = replacement.solver.basisOperationWork?.let { if (it.saturated) null else it.units }
+            basisWork = replacement.solver.basisOperationWork?.let {
+                if (!it.complete || it.saturated) null else it.units
+            }
         }
         var installed = false
+        var failure: Throwable? = null
         try {
             if (token()) {
                 return LpAppendReplacementAttempt(
@@ -720,8 +723,11 @@ internal class RevisedSimplex(
                 LpAppendReplacement(candidate, basis, replacement.transferred),
                 basisWork = basisWork,
             )
+        } catch (primary: Throwable) {
+            failure = primary
+            throw primary
         } finally {
-            if (!installed) replacement.solver.close()
+            if (!installed) closeRejectedReplacement(replacement.solver, failure)
         }
     }
 
@@ -817,6 +823,16 @@ internal class RevisedSimplex(
                 VarStatus.FIXED -> source.fixed(column)
                 VarStatus.FREE -> !source.hasFiniteLower(column) && !source.hasFiniteUpper(column)
             }
+        }
+    }
+
+    @Suppress("TooGenericExceptionCaught")
+    private fun closeRejectedReplacement(owner: BasisSolver, primary: Throwable?) {
+        try {
+            owner.close()
+        } catch (cleanup: Throwable) {
+            if (primary == null) throw cleanup
+            primary.addSuppressed(cleanup)
         }
     }
 

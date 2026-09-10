@@ -1,9 +1,12 @@
 package com.eignex.klause.lp.engine
 
+import com.eignex.klause.simplex.basis.BasisSolver
+import com.eignex.klause.simplex.basis.KotlinBasisSolver
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
@@ -213,6 +216,132 @@ class LpScopedBasisTransferTest {
         }
     }
 
+    @Test
+    fun `replacement cleanup is suppressed behind the primary cancellation failure`() {
+        val primary = IllegalStateException("primary")
+        val cleanup = IllegalArgumentException("cleanup")
+        var basisFactoryCalls = 0
+        var targetConstructed = false
+        val token = Cancellation {
+            if (targetConstructed) throw primary
+            false
+        }
+        val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+            override fun newPersistentSolver(
+                model: LpModel,
+                cancellation: Cancellation,
+                refactorUpdateLimit: Int,
+                iterationLimit: Int,
+                workLimit: Long,
+                trackDegeneracy: Boolean,
+            ): PersistentLpSolver = RevisedSimplex(model, cancellation, basisSolverFactory = { matrix ->
+                basisFactoryCalls++
+                val target = basisFactoryCalls > 1
+                val delegate = KotlinBasisSolver(matrix)
+                if (target) targetConstructed = true
+                object : BasisSolver by delegate {
+                    override fun close() {
+                        delegate.close()
+                        if (target) throw cleanup
+                    }
+                }
+            })
+        }
+        val solver = LpScopedSolver(
+            LpExactState(lowerBoundModel()),
+            cancellation = token,
+            context = LpSolveContext(engineFactory = factory),
+            appendSelection = LpAppendSelection.FRESH_INTENDED,
+        )
+        assertNotNull(solver.solve())
+
+        val thrown = assertFailsWith<IllegalStateException> {
+            solver.append(lowerRow(1, 2), scoped = false)
+        }
+
+        assertTrue(thrown === primary)
+        assertEquals(listOf(cleanup), thrown.suppressedExceptions.toList())
+        targetConstructed = false
+        solver.close()
+    }
+
+    @Test
+    fun `fresh construction cleanup is suppressed behind its primary failure`() {
+        val primary = IllegalStateException("primary")
+        val cleanup = IllegalArgumentException("cleanup")
+        var basisFactoryCalls = 0
+        val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+            override fun newPersistentSolver(
+                model: LpModel,
+                cancellation: Cancellation,
+                refactorUpdateLimit: Int,
+                iterationLimit: Int,
+                workLimit: Long,
+                trackDegeneracy: Boolean,
+            ): PersistentLpSolver = RevisedSimplex(model, cancellation, basisSolverFactory = { matrix ->
+                basisFactoryCalls++
+                val target = basisFactoryCalls > 1
+                val delegate = KotlinBasisSolver(matrix)
+                object : BasisSolver by delegate {
+                    override fun refactorize(basicIndex: IntArray): Boolean {
+                        if (target) throw primary
+                        return delegate.refactorize(basicIndex)
+                    }
+
+                    override fun close() {
+                        delegate.close()
+                        if (target) throw cleanup
+                    }
+                }
+            })
+        }
+        val solver = LpScopedSolver(
+            LpExactState(lowerBoundModel()),
+            context = LpSolveContext(engineFactory = factory),
+            appendSelection = LpAppendSelection.FRESH_INTENDED,
+        )
+        assertNotNull(solver.solve())
+
+        val thrown = assertFailsWith<IllegalStateException> {
+            solver.append(lowerRow(1, 2), scoped = false)
+        }
+
+        assertTrue(thrown === primary)
+        assertEquals(listOf(cleanup), thrown.suppressedExceptions.toList())
+        solver.close()
+    }
+
+    @Test
+    fun `exact source validation uses shifted coordinates logical costs and minimized scale`() {
+        val zero = ExactLpNumber.of(0L)
+        val model = ExactLpModel(
+            listOf(listOf(ExactLpEntry(0, ExactLpNumber.of(-1L)))),
+            listOf(ExactLpNumber.of(-1L)),
+            listOf(
+                ExactLpColumn(
+                    ExactLpBounds(ExactLpSide(zero), ExactLpSide(ExactLpNumber.of(10L))),
+                    origin = ExactLpNumber.of(1L),
+                ),
+                ExactLpColumn(ExactLpBounds(ExactLpSide(zero))),
+            ),
+            listOf(ExactLpRow()),
+            ExactLpObjective(
+                listOf(ExactLpNumber.of(2L), ExactLpNumber.of(3L)),
+                constant = ExactLpNumber.of(4L),
+                scale = ExactLpNumber.of(2L),
+                externalConstant = ExactLpNumber.of(5L),
+            ),
+        )
+        LpScopedSolver(LpExactState(model)).use { solver ->
+            val result = assertNotNull(solver.solve())
+
+            B5bIndependentExactSourceValidator.validate(solver.state, result)
+
+            assertEquals(listOf(BigFraction.ofLong(2L)), result.exactPrimal)
+            assertEquals(BigFraction.ofLong(8L), assertNotNull(result.witness).objective)
+        }
+    }
+
     private fun lowerBoundModel(): ExactLpModel {
         val zero = ExactLpNumber.of(0L)
         val one = ExactLpNumber.of(1L)
@@ -257,24 +386,32 @@ class LpScopedBasisTransferTest {
     }
 }
 
-private object B5bIndependentExactSourceValidator {
+internal object B5bIndependentExactSourceValidator {
     fun validate(state: LpExactState, result: CertifiedLpResult) {
         val primal = assertNotNull(result.exactPrimal)
         assertEquals(state.model.n, primal.size)
-        for (column in 0 until state.model.n) validateBounds(primal[column], state.model.column(column).bounds)
+        val shifted = List(state.model.n) { column ->
+            primal[column] - state.model.column(column).origin.value
+        }
+        for (column in shifted.indices) validateBounds(shifted[column], state.model.column(column).bounds)
+        val logicals = MutableList(state.model.m) { BigFraction.ZERO }
         for (row in 0 until state.model.m) {
             var logical = state.model.rhs(row).value
             for (column in 0 until state.model.n) {
                 val coefficient = state.model.entries(column).firstOrNull { it.row == row }?.number?.value
                     ?: BigFraction.ZERO
-                logical -= coefficient * primal[column]
+                logical -= coefficient * shifted[column]
             }
             validateBounds(logical, state.model.column(state.model.n + row).bounds)
+            logicals[row] = logical
         }
+        val coordinates = shifted + logicals
         var objective = state.model.objective.constant.value
-        for (column in primal.indices) objective += state.model.objective.cost(column).value * primal[column]
-        objective *= state.model.objective.scale.value
-        objective += state.model.objective.externalConstant.value
+        for (column in coordinates.indices) {
+            objective += state.model.objective.cost(column).value * coordinates[column]
+        }
+        objective = objective * state.model.objective.scale.value.reciprocal() +
+            state.model.objective.externalConstant.value
         assertEquals(objective, assertNotNull(result.witness).objective)
     }
 
