@@ -1,7 +1,10 @@
 package com.eignex.klause.simplex.basis
 
 import com.eignex.klause.util.argsortBy
-import com.eignex.koblas.sparse.SparseWorkspace
+import com.eignex.koblas.Workspace
+import com.eignex.koblas.borrow
+import com.eignex.koblas.borrowI32
+import com.eignex.koblas.sparse.SparseSlices
 import kotlin.math.abs
 
 internal data class ForrestTomlinWork(
@@ -18,8 +21,9 @@ internal class ForrestTomlinFactors private constructor(
     factors: LuFactors,
     state: ForrestTomlinState?,
     takeOwnership: Boolean,
+    private val workspace: Workspace,
 ) {
-    constructor(factors: LuFactors) : this(factors, null, false)
+    constructor(factors: LuFactors, workspace: Workspace = Workspace()) : this(factors, null, false, workspace)
 
     private val sharedOrder = state?.order?.let { if (takeOwnership) it else it.copyOf() }
     val upper = if (state == null) {
@@ -40,9 +44,9 @@ internal class ForrestTomlinFactors private constructor(
         if (takeOwnership) it.restoreOwned() else it.restore()
     }?.toMutableList() ?: mutableListOf()
     private val n = upper.columns.size
-    private val column = BasisWorkspace(n)
-    private val row = BasisWorkspace(n)
-    private val multipliers = BasisWorkspace(n)
+    private val column = BasisWorkspace(n, workspace)
+    private val row = BasisWorkspace(n, workspace)
+    private val multipliers = BasisWorkspace(n, workspace)
     private val initialEntries = state?.initialEntries ?: factors.upper.nnz
     var upperEntries = state?.upperEntries ?: initialEntries
         private set
@@ -232,31 +236,32 @@ internal class ForrestTomlinFactors private constructor(
         return BasisSlice(indices, values)
     }
 
-    private fun compact(work: BasisWorkspace): BasisSlice {
-        val gatheredIndices = IntArray(work.count)
-        val gatheredValues = DoubleArray(work.count)
-        val gathered = SparseWorkspace.gatherTouched(
-            work.indices, 0, work.count, work.values,
-            gatheredIndices, 0, gatheredValues, 0,
-            compactExactZeros = true,
-        )
-        val order = argsortBy(gathered) { a, b -> gatheredIndices[a].compareTo(gatheredIndices[b]) }
-        return BasisSlice(
-            IntArray(gathered) { gatheredIndices[order[it]] },
-            DoubleArray(gathered) { gatheredValues[order[it]] },
-        )
+    private fun compact(work: BasisWorkspace): BasisSlice = workspace.borrowI32(n) { gatheredIndices ->
+        workspace.borrow(n) { gatheredValues ->
+            val gathered = SparseSlices.gatherTouched(
+                work.indices, 0, work.count, work.values,
+                gatheredIndices, 0, gatheredValues, 0,
+                compactExactZeros = true,
+            )
+            val order = argsortBy(gathered) { a, b -> gatheredIndices[a].compareTo(gatheredIndices[b]) }
+            BasisSlice(
+                IntArray(gathered) { gatheredIndices[order[it]] },
+                DoubleArray(gathered) { gatheredValues[order[it]] },
+            )
+        }
     }
 
     companion object {
-        fun restore(factors: LuFactors, state: ForrestTomlinState): ForrestTomlinFactors =
-            ForrestTomlinFactors(factors, state, false)
+        fun restore(factors: LuFactors, state: ForrestTomlinState, workspace: Workspace): ForrestTomlinFactors =
+            ForrestTomlinFactors(factors, state, false, workspace)
 
-        fun transfer(factors: LuFactors, state: ForrestTomlinState): ForrestTomlinFactors =
-            ForrestTomlinFactors(factors, state, true)
+        fun transfer(factors: LuFactors, state: ForrestTomlinState, workspace: Workspace): ForrestTomlinFactors =
+            ForrestTomlinFactors(factors, state, true, workspace)
     }
 }
 
 internal class ForrestTomlinRow(val pivot: Int, val entries: BasisSlice) {
+    private val arithmeticStatus = IntArray(1)
     var lastWork = 0L
         private set
 
@@ -271,11 +276,15 @@ internal class ForrestTomlinRow(val pivot: Int, val entries: BasisSlice) {
     )
 
     fun forward(work: BasisWorkspace): Long {
-        lastWork = 0
-        var value = work.values[pivot]
-        for (k in 0 until entries.count) {
-            lastWork = saturatedAdd(lastWork, 1)
-            value = basisFinite(value - basisProduct(entries.values[k], work.values[entries.indices[k]]))
+        lastWork = entries.count.toLong()
+        arithmeticStatus[0] = 0
+        val value = SparseSlices.reduceDotChecked(
+            work.values[pivot], true,
+            entries.indices, entries.offset, entries.values, entries.offset, entries.count,
+            work.values, arithmeticStatus, 0,
+        )
+        if (arithmeticStatus[0] != 0) {
+            throw BasisArithmeticException("checked basis row reduction breakdown")
         }
         work.set(pivot, value)
         return lastWork

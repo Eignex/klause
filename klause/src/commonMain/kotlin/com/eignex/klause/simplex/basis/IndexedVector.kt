@@ -1,9 +1,8 @@
 package com.eignex.klause.simplex.basis
 
 import com.eignex.koblas.SparseMatrix
-import com.eignex.koblas.SparseVector
 import com.eignex.koblas.koblas
-import com.eignex.koblas.sparse.SparseWorkspace
+import com.eignex.koblas.sparse.SparseSlices
 
 // Dense values with unique sparse support. Explicit zeros stay stored until clear; arrays never escape.
 internal class IndexedVector(val size: Int) {
@@ -20,7 +19,11 @@ internal class IndexedVector(val size: Int) {
 
     operator fun get(i: Int): Double = values[i]
 
-    fun dot(vector: SparseVector): Double = koblas.sparseKernels.dot(vector, values)
+    @Suppress("LongParameterList")
+    fun dot(indices: IntArray, indexOffset: Int, source: DoubleArray, valueOffset: Int, count: Int): Double =
+        koblas.sparseKernels.dot(indices, indexOffset, source, valueOffset, count, values)
+
+    fun nrm2(): Double = koblas.sparseKernels.nrm2(indices, 0, count, values)
 
     fun forEachStored(block: (Int, Double) -> Unit) {
         for (k in 0 until count) {
@@ -38,10 +41,7 @@ internal class IndexedVector(val size: Int) {
     }
 
     fun clear() {
-        forEachStored { i, _ ->
-            values[i] = 0.0
-            stored[i] = 0
-        }
+        SparseSlices.clearTouched(indices, 0, count, values, stored)
         count = 0
     }
 
@@ -60,7 +60,7 @@ internal class IndexedVector(val size: Int) {
     // The input is canonical sparse support: indices are unique and values are nonzero.
     fun scatterStored(indices: IntArray, indexOffset: Int, source: DoubleArray, valueOffset: Int, count: Int) {
         clear()
-        this.count = SparseWorkspace.scatterAxpy(
+        this.count = SparseSlices.scatterAxpy(
             1.0, indices, indexOffset, source, valueOffset, count,
             values, stored, 1, this.indices, 0, 0,
         )
