@@ -1,9 +1,6 @@
 package com.eignex.klause.simplex.basis
 
 import com.eignex.koblas.SparseMatrix
-import com.eignex.koblas.SparseVector
-import com.eignex.koblas.column
-import com.eignex.koblas.koblas
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
@@ -34,7 +31,6 @@ internal class KotlinBasisSolver(
         matrix.values.copyOf(),
     )
     private val builder = BasisFactors(source)
-    private val sourceColumns = arrayOfNulls<SparseVector>(source.cols)
     override val n = source.rows
     private val solveWorkspace = BasisWorkspace(n)
     private val mapped = BasisWorkspace(n)
@@ -297,11 +293,8 @@ internal class KotlinBasisSolver(
             if (unitRow >= 0) {
                 if (transpose) product[j] = solution[unitRow] else product[unitRow] += solution[j]
             } else {
-                val column = sourceColumn(columns[j])
-                if (transpose) {
-                    product[j] = solution.dot(column)
-                } else {
-                    koblas.sparseKernels.axpy(product, solution[j], column)
+                source.forEachInColumn(columns[j]) { i, value ->
+                    if (transpose) product[j] += value * solution[i] else product[i] += value * solution[j]
                 }
             }
         }
@@ -315,10 +308,6 @@ internal class KotlinBasisSolver(
             scale = max(scale, max(abs(product[i]), abs(rhs[i])))
         }
         return BasisSolveQuality(residual, residual / scale)
-    }
-
-    private fun sourceColumn(column: Int): SparseVector = sourceColumns[column] ?: source.column(column).also {
-        sourceColumns[column] = it
     }
 
     override fun snapshot(): BasisSnapshot? {

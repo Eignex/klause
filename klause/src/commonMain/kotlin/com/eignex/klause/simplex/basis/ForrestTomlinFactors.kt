@@ -1,5 +1,6 @@
 package com.eignex.klause.simplex.basis
 
+import com.eignex.klause.util.argsortBy
 import com.eignex.koblas.sparse.SparseWorkspace
 import kotlin.math.abs
 
@@ -239,21 +240,10 @@ internal class ForrestTomlinFactors private constructor(
             gatheredIndices, 0, gatheredValues, 0,
             compactExactZeros = true,
         )
-        for (i in 1 until gathered) {
-            val index = gatheredIndices[i]
-            val value = gatheredValues[i]
-            var position = i
-            while (position > 0 && gatheredIndices[position - 1] > index) {
-                gatheredIndices[position] = gatheredIndices[position - 1]
-                gatheredValues[position] = gatheredValues[position - 1]
-                position--
-            }
-            gatheredIndices[position] = index
-            gatheredValues[position] = value
-        }
+        val order = argsortBy(gathered) { a, b -> gatheredIndices[a].compareTo(gatheredIndices[b]) }
         return BasisSlice(
-            gatheredIndices.copyOf(gathered),
-            gatheredValues.copyOf(gathered),
+            IntArray(gathered) { gatheredIndices[order[it]] },
+            DoubleArray(gathered) { gatheredValues[order[it]] },
         )
     }
 
