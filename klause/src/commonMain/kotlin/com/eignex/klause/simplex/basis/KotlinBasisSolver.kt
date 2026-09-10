@@ -228,7 +228,7 @@ internal class KotlinBasisSolver(
                     transpose,
                     saturatedAdd(completedUnits, saturatedAdd(triangularUnits, transformUnits)),
                 )
-                operationMeter.decline(
+                operationMeter.declineUnknown(
                     if (transpose) BasisOperationKind.BTRAN else BasisOperationKind.FTRAN,
                     saturatedAdd(completedUnits, saturatedAdd(triangularUnits, transformUnits)),
                 )

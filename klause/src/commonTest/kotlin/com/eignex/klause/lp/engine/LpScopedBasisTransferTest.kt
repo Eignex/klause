@@ -393,6 +393,48 @@ class LpScopedBasisTransferTest {
     }
 
     @Test
+    fun `scoped aggregate saturation records unknown work`() {
+        val contribution = Long.MAX_VALUE / 2 + 1
+        val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+            override fun newPersistentSolver(
+                model: LpModel,
+                cancellation: Cancellation,
+                refactorUpdateLimit: Int,
+                iterationLimit: Int,
+                workLimit: Long,
+                trackDegeneracy: Boolean,
+            ): PersistentLpSolver {
+                val delegate = RevisedSimplex(model, cancellation)
+                return object : PersistentLpSolver by delegate {
+                    override fun appendReplacement(
+                        next: LpExactState,
+                        oldRowsInNew: IntArray,
+                        oldColumnsInNew: IntArray,
+                        mode: LpAppendReplacementMode,
+                        token: Cancellation,
+                    ) = LpAppendReplacementAttempt(
+                        decline = LpAppendTransferDecline.STRUCTURAL,
+                        basisWork = contribution,
+                    )
+                }
+            }
+        }
+        LpScopedSolver(
+            LpExactState(lowerBoundModel()),
+            context = LpSolveContext(engineFactory = factory),
+            appendSelection = LpAppendSelection.FORCE_TRANSFER,
+        ).use { solver ->
+            assertNotNull(solver.solve())
+
+            assertTrue(solver.append(lowerRow(1, 2), scoped = false))
+            assertTrue(solver.append(lowerRow(2, 3), scoped = false))
+
+            assertEquals(Long.MAX_VALUE, solver.metrics.appendBasisWork)
+            assertTrue(solver.metrics.appendUnknownWork > 0)
+        }
+    }
+
+    @Test
     fun `cancellation after transfer construction preserves the published owner and exact state`() {
         var cancelled = false
         val token = Cancellation { cancelled }
@@ -489,6 +531,8 @@ class LpScopedBasisTransferTest {
 
         assertTrue(thrown === primary)
         assertEquals(listOf(cleanup), thrown.suppressedExceptions.toList())
+        assertTrue(solver.metrics.appendBasisWork > 0)
+        assertEquals(0, solver.metrics.appendUnknownWork)
         targetConstructed = false
         solver.close()
     }
@@ -536,6 +580,51 @@ class LpScopedBasisTransferTest {
 
         assertTrue(thrown === primary)
         assertEquals(listOf(cleanup), thrown.suppressedExceptions.toList())
+        solver.close()
+    }
+
+    @Test
+    fun `fresh arithmetic decline propagates cleanup failure`() {
+        val cleanup = IllegalStateException("cleanup")
+        var basisFactoryCalls = 0
+        val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+            override fun newPersistentSolver(
+                model: LpModel,
+                cancellation: Cancellation,
+                refactorUpdateLimit: Int,
+                iterationLimit: Int,
+                workLimit: Long,
+                trackDegeneracy: Boolean,
+            ): PersistentLpSolver = RevisedSimplex(model, cancellation, basisSolverFactory = { matrix ->
+                basisFactoryCalls++
+                val target = basisFactoryCalls > 1
+                val delegate = KotlinBasisSolver(matrix)
+                object : BasisSolver by delegate {
+                    override fun refactorize(basicIndex: IntArray): Boolean {
+                        if (target) throw BasisArithmeticException("arithmetic")
+                        return delegate.refactorize(basicIndex)
+                    }
+
+                    override fun close() {
+                        delegate.close()
+                        if (target) throw cleanup
+                    }
+                }
+            })
+        }
+        val solver = LpScopedSolver(
+            LpExactState(lowerBoundModel()),
+            context = LpSolveContext(engineFactory = factory),
+            appendSelection = LpAppendSelection.FRESH_INTENDED,
+        )
+        assertNotNull(solver.solve())
+
+        val thrown = assertFailsWith<IllegalStateException> {
+            solver.append(lowerRow(1, 2), scoped = false)
+        }
+
+        assertTrue(thrown === cleanup)
+        assertEquals(1, solver.metrics.appendUnknownWork)
         solver.close()
     }
 

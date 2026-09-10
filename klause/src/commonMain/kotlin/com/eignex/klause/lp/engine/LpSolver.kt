@@ -226,6 +226,7 @@ internal interface PersistentLpSolver : LpSolver {
 
     val appendTransferReady: Boolean get() = false
     val basisLifecycleWork: BasisOperationWork? get() = null
+    val lastAppendReplacementWork: LpAppendBasisWork? get() = null
 
     fun appendReplacement(
         next: LpExactState,
@@ -267,6 +268,8 @@ internal enum class LpAppendTransferDecline {
 }
 
 internal class LpAppendReplacement(val solver: PersistentLpSolver, val basis: Basis, val transferred: Boolean)
+
+internal data class LpAppendBasisWork(val units: Long?, val complete: Boolean)
 
 internal class LpAppendReplacementAttempt(
     val replacement: LpAppendReplacement? = null,

@@ -634,6 +634,8 @@ internal class RevisedSimplex(
     override val appendTransferReady: Boolean
         get() = basisKept && basisFactorized && basisSolver?.singular == false && trackedHeadingsConsistent()
     override val basisLifecycleWork get() = basisSolver?.basisOperationWork
+    override var lastAppendReplacementWork: LpAppendBasisWork? = null
+        private set
 
     @Suppress("ReturnCount", "TooGenericExceptionCaught")
     override fun appendReplacement(
@@ -643,6 +645,7 @@ internal class RevisedSimplex(
         mode: LpAppendReplacementMode,
         token: Cancellation,
     ): LpAppendReplacementAttempt {
+        lastAppendReplacementWork = null
         val current = model.exactState
             ?: return LpAppendReplacementAttempt(decline = LpAppendTransferDecline.INCOMPATIBLE_STATE)
         if (token()) return LpAppendReplacementAttempt(decline = LpAppendTransferDecline.CANCELLED)
@@ -684,6 +687,9 @@ internal class RevisedSimplex(
                 logicalColumns,
                 BasisExtension(ownerColumns, ownerUnitRows, oldRowsInNew, oldColumnsInNew),
             )
+            basisWork = transfer.workUnits
+            basisWorkComplete = transfer.workComplete
+            lastAppendReplacementWork = LpAppendBasisWork(basisWork, basisWorkComplete)
             replacement = transfer.replacement ?: return LpAppendReplacementAttempt(
                 decline = if (transfer.arithmeticDeclined) {
                     LpAppendTransferDecline.ARITHMETIC
@@ -693,17 +699,16 @@ internal class RevisedSimplex(
                 basisWork = transfer.workUnits,
                 basisWorkComplete = transfer.workComplete,
             )
-            basisWork = transfer.workUnits
-            basisWorkComplete = transfer.workComplete
         } else {
             val fresh = adapter.replacementAttempt(oldSolver, candidate.columns, intended, logicalColumns)
+            basisWork = fresh.workUnits
+            basisWorkComplete = fresh.workComplete
+            lastAppendReplacementWork = LpAppendBasisWork(basisWork, basisWorkComplete)
             replacement = fresh.replacement ?: return LpAppendReplacementAttempt(
                 decline = LpAppendTransferDecline.FRESH_FAILED,
                 basisWork = fresh.workUnits,
                 basisWorkComplete = fresh.workComplete,
             )
-            basisWork = fresh.workUnits
-            basisWorkComplete = fresh.workComplete
         }
         var installed = false
         var failure: Throwable? = null

@@ -151,12 +151,10 @@ internal class BasisExtensionAdapter(private val factory: (SparseMatrix) -> Basi
         val fresh = factory(newMatrix)
         var accepted = false
         var failure: Throwable? = null
-        var arithmeticFailure: BasisArithmeticException? = null
         try {
             val factorized = try {
                 fresh.refactorize(intendedBasis)
-            } catch (arithmetic: BasisArithmeticException) {
-                arithmeticFailure = arithmetic
+            } catch (_: BasisArithmeticException) {
                 false
             }
             val work = fresh.basisOperationWork
@@ -177,7 +175,7 @@ internal class BasisExtensionAdapter(private val factory: (SparseMatrix) -> Basi
             failure = primary
             throw primary
         } finally {
-            if (!accepted) closeRejected(fresh, failure ?: arithmeticFailure)
+            if (!accepted) closeRejected(fresh, failure)
         }
     }
 

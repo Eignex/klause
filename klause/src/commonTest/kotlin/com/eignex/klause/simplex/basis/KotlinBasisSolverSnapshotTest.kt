@@ -158,6 +158,8 @@ class KotlinBasisSolverSnapshotTest {
         val declined = solver.basisWork
         assertEquals(1, declined.ftran.declines)
         assertTrue(declined.ftran.units > 0)
+        assertFalse(solver.basisOperationWork.complete)
+        assertTrue(solver.basisOperationWork.ftran.units > 0)
         val snapshot = assertNotNull(solver.snapshot())
         vector.scatter(doubleArrayOf(1e-200))
         solver.ftran(vector)

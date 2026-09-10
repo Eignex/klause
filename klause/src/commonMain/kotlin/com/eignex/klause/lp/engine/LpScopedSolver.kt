@@ -245,7 +245,12 @@ internal class LpScopedSolver(
         val columnMap = IntArray(state.model.numVars) { old ->
             if (old < state.model.n) old else next.model.n + rowMap[old - state.model.n]
         }
-        val attempt = current.appendReplacement(next, rowMap, columnMap, mode, token)
+        val attempt = try {
+            current.appendReplacement(next, rowMap, columnMap, mode, token)
+        } catch (primary: Throwable) {
+            recordExceptionalAppendWork(current, primary)
+            throw primary
+        }
         recordAppendWork(attempt.basisWork, attempt.basisWorkComplete)
         val accepted = attempt.replacement
         if (accepted == null) {
@@ -289,9 +294,23 @@ internal class LpScopedSolver(
         if (left > Long.MAX_VALUE - right) Long.MAX_VALUE else left + right
 
     private fun recordAppendWork(work: Long?, complete: Boolean = work != null) {
-        if (work != null) appendBasisWork = saturatingAdd(appendBasisWork, work)
-        if (!complete || work == null) {
+        var aggregateComplete = true
+        if (work != null) {
+            appendBasisWork = saturatingAdd(appendBasisWork, work)
+            aggregateComplete = appendBasisWork != Long.MAX_VALUE
+        }
+        if (!complete || work == null || !aggregateComplete) {
             appendUnknownWork = saturatingAdd(appendUnknownWork, 1)
+        }
+    }
+
+    private fun recordExceptionalAppendWork(current: PersistentLpSolver, primary: Throwable) {
+        try {
+            val work = current.lastAppendReplacementWork
+            recordAppendWork(work?.units, work?.complete == true)
+        } catch (telemetry: Throwable) {
+            appendUnknownWork = saturatingAdd(appendUnknownWork, 1)
+            primary.addSuppressed(telemetry)
         }
     }
 
