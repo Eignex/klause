@@ -1,5 +1,7 @@
 package com.eignex.klause.simplex.basis
 
+import com.eignex.klause.util.argsortBy
+import com.eignex.koblas.sparse.SparseWorkspace
 import kotlin.math.abs
 
 internal data class ForrestTomlinWork(
@@ -134,7 +136,7 @@ internal class ForrestTomlinFactors private constructor(
                     copiedEntries += rows[i].count
                 }
             }
-            row.scatter(1.0, rows[pivot])
+            row.load(rows[pivot])
             val order = upper.order
             val position = order.indexOf(pivot)
             for (k in position + 1 until n) {
@@ -231,9 +233,18 @@ internal class ForrestTomlinFactors private constructor(
     }
 
     private fun compact(work: BasisWorkspace): BasisSlice {
-        val indices = work.indices.copyOf(work.count).filter { work.values[it] != 0.0 }.toIntArray()
-        indices.sort()
-        return BasisSlice(indices, DoubleArray(indices.size) { work.values[indices[it]] })
+        val gatheredIndices = IntArray(work.count)
+        val gatheredValues = DoubleArray(work.count)
+        val gathered = SparseWorkspace.gatherTouched(
+            work.indices, 0, work.count, work.values,
+            gatheredIndices, 0, gatheredValues, 0,
+            compactExactZeros = true,
+        )
+        val order = argsortBy(gathered) { a, b -> gatheredIndices[a].compareTo(gatheredIndices[b]) }
+        return BasisSlice(
+            IntArray(gathered) { gatheredIndices[order[it]] },
+            DoubleArray(gathered) { gatheredValues[order[it]] },
+        )
     }
 
     companion object {

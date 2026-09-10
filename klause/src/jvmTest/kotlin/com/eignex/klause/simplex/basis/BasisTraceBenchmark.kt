@@ -1,7 +1,7 @@
 package com.eignex.klause.simplex.basis
 
 import com.eignex.koblas.SparseMatrix
-import com.eignex.koblas.hfactor.BundledHfactor
+import com.eignex.koblas.sparse.host.hfactor.HfactorSparseLu
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.io.path.extension
@@ -253,7 +253,7 @@ private fun commonFields(
     "backend" to report.backend,
     "artifactSha256" to artifactSha,
     "koblasArtifactSha256" to artifactHash(SparseMatrix::class.java),
-    "hfactorArtifactSha256" to artifactHash(BundledHfactor::class.java),
+    "hfactorArtifactSha256" to artifactHash(HfactorSparseLu::class.java),
     "javaRuntime" to System.getProperty("java.runtime.version"),
     "kotlinRuntime" to KotlinVersion.CURRENT.toString(),
     "os" to "${System.getProperty("os.name")}/${System.getProperty("os.arch")}",

@@ -1,13 +1,13 @@
 package com.eignex.klause.simplex.basis
 
 import com.eignex.koblas.SparseMatrix
-import com.eignex.koblas.hfactor.BundledHfactor
 import com.eignex.koblas.sparse.host.hfactor.HfactorSparseLu
 import java.util.IdentityHashMap
 import com.eignex.koblas.sparse.basis.IndexedVector as HfactorVector
 
 // Comparison-only bridge. Stable carrier identity lets HFactor reuse its prepared FTRAN/BTRAN state.
-internal class HfactorBasisSolver(matrix: SparseMatrix, provider: HfactorSparseLu = BundledHfactor()) : BasisSolver {
+internal class HfactorBasisSolver(matrix: SparseMatrix, provider: HfactorSparseLu = HfactorSparseLu.bundled()) :
+    BasisSolver {
     private val delegate = provider.basisSolver(matrix)
     private val carriers = IdentityHashMap<IndexedVector, HfactorVector>()
     override val n: Int get() = delegate.n

@@ -4,8 +4,8 @@ import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.MutableIntDoubleMap
 import com.eignex.koblas.SparseMatrix
+import com.eignex.koblas.sparse.SparseWorkspace
 import kotlin.math.abs
-import kotlin.math.max
 
 internal data class LuPivotPolicy(
     val absoluteTolerance: Double = 1e-10,
@@ -183,6 +183,10 @@ private class LuConstruction(
     private val columnOrder = IntArray(n)
     private val lower = LuEntries()
     private val upper = LuEntries()
+    private val activeRows = BooleanArray(n) { true }
+    private val stagedRows = IntArray(n)
+    private val stagedValues = DoubleArray(n)
+    private val candidatePositions = IntArray(n)
     private var inputEntries = 0
     private var pivots = 0
     private var singletonPivots = 0
@@ -278,8 +282,7 @@ private class LuConstruction(
         var bestMerit = Long.MAX_VALUE
         var bestMagnitude = 0.0
         var searched = 0
-        fun consider(i: Int, j: Int) {
-            if (!acceptable(i, j)) return
+        fun considerAccepted(i: Int, j: Int) {
             val merit = (rows[i].size - 1).toLong() * (columns[j].size - 1)
             val magnitude = abs(columns[j].getOrDefault(i, 0.0))
             val previous = best
@@ -296,10 +299,20 @@ private class LuConstruction(
                 bestMagnitude = magnitude
             }
         }
+        fun consider(i: Int, j: Int) {
+            if (acceptable(i, j)) considerAccepted(i, j)
+        }
         for (count in 2..n) {
             var j = columnBuckets.first(count)
             while (j >= 0) {
-                columns[j].forEach { i, _ -> consider(i, j) }
+                val entries = stageColumn(j)
+                val eligible = SparseWorkspace.pivotCandidatePositions(
+                    stagedRows, 0, stagedValues, 0, entries, activeRows,
+                    columnMax[j], policy.absoluteTolerance, policy.relativeThreshold,
+                    candidatePositions, 0,
+                )
+                candidates = saturatedAdd(candidates, entries.toLong())
+                for (k in 0 until eligible) considerAccepted(stagedRows[candidatePositions[k]], j)
                 searched++
                 if (best != null && searched >= policy.searchLimit) return best
                 j = columnBuckets.next(j)
@@ -333,6 +346,7 @@ private class LuConstruction(
             lower.add(affectedRows[k], pivots, multiplier)
         }
         rowBuckets.remove(i)
+        activeRows[i] = false
         columnBuckets.remove(j)
         for (column in affectedColumns) {
             val top = columns[column].getOrDefault(i, 0.0)
@@ -374,12 +388,26 @@ private class LuConstruction(
     }
 
     private fun refreshMaximum(column: Int) {
-        var maximum = 0.0
-        columns[column].forEach { _, value ->
-            maximumEntries++
-            maximum = max(maximum, abs(value))
+        val entries = stageColumn(column)
+        maximumEntries = saturatedAdd(maximumEntries, entries.toLong())
+        columnMax[column] = SparseWorkspace.activeColumnMaxAbs(
+            stagedRows,
+            0,
+            stagedValues,
+            0,
+            entries,
+            activeRows,
+        )
+    }
+
+    private fun stageColumn(column: Int): Int {
+        var count = 0
+        columns[column].forEach { row, value ->
+            stagedRows[count] = row
+            stagedValues[count] = value
+            count++
         }
-        columnMax[column] = maximum
+        return count
     }
 
     private fun work() = LuBuildWork(
