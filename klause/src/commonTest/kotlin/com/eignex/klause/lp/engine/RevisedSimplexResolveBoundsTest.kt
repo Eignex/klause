@@ -96,12 +96,14 @@ class RevisedSimplexResolveBoundsTest {
         val zero = ExactLpNumber.of(0L)
         val one = ExactLpNumber.of(1L)
         val source = ExactLpModel(
-            listOf(listOf(ExactLpEntry(0, one))), listOf(ExactLpNumber.of(10L)),
+            listOf(listOf(ExactLpEntry(0, one))),
+            listOf(ExactLpNumber.of(10L)),
             listOf(
                 ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(ExactLpNumber.of(10L)))),
                 ExactLpColumn(ExactLpBounds(ExactLpSide(zero))),
             ),
-            listOf(ExactLpRow()), ExactLpObjective(listOf(one, zero)),
+            listOf(ExactLpRow()),
+            ExactLpObjective(listOf(one, zero)),
         )
         val trail = LpBoundTrail(source)
         var cancelDuringFtran = false
@@ -140,12 +142,14 @@ class RevisedSimplexResolveBoundsTest {
         val one = ExactLpNumber.of(1L)
         for (upper in listOf(false, true)) {
             val source = ExactLpModel(
-                listOf(listOf(ExactLpEntry(0, one))), listOf(ExactLpNumber.of(10L)),
+                listOf(listOf(ExactLpEntry(0, one))),
+                listOf(ExactLpNumber.of(10L)),
                 listOf(
                     ExactLpColumn(ExactLpBounds()),
                     ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(ExactLpNumber.of(10L)))),
                 ),
-                listOf(ExactLpRow()), ExactLpObjective(listOf(ExactLpNumber.of(if (upper) -1L else 1L), zero)),
+                listOf(ExactLpRow()),
+                ExactLpObjective(listOf(ExactLpNumber.of(if (upper) -1L else 1L), zero)),
             )
             val trail = LpBoundTrail(source)
             assertTrue(trail.push())
@@ -182,12 +186,14 @@ class RevisedSimplexResolveBoundsTest {
         val zero = ExactLpNumber.of(0L)
         val one = ExactLpNumber.of(1L)
         val source = ExactLpModel(
-            listOf(listOf(ExactLpEntry(0, one))), listOf(ExactLpNumber.of(3L)),
+            listOf(listOf(ExactLpEntry(0, one))),
+            listOf(ExactLpNumber.of(3L)),
             listOf(
                 ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(ExactLpNumber.of(10L)))),
                 ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(zero))),
             ),
-            listOf(ExactLpRow()), ExactLpObjective(listOf(one, zero)),
+            listOf(ExactLpRow()),
+            ExactLpObjective(listOf(one, zero)),
         )
         val trail = LpBoundTrail(source)
         var forwardSolves = 0
@@ -225,9 +231,11 @@ class RevisedSimplexResolveBoundsTest {
             val zero = ExactLpNumber.of(0L)
             val box = ExactLpBounds(ExactLpSide(zero), ExactLpSide(ExactLpNumber.of(10L)))
             val source = ExactLpModel(
-                List(2) { listOf(ExactLpEntry(0, ExactLpNumber.of(-1L))) }, listOf(ExactLpNumber.of(-3L)),
+                List(2) { listOf(ExactLpEntry(0, ExactLpNumber.of(-1L))) },
+                listOf(ExactLpNumber.of(-3L)),
                 listOf(ExactLpColumn(box), ExactLpColumn(box), ExactLpColumn(ExactLpBounds(ExactLpSide(zero)))),
-                listOf(ExactLpRow()), ExactLpObjective(listOf(ExactLpNumber.of(1L), ExactLpNumber.of(2L), zero)),
+                listOf(ExactLpRow()),
+                ExactLpObjective(listOf(ExactLpNumber.of(1L), ExactLpNumber.of(2L), zero)),
             )
             val trail = LpBoundTrail(source)
             RevisedSimplex(assertNotNull(trail.state.toWorkingModel())).use { native ->
@@ -257,19 +265,23 @@ class RevisedSimplexResolveBoundsTest {
                                         trail.assertBound(0, true, ExactLpSide(ExactLpNumber.of(1L)), cycle * 3L),
                                     )
                                 }
+
                                 1 -> {
                                     assertTrue(trail.push())
                                     assertTrue(
                                         trail.assertBound(1, false, ExactLpSide(ExactLpNumber.of(3L)), cycle * 3L + 1L),
                                     )
                                 }
+
                                 2 -> {
                                     assertTrue(trail.push())
                                     assertTrue(
                                         trail.assertBound(0, false, ExactLpSide(ExactLpNumber.of(1L)), cycle * 3L + 2L),
                                     )
                                 }
+
                                 3 -> assertTrue(trail.pop(1))
+
                                 else -> assertTrue(trail.pop(0))
                             }
                             assertTrue(native.adopt(trail.state, Cancellation.Never))
@@ -295,11 +307,15 @@ class RevisedSimplexResolveBoundsTest {
                             legacyFactors += legacy.lastRefactorizations
                             if (repetition == 0) {
                                 val certified = certifyLpResult(
-                                    assertNotNull(trail.state.toWorkingModel()), native, nativeResult,
+                                    assertNotNull(trail.state.toWorkingModel()),
+                                    native,
+                                    nativeResult,
                                 )
                                 val baseline = certifyLpResult(legacyModel, legacy, legacyResult)
                                 val checked = listOfNotNull(
-                                    certified, baseline, if (cycle == 0) solveAndCertify(trail.state.model) else null,
+                                    certified,
+                                    baseline,
+                                    if (cycle == 0) solveAndCertify(trail.state.model) else null,
                                 )
                                 for (result in checked) {
                                     assertEquals(LpVerdict.ATTAINED_OPTIMUM, result.verdict, "cycle=$cycle step=$step")

@@ -58,11 +58,16 @@ class LpCaptureTest {
     fun `exact capture rejects unknown format and event versions`() {
         val zero = ExactLpNumber.of(0L)
         val model = ExactLpModel(
-            listOf(emptyList()), emptyList(), listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero)))),
-            emptyList(), ExactLpObjective(listOf(zero)),
+            listOf(emptyList()),
+            emptyList(),
+            listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero)))),
+            emptyList(),
+            ExactLpObjective(listOf(zero)),
         )
         val bytes = LpExactCapture.capture(
-            model, LpReplaySettings("version", 0L), listOf(LpExactReplayEvent.Push()),
+            model,
+            LpReplaySettings("version", 0L),
+            listOf(LpExactReplayEvent.Push()),
         ).encode()
         val badFormat = bytes.copyOf().also { it[11] = 99 }
         val badEvent = bytes.copyOf().also { it[it.lastIndex] = 99 }
@@ -76,8 +81,11 @@ class LpCaptureTest {
     fun `exact state keys distinguish weaker witnesses and restored revisions`() {
         val zero = ExactLpNumber.of(0L)
         val model = ExactLpModel(
-            listOf(emptyList()), emptyList(), listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero)))),
-            emptyList(), ExactLpObjective(listOf(zero)),
+            listOf(emptyList()),
+            emptyList(),
+            listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero)))),
+            emptyList(),
+            ExactLpObjective(listOf(zero)),
         )
         val trail = LpBoundTrail(model)
         val first = assertNotNull(LpExactCapture.stateKey(trail.state))
@@ -96,8 +104,11 @@ class LpCaptureTest {
     @Test
     fun `exact state key declines excessive complete authority`() {
         val model = ExactLpModel(
-            List(500) { emptyList() }, emptyList(), List(500) { ExactLpColumn(ExactLpBounds()) },
-            emptyList(), ExactLpObjective(List(500) { ExactLpNumber.of(0L) }),
+            List(500) { emptyList() },
+            emptyList(),
+            List(500) { ExactLpColumn(ExactLpBounds()) },
+            emptyList(),
+            ExactLpObjective(List(500) { ExactLpNumber.of(0L) }),
         )
 
         assertNull(LpExactCapture.stateKey(LpExactState(model)))
@@ -107,8 +118,11 @@ class LpCaptureTest {
     fun `exact state key declines oversized rational bytes below value budget`() {
         val large = ExactLpNumber.of(BigFraction.of(BigInteger.ONE shl 4096, BigInteger.ONE))
         val model = ExactLpModel(
-            List(40) { emptyList() }, emptyList(), List(40) { ExactLpColumn(ExactLpBounds(), origin = large) },
-            emptyList(), ExactLpObjective(List(40) { ExactLpNumber.of(0L) }),
+            List(40) { emptyList() },
+            emptyList(),
+            List(40) { ExactLpColumn(ExactLpBounds(), origin = large) },
+            emptyList(),
+            ExactLpObjective(List(40) { ExactLpNumber.of(0L) }),
         )
 
         assertNull(LpExactCapture.stateKey(LpExactState(model)))
@@ -120,8 +134,11 @@ class LpCaptureTest {
         val second = ExactLpNumber.of(9007199254740993L)
         assertEquals(first.value.toDouble(), second.value.toDouble())
         val model = ExactLpModel(
-            listOf(emptyList()), emptyList(), listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(first)))),
-            emptyList(), ExactLpObjective(listOf(ExactLpNumber.of(0L))),
+            listOf(emptyList()),
+            emptyList(),
+            listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(first)))),
+            emptyList(),
+            ExactLpObjective(listOf(ExactLpNumber.of(0L))),
         )
         val baseline = assertNotNull(LpExactCapture.stateKey(LpExactState(model)))
         val variants = listOf(
@@ -140,8 +157,11 @@ class LpCaptureTest {
     fun `legacy capture rejects exact projection and native status`() {
         val zero = ExactLpNumber.of(0L)
         val model = ExactLpModel(
-            listOf(emptyList()), emptyList(), listOf(ExactLpColumn(ExactLpBounds())),
-            emptyList(), ExactLpObjective(listOf(zero)),
+            listOf(emptyList()),
+            emptyList(),
+            listOf(ExactLpColumn(ExactLpBounds())),
+            emptyList(),
+            ExactLpObjective(listOf(zero)),
         )
         val working = assertNotNull(LpExactState(model).toWorkingModel())
 

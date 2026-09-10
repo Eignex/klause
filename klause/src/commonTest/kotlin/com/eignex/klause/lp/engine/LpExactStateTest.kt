@@ -17,7 +17,8 @@ class LpExactStateTest {
         val third = ExactLpNumber.of(BigFraction.of(BigInteger.ONE, BigInteger.fromInt(3)))
         val premises = ExactLpPremises(listOf(ExactLpPremise(8, true, third)))
         val model = ExactLpModel(
-            listOf(listOf(ExactLpEntry(0, third))), listOf(third),
+            listOf(listOf(ExactLpEntry(0, third))),
+            listOf(third),
             listOf(
                 ExactLpColumn(ExactLpBounds(upper = ExactLpSide(third, strict = true)), third, false, 42),
                 ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(zero))),
@@ -50,9 +51,11 @@ class LpExactStateTest {
         val tiny = ExactLpNumber.of(BigFraction.of(BigInteger.ONE, BigInteger.ONE shl 2048))
         for (matrixUnderflow in listOf(false, true)) {
             val model = ExactLpModel(
-                listOf(listOf(ExactLpEntry(0, if (matrixUnderflow) tiny else zero))), listOf(zero),
+                listOf(listOf(ExactLpEntry(0, if (matrixUnderflow) tiny else zero))),
+                listOf(zero),
                 listOf(ExactLpColumn(ExactLpBounds()), ExactLpColumn(ExactLpBounds())),
-                listOf(ExactLpRow()), ExactLpObjective(listOf(if (matrixUnderflow) zero else tiny, zero)),
+                listOf(ExactLpRow()),
+                ExactLpObjective(listOf(if (matrixUnderflow) zero else tiny, zero)),
             )
 
             assertNull(LpExactState(model).toWorkingModel())
@@ -64,9 +67,11 @@ class LpExactStateTest {
         val zero = ExactLpNumber.ofIeee(-0.0)
         val tiny = ExactLpNumber.ofIeee(Double.MIN_VALUE)
         val model = ExactLpModel(
-            listOf(listOf(ExactLpEntry(0, tiny))), listOf(tiny),
+            listOf(listOf(ExactLpEntry(0, tiny))),
+            listOf(tiny),
             listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero))), ExactLpColumn(ExactLpBounds())),
-            listOf(ExactLpRow()), ExactLpObjective(listOf(tiny, zero)),
+            listOf(ExactLpRow()),
+            ExactLpObjective(listOf(tiny, zero)),
         )
 
         val working = assertNotNull(LpExactState(model).toWorkingModel())
@@ -82,8 +87,11 @@ class LpExactStateTest {
     fun `snapshots own assertion and scope collections`() {
         val zero = ExactLpNumber.of(0L)
         val model = ExactLpModel(
-            listOf(emptyList()), emptyList(), listOf(ExactLpColumn(ExactLpBounds())),
-            emptyList(), ExactLpObjective(listOf(zero)),
+            listOf(emptyList()),
+            emptyList(),
+            listOf(ExactLpColumn(ExactLpBounds())),
+            emptyList(),
+            ExactLpObjective(listOf(zero)),
         )
         val assertions = mutableListOf(LpBoundAssertion(0, false, ExactLpSide(zero), 7L, 1))
         val scopes = mutableListOf(0)
@@ -102,8 +110,11 @@ class LpExactStateTest {
     fun `empty scopes and weaker witnesses distinguish otherwise equal boxes`() {
         val zero = ExactLpNumber.of(0L)
         val model = ExactLpModel(
-            listOf(emptyList()), emptyList(), listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero)))),
-            emptyList(), ExactLpObjective(listOf(zero)),
+            listOf(emptyList()),
+            emptyList(),
+            listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero)))),
+            emptyList(),
+            ExactLpObjective(listOf(zero)),
         )
         val trail = LpBoundTrail(model)
         val root = trail.state
@@ -125,14 +136,19 @@ class LpExactStateTest {
         val zero = ExactLpNumber.of(0L)
         val one = ExactLpNumber.of(1L)
         val model = ExactLpModel(
-            listOf(listOf(ExactLpEntry(0, one))), listOf(one),
+            listOf(listOf(ExactLpEntry(0, one))),
+            listOf(one),
             listOf(ExactLpColumn(ExactLpBounds()), ExactLpColumn(ExactLpBounds())),
-            listOf(ExactLpRow()), ExactLpObjective(listOf(zero, zero)),
+            listOf(ExactLpRow()),
+            ExactLpObjective(listOf(zero, zero)),
         )
         val state = LpExactState(model)
         val ieee = ExactLpModel(
-            listOf(listOf(ExactLpEntry(0, ExactLpNumber.ofIeee(1.0)))), listOf(one),
-            List(2) { model.column(it) }, listOf(model.row(0)), model.objective,
+            listOf(listOf(ExactLpEntry(0, ExactLpNumber.ofIeee(1.0)))),
+            listOf(one),
+            List(2) { model.column(it) },
+            listOf(model.row(0)),
+            model.objective,
         )
 
         assertFalse(state.sameMatrix(LpExactState(ieee)))

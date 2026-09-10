@@ -62,8 +62,10 @@ class RevisedSimplexPrimalTest {
         val one = ExactLpNumber.of(1L)
         val box = ExactLpBounds(ExactLpSide(zero), ExactLpSide(one))
         val model = ExactLpModel(
-            listOf(listOf(ExactLpEntry(0, one))), listOf(one),
-            listOf(ExactLpColumn(box), ExactLpColumn(box)), listOf(ExactLpRow()),
+            listOf(listOf(ExactLpEntry(0, one))),
+            listOf(one),
+            listOf(ExactLpColumn(box), ExactLpColumn(box)),
+            listOf(ExactLpRow()),
             ExactLpObjective(listOf(zero, one)),
         )
 
@@ -79,12 +81,14 @@ class RevisedSimplexPrimalTest {
         val zero = ExactLpNumber.of(0L)
         val one = ExactLpNumber.of(1L)
         val model = ExactLpModel(
-            listOf(listOf(ExactLpEntry(0, one))), listOf(ExactLpNumber.of(2L)),
+            listOf(listOf(ExactLpEntry(0, one))),
+            listOf(ExactLpNumber.of(2L)),
             listOf(
                 ExactLpColumn(ExactLpBounds()),
                 ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(zero))),
             ),
-            listOf(ExactLpRow()), ExactLpObjective(listOf(one, zero)),
+            listOf(ExactLpRow()),
+            ExactLpObjective(listOf(one, zero)),
         )
         val working = assertNotNull(LpExactState(model).toWorkingModel())
 
@@ -107,12 +111,14 @@ class RevisedSimplexPrimalTest {
         val lower = ExactLpNumber.of(9007199254740992L)
         val upper = ExactLpNumber.of(9007199254740993L)
         val model = ExactLpModel(
-            listOf(listOf(ExactLpEntry(0, one))), listOf(lower),
+            listOf(listOf(ExactLpEntry(0, one))),
+            listOf(lower),
             listOf(
                 ExactLpColumn(ExactLpBounds(ExactLpSide(lower), ExactLpSide(upper))),
                 ExactLpColumn(ExactLpBounds()),
             ),
-            listOf(ExactLpRow()), ExactLpObjective(listOf(one, zero)),
+            listOf(ExactLpRow()),
+            ExactLpObjective(listOf(one, zero)),
         )
 
         val certified = solveAndCertify(model)

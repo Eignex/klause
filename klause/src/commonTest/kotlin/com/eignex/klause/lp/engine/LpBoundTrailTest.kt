@@ -16,8 +16,11 @@ class LpBoundTrailTest {
     fun `weaker active witnesses survive arbitrary backjumps`() {
         val zero = ExactLpNumber.of(0L)
         val model = ExactLpModel(
-            listOf(emptyList()), emptyList(), listOf(ExactLpColumn(ExactLpBounds())),
-            emptyList(), ExactLpObjective(listOf(zero)),
+            listOf(emptyList()),
+            emptyList(),
+            listOf(ExactLpColumn(ExactLpBounds())),
+            emptyList(),
+            ExactLpObjective(listOf(zero)),
         )
         val trail = LpBoundTrail(model)
         assertTrue(trail.assertBound(0, false, ExactLpSide(ExactLpNumber.of(1L)), 1L))
@@ -47,9 +50,11 @@ class LpBoundTrailTest {
         val zero = ExactLpNumber.of(0L)
         val premise = ExactLpPremises(listOf(ExactLpPremise(7, false, zero)), listOf(5))
         val model = ExactLpModel(
-            listOf(emptyList()), emptyList(),
+            listOf(emptyList()),
+            emptyList(),
             listOf(ExactLpColumn(ExactLpBounds(upper = ExactLpSide(zero)))),
-            emptyList(), ExactLpObjective(listOf(zero)),
+            emptyList(),
+            ExactLpObjective(listOf(zero)),
         )
         val trail = LpBoundTrail(model)
         assertTrue(trail.push())
@@ -71,9 +76,11 @@ class LpBoundTrailTest {
         val low = ExactLpNumber.of(9007199254740992L)
         val high = ExactLpNumber.of(9007199254740993L)
         val model = ExactLpModel(
-            listOf(emptyList()), emptyList(),
+            listOf(emptyList()),
+            emptyList(),
             listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(low), ExactLpSide(high)))),
-            emptyList(), ExactLpObjective(listOf(ExactLpNumber.of(0L))),
+            emptyList(),
+            ExactLpObjective(listOf(ExactLpNumber.of(0L))),
         )
         val trail = LpBoundTrail(model)
         assertEquals(low.value.toDouble(), high.value.toDouble())
@@ -93,8 +100,11 @@ class LpBoundTrailTest {
     fun `equal witnesses keep the oldest strongest premise`() {
         val zero = ExactLpNumber.of(0L)
         val model = ExactLpModel(
-            listOf(emptyList()), emptyList(), listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero)))),
-            emptyList(), ExactLpObjective(listOf(zero)),
+            listOf(emptyList()),
+            emptyList(),
+            listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero)))),
+            emptyList(),
+            ExactLpObjective(listOf(zero)),
         )
         val trail = LpBoundTrail(model)
         assertTrue(trail.assertBound(0, false, ExactLpSide(zero), 1L))
@@ -111,9 +121,11 @@ class LpBoundTrailTest {
     fun `invalid and cancelled operations leave the complete state unchanged`() {
         val zero = ExactLpNumber.of(0L)
         val model = ExactLpModel(
-            listOf(emptyList()), listOf(zero),
+            listOf(emptyList()),
+            listOf(zero),
             listOf(ExactLpColumn(ExactLpBounds()), ExactLpColumn(ExactLpBounds())),
-            listOf(ExactLpRow()), ExactLpObjective(listOf(zero, zero)),
+            listOf(ExactLpRow()),
+            ExactLpObjective(listOf(zero, zero)),
         )
         val trail = LpBoundTrail(model)
         val before = trail.state
@@ -138,12 +150,14 @@ class LpBoundTrailTest {
         val zero = ExactLpNumber.of(0L)
         val one = ExactLpNumber.of(1L)
         val model = ExactLpModel(
-            listOf(listOf(ExactLpEntry(0, one))), listOf(ExactLpNumber.of(8L)),
+            listOf(listOf(ExactLpEntry(0, one))),
+            listOf(ExactLpNumber.of(8L)),
             listOf(
                 ExactLpColumn(ExactLpBounds(ExactLpSide(zero))),
                 ExactLpColumn(ExactLpBounds(ExactLpSide(zero))),
             ),
-            listOf(ExactLpRow()), ExactLpObjective(listOf(one, zero)),
+            listOf(ExactLpRow()),
+            ExactLpObjective(listOf(one, zero)),
         )
         val trail = LpBoundTrail(model)
         val premise = ExactLpPremises(listOf(ExactLpPremise(42, false, ExactLpNumber.of(2L))))
@@ -168,8 +182,11 @@ class LpBoundTrailTest {
     fun `IEEE assertions and premises reject changed origins without erasing authority`() {
         val zero = ExactLpNumber.of(0L)
         val model = ExactLpModel(
-            listOf(emptyList()), emptyList(), listOf(ExactLpColumn(ExactLpBounds())),
-            emptyList(), ExactLpObjective(listOf(zero)),
+            listOf(emptyList()),
+            emptyList(),
+            listOf(ExactLpColumn(ExactLpBounds())),
+            emptyList(),
+            ExactLpObjective(listOf(zero)),
         )
         val sides = listOf(
             ExactLpSide(ExactLpNumber.ofIeee(0.5)),
@@ -192,8 +209,11 @@ class LpBoundTrailTest {
     fun `overflowing projection rejects assertion before publication`() {
         val zero = ExactLpNumber.of(0L)
         val model = ExactLpModel(
-            listOf(emptyList()), emptyList(), listOf(ExactLpColumn(ExactLpBounds())),
-            emptyList(), ExactLpObjective(listOf(zero)),
+            listOf(emptyList()),
+            emptyList(),
+            listOf(ExactLpColumn(ExactLpBounds())),
+            emptyList(),
+            ExactLpObjective(listOf(zero)),
         )
         val trail = LpBoundTrail(model)
         val before = trail.state

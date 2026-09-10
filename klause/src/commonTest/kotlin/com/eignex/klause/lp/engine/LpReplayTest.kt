@@ -16,9 +16,11 @@ class LpReplayTest {
     fun `exact replay preserves active witnesses across objective and origin changes`() {
         val zero = ExactLpNumber.of(0L)
         val model = ExactLpModel(
-            listOf(emptyList()), emptyList(),
+            listOf(emptyList()),
+            emptyList(),
             listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(ExactLpNumber.of(10L))))),
-            emptyList(), ExactLpObjective(listOf(ExactLpNumber.of(1L))),
+            emptyList(),
+            ExactLpObjective(listOf(ExactLpNumber.of(1L))),
         )
         val premises = ExactLpPremises(listOf(ExactLpPremise(3, false, ExactLpNumber.of(2L))), listOf(19))
         val capture = LpExactCapture.capture(
@@ -70,12 +72,16 @@ class LpReplayTest {
     fun `exact replay preflight rejects unsupported later projection`() {
         val zero = ExactLpNumber.of(0L)
         val model = ExactLpModel(
-            listOf(emptyList()), emptyList(), listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero)))),
-            emptyList(), ExactLpObjective(listOf(zero)),
+            listOf(emptyList()),
+            emptyList(),
+            listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero)))),
+            emptyList(),
+            ExactLpObjective(listOf(zero)),
         )
         val huge = ExactLpNumber.of(BigFraction.of(BigInteger.ONE shl 2048, BigInteger.ONE))
         val capture = LpExactCapture.capture(
-            model, persistentSettings("unsupported projection"),
+            model,
+            persistentSettings("unsupported projection"),
             listOf(LpExactReplayEvent.Solve(), LpExactReplayEvent.Assert(0, false, ExactLpSide(huge), 7L)),
         )
 
@@ -86,11 +92,16 @@ class LpReplayTest {
     fun `exact replay preflight rejects invalid backjump after solve`() {
         val zero = ExactLpNumber.of(0L)
         val model = ExactLpModel(
-            listOf(emptyList()), emptyList(), listOf(ExactLpColumn(ExactLpBounds())),
-            emptyList(), ExactLpObjective(listOf(zero)),
+            listOf(emptyList()),
+            emptyList(),
+            listOf(ExactLpColumn(ExactLpBounds())),
+            emptyList(),
+            ExactLpObjective(listOf(zero)),
         )
         val capture = LpExactCapture.capture(
-            model, persistentSettings("bad pop"), listOf(LpExactReplayEvent.Solve(), LpExactReplayEvent.Pop(1)),
+            model,
+            persistentSettings("bad pop"),
+            listOf(LpExactReplayEvent.Solve(), LpExactReplayEvent.Pop(1)),
         )
 
         assertFails { LpExactReplay.replay(capture) }
@@ -100,11 +111,18 @@ class LpReplayTest {
     fun `exact replay cancellation declines before any event claim`() {
         val zero = ExactLpNumber.of(0L)
         val model = ExactLpModel(
-            listOf(emptyList()), emptyList(), listOf(ExactLpColumn(ExactLpBounds())),
-            emptyList(), ExactLpObjective(listOf(zero)),
+            listOf(emptyList()),
+            emptyList(),
+            listOf(ExactLpColumn(ExactLpBounds())),
+            emptyList(),
+            ExactLpObjective(listOf(zero)),
         )
         val settings = LpReplaySettings(
-            "cancelled exact", 0L, LpReplaySolverKind.PERSISTENT, componentSplit = false, cancellationPollLimit = 1,
+            "cancelled exact",
+            0L,
+            LpReplaySolverKind.PERSISTENT,
+            componentSplit = false,
+            cancellationPollLimit = 1,
         )
 
         val report = LpExactReplay.replay(LpExactCapture.capture(model, settings, listOf(LpExactReplayEvent.Solve())))
@@ -117,14 +135,23 @@ class LpReplayTest {
     fun `exact replay cancelled solve stops without publishing a claim`() {
         val zero = ExactLpNumber.of(0L)
         val model = ExactLpModel(
-            listOf(emptyList()), emptyList(), listOf(ExactLpColumn(ExactLpBounds())),
-            emptyList(), ExactLpObjective(listOf(zero)),
+            listOf(emptyList()),
+            emptyList(),
+            listOf(ExactLpColumn(ExactLpBounds())),
+            emptyList(),
+            ExactLpObjective(listOf(zero)),
         )
         val settings = LpReplaySettings(
-            "cancelled solve", 0L, LpReplaySolverKind.PERSISTENT, componentSplit = false, cancellationPollLimit = 5,
+            "cancelled solve",
+            0L,
+            LpReplaySolverKind.PERSISTENT,
+            componentSplit = false,
+            cancellationPollLimit = 5,
         )
         val capture = LpExactCapture.capture(
-            model, settings, listOf(LpExactReplayEvent.Solve(), LpExactReplayEvent.Push()),
+            model,
+            settings,
+            listOf(LpExactReplayEvent.Solve(), LpExactReplayEvent.Push()),
         )
 
         val report = LpExactReplay.replay(capture)

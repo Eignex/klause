@@ -21,15 +21,21 @@ class LpSolveTest {
         val certificate = assertNotNull(integerCertify(legacy, doubleArrayOf()))
         val zero = ExactLpNumber.of(0L)
         val source = ExactLpModel(
-            listOf(emptyList()), emptyList(),
+            listOf(emptyList()),
+            emptyList(),
             listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(ExactLpNumber.of(10L))))),
-            emptyList(), ExactLpObjective(listOf(ExactLpNumber.of(1L))),
+            emptyList(),
+            ExactLpObjective(listOf(ExactLpNumber.of(1L))),
         )
         val working = assertNotNull(LpExactState(source).toWorkingModel())
 
         val bound = tightObjectiveLowerBound(working, doubleArrayOf(), certificate)
         val accepted = certifiedTightObjectiveLowerBound(
-            working, doubleArrayOf(), certificate, null, ProductionLpCertificationPolicy,
+            working,
+            doubleArrayOf(),
+            certificate,
+            null,
+            ProductionLpCertificationPolicy,
         )
 
         assertEquals(0.0, bound)
@@ -40,9 +46,11 @@ class LpSolveTest {
     fun `crossed bound witnesses honor proof acceptance policy`() {
         val zero = ExactLpNumber.of(0L)
         val source = ExactLpModel(
-            listOf(emptyList()), emptyList(),
+            listOf(emptyList()),
+            emptyList(),
             listOf(ExactLpColumn(ExactLpBounds(upper = ExactLpSide(zero)))),
-            emptyList(), ExactLpObjective(listOf(zero)),
+            emptyList(),
+            ExactLpObjective(listOf(zero)),
         )
         val trail = LpBoundTrail(source)
         assertTrue(trail.assertBound(0, false, ExactLpSide(zero, strict = true), 7L))
@@ -63,17 +71,23 @@ class LpSolveTest {
     fun `exact objective units and source origins survive certification`() {
         val third = BigFraction.of(BigInteger.ONE, BigInteger.fromInt(3))
         val model = ExactLpModel(
-            listOf(emptyList()), emptyList(),
+            listOf(emptyList()),
+            emptyList(),
             listOf(
                 ExactLpColumn(
                     ExactLpBounds(ExactLpSide(ExactLpNumber.of(third)), ExactLpSide(ExactLpNumber.of(2L))),
-                    origin = ExactLpNumber.of(10L), integral = false, tag = 17,
+                    origin = ExactLpNumber.of(10L),
+                    integral = false,
+                    tag = 17,
                 ),
             ),
             emptyList(),
             ExactLpObjective(
-                listOf(ExactLpNumber.of(6L)), constant = ExactLpNumber.of(9L),
-                scale = ExactLpNumber.of(3L), externalConstant = ExactLpNumber.of(4L), sense = Sense.MAXIMIZE,
+                listOf(ExactLpNumber.of(6L)),
+                constant = ExactLpNumber.of(9L),
+                scale = ExactLpNumber.of(3L),
+                externalConstant = ExactLpNumber.of(4L),
+                sense = Sense.MAXIMIZE,
             ),
         )
 
@@ -91,9 +105,11 @@ class LpSolveTest {
     fun `strict closure vertex proves only a bound`() {
         val zero = ExactLpNumber.of(0L)
         val model = ExactLpModel(
-            listOf(emptyList()), emptyList(),
+            listOf(emptyList()),
+            emptyList(),
             listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero, strict = true), ExactLpSide(ExactLpNumber.of(1L))))),
-            emptyList(), ExactLpObjective(listOf(zero)),
+            emptyList(),
+            ExactLpObjective(listOf(zero)),
         )
 
         val result = solveAndCertify(model)
@@ -110,12 +126,14 @@ class LpSolveTest {
         val zero = ExactLpNumber.of(0L)
         for (rhs in listOf(tenth, ExactLpNumber.ofIeee(0.1))) {
             val model = ExactLpModel(
-                listOf(listOf(ExactLpEntry(0, ExactLpNumber.of(1L)))), listOf(rhs),
+                listOf(listOf(ExactLpEntry(0, ExactLpNumber.of(1L)))),
+                listOf(rhs),
                 listOf(
                     ExactLpColumn(ExactLpBounds(ExactLpSide(tenth), ExactLpSide(tenth))),
                     ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(zero))),
                 ),
-                listOf(ExactLpRow()), ExactLpObjective(listOf(zero, zero)),
+                listOf(ExactLpRow()),
+                ExactLpObjective(listOf(zero, zero)),
             )
 
             val result = solveAndCertify(model)
@@ -134,13 +152,18 @@ class LpSolveTest {
     fun `unrepresentable exact costs decline before engine creation`() {
         val huge = ExactLpNumber.of(BigFraction.of(BigInteger.ONE shl 4096, BigInteger.ONE))
         val model = ExactLpModel(
-            listOf(emptyList()), emptyList(), listOf(ExactLpColumn(ExactLpBounds())), emptyList(),
+            listOf(emptyList()),
+            emptyList(),
+            listOf(ExactLpColumn(ExactLpBounds())),
+            emptyList(),
             ExactLpObjective(listOf(huge)),
         )
-        val context = LpSolveContext(engineFactory = object : LpEngineFactory by ProductionLpEngineFactory {
+        val context = LpSolveContext(
+            engineFactory = object : LpEngineFactory by ProductionLpEngineFactory {
             override fun newGeneralSolver(model: LpModel, cancellation: Cancellation): LpSolver =
                 error("engine entered")
-        })
+        }
+        )
 
         val result = solveAndCertify(model, context = context)
 
@@ -153,9 +176,11 @@ class LpSolveTest {
     fun `weaker witnesses invalidate counters while old lazy bounds retain their source state`() {
         val zero = ExactLpNumber.of(0L)
         val source = ExactLpModel(
-            listOf(emptyList()), emptyList(),
+            listOf(emptyList()),
+            emptyList(),
             listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(ExactLpNumber.of(10L))))),
-            emptyList(), ExactLpObjective(listOf(ExactLpNumber.of(1L))),
+            emptyList(),
+            ExactLpObjective(listOf(ExactLpNumber.of(1L))),
         )
         val trail = LpBoundTrail(source)
         assertTrue(trail.assertBound(0, false, ExactLpSide(ExactLpNumber.of(3L)), 1L))
