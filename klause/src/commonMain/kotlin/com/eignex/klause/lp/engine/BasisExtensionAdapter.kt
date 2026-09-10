@@ -60,6 +60,9 @@ internal class BasisExtensionAdapter(private val factory: (SparseMatrix) -> Basi
             val work = operationDelta(before, oldSolver.basisOperationWork)
             remember(work)
             return BasisTransferAttempt(null, true, work.units, work.complete)
+        } catch (primary: Throwable) {
+            rememberExceptionalDelta(before, oldSolver, primary)
+            throw primary
         }
         if (extended == null) {
             val work = operationDelta(before, oldSolver.basisOperationWork)
@@ -184,6 +187,7 @@ internal class BasisExtensionAdapter(private val factory: (SparseMatrix) -> Basi
             return BasisReplacementAttempt(result, workUnits, workComplete)
         } catch (primary: Throwable) {
             failure = primary
+            rememberExceptionalWork(fresh, primary)
             throw primary
         } finally {
             if (!accepted) closeRejected(fresh, failure)
@@ -219,6 +223,29 @@ internal class BasisExtensionAdapter(private val factory: (SparseMatrix) -> Basi
 
     private fun remember(work: BasisOperationDelta) {
         lastAttemptWork = BasisAttemptWork(work.units, work.complete)
+    }
+
+    @Suppress("TooGenericExceptionCaught")
+    private fun rememberExceptionalDelta(before: BasisOperationWork?, solver: BasisSolver, primary: Throwable) {
+        try {
+            remember(operationDelta(before, solver.basisOperationWork))
+        } catch (telemetry: Throwable) {
+            if (telemetry !== primary) primary.addSuppressed(telemetry)
+        }
+    }
+
+    @Suppress("TooGenericExceptionCaught")
+    private fun rememberExceptionalWork(solver: BasisSolver, primary: Throwable) {
+        if (lastAttemptWork != null) return
+        try {
+            val work = solver.basisOperationWork
+            lastAttemptWork = BasisAttemptWork(
+                work?.takeUnless { it.saturated }?.units,
+                work?.complete == true && !work.saturated,
+            )
+        } catch (telemetry: Throwable) {
+            if (telemetry !== primary) primary.addSuppressed(telemetry)
+        }
     }
 
     @Suppress("TooGenericExceptionCaught")

@@ -3,6 +3,7 @@ package com.eignex.klause.lp.engine
 import com.eignex.klause.lp.engine.Cut
 import com.eignex.klause.simplex.basis.BasisArithmeticException
 import com.eignex.klause.simplex.basis.BasisExtension
+import com.eignex.klause.simplex.basis.BasisOperationWork
 import com.eignex.klause.simplex.basis.BasisSolver
 import com.eignex.klause.simplex.basis.BasisUpdate
 import com.eignex.klause.simplex.basis.IndexedVector
@@ -183,6 +184,7 @@ internal class RevisedSimplex(
      * its caller drops — would otherwise each take one.
      */
     private var basisSolver: BasisSolver? = null
+    private var retiredBasisWork: BasisOperationWork? = null
 
     /** Whether [basisSolver] currently factorizes the seated [basicVar]. False before the first
      *  factorization and after one came back singular. */
@@ -333,8 +335,24 @@ internal class RevisedSimplex(
         basisSolver = it
     }
 
+    @Suppress("TooGenericExceptionCaught")
     override fun close() {
-        basisSolver?.close()
+        val current = basisSolver
+        var failure: Throwable? = null
+        if (current != null) {
+            try {
+                val work = current.basisOperationWork ?: BasisOperationWork(complete = false)
+                retiredBasisWork = retiredBasisWork?.mergedWith(work) ?: work
+            } catch (_: Throwable) {
+                val incomplete = BasisOperationWork(complete = false)
+                retiredBasisWork = retiredBasisWork?.mergedWith(incomplete) ?: incomplete
+            }
+            try {
+                current.close()
+            } catch (cleanup: Throwable) {
+                if (failure == null) failure = cleanup else failure.addSuppressed(cleanup)
+            }
+        }
         basisSolver = null
         basisFactorized = false
         basisKept = false
@@ -344,6 +362,7 @@ internal class RevisedSimplex(
         cachedModel = null
         cachedStatus = null
         solvedExactState = null
+        if (failure != null) throw failure
     }
 
     /**
@@ -633,7 +652,11 @@ internal class RevisedSimplex(
 
     override val appendTransferReady: Boolean
         get() = basisKept && basisFactorized && basisSolver?.singular == false && trackedHeadingsConsistent()
-    override val basisLifecycleWork get() = basisSolver?.basisOperationWork
+    override val basisLifecycleWork: BasisOperationWork?
+        get() {
+            val active = basisSolver?.basisOperationWork ?: return retiredBasisWork
+            return retiredBasisWork?.mergedWith(active) ?: active
+        }
     override var lastAppendReplacementWork: LpAppendBasisWork? = null
         private set
 

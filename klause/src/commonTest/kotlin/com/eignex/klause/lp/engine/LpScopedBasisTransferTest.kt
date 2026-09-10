@@ -6,6 +6,7 @@ import com.eignex.klause.simplex.basis.BasisExtensionResult
 import com.eignex.klause.simplex.basis.BasisOperationWork
 import com.eignex.klause.simplex.basis.BasisPhaseWork
 import com.eignex.klause.simplex.basis.BasisSolver
+import com.eignex.klause.simplex.basis.IndexedVector
 import com.eignex.klause.simplex.basis.KotlinBasisSolver
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.Cancellation
@@ -351,6 +352,48 @@ class LpScopedBasisTransferTest {
     }
 
     @Test
+    fun `untyped transfer failure retains partial units and incomplete status`() {
+        val primary = IllegalStateException("primary")
+        val oldMatrix = SparseMatrix.ofColumns(1, 1, listOf(listOf(0 to 1.0)))
+        val newMatrix = SparseMatrix.ofColumns(
+            2,
+            2,
+            listOf(listOf(0 to 1.0), listOf(1 to 1.0)),
+        )
+        val delegate = KotlinBasisSolver(oldMatrix)
+        var reads = 0
+        val old = object : BasisSolver by delegate {
+            override val basisOperationWork: BasisOperationWork
+                get() = if (reads++ == 0) {
+                    BasisOperationWork()
+                } else {
+                    BasisOperationWork(
+                        extension = BasisPhaseWork(attempts = 1, units = 7, declines = 1),
+                        complete = false,
+                    )
+                }
+
+            override fun extend(matrix: SparseMatrix, extension: BasisExtension): BasisExtensionResult? = throw primary
+        }
+        val adapter = BasisExtensionAdapter()
+
+        val thrown = assertFailsWith<IllegalStateException> {
+            adapter.transfer(
+                old,
+                newMatrix,
+                intArrayOf(0, 1),
+                intArrayOf(0, 1),
+                BasisExtension(intArrayOf(0), intArrayOf(-1), intArrayOf(0), intArrayOf(0)),
+            )
+        }
+
+        assertTrue(thrown === primary)
+        assertEquals(7, assertNotNull(adapter.lastAttemptWork).units)
+        assertTrue(!assertNotNull(adapter.lastAttemptWork).complete)
+        old.close()
+    }
+
+    @Test
     fun `scoped incomplete decline keeps partial units and records unknown work`() {
         val factory = object : LpEngineFactory by ProductionLpEngineFactory {
             override fun newPersistentSolver(
@@ -555,6 +598,16 @@ class LpScopedBasisTransferTest {
                 val target = basisFactoryCalls > 1
                 val delegate = KotlinBasisSolver(matrix)
                 object : BasisSolver by delegate {
+                    override val basisOperationWork: BasisOperationWork
+                        get() = if (target) {
+                            BasisOperationWork(
+                                refactorization = BasisPhaseWork(attempts = 1, units = 7, declines = 1),
+                                complete = false,
+                            )
+                        } else {
+                            delegate.basisOperationWork
+                        }
+
                     override fun refactorize(basicIndex: IntArray): Boolean {
                         if (target) throw primary
                         return delegate.refactorize(basicIndex)
@@ -580,7 +633,41 @@ class LpScopedBasisTransferTest {
 
         assertTrue(thrown === primary)
         assertEquals(listOf(cleanup), thrown.suppressedExceptions.toList())
+        assertEquals(7, solver.metrics.appendBasisWork)
+        assertEquals(1, solver.metrics.appendUnknownWork)
         solver.close()
+    }
+
+    @Test
+    fun `disposed basis owner retains completed and failed solve work`() {
+        var inject = false
+        var unitsAtClose = 0L
+        val working = assertNotNull(LpExactState(lowerBoundModel()).toWorkingModel())
+        val engine = RevisedSimplex(working, basisSolverFactory = { matrix ->
+            val delegate = KotlinBasisSolver(matrix)
+            object : BasisSolver by delegate {
+                override fun ftran(x: IndexedVector, expectedDensity: Double) {
+                    delegate.ftran(x, expectedDensity)
+                    if (inject) throw BasisArithmeticException("after known work")
+                }
+
+                override fun close() {
+                    unitsAtClose = delegate.basisOperationWork.units
+                    delegate.close()
+                }
+            }
+        })
+        assertNotNull(engine.prepareLogicals(Cancellation.Never))
+        val before = assertNotNull(engine.basisLifecycleWork).units
+        inject = true
+
+        assertEquals(null, engine.resolveBounds())
+
+        val retained = assertNotNull(engine.basisLifecycleWork)
+        assertTrue(retained.units > before)
+        assertEquals(unitsAtClose, retained.units)
+        assertTrue(retained.complete)
+        engine.close()
     }
 
     @Test

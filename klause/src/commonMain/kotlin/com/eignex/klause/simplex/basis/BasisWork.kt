@@ -13,7 +13,14 @@ internal data class BasisPhaseWork(
     val successes: Long = 0,
     val units: Long = 0,
     val declines: Long = attempts - successes,
-)
+) {
+    fun mergedWith(other: BasisPhaseWork) = BasisPhaseWork(
+        saturatedAdd(attempts, other.attempts),
+        saturatedAdd(successes, other.successes),
+        saturatedAdd(units, other.units),
+        saturatedAdd(declines, other.declines),
+    )
+}
 
 internal data class BasisBuildWork(
     val kind: BasisBuildKind,
@@ -50,6 +57,18 @@ internal data class BasisOperationWork(
     val update: BasisPhaseWork = BasisPhaseWork(),
     val complete: Boolean = true,
 ) {
+    fun mergedWith(other: BasisOperationWork) = BasisOperationWork(
+        refactorization.mergedWith(other.refactorization),
+        repair.mergedWith(other.repair),
+        extension.mergedWith(other.extension),
+        snapshot.mergedWith(other.snapshot),
+        restore.mergedWith(other.restore),
+        ftran.mergedWith(other.ftran),
+        btran.mergedWith(other.btran),
+        update.mergedWith(other.update),
+        complete && other.complete,
+    )
+
     val units: Long get() = listOf(
         refactorization,
         repair,
