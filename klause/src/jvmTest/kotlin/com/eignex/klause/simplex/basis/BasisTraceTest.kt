@@ -104,6 +104,31 @@ class BasisTraceTest {
 
         assertTrue(result.custom.errors.any { "source residual" in it })
         assertTrue(result.hfactor.errors.none { "source residual" in it })
+        assertEquals(0, result.hfactor.ftrans)
+        assertEquals(0, result.hfactor.btrans)
+    }
+
+    @Test
+    fun `nonfinite solve output fails replay`() {
+        val fixture = trace(simpleMatrix())
+        val result = BasisTraceReplay.replay(
+            fixture,
+            customFactory = { matrix ->
+                val delegate = KotlinBasisSolver(matrix)
+                object : BasisSolver by delegate {
+                    override fun ftran(x: IndexedVector, expectedDensity: Double) {
+                        delegate.ftran(x, expectedDensity)
+                        val values = x.toDoubleArray()
+                        values[0] = Double.NaN
+                        x.scatter(values)
+                    }
+                }
+            },
+            referenceFactory = ::KotlinBasisSolver,
+        )
+
+        assertTrue(result.custom.errors.any { "nonfinite" in it })
+        assertTrue(result.custom.absoluteResidual.isFinite())
     }
 
     @Test
@@ -116,6 +141,15 @@ class BasisTraceTest {
         assertEquals(BasisTraceFormat.SMTLIB, trace.metadata.format)
         assertEquals(0, result.custom.stateErrors)
         assertEquals(0, result.hfactor.stateErrors)
+    }
+
+    @Test
+    fun `persisted production trace retains source shifts`() {
+        val resource = requireNotNull(javaClass.getResourceAsStream("/basis-corpus/mzn-graph-coloring.kbtrace"))
+        val trace = BasisTraceCodec.decode(resource.use { it.readBytes() })
+
+        assertEquals(1.0, Double.fromBits(requireNotNull(trace.origins.first().lowerBits)))
+        assertEquals(6.0, Double.fromBits(requireNotNull(trace.origins.first().upperBits)))
     }
 
     private fun trace(matrix: BasisTraceMatrix): BasisTrace {

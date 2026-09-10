@@ -59,9 +59,16 @@ internal object BasisTraceReplay {
         val hfactor = newArm("hfactor", true, matrix, trace, bean, referenceFactory)
         try {
             for ((index, operation) in trace.operations.withIndex()) {
+                val customErrors = custom.errorCount
+                val hfactorErrors = hfactor.errorCount
                 custom.apply(index, operation)
                 hfactor.apply(index, operation)
-                if (operation is BasisTraceOperation.Update && custom.lastAccepted != hfactor.lastAccepted) {
+                val customFailed = custom.errorCount != customErrors
+                val hfactorFailed = hfactor.errorCount != hfactorErrors
+                if (customFailed || hfactorFailed) {
+                    if (!customFailed) custom.stopForPeer(index)
+                    if (!hfactorFailed) hfactor.stopForPeer(index)
+                } else if (operation is BasisTraceOperation.Update && custom.lastAccepted != hfactor.lastAccepted) {
                     custom.diverge(index)
                     hfactor.diverge(index)
                 }
@@ -124,6 +131,7 @@ internal object BasisTraceReplay {
         private val timing = BasisReplayTiming(setupNanos = setupNanos, setupBytes = setupBytes)
         var lastAccepted: Boolean? = null
             private set
+        val errorCount: Int get() = stateErrors
 
         fun apply(index: Int, operation: BasisTraceOperation) {
             when (operation) {
@@ -262,6 +270,8 @@ internal object BasisTraceReplay {
             headings = null
         }
 
+        fun stopForPeer(index: Int) = fail(index, "peer backend failed")
+
         private fun checkBasisResidual(
             operation: Int,
             basisSolver: BasisSolver = solver,
@@ -290,7 +300,15 @@ internal object BasisTraceReplay {
             basis: List<BasisHeading> = requireNotNull(headings),
             context: String = "observed",
         ) {
+            if (rhs.any { !it.isFinite() } || solution.any { !it.isFinite() }) {
+                fail(operation, "$context source residual has nonfinite input")
+                return
+            }
             val residual = sourceResidual(trace.matrix, basis, trace.sourceColumns, rhs, solution, transpose)
+            if (!residual.absolute.isFinite() || !residual.relative.isFinite() || !residual.scale.isFinite()) {
+                fail(operation, "$context source residual is nonfinite")
+                return
+            }
             absoluteResidual = max(absoluteResidual, residual.absolute)
             relativeResidual = max(relativeResidual, residual.relative)
             val tolerance = RESIDUAL_ABSOLUTE + RESIDUAL_RELATIVE * residual.scale
@@ -411,6 +429,7 @@ private fun sourceResidual(
 private fun closeVectors(actual: DoubleArray, expected: DoubleArray): Boolean {
     if (actual.size != expected.size) return false
     for (i in actual.indices) {
+        if (!actual[i].isFinite() || !expected[i].isFinite()) return false
         val scale = max(1.0, max(abs(actual[i]), abs(expected[i])))
         if (abs(actual[i] - expected[i]) > 1e-10 + 1e-9 * scale) return false
     }

@@ -80,6 +80,8 @@ internal object BasisTraceCapture {
         val termination = when {
             System.nanoTime() >= deadline -> "deadline"
             recording.truncated -> "recording-limit"
+            solved?.optimal == false && solver.lastWorkOps >= CAPTURE_WORK_LIMIT -> "work-limit"
+            solved?.optimal == false -> "iteration-limit"
             solved == null -> "solver-null"
             else -> "completed"
         }
@@ -203,7 +205,7 @@ internal object BasisTraceCapture {
                 BasisColumnKind.BOOLEAN, BasisColumnKind.INTEGER -> relaxation.colVarId[column]
                 else -> -1
             }
-            val lower = model.lowerD(column)
+            val lower = model.loShiftD(column)
             val upper = if (model.hasFiniteUpper(column)) lower + model.upperD(column) else null
             BasisColumnOrigin(
                 kind,
@@ -420,6 +422,7 @@ private fun rootStateHash(model: LpModel): String {
     fun putLong(value: Long) = digest.update(ByteBuffer.allocate(Long.SIZE_BYTES).putLong(value).array())
     putInt(model.n)
     putInt(model.m)
+    putLong(model.objConstantD.toRawBits())
     for (row in 0 until model.m) {
         putLong(model.rhsD(row).toRawBits())
         digest.update(if (model.rowStrict[row]) 1.toByte() else 0.toByte())
@@ -428,6 +431,7 @@ private fun rootStateHash(model: LpModel): String {
         putLong(model.costD(column).toRawBits())
         putLong(model.upperD(column).toRawBits())
         digest.update(if (model.hasFiniteUpper(column)) 1.toByte() else 0.toByte())
+        if (column < model.n) putLong(model.loShiftD(column).toRawBits())
     }
     return digest.digest().joinToString("") { "%02x".format(it) }
 }
