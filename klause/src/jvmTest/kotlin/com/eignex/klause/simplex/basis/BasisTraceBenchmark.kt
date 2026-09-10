@@ -232,6 +232,7 @@ private fun commonFields(
     "koblasArtifactSha256" to artifactHash(SparseMatrix::class.java),
     "hfactorArtifactSha256" to artifactHash(BundledHfactor::class.java),
     "javaRuntime" to System.getProperty("java.runtime.version"),
+    "kotlinRuntime" to KotlinVersion.CURRENT.toString(),
     "os" to "${System.getProperty("os.name")}/${System.getProperty("os.arch")}",
     "rows" to trace.matrix.rows,
     "columns" to trace.matrix.columns,
