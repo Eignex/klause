@@ -15,7 +15,6 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-/** #23↔#22: the objective-weighted AllDifferent (assignment) cut. */
 class AssignmentObjectiveCutTest {
 
     private fun setup(coef: LongArray, hi: Int): Triple<Problem, LpRelaxation, FloatLpResult> {

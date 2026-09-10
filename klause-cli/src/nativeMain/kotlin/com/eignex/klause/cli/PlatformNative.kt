@@ -30,9 +30,8 @@ internal actual fun errPrintln(message: String) {
 
 internal actual fun exitCli(code: Int): Nothing = exitProcess(code)
 
-// Native reads the whole file up front (a chunked reader would have to buffer partial UTF-8 sequences
-// across chunk boundaries); the [CharSource] contract is met, and the incremental-IO win lands on the
-// JVM distribution first. A dedicated native streaming reader is a follow-up.
+// Native reads the whole file up front because a chunked reader must preserve partial UTF-8 sequences
+// across chunk boundaries.
 internal actual fun openFileSource(path: String): CharSource = StringCharSource(readWholeFile(path))
 
 @OptIn(ExperimentalForeignApi::class)

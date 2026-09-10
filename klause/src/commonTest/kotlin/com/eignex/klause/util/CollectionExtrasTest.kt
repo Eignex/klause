@@ -3,7 +3,6 @@ package com.eignex.klause.util
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 
-/** Coverage for the shared collection affordances in `CollectionExtras.kt`. */
 class CollectionExtrasTest {
 
     @Test

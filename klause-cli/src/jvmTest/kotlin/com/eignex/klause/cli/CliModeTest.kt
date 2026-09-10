@@ -695,12 +695,6 @@ class CliModeTest {
         val opts = CommonOptions()
         val positionals = mutableListOf<String>()
         parseArgs(
-            // -as          → bundled booleans (all-solutions + statistics)
-            // -t5000       → attached short value
-            // --random-seed=7 → long with =value
-            // -p 2         → space-separated short value
-            // --           → end of options
-            // -notaflag    → positional after the terminator, not an ignored flag
             arrayOf("-as", "-t5000", "--random-seed=7", "-p", "2", "--", "-notaflag"),
             commonFlagSpecs(opts),
         ) { positionals.add(it) }
@@ -718,7 +712,6 @@ class CliModeTest {
         val opts = CommonOptions()
         parseArgs(arrayOf("--lp", "aggressive,-cuts"), commonFlagSpecs(opts)) { }
         assertTrue(opts.lp == "aggressive,-cuts", "lp=${opts.lp}")
-        // The token routes through LpConfig.parse (emphasis + per-technique delta).
         val cfg = LpConfig.parse(requireNotNull(opts.lp))
         assertEquals(LpEmphasis.AGGRESSIVE, cfg.emphasis)
         assertEquals(false, cfg.resolved(LpTechnique.CUTS))
@@ -790,17 +783,14 @@ class CliModeTest {
         for (flag in listOf("--help", "-h")) {
             val out = capture { main(arrayOf(flag)) }
             assertTrue("usage: klause-cli" in out, out)
-            // The standard MiniZinc fzn-spec flags are all documented.
             for (token in listOf("-a", "-i", "-n", "-f", "-s", "-v", "-t", "-r", "-p", "--engine")) {
                 assertTrue(token in out, "help missing $token:\n$out")
             }
-            // Formats come from the live mode registry.
             assertTrue("minizinc" in out, out)
             assertTrue("xcsp3" in out, out)
-            // Defaults are shown for the flags that carry one.
-            assertTrue("(default: mixed)" in out, out) // engine (env-overridable)
-            assertTrue("(default: default)" in out, out) // presolve strength
-            assertTrue("(default: 1)" in out, out) // parallel cores
+            assertTrue("(default: mixed)" in out, out)
+            assertTrue("(default: default)" in out, out)
+            assertTrue("(default: 1)" in out, out)
         }
     }
 
@@ -817,9 +807,7 @@ class CliModeTest {
             deleteOnExit()
         }
         for (engineArgs in listOf(
-            // cp resolves a one-arm override pool from the per-solver var-/val-selector knobs.
             arrayOf("-e", "cp", "--param", "seed=7", "--param", "val-selector=max", "--param", "luby=50"),
-            // ls resolves a four-axis arm pool; a named base takes the strategy knobs (tabu / noise).
             arrayOf("-e", "ls", "--param", "strategy=cbls", "--param", "tabu-tenure=5", "-t", "5000"),
             arrayOf("-e", "ls", "--param", "seed=7", "--param", "lambda=2.0", "-t", "5000"),
         )) {
@@ -835,8 +823,6 @@ class CliModeTest {
             writeText("var 1..3: x;\nconstraint int_lt(x, 3);\nsolve satisfy;\n")
             deleteOnExit()
         }
-        // A `sources=` spec with no `strategy=` is a bare four-axis recipe over the driver; a named
-        // base strategy, and overriding a single axis on a base, are also valid.
         for (args in listOf(
             arrayOf("--param", "sources=violated,argmin", "--param", "acceptance=walksat", "--param", "noise=0.2"),
             arrayOf("--param", "sources=violated,frontier", "--param", "scoring=raw", "--param", "acceptance=greedy"),
@@ -863,24 +849,20 @@ class CliModeTest {
             writeText("var 1..3: x;\nconstraint int_lt(x, 3);\nsolve satisfy;\n")
             deleteOnExit()
         }
-        // The default pool lists the curated arms; no solve output on stdout.
         val default = captureErr { main(arrayOf("-e", "ls", "--param", "dry-run-solver=on", fzn.absolutePath)) }
         assertTrue("ls dry-run:" in default, default)
         assertTrue("cbls/fixed" in default, default)
 
-        // A global source removal drops `violated` from every arm.
         val removed = captureErr {
             main(arrayOf("-e", "ls", "--param", "sources=-violated", "--param", "dry-run-solver=on", fzn.absolutePath))
         }
         assertTrue("violated-repairs" !in removed, removed)
 
-        // A scoped scalar edit sets break scoring on the cbls family only.
         val scoped = captureErr {
             main(arrayOf("-e", "ls", "--param", "scoring=cbls.break", "--param", "dry-run-solver=on", fzn.absolutePath))
         }
         assertTrue("scoring=Break" in scoped, scoped)
 
-        // An acceptance edit to sa attaches a cooling schedule to arms that carried none.
         val annealed = captureErr {
             main(arrayOf("-e", "ls", "--param", "acceptance=sa", "--param", "dry-run-solver=on", fzn.absolutePath))
         }
@@ -1015,7 +997,6 @@ class CliModeTest {
             writeText("var 1..3: x;\nconstraint int_lt(x, 3);\nsolve satisfy;\n")
             deleteOnExit()
         }
-        // arm= resolves a one-arm pool of exactly that catalog arm (the fair-tester sweep).
         val dry = captureErr {
             main(
                 arrayOf(
@@ -1031,7 +1012,6 @@ class CliModeTest {
         }
         assertTrue("ls dry-run: 1 arm(s)" in dry, dry)
         assertTrue("cbls-plateau/ils-basin" in dry, dry)
-        // It also solves as a single isolated arm.
         val out = capture { main(arrayOf("-e", "ls", "--param", "arm=cbls/fixed", "-t", "5000", fzn.absolutePath)) }
         assertTrue("x = " in out, out)
         assertTrue("----------" in out, out)
@@ -1039,14 +1019,11 @@ class CliModeTest {
 
     @Test
     fun `ls numeric knobs no axis consumes are reported as ineffective`() {
-        // noise is meaningless on the curated pool (no walksat acceptance) — rejected, not ignored.
         assertEquals(listOf("noise"), ineffectiveNumerics("auto", emptySet(), listOf("noise")))
-        // The cbls base consumes noise/smoothing/tabu; a walksat acceptance edit consumes noise.
         assertTrue(ineffectiveNumerics("cbls", emptySet(), listOf("noise", "smooth-prob", "tabu-tenure")).isEmpty())
         assertTrue(ineffectiveNumerics("auto", setOf("walksat"), listOf("noise")).isEmpty())
         assertTrue(ineffectiveNumerics("probsat", emptySet(), listOf("cb")).isEmpty())
         assertTrue(ineffectiveNumerics("sa", emptySet(), listOf("initial-temp", "cooling-rate", "min-temp")).isEmpty())
-        // feasibility-jump ignores tabu, so a tabu-tenure knob is ineffective there.
         assertEquals(listOf("tabu-tenure"), ineffectiveNumerics("fjump", emptySet(), listOf("tabu-tenure")))
     }
 
@@ -1068,7 +1045,6 @@ class CliModeTest {
             writeText("var 1..3: x;\nconstraint int_lt(x, 3);\nsolve minimize x;\n")
             deleteOnExit()
         }
-        // `-e alns` routes to the hybrid-ALNS portfolio (EngineMix.ALNS). x < 3 over 1..3 ⇒ optimum x = 1.
         val out = capture { main(arrayOf("-e", "alns", "-p", "2", "-t", "10000", fzn.absolutePath)) }
         assertTrue("x = 1" in out, out)
     }
@@ -1135,16 +1111,13 @@ class CliModeTest {
             writeText("var 1..9: x;\nsolve maximize x;\n")
             deleteOnExit()
         }
-        // Complete engine: the CP/CDCL counter schema (nodes/failures/...).
         val cpOut = capture { main(arrayOf("-s", "-e", "cp", sat.absolutePath)) }
         assertTrue("%%%mzn-stat: solveTime=" in cpOut, cpOut)
         assertTrue("%%%mzn-stat: solutions=1" in cpOut, cpOut)
         assertTrue("%%%mzn-stat: nodes=" in cpOut, cpOut)
         assertTrue("%%%mzn-stat-end" in cpOut, cpOut)
-        // The stats block must come after the protocol terminator, not between solutions.
         assertTrue(cpOut.indexOf("==========") < cpOut.indexOf("%%%mzn-stat:"), cpOut)
 
-        // Local search: the native LS schema (lsMoves/...), and none of the CP zero counters.
         val lsOut = capture { main(arrayOf("-s", "-e", "ls", sat.absolutePath)) }
         assertTrue("%%%mzn-stat: solutions=1" in lsOut, lsOut)
         assertTrue("%%%mzn-stat: lsMoves=" in lsOut, lsOut)
@@ -1196,7 +1169,6 @@ class CliModeTest {
         assertTrue("s SATISFIABLE" in out, out)
         assertTrue("v <instantiation>" in out, out)
         assertTrue("<list> a b </list>" in out, out)
-        // No MiniZinc-flavored tokens must leak into XCSP output.
         assertTrue("----------" !in out, out)
         assertTrue("%%%mzn-stat" !in out, out)
     }
@@ -1212,10 +1184,8 @@ class CliModeTest {
         }
         val out = capture { main(arrayOf("-e", "bt", "-t", "5000", "-s", xml.absolutePath)) }
         assertTrue("s OPTIMUM FOUND" in out, out)
-        // maximize a over 1..3 → optimum 3, reported sign-corrected (not the negated internal).
         assertTrue("o 3" in out, out)
         assertTrue("<values> 3 </values>" in out, out)
-        // `-s` statistics adapt to XCSP `c` comment lines, not %%%mzn-stat.
         assertTrue("c solveTime=" in out, out)
     }
 
@@ -1234,7 +1204,6 @@ class CliModeTest {
 
     @Test
     fun `format override forces a mode regardless of extension`() {
-        // An XCSP3 instance written to a .txt file is still solved as XCSP3 via --format.
         val txt = File.createTempFile("cli", ".txt").apply {
             writeText(
                 """<instance type="CSP"><variables><var id="a"> 1..3 </var></variables>

@@ -102,12 +102,8 @@ data class LpPlan(
      * feasibility — so it is correctness-neutral. A no-op for variables with no fresh LP value, and
      * for any emphasis that leaves [bounding] off, since there is then no LP value to steer by.
      *
-     * On, because branching on the relaxation is what makes a relaxation worth solving on a MIP: over
-     * the MIPLIB band a reference solver proves quickly, it wins 5 instances and loses none, turning
-     * one timeout into a proof at a sixth of the budget. The measurement that previously justified
-     * leaving it off could not have seen that — it averaged over CP-structured models where the LP
-     * prunes nothing and over instances where no solution is found at all, and this only ever changes
-     * which solution is found first.
+     * Branching on the relaxation makes an LP solve useful for MIP search. It only changes which solution
+     * search finds first.
      */
     val branching: Boolean = true,
     /**
@@ -423,9 +419,7 @@ data class LpPlan(
      * Whether Gomory integrality cuts actually run: [gomory] permits them, [cuts] admits the
      * separators at all.
      *
-     * Derived here rather than re-formed per consumer. [gomory] and [mir] read as enabled on their
-     * own, so a caller that reads either without the [cuts] conjunction silently separates cuts the
-     * plan does not permit — and that conjunction was previously spelled out at each call site.
+     * Derived here so callers cannot separate cuts when [cuts] is disabled.
      */
     val gomoryEnabled: Boolean get() = cuts && gomory
 

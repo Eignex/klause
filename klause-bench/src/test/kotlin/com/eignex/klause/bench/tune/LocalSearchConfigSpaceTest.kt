@@ -16,12 +16,10 @@ class LocalSearchConfigSpaceTest {
             val fam = a["family"] as String
             families += fam
             fun hasPrefix(prefix: String) = a.keys.any { k -> k.startsWith(prefix) }
-            // Conditional params are present only for their family (child-param gating).
             assertEquals(fam == "cbls", hasPrefix("cbls."), "cbls knobs gated: $a")
             assertEquals(fam == "probsat", hasPrefix("probsat."), "probsat knobs gated: $a")
             assertEquals(fam == "walksat", hasPrefix("walksat."), "walksat knobs gated: $a")
             assertEquals(fam == "sa", hasPrefix("sa."), "sa knobs gated: $a")
-            // Every sampled point decodes to a fresh recipe without throwing.
             val recipe = LocalSearchConfigSpace.toRecipe(a)
             assertTrue(recipe.label.startsWith("cfg/"), recipe.label)
         }

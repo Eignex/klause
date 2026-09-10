@@ -86,10 +86,8 @@ internal actual fun sampleHeap(): HeapSample? {
     System.gc()
     val runtime = Runtime.getRuntime()
     val retained = runtime.totalMemory() - runtime.freeMemory()
-    // Committed is not a peak: the JVM grows the heap under pressure and rarely gives it back, so at the
-    // end of ingest it is roughly the high-water demand, and it says nothing about when that demand
-    // arose. Summing the pools' own peak marks was tried instead of a sampler and is unusable — the
-    // generations peak at different times, so the sum ran past the `-Xmx` ceiling itself (5074MiB under
-    // `-Xmx3g`).
+    // Committed is not a peak: the JVM grows the heap under pressure and rarely gives it back, so it
+    // cannot establish when high-water demand arose. Pool peak marks cannot be summed because pools
+    // peak at different times.
     return HeapSample(retained, runtime.totalMemory(), peak)
 }

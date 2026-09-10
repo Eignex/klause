@@ -3,9 +3,9 @@ package com.eignex.klause.propagation
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.LongArrayList
 
-/** Per-var atom index, segregated by kind and sorted ascending by threshold. A bound
- *  move flips a contiguous threshold range per kind, so wakeups visit exactly the
- *  flipped atoms via binary search. */
+// Per-var atom index, segregated by kind and sorted ascending by threshold. A bound
+// move flips a contiguous threshold range per kind, so wakeups visit exactly the
+// flipped atoms via binary search.
 internal class VarAtomIndex {
     internal val ge = AtomRun()
     internal val le = AtomRun()
@@ -13,7 +13,6 @@ internal class VarAtomIndex {
 
     fun insert(kind: AtomKind, k: Long, id: Int) = runOf(kind).insert(k, id)
 
-    /** Atom id for threshold [k] of [kind], or -1 if not materialized. */
     fun find(kind: AtomKind, k: Long): Int = runOf(kind).find(k)
 
     fun runOf(kind: AtomKind): AtomRun = when (kind) {
@@ -23,19 +22,8 @@ internal class VarAtomIndex {
     }
 }
 
-/**
- * One kind's `(threshold → atom id)` run: a sorted array plus a small sorted staging buffer.
- *
- * A single sorted array costs an O(n) element shift per insertion, which is quadratic over a run and was
- * measured dominating search on wide domains — bound tightening allocates an order atom at every distinct
- * threshold it passes, so the index grows by insertions into the middle. Staging bounds that shift: an
- * insert only reorders the buffer, which merges into the main array once it reaches `√n`.
- *
- * The staged entries are never materialized into one array for reading. An earlier attempt merged on
- * every read and was *worse* — the workload interleaves insert and scan (a bound move both allocates
- * atoms and wakes a range), so the buffer was non-empty at almost every scan and the O(n) merge simply
- * moved the quadratic term to the scan side. [visitRange] therefore walks the two sorted runs together.
- */
+// One kind's `(threshold → atom id)` run: a sorted main array plus a small sorted staging buffer.
+// Staging avoids quadratic middle inserts; range reads walk both arrays without forcing a merge.
 internal class AtomRun {
     internal val mainKeys = LongArrayList()
     internal val mainIds = IntArrayList()
@@ -56,10 +44,6 @@ internal class AtomRun {
         return if (p < pendKeys.size && pendKeys[p] == k) pendIds[p] else -1
     }
 
-    /**
-     * Atom id of the greatest threshold strictly below [k], or -1. Searches both runs and takes the
-     * nearer, so a neighbour lookup never forces a merge — the caller runs on every atom allocation.
-     */
     fun below(k: Long): Int {
         val i = mainKeys.lowerBound(k)
         val j = pendKeys.lowerBound(k)
@@ -69,7 +53,6 @@ internal class AtomRun {
         return if (mainKeys[i - 1] >= pendKeys[j - 1]) mainIds[i - 1] else pendIds[j - 1]
     }
 
-    /** Atom id of the least threshold strictly above [k], or -1. Merge-free, like [below]. */
     fun above(k: Long): Int {
         var i = mainKeys.lowerBound(k)
         while (i < mainKeys.size && mainKeys[i] <= k) i++
@@ -83,14 +66,12 @@ internal class AtomRun {
         return if (mainKeys[i] <= pendKeys[j]) mainIds[i] else pendIds[j]
     }
 
-    /** `√n`, floored to a small minimum so a short run does not merge on every insert. */
     private fun mergeThreshold(): Int {
         var s = MIN_PENDING
         while (s * s < mainKeys.size) s++
         return s
     }
 
-    /** Fold the staged entries into the main run, back to front so each lands in one pass. */
     private fun merge() {
         val p = pendKeys.size
         if (p == 0) return

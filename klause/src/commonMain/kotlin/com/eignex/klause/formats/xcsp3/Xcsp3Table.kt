@@ -245,11 +245,8 @@ internal class ShortRows(val lo: LongArray, private val intervals: LongArray?) {
  *  Unary tables use the bare-value form (`0 1 2`, no parentheses). */
 internal fun Compiler.Builder.parseShortRows(text: String, arity: Int): ShortRows {
     val bare = arity == 1 && '(' !in text
-    // Size the cell arrays exactly from one cheap counting pass. Accumulating into growable lists made a
-    // multi-MB table peak at several times the payload it produces — each list doubles while filling and
-    // is copied once more at the end, and the `hi` list was built in full even for a ground table that
-    // discards it (Benzenoide-15_c23 died here at 3 GB). `hi` is now materialized only if an
-    // interval cell actually appears, back-filling the points already read.
+    // Size the cell arrays exactly to avoid transient copies from growable lists. Materialize `hi` only
+    // after an interval cell appears, back-filling the points already read.
     val cells = if (bare) countBareCells(text) else countTuples(text) * arity
     val lo = LongArray(cells)
     var intervals: LongArray? = null

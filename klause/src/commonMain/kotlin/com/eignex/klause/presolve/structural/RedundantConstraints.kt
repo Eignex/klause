@@ -606,8 +606,8 @@ internal object RedundantConstraints {
      * never a knapsack) are used: a clique implied by a knapsack holds only while that knapsack stays,
      * so dropping by it could remove the very constraint it rests on.
      *
-     * Only redundancy is done here: clique-based coefficient *lifting* (GUB cover lifting) is subtle —
-     * the naive clamp to the clique-reduced slack is unsound — and is left to a follow-up.
+     * Clique-based coefficient lifting is excluded because naively clamping to the clique-reduced slack
+     * is unsound.
      */
     private fun dropCliqueImpliedKnapsacks(factors: List<Factor>, cancellation: Cancellation): List<Factor> {
         val cliques = maximalPersistentAmoCliques(factors, cancellation)

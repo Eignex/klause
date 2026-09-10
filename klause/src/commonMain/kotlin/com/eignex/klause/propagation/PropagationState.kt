@@ -340,19 +340,8 @@ class PropagationState(
      *  backtrack on any conflict that doesn't come from a factor's `propagate`. */
     internal var lastDecisionConflictVar: Int = -1
 
-    /*
-     * Per-factor mutable scratch space — mirrors [com.eignex.klause.localsearch.LocalSearchState.refPayload]
-     * on the LS side. Factors stash propagation-time bookkeeping here keyed by their own
-     * factor id; the engine doesn't touch the contents. Today's only user is
-     * [Clause]'s two-watched-literal scheme, but the slot
-     * is general so future factors (Cardinality watched literals, etc.) can adopt the
-     * same pattern.
-     *
-     * Drift across snapshot / restore is intentional. CDCL-style watches are advisory:
-     * they point at "non-false-when-last-checked" literals, and propagate self-corrects
-     * by re-validating on each fire. Carrying them across pops keeps work amortised
-     * without the snapshot copying that level-aware state needs.
-     */
+    // Per-factor mutable scratch. Its drift across snapshot / restore is intentional: advisory
+    // watch state self-corrects on each fire, avoiding snapshot copies of level-aware state.
 
     /** Backing list for [refPayload]; mutable so [addLearnedClause] can grow it
      *  alongside the learned-clause registry without copying the full array. */
@@ -443,9 +432,7 @@ class PropagationState(
      *
      * Note: only the *current* tightening is tracked. If a factor at level 1 sets
      * `v.min = 3` and another at level 2 sets `v.min = 5`, this array holds the level-2
-     * tightening's antecedents — analyzer reasoning about why `v.min = 3` later is lost.
-     * Full LCG with bound atoms `[v ≥ k]` solves this; for now the single-slot
-     * approximation suffices for the common bool-decisions-cause-int-facts pattern.
+     * tightening's antecedents — analyzer reasoning about why `v.min = 3` later is unavailable.
      */
     val intMinAntecedents: Array<IntArray?> = arrayOfNulls(problem.numIntVars)
 

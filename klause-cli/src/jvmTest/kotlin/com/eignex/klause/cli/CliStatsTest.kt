@@ -18,7 +18,6 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-/** Formatting + gating of the `-s` LP-success block ([lpStatPairs]). */
 class CliStatsTest {
 
     @Test
@@ -46,7 +45,6 @@ class CliStatsTest {
     @Test
     fun `no lp activity emits nothing`() {
         assertTrue(lpStatPairs(SolveStats.EMPTY).isEmpty())
-        // Backend set but the LP never ran: still nothing.
         assertTrue(
             lpStatPairs(
                 SolveStats(run = RunStats(backend = "backtrack"), search = SearchStats(nodes = SumResult(10.0))),
@@ -191,7 +189,6 @@ class CliStatsTest {
     @Test
     fun `no ls activity emits nothing`() {
         assertTrue(lsStatPairs(SolveStats.EMPTY, solveTimeMs = 0).isEmpty())
-        // A complete backend that never ran LS: nothing in the LS block.
         assertTrue(
             lsStatPairs(
                 SolveStats(run = RunStats(backend = "backtrack"), search = SearchStats(nodes = SumResult(10.0))),
@@ -202,7 +199,6 @@ class CliStatsTest {
 
     @Test
     fun `ls backend emits the block even before any move`() {
-        // An LS solve that found feasibility immediately still identifies as the LS engine.
         val pairs = lsStatPairs(SolveStats(run = RunStats(backend = "ls")), solveTimeMs = 0)
         assertTrue(pairs.isNotEmpty())
         assertEquals("0", pairs.toMap()["lsMoves"])

@@ -773,9 +773,8 @@ internal class LpEngine(
         }
     }
 
-    /** The per-node prune cascade, in short-circuit order: cheap lower bound → scheduling-feasibility
-     *  bounds → Lagrangian bounds → LP relaxation. [pruneNode] tries each in turn; the first true
-     *  prune wins, exactly as the former hand-coded `when`. */
+    // Per-node prune cascade in short-circuit order: cheap lower bound, scheduling feasibility,
+    // Lagrangian bounds, then LP relaxation.
     private val bounds: List<RelaxationBound> = listOfNotNull(
         LinearBound(),
         energeticBound?.let { SchedulingFeasibilityArm(it, params.lpPlan.energeticEvery) },

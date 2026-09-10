@@ -9,7 +9,6 @@ import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertTrue
 
-/** #454: preemptive max-flow feasibility bound for the scheduling globals. */
 class CumulativeFlowBoundTest {
 
     private fun problem(n: Int, spanHi: Int, durations: LongArray, resources: LongArray, capacity: Long): Problem =

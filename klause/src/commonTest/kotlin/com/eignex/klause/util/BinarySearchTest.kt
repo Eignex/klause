@@ -5,7 +5,6 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-/** #104: coverage for [binarySearchInt], the multiplatform IntArray binary search. */
 class BinarySearchTest {
 
     /** Reference: the stdlib contract computed by a simple linear scan over `[from, to)`. */

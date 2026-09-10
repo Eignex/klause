@@ -10,8 +10,6 @@ import kotlin.test.assertNull
  *  corpus is fetched. */
 class SuitesTest {
 
-    /** Suites over corpora big enough that resolving them uncapped would ingest thousands of live
-     *  problems in one process. */
     private val largeCorpusSuites = listOf(
         "mzn-bench",
         "libminizinc-tests",

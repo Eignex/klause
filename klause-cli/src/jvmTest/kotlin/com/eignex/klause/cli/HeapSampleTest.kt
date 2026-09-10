@@ -4,11 +4,8 @@ import kotlin.test.Test
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
-/** The `dry-run-presolve` heap readout (issue #1415), whose numbers are only worth reporting if the
- *  seam actually reads the JVM's accounting rather than returning a placeholder. */
 class HeapSampleTest {
 
-    /** Large enough to dominate whatever the test JVM already retains, small enough to allocate fast. */
     private val transientBytes = 64 * 1024 * 1024
 
     @Test
@@ -24,8 +21,6 @@ class HeapSampleTest {
 
     @Test
     fun `the peak heap keeps a transient that the retained figure drops`() {
-        // The whole point of the peak: an ingest that allocates and releases a large structure shows
-        // nothing in retained, and that transient is what exhausts a heap ceiling.
         startHeapPeakSampler()
         var block: ByteArray? = ByteArray(transientBytes)
         block?.set(transientBytes - 1, 1)

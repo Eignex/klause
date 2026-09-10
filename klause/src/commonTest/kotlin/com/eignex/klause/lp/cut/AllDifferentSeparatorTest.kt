@@ -15,7 +15,6 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-/** #22: the AllDifferent Hall-set cut separator. */
 class AllDifferentSeparatorTest {
 
     private fun setup(

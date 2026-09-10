@@ -97,13 +97,10 @@ internal enum class FactorKind {
     DIFFERENCE_SYSTEM,
 }
 
-/** Payload builder for `StructuralKey.of`. Appends scalars and length-prefixed array segments into a
- *  primitive `long` buffer — no per-word boxing, since these keys are rebuilt in symmetry refinement's
- *  per-round inner loop. */
+// Payload builder for `StructuralKey.of`. Appends scalars and length-prefixed array segments into a
+// primitive `long` buffer to avoid per-word boxing in symmetry refinement's inner loop.
 internal class StructuralKeyBuilder(expectedWords: Int = 0) {
-    // Sized from the caller's estimate where one is available. A key whose payload is a whole transition
-    // table or tuple set would otherwise double its way up and then be copied once more by [build],
-    // peaking at ~3x the payload it produces (MagicSquare-mdd-16_c23 died here at 3 GB).
+    // Caller estimates avoid growth and a final copy peaking at roughly three times a large payload.
     private var buf = LongArray(expectedWords.coerceAtLeast(INITIAL_CAPACITY))
     private var size = 0
 

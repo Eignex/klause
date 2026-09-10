@@ -27,7 +27,6 @@ class DimacsModeTest {
 
     @Test
     fun `a satisfiable cnf prints s SATISFIABLE with a full signed model line`() {
-        // (x1 or x2) and (not x1) — forces x2 true; the model line must assign every variable.
         val out = capture { main(arrayOf(cnf("p cnf 2 2\n1 2 0\n-1 0\n"))) }
         assertTrue("s SATISFIABLE" in out, out)
         val model = out.lines().first { it.startsWith("v ") }.removePrefix("v ").trim().split(" ")

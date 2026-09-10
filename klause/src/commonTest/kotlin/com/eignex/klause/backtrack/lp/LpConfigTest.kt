@@ -9,7 +9,6 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
-/** #429: the LP emphasis config — the presolve-mirrored selector surface. */
 class LpConfigTest {
 
     @Test

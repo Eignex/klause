@@ -42,8 +42,7 @@ import com.eignex.klause.util.MutableIntIntMap
  * The Problem is rebuilt each iteration because the immutable-Problem contract prevents
  * clause replacement (a relaxer clause's blocker list grows from `(s ∨ r)` to
  * `(s ∨ r ∨ b₁)` to `(s ∨ r ∨ b₁ ∨ b₂)` as a soft gets re-cored). Bake cost grows
- * linearly with cores; a session-level "add factor at runtime" API is the natural
- * follow-up if this becomes the bottleneck.
+ * linearly with cores.
  */
 internal class CoreGuidedOptimizer(val baseProblem: BakedProblem) {
 

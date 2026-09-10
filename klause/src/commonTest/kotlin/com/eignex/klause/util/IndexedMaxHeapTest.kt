@@ -7,7 +7,6 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
-/** #104: coverage for [IndexedMaxHeap] — VSIDS-style sift / updateKey / remove / restore. */
 class IndexedMaxHeapTest {
 
     @Test

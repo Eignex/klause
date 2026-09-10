@@ -20,7 +20,6 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-/** #19: the CP-to-LP relaxation builder over real Problems and live propagation sessions. */
 class CpToLpRelaxationTest {
 
     private val eps = 1e-9

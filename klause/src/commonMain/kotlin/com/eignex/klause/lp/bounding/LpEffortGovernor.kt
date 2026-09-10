@@ -62,18 +62,8 @@ internal class LpEffortGovernor(
         ops += opsSpent
         solves++
         if (pruned) {
-            // A demotion is a judgement about a relaxation that was not paying; a prune is that
-            // judgement being wrong. Restore it rather than leaving the LP throttled on stale evidence —
-            // the old wall-clock breaker latched here, and could never take the correction.
-            //
-            // For the clock that is permanent, and deliberately so: a wall-clock rule overruling a
-            // relaxation which demonstrably pays is the non-determinism this governor replaced.
-            //
-            // For the deterministic rule it is not. Sparing that one for the rest of the run too meant a
-            // relaxation which pruned once early and then turned expensive could never be demoted again,
-            // however far its cost per node drifted. So its evidence window restarts instead: the next
-            // demotion has to be earned on the solves since this prune rather than on the run's whole
-            // history, which keeps the rule live without holding a stale judgement against the LP.
+            // A prune invalidates a deterministic demotion, but starts a new evidence window so a later
+            // expensive relaxation can be demoted again. The wall-clock gate remains disabled permanently.
             everPruned = true
             demoted = false
             ops = 0L

@@ -43,9 +43,6 @@ object LocalSearchCatalog {
         acceptance = AcceptanceCriterion.Improving,
     )
 
-    /** ILS basin-hopping whose accept/reject is driven by the contextual acceptance bandit — learns
-     *  when drifting through worse optima pays off, rather than the fixed improving-only rule. Fresh
-     *  bandit per slot. */
     private fun ilsBandit() = IteratedLocalSearchRestart(
         populationSize = 3,
         crossoverRate = 0.25,
@@ -53,12 +50,9 @@ object LocalSearchCatalog {
         acceptanceBandit = IteratedLocalSearchRestart.acceptanceBandit(),
     )
 
-    /** Fold a restart cadence into a strategy's schedule axis. */
     private fun SourceDrivenStrategy.withRestart(restart: RestartPolicy): SourceDrivenStrategy =
         copy(schedule = schedule.copy(restart = restart))
 
-    /** A CBLS recipe with the unified minimize path: [make] is invoked twice so the satisfy and
-     *  optimize strategies are independent instances (CBLS carries per-search state). */
     private fun cblsRecipe(
         label: String,
         restart: RestartPolicy,
@@ -73,164 +67,104 @@ object LocalSearchCatalog {
         seedImplicitOnRestart = seedImplicitOnRestart,
     )
 
-    /** An SA recipe on the unified minimize path so Metropolis anneals on the objective at feasibility
-     *  (rather than bailing to the engine's greedy descent); on a CSP the minimize path is unused, so
-     *  this is identical to plain SA. [makeSchedule] is invoked twice so the satisfy and optimize
-     *  strategies get independent temperature schedules (a [Geometric] carries mutable per-search state). */
     private fun saRecipe(label: String, restart: RestartPolicy, makeSchedule: () -> Schedule) = LocalSearchRecipe(
         label,
         SimulatedAnnealing.optimizer(makeSchedule()).withRestart(restart),
         optimizeStrategy = SimulatedAnnealing.optimizer(makeSchedule()).withRestart(restart),
     )
 
-    /**
-     * Fresh [LocalSearchRecipe] for a typed [LocalSearchArm] — the catalog's single factory. Exhaustive `when` so every
-     * arm in [LocalSearchArm] must have a factory (and conversely every factory a typed arm); the per-arm
-     * comment is the credit-campaign provenance.
-     */
     private fun make(arm: LocalSearchArm): LocalSearchRecipe = when (arm) {
-        // The constraint-based workhorse; fastest first-incumbent (median 4 ms).
         LocalSearchArm.CblsFixed -> cblsRecipe(arm.label, FixedCadenceRestart()) { Cbls(tabu = cblsTabu()) }
 
-        // Adaptive probSAT: biggest marginal adder (+16 uncovered, +9 best) — many flattened
-        // Challenge models expose a large boolean core.
         LocalSearchArm.AdaptiveProbsatFixed ->
             LocalSearchRecipe(arm.label, ProbSat.adaptive(tabu = cblsTabu()).withRestart(FixedCadenceRestart()))
 
-        // Plateau-buster (Cbls.stallSwapCap) on the ILS basin-hopping restart: the best plateau
-        // variant (+9 uncovered, +5 best).
         LocalSearchArm.CblsPlateauIlsBasin ->
             cblsRecipe(arm.label, ilsBasin()) { Cbls(stallSwapCap = 16, tabu = cblsTabu()) }
 
-        // Ejection chains (Cbls.stallChainCap) + targeted kick — the principled plateau escape.
-        // Sweep-off (perMoveInvariants = false): defined vars re-enter the move space, the niche
-        // cyclic-definitional successor encodings need. Deep-runway cadence: the dismantle threads at
-        // 21k–214k flips, so the default 10k cadence cuts every walk short.
         LocalSearchArm.CblsChainNoinvFixed -> cblsRecipe(
             arm.label,
             FixedCadenceRestart(maxFlipsBeforeRestart = 1_000_000),
             perMoveInvariants = false,
         ) { Cbls(stallChainCap = 8, stallChainDepth = 16, tabu = cblsTabu()) }
 
-        // Ejection chains on the ILS basin-hopping restart with invariants on (the most seed-stable
-        // adder in the pool: +3 uncovered, +9 best-held at both campaign seeds).
         LocalSearchArm.CblsChainIlsBasin ->
             cblsRecipe(arm.label, ilsBasin()) { Cbls(stallChainCap = 8, stallChainDepth = 16, tabu = cblsTabu()) }
 
-        // Plateau-buster + smoothing (+5 uncovered, +2 best).
         LocalSearchArm.CblsPlateauSmoothFixed -> cblsRecipe(arm.label, FixedCadenceRestart()) {
             Cbls(stallSwapCap = 16, smoothProb = 0.4, smoothFactor = 0.8, tabu = cblsTabu())
         }
 
-        // Plateau-buster on the fixed cadence (+3 uncovered incl. the bacp-class sole win).
         LocalSearchArm.CblsPlateauFixed ->
             cblsRecipe(arm.label, FixedCadenceRestart()) { Cbls(stallSwapCap = 16, tabu = cblsTabu()) }
 
-        // Weight forgetting + basin hopping (+2 uncovered, +3 best).
         LocalSearchArm.CblsSmoothIlsBasin ->
             cblsRecipe(arm.label, ilsBasin()) { Cbls(smoothProb = 0.4, smoothFactor = 0.8, tabu = cblsTabu()) }
 
-        // Annealing + adaptive perturbation: the quality closer — adds no coverage but holds the final
-        // best on 7 instances, the second-highest in the pool.
         LocalSearchArm.SaAdaptivePerturb -> saRecipe(arm.label, AdaptivePerturbationRestart()) { Geometric() }
 
-        // Patient stall cadence (+1 uncovered, +3 best, one sole win).
         LocalSearchArm.CblsStallslowFixed -> cblsRecipe(arm.label, FixedCadenceRestart()) {
             Cbls(frontierAfterStall = 160, stallNoise = 0.2, tabu = cblsTabu())
         }
 
-        // Cold noise (+1 uncovered, +3 best).
         LocalSearchArm.CblsLonoiseFixed ->
             cblsRecipe(arm.label, FixedCadenceRestart()) { Cbls(noiseProbability = 0.01, tabu = cblsTabu()) }
 
-        // WalkSAT + configuration checking (+1 uncovered, +2 best; structured-SAT niche).
         LocalSearchArm.WalksatCcLuby -> LocalSearchRecipe(
             arm.label,
             WalkSat(configurationChecking = true, tabu = TabuFilter(tenure = 5)).withRestart(LubyRestart(unit = 200)),
         )
 
-        // Hot noise (+1 uncovered, +1 best).
         LocalSearchArm.CblsHinoiseFixed ->
             cblsRecipe(arm.label, FixedCadenceRestart()) { Cbls(noiseProbability = 0.15, tabu = cblsTabu()) }
 
-        // --- tail: raw credit only; marginally redundant given the arms above ---
-        // Tabu-free CBLS: high raw credit (4 firsts / 247 improvements) but +0 uncovered.
         LocalSearchArm.CblsNotabuFixed ->
             cblsRecipe(arm.label, FixedCadenceRestart()) { Cbls(tabu = TabuFilter.Disabled) }
 
-        // Plain annealing: 5 raw firsts, all on instances the arms above also solve.
         LocalSearchArm.SaFixed -> saRecipe(
             arm.label,
             FixedCadenceRestart(maxFlipsBeforeRestart = 50_000),
         ) { Geometric() }
 
-        // Aggressive swap cap (raw 1/2, 191 improvements).
         LocalSearchArm.CblsPlateau64Fixed ->
             cblsRecipe(arm.label, FixedCadenceRestart()) { Cbls(stallSwapCap = 64, tabu = cblsTabu()) }
 
-        // Raw (unweighted) scoring (raw 2/1).
         LocalSearchArm.CblsRawFixed ->
             cblsRecipe(arm.label, FixedCadenceRestart()) { Cbls(scoring = MoveScoring.Raw, tabu = cblsTabu()) }
 
-        // Short tabu tenure (raw 2/0, 127 improvements).
         LocalSearchArm.CblsTenure3Fixed -> cblsRecipe(arm.label, FixedCadenceRestart()) {
             Cbls(tabu = TabuFilter(tenure = 3, aspiration = AspirationCriterion.OrImproving))
         }
 
-        // Contextual-bandit ILS acceptance: CBLS on a basin-hopping ILS restart whose accept/reject is
-        // learned.
         LocalSearchArm.CblsIlsBandit -> cblsRecipe(arm.label, ilsBandit()) { Cbls(tabu = cblsTabu()) }
 
-        // Bandit-adaptive probSAT: a UCB1 bandit picks the cb noise schedule per session.
         LocalSearchArm.ProbsatBanditFixed ->
             LocalSearchRecipe(arm.label, ProbSat.bandit(tabu = cblsTabu()).withRestart(FixedCadenceRestart()))
 
-        // Implicit-solving neighbourhoods: seed elected structural globals (all-different / inverse /
-        // table) feasible on every restart and draw their feasibility-preserving moves during the
-        // infeasibility fight. The permutation/assignment-shaped niche.
         LocalSearchArm.CblsImplicitFixed -> cblsRecipe(arm.label, FixedCadenceRestart(), seedImplicitOnRestart = true) {
             Cbls(implicitStructuredCap = 8, tabu = cblsTabu())
         }
 
-        // Clique-swap arm: stall-gated at-most-one clique swaps for packing/assignment cliques whose
-        // categorical "which member is on" choice a single flip can only relocate by passing through
-        // the doubly-on violating state. Kept last pending its cross-seed credit pass.
         LocalSearchArm.CblsCliqueFixed ->
             cblsRecipe(arm.label, FixedCadenceRestart()) { Cbls(stallCliqueSwapCap = 8, tabu = cblsTabu()) }
 
-        // Feasibility-Jump arm: a weighted-violation argmin-jump strategy, orthogonal to the
-        // step-based CBLS/WalkSAT/SA arms. Violation-native (returns null at feasibility), so on a COP
-        // the portfolio's objective-bound ratchet drives its optimize phase, exactly like probSAT/WalkSAT.
         LocalSearchArm.FeasibilityJumpFixed ->
             LocalSearchRecipe(arm.label, FeasibilityJump().withRestart(FixedCadenceRestart()))
 
-        // Flip-and-propagate: stall-gated implication-aware flip compounds (a seed flip bundled with
-        // the literals it forces through the binary-implication graph). The boolean-core niche where a
-        // flip cascades through binary implications the search would otherwise repair one step at a time.
         LocalSearchArm.CblsFlipPropFixed ->
             cblsRecipe(arm.label, FixedCadenceRestart()) { Cbls(flipPropagateCap = 8, tabu = cblsTabu()) }
 
-        // Objective-hot-spot pair swaps: objective-descent pair swaps whose first endpoint is drawn
-        // from the objective gradient, concentrating coordinated moves on objective-relevant
-        // variables. The objective-heavy niche. Kept last pending its cross-seed credit pass.
         LocalSearchArm.CblsHotpairFixed ->
             cblsRecipe(arm.label, FixedCadenceRestart()) { Cbls(pairSwapHotSpotCap = 8, tabu = cblsTabu()) }
 
-        // Implicit-solving + the opt-in extended structured/repair moves (circuit 2-opt, all-different
-        // 3-cycle, Regular DP-repair). A niche layered on cbls-implicit; bench-gated, kept last.
         LocalSearchArm.CblsExtendedFixed -> cblsRecipe(arm.label, FixedCadenceRestart(), seedImplicitOnRestart = true) {
             Cbls(implicitStructuredCap = 8, extendedStructuredCap = 8, extendedRepair = true, tabu = cblsTabu())
         }
 
-        // SA with periodic reheating: the schedule re-diversifies a cooled-and-stuck run without
-        // discarding the incumbent. Restart epoch (100k) spans several reheat periods (20k) so the
-        // reheats fire before a restart resets the schedule.
         LocalSearchArm.SaReheatFixed -> saRecipe(arm.label, FixedCadenceRestart(maxFlipsBeforeRestart = 100_000)) {
             Reheating(Geometric(), period = 20_000, reheatFactor = 4.0)
         }
 
-        // SA with an explore→exploit phased schedule: a hot, fast-cooling exploratory leg then a cool,
-        // slow-cooling exploitative leg, looped. Distinct landscape coverage from the fixed-rate arms.
         LocalSearchArm.SaPhasedFixed -> saRecipe(arm.label, FixedCadenceRestart(maxFlipsBeforeRestart = 100_000)) {
             LoopSchedule(
                 listOf(
@@ -241,12 +175,6 @@ object LocalSearchCatalog {
         }
     }
 
-    /**
-     * COP pool order by cross-seed combined marginal credit (two campaigns at seeds 1/2 — 91 mzn-bench
-     * optimization instances, 10 s; score = Σ uncovered + 0.5·Σ best-held; cbls/fixed anchored first as
-     * the satisfy workhorse). [diverse] takes a prefix, so `-p <n>` gets the measured-best arms first.
-     * Re-derive by re-running the credit campaign at two seeds and editing this one list.
-     */
     private val copOrder: List<LocalSearchArm> = listOf(
         LocalSearchArm.CblsFixed,
         LocalSearchArm.CblsPlateauIlsBasin,
@@ -266,33 +194,18 @@ object LocalSearchCatalog {
         LocalSearchArm.CblsPlateauSmoothFixed,
         LocalSearchArm.CblsPlateauFixed,
         LocalSearchArm.CblsRawFixed,
-        // Bandit candidates; kept last so the default diverse(N) prefix is unchanged.
         LocalSearchArm.CblsIlsBandit,
         LocalSearchArm.ProbsatBanditFixed,
-        // Implicit-solving niche; kept last pending a cross-seed credit pass.
         LocalSearchArm.CblsImplicitFixed,
-        // Clique-swap niche; kept last pending a cross-seed credit pass.
         LocalSearchArm.CblsCliqueFixed,
-        // Feasibility-Jump arm; kept last pending its cross-seed credit pass.
         LocalSearchArm.FeasibilityJumpFixed,
-        // Implication-aware flip niche; kept last pending its cross-seed credit pass.
         LocalSearchArm.CblsFlipPropFixed,
-        // Objective-hot-spot pair-swap niche; kept last pending its cross-seed credit pass.
         LocalSearchArm.CblsHotpairFixed,
-        // Extended structured/repair moves niche; kept last pending its cross-seed credit pass.
         LocalSearchArm.CblsExtendedFixed,
-        // Schedule-diversity SA arms; kept last pending their cross-seed credit pass.
         LocalSearchArm.SaReheatFixed,
         LocalSearchArm.SaPhasedFixed,
     )
 
-    /**
-     * CSP pool order: [copOrder] minus the arms that do nothing without an objective — mirroring how
-     * [BacktrackCatalog] drops its LP / LinUCB arms on a CSP. Only [LocalSearchArm.CblsHotpairFixed]
-     * (objective-hot-spot pair swaps, whose endpoints are drawn from the objective gradient) degenerates
-     * without one; every other arm fights infeasibility, so it stays. Relative order is preserved
-     * pending a dedicated CSP credit campaign.
-     */
     private val cspOrder: List<LocalSearchArm> = copOrder.filter { it != LocalSearchArm.CblsHotpairFixed }
 
     private fun rankedArms(kind: Kind): List<LocalSearchArm> = when (kind) {
@@ -300,8 +213,6 @@ object LocalSearchCatalog {
         Kind.CSP -> cspOrder
     }
 
-    /** The shared string-boundary / order-driven accessors (see [ArmCatalog]); this catalog supplies
-     *  the per-[Kind] order ([rankedArms]) to the pool builders. */
     private val catalog = ArmCatalog(LocalSearchArm.entries, LocalSearchArm::label, ::make)
 
     /** A fresh recipe for the arm named [label] (the single string boundary). */

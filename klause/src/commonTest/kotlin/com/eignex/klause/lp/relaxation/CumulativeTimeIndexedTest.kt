@@ -23,7 +23,6 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-/** #453: the time-indexed `x_{i,t}` LP reformulation of the scheduling globals. */
 class CumulativeTimeIndexedTest {
 
     private val eps = 1e-6
