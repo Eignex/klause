@@ -156,6 +156,7 @@ internal fun LpModel.restrictTo(
      *  out, so the buffer comes back all `-1` and the next call cannot see this one's rows. */
     rowMapScratch: IntArray? = null,
 ): LpNeighborhood {
+    require(exactState == null) { "exact state neighborhood reconstruction is unsupported" }
     val subN = takenCols.size
     val subM = takenRows.size
     val rowMap = rowMapScratch ?: IntArray(m) { -1 }

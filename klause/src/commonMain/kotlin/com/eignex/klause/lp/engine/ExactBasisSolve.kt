@@ -1,6 +1,7 @@
 package com.eignex.klause.lp.engine
 
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.Int128
 import com.ionspin.kotlin.bignum.integer.BigInteger
 
@@ -33,7 +34,13 @@ internal fun exactBasisWitness(
     model: LpModel,
     basis: Basis,
     observer: LpCertificationObserver? = null,
+    cancellation: Cancellation = Cancellation.Never,
 ): ExactLpWitness? {
+    if (model.exactState != null) {
+        val point = exactStateBasisWitness(model, basis, cancellation)
+        observer?.observe(LpCertifier.EXACT_BASIS, point != null)
+        return point
+    }
     var point: ExactLpWitness? = null
     exactBasisFeasibleUnchecked(model, basis, observer) { candidate ->
         point = checkedLpWitness(model, candidate)
@@ -68,10 +75,15 @@ internal fun exactPointFeasible(
  * rationalization ([rationalizeToIntegerModel]), where a positive integer scale preserves the feasible
  * region so the proof carries back exactly.
  */
-internal fun exactBasisFeasible(model: LpModel, basis: Basis, observer: LpCertificationObserver? = null): Boolean? =
-    exactBasisFeasibleUnchecked(model, basis, observer).also {
-        observer?.observe(LpCertifier.EXACT_BASIS, it == true)
+internal fun exactBasisFeasible(model: LpModel, basis: Basis, observer: LpCertificationObserver? = null): Boolean? = (
+    if (model.exactState != null) {
+        exactStateBasisWitness(model, basis, Cancellation.Never)?.let { true }
+    } else {
+        exactBasisFeasibleUnchecked(model, basis, observer)
     }
+    ).also {
+    observer?.observe(LpCertifier.EXACT_BASIS, it == true)
+}
 
 private fun exactBasisFeasibleUnchecked(
     model: LpModel,
@@ -150,9 +162,67 @@ private fun validBasisDeclaration(model: LpModel, basis: Basis): Boolean {
             VarStatus.BASIC -> seen[j]
             VarStatus.AT_LOWER -> j >= model.n || !model.probeClampedLo[j]
             VarStatus.AT_UPPER -> model.hasFiniteUpper(j) && (j >= model.n || !model.probeClampedHi[j])
+            VarStatus.FIXED -> model.fixed(j)
+            VarStatus.FREE -> !model.hasFiniteLower(j) && !model.hasFiniteUpper(j)
         }
     }
 }
+
+private fun exactStateBasisWitness(model: LpModel, basis: Basis, cancellation: Cancellation): ExactLpWitness? {
+    if (cancellation()) return null
+    if (model.m > MAX_EXACT_BASIS || !validBasisDeclaration(model, basis)) return null
+    val point = MutableList(model.numVars) { j ->
+        when (basis.status[j]) {
+            VarStatus.AT_UPPER -> model.exactUpper(j)
+            VarStatus.AT_LOWER, VarStatus.FIXED -> model.exactLower(j)
+            VarStatus.FREE, VarStatus.BASIC -> BigFraction.ZERO
+        }
+    }
+    for (j in 0 until model.numVars) {
+        if (basis.status[j] == VarStatus.AT_LOWER && !model.hasFiniteLower(j)) return null
+    }
+    val matrix = Array(model.m) { MutableList(model.m + 1) { BigFraction.ZERO } }
+    for (i in 0 until model.m) matrix[i][model.m] = model.exactRhs(i)
+    for (j in 0 until model.numVars) {
+        if (basis.status[j] == VarStatus.BASIC) continue
+        model.forEachRationalColumn(j) { i, value -> matrix[i][model.m] -= value * point[j] }
+    }
+    for (column in 0 until model.m) {
+        model.forEachRationalColumn(basis.basicVars[column]) { row, value -> matrix[row][column] = value }
+    }
+    for (column in 0 until model.m) {
+        if (cancellation()) return null
+        val pivot = (column until model.m).firstOrNull { !matrix[it][column].isZero } ?: return null
+        val row = matrix[pivot]
+        matrix[pivot] = matrix[column]
+        matrix[column] = row
+        val inverse = row[column].reciprocal()
+        for (entry in column..model.m) {
+            val value = row[entry] * inverse
+            if (!value.withinBasisBudget()) return null
+            row[entry] = value
+        }
+        for (i in 0 until model.m) {
+            if (cancellation()) return null
+            if (i == column) continue
+            val scale = matrix[i][column]
+            if (scale.isZero) continue
+            for (entry in column..model.m) {
+                val value = matrix[i][entry] - scale * row[entry]
+                if (!value.withinBasisBudget()) return null
+                matrix[i][entry] = value
+            }
+        }
+    }
+    for (i in 0 until model.m) point[basis.basicVars[i]] = matrix[i][model.m]
+    if (point.indices.any { !model.withinExactBounds(it, point[it]) }) return null
+    return checkedLpWitness(model, List(model.n) { point[it] + model.exactShift(it) })
+}
+
+private const val MAX_RATIONAL_DIGITS = 1234
+
+private fun BigFraction.withinBasisBudget(): Boolean =
+    num.toString().length <= MAX_RATIONAL_DIGITS && den.toString().length <= MAX_RATIONAL_DIGITS
 
 /**
  * The exact Farkas ray `ρ = B⁻ᵀeᵣ` of the dual-unbounded [basis] with leaving row [row], scaled by

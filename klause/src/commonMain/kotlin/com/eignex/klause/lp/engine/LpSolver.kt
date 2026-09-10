@@ -100,6 +100,8 @@ internal interface LpSolver : AutoCloseable {
     /** The leaving row of [infeasibleBasis]; `-1` when there is none. */
     val infeasibleRow: Int get() = -1
 
+    val solvedExactState: LpExactState? get() = null
+
     /**
      * Pivots the last solve spent, whether or not it returned a [FloatLpResult].
      *
@@ -216,6 +218,8 @@ internal interface TableauCutSolver : LpSolver {
  * caller would silently pay a full rebuild for.
  */
 internal interface PersistentLpSolver : LpSolver {
+    fun adopt(state: LpExactState, token: Cancellation = Cancellation.Never): Boolean = false
+
     /**
      * Re-point this engine at [next] and [token], keeping the seated basis and its factorization; false
      * when [next] is not a bound-only revision of the current model, which is the caller's signal to

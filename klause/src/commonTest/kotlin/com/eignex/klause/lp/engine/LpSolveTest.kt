@@ -16,6 +16,165 @@ import kotlin.test.assertTrue
 
 class LpSolveTest {
     @Test
+    fun `supplied legacy certificates cannot raise an exact state bound`() {
+        val legacy = LpBuilder().apply { addVar(5L, 10L, cost = 1L) }.build(Sense.MINIMIZE)
+        val certificate = assertNotNull(integerCertify(legacy, doubleArrayOf()))
+        val zero = ExactLpNumber.of(0L)
+        val source = ExactLpModel(
+            listOf(emptyList()), emptyList(),
+            listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(ExactLpNumber.of(10L))))),
+            emptyList(), ExactLpObjective(listOf(ExactLpNumber.of(1L))),
+        )
+        val working = assertNotNull(LpExactState(source).toWorkingModel())
+
+        val bound = tightObjectiveLowerBound(working, doubleArrayOf(), certificate)
+        val accepted = certifiedTightObjectiveLowerBound(
+            working, doubleArrayOf(), certificate, null, ProductionLpCertificationPolicy,
+        )
+
+        assertEquals(0.0, bound)
+        assertEquals(0.0, accepted)
+    }
+
+    @Test
+    fun `crossed bound witnesses honor proof acceptance policy`() {
+        val zero = ExactLpNumber.of(0L)
+        val source = ExactLpModel(
+            listOf(emptyList()), emptyList(),
+            listOf(ExactLpColumn(ExactLpBounds(upper = ExactLpSide(zero)))),
+            emptyList(), ExactLpObjective(listOf(zero)),
+        )
+        val trail = LpBoundTrail(source)
+        assertTrue(trail.assertBound(0, false, ExactLpSide(zero, strict = true), 7L))
+        val working = assertNotNull(trail.state.toWorkingModel())
+        val decline = LpSolveContext(certificationPolicy = LpCertificationPolicy { _, _ -> false })
+
+        val accepted = solveAndCertify(working)
+        val rejected = solveAndCertify(working, context = decline)
+
+        assertEquals(LpVerdict.INFEASIBLE, accepted.verdict)
+        assertEquals(7L, assertNotNull(accepted.boundConflict).lower.witness)
+        assertEquals(-2L, accepted.boundConflict.upper.witness)
+        assertEquals(LpVerdict.INDETERMINATE, rejected.verdict)
+        assertNull(rejected.boundConflict)
+    }
+
+    @Test
+    fun `exact objective units and source origins survive certification`() {
+        val third = BigFraction.of(BigInteger.ONE, BigInteger.fromInt(3))
+        val model = ExactLpModel(
+            listOf(emptyList()), emptyList(),
+            listOf(
+                ExactLpColumn(
+                    ExactLpBounds(ExactLpSide(ExactLpNumber.of(third)), ExactLpSide(ExactLpNumber.of(2L))),
+                    origin = ExactLpNumber.of(10L), integral = false, tag = 17,
+                ),
+            ),
+            emptyList(),
+            ExactLpObjective(
+                listOf(ExactLpNumber.of(6L)), constant = ExactLpNumber.of(9L),
+                scale = ExactLpNumber.of(3L), externalConstant = ExactLpNumber.of(4L), sense = Sense.MAXIMIZE,
+            ),
+        )
+
+        val result = solveAndCertify(model)
+
+        assertEquals(LpVerdict.ATTAINED_OPTIMUM, result.verdict)
+        assertEquals(BigFraction.ofLong(10L) + third, assertNotNull(result.exactPrimal).single())
+        assertEquals(BigFraction.ofLong(7L) + third + third, result.lowerBound)
+        assertNull(result.integerObjectiveLowerBound)
+        assertNull(result.certificate)
+        assertEquals(Sense.MAXIMIZE, assertNotNull(result.bound?.support).state.model.objective.sense)
+    }
+
+    @Test
+    fun `strict closure vertex proves only a bound`() {
+        val zero = ExactLpNumber.of(0L)
+        val model = ExactLpModel(
+            listOf(emptyList()), emptyList(),
+            listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero, strict = true), ExactLpSide(ExactLpNumber.of(1L))))),
+            emptyList(), ExactLpObjective(listOf(zero)),
+        )
+
+        val result = solveAndCertify(model)
+
+        assertEquals(LpVerdict.CERTIFIED_BOUND, result.verdict)
+        assertEquals(BigFraction.ZERO, result.lowerBound)
+        assertNull(result.witness)
+        assertNull(result.farkasRay)
+    }
+
+    @Test
+    fun `binary and parsed equations retain different acceptance authority`() {
+        val tenth = ExactLpNumber.of(BigFraction.of(BigInteger.ONE, BigInteger.fromInt(10)))
+        val zero = ExactLpNumber.of(0L)
+        for (rhs in listOf(tenth, ExactLpNumber.ofIeee(0.1))) {
+            val model = ExactLpModel(
+                listOf(listOf(ExactLpEntry(0, ExactLpNumber.of(1L)))), listOf(rhs),
+                listOf(
+                    ExactLpColumn(ExactLpBounds(ExactLpSide(tenth), ExactLpSide(tenth))),
+                    ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(zero))),
+                ),
+                listOf(ExactLpRow()), ExactLpObjective(listOf(zero, zero)),
+            )
+
+            val result = solveAndCertify(model)
+
+            if (rhs == tenth) {
+                assertEquals(LpVerdict.ATTAINED_OPTIMUM, result.verdict)
+                assertEquals(listOf(tenth.value), result.exactPrimal)
+            } else {
+                assertNull(result.witness)
+                assertTrue(result.verdict != LpVerdict.ATTAINED_OPTIMUM)
+            }
+        }
+    }
+
+    @Test
+    fun `unrepresentable exact costs decline before engine creation`() {
+        val huge = ExactLpNumber.of(BigFraction.of(BigInteger.ONE shl 4096, BigInteger.ONE))
+        val model = ExactLpModel(
+            listOf(emptyList()), emptyList(), listOf(ExactLpColumn(ExactLpBounds())), emptyList(),
+            ExactLpObjective(listOf(huge)),
+        )
+        val context = LpSolveContext(engineFactory = object : LpEngineFactory by ProductionLpEngineFactory {
+            override fun newGeneralSolver(model: LpModel, cancellation: Cancellation): LpSolver =
+                error("engine entered")
+        })
+
+        val result = solveAndCertify(model, context = context)
+
+        assertEquals(LpVerdict.INDETERMINATE, result.verdict)
+        assertNull(result.float)
+        assertNull(exactLpStateKey(model))
+    }
+
+    @Test
+    fun `weaker witnesses invalidate counters while old lazy bounds retain their source state`() {
+        val zero = ExactLpNumber.of(0L)
+        val source = ExactLpModel(
+            listOf(emptyList()), emptyList(),
+            listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(ExactLpNumber.of(10L))))),
+            emptyList(), ExactLpObjective(listOf(ExactLpNumber.of(1L))),
+        )
+        val trail = LpBoundTrail(source)
+        assertTrue(trail.assertBound(0, false, ExactLpSide(ExactLpNumber.of(3L)), 1L))
+        val model = assertNotNull(trail.state.toWorkingModel())
+        val counters = LpCounterResults()
+        val result = solveAndCertify(model, counterResults = counters)
+
+        assertTrue(trail.assertBound(0, false, ExactLpSide(ExactLpNumber.of(2L)), 2L))
+        val next = assertNotNull(trail.state.toWorkingModel())
+
+        assertNull(counters.read(next, ProductionLpCertificationPolicy))
+        assertEquals(3.0, result.safeLowerBound)
+        assertEquals(1L, assertNotNull(result.bound?.support).sides.single().witness)
+        assertEquals(2, trail.state.assertions.size)
+        assertNull(integerCertify(next, doubleArrayOf()))
+        assertNull(rationalizeToIntegerModel(next, outwardRealUppers = true))
+    }
+
+    @Test
     fun `short premise metadata declines keys and safe snapshots without throwing`() {
         val model = LpModel(
             1, 1, Csc(intArrayOf(0, 1), intArrayOf(0), longArrayOf(1L)),
@@ -98,15 +257,16 @@ class LpSolveTest {
         assertEquals(one.value.toDouble(), nextBound.value.toDouble())
         assertTrue(!model.sameAuthority(next))
         assertNotNull(exactLpStateKey(model))
-        assertNull(exactLpStateKey(next))
-        assertEquals(LpVerdict.INDETERMINATE, result.verdict)
-        assertNull(result.safeLowerBound)
-        assertTrue(cache.storageDeclined)
+        assertNotNull(exactLpStateKey(next))
+        assertEquals(LpVerdict.ATTAINED_OPTIMUM, result.verdict)
+        assertEquals(nextBound.value.negated(), result.lowerBound)
+        assertTrue(assertNotNull(result.safeLowerBound) <= nextBound.value.negated().toDouble())
+        assertTrue(!cache.storageDeclined)
         assertNull(cache.read(assertNotNull(model.toLegacy()), ProductionLpCertificationPolicy))
     }
 
     @Test
-    fun `unsupported exact metadata declines before engine injection`() {
+    fun `general exact metadata reaches the engine without losing authority`() {
         val zero = ExactLpNumber.of(0L)
         val model = ExactLpModel(
             listOf(emptyList()),
@@ -130,11 +290,14 @@ class LpSolveTest {
             model.copy(objective = ExactLpObjective(listOf(zero), externalConstant = ExactLpNumber.of(1L))),
             model.copy(objective = ExactLpObjective(listOf(ExactLpNumber.ofIeee(0.0)))),
         )
+        var calls = 0
         val context = LpSolveContext(
             engineFactory = object : LpEngineFactory by ProductionLpEngineFactory {
-                override fun newGeneralSolver(model: LpModel, cancellation: Cancellation): LpSolver = error(
-                    "unsupported engine entry",
-                )
+                override fun newGeneralSolver(model: LpModel, cancellation: Cancellation): LpSolver {
+                    calls++
+                    assertNotNull(model.exactState)
+                    return ProductionLpEngineFactory.newGeneralSolver(model, cancellation)
+                }
                 override fun newComponentSolver(
                     model: LpModel,
                     parts: List<LpNeighborhood>,
@@ -145,14 +308,15 @@ class LpSolveTest {
         )
         for (variant in variants) {
             assertNull(variant.toLegacy())
-            assertNull(exactLpStateKey(variant))
+            assertNotNull(exactLpStateKey(variant))
             val result = solveAndCertify(variant, context = context)
-            assertEquals(LpVerdict.INDETERMINATE, result.verdict)
-            assertNull(result.float)
-            assertNull(result.bound)
-            assertNull(result.witness)
-            assertNull(result.safeLowerBound)
+            assertEquals(LpVerdict.ATTAINED_OPTIMUM, result.verdict)
+            assertTrue(assertNotNull(result.float).exactState?.model?.sameAuthority(variant) == true)
+            assertNotNull(result.bound)
+            assertNotNull(result.witness)
+            assertNotNull(result.safeLowerBound)
         }
+        assertEquals(variants.size, calls)
     }
 
     @Test

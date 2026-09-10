@@ -296,6 +296,10 @@ internal fun integerFarkasRay(
     onRoute: ((FarkasRoute) -> Unit)? = null,
     observer: LpCertificationObserver? = null,
 ): LongArray? {
+    if (model.exactState != null) {
+        onRoute?.invoke(FarkasRoute.NONE)
+        return null
+    }
     if (ray.size != model.m || !model.finiteExactInput()) {
         onRoute?.invoke(FarkasRoute.NONE)
         return null
@@ -426,6 +430,7 @@ internal fun rationalizeToIntegerModel(
 }
 
 private fun rationalizeToIntegerModelUnchecked(model: LpModel, outwardRealUppers: Boolean): RationalizedLp? {
+    if (model.exactState != null) return null
     if (!model.finiteExactInput()) return null
     val dv = model.doubleView ?: return RationalizedLp(model, 1L, objConstantExact = true)
     val n = model.n

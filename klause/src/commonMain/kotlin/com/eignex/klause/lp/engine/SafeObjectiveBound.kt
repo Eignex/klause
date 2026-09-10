@@ -67,6 +67,7 @@ internal fun LpModel.safeVariableBound(
     clamped: Boolean? = null,
     observer: LpCertificationObserver? = null,
 ): Long? {
+    if (exactState != null) return null
     if (!hasIntegralObjective()) return null
     val objMin = safeObjectiveLowerBound(this, result.duals, observer) ?: return null
     val ceilMin = ceil(objMin)
@@ -88,6 +89,7 @@ internal fun LpModel.exactVariableBound(
     clamped: Boolean? = null,
     observer: LpCertificationObserver? = null,
 ): Long? {
+    if (exactState != null) return null
     val ceilMin = exactObjectiveLowerBoundCeil(result.duals, observer) ?: return null
     return orientedVariableBound(ceilMin, objectiveCol, maximize, clamped)
 }
@@ -188,7 +190,7 @@ internal fun tightObjectiveLowerBound(
     observer: LpCertificationObserver? = null,
 ): Double? = tighterLowerBound(
     safeObjectiveLowerBound(model, y, observer),
-    certificate?.takeIf { model.hasIntegralObjective() }?.objectiveBoundCeil(0L),
+    certificate?.takeIf { model.exactState == null && model.hasIntegralObjective() }?.objectiveBoundCeil(0L),
 )
 
 /** The larger of two sound lower bounds on the same objective, either of which may be unavailable. */

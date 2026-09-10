@@ -145,13 +145,14 @@ internal class LpModel(
      * costs and shift are all `Double`; the CSC mirrors [csc] (structural columns only, slacks implicit).
      */
     override val doubleView: LpDoubleView? = null,
+    val exactState: LpExactState? = null,
 ) : ExactSimplexModel {
     /** Total variable count: structural plus slack. */
     override val numVars: Int get() = n + m
 
     /** Whether the model carries real coefficients, so it is solved through [doubleView] and the exact
      *  128-bit integer certification declines (a real coefficient is not integrally certifiable here). */
-    val hasContinuous: Boolean get() = doubleView != null
+    val hasContinuous: Boolean get() = exactState != null || doubleView != null
 
     /** Objective coefficient of variable [j] as a double (from [doubleView] when present). */
     fun costD(j: Int): Double = doubleView?.cost?.get(j) ?: cost[j].toDouble()
@@ -163,7 +164,23 @@ internal class LpModel(
     fun upperD(j: Int): Double = doubleView?.upper?.get(j) ?: upper[j].toDouble()
 
     /** Whether variable [j] has a finite upper bound. */
-    fun hasFiniteUpper(j: Int): Boolean = doubleView?.hasUpper?.get(j) ?: hasUpper[j]
+    fun hasFiniteUpper(j: Int): Boolean = exactState?.let { it.model.column(j).bounds.upper != null }
+        ?: (doubleView?.hasUpper?.get(j) ?: hasUpper[j])
+
+    fun hasFiniteLower(j: Int): Boolean = exactState == null || exactState.model.column(j).bounds.lower != null
+
+    fun lowerD(j: Int): Double = exactState?.model?.column(j)?.bounds?.lower?.number?.let {
+        it.ieeeBits?.let(Double::fromBits) ?: it.value.toDouble()
+    } ?: 0.0
+
+    fun fixed(j: Int): Boolean = exactState?.model?.column(j)?.bounds?.fixed
+        ?: (hasFiniteLower(j) && hasFiniteUpper(j) && exactUpper(j).isZero)
+
+    fun objectiveD(value: Double): Double = exactState?.model?.objective?.let {
+        val scale = it.scale.ieeeBits?.let(Double::fromBits) ?: it.scale.value.toDouble()
+        val constant = it.externalConstant.ieeeBits?.let(Double::fromBits) ?: it.externalConstant.value.toDouble()
+        value / scale + constant
+    } ?: value
 
     /** Lower-bound shift of structural column [j] as a double. */
     override fun loShiftD(j: Int): Double = doubleView?.loShift?.get(j) ?: loShift[j].toDouble()
@@ -191,6 +208,7 @@ internal class LpModel(
      * so a search node can re-bind the persistent relaxation instead of rebuilding it.
      */
     fun rebind(lo: LongArray, hi: LongArray): LpModel {
+        require(exactState == null) { "exact state bounds require the bound trail" }
         require(lo.size == n && hi.size == n) { "rebind expects $n bounds, got ${lo.size}/${hi.size}" }
         val newRhs = flippedRhs.copyOf()
         val newUpper = upper.copyOf()
@@ -244,6 +262,7 @@ internal class LpModel(
         negCol: Int = -1,
         prevNegCol: Int = -1,
     ): LpModel {
+        require(exactState == null) { "exact state objectives require the bound trail" }
         val cost = cost.copyOf()
         if (prevCol >= 0) cost[prevCol] = 0L
         if (prevNegCol >= 0) cost[prevNegCol] = 0L
@@ -280,6 +299,7 @@ internal class LpModel(
      * Copies the objective arrays before resetting [prevCols] and assigning the replacement costs.
      */
     fun withRowObjective(cols: IntArray, coeffs: LongArray, prevCols: IntArray): LpModel {
+        require(exactState == null) { "exact state objectives require the bound trail" }
         val cost = cost.copyOf()
         for (c in prevCols) cost[c] = 0L
         var constant = 0L
@@ -782,6 +802,9 @@ internal class ExactLpPremises(bounds: List<ExactLpPremise>, literals: List<Int>
     val size: Long get() = bounds.size.toLong() * 3 + literals.size
     val hasIeeeInput: Boolean get() = bounds.any { it.threshold.ieeeBits != null }
 
+    fun boundEntries(): List<ExactLpPremise> = bounds.toList()
+    fun literalEntries(): List<Int> = literals.toList()
+
     fun toLegacy(): LpRowPremises? {
         val thresholds = LongArray(bounds.size)
         for (i in bounds.indices) thresholds[i] = bounds[i].threshold.legacyLong() ?: return null
@@ -871,17 +894,21 @@ internal class ExactLpObjective(
     override fun hashCode(): Int = listOf(costs, constant, scale, externalConstant, sense).hashCode()
 }
 
-internal class ExactLpModel(
-    matrix: List<List<ExactLpEntry>>,
-    rhs: List<ExactLpNumber>,
-    columns: List<ExactLpColumn>,
-    rows: List<ExactLpRow>,
+internal class ExactLpModel private constructor(
+    private val matrix: List<List<ExactLpEntry>>,
+    private val rightHandSide: List<ExactLpNumber>,
+    private val columns: List<ExactLpColumn>,
+    private val rows: List<ExactLpRow>,
     val objective: ExactLpObjective,
+    validateMatrix: Boolean,
 ) {
-    private val matrix = matrix.map { it.toList() }
-    private val rightHandSide = rhs.toList()
-    private val columns = columns.toList()
-    private val rows = rows.toList()
+    constructor(
+        matrix: List<List<ExactLpEntry>>,
+        rhs: List<ExactLpNumber>,
+        columns: List<ExactLpColumn>,
+        rows: List<ExactLpRow>,
+        objective: ExactLpObjective,
+    ) : this(matrix.map { it.toList() }, rhs.toList(), columns.toList(), rows.toList(), objective, true)
     val n: Int get() = matrix.size
     val m: Int get() = rows.size
     val numVars: Int get() = columns.size
@@ -890,9 +917,11 @@ internal class ExactLpModel(
 
     init {
         require(n.toLong() + m == numVars.toLong() && rightHandSide.size == m && objective.size == numVars)
-        for (column in this.matrix) {
-            require(column.all { it.row in 0 until m })
-            require(column.zipWithNext().all { (a, b) -> a.row < b.row })
+        if (validateMatrix) {
+            for (column in this.matrix) {
+                require(column.all { it.row in 0 until m })
+                require(column.zipWithNext().all { (a, b) -> a.row < b.row })
+            }
         }
         require((n until numVars).all { this.columns[it].origin.value.isZero }) { "slack origins must be zero" }
     }
@@ -910,7 +939,7 @@ internal class ExactLpModel(
         require(columns.size == numVars && columns.indices.all { columns[it].origin == this.columns[it].origin }) {
             "coordinate changes require recentered"
         }
-        return ExactLpModel(matrix, rightHandSide, columns, rows, objective)
+        return ExactLpModel(matrix, rightHandSide, columns.toList(), rows.toList(), objective, false)
     }
 
     fun recentered(origins: List<ExactLpNumber>): ExactLpModel {
@@ -937,7 +966,7 @@ internal class ExactLpModel(
         } else {
             objective.withConstant(ExactLpNumber.of(constant))
         }
-        return ExactLpModel(matrix, rhs, columns, rows, nextObjective)
+        return ExactLpModel(matrix, rhs.toList(), columns.toList(), rows, nextObjective, false)
     }
 
     private fun hasIeeeInput(): Boolean = matrix.any { entries -> entries.any { it.number.ieeeBits != null } } ||
@@ -953,6 +982,9 @@ internal class ExactLpModel(
     fun sameAuthority(other: ExactLpModel): Boolean = matrix == other.matrix &&
         rightHandSide == other.rightHandSide && columns == other.columns && rows == other.rows &&
         objective == other.objective
+
+    fun sameMatrix(other: ExactLpModel): Boolean = n == other.n && m == other.m &&
+        matrix == other.matrix && rows == other.rows
 
     fun toLegacy(): LpModel? {
         if (columns.any { !it.bounds.consistent || !it.integral } || rows.any { it.strict }) return null

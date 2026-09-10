@@ -1,6 +1,8 @@
 package com.eignex.klause.lp.engine
 
+import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.Cancellation
+import com.ionspin.kotlin.bignum.integer.BigInteger
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -12,6 +14,147 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class LpCaptureTest {
+    @Test
+    fun `exact capture preserves all numeric and source authority`() {
+        val third = ExactLpNumber.of(BigFraction.of(BigInteger.ONE, BigInteger.fromInt(3)))
+        val negativeZero = ExactLpNumber.ofIeee(-0.0)
+        val premises = ExactLpPremises(listOf(ExactLpPremise(7, true, third)), listOf(11, -13))
+        val model = ExactLpModel(
+            listOf(listOf(ExactLpEntry(0, third)), listOf(ExactLpEntry(0, ExactLpNumber.ofIeee(0.1)))),
+            listOf(third),
+            listOf(
+                ExactLpColumn(ExactLpBounds(), third, integral = false, tag = 17),
+                ExactLpColumn(ExactLpBounds(ExactLpSide(negativeZero), ExactLpSide(negativeZero))),
+                ExactLpColumn(ExactLpBounds(ExactLpSide(third, strict = true, premises))),
+            ),
+            listOf(ExactLpRow(global = false, strict = true, premises)),
+            ExactLpObjective(listOf(third, negativeZero, third), third, third, third, Sense.MAXIMIZE),
+        )
+        val basis = Basis(intArrayOf(2), arrayOf(VarStatus.FREE, VarStatus.FIXED, VarStatus.BASIC), false)
+        val events = listOf(
+            LpExactReplayEvent.Push(),
+            LpExactReplayEvent.Assert(0, false, ExactLpSide(third, true, premises), 29L),
+            LpExactReplayEvent.Objective(model.objective),
+            LpExactReplayEvent.Recenter(listOf(third, negativeZero)),
+            LpExactReplayEvent.Solve(basis),
+            LpExactReplayEvent.Pop(0),
+        )
+        val capture = LpExactCapture.capture(model, LpReplaySettings("exact", 31L), events)
+        basis.status[0] = VarStatus.AT_LOWER
+
+        val decoded = LpExactCapture.decode(capture.encode())
+
+        assertTrue(model.sameAuthority(decoded.model))
+        assertContentEquals(capture.encode(), decoded.encode())
+        val restoredBasis = assertNotNull((decoded.events[4] as LpExactReplayEvent.Solve).warm)
+        assertEquals(VarStatus.FREE, restoredBasis.status[0])
+        assertEquals(VarStatus.FIXED, restoredBasis.status[1])
+        restoredBasis.status[0] = VarStatus.AT_UPPER
+        assertEquals(VarStatus.FREE, assertNotNull((decoded.events[4] as LpExactReplayEvent.Solve).warm).status[0])
+        assertEquals((-0.0).toRawBits(), decoded.model.column(1).bounds.lower?.number?.ieeeBits)
+    }
+
+    @Test
+    fun `exact capture rejects unknown format and event versions`() {
+        val zero = ExactLpNumber.of(0L)
+        val model = ExactLpModel(
+            listOf(emptyList()), emptyList(), listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero)))),
+            emptyList(), ExactLpObjective(listOf(zero)),
+        )
+        val bytes = LpExactCapture.capture(
+            model, LpReplaySettings("version", 0L), listOf(LpExactReplayEvent.Push()),
+        ).encode()
+        val badFormat = bytes.copyOf().also { it[11] = 99 }
+        val badEvent = bytes.copyOf().also { it[it.lastIndex] = 99 }
+
+        assertFails { LpExactCapture.decode(badFormat) }
+        assertFails { LpExactCapture.decode(badEvent) }
+        assertFails { LpExactCapture.decode(bytes + byteArrayOf(1)) }
+    }
+
+    @Test
+    fun `exact state keys distinguish weaker witnesses and restored revisions`() {
+        val zero = ExactLpNumber.of(0L)
+        val model = ExactLpModel(
+            listOf(emptyList()), emptyList(), listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero)))),
+            emptyList(), ExactLpObjective(listOf(zero)),
+        )
+        val trail = LpBoundTrail(model)
+        val first = assertNotNull(LpExactCapture.stateKey(trail.state))
+        assertTrue(trail.push(Cancellation.Never))
+        assertTrue(trail.assertBound(0, false, ExactLpSide(ExactLpNumber.of(-1L)), 1L, Cancellation.Never))
+        val weak = assertNotNull(LpExactCapture.stateKey(trail.state))
+        assertTrue(trail.state.model.sameAuthority(model))
+        assertFalse(first.contentEquals(weak))
+        assertTrue(trail.pop(0, Cancellation.Never))
+        val popped = assertNotNull(LpExactCapture.stateKey(trail.state))
+        assertTrue(trail.state.model.sameAuthority(model))
+        assertFalse(first.contentEquals(popped))
+        assertContentEquals(popped, LpExactCapture.stateKey(trail.state))
+    }
+
+    @Test
+    fun `exact state key declines excessive complete authority`() {
+        val model = ExactLpModel(
+            List(500) { emptyList() }, emptyList(), List(500) { ExactLpColumn(ExactLpBounds()) },
+            emptyList(), ExactLpObjective(List(500) { ExactLpNumber.of(0L) }),
+        )
+
+        assertNull(LpExactCapture.stateKey(LpExactState(model)))
+    }
+
+    @Test
+    fun `exact state key declines oversized rational bytes below value budget`() {
+        val large = ExactLpNumber.of(BigFraction.of(BigInteger.ONE shl 4096, BigInteger.ONE))
+        val model = ExactLpModel(
+            List(40) { emptyList() }, emptyList(), List(40) { ExactLpColumn(ExactLpBounds(), origin = large) },
+            emptyList(), ExactLpObjective(List(40) { ExactLpNumber.of(0L) }),
+        )
+
+        assertNull(LpExactCapture.stateKey(LpExactState(model)))
+    }
+
+    @Test
+    fun `exact state keys retain sub-double bounds and each revision`() {
+        val first = ExactLpNumber.of(9007199254740992L)
+        val second = ExactLpNumber.of(9007199254740993L)
+        assertEquals(first.value.toDouble(), second.value.toDouble())
+        val model = ExactLpModel(
+            listOf(emptyList()), emptyList(), listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(first)))),
+            emptyList(), ExactLpObjective(listOf(ExactLpNumber.of(0L))),
+        )
+        val baseline = assertNotNull(LpExactCapture.stateKey(LpExactState(model)))
+        val variants = listOf(
+            LpExactState(model.copy(columns = listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(second)))))),
+            LpExactState(model, matrixRevision = 1L),
+            LpExactState(model, boundRevision = 1L),
+            LpExactState(model, objectiveRevision = 1L),
+            LpExactState(model, popRevision = 1L),
+            LpExactState(model, scopes = listOf(0)),
+        )
+
+        variants.forEach { assertFalse(baseline.contentEquals(assertNotNull(LpExactCapture.stateKey(it)))) }
+    }
+
+    @Test
+    fun `legacy capture rejects exact projection and native status`() {
+        val zero = ExactLpNumber.of(0L)
+        val model = ExactLpModel(
+            listOf(emptyList()), emptyList(), listOf(ExactLpColumn(ExactLpBounds())),
+            emptyList(), ExactLpObjective(listOf(zero)),
+        )
+        val working = assertNotNull(LpExactState(model).toWorkingModel())
+
+        assertFailsWith<IllegalArgumentException> { LpCapturedModel.capture(working) }
+        assertNull(LpCapturedModel.captureOrNull(working))
+        assertFailsWith<IllegalArgumentException> {
+            LpCapturedBasis.capture(Basis(intArrayOf(), arrayOf(VarStatus.FREE)))
+        }
+        assertFailsWith<IllegalArgumentException> {
+            LpCapturedBasis.capture(Basis(intArrayOf(), arrayOf(VarStatus.FIXED)))
+        }
+    }
+
     @Test
     fun `fixed capture decline survives zero pivot warm chains and close reuse`() {
         val zero = ExactLpNumber.of(0L)

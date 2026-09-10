@@ -378,6 +378,8 @@ class RevisedSimplexNumericsTest {
             when (result.basis.status[j]) {
                 VarStatus.AT_LOWER -> assertTrue(reducedCost >= -1e-7, "column $j reduced cost $reducedCost")
                 VarStatus.AT_UPPER -> assertTrue(reducedCost <= 1e-7, "column $j reduced cost $reducedCost")
+                VarStatus.FREE -> assertTrue(kotlin.math.abs(reducedCost) <= 1e-7)
+                VarStatus.FIXED -> Unit
                 VarStatus.BASIC -> Unit
             }
         }

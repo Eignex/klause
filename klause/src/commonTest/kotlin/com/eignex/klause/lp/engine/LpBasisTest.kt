@@ -33,7 +33,7 @@ class LpBasisTest {
     }
 
     @Test
-    fun `nonbasic seats require an existing nonstrict side`() {
+    fun `nonbasic seats require an existing closure side`() {
         val zero = ExactLpSide(ExactLpNumber.of(0L))
         val one = ExactLpSide(ExactLpNumber.of(1L))
         val cases = listOf(
@@ -45,8 +45,8 @@ class LpBasisTest {
             Triple(ExactLpBounds(lower = zero), ExactLpStatus.FREE, false),
             Triple(ExactLpBounds(zero, zero), ExactLpStatus.FIXED, true),
             Triple(ExactLpBounds(zero, one), ExactLpStatus.FIXED, false),
-            Triple(ExactLpBounds(zero.copy(strict = true), one), ExactLpStatus.AT_LOWER, false),
-            Triple(ExactLpBounds(zero, one.copy(strict = true)), ExactLpStatus.AT_UPPER, false),
+            Triple(ExactLpBounds(zero.copy(strict = true), one), ExactLpStatus.AT_LOWER, true),
+            Triple(ExactLpBounds(zero, one.copy(strict = true)), ExactLpStatus.AT_UPPER, true),
         )
         for ((bounds, status, valid) in cases) {
             val model = ExactLpModel(
@@ -126,7 +126,7 @@ class LpBasisTest {
 
             assertTrue(basis.validFor(model))
             assertNull(basis.toLegacy(model))
-            assertEquals(LpVerdict.INDETERMINATE, solveAndCertify(model, basis).verdict)
+            assertEquals(LpVerdict.ATTAINED_OPTIMUM, solveAndCertify(model, basis).verdict)
         }
     }
 }

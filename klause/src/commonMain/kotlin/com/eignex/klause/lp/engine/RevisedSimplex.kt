@@ -48,6 +48,7 @@ internal class FloatLpResult(
      * no claim of infeasibility rests on it.
      */
     val optimal: Boolean = true,
+    val exactState: LpExactState? = null,
 )
 
 /** Updates folded into the basis before it is rebuilt; bounds fill and rounding drift. */
@@ -132,7 +133,12 @@ internal class RevisedSimplex(
     private val status = Array(numVars) { VarStatus.BASIC }
 
     // v1 cannot recover an imported general status declaration; keep this conservative through reuse.
-    private var basisCaptureEligible = true
+    private var basisCaptureEligible = model.exactState == null
+    override var solvedExactState: LpExactState? = null
+        private set
+    private var cachedBeta: DoubleArray? = null
+    private var cachedModel: LpModel? = null
+    private var cachedStatus: Array<VarStatus>? = null
     private var pivots = 0
     private var warmStarted = false
     private var refactorizations = 0
@@ -327,6 +333,10 @@ internal class RevisedSimplex(
         basisSolver = null
         basisFactorized = false
         basisKept = false
+        cachedBeta = null
+        cachedModel = null
+        cachedStatus = null
+        solvedExactState = null
     }
 
     /**
@@ -562,10 +572,27 @@ internal class RevisedSimplex(
      * survives the swap; only the basis and its factorization do.
      */
     override fun rebind(next: LpModel, token: Cancellation): Boolean {
+        if (model.exactState != null || next.exactState != null) return false
         if (next.csc !== model.csc || next.cost !== model.cost) return false
         if (next.n != n || next.m != m) return false
         model = next
         cancellation = token
+        return true
+    }
+
+    override fun adopt(state: LpExactState, token: Cancellation): Boolean {
+        val current = model.exactState ?: return false
+        if (!current.sameMatrix(state) || token()) return false
+        val next = state.toWorkingModel() ?: return false
+        if (token()) return false
+        model = next
+        cancellation = token
+        solvedExactState = null
+        optimalBasis = null
+        optimalPrimal = null
+        infeasibleBasis = null
+        infeasibleRow = -1
+        infeasibleRay = null
         return true
     }
 
@@ -579,7 +606,26 @@ internal class RevisedSimplex(
 
     // A checked basis failure cannot supply a terminal claim or a factorization safe to keep.
     private inline fun numericalSolve(block: () -> FloatLpResult?): FloatLpResult? = try {
-        block()
+        val candidate = block()
+        val result = if (model.exactState != null && cancellation()) {
+            solvedExactState = null
+            optimalBasis = null
+            optimalPrimal = null
+            null
+        } else {
+            candidate
+        }
+        result.also {
+            if (model.exactState != null && it == null && solvedExactState == null) {
+                cachedBeta = null
+                cachedModel = null
+                cachedStatus = null
+                basisKept = false
+                infeasibleBasis = null
+                infeasibleRow = -1
+                infeasibleRay = null
+            }
+        }
     } catch (_: BasisArithmeticException) {
         close()
         optimalBasis = null
@@ -587,10 +633,13 @@ internal class RevisedSimplex(
         infeasibleBasis = null
         infeasibleRow = -1
         infeasibleRay = null
+        cachedBeta = null
+        solvedExactState = null
         null
     }
 
     private fun resetSolveState(warmAttempted: Boolean) {
+        solvedExactState = null
         optimalBasis = null
         optimalPrimal = null
         infeasibleBasis = null
@@ -621,6 +670,11 @@ internal class RevisedSimplex(
         // Per-solve state: the infeasibility certificate slots and counters must not leak across a
         // persistent instance's solves.
         resetSolveState(reuse || warm != null)
+        if (model.exactState != null &&
+            (enforced != null || cancellation() || model.exactState?.conflict != null)
+        ) {
+            return null
+        }
         val kept = reuse && basisKept && basisFactorized
         basisKept = false
         // A kept factorization implies the basis it factorizes is still seated, so that is the warmest
@@ -648,10 +702,19 @@ internal class RevisedSimplex(
                 if (!refactorize(LpRefactorReason.RECONCILE_RECOVERY)) return null
             }
         }
+        if (model.exactState != null) {
+            repairNonbasicStatuses()
+            val sameObjective = cachedModel?.exactState?.model?.objective == model.exactState?.model?.objective
+            val sameSeats = cachedStatus?.contentEquals(status) == true
+            if ((!kept || !sameObjective || !sameSeats) && !dualFeasible()) {
+                return solvePrimalCore(null, reuse = true, reset = false)
+            }
+        }
         resetGamma() // fresh Devex reference frame for this solve
         val maxIter = if (iterationLimit > 0) iterationLimit else 50 * (m + numVars) + 200
         val rhsAdj = DoubleArray(m)
         val beta = DoubleArray(m)
+        var useCached = kept && model.exactState != null && restoreBasicValues(beta)
         val pivotRowEntry = DoubleArray(numVars) // ρ·A_j per nonbasic, reused by the bound-flip ratio test
         val ratioBuf = DoubleArray(numVars) // |d_j / a_j| per eligible nonbasic
         val elig = IntArrayList()
@@ -680,11 +743,14 @@ internal class RevisedSimplex(
             // dual-feasible, so its objective is a valid lower bound even though the primal is not yet
             // feasible. Phased off the first iteration so an already-spent budget never starts a solve.
             if ((iter - 1) % CANCEL_POLL == 0 && cancellation()) {
-                return if (haveBeta) truncated(beta) else null
+                return if (haveBeta && model.exactState == null) truncated(beta) else null
             }
             // β = B⁻¹ (b − Σ_{j nonbasic at upper} A_j·u_j)
-            adjustedRhs(rhsAdj)
-            ftranDense(rhsAdj, beta, rhsVec)
+            if (!useCached) {
+                adjustedRhs(rhsAdj)
+                ftranDense(rhsAdj, beta, rhsVec)
+            }
+            useCached = false
             haveBeta = true
             // Leaving: the most infeasible basic bound, scored by Devex — violation² / γ_i (approximate
             // dual steepest edge). Verify the chosen weight against the pivotal row which this iteration
@@ -700,7 +766,7 @@ internal class RevisedSimplex(
                     val v = basicVar[i]
                     // An unenforced row's basic slack is free: its value is never a violation.
                     if (enforced != null && v >= n && !enforced[v - n]) continue
-                    val below = -beta[i]
+                    val below = if (model.hasFiniteLower(v)) model.lowerD(v) - beta[i] else Double.NEGATIVE_INFINITY
                     val above = if (model.hasFiniteUpper(v)) {
                         beta[i] - model.upperD(v)
                     } else {
@@ -728,7 +794,8 @@ internal class RevisedSimplex(
                 if (!(gamma[r] < DEVEX_WEIGHT_THRESHOLD * trueWeight)) break
                 gamma[r] = trueWeight
                 lastDevexWeightCorrections++
-                if ((workLimit > 0L && work.ops >= workLimit) || cancellation()) return truncated(beta)
+                if (cancellation()) return if (model.exactState == null) truncated(beta) else null
+                if (workLimit > 0L && work.ops >= workLimit) return truncated(beta)
             }
 
             val y = duals()
@@ -758,14 +825,16 @@ internal class RevisedSimplex(
             elig.clear()
             for (t in 0 until touched.size) {
                 val j = touched[t]
-                if (status[j] == VarStatus.BASIC) continue
+                if (status[j] == VarStatus.BASIC || model.fixed(j)) continue
                 // An unenforced row's slack never enters — it is conceptually basic forever (and the
                 // reconciliation above seats it, so a nonbasic one cannot appear mid-loop).
                 if (enforced != null && j >= n && !enforced[j - n]) continue
                 val a = pivotRowEntry[j]
                 if (abs(a) < TOL) continue
                 val atLower = status[j] == VarStatus.AT_LOWER
-                val eligible = if (belowLower) {
+                val eligible = if (status[j] == VarStatus.FREE) {
+                    true
+                } else if (belowLower) {
                     (atLower && a < 0) || (!atLower && a > 0)
                 } else {
                     (atLower && a > 0) || (!atLower && a < 0)
@@ -781,7 +850,8 @@ internal class RevisedSimplex(
                 // and retry once per solve. A basis with no folded updates is already fresh.
                 if (!numericalRecoveryTried && worst <= FEAS_TOL && solver().updateCount > 0) {
                     numericalRecoveryTried = true
-                    if ((workLimit > 0L && work.ops >= workLimit) || cancellation()) return truncated(beta)
+                    if (cancellation()) return if (model.exactState == null) truncated(beta) else null
+                    if (workLimit > 0L && work.ops >= workLimit) return truncated(beta)
                     if (!refactorize(LpRefactorReason.NUMERICAL_RECOVERY)) return null
                     resetGamma()
                     iter-- // recovery is not a pivot and must not consume [iterationLimit]
@@ -794,6 +864,8 @@ internal class RevisedSimplex(
                 // float ρ = B⁻ᵀeᵣ densely; integerFarkasRay rounds + certifies it.
                 infeasibleRay = pivotEtaVec.toDoubleArray()
                 basisKept = true // the seated basis stays dual-feasible for the next [resolve]
+                retainBasicValues(beta)
+                solvedExactState = model.exactState
                 return null
             }
 
@@ -806,7 +878,7 @@ internal class RevisedSimplex(
             }
             updateGamma(spikeVec, r)
             val leaving = basicVar[r]
-            status[leaving] = if (belowLower) VarStatus.AT_LOWER else VarStatus.AT_UPPER
+            status[leaving] = sideStatus(leaving, upper = !belowLower)
             basicVar[r] = q
             status[q] = VarStatus.BASIC
             pivots++
@@ -828,10 +900,120 @@ internal class RevisedSimplex(
     private fun adjustedRhs(out: DoubleArray) {
         for (i in 0 until m) out[i] = model.rhsD(i)
         for (j in 0 until numVars) {
-            if (status[j] != VarStatus.AT_UPPER) continue
-            val u = model.upperD(j)
+            if (status[j] == VarStatus.BASIC) continue
+            val u = seat(model, status[j], j)
+            if (u == 0.0) continue
             for (k in colPtr[j] until colPtr[j + 1]) out[rowIdx[k]] -= colVal[k] * u
+            work.add(2 * (colPtr[j + 1] - colPtr[j]))
         }
+        work.add(m)
+    }
+
+    private fun seat(source: LpModel, side: VarStatus, column: Int): Double = when (side) {
+        VarStatus.AT_UPPER -> source.upperD(column)
+        VarStatus.AT_LOWER, VarStatus.FIXED -> source.lowerD(column)
+        VarStatus.FREE, VarStatus.BASIC -> 0.0
+    }
+
+    private fun sideStatus(column: Int, upper: Boolean): VarStatus =
+        if (model.exactState != null && model.fixed(column)) {
+            VarStatus.FIXED
+        } else if (upper) {
+            VarStatus.AT_UPPER
+        } else {
+            VarStatus.AT_LOWER
+        }
+
+    private fun boundRange(column: Int): Double {
+        if (!model.hasFiniteLower(column) || !model.hasFiniteUpper(column)) return Double.MAX_VALUE
+        return if (model.exactState == null) {
+            model.upperD(column)
+        } else {
+            (model.exactUpper(column) - model.exactLower(column)).toDouble()
+        }
+    }
+
+    private fun defaultStatus(column: Int): VarStatus = when {
+        model.exactState != null && model.fixed(column) -> VarStatus.FIXED
+
+        model.hasFiniteLower(
+            column,
+        ) && (model.costD(column) >= 0.0 || !model.hasFiniteUpper(column)) -> VarStatus.AT_LOWER
+
+        model.hasFiniteUpper(column) -> VarStatus.AT_UPPER
+
+        else -> VarStatus.FREE
+    }
+
+    private fun repairNonbasicStatuses() {
+        for (j in 0 until numVars) {
+            if (status[j] == VarStatus.BASIC) continue
+            status[j] = when {
+                model.fixed(j) -> VarStatus.FIXED
+                status[j] == VarStatus.AT_LOWER && model.hasFiniteLower(j) -> VarStatus.AT_LOWER
+                status[j] == VarStatus.AT_UPPER && model.hasFiniteUpper(j) -> VarStatus.AT_UPPER
+                else -> defaultStatus(j)
+            }
+        }
+    }
+
+    private fun dualFeasible(): Boolean {
+        val y = duals()
+        for (j in 0 until numVars) {
+            if (status[j] == VarStatus.BASIC || model.fixed(j)) continue
+            val reduced = model.costD(j) - dotColumn(y, j)
+            if (!reduced.isFinite()) return false
+            when (status[j]) {
+                VarStatus.AT_LOWER -> if (reduced < -TOL) return false
+                VarStatus.AT_UPPER -> if (reduced > TOL) return false
+                VarStatus.FREE -> if (abs(reduced) > TOL) return false
+                else -> Unit
+            }
+        }
+        return true
+    }
+
+    private fun retainBasicValues(beta: DoubleArray) {
+        if (model.exactState == null) return
+        cachedBeta = beta.copyOf()
+        cachedModel = model
+        cachedStatus = status.copyOf()
+    }
+
+    private fun restoreBasicValues(out: DoubleArray): Boolean {
+        val previous = cachedModel ?: return false
+        val values = cachedBeta ?: return false
+        val seats = cachedStatus ?: return false
+        val before = previous.exactState ?: return false
+        val after = model.exactState ?: return false
+        if (before.popRevision != after.popRevision || (0 until n).any {
+                previous.exactShift(
+                    it,
+                ) != model.exactShift(it)
+            }
+        ) {
+            return false
+        }
+        if ((0 until m).any { previous.exactRhs(it) != model.exactRhs(it) }) return false
+        values.copyInto(out)
+        val rhs = DoubleArray(m)
+        var changed = false
+        for (j in 0 until numVars) {
+            if (status[j] == VarStatus.BASIC) continue
+            val delta = seat(model, status[j], j) - seat(previous, seats[j], j)
+            if (delta == 0.0) continue
+            changed = true
+            for (p in colPtr[j] until colPtr[j + 1]) rhs[rowIdx[p]] -= colVal[p] * delta
+            work.add(2 * (colPtr[j + 1] - colPtr[j]))
+        }
+        work.add(numVars)
+        if (changed) {
+            val change = DoubleArray(m)
+            ftranDense(rhs, change, rhsVec)
+            for (i in 0 until m) out[i] += change[i]
+            work.add(m)
+        }
+        return out.all { it.isFinite() }
     }
 
     /**
@@ -917,7 +1099,7 @@ internal class RevisedSimplex(
         var flipCount = 0
         for (idx in 0 until elig.size) {
             val j = elig[idx]
-            val range = if (model.hasFiniteUpper(j)) model.upperD(j) else Double.MAX_VALUE
+            val range = boundRange(j)
             val cap = abs(pivotRowEntry[j]) * range
             val last = idx == elig.size - 1
             if (!last && range < Double.MAX_VALUE && acc + cap < delta - TOL) {
@@ -932,7 +1114,7 @@ internal class RevisedSimplex(
                 while (k < elig.size && ratioBuf[elig[k]] <= harrisBound) {
                     val cand = elig[k]
                     val mag = abs(pivotRowEntry[cand])
-                    val candRange = if (model.hasFiniteUpper(cand)) model.upperD(cand) else Double.MAX_VALUE
+                    val candRange = boundRange(cand)
                     val canFinish = candRange == Double.MAX_VALUE || mag * candRange >= remaining - TOL
                     val relaxed = maxOf(MINIMUM_DELTA / mag, ratioBuf[cand] + HARRIS_TOL / mag)
                     harrisBound = minOf(harrisBound, relaxed)
@@ -963,12 +1145,15 @@ internal class RevisedSimplex(
     }
 
     private fun optimal(beta: DoubleArray): FloatLpResult {
+        basisKept = true
+        solvedExactState = model.exactState
+        retainBasicValues(beta)
         // Re-add the lower-bound shift the model folded out (c·lo), so [FloatLpResult.objective] is the
         // objective in original coordinates — matching the exact certify.
         var obj = model.objConstantD
         for (j in 0 until numVars) {
             val c = model.costD(j)
-            if (c != 0.0 && status[j] == VarStatus.AT_UPPER) obj += c * model.upperD(j)
+            if (c != 0.0 && status[j] != VarStatus.BASIC) obj += c * seat(model, status[j], j)
         }
         for (i in 0 until m) {
             val c = model.costD(basicVar[i])
@@ -976,8 +1161,7 @@ internal class RevisedSimplex(
         }
         val primal = DoubleArray(n)
         for (j in 0 until n) {
-            primal[j] = model.loShiftD(j) +
-                if (status[j] == VarStatus.AT_UPPER) model.upperD(j) else 0.0
+            primal[j] = model.loShiftD(j) + seat(model, status[j], j)
         }
         for (i in 0 until m) {
             val v = basicVar[i]
@@ -990,7 +1174,7 @@ internal class RevisedSimplex(
         recordDegeneracy(y)
         return FloatLpResult(
             basis,
-            obj,
+            model.objectiveD(obj),
             y,
             primal,
             pivots,
@@ -998,6 +1182,7 @@ internal class RevisedSimplex(
             maxLuDensity,
             warmStarted = warmStarted,
             refactorizations = refactorizations,
+            exactState = model.exactState,
         )
     }
 
@@ -1010,10 +1195,11 @@ internal class RevisedSimplex(
      * is read the same way.
      */
     private fun truncated(beta: DoubleArray): FloatLpResult {
+        solvedExactState = model.exactState
         var obj = model.objConstantD
         for (j in 0 until numVars) {
             val c = model.costD(j)
-            if (c != 0.0 && status[j] == VarStatus.AT_UPPER) obj += c * model.upperD(j)
+            if (c != 0.0 && status[j] != VarStatus.BASIC) obj += c * seat(model, status[j], j)
         }
         for (i in 0 until m) {
             val c = model.costD(basicVar[i])
@@ -1021,7 +1207,7 @@ internal class RevisedSimplex(
         }
         val primal = DoubleArray(n)
         for (j in 0 until n) {
-            primal[j] = model.loShiftD(j) + if (status[j] == VarStatus.AT_UPPER) model.upperD(j) else 0.0
+            primal[j] = model.loShiftD(j) + seat(model, status[j], j)
         }
         for (i in 0 until m) {
             val v = basicVar[i]
@@ -1031,7 +1217,7 @@ internal class RevisedSimplex(
         recordDegeneracy(y)
         return FloatLpResult(
             Basis(basicVar.copyOf(), status.copyOf(), captureEligible = basisCaptureEligible),
-            obj,
+            model.objectiveD(obj),
             y,
             primal,
             pivots,
@@ -1040,6 +1226,7 @@ internal class RevisedSimplex(
             warmStarted = warmStarted,
             refactorizations = refactorizations,
             optimal = false,
+            exactState = model.exactState,
         )
     }
 
@@ -1073,6 +1260,20 @@ internal class RevisedSimplex(
         basisCaptureEligible = basisCaptureEligible && warm.captureEligible
         if (warm.basicVars.size != m || warm.status.size != numVars) return false
         for (t in 0 until m) if (warm.basicVars[t] !in 0 until numVars) return false
+        if (warm.basicVars.distinct().size != m || warm.status.count { it == VarStatus.BASIC } != m) return false
+        if (warm.basicVars.any { warm.status[it] != VarStatus.BASIC }) return false
+        if (warm.status.indices.any { j ->
+                when (warm.status[j]) {
+                    VarStatus.BASIC -> false
+                    VarStatus.AT_LOWER -> !model.hasFiniteLower(j)
+                    VarStatus.AT_UPPER -> !model.hasFiniteUpper(j)
+                    VarStatus.FIXED -> !model.fixed(j)
+                    VarStatus.FREE -> model.hasFiniteLower(j) || model.hasFiniteUpper(j)
+                }
+            }
+        ) {
+            return false
+        }
         warm.basicVars.copyInto(basicVar)
         warm.status.copyInto(status)
         return true
@@ -1087,11 +1288,7 @@ internal class RevisedSimplex(
             // A column with no finite upper has no upper seat to take, whatever its cost: seating it
             // there reads an upper the model does not have — for a genuinely open column, the stale
             // probe-derived slot — and starts the solve outside the feasible set.
-            status[j] = if (model.costD(j) >= 0.0 || !model.hasFiniteUpper(j)) {
-                VarStatus.AT_LOWER
-            } else {
-                VarStatus.AT_UPPER
-            }
+            status[j] = defaultStatus(j)
         }
     }
 
@@ -1103,7 +1300,7 @@ internal class RevisedSimplex(
             basicVar[i] = model.slackCol(i)
             status[model.slackCol(i)] = VarStatus.BASIC
         }
-        for (j in 0 until n) status[j] = VarStatus.AT_LOWER
+        for (j in 0 until n) status[j] = if (model.hasFiniteLower(j)) sideStatus(j, false) else defaultStatus(j)
     }
 
     /** Current basic values `β = B⁻¹(b − Σ_{j nonbasic at upper} A_j·u_j)` into [out], which is
@@ -1116,8 +1313,8 @@ internal class RevisedSimplex(
 
     private fun primalFeasible(beta: DoubleArray): Boolean {
         for (i in 0 until m) {
-            if (beta[i] < -FEAS_TOL) return false
             val v = basicVar[i]
+            if (model.hasFiniteLower(v) && beta[i] < model.lowerD(v) - FEAS_TOL) return false
             if (model.hasFiniteUpper(v) && beta[i] > model.upperD(v) + FEAS_TOL) return false
         }
         return true
@@ -1146,9 +1343,10 @@ internal class RevisedSimplex(
             for (i in 0 until m) {
                 val v = basicVar[i]
                 val hi = if (model.hasFiniteUpper(v)) model.upperD(v) else Double.MAX_VALUE
+                val lo = if (model.hasFiniteLower(v)) model.lowerD(v) else -Double.MAX_VALUE
                 gamma[i] = when {
-                    beta[i] < -FEAS_TOL -> {
-                        w -= beta[i]
+                    beta[i] < lo - FEAS_TOL -> {
+                        w += lo - beta[i]
                         -1.0
                     }
 
@@ -1168,9 +1366,9 @@ internal class RevisedSimplex(
             var qAtLower = true
             var best = TOL
             for (j in 0 until numVars) {
-                if (status[j] == VarStatus.BASIC) continue
+                if (status[j] == VarStatus.BASIC || model.fixed(j)) continue
                 val pj = dotColumn(pi, j)
-                val atLower = status[j] == VarStatus.AT_LOWER
+                val atLower = status[j] == VarStatus.AT_LOWER || (status[j] == VarStatus.FREE && pj > 0.0)
                 val gain = if (atLower) pj else -pj
                 if (gain > best) {
                     best = gain
@@ -1178,11 +1376,19 @@ internal class RevisedSimplex(
                     qAtLower = atLower
                 }
             }
-            if (q == -1) return false // w > 0 with no improving column ⇒ primal infeasible
+            if (q == -1) {
+                if (model.exactState != null) {
+                    infeasibleRay = pi.copyOf()
+                    solvedExactState = model.exactState
+                    basisKept = true
+                    retainBasicValues(beta)
+                }
+                return false
+            }
 
             val alpha = spikeDense(q, alphaBuf)
             val dir = if (qAtLower) 1.0 else -1.0
-            var tMax = if (model.hasFiniteUpper(q)) model.upperD(q) else Double.MAX_VALUE
+            var tMax = boundRange(q)
             var leaving = -1
             var leavingToUpper = false
             for (i in 0 until m) {
@@ -1190,11 +1396,12 @@ internal class RevisedSimplex(
                 if (abs(rate) < TOL) continue
                 val v = basicVar[i]
                 val hi = if (model.hasFiniteUpper(v)) model.upperD(v) else Double.MAX_VALUE
+                val lo = if (model.hasFiniteLower(v)) model.lowerD(v) else -Double.MAX_VALUE
                 var t = Double.MAX_VALUE
                 var toUpper = false
                 when {
                     // Below its lower bound: a rising β_i reaches feasibility at 0 and may leave.
-                    gamma[i] < 0 -> if (rate > 0) t = -beta[i] / rate
+                    gamma[i] < 0 -> if (rate > 0) t = (lo - beta[i]) / rate
 
                     // Above its upper bound: a falling β_i reaches feasibility at u_i and may leave.
                     gamma[i] > 0 -> if (rate < 0) {
@@ -1203,9 +1410,9 @@ internal class RevisedSimplex(
                     }
 
                     // Feasible: blocks at whichever bound it heads toward.
-                    rate < 0 -> t = beta[i] / -rate
+                    rate < 0 && model.hasFiniteLower(v) -> t = (beta[i] - lo) / -rate
 
-                    hi < Double.MAX_VALUE -> {
+                    rate > 0 && hi < Double.MAX_VALUE -> {
                         t = (hi - beta[i]) / rate
                         toUpper = true
                     }
@@ -1227,7 +1434,7 @@ internal class RevisedSimplex(
                 return false
             }
             val evicted = basicVar[leaving]
-            status[evicted] = if (leavingToUpper) VarStatus.AT_UPPER else VarStatus.AT_LOWER
+            status[evicted] = sideStatus(evicted, leavingToUpper)
             basicVar[leaving] = q
             status[q] = VarStatus.BASIC
             pivots++
@@ -1251,18 +1458,23 @@ internal class RevisedSimplex(
     override fun solvePrimal(warm: Basis?): FloatLpResult? = numericalSolve { solvePrimalCore(warm) }
 
     @Suppress("CyclomaticComplexMethod", "NestedBlockDepth", "ReturnCount", "LongMethod")
-    private fun solvePrimalCore(warm: Basis?): FloatLpResult? {
-        resetSolveState(warm != null)
-        if (warm == null || !tryWarmStart(warm)) {
-            lowerStart()
-        } else {
-            warmStarted = true
+    private fun solvePrimalCore(warm: Basis?, reuse: Boolean = false, reset: Boolean = true): FloatLpResult? {
+        if (reset) resetSolveState(warm != null || reuse)
+        if (model.exactState != null && (cancellation() || model.exactState?.conflict != null)) return null
+        basisKept = false
+        if (!reuse || !basisFactorized) {
+            if (warm == null || !tryWarmStart(warm)) {
+                lowerStart()
+            } else {
+                warmStarted = true
+            }
+            if (!refactorize(LpRefactorReason.PRIMAL)) {
+                lowerStart()
+                warmStarted = false
+                if (!refactorize(LpRefactorReason.SINGULAR_RECOVERY)) return null
+            }
         }
-        if (!refactorize(LpRefactorReason.PRIMAL)) {
-            lowerStart()
-            warmStarted = false
-            if (!refactorize(LpRefactorReason.SINGULAR_RECOVERY)) return null
-        }
+        if (model.exactState != null) repairNonbasicStatuses()
         val beta = basicValues()
         if (!primalFeasible(beta)) {
             if (!primalPhase1()) return null
@@ -1284,9 +1496,9 @@ internal class RevisedSimplex(
             var qAtLower = true
             var best = TOL
             for (j in 0 until numVars) {
-                if (status[j] == VarStatus.BASIC) continue
+                if (status[j] == VarStatus.BASIC || model.fixed(j)) continue
                 val dj = model.costD(j) - dotColumn(y, j)
-                val atLower = status[j] == VarStatus.AT_LOWER
+                val atLower = status[j] == VarStatus.AT_LOWER || (status[j] == VarStatus.FREE && dj < 0.0)
                 // From lower, increasing improves iff d_j < 0; from upper, decreasing improves iff d_j > 0.
                 val gain = if (atLower) -dj else dj
                 if (gain <= TOL) continue
@@ -1306,7 +1518,7 @@ internal class RevisedSimplex(
             val alpha = spikeDense(q, alphaBuf) // α = B⁻¹ A_q
             val dir = if (qAtLower) 1.0 else -1.0 // x_q moves by dir·t, t ≥ 0
             // Ratio test with the entering variable's own bound flip as a candidate blocker.
-            var tMax = if (model.hasFiniteUpper(q)) model.upperD(q) else Double.MAX_VALUE
+            var tMax = boundRange(q)
             var leaving = -1
             var leavingToUpper = false
             var leavingVar = Int.MAX_VALUE
@@ -1314,8 +1526,8 @@ internal class RevisedSimplex(
                 val rate = -alpha[i] * dir // dβ_i/dt
                 var t = Double.MAX_VALUE
                 var toUpper = false
-                if (rate < -TOL) {
-                    t = beta[i] / -rate // β_i falls to its lower bound 0
+                if (rate < -TOL && model.hasFiniteLower(basicVar[i])) {
+                    t = (beta[i] - model.lowerD(basicVar[i])) / -rate
                 } else if (rate > TOL && model.hasFiniteUpper(basicVar[i])) {
                     t = (model.upperD(basicVar[i]) - beta[i]) / rate // β_i rises to its upper bound
                     toUpper = true
@@ -1343,7 +1555,7 @@ internal class RevisedSimplex(
             }
             degenerate = if (tMax <= TOL) degenerate + 1 else 0
             val evicted = basicVar[leaving]
-            status[evicted] = if (leavingToUpper) VarStatus.AT_UPPER else VarStatus.AT_LOWER
+            status[evicted] = sideStatus(evicted, leavingToUpper)
             basicVar[leaving] = q
             status[q] = VarStatus.BASIC
             pivots++

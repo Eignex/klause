@@ -36,7 +36,7 @@ class LpModelTest {
         assertTrue(model.sameAuthority(model.recentered(listOf(zero))))
         assertEquals(2.0.toRawBits(), model.rhs(0).ieeeBits)
         assertNull(model.toLegacy())
-        assertNull(exactLpStateKey(model))
+        assertNotNull(exactLpStateKey(model))
     }
 
     @Test
@@ -114,7 +114,7 @@ class LpModelTest {
                 )
 
                 assertNull(model.toLegacy(), "slot $slot")
-                assertNull(exactLpStateKey(model))
+                assertNotNull(exactLpStateKey(model))
                 assertTrue(model.sameAuthority(model.copy()))
             }
         }
