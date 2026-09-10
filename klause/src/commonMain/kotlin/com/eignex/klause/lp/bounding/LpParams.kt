@@ -1,5 +1,6 @@
 package com.eignex.klause.lp.bounding
 
+import com.eignex.klause.lp.engine.LpZeroObjectivePricing
 import com.eignex.klause.lp.relaxation.LpRelaxation
 import com.eignex.klause.util.Cancellation
 
@@ -23,9 +24,21 @@ class LpParams(
     /** Seed for the feasibility-pump RNG; null picks a fixed default. */
     val randomSeed: Long? = null,
 ) {
+    /** Optional entering-column policy for exactly zero-objective LP solves. */
+    var zeroObjectivePricing: LpZeroObjectivePricing = LpZeroObjectivePricing.DEFAULT
+        private set
+
+    /** Return an otherwise identical configuration using [pricing] for zero-objective LP solves. */
+    fun withZeroObjectivePricing(pricing: LpZeroObjectivePricing): LpParams =
+        LpParams(lpPlan, lpConfig, cancellation, solveBudgetMillis, randomSeed).also {
+            it.zeroObjectivePricing = pricing
+        }
+
     /** These params with [lpPlan] replaced (the resolved-plan swap [LpEngine] makes after auto-config). */
     fun copy(lpPlan: LpPlan = this.lpPlan): LpParams =
-        LpParams(lpPlan, lpConfig, cancellation, solveBudgetMillis, randomSeed)
+        LpParams(lpPlan, lpConfig, cancellation, solveBudgetMillis, randomSeed).also {
+            it.zeroObjectivePricing = zeroObjectivePricing
+        }
 }
 
 /**

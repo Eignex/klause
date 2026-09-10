@@ -218,6 +218,17 @@ final enum class com.eignex.klause.lp.bounding/LpTiming : kotlin/Enum<com.eignex
     final fun values(): kotlin/Array<com.eignex.klause.lp.bounding/LpTiming> // com.eignex.klause.lp.bounding/LpTiming.values|values#static(){}[0]
 }
 
+final enum class com.eignex.klause.lp.engine/LpZeroObjectivePricing : kotlin/Enum<com.eignex.klause.lp.engine/LpZeroObjectivePricing> { // com.eignex.klause.lp.engine/LpZeroObjectivePricing|null[0]
+    enum entry DEFAULT // com.eignex.klause.lp.engine/LpZeroObjectivePricing.DEFAULT|null[0]
+    enum entry THEORY // com.eignex.klause.lp.engine/LpZeroObjectivePricing.THEORY|null[0]
+
+    final val entries // com.eignex.klause.lp.engine/LpZeroObjectivePricing.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<com.eignex.klause.lp.engine/LpZeroObjectivePricing> // com.eignex.klause.lp.engine/LpZeroObjectivePricing.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): com.eignex.klause.lp.engine/LpZeroObjectivePricing // com.eignex.klause.lp.engine/LpZeroObjectivePricing.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<com.eignex.klause.lp.engine/LpZeroObjectivePricing> // com.eignex.klause.lp.engine/LpZeroObjectivePricing.values|values#static(){}[0]
+}
+
 final enum class com.eignex.klause.lp/Contribution : kotlin/Enum<com.eignex.klause.lp/Contribution> { // com.eignex.klause.lp/Contribution|null[0]
     enum entry CORE // com.eignex.klause.lp/Contribution.CORE|null[0]
     enum entry HULL // com.eignex.klause.lp/Contribution.HULL|null[0]
@@ -6683,7 +6694,11 @@ final class com.eignex.klause.lp.bounding/LpParams { // com.eignex.klause.lp.bou
     final val solveBudgetMillis // com.eignex.klause.lp.bounding/LpParams.solveBudgetMillis|{}solveBudgetMillis[0]
         final fun <get-solveBudgetMillis>(): kotlin/Long? // com.eignex.klause.lp.bounding/LpParams.solveBudgetMillis.<get-solveBudgetMillis>|<get-solveBudgetMillis>(){}[0]
 
+    final var zeroObjectivePricing // com.eignex.klause.lp.bounding/LpParams.zeroObjectivePricing|{}zeroObjectivePricing[0]
+        final fun <get-zeroObjectivePricing>(): com.eignex.klause.lp.engine/LpZeroObjectivePricing // com.eignex.klause.lp.bounding/LpParams.zeroObjectivePricing.<get-zeroObjectivePricing>|<get-zeroObjectivePricing>(){}[0]
+
     final fun copy(com.eignex.klause.lp.bounding/LpPlan = ...): com.eignex.klause.lp.bounding/LpParams // com.eignex.klause.lp.bounding/LpParams.copy|copy(com.eignex.klause.lp.bounding.LpPlan){}[0]
+    final fun withZeroObjectivePricing(com.eignex.klause.lp.engine/LpZeroObjectivePricing): com.eignex.klause.lp.bounding/LpParams // com.eignex.klause.lp.bounding/LpParams.withZeroObjectivePricing|withZeroObjectivePricing(com.eignex.klause.lp.engine.LpZeroObjectivePricing){}[0]
 }
 
 final class com.eignex.klause.lp.bounding/LpPlan { // com.eignex.klause.lp.bounding/LpPlan|null[0]
