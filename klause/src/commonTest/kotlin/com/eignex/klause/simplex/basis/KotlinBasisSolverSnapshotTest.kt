@@ -46,6 +46,28 @@ class KotlinBasisSolverSnapshotTest {
     }
 
     @Test
+    fun `restore work is determined by the saved snapshot payload`() {
+        val source = ftSource("dense", 5)
+        val solver = KotlinBasisSolver(source, updateLimit = 100, fillFactor = 100.0)
+        val basis = IntArray(5) { it }
+        assertTrue(solver.refactorize(basis))
+        replace(solver, source, basis, 1, 6)
+        val snapshot = assertNotNull(solver.snapshot())
+        val beforeFirst = solver.basisOperationWork.restore.units
+
+        assertTrue(solver.restore(snapshot))
+        val firstUnits = solver.basisOperationWork.restore.units - beforeFirst
+        assertTrue(solver.refactorize(IntArray(5) { 4 - it }))
+        val beforeSecond = solver.basisOperationWork.restore.units
+
+        assertTrue(solver.restore(snapshot))
+        val secondUnits = solver.basisOperationWork.restore.units - beforeSecond
+
+        assertTrue(firstUnits > 0)
+        assertEquals(firstUnits, secondUnits)
+    }
+
+    @Test
     fun `repaired snapshots restore source and logical headings after failure`() {
         val source = SparseMatrix.ofColumns(
             3,
@@ -136,6 +158,8 @@ class KotlinBasisSolverSnapshotTest {
         val declined = solver.basisWork
         assertEquals(1, declined.ftran.declines)
         assertTrue(declined.ftran.units > 0)
+        assertFalse(solver.basisOperationWork.complete)
+        assertTrue(solver.basisOperationWork.ftran.units > 0)
         val snapshot = assertNotNull(solver.snapshot())
         vector.scatter(doubleArrayOf(1e-200))
         solver.ftran(vector)
