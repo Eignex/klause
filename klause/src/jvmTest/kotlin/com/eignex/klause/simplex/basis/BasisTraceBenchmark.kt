@@ -189,7 +189,7 @@ private fun reportJson(
 
 internal fun benchmarkJson(trace: BasisTrace, artifactSha: String, reports: List<BasisReplayReport>): String {
     val validReports = reports.filter { it.stateErrors == 0 }
-    val representative = reports.first()
+    val representative = validReports.firstOrNull() ?: reports.first()
     val aggregate = representative.copy(
         stateErrors = reports.sumOf(BasisReplayReport::stateErrors),
         errors = reports.flatMap(BasisReplayReport::errors),

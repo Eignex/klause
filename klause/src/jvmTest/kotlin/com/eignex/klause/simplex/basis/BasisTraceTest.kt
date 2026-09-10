@@ -326,11 +326,6 @@ class BasisTraceTest {
         assertTrue(result.custom.errors.any { "operation=1 FTRAN numerical failure" in it })
         assertEquals(4, failing.ftranCalls)
         assertEquals(1, result.custom.ftrans)
-        val benchmark = benchmarkJson(fixture, "0".repeat(64), listOf(result.custom))
-        assertTrue("\"allRepetitionsValid\":false" in benchmark)
-        assertTrue("\"validRepetitions\":0" in benchmark)
-        assertTrue("\"stateErrors\":1" in benchmark)
-        assertTrue("\"setupNanosMedian\":null" in benchmark)
     }
 
     @Test
@@ -355,6 +350,30 @@ class BasisTraceTest {
         assertTrue(result.hfactor.errors.any { "operation=3 update numerical failure" in it })
         assertEquals(1, failing.updateCalls)
         assertEquals(2, result.hfactor.ftrans)
+    }
+
+    @Test
+    fun `benchmark reports only valid repetition timing and counts`() {
+        val fixture = traceWithRecoveryCheckpoint()
+        val valid = replay(fixture, referenceFactory = ::KotlinBasisSolver).custom
+        val invalid = valid.copy(
+            ftrans = valid.ftrans - 1,
+            stateErrors = 1,
+            errors = listOf("operation=1 injected failure"),
+            timing = BasisReplayTiming(ftranNanos = valid.timing.ftranNanos + 1),
+        )
+
+        val mixed = benchmarkJson(fixture, "0".repeat(64), listOf(invalid, valid))
+        val allInvalid = benchmarkJson(fixture, "0".repeat(64), listOf(invalid))
+
+        assertTrue("\"ftrans\":${valid.ftrans}" in mixed)
+        assertTrue("\"ftranNanosMedian\":${valid.timing.ftranNanos}" in mixed)
+        assertTrue("\"validRepetitions\":1" in mixed)
+        assertTrue("\"allRepetitionsValid\":false" in mixed)
+        assertTrue("\"stateErrors\":1" in mixed)
+        assertTrue("\"setupNanos\":null" in allInvalid)
+        assertTrue("\"setupNanosMedian\":null" in allInvalid)
+        assertTrue("\"validRepetitions\":0" in allInvalid)
     }
 
     @Test
