@@ -1,5 +1,15 @@
 package com.eignex.klause.lp
 
+import com.eignex.klause.lp.engine.Csc
+import com.eignex.klause.lp.engine.LpModel
+import com.eignex.klause.lp.engine.LpSolver
+import com.eignex.klause.lp.engine.RevisedSimplex
+import com.eignex.klause.lp.engine.Sense
+import com.eignex.klause.lp.engine.newLpSolver
+import com.eignex.klause.lp.engine.newPersistentLpSolver
+import com.eignex.klause.lp.engine.newTableauCutSolver
+import com.eignex.klause.simplex.basis.BasisSolver
+import com.eignex.klause.simplex.basis.KotlinBasisSolver
 import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.Path
@@ -10,10 +20,11 @@ import kotlin.io.path.name
 import kotlin.io.path.readText
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class LpArchitectureTest {
-
     @Test
     fun `production sources respect the LP kernel boundary`() {
         val root = repositoryRoot()
@@ -107,6 +118,56 @@ class LpArchitectureTest {
     }
 
     @Test
+    fun `engine rejects koblas factorization basis and provider dependencies`() {
+        for (dependency in listOf(
+            "import com.eignex.koblas.sparse.factorization.lu.F64SparseMarkowitzLu",
+            "import com.eignex.koblas.sparse.factorization.lu.F64SparseMarkowitzLu as SparseLu",
+            "import com.eignex.koblas.sparse.basis.*",
+            "import com.eignex.koblas.sparse.basis.BasisSolverFactory",
+            "import com.eignex.koblas.core.Vector",
+            "val vector: com.eignex.koblas.core.Vector? = null",
+            "val backend = com.eignex.koblas.koblas",
+        )) {
+            val source = "package com.eignex.klause.lp.engine\n$dependency"
+            assertTrue(
+                LpBoundaryScanner.scan("Engine.kt", source).any { "outbound dependency" in it },
+                "scanner accepted forbidden engine dependency:\n$dependency",
+            )
+        }
+    }
+
+    @Test
+    fun `general production factory installs the klause basis owner`() {
+        newLpSolver(emptyLpModel(), componentSplit = false).use {
+            assertTrue(initializeBasisOwner(it) is KotlinBasisSolver)
+        }
+    }
+
+    @Test
+    fun `tableau production factory installs the klause basis owner`() {
+        newTableauCutSolver(emptyLpModel()).use {
+            assertTrue(initializeBasisOwner(it) is KotlinBasisSolver)
+        }
+    }
+
+    @Test
+    fun `persistent production factory installs the klause basis owner`() {
+        newPersistentLpSolver(emptyLpModel()).use {
+            assertTrue(initializeBasisOwner(it) is KotlinBasisSolver)
+        }
+    }
+
+    @Test
+    fun `factory owner observer rejects an injected owner`() {
+        RevisedSimplex(
+            emptyLpModel(),
+            basisSolverFactory = { matrix -> object : BasisSolver by KotlinBasisSolver(matrix) {} },
+        ).use { injected ->
+            assertFalse(initializeBasisOwner(injected) is KotlinBasisSolver, "observer ignored an injected owner")
+        }
+    }
+
+    @Test
     fun `scanner rejects outbound kernel dependencies`() {
         val fixtures = listOf(
             """
@@ -187,16 +248,23 @@ internal object LpBoundaryScanner {
             forbiddenEngineSymbols.any { name == "$ENGINE_PACKAGE.$it" || name.startsWith("$ENGINE_PACKAGE.$it.") }
 
     private fun forbiddenOutboundDependency(packageName: String, dependency: String): Boolean {
-        if (packageName == BASIS_PACKAGE || packageName.startsWith("$BASIS_PACKAGE.")) {
-            if (dependency == "com.eignex.koblas" || dependency.startsWith("com.eignex.koblas.")) {
-                val allowedTypes = listOf(
+        if (dependency == "com.eignex.koblas" || dependency.startsWith("com.eignex.koblas.")) {
+            val allowedTypes = when {
+                packageName == ENGINE_PACKAGE || packageName.startsWith("$ENGINE_PACKAGE.") -> listOf(
+                    "com.eignex.koblas.SparseMatrix",
+                )
+
+                packageName == BASIS_PACKAGE || packageName.startsWith("$BASIS_PACKAGE.") -> listOf(
                     "com.eignex.koblas.SparseMatrix",
                     "com.eignex.koblas.ExperimentalKoblasApi",
                     "com.eignex.koblas.sparse.SparseWorkspace",
                 )
-                return !dependency.startsWith("com.eignex.koblas.core.") &&
-                    allowedTypes.none { dependency == it || dependency.startsWith("$it.") }
+
+                else -> return false
             }
+            val basisPackage = packageName == BASIS_PACKAGE || packageName.startsWith("$BASIS_PACKAGE.")
+            return !(basisPackage && dependency.startsWith("com.eignex.koblas.core.")) &&
+                allowedTypes.none { dependency == it || dependency.startsWith("$it.") }
         }
         if (!dependency.startsWith("com.eignex.klause.")) return false
         if (
@@ -405,6 +473,34 @@ internal object LpBoundaryScanner {
 
     private enum class LexicalState { CODE, LINE_COMMENT, BLOCK_COMMENT, STRING, RAW_STRING, CHAR }
 }
+
+private fun initializeBasisOwner(solver: LpSolver): BasisSolver {
+    val ownerMethod = generateSequence(solver.javaClass as Class<*>?) { it.superclass }
+        .flatMap { it.declaredMethods.asSequence() }
+        .first { it.name == "solver" }
+    assertTrue(ownerMethod.trySetAccessible(), "could not invoke ${solver.javaClass.name}.solver")
+    ownerMethod.invoke(solver)
+    val field = generateSequence(solver.javaClass as Class<*>?) { it.superclass }
+        .flatMap { it.declaredFields.asSequence() }
+        .firstOrNull { it.name == "basisSolver" }
+        ?: error("could not find ${solver.javaClass.name}.basisSolver")
+    assertTrue(field.trySetAccessible(), "could not inspect ${solver.javaClass.name}.basisSolver")
+    return assertNotNull(field.get(solver) as? BasisSolver)
+}
+
+private fun emptyLpModel() = LpModel(
+    n = 0,
+    m = 0,
+    csc = Csc(intArrayOf(0), intArrayOf(), longArrayOf()),
+    rhs = longArrayOf(),
+    cost = longArrayOf(),
+    upper = longArrayOf(),
+    hasUpper = booleanArrayOf(),
+    loShift = longArrayOf(),
+    objConstant = 0L,
+    sense = Sense.MINIMIZE,
+    tag = intArrayOf(),
+)
 
 private fun productionKotlinSources(root: Path): List<Path> {
     val sourceRoot = root.resolve("klause/src")
