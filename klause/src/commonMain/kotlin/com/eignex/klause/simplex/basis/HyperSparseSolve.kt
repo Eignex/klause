@@ -17,6 +17,8 @@ internal class BasisWorkspace(val size: Int) {
     val values = DoubleArray(size)
     val indices = IntArray(size)
     private val marks = IntArray(size)
+    private var gatheredIndices: IntArray? = null
+    private var gatheredValues: DoubleArray? = null
     private val arithmeticStatus = IntArray(1)
     var count = 0
         private set
@@ -47,6 +49,15 @@ internal class BasisWorkspace(val size: Int) {
         if (arithmeticStatus[0] != 0) throw BasisArithmeticException("checked basis scatter breakdown")
     }
 
+    fun load(slice: BasisSlice) {
+        clear()
+        // Factor slices are finite by construction; identity scatter only copies them into an empty workspace.
+        count = SparseWorkspace.scatterAxpy(
+            1.0, slice.indices, slice.offset, slice.values, slice.offset, slice.count,
+            values, marks, 1, indices, 0, count,
+        )
+    }
+
     fun load(vector: IndexedVector, position: IntArray? = null) {
         clear()
         vector.forEachStored { i, value ->
@@ -57,11 +68,23 @@ internal class BasisWorkspace(val size: Int) {
 
     fun write(vector: IndexedVector, order: IntArray? = null) {
         vector.clear()
-        for (k in 0 until count) {
-            val i = indices[k]
-            if (values[i] != 0.0) vector.store(order?.get(i) ?: i, values[i])
+        val outIndices = gatheredIndices()
+        val outValues = gatheredValues()
+        val gathered = SparseWorkspace.gatherClearTouched(
+            indices, 0, count, values, marks,
+            outIndices, 0, outValues, 0,
+            compactExactZeros = true,
+        )
+        count = 0
+        for (k in 0 until gathered) {
+            val i = outIndices[k]
+            vector.store(order?.get(i) ?: i, outValues[k])
         }
     }
+
+    private fun gatheredIndices(): IntArray = gatheredIndices ?: IntArray(size).also { gatheredIndices = it }
+
+    private fun gatheredValues(): DoubleArray = gatheredValues ?: DoubleArray(size).also { gatheredValues = it }
 }
 
 // Owns reach scratch and structural copies; numerical values belong to the enclosing factor cache.

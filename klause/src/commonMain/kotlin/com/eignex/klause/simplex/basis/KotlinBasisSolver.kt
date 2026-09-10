@@ -291,7 +291,7 @@ internal class KotlinBasisSolver(
         for (j in 0 until n) {
             val unitRow = unitRows[j]
             if (unitRow >= 0) {
-                if (transpose) product[j] += solution[unitRow] else product[unitRow] += solution[j]
+                if (transpose) product[j] = solution[unitRow] else product[unitRow] += solution[j]
             } else {
                 source.forEachInColumn(columns[j]) { i, value ->
                     if (transpose) product[j] += value * solution[i] else product[i] += value * solution[j]

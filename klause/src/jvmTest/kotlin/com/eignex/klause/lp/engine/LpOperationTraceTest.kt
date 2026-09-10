@@ -3,7 +3,7 @@ package com.eignex.klause.lp.engine
 import com.eignex.klause.simplex.basis.BasisSolver
 import com.eignex.klause.simplex.basis.HfactorBasisSolver
 import com.eignex.koblas.SparseMatrix
-import com.eignex.koblas.hfactor.BundledHfactor
+import com.eignex.koblas.sparse.host.hfactor.HfactorSparseLu
 import org.junit.BeforeClass
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -12,13 +12,13 @@ import kotlin.test.assertTrue
 
 class LpOperationTraceTest {
     companion object {
-        private lateinit var hfactor: BundledHfactor
+        private lateinit var hfactor: HfactorSparseLu
 
         @BeforeClass
         @JvmStatic
         fun loadHfactor() {
-            hfactor = BundledHfactor()
-            check(hfactor.isAvailable) { hfactor.unavailableReason.orEmpty() }
+            hfactor = HfactorSparseLu.bundled()
+            check(hfactor.available) { hfactor.unavailableReason.orEmpty() }
         }
     }
 
