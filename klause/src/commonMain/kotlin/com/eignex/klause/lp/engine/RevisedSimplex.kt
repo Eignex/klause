@@ -1460,10 +1460,7 @@ internal class RevisedSimplex(
         return if (haveBeta) truncated(beta) else null
     }
 
-    private fun restartDual(
-        enforced: BooleanArray?,
-        progress: SolveProgress,
-    ): FloatLpResult? {
+    private fun restartDual(enforced: BooleanArray?, progress: SolveProgress): FloatLpResult? {
         if (progress.restarts >= MAX_SOLVE_RESTARTS || cancellation()) return null
         progress.restarts++
         basisKept = true
