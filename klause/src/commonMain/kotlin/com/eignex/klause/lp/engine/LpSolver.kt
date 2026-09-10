@@ -228,6 +228,11 @@ internal interface PersistentLpSolver : LpSolver {
     val basisLifecycleWork: BasisOperationWork? get() = null
     val lastAppendReplacementWork: LpAppendBasisWork? get() = null
 
+    fun captureBasisRestart(token: Cancellation = Cancellation.Never): EngineBasisRestartSnapshot? = null
+
+    fun restoreBasisRestart(snapshot: EngineBasisRestartSnapshot, token: Cancellation = Cancellation.Never): Boolean =
+        false
+
     fun appendReplacement(
         next: LpExactState,
         oldRowsInNew: IntArray,

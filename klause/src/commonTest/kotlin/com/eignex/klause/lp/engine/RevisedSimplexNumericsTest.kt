@@ -191,7 +191,7 @@ class RevisedSimplexNumericsTest {
 
         assertNull(simplex.solve())
 
-        assertEquals(2, factors.refactorizations)
+        assertEquals(3, factors.refactorizations)
         assertEquals(1, simplex.lastMetrics.numericalRecoveryRefactorizations)
         assertEquals(1, simplex.lastSingularRefactorizations)
         assertNull(simplex.infeasibleBasis)
@@ -410,8 +410,10 @@ private class FailingRefactorBasisSolver(private val delegate: BasisSolver, priv
 
     override fun refactorize(basicIndex: IntArray): Boolean {
         refactorizations++
-        return refactorizations != failAt && delegate.refactorize(basicIndex)
+        return refactorizations < failAt && delegate.refactorize(basicIndex)
     }
+
+    override fun refactorizeRepairing(basicIndex: IntArray) = null
 
     override fun close() {
         closed = true

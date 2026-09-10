@@ -1,6 +1,7 @@
 package com.eignex.klause.lp.engine
 
 import com.eignex.klause.simplex.basis.BasisArithmeticException
+import com.eignex.klause.simplex.basis.BasisRepair
 import com.eignex.klause.simplex.basis.BasisSolver
 import com.eignex.klause.simplex.basis.KotlinBasisSolver
 import com.eignex.klause.simplex.exact.BigFraction
@@ -514,6 +515,18 @@ class LpScopedSolverTest {
                                     }
                                 }
                                 return factors.refactorize(basicIndex)
+                            }
+
+                            override fun refactorizeRepairing(basicIndex: IntArray): BasisRepair? {
+                                if (fail) {
+                                    when (failure) {
+                                        "singular" -> return null
+                                        "arithmetic" -> throw BasisArithmeticException("injected preparation")
+                                        "unexpected" -> error("injected preparation")
+                                        "cancel" -> cancelled = true
+                                    }
+                                }
+                                return factors.refactorizeRepairing(basicIndex)
                             }
                         }
                     })

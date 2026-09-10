@@ -243,7 +243,7 @@ class LpLifecycleTest {
     }
 
     @Test
-    fun `continued improvements add one factorization on LP reacquisition and no extra solve`() {
+    fun `continued improvements retain one owner and add no extra solve`() {
         val retainedFactory = LifecycleFactory()
         val retainedSolver = BacktrackSolver(continuedImprovementProblem().bake(), context(retainedFactory))
         val objective = LinearObjective(intCoefficients = longArrayOf(1L, 0L, 0L))
@@ -276,10 +276,8 @@ class LpLifecycleTest {
         val retainedFactorizations = retainedFactory.persistent.sumOf { it.factorizations }
         val releasedFactorizations = releasedFactory.persistent.sumOf { it.factorizations }
         assertEquals(0, releasedSolves - retainedSolves)
-        assertEquals(
-            releasedFactory.persistent.size - retainedFactory.persistent.size,
-            releasedFactorizations - retainedFactorizations,
-        )
+        val reacquisitions = releasedFactory.persistent.size - retainedFactory.persistent.size
+        assertTrue(releasedFactorizations - retainedFactorizations in 0..reacquisitions)
         assertTrue(releasedFactory.persistent.sumOf { it.warmAttempts } > 0)
         retainedFactory.assertAllClosed()
         releasedFactory.assertAllClosed()

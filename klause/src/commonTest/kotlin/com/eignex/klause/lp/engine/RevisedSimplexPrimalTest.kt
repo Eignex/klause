@@ -6,6 +6,10 @@ import com.eignex.klause.lp.engine.Relation
 import com.eignex.klause.lp.engine.RevisedSimplex
 import com.eignex.klause.lp.engine.Sense
 import com.eignex.klause.lp.engine.integerDualLowerBoundCeil
+import com.eignex.klause.simplex.basis.BasisSolveQuality
+import com.eignex.klause.simplex.basis.BasisSolver
+import com.eignex.klause.simplex.basis.IndexedVector
+import com.eignex.klause.simplex.basis.KotlinBasisSolver
 import com.eignex.klause.simplex.exact.BigFraction
 import kotlin.math.abs
 import kotlin.math.ceil
@@ -14,6 +18,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
@@ -233,4 +238,29 @@ class RevisedSimplexPrimalTest {
         )
         assertTrue(abs(primal.objective - (-3.0)) <= 1e-9, "optimum ${primal.objective} should be -3")
     }
+
+    @Test
+    fun `generation changing quality restarts share one recovery budget`() {
+        val builder = LpBuilder()
+        repeat(40) {
+            val variable = builder.addVar(0L, 1L, cost = -1L)
+            builder.addRow(intArrayOf(variable), longArrayOf(1L), Relation.LE, 0L)
+        }
+        RevisedSimplex(
+            builder.build(Sense.MINIMIZE),
+            basisSolverFactory = { matrix -> PersistentlyBadQualitySolver(KotlinBasisSolver(matrix)) },
+        ).use { solver ->
+            val result = solver.solvePrimal()
+
+            assertNull(result)
+            assertTrue(solver.lastRefactorPolicyMetrics.acceptedUpdates >= 5L)
+            assertEquals(5L, solver.lastRefactorPolicyMetrics.residualTriggers)
+            assertEquals(5, solver.lastMetrics.numericalRecoveryRefactorizations)
+        }
+    }
+}
+
+private class PersistentlyBadQualitySolver(private val delegate: BasisSolver) : BasisSolver by delegate {
+    override fun solveQuality(rhs: DoubleArray, solution: IndexedVector, transpose: Boolean): BasisSolveQuality =
+        BasisSolveQuality(1e-4, 1e-4)
 }

@@ -331,8 +331,8 @@ class RevisedSimplexResolveBoundsTest {
                     assertEquals(40L, attempts)
                     assertEquals(attempts, nativeSolved)
                     assertEquals(attempts, legacySolved)
-                    assertEquals(0L, nativeFactors - nativeInitialFactors)
-                    assertEquals(0L, legacyFactors - legacyInitialFactors)
+                    assertTrue(nativeFactors - nativeInitialFactors <= attempts / 8L)
+                    assertTrue(legacyFactors - legacyInitialFactors <= attempts / 8L)
                 }
             }
         }

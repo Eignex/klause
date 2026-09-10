@@ -5,6 +5,8 @@ import com.eignex.klause.simplex.basis.BasisExtension
 import com.eignex.klause.simplex.basis.BasisExtensionResult
 import com.eignex.klause.simplex.basis.BasisOperationWork
 import com.eignex.klause.simplex.basis.BasisPhaseWork
+import com.eignex.klause.simplex.basis.BasisRepair
+import com.eignex.klause.simplex.basis.BasisSnapshot
 import com.eignex.klause.simplex.basis.BasisSolver
 import com.eignex.klause.simplex.basis.IndexedVector
 import com.eignex.klause.simplex.basis.KotlinBasisSolver
@@ -18,6 +20,86 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class LpScopedBasisTransferTest {
+    @Test
+    fun `repaired mixed headings transfer and restore on the replacement owner`() {
+        val repairedOwners = mutableListOf<MixedRepairBasisSolver>()
+        val transferredPolicyBaselines = mutableListOf<RefactorPolicyMetrics>()
+        val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+            override fun newPersistentSolver(
+                model: LpModel,
+                cancellation: Cancellation,
+                refactorUpdateLimit: Int,
+                iterationLimit: Int,
+                workLimit: Long,
+                trackDegeneracy: Boolean,
+            ): PersistentLpSolver {
+                val delegate = RevisedSimplex(
+                    model,
+                    cancellation,
+                    refactorUpdateLimit = 64,
+                    iterationLimit = iterationLimit,
+                    workLimit = workLimit,
+                    trackDegeneracy = trackDegeneracy,
+                    basisSolverFactory = { matrix ->
+                        MixedRepairBasisSolver(KotlinBasisSolver(matrix)).also { repairedOwners.add(it) }
+                    },
+                )
+                return object : PersistentLpSolver by delegate {
+                    override fun appendReplacement(
+                        next: LpExactState,
+                        oldRowsInNew: IntArray,
+                        oldColumnsInNew: IntArray,
+                        mode: LpAppendReplacementMode,
+                        token: Cancellation,
+                    ): LpAppendReplacementAttempt {
+                        val attempt = delegate.appendReplacement(next, oldRowsInNew, oldColumnsInNew, mode, token)
+                        val replacement = attempt.replacement?.solver
+                        if (replacement is RevisedSimplex) {
+                            transferredPolicyBaselines.add(replacement.lastRefactorPolicyMetrics)
+                        }
+                        return attempt
+                    }
+                }
+            }
+        }
+        LpScopedSolver(
+            LpExactState(repairCompositionModel()),
+            context = LpSolveContext(engineFactory = factory),
+            refactorUpdateLimit = 1,
+            appendSelection = LpAppendSelection.FORCE_TRANSFER,
+        ).use { solver ->
+            B5bIndependentExactSourceValidator.validate(solver.state, assertNotNull(solver.solve()))
+            val recoverySnapshot = assertNotNull(solver.captureBasisRestart())
+            val repairedOwner = repairedOwners.single()
+            repairedOwner.armRepair()
+            assertTrue(solver.restoreBasisRestart(recoverySnapshot))
+            recoverySnapshot.close()
+            assertTrue(repairedOwner.installedMixedRepair)
+
+            assertTrue(solver.append(lowerRow(3, 2), scoped = false))
+            assertTrue(repairedOwners.any { it.extendedMixedRepair })
+            assertNotNull(transferredPolicyBaselines.single().freshFactorNnz)
+            val transferred = assertNotNull(solver.solve())
+            B5bIndependentExactSourceValidator.validate(solver.state, transferred)
+            assertEquals(1, solver.metrics.appendTransfers)
+            assertEquals(0, solver.metrics.appendFallbacks)
+
+            val snapshot = assertNotNull(solver.captureBasisRestart())
+            val before = assertNotNull(solver.basisLifecycleWork).units
+            assertTrue(solver.assertBound(0, false, ExactLpSide(ExactLpNumber.of(4L)), witness = 99L))
+            B5bIndependentExactSourceValidator.validate(solver.state, assertNotNull(solver.solve()))
+            assertTrue(solver.restoreBasisRestart(snapshot))
+            val restored = assertNotNull(solver.solve())
+            B5bIndependentExactSourceValidator.validate(solver.state, restored)
+            assertTrue(assertNotNull(solver.basisLifecycleWork).units > before)
+
+            LpScopedSolver(solver.state).use { fresh ->
+                assertEquals(assertNotNull(fresh.solve()).lowerBound, restored.lowerBound)
+            }
+            snapshot.close()
+        }
+    }
+
     @Test
     fun `successive appends transfer accepted source and extension unit headings`() {
         val zero = ExactLpNumber.of(0L)
@@ -786,6 +868,7 @@ class LpScopedBasisTransferTest {
         )
         val initial = assertNotNull(solver.solve())
         val state = solver.state
+        ledgerReads = 0
 
         val thrown = assertFailsWith<IllegalStateException> {
             solver.append(lowerRow(1, 2), scoped = false)
@@ -1092,6 +1175,26 @@ class LpScopedBasisTransferTest {
         )
     }
 
+    private fun repairCompositionModel(): ExactLpModel {
+        val zero = ExactLpNumber.of(0L)
+        val minusOne = ExactLpNumber.of(-1L)
+        val structural = ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(ExactLpNumber.of(10L))))
+        val logical = ExactLpColumn(ExactLpBounds(ExactLpSide(zero)))
+        return ExactLpModel(
+            listOf(
+                listOf(ExactLpEntry(0, minusOne), ExactLpEntry(2, minusOne)),
+                listOf(ExactLpEntry(0, minusOne), ExactLpEntry(1, minusOne)),
+                listOf(ExactLpEntry(1, minusOne), ExactLpEntry(2, minusOne)),
+            ),
+            listOf(ExactLpNumber.of(-3L), ExactLpNumber.of(-4L), ExactLpNumber.of(-5L)),
+            List(3) { structural } + List(3) { logical },
+            List(3) { ExactLpRow() },
+            ExactLpObjective(
+                listOf(ExactLpNumber.of(1L), ExactLpNumber.of(2L), ExactLpNumber.of(3L), zero, zero, zero),
+            ),
+        )
+    }
+
     private fun lowerRow(id: Long, lower: Long): LpScopedRow = LpScopedRow(
         id,
         listOf(0 to ExactLpNumber.of(-1L)),
@@ -1127,6 +1230,46 @@ class LpScopedBasisTransferTest {
             List(16) { ExactLpRow() },
             ExactLpObjective(List(24) { zero }),
         )
+    }
+}
+
+private class MixedRepairBasisSolver(private val delegate: BasisSolver) : BasisSolver by delegate {
+    private var repairArmed = false
+    var installedMixedRepair = false
+        private set
+    var extendedMixedRepair = false
+        private set
+
+    fun armRepair() {
+        repairArmed = true
+    }
+
+    override fun refactorize(basicIndex: IntArray): Boolean {
+        if (!repairArmed) return delegate.refactorize(basicIndex)
+        repairArmed = false
+        return false
+    }
+
+    override fun refactorizeRepairing(basicIndex: IntArray): BasisRepair? {
+        if (n < 2) return null
+        val requested = IntArray(n)
+        requested[n - 1] = 1
+        val repair = delegate.refactorizeRepairing(requested) ?: return null
+        installedMixedRepair = repair.repaired
+        return repair
+    }
+
+    override fun snapshot(): BasisSnapshot? = null
+
+    override fun extend(matrix: SparseMatrix, extension: BasisExtension): BasisExtensionResult? {
+        val requested = extension.basis
+        assertTrue(installedMixedRepair)
+        assertTrue(
+            requested.repaired,
+            "columns=${requested.columns.contentToString()} units=${requested.unitRows.contentToString()}",
+        )
+        extendedMixedRepair = true
+        return delegate.extend(matrix, extension)
     }
 }
 
