@@ -120,7 +120,12 @@ internal fun certifyLpResult(
             val support = accepted?.let { conflict ->
                 LpExactSupport(
                     state,
-                    emptyList(),
+                    if (conflict.column < model.n) {
+                        emptyList()
+                    } else {
+                        val row = conflict.column - model.n
+                        listOf(row to state.model.row(row))
+                    },
                     listOf(
                         LpExactCitedSide(conflict.column, false, conflict.lower.side, conflict.lower.witness),
                         LpExactCitedSide(conflict.column, true, conflict.upper.side, conflict.upper.witness),
@@ -324,12 +329,7 @@ private fun LpModel.exactSupport(multipliers: List<BigFraction>, objective: Bool
         val upper = coefficient.signum() > 0
         val side = if (upper) exactBounds(j).upper else exactBounds(j).lower
         if (side != null) {
-            val original = state.baseModel.column(j).bounds.let { if (upper) it.upper else it.lower }
-            val witness = if (original == side) {
-                -2L * j - if (upper) 2L else 1L
-            } else {
-                state.assertions.firstOrNull { it.column == j && it.upper == upper && it.side == side }?.witness
-            }
+            val witness = state.activeSide(j, upper)?.takeIf { it.side == side }?.witness
             sides += LpExactCitedSide(j, upper, side, witness)
         }
     }

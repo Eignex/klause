@@ -19,6 +19,8 @@ internal class LpExactState internal constructor(
     val objectiveRevision: Long = 0L,
     val popRevision: Long = 0L,
     changedColumns: List<Int> = emptyList(),
+    val rows: LpScopedRows = LpScopedRows.initial(baseModel.m),
+    val rowRevision: Long = 0L,
 ) {
     private val activeAssertions = assertions.toList()
     private val scopeMarks = scopes.toList()
@@ -36,17 +38,35 @@ internal class LpExactState internal constructor(
     val conflict: LpBoundConflict?
 
     init {
-        require(listOf(matrixRevision, boundRevision, objectiveRevision, popRevision).all { it >= 0L })
+        require(listOf(matrixRevision, boundRevision, objectiveRevision, popRevision, rowRevision).all { it >= 0L })
+        require(rows.size == baseModel.m)
+        require(rows.entries().all { !it.active || it.depth == null || it.depth <= depth })
+        require(
+            (0 until rows.size).all { rows.row(it).active || baseModel.objective.cost(baseModel.n + it).value.isZero },
+        )
         require(scopeMarks.all { it in 0..activeAssertions.size })
         require(scopeMarks.zipWithNext().all { (a, b) -> a <= b })
         require(activeAssertions.map { it.witness }.distinct().size == activeAssertions.size)
         for ((index, assertion) in activeAssertions.withIndex()) {
-            require(assertion.column in 0 until baseModel.n && assertion.witness >= 0L)
+            require(assertion.column in 0 until baseModel.numVars && assertion.witness >= 0L)
+            require(assertion.column < baseModel.n || rows.row(assertion.column - baseModel.n).active)
+            require(
+                assertion.column < baseModel.n ||
+                    assertion.depth >= (rows.row(assertion.column - baseModel.n).depth ?: 0),
+            )
             require(assertion.depth == scopeMarks.count { it <= index })
         }
         require(changed.all { it in 0 until baseModel.numVars } && changed.distinct().size == changed.size)
         for (j in 0 until baseModel.numVars) {
-            val bounds = baseModel.column(j).bounds
+            if (j >= baseModel.n && !rows.row(j - baseModel.n).active) continue
+            val declared = baseModel.column(j).bounds
+            val bounds = if (j >= baseModel.n && baseModel.row(j - baseModel.n).strict &&
+                declared.lower?.number?.value?.isZero == true
+            ) {
+                declared.copy(lower = declared.lower.copy(strict = true))
+            } else {
+                declared
+            }
             lower[j] = bounds.lower?.let { LpBoundAssertion(j, false, it, -2L * j - 1L, 0) }
             upper[j] = bounds.upper?.let { LpBoundAssertion(j, true, it, -2L * j - 2L, 0) }
         }
@@ -57,7 +77,13 @@ internal class LpExactState internal constructor(
         }
         model = baseModel.copy(
             columns = List(baseModel.numVars) { j ->
-                baseModel.column(j).copy(bounds = ExactLpBounds(lower[j]?.side, upper[j]?.side))
+                baseModel.column(j).copy(
+                    bounds = ExactLpBounds(lower[j]?.side, upper[j]?.side),
+                    integral = baseModel.column(j).integral && (j < baseModel.n || rows.row(j - baseModel.n).active),
+                )
+            },
+            rows = List(baseModel.m) {
+                if (rows.row(it).active) baseModel.row(it) else baseModel.row(it).copy(strict = false)
             },
         )
         conflict = (0 until model.numVars).firstOrNull { !model.column(it).bounds.consistent }?.let {
@@ -67,16 +93,15 @@ internal class LpExactState internal constructor(
 
     fun activeSide(column: Int, upper: Boolean): LpBoundAssertion? = if (upper) this.upper[column] else lower[column]
 
-    fun sameMatrix(other: LpExactState): Boolean = matrixRevision == other.matrixRevision && model.sameMatrix(
-        other.model,
-    )
+    fun sameMatrix(other: LpExactState): Boolean = matrixRevision == other.matrixRevision &&
+        baseModel.sameMatrix(other.baseModel) && rows.sameIdentities(other.rows)
 
     fun fullAuthorityEquals(other: LpExactState): Boolean = baseModel.sameAuthority(other.baseModel) &&
-        model.sameAuthority(
-            other.model,
-        ) && activeAssertions == other.activeAssertions && scopeMarks == other.scopeMarks &&
+        model.sameAuthority(other.model) && activeAssertions == other.activeAssertions &&
+        scopeMarks == other.scopeMarks &&
         matrixRevision == other.matrixRevision && boundRevision == other.boundRevision &&
-        objectiveRevision == other.objectiveRevision && popRevision == other.popRevision
+        objectiveRevision == other.objectiveRevision && popRevision == other.popRevision &&
+        rowRevision == other.rowRevision && rows.sameAuthority(other.rows)
 
     internal fun inheritProjection(previous: LpExactState) {
         projection = previous.projection

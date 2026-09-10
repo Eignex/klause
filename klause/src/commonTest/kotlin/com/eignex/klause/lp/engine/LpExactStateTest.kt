@@ -31,7 +31,9 @@ class LpExactStateTest {
         val working = assertNotNull(state.toWorkingModel())
 
         assertSame(state, working.exactState)
-        assertTrue(model.sameAuthority(assertNotNull(working.exactState).model))
+        assertTrue(model.sameAuthority(assertNotNull(working.exactState).baseModel))
+        assertTrue(assertNotNull(state.model.column(1).bounds.lower).strict)
+        assertNotNull(state.conflict)
         assertEquals(1.0 / 3.0, working.costD(0))
         assertEquals(1.0 / 3.0, working.rhsD(0))
         assertEquals(1.0 / 3.0, working.loShiftD(0))

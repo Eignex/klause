@@ -218,6 +218,9 @@ internal interface TableauCutSolver : LpSolver {
  * caller would silently pay a full rebuild for.
  */
 internal interface PersistentLpSolver : LpSolver {
+    // Builds an all-logical basis without claiming feasibility; null means unsupported or declined.
+    fun prepareLogicals(token: Cancellation = Cancellation.Never): Basis? = null
+
     fun adopt(state: LpExactState, token: Cancellation = Cancellation.Never): Boolean = false
 
     /**

@@ -580,6 +580,28 @@ internal class RevisedSimplex(
         return true
     }
 
+    override fun prepareLogicals(token: Cancellation): Basis? {
+        resetSolveState(false)
+        basisKept = false
+        cachedBeta = null
+        cachedModel = null
+        cachedStatus = null
+        if (model.exactState == null || token()) return null
+        cancellation = token
+        return try {
+            coldStart()
+            if (!refactorize(LpRefactorReason.INITIAL) || token() || (workLimit > 0L && work.ops > workLimit)) {
+                null
+            } else {
+                basisKept = true
+                Basis(basicVar.copyOf(), status.copyOf(), captureEligible = false)
+            }
+        } catch (_: BasisArithmeticException) {
+            close()
+            null
+        }
+    }
+
     override fun adopt(state: LpExactState, token: Cancellation): Boolean {
         val current = model.exactState ?: return false
         if (!current.sameMatrix(state) || token()) return false
