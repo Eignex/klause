@@ -199,7 +199,7 @@ class BasisWorkTest {
         assertEquals(BasisBuildKind.EXTENSION, extension.kind)
         assertEquals(0, extension.builds)
         assertEquals(null, extension.installedBuildUnits)
-        assertEquals(67, extension.units)
+        assertEquals(54, extension.units)
         assertEquals(0, result.solver.basisWork?.workSinceBuild)
         val snapshot = assertNotNull(result.solver.snapshot())
         result.solver.ftran(IndexedVector(3).also { it.unit(0) }, 0.0)
