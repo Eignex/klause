@@ -1,6 +1,8 @@
 package com.eignex.klause.simplex.basis
 
+import com.eignex.koblas.SingularMatrix
 import com.eignex.koblas.SparseMatrix
+import org.junit.BeforeClass
 import java.util.IdentityHashMap
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
@@ -9,6 +11,22 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 class BasisTraceTest {
+    companion object {
+        @BeforeClass
+        @JvmStatic
+        fun warmReplayRuntime() {
+            val resource = requireNotNull(
+                BasisTraceTest::class.java.getResourceAsStream("/basis-corpus/smt-lia-wide-span.kbtrace"),
+            )
+            val trace = BasisTraceCodec.decode(resource.use { it.readBytes() })
+            BasisTraceReplay.replay(
+                trace,
+                referenceFactory = ::KotlinBasisSolver,
+                measureAllocations = false,
+            )
+        }
+    }
+
     @Test
     fun `codec roundtrip preserves raw bits and owns arrays`() {
         val sourceBits = longArrayOf(1.0.toRawBits(), (-0.0).toRawBits(), 1.0.toRawBits(), 1.0.toRawBits())
@@ -114,7 +132,7 @@ class BasisTraceTest {
     @Test
     fun `replay stops both arms when an update diverges`() {
         val fixture = trace(simpleMatrix())
-        val result = BasisTraceReplay.replay(
+        val result = replay(
             fixture,
             customFactory = ::KotlinBasisSolver,
             referenceFactory = { matrix ->
@@ -161,7 +179,7 @@ class BasisTraceTest {
             }
         }
 
-        val result = BasisTraceReplay.replay(fixture, singularFactory, singularFactory)
+        val result = replay(fixture, singularFactory, singularFactory)
 
         assertEquals(1, result.custom.ftrans)
         assertEquals(1, result.hfactor.ftrans)
@@ -194,15 +212,155 @@ class BasisTraceTest {
             }
         }
 
-        BasisTraceReplay.replay(fixture, recordingFactory, ::KotlinBasisSolver)
+        replay(fixture, recordingFactory, ::KotlinBasisSolver)
 
         assertTrue(calls.values.any { it >= 2 })
     }
 
     @Test
+    fun `replay closes every solver when either prepared factory fails`() {
+        for (failureAt in listOf(2, 4)) {
+            val created = ArrayList<TrackingBasisSolver>()
+            var factoryCalls = 0
+            val factory: (SparseMatrix) -> BasisSolver = { matrix ->
+                factoryCalls++
+                if (factoryCalls == failureAt) throw IllegalStateException("factory-$failureAt")
+                TrackingBasisSolver(KotlinBasisSolver(matrix)).also(created::add)
+            }
+
+            val failure = assertFailsWith<IllegalStateException> {
+                replay(
+                    trace(simpleMatrix()),
+                    factory,
+                    factory,
+                )
+            }
+
+            assertEquals("factory-$failureAt", failure.message)
+            assertEquals(failureAt - 1, created.size)
+            assertTrue(created.all { it.closeCalls == 1 })
+        }
+    }
+
+    @Test
+    fun `replay preserves an operation failure while closing every solver`() {
+        val created = ArrayList<TrackingBasisSolver>()
+        var factoryCalls = 0
+        val factory: (SparseMatrix) -> BasisSolver = { matrix ->
+            factoryCalls++
+            TrackingBasisSolver(
+                KotlinBasisSolver(matrix),
+                refactorizeFailure = if (factoryCalls == 1) IllegalStateException("operation") else null,
+                closeFailure = when (factoryCalls) {
+                    1 -> IllegalArgumentException("close-1")
+                    2 -> IllegalArgumentException("close-2")
+                    3 -> IllegalArgumentException("close-3")
+                    else -> null
+                },
+            ).also(created::add)
+        }
+
+        val failure = assertFailsWith<IllegalStateException> {
+            replay(
+                trace(simpleMatrix()),
+                factory,
+                factory,
+            )
+        }
+
+        assertEquals("operation", failure.message)
+        assertEquals(listOf("close-1", "close-3"), failure.suppressed.map { it.message })
+        assertEquals(listOf("close-2"), failure.suppressed.first().suppressed.map { it.message })
+        assertTrue(created.all { it.closeCalls == 1 })
+    }
+
+    @Test
+    fun `replay preserves the first close failure while closing every solver`() {
+        val created = ArrayList<TrackingBasisSolver>()
+        var factoryCalls = 0
+        val factory: (SparseMatrix) -> BasisSolver = { matrix ->
+            factoryCalls++
+            TrackingBasisSolver(
+                KotlinBasisSolver(matrix),
+                closeFailure = when (factoryCalls) {
+                    1 -> IllegalArgumentException("close-1")
+                    2 -> IllegalArgumentException("close-2")
+                    3 -> IllegalArgumentException("close-3")
+                    else -> null
+                },
+            ).also(created::add)
+        }
+
+        val failure = assertFailsWith<IllegalArgumentException> {
+            replay(
+                trace(simpleMatrix()),
+                factory,
+                factory,
+            )
+        }
+
+        assertEquals("close-1", failure.message)
+        assertEquals(listOf("close-2", "close-3"), suppressedMessages(failure))
+        assertTrue(created.all { it.closeCalls == 1 })
+    }
+
+    @Test
+    fun `replay records FTRAN arithmetic failure and resumes at checkpoint`() {
+        val fixture = traceWithRecoveryCheckpoint()
+        lateinit var failing: TrackingBasisSolver
+        var factoryCalls = 0
+        val result = replay(
+            fixture,
+            customFactory = { matrix ->
+                factoryCalls++
+                TrackingBasisSolver(
+                    KotlinBasisSolver(matrix),
+                    ftranFailureAt = if (factoryCalls == 1) 2 else null,
+                ).also { if (factoryCalls == 1) failing = it }
+            },
+            referenceFactory = ::KotlinBasisSolver,
+        )
+
+        assertEquals(1, result.custom.stateErrors)
+        assertEquals(1, result.hfactor.stateErrors)
+        assertTrue(result.custom.errors.any { "operation=1 FTRAN numerical failure" in it })
+        assertEquals(4, failing.ftranCalls)
+        assertEquals(1, result.custom.ftrans)
+        val benchmark = benchmarkJson(fixture, "0".repeat(64), listOf(result.custom))
+        assertTrue("\"allRepetitionsValid\":false" in benchmark)
+        assertTrue("\"validRepetitions\":0" in benchmark)
+        assertTrue("\"stateErrors\":1" in benchmark)
+        assertTrue("\"setupNanosMedian\":null" in benchmark)
+    }
+
+    @Test
+    fun `replay records reference update failure and resumes at checkpoint`() {
+        val fixture = traceWithRecoveryCheckpoint()
+        lateinit var failing: TrackingBasisSolver
+        var factoryCalls = 0
+        val result = replay(
+            fixture,
+            customFactory = ::KotlinBasisSolver,
+            referenceFactory = { matrix ->
+                factoryCalls++
+                TrackingBasisSolver(
+                    KotlinBasisSolver(matrix),
+                    updateFailure = if (factoryCalls == 1) SingularMatrix(-1, "injected update") else null,
+                ).also { if (factoryCalls == 1) failing = it }
+            },
+        )
+
+        assertEquals(1, result.custom.stateErrors)
+        assertEquals(1, result.hfactor.stateErrors)
+        assertTrue(result.hfactor.errors.any { "operation=3 update numerical failure" in it })
+        assertEquals(1, failing.updateCalls)
+        assertEquals(2, result.hfactor.ftrans)
+    }
+
+    @Test
     fun `independent source residual rejects a distorted solve`() {
         val fixture = trace(simpleMatrix())
-        val result = BasisTraceReplay.replay(
+        val result = replay(
             fixture,
             customFactory = { matrix ->
                 val delegate = KotlinBasisSolver(matrix)
@@ -227,7 +385,7 @@ class BasisTraceTest {
     @Test
     fun `nonfinite solve output fails replay`() {
         val fixture = trace(simpleMatrix())
-        val result = BasisTraceReplay.replay(
+        val result = replay(
             fixture,
             customFactory = { matrix ->
                 val delegate = KotlinBasisSolver(matrix)
@@ -252,7 +410,7 @@ class BasisTraceTest {
         val resource = requireNotNull(javaClass.getResourceAsStream("/basis-corpus/smt-lia-wide-span.kbtrace"))
         val trace = BasisTraceCodec.decode(resource.use { it.readBytes() })
 
-        val result = BasisTraceReplay.replay(trace, referenceFactory = ::KotlinBasisSolver)
+        val result = replay(trace, referenceFactory = ::KotlinBasisSolver)
 
         assertEquals(BasisTraceFormat.SMTLIB, trace.metadata.format)
         assertEquals(0, result.custom.stateErrors)
@@ -318,6 +476,12 @@ class BasisTraceTest {
         )
     }
 
+    private fun replay(
+        trace: BasisTrace,
+        customFactory: (SparseMatrix) -> BasisSolver = ::KotlinBasisSolver,
+        referenceFactory: (SparseMatrix) -> BasisSolver = ::HfactorBasisSolver,
+    ): BasisReplayPair = BasisTraceReplay.replay(trace, customFactory, referenceFactory, measureAllocations = false)
+
     private fun simpleMatrix() = BasisTraceMatrix(
         2,
         4,
@@ -325,6 +489,21 @@ class BasisTraceTest {
         intArrayOf(0, 1, 0, 1),
         longArrayOf(1.0.toRawBits(), 1.0.toRawBits(), 1.0.toRawBits(), 1.0.toRawBits()),
     )
+
+    private fun traceWithRecoveryCheckpoint(): BasisTrace {
+        val original = trace(simpleMatrix())
+        val recovery = listOf(
+            BasisTraceOperation.Factorize(listOf(BasisHeading.Unit(0), BasisHeading.Unit(1)), true),
+            BasisTraceOperation.Solve(
+                3,
+                false,
+                BasisVectorRole.GENERAL,
+                0.0.toRawBits(),
+                BasisTraceVector(doubleArrayOf(4.0, 5.0), intArrayOf(0, 1)),
+            ),
+        )
+        return original.copyWithOperations(original.operations + recovery)
+    }
 
     private fun origin(kind: BasisColumnKind, source: Int) = BasisColumnOrigin(
         kind,
@@ -360,4 +539,54 @@ class BasisTraceTest {
         rowStrict(),
         operations,
     )
+
+    private fun suppressedMessages(failure: Throwable): List<String?> = buildList {
+        for (suppressed in failure.suppressed) {
+            add(suppressed.message)
+            addAll(suppressedMessages(suppressed))
+        }
+    }
+
+    private class TrackingBasisSolver(
+        private val delegate: BasisSolver,
+        private val refactorizeFailure: Throwable? = null,
+        private val ftranFailureAt: Int? = null,
+        private val updateFailure: Throwable? = null,
+        private val closeFailure: Throwable? = null,
+    ) : BasisSolver by delegate {
+        var ftranCalls = 0
+            private set
+        var updateCalls = 0
+            private set
+        var closeCalls = 0
+            private set
+
+        override fun refactorize(basicIndex: IntArray): Boolean {
+            refactorizeFailure?.let { throw it }
+            return delegate.refactorize(basicIndex)
+        }
+
+        override fun ftran(x: IndexedVector, expectedDensity: Double) {
+            ftranCalls++
+            if (ftranCalls == ftranFailureAt) throw BasisArithmeticException("injected FTRAN")
+            delegate.ftran(x, expectedDensity)
+        }
+
+        override fun update(
+            pivotRow: Int,
+            entering: Int,
+            spike: IndexedVector,
+            pivotEta: IndexedVector?,
+        ): BasisUpdate {
+            updateCalls++
+            updateFailure?.let { throw it }
+            return delegate.update(pivotRow, entering, spike, pivotEta)
+        }
+
+        override fun close() {
+            closeCalls++
+            delegate.close()
+            closeFailure?.let { throw it }
+        }
+    }
 }

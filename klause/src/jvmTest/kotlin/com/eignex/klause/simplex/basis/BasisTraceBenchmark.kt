@@ -187,29 +187,49 @@ private fun reportJson(
     repetitions: Int,
 ): String = json(*commonFields(command, trace, artifactSha, report, repetitions).toTypedArray())
 
-private fun benchmarkJson(trace: BasisTrace, artifactSha: String, reports: List<BasisReplayReport>): String {
+internal fun benchmarkJson(trace: BasisTrace, artifactSha: String, reports: List<BasisReplayReport>): String {
+    val validReports = reports.filter { it.stateErrors == 0 }
     val representative = reports.first()
-    val fields = commonFields("benchmark", trace, artifactSha, representative, reports.size).toMutableList()
+    val aggregate = representative.copy(
+        stateErrors = reports.sumOf(BasisReplayReport::stateErrors),
+        errors = reports.flatMap(BasisReplayReport::errors),
+        timing = validReports.firstOrNull()?.timing ?: BasisReplayTiming(),
+    )
+    val fields = commonFields(
+        "benchmark",
+        trace,
+        artifactSha,
+        aggregate,
+        reports.size,
+        timingValid = validReports.isNotEmpty(),
+    ).toMutableList()
     fun addSpread(name: String, values: List<Long>) {
+        if (values.isEmpty()) {
+            fields += "${name}Median" to null
+            fields += "${name}Min" to null
+            fields += "${name}Max" to null
+            return
+        }
         val sorted = values.sorted()
         fields += "${name}Median" to sorted[sorted.size / 2]
         fields += "${name}Min" to sorted.first()
         fields += "${name}Max" to sorted.last()
     }
-    addSpread("setupNanos", reports.map { it.timing.setupNanos })
-    addSpread("buildNanos", reports.map { it.timing.buildNanos })
-    addSpread("ftranNanos", reports.map { it.timing.ftranNanos })
-    addSpread("btranNanos", reports.map { it.timing.btranNanos })
-    addSpread("updateOnlyNanos", reports.map { it.timing.updateOnlyNanos })
-    addSpread("preparedUpdateNanos", reports.map { it.timing.preparedUpdateNanos })
-    addSpread("composedNanos", reports.map { it.timing.lifecycleNanos })
-    addSpread("totalNanos", reports.map { it.timing.setupNanos + it.timing.lifecycleNanos })
-    addSpread("setupBytes", reports.map { it.timing.setupBytes })
-    addSpread("buildBytes", reports.map { it.timing.buildBytes })
-    addSpread("ftranBytes", reports.map { it.timing.ftranBytes })
-    addSpread("btranBytes", reports.map { it.timing.btranBytes })
-    addSpread("updateOnlyBytes", reports.map { it.timing.updateOnlyBytes })
-    addSpread("preparedUpdateBytes", reports.map { it.timing.preparedUpdateBytes })
+    addSpread("setupNanos", validReports.map { it.timing.setupNanos })
+    addSpread("buildNanos", validReports.map { it.timing.buildNanos })
+    addSpread("ftranNanos", validReports.map { it.timing.ftranNanos })
+    addSpread("btranNanos", validReports.map { it.timing.btranNanos })
+    addSpread("updateOnlyNanos", validReports.map { it.timing.updateOnlyNanos })
+    addSpread("preparedUpdateNanos", validReports.map { it.timing.preparedUpdateNanos })
+    addSpread("composedNanos", validReports.map { it.timing.lifecycleNanos })
+    addSpread("totalNanos", validReports.map { it.timing.setupNanos + it.timing.lifecycleNanos })
+    addSpread("setupBytes", validReports.map { it.timing.setupBytes })
+    addSpread("buildBytes", validReports.map { it.timing.buildBytes })
+    addSpread("ftranBytes", validReports.map { it.timing.ftranBytes })
+    addSpread("btranBytes", validReports.map { it.timing.btranBytes })
+    addSpread("updateOnlyBytes", validReports.map { it.timing.updateOnlyBytes })
+    addSpread("preparedUpdateBytes", validReports.map { it.timing.preparedUpdateBytes })
+    fields += "validRepetitions" to validReports.size
     fields += "allRepetitionsValid" to reports.all { it.stateErrors == 0 }
     return json(*fields.toTypedArray())
 }
@@ -220,6 +240,7 @@ private fun commonFields(
     artifactSha: String,
     report: BasisReplayReport,
     repetitions: Int,
+    timingValid: Boolean = true,
 ): List<Pair<String, Any?>> = listOf(
     "command" to command,
     "id" to trace.metadata.id,
@@ -258,20 +279,20 @@ private fun commonFields(
     "residualTolerance" to report.residualTolerance,
     "stateErrors" to report.stateErrors,
     "errors" to report.errors.joinToString(" | "),
-    "setupNanos" to report.timing.setupNanos,
-    "buildNanos" to report.timing.buildNanos,
-    "ftranNanos" to report.timing.ftranNanos,
-    "btranNanos" to report.timing.btranNanos,
-    "updateOnlyNanos" to report.timing.updateOnlyNanos,
-    "preparedUpdateNanos" to report.timing.preparedUpdateNanos,
-    "composedNanos" to report.timing.lifecycleNanos,
-    "totalNanos" to report.timing.setupNanos + report.timing.lifecycleNanos,
-    "setupBytes" to report.timing.setupBytes,
-    "buildBytes" to report.timing.buildBytes,
-    "ftranBytes" to report.timing.ftranBytes,
-    "btranBytes" to report.timing.btranBytes,
-    "updateOnlyBytes" to report.timing.updateOnlyBytes,
-    "preparedUpdateBytes" to report.timing.preparedUpdateBytes,
+    "setupNanos" to report.timing.setupNanos.takeIf { timingValid },
+    "buildNanos" to report.timing.buildNanos.takeIf { timingValid },
+    "ftranNanos" to report.timing.ftranNanos.takeIf { timingValid },
+    "btranNanos" to report.timing.btranNanos.takeIf { timingValid },
+    "updateOnlyNanos" to report.timing.updateOnlyNanos.takeIf { timingValid },
+    "preparedUpdateNanos" to report.timing.preparedUpdateNanos.takeIf { timingValid },
+    "composedNanos" to report.timing.lifecycleNanos.takeIf { timingValid },
+    "totalNanos" to (report.timing.setupNanos + report.timing.lifecycleNanos).takeIf { timingValid },
+    "setupBytes" to report.timing.setupBytes.takeIf { timingValid },
+    "buildBytes" to report.timing.buildBytes.takeIf { timingValid },
+    "ftranBytes" to report.timing.ftranBytes.takeIf { timingValid },
+    "btranBytes" to report.timing.btranBytes.takeIf { timingValid },
+    "updateOnlyBytes" to report.timing.updateOnlyBytes.takeIf { timingValid },
+    "preparedUpdateBytes" to report.timing.preparedUpdateBytes.takeIf { timingValid },
     "preparedUpdateMode" to "synthetic_prepared",
     "repair" to "not_comparable",
     "snapshots" to "not_comparable",

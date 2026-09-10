@@ -1,5 +1,6 @@
 package com.eignex.klause.simplex.basis
 
+import com.eignex.koblas.KoblasException
 import com.eignex.koblas.SparseMatrix
 import com.sun.management.ThreadMXBean
 import java.lang.management.ManagementFactory
@@ -46,38 +47,49 @@ internal data class BasisReplayReport(
 internal data class BasisReplayPair(val custom: BasisReplayReport, val hfactor: BasisReplayReport)
 
 internal object BasisTraceReplay {
+    private val allocationBean: ThreadMXBean by lazy {
+        (ManagementFactory.getThreadMXBean() as ThreadMXBean).also { bean ->
+            if (bean.isThreadAllocatedMemorySupported) bean.isThreadAllocatedMemoryEnabled = true
+        }
+    }
+
     fun replay(
         trace: BasisTrace,
         customFactory: (SparseMatrix) -> BasisSolver = ::KotlinBasisSolver,
         referenceFactory: (SparseMatrix) -> BasisSolver = ::HfactorBasisSolver,
+        measureAllocations: Boolean = true,
     ): BasisReplayPair {
         BasisTraceCodec.validate(trace)
         val matrix = trace.matrix.toSparseMatrix()
-        val bean = ManagementFactory.getThreadMXBean() as ThreadMXBean
-        if (bean.isThreadAllocatedMemorySupported) bean.isThreadAllocatedMemoryEnabled = true
+        val bean = if (measureAllocations) allocationBean else null
         val custom = newArm("custom", false, matrix, trace, bean, customFactory)
-        val hfactor = newArm("hfactor", true, matrix, trace, bean, referenceFactory)
+        var hfactor: Arm? = null
+        var primaryFailure: Throwable? = null
         try {
+            val reference = newArm("hfactor", true, matrix, trace, bean, referenceFactory)
+            hfactor = reference
             for ((index, operation) in trace.operations.withIndex()) {
                 val customErrors = custom.errorCount
-                val hfactorErrors = hfactor.errorCount
+                val hfactorErrors = reference.errorCount
                 custom.apply(index, operation)
-                hfactor.apply(index, operation)
+                reference.apply(index, operation)
                 val customFailed = custom.errorCount != customErrors
-                val hfactorFailed = hfactor.errorCount != hfactorErrors
+                val hfactorFailed = reference.errorCount != hfactorErrors
                 if (customFailed || hfactorFailed) {
                     if (!customFailed) custom.stopForPeer(index)
-                    if (!hfactorFailed) hfactor.stopForPeer(index)
-                } else if (operation is BasisTraceOperation.Update && custom.lastAccepted != hfactor.lastAccepted) {
+                    if (!hfactorFailed) reference.stopForPeer(index)
+                } else if (operation is BasisTraceOperation.Update && custom.lastAccepted != reference.lastAccepted) {
                     custom.diverge(index)
-                    hfactor.diverge(index)
+                    reference.diverge(index)
                 }
             }
+            return BasisReplayPair(custom.report(), reference.report())
+        } catch (failure: Throwable) {
+            primaryFailure = failure
+            throw failure
         } finally {
-            custom.close()
-            hfactor.close()
+            closeOwners(primaryFailure, custom, hfactor)
         }
-        return BasisReplayPair(custom.report(), hfactor.report())
     }
 
     private fun newArm(
@@ -85,17 +97,29 @@ internal object BasisTraceReplay {
         adapter: Boolean,
         matrix: SparseMatrix,
         trace: BasisTrace,
-        bean: ThreadMXBean,
+        bean: ThreadMXBean?,
         factory: (SparseMatrix) -> BasisSolver,
     ): Arm {
         val thread = Thread.currentThread().threadId()
-        val beforeBytes = if (bean.isThreadAllocatedMemoryEnabled) bean.getThreadAllocatedBytes(thread) else -1L
+        val beforeBytes = if (bean?.isThreadAllocatedMemoryEnabled == true) {
+            bean.getThreadAllocatedBytes(thread)
+        } else {
+            -1L
+        }
         val beforeNanos = System.nanoTime()
         val solver = factory(matrix)
         val nanos = System.nanoTime() - beforeNanos
-        val bytes = if (beforeBytes >= 0L) bean.getThreadAllocatedBytes(thread) - beforeBytes else -1L
-        val preparedSolver = factory(matrix)
-        return Arm(name, adapter, matrix, solver, preparedSolver, trace, bean, nanos, bytes)
+        val bytes = if (beforeBytes >= 0L) requireNotNull(bean).getThreadAllocatedBytes(thread) - beforeBytes else -1L
+        var primaryFailure: Throwable? = null
+        try {
+            val preparedSolver = factory(matrix)
+            return Arm(name, adapter, matrix, solver, preparedSolver, trace, bean, nanos, bytes)
+        } catch (failure: Throwable) {
+            primaryFailure = failure
+            throw failure
+        } finally {
+            if (primaryFailure != null) closeOwners(primaryFailure, solver)
+        }
     }
 
     private class Arm(
@@ -105,10 +129,10 @@ internal object BasisTraceReplay {
         private val solver: BasisSolver,
         private val preparedSolver: BasisSolver,
         private val trace: BasisTrace,
-        private val bean: ThreadMXBean,
+        private val bean: ThreadMXBean?,
         setupNanos: Long,
         setupBytes: Long,
-    ) {
+    ) : AutoCloseable {
         private val vectors = HashMap<Int, IndexedVector>()
         private val solved = HashMap<Int, DoubleArray>()
         private var headings: MutableList<BasisHeading>? = null
@@ -134,10 +158,16 @@ internal object BasisTraceReplay {
         val errorCount: Int get() = stateErrors
 
         fun apply(index: Int, operation: BasisTraceOperation) {
-            when (operation) {
-                is BasisTraceOperation.Factorize -> factorize(index, operation)
-                is BasisTraceOperation.Solve -> if (active) solve(index, operation)
-                is BasisTraceOperation.Update -> if (active) update(index, operation)
+            try {
+                when (operation) {
+                    is BasisTraceOperation.Factorize -> factorize(index, operation)
+                    is BasisTraceOperation.Solve -> if (active) solve(index, operation)
+                    is BasisTraceOperation.Update -> if (active) update(index, operation)
+                }
+            } catch (failure: BasisArithmeticException) {
+                fail(index, "${operationName(operation)} numerical failure: ${failure.message}")
+            } catch (failure: KoblasException) {
+                fail(index, "${operationName(operation)} numerical failure: ${failure.message}")
             }
         }
 
@@ -327,9 +357,8 @@ internal object BasisTraceReplay {
             lastAccepted = null
         }
 
-        fun close() {
-            solver.close()
-            preparedSolver.close()
+        override fun close() {
+            closeOwners(null, solver, preparedSolver)
         }
 
         fun report() = BasisReplayReport(
@@ -355,14 +384,47 @@ internal object BasisTraceReplay {
 
         private fun <T> measure(block: () -> T): Measurement<T> {
             val thread = Thread.currentThread().threadId()
-            val beforeBytes = if (bean.isThreadAllocatedMemoryEnabled) bean.getThreadAllocatedBytes(thread) else -1L
+            val beforeBytes = if (bean?.isThreadAllocatedMemoryEnabled == true) {
+                bean.getThreadAllocatedBytes(thread)
+            } else {
+                -1L
+            }
             val beforeNanos = System.nanoTime()
             val value = block()
             val nanos = System.nanoTime() - beforeNanos
-            val bytes = if (beforeBytes >= 0L) bean.getThreadAllocatedBytes(thread) - beforeBytes else -1L
+            val bytes = if (beforeBytes >= 0L) {
+                requireNotNull(
+                    bean,
+                ).getThreadAllocatedBytes(thread) - beforeBytes
+            } else {
+                -1L
+            }
             return Measurement(value, nanos, bytes)
         }
     }
+}
+
+private fun operationName(operation: BasisTraceOperation): String = when (operation) {
+    is BasisTraceOperation.Factorize -> "factorization"
+    is BasisTraceOperation.Solve -> if (operation.transpose) "BTRAN" else "FTRAN"
+    is BasisTraceOperation.Update -> "update"
+}
+
+private fun closeOwners(primaryFailure: Throwable?, vararg owners: AutoCloseable?) {
+    var failure = primaryFailure
+    for (owner in owners) {
+        if (owner == null) continue
+        try {
+            owner.close()
+        } catch (closeFailure: Throwable) {
+            if (failure == null) {
+                failure = closeFailure
+            } else if (failure !== closeFailure) {
+                failure.addSuppressed(closeFailure)
+            }
+        }
+    }
+    if (primaryFailure == null && failure != null) throw failure
 }
 
 private data class Measurement<T>(val value: T, val nanos: Long, val bytes: Long)
