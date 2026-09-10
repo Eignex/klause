@@ -164,10 +164,8 @@ private class SnapshotCleanupTracker {
     var ownerCloses = 0
 }
 
-private class SnapshotCleanupSolver(
-    private val delegate: BasisSolver,
-    private val tracker: SnapshotCleanupTracker,
-) : BasisSolver by delegate {
+private class SnapshotCleanupSolver(private val delegate: BasisSolver, private val tracker: SnapshotCleanupTracker) :
+    BasisSolver by delegate {
     override fun snapshot(): BasisSnapshot {
         val id = ++tracker.snapshots
         return object : BasisSnapshot {
