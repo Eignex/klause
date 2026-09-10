@@ -254,12 +254,16 @@ private fun Frac128.bits(): Int {
 
 private fun toFixed(value: BigFraction, meter: RationalMeter): Frac128 {
     meter.visit(value)
-    if (value.num.bitLength() > 127 || value.den.bitLength() > 127) throw RationalOverflow()
+    val numeratorBits = value.num.bitLength()
+    val negative = value.signum() < 0
+    if (numeratorBits > 128 || (numeratorBits == 128 && !negative) || value.den.bitLength() > 127) {
+        throw RationalOverflow()
+    }
     meter.arithmetic(value.bits().toLong())
     val magnitude = value.num.abs()
     val low = magnitude.longValue(exactRequired = false)
-    val high = (magnitude shr 64).longValue()
-    val negative = value.signum() < 0
+    val high = (magnitude shr 64).longValue(exactRequired = false)
+    if (numeratorBits == 128 && (high != Long.MIN_VALUE || low != 0L)) throw RationalOverflow()
     return Frac128(
         if (negative) high.inv() + if (low == 0L) 1L else 0L else high,
         if (negative) -low else low,

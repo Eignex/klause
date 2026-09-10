@@ -125,6 +125,22 @@ class RationalBasisFactorsTest {
     }
 
     @Test
+    fun `negative signed endpoint stays fixed in off diagonal entries and RHS`() {
+        val endpoint = power(127).negated()
+        val matrix = listOf(listOf(BigFraction.ONE, endpoint), listOf(BigFraction.ZERO, BigFraction.ONE))
+        val built = ready(matrix, identityOrder(2))
+        assertEquals(0, built.stats.restarts)
+        val factors = ready(matrix(listOf(1, 0), listOf(0, 1))).factors
+        for (transpose in listOf(false, true)) {
+            val rhs = listOf(endpoint, BigFraction.ZERO)
+            val result = solved(factors, rhs, transpose)
+            assertEquals(0, result.stats.restarts)
+            assertEquals(rhs, result.values)
+        }
+        checkSolves(matrix, built.factors)
+    }
+
+    @Test
     fun `input hint output and RHS mutations cannot alter retained factors`() {
         val matrix = mutableListOf(mutableListOf(BigFraction.ofLong(2), BigFraction.ONE), mutableListOf(BigFraction.ZERO, BigFraction.ofLong(3)))
         val original = matrix.map { it.toList() }
@@ -277,8 +293,9 @@ class RationalBasisFactorsTest {
 
     @Test
     fun `empty basis has empty normal and transpose solutions`() {
-        val built = ready(emptyList(), identityOrder(0))
-        for (transpose in listOf(false, true)) assertEquals(emptyList(), solved(built.factors, emptyList(), transpose).values)
+        for (transpose in listOf(false, true)) {
+            assertEquals(emptyList(), solved(emptyFactors, emptyList(), transpose).values)
+        }
     }
 
     @Test
@@ -385,4 +402,11 @@ class RationalBasisFactorsTest {
     private fun matrix(vararg rows: List<Int>): List<List<BigFraction>> = rows.map { row -> row.map { BigFraction.ofLong(it.toLong()) } }
     private fun identityOrder(n: Int) = RationalBasisOrder(IntArray(n) { it }, IntArray(n) { it })
     private fun power(bits: Int) = BigFraction.of(BigInteger.ONE shl bits, BigInteger.ONE)
+
+    companion object {
+        private val emptyFactors = assertIs<RationalBasisBuild.Ready>(
+            RationalBasisFactors.factor(emptyList(), RationalBasisOrder(intArrayOf(), intArrayOf())),
+        ).factors
+    }
+
 }
