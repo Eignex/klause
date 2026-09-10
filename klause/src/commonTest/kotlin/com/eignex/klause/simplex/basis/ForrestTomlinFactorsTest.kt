@@ -7,6 +7,7 @@ import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
@@ -152,6 +153,20 @@ class ForrestTomlinFactorsTest {
             spike.set(initial.symbolic.columnPosition[0], 1.0)
             assertTrue(ft.update(initial.symbolic.columnPosition[0], spike, 0.0))
             assertEquals(1, ft.updateCount)
+        }
+    }
+
+    @Test
+    fun `row transform rejects checked product breakdown`() {
+        for ((left, right) in listOf(1e200 to 1e200, 1e-200 to 1e-200)) {
+            val transform = ForrestTomlinRow(0, BasisSlice(intArrayOf(1), doubleArrayOf(left)))
+            val work = BasisWorkspace(2)
+            work.set(0, 1.0)
+            work.set(1, right)
+
+            assertFailsWith<BasisArithmeticException> { transform.forward(work) }
+
+            assertEquals(1L, transform.lastWork)
         }
     }
 

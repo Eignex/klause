@@ -1,6 +1,7 @@
 package com.eignex.klause.simplex.basis
 
 import com.eignex.koblas.SparseMatrix
+import com.eignex.koblas.Workspace
 
 internal class BasisExtension(
     columns: IntArray,
@@ -148,6 +149,7 @@ internal fun buildExtendedCache(
     oldSource: SparseMatrix,
     extension: BasisExtensionState,
     threshold: Double,
+    workspace: Workspace,
 ): Pair<BasisSolveCache, Long> {
     val offset = extension.newRows.size
     val oldFactors = old.factors
@@ -210,7 +212,7 @@ internal fun buildExtendedCache(
             copiedEntries,
         ),
     )
-    return BasisSolveCache.transfer(factors, ft, threshold) to units
+    return BasisSolveCache.transfer(factors, ft, threshold, workspace) to units
 }
 
 private fun mappedHeadings(old: IntArray, columnMap: IntArray, oldDimension: Int, extension: Int): IntArray =

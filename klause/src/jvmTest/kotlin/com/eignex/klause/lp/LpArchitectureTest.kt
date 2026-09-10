@@ -70,18 +70,17 @@ class LpArchitectureTest {
             """
                 package com.eignex.klause.lp.engine
                 import com.eignex.klause.simplex.basis.BasisSolver
-                import com.eignex.koblas.SparseVector
-                import com.eignex.koblas.column
                 import com.eignex.koblas.koblas
-                import com.eignex.koblas.sparse.SparseWorkspace
+                import com.eignex.koblas.sparse.SparseSlices
                 val solver: RevisedSimplex? = null
             """.trimIndent(),
             """
                 package com.eignex.klause.simplex.basis
-                import com.eignex.koblas.SparseVector
-                import com.eignex.koblas.column
+                import com.eignex.koblas.Workspace
+                import com.eignex.koblas.borrow
+                import com.eignex.koblas.borrowI32
                 import com.eignex.koblas.koblas
-                import com.eignex.koblas.sparse.SparseWorkspace
+                import com.eignex.koblas.sparse.SparseSlices
                 import com.eignex.klause.simplex.basis.BasisSolver
                 import com.eignex.klause.simplex.basis.IndexedVector
                 import com.eignex.klause.simplex.basis.BasisUpdate
@@ -262,18 +261,17 @@ internal object LpBoundaryScanner {
             val allowedTypes = when {
                 packageName == ENGINE_PACKAGE || packageName.startsWith("$ENGINE_PACKAGE.") -> listOf(
                     "com.eignex.koblas.SparseMatrix",
-                    "com.eignex.koblas.SparseVector",
-                    "com.eignex.koblas.column",
                     "com.eignex.koblas.koblas",
-                    "com.eignex.koblas.sparse.SparseWorkspace",
+                    "com.eignex.koblas.sparse.SparseSlices",
                 )
 
                 packageName == BASIS_PACKAGE || packageName.startsWith("$BASIS_PACKAGE.") -> listOf(
                     "com.eignex.koblas.SparseMatrix",
-                    "com.eignex.koblas.SparseVector",
-                    "com.eignex.koblas.column",
+                    "com.eignex.koblas.Workspace",
+                    "com.eignex.koblas.borrow",
+                    "com.eignex.koblas.borrowI32",
                     "com.eignex.koblas.koblas",
-                    "com.eignex.koblas.sparse.SparseWorkspace",
+                    "com.eignex.koblas.sparse.SparseSlices",
                 )
 
                 else -> return false
