@@ -314,6 +314,9 @@ internal object BasisTraceCodec {
                     if (operation.outcome != BasisUpdate.SINGULAR) {
                         headings = current.toMutableList().also { it[operation.leavingSlot] = operation.entering }
                     }
+                    solves.clear()
+                    latestSolveByCarrier.clear()
+                    consumedPreparation.clear()
                 }
             }
         }

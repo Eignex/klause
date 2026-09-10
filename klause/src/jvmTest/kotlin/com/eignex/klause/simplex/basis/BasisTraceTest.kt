@@ -63,6 +63,55 @@ class BasisTraceTest {
     }
 
     @Test
+    fun `codec rejects preparation from an earlier basis epoch`() {
+        val original = trace(simpleMatrix())
+        val spike = original.operations[1] as BasisTraceOperation.Solve
+        val pivot = original.operations[2] as BasisTraceOperation.Solve
+        val update = original.operations[3] as BasisTraceOperation.Update
+        val operations = listOf(
+            original.operations[0],
+            spike,
+            pivot,
+            BasisTraceOperation.Solve(
+                2,
+                false,
+                BasisVectorRole.ENTERING_SPIKE,
+                0.0.toRawBits(),
+                BasisTraceVector(doubleArrayOf(0.0, 1.0), intArrayOf(1)),
+            ),
+            BasisTraceOperation.Solve(
+                3,
+                true,
+                BasisVectorRole.PIVOT_ROW,
+                0.0.toRawBits(),
+                BasisTraceVector(doubleArrayOf(0.0, 1.0), intArrayOf(1)),
+            ),
+            BasisTraceOperation.Update(
+                1,
+                BasisHeading.Source(1),
+                3,
+                4,
+                BasisTraceVector(doubleArrayOf(0.0, 1.0), intArrayOf(1)),
+                BasisTraceVector(doubleArrayOf(0.0, 1.0), intArrayOf(1)),
+                BasisUpdate.APPLIED,
+            ),
+            BasisTraceOperation.Update(
+                update.leavingSlot,
+                update.entering,
+                1,
+                2,
+                update.spikeEvidence,
+                update.pivotEvidence,
+                update.outcome,
+            ),
+        )
+
+        assertFailsWith<BasisTraceFormatException> {
+            BasisTraceCodec.encode(original.copyWithOperations(operations))
+        }
+    }
+
+    @Test
     fun `replay stops both arms when an update diverges`() {
         val fixture = trace(simpleMatrix())
         val result = BasisTraceReplay.replay(

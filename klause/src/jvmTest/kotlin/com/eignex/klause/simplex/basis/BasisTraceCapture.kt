@@ -127,7 +127,9 @@ internal object BasisTraceCapture {
     }
 
     private fun prepareMiniZinc(source: Path, sourceText: String): PreparedCapture {
-        val flatZinc = if (source.fileName.toString().endsWith(".fzn")) sourceText else flatten(source)
+        val precompiled = source.fileName.toString().endsWith(".fzn")
+        val compiler = if (precompiled) null else miniZincVersion()
+        val flatZinc = if (precompiled) sourceText else flatten(source)
         val execution = parseFlatZincExecution(flatZinc)
         val program = execution.program
         val objective: LinearObjective? = when (val solve = program.solve) {
@@ -147,7 +149,11 @@ internal object BasisTraceCapture {
         return PreparedCapture(
             relaxation.model,
             BasisTraceRoute.PRODUCTION_RELAXATION,
-            "MiniZinc 2.9.7 to FlatZinc; klause FlatZinc parser and CP/MIP LP relaxation",
+            if (compiler == null) {
+                "precompiled FlatZinc input; klause FlatZinc parser and CP/MIP LP relaxation"
+            } else {
+                "$compiler; klause FlatZinc parser and CP/MIP LP relaxation"
+            },
             "defaultFloatBuckets;defaultFloatScale;fznSha256=${sha256(flatZinc.encodeToByteArray())}",
             origins(relaxation),
         )
@@ -253,6 +259,12 @@ internal object BasisTraceCapture {
             Files.deleteIfExists(output)
         }
     }
+
+    private fun miniZincVersion(): String = runCommand(workspaceRoot(), "minizinc", "--version")
+        .lineSequence()
+        .firstOrNull { it.isNotBlank() }
+        ?.trim()
+        ?: error("MiniZinc version output was empty")
 
     private fun captureRevision(): String = runCommand(workspaceRoot(), "git", "rev-parse", "HEAD").trim()
 
