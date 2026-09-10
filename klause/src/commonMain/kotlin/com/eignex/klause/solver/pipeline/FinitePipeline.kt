@@ -1,6 +1,7 @@
 package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.lp.engine.LpZeroObjectivePricing
 import com.eignex.klause.portfolio.EngineMix
 import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.presolve.PresolveConfig
@@ -32,6 +33,10 @@ class FinitePipelineRequest(
     val cancellation: Cancellation = Cancellation.Never,
     /** Optional budget allocated to the presolve phase. */
     val presolveBudget: PresolveBudget? = null,
+    /** Entering-column policy used by zero-objective LP solves during finite presolve. */
+    val zeroObjectivePricing: LpZeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT,
+    /** Tie-breaking seed used by LP pricing during finite presolve. */
+    val randomSeed: Long? = null,
     /**
      * Component ownership selected from the untransformed [problem] during routing.
      *
@@ -102,6 +107,8 @@ object FinitePipeline {
             config,
             request.solutionSetSensitive,
             request.cancellation,
+            request.zeroObjectivePricing,
+            request.randomSeed,
         )
         val finiteModel = if (outcome.stats.infeasible) {
             outcome.problem

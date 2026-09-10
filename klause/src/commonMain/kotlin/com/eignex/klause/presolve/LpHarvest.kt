@@ -13,6 +13,7 @@ import com.eignex.klause.lp.bounding.rootLpInfeasibleNoBake
 import com.eignex.klause.lp.bounding.rootRelaxationSize
 import com.eignex.klause.lp.bounding.shaveObjectiveLb
 import com.eignex.klause.lp.bounding.shaveVariableBounds
+import com.eignex.klause.lp.engine.LpZeroObjectivePricing
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.LpHarvestReport
@@ -75,7 +76,16 @@ fun lpRootInfeasible(
     objective: LinearObjective,
     plan: LpPlan,
     cancellation: Cancellation = Cancellation.Never,
-): Boolean = lpRootInfeasibleReporting(problem, objective, plan, cancellation).infeasible
+    zeroObjectivePricing: LpZeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT,
+    randomSeed: Long? = null,
+): Boolean = lpRootInfeasibleReporting(
+    problem,
+    objective,
+    plan,
+    cancellation,
+    zeroObjectivePricing,
+    randomSeed,
+).infeasible
 
 internal class LpRootInfeasibleResult(val infeasible: Boolean, val stats: LpStats)
 
@@ -84,12 +94,19 @@ internal fun lpRootInfeasibleReporting(
     objective: LinearObjective,
     plan: LpPlan,
     cancellation: Cancellation = Cancellation.Never,
+    zeroObjectivePricing: LpZeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT,
+    randomSeed: Long? = null,
 ): LpRootInfeasibleResult {
     val sink = SolveStatsSink(backend = "lp-root-feasibility", lpProbeRoute = LpRoute.ROOT)
     val infeasible = LpEngine(
         problem,
         objective,
-        LpParams(lpPlan = plan, cancellation = cancellation),
+        LpParams(
+            lpPlan = plan,
+            cancellation = cancellation,
+            zeroObjectivePricing = zeroObjectivePricing,
+            randomSeed = randomSeed,
+        ),
         sink,
     ).rootLpInfeasibleNoBake(cancellation)
     return LpRootInfeasibleResult(infeasible, sink.snapshot().lp)
@@ -105,7 +122,16 @@ fun lpRootBounds(
     objective: LinearObjective,
     plan: LpPlan,
     cancellation: Cancellation = Cancellation.Never,
-): Problem = lpRootBoundsReporting(problem, objective, plan, cancellation).problem
+    zeroObjectivePricing: LpZeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT,
+    randomSeed: Long? = null,
+): Problem = lpRootBoundsReporting(
+    problem,
+    objective,
+    plan,
+    cancellation,
+    zeroObjectivePricing,
+    randomSeed,
+).problem
 
 internal class LpRootBoundsResult(val problem: Problem, val stats: LpStats)
 
@@ -114,12 +140,19 @@ internal fun lpRootBoundsReporting(
     objective: LinearObjective,
     plan: LpPlan,
     cancellation: Cancellation = Cancellation.Never,
+    zeroObjectivePricing: LpZeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT,
+    randomSeed: Long? = null,
 ): LpRootBoundsResult {
     val sink = SolveStatsSink(backend = "lp-obbt", lpProbeRoute = LpRoute.ROOT)
     val engine = LpEngine(
         problem,
         objective,
-        LpParams(lpPlan = plan, cancellation = cancellation),
+        LpParams(
+            lpPlan = plan,
+            cancellation = cancellation,
+            zeroObjectivePricing = zeroObjectivePricing,
+            randomSeed = randomSeed,
+        ),
         sink,
     )
     val shaved = engine.rootLpBoundsNoBake(cancellation)
@@ -149,6 +182,8 @@ fun lpHarvestReporting(
     plan: LpPlan,
     bakeConfig: BakeConfig = BakeConfig.NONE,
     cancellation: Cancellation = Cancellation.Never,
+    zeroObjectivePricing: LpZeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT,
+    randomSeed: Long? = null,
 ): LpHarvestResult {
     // The token must reach the simplex itself, not just the probe loops below: one primal phase-1 on a
     // large relaxation runs far past the presolve budget, and the engine polls only the `cancellation`
@@ -157,7 +192,12 @@ fun lpHarvestReporting(
     val engine = LpEngine(
         problem,
         objective,
-        LpParams(lpPlan = plan, cancellation = cancellation),
+        LpParams(
+            lpPlan = plan,
+            cancellation = cancellation,
+            zeroObjectivePricing = zeroObjectivePricing,
+            randomSeed = randomSeed,
+        ),
         sink,
     )
     if (engine.lpRelaxer == null) return LpHarvestResult(problem, LpHarvestReport(), sink.snapshot().lp)

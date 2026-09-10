@@ -55,10 +55,10 @@ private class TerminalRecordingFactory : LpEngineFactory {
         private set
     val cancellations = ArrayList<Cancellation>()
 
-    override fun newGeneralSolver(model: LpModel, cancellation: Cancellation): LpSolver {
+    override fun newGeneralSolver(model: LpModel, cancellation: Cancellation, pricing: LpPricingOptions): LpSolver {
         generalSolvers++
         cancellations += cancellation
-        val delegate = ProductionLpEngineFactory.newGeneralSolver(model, cancellation)
+        val delegate = ProductionLpEngineFactory.newGeneralSolver(model, cancellation, pricing)
         return object : LpSolver by delegate {
             override fun solve(warm: Basis?): FloatLpResult? {
                 generalSolves++

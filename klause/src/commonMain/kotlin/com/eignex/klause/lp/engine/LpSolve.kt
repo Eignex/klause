@@ -66,6 +66,7 @@ internal fun solveAndCertify(
     cancellation: Cancellation = Cancellation.Never,
     context: LpSolveContext = LpSolveContext.Production,
     counterResults: LpCounterResults? = null,
+    pricing: LpPricingOptions = LpPricingOptions(),
 ): CertifiedLpResult {
     val state = LpExactState(model)
     val working = state.toWorkingModel()
@@ -80,7 +81,14 @@ internal fun solveAndCertify(
             captureEligible = false,
         )
     }
-    return solveAndCertify(working, basis, cancellation, context = context, counterResults = counterResults)
+    return solveAndCertify(
+        working,
+        basis,
+        cancellation,
+        context = context,
+        counterResults = counterResults,
+        pricing = pricing,
+    )
 }
 
 // Float termination hints never determine the proof strength.
@@ -92,7 +100,14 @@ internal fun solveAndCertify(
     observer: LpCertificationObserver? = null,
     context: LpSolveContext = LpSolveContext.Production,
     counterResults: LpCounterResults? = null,
-): CertifiedLpResult = newLpSolver(model, cancellation, componentSplit, context.engineFactory).use { solver ->
+    pricing: LpPricingOptions = LpPricingOptions(),
+): CertifiedLpResult = newLpSolver(
+    model,
+    cancellation,
+    componentSplit,
+    context.engineFactory,
+    pricing,
+).use { solver ->
     val result = try {
         solver.solve(warm)
     } finally {

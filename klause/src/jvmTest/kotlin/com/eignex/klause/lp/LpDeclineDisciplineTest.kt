@@ -99,10 +99,10 @@ private class ConsumerRecordingFactory : LpEngineFactory {
     val calls = ArrayList<DeclineCall>()
     val cancellations = ArrayList<Cancellation>()
 
-    override fun newGeneralSolver(model: LpModel, cancellation: Cancellation): LpSolver {
+    override fun newGeneralSolver(model: LpModel, cancellation: Cancellation, pricing: LpPricingOptions): LpSolver {
         calls += DeclineCall.GENERAL
         cancellations += cancellation
-        return RecordingSolver(ProductionLpEngineFactory.newGeneralSolver(model, cancellation), calls)
+        return RecordingSolver(ProductionLpEngineFactory.newGeneralSolver(model, cancellation, pricing), calls)
     }
 
     override fun newComponentSolver(

@@ -6,6 +6,7 @@ import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.lp.bounding.LpConfig
+import com.eignex.klause.lp.engine.LpZeroObjectivePricing
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective
@@ -19,7 +20,10 @@ import com.eignex.klause.solver.result.SearchEvent
  * owns only the run-time wiring (shared pools, bound pruning, event sink) and the portfolio-side
  * `--lp` ceiling capping.
  */
-internal class BacktrackWorkerConfig(val recipe: BacktrackRecipe) : WorkerConfig {
+internal class BacktrackWorkerConfig(
+    val recipe: BacktrackRecipe,
+    internal val zeroObjectivePricing: LpZeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT,
+) : WorkerConfig {
 
     override val label: String get() = recipe.label
 
@@ -44,6 +48,7 @@ internal class BacktrackWorkerConfig(val recipe: BacktrackRecipe) : WorkerConfig
         val workerLabel = "backtrack#$index"
         val workerEvent = onEvent?.let { sink -> { e: SearchEvent -> sink(workerLabel, e) } }
         var params = recipe.build(seed + 1000L + index, workerEvent)
+        params = params.copy(zeroObjectivePricing = zeroObjectivePricing)
         pools?.clauses?.let { params = params.copy(clauseExchange = PoolClauseExchange(it)) }
         pools?.cuts?.let { params = params.copy(cutExchange = PoolCutExchange(it)) }
         // Wire this arm to the shared objective lower-bound manager when optimising: publish
@@ -107,10 +112,16 @@ internal class BacktrackWorkerConfig(val recipe: BacktrackRecipe) : WorkerConfig
             count: Int,
             lpCeiling: LpConfig = LpConfig.AGGRESSIVE,
             nodeBudget: NodeBudget? = null,
+            zeroObjectivePricing: LpZeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT,
         ): List<BacktrackWorkerConfig> {
             require(count >= 1) { "count must be ≥ 1" }
             val order = BacktrackCatalog.ranked(kind)
-            return List(count) { BacktrackWorkerConfig(order[it % order.size].capLp(lpCeiling).spending(nodeBudget)) }
+            return List(count) {
+                BacktrackWorkerConfig(
+                    order[it % order.size].capLp(lpCeiling).spending(nodeBudget),
+                    zeroObjectivePricing,
+                )
+            }
         }
     }
 }

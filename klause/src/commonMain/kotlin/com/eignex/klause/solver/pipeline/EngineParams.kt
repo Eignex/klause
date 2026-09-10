@@ -577,6 +577,7 @@ fun buildPortfolioScenario(
     defaultEngine: EngineMix,
     defaultArms: Int,
     lpCeiling: LpConfig = LpConfig.AGGRESSIVE,
+    zeroObjectivePricing: LpZeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT,
     lsPool: List<() -> LocalSearchRecipe>? = null,
     btPool: List<() -> BacktrackRecipe>? = null,
     annotationArm: BacktrackParams? = null,
@@ -616,6 +617,7 @@ fun buildPortfolioScenario(
         seed = seed,
         lsLambda = lambda,
         lpCeiling = lpCeiling,
+        zeroObjectivePricing = zeroObjectivePricing,
         lsPool = lsPool,
         btPool = btPool,
         annotationArm = annotationArm,
@@ -677,15 +679,6 @@ fun withNodeBudget(pool: List<() -> BacktrackRecipe>?, kind: Kind, budget: NodeB
     (pool ?: BacktrackCatalog.factories(kind)).map { factory ->
         { editRecipe(factory(), { params -> params.copy(nodeBudget = budget) }) }
     }
-
-/** [pool], or the curated pool when it is null, with one zero-objective LP pricing policy. */
-internal fun withLpPricing(
-    pool: List<() -> BacktrackRecipe>?,
-    kind: Kind,
-    pricing: LpZeroObjectivePricing,
-): List<() -> BacktrackRecipe> = (pool ?: BacktrackCatalog.factories(kind)).map { factory ->
-    { editRecipe(factory(), { params -> params.copy(zeroObjectivePricing = pricing) }) }
-}
 
 /** Wrap [recipe] so [edit] is applied to the [BacktrackParams] it builds — per worker, so selector
  *  state stays unshared. Preserves the arm's label for telemetry / the `dry-run-solver` listing. */

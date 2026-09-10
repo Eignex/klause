@@ -306,6 +306,8 @@ internal fun FinitePipeline.solve(
             solutionSetSensitive = request.solutionSetSensitive,
             cancellation = request.presolveCancellation,
             presolveBudget = request.presolveBudget,
+            zeroObjectivePricing = request.zeroObjectivePricing,
+            randomSeed = request.randomSeed,
         ),
     )
     val preparationElapsed = preparationStart.elapsedNow()
@@ -583,7 +585,10 @@ private fun executePortfolio(
     )
     when (plan) {
         is PortfolioPlan.LocalSearchDryRun -> return localSearchDryRun(plan.pool)
-        is PortfolioPlan.BacktrackDryRun -> return backtrackDryRun(request.problem, plan.pool, plan.kind)
+
+        is PortfolioPlan.BacktrackDryRun ->
+            return backtrackDryRun(request.problem, plan.pool, plan.kind, plan.zeroObjectivePricing)
+
         is PortfolioPlan.Execute -> Unit
     }
     val scenario = plan.scenario
@@ -683,6 +688,7 @@ private fun backtrackDryRun(
     problem: BakedProblem,
     pool: List<() -> BacktrackRecipe>?,
     kind: Kind,
+    zeroObjectivePricing: LpZeroObjectivePricing,
 ): FiniteExecutionResult.DryRun {
     val recipes = pool?.map { it() } ?: BacktrackCatalog.ranked(kind)
     val solver = BacktrackSolver(problem)
@@ -691,7 +697,9 @@ private fun backtrackDryRun(
         lines = buildList {
             for (recipe in recipes) {
                 add("  ${recipe.label}:")
-                solver.describe(recipe.build(0L, null)).lines().forEach { add("    $it") }
+                solver.describe(
+                    recipe.build(0L, null).copy(zeroObjectivePricing = zeroObjectivePricing),
+                ).lines().forEach { add("    $it") }
             }
         },
     )

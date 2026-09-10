@@ -19,7 +19,7 @@ internal data class LpPricingOptions(
 
 /** Immutable construction seam shared by standalone solves and one [com.eignex.klause.lp.bounding.LpEngine]. */
 internal interface LpEngineFactory {
-    fun newGeneralSolver(model: LpModel, cancellation: Cancellation): LpSolver
+    fun newGeneralSolver(model: LpModel, cancellation: Cancellation, pricing: LpPricingOptions): LpSolver
 
     fun newComponentSolver(
         model: LpModel,
@@ -49,8 +49,8 @@ internal interface LpEngineFactory {
 }
 
 internal object ProductionLpEngineFactory : LpEngineFactory {
-    override fun newGeneralSolver(model: LpModel, cancellation: Cancellation): LpSolver =
-        RevisedSimplex(model, cancellation)
+    override fun newGeneralSolver(model: LpModel, cancellation: Cancellation, pricing: LpPricingOptions): LpSolver =
+        RevisedSimplex(model, cancellation, pricing = pricing)
 
     override fun newComponentSolver(
         model: LpModel,

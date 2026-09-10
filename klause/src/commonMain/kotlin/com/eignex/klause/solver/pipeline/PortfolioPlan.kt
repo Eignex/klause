@@ -57,6 +57,8 @@ sealed class PortfolioPlan {
         val pool: List<() -> BacktrackRecipe>?,
         /** Problem kind used to resolve the backtrack recipes. */
         val kind: Kind,
+        /** Zero-objective LP pricing rendered for every resolved arm. */
+        val zeroObjectivePricing: LpZeroObjectivePricing,
     ) : PortfolioPlan()
 }
 
@@ -130,18 +132,13 @@ fun FinitePipeline.planPortfolio(request: PortfolioPlanRequest): PortfolioPlan {
 
     val kind = if (request.optimize) Kind.COP else Kind.CSP
     val resolvedBtPool = if (mix != EngineMix.LOCAL_SEARCH) resolveBtRecipes(params, kind) else null
-    val budgetedBtPool = if (request.nodeBudget != null && mix != EngineMix.LOCAL_SEARCH) {
+    val btPool = if (request.nodeBudget != null && mix != EngineMix.LOCAL_SEARCH) {
         withNodeBudget(resolvedBtPool, kind, request.nodeBudget)
     } else {
         resolvedBtPool
     }
-    val btPool = if (mix != EngineMix.LOCAL_SEARCH) {
-        withLpPricing(budgetedBtPool, kind, request.zeroObjectivePricing)
-    } else {
-        null
-    }
     if (mix == EngineMix.BACKTRACK && params.bool("dry-run-solver") == true) {
-        return PortfolioPlan.BacktrackDryRun(btPool, kind)
+        return PortfolioPlan.BacktrackDryRun(btPool, kind, request.zeroObjectivePricing)
     }
 
     return PortfolioPlan.Execute(
@@ -153,6 +150,7 @@ fun FinitePipeline.planPortfolio(request: PortfolioPlanRequest): PortfolioPlan {
             defaultEngine = mix,
             defaultArms = lsResolution.forceArms ?: request.defaultArms,
             lpCeiling = request.lpCeiling,
+            zeroObjectivePricing = request.zeroObjectivePricing,
             lsPool = lsResolution.pool,
             btPool = btPool,
             annotationArm = request.annotationArm?.copy(

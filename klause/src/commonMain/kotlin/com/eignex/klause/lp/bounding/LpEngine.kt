@@ -514,6 +514,7 @@ internal class LpEngine(
                         params.cancellation,
                         refactorUpdateLimit = GATED_UPDATE_LIMIT,
                         factory = solveContext.engineFactory,
+                        pricing = pricingOptions,
                     )
                 } catch (failure: Throwable) {
                     gatedResolved = false
@@ -571,6 +572,7 @@ internal class LpEngine(
             observer = sink.lp.certificationObserver(LpRoute.STANDALONE),
             context = solveContext,
             counterResults = lpCounterResults,
+            pricing = pricingOptions,
         )
         certified.float?.let { sink.lp.observeComponentSplit(it.blocks) }
         return when (certified.verdict) {

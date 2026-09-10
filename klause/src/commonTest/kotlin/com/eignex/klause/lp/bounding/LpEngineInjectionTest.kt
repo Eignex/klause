@@ -1,6 +1,7 @@
 package com.eignex.klause.lp.bounding
 
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
@@ -114,7 +115,11 @@ class LpEngineInjectionTest {
         val rejecting = LpEngine(
             problem,
             objective,
-            LpParams(lpPlan = LpPlan(bounding = true)),
+            LpParams(
+                lpPlan = LpPlan(bounding = true),
+                randomSeed = 41L,
+                zeroObjectivePricing = LpZeroObjectivePricing.LARGEST_PIVOT,
+            ),
             SolveStatsSink(backend = "rejecting"),
             LpSolveContext(factory, decline),
         )
@@ -128,6 +133,77 @@ class LpEngineInjectionTest {
         assertFalse(rejecting.rootLpInfeasibleNoBake(Cancellation.Never))
         assertTrue(production.rootLpInfeasibleNoBake(Cancellation.Never))
         assertEquals(1, factory.calls.count { it.kind == EngineConstruction.TABLEAU })
+        val construction = factory.calls.single { it.kind == EngineConstruction.TABLEAU }
+        assertEquals(LpZeroObjectivePricing.LARGEST_PIVOT, construction.zeroObjectivePricing)
+        assertEquals(41L, construction.tieSeed)
+    }
+
+    @Test
+    fun `gated residual uses the injected pricing policy`() {
+        val problem = Problem(
+            numBoolVars = 1,
+            numIntVars = 0,
+            intDomains = emptyArray(),
+            factors = arrayOf<Factor>(
+                ReifiedRealLinear(
+                    aux = 0,
+                    vars = IntArray(0),
+                    intCoeffs = DoubleArray(0),
+                    realVars = intArrayOf(0),
+                    realCoeffs = doubleArrayOf(1.0),
+                    op = LinearOp.GE,
+                    bound = 2.0,
+                ),
+            ),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(1.0),
+        )
+        val factory = RecordingLpEngineFactory()
+        val engine = LpEngine(
+            problem,
+            LinearObjective(intCoefficients = LongArray(0)),
+            LpParams(
+                lpPlan = LpPlan(bounding = true, realResidual = true),
+                randomSeed = 43L,
+                zeroObjectivePricing = LpZeroObjectivePricing.LARGEST_PIVOT,
+            ),
+            SolveStatsSink(backend = "gated"),
+            LpSolveContext(factory, decline),
+        )
+
+        engine.use {
+            assertTrue(it.gatedResidual(PropagationSession(problem)) != null)
+        }
+
+        val construction = factory.calls.single { it.kind == EngineConstruction.PERSISTENT }
+        assertEquals(LpZeroObjectivePricing.LARGEST_PIVOT, construction.zeroObjectivePricing)
+        assertEquals(43L, construction.tieSeed)
+    }
+
+    @Test
+    fun `leaf certification uses the injected pricing policy`() {
+        val problem = boundedProblem()
+        val factory = RecordingLpEngineFactory()
+        val engine = LpEngine(
+            problem,
+            LinearObjective(intCoefficients = LongArray(problem.numIntVars)),
+            LpParams(
+                lpPlan = LpPlan(bounding = true, realResidual = true),
+                randomSeed = 47L,
+                zeroObjectivePricing = LpZeroObjectivePricing.LARGEST_PIVOT,
+            ),
+            SolveStatsSink(backend = "leaf"),
+            LpSolveContext(factory, decline),
+        )
+
+        engine.use {
+            it.leafCertify(PropagationSession(problem))
+        }
+
+        val construction = factory.calls.single { it.kind == EngineConstruction.GENERAL }
+        assertEquals(LpZeroObjectivePricing.LARGEST_PIVOT, construction.zeroObjectivePricing)
+        assertEquals(47L, construction.tieSeed)
     }
 
     @Test
