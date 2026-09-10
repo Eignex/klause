@@ -344,7 +344,7 @@ internal class KotlinBasisSolver(
         )
         var transferred = false
         try {
-            val (extended, units) = buildExtendedCache(current, source, target.source, state, densityThreshold)
+            val (extended, units) = buildExtendedCache(current, source, state, densityThreshold)
             target.installExtension(extended, state.basisColumns, state.basisUnitRows, units)
             transferred = true
             return BasisExtensionResult(target, state.basisColumns, state.basisUnitRows)
@@ -475,6 +475,9 @@ internal class BasisSolveCache private constructor(
     fun snapshot() = BasisCacheState(factors.copyOwned(), ft.snapshot())
 
     companion object {
+        fun transfer(factors: LuFactors, state: ForrestTomlinState, threshold: Double): BasisSolveCache =
+            BasisSolveCache(factors, ForrestTomlinFactors.transfer(factors, state), threshold)
+
         fun restore(state: BasisCacheState, threshold: Double): BasisSolveCache {
             val factors = state.factors.copyOwned()
             return BasisSolveCache(factors, ForrestTomlinFactors.restore(factors, state.ft), threshold)

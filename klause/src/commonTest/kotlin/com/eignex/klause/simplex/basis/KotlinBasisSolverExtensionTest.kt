@@ -112,6 +112,38 @@ class KotlinBasisSolverExtensionTest {
     }
 
     @Test
+    fun `mapped nonbasic structure compares raw IEEE bits`() {
+        val firstNaN = Double.fromBits(0x7ff8000000000001L)
+        val secondNaN = Double.fromBits(0x7ff8000000000002L)
+        val oldSource = SparseMatrix.wrap(
+            1,
+            4,
+            intArrayOf(0, 1, 2, 3, 3),
+            intArrayOf(0, 0, 0),
+            doubleArrayOf(1.0, firstNaN, -0.0),
+        )
+        val old = KotlinBasisSolver(oldSource)
+        assertTrue(old.refactorize(intArrayOf(0)))
+        val request = BasisExtension(
+            intArrayOf(0),
+            intArrayOf(-1),
+            intArrayOf(0),
+            intArrayOf(0, 1, 2, 3),
+        )
+
+        val identical = assertNotNull(old.extend(oldSource, request))
+        identical.solver.close()
+        val differentNaN = mappedBitsSource(secondNaN, -0.0, storedTail = false)
+        val differentZero = mappedBitsSource(firstNaN, 0.0, storedTail = false)
+        val differentStructure = mappedBitsSource(firstNaN, -0.0, storedTail = true)
+
+        assertNull(old.extend(differentNaN, request))
+        assertNull(old.extend(differentZero, request))
+        assertNull(old.extend(differentStructure, request))
+        assertBasisSolves(old, oldSource, intArrayOf(0), intArrayOf(-1))
+    }
+
+    @Test
     fun `extension preserves sparse dense and near singular solves`() {
         for (shape in listOf("sparse", "dense", "near")) {
             val oldSource = ftSource(shape, 5)
@@ -170,6 +202,7 @@ class KotlinBasisSolverExtensionTest {
         )
         assertEquals(0, same.solver.n)
         assertEquals(BasisBuildKind.EXTENSION, same.solver.basisWork?.build?.kind)
+        assertEquals(0, same.solver.basisWork?.build?.units)
 
         val positive = SparseMatrix.ofColumns(
             2,
@@ -191,6 +224,14 @@ class KotlinBasisSolverExtensionTest {
         basis[slot] = entering
     }
 }
+
+private fun mappedBitsSource(nan: Double, zero: Double, storedTail: Boolean): SparseMatrix = SparseMatrix.wrap(
+    1,
+    4,
+    if (storedTail) intArrayOf(0, 1, 2, 3, 4) else intArrayOf(0, 1, 2, 3, 3),
+    if (storedTail) intArrayOf(0, 0, 0, 0) else intArrayOf(0, 0, 0),
+    if (storedTail) doubleArrayOf(1.0, nan, zero, 0.0) else doubleArrayOf(1.0, nan, zero),
+)
 
 private fun embeddedSource(
     old: SparseMatrix,
