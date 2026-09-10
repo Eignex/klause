@@ -229,11 +229,12 @@ private fun reconstructedLpBound(model: LpModel, duals: DoubleArray, cancellatio
     return exactLagrangian(model, multipliers, cancellation)
 }
 
-private fun exactLagrangian(
+internal fun exactLagrangian(
     model: LpModel,
     multipliers: List<BigFraction>,
     cancellation: Cancellation = Cancellation.Never,
 ): BigFraction? {
+    if (multipliers.size != model.m || !model.finiteExactInput()) return null
     val y = List(model.m) { row ->
         val candidate = multipliers[row]
         val slackCost = model.exactCost(model.slackCol(row))
@@ -283,8 +284,8 @@ internal fun certifyLpFarkas(
     return ray
 }
 
-private fun sourceFarkasValid(model: LpModel, ray: LongArray): Boolean {
-    if (!model.hasContinuous && model.probeClampedLo.none { it }) return true
+internal fun sourceFarkasValid(model: LpModel, ray: LongArray): Boolean {
+    if (ray.size != model.m || !model.finiteExactInput()) return false
     var surplus = BigFraction.ZERO
     for (i in 0 until model.m) surplus += BigFraction.ofLong(ray[i]) * model.exactRhs(i)
     for (j in 0 until model.numVars) {
@@ -300,7 +301,7 @@ private fun sourceFarkasValid(model: LpModel, ray: LongArray): Boolean {
 }
 
 internal fun checkedLpConflict(model: LpModel, conflict: BigRationalConflict): Boolean {
-    if (conflict.rows.size != conflict.multipliers.size) return false
+    if (!model.finiteExactInput() || conflict.rows.size != conflict.multipliers.size) return false
     val multipliers = MutableList(model.m) { BigFraction.ZERO }
     var rhs = BigFraction.ZERO
     var strict = BigFraction.ZERO
@@ -392,11 +393,35 @@ private fun LpModel.exactRhs(i: Int): BigFraction = doubleView?.let { exactDoubl
 internal fun LpModel.exactConstant(): BigFraction = doubleView?.let { exactDouble(it.objConstant) }
     ?: BigFraction.ofLong(objConstant)
 
-private fun LpModel.finiteExactInput(): Boolean {
-    val dv = doubleView ?: return true
-    return dv.colVal.all { it.isFinite() } && dv.rhs.all { it.isFinite() } && dv.cost.all { it.isFinite() } &&
+internal fun LpModel.finiteExactInput(): Boolean {
+    if (n < 0 || m < 0 || n > Int.MAX_VALUE - m) return false
+    if (colContinuous.size != n || probeClampedLo.size != n || probeClampedHi.size != n ||
+        rowStrict.size != m || rowGlobal.size != m || rowPremises.size != m
+    ) {
+        return false
+    }
+    val dv = doubleView
+    val pointers = dv?.colPtr ?: csc.colPtr
+    val rows = dv?.rowIdx ?: csc.rowIdx
+    val count = dv?.colVal?.size ?: csc.colVal.size
+    if (pointers.size != n + 1 || pointers[0] != 0 || pointers[n] != count || rows.size != count) return false
+    for (j in 0 until n) {
+        if (pointers[j] > pointers[j + 1] || pointers[j] < 0 || pointers[j + 1] > count) return false
+        var previous = -1
+        for (entry in pointers[j] until pointers[j + 1]) {
+            if (rows[entry] !in 0 until m || rows[entry] <= previous) return false
+            previous = rows[entry]
+        }
+    }
+    if (dv == null) {
+        return rhs.size == m && cost.size == numVars && upper.size == numVars &&
+            hasUpper.size == numVars && loShift.size == n && upper.indices.all { !hasUpper[it] || upper[it] >= 0L }
+    }
+    return dv.rhs.size == m && dv.cost.size == numVars && dv.upper.size == numVars &&
+        dv.hasUpper.size == numVars && dv.loShift.size == n &&
+        dv.colVal.all { it.isFinite() } && dv.rhs.all { it.isFinite() } && dv.cost.all { it.isFinite() } &&
         dv.loShift.all { it.isFinite() } && dv.objConstant.isFinite() &&
-        dv.upper.indices.all { !dv.hasUpper[it] || dv.upper[it].isFinite() }
+        dv.upper.indices.all { !dv.hasUpper[it] || (dv.upper[it].isFinite() && dv.upper[it] >= 0.0) }
 }
 
 private fun exactDouble(value: Double): BigFraction = checkNotNull(BigFraction.ofDouble(value))
@@ -414,17 +439,20 @@ private inline fun LpModel.forEachRationalColumn(j: Int, action: (Int, BigFracti
     }
 }
 
-private fun LpModel.hasIntegralObjective(): Boolean {
-    if (exactConstant().den != BigInteger.ONE) return false
+internal fun LpModel.hasIntegralObjective(): Boolean {
+    if (!finiteExactInput()) return false
+    if (doubleView == null) return cost.indices.all { cost[it] == 0L || (it < n && !colContinuous[it]) }
+    var sourceConstant = exactConstant()
     for (j in 0 until numVars) {
         val c = exactCost(j)
         if (c.isZero) continue
         if (j >= n || colContinuous[j] || c.den != BigInteger.ONE) return false
+        sourceConstant -= c * exactShift(j)
     }
-    return true
+    return sourceConstant.den == BigInteger.ONE
 }
 
-private fun BigFraction.ceilLong(): Long? {
+internal fun BigFraction.ceilLong(): Long? {
     var ceiling = num / den
     if (num.signum() > 0 && !(num % den).isZero()) ceiling += BigInteger.ONE
     if (ceiling < BigInteger.fromLong(Long.MIN_VALUE) || ceiling > BigInteger.fromLong(Long.MAX_VALUE)) return null

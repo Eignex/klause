@@ -41,7 +41,7 @@ internal fun certifiedTightObjectiveLowerBound(
     policy: LpCertificationPolicy,
 ): Double? {
     val safe = policy.acceptNullable(LpCertifier.SAFE_OBJECTIVE, safeObjectiveLowerBound(model, y, observer))
-    return tighterAcceptedLowerBound(safe, certificate?.objectiveBoundCeil(0L))
+    return tighterAcceptedLowerBound(safe, certificate?.takeIf { model.hasIntegralObjective() }?.objectiveBoundCeil(0L))
 }
 
 internal fun LpModel.certifiedTightVariableBound(

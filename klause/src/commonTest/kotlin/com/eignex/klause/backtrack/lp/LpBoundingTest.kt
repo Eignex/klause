@@ -8,13 +8,24 @@ import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.lp.bounding.LpEngine
+import com.eignex.klause.lp.bounding.LpParams
 import com.eignex.klause.lp.bounding.LpPlan
+import com.eignex.klause.lp.bounding.rootLpRelaxationBound
 import com.eignex.klause.lp.bounding.roundUpToResidue
+import com.eignex.klause.lp.bounding.sparseCertifiedPrune
+import com.eignex.klause.lp.bounding.sparseSafePrune
+import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
+import com.eignex.klause.solver.result.SolveStatsSink
+import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 /** #20: LP-relaxation bounding wired into BacktrackSolver branch-and-bound. */
@@ -146,5 +157,141 @@ class LpBoundingTest {
         assertEquals(5L, roundUpToResidue(3L, 3L, 2L)) // next value congruent to 2 mod 3
         assertEquals(3L, roundUpToResidue(3L, 3L, 0L)) // 3 is 0 mod 3, unchanged
         assertEquals(-2L, roundUpToResidue(-3L, 2L, 0L)) // negative lower bound -> next even
+    }
+
+    @Test
+    fun `wide source constants cannot prune an improving node or recovery`() {
+        for (constant in listOf(9007199254740995L, -9007199254740993L)) {
+            val problem = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
+            val objective = LinearObjective(intCoefficients = longArrayOf(1L), constant = constant)
+            val sink = SolveStatsSink(backend = "source-bound")
+            val session = PropagationSession(problem)
+            val cutoff = (constant + 1L).toDouble()
+            LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true)), sink).use { engine ->
+                val relaxer = assertNotNull(engine.lpRelaxer)
+
+                assertFalse(engine.sparseSafePrune(relaxer, session, cutoff, sink, Cancellation.Never, -1, true).prune)
+                assertFalse(engine.sparseCertifiedPrune(relaxer, session, cutoff, sink, Cancellation.Never).prune)
+                val root = engine.rootLpRelaxationBound(relaxer, emptyList())
+
+                assertTrue(assertNotNull(BigFraction.ofDouble(root)) <= BigFraction.ofLong(constant))
+                assertTrue(root < cutoff)
+            }
+        }
+    }
+
+    @Test
+    fun `source bounds retain exact cancellation of wide opposite terms`() {
+        val lower = 9007199254740993L
+        val constant = 9007199254740995L
+        val problem = Problem(0, 1, arrayOf(IntDomain(lower, lower + 1L)), emptyArray())
+        val objective = LinearObjective(intCoefficients = longArrayOf(-1L), constant = constant)
+        val sink = SolveStatsSink(backend = "source-cancellation")
+        val session = PropagationSession(problem)
+        LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true)), sink).use { engine ->
+            val relaxer = assertNotNull(engine.lpRelaxer)
+
+            val root = engine.rootLpRelaxationBound(relaxer, emptyList())
+
+            assertEquals(BigFraction.ONE, BigFraction.ofLong(constant) - BigFraction.ofLong(lower + 1L))
+            assertEquals(1.0, root)
+            assertFalse(engine.sparseSafePrune(relaxer, session, 2.0, sink, Cancellation.Never, -1, true).prune)
+            assertFalse(engine.sparseCertifiedPrune(relaxer, session, 2.0, sink, Cancellation.Never).prune)
+        }
+    }
+
+    @Test
+    fun `source bound composition remains below both Long endpoint objectives`() {
+        for (constant in listOf(Long.MIN_VALUE, Long.MAX_VALUE)) {
+            val coefficient = if (constant < 0L) 1L else -1L
+            val problem = Problem(0, 1, arrayOf(IntDomain(Long.MAX_VALUE - 1L, Long.MAX_VALUE)), emptyArray())
+            val objective = LinearObjective(intCoefficients = longArrayOf(coefficient), constant = constant)
+            val sink = SolveStatsSink(backend = "source-endpoint")
+            LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true)), sink).use { engine ->
+                val relaxer = assertNotNull(engine.lpRelaxer)
+
+                val root = assertNotNull(BigFraction.ofDouble(engine.rootLpRelaxationBound(relaxer, emptyList())))
+
+                for (point in listOf(Long.MAX_VALUE - 1L, Long.MAX_VALUE)) {
+                    val exact = BigFraction.ofLong(constant) +
+                        BigFraction.ofLong(coefficient) * BigFraction.ofLong(point)
+                    assertTrue(root <= exact)
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `an overflowing source objective declines incumbent deductions`() {
+        for (constant in listOf(Long.MIN_VALUE, Long.MAX_VALUE)) {
+            val coefficient = if (constant < 0L) -1L else 1L
+            val problem = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
+            val objective = LinearObjective(intCoefficients = longArrayOf(coefficient), constant = constant)
+            val sink = SolveStatsSink(backend = "source-overflow")
+            val session = PropagationSession(problem)
+            LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true)), sink).use { engine ->
+                val relaxer = assertNotNull(engine.lpRelaxer)
+
+                assertFalse(engine.sparseSafePrune(relaxer, session, 0.0, sink, Cancellation.Never, 0, true).prune)
+                assertFalse(engine.sparseCertifiedPrune(relaxer, session, 0.0, sink, Cancellation.Never).prune)
+                assertTrue(engine.rootLpRelaxationBound(relaxer, emptyList()).isNaN())
+                assertEquals(0L, session.intDomain(0).min)
+                assertEquals(1L, session.intDomain(0).max)
+            }
+        }
+    }
+
+    @Test
+    fun `ordinary source cutoff still prunes node and recovery`() {
+        val problem = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
+        val objective = LinearObjective(intCoefficients = longArrayOf(1L), constant = 7L)
+        val sink = SolveStatsSink(backend = "source-ordinary")
+        val session = PropagationSession(problem)
+        LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true)), sink).use { engine ->
+            val relaxer = assertNotNull(engine.lpRelaxer)
+
+            assertTrue(engine.sparseSafePrune(relaxer, session, 7.0, sink, Cancellation.Never, -1, true).prune)
+            assertTrue(engine.sparseCertifiedPrune(relaxer, session, 7.0, sink, Cancellation.Never).prune)
+            assertEquals(7.0, engine.rootLpRelaxationBound(relaxer, emptyList()))
+        }
+    }
+
+    @Test
+    fun `affine objective propagation uses source variable units with either reason policy`() {
+        for (learn in listOf(false, true)) {
+            val problem = Problem(
+                0,
+                4,
+                arrayOf(IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 3)),
+                arrayOf<Factor>(
+                    Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),
+                    Linear(intArrayOf(1, 1), intArrayOf(1, 2), LinearOp.GE, 1),
+                    Linear(intArrayOf(1, 1), intArrayOf(0, 2), LinearOp.GE, 1),
+                    Linear(intArrayOf(1, 1, 1, -1), intArrayOf(0, 1, 2, 3), LinearOp.EQ, 0),
+                ),
+            )
+            val objective = LinearObjective(intCoefficients = longArrayOf(0, 0, 0, 2), constant = 5L)
+            val sink = SolveStatsSink(backend = "source-propagation")
+            val session = PropagationSession(problem)
+            LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true)), sink).use { engine ->
+                val relaxer = assertNotNull(engine.lpRelaxer)
+                assertEquals(0L, session.intDomain(3).min)
+
+                val result = engine.sparseSafePrune(
+                    relaxer,
+                    session,
+                    Double.POSITIVE_INFINITY,
+                    sink,
+                    Cancellation.Never,
+                    3,
+                    true,
+                    learn = learn,
+                )
+
+                assertFalse(result.prune)
+                assertEquals(2L, session.intDomain(3).min)
+                assertEquals(3L, session.intDomain(3).max)
+            }
+        }
     }
 }

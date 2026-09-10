@@ -556,4 +556,32 @@ class LpSolveTest {
         assertTrue(conflict.bounds.any { it.column == 1 && !it.upper })
         assertTrue(checkedLpConflict(model, conflict))
     }
+
+    @Test
+    fun `contradictory near zero equalities cannot seed counter witnesses`() {
+        val model = LpBuilder().apply {
+            val x = addRealVar(0.0, 1.0)
+            addRealRow(intArrayOf(x), doubleArrayOf(1.0), Relation.EQ, 0.0, premiseLits = intArrayOf(7))
+            addRealRow(intArrayOf(x), doubleArrayOf(1.0), Relation.EQ, 1e-10, premiseLits = intArrayOf(9))
+        }.build(Sense.MINIMIZE)
+        val counters = LpCounterResults()
+
+        val result = solveAndCertify(model, counterResults = counters)
+
+        assertEquals(LpVerdict.INFEASIBLE, result.verdict)
+        assertNull(result.witness)
+        assertNull(counters.read(model, ProductionLpCertificationPolicy)?.witness)
+        val conflict = assertNotNull(result.rationalConflict)
+        assertEquals(setOf(0, 1), conflict.rows.toSet())
+        var lhs = BigFraction.ZERO
+        var rhs = BigFraction.ZERO
+        for (entry in conflict.rows.indices) {
+            val row = conflict.rows[entry]
+            lhs += conflict.multipliers[entry]
+            rhs += conflict.multipliers[entry] * assertNotNull(BigFraction.ofDouble(if (row == 0) 0.0 else 1e-10))
+        }
+        assertEquals(BigFraction.ZERO, lhs)
+        assertTrue(rhs < BigFraction.ZERO)
+        assertEquals(setOf(7, 9), conflict.rows.map { model.rowPremises[it]!!.boolLits.single() }.toSet())
+    }
 }

@@ -23,7 +23,8 @@ import kotlin.math.roundToLong
  *  - a reduced cost too large to evaluate in 64 bits, or a 128-bit accumulator overflow;
  *  - a strictly-negative reduced cost on a variable with no finite upper bound (unbounded Lagrangian).
  *
- * The result is `⌈L⌉` — a valid integer lower bound. Because the scale is a power of two, the final
+ * The result is `⌈L⌉` when the source objective has a verified integer lattice; otherwise it declines.
+ * Because the scale is a power of two, the final
  * division is an arithmetic shift ([Int128.ceilDivPow2]); no 128÷64 division is needed.
  *
  * @param model the slack-form relaxation (`A z = rhs`, `0 ≤ z ≤ upper`) whose objective is bounded.
@@ -37,13 +38,18 @@ internal fun integerDualLowerBoundCeil(
     y: DoubleArray,
     scaleBits: Int = DEFAULT_SCALE_BITS,
     observer: LpCertificationObserver? = null,
-): Long? = integerCertify(model, y, scaleBits, observer)?.objectiveBoundCeil(0L)
+): Long? = if (model.hasIntegralObjective()) {
+    integerCertify(model, y, scaleBits, observer)?.objectiveBoundCeil(0L)
+} else {
+    null
+}
 
 /**
  * `⌈L⌉` on a **continuous** model's true minimized objective, certified over its scaled-integer
  * rationalization: the integer certificate bounds the scaled objective `s·(cᵀz + objConstant)` exactly,
  * and the scale divides back out through `⌈⌈N / 2ᵏ⌉ / s⌉ = ⌈N / (2ᵏ·s)⌉`, so the result is a sound
- * integer lower bound on the real objective. The float duals need no rescaling — row-scaling by `s`
+ * lower bound only for a verified integer source objective lattice. The float duals need no rescaling —
+ * row-scaling by `s`
  * leaves the optimal duals unchanged, and any multipliers are sound regardless. Null when the model
  * does not rationalize (an exactly-scaled objective constant included) or the certification overflows.
  */
@@ -60,7 +66,7 @@ internal fun rationalizedDualLowerBoundCeil(
         requireExactObjectiveConstant = true,
     ) ?: return null
     val scaled = integerCertify(r.model, y, scaleBits, observer)?.objectiveBoundCeil(0L) ?: return null
-    return ceilDivPositive(scaled, r.scale)
+    return if (model.hasIntegralObjective()) ceilDivPositive(scaled, r.scale) else null
 }
 
 /** `⌈a / d⌉` for a positive [d]: truncating division adjusted upward on a positive remainder. */
@@ -78,6 +84,7 @@ internal class RoundedDuals(val scaleBits: Int, val scale: Long, val mult: LongA
  *  and the [integerTableauCuts] aggregation. */
 internal fun roundDuals(model: LpModel, y: DoubleArray, scaleBits: Int = DEFAULT_SCALE_BITS): RoundedDuals? {
     val m = model.m
+    if (y.size != m) return null
     var maxY = 0.0
     for (i in 0 until m) {
         val yi = y[i]
@@ -196,7 +203,7 @@ internal fun integerCertify(
 }
 
 private fun integerCertifyUnchecked(model: LpModel, y: DoubleArray, scaleBits: Int): IntegerCertificate? {
-    if (model.hasContinuous) return null // a real coefficient is not integrally certifiable here (Phase 3b)
+    if (model.hasContinuous || !model.finiteExactInput()) return null
     val rd = roundDuals(model, y, scaleBits) ?: return null
     val m = model.m
     val n = model.n
@@ -217,8 +224,9 @@ private fun integerCertifyUnchecked(model: LpModel, y: DoubleArray, scaleBits: I
         if (!dAcc.fitsLong()) return null // reduced cost too large to evaluate ⇒ keep node (sound)
         val dj = dAcc.toLong()
         reduced[j] = dj
+        if (dj > 0L && j < n && model.probeClampedLo[j]) return null
         if (dj < 0L) {
-            if (!model.hasUpper[j]) return null // unbounded below
+            if (!model.hasUpper[j] || (j < n && model.probeClampedHi[j])) return null
             acc.addProduct(dj, model.upper[j]) // min over [0,uⱼ] of dⱼ·zⱼ is dⱼ·uⱼ (scaled)
         }
     }
@@ -288,6 +296,10 @@ internal fun integerFarkasRay(
     onRoute: ((FarkasRoute) -> Unit)? = null,
     observer: LpCertificationObserver? = null,
 ): LongArray? {
+    if (ray.size != model.m || !model.finiteExactInput()) {
+        onRoute?.invoke(FarkasRoute.NONE)
+        return null
+    }
     if (model.hasContinuous) {
         // A real model is certified over its scaled-integer rationalization (the existing 128-bit Farkas);
         // scaling by a positive 2ᵏ preserves feasibility, so an infeasibility proof carries back exactly.
@@ -295,8 +307,8 @@ internal fun integerFarkasRay(
             model,
             outwardRealUppers = true,
             observer = observer,
-        )?.model ?: return null
-        return integerFarkasRay(integral, ray, scaleBits, basis, basisRow, onRoute, observer)
+        )?.model
+        if (integral != null) return integerFarkasRay(integral, ray, scaleBits, basis, basisRow, onRoute, observer)
     }
     // Reconstruction first: the ray's entries are ratios of minors of B, so they are small rationals, and
     // recovering them exactly annihilates the open columns the same way a basis solve does — without the
@@ -349,6 +361,7 @@ internal fun integerFarkasRay(
  *  evaluated exactly in 128 bits. A column with `ρ·Aⱼ > 0` but no finite upper bound makes the box max
  *  unbounded (this ρ cannot certify); a term that escapes 64/128 bits likewise bails (false, keep node). */
 private fun farkasCertifies(model: LpModel, rho: LongArray): Boolean {
+    if (model.hasContinuous) return sourceFarkasValid(model, rho)
     val lhs = Int128()
     for (i in 0 until model.m) lhs.addProduct(rho[i], model.rhs[i])
     val boxMax = Int128()
@@ -362,6 +375,7 @@ private fun farkasCertifies(model: LpModel, rho: LongArray): Boolean {
         }
         if (!ajAcc.fitsLong()) return false
         val aj = ajAcc.toLong()
+        if (aj < 0L && j < model.n && model.probeClampedLo[j]) return false
         if (aj > 0L) {
             // A probe-clamped side stands in for `+∞`, so its `upper` is an artefact of the encoding
             // rather than a bound of the model: folding it into the box max would certify against a
@@ -390,31 +404,14 @@ private fun chooseScale(maxY: Double, scaleBits: Int): Int {
 internal class RationalizedLp(val model: LpModel, val scale: Long, val objConstantExact: Boolean)
 
 /**
- * A scaled-integer copy of a continuous [model], or null when it cannot be rationalized within budget.
- * Multiplies the double-view coefficients (matrix, rhs, cost) by a common positive integer scale so they
- * become exact [Long]s. The existing 128-bit certifiers then apply
- * unchanged: scaling by a positive integer leaves the feasible region intact, so an infeasibility (Farkas)
- * certificate over the scaled model proves the real model infeasible. The scale is drawn from a dyadic
- * ladder (`2ᵏ`, exact — a power-of-two multiply never rounds the mantissa) and then a decimal ladder
- * (`10ᵏ` within [DEC_TOL], for the `0.1`-style coefficients real MPS files carry). The decimal rungs use
- * the same convention as [exactPointFeasible]: the scale *reconstructs the decimals the frontend
- * emitted* — the decimal text is the authoritative model and its double is already the approximation —
- * so the certificate is exact for the intended model even though the stored double of `0.1` is not
- * `1/10`. Returns null — leaving the LP `INDETERMINATE`, never mis-certified — when no ladder scale
- * covers every coefficient or a scaled value escapes the exactly-representable range.
+ * A dyadically scaled copy of the exact finite binary data in a legacy Double view, or null outside
+ * the bounded Long scaling budget. Parsed rational authority belongs to [ExactLpModel] and cannot be
+ * recovered from this projection. Structural coordinates stay unchanged; logical coordinates scale
+ * with the rows, so their costs stay unchanged and their finite sides scale with the RHS.
  *
- * Variable bounds are not scaled. An int-backed or slack column takes its exact bound from the
- * [Long] core (valid even at probe magnitude, where the double view's copy has rounded). A real
- * column's box may be fractional, so its upper rounds by certificate direction, chosen by
- * [outwardRealUppers]: `true` rounds **up** — enlarging the box only weakens a refutation (a Farkas
- * box max grows, a dual lower bound drops), so Farkas rays and objective bounds stay sound; `false`
- * rounds **down** — a feasibility certificate's point must live inside the true box.
- *
- * @param model model to rationalize.
- * @param outwardRealUppers whether real upper bounds round outward rather than inward.
- * @param observer recipient of this rationalization's exact-input outcome.
- * @param requireExactObjectiveConstant reject a rationalization whose objective constant cannot be
- * represented exactly at the matrix scale.
+ * Real structural uppers round outward for bounds/refutations and inward for point candidates.
+ * Those candidates still require an authoritative point check. Row premises, strictness and absent
+ * probe sides retain their source meaning. An inexact objective constant is usable only for feasibility.
  */
 internal fun rationalizeToIntegerModel(
     model: LpModel,
@@ -429,24 +426,23 @@ internal fun rationalizeToIntegerModel(
 }
 
 private fun rationalizeToIntegerModelUnchecked(model: LpModel, outwardRealUppers: Boolean): RationalizedLp? {
+    if (!model.finiteExactInput()) return null
     val dv = model.doubleView ?: return RationalizedLp(model, 1L, objConstantExact = true)
     val n = model.n
     val numVars = model.numVars
+    val s = commonScale(model) ?: return null
     val upper = LongArray(numVars)
     for (j in 0 until numVars) {
         if (!dv.hasUpper[j]) continue
-        if (j >= n || !model.colContinuous[j]) {
-            upper[j] = model.upper[j]
-            continue
+        if (j >= n) {
+            upper[j] = scaledInteger(dv.upper[j], s) ?: return null
+        } else {
+            val u = if (outwardRealUppers) ceil(dv.upper[j]) else floor(dv.upper[j])
+            if (u < 0.0 || u >= LONG_LIMIT) return null
+            upper[j] = u.toLong()
         }
-        val u = if (outwardRealUppers) ceil(dv.upper[j]) else floor(dv.upper[j])
-        if (u.isNaN() || u < 0.0 || u >= LONG_LIMIT) return null
-        upper[j] = u.toLong()
     }
-    val s = commonScale(dv) ?: return null
-    val objC = dv.objConstant * s
-    val objConstantExact = objC.isFinite() && abs(objC) < MAX_EXACT_INT &&
-        abs(objC.roundToLong() / s - dv.objConstant) <= DEC_TOL
+    val objConstant = scaledInteger(dv.objConstant, s)
     return RationalizedLp(
         LpModel(
             n = n,
@@ -454,64 +450,52 @@ private fun rationalizeToIntegerModelUnchecked(model: LpModel, outwardRealUppers
             csc = Csc(
                 dv.colPtr.copyOf(),
                 dv.rowIdx.copyOf(),
-                LongArray(dv.colVal.size) { (dv.colVal[it] * s).roundToLong() },
+                LongArray(dv.colVal.size) { checkNotNull(scaledInteger(dv.colVal[it], s)) },
             ),
-            rhs = LongArray(model.m) { (dv.rhs[it] * s).roundToLong() },
-            cost = LongArray(numVars) { (dv.cost[it] * s).roundToLong() },
+            rhs = LongArray(model.m) { checkNotNull(scaledInteger(dv.rhs[it], s)) },
+            cost = LongArray(numVars) { checkNotNull(scaledInteger(dv.cost[it], if (it < n) s else 1.0)) },
             upper = upper,
             hasUpper = dv.hasUpper.copyOf(),
             loShift = LongArray(n),
-            objConstant = if (objConstantExact) objC.roundToLong() else 0L,
+            objConstant = objConstant ?: 0L,
             sense = model.sense,
-            tag = IntArray(n) { -1 },
+            tag = model.tag.copyOf(),
+            rowGlobal = model.rowGlobal.copyOf(),
+            rowStrict = model.rowStrict.copyOf(),
+            rowPremises = model.rowPremises.copyOf(),
+            probeClampedLo = model.probeClampedLo.copyOf(),
+            probeClampedHi = model.probeClampedHi.copyOf(),
         ),
         s.toLong(),
-        objConstantExact,
+        objConstant != null,
     )
 }
 
-/** Smallest ladder scale covering every double-view coefficient, or null when none does. Dyadic scales
- *  first (strictly exact, and they keep today's models on exactly today's path), then decimal
- *  (reconstructing within [DEC_TOL]). Returned as a double: both ladders are exactly representable. */
-private fun commonScale(dv: LpDoubleView): Double? {
+private fun commonScale(model: LpModel): Double? {
+    val dv = checkNotNull(model.doubleView)
+    // Implicit logical columns absorb the row scale, so fractional logical costs cannot enter this route.
+    if ((model.n until model.numVars).any { scaledInteger(dv.cost[it], 1.0) == null }) return null
+    var fallback: Double? = null
     for (k in 0..MAX_SCALE_BITS) {
         val s = (1L shl k).toDouble()
-        if (exactlyIntegral(dv.colVal, s) && exactlyIntegral(dv.rhs, s) && exactlyIntegral(dv.cost, s)) return s
-    }
-    var s = 1.0
-    repeat(DEC_MAX_DIGITS) {
-        s *= 10.0
-        if (reconstructsDecimal(dv.colVal, s) && reconstructsDecimal(dv.rhs, s) && reconstructsDecimal(dv.cost, s)) {
-            return s
+        if (dv.colVal.all { scaledInteger(it, s) != null } && dv.rhs.all { scaledInteger(it, s) != null } &&
+            (0 until model.n).all { scaledInteger(dv.cost[it], s) != null } &&
+            (model.n until model.numVars).all { !dv.hasUpper[it] || scaledInteger(dv.upper[it], s) != null }
+        ) {
+            if (fallback == null) fallback = s
+            if (scaledInteger(dv.objConstant, s) != null) return s
         }
     }
-    return null
+    return fallback
 }
 
-private fun exactlyIntegral(a: DoubleArray, scale: Double): Boolean {
-    for (x in a) {
-        val v = x * scale
-        if (!v.isFinite() || v != floor(v) || abs(v) >= MAX_EXACT_INT) return false
-    }
-    return true
+private fun scaledInteger(value: Double, scale: Double): Long? {
+    val scaled = value * scale
+    // Multiplication by an in-range power of two is exact; an integral result cannot have underflowed.
+    if (!scaled.isFinite() || scaled != floor(scaled) || abs(scaled) >= MAX_EXACT_INT) return null
+    if (value != 0.0 && scaled == 0.0) return null
+    return scaled.toLong()
 }
-
-/** Whether every value in [a] reconstructs from `round(v·scale)/scale` within [DEC_TOL] and stays in
- *  the exactly-representable range — the decimal-reconstruction test [exactPointFeasible] uses. */
-private fun reconstructsDecimal(a: DoubleArray, scale: Double): Boolean {
-    for (x in a) {
-        val v = x * scale
-        if (!v.isFinite() || abs(v) >= MAX_EXACT_INT) return false
-        if (abs(v.roundToLong() / scale - x) > DEC_TOL) return false
-    }
-    return true
-}
-
-/** Decimal-reconstruction tolerance; matches the decimal point-feasibility check in ExactBasisSolve. */
-private const val DEC_TOL = 1e-9
-
-/** Largest decimal scale exponent tried (`10⁹`); matches the decimal point-feasibility check. */
-private const val DEC_MAX_DIGITS = 9
 
 /** Requested scale: fine enough to keep rounding loss negligible, capped by [chooseScale]. */
 private const val DEFAULT_SCALE_BITS = 40

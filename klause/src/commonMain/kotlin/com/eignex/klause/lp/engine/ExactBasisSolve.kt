@@ -3,27 +3,24 @@ package com.eignex.klause.lp.engine
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.Int128
 import com.ionspin.kotlin.bignum.integer.BigInteger
-import kotlin.math.abs
-import kotlin.math.roundToLong
 
 internal fun exactPointWitness(
     model: LpModel,
     primal: DoubleArray,
     observer: LpCertificationObserver? = null,
 ): ExactLpWitness? {
-    val point = if (primal.size == model.n && primal.all { it.isFinite() }) {
+    val point = if (primal.size == model.n && primal.all { it.isFinite() } && model.finiteExactInput()) {
         checkedLpWitness(model, primal.map { checkNotNull(BigFraction.ofDouble(it)) }) ?: run {
-            val z = DoubleArray(model.n) { primal[it] - model.loShiftD(it) }
-            decimalScaleBits(model, z)?.let { k ->
-                val denominator = BigInteger.fromLong(pow10Long(k))
-                checkedLpWitness(
-                    model,
-                    List(model.n) { j ->
-                        BigFraction.of(BigInteger.fromLong((z[j] * pow10(k)).roundToLong()), denominator) +
-                            model.exactShift(j)
-                    },
-                )
+            var common = BigInteger.ONE
+            val limit = BigInteger.fromLong(MAX_POINT_DENOMINATOR)
+            val candidate = primal.map { value ->
+                val part = reconstructRational(value, maxDenominator = MAX_POINT_DENOMINATOR) ?: return@run null
+                val denominator = BigInteger.fromLong(part.denominator)
+                common = common / common.gcd(denominator) * denominator
+                if (common > limit) return@run null
+                BigFraction.of(BigInteger.fromLong(part.numerator), denominator)
             }
+            checkedLpWitness(model, candidate)
         }
     } else {
         null
@@ -45,116 +42,11 @@ internal fun exactBasisWitness(
     return point
 }
 
-/**
- * Exact feasibility of the float primal **point** itself: when every structural value the
- * float solve reported snaps to an exact dyadic rational `p_j / 2ᴷ`, verify that point satisfies every
- * row (`Σ aᵢⱼ zⱼ = rhs` for an equality slack, `≤ rhs` for an inequality one) and the box `0 ≤ zⱼ ≤ uⱼ`
- * exactly, in 128-bit integer arithmetic over the scaled-integer rationalization. Returns true only on a
- * proven-feasible point; false when the snapped point is not exactly representable or violates a
- * constraint (the caller then falls back / declines). This is robust where [exactBasisFeasible]'s basis
- * reconstruction is finicky — e.g. a degenerate inequality-plus-equality vertex — since it checks the
- * point, not the basis.
- */
 internal fun exactPointFeasible(
     model: LpModel,
     primal: DoubleArray,
     observer: LpCertificationObserver? = null,
-): Boolean = exactPointFeasibleUnchecked(model, primal).also {
-    observer?.observe(LpCertifier.EXACT_POINT, it)
-}
-
-private fun exactPointFeasibleUnchecked(model: LpModel, primal: DoubleArray): Boolean {
-    val n = model.n
-    val m = model.m
-    // Shifted point zⱼ = primalⱼ − loShiftⱼ (the constraints/rhs are in shifted, lower-bound-zero coords).
-    val z = DoubleArray(n) { primal[it] - model.loShiftD(it) }
-    // A common decimal scale D = 10ᵏ turning every coefficient, rhs, bound and point value into an exact
-    // integer within a tight reconstruct tolerance (so 0.1 / 0.3 / 0.6 — dyadic-impossible but decimal —
-    // are handled with small integers). The scale reconstructs the intended decimals the frontend emitted;
-    // certifying the snapped-decimal point is the SAT (feasibility) verdict, not the strict Farkas path.
-    val k = decimalScaleBits(model, z) ?: return false
-    val d = pow10(k)
-    val dLong = pow10Long(k)
-    val p = LongArray(n) { (z[it] * d).roundToLong() }
-    // Box: 0 ≤ pⱼ ≤ round(uⱼ·D).
-    for (j in 0 until n) {
-        if (p[j] < 0L) return false
-        if (model.hasFiniteUpper(j) && p[j] > (model.upperD(j) * d).roundToLong()) return false
-    }
-    // Per-row L = Σⱼ round(aᵢⱼ·D)·pⱼ ; compare to round(rhsᵢ·D)·D under the row's relation
-    // (equality slack ⇒ ==, else ≤) — both sides are the exact integer D²·(a·z) resp. D²·rhs.
-    val lhs = Array(m) { Int128() }
-    for (j in 0 until n) model.forEachInColumnD(j) { i, a -> lhs[i].addProduct((a * d).roundToLong(), p[j]) }
-    for (i in 0 until m) {
-        val r = Int128()
-        r.addProduct((model.rhsD(i) * d).roundToLong(), dLong)
-        val diff = lhs[i].copy()
-        diff.subtract(r) // L − rhs·D
-        if (diff.overflow) return false
-        val isEquality = model.hasFiniteUpper(model.slackCol(i))
-        val sign = when {
-            diff.hi < 0L -> -1
-            diff.hi == 0L && diff.lo == 0L -> 0
-            else -> 1
-        }
-        if (sign > 0) return false // L > rhs violates both `≤` and `==`
-        if (isEquality && sign < 0) return false // L < rhs violates `==`
-    }
-    return true
-}
-
-/** Smallest decimal scale exponent `k ≤ DEC_MAX_BITS` at which every coefficient, rhs, finite bound and
- *  point value of [model]/[z] reconstructs from `round(v·10ᵏ)/10ᵏ` within [DEC_TOL] and stays inside the
- *  exactly-representable range, or null when none does (a genuinely non-decimal value like 1/3). */
-private fun decimalScaleBits(model: LpModel, z: DoubleArray): Int? {
-    for (k in 0..DEC_MAX_BITS) {
-        val s = pow10(k)
-        var ok = true
-        fun check(v: Double): Boolean {
-            val scaled = v * s
-            if (!scaled.isFinite() || abs(scaled) >= DEC_MAX_INT) return false
-            return abs(scaled.roundToLong() / s - v) <= DEC_TOL
-        }
-        for (j in 0 until model.n) {
-            if (!check(z[j])) {
-                ok = false
-                break
-            }
-            if (model.hasFiniteUpper(j) && !check(model.upperD(j))) {
-                ok = false
-                break
-            }
-            model.forEachInColumnD(j) { _, a -> if (!check(a)) ok = false }
-            if (!ok) break
-        }
-        if (ok) {
-            for (i in 0 until model.m) {
-                if (!check(model.rhsD(i))) {
-                    ok = false
-                    break
-                }
-            }
-        }
-        if (ok) return k
-    }
-    return null
-}
-
-private fun pow10(k: Int): Double {
-    var r = 1.0
-    repeat(k) { r *= 10.0 }
-    return r
-}
-
-private fun pow10Long(k: Int): Long {
-    var r = 1L
-    repeat(k) { r *= 10L }
-    return r
-}
-
-private const val DEC_MAX_BITS = 9
-private const val DEC_TOL = 1e-9
-private const val DEC_MAX_INT = 9.007199254740992E15
+): Boolean = exactPointWitness(model, primal, observer) != null
 
 /**
  * Exact primal-feasibility check of a reported LP [Basis] over an integer-coefficient [LpModel], in
@@ -187,28 +79,25 @@ private fun exactBasisFeasibleUnchecked(
     observer: LpCertificationObserver?,
     onPoint: ((List<BigFraction>) -> Unit)? = null,
 ): Boolean? {
-    val integral = rationalizeToIntegerModel(
-        model,
-        outwardRealUppers = false,
-        observer = observer,
-    )?.model ?: return null
+    if (!model.finiteExactInput() || !validBasisDeclaration(model, basis)) return null
+    val rationalized = rationalizeToIntegerModel(model, outwardRealUppers = true, observer = observer) ?: return null
+    val integral = rationalized.model
     val m = integral.m
-    if (basis.status.size != model.numVars || basis.basicVars.any { it !in 0 until model.numVars }) return null
-    if (basis.status.indices.any { basis.status[it] == VarStatus.AT_UPPER && !model.hasFiniteUpper(it) }) return null
-    val point = if (onPoint != null) {
-        MutableList(model.numVars) { j ->
-            if (basis.status[j] == VarStatus.AT_UPPER) model.exactUpper(j) else BigFraction.ZERO
-        }
-    } else {
-        null
+    if (m > MAX_EXACT_BASIS) return null
+    val basic = basis.basicVars
+    val point = MutableList(model.numVars) { j ->
+        if (basis.status[j] == VarStatus.AT_UPPER) BigFraction.ofLong(integral.upper[j]) else BigFraction.ZERO
+    }
+    // An outward-rounded seat is not the declared exact upper-bound status.
+    for (j in 0 until model.n) {
+        if (basis.status[j] == VarStatus.AT_UPPER && point[j] != model.exactUpper(j)) return null
     }
     if (m == 0) {
-        point?.let { onPoint?.invoke(List(model.n) { j -> it[j] + model.exactShift(j) }) }
+        val source = List(model.n) { j -> point[j] + model.exactShift(j) }
+        if (checkedLpWitness(model, source) == null) return false
+        onPoint?.invoke(source)
         return true
     }
-    if (m > MAX_EXACT_BASIS) return null // beyond this the fraction-free minors cannot stay in 128 bits
-    val basic = basis.basicVars
-    if (basic.size != m) return null
 
     // b'[i] = rhs[i] − Σ_{nonbasic j at upper} A[i][j]·u[j]. Nonbasic-at-lower columns are 0 (lower is 0
     // in the normalized model), so only upper-pinned columns move the right-hand side.
@@ -234,45 +123,35 @@ private fun exactBasisFeasibleUnchecked(
         forEachColumnEntry(integral, basic[t]) { i, a -> b[i][t] = a }
     }
 
-    val det = bareissDet(b) ?: return null
+    val det = bareissDet(Array(m) { b[it].copyOf() }) ?: return null
     if (det == 0L) return null // singular basis — cannot reconstruct the point
 
-    // Cramer: x_t = det(B with column t replaced by b') / det. Check 0 ≤ x_t ≤ u[basic[t]] exactly,
-    // sign-aware in `det` (multiplying an inequality by det flips it when det < 0).
-    val detPositive = det > 0L
     for (t in 0 until m) {
         val bt = Array(m) { r -> b[r].copyOf() }
         for (i in 0 until m) bt[i][t] = rhsAdj[i]
         val detT = bareissDet(bt) ?: return null
-        point?.set(basic[t], BigFraction.of(BigInteger.fromLong(detT), BigInteger.fromLong(det)))
-
-        // x_t ≥ 0  ⟺  detT/det ≥ 0  ⟺  detT and det share sign (or detT == 0).
-        if (detT != 0L && (detT > 0L) != detPositive) return false
-
-        // x_t ≤ u  ⟺  detT ≤ u·det (det > 0) or detT ≥ u·det (det < 0), when the column is bounded.
-        val col = basic[t]
-        if (col < integral.numVars && integral.hasUpper[col]) {
-            val uDet = Int128()
-            uDet.addProduct(integral.upper[col], det)
-            val dt = Int128()
-            dt.addLong(detT)
-            dt.subtract(uDet) // detT − u·det
-            if (dt.overflow) return null
-            // detT − u·det ≤ 0 required when det > 0; ≥ 0 when det < 0.
-            val sign = detSign(dt)
-            if (detPositive && sign > 0) return false
-            if (!detPositive && sign < 0) return false
-        }
+        point[basic[t]] = BigFraction.of(BigInteger.fromLong(detT), BigInteger.fromLong(det))
     }
-    point?.let { onPoint?.invoke(List(model.n) { j -> it[j] + model.exactShift(j) }) }
+    val source = List(model.n) { j -> point[j] + model.exactShift(j) }
+    if (checkedLpWitness(model, source) == null) return false
+    onPoint?.invoke(source)
     return true
 }
 
-/** Sign of an [Int128] value assumed non-overflowed: `-1`, `0`, or `+1`. */
-private fun detSign(v: Int128): Int = when {
-    v.hi < 0L -> -1
-    v.hi == 0L && v.lo == 0L -> 0
-    else -> 1
+private fun validBasisDeclaration(model: LpModel, basis: Basis): Boolean {
+    if (basis.status.size != model.numVars || basis.basicVars.size != model.m) return false
+    val seen = BooleanArray(model.numVars)
+    for (j in basis.basicVars) {
+        if (j !in seen.indices || seen[j] || basis.status[j] != VarStatus.BASIC) return false
+        seen[j] = true
+    }
+    return basis.status.indices.all { j ->
+        when (basis.status[j]) {
+            VarStatus.BASIC -> seen[j]
+            VarStatus.AT_LOWER -> j >= model.n || !model.probeClampedLo[j]
+            VarStatus.AT_UPPER -> model.hasFiniteUpper(j) && (j >= model.n || !model.probeClampedHi[j])
+        }
+    }
 }
 
 /**
@@ -292,6 +171,7 @@ private fun detSign(v: Int128): Int = when {
  * one.
  */
 internal fun exactFarkasRay(model: LpModel, basis: Basis, row: Int): LongArray? {
+    if (model.doubleView != null || !model.finiteExactInput() || !validBasisDeclaration(model, basis)) return null
     val m = model.m
     if (m == 0 || row < 0 || row >= m || m > MAX_EXACT_BASIS) return null
     val basic = basis.basicVars
@@ -383,3 +263,5 @@ private fun bareissDet(a: Array<LongArray>): Long? {
 /** Largest basis dimension the fraction-free solve attempts; beyond it the exact minors overflow 128
  *  bits for all but trivial coefficients, so the check declines (degrading the verdict to `unknown`). */
 private const val MAX_EXACT_BASIS = 48
+
+private const val MAX_POINT_DENOMINATOR = 1L shl 40

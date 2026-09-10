@@ -6,6 +6,7 @@ import com.eignex.klause.lp.engine.Relation
 import com.eignex.klause.lp.engine.RevisedSimplex
 import com.eignex.klause.lp.engine.Sense
 import com.eignex.klause.lp.engine.integerDualLowerBoundCeil
+import com.eignex.klause.simplex.exact.BigFraction
 import kotlin.math.ceil
 import kotlin.random.Random
 import kotlin.test.Test
@@ -198,5 +199,180 @@ class IntegerDualBoundTest {
         assertEquals(null, ray)
         assertEquals(1, attempts)
         assertEquals(0, successes)
+    }
+
+    @Test
+    fun `decimal and tiny binary coefficients decline bounded dyadic scaling`() {
+        for (coefficient in listOf(0.1, 1e-10, Double.MIN_VALUE, Double.MAX_VALUE)) {
+            val model = LpBuilder().apply {
+                val x = addRealVar(0.0, 1.0)
+                addRealRow(intArrayOf(x), doubleArrayOf(coefficient), Relation.EQ, 0.0)
+            }.build(Sense.MINIMIZE)
+
+            assertEquals(null, rationalizeToIntegerModel(model, outwardRealUppers = true))
+        }
+    }
+
+    @Test
+    fun `dyadic scaling preserves exact row coefficients and antecedents`() {
+        val model = LpBuilder().apply {
+            val x = addRealVar(2.0, 4.0, cost = 0.5, tag = 7)
+            addRealRow(
+                intArrayOf(x),
+                doubleArrayOf(0.25),
+                Relation.LE,
+                0.75,
+                strict = true,
+                premiseLits = intArrayOf(9),
+            )
+        }.build(Sense.MINIMIZE)
+
+        val scaled = assertNotNull(rationalizeToIntegerModel(model, outwardRealUppers = true))
+        val integral = scaled.model
+        val scale = BigFraction.ofLong(scaled.scale)
+
+        assertEquals(BigFraction.ofDouble(0.25), BigFraction.ofLong(integral.csc.colVal.single()) * scale.reciprocal())
+        assertEquals(BigFraction.ofDouble(0.25), BigFraction.ofLong(integral.rhs.single()) * scale.reciprocal())
+        assertEquals(BigFraction.ONE, BigFraction.ofLong(integral.objConstant) * scale.reciprocal())
+        assertEquals(7, integral.tag.single())
+        assertEquals(false, integral.rowGlobal.single())
+        assertEquals(true, integral.rowStrict.single())
+        assertEquals(9, integral.rowPremises.single()!!.boolLits.single())
+    }
+
+    @Test
+    fun `slack costs and sides follow logical coordinate scaling`() {
+        val model = LpBuilder().apply {
+            val x = addRealVar(0.0, 0.0)
+            addRealRow(intArrayOf(x), doubleArrayOf(0.5), Relation.LE, 0.5)
+        }.build(Sense.MINIMIZE)
+        model.doubleView!!.cost[1] = 1.0
+        model.doubleView.hasUpper[1] = true
+        model.doubleView.upper[1] = 0.5
+
+        val scaled = assertNotNull(rationalizeToIntegerModel(model, outwardRealUppers = true))
+        val certificate = assertNotNull(integerCertify(scaled.model, doubleArrayOf(1.0), scaleBits = 0))
+
+        assertEquals(2L, scaled.scale)
+        assertEquals(1L, scaled.model.cost[1])
+        assertEquals(1L, scaled.model.upper[1])
+        assertEquals(1L, certificate.objectiveBoundCeil(0L))
+        assertEquals(
+            BigFraction.ofDouble(0.5),
+            BigFraction.ofLong(scaled.model.cost[1] * scaled.model.upper[1]) *
+                BigFraction.ofLong(scaled.scale).reciprocal(),
+        )
+    }
+
+    @Test
+    fun `unsupported fractional slack costs decline scaling`() {
+        val model = LpBuilder().apply {
+            val x = addRealVar(0.0, 1.0)
+            addRealRow(intArrayOf(x), doubleArrayOf(0.5), Relation.LE, 0.5)
+        }.build(Sense.MINIMIZE)
+        model.doubleView!!.cost[1] = 0.5
+
+        assertEquals(null, rationalizeToIntegerModel(model, outwardRealUppers = true))
+    }
+
+    @Test
+    fun `inexact binary objective constant cannot be accepted as zero`() {
+        val model = LpBuilder().apply { addRealVar(0.0, 1.0) }.build(Sense.MINIMIZE)
+        model.doubleView!!.objConstant = 1e-10
+
+        assertEquals(false, assertNotNull(rationalizeToIntegerModel(model, true)).objConstantExact)
+        assertEquals(null, rationalizedDualLowerBoundCeil(model, doubleArrayOf()))
+    }
+
+    @Test
+    fun `direct certificates cannot use probe sides as finite support`() {
+        for (cost in listOf(-1L, 1L)) {
+            val model = LpBuilder().apply { addFreeVar(null, null, cost = cost) }.build(Sense.MINIMIZE)
+
+            assertEquals(null, integerCertify(model, doubleArrayOf()))
+        }
+        val model = LpBuilder().apply {
+            val x = addFreeVar(null, 1L)
+            addRow(intArrayOf(x), longArrayOf(1L), Relation.EQ, -LP_UNBOUNDED_PROBE - 1L)
+        }.build(Sense.MINIMIZE)
+        assertEquals(null, integerFarkasRay(model, doubleArrayOf(-1.0)))
+    }
+
+    @Test
+    fun `direct Farkas validation rejects decimal cancellation on an open column`() {
+        val model = LpBuilder().apply {
+            val x = addRealVar(0.0, null)
+            val y = addRealVar(0.0, null)
+            addRealRow(intArrayOf(x, y), doubleArrayOf(1.0000000001, -1.0), Relation.EQ, 1.0)
+            addRealRow(intArrayOf(x, y), doubleArrayOf(1.0, -1.0), Relation.EQ, 0.0)
+        }.build(Sense.MINIMIZE)
+
+        assertEquals(null, integerFarkasRay(model, doubleArrayOf(1.0, -1.0)))
+    }
+
+    @Test
+    fun `malformed vectors and numeric views decline direct certificates`() {
+        val model = LpBuilder().apply {
+            val x = addRealVar(0.0, 1.0)
+            addRealRow(intArrayOf(x), doubleArrayOf(1.0), Relation.EQ, 0.5)
+        }.build(Sense.MINIMIZE)
+
+        assertEquals(null, roundDuals(model, doubleArrayOf()))
+        assertEquals(null, integerFarkasRay(model, doubleArrayOf()))
+        model.doubleView!!.colVal[0] = Double.NaN
+        assertEquals(null, rationalizeToIntegerModel(model, true))
+    }
+
+    @Test
+    fun `dyadic Farkas ray validates exact source rows and their premises`() {
+        val model = LpBuilder().apply {
+            val x = addRealVar(0.0, 2.0)
+            addRealRow(intArrayOf(x), doubleArrayOf(0.5), Relation.LE, 0.0, premiseLits = intArrayOf(7))
+            addRealRow(intArrayOf(x), doubleArrayOf(0.5), Relation.GE, 0.5, premiseLits = intArrayOf(9))
+        }.build(Sense.MINIMIZE)
+
+        val ray = assertNotNull(integerFarkasRay(model, doubleArrayOf(-1.0, -1.0)))
+        val first = BigFraction.ofLong(ray[0])
+        val second = BigFraction.ofLong(ray[1])
+
+        assertEquals(BigFraction.ZERO, (first - second) * assertNotNull(BigFraction.ofDouble(0.5)))
+        assertTrue(second * assertNotNull(BigFraction.ofDouble(-0.5)) > BigFraction.ZERO)
+        assertTrue(first.signum() <= 0 && second.signum() <= 0)
+        assertEquals(
+            setOf(7, 9),
+            ray.indices.filter { ray[it] != 0L }.map { model.rowPremises[it]!!.boolLits.single() }.toSet(),
+        )
+    }
+
+    @Test
+    fun `unscaled binary Farkas candidate is checked beyond the compact scale budget`() {
+        for (rhs in listOf(-5e-7, -Double.MIN_VALUE)) {
+            val model = LpBuilder().apply {
+                val x = addRealVar(0.0, 1.0)
+                addRealRow(intArrayOf(x), doubleArrayOf(1.0), Relation.LE, rhs, premiseLits = intArrayOf(11))
+            }.build(Sense.MINIMIZE)
+
+            val ray = assertNotNull(integerFarkasRay(model, doubleArrayOf(-1.0)))
+
+            assertEquals(null, rationalizeToIntegerModel(model, true))
+            assertTrue(BigFraction.ofLong(ray.single()) * assertNotNull(BigFraction.ofDouble(rhs)) > BigFraction.ZERO)
+            assertTrue(ray.single() < 0L)
+            assertEquals(11, model.rowPremises.single()!!.boolLits.single())
+        }
+    }
+
+    @Test
+    fun `finite logical sides participate in exact scale selection`() {
+        val model = LpBuilder().apply {
+            val x = addRealVar(0.0, 1.0)
+            addRealRow(intArrayOf(x), doubleArrayOf(1.0), Relation.LE, 1.0)
+        }.build(Sense.MINIMIZE)
+        model.doubleView!!.hasUpper[1] = true
+        model.doubleView.upper[1] = 0.5
+
+        val scaled = assertNotNull(rationalizeToIntegerModel(model, true))
+
+        assertEquals(2L, scaled.scale)
+        assertEquals(1L, scaled.model.upper[1])
     }
 }

@@ -15,12 +15,17 @@ import com.eignex.klause.lp.engine.LpSolver
 import com.eignex.klause.lp.engine.PersistentLpSolver
 import com.eignex.klause.lp.engine.TableauCutSolver
 import com.eignex.klause.lp.engine.acceptNullable
+import com.eignex.klause.lp.engine.ceilLong
 import com.eignex.klause.lp.engine.certifiedTightObjectiveLowerBound
 import com.eignex.klause.lp.engine.certifyLpFarkas
 import com.eignex.klause.lp.engine.checkedLpConflict
 import com.eignex.klause.lp.engine.checkedLpWitness
+import com.eignex.klause.lp.engine.exactConstant
+import com.eignex.klause.lp.engine.exactCost
 import com.eignex.klause.lp.engine.exactShift
+import com.eignex.klause.lp.engine.finiteExactInput
 import com.eignex.klause.lp.engine.integerCertify
+import com.eignex.klause.lp.engine.lowerBoundDouble
 import com.eignex.klause.lp.engine.lpConditioning
 import com.eignex.klause.lp.engine.newPersistentLpSolver
 import com.eignex.klause.lp.engine.newTableauCutSolver
@@ -29,6 +34,7 @@ import com.eignex.klause.lp.relaxation.LpExplanation
 import com.eignex.klause.lp.relaxation.LpRelaxation
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
+import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.RationalFeasibility
 import com.eignex.klause.simplex.exact.rationalOutcome
 import com.eignex.klause.solver.objective.LinearObjective
@@ -43,7 +49,8 @@ import com.eignex.klause.util.addExact
 import com.eignex.klause.util.mulExact
 import com.eignex.klause.util.subExact
 import kotlin.math.abs
-import kotlin.math.ceil
+import kotlin.math.nextDown
+import kotlin.math.nextUp
 import kotlin.math.round
 
 /**
@@ -597,8 +604,10 @@ internal fun LpEngine.sparseSafePrune(
         solveContext.certificationPolicy,
     )
         ?: return LpNodeOutcome(false, optimalBasis)
-    val full = lower + boundRel.objectiveConstant.toDouble()
-    if (canPrune && full >= bound) {
+    val full = checkNotNull(BigFraction.ofDouble(lower)) + BigFraction.ofLong(boundRel.objectiveConstant)
+    val sourceRange = sourceObjectiveRange(boundRel)
+    val cutoff = if (canPrune && sourceRange != null) enclosingCutoff(bound) else null
+    if (cutoff != null && full >= cutoff) {
         sink.lp.observePrune()
         return LpNodeOutcome(true, null)
     }
@@ -607,14 +616,14 @@ internal fun LpEngine.sparseSafePrune(
     // reason so an Unsat tightening backjumps; otherwise tighten to ceil of the combined bound,
     // reason-less (a sound conflict-analysis leaf). Every bound here only under-estimates the optimum,
     // so either floor ≤ the true optimum.
-    if (canPropagate && full.isFinite()) {
+    if (canPropagate && sourceRange != null) {
         val exactFloor = if (learn && cert != null) {
             cert.objectiveBoundCeil(boundRel.objectiveConstant)
         } else {
             null
         }
-        val lpFloor = exactFloor ?: ceil(full).takeIf { it in Long.MIN_VALUE.toDouble()..Long.MAX_VALUE.toDouble() }
-            ?.toLong()
+        val sourceLower = exactFloor?.let(BigFraction::ofLong) ?: full
+        val lpFloor = boundRel.objectiveVariableLowerBound(objectiveVar, sourceLower)
         // Round the bound up to the objective variable's achievable residue (`v ≡ r mod g` from its
         // defining equality): a tighter, still-sound cutoff. A strict lift cannot be witnessed by the
         // reduced-cost reason (the modular premise is not in it), so it is imposed reason-less — a sound
@@ -626,7 +635,7 @@ internal fun LpEngine.sparseSafePrune(
             lpFloor
         }
         if (rounded != null) {
-            val reason = if (learn && cert != null && rounded == lpFloor) {
+            val reason = if (learn && cert != null && exactFloor != null && rounded == lpFloor) {
                 LpExplanation.objectiveBoundReason(boundRel, cert, session)
             } else {
                 null
@@ -683,8 +692,10 @@ internal fun LpEngine.applySparseReducedCostFixing(
     objectiveAscending: Boolean = true,
     learn: Boolean = false,
 ): Boolean {
-    if (!bound.isFinite() || bound <= Long.MIN_VALUE.toDouble() || bound >= Long.MAX_VALUE.toDouble()) return false
-    val improvingMax = ceil(bound).toLong() - 1L // greatest integer objective strictly below the incumbent
+    if (sourceObjectiveRange(relaxation) == null) return false
+    val ceiling = enclosingCutoff(bound)?.ceilLong() ?: return false
+    if (ceiling == Long.MIN_VALUE) return false
+    val improvingMax = ceiling - 1L
     val sourceConstant = relaxation.objectiveConstant
     if (!cert.improvingGapNonNegative(improvingMax, sourceConstant)) return false
     val reasonSupport = if (learn && objectiveVar >= 0 && objectiveAscending) {
@@ -827,6 +838,72 @@ internal fun reducedCostFixingReasons(
     )
 }
 
+private fun LpEngine.sourceObjectiveRange(relaxation: LpRelaxation): LongRange? {
+    val model = relaxation.model
+    if (!model.finiteExactInput() || model.cost.size != model.numVars || model.loShift.size != model.n) return null
+    if (model.exactConstant() != BigFraction.ofLong(model.objConstant)) return null
+    val constant = Int128().also {
+        it.addLong(model.objConstant)
+        it.addLong(relaxation.objectiveConstant)
+    }
+    for (j in 0 until model.numVars) {
+        val cost = model.cost[j]
+        if (model.exactCost(j) != BigFraction.ofLong(cost)) return null
+        if (cost == 0L) continue
+        if (j >= model.n || model.colContinuous[j] ||
+            model.exactShift(j) != BigFraction.ofLong(model.loShift[j])
+        ) {
+            return null
+        }
+        val shift = Int128().also { it.addProduct(cost, model.loShift[j]) }
+        constant.subtract(shift)
+    }
+    val minimum = constant.copy()
+    val maximum = constant.copy()
+    for (j in 0 until model.n) {
+        val cost = model.cost[j]
+        if (cost == 0L) continue
+        val source = relaxation.colVarId.getOrNull(j) ?: return null
+        val isBool = relaxation.colIsBool.getOrNull(j) ?: return null
+        val lower: Long
+        val upper: Long
+        if (isBool) {
+            if (source !in 0 until problem.numBoolVars) return null
+            lower = 0L
+            upper = 1L
+        } else {
+            if (source !in 0 until problem.numIntVars) return null
+            if (!problem.intBounds.hasLower(source) || !problem.intBounds.hasUpper(source)) return null
+            lower = problem.intBounds.lower(source)
+            upper = problem.intBounds.upper(source)
+        }
+        minimum.addProduct(cost, if (cost > 0L) lower else upper)
+        maximum.addProduct(cost, if (cost > 0L) upper else lower)
+    }
+    if (!minimum.fitsLong() || !maximum.fitsLong()) return null
+    return minimum.toLong()..maximum.toLong()
+}
+
+private fun enclosingCutoff(bound: Double): BigFraction? {
+    if (!bound.isFinite()) return null
+    // Wide Long incumbents can share a Double bin; its upper neighbor encloses every such source value.
+    return BigFraction.ofDouble(if (abs(bound) >= EXACT_INTEGER_DOUBLE_LIMIT) bound.nextUp() else bound)
+}
+
+private fun LpRelaxation.objectiveVariableLowerBound(variable: Int, lower: BigFraction): Long? {
+    val column = intColOf.getOrNull(variable) ?: return null
+    if (column !in 0 until model.n || colVarId[column] != variable || colIsBool[column]) return null
+    val coefficient = model.exactCost(column)
+    if (coefficient.signum() <= 0 || (0 until model.numVars).any { it != column && !model.exactCost(it).isZero }) {
+        return null
+    }
+    val constant = BigFraction.ofLong(objectiveConstant) + model.exactConstant() -
+        coefficient * model.exactShift(column)
+    return ((lower - constant) * coefficient.reciprocal()).ceilLong()
+}
+
+private const val EXACT_INTEGER_DOUBLE_LIMIT = 9007199254740992.0
+
 /**
  * Sound objective lower bound from the float revised simplex — the tighter of the safe float and
  * integer-multiplier 128-bit bounds ([certifiedTightObjectiveLowerBound]) — used when the cheap safe-bound path
@@ -868,8 +945,10 @@ internal fun LpEngine.sparseCertifiedPrune(
         solveContext.certificationPolicy,
     )
         ?: return LpNodeOutcome(false, null)
-    val full = lb + relaxation.objectiveConstant.toDouble()
-    return if (full >= bound) {
+    if (sourceObjectiveRange(relaxation) == null) return LpNodeOutcome(false, null)
+    val cutoff = enclosingCutoff(bound) ?: return LpNodeOutcome(false, null)
+    val full = checkNotNull(BigFraction.ofDouble(lb)) + BigFraction.ofLong(relaxation.objectiveConstant)
+    return if (full >= cutoff) {
         sink.lp.observePrune()
         LpNodeOutcome(true, null)
     } else {
@@ -910,7 +989,13 @@ internal fun LpEngine.rootLpRelaxationBound(
                 solveContext.certificationPolicy,
             )
         }
-        if (lower != null) lower + relaxation.objectiveConstant.toDouble() else Double.NaN
+        val full = lower?.let { BigFraction.ofDouble(it) }?.plus(BigFraction.ofLong(relaxation.objectiveConstant))
+        val projected = full?.lowerBoundDouble()
+        when {
+            projected == null || sourceObjectiveRange(relaxation) == null -> Double.NaN
+            abs(projected) >= EXACT_INTEGER_DOUBLE_LIMIT -> projected.nextDown()
+            else -> projected
+        }
     }
 } catch (_: CheckedLongOverflowException) {
     Double.NaN
