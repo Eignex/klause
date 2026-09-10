@@ -6,6 +6,7 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.lp.bounding.LpEmphasis
+import com.eignex.klause.lp.engine.LpZeroObjectivePricing
 import com.eignex.klause.presolve.PresolveEmphasis
 import com.eignex.klause.presolve.PresolvePass
 import com.eignex.klause.solver.Sample
@@ -125,6 +126,9 @@ internal class CommonOptions {
      *  default applies to the pooled routes only — the one place `--help` still cannot say so, since the
      *  flag specs are built before the engine is resolved (#1887). */
     var lp: String? = null
+
+    /** `--lp-pricing POLICY`: entering-column policy for zero-objective LP solves. */
+    var lpPricing: LpZeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT
 
     /** Raw repeatable `--param key=value` engine params; interpreted per engine (see [EngineParams]). */
     val engineParams = mutableListOf<String>()
@@ -297,6 +301,24 @@ internal fun commonFlagSpecs(o: CommonOptions): List<FlagSpec> = listOf(
         // env-aware: KLAUSE_LP overrides the built-in default, and --help reflects it.
         default = defaultLp() ?: LpEmphasis.AGGRESSIVE.id,
     ) { o.lp = it },
+    FlagSpec(
+        listOf("--lp-pricing"),
+        true,
+        FlagGroup.KLAUSE,
+        valueLabel = "policy",
+        help = "zero-objective LP entering pricing: min-bound-support | largest-pivot",
+        default = "min-bound-support",
+    ) {
+        o.lpPricing = when (val policy = requireNotNull(it).lowercase()) {
+            "min-bound-support" -> LpZeroObjectivePricing.MIN_BOUND_SUPPORT
+
+            "largest-pivot" -> LpZeroObjectivePricing.LARGEST_PIVOT
+
+            else -> usageError(
+                "--lp-pricing expects min-bound-support | largest-pivot, got `$policy`",
+            )
+        }
+    },
     FlagSpec(
         listOf("-h", "--help"),
         false,

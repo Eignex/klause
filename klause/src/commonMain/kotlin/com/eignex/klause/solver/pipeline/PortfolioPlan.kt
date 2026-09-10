@@ -6,6 +6,7 @@ import com.eignex.klause.backtrack.BacktrackRecipe
 import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.localsearch.strategy.LocalSearchRecipe
 import com.eignex.klause.lp.bounding.LpConfig
+import com.eignex.klause.lp.engine.LpZeroObjectivePricing
 import com.eignex.klause.portfolio.EngineMix
 import com.eignex.klause.portfolio.Kind
 import com.eignex.klause.portfolio.PortfolioScenario
@@ -28,6 +29,8 @@ class PortfolioPlanRequest(
     val defaultArms: Int,
     /** Ceiling applied to LP-enabled backtrack arms. */
     val lpCeiling: LpConfig,
+    /** Entering-column policy for exactly zero-objective LP solves. */
+    val zeroObjectivePricing: LpZeroObjectivePricing,
     /** One invocation-wide backtrack node allowance, if selected. */
     val nodeBudget: NodeBudget?,
     /** Optional model search-annotation arm. */
@@ -73,6 +76,8 @@ class FixedBacktrackPlanRequest(
     val solveBudgetMillis: Long?,
     /** LP configuration selected by the frontend. */
     val lpConfig: LpConfig,
+    /** Entering-column policy for exactly zero-objective LP solves. */
+    val zeroObjectivePricing: LpZeroObjectivePricing,
     /** Optional engine event sink supplied by the frontend. */
     val onEvent: ((SearchEvent) -> Unit)?,
 )
@@ -100,6 +105,7 @@ fun FinitePipeline.planFixedBacktrack(request: FixedBacktrackPlanRequest): Fixed
             propagationCancelFloor = if (request.solveBudgetMillis != null) 0 else base.propagationCancelFloor,
             onEvent = request.onEvent,
             lpConfig = request.lpConfig,
+            zeroObjectivePricing = request.zeroObjectivePricing,
         ),
         engineParams,
         allowSelectors = annotation == null,
@@ -124,10 +130,15 @@ fun FinitePipeline.planPortfolio(request: PortfolioPlanRequest): PortfolioPlan {
 
     val kind = if (request.optimize) Kind.COP else Kind.CSP
     val resolvedBtPool = if (mix != EngineMix.LOCAL_SEARCH) resolveBtRecipes(params, kind) else null
-    val btPool = if (request.nodeBudget != null && mix != EngineMix.LOCAL_SEARCH) {
+    val budgetedBtPool = if (request.nodeBudget != null && mix != EngineMix.LOCAL_SEARCH) {
         withNodeBudget(resolvedBtPool, kind, request.nodeBudget)
     } else {
         resolvedBtPool
+    }
+    val btPool = if (mix != EngineMix.LOCAL_SEARCH) {
+        withLpPricing(budgetedBtPool, kind, request.zeroObjectivePricing)
+    } else {
+        null
     }
     if (mix == EngineMix.BACKTRACK && params.bool("dry-run-solver") == true) {
         return PortfolioPlan.BacktrackDryRun(btPool, kind)
@@ -144,7 +155,10 @@ fun FinitePipeline.planPortfolio(request: PortfolioPlanRequest): PortfolioPlan {
             lpCeiling = request.lpCeiling,
             lsPool = lsResolution.pool,
             btPool = btPool,
-            annotationArm = request.annotationArm?.copy(nodeBudget = request.nodeBudget),
+            annotationArm = request.annotationArm?.copy(
+                nodeBudget = request.nodeBudget,
+                zeroObjectivePricing = request.zeroObjectivePricing,
+            ),
         ),
     )
 }

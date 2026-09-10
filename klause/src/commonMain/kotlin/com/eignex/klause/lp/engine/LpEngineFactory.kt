@@ -4,16 +4,16 @@ import com.eignex.klause.util.Cancellation
 
 /** Entering-column policy for feasibility solves with an exactly zero objective. */
 enum class LpZeroObjectivePricing {
-    /** Preserve the ordinary Harris largest-pivot selection. */
-    DEFAULT,
+    /** Select the finishing candidate with the largest pivot magnitude. */
+    LARGEST_PIVOT,
 
     /** Prefer fewer disturbed non-free basics, then source-column sparsity and seeded ties. */
-    THEORY,
+    MIN_BOUND_SUPPORT,
 }
 
 /** Construction-time pricing configuration. Nonzero objectives ignore [zeroObjective]. */
 internal data class LpPricingOptions(
-    val zeroObjective: LpZeroObjectivePricing = LpZeroObjectivePricing.DEFAULT,
+    val zeroObjective: LpZeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT,
     val tieSeed: Long = 0L,
 )
 
@@ -34,17 +34,9 @@ internal interface LpEngineFactory {
         iterationLimit: Int,
         workLimit: Long,
         trackDegeneracy: Boolean,
+        pricing: LpPricingOptions,
     ): TableauCutSolver
 
-    fun newTableauSolver(
-        model: LpModel,
-        cancellation: Cancellation,
-        iterationLimit: Int,
-        workLimit: Long,
-        trackDegeneracy: Boolean,
-        pricing: LpPricingOptions,
-    ): TableauCutSolver = newTableauSolver(model, cancellation, iterationLimit, workLimit, trackDegeneracy)
-
     fun newPersistentSolver(
         model: LpModel,
         cancellation: Cancellation,
@@ -52,24 +44,8 @@ internal interface LpEngineFactory {
         iterationLimit: Int,
         workLimit: Long,
         trackDegeneracy: Boolean,
+        pricing: LpPricingOptions,
     ): PersistentLpSolver
-
-    fun newPersistentSolver(
-        model: LpModel,
-        cancellation: Cancellation,
-        refactorUpdateLimit: Int,
-        iterationLimit: Int,
-        workLimit: Long,
-        trackDegeneracy: Boolean,
-        pricing: LpPricingOptions,
-    ): PersistentLpSolver = newPersistentSolver(
-        model,
-        cancellation,
-        refactorUpdateLimit,
-        iterationLimit,
-        workLimit,
-        trackDegeneracy,
-    )
 }
 
 internal object ProductionLpEngineFactory : LpEngineFactory {
@@ -89,20 +65,6 @@ internal object ProductionLpEngineFactory : LpEngineFactory {
         iterationLimit: Int,
         workLimit: Long,
         trackDegeneracy: Boolean,
-    ): TableauCutSolver = RevisedSimplex(
-        model,
-        cancellation,
-        iterationLimit = iterationLimit,
-        workLimit = workLimit,
-        trackDegeneracy = trackDegeneracy,
-    )
-
-    override fun newTableauSolver(
-        model: LpModel,
-        cancellation: Cancellation,
-        iterationLimit: Int,
-        workLimit: Long,
-        trackDegeneracy: Boolean,
         pricing: LpPricingOptions,
     ): TableauCutSolver = RevisedSimplex(
         model,
@@ -111,22 +73,6 @@ internal object ProductionLpEngineFactory : LpEngineFactory {
         workLimit = workLimit,
         trackDegeneracy = trackDegeneracy,
         pricing = pricing,
-    )
-
-    override fun newPersistentSolver(
-        model: LpModel,
-        cancellation: Cancellation,
-        refactorUpdateLimit: Int,
-        iterationLimit: Int,
-        workLimit: Long,
-        trackDegeneracy: Boolean,
-    ): PersistentLpSolver = RevisedSimplex(
-        model,
-        cancellation,
-        refactorUpdateLimit = refactorUpdateLimit,
-        iterationLimit = iterationLimit,
-        workLimit = workLimit,
-        trackDegeneracy = trackDegeneracy,
     )
 
     override fun newPersistentSolver(

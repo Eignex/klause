@@ -30,6 +30,7 @@ import com.eignex.klause.lp.engine.LpCertificationPolicy
 import com.eignex.klause.lp.engine.LpEngineFactory
 import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.LpNeighborhood
+import com.eignex.klause.lp.engine.LpPricingOptions
 import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.lp.engine.LpSolver
 import com.eignex.klause.lp.engine.PersistentLpSolver
@@ -146,6 +147,7 @@ private class LifecycleFactory : LpEngineFactory {
         iterationLimit: Int,
         workLimit: Long,
         trackDegeneracy: Boolean,
+        pricing: LpPricingOptions,
     ): TableauCutSolver {
         val delegate = ProductionLpEngineFactory.newTableauSolver(
             model,
@@ -153,6 +155,7 @@ private class LifecycleFactory : LpEngineFactory {
             iterationLimit,
             workLimit,
             trackDegeneracy,
+            pricing,
         )
         val record = record(LifecycleKind.TABLEAU)
         return object : TableauCutSolver, LpSolver by delegate {
@@ -177,6 +180,7 @@ private class LifecycleFactory : LpEngineFactory {
         iterationLimit: Int,
         workLimit: Long,
         trackDegeneracy: Boolean,
+        pricing: LpPricingOptions,
     ): PersistentLpSolver {
         persistentAttempts++
         if (persistentAttempts == failPersistentAcquisitionAt) error("persistent acquisition failure")
@@ -187,6 +191,7 @@ private class LifecycleFactory : LpEngineFactory {
             iterationLimit,
             workLimit,
             trackDegeneracy,
+            pricing,
         )
         val record = record(LifecycleKind.PERSISTENT)
         return object : PersistentLpSolver, LpSolver by delegate {
@@ -488,7 +493,15 @@ class LpLifecycleTest {
             context(factory),
         )
         val model = LpBuilder().apply { addVar(0L, 1L) }.build(Sense.MINIMIZE)
-        engine.nodeSimplex = factory.newPersistentSolver(model, Cancellation.Never, 50, 0, 0L, false)
+        engine.nodeSimplex = factory.newPersistentSolver(
+            model,
+            Cancellation.Never,
+            50,
+            0,
+            0L,
+            false,
+            LpPricingOptions(),
+        )
         engine.gatedResidual(PropagationSession(problem))
 
         assertFailsWith<IllegalStateException> { engine.close() }

@@ -15,8 +15,10 @@ import com.eignex.klause.lp.engine.LpCertifier
 import com.eignex.klause.lp.engine.LpEngineFactory
 import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.LpNeighborhood
+import com.eignex.klause.lp.engine.LpPricingOptions
 import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.lp.engine.LpSolver
+import com.eignex.klause.lp.engine.LpZeroObjectivePricing
 import com.eignex.klause.lp.engine.PersistentLpSolver
 import com.eignex.klause.lp.engine.ProductionLpCertificationPolicy
 import com.eignex.klause.lp.engine.ProductionLpEngineFactory
@@ -83,12 +85,14 @@ private class TerminalRecordingFactory : LpEngineFactory {
         iterationLimit: Int,
         workLimit: Long,
         trackDegeneracy: Boolean,
+        pricing: LpPricingOptions,
     ): TableauCutSolver = ProductionLpEngineFactory.newTableauSolver(
         model,
         cancellation,
         iterationLimit,
         workLimit,
         trackDegeneracy,
+        pricing,
     )
 
     override fun newPersistentSolver(
@@ -98,6 +102,7 @@ private class TerminalRecordingFactory : LpEngineFactory {
         iterationLimit: Int,
         workLimit: Long,
         trackDegeneracy: Boolean,
+        pricing: LpPricingOptions,
     ): PersistentLpSolver {
         persistentSolversCreated++
         val delegate = ProductionLpEngineFactory.newPersistentSolver(
@@ -107,6 +112,7 @@ private class TerminalRecordingFactory : LpEngineFactory {
             iterationLimit,
             workLimit,
             trackDegeneracy,
+            pricing,
         )
         return object : PersistentLpSolver by delegate {
             private var closed = false
@@ -190,6 +196,7 @@ class LpTerminalDeclineTest {
                 randomSeed = 1L,
                 defaultArms = 1,
                 lpConfig = LpConfig(),
+                zeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT,
                 nodeBudget = null,
                 solveBudgetMillis = null,
                 allSolutions = allSolutions,

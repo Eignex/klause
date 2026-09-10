@@ -4,6 +4,7 @@ import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.lp.bounding.LpEmphasis
 import com.eignex.klause.lp.bounding.LpTechnique
+import com.eignex.klause.lp.engine.LpZeroObjectivePricing
 import com.eignex.klause.solver.pipeline.FiniteEngine
 import com.eignex.klause.solver.pipeline.ValSelectorKind
 import com.eignex.klause.solver.pipeline.VarSelectorKind
@@ -719,6 +720,21 @@ class CliModeTest {
     }
 
     @Test
+    fun `--lp-pricing defaults to minimum bound support and accepts largest pivot`() {
+        val defaults = CommonOptions()
+        assertEquals(LpZeroObjectivePricing.MIN_BOUND_SUPPORT, defaults.lpPricing)
+
+        val overridden = CommonOptions()
+        parseArgs(arrayOf("--lp-pricing", "largest-pivot"), commonFlagSpecs(overridden)) { }
+
+        assertEquals(LpZeroObjectivePricing.LARGEST_PIVOT, overridden.lpPricing)
+        val error = assertFailsWith<CliUsageException> {
+            parseArgs(arrayOf("--lp-pricing", "unknown"), commonFlagSpecs(CommonOptions())) { }
+        }
+        assertTrue("expects min-bound-support | largest-pivot" in error.message.orEmpty(), error.message.orEmpty())
+    }
+
+    @Test
     fun `default engine is mixed and is overridable via the KLAUSE_ENGINE property`() {
         assertTrue(defaultEngine() == FiniteEngine.MIXED, defaultEngine().id)
         // cliProp reads the system property first on the JVM, so it stands in for the env var.
@@ -879,6 +895,23 @@ class CliModeTest {
         val out = captureErr { main(arrayOf("-e", "cp", "--param", "dry-run-solver=on", fzn.absolutePath)) }
         assertTrue("solver dry-run:" in out, out)
         assertTrue("backtrack" in out && "var-select:" in out, out)
+        assertTrue("lp-pricing:  min-bound-support" in out, out)
+
+        val largestPivot = captureErr {
+            main(
+                arrayOf(
+                    "-e",
+                    "cp",
+                    "--lp-pricing",
+                    "largest-pivot",
+                    "--param",
+                    "dry-run-solver=on",
+                    fzn.absolutePath,
+                ),
+            )
+        }
+        assertTrue("lp-pricing:  largest-pivot" in largestPivot, largestPivot)
+        assertTrue("lp-pricing:  min-bound-support" !in largestPivot, largestPivot)
     }
 
     @Test

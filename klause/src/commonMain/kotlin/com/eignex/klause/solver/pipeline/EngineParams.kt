@@ -49,6 +49,7 @@ import com.eignex.klause.localsearch.strategy.SimulatedAnnealing
 import com.eignex.klause.localsearch.strategy.SourceDrivenStrategy
 import com.eignex.klause.localsearch.strategy.WalkSat
 import com.eignex.klause.lp.bounding.LpConfig
+import com.eignex.klause.lp.engine.LpZeroObjectivePricing
 import com.eignex.klause.portfolio.BacktrackCatalog
 import com.eignex.klause.portfolio.EngineMix
 import com.eignex.klause.portfolio.Kind
@@ -676,6 +677,15 @@ fun withNodeBudget(pool: List<() -> BacktrackRecipe>?, kind: Kind, budget: NodeB
     (pool ?: BacktrackCatalog.factories(kind)).map { factory ->
         { editRecipe(factory(), { params -> params.copy(nodeBudget = budget) }) }
     }
+
+/** [pool], or the curated pool when it is null, with one zero-objective LP pricing policy. */
+internal fun withLpPricing(
+    pool: List<() -> BacktrackRecipe>?,
+    kind: Kind,
+    pricing: LpZeroObjectivePricing,
+): List<() -> BacktrackRecipe> = (pool ?: BacktrackCatalog.factories(kind)).map { factory ->
+    { editRecipe(factory(), { params -> params.copy(zeroObjectivePricing = pricing) }) }
+}
 
 /** Wrap [recipe] so [edit] is applied to the [BacktrackParams] it builds — per worker, so selector
  *  state stays unshared. Preserves the arm's label for telemetry / the `dry-run-solver` listing. */

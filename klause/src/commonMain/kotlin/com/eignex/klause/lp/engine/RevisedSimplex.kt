@@ -1772,7 +1772,9 @@ internal class RevisedSimplex(
                     k++
                 }
                 if (best != -1) {
-                    val selected = if (pricing.zeroObjective == LpZeroObjectivePricing.THEORY && allZeroCost) {
+                    val minimizeBoundSupport =
+                        pricing.zeroObjective == LpZeroObjectivePricing.MIN_BOUND_SUPPORT && allZeroCost
+                    val selected = if (minimizeBoundSupport) {
                         when (val theory = chooseTheoryEntering(theoryCandidates, leavingRow, enforced)) {
                             EnteringChoice.ResourceStopped -> return theory
                             is EnteringChoice.Selected -> theory.column ?: best

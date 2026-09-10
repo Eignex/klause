@@ -43,7 +43,7 @@ class LpEngineInjectionTest {
         val params = LpParams(
             lpPlan = LpPlan(bounding = true),
             randomSeed = 31L,
-        ).withZeroObjectivePricing(LpZeroObjectivePricing.THEORY)
+        )
         val rejectingFactory = RecordingLpEngineFactory()
         val rejecting = LpEngine(
             problem,
@@ -66,7 +66,7 @@ class LpEngineInjectionTest {
         assertTrue(accepted)
         assertEquals(1, rejectingFactory.calls.count { it.kind == EngineConstruction.PERSISTENT })
         val construction = rejectingFactory.calls.single { it.kind == EngineConstruction.PERSISTENT }
-        assertEquals(LpZeroObjectivePricing.THEORY, construction.zeroObjectivePricing)
+        assertEquals(LpZeroObjectivePricing.MIN_BOUND_SUPPORT, construction.zeroObjectivePricing)
         assertEquals(31L, construction.tieSeed)
     }
 
@@ -86,7 +86,8 @@ class LpEngineInjectionTest {
             LpParams(
                 lpPlan = LpPlan(bounding = true),
                 randomSeed = 37L,
-            ).withZeroObjectivePricing(LpZeroObjectivePricing.THEORY),
+                zeroObjectivePricing = LpZeroObjectivePricing.LARGEST_PIVOT,
+            ),
             SolveStatsSink(backend = "root"),
             LpSolveContext(factory, decline),
         )
@@ -96,7 +97,7 @@ class LpEngineInjectionTest {
         assertTrue(bound.isNaN())
         assertEquals(1, factory.calls.count { it.kind == EngineConstruction.TABLEAU })
         val construction = factory.calls.single { it.kind == EngineConstruction.TABLEAU }
-        assertEquals(LpZeroObjectivePricing.THEORY, construction.zeroObjectivePricing)
+        assertEquals(LpZeroObjectivePricing.LARGEST_PIVOT, construction.zeroObjectivePricing)
         assertEquals(37L, construction.tieSeed)
     }
 

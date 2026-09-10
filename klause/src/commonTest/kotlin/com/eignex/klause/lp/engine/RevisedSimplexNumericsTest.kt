@@ -42,6 +42,7 @@ class RevisedSimplexNumericsTest {
         val simplex = RevisedSimplex(
             multiPivotFeasibilityModel(),
             cancellation = Cancellation { ++polls == 2 },
+            pricing = LpPricingOptions(LpZeroObjectivePricing.LARGEST_PIVOT),
             basisSolverFactory = { matrix ->
                 DistortingBasisSolver(KotlinBasisSolver(matrix)).also { factors = it }
             },

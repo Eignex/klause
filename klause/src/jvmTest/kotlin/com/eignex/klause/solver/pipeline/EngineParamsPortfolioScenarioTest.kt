@@ -1,6 +1,7 @@
 package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.lp.bounding.LpConfig
+import com.eignex.klause.lp.engine.LpZeroObjectivePricing
 import com.eignex.klause.portfolio.EngineMix
 import com.eignex.klause.portfolio.Kind
 import com.eignex.klause.portfolio.PortfolioScenario
@@ -28,6 +29,7 @@ class EngineParamsPortfolioScenarioTest {
                 randomSeed = null,
                 defaultArms = PortfolioScenario.DEFAULT_ARMS,
                 lpCeiling = LpConfig.AGGRESSIVE,
+                zeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT,
                 nodeBudget = null,
                 annotationArm = null,
             ),
@@ -139,6 +141,7 @@ class EngineParamsPortfolioScenarioTest {
                 nodeBudget = null,
                 solveBudgetMillis = null,
                 lpConfig = LpConfig.OFF,
+                zeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT,
                 onEvent = null,
             ),
         )

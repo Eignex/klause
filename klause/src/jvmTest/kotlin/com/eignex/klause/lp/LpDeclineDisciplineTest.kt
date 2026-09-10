@@ -35,6 +35,7 @@ import com.eignex.klause.lp.engine.LpCertifier
 import com.eignex.klause.lp.engine.LpEngineFactory
 import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.LpNeighborhood
+import com.eignex.klause.lp.engine.LpPricingOptions
 import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.lp.engine.LpSolver
 import com.eignex.klause.lp.engine.LpVerdict
@@ -121,6 +122,7 @@ private class ConsumerRecordingFactory : LpEngineFactory {
         iterationLimit: Int,
         workLimit: Long,
         trackDegeneracy: Boolean,
+        pricing: LpPricingOptions,
     ): TableauCutSolver {
         calls += DeclineCall.TABLEAU
         cancellations += cancellation
@@ -130,6 +132,7 @@ private class ConsumerRecordingFactory : LpEngineFactory {
             iterationLimit,
             workLimit,
             trackDegeneracy,
+            pricing,
         )
         return RecordingTableauSolver(delegate, calls)
     }
@@ -141,6 +144,7 @@ private class ConsumerRecordingFactory : LpEngineFactory {
         iterationLimit: Int,
         workLimit: Long,
         trackDegeneracy: Boolean,
+        pricing: LpPricingOptions,
     ): PersistentLpSolver {
         calls += DeclineCall.PERSISTENT
         cancellations += cancellation
@@ -151,6 +155,7 @@ private class ConsumerRecordingFactory : LpEngineFactory {
             iterationLimit,
             workLimit,
             trackDegeneracy,
+            pricing,
         )
         return RecordingPersistentSolver(delegate, calls)
     }

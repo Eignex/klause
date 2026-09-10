@@ -23,22 +23,12 @@ class LpParams(
     val solveBudgetMillis: Long? = null,
     /** Seed for the feasibility-pump RNG; null picks a fixed default. */
     val randomSeed: Long? = null,
+    /** Entering-column policy for exactly zero-objective LP solves. */
+    val zeroObjectivePricing: LpZeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT,
 ) {
-    /** Optional entering-column policy for exactly zero-objective LP solves. */
-    var zeroObjectivePricing: LpZeroObjectivePricing = LpZeroObjectivePricing.DEFAULT
-        private set
-
-    /** Return an otherwise identical configuration using [pricing] for zero-objective LP solves. */
-    fun withZeroObjectivePricing(pricing: LpZeroObjectivePricing): LpParams =
-        LpParams(lpPlan, lpConfig, cancellation, solveBudgetMillis, randomSeed).also {
-            it.zeroObjectivePricing = pricing
-        }
-
     /** These params with [lpPlan] replaced (the resolved-plan swap [LpEngine] makes after auto-config). */
     fun copy(lpPlan: LpPlan = this.lpPlan): LpParams =
-        LpParams(lpPlan, lpConfig, cancellation, solveBudgetMillis, randomSeed).also {
-            it.zeroObjectivePricing = zeroObjectivePricing
-        }
+        LpParams(lpPlan, lpConfig, cancellation, solveBudgetMillis, randomSeed, zeroObjectivePricing)
 }
 
 /**
