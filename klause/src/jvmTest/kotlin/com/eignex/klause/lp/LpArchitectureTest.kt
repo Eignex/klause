@@ -78,7 +78,6 @@ class LpArchitectureTest {
             """.trimIndent(),
             """
                 package com.eignex.klause.simplex.basis
-                import com.eignex.koblas.ExperimentalKoblasApi
                 import com.eignex.koblas.SparseVector
                 import com.eignex.koblas.column
                 import com.eignex.koblas.koblas
@@ -109,7 +108,7 @@ class LpArchitectureTest {
     }
 
     @Test
-    fun `basis leaf rejects factorization dependencies`() {
+    fun `basis leaf rejects factorization and backend dependencies`() {
         for (dependency in listOf(
             "import com.eignex.koblas.sparse.factorization.lu.F64SparseMarkowitzLu",
             "import com.eignex.koblas.sparse.basis.*",
@@ -119,6 +118,7 @@ class LpArchitectureTest {
             "import com.eignex.koblas.corex.Matrix as Matrix",
             "import com.eignex.koblas.*",
             "import com.eignex.koblas.SparseMatrixFactory",
+            "val backend = com.eignex.koblas.koblas",
             "val solver: com.eignex.klause.lp.engine.LpModel? = null",
             "import com.eignex.klause.simplex.exact.rationalOutcome",
             "import com.eignex.klause.simplex.exact.RationalSimplex",
@@ -130,7 +130,7 @@ class LpArchitectureTest {
     }
 
     @Test
-    fun `engine rejects koblas factorization and basis dependencies`() {
+    fun `engine rejects koblas factorization basis and provider dependencies`() {
         for (dependency in listOf(
             "import com.eignex.koblas.sparse.factorization.lu.F64SparseMarkowitzLu",
             "import com.eignex.koblas.sparse.factorization.lu.F64SparseMarkowitzLu as SparseLu",
@@ -138,6 +138,7 @@ class LpArchitectureTest {
             "import com.eignex.koblas.sparse.basis.BasisSolverFactory",
             "import com.eignex.koblas.core.Vector",
             "val vector: com.eignex.koblas.core.Vector? = null",
+            "val backend = com.eignex.koblas.koblas",
         )) {
             val source = "package com.eignex.klause.lp.engine\n$dependency"
             assertTrue(
@@ -272,7 +273,6 @@ internal object LpBoundaryScanner {
                 packageName == BASIS_PACKAGE || packageName.startsWith("$BASIS_PACKAGE.") -> listOf(
                     "com.eignex.koblas.SparseMatrix",
                     "com.eignex.koblas.SparseVector",
-                    "com.eignex.koblas.ExperimentalKoblasApi",
                     "com.eignex.koblas.column",
                     "com.eignex.koblas.koblas",
                     "com.eignex.koblas.sparse.SparseWorkspace",
