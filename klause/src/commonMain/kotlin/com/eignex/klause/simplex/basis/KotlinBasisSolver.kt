@@ -330,6 +330,29 @@ internal class KotlinBasisSolver(
         return true
     }
 
+    override fun extend(matrix: SparseMatrix, extension: BasisExtension): BasisExtensionResult? {
+        requireOpen()
+        val state = verifyBasisExtension(source, matrix, columns, unitRows, extension) ?: return null
+        val current = cache ?: return null
+        val target = KotlinBasisSolver(
+            matrix,
+            policy,
+            updateLimit,
+            fillFactor,
+            densityThreshold,
+            reusePivotOrder,
+        )
+        var transferred = false
+        try {
+            val (extended, units) = buildExtendedCache(current, source, target.source, state, densityThreshold)
+            target.installExtension(extended, state.basisColumns, state.basisUnitRows, units)
+            transferred = true
+            return BasisExtensionResult(target, state.basisColumns, state.basisUnitRows)
+        } finally {
+            if (!transferred) target.close()
+        }
+    }
+
     override fun close() {
         if (closed) return
         for (snapshot in liveSnapshots.toList()) snapshot.close()
@@ -363,6 +386,29 @@ internal class KotlinBasisSolver(
         retainedOrder = SymbolicLu(
             result.factors.symbolic.rowOrder.copyOf(),
             result.factors.symbolic.columnOrder.copyOf(),
+        )
+        singular = false
+    }
+
+    private fun installExtension(extended: BasisSolveCache, columns: IntArray, unitRows: IntArray, units: Long) {
+        cache = extended
+        this.columns = columns.copyOf()
+        this.unitRows = unitRows.copyOf()
+        retainedOrder = SymbolicLu(
+            extended.factors.symbolic.rowOrder.copyOf(),
+            extended.factors.symbolic.columnOrder.copyOf(),
+        )
+        workMeter.reset(
+            BasisBuildWork(
+                BasisBuildKind.EXTENSION,
+                successful = true,
+                builds = 0,
+                orderingAttempts = 0,
+                reusedOrders = 0,
+                fallbacks = 0,
+                units = units,
+                installedBuildUnits = null,
+            ),
         )
         singular = false
     }
@@ -414,7 +460,7 @@ internal class KotlinBasisSolver(
     }
 }
 
-private class BasisSolveCache private constructor(
+internal class BasisSolveCache private constructor(
     val factors: LuFactors,
     val ft: ForrestTomlinFactors,
     threshold: Double,
@@ -436,4 +482,4 @@ private class BasisSolveCache private constructor(
     }
 }
 
-private class BasisCacheState(val factors: LuFactors, val ft: ForrestTomlinState)
+internal class BasisCacheState(val factors: LuFactors, val ft: ForrestTomlinState)

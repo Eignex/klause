@@ -3,6 +3,7 @@ package com.eignex.klause.simplex.basis
 internal enum class BasisBuildKind {
     REFACTORIZATION,
     REPAIR,
+    EXTENSION,
 }
 
 // A unit is one reported entry visit, pivot visit, candidate test, Schur update, or copied entry.

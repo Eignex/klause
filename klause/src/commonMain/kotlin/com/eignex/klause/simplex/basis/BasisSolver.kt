@@ -1,5 +1,7 @@
 package com.eignex.klause.simplex.basis
 
+import com.eignex.koblas.SparseMatrix
+
 internal class BasisArithmeticException(message: String) : ArithmeticException(message)
 
 internal enum class BasisUpdate {
@@ -56,5 +58,6 @@ internal interface BasisSolver : AutoCloseable {
 
     fun snapshot(): BasisSnapshot? = null
     fun restore(snapshot: BasisSnapshot): Boolean = false
+    fun extend(matrix: SparseMatrix, extension: BasisExtension): BasisExtensionResult? = null
     override fun close() {}
 }

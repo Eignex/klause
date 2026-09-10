@@ -166,6 +166,48 @@ class BasisWorkTest {
         assertEquals(0, solver.basisWork.workSinceBuild)
     }
 
+    @Test
+    fun `extension records transfer work without inheriting a reinversion epoch`() {
+        val oldSource = SparseMatrix.ofColumns(
+            2,
+            2,
+            listOf(listOf(0 to 2.0, 1 to 1.0), listOf(0 to 1.0, 1 to 3.0)),
+        )
+        val old = KotlinBasisSolver(oldSource)
+        assertTrue(old.refactorize(intArrayOf(0, 1)))
+        val vector = IndexedVector(2).also { it.unit(0) }
+        old.ftran(vector, 0.0)
+        assertTrue(old.basisWork.workSinceBuild > 0)
+        val newSource = SparseMatrix.ofColumns(
+            3,
+            3,
+            listOf(
+                listOf(1 to 2.0, 2 to 1.0, 0 to 0.5),
+                listOf(1 to 1.0, 2 to 3.0, 0 to 0.25),
+                listOf(0 to 1.0),
+            ),
+        )
+
+        val result = assertNotNull(
+            old.extend(
+                newSource,
+                BasisExtension(intArrayOf(0, 1), intArrayOf(-1, -1), intArrayOf(1, 2), intArrayOf(0, 1)),
+            ),
+        )
+
+        val extension = assertNotNull(result.solver.basisWork?.build)
+        assertEquals(BasisBuildKind.EXTENSION, extension.kind)
+        assertEquals(0, extension.builds)
+        assertEquals(null, extension.installedBuildUnits)
+        assertTrue(extension.units > 0)
+        assertEquals(0, result.solver.basisWork?.workSinceBuild)
+        val snapshot = assertNotNull(result.solver.snapshot())
+        result.solver.ftran(IndexedVector(3).also { it.unit(0) }, 0.0)
+        assertTrue(result.solver.basisWork!!.workSinceBuild > 0)
+        assertTrue(result.solver.restore(snapshot))
+        assertEquals(0, result.solver.basisWork?.workSinceBuild)
+    }
+
     private fun measuredTrace(source: SparseMatrix): BasisWork {
         val solver = KotlinBasisSolver(source, updateLimit = 100, fillFactor = 100.0)
         val basis = IntArray(source.rows) { it }

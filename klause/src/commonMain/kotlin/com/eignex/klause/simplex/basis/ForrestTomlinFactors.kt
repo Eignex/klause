@@ -252,4 +252,12 @@ internal class ForrestTomlinState(
 
 internal class ForrestTomlinRowState(private val pivot: Int, private val entries: BasisSlice) {
     fun restore() = ForrestTomlinRow(pivot, entries.copyOwned())
+
+    fun shifted(offset: Int): ForrestTomlinRowState = ForrestTomlinRowState(
+        pivot + offset,
+        BasisSlice(
+            IntArray(entries.count) { entries.indices[entries.offset + it] + offset },
+            DoubleArray(entries.count) { entries.values[entries.offset + it] },
+        ),
+    )
 }
