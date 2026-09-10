@@ -73,11 +73,14 @@ class LpScopedBasisTransferTest {
             assertTrue(solver.pop(0))
 
             assertTrue(solver.compact())
+            val settledWork = solver.metrics.appendBasisWork
 
             assertEquals(0, solver.metrics.appendReplacementAttempts)
             assertEquals(0, solver.metrics.appendTransfers)
             assertEquals(1, solver.state.model.m)
             B5bIndependentExactSourceValidator.validate(solver.state, assertNotNull(solver.solve()))
+            assertEquals(settledWork, solver.metrics.appendBasisWork)
+            assertEquals(0, solver.metrics.appendUnknownWork)
         }
     }
 

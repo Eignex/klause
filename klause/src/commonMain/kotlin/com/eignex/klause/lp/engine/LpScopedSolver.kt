@@ -69,6 +69,7 @@ internal class LpScopedSolver(
     private var pendingAppendSolveWork: Long? = null
     private var pendingAppendSolveWorkComplete = false
     private var pendingAppendSolve = false
+    private var pendingAppendSolveOwner: PersistentLpSolver? = null
 
     val state: LpExactState get() = trail.state
     var lastResult: CertifiedLpResult? = null
@@ -181,6 +182,7 @@ internal class LpScopedSolver(
     }
 
     private fun replace(next: LpBoundTrail, token: Cancellation, append: Boolean): Boolean {
+        if (append) solver?.let { recordPendingAppendSolve(it) }
         val selected = if (append) appendReplacement(next.state, token) else null
         val expected = selected?.second?.basicVars ?: if (next.state.model.m < state.model.m) {
             // Seat the disappearing logicals in an isolated old-size owner before deleting their slots.
@@ -207,11 +209,15 @@ internal class LpScopedSolver(
             val pendingWork = basisWorkUnits(replacementWork)
             if (!replacement.second.basicVars.contentEquals(expected) || token()) return false
             val old = solver
+            if (!append && old != null) recordPendingAppendSolve(old)
             solver = replacement.first
             if (append) {
                 pendingAppendSolveWork = pendingWork
                 pendingAppendSolveWorkComplete = basisWorkComplete(replacementWork)
                 pendingAppendSolve = true
+                pendingAppendSolveOwner = replacement.first
+            } else {
+                clearPendingAppendSolve()
             }
             publish(next)
             published = true
@@ -337,6 +343,11 @@ internal class LpScopedSolver(
     @Suppress("TooGenericExceptionCaught")
     private fun recordPendingAppendSolve(current: PersistentLpSolver) {
         if (!pendingAppendSolve) return
+        if (current !== pendingAppendSolveOwner) {
+            appendUnknownWork = saturatingAdd(appendUnknownWork, 1)
+            clearPendingAppendSolve()
+            return
+        }
         val before = pendingAppendSolveWork
         val beforeComplete = pendingAppendSolveWorkComplete
         try {
@@ -348,10 +359,15 @@ internal class LpScopedSolver(
             appendUnknownWork = saturatingAdd(appendUnknownWork, 1)
             throw failure
         } finally {
-            pendingAppendSolve = false
-            pendingAppendSolveWork = null
-            pendingAppendSolveWorkComplete = false
+            clearPendingAppendSolve()
         }
+    }
+
+    private fun clearPendingAppendSolve() {
+        pendingAppendSolve = false
+        pendingAppendSolveOwner = null
+        pendingAppendSolveWork = null
+        pendingAppendSolveWorkComplete = false
     }
 
     @Suppress("TooGenericExceptionCaught")
