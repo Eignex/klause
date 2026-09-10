@@ -70,6 +70,7 @@ class LpArchitectureTest {
             """
                 package com.eignex.klause.lp.engine
                 import com.eignex.klause.simplex.basis.BasisSolver
+                import com.eignex.koblas.sparse.SparseWorkspace
                 val solver: RevisedSimplex? = null
             """.trimIndent(),
             """
@@ -258,6 +259,7 @@ internal object LpBoundaryScanner {
             val allowedTypes = when {
                 packageName == ENGINE_PACKAGE || packageName.startsWith("$ENGINE_PACKAGE.") -> listOf(
                     "com.eignex.koblas.SparseMatrix",
+                    "com.eignex.koblas.sparse.SparseWorkspace",
                 )
 
                 packageName == BASIS_PACKAGE || packageName.startsWith("$BASIS_PACKAGE.") -> listOf(

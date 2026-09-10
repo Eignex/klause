@@ -14,6 +14,7 @@ import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.argsortBy
 import com.eignex.koblas.SparseMatrix
+import com.eignex.koblas.sparse.SparseWorkspace
 import kotlin.math.abs
 
 /**
@@ -132,6 +133,10 @@ internal class RevisedSimplex(
     // BTRAN worth having, since dotting ρ against all numVars columns would swamp it.
     private val rowCols: Array<IntArray>
     private val rowVals: Array<DoubleArray>
+
+    // A permanently active full support lets sparse AXPY update a pre-populated dense destination.
+    private val denseSupport = IntArray(m) { it }
+    private val denseMarks = IntArray(m) { 1 }
 
     private val basicVar = IntArray(m)
     private val status = Array(numVars) { VarStatus.BASIC }
@@ -316,11 +321,7 @@ internal class RevisedSimplex(
      *  rather than `m`, since an indexed vector clears only what it stored. */
     private fun scatterColumn(j: Int, into: IndexedVector) {
         work.add(columnNnz(j))
-        into.clear()
-        for (k in colPtr[j] until colPtr[j + 1]) {
-            val v = colVal[k]
-            if (v != 0.0) into.store(rowIdx[k], v)
-        }
+        into.scatterStored(rowIdx, colPtr[j], colVal, colPtr[j], columnNnz(j))
     }
 
     /** `y · A_j`, uncharged — for the passes that must not move the work meter. */
@@ -553,7 +554,14 @@ internal class RevisedSimplex(
     private fun shouldSampleQuality(): Boolean = refactorPolicy.shouldSample(cancelled = false) && !cancellation()
 
     private fun denseColumn(column: Int): DoubleArray = DoubleArray(m).also { dense ->
-        for (entry in colPtr[column] until colPtr[column + 1]) dense[rowIdx[entry]] = colVal[entry]
+        sparseAxpy(dense, 1.0, column)
+    }
+
+    private fun sparseAxpy(destination: DoubleArray, alpha: Double, column: Int) {
+        SparseWorkspace.scatterAxpy(
+            alpha, rowIdx, colPtr[column], colVal, colPtr[column], columnNnz(column),
+            destination, denseMarks, 1, denseSupport, 0, m,
+        )
     }
 
     /** `B x = b` for a dense right-hand side, into [out] through [carrier]. */
@@ -689,7 +697,7 @@ internal class RevisedSimplex(
 
     /** Reset the Devex reference weights to 1 (a fresh reference frame). */
     private fun resetGamma() {
-        for (i in 0 until m) gamma[i] = 1.0
+        gamma.fill(1.0)
     }
 
     /**
@@ -1256,7 +1264,8 @@ internal class RevisedSimplex(
         // The columns this iteration's pivot row reached, and the iteration that reached them. A stamp
         // rather than a clear: the row is formed over ρ's nonzeros, and zeroing [pivotRowEntry] between
         // iterations would reintroduce the pass over every column that forming it this way removes.
-        val touched = IntArrayList()
+        val touched = IntArray(numVars)
+        var touchedCount = 0
         val touchEpoch = IntArray(numVars)
         var epoch = 0
         // Whether an iterate's basic values are in [beta], so a solve that stops short can still hand
@@ -1362,27 +1371,22 @@ internal class RevisedSimplex(
             // entries instead of nnz(A), which is the whole point of ρ staying sparse. A column ρ misses
             // has ρ·A_j = 0 exactly, so the eligibility pass below loses no candidate by skipping it.
             epoch++
-            touched.clear()
+            touchedCount = 0
             var pivotRowOps = 0L
             pivotEtaVec.forEachStored { i, rhoI ->
                 val cols = rowCols[i]
                 val vals = rowVals[i]
                 pivotRowOps += cols.size
-                for (k in cols.indices) {
-                    val j = cols[k]
-                    if (touchEpoch[j] != epoch) {
-                        touchEpoch[j] = epoch
-                        pivotRowEntry[j] = 0.0
-                        touched.add(j)
-                    }
-                    pivotRowEntry[j] += rhoI * vals[k]
-                }
+                touchedCount = SparseWorkspace.scatterAxpy(
+                    rhoI, cols, 0, vals, 0, cols.size,
+                    pivotRowEntry, touchEpoch, epoch, touched, 0, touchedCount,
+                )
             }
             work.add(pivotRowOps)
             // Collect the dual-feasible entering candidates and their ratios; eligibility is the sign
             // rule that keeps reduced costs feasible as the leaving variable moves to its bound.
             elig.clear()
-            for (t in 0 until touched.size) {
+            for (t in 0 until touchedCount) {
                 val j = touched[t]
                 if (status[j] == VarStatus.BASIC || model.fixed(j)) continue
                 // An unenforced row's slack never enters — it is conceptually basic forever (and the
@@ -1490,7 +1494,7 @@ internal class RevisedSimplex(
             if (status[j] == VarStatus.BASIC) continue
             val u = seat(model, status[j], j)
             if (u == 0.0) continue
-            for (k in colPtr[j] until colPtr[j + 1]) out[rowIdx[k]] -= colVal[k] * u
+            sparseAxpy(out, -u, j)
             work.add(2 * (colPtr[j + 1] - colPtr[j]))
         }
         work.add(m)
@@ -1590,7 +1594,7 @@ internal class RevisedSimplex(
             val delta = seat(model, status[j], j) - seat(previous, seats[j], j)
             if (delta == 0.0) continue
             changed = true
-            for (p in colPtr[j] until colPtr[j + 1]) rhs[rowIdx[p]] -= colVal[p] * delta
+            sparseAxpy(rhs, -delta, j)
             work.add(2 * (colPtr[j + 1] - colPtr[j]))
         }
         work.add(numVars)

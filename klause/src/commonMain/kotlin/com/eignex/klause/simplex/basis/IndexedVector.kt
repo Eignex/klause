@@ -1,6 +1,7 @@
 package com.eignex.klause.simplex.basis
 
 import com.eignex.koblas.SparseMatrix
+import com.eignex.koblas.sparse.SparseWorkspace
 
 // Dense values with unique sparse support. Explicit zeros stay stored until clear; arrays never escape.
 internal class IndexedVector(val size: Int) {
@@ -10,7 +11,7 @@ internal class IndexedVector(val size: Int) {
 
     private val values = DoubleArray(size)
     private val indices = IntArray(size)
-    private val stored = BooleanArray(size)
+    private val stored = IntArray(size)
     var count: Int = 0
         private set
     val density: Double get() = if (size == 0) 0.0 else count.toDouble() / size
@@ -26,8 +27,8 @@ internal class IndexedVector(val size: Int) {
 
     fun store(i: Int, value: Double) {
         require(i in 0 until size)
-        require(!stored[i]) { "position $i is already stored" }
-        stored[i] = true
+        require(stored[i] == 0) { "position $i is already stored" }
+        stored[i] = 1
         indices[count++] = i
         values[i] = value
     }
@@ -35,7 +36,7 @@ internal class IndexedVector(val size: Int) {
     fun clear() {
         forEachStored { i, _ ->
             values[i] = 0.0
-            stored[i] = false
+            stored[i] = 0
         }
         count = 0
     }
@@ -50,6 +51,15 @@ internal class IndexedVector(val size: Int) {
         require(matrix.rows == size && column in 0 until matrix.cols)
         clear()
         matrix.forEachInColumn(column) { i, value -> if (value != 0.0) store(i, value) }
+    }
+
+    // The input is canonical sparse support: indices are unique and values are nonzero.
+    fun scatterStored(indices: IntArray, indexOffset: Int, source: DoubleArray, valueOffset: Int, count: Int) {
+        clear()
+        this.count = SparseWorkspace.scatterAxpy(
+            1.0, indices, indexOffset, source, valueOffset, count,
+            values, stored, 1, this.indices, 0, 0,
+        )
     }
 
     fun scatter(dense: DoubleArray) {
