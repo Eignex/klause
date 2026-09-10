@@ -50,6 +50,7 @@ class RefactorPolicyTest {
         val bad = BasisSolveQuality(1e-4, 1e-4)
 
         assertEquals(EngineRefactorTrigger.RESIDUAL, policy.chooseAtSafePoint(0, 20, quality = bad))
+        policy.recordFactorization(factorNnz = 20, buildWork = 1_000L, pivotSpread = 0.5)
         assertNull(policy.chooseAtSafePoint(0, 20, quality = bad))
         policy.recordAcceptedUpdate(10L)
         assertEquals(EngineRefactorTrigger.RESIDUAL, policy.chooseAtSafePoint(1, 20, quality = bad))
@@ -94,11 +95,41 @@ class RefactorPolicyTest {
     }
 
     @Test
+    fun `aggregate overflow disables adaptive work triggers`() {
+        val policy = RefactorPolicy()
+        policy.recordFactorization(factorNnz = 10, buildWork = 100L, pivotSpread = 1.0)
+        repeat(8) { policy.recordAcceptedUpdate(0L) }
+        policy.recordBasisSolve(Long.MAX_VALUE - 10L)
+        policy.recordBasisSolve(20L)
+
+        assertNull(policy.chooseAtSafePoint(8, 10))
+        assertEquals(Long.MAX_VALUE, policy.metrics.knownWork)
+        assertEquals(1L, policy.metrics.saturatedWorkEvents)
+    }
+
+    @Test
+    fun `factorization resets residual sampling cadence`() {
+        val policy = RefactorPolicy()
+        policy.recordFactorization(factorNnz = 10, buildWork = 100L, pivotSpread = 1.0)
+        repeat(7) { policy.recordBasisSolve(1L) }
+        policy.recordFactorization(factorNnz = 10, buildWork = 100L, pivotSpread = 1.0)
+
+        policy.recordBasisSolve(1L)
+        assertFalse(policy.shouldSample(cancelled = false))
+        repeat(7) { policy.recordBasisSolve(1L) }
+        assertTrue(policy.shouldSample(cancelled = false))
+    }
+
+    @Test
     fun `backend advice precedes hard cap and numerical policy triggers`() {
         val policy = RefactorPolicy()
         policy.recordFactorization(factorNnz = 1, buildWork = 1L, pivotSpread = 1.0)
         repeat(64) { policy.recordAcceptedUpdate(1L) }
 
+        assertEquals(
+            EngineRefactorTrigger.BACKEND_SINGULAR,
+            policy.chooseAtSafePoint(64, 10, backendRequested = true, backendSingular = true),
+        )
         assertEquals(
             EngineRefactorTrigger.BACKEND_SINGULAR,
             policy.chooseAtSafePoint(64, 10, backendRequested = true, backendSingular = true),

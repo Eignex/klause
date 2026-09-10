@@ -31,6 +31,8 @@ class BasisRepairTest {
         val decoded = assertNotNull(decodeBasisRepair(repair, 3, bounds, statuses))
 
         assertContentEquals(intArrayOf(2, 4, 0), decoded.headings)
+        assertContentEquals(intArrayOf(2, -1, 0), decoded.ownerColumns)
+        assertContentEquals(intArrayOf(-1, 1, -1), decoded.ownerUnitRows)
         assertEquals(VarStatus.AT_LOWER, decoded.statuses[1])
         assertEquals(VarStatus.BASIC, decoded.statuses[4])
         assertEquals(setOf(0, 2, 4), decoded.statuses.indices.filter { decoded.statuses[it] == VarStatus.BASIC }.toSet())
@@ -91,6 +93,7 @@ class BasisRepairTest {
         assertEquals(BasisRepairDecline.LOGICAL_FALLBACK_FAILED, failed.decline)
         assertEquals(ExactBasisRankEvidence.UNAVAILABLE, failed.rankEvidence)
         assertEquals(1, repairer.metrics.logicalFallbackFailures)
+        assertEquals(1, repairer.metrics.rankEvidence[ExactBasisRankEvidence.UNAVAILABLE])
         delegate.close()
     }
 
@@ -120,6 +123,29 @@ class BasisRepairTest {
     }
 
     @Test
+    fun `exact rank evidence observes arithmetic and cancellation budgets`() {
+        val model = exactWorkingModel(
+            listOf(
+                listOf(0 to 1L, 1 to 1L),
+                listOf(0 to 1L, 1 to 2L),
+            ),
+        )
+
+        assertEquals(
+            ExactBasisRankEvidence.RESOURCE_DECLINED,
+            exactBasisRankEvidence(
+                model,
+                intArrayOf(0, 1),
+                ExactRankLimits(maxIntermediateDigits = 1),
+            ),
+        )
+        assertEquals(
+            ExactBasisRankEvidence.CANCELLED,
+            exactBasisRankEvidence(model, intArrayOf(0, 1), cancellation = Cancellation { true }),
+        )
+    }
+
+    @Test
     fun `snapshot restores an earlier basis on the same owner and current bounds`() {
         val matrix = repairMatrix()
         val solver = KotlinBasisSolver(matrix)
@@ -129,7 +155,7 @@ class BasisRepairTest {
             intArrayOf(0, 1),
             arrayOf(VarStatus.BASIC, VarStatus.BASIC, VarStatus.AT_UPPER, VarStatus.AT_LOWER),
         )
-        val snapshot = EngineBasisRestartSnapshot.capture(solver, identity, captured)
+        val snapshot = assertNotNull(EngineBasisRestartSnapshot.capture(solver, identity, captured))
         assertTrue(solver.refactorize(intArrayOf(2, 3)))
         val currentBounds = arrayOf(
             BasisBoundState(true, false, false),
@@ -138,7 +164,7 @@ class BasisRepairTest {
             BasisBoundState(true, false, false),
         )
 
-        val restored = assertNotNull(snapshot.restore(solver, identity, currentBounds))
+        val restored = assertNotNull(snapshot.restore(solver, identity, currentBounds)) as BasisRestartResult.Restored
 
         assertTrue(restored.factorsRestored)
         assertFalse(restored.factorRestoreDeclined)
@@ -157,14 +183,18 @@ class BasisRepairTest {
         val identity = BasisMatrixIdentity(0L, 0, listOf(0L, 1L))
         val state = EngineBasisState(intArrayOf(0, 1), arrayOf(VarStatus.BASIC, VarStatus.BASIC))
         val bounds = Array(2) { BasisBoundState(true, false, false) }
-        val snapshot = EngineBasisRestartSnapshot.capture(first, identity, state)
+        val snapshot = assertNotNull(EngineBasisRestartSnapshot.capture(first, identity, state))
 
         assertNull(snapshot.restore(second, identity, bounds))
-        assertNull(snapshot.restore(first, identity, bounds, Cancellation { true }))
-        val restored = assertNotNull(snapshot.restore(first, identity, bounds))
+        val restored = assertNotNull(snapshot.restore(first, identity, bounds)) as BasisRestartResult.Restored
         assertFalse(restored.factorsRestored)
         assertFalse(restored.factorRestoreDeclined)
         snapshot.close()
+        val cancelledSnapshot = assertNotNull(EngineBasisRestartSnapshot.capture(first, identity, state))
+        val cancelled = assertNotNull(
+            cancelledSnapshot.restore(first, identity, bounds, Cancellation { true }),
+        ) as BasisRestartResult.Cancelled
+        assertFalse(cancelled.factorsMayHaveChanged)
     }
 
     @Test
@@ -180,21 +210,50 @@ class BasisRepairTest {
             override fun restore(snapshot: BasisSnapshot): Boolean = false
         }
         val identity = BasisMatrixIdentity(0L, 0, listOf(0L))
-        val snapshot = EngineBasisRestartSnapshot.capture(
+        val snapshot = assertNotNull(EngineBasisRestartSnapshot.capture(
             solver,
             identity,
             EngineBasisState(intArrayOf(0), arrayOf(VarStatus.BASIC)),
-        )
+        ))
 
         val restored = assertNotNull(
             snapshot.restore(solver, identity, arrayOf(BasisBoundState(true, false, false))),
-        )
+        ) as BasisRestartResult.Restored
 
         assertFalse(restored.factorsRestored)
         assertTrue(restored.factorRestoreDeclined)
         snapshot.close()
         snapshot.close()
         assertEquals(1, closes)
+    }
+
+    @Test
+    fun `invalid snapshot shape does not create a factor handle`() {
+        var snapshots = 0
+        val delegate = statusOnlySolver(2)
+        val solver = object : BasisSolver by delegate {
+            override fun snapshot(): BasisSnapshot? {
+                snapshots++
+                return null
+            }
+        }
+        val invalid = EngineBasisState(intArrayOf(0), arrayOf(VarStatus.BASIC, VarStatus.AT_LOWER))
+        val missingColumns = EngineBasisState(
+            intArrayOf(0, 1),
+            arrayOf(VarStatus.BASIC, VarStatus.BASIC),
+            ownerColumns = intArrayOf(),
+        )
+        val missingUnits = EngineBasisState(
+            intArrayOf(0, 1),
+            arrayOf(VarStatus.BASIC, VarStatus.BASIC),
+            ownerUnitRows = intArrayOf(),
+        )
+
+        val identity = BasisMatrixIdentity(0L, 0, listOf(0L, 1L))
+        assertNull(EngineBasisRestartSnapshot.capture(solver, identity, invalid))
+        assertNull(EngineBasisRestartSnapshot.capture(solver, identity, missingColumns))
+        assertNull(EngineBasisRestartSnapshot.capture(solver, identity, missingUnits))
+        assertEquals(0, snapshots)
     }
 
     private fun repairMatrix(): SparseMatrix = SparseMatrix.ofColumns(

@@ -49,6 +49,7 @@ internal class RefactorPolicy(
     private val config: RefactorPolicyConfig = RefactorPolicyConfig(),
 ) {
     private var successfulBasisSolves = 0L
+    private var basisSolvesSinceFactorization = 0L
     private var acceptedUpdates = 0L
     private var updatesSinceFactorization = 0
     private var qualitySamples = 0L
@@ -90,6 +91,7 @@ internal class RefactorPolicy(
         factorNnz: Int,
         buildWork: Long?,
         pivotSpread: Double,
+        basisChanged: Boolean = false,
     ) {
         require(factorNnz >= 0 && (buildWork == null || buildWork >= 0L))
         freshFactorNnz = factorNnz
@@ -97,14 +99,18 @@ internal class RefactorPolicy(
         adaptiveWorkUsable = buildWork != Long.MAX_VALUE
         this.pivotSpread = pivotSpread.takeIf { it.isFinite() && it >= 0.0 }
         updatesSinceFactorization = 0
+        basisSolvesSinceFactorization = 0L
         accumulatedSolveWork = 0L
         latestSolveWork = 0L
-        generation = saturatingIncrement(generation)
-        consumedGeneration = -1L
+        if (basisChanged) {
+            generation = saturatingIncrement(generation)
+            consumedGeneration = -1L
+        }
     }
 
     fun recordBasisSolve(work: Long?, boundUpdateFtran: Boolean = false) {
         successfulBasisSolves = saturatingIncrement(successfulBasisSolves)
+        basisSolvesSinceFactorization = saturatingIncrement(basisSolvesSinceFactorization)
         latestSolveWork = recordWork(work)
         accumulatedSolveWork = saturatingAdd(accumulatedSolveWork, latestSolveWork)
         if (boundUpdateFtran) boundUpdateFtranWork = saturatingAdd(boundUpdateFtranWork, latestSolveWork)
@@ -118,8 +124,8 @@ internal class RefactorPolicy(
         consumedGeneration = -1L
     }
 
-    fun shouldSample(cancelled: Boolean): Boolean = !cancelled && successfulBasisSolves > 0L &&
-        successfulBasisSolves % config.residualSampleInterval == 0L
+    fun shouldSample(cancelled: Boolean): Boolean = !cancelled && basisSolvesSinceFactorization > 0L &&
+        basisSolvesSinceFactorization % config.residualSampleInterval == 0L
 
     fun chooseAtSafePoint(
         updateCount: Int,
@@ -145,11 +151,16 @@ internal class RefactorPolicy(
                 EngineRefactorTrigger.SYNTHETIC_WORK
             else -> return null
         }
-        if (consumedGeneration == generation) {
+        val cooldownApplies = trigger !in setOf(
+            EngineRefactorTrigger.BACKEND_SINGULAR,
+            EngineRefactorTrigger.BACKEND_REQUESTED,
+            EngineRefactorTrigger.HARD_UPDATE_CAP,
+        )
+        if (cooldownApplies && consumedGeneration == generation) {
             cooldownDeclines = saturatingIncrement(cooldownDeclines)
             return null
         }
-        consumedGeneration = generation
+        if (cooldownApplies) consumedGeneration = generation
         triggers[trigger] = saturatingIncrement(triggers[trigger] ?: 0L)
         if (trigger == EngineRefactorTrigger.RESIDUAL) residualTriggers = saturatingIncrement(residualTriggers)
         return trigger
@@ -185,7 +196,13 @@ internal class RefactorPolicy(
             knownWork = Long.MAX_VALUE
             return 0L
         }
-        knownWork = saturatingAdd(knownWork, work)
+        if (knownWork > Long.MAX_VALUE - work) {
+            saturatedWorkEvents = saturatingIncrement(saturatedWorkEvents)
+            adaptiveWorkUsable = false
+            knownWork = Long.MAX_VALUE
+            return 0L
+        }
+        knownWork += work
         return work
     }
 }

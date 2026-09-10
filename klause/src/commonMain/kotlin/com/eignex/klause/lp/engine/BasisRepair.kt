@@ -17,11 +17,20 @@ internal data class BasisBoundState(
     }
 }
 
-internal class EngineBasisState(headings: IntArray, statuses: Array<VarStatus>) {
+internal class EngineBasisState(
+    headings: IntArray,
+    statuses: Array<VarStatus>,
+    ownerColumns: IntArray = headings,
+    ownerUnitRows: IntArray = IntArray(headings.size) { -1 },
+) {
     private val storedHeadings: IntArray = headings.copyOf()
     private val storedStatuses: Array<VarStatus> = statuses.copyOf()
+    private val storedOwnerColumns: IntArray = ownerColumns.copyOf()
+    private val storedOwnerUnitRows: IntArray = ownerUnitRows.copyOf()
     val headings: IntArray get() = storedHeadings.copyOf()
     val statuses: Array<VarStatus> get() = storedStatuses.copyOf()
+    val ownerColumns: IntArray get() = storedOwnerColumns.copyOf()
+    val ownerUnitRows: IntArray get() = storedOwnerUnitRows.copyOf()
 }
 
 internal enum class ExactBasisRankEvidence {
@@ -50,6 +59,7 @@ internal data class BasisRepairMetrics(
     val logicalFallbackFailures: Long = 0,
     val avoidedLogicalRebuilds: Long = 0,
     val declines: Map<BasisRepairDecline, Long> = emptyMap(),
+    val rankEvidence: Map<ExactBasisRankEvidence, Long> = emptyMap(),
 )
 
 internal sealed interface BasisRecoveryResult {
@@ -78,6 +88,7 @@ internal class EngineBasisRepairer(
     private var logicalFallbackFailures = 0L
     private var avoidedLogicalRebuilds = 0L
     private val declines = mutableMapOf<BasisRepairDecline, Long>()
+    private val rankEvidence = mutableMapOf<ExactBasisRankEvidence, Long>()
 
     val metrics: BasisRepairMetrics
         get() = BasisRepairMetrics(
@@ -89,6 +100,7 @@ internal class EngineBasisRepairer(
             logicalFallbackFailures,
             avoidedLogicalRebuilds,
             declines.toMap(),
+            rankEvidence.toMap(),
         )
 
     fun recover(
@@ -102,6 +114,7 @@ internal class EngineBasisRepairer(
     ): BasisRecoveryResult {
         attempts = saturatingIncrement(attempts)
         val evidence = exactBasisRankEvidence(exactModel, requested, exactRankLimits, cancellation)
+        rankEvidence[evidence] = saturatingIncrement(rankEvidence[evidence] ?: 0L)
         if (evidence == ExactBasisRankEvidence.CANCELLED || cancellation()) {
             return failed(BasisRepairDecline.CANCELLED, evidence)
         }
@@ -170,7 +183,10 @@ internal class EngineBasisRepairer(
         logicalFallbacks = saturatingIncrement(logicalFallbacks)
         val logicals = IntArray(bounds.size - structuralColumns) { structuralColumns + it }
         val state = normalizeBasisState(logicals, bounds, statuses)
-            ?: return failed(BasisRepairDecline.LOGICAL_FALLBACK_FAILED, evidence)
+            ?: run {
+                logicalFallbackFailures = saturatingIncrement(logicalFallbackFailures)
+                return failed(BasisRepairDecline.LOGICAL_FALLBACK_FAILED, evidence)
+            }
         val factorized = try {
             solver.refactorize(logicals)
         } catch (_: BasisArithmeticException) {
@@ -218,16 +234,33 @@ internal fun decodeBasisRepair(
             else -> return null
         }
     }
-    return normalizeBasisState(headings, bounds, statuses)
+    return normalizeBasisState(headings, bounds, statuses, repair.columns, repair.unitRows)
 }
 
 internal fun normalizeBasisState(
     headings: IntArray,
     bounds: Array<BasisBoundState>,
     statuses: Array<VarStatus>,
+    ownerColumns: IntArray = headings,
+    ownerUnitRows: IntArray = IntArray(headings.size) { -1 },
 ): EngineBasisState? {
     if (statuses.size != bounds.size || headings.distinct().size != headings.size ||
-        headings.any { it !in bounds.indices }
+        headings.any { it !in bounds.indices } || ownerColumns.size != headings.size ||
+        ownerUnitRows.size != headings.size
+    ) {
+        return null
+    }
+    val structuralColumns = bounds.size - headings.size
+    if (structuralColumns < 0 || headings.indices.any { slot ->
+            val column = ownerColumns[slot]
+            val unitRow = ownerUnitRows[slot]
+            val mapped = when {
+                column in bounds.indices && unitRow == -1 -> column
+                column == -1 && unitRow in headings.indices -> structuralColumns + unitRow
+                else -> return@any true
+            }
+            mapped != headings[slot]
+        }
     ) {
         return null
     }
@@ -243,7 +276,7 @@ internal fun normalizeBasisState(
     ) {
         return null
     }
-    return EngineBasisState(headings, normalized)
+    return EngineBasisState(headings, normalized, ownerColumns, ownerUnitRows)
 }
 
 private fun normalizeNonbasicStatus(status: VarStatus, bounds: BasisBoundState): VarStatus = when {
@@ -280,11 +313,15 @@ internal data class BasisMatrixIdentity(
     val rowIds: List<Long>,
 )
 
-internal data class BasisRestartRestore(
-    val state: EngineBasisState,
-    val factorsRestored: Boolean,
-    val factorRestoreDeclined: Boolean,
-)
+internal sealed interface BasisRestartResult {
+    class Restored(
+        val state: EngineBasisState,
+        val factorsRestored: Boolean,
+        val factorRestoreDeclined: Boolean,
+    ) : BasisRestartResult
+
+    class Cancelled(val factorsMayHaveChanged: Boolean) : BasisRestartResult
+}
 
 internal class EngineBasisRestartSnapshot private constructor(
     private val owner: BasisSolver,
@@ -299,10 +336,25 @@ internal class EngineBasisRestartSnapshot private constructor(
         currentIdentity: BasisMatrixIdentity,
         currentBounds: Array<BasisBoundState>,
         cancellation: Cancellation = Cancellation.Never,
-    ): BasisRestartRestore? {
-        if (closed || cancellation() || target !== owner || currentIdentity != identity) return null
-        val normalized = normalizeBasisState(captured.headings, currentBounds, captured.statuses) ?: return null
-        if (factors == null) return BasisRestartRestore(normalized, false, false)
+    ): BasisRestartResult? {
+        if (closed || target !== owner || currentIdentity != identity) return null
+        if (cancellation()) {
+            close()
+            return BasisRestartResult.Cancelled(factorsMayHaveChanged = false)
+        }
+        if (!validBasisSnapshotShape(target, currentIdentity, captured)) return null
+        val normalized = normalizeBasisState(
+            captured.headings,
+            currentBounds,
+            captured.statuses,
+            captured.ownerColumns,
+            captured.ownerUnitRows,
+        ) ?: return null
+        if (cancellation()) {
+            close()
+            return BasisRestartResult.Cancelled(factorsMayHaveChanged = false)
+        }
+        if (factors == null) return BasisRestartResult.Restored(normalized, false, false)
         val restored = try {
             target.restore(factors)
         } catch (_: BasisArithmeticException) {
@@ -310,7 +362,11 @@ internal class EngineBasisRestartSnapshot private constructor(
         } catch (_: ArithmeticException) {
             false
         }
-        return BasisRestartRestore(normalized, restored, !restored)
+        if (cancellation()) {
+            close()
+            return BasisRestartResult.Cancelled(factorsMayHaveChanged = true)
+        }
+        return BasisRestartResult.Restored(normalized, restored, !restored)
     }
 
     override fun close() {
@@ -324,7 +380,10 @@ internal class EngineBasisRestartSnapshot private constructor(
             owner: BasisSolver,
             identity: BasisMatrixIdentity,
             state: EngineBasisState,
-        ): EngineBasisRestartSnapshot {
+            cancellation: Cancellation = Cancellation.Never,
+        ): EngineBasisRestartSnapshot? {
+            if (cancellation() || !validBasisSnapshotShape(owner, identity, state)) return null
+            if (cancellation()) return null
             val factors = try {
                 owner.snapshot()
             } catch (_: BasisArithmeticException) {
@@ -332,13 +391,51 @@ internal class EngineBasisRestartSnapshot private constructor(
             } catch (_: ArithmeticException) {
                 null
             }
+            if (cancellation()) {
+                factors?.close()
+                return null
+            }
             return EngineBasisRestartSnapshot(
                 owner,
                 identity.copy(rowIds = identity.rowIds.toList()),
-                EngineBasisState(state.headings, state.statuses),
+                EngineBasisState(state.headings, state.statuses, state.ownerColumns, state.ownerUnitRows),
                 factors,
             )
         }
+    }
+}
+
+private fun validBasisSnapshotShape(
+    owner: BasisSolver,
+    identity: BasisMatrixIdentity,
+    state: EngineBasisState,
+): Boolean {
+    val headings = state.headings
+    val statuses = state.statuses
+    val ownerColumns = state.ownerColumns
+    val ownerUnitRows = state.ownerUnitRows
+    if (identity.matrixRevision < 0L || identity.structuralColumns < 0 || identity.rowIds.size != owner.n ||
+        identity.rowIds.distinct().size != owner.n || headings.size != owner.n ||
+        statuses.size != identity.structuralColumns + owner.n || ownerColumns.size != owner.n ||
+        ownerUnitRows.size != owner.n
+    ) {
+        return false
+    }
+    if (headings.distinct().size != owner.n || headings.any { it !in statuses.indices }) return false
+    val basic = BooleanArray(statuses.size)
+    headings.forEach { basic[it] = true }
+    if (statuses.indices.any { (statuses[it] == VarStatus.BASIC) != basic[it] }
+    ) {
+        return false
+    }
+    return headings.indices.all { slot ->
+        val column = ownerColumns[slot]
+        val unitRow = ownerUnitRows[slot]
+        when {
+            column in statuses.indices && unitRow == -1 -> column
+            column == -1 && unitRow in headings.indices -> identity.structuralColumns + unitRow
+            else -> -1
+        } == headings[slot]
     }
 }
 
@@ -392,11 +489,13 @@ internal fun exactBasisRankEvidence(
             matrix[column] = swap
         }
         for (row in column + 1 until matrix.size) {
+            if (cancellation()) return ExactBasisRankEvidence.CANCELLED
             if (matrix[row][column].isZero) continue
             val factor = safeDivide(matrix[row][column], matrix[column][column], limits) ?:
                 return ExactBasisRankEvidence.RESOURCE_DECLINED
             for (entry in column until matrix.size) {
                 if (++updates > limits.maxUpdates) return ExactBasisRankEvidence.RESOURCE_DECLINED
+                if (updates % 32 == 0 && cancellation()) return ExactBasisRankEvidence.CANCELLED
                 val product = safeMultiply(factor, matrix[column][entry], limits) ?:
                     return ExactBasisRankEvidence.RESOURCE_DECLINED
                 matrix[row][entry] = safeSubtract(matrix[row][entry], product, limits) ?:
@@ -430,8 +529,8 @@ private fun safeSubtract(left: BigFraction, right: BigFraction, limits: ExactRan
     val rightNum = decimalDigits(right.num.toString())
     val leftDen = decimalDigits(left.den.toString())
     val rightDen = decimalDigits(right.den.toString())
-    if (leftNum + rightDen > limits.maxIntermediateDigits ||
-        rightNum + leftDen > limits.maxIntermediateDigits ||
+    if (leftNum + rightDen + 1 > limits.maxIntermediateDigits ||
+        rightNum + leftDen + 1 > limits.maxIntermediateDigits ||
         leftDen + rightDen > limits.maxIntermediateDigits
     ) {
         return null
