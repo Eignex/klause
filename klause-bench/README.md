@@ -16,6 +16,7 @@ bench solve [filters…]      e.g.  bench solve suite=mzn-bench backend=choco
 ./gradlew :klause-bench:bench --args="list"                       suites + usage
 ./gradlew :klause-bench:bench --args="solve suite=core"           klause solves the in-process core
 ./gradlew :klause-bench:bench --args="solve suite=core backend=choco"  a reference baseline to diff against
+./gradlew :klause-bench:intDomainMicrobench                        host-sensitive IntDomain timing probes
 ```
 
 Tune any knob with `-Dklause.*` properties (forwarded to the run JVM), e.g. `-Dklause.bench.mzn.timeoutSec=30`.

@@ -35,8 +35,6 @@ class LpReplayHarnessTest {
         assertTrue(allSteps.any { it.hasFeasibleWitness })
         assertTrue(allSteps.any { it.independentCheck.claim == LpIndependentClaim.CERTIFIED_BOUND })
         assertTrue(allSteps.any { it.productionVerdict == LpVerdict.INDETERMINATE })
-
-        println(reportLine(reports))
     }
 
     @Test
@@ -228,24 +226,6 @@ class LpReplayHarnessTest {
         exactInputAccepted = 0,
         rationalLowerBound = lowerBound,
     )
-
-    private fun reportLine(reports: List<LpReplayReport>): String {
-        val steps = reports.flatMap { it.steps }
-        val verdicts = LpVerdict.entries.joinToString(",") { verdict ->
-            "$verdict=${steps.count { it.productionVerdict == verdict }}"
-        }
-        val validations = LpIndependentValidation.entries.joinToString(",") { validation ->
-            "$validation=${steps.count { it.independentCheck.validation == validation }}"
-        }
-        val totalPivots = reports.sumOf { it.pivots }
-        val totalWork = reports.sumOf { it.workOps }
-        return "LP_REPLAY label=${LpWave0ReplaySlice.LABEL} seed=${LpWave0ReplaySlice.SEED} " +
-            "workloads=${reports.size} " +
-            "solver=persistent componentSplit=false refactorUpdateLimit=$DEFAULT_REFACTOR_UPDATE_LIMIT " +
-            "budgets=per-workload cache=none verdicts=[$verdicts] " +
-            "validations=[$validations] pivots=$totalPivots workOps=$totalWork " +
-            "persistence=correctness-only"
-    }
 
     internal object IndependentExactValidator : LpReplayValidator {
         override fun validate(model: LpModel, step: LpReplayStep): LpIndependentCheck {

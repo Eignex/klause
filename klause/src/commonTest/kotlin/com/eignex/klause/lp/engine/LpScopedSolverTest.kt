@@ -256,7 +256,6 @@ class LpScopedSolverTest {
             ExactLpObjective(listOf(one, zero)),
         )
         val solver = LpScopedSolver(LpExactState(source))
-        var solveWork = 0L
         var solveAttempts = 0
         var solves = 0
         val counters = LpCounterResults()
@@ -280,7 +279,6 @@ class LpScopedSolverTest {
                 solveAttempts++
                 val local = assertNotNull(solver.solve(counterResults = counters))
                 solves++
-                solveWork += solver.lastMetrics.workOps
                 val point = assertNotNull(local.witness).primal.single()
                 assertEquals(BigFraction.ofLong(lower), point)
                 assertEquals(point, local.lowerBound)
@@ -292,10 +290,6 @@ class LpScopedSolverTest {
                 val duals = local.float.duals
                 assertEquals(-1.0, duals[1])
                 assertEquals(0.0, duals[0])
-                assertEquals(
-                    BigFraction.ZERO,
-                    point.negated() + (point - BigFraction.ofLong(lower)) + BigFraction.ofLong(lower),
-                )
                 val localKey = assertNotNull(LpExactCapture.stateKey(solver.state))
 
                 assertTrue(solver.pop(0))
@@ -304,7 +298,6 @@ class LpScopedSolverTest {
                 solveAttempts++
                 val popped = assertNotNull(solver.solve())
                 solves++
-                solveWork += solver.lastMetrics.workOps
                 assertEquals(BigFraction.ONE, popped.lowerBound)
                 assertEquals(listOf(BigFraction.ONE), popped.exactPrimal)
                 assertEquals(listOf(0), assertNotNull(popped.bound?.support).rows.map { it.first })
@@ -315,7 +308,6 @@ class LpScopedSolverTest {
                 solveAttempts++
                 val compacted = assertNotNull(solver.solve())
                 solves++
-                solveWork += solver.lastMetrics.workOps
                 assertEquals(BigFraction.ONE, compacted.lowerBound)
                 assertEquals(listOf(BigFraction.ONE), compacted.exactPrimal)
                 assertEquals(1, solver.metrics.retainedRows)
@@ -343,7 +335,6 @@ class LpScopedSolverTest {
             assertEquals(0L, solver.metrics.preparationDeclines)
             assertEquals(36L, solver.metrics.preparationAttempts)
             assertEquals(2L, solver.metrics.peakOwners)
-            println("scoped-row trace solves=$solves attempts=$solveAttempts work=$solveWork metrics=${solver.metrics}")
         }
         assertEquals(0L, solver.metrics.currentOwners)
         assertEquals(solver.metrics.createdOwners, solver.metrics.closedOwners)

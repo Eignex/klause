@@ -182,6 +182,13 @@ tasks.register<JavaExec>("bench") {
     doFirst { systemProperty("klause.workspace.root", workspaceRoot) }
 }
 
+tasks.register<JavaExec>("intDomainMicrobench") {
+    group = "bench"
+    description = "Run host-sensitive IntDomain representation timing probes."
+    classpath = sourceSets["main"].runtimeClasspath
+    mainClass.set("com.eignex.klause.bench.microbench.IntDomainMicrobench")
+}
+
 tasks.register("dumpSchema", JavaExec::class) {
     group = "tools"
     description = "Regenerate bundled JSON SchemaDef sample at smoke-corpus/schema/campaign.json."

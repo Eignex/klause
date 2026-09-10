@@ -1,7 +1,10 @@
 package com.eignex.klause.formats.dimacs
 
+import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Lit
+import com.eignex.klause.propagation.bake
+import com.eignex.klause.solver.SolveResult
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFails
@@ -197,22 +200,13 @@ class DimacsTest {
 
     @Test
     fun `an empty hard clause makes the instance unsatisfiable`() {
-        // The empty hard clause forces a contradiction on a fresh marker variable.
         val w = Dimacs.parseWcnf("h 0\n2 -1 0\n")
-        assertTrue(w.problem.factors.any { it is Clause })
-        assertEquals(2, w.problem.factors.count { it is Clause && it.literals.size == 1 })
+        assertTrue(BacktrackSolver(w.problem.bake()).solve() is SolveResult.Unsat)
     }
 
     @Test
     fun `a bare zero empty clause makes the cnf instance unsatisfiable`() {
-        // `0` with no preceding literals is the empty clause (⊥); it must force a contradiction on a fresh
-        // marker variable, not be silently dropped (which would report the instance satisfiable).
         val problem = Dimacs.parse("p cnf 2 2\n1 2 0\n0\n")
-        assertEquals(3, problem.numBoolVars, "a marker variable is appended for the empty clause")
-        assertEquals(
-            2,
-            problem.factors.count { it is Clause && it.literals.size == 1 },
-            "the empty clause becomes two contradictory unit clauses on the marker",
-        )
+        assertTrue(BacktrackSolver(problem.bake()).solve() is SolveResult.Unsat)
     }
 }

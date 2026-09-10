@@ -24,8 +24,6 @@ class ForrestTomlinFactorsTest {
             assertTrue(ft.refactorize(basis))
             assertTrue(eta.refactorize(basis))
             val random = Random(193)
-            var residual = 0.0
-            var rebuilds = 0
             for (step in 0..24) {
                 assertTrue(fresh.refactorize(basis))
                 repeat(if (step == 12) 2 else 1) { rebuilt ->
@@ -33,7 +31,6 @@ class ForrestTomlinFactorsTest {
                         assertTrue(ft.refactorize(basis))
                         assertTrue(eta.refactorize(basis))
                         assertEquals(0, ft.updateCount)
-                        rebuilds++
                     }
                     for (transpose in listOf(false, true)) {
                         for (hint in listOf(0.0, 1.0)) {
@@ -44,7 +41,6 @@ class ForrestTomlinFactorsTest {
                                 val vector = IndexedVector(source.rows).also { it.scatter(rhs) }
                                 if (transpose) solver.btran(vector, hint) else solver.ftran(vector, hint)
                                 val error = ftResidual(source, basis, rhs, vector, transpose)
-                                residual = max(residual, error)
                                 assertTrue(error <= if (shape == "near") 1e-8 else 1e-11, "$shape $step $error")
                                 for (i in basis.indices) {
                                     assertTrue(abs(vector[i] - expected[i]) <= 1e-8 * max(1.0, abs(expected[i])))
@@ -65,7 +61,6 @@ class ForrestTomlinFactorsTest {
                 }
                 basis[slot] = entering
             }
-            println("B3 fresh $shape residual=$residual accepted=24 rejected=0 rebuilds=$rebuilds")
             ft.close()
             eta.close()
             fresh.close()

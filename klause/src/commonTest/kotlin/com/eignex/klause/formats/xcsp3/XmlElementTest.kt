@@ -25,11 +25,12 @@ class XmlElementTest {
     }
 
     @Test
-    fun `handles single and double quoted attributes`() {
-        val e = parseXml("""<e a='1' b="2"/>""")
-        assertEquals("1", e.attr("a"))
-        assertEquals("2", e.attr("b"))
-        assertTrue(e.children.isEmpty())
+    fun `handles quoted attributes`() {
+        for (xml in listOf("<e a='1'/>", "<e a=\"1\"/>")) {
+            val e = parseXml(xml)
+            assertEquals("1", e.attr("a"))
+            assertTrue(e.children.isEmpty())
+        }
     }
 
     @Test

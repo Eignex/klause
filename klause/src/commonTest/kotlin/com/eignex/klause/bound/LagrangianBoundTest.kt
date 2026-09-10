@@ -10,6 +10,9 @@ import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.objective.LinearObjective
 import kotlin.random.Random
 import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class LagrangianBoundTest {
@@ -27,8 +30,9 @@ class LagrangianBoundTest {
         val obj = LinearObjective(intCoefficients = longArrayOf(1, 2, 3))
         val lb = LagrangianBound(p, obj)
         assertTrue(lb.applicable)
-        val r = lb.computeBound(PropagationSession(p), Double.POSITIVE_INFINITY, LongArray(lb.multiplierCount), 1)
-        requireNotNull(r)
+        val r = assertNotNull(
+            lb.computeBound(PropagationSession(p), Double.POSITIVE_INFINITY, LongArray(lb.multiplierCount), 1),
+        )
         // True optimum: x2=0,x1=1,x0=2 -> 2 + 2 + 0 = 4. The bound must not exceed it.
         assertTrue(ceil(r.boundNumerator, r.denominator) <= 4L, "bound ${r.boundNumerator}/${r.denominator} > 4")
     }
@@ -44,8 +48,9 @@ class LagrangianBoundTest {
         )
         val obj = LinearObjective(intCoefficients = longArrayOf(1, 1, 1))
         val lb = LagrangianBound(p, obj)
-        val r = lb.computeBound(PropagationSession(p), Double.POSITIVE_INFINITY, LongArray(lb.multiplierCount), 1)
-        requireNotNull(r)
+        val r = assertNotNull(
+            lb.computeBound(PropagationSession(p), Double.POSITIVE_INFINITY, LongArray(lb.multiplierCount), 1),
+        )
         assertTrue(r.prune)
     }
 
@@ -147,12 +152,11 @@ class LagrangianBoundTest {
         val obj = LinearObjective(intCoefficients = longArrayOf(1, 1, 1, 1, 1, 1))
         val lb = LagrangianBound(p, obj)
         assertTrue(lb.applicable)
-        assertTrue(lb.multiplierCount == 1, "the spanning linear constraint is the one dualized link")
-        val r = lb.computeBound(PropagationSession(p), 100.0, LongArray(lb.multiplierCount), 20)
-        requireNotNull(r)
+        assertEquals(1, lb.multiplierCount)
+        val r = assertNotNull(lb.computeBound(PropagationSession(p), 100.0, LongArray(lb.multiplierCount), 20))
         // True optimum: unconstrained each block is 0+1+2 = 3, but x0+x3>=6 forces one anchor up — the
         // cheapest is {2,0,1} and {4,0,1} (2+4=6), total 8. The bound is a lower bound, so ≤ 8.
-        assertTrue(!r.prune)
+        assertFalse(r.prune)
         assertTrue(ceil(r.boundNumerator, r.denominator) <= 8L, "bound ${r.boundNumerator}/${r.denominator} > 8")
     }
 

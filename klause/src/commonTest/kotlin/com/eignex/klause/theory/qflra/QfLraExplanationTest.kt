@@ -14,7 +14,6 @@ import com.eignex.klause.ir.RealConsts
 import com.eignex.klause.ir.TaggedLinearRow
 import com.eignex.klause.ir.Term
 import com.eignex.klause.ir.linearRows
-import com.eignex.klause.solver.result.SmtStatsSink
 import com.eignex.klause.theory.TheoryCheck
 import com.eignex.klause.theory.TheoryContext
 import com.eignex.klause.util.Bits
@@ -29,15 +28,11 @@ class QfLraExplanationTest {
     @Test
     fun `frozen real conflicts retain their support across repeated checks`() {
         for ((name, model, values) in realConflicts()) {
-            repeat(3) { repetition ->
-                val stats = SmtStatsSink()
-                val solver = ExactLraSolver(model).also { it.observeWith(stats) }
+            repeat(3) {
+                val solver = ExactLraSolver(model)
                 val conflict = assertIs<TheoryCheck.Infeasible>(solver.check(values, context))
-                println("FARKAS_COST,$name,$repetition,${stats.snapshot().simplexAttempts}")
-                println("FARKAS_SLICE,$name,$repetition,${values.size},${conflict.explanation?.literals?.size ?: -1}")
                 val literals = assertNotNull(conflict.explanation).literals
                 assertEquals(if (name == "declared-bound" || name == "substitution") 1 else 2, literals.size)
-                println("FARKAS_LITERALS,$name,$repetition,${literals.joinToString(";")}")
                 literals.forEach { literal ->
                     assertTrue(values[Lit.variable(literal)] != Lit.isPositive(literal))
                 }
@@ -55,14 +50,11 @@ class QfLraExplanationTest {
             "integer-only" to arrayOf<Factor>(ReifiedLinear(0, intArrayOf(2), intArrayOf(0), LinearOp.EQ, 1)),
         )) {
             val model = Problem(3, intBounds = openBounds(1), factors = factors)
-            repeat(3) { repetition ->
-                val stats = SmtStatsSink()
-                val solver = ExactLiraSolver(model).also { it.observeWith(stats) }
+            repeat(3) {
+                val solver = ExactLiraSolver(model)
                 val conflict = assertIs<TheoryCheck.Infeasible>(
                     solver.check(booleanArrayOf(true, true, true), context),
                 )
-                println("FARKAS_COST,$name,$repetition,${stats.snapshot().simplexAttempts}")
-                println("FARKAS_SLICE,$name,$repetition,3,${conflict.explanation?.literals?.size ?: -1}")
                 if (name == "mixed-lp") {
                     assertEquals(listOf(Lit.make(0, false)), assertNotNull(conflict.explanation).literals.toList())
                 } else {

@@ -6,7 +6,7 @@ import kotlin.test.assertTrue
 
 class HeapSampleTest {
 
-    private val transientBytes = 64 * 1024 * 1024
+    private val transientBytes = 16 * 1024 * 1024
 
     @Test
     fun `the jvm heap sample reports a live figure bounded by what is committed`() {

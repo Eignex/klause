@@ -1,5 +1,7 @@
 package com.eignex.klause.schema
 
+import com.eignex.klause.backtrack.BacktrackParams
+import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.compile.compile
 import com.eignex.klause.factor.arithmetic.ReifiedCardinality
 import com.eignex.klause.factor.bool.Cardinality
@@ -7,9 +9,12 @@ import com.eignex.klause.localsearch.FixedCadenceRestart
 import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.localsearch.LocalSearchSolver
 import com.eignex.klause.model.CircuitExpr
+import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.solver.SolveResult
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 private class CircuitReifiedSchema : VariableSchema() {
@@ -18,7 +23,6 @@ private class CircuitReifiedSchema : VariableSchema() {
     val n2 by intVar(min = 0, max = 2)
     val flag by boolVar()
 
-    // Sub-expression position: reify the global behind iff/implies.
     val c by constraint {
         flag iff CircuitExpr(listOf(n0.toIntExpr(), n1.toIntExpr(), n2.toIntExpr()))
     }
@@ -110,16 +114,22 @@ class OperatorsTest {
     }
 
     @Test
-    fun `reified circuit produces a feasibility-checkable model`() {
+    fun `reified circuit accepts a tour and rejects a self loop`() {
         val s = CircuitReifiedSchema()
         val compiled = s.compile()
-        val solver = LocalSearchSolver(
-            compiled.problem.bake(),
-            restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 300),
+        val baked = compiled.problem.bake()
+        fun solve(flag: Boolean, successors: List<Long>): SolveResult = BacktrackSolver(baked).solve(
+            BacktrackParams(
+                assumptions = Assumptions(
+                    bools = mapOf(compiled.boolVarIdByName.getValue("flag") to flag),
+                    ints = successors.mapIndexed { i, value ->
+                        compiled.intVarIdByName.getValue("n$i") to value
+                    }.toMap(),
+                ),
+            ),
         )
-        // Exercise the lowering and confirm it produces a model the solver can iterate against
-        // without crashing; we don't insist LS terminates on a feasible sample within a fixed budget.
-        val samples = solver.samples(LocalSearchParams(maxFlips = 5_000, randomSeed = 41)).take(5).toList()
-        assertTrue(samples.isNotEmpty(), "solver returned no samples")
+
+        assertIs<SolveResult.Sat>(solve(flag = true, successors = listOf(1, 2, 0)))
+        assertIs<SolveResult.Unsat>(solve(flag = true, successors = listOf(1, 0, 2)))
     }
 }

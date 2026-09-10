@@ -3,6 +3,7 @@ package com.eignex.klause.bench.tune
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
 
 class BacktrackConfigSpaceTest {
@@ -14,12 +15,10 @@ class BacktrackConfigSpaceTest {
         repeat(1000) {
             val a = BacktrackConfigSpace.sample(rng)
             presets += a["preset"] as String
-            // The LP-plan dials are children of lp.emphasis != off.
             val lpOn = a["lp.emphasis"] != "off"
             for (child in listOf("lp.lbtree", "lp.objective-cone", "lp.auto-off-reprobe", "lp.knapsack-lagrangian")) {
                 assertEquals(lpOn, a.containsKey(child), "$child gated by lp.emphasis: $a")
             }
-            // Decodes without throwing; LP config presence matches the emphasis choice.
             val p = BacktrackConfigSpace.toParams(a)
             assertEquals(!lpOn, p.lpConfig == null, "lpConfig set iff emphasis != off: $a")
         }
@@ -66,21 +65,21 @@ class BacktrackConfigSpaceTest {
     }
 
     @Test
-    fun `every var-selector value decodes to a real variable selector`() {
+    fun `every variable selector option decodes to a distinct selector implementation`() {
         val values = (BacktrackConfigSpace.params.first { it.name == "var-selector" } as CategoricalParam).values
-        for (v in values) {
-            val p = BacktrackConfigSpace.toParams(baseAssignment("var-selector" to v))
-            assertTrue(p.variableSelector.toString().isNotEmpty(), "var-selector=$v builds a selector")
+        val implementations = values.map {
+            BacktrackConfigSpace.toParams(baseAssignment("var-selector" to it)).variableSelector::class
         }
+        assertEquals(values.size, implementations.toSet().size)
     }
 
     @Test
-    fun `every val-selector value decodes to a real value selector`() {
+    fun `every value selector option decodes to a distinct selector implementation`() {
         val values = (BacktrackConfigSpace.params.first { it.name == "val-selector" } as CategoricalParam).values
-        for (v in values) {
-            val p = BacktrackConfigSpace.toParams(baseAssignment("val-selector" to v))
-            assertTrue(p.valueSelector.toString().isNotEmpty(), "val-selector=$v builds a selector")
+        val implementations = values.map {
+            BacktrackConfigSpace.toParams(baseAssignment("val-selector" to it)).valueSelector::class
         }
+        assertEquals(values.size, implementations.toSet().size)
     }
 
     @Test
@@ -88,11 +87,11 @@ class BacktrackConfigSpaceTest {
         val vsids = BacktrackConfigSpace.toParams(baseAssignment("var-selector" to "vsids")).variableSelector
         for (v in listOf("domwdeg", "activity")) {
             val sel = BacktrackConfigSpace.toParams(baseAssignment("var-selector" to v)).variableSelector
-            assertTrue(sel != vsids, "var-selector=$v builds a distinct selector")
+            assertNotEquals(vsids::class, sel::class, "var-selector=$v must not resolve to VSIDS")
         }
         val min = BacktrackConfigSpace.toParams(baseAssignment("val-selector" to "min")).valueSelector
         val impact = BacktrackConfigSpace.toParams(baseAssignment("val-selector" to "impact")).valueSelector
-        assertTrue(impact != min, "val-selector=impact builds a distinct selector")
+        assertNotEquals(min::class, impact::class, "val-selector=impact must not resolve to indomain min")
     }
 
     @Test
@@ -111,8 +110,6 @@ class BacktrackConfigSpaceTest {
         assertTrue(p.lpPlan.knapsackLagrangian)
     }
 
-    /** A fully-populated assignment with every param at a valid value, overridden by [overrides]. LP
-     *  child dials are included so an emphasis-on assignment stays well-formed. */
     private fun baseAssignment(vararg overrides: Pair<String, Any>): Map<String, Any> = buildMap {
         put("preset", "free")
         put("var-selector", "vsids")
