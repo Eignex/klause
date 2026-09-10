@@ -1188,7 +1188,7 @@ internal class RevisedSimplex(
         reuse: Boolean,
         enforced: BooleanArray? = null,
         reset: Boolean = true,
-        basisRestarts: Int = 0,
+        progress: SolveProgress = SolveProgress(),
     ): FloatLpResult? {
         // Per-solve state: the infeasibility certificate slots and counters must not leak across a
         // persistent instance's solves.
@@ -1226,9 +1226,9 @@ internal class RevisedSimplex(
             when (reconcileUnenforced(enforced)) {
                 IterationResult.CONTINUE -> Unit
 
-                IterationResult.RESTART -> return restartDual(enforced, basisRestarts, basisChanged = false)
+                IterationResult.RESTART -> return restartDual(enforced, progress)
 
-                IterationResult.BASIS_CHANGED -> return restartDual(enforced, basisRestarts)
+                IterationResult.BASIS_CHANGED -> return restartDual(enforced, progress)
 
                 IterationResult.FAILED -> {
                     coldStart()
@@ -1241,7 +1241,7 @@ internal class RevisedSimplex(
             val sameObjective = cachedModel?.exactState?.model?.objective == model.exactState?.model?.objective
             val sameSeats = cachedStatus?.contentEquals(status) == true
             if ((!kept || !sameObjective || !sameSeats) && !dualFeasible()) {
-                return solvePrimalCore(null, reuse = true, reset = false)
+                return solvePrimalCore(null, reuse = true, reset = false, progress = progress)
             }
         }
         resetGamma() // fresh Devex reference frame for this solve
@@ -1259,12 +1259,11 @@ internal class RevisedSimplex(
         val touched = IntArrayList()
         val touchEpoch = IntArray(numVars)
         var epoch = 0
-        var iter = 0
-        var numericalRecoveryTried = false
         // Whether an iterate's basic values are in [beta], so a solve that stops short can still hand
         // back its bound. The buffer is reused, and holds the last iterate the loop completed.
         var haveBeta = false
-        while (iter++ < maxIter) {
+        while (progress.dualIterations < maxIter) {
+            val iteration = progress.dualIterations++
             // Work budget, checked before the iteration that would exceed it. Pivots are not a unit of
             // cost — one costs an order of magnitude more on a dense basis than a sparse one — so a
             // budget stated in work means the same thing on every model, which a pivot count does not.
@@ -1276,7 +1275,7 @@ internal class RevisedSimplex(
             // current iterate rather than nothing: every basis the dual simplex passes through is
             // dual-feasible, so its objective is a valid lower bound even though the primal is not yet
             // feasible. Phased off the first iteration so an already-spent budget never starts a solve.
-            if ((iter - 1) % CANCEL_POLL == 0 && cancellation()) {
+            if (iteration % CANCEL_POLL == 0 && cancellation()) {
                 return if (haveBeta && model.exactState == null) truncated(beta) else null
             }
             // β = B⁻¹ (b − Σ_{j nonbasic at upper} A_j·u_j)
@@ -1290,11 +1289,11 @@ internal class RevisedSimplex(
 
                 RefactorResult.UNCHANGED -> {
                     resetGamma()
-                    iter--
+                    progress.dualIterations--
                     continue
                 }
 
-                RefactorResult.BASIS_CHANGED -> return restartDual(enforced, basisRestarts)
+                RefactorResult.BASIS_CHANGED -> return restartDual(enforced, progress)
 
                 RefactorResult.FAILED -> return null
             }
@@ -1351,11 +1350,11 @@ internal class RevisedSimplex(
 
                 RefactorResult.UNCHANGED -> {
                     resetGamma()
-                    iter--
+                    progress.dualIterations--
                     continue
                 }
 
-                RefactorResult.BASIS_CHANGED -> return restartDual(enforced, basisRestarts)
+                RefactorResult.BASIS_CHANGED -> return restartDual(enforced, progress)
 
                 RefactorResult.FAILED -> return null
             }
@@ -1408,17 +1407,17 @@ internal class RevisedSimplex(
                 // An update chain can turn a tiny violation into a false infeasibility candidate even
                 // though β is recomputed every iteration. Rebuild the factors—not merely the RHS solve—
                 // and retry once per solve. A basis with no folded updates is already fresh.
-                if (!numericalRecoveryTried && worst <= FEAS_TOL && solver().updateCount > 0) {
-                    numericalRecoveryTried = true
+                if (!progress.dualNumericalRecoveryTried && worst <= FEAS_TOL && solver().updateCount > 0) {
+                    progress.dualNumericalRecoveryTried = true
                     if (cancellation()) return if (model.exactState == null) truncated(beta) else null
                     if (workLimit > 0L && work.ops >= workLimit) return truncated(beta)
                     when (refactorize(LpRefactorReason.NUMERICAL_RECOVERY)) {
                         RefactorResult.UNCHANGED -> Unit
-                        RefactorResult.BASIS_CHANGED -> return restartDual(enforced, basisRestarts)
+                        RefactorResult.BASIS_CHANGED -> return restartDual(enforced, progress)
                         RefactorResult.FAILED -> return null
                     }
                     resetGamma()
-                    iter-- // recovery is not a pivot and must not consume [iterationLimit]
+                    progress.dualIterations-- // recovery is not a pivot and must not consume [iterationLimit]
                     continue
                 }
                 // Dual unbounded ⇒ primal infeasible. Record the basis + leaving row so the caller can
@@ -1452,7 +1451,7 @@ internal class RevisedSimplex(
             when (foldPivot(r, q, leaving, withPivotEta = true)) {
                 PivotFold.UPDATED -> Unit
                 PivotFold.REBUILT -> resetGamma()
-                PivotFold.BASIS_CHANGED -> return restartDual(enforced, basisRestarts)
+                PivotFold.BASIS_CHANGED -> return restartDual(enforced, progress)
                 PivotFold.FAILED -> return null
             }
         }
@@ -1463,17 +1462,17 @@ internal class RevisedSimplex(
 
     private fun restartDual(
         enforced: BooleanArray?,
-        basisRestarts: Int,
-        basisChanged: Boolean = true,
+        progress: SolveProgress,
     ): FloatLpResult? {
-        if ((basisChanged && basisRestarts >= MAX_BASIS_RESTARTS) || cancellation()) return null
+        if (progress.restarts >= MAX_SOLVE_RESTARTS || cancellation()) return null
+        progress.restarts++
         basisKept = true
         return solveCore(
             warm = null,
             reuse = true,
             enforced = enforced,
             reset = false,
-            basisRestarts = basisRestarts + if (basisChanged) 1 else 0,
+            progress = progress,
         )
     }
 
@@ -1925,15 +1924,15 @@ internal class RevisedSimplex(
      * singular pivot / cancellation / budget. Mutates [basicVar] / [status].
      */
     @Suppress("CyclomaticComplexMethod", "NestedBlockDepth", "ReturnCount", "LongMethod")
-    private fun primalPhase1(): IterationResult {
+    private fun primalPhase1(progress: SolveProgress): IterationResult {
         val beta = basicValues()
         val gamma = DoubleArray(m)
         val pi = DoubleArray(m)
         val alphaBuf = DoubleArray(m)
         val maxIter = 50 * (m + numVars) + 200
-        var iter = 0
-        while (iter++ < maxIter) {
-            if ((iter - 1) % CANCEL_POLL == 0 && cancellation()) return IterationResult.FAILED
+        while (progress.primalIterations < maxIter) {
+            val iteration = progress.primalIterations++
+            if (iteration % CANCEL_POLL == 0 && cancellation()) return IterationResult.FAILED
             var w = 0.0
             for (i in 0 until m) {
                 val v = basicVar[i]
@@ -2067,7 +2066,7 @@ internal class RevisedSimplex(
         warm: Basis?,
         reuse: Boolean = false,
         reset: Boolean = true,
-        basisRestarts: Int = 0,
+        progress: SolveProgress = SolveProgress(),
     ): FloatLpResult? {
         if (reset) resetSolveState(warm != null || reuse)
         if (model.exactState != null && (cancellation() || model.exactState?.conflict != null)) return null
@@ -2088,15 +2087,15 @@ internal class RevisedSimplex(
         val beta = basicValues()
         when (refactorAtQualitySafePoint()) {
             null -> Unit
-            RefactorResult.UNCHANGED -> return restartPrimal(basisRestarts, basisChanged = false)
-            RefactorResult.BASIS_CHANGED -> return restartPrimal(basisRestarts)
+            RefactorResult.UNCHANGED -> return restartPrimal(progress)
+            RefactorResult.BASIS_CHANGED -> return restartPrimal(progress)
             RefactorResult.FAILED -> return null
         }
         if (!primalFeasible(beta)) {
-            when (primalPhase1()) {
+            when (primalPhase1(progress)) {
                 IterationResult.CONTINUE -> Unit
-                IterationResult.RESTART -> return restartPrimal(basisRestarts, basisChanged = false)
-                IterationResult.BASIS_CHANGED -> return restartPrimal(basisRestarts)
+                IterationResult.RESTART -> return restartPrimal(progress)
+                IterationResult.BASIS_CHANGED -> return restartPrimal(progress)
                 IterationResult.FAILED -> return null
             }
             basicValues(beta)
@@ -2105,18 +2104,17 @@ internal class RevisedSimplex(
         val maxIter = 50 * (m + numVars) + 200
         val blandStall = 2 * (m + numVars) + BLAND_STALL_BASE
         val alphaBuf = DoubleArray(m)
-        var iter = 0
-        var degenerate = 0 // consecutive zero-length pivots; past [blandStall] switch to Bland's rule
-        while (iter++ < maxIter) {
-            if ((iter - 1) % CANCEL_POLL == 0 && cancellation()) return null
+        while (progress.primalIterations < maxIter) {
+            val iteration = progress.primalIterations++
+            if (iteration % CANCEL_POLL == 0 && cancellation()) return null
             // Bland's rule once degenerate pivots pile up: lowest-index entering, lowest-variable leaving
             // tie-break. Guarantees termination on a degenerate LP that the Dantzig rule could cycle on.
-            val bland = degenerate >= blandStall
+            val bland = progress.primalDegenerate >= blandStall
             val y = duals()
             when (refactorAtQualitySafePoint()) {
                 null -> Unit
-                RefactorResult.UNCHANGED -> return restartPrimal(basisRestarts, basisChanged = false)
-                RefactorResult.BASIS_CHANGED -> return restartPrimal(basisRestarts)
+                RefactorResult.UNCHANGED -> return restartPrimal(progress)
+                RefactorResult.BASIS_CHANGED -> return restartPrimal(progress)
                 RefactorResult.FAILED -> return null
             }
             var q = -1
@@ -2180,7 +2178,7 @@ internal class RevisedSimplex(
                 smallPivotBails++
                 return null // numerically singular pivot
             }
-            degenerate = if (tMax <= TOL) degenerate + 1 else 0
+            progress.primalDegenerate = if (tMax <= TOL) progress.primalDegenerate + 1 else 0
             val evicted = basicVar[leaving]
             status[evicted] = sideStatus(evicted, leavingToUpper)
             basicVar[leaving] = q
@@ -2188,7 +2186,7 @@ internal class RevisedSimplex(
             pivots++
             when (foldPivot(leaving, q, evicted, withPivotEta = false)) {
                 PivotFold.UPDATED, PivotFold.REBUILT -> Unit
-                PivotFold.BASIS_CHANGED -> return restartPrimal(basisRestarts)
+                PivotFold.BASIS_CHANGED -> return restartPrimal(progress)
                 PivotFold.FAILED -> return null
             }
             basicValues(beta)
@@ -2196,14 +2194,15 @@ internal class RevisedSimplex(
         return null // budget exhausted
     }
 
-    private fun restartPrimal(basisRestarts: Int, basisChanged: Boolean = true): FloatLpResult? {
-        if ((basisChanged && basisRestarts >= MAX_BASIS_RESTARTS) || cancellation()) return null
+    private fun restartPrimal(progress: SolveProgress): FloatLpResult? {
+        if (progress.restarts >= MAX_SOLVE_RESTARTS || cancellation()) return null
+        progress.restarts++
         basisKept = true
         return solvePrimalCore(
             null,
             reuse = true,
             reset = false,
-            basisRestarts = basisRestarts + if (basisChanged) 1 else 0,
+            progress = progress,
         )
     }
 
@@ -2229,9 +2228,19 @@ internal class RevisedSimplex(
         /** Iterations between cooperative cancellation polls. */
         const val CANCEL_POLL: Int = 32
 
-        const val MAX_BASIS_RESTARTS: Int = 4
+        const val MAX_SOLVE_RESTARTS: Int = 4
     }
 }
+
+// Recovery may replace factors or headings, but it remains part of one logical solve. Keeping these
+// counters in one carrier prevents a restart from buying a fresh termination or anti-cycling budget.
+private class SolveProgress(
+    var dualIterations: Int = 0,
+    var primalIterations: Int = 0,
+    var primalDegenerate: Int = 0,
+    var restarts: Int = 0,
+    var dualNumericalRecoveryTried: Boolean = false,
+)
 
 private enum class RefactorResult {
     UNCHANGED,
