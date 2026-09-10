@@ -20,15 +20,15 @@ import com.eignex.klause.lp.engine.RevisedSimplex
 import com.eignex.klause.lp.engine.certifyLpResult
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.Cancellation
-import java.nio.file.Files
-import java.nio.file.Path
-import java.nio.file.StandardOpenOption
-import java.security.MessageDigest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.boolean
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.long
+import java.nio.file.Files
+import java.nio.file.Path
+import java.nio.file.StandardOpenOption
+import java.security.MessageDigest
 
 private const val SCHEMA = 1
 private const val POLICY_SEED = 21L
@@ -98,15 +98,19 @@ private fun measureTrace21(repetition: String, provenance: Provenance): Measurem
                     check(trail.push())
                     check(trail.assertBound(0, true, ExactLpSide(ExactLpNumber.of(1L)), cycle * 3L))
                 }
+
                 1 -> {
                     check(trail.push())
                     check(trail.assertBound(1, false, ExactLpSide(ExactLpNumber.of(3L)), cycle * 3L + 1L))
                 }
+
                 2 -> {
                     check(trail.push())
                     check(trail.assertBound(0, false, ExactLpSide(ExactLpNumber.of(1L)), cycle * 3L + 2L))
                 }
+
                 3 -> check(trail.pop(1))
+
                 else -> check(trail.pop(0))
             }
             check(solver.adopt(trail.state, Cancellation.Never))
@@ -130,7 +134,12 @@ private fun measureTrace21(repetition: String, provenance: Provenance): Measurem
             check(certified.exactPrimal == listOf(expectedX, expectedY).map(BigFraction::ofLong))
             check(certified.lowerBound == BigFraction.ofLong(expectedX + 2L * expectedY))
             exactAccepted++
-            recordOutcome(outcomeDigest, attempts, certified.verdict.name, checkNotNull(certified.lowerBound).toString())
+            recordOutcome(
+                outcomeDigest,
+                attempts,
+                certified.verdict.name,
+                checkNotNull(certified.lowerBound).toString(),
+            )
         }
     }
     return finishCandidateMeasurement(
@@ -185,7 +194,12 @@ private fun measureTrace22(repetition: String, provenance: Provenance): Measurem
             val certified = certifyLpResult(checkNotNull(trail.state.toWorkingModel()), solver, result)
             validateCandidate(trail, certified, TRACE_22)
             exactAccepted++
-            recordOutcome(outcomeDigest, attempts, certified.verdict.name, checkNotNull(certified.lowerBound).toString())
+            recordOutcome(
+                outcomeDigest,
+                attempts,
+                certified.verdict.name,
+                checkNotNull(certified.lowerBound).toString(),
+            )
         }
     }
     return finishCandidateMeasurement(
@@ -195,16 +209,15 @@ private fun measureTrace22(repetition: String, provenance: Provenance): Measurem
     )
 }
 
-private fun newCandidateSolver(trail: LpBoundTrail): PersistentLpSolver =
-    ProductionLpEngineFactory.newPersistentSolver(
-        checkNotNull(trail.state.toWorkingModel()),
-        Cancellation.Never,
-        64,
-        0,
-        0L,
-        false,
-        LpPricingOptions(LpZeroObjectivePricing.MIN_BOUND_SUPPORT, POLICY_SEED),
-    )
+private fun newCandidateSolver(trail: LpBoundTrail): PersistentLpSolver = ProductionLpEngineFactory.newPersistentSolver(
+    checkNotNull(trail.state.toWorkingModel()),
+    Cancellation.Never,
+    64,
+    0,
+    0L,
+    false,
+    LpPricingOptions(LpZeroObjectivePricing.MIN_BOUND_SUPPORT, POLICY_SEED),
+)
 
 private fun finishCandidateMeasurement(
     repetition: String,
@@ -275,6 +288,7 @@ private fun validateCandidate(trail: LpBoundTrail, result: CertifiedLpResult, wo
     val primal = checkNotNull(result.exactPrimal)
     when (workload) {
         TRACE_21 -> check(primal[0] + primal[1] >= BigFraction.ofLong(3L))
+
         TRACE_22 -> repeat(8) { row ->
             var lhs = BigFraction.ZERO
             repeat(12) { column -> lhs += BigFraction.ofLong(trace22Coefficient(row, column)) * primal[column] }
@@ -416,7 +430,8 @@ private fun compare(options: Map<String, String>) {
         val aggregateRatio = rows.sumOf { it.candidateWork }.toDouble() / rows.sumOf { it.historicalWork }
         if (aggregateRatio > 0.95) failures += "aggregate engine-work ratio $aggregateRatio exceeds 0.95"
     }
-    failures += "captured bound-only CP factorization reduction is not established by direct-engine source-derived traces"
+    failures +=
+        "captured bound-only CP factorization reduction is not established by direct-engine source-derived traces"
     failures += "rule-8 wall-time performance is not established by descriptive busy-host timings"
     val passed = failures.isEmpty()
     val summary = buildString {
@@ -538,7 +553,9 @@ private fun readMeasurements(path: Path, arm: String, failures: MutableList<Stri
                 unknownWork = value.long("unknownWork"), saturatedWork = value.long("saturatedWork"),
                 ownerClosed = value.boolean("ownerClosed"),
                 provenance = Provenance(
-                    value.string("revision"), value.string("tree"), value.string("sourceSha256"),
+                    value.string("revision"),
+                    value.string("tree"),
+                    value.string("sourceSha256"),
                     value.string("manifestSha256"),
                 ),
             )
@@ -601,7 +618,12 @@ private inline fun measureSafely(
 private fun provenance(manifest: Path): Provenance {
     val root = Path.of(checkNotNull(System.getProperty("klause.workspace.root")))
     val source = root.resolve("klause/src/jvmTest/kotlin/com/eignex/klause/lp/LpWave2Acceptance.kt")
-    return Provenance(git(root, "rev-parse", "HEAD"), git(root, "rev-parse", "HEAD^{tree}"), sha256(source), sha256(manifest))
+    return Provenance(
+        git(root, "rev-parse", "HEAD"),
+        git(root, "rev-parse", "HEAD^{tree}"),
+        sha256(source),
+        sha256(manifest),
+    )
 }
 
 private fun git(root: Path, vararg arguments: String): String {
