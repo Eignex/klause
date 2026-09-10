@@ -674,7 +674,7 @@ internal class RevisedSimplex(
         val logicalColumns = IntArray(nextModel.m) { nextModel.n + it }
         val adapter = BasisExtensionAdapter { candidate.createBasisSolver() }
         val replacement: BasisReplacement
-        val basisWork: Long?
+        var basisWork: Long? = null
         if (mode == LpAppendReplacementMode.TRANSFER) {
             val transfer = adapter.transfer(
                 oldSolver,
@@ -698,13 +698,15 @@ internal class RevisedSimplex(
             } catch (_: BasisArithmeticException) {
                 null
             } ?: return LpAppendReplacementAttempt(decline = LpAppendTransferDecline.FRESH_FAILED)
-            basisWork = replacement.solver.basisOperationWork?.let {
-                if (!it.complete || it.saturated) null else it.units
-            }
         }
         var installed = false
         var failure: Throwable? = null
         try {
+            if (mode == LpAppendReplacementMode.FRESH_INTENDED) {
+                basisWork = replacement.solver.basisOperationWork?.let {
+                    if (!it.complete || it.saturated) null else it.units
+                }
+            }
             if (token()) {
                 return LpAppendReplacementAttempt(
                     decline = LpAppendTransferDecline.CANCELLED,

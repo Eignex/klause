@@ -27,6 +27,7 @@ internal class BasisTransferAttempt(
 )
 
 internal class BasisExtensionAdapter(private val factory: (SparseMatrix) -> BasisSolver = { KotlinBasisSolver(it) }) {
+    @Suppress("TooGenericExceptionCaught")
     fun transfer(
         oldSolver: BasisSolver,
         newMatrix: SparseMatrix,
@@ -43,25 +44,35 @@ internal class BasisExtensionAdapter(private val factory: (SparseMatrix) -> Basi
         } catch (_: BasisArithmeticException) {
             return BasisTransferAttempt(null, true, operationDelta(before, oldSolver.basisOperationWork))
         }
-        val units = operationDelta(before, oldSolver.basisOperationWork)
-        if (extended == null) return BasisTransferAttempt(null, false, units)
-        val headings = translate(extended.basis, logicalColumns)
-        if (!headings.contentEquals(intendedBasis)) {
-            extended.solver.close()
-            return BasisTransferAttempt(null, false, units)
+        if (extended == null) {
+            return BasisTransferAttempt(null, false, operationDelta(before, oldSolver.basisOperationWork))
         }
-        return BasisTransferAttempt(
-            BasisReplacement(
-                extended.solver,
-                headings,
-                extended.basis.columns,
-                extended.basis.unitRows,
-                transferred = true,
-                transferArithmeticDeclined = false,
-            ),
-            arithmeticDeclined = false,
-            workUnits = units,
-        )
+        var accepted = false
+        var failure: Throwable? = null
+        try {
+            val units = operationDelta(before, oldSolver.basisOperationWork)
+            val headings = translate(extended.basis, logicalColumns)
+            if (!headings.contentEquals(intendedBasis)) return BasisTransferAttempt(null, false, units)
+            val result = BasisTransferAttempt(
+                BasisReplacement(
+                    extended.solver,
+                    headings,
+                    extended.basis.columns,
+                    extended.basis.unitRows,
+                    transferred = true,
+                    transferArithmeticDeclined = false,
+                ),
+                arithmeticDeclined = false,
+                workUnits = units,
+            )
+            accepted = true
+            return result
+        } catch (primary: Throwable) {
+            failure = primary
+            throw primary
+        } finally {
+            if (!accepted) closeRejected(extended.solver, failure)
+        }
     }
 
     @Suppress("TooGenericExceptionCaught")
@@ -84,18 +95,28 @@ internal class BasisExtensionAdapter(private val factory: (SparseMatrix) -> Basi
                 null
             }
             if (extended != null) {
-                val headings = translate(extended.basis, logicalColumns)
-                if (headings.contentEquals(intendedBasis)) {
-                    return BasisReplacement(
-                        extended.solver,
-                        headings,
-                        extended.basis.columns,
-                        extended.basis.unitRows,
-                        transferred = true,
-                        transferArithmeticDeclined = false,
-                    )
+                var accepted = false
+                var failure: Throwable? = null
+                try {
+                    val headings = translate(extended.basis, logicalColumns)
+                    if (headings.contentEquals(intendedBasis)) {
+                        val result = BasisReplacement(
+                            extended.solver,
+                            headings,
+                            extended.basis.columns,
+                            extended.basis.unitRows,
+                            transferred = true,
+                            transferArithmeticDeclined = false,
+                        )
+                        accepted = true
+                        return result
+                    }
+                } catch (primary: Throwable) {
+                    failure = primary
+                    throw primary
+                } finally {
+                    if (!accepted) closeRejected(extended.solver, failure)
                 }
-                extended.solver.close()
             }
         }
         val fresh = factory(newMatrix)

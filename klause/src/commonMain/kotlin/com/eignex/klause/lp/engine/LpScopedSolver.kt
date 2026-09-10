@@ -119,6 +119,7 @@ internal class LpScopedSolver(
 
     fun compact(token: Cancellation = cancellation): Boolean = edit(token) { it.compact(token) }
 
+    @Suppress("TooGenericExceptionCaught")
     fun solve(
         warm: Basis? = null,
         token: Cancellation = cancellation,
@@ -128,12 +129,15 @@ internal class LpScopedSolver(
         lastMetrics = LpSolveMetrics()
         if (!prepare(token)) return null
         val current = requireNotNull(solver)
-        if (!current.adopt(state, token)) return null
+        var failure: Throwable? = null
         val result = try {
+            if (!current.adopt(state, token)) return null
             if (warm == null) current.resolveBounds() else current.solve(warm)
+        } catch (primary: Throwable) {
+            failure = primary
+            throw primary
         } finally {
-            lastMetrics = current.lastMetrics
-            recordPendingAppendSolve(current)
+            recordSolveCompletion(current, failure)
         }
         if (token()) return null
         val certified = certifyLpResult(
@@ -297,13 +301,36 @@ internal class LpScopedSolver(
     private fun knownBasisWork(work: com.eignex.klause.simplex.basis.BasisOperationWork?): Long? =
         work?.takeIf { it.complete && !it.saturated }?.units
 
+    @Suppress("TooGenericExceptionCaught")
     private fun recordPendingAppendSolve(current: PersistentLpSolver) {
         if (!pendingAppendSolve) return
-        pendingAppendSolve = false
         val before = pendingAppendSolveWork
-        pendingAppendSolveWork = null
-        val after = knownBasisWork(current.basisLifecycleWork)
-        recordAppendWork(if (before != null && after != null && after >= before) after - before else null)
+        try {
+            val after = knownBasisWork(current.basisLifecycleWork)
+            recordAppendWork(if (before != null && after != null && after >= before) after - before else null)
+        } catch (failure: Throwable) {
+            appendUnknownWork = saturatingAdd(appendUnknownWork, 1)
+            throw failure
+        } finally {
+            pendingAppendSolve = false
+            pendingAppendSolveWork = null
+        }
+    }
+
+    @Suppress("TooGenericExceptionCaught")
+    private fun recordSolveCompletion(current: PersistentLpSolver, primary: Throwable?) {
+        var failure = primary
+        try {
+            lastMetrics = current.lastMetrics
+        } catch (telemetry: Throwable) {
+            if (failure == null) failure = telemetry else failure.addSuppressed(telemetry)
+        }
+        try {
+            recordPendingAppendSolve(current)
+        } catch (telemetry: Throwable) {
+            if (failure == null) failure = telemetry else failure.addSuppressed(telemetry)
+        }
+        if (primary == null && failure != null) throw failure
     }
 
     private fun prepared(

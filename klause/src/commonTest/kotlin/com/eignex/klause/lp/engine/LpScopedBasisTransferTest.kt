@@ -1,5 +1,7 @@
 package com.eignex.klause.lp.engine
 
+import com.eignex.klause.simplex.basis.BasisExtension
+import com.eignex.klause.simplex.basis.BasisExtensionResult
 import com.eignex.klause.simplex.basis.BasisOperationWork
 import com.eignex.klause.simplex.basis.BasisSolver
 import com.eignex.klause.simplex.basis.KotlinBasisSolver
@@ -360,6 +362,118 @@ class LpScopedBasisTransferTest {
     }
 
     @Test
+    fun `transfer telemetry failure closes the extended basis owner`() {
+        val telemetry = IllegalStateException("telemetry")
+        val cleanup = IllegalArgumentException("cleanup")
+        var ledgerReads = 0
+        var extendedCloses = 0
+        val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+            override fun newPersistentSolver(
+                model: LpModel,
+                cancellation: Cancellation,
+                refactorUpdateLimit: Int,
+                iterationLimit: Int,
+                workLimit: Long,
+                trackDegeneracy: Boolean,
+            ): PersistentLpSolver = RevisedSimplex(model, cancellation, basisSolverFactory = { matrix ->
+                val delegate = KotlinBasisSolver(matrix)
+                object : BasisSolver by delegate {
+                    override val basisOperationWork: BasisOperationWork
+                        get() {
+                            ledgerReads++
+                            if (ledgerReads > 1) throw telemetry
+                            return delegate.basisOperationWork
+                        }
+
+                    override fun extend(
+                        matrix: com.eignex.koblas.SparseMatrix,
+                        extension: BasisExtension,
+                    ): BasisExtensionResult? = delegate.extend(matrix, extension)?.let { result ->
+                        val extended = object : BasisSolver by result.solver {
+                            override fun close() {
+                                extendedCloses++
+                                result.solver.close()
+                                throw cleanup
+                            }
+                        }
+                        BasisExtensionResult(extended, result.basis.columns, result.basis.unitRows)
+                    }
+                }
+            })
+        }
+        val solver = LpScopedSolver(
+            LpExactState(lowerBoundModel()),
+            context = LpSolveContext(engineFactory = factory),
+            appendSelection = LpAppendSelection.FORCE_TRANSFER,
+        )
+        val initial = assertNotNull(solver.solve())
+        val state = solver.state
+
+        val thrown = assertFailsWith<IllegalStateException> {
+            solver.append(lowerRow(1, 2), scoped = false)
+        }
+
+        assertTrue(thrown === telemetry)
+        assertEquals(listOf(cleanup), thrown.suppressedExceptions.toList())
+        assertEquals(1, extendedCloses)
+        assertTrue(solver.state === state)
+        assertTrue(solver.lastResult === initial)
+        B5bIndependentExactSourceValidator.validate(solver.state, assertNotNull(solver.solve()))
+        solver.close()
+    }
+
+    @Test
+    fun `fresh telemetry failure closes the constructed basis owner`() {
+        val telemetry = IllegalStateException("telemetry")
+        val cleanup = IllegalArgumentException("cleanup")
+        var basisFactoryCalls = 0
+        var targetCloses = 0
+        val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+            override fun newPersistentSolver(
+                model: LpModel,
+                cancellation: Cancellation,
+                refactorUpdateLimit: Int,
+                iterationLimit: Int,
+                workLimit: Long,
+                trackDegeneracy: Boolean,
+            ): PersistentLpSolver = RevisedSimplex(model, cancellation, basisSolverFactory = { matrix ->
+                basisFactoryCalls++
+                val target = basisFactoryCalls > 1
+                val delegate = KotlinBasisSolver(matrix)
+                object : BasisSolver by delegate {
+                    override val basisOperationWork: BasisOperationWork
+                        get() = if (target) throw telemetry else delegate.basisOperationWork
+
+                    override fun close() {
+                        if (target) targetCloses++
+                        delegate.close()
+                        if (target) throw cleanup
+                    }
+                }
+            })
+        }
+        val solver = LpScopedSolver(
+            LpExactState(lowerBoundModel()),
+            context = LpSolveContext(engineFactory = factory),
+            appendSelection = LpAppendSelection.FRESH_INTENDED,
+        )
+        val initial = assertNotNull(solver.solve())
+        val state = solver.state
+
+        val thrown = assertFailsWith<IllegalStateException> {
+            solver.append(lowerRow(1, 2), scoped = false)
+        }
+
+        assertTrue(thrown === telemetry)
+        assertEquals(listOf(cleanup), thrown.suppressedExceptions.toList())
+        assertEquals(1, targetCloses)
+        assertTrue(solver.state === state)
+        assertTrue(solver.lastResult === initial)
+        B5bIndependentExactSourceValidator.validate(solver.state, assertNotNull(solver.solve()))
+        solver.close()
+    }
+
+    @Test
     fun `telemetry failure before publication closes replacement and preserves old owner`() {
         val telemetry = IllegalStateException("telemetry")
         var owners = 0
@@ -405,6 +519,53 @@ class LpScopedBasisTransferTest {
         B5bIndependentExactSourceValidator.validate(solver.state, assertNotNull(solver.solve()))
         solver.close()
         assertEquals(2, closes)
+    }
+
+    @Test
+    fun `pending telemetry is suppressed behind a post append solve failure`() {
+        val primary = IllegalStateException("primary")
+        val telemetry = IllegalArgumentException("telemetry")
+        var owners = 0
+        var replacementLedgerReads = 0
+        val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+            override fun newPersistentSolver(
+                model: LpModel,
+                cancellation: Cancellation,
+                refactorUpdateLimit: Int,
+                iterationLimit: Int,
+                workLimit: Long,
+                trackDegeneracy: Boolean,
+            ): PersistentLpSolver {
+                owners++
+                val replacement = owners > 1
+                val delegate = RevisedSimplex(model, cancellation)
+                return object : PersistentLpSolver by delegate {
+                    override val basisLifecycleWork: BasisOperationWork
+                        get() {
+                            if (replacement && replacementLedgerReads++ > 0) throw telemetry
+                            return checkNotNull(delegate.basisLifecycleWork)
+                        }
+
+                    override fun resolveBounds(): FloatLpResult? {
+                        if (replacement) throw primary
+                        return delegate.resolveBounds()
+                    }
+                }
+            }
+        }
+        val solver = LpScopedSolver(
+            LpExactState(lowerBoundModel()),
+            context = LpSolveContext(engineFactory = factory),
+        )
+        assertNotNull(solver.solve())
+        assertTrue(solver.append(lowerRow(1, 2), scoped = false))
+
+        val thrown = assertFailsWith<IllegalStateException> { solver.solve() }
+
+        assertTrue(thrown === primary)
+        assertEquals(listOf(telemetry), thrown.suppressedExceptions.toList())
+        assertEquals(1, solver.metrics.appendUnknownWork)
+        solver.close()
     }
 
     @Test
