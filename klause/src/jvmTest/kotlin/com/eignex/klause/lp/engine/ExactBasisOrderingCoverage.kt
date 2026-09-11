@@ -12,6 +12,9 @@ import com.eignex.klause.simplex.basis.BasisUpdate
 import com.eignex.klause.simplex.basis.IndexedVector
 import com.eignex.klause.simplex.basis.KotlinBasisSolver
 import com.eignex.klause.simplex.basis.RationalBasisOrder
+import com.eignex.klause.simplex.basis.RationalBasisFactors
+import com.eignex.klause.simplex.basis.RationalBasisBuild
+import com.eignex.klause.simplex.basis.RationalBasisSolve
 import com.eignex.klause.simplex.basis.headingColumn
 import com.eignex.koblas.SparseMatrix
 import com.eignex.klause.simplex.exact.BigFraction
@@ -27,10 +30,16 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import java.nio.file.Files
 import java.nio.file.Path
+import kotlin.test.assertTrue
+import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
+import kotlin.test.assertIs
+import kotlin.test.assertEquals
 
 internal object ExactBasisOrderingCoverage {
     @JvmStatic
     fun main(args: Array<String>) {
+        verifyNonsymmetricOrder()
         val root = Path.of(args.single())
         val inputs = listOf(
             "mps/blend-tiny.mps", "mps/feasible-tiny.mps", "mps/infeasible-tiny.mps", "mps/float-tiny.mps",
@@ -226,6 +235,36 @@ internal object ExactBasisOrderingCoverage {
                     }
                 }
             }
+        }
+    }
+
+    private fun verifyNonsymmetricOrder() {
+        val matrix = SparseMatrix.ofColumns(3, 3, listOf(
+            listOf(0 to 3.0, 1 to 1.0, 2 to 2.0),
+            listOf(0 to 2.0, 1 to 4.0, 2 to 1.0),
+            listOf(0 to 1.0, 1 to 3.0, 2 to 5.0),
+        ))
+        KotlinBasisSolver(matrix).use { solver ->
+            val headings = intArrayOf(2, 0, 1)
+            assertTrue(solver.refactorize(headings))
+            val order = assertNotNull(solver.ordering())
+            val exact = listOf(listOf(1L, 3L, 2L), listOf(3L, 1L, 4L), listOf(5L, 2L, 1L))
+                .map { it.map(BigFraction::ofLong) }
+
+            val built = assertIs<RationalBasisBuild.Ready>(
+                RationalBasisFactors.factor(exact, RationalBasisOrder(order.rows, order.slots)),
+            )
+            val normal = assertIs<RationalBasisSolve.Solved>(
+                built.factors.solve(listOf(13L, 23L, 16L).map(BigFraction::ofLong)),
+            )
+            val transpose = assertIs<RationalBasisSolve.Solved>(
+                built.factors.solve(listOf(22L, 11L, 13L).map(BigFraction::ofLong), transpose = true),
+            )
+
+            assertFalse(order.rows.contentEquals(order.slots))
+            assertEquals(0, built.stats.fallbacks)
+            assertEquals(listOf(2L, 1L, 4L).map(BigFraction::ofLong), normal.values)
+            assertEquals(listOf(1L, 2L, 3L).map(BigFraction::ofLong), transpose.values)
         }
     }
 
