@@ -33,6 +33,7 @@ import com.eignex.klause.lp.engine.LpCertificationObserver
 import com.eignex.klause.lp.engine.LpCertificationPolicy
 import com.eignex.klause.lp.engine.LpCertifier
 import com.eignex.klause.lp.engine.LpEngineFactory
+import com.eignex.klause.lp.engine.LpExactState
 import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.LpNeighborhood
 import com.eignex.klause.lp.engine.LpPricingOptions
@@ -79,6 +80,8 @@ private enum class DeclineCall {
     SOLVE,
     SOLVE_PRIMAL,
     REBIND,
+    ADOPT,
+    PREPARE_LOGICALS,
     RESOLVE_BOUNDS,
     RESOLVE_GATED,
     CLOSE,
@@ -204,6 +207,16 @@ private class RecordingPersistentSolver(
     private val calls: MutableList<DeclineCall>,
 ) : RecordingSolver(persistent, calls),
     PersistentLpSolver {
+    override fun prepareLogicals(token: Cancellation): Basis? {
+        calls += DeclineCall.PREPARE_LOGICALS
+        return persistent.prepareLogicals(token)
+    }
+
+    override fun adopt(state: LpExactState, token: Cancellation): Boolean {
+        calls += DeclineCall.ADOPT
+        return persistent.adopt(state, token)
+    }
+
     override fun rebind(next: LpModel, token: Cancellation): Boolean {
         calls += DeclineCall.REBIND
         return persistent.rebind(next, token)
@@ -455,7 +468,9 @@ class LpDeclineDisciplineTest {
             assertFalse(node.pruneNode(session, 1.5, -1, true))
             assertFalse(node.pruneNode(PropagationSession(problem), 1.5, -1, true))
             assertTrue(nodeHarness.factory.calls.contains(DeclineCall.PERSISTENT))
-            assertTrue(nodeHarness.factory.calls.contains(DeclineCall.REBIND))
+            assertFalse(nodeHarness.factory.calls.contains(DeclineCall.REBIND))
+            assertTrue(nodeHarness.factory.calls.contains(DeclineCall.ADOPT))
+            assertTrue(nodeHarness.factory.calls.contains(DeclineCall.PREPARE_LOGICALS))
             assertTrue(nodeHarness.factory.calls.contains(DeclineCall.RESOLVE_BOUNDS))
             assertFalse(nodeHarness.factory.calls.contains(DeclineCall.TABLEAU))
             assertTrue(nodeHarness.policy.observedSuccess(LpCertifier.INTEGER))

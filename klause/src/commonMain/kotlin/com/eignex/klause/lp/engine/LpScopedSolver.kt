@@ -109,6 +109,16 @@ internal class LpScopedSolver(
 
     fun pop(targetDepth: Int, token: Cancellation = cancellation): Boolean = edit(token) { it.pop(targetDepth, token) }
 
+    fun resetRoot(initial: LpExactState, token: Cancellation = cancellation): Boolean {
+        editAttempts++
+        if (closed || token() || initial.depth != 0 || !state.sameMatrix(initial)) return false
+        val current = solver
+        if (current != null && !current.adopt(initial, token)) return false
+        if (current == null && token()) return false
+        publish(LpBoundTrail(initial))
+        return true
+    }
+
     fun replaceObjective(objective: ExactLpObjective, token: Cancellation = cancellation): Boolean =
         edit(token) { it.replaceObjective(objective, token) }
 

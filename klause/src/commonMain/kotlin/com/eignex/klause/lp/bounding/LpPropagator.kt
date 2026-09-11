@@ -63,6 +63,7 @@ internal class LpPropagator(
     AutoCloseable {
     private var owner: LpScopedSolver? = null
     private var modelKey: Any? = null
+    private var rootState: LpExactState? = null
     private var closed = false
     private var nextWitness = 0L
     private var preparedWork = 0L
@@ -82,7 +83,9 @@ internal class LpPropagator(
         if (closed || cancellation()) return false
         if (modelKey === key && owner != null) return true
         reset()
-        owner = newOwner(LpExactState(model))
+        val initial = LpExactState(model)
+        owner = newOwner(initial)
+        rootState = initial
         modelKey = key
         sourcePremises = LpSourcePremises(key)
         return true
@@ -103,10 +106,10 @@ internal class LpPropagator(
         )
     }
 
-    fun atLevel(depth: Int): Boolean {
+    fun atLevel(depth: Int, token: Cancellation = cancellation): Boolean {
         val current = owner ?: return false
-        if (depth < current.state.depth && !current.pop(depth)) return invalidate()
-        while (current.state.depth < depth) if (!current.push()) return invalidate()
+        if (depth < current.state.depth && !current.pop(depth, token)) return invalidate()
+        while (current.state.depth < depth) if (!current.push(token)) return invalidate()
         return true
     }
 
@@ -137,15 +140,19 @@ internal class LpPropagator(
 
     fun solve(): CertifiedLpResult? = solveOwned { it.solve() }
 
+    private inline fun <T> solveOwned(action: (LpScopedSolver) -> T): T? = withOwner { current ->
+        try {
+            action(current)
+        } finally {
+            recordWork(current)
+        }
+    }
+
     @Suppress("TooGenericExceptionCaught") // A failed owner is invalid; preserve its primary and cleanup failures.
-    private inline fun <T> solveOwned(action: (LpScopedSolver) -> T): T? {
+    private inline fun <T> withOwner(action: (LpScopedSolver) -> T): T? {
         val current = owner ?: return null
         return try {
-            try {
-                action(current)
-            } finally {
-                recordWork(current)
-            }
+            action(current)
         } catch (primary: Throwable) {
             val metrics = lastMetrics
             try {
@@ -157,6 +164,16 @@ internal class LpPropagator(
             }
             throw primary
         }
+    }
+
+    fun resetRoot(): Boolean {
+        lastMetrics = LpSolveMetrics()
+        val initial = rootState ?: return false
+        if (withOwner { it.resetRoot(initial, cancellation) } != true) return invalidate()
+        witnesses.clear()
+        nextWitness = 0L
+        sourcePremises = LpSourcePremises(requireNotNull(modelKey))
+        return true
     }
 
     private fun recordWork(current: LpScopedSolver) {
@@ -175,7 +192,7 @@ internal class LpPropagator(
     }
 
     override fun assert(decision: SearchDecision, context: SearchContext): ComponentResult {
-        if (owner != null && !atLevel(context.decisionLevel)) return ComponentResult.Indeterminate
+        if (owner != null && !atLevel(context.decisionLevel, Cancellation.Never)) return ComponentResult.Indeterminate
         sourcePremises?.record(decision, context)
         return policy.assert(decision, context)
     }
@@ -241,6 +258,7 @@ internal class LpPropagator(
         val previous = owner
         owner = null
         modelKey = null
+        rootState = null
         sourcePremises = null
         witnesses.clear()
         solved = false
