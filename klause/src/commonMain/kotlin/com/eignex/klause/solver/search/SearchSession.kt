@@ -21,8 +21,13 @@ class SearchSession(
     private val cancellation: Cancellation = Cancellation.Never,
     private val learnedDb: SearchLearnedDbParams = SearchLearnedDbParams(),
     private val branchers: List<SearchBrancher> = emptyList(),
+    private val atoms: SearchAtomRegistry? = null,
 ) : SearchContext,
     ClauseWatchHost {
+    init {
+        atoms?.attach()
+    }
+
     private val singleComponent = components.singleOrNull()
     private val trail = ArrayList<SearchDecision>()
     private val boolValues = MutableIntIntMap()
@@ -70,6 +75,16 @@ class SearchSession(
         else -> null
     }
 
+    override fun registerAtom(positive: SearchTheoryDecision, negative: SearchTheoryDecision): SearchTheoryAtom? =
+        atoms?.register(positive, negative)
+
+    override fun atomLiteral(decision: SearchDecision): Int? = atoms?.literal(decision)
+
+    private fun acceptsLiteral(literal: Int): Boolean = atoms?.accepts(literal) ?: true
+
+    private fun namedExplanation(explanation: SearchExplanation?): SearchExplanation? =
+        explanation?.takeIf { it.literals.all(::acceptsLiteral) }
+
     override fun intLowerBound(variable: Int): Long? = intFacts[variable]?.lower
 
     override fun intUpperBound(variable: Int): Long? = intFacts[variable]?.upper
@@ -98,8 +113,13 @@ class SearchSession(
         )
 
         is SearchDecision.Theory -> {
-            pendingAssertions.addLast(PendingAssertion(decision, activeComponent))
-            ComponentResult.Consistent
+            if (decision.decision is RegisteredTheoryDecision) {
+                val literal = atomLiteral(decision)
+                if (literal == null) ComponentResult.Indeterminate else assignImplied(literal, null, publishedTheory = true)
+            } else {
+                pendingAssertions.addLast(PendingAssertion(decision, activeComponent))
+                ComponentResult.Consistent
+            }
         }
     }
 
@@ -118,24 +138,30 @@ class SearchSession(
         return result
     }
 
-    private fun assignImplied(literal: Int, explanation: SearchExplanation?): ComponentResult {
+    private fun assignImplied(
+        literal: Int,
+        explanation: SearchExplanation?,
+        publishedTheory: Boolean = false,
+    ): ComponentResult {
+        if (!acceptsLiteral(literal)) return ComponentResult.Indeterminate
+        val reason = namedExplanation(explanation)
         val variable = literal ushr 1
         val value = if (literal and 1 == 0) TRUE else FALSE
         return when (boolValues.getOrDefault(variable, UNASSIGNED)) {
             value -> ComponentResult.Consistent
 
             UNASSIGNED -> {
-                assignBool(variable, value)
-                if (explanation != null) {
-                    boolReasons.put(variable, explanation)
+                assignBool(variable, value, if (publishedTheory) activeComponent else null)
+                if (reason != null) {
+                    boolReasons.put(variable, reason)
                 } else {
                     activeComponent?.let { boolPublisher.put(variable, it) }
                 }
-                pendingAssertions.addLast(PendingAssertion(SearchDecision.Bool(literal), activeComponent))
+                pendingAssertions.addLast(PendingAssertion(SearchDecision.Bool(literal), if (publishedTheory) null else activeComponent))
                 ComponentResult.Consistent
             }
 
-            else -> ComponentResult.Conflict(explanation)
+            else -> ComponentResult.Conflict(reason)
         }
     }
 
@@ -190,7 +216,12 @@ class SearchSession(
     private fun recordAndDispatch(decision: SearchDecision, source: SearchComponent?): ComponentResult {
         conflictResolver = null
         conflictOwner = null
+        if (decision is SearchDecision.Theory && decision.decision is RegisteredTheoryDecision) {
+            val literal = atomLiteral(decision) ?: return ComponentResult.Indeterminate
+            return recordAndDispatch(SearchDecision.Bool(literal), source)
+        }
         if (decision is SearchDecision.Bool) {
+            if (!acceptsLiteral(decision.literal)) return ComponentResult.Indeterminate
             val variable = decision.literal ushr 1
             val value = if (decision.literal and 1 == 0) TRUE else FALSE
             when (boolValues.getOrDefault(variable, UNASSIGNED)) {
@@ -208,6 +239,7 @@ class SearchSession(
             is SearchDecision.Bool -> assignBool(
                 decision.literal ushr 1,
                 if (decision.literal and 1 == 0) TRUE else FALSE,
+                source,
             )
 
             is SearchDecision.IntAtMost, is SearchDecision.IntAtLeast, is SearchDecision.IntEqual -> {
@@ -352,7 +384,7 @@ class SearchSession(
      * literal unit.
      */
     internal fun explainedConflict(explanation: SearchExplanation?): SearchConflictResolution? {
-        var clause = explanation?.literals?.toList() ?: return null
+        var clause = namedExplanation(explanation)?.literals?.toList() ?: return null
         if (clause.isEmpty()) return SearchConflictResolution.Exhausted
         if (!clause.all(::isFalseLiteral)) return null
         var remainingResolutions = boolValues.size
@@ -413,7 +445,7 @@ class SearchSession(
      */
     private fun reasonOf(variable: Int, implied: Int): SearchExplanation? {
         boolReasons[variable]?.let { return it }
-        val published = boolPublisher[variable]?.reasonFor(implied) ?: return null
+        val published = namedExplanation(boolPublisher[variable]?.reasonFor(implied)) ?: return null
         if (implied !in published.literals) return null
         boolReasons.put(variable, published)
         return published
@@ -475,6 +507,7 @@ class SearchSession(
      * assumption set can leak into the next component run.
      */
     fun resetRootFacts() {
+        require(atoms == null) { "registered source atoms require a fresh session when rebuilding the root" }
         require(decisionLevel == 0) { "root facts can only be rebuilt at shared level zero" }
         boolValues.clear()
         boolLevels.clear()
@@ -553,6 +586,9 @@ class SearchSession(
         lifecycle: SearchRunLifecycle = SearchRunLifecycle.None,
         candidateHints: SearchCandidateHints = SearchCandidateHints.None,
     ): SearchRun {
+        require(atoms == null || numBoolVars in 0..atoms.sourceBooleanCount) {
+            "Boolean traversal must stay within the reserved source namespace"
+        }
         decisionsExhausted = false
         observeUnassignments(booleanBranching as? SearchUnassignListener)
         return SearchRun(
@@ -621,7 +657,7 @@ class SearchSession(
 
     /** Retain a sound clause-form explanation for subsequent propagation. */
     fun learn(explanation: SearchExplanation?) {
-        val literals = explanation?.literals ?: return
+        val literals = namedExplanation(explanation)?.literals ?: return
         learn(literals)
     }
 
@@ -754,11 +790,15 @@ class SearchSession(
         return value == (literal and 1 == 0)
     }
 
-    private fun assignBool(variable: Int, value: Int) {
+    private fun assignBool(variable: Int, value: Int, source: SearchComponent?) {
         boolValues.put(variable, value)
         boolLevels.put(variable, decisionLevel)
         valuesAtLevel[decisionLevel].add(variable)
-        boolTrail.add((variable shl 1) or if (value == TRUE) 0 else 1)
+        val literal = (variable shl 1) or if (value == TRUE) 0 else 1
+        boolTrail.add(literal)
+        atoms?.assertion(literal)?.let {
+            pendingAssertions.addLast(PendingAssertion(SearchDecision.Theory(it), source))
+        }
     }
 
     private fun publishIntFact(decision: SearchDecision): ComponentResult {
