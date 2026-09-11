@@ -88,4 +88,25 @@ class IndexedVectorTest {
         assertEquals(0.0, vector.density)
         assertContentEquals(doubleArrayOf(), vector.toDoubleArray())
     }
+
+    @Test
+    fun `gather preserves stored IEEE values and clears absent entries after reuse`() {
+        val vector = IndexedVector(4)
+        val out = DoubleArray(4) { 7.0 }
+        for (value in listOf(-0.0, Double.NaN, Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY)) {
+            vector.clear()
+            vector.store(2, value)
+
+            vector.gather(out)
+
+            assertEquals(value.toRawBits(), out[2].toRawBits())
+            assertEquals(0.0.toRawBits(), out[0].toRawBits())
+            assertEquals(0.0.toRawBits(), out[1].toRawBits())
+            assertEquals(0.0.toRawBits(), out[3].toRawBits())
+            vector.unit(1)
+            vector.gather(out)
+            assertContentEquals(doubleArrayOf(0.0, 1.0, 0.0, 0.0), out)
+        }
+    }
+
 }
