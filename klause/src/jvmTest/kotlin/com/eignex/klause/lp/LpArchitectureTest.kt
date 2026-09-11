@@ -70,12 +70,17 @@ class LpArchitectureTest {
             """
                 package com.eignex.klause.lp.engine
                 import com.eignex.klause.simplex.basis.BasisSolver
-                import com.eignex.koblas.sparse.SparseWorkspace
+                import com.eignex.koblas.koblas
+                import com.eignex.koblas.sparse.SparseSlices
                 val solver: RevisedSimplex? = null
             """.trimIndent(),
             """
                 package com.eignex.klause.simplex.basis
-                import com.eignex.koblas.sparse.SparseWorkspace
+                import com.eignex.koblas.Workspace
+                import com.eignex.koblas.borrow
+                import com.eignex.koblas.borrowI32
+                import com.eignex.koblas.koblas
+                import com.eignex.koblas.sparse.SparseSlices
                 import com.eignex.klause.simplex.basis.BasisSolver
                 import com.eignex.klause.simplex.basis.IndexedVector
                 import com.eignex.klause.simplex.basis.BasisUpdate
@@ -102,7 +107,7 @@ class LpArchitectureTest {
     }
 
     @Test
-    fun `basis leaf rejects factorization and backend dependencies`() {
+    fun `basis leaf rejects factorization dependencies`() {
         for (dependency in listOf(
             "import com.eignex.koblas.sparse.factorization.lu.F64SparseMarkowitzLu",
             "import com.eignex.koblas.sparse.basis.*",
@@ -112,7 +117,6 @@ class LpArchitectureTest {
             "import com.eignex.koblas.corex.Matrix as Matrix",
             "import com.eignex.koblas.*",
             "import com.eignex.koblas.SparseMatrixFactory",
-            "val backend = com.eignex.koblas.koblas",
             "val solver: com.eignex.klause.lp.engine.LpModel? = null",
             "import com.eignex.klause.simplex.exact.rationalOutcome",
             "import com.eignex.klause.simplex.exact.RationalSimplex",
@@ -124,7 +128,7 @@ class LpArchitectureTest {
     }
 
     @Test
-    fun `engine rejects koblas factorization basis and provider dependencies`() {
+    fun `engine rejects koblas factorization and basis dependencies`() {
         for (dependency in listOf(
             "import com.eignex.koblas.sparse.factorization.lu.F64SparseMarkowitzLu",
             "import com.eignex.koblas.sparse.factorization.lu.F64SparseMarkowitzLu as SparseLu",
@@ -132,7 +136,6 @@ class LpArchitectureTest {
             "import com.eignex.koblas.sparse.basis.BasisSolverFactory",
             "import com.eignex.koblas.core.Vector",
             "val vector: com.eignex.koblas.core.Vector? = null",
-            "val backend = com.eignex.koblas.koblas",
         )) {
             val source = "package com.eignex.klause.lp.engine\n$dependency"
             assertTrue(
@@ -258,12 +261,17 @@ internal object LpBoundaryScanner {
             val allowedTypes = when {
                 packageName == ENGINE_PACKAGE || packageName.startsWith("$ENGINE_PACKAGE.") -> listOf(
                     "com.eignex.koblas.SparseMatrix",
-                    "com.eignex.koblas.sparse.SparseWorkspace",
+                    "com.eignex.koblas.koblas",
+                    "com.eignex.koblas.sparse.SparseSlices",
                 )
 
                 packageName == BASIS_PACKAGE || packageName.startsWith("$BASIS_PACKAGE.") -> listOf(
                     "com.eignex.koblas.SparseMatrix",
-                    "com.eignex.koblas.sparse.SparseWorkspace",
+                    "com.eignex.koblas.Workspace",
+                    "com.eignex.koblas.borrow",
+                    "com.eignex.koblas.borrowI32",
+                    "com.eignex.koblas.koblas",
+                    "com.eignex.koblas.sparse.SparseSlices",
                 )
 
                 else -> return false

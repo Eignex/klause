@@ -2,7 +2,10 @@ package com.eignex.klause.simplex.basis
 
 import com.eignex.klause.util.binarySearchInt
 import com.eignex.koblas.SparseMatrix
-import com.eignex.koblas.sparse.SparseWorkspace
+import com.eignex.koblas.Workspace
+import com.eignex.koblas.borrow
+import com.eignex.koblas.borrowI32
+import com.eignex.koblas.sparse.SparseSlices
 
 internal data class TriangularSolveWork(
     val sparse: Boolean,
@@ -13,15 +16,18 @@ internal data class TriangularSolveWork(
 )
 
 // Exclusive scratch storage. Membership survives exact cancellation until clear; no tolerance dropping.
-internal class BasisWorkspace(val size: Int) {
+internal class BasisWorkspace(val size: Int, private val workspace: Workspace = Workspace()) {
     val values = DoubleArray(size)
     val indices = IntArray(size)
     private val marks = IntArray(size)
-    private var gatheredIndices: IntArray? = null
-    private var gatheredValues: DoubleArray? = null
     private val arithmeticStatus = IntArray(1)
     var count = 0
         private set
+
+    init {
+        workspace.reserve(size, 1)
+        workspace.reserveI32(size, 1)
+    }
 
     fun set(i: Int, value: Double) {
         if (marks[i] == 0) {
@@ -32,17 +38,13 @@ internal class BasisWorkspace(val size: Int) {
     }
 
     fun clear() {
-        for (k in 0 until count) {
-            val i = indices[k]
-            values[i] = 0.0
-            marks[i] = 0
-        }
+        SparseSlices.clearTouched(indices, 0, count, values, marks)
         count = 0
     }
 
     fun scatter(alpha: Double, slice: BasisSlice, start: Int = 0, length: Int = slice.count) {
         arithmeticStatus[0] = 0
-        count = SparseWorkspace.scatterAxpyChecked(
+        count = SparseSlices.scatterAxpyChecked(
             alpha, slice.indices, slice.offset + start, slice.values, slice.offset + start, length,
             values, marks, 1, indices, 0, count, arithmeticStatus, 0,
         )
@@ -52,7 +54,7 @@ internal class BasisWorkspace(val size: Int) {
     fun load(slice: BasisSlice) {
         clear()
         // Factor slices are finite by construction; identity scatter only copies them into an empty workspace.
-        count = SparseWorkspace.scatterAxpy(
+        count = SparseSlices.scatterAxpy(
             1.0, slice.indices, slice.offset, slice.values, slice.offset, slice.count,
             values, marks, 1, indices, 0, count,
         )
@@ -68,23 +70,21 @@ internal class BasisWorkspace(val size: Int) {
 
     fun write(vector: IndexedVector, order: IntArray? = null) {
         vector.clear()
-        val outIndices = gatheredIndices()
-        val outValues = gatheredValues()
-        val gathered = SparseWorkspace.gatherClearTouched(
-            indices, 0, count, values, marks,
-            outIndices, 0, outValues, 0,
-            compactExactZeros = true,
-        )
-        count = 0
-        for (k in 0 until gathered) {
-            val i = outIndices[k]
-            vector.store(order?.get(i) ?: i, outValues[k])
+        workspace.borrowI32(size) { outIndices ->
+            workspace.borrow(size) { outValues ->
+                val gathered = SparseSlices.gatherClearTouched(
+                    indices, 0, count, values, marks,
+                    outIndices, 0, outValues, 0,
+                    compactExactZeros = true,
+                )
+                count = 0
+                for (k in 0 until gathered) {
+                    val i = outIndices[k]
+                    vector.store(order?.get(i) ?: i, outValues[k])
+                }
+            }
         }
     }
-
-    private fun gatheredIndices(): IntArray = gatheredIndices ?: IntArray(size).also { gatheredIndices = it }
-
-    private fun gatheredValues(): DoubleArray = gatheredValues ?: DoubleArray(size).also { gatheredValues = it }
 }
 
 // Owns reach scratch and structural copies; numerical values belong to the enclosing factor cache.

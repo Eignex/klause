@@ -14,7 +14,8 @@ import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.argsortBy
 import com.eignex.koblas.SparseMatrix
-import com.eignex.koblas.sparse.SparseWorkspace
+import com.eignex.koblas.koblas
+import com.eignex.koblas.sparse.SparseSlices
 import kotlin.math.abs
 
 /**
@@ -341,11 +342,10 @@ internal class RevisedSimplex(
     }
 
     /** `y · A_j`, uncharged — for the passes that must not move the work meter. */
-    private fun columnDot(y: DoubleArray, j: Int): Double {
-        if (j >= n) return y[j - n]
-        var acc = 0.0
-        for (k in colPtr[j] until colPtr[j + 1]) acc += y[rowIdx[k]] * colVal[k]
-        return acc
+    private fun columnDot(y: DoubleArray, j: Int): Double = if (j < n) {
+        koblas.sparseKernels.dot(rowIdx, colPtr[j], colVal, colPtr[j], columnNnz(j), y)
+    } else {
+        y[j - n]
     }
 
     /** `y · A_j` for the dual vector [y], charged to the work meter. */
@@ -571,13 +571,26 @@ internal class RevisedSimplex(
     private fun shouldSampleQuality(): Boolean = refactorPolicy.shouldSample(cancelled = false) && !cancellation()
 
     private fun denseColumn(column: Int): DoubleArray = DoubleArray(m).also { dense ->
-        for (entry in colPtr[column] until colPtr[column + 1]) dense[rowIdx[entry]] = colVal[entry]
+        koblas.sparseKernels.scatter(
+            rowIdx,
+            colPtr[column],
+            colVal,
+            colPtr[column],
+            columnNnz(column),
+            dense,
+        )
     }
 
     private fun sparseAxpy(destination: DoubleArray, alpha: Double, column: Int) {
-        for (entry in colPtr[column] until colPtr[column + 1]) {
-            destination[rowIdx[entry]] += alpha * colVal[entry]
-        }
+        koblas.sparseKernels.axpy(
+            destination,
+            alpha,
+            rowIdx,
+            colPtr[column],
+            colVal,
+            colPtr[column],
+            columnNnz(column),
+        )
     }
 
     /** `B x = b` for a dense right-hand side, into [out] through [carrier]. */
@@ -738,24 +751,10 @@ internal class RevisedSimplex(
         gamma[r] = maxOf(tau / pivotSq, 1.0)
     }
 
-    /** Squared Euclidean norm of the pivotal row, accumulated without overflowing intermediate squares. */
+    /** Squared Euclidean norm of the pivotal row, with a stable norm before the final square. */
     private fun pivotalRowSquaredNorm(): Double {
-        var scale = 0.0
-        var scaledSquares = 1.0
-        pivotEtaVec.forEachStored { _, rho ->
-            val magnitude = abs(rho)
-            if (magnitude != 0.0) {
-                if (scale < magnitude) {
-                    val ratio = scale / magnitude
-                    scaledSquares = 1.0 + scaledSquares * ratio * ratio
-                    scale = magnitude
-                } else {
-                    val ratio = magnitude / scale
-                    scaledSquares += ratio * ratio
-                }
-            }
-        }
-        return if (scale == 0.0) 0.0 else scale * scale * scaledSquares
+        val norm = pivotEtaVec.nrm2()
+        return norm * norm
     }
 
     /**
@@ -1404,7 +1403,7 @@ internal class RevisedSimplex(
                 val cols = rowCols[i]
                 val vals = rowVals[i]
                 pivotRowOps += cols.size
-                touchedCount = SparseWorkspace.scatterAxpy(
+                touchedCount = SparseSlices.scatterAxpy(
                     rhoI, cols, 0, vals, 0, cols.size,
                     pivotRowEntry, touchEpoch, epoch, touched, 0, touchedCount,
                 )
@@ -1646,7 +1645,7 @@ internal class RevisedSimplex(
         if (changed) {
             val change = DoubleArray(m)
             ftranDense(rhs, change, rhsVec, boundUpdateFtran = true)
-            for (i in 0 until m) out[i] += change[i]
+            koblas.vectorKernels.axpy(out, 0, 1.0, change, 0, m)
             work.add(m)
         }
         return out.all { it.isFinite() }
