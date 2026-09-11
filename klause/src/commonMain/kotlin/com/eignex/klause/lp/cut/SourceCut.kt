@@ -19,7 +19,12 @@ import com.eignex.klause.simplex.exact.BigFraction
 import com.ionspin.kotlin.bignum.integer.BigInteger
 
 internal enum class CutMappingDecline {
-    MISSING_SOURCE, MISSING_PROVENANCE, MODEL_SCOPE, INACTIVE_GUARD, ARITHMETIC_LIMIT, LONG_RANGE
+    MISSING_SOURCE,
+    MISSING_PROVENANCE,
+    MODEL_SCOPE,
+    INACTIVE_GUARD,
+    ARITHMETIC_LIMIT,
+    LONG_RANGE,
 }
 
 internal sealed interface CutMapping<out T> {
@@ -121,14 +126,24 @@ internal class SourceCut(
             if (scale.bitLength() > limits.bits) return CutMapping.Declined(CutMappingDecline.ARITHMETIC_LIMIT)
         }
         val scaledIntegers = all.map { it.num * (scale / it.den) }
-        val divisor = scaledIntegers.fold(BigInteger.ZERO) { gcd, value -> gcd.gcd(value.abs()) }
-        val integers = if (divisor.isZero()) scaledIntegers else scaledIntegers.map { it / divisor }
         val min = BigInteger.fromLong(Long.MIN_VALUE)
         val max = BigInteger.fromLong(Long.MAX_VALUE)
-        if (integers.any { it < min || it > max || (relation == Relation.GE && it == min) }) {
+        fun representable(value: BigInteger): Boolean =
+            value >= min && value <= max && (relation != Relation.GE || value != min)
+        // Absolute slack drives pool aging, so retain representable input scaling.
+        val integers = if (scaledIntegers.all { representable(it) }) {
+            scaledIntegers
+        } else {
+            val divisor = scaledIntegers.fold(BigInteger.ZERO) { gcd, value -> gcd.gcd(value.abs()) }
+            if (divisor.isZero()) scaledIntegers else scaledIntegers.map { it / divisor }
+        }
+        if (integers.any { !representable(it) }) {
             return CutMapping.Declined(CutMappingDecline.LONG_RANGE)
         }
-        val proof = CutProvenance(map.model, provenance.epoch, facts, provenance.assumptions, provenance.rules)
+        val proof = CutProvenance(
+            map.model, provenance.epoch, facts, provenance.assumptions, provenance.rules,
+            CutPremise.Row(expression, relation, rhs),
+        )
         if (!limits.accepts(proof)) return CutMapping.Declined(CutMappingDecline.ARITHMETIC_LIMIT)
         return CutMapping.Mapped(
             Cut(
@@ -208,7 +223,11 @@ private class SourceCutMapper(
         if (view != null) {
             charge(view.colPtr[column + 1] - view.colPtr[column])
             return (view.colPtr[column] until view.colPtr[column + 1]).map {
-                view.rowIdx[it] to (BigFraction.ofDouble(view.colVal[it]) ?: decline(CutMappingDecline.ARITHMETIC_LIMIT))
+                view.rowIdx[it] to (
+                    BigFraction.ofDouble(
+                    view.colVal[it],
+                ) ?: decline(CutMappingDecline.ARITHMETIC_LIMIT)
+                )
             }
         }
         charge(model.csc.colPtr[column + 1] - model.csc.colPtr[column])
@@ -262,8 +281,8 @@ private class SourceCutMapper(
                             integral,
                         ) && !sources.isActive(integral)
                     ) {
-                            decline(CutMappingDecline.MISSING_PROVENANCE)
-                        }
+                        decline(CutMappingDecline.MISSING_PROVENANCE)
+                    }
                     facts.add(CutProofFact(integral, sources.isGlobal(integral)))
                 }
             }
@@ -279,8 +298,8 @@ private class SourceCutMapper(
                             parent.assumptions,
                         )
                     ) {
-                            decline(CutMappingDecline.MODEL_SCOPE)
-                        }
+                        decline(CutMappingDecline.MODEL_SCOPE)
+                    }
                     if (facts.size + parent.facts.size > limits.terms) decline(CutMappingDecline.ARITHMETIC_LIMIT)
                     facts.addAll(parent.facts)
                     if (rules.size + parent.rules.size > limits.terms) decline(CutMappingDecline.ARITHMETIC_LIMIT)
@@ -291,8 +310,8 @@ private class SourceCutMapper(
                     val premises = row.premises ?: decline(CutMappingDecline.MISSING_PROVENANCE)
                     if (premises.vars.isEmpty() && premises.boolLits.isEmpty()) {
                         decline(
-                        CutMappingDecline.MISSING_PROVENANCE,
-                    )
+                            CutMappingDecline.MISSING_PROVENANCE,
+                        )
                     }
                     if (premises.vars.size != premises.isUpper.size || premises.vars.size != premises.thresholds.size ||
                         premises.vars.any { it < 0 }
@@ -322,7 +341,10 @@ private class SourceCutMapper(
         }
         if (facts.size > limits.terms) decline(CutMappingDecline.ARITHMETIC_LIMIT)
         val assumptions = sources.assumptions + (inherited?.assumptions ?: emptySet())
-        val proof = CutProvenance(sources.model, sources.epoch, facts, assumptions, rules)
+        val proof = CutProvenance(
+            sources.model, sources.epoch, facts, assumptions, rules,
+            CutPremise.Row(inequality, cut.rel, BigFraction.ofLong(cut.rhs)),
+        )
         if (!limits.accepts(proof)) decline(CutMappingDecline.ARITHMETIC_LIMIT)
         return CutMapping.Mapped(SourceCut(inequality, cut.rel, BigFraction.ofLong(cut.rhs), proof))
     }

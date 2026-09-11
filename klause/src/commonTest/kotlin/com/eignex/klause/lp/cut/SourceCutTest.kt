@@ -9,6 +9,7 @@ import com.eignex.klause.lp.engine.Basis
 import com.eignex.klause.lp.engine.Csc
 import com.eignex.klause.lp.engine.Cut
 import com.eignex.klause.lp.engine.CutExpression
+import com.eignex.klause.lp.engine.CutInputRow
 import com.eignex.klause.lp.engine.CutPremise
 import com.eignex.klause.lp.engine.CutProofFact
 import com.eignex.klause.lp.engine.CutProvenance
@@ -26,6 +27,7 @@ import com.eignex.klause.lp.engine.LpBuilder
 import com.eignex.klause.lp.engine.LpDoubleView
 import com.eignex.klause.lp.engine.LpExactState
 import com.eignex.klause.lp.engine.LpModel
+import com.eignex.klause.lp.engine.LpRowPremises
 import com.eignex.klause.lp.engine.Relation
 import com.eignex.klause.lp.engine.Sense
 import com.eignex.klause.lp.engine.VarStatus
@@ -319,6 +321,16 @@ class SourceCutTest {
             }
         }
         assertTrue(portable.expression.value { BigFraction.ofLong(if (it == x) 2 else 4) } < portable.rhs)
+        val pool = CutPool()
+        pool.add(portable, assertNotNull(relaxation.sourceMap))
+        val premises = portable.provenance.facts.map { it.premise }
+        val popped = CutSourceMap(problem, 1, listOf(CutColumnSource(other), CutColumnSource(x)))
+        assertEquals(mapOf(CutMappingDecline.INACTIVE_GUARD to 1), pool.remap(popped))
+        assertTrue(pool.cuts().isEmpty())
+        val restored = CutSourceMap(problem, 2, popped.columns, activePremises = premises.toSet())
+        assertTrue(pool.remap(restored).isEmpty())
+        assertEquals(1, pool.cuts().single().cols.single())
+        assertTrue(pool.exportGlobalCuts().isEmpty())
     }
 
     @Test
@@ -597,18 +609,59 @@ class SourceCutTest {
     }
 
     @Test
-    fun `minimum long coefficient is retained only when the row consumer need not negate it`() {
-        val source = SourceCut(
-            CutExpression(mapOf(x to BigFraction.ofLong(Long.MIN_VALUE))),
-            Relation.LE,
-            BigFraction.ONE,
-            CutProvenance(modelToken, 0, emptyList()),
-        )
+    fun `minimum long values are retained only when the row consumer need not negate them`() {
         val map = CutSourceMap(modelToken, 0, listOf(CutColumnSource(x)))
-        val ge = SourceCut(source.expression, Relation.GE, source.rhs, source.provenance)
+        for ((coefficient, rhs) in listOf(Long.MIN_VALUE to 1L, 1L to Long.MIN_VALUE)) {
+            val source = SourceCut(
+                CutExpression(mapOf(x to BigFraction.ofLong(coefficient))),
+                Relation.LE,
+                BigFraction.ofLong(rhs),
+                CutProvenance(modelToken, 0, emptyList()),
+            )
+            val ge = SourceCut(source.expression, Relation.GE, source.rhs, source.provenance)
 
-        assertEquals(Long.MIN_VALUE, assertNotNull(source.toCut(map).orNull()).coeffs.single())
-        assertEquals(CutMapping.Declined(CutMappingDecline.LONG_RANGE), ge.toCut(map))
+            val mapped = assertNotNull(source.toCut(map).orNull())
+            assertEquals(coefficient, mapped.coeffs.single())
+            assertEquals(rhs, mapped.rhs)
+            assertEquals(CutMapping.Declined(CutMappingDecline.LONG_RANGE), ge.toCut(map))
+        }
+    }
+
+    @Test
+    fun `coprime denominator growth declines before producing an oversized scale`() {
+        val source = SourceCut(
+            CutExpression(mapOf(
+                x to BigFraction.of(BigInteger.ONE, BigInteger.fromLong(17)),
+                y to BigFraction.of(BigInteger.ONE, BigInteger.fromLong(19)),
+            )),
+            Relation.LE, BigFraction.ONE, CutProvenance(modelToken, 0, emptyList()),
+        )
+        val map = CutSourceMap(modelToken, 0, listOf(CutColumnSource(x), CutColumnSource(y)))
+
+        assertEquals(CutMapping.Declined(CutMappingDecline.ARITHMETIC_LIMIT),
+            source.toCut(map, CutMappingLimits(bits = 8)))
+    }
+
+    @Test
+    fun `tableau row snapshots retain nested premises after producer and reader mutation`() {
+        val columns = intArrayOf(0)
+        val coefficients = longArrayOf(2)
+        val premises = LpRowPremises(intArrayOf(0), booleanArrayOf(true), longArrayOf(3), intArrayOf(2))
+        val row = CutInputRow(0, false, 1, BigFraction.ofLong(3), Relation.LE,
+            columns, coefficients, premises)
+        columns[0] = 8
+        coefficients[0] = 9
+        premises.thresholds[0] = 10
+        premises.boolLits[0] = 4
+        row.columns[0] = 7
+        row.coefficients[0] = 6
+        assertNotNull(row.premises).thresholds[0] = 12
+        assertNotNull(row.premises).boolLits[0] = 6
+
+        assertEquals(0, row.columns.single())
+        assertEquals(2L, row.coefficients.single())
+        assertEquals(3L, assertNotNull(row.premises).thresholds.single())
+        assertEquals(2, assertNotNull(row.premises).boolLits.single())
     }
 
     @Test

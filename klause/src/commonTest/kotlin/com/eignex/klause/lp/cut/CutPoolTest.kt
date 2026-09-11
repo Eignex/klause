@@ -1,10 +1,18 @@
 package com.eignex.klause.lp.cut
 
 import com.eignex.klause.lp.engine.Cut
+import com.eignex.klause.lp.engine.CutExpression
+import com.eignex.klause.lp.engine.CutProvenance
+import com.eignex.klause.lp.engine.CutSource
+import com.eignex.klause.lp.engine.CutSourceKind
 import com.eignex.klause.lp.engine.Relation
+import com.eignex.klause.lp.relaxation.CutColumnSource
+import com.eignex.klause.lp.relaxation.CutSourceMap
+import com.eignex.klause.simplex.exact.BigFraction
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class CutPoolTest {
@@ -94,4 +102,80 @@ class CutPoolTest {
         assertEquals(0, pool.size)
         assertTrue(pool.add(stale), "an inactive eviction clears the dedup key")
     }
+
+    @Test
+    fun `raw and portable global duplicates retain one portable entry in either order`() {
+        val source = CutSource(CutSourceKind.INTEGER, 0)
+        val token = Any()
+        val map = CutSourceMap(token, 0, listOf(CutColumnSource(source)))
+        val portable = SourceCut(CutExpression(mapOf(source to BigFraction.ONE)), Relation.LE,
+            BigFraction.ofLong(5), CutProvenance(token, 0, emptyList()))
+        for (portableFirst in listOf(false, true)) {
+            val pool = CutPool()
+            if (portableFirst) {
+                assertTrue(pool.add(portable, map))
+                assertFalse(pool.add(cut(0, 1, 5)))
+            } else {
+                assertTrue(pool.add(cut(0, 1, 5)))
+                assertFalse(pool.add(portable, map))
+            }
+            assertEquals(1, pool.size)
+            assertEquals(1, pool.exportGlobalCuts().size)
+        }
+    }
+
+    @Test
+    fun `promoting a raw entry preserves its consecutive inactivity`() {
+        val source = CutSource(CutSourceKind.INTEGER, 0)
+        val token = Any()
+        val map = CutSourceMap(token, 0, listOf(CutColumnSource(source)))
+        val portable = SourceCut(CutExpression(mapOf(source to BigFraction.ONE)), Relation.LE,
+            BigFraction.ofLong(5), CutProvenance(token, 0, emptyList()))
+        val pool = CutPool(maxConsecutiveInactive = 2)
+        pool.add(cut(0, 1, 5))
+        pool.observe(doubleArrayOf(0.0))
+
+        pool.add(portable, map)
+        pool.observe(doubleArrayOf(0.0))
+
+        assertEquals(0, pool.size)
+    }
+
+    @Test
+    fun `root seeding preserves portable payload for export and permuted remapping`() {
+        val source = CutSource(CutSourceKind.INTEGER, 0)
+        val token = Any()
+        val map = CutSourceMap(token, 0, listOf(CutColumnSource(source)))
+        val portable = SourceCut(CutExpression(mapOf(source to BigFraction.ONE)), Relation.LE,
+            BigFraction.ofLong(5), CutProvenance(token, 0, emptyList()))
+        val root = CutPool()
+        root.add(portable, map)
+        val search = CutPool()
+
+        assertEquals(1, search.addAll(root.cuts()))
+        val declines = search.remap(CutSourceMap(token, 1, listOf(null, CutColumnSource(source))))
+
+        assertTrue(declines.isEmpty())
+        assertEquals(1, search.exportGlobalCuts().size)
+        assertEquals(1, search.cuts().single().cols.single())
+    }
+
+    @Test
+    fun `portable conversion preserves raw cut aging at the activity threshold`() {
+        val source = CutSource(CutSourceKind.INTEGER, 0)
+        val token = Any()
+        val map = CutSourceMap(token, 0, listOf(CutColumnSource(source)))
+        val portable = SourceCut(CutExpression(mapOf(source to BigFraction.ofLong(2))), Relation.LE,
+            BigFraction.ofLong(2), CutProvenance(token, 0, emptyList()))
+        val mapped = assertNotNull(portable.toCut(map).orNull())
+        for (candidate in listOf(cut(0, 2, 2), mapped)) {
+            val pool = CutPool(maxConsecutiveInactive = 1)
+            pool.add(candidate)
+
+            pool.observe(doubleArrayOf(1.0000006))
+
+            assertEquals(0, pool.size)
+        }
+    }
+
 }
