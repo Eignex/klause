@@ -29,7 +29,7 @@ class OpenTheoryMinimizeTest {
             (declare-const x Int)
             (assert (>= x 2))
             (assert (<= x 5))
-        """.trimIndent()
+                """.trimIndent(),
             )
         val x = parsed.intVarNames.getValue("x")
         val positive = LinearObjective(intCoefficients = LongArray(parsed.model.numIntVars).also { it[x] = 1L })

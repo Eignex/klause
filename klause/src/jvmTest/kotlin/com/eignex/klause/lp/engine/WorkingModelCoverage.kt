@@ -40,8 +40,8 @@ internal object WorkingModelCoverage {
             val offered = ArrayList<Double>()
             val second = assertIs<MinimizeResult.Optimal>(
                 search.runSlice(Cancellation.Never, 1000L, 256L) {
-                offered += it.objective
-            }
+                    offered += it.objective
+                },
             )
             assertEquals(3L, second.sample.ints[0])
             assertEquals(4.0, second.objective)
@@ -61,13 +61,13 @@ internal object WorkingModelCoverage {
             intDomains = arrayOf(IntDomain(0, 1)),
             factors = arrayOf<Factor>(
                 Linear(
-                intVars = intArrayOf(0),
-                intCoeffs = doubleArrayOf(1.0),
-                realVars = intArrayOf(0),
-                realCoeffs = doubleArrayOf(1.0),
-                op = LinearOp.EQ,
-                bound = 1.5,
-            )
+                    intVars = intArrayOf(0),
+                    intCoeffs = doubleArrayOf(1.0),
+                    realVars = intArrayOf(0),
+                    realCoeffs = doubleArrayOf(1.0),
+                    op = LinearOp.EQ,
+                    bound = 1.5,
+                ),
             ),
             numRealVars = 1,
             realLower = doubleArrayOf(0.0),
@@ -86,8 +86,8 @@ internal object WorkingModelCoverage {
             val offered = ArrayList<Double>()
             val result = assertIs<MinimizeResult.Optimal>(
                 second.runSlice(Cancellation.Never, 1000L, 256L) {
-                offered += it.sample.ints[0] + it.sample.reals[0]
-            }
+                    offered += it.sample.ints[0] + it.sample.reals[0]
+                },
             )
             assertTrue(offered.all { it == 1.5 })
             assertEquals(1.5, result.sample.reals[0])

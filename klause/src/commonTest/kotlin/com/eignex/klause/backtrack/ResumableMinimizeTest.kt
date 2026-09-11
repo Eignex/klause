@@ -30,8 +30,8 @@ class ResumableMinimizeTest {
                 val offered = ArrayList<Long>()
                 val result = assertIs<MinimizeResult.Optimal>(
                     second.runSlice(Cancellation.Never, 1000L, 256L) {
-                    offered += it.sample.ints[0]
-                }
+                        offered += it.sample.ints[0]
+                    },
                 )
                 assertTrue(offered.all { it >= 2L })
                 assertEquals(if (assumptions.numInts > 0) 3L else 2L, result.sample.ints[0])

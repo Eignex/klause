@@ -21,12 +21,12 @@ class LpWorkingModelTest {
         val three = ExactLpNumber.of(3L)
         val source = LpExactState(
             ExactLpModel(
-            listOf(listOf(ExactLpEntry(0, one))),
-            listOf(three),
-            List(2) { ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(three))) },
-            listOf(ExactLpRow()),
-            ExactLpObjective(listOf(one, zero)),
-        )
+                listOf(listOf(ExactLpEntry(0, one))),
+                listOf(three),
+                List(2) { ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(three))) },
+                listOf(ExactLpRow()),
+                ExactLpObjective(listOf(one, zero)),
+            ),
         )
         LpScopedSolver(source).use { owner ->
             val original = assertNotNull(owner.solve())
@@ -45,10 +45,10 @@ class LpWorkingModelTest {
                 assertEquals(
                     LpVerdict.INDETERMINATE,
                     certifyLpResult(
-                    assertNotNull(source.toWorkingModel()),
-                    sourceSolver,
-                    result.float,
-                ).verdict
+                        assertNotNull(source.toWorkingModel()),
+                        sourceSolver,
+                        result.float,
+                    ).verdict,
                 )
                 assertFailsWith<IllegalStateException> { owner.solve() }
                 assertFailsWith<IllegalStateException> { owner.prepare() }
@@ -88,12 +88,12 @@ class LpWorkingModelTest {
         val one = ExactLpNumber.of(1L)
         val source = LpExactState(
             ExactLpModel(
-            listOf(listOf(ExactLpEntry(0, one))),
-            listOf(one),
-            List(2) { ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(one))) },
-            listOf(ExactLpRow()),
-            ExactLpObjective(listOf(one, zero)),
-        )
+                listOf(listOf(ExactLpEntry(0, one))),
+                listOf(one),
+                List(2) { ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(one))) },
+                listOf(ExactLpRow()),
+                ExactLpObjective(listOf(one, zero)),
+            ),
         )
         LpScopedSolver(source).use { owner ->
             val (solver, result) = assertNotNull(owner.solveFloat())
@@ -104,17 +104,19 @@ class LpWorkingModelTest {
             val auxiliary = LpWorkingModel(
                 source,
                 source.model.appendScopedRow(
-                LpScopedRow(
-                    1L, listOf(0 to one), ExactLpNumber.of(2L),
-                    ExactLpColumn(
-                        ExactLpBounds(
-                    ExactLpSide(zero),
-                    ExactLpSide(zero),
-                )
+                    LpScopedRow(
+                        1L,
+                        listOf(0 to one),
+                        ExactLpNumber.of(2L),
+                        ExactLpColumn(
+                            ExactLpBounds(
+                                ExactLpSide(zero),
+                                ExactLpSide(zero),
+                            ),
+                        ),
+                        ExactLpRow(global = false, premises = ExactLpPremises(emptyList(), listOf(7))),
                     ),
-                    ExactLpRow(global = false, premises = ExactLpPremises(emptyList(), listOf(7)))
                 ),
-            )
             )
             owner.withWorkingModel(auxiliary) { scope ->
                 val conflict = assertNotNull(scope.solve())
@@ -134,12 +136,12 @@ class LpWorkingModelTest {
         val one = ExactLpNumber.of(1L)
         val source = LpExactState(
             ExactLpModel(
-            listOf(emptyList()),
-            emptyList(),
-            listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(one)))),
-            emptyList(),
-            ExactLpObjective(listOf(one)),
-        )
+                listOf(emptyList()),
+                emptyList(),
+                listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(one)))),
+                emptyList(),
+                ExactLpObjective(listOf(one)),
+            ),
         )
         for (terminal in listOf("infeasible", "unbounded", "cancelled")) {
             LpScopedSolver(source).use { owner ->
@@ -166,12 +168,12 @@ class LpWorkingModelTest {
         val one = ExactLpNumber.of(1L)
         val source = LpExactState(
             ExactLpModel(
-            listOf(emptyList()),
-            emptyList(),
-            listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(one)))),
-            emptyList(),
-            ExactLpObjective(listOf(one)),
-        )
+                listOf(emptyList()),
+                emptyList(),
+                listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(one)))),
+                emptyList(),
+                ExactLpObjective(listOf(one)),
+            ),
         )
         val primary = IllegalStateException("body")
         val cleanup = IllegalStateException("close")
@@ -226,12 +228,12 @@ class LpWorkingModelTest {
         val one = ExactLpNumber.of(1L)
         val source = LpExactState(
             ExactLpModel(
-            listOf(emptyList()),
-            emptyList(),
-            listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(one)))),
-            emptyList(),
-            ExactLpObjective(listOf(one)),
-        )
+                listOf(emptyList()),
+                emptyList(),
+                listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(one)))),
+                emptyList(),
+                ExactLpObjective(listOf(one)),
+            ),
         )
         for (preparation in listOf(true, false)) {
             val primary = IllegalStateException("operation")
@@ -288,39 +290,39 @@ class LpWorkingModelTest {
         val one = ExactLpNumber.of(1L)
         val source = LpExactState(
             ExactLpModel(
-            listOf(emptyList()),
-            emptyList(),
-            listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(ExactLpNumber.of(3L))))),
-            emptyList(),
-            ExactLpObjective(listOf(one)),
-        )
+                listOf(emptyList()),
+                emptyList(),
+                listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(ExactLpNumber.of(3L))))),
+                emptyList(),
+                ExactLpObjective(listOf(one)),
+            ),
         )
         LpScopedSolver(source).use { owner ->
             assertTrue(owner.assertBound(0, true, ExactLpSide(one), 0L))
             assertTrue(
                 owner.append(
                     LpScopedRow(
-                0L,
-                listOf(0 to one),
-                one,
-                ExactLpColumn(ExactLpBounds(ExactLpSide(zero))),
-                ExactLpRow(global = false),
-            ),
-                false
-                )
+                        0L,
+                        listOf(0 to one),
+                        one,
+                        ExactLpColumn(ExactLpBounds(ExactLpSide(zero))),
+                        ExactLpRow(global = false),
+                    ),
+                    false,
+                ),
             )
             assertTrue(owner.push())
             assertTrue(
                 owner.append(
                     LpScopedRow(
-                1L,
-                listOf(0 to one),
-                zero,
-                ExactLpColumn(ExactLpBounds(ExactLpSide(zero))),
-                ExactLpRow(global = false),
-            ),
-                true
-                )
+                        1L,
+                        listOf(0 to one),
+                        zero,
+                        ExactLpColumn(ExactLpBounds(ExactLpSide(zero))),
+                        ExactLpRow(global = false),
+                    ),
+                    true,
+                ),
             )
             assertNotNull(owner.solve())
 
@@ -341,12 +343,12 @@ class LpWorkingModelTest {
         val zero = ExactLpNumber.of(0L)
         val source = LpExactState(
             ExactLpModel(
-            listOf(emptyList()),
-            emptyList(),
-            listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(ExactLpNumber.of(2L))))),
-            emptyList(),
-            ExactLpObjective(listOf(zero)),
-        )
+                listOf(emptyList()),
+                emptyList(),
+                listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(ExactLpNumber.of(2L))))),
+                emptyList(),
+                ExactLpObjective(listOf(zero)),
+            ),
         )
         val factory = object : LpEngineFactory by ProductionLpEngineFactory {
             override fun newPersistentSolver(
@@ -387,12 +389,12 @@ class LpWorkingModelTest {
         val zero = ExactLpNumber.of(0L)
         val source = LpExactState(
             ExactLpModel(
-            listOf(emptyList()),
-            emptyList(),
-            listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(ExactLpNumber.of(2L))))),
-            emptyList(),
-            ExactLpObjective(listOf(zero)),
-        )
+                listOf(emptyList()),
+                emptyList(),
+                listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(ExactLpNumber.of(2L))))),
+                emptyList(),
+                ExactLpObjective(listOf(zero)),
+            ),
         )
         val factory = object : LpEngineFactory by ProductionLpEngineFactory {
             override fun newPersistentSolver(
