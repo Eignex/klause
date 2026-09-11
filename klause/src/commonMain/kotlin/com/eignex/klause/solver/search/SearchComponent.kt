@@ -476,6 +476,18 @@ interface SearchContext {
     /** Publish a non-Boolean consequence, such as a CP bound tightening, to peer components. */
     fun publish(decision: SearchDecision): ComponentResult
 
+    /**
+     * Name immutable, exclusive and exhaustive theory payloads in this session's source scope.
+     *
+     * The caller proves complementarity and supplies immutable payloads with stable equality/hash.
+     * Payload source ids must belong to the session's immutable model. Returns null for unsupported registration, incompatible
+     * existing meaning or resource exhaustion. Equal payload pairs reuse names across retract/restart.
+     */
+    fun registerAtom(positive: SearchTheoryDecision, negative: SearchTheoryDecision): SearchTheoryAtom? = null
+
+    /** Boolean name of a source Boolean or a registered assertion owned by this session. */
+    fun atomLiteral(decision: SearchDecision): Int? = null
+
     /** Consume one complete component check from the solve-wide allowance. */
     fun consumeCheck(): Boolean
 
