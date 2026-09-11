@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "comparison": {
+    "candidate": "KotlinBasisSolver",
+    "reference": "HfactorBasisSolver",
+    "sourcePolicy": "Both backends are built and run from the same Klause checkout.",
+    "dependencyPolicy": "Refresh normal 0.1.1-SNAPSHOT resolution at campaign start; do not override or pin Koblas artifacts."
+  },
+  "corpus": "klause/src/jvmTest/resources/basis-corpus/manifest.json",
+  "warmups": 1,
+  "measuredRepetitions": 3,
+  "gradleWorkers": 2,
+  "campaignTimeoutSeconds": 300,
+  "validity": {
+    "requiredRecords": 12,
+    "requiredValidRepetitionsPerRecord": 3,
+    "requireAllRepetitionsValid": true,
+    "requireZeroStateErrors": true
+  },
+  "interpretation": {
+    "performance": "Report custom-to-HFactor median ratios per trace and over summed production-trace medians.",
+    "timing": "Descriptive on the campaign host; HFactor includes adapter copies and synthetic-prepared timing excludes shadow setup and checkpoint builds.",
+    "allocations": "Java-thread allocation only; HFactor native heap is excluded.",
+    "scope": "Basis factorization, FTRAN, BTRAN, and update replay only; no pricing or whole-LP attribution."
+  }
+}
