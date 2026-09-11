@@ -26,12 +26,15 @@ class BakedProblemTest {
             ).withTightenedMax(0, 5) to holey().withMinAtLeast(1).withMaxAtMost(5),
             Assumptions.None.withIntHole(0, 3) to holey().excludeValue(3),
             Assumptions(
-                intArrayOf(), booleanArrayOf(), intArrayOf(), longArrayOf(),
+                intArrayOf(),
+                booleanArrayOf(),
+                intArrayOf(),
+                longArrayOf(),
                 DeducedRestrictions(
-                intSetKeys = intArrayOf(0),
-                intSetOffsets = intArrayOf(0, 4),
-                intSetValues = longArrayOf(-1, 2, 3, 7),
-            )
+                    intSetKeys = intArrayOf(0),
+                    intSetOffsets = intArrayOf(0, 4),
+                    intSetValues = longArrayOf(-1, 2, 3, 7),
+                ),
             ) to IntDomain(3, 3),
         )
         for ((assumptions, expected) in cases) {
