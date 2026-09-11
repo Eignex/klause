@@ -135,13 +135,16 @@ private fun exactBasisFeasibleUnchecked(
         forEachColumnEntry(integral, basic[t]) { i, a -> b[i][t] = a }
     }
 
-    val det = bareissDet(Array(m) { b[it].copyOf() }) ?: return null
+    val minor = Array(m) { b[it].copyOf() }
+    val det = bareissDet(minor) ?: return null
     if (det == 0L) return null // singular basis — cannot reconstruct the point
 
     for (t in 0 until m) {
-        val bt = Array(m) { r -> b[r].copyOf() }
-        for (i in 0 until m) bt[i][t] = rhsAdj[i]
-        val detT = bareissDet(bt) ?: return null
+        for (i in 0 until m) {
+            b[i].copyInto(minor[i])
+            minor[i][t] = rhsAdj[i]
+        }
+        val detT = bareissDet(minor) ?: return null
         point[basic[t]] = BigFraction.of(BigInteger.fromLong(detT), BigInteger.fromLong(det))
     }
     val source = List(model.n) { j -> point[j] + model.exactShift(j) }
@@ -252,14 +255,17 @@ internal fun exactFarkasRay(model: LpModel, basis: Basis, row: Int): LongArray? 
     for (t in 0 until m) {
         forEachColumnEntry(model, basic[t]) { i, a -> bt[t][i] = a }
     }
-    val det = bareissDet(Array(m) { bt[it].copyOf() }) ?: return null
+    val minor = Array(m) { bt[it].copyOf() }
+    val det = bareissDet(minor) ?: return null
     if (det == 0L) return null
 
     val ray = LongArray(m)
     for (i in 0 until m) {
-        val mi = Array(m) { t -> bt[t].copyOf() }
-        for (t in 0 until m) mi[t][i] = if (t == row) 1L else 0L
-        ray[i] = bareissDet(mi) ?: return null
+        for (t in 0 until m) {
+            bt[t].copyInto(minor[t])
+            minor[t][i] = if (t == row) 1L else 0L
+        }
+        ray[i] = bareissDet(minor) ?: return null
     }
     if (det < 0L) {
         for (i in 0 until m) {
@@ -292,6 +298,8 @@ private fun bareissDet(a: Array<LongArray>): Long? {
     val n = a.size
     var prev = 1L
     var sign = 1
+    val acc = Int128()
+    val sub = Int128()
     for (k in 0 until n) {
         if (a[k][k] == 0L) {
             var swap = -1
@@ -311,9 +319,9 @@ private fun bareissDet(a: Array<LongArray>): Long? {
         for (i in k + 1 until n) {
             for (j in k + 1 until n) {
                 // a[i][j] = (a[i][j]·pivot − a[i][k]·a[k][j]) / prev, exact by Bareiss's identity.
-                val acc = Int128()
+                acc.clear()
                 acc.addProduct(a[i][j], pivot)
-                val sub = Int128()
+                sub.clear()
                 sub.addProduct(a[i][k], a[k][j])
                 acc.subtract(sub)
                 a[i][j] = acc.divExactByLong(prev) ?: return null

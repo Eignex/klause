@@ -13,6 +13,27 @@ import kotlin.test.assertTrue
 
 class LpModelTest {
     @Test
+    fun `mixed rows preserve coalescing shifts and maximizing costs`() {
+        val model = LpBuilder().apply {
+            val x = addVar(2L, 7L, cost = 3L)
+            val y = addRealVar(-1.0, 2.5, cost = -0.5)
+            addRealRow(intArrayOf(x, x, y), doubleArrayOf(2.0, -1.0, 0.5), Relation.GE, 4.0)
+            addRow(intArrayOf(x, x), longArrayOf(3L, -1L), Relation.EQ, 6L)
+        }.build(Sense.MAXIMIZE)
+
+        val view = assertNotNull(model.doubleView)
+
+        assertContentEquals(intArrayOf(0, 2, 3), view.colPtr)
+        assertContentEquals(intArrayOf(0, 1, 0), view.rowIdx)
+        assertContentEquals(doubleArrayOf(-1.0, 2.0, -0.5), view.colVal)
+        assertContentEquals(doubleArrayOf(-2.5, 2.0), view.rhs)
+        assertContentEquals(doubleArrayOf(-3.0, 0.5, 0.0, 0.0), view.cost)
+        assertContentEquals(doubleArrayOf(5.0, 3.5, 0.0, 0.0), view.upper)
+        assertContentEquals(doubleArrayOf(2.0, -1.0), view.loShift)
+        assertEquals(-6.5, view.objConstant)
+    }
+
+    @Test
     fun `IEEE recenter cannot erase source authority by deriving integral values`() {
         val zero = ExactLpNumber.of(0L)
         val one = ExactLpNumber.of(1L)

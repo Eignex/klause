@@ -45,6 +45,36 @@ class CircuitCutTest {
     }
 
     @Test
+    fun `repeated separation keeps cuts independent across changing support`() {
+        val (p, obj) = circuitProblem()
+        val session = PropagationSession(p)
+        val r = relaxer(p, obj).build(session)
+        val arcs = r.circuitArcs.single()
+        val subtour = DoubleArray(r.model.n)
+        val tour = DoubleArray(r.model.n)
+        val dense = DoubleArray(r.model.n)
+        val successors = intArrayOf(1, 0, 3, 2)
+        for (k in arcs.cols.indices) {
+            val col = arcs.cols[k]
+            if (arcs.heads[k] == successors[arcs.tails[k]]) subtour[col] = 1.0
+            if (arcs.heads[k] == (arcs.tails[k] + 1) % arcs.n) tour[col] = 1.0
+            dense[col] = 1.0 / (arcs.n - 1)
+        }
+        val separator = CircuitSeparator()
+        val retained = separator.separate(CutContext(p, r, subtour, session))
+        val expected = retained.map { it.key() }
+        assertTrue(expected.isNotEmpty())
+
+        for (point in listOf(tour, dense, DoubleArray(r.model.n), tour)) {
+            assertTrue(separator.separate(CutContext(p, r, point, session)).isEmpty())
+            val cuts = separator.separate(CutContext(p, r, subtour, session))
+            assertEquals(expected, cuts.map { it.key() })
+        }
+
+        assertEquals(expected, retained.map { it.key() })
+    }
+
+    @Test
     fun `arc relaxation optimum is a subtour and gets cut`() {
         val (p, obj) = circuitProblem()
         val session = PropagationSession(p)

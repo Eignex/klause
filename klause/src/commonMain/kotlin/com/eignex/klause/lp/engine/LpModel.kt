@@ -647,17 +647,15 @@ internal class LpBuilder {
      *  rows. Integer columns and rows contribute their exact [Long] values widened to double. */
     private fun buildDoubleView(n: Int, m: Int, signedSense: Long): LpDoubleView {
         val loD = DoubleArray(n) { contLo.getOrDefault(it, lo[it].toDouble()) }
-        val hiD = DoubleArray(n) { contHi.getOrDefault(it, hi[it].toDouble()) }
-        val costRawD = DoubleArray(n) { contCost.getOrDefault(it, this.cost[it].toDouble()) }
         val rhsD = DoubleArray(m)
         for ((i, row) in rows.withIndex()) {
             val flip = row.rel == Relation.GE
             val rawRhs = row.rhsD ?: row.rhs.toDouble()
             var b = if (flip) -rawRhs else rawRhs
-            val rvals = row.valsD ?: DoubleArray(row.vals.size) { row.vals[it].toDouble() }
             for (k in row.cols.indices) {
                 val j = row.cols[k]
-                val coeff = if (flip) -rvals[k] else rvals[k]
+                val value = row.valsD?.get(k) ?: row.vals[k].toDouble()
+                val coeff = if (flip) -value else value
                 b -= coeff * loD[j]
             }
             rhsD[i] = b
@@ -666,11 +664,11 @@ internal class LpBuilder {
         val colValBuckets = Array(n) { ArrayList<Double>() }
         for ((i, row) in rows.withIndex()) {
             val flip = row.rel == Relation.GE
-            val rvals = row.valsD ?: DoubleArray(row.vals.size) { row.vals[it].toDouble() }
             val summed = MutableIntDoubleMap(row.cols.size)
             for (k in row.cols.indices) {
                 val j = row.cols[k]
-                val coeff = if (flip) -rvals[k] else rvals[k]
+                val value = row.valsD?.get(k) ?: row.vals[k].toDouble()
+                val coeff = if (flip) -value else value
                 summed.put(j, summed.getOrDefault(j, 0.0) + coeff)
             }
             // Ascending column order keeps the CSC deterministic; i ascends ⇒ rows ascend within a column.
@@ -705,8 +703,8 @@ internal class LpBuilder {
         val signed = signedSense.toDouble()
         var objConstantD = 0.0
         for (j in 0 until n) {
-            costD[j] = signed * costRawD[j]
-            upperD[j] = hiD[j] - loD[j]
+            costD[j] = signed * contCost.getOrDefault(j, this.cost[j].toDouble())
+            upperD[j] = contHi.getOrDefault(j, hi[j].toDouble()) - loD[j]
             hasUpperD[j] = j !in openAboveCols
             objConstantD += costD[j] * loD[j]
         }
