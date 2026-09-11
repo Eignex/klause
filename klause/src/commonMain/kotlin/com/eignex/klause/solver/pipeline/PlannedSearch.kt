@@ -9,6 +9,7 @@ import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.result.SmtStatsSink
 import com.eignex.klause.solver.search.CardinalitySearchComponent
 import com.eignex.klause.solver.search.ClauseSearchComponent
+import com.eignex.klause.solver.search.SearchAtomRegistry
 import com.eignex.klause.solver.search.SearchComponent
 import com.eignex.klause.solver.search.SearchComponentSet
 import com.eignex.klause.solver.search.SearchLearnedDbParams
@@ -24,7 +25,11 @@ class PlannedSearch internal constructor(
     val cp: CpSearchComponent?,
     /** Theory participant, if selected. */
     val theory: TheoryComponent?,
-)
+) : AutoCloseable {
+    override fun close() {
+        (theory as? AutoCloseable)?.close()
+    }
+}
 
 /** Builds the selected search components. */
 fun ComponentPlan.search(
@@ -64,7 +69,9 @@ internal fun ComponentPlan.search(
     if (theory != null) components += theory
     cp?.rebase()
     return PlannedSearch(
-        SearchComponentSet(components).session(maxChecks, cancellation, learnedDb),
+        SearchComponentSet(
+            components,
+        ).session(maxChecks, cancellation, learnedDb, SearchAtomRegistry(spec.numBoolVars)),
         cp,
         theory,
     )

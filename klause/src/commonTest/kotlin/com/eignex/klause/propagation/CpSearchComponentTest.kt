@@ -4,18 +4,50 @@ import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.solver.search.ComponentResult
+import com.eignex.klause.solver.search.SearchAtomRegistry
+import com.eignex.klause.solver.search.SearchComponent
+import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchDecision
+import com.eignex.klause.solver.search.SearchIntValue
 import com.eignex.klause.solver.search.SearchResult
 import com.eignex.klause.solver.search.SearchRunEvent
 import com.eignex.klause.solver.search.SearchSession
+import com.eignex.klause.theory.qflra.SourceBoundAtom
+import com.eignex.klause.theory.qflra.SourceBoundTerm
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 
 class CpSearchComponentTest {
+
+    @Test
+    fun `registered theory names bypass CP arrays while source Booleans still propagate`() {
+        val problem = Problem(1, 1, arrayOf(IntDomain(0, 1)), emptyArray())
+        val component = CpSearchComponent(PropagationSession(problem))
+        component.rebase()
+        val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(1))
+        session.initialize()
+        val atom = requireNotNull(
+            SourceBoundAtom.integerSplit(
+                session,
+                listOf(
+                    SourceBoundTerm(
+                        SearchIntValue(0),
+                        BigFraction.ONE,
+                    ),
+                ),
+                BigFraction.ZERO,
+            ),
+        )
+
+        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Theory(atom.positive)))
+        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+        assertEquals(true, component.session.boolValue(0))
+    }
 
     @Test
     fun `shared runner enumerates CP branches without repeating a model`() {
@@ -33,8 +65,8 @@ class CpSearchComponentTest {
         assertEquals(
             setOf(0L, 1L),
             setOf(
-                first.model.valueOf<Long>(com.eignex.klause.solver.search.SearchIntValue(0)),
-                second.model.valueOf<Long>(com.eignex.klause.solver.search.SearchIntValue(0)),
+                first.model.valueOf<Long>(SearchIntValue(0)),
+                second.model.valueOf<Long>(SearchIntValue(0)),
             ),
         )
         assertIs<SearchRunEvent.Exhausted>(run.next())
@@ -196,11 +228,8 @@ class CpSearchComponentTest {
         val component = CpSearchComponent(propagation)
         component.rebase()
         var observed: Boolean? = null
-        val peer = object : com.eignex.klause.solver.search.SearchComponent {
-            override fun assert(
-                decision: SearchDecision,
-                context: com.eignex.klause.solver.search.SearchContext,
-            ): ComponentResult {
+        val peer = object : SearchComponent {
+            override fun assert(decision: SearchDecision, context: SearchContext): ComponentResult {
                 observed = context.boolValue(0)
                 return ComponentResult.Consistent
             }

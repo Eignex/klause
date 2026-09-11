@@ -2,9 +2,12 @@ package com.eignex.klause.lp.bounding
 
 import com.eignex.klause.lp.engine.ExactLpBounds
 import com.eignex.klause.lp.engine.ExactLpColumn
+import com.eignex.klause.lp.engine.ExactLpEntry
 import com.eignex.klause.lp.engine.ExactLpModel
 import com.eignex.klause.lp.engine.ExactLpNumber
 import com.eignex.klause.lp.engine.ExactLpObjective
+import com.eignex.klause.lp.engine.ExactLpPremises
+import com.eignex.klause.lp.engine.ExactLpRow
 import com.eignex.klause.lp.engine.ExactLpSide
 import com.eignex.klause.lp.engine.FloatLpResult
 import com.eignex.klause.lp.engine.LpEngineFactory
@@ -17,6 +20,9 @@ import com.eignex.klause.lp.engine.PersistentLpSolver
 import com.eignex.klause.lp.engine.ProductionLpEngineFactory
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.search.ComponentCheck
+import com.eignex.klause.solver.search.SearchAtomRegistry
+import com.eignex.klause.solver.search.SearchContext
+import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
@@ -29,6 +35,97 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class LpPropagatorTest {
+    @Test
+    fun `an unnamed local row withholds the entire exact conflict clause`() {
+        val zero = ExactLpNumber.of(0L)
+        val source = ExactLpModel(
+            listOf(listOf(ExactLpEntry(0, ExactLpNumber.of(1L)))),
+            listOf(ExactLpNumber.of(-1L)),
+            listOf(
+                ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(zero))),
+                ExactLpColumn(ExactLpBounds(lower = ExactLpSide(zero))),
+            ),
+            listOf(ExactLpRow(global = false, premises = ExactLpPremises(emptyList()))),
+            ExactLpObjective(listOf(zero, zero)),
+        )
+        LpPropagator(object : LpSearchPolicy {}).use { lp ->
+            assertTrue(lp.install(Any(), source))
+            val session = SearchSession(listOf(lp), atoms = SearchAtomRegistry(0))
+            session.initialize()
+            val result = assertNotNull(lp.solve())
+            assertNotNull(result.conflictSupport)
+            assertNull(lp.explainConflict(result.conflictSupport, session))
+        }
+    }
+
+    @Test
+    fun `failed bound invalidation overrides a cached feasible consumer check`() {
+        val zero = ExactLpNumber.of(0L)
+        val source = ExactLpModel(
+            listOf(emptyList()),
+            emptyList(),
+            listOf(ExactLpColumn(ExactLpBounds())),
+            emptyList(),
+            ExactLpObjective(listOf(zero)),
+        )
+        val policy = object : LpSearchPolicy {
+            override fun check(context: SearchContext): ComponentCheck =
+                ComponentCheck.Feasible
+        }
+        LpPropagator(policy).use { lp ->
+            assertTrue(lp.install(Any(), source))
+            val session = SearchSession(listOf(lp))
+            session.initialize()
+            assertEquals(ComponentCheck.Feasible, lp.check(session))
+            assertFalse(lp.assertBound(1, true, ExactLpSide(zero)))
+            assertEquals(ComponentCheck.Indeterminate, lp.check(session))
+        }
+    }
+
+    @Test
+    fun `a cancelled source coefficient retains its local row assumption in the conflict`() {
+        val zero = ExactLpNumber.of(0L)
+        val one = ExactLpNumber.of(1L)
+        val minus = ExactLpNumber.of(-1L)
+        val free = ExactLpColumn(ExactLpBounds(), integral = false)
+        val slack = ExactLpColumn(ExactLpBounds(lower = ExactLpSide(zero)), integral = false)
+        val source = ExactLpModel(
+            listOf(
+                listOf(
+                    ExactLpEntry(0, one),
+                    ExactLpEntry(1, minus),
+                ),
+                listOf(
+                    ExactLpEntry(0, minus),
+                    ExactLpEntry(1, one),
+                ),
+            ),
+            listOf(zero, minus),
+            listOf(free, free, slack, slack),
+            listOf(
+                ExactLpRow(
+                    global = false,
+                    premises = ExactLpPremises(emptyList(), listOf(0)),
+                ),
+                ExactLpRow(),
+            ),
+            ExactLpObjective(List(4) { zero }),
+        )
+        LpPropagator(object : LpSearchPolicy {}).use { lp ->
+            assertTrue(lp.install(Any(), source))
+            val session = SearchSession(listOf(lp), atoms = SearchAtomRegistry(2))
+            session.initialize()
+            session.push(SearchDecision.Bool(0))
+            val support = assertNotNull(lp.solve()).conflictSupport
+            val clause = assertNotNull(lp.explainConflict(support, session))
+            kotlin.test.assertContentEquals(intArrayOf(1), clause.literals)
+            session.popTo(0)
+            assertNull(lp.explainConflict(support, session))
+            val inactive = assertNotNull(lp.solve()).conflictSupport
+            assertNull(lp.explainConflict(inactive, session))
+        }
+    }
+
     @Test
     fun `scoped row pop restores exact feasibility while retaining the original output`() {
         val zero = ExactLpNumber.of(0L)

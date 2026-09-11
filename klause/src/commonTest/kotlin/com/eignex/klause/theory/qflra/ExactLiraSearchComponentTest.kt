@@ -24,7 +24,9 @@ import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchDecision
+import com.eignex.klause.solver.search.SearchResult
 import com.eignex.klause.solver.search.SearchSession
+import com.eignex.klause.solver.search.SearchSolveParams
 import com.eignex.klause.theory.TheoryCheck
 import com.eignex.klause.theory.TheoryContext
 import com.eignex.klause.theory.TheorySearchComponent
@@ -62,7 +64,7 @@ class ExactLiraSearchComponentTest {
     }
 
     @Test
-    fun `partial integer-only conflicts retain chronological handling`() {
+    fun `partial integer equality is relaxed before complete chronological refutation`() {
         val model = Problem(
             2,
             intBounds = openBounds(),
@@ -71,11 +73,9 @@ class ExactLiraSearchComponentTest {
         val session = SearchSession(listOf(ExactLiraSearchComponent(model)))
         assertIs<ComponentResult.Consistent>(session.initialize())
 
-        val conflict = assertIs<ComponentResult.Conflict>(session.push(SearchDecision.Bool(Lit.make(0, true))))
-
-        assertNull(conflict.explanation)
-        session.popTo(0)
-        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, false))))
+        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, true))))
+        assertIs<SearchResult.Exhausted>(session.solve(2))
     }
 
     @Test
@@ -144,7 +144,7 @@ class ExactLiraSearchComponentTest {
     }
 
     @Test
-    fun `partial exact conflict counts only accepted private checks and its explanation`() {
+    fun `partial relaxation conflict records its explanation without a private exact search`() {
         val stats = SmtStatsSink()
         val component = ExactLiraSearchComponent(partialModel()).also { it.observeWith(stats) }
         val session = SearchSession(listOf(component))
@@ -153,7 +153,8 @@ class ExactLiraSearchComponentTest {
         assertIs<ComponentResult.Conflict>(session.push(SearchDecision.Bool(Lit.make(0, positive = true))))
 
         val snapshot = stats.snapshot()
-        assertTrue(snapshot.privateChecks > 0L)
+        assertEquals(0L, snapshot.privateChecks)
+        assertTrue(requireNotNull(component.lpMetrics).preparationAttempts > 0L)
         assertEquals(1L, snapshot.conflicts)
         assertEquals(1L, snapshot.explainedConflicts)
         assertEquals(1L, snapshot.conflictLiterals)
@@ -277,13 +278,15 @@ class ExactLiraSearchComponentTest {
             realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
             realUpper = doubleArrayOf(Double.POSITIVE_INFINITY),
         )
-        val session = SearchSession(listOf(ExactLiraSearchComponent(model)), maxChecks = 2)
+        val session = SearchSession(listOf(ExactLiraSearchComponent(model)), maxChecks = 6)
 
         assertIs<ComponentResult.Consistent>(session.initialize())
         assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, positive = true))))
 
-        assertIs<ComponentResult.Conflict>(
-            session.push(SearchDecision.Bool(Lit.make(0, positive = true))),
+        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(2, true))))
+        assertIs<SearchResult.Exhausted>(
+            session.solve(3, SearchSolveParams(maxDecisions = 0)),
         )
     }
 

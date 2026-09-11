@@ -154,9 +154,7 @@ class PlannedSearchTest {
             mapOf(0 to IntDomain(0, 1), 1 to IntDomain(1, 1)),
         )
 
-        assertIs<ComponentResult.Consistent>(planned.session.initialize())
-
-        assertIs<SearchResult.Exhausted>(planned.session.solve(0))
+        assertIs<ComponentResult.Conflict>(planned.session.initialize())
     }
 
     @Test

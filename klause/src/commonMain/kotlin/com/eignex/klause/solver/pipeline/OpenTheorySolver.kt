@@ -209,54 +209,56 @@ class OpenTheoryEngine internal constructor(
             learnedDb = SearchLearnedDbParams(params.maxLearnedClauses, params.lbdGlue),
             smtStats = state.smt,
         )
-        planned.session.attachOpenTheoryWork(work)
-        when (planned.session.initialize()) {
-            ComponentResult.Consistent -> Unit
+        planned.use {
+            planned.session.attachOpenTheoryWork(work)
+            when (planned.session.initialize()) {
+                ComponentResult.Consistent -> Unit
 
-            is ComponentResult.Conflict -> return OpenTheoryResult.Unsat(
-                stats.finish(state),
-            )
+                is ComponentResult.Conflict -> return OpenTheoryResult.Unsat(
+                    stats.finish(state),
+                )
 
-            ComponentResult.Indeterminate -> return unknown(
-                params.timeout(),
-                planned.session.checkBudgetExhausted(),
-                stats,
-                state,
+                ComponentResult.Indeterminate -> return unknown(
+                    params.timeout(),
+                    planned.session.checkBudgetExhausted(),
+                    stats,
+                    state,
+                )
+            }
+            val solveParams = SearchSolveParams(
+                maxDecisions = state.remainingDecisions(),
+                restart = params.sharedRestart?.let(SearchRestart::Every) ?: SearchRestart.Never,
             )
-        }
-        val solveParams = SearchSolveParams(
-            maxDecisions = state.remainingDecisions(),
-            restart = params.sharedRestart?.let(SearchRestart::Every) ?: SearchRestart.Never,
-        )
-        // Drawn here rather than beside the plan, so a root that propagation already refuted never pays
-        // for a proposal no traversal would have read.
-        val hints = state.candidateHints(plan, model, cancellation)
-        val branching = when (params.openBranching) {
-            OpenBranching.SourceOrder -> BooleanBranching.SourceOrder(model.numBoolVars)
-            OpenBranching.Activity -> HeuristicBooleanBranching(Vsids(), model.numBoolVars)
-        }
-        val result = planned.session.solve(
-            model.numBoolVars,
-            solveParams,
-            hints,
-            branching,
-            branching as? SearchRunObserver ?: SearchRunObserver.None,
-        )
-        return when (result) {
-            is SearchResult.Satisfied -> OpenTheoryResult.Sat(
-                assignment(result.model, checkNotNull(planned.theory), route),
-                stats.finish(state, planned.session),
+            // Drawn here rather than beside the plan, so a root that propagation already refuted never pays
+            // for a proposal no traversal would have read.
+            val hints = state.candidateHints(plan, model, cancellation)
+            val branching = when (params.openBranching) {
+                OpenBranching.SourceOrder -> BooleanBranching.SourceOrder(model.numBoolVars)
+                OpenBranching.Activity -> HeuristicBooleanBranching(Vsids(), model.numBoolVars)
+            }
+            val result = planned.session.solve(
+                model.numBoolVars,
+                solveParams,
+                hints,
+                branching,
+                branching as? SearchRunObserver ?: SearchRunObserver.None,
             )
+            return when (result) {
+                is SearchResult.Satisfied -> OpenTheoryResult.Sat(
+                    assignment(result.model, checkNotNull(planned.theory), route),
+                    stats.finish(state, planned.session),
+                )
 
-            SearchResult.Exhausted -> OpenTheoryResult.Unsat(stats.finish(state, planned.session))
+                SearchResult.Exhausted -> OpenTheoryResult.Unsat(stats.finish(state, planned.session))
 
-            SearchResult.Indeterminate -> unknown(
-                params.timeout(),
-                planned.session.checkBudgetExhausted() || planned.session.decisionBudgetExhausted(),
-                stats,
-                state,
-                planned.session,
-            )
+                SearchResult.Indeterminate -> unknown(
+                    params.timeout(),
+                    planned.session.checkBudgetExhausted() || planned.session.decisionBudgetExhausted(),
+                    stats,
+                    state,
+                    planned.session,
+                )
+            }
         }
     }
 

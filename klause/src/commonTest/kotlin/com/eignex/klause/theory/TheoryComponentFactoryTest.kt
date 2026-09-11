@@ -8,6 +8,7 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.solver.pipeline.componentPlan
 import com.eignex.klause.solver.pipeline.theoryComponent
 import com.eignex.klause.theory.difference.DifferenceSearchComponent
+import com.eignex.klause.theory.qflra.ExactLiraSearchComponent
 import com.eignex.klause.util.Bits
 import kotlin.test.Test
 import kotlin.test.assertIs
@@ -54,6 +55,6 @@ class TheoryComponentFactoryTest {
 
         val plan = model.componentPlan()
 
-        assertIs<TheorySearchComponent<*>>(plan.theoryComponent(model))
+        assertIs<ExactLiraSearchComponent>(plan.theoryComponent(model))
     }
 }

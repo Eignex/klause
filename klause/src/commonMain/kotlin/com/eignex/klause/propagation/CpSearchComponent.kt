@@ -80,6 +80,13 @@ class CpSearchComponent(
         decision: SearchDecision,
         context: com.eignex.klause.solver.search.SearchContext,
     ): ComponentResult {
+        if (decision is SearchDecision.Bool && Lit.variable(decision.literal) >= session.problem.numBoolVars) {
+            return if (context.atomLiteral(decision) != null) {
+                ComponentResult.Consistent
+            } else {
+                ComponentResult.Indeterminate
+            }
+        }
         val result = when (decision) {
             is SearchDecision.Bool -> when (
                 val result = session.pinBool(
