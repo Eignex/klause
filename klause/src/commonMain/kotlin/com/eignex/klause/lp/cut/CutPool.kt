@@ -20,6 +20,7 @@ internal class CutPool(
 ) {
     private val seen = HashSet<Any>()
     private val entries = ArrayList<Entry>()
+    private val cosineIndex = MutableIntLongMap()
 
     private class Entry(
         var cut: Cut?,
@@ -248,7 +249,8 @@ internal class CutPool(
         val nb = l2(b)
         if (na == 0.0 || nb == 0.0) return 0.0
         // Map b's columns for an O(|a|) shared-support dot product.
-        val bIndex = MutableIntLongMap(b.cols.size * 2)
+        val bIndex = cosineIndex
+        bIndex.clear()
         for (k in b.cols.indices) bIndex.put(b.cols[k], b.coeffs[k])
         var dot = 0.0
         for (k in a.cols.indices) {

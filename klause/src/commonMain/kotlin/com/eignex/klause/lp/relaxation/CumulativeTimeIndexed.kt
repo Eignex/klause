@@ -58,13 +58,12 @@ internal fun RelaxationBuilder.buildCumulativeTimeIndexed(view: SchedulingView) 
     val taskCols = Array(n) { IntArray((lst[it] - est[it] + 1).toInt()) }
     for (i in 0 until n) {
         val live = liveDomain(view.starts[i])
-        val assignCols = IntArray(taskCols[i].size)
+        val assignCols = taskCols[i]
         val chanCols = IntArray(taskCols[i].size + 1)
         val chanVals = LongArray(taskCols[i].size + 1)
         for (k in taskCols[i].indices) {
             val t = est[i] + k
             val col = auxColumn(0L, if (live.contains(t)) 1L else 0L)
-            taskCols[i][k] = col
             assignCols[k] = col
             chanCols[k] = col
             chanVals[k] = t

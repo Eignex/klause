@@ -75,6 +75,7 @@ internal fun integerTableauCuts(
 
         val cuts = ArrayList<Cut>()
         val unit = IndexedVector(m)
+        val tableauRow = DoubleArray(m)
         for (i in 0 until m) {
             if (cuts.size >= maxCuts) break
             val bvar = basis.basicVars[i]
@@ -87,7 +88,7 @@ internal fun integerTableauCuts(
             } catch (_: ArithmeticException) {
                 return emptyList()
             }
-            val w = roundDuals(model, unit.toDoubleArray())?.mult ?: continue
+            val w = roundDuals(model, unit.gather(tableauRow))?.mult ?: continue
 
             var anyWeight = false
             for (r in 0 until m) {
@@ -163,11 +164,15 @@ private fun bestRoundedCut(
     val divisors = divisorSet.toLongArray()
     divisors.sort()
     // Highest magnitudes first (likely the basic column), capped.
-    val tryDivisors = LongArray(minOf(divisors.size, MAX_DIVISORS)) { divisors[divisors.size - 1 - it] }
+    val divisorCount = minOf(divisors.size, MAX_DIVISORS)
+    val fw = LongArray(m)
+    val cutCols = IntArrayList()
+    val cutVals = LongArrayList()
 
     var best: Cut? = null
     var bestScore = TABLEAU_MIN_VIOLATION
-    for (d in tryDivisors) {
+    for (index in 0 until divisorCount) {
+        val d = divisors[divisors.lastIndex - index]
         val floorH = hAgg.floorDivPositive(d) ?: continue
         val remH = hAgg.copy()
         remH.addProduct(-d, floorH)
@@ -176,7 +181,7 @@ private fun bestRoundedCut(
         val fH = superAdditive(hAgg, d, f0, mir) ?: continue
 
         // f(w_r) for the ≤-row slacks, which back-substitution folds into the structural columns / rhs.
-        val fw = LongArray(m)
+        fw.fill(0L)
         var fwOk = true
         for (r in 0 until m) {
             if (w[r] == 0L || !isLeRow[r]) continue
@@ -199,8 +204,8 @@ private fun bestRoundedCut(
         if (!dAcc.fitsLong()) continue
         val rhsLe = dAcc.toLong()
 
-        val cutCols = IntArrayList()
-        val cutVals = LongArrayList()
+        cutCols.clear()
+        cutVals.clear()
         var ok = true
         var dot = 0.0
         for (k in 0 until n) {

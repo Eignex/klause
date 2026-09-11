@@ -163,8 +163,9 @@ internal class KnapsackCoverSeparator : CutSeparator {
         val byGroup = MutableIntObjectMap<IntArrayList>()
         for (t in 0 until lifted.size) byGroup.getOrPut(groupOf[lifted[t]]) { IntArrayList() }.add(t)
         val dp = LongArray(cap + 1)
+        val next = LongArray(cap + 1)
         byGroup.forEach { _, idxs ->
-            val next = dp.copyOf() // "take none from this group"
+            dp.copyInto(next) // "take none from this group"
             idxs.forEach { t ->
                 val w = weights[lifted[t]]
                 if (w > cap) return@forEach // an item heavier than the capacity is never taken
@@ -176,7 +177,7 @@ internal class KnapsackCoverSeparator : CutSeparator {
                     if (cand > next[c]) next[c] = cand
                 }
             }
-            for (c in 0..cap) dp[c] = next[c]
+            next.copyInto(dp)
         }
         return dp[cap]
     }

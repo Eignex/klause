@@ -11,6 +11,51 @@ import kotlin.test.assertTrue
 
 class ExactBasisSolveTest {
     @Test
+    fun `basis reconstruction restores each minor after row exchanges`() {
+        val model = LpBuilder().apply {
+            val x = addVar(0L, 10L)
+            val y = addVar(0L, 10L)
+            val z = addVar(0L, 10L)
+            addRow(intArrayOf(y, z), longArrayOf(2L, 1L), Relation.EQ, 7L)
+            addRow(intArrayOf(x, y), longArrayOf(3L, 1L), Relation.EQ, 5L)
+            addRow(intArrayOf(x, z), longArrayOf(1L, 4L), Relation.EQ, 13L)
+        }.build(Sense.MINIMIZE)
+        val basis = Basis(
+            intArrayOf(0, 1, 2),
+            Array(model.numVars) { if (it < model.n) VarStatus.BASIC else VarStatus.AT_LOWER },
+        )
+
+        val witness = assertNotNull(exactBasisWitness(model, basis))
+
+        assertEquals(listOf(1L, 2L, 3L).map(BigFraction::ofLong), witness.primal)
+    }
+
+    @Test
+    fun `basis rays annihilate other columns after minor row exchanges`() {
+        val model = LpBuilder().apply {
+            val x = addVar(0L, 10L)
+            val y = addVar(0L, 10L)
+            val z = addVar(0L, 10L)
+            addRow(intArrayOf(y, z), longArrayOf(2L, 1L), Relation.EQ, 7L)
+            addRow(intArrayOf(x, y), longArrayOf(3L, 1L), Relation.EQ, 5L)
+            addRow(intArrayOf(x, z), longArrayOf(1L, 4L), Relation.EQ, 13L)
+        }.build(Sense.MINIMIZE)
+        val basis = Basis(
+            intArrayOf(0, 1, 2),
+            Array(model.numVars) { if (it < model.n) VarStatus.BASIC else VarStatus.AT_LOWER },
+        )
+
+        for (row in 0 until model.m) {
+            val ray = assertNotNull(exactFarkasRay(model, basis, row))
+            for (col in 0 until model.n) {
+                var product = 0L
+                model.forEachInColumn(col) { i, value -> product += ray[i] * value }
+                if (col == row) assertTrue(product > 0L) else assertEquals(0L, product)
+            }
+        }
+    }
+
+    @Test
     fun `near zero equalities remain contradictory for every point candidate`() {
         val model = LpBuilder().apply {
             val x = addRealVar(0.0, 1.0)

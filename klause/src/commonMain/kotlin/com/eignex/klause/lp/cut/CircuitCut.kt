@@ -47,6 +47,8 @@ internal class CircuitArcModel(
  * n².
  */
 internal class CircuitSeparator : CutSeparator {
+    private val queue = IntArrayDeque()
+
     override fun separate(ctx: CutContext): List<Cut> {
         val cuts = ArrayList<Cut>()
         for (model in ctx.relaxation.circuitArcs) {
@@ -87,8 +89,10 @@ internal class CircuitSeparator : CutSeparator {
         }
         val root = 0
         val seen = LongHashSet()
+        val scratch = CircuitFlowScratch(n, capOrig.size)
+        val reach = scratch.reach
         for (t in 1 until n) {
-            val (flow, reach) = maxFlowMinCut(n, eHead, eTo, eNext, capOrig, root, t)
+            val flow = maxFlowMinCut(eHead, eTo, eNext, capOrig, root, t, scratch)
             if (flow >= 1.0 - TOL) continue
             // Dedup the source side S by a content hash — n may exceed 64, so a Long set-bitmask
             // would collide. A hash collision only ever drops a distinct cut (sound, never unsound).
@@ -109,27 +113,29 @@ internal class CircuitSeparator : CutSeparator {
     /**
      * Edmonds–Karp max flow from [s] to [t] over the paired-adjacency residual graph
      * ([eHead] / [eTo] / [eNext] / [capOrig]; the reverse of edge `e` is `e xor 1`, and `eTo(e xor 1)`
-     * is therefore the tail of `e`). Returns the flow value and the source-reachable set of the
-     * residual graph — the minimum cut's source side. The capacities are copied per call, so the
+     * is therefore the tail of `e`). Returns the flow value and writes the source-reachable set of the
+     * residual graph into [scratch] — the minimum cut's source side. The capacities are copied per call, so the
      * separator can reuse the same graph across every sink.
      */
     @Suppress("LongParameterList")
     private fun maxFlowMinCut(
-        n: Int,
         eHead: IntArray,
         eTo: IntArray,
         eNext: IntArray,
         capOrig: DoubleArray,
         s: Int,
         t: Int,
-    ): Pair<Double, BooleanArray> {
-        val cap = capOrig.copyOf()
-        val parentEdge = IntArray(n)
+        scratch: CircuitFlowScratch,
+    ): Double {
+        val cap = scratch.cap
+        val parentEdge = scratch.parentEdge
+        val reach = scratch.reach
+        capOrig.copyInto(cap)
         var flow = 0.0
         while (true) {
             parentEdge.fill(-1)
             parentEdge[s] = -2 // source visited; no parent edge
-            val queue = IntArrayDeque()
+            queue.clear()
             queue.addLast(s)
             while (queue.isNotEmpty()) {
                 val u = queue.removeFirst()
@@ -160,9 +166,9 @@ internal class CircuitSeparator : CutSeparator {
             }
             flow += bottleneck
         }
-        val reach = BooleanArray(n)
+        reach.fill(false)
         reach[s] = true
-        val queue = IntArrayDeque()
+        queue.clear()
         queue.addLast(s)
         while (queue.isNotEmpty()) {
             val u = queue.removeFirst()
@@ -176,7 +182,7 @@ internal class CircuitSeparator : CutSeparator {
                 e = eNext[e]
             }
         }
-        return flow to reach
+        return flow
     }
 
     private companion object {
@@ -185,4 +191,10 @@ internal class CircuitSeparator : CutSeparator {
         const val HASH_SEED: Long = 1125899906842597L
         const val HASH_MULT: Long = 1000003L
     }
+}
+
+private class CircuitFlowScratch(nodes: Int, edges: Int) {
+    val cap = DoubleArray(edges)
+    val parentEdge = IntArray(nodes)
+    val reach = BooleanArray(nodes)
 }
