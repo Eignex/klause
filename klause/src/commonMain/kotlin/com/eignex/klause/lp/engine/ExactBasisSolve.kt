@@ -22,6 +22,11 @@ internal class ExactBasisMeter(val limits: ExactBasisLimits, private val cancell
     var maxBits = 0
     var peakFill = 0
     var verificationChecks = 0
+    var orderOffers = 0
+    var orderProposals = 0
+    var orderAttempts = 0
+    var orderFallbacks = 0
+    var orderDecline: ExactBasisOrderDecline? = null
 
     val token = Cancellation { cancellation() || started.elapsedNow() >= limits.factor.time }
 
@@ -90,6 +95,10 @@ internal class ExactBasisMeter(val limits: ExactBasisLimits, private val cancell
         allocation[phase.ordinal] += stats.allocationBytes
         builds += stats.builds
         restarts += stats.restarts
+        if (phase == ExactBasisPhase.FACTOR) {
+            orderAttempts += stats.proposedAttempts
+            orderFallbacks += stats.fallbacks
+        }
         maxBits = maxOf(maxBits, stats.maxBits)
         peakFill = maxOf(peakFill, stats.peakFill)
     }
@@ -122,6 +131,7 @@ internal class ExactBasisMeter(val limits: ExactBasisLimits, private val cancell
     fun snapshot(decline: ExactBasisDecline?) = ExactBasisMetrics(
         eligible, factoryCalls, builds, reuse, solves, restarts, verificationChecks, maxBits, peakFill,
         ExactBasisPhase.entries.map { ExactBasisWork(it, work[it.ordinal], allocation[it.ordinal]) }, decline, phase,
+        orderOffers, orderProposals, orderAttempts, orderFallbacks, orderDecline,
     )
 }
 

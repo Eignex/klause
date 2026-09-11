@@ -362,6 +362,23 @@ internal class KotlinBasisSolver(
         }
     }
 
+    override fun ordering(): BasisOrdering? {
+        if (closed || singular) return null
+        val current = cache ?: return null
+        // FT transforms change the source elimination problem; their triangular labels are not LU pivots.
+        if (current.ft.updateCount != 0 || !columns.contentEquals(current.factors.basisColumns) ||
+            !unitRows.contentEquals(current.factors.basisUnitRows)
+        ) {
+            return null
+        }
+        return BasisOrdering(
+            columns,
+            unitRows,
+            current.factors.symbolic.rowOrder,
+            current.factors.symbolic.columnOrder,
+        )
+    }
+
     override fun restore(snapshot: BasisSnapshot): Boolean {
         requireOpen()
         operationMeter.attempt(BasisOperationKind.RESTORE)
