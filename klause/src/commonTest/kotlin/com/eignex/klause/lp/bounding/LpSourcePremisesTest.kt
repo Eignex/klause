@@ -39,11 +39,12 @@ class LpSourcePremisesTest {
         names.record(bound, session)
         val expression = CutExpression(mapOf(CutSource(CutSourceKind.INTEGER, 0) to BigFraction.ONE))
         val proof = CutProvenance(
-            root, 0,
+            root,
+            0,
             listOf(
-            CutProofFact(CutPremise.Literal(0), false),
-            CutProofFact(CutPremise.Bound(expression, true, BigFraction.ZERO), false),
-        )
+                CutProofFact(CutPremise.Literal(0), false),
+                CutProofFact(CutPremise.Bound(expression, true, BigFraction.ZERO), false),
+            ),
         )
 
         val explanation = assertNotNull(names.explain(proof, session))
@@ -51,15 +52,15 @@ class LpSourcePremisesTest {
         assertEquals(setOf(1, 7), explanation.literals.toSet())
         for (guardValue in listOf(false, true)) {
             for (x in 0..2) {
-            if (!guardValue || 2 * x >= 1) {
-                assertTrue(
-                    explanation.literals.any { literal ->
-                    val truth = if ((literal ushr 1) == 0) guardValue else x <= 0
-                    truth == (literal and 1 == 0)
+                if (!guardValue || 2 * x >= 1) {
+                    assertTrue(
+                        explanation.literals.any { literal ->
+                            val truth = if ((literal ushr 1) == 0) guardValue else x <= 0
+                            truth == (literal and 1 == 0)
+                        },
+                    )
                 }
-                )
             }
-        }
         }
         assertNull(names.explain(proof, session, maxNodes = 2))
         session.popTo(1)

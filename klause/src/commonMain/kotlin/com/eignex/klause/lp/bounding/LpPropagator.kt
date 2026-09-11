@@ -132,21 +132,30 @@ internal class LpPropagator(
     fun append(row: LpScopedRow, scoped: Boolean): Boolean = owner?.append(row, scoped) == true
     fun deactivate(row: Long): Boolean = owner?.deactivate(row) == true
 
-    fun solveFloat(warm: Basis? = null, token: Cancellation = cancellation): Pair<LpSolver, FloatLpResult?>? {
-        val current = owner ?: return null
-        return try {
-            current.solveFloat(if (solved) null else warm, token).also { solved = true }
-        } finally {
-            recordWork(current)
-        }
-    }
+    fun solveFloat(warm: Basis? = null, token: Cancellation = cancellation): Pair<LpSolver, FloatLpResult?>? =
+        solveOwned { current -> current.solveFloat(if (solved) null else warm, token).also { solved = true } }
 
-    fun solve(): CertifiedLpResult? {
+    fun solve(): CertifiedLpResult? = solveOwned { it.solve() }
+
+    @Suppress("TooGenericExceptionCaught") // A failed owner is invalid; preserve its primary and cleanup failures.
+    private inline fun <T> solveOwned(action: (LpScopedSolver) -> T): T? {
         val current = owner ?: return null
         return try {
-            current.solve()
-        } finally {
-            recordWork(current)
+            try {
+                action(current)
+            } finally {
+                recordWork(current)
+            }
+        } catch (primary: Throwable) {
+            val metrics = lastMetrics
+            try {
+                reset()
+            } catch (cleanup: Throwable) {
+                primary.addSuppressed(cleanup)
+            } finally {
+                lastMetrics = metrics
+            }
+            throw primary
         }
     }
 

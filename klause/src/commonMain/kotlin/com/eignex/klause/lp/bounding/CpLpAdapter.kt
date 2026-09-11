@@ -85,10 +85,10 @@ internal class CpLpAdapter(private val engine: LpEngine) : LpSearchPolicy {
         val depth = if (session ===
             sharedNative
         ) {
-                shared?.decisionLevel ?: session.decisionLevel
-            } else {
-                session.decisionLevel
-            }
+            shared?.decisionLevel ?: session.decisionLevel
+        } else {
+            session.decisionLevel
+        }
         if (!core.atLevel(depth)) return null
         val (lower, upper) = base.columnBounds(session)
         val current = requireNotNull(core.state).model

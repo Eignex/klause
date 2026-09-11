@@ -1,4 +1,4 @@
-package com.eignex.klause.lp.relaxation
+package com.eignex.klause.lp.bounding
 
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
@@ -15,23 +15,27 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.engine.FloatLpStatus
 import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.solveLp
+import com.eignex.klause.lp.relaxation.CpToLpRelaxation
+import com.eignex.klause.lp.relaxation.LpRelaxation
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.result.SolveStatsSink
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
-/**
- * #39: a node-invariant relaxation is built once and re-bound to live column bounds, which must yield
- * exactly the model a per-node rebuild would — the persistent LP's bit-identity guarantee — and only
- * for relaxations whose layout does not depend on the live domains (no auxiliary columns, no live-M
- * rows).
- */
-class CpToLpRelaxationReboundTest {
+class CpLpAdapterRebuildTest {
 
-    private fun assertSameModel(expected: LpModel, actual: LpModel) {
+    private fun assertSameModel(expected: LpModel, base: LpRelaxation, session: PropagationSession) {
+        val actual = LpEngine(
+            session.problem,
+            LinearObjective(intCoefficients = LongArray(session.problem.numIntVars)),
+            LpParams(),
+            SolveStatsSink(backend = "adapter"),
+        ).use { assertNotNull(it.cpAdapter.relaxation(base, session)).model }
         assertEquals(expected.n, actual.n, "n")
         assertEquals(expected.m, actual.m, "m")
         assertContentEquals(expected.csc.colPtr, actual.csc.colPtr, "colPtr")
@@ -48,7 +52,7 @@ class CpToLpRelaxationReboundTest {
     }
 
     @Test
-    fun `rebound reproduces a per-node rebuild bit-for-bit`() {
+    fun `the adapter reproduces a per-node rebuild bit-for-bit`() {
         // x0 + 2·x1 + 3·x2 ≥ 5 over [0,10], minimize x0 + x1 + x2 — a pure-linear, persistent-eligible
         // relaxation. Build once from declared domains, then re-bind to a branch-tightened session and
         // compare against a fresh build of that same session.
@@ -70,8 +74,7 @@ class CpToLpRelaxationReboundTest {
         node.implyIntAtMost(2, 4)
 
         val fresh = relaxer.build(node)
-        val reboundModel = base.rebound(node).model
-        assertSameModel(fresh.model, reboundModel)
+        assertSameModel(fresh.model, base, node)
     }
 
     @Test
@@ -92,7 +95,7 @@ class CpToLpRelaxationReboundTest {
     }
 
     @Test
-    fun `rebound tracks a pinned column`() {
+    fun `the adapter tracks a pinned column`() {
         // Pinning x1 to a point must give the same shifted bounds and rhs as a rebuild sees.
         val problem = Problem(
             0,
@@ -106,11 +109,11 @@ class CpToLpRelaxationReboundTest {
 
         val node = PropagationSession(problem)
         node.pinInt(1, 5)
-        assertSameModel(relaxer.build(node).model, base.rebound(node).model)
+        assertSameModel(relaxer.build(node).model, base, node)
     }
 
     @Test
-    fun `rebound reproduces a circuit arc relaxation when an arc is pruned`() {
+    fun `the adapter reproduces a circuit arc relaxation when an arc is pruned`() {
         // A 3-node circuit: arc columns are laid out from the declared domains and pinned live, so the
         // relaxation is persistent-eligible. Pruning value 2 from succ[0] drops arc 0->2; re-binding
         // must pin that arc column to 0 exactly as a per-node rebuild does.
@@ -130,7 +133,7 @@ class CpToLpRelaxationReboundTest {
 
         val node = PropagationSession(problem)
         node.implyIntAtMost(0, 1) // drop value 2 from succ[0]
-        assertSameModel(relaxer.build(node).model, base.rebound(node).model)
+        assertSameModel(relaxer.build(node).model, base, node)
     }
 
     @Test
@@ -158,7 +161,7 @@ class CpToLpRelaxationReboundTest {
     }
 
     @Test
-    fun `rebound reproduces a table hull when a tuple becomes infeasible`() {
+    fun `the adapter reproduces a table hull when a tuple becomes infeasible`() {
         // Table {(0,5),(2,2),(4,0)}: each tuple's selector is present while every entry stays live.
         // Pruning value 5 from x1 drops the (0,5) selector; re-binding must pin it to 0 like a rebuild.
         val problem = Problem(
@@ -173,11 +176,11 @@ class CpToLpRelaxationReboundTest {
 
         val node = PropagationSession(problem)
         node.implyIntAtMost(1, 4) // value 5 leaves x1 — tuple (0,5) infeasible
-        assertSameModel(relaxer.build(node).model, base.rebound(node).model)
+        assertSameModel(relaxer.build(node).model, base, node)
     }
 
     @Test
-    fun `rebound reproduces a table hull over values beyond Int range`() {
+    fun `the adapter reproduces a table hull over values beyond Int range`() {
         // Tuple values past 2^31 (a float-scaled table): the selector's presence rule stores the true
         // Long value, so pruning a wide value must pin the tuple's column exactly as a rebuild does. A
         // truncated presence value would test membership of the wrong value and diverge from the rebuild.
@@ -194,11 +197,11 @@ class CpToLpRelaxationReboundTest {
 
         val node = PropagationSession(problem)
         node.implyIntAtMost(0, b + 3) // value b+4 leaves x0 — tuple (b+4, 0) infeasible
-        assertSameModel(relaxer.build(node).model, base.rebound(node).model)
+        assertSameModel(relaxer.build(node).model, base, node)
     }
 
     @Test
-    fun `rebound reproduces an nvalue hull when a value is pruned`() {
+    fun `the adapter reproduces an nvalue hull when a value is pruned`() {
         // var n = |distinct(x0,x1,x2)| over [0,3]; pruning value 3 from x0 drops its z selector.
         val problem = Problem(
             0,
@@ -213,11 +216,11 @@ class CpToLpRelaxationReboundTest {
 
         val node = PropagationSession(problem)
         node.implyIntAtMost(0, 2)
-        assertSameModel(relaxer.build(node).model, base.rebound(node).model)
+        assertSameModel(relaxer.build(node).model, base, node)
     }
 
     @Test
-    fun `rebound reproduces a gcc count hull when a value is pruned`() {
+    fun `the adapter reproduces a gcc count hull when a value is pruned`() {
         // counts of cover values 1,2 over x0,x1; count vars are 2,3. Pruning value 2 from x0 drops a z.
         val problem = Problem(
             0,
@@ -234,11 +237,11 @@ class CpToLpRelaxationReboundTest {
 
         val node = PropagationSession(problem)
         node.implyIntAtMost(0, 1)
-        assertSameModel(relaxer.build(node).model, base.rebound(node).model)
+        assertSameModel(relaxer.build(node).model, base, node)
     }
 
     @Test
-    fun `rebound reproduces a gcc count hull over cover values beyond Int range`() {
+    fun `the adapter reproduces a gcc count hull over cover values beyond Int range`() {
         // Cover values past 2^31: the count-linkage rows key selectors by cover position and the
         // selector presence carries the full Long value, so the hull emits its columns and re-binds
         // bit-identically when a wide value is pruned.
@@ -262,11 +265,11 @@ class CpToLpRelaxationReboundTest {
 
         val node = PropagationSession(problem)
         node.implyIntAtMost(0, b + 1) // value b+2 leaves x0 — drops that selector
-        assertSameModel(relaxer.build(node).model, base.rebound(node).model)
+        assertSameModel(relaxer.build(node).model, base, node)
     }
 
     @Test
-    fun `rebound reproduces an element hull when an index value is pruned`() {
+    fun `the adapter reproduces an element hull when an index value is pruned`() {
         // result = arr[idx], arr = [7,3,9,5]; pruning index 3 drops the p=3 selector.
         val problem = Problem(
             0,
@@ -283,7 +286,7 @@ class CpToLpRelaxationReboundTest {
 
         val node = PropagationSession(problem)
         node.implyIntAtMost(0, 2)
-        assertSameModel(relaxer.build(node).model, base.rebound(node).model)
+        assertSameModel(relaxer.build(node).model, base, node)
     }
 
     @Test

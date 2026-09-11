@@ -5,6 +5,8 @@ import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.lp.bounding.LpEngine
+import com.eignex.klause.lp.bounding.LpParams
 import com.eignex.klause.lp.engine.Basis
 import com.eignex.klause.lp.engine.Csc
 import com.eignex.klause.lp.engine.Cut
@@ -37,10 +39,10 @@ import com.eignex.klause.lp.relaxation.CutColumnSource
 import com.eignex.klause.lp.relaxation.CutSourceMap
 import com.eignex.klause.lp.relaxation.LpRelaxation
 import com.eignex.klause.lp.relaxation.cpCutSources
-import com.eignex.klause.lp.relaxation.rebound
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.result.SolveStatsSink
 import com.ionspin.kotlin.bignum.integer.BigInteger
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -470,7 +472,7 @@ class SourceCutTest {
     }
 
     @Test
-    fun `rebound refreshes local guards and rejects a popped parent during assembly`() {
+    fun `the adapter refreshes local guards and rejects a popped parent during assembly`() {
         val p = Problem(
             0,
             1,
@@ -491,8 +493,15 @@ class SourceCutTest {
             provenance = CutProvenance(p, 0, listOf(CutProofFact(guard, false))),
         )
 
-        assertTrue(assertNotNull(base.rebound(local).sourceMap).isActive(guard))
-        assertFalse(assertNotNull(base.rebound(root).sourceMap).isActive(guard))
+        LpEngine(
+            p,
+            LinearObjective(intCoefficients = longArrayOf(1)),
+            LpParams(),
+            SolveStatsSink(backend = "source"),
+        ).use { engine ->
+            assertTrue(assertNotNull(assertNotNull(engine.cpAdapter.relaxation(base, local)).sourceMap).isActive(guard))
+            assertFalse(assertNotNull(assertNotNull(engine.cpAdapter.relaxation(base, root)).sourceMap).isActive(guard))
+        }
         assertEquals(base.model.m + 1, relaxer.build(local, listOf(parent)).model.m)
         assertEquals(base.model.m, relaxer.build(root, listOf(parent)).model.m)
     }
