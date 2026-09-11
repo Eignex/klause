@@ -1,8 +1,8 @@
 package com.eignex.klause.cli
 
 import com.eignex.klause.solver.result.LpCertifierRouteStats
-import com.eignex.klause.solver.result.LpContinuationStats
 import com.eignex.klause.solver.result.LpCertifierStats
+import com.eignex.klause.solver.result.LpContinuationStats
 import com.eignex.klause.solver.result.LpRouteSolveStats
 import com.eignex.klause.solver.result.LpStats
 import com.eignex.klause.solver.result.SmtStats

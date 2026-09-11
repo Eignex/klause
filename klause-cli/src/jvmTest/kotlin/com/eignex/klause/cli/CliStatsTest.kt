@@ -4,8 +4,8 @@ import com.eignex.klause.solver.result.LocalSearchStats
 import com.eignex.klause.solver.result.LpBasisVerificationStats
 import com.eignex.klause.solver.result.LpCertifierRouteStats
 import com.eignex.klause.solver.result.LpCertifierStats
-import com.eignex.klause.solver.result.LpRouteSolveStats
 import com.eignex.klause.solver.result.LpContinuationStats
+import com.eignex.klause.solver.result.LpRouteSolveStats
 import com.eignex.klause.solver.result.LpStats
 import com.eignex.klause.solver.result.OpenHintStats
 import com.eignex.klause.solver.result.OpenTheoryWorkStats
@@ -25,7 +25,9 @@ class CliStatsTest {
     @Test
     fun `continuation costs remain visible for LP and SMT declines`() {
         val continuation = LpContinuationStats(
-            calls = 1, work = mapOf("IMPORT" to 13), declines = mapOf("IMPORT_WORK" to 1),
+            calls = 1,
+            work = mapOf("IMPORT" to 13),
+            declines = mapOf("IMPORT_WORK" to 1),
         )
         val stats = SolveStats(lp = LpStats(continuation = continuation), smt = SmtStats(continuation = continuation))
 

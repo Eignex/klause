@@ -295,6 +295,4 @@ internal object ExactContinuationCoverage {
             assertEquals(ContinuationDecline.NO_BASIS, assertNotNull(missing.continuation).decline)
         }
     }
-
-
 }
