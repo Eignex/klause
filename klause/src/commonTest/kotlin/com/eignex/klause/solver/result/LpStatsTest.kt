@@ -22,21 +22,21 @@ class LpStatsTest {
         val observer = sink.certificationObserver()
         observer.observeContinuation(
             ExactContinuationMetrics(
-            builds = 2, pivots = 3, restarts = 1, work = 19, allocation = 23,
-            phase = ContinuationPhase.IMPORT, decline = ContinuationDecline.WORK,
-            workByPhase = mapOf(ContinuationPhase.IMPORT to 19),
-            allocationByPhase = mapOf(ContinuationPhase.IMPORT to 23),
-        )
+                builds = 2, pivots = 3, restarts = 1, work = 19, allocation = 23,
+                phase = ContinuationPhase.IMPORT, decline = ContinuationDecline.WORK,
+                workByPhase = mapOf(ContinuationPhase.IMPORT to 19),
+                allocationByPhase = mapOf(ContinuationPhase.IMPORT to 23),
+            ),
         )
         observer.observeContinuation(
             ExactContinuationMetrics(
-            pivots = 2,
-            resumed = true,
-            work = 7,
-            workByPhase = mapOf(ContinuationPhase.FEASIBILITY to 7),
-            phase = ContinuationPhase.FEASIBILITY,
-            decline = ContinuationDecline.WORK,
-        )
+                pivots = 2,
+                resumed = true,
+                work = 7,
+                workByPhase = mapOf(ContinuationPhase.FEASIBILITY to 7),
+                phase = ContinuationPhase.FEASIBILITY,
+                decline = ContinuationDecline.WORK,
+            ),
         )
 
         val stats = sink.snapshot().continuation

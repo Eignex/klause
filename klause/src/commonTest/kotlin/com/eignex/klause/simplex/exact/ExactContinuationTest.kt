@@ -295,7 +295,7 @@ class ExactContinuationTest {
         ExactContinuation(input).resume(
             ExactContinuationLimits(maxImportPivots = 1),
             Cancellation {
-                checkpoints++;
+                checkpoints++
                 false
             },
         )
