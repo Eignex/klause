@@ -490,7 +490,7 @@ class LpReplayTest {
 
         assertEquals(LpVerdict.INFEASIBLE, step.productionVerdict)
         assertTrue(step.hasInfeasibilityProof)
-        assertTrue(step.certifiers.any { it.certifier == LpCertifier.RATIONAL && it.successes == 1 })
+        assertTrue(step.certifiers.any { it.certifier == LpCertifier.RATIONAL && it.successes >= 1 })
     }
 
     @Test

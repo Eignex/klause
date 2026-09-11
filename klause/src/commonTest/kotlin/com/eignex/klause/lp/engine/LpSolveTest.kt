@@ -994,4 +994,25 @@ class LpSolveTest {
         assertNotNull(result.conflictSupport)
         assertTrue(assertNotNull(result.reconstruction).raySuccesses > 0)
     }
+
+    @Test
+    fun `cancelled zero row fallback records a decline without creating a fresh witness`() {
+        val model = LpBuilder().apply { addVar(0L, 1L) }.build(Sense.MINIMIZE)
+        val attempts = ArrayList<Pair<LpCertifier, Boolean>>()
+        val policy = LpCertificationPolicy { route, success ->
+            attempts += route to success
+            success
+        }
+        val solver = object : LpSolver {
+            override val infeasibleRay: DoubleArray? = null
+            override fun solve(warm: Basis?): FloatLpResult? = null
+            override fun solvePrimal(warm: Basis?): FloatLpResult? = null
+        }
+
+        val result = certifyLpResult(model, solver, null, Cancellation { true }, policy = policy)
+
+        assertEquals(LpVerdict.INDETERMINATE, result.verdict)
+        assertNull(result.witness)
+        assertEquals(listOf(LpCertifier.RATIONAL to false), attempts)
+    }
 }
