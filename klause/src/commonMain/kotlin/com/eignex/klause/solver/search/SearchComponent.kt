@@ -481,7 +481,8 @@ interface SearchContext {
      *
      * The caller proves complementarity and supplies immutable payloads with stable equality/hash.
      * Payload source ids must belong to the session's immutable model. Returns null for unsupported
-     * registration, incompatible existing meaning or resource exhaustion. Equal payload pairs reuse names across retract/restart.
+     * registration, incompatible existing meaning or resource exhaustion. Equal payload pairs reuse names
+     * across retract/restart.
      */
     fun registerAtom(positive: SearchTheoryDecision, negative: SearchTheoryDecision): SearchTheoryAtom? = null
 
