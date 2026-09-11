@@ -20,7 +20,29 @@ internal class LpExactContinuationCache {
     internal var statuses: List<VarStatus>? = null
     internal var continuation: ExactContinuation? = null
 
+    private var inputWork = 0L
+    private var inputAllocation = 0L
+    private var inputTimeNs = 0L
+    val usedWork get() = continuation?.usedWork ?: inputWork
+    val usedAllocation get() = continuation?.usedAllocation ?: inputAllocation
+    val usedTimeNs get() = continuation?.usedTimeNs ?: inputTimeNs
+
+    fun accountInput(work: Long, allocation: Long, timeNs: Long) {
+        continuation?.let { it.account(work, allocation, timeNs); return }
+        inputWork += work
+        inputAllocation += allocation
+        inputTimeNs += timeNs
+    }
+
+    fun initialize(input: ExactContinuationInput): ExactContinuation = continuation ?: ExactContinuation(input).also {
+        it.account(inputWork, inputAllocation, inputTimeNs)
+        continuation = it
+    }
+
     fun clear() {
+        inputWork = 0L
+        inputAllocation = 0L
+        inputTimeNs = 0L
         state = null
         key = null
         headings = null
@@ -35,34 +57,39 @@ internal fun captureContinuationTarget(
     model: LpModel,
     solver: LpSolver,
     result: FloatLpResult?,
-    cache: LpExactContinuationCache,
     limits: ExactContinuationLimits,
     cancellation: Cancellation,
 ): LpContinuationTarget {
-    val old = cache.continuation.takeIf { cache.state === model.exactState }
-    val budget = ContinuationBudget(remainingContinuationLimits(limits, old), cancellation)
+    val budget = ContinuationBudget(admissionLimits(limits), cancellation)
+    budget.phase = ContinuationPhase.ADMISSION
     var basis: Basis? = null
     var decline: ContinuationDecline? = null
     try {
         budget.step()
-        if (model.m > limits.maxRows || model.numVars > limits.maxColumns) {
-            throw ContinuationStop(ContinuationDecline.DIMENSION)
-        }
-        val sourceSize = model.exactState?.model?.keySize ?: model.csc.colVal.size.toLong() * 3L
-        // Current-authority validation scans the source; stopped snapshots and output arrays are owned copies.
-        budget.step(sourceSize + model.numVars, (model.m.toLong() + model.numVars) * 64L)
+        admitContinuation(model, budget)
+        // The hook validates current authority and returns owned target arrays.
+        budget.step(bytes = (model.m.toLong() + model.numVars) * 64L)
         basis = solver.continuationBasis(model) ?: if (model.exactState == null) {
             (result?.basis ?: solver.infeasibleBasis)?.let { Basis(it.basicVars.copyOf(), it.status.copyOf(), false) }
-        } else null
+        } else {
+            null
+        }
         budget.step()
     } catch (stop: ContinuationStop) {
         decline = stop.reason
         basis = null
     }
-    return LpContinuationTarget(basis, ExactContinuationMetrics(
-        work = budget.work, allocation = budget.allocation, elapsedNs = budget.elapsedNs, decline = decline,
-        workByPhase = budget.workByPhase.toMap(), allocationByPhase = budget.allocationByPhase.toMap(),
-    ))
+    return LpContinuationTarget(
+        basis,
+        ExactContinuationMetrics(
+        work = budget.work,
+        allocation = budget.allocation,
+        elapsedNs = budget.elapsedNs,
+        decline = decline,
+        workByPhase = budget.workByPhase.toMap(),
+        allocationByPhase = budget.allocationByPhase.toMap(),
+    )
+    )
 }
 
 internal class LpContinuationVerification(
@@ -83,18 +110,17 @@ internal fun continueExactLp(
     targetMetrics: ExactContinuationMetrics = ExactContinuationMetrics(),
 ): LpContinuationVerification {
     require(shortPivots >= 0)
-    var invalidated = cache.continuation != null && cache.state !== model.exactState
-    if (invalidated) cache.clear()
-    val old = cache.continuation
-    old?.account(targetMetrics.work, targetMetrics.allocation, targetMetrics.elapsedNs)
     if (targetMetrics.decline != null) return LpContinuationVerification(null, null, null, targetMetrics)
-    val captureLimits = remainingContinuationLimits(limits, old).let {
-        if (old != null) it else it.copy(
-            maxWork = (it.maxWork - targetMetrics.work).coerceAtLeast(0),
-            maxAllocation = (it.maxAllocation - targetMetrics.allocation).coerceAtLeast(0),
-            maxTimeNs = (it.maxTimeNs - targetMetrics.elapsedNs).coerceAtLeast(0),
-        )
+    val selection = selectContinuation(model, basis, cache, limits, cancellation, targetMetrics)
+    if (selection.metrics.decline != null) {
+        return LpContinuationVerification(null, null, null, selection.metrics)
     }
+    val invalidated = selection.metrics.invalidated
+    val captureLimits = limits.copy(
+        maxWork = (limits.maxWork - cache.usedWork).coerceAtLeast(0),
+        maxAllocation = (limits.maxAllocation - cache.usedAllocation).coerceAtLeast(0),
+        maxTimeNs = (limits.maxTimeNs - cache.usedTimeNs).coerceAtLeast(0),
+    )
     val capture = ContinuationBudget(captureLimits, cancellation)
     var metrics = ExactContinuationMetrics(invalidated = invalidated)
     var point: ExactLpWitness? = null
@@ -104,27 +130,8 @@ internal fun continueExactLp(
     var captureNs: Long? = null
     try {
         capture.step()
-        if (basis == null) throw ContinuationStop(ContinuationDecline.NO_BASIS)
-        val authority = captureContinuation(model, basis, capture)
-        val key = if (model.exactState == null) exactLpStateKey(model) else null
-        capture.step(bytes = key?.size?.toLong() ?: 0L)
-        if (model.exactState == null && key == null && old != null) {
-            throw ContinuationStop(ContinuationDecline.RESUME_KEY)
-        }
-        val sameAuthority = if (model.exactState != null) cache.state === model.exactState else
-            key != null && cache.key?.contentEquals(key) == true
-        val matching = sameAuthority &&
-            cache.headings == basis.basicVars.toList() && cache.statuses == basis.status.toList()
-        invalidated = invalidated || old != null && !matching
-        val session = if (matching) requireNotNull(old) else ExactContinuation(authority.input).also {
-            cache.clear()
-            cache.state = model.exactState
-            cache.key = key
-            cache.headings = basis.basicVars.toList()
-            cache.statuses = basis.status.toList()
-            cache.continuation = it
-        }
-        if (session !== old) session.account(targetMetrics.work, targetMetrics.allocation, targetMetrics.elapsedNs)
+        val authority = captureContinuation(model, requireNotNull(basis), capture)
+        val session = cache.initialize(authority.input)
         captureNs = capture.elapsedNs
         session.account(capture.work, capture.allocation, captureNs)
         captureCharged = true
@@ -152,12 +159,19 @@ internal fun continueExactLp(
                     sourcePrimal = source,
                     ray = result.ray,
                     basis = result.headings?.let { headings ->
-                        Basis(headings.toIntArray(), requireNotNull(result.statuses).map(::engineStatus).toTypedArray(), false)
+                        Basis(
+                            headings.toIntArray(),
+                            requireNotNull(result.statuses).map(::engineStatus).toTypedArray(),
+                            false,
+                        )
                     },
                     cancellation = Cancellation { cancellation() || verification.elapsedNs >= remaining.maxTimeNs },
                     limits = defaults.copy(
                         maxWork = minOf(defaults.maxWork, (remaining.maxWork - verification.work).coerceAtLeast(0)),
-                        maxAllocation = minOf(defaults.maxAllocation, (remaining.maxAllocation - verification.allocation).coerceAtLeast(0)),
+                        maxAllocation = minOf(
+                            defaults.maxAllocation,
+                            (remaining.maxAllocation - verification.allocation).coerceAtLeast(0),
+                        ),
                         maxBits = minOf(defaults.maxBits, remaining.maxBits),
                     ),
                 )
@@ -169,16 +183,24 @@ internal fun continueExactLp(
                     phase = ContinuationPhase.VERIFY,
                     checks = 1,
                     restarts = metrics.restarts + checked.metrics.verificationRestarts + checked.metrics.vectorRestarts,
-                    decline = if (point == null && conflict == null) checked.metrics.decline?.let {
-                        when (it) {
-                            ReconstructionDecline.CANCELLED -> if (cancellation()) ContinuationDecline.CANCELLED else ContinuationDecline.TIME
-                            ReconstructionDecline.WORK -> ContinuationDecline.WORK
-                            ReconstructionDecline.ALLOCATION -> ContinuationDecline.ALLOCATION
-                            ReconstructionDecline.BITS -> ContinuationDecline.BITS
-                            ReconstructionDecline.DIMENSION -> ContinuationDecline.DIMENSION
-                            else -> ContinuationDecline.CANDIDATE
-                        }
-                    } ?: ContinuationDecline.CANDIDATE else null,
+                    decline = if (point == null && conflict == null) {
+                        checked.metrics.decline?.let {
+                            when (it) {
+                                ReconstructionDecline.CANCELLED -> if (cancellation()) {
+                                    ContinuationDecline.CANCELLED
+                                } else {
+                                    ContinuationDecline.TIME
+                                }
+                                ReconstructionDecline.WORK -> ContinuationDecline.WORK
+                                ReconstructionDecline.ALLOCATION -> ContinuationDecline.ALLOCATION
+                                ReconstructionDecline.BITS -> ContinuationDecline.BITS
+                                ReconstructionDecline.DIMENSION -> ContinuationDecline.DIMENSION
+                                else -> ContinuationDecline.CANDIDATE
+                            }
+                        } ?: ContinuationDecline.CANDIDATE
+                    } else {
+                        null
+                    },
                 )
             } finally {
                 val work = verification.work + (checked?.metrics?.work ?: 0L)
@@ -189,15 +211,21 @@ internal fun continueExactLp(
                     allocation = metrics.allocation + bytes,
                     elapsedNs = metrics.elapsedNs + verification.elapsedNs,
                     workByPhase = addContinuationCosts(metrics.workByPhase, mapOf(ContinuationPhase.VERIFY to work)),
-                    allocationByPhase = addContinuationCosts(metrics.allocationByPhase, mapOf(ContinuationPhase.VERIFY to bytes)),
+                    allocationByPhase = addContinuationCosts(
+                        metrics.allocationByPhase,
+                        mapOf(ContinuationPhase.VERIFY to bytes),
+                    ),
                 )
             }
         }
     } catch (stop: ContinuationStop) {
-        metrics = metrics.copy(phase = if (captureCharged) ContinuationPhase.VERIFY else capture.phase, decline = stop.reason)
+        metrics = metrics.copy(
+            phase = if (captureCharged) ContinuationPhase.VERIFY else capture.phase,
+            decline = stop.reason,
+        )
     } finally {
         if (captureNs == null) captureNs = capture.elapsedNs
-        if (!captureCharged) old?.account(capture.work, capture.allocation, requireNotNull(captureNs))
+        if (!captureCharged) cache.accountInput(capture.work, capture.allocation, requireNotNull(captureNs))
     }
     metrics = metrics.copy(
         work = metrics.work + capture.work,
@@ -208,7 +236,96 @@ internal fun continueExactLp(
         workByPhase = addContinuationCosts(metrics.workByPhase, capture.workByPhase),
         allocationByPhase = addContinuationCosts(metrics.allocationByPhase, capture.allocationByPhase),
     )
-    return LpContinuationVerification(point, conflict, support, combineContinuationMetrics(targetMetrics, metrics))
+    return LpContinuationVerification(point, conflict, support, combineContinuationMetrics(selection.metrics, metrics))
+}
+
+// Identity admission is separately bounded; it cannot replenish retained numerical work.
+private fun admissionLimits(limits: ExactContinuationLimits) = limits.copy(
+    maxWork = minOf(limits.maxWork, 1_000_000L),
+    maxAllocation = minOf(limits.maxAllocation, 4L * 1024L * 1024L),
+    maxTimeNs = minOf(limits.maxTimeNs, 100_000_000L),
+)
+
+private fun admitContinuation(model: LpModel, budget: ContinuationBudget) {
+    if (model.m > budget.limits.maxRows || model.numVars > budget.limits.maxColumns ||
+        model.m.toLong() * (model.numVars.toLong() + model.m + 1L) > budget.limits.maxCells
+    ) {
+        throw ContinuationStop(ContinuationDecline.DIMENSION)
+    }
+    val size = model.exactState?.model?.keySize ?: model.csc.colVal.size.toLong() * 3L + model.numVars * 16L
+    budget.step(size + model.numVars, size * 8L)
+    // These are the only rational values compared by the target's current-state guard.
+    model.exactState?.model?.let { source ->
+        repeat(model.numVars) { j ->
+            source.column(j).bounds.lower?.let { budget.fraction(it.number.value) }
+            source.column(j).bounds.upper?.let { budget.fraction(it.number.value) }
+        }
+    }
+}
+
+private class ContinuationSelection(val metrics: ExactContinuationMetrics)
+
+@Suppress("ThrowsCount")
+private fun selectContinuation(
+    model: LpModel,
+    basis: Basis?,
+    cache: LpExactContinuationCache,
+    limits: ExactContinuationLimits,
+    cancellation: Cancellation,
+    exported: ExactContinuationMetrics,
+): ContinuationSelection {
+    val envelope = admissionLimits(limits)
+    val budget = ContinuationBudget(envelope.copy(
+        maxWork = (envelope.maxWork - exported.work).coerceAtLeast(0),
+        maxAllocation = (envelope.maxAllocation - exported.allocation).coerceAtLeast(0),
+        maxTimeNs = (envelope.maxTimeNs - exported.elapsedNs).coerceAtLeast(0),
+    ), cancellation)
+    budget.phase = ContinuationPhase.ADMISSION
+    var decline: ContinuationDecline? = null
+    var invalidated = false
+    try {
+        budget.step()
+        if (basis == null) throw ContinuationStop(ContinuationDecline.NO_BASIS)
+        admitContinuation(model, budget)
+        if (basis.basicVars.size != model.m || basis.status.size != model.numVars) {
+            throw ContinuationStop(ContinuationDecline.INVALID_BASIS)
+        }
+        val key = if (model.exactState == null) {
+            var size = model.n.toLong() * 16L + model.m * 16L + model.csc.colVal.size.toLong() * 3L
+            model.doubleView?.let { size += it.colVal.size.toLong() * 3L }
+            for (premises in model.rowPremises) {
+                budget.step()
+                if (premises != null) size += premises.vars.size.toLong() * 3L + premises.boolLits.size
+            }
+            budget.step(minOf(size, 4096L) * 4L, minOf(size, 4096L) * 64L)
+            exactLpStateKey(model)
+        } else null
+        if (model.exactState == null && key == null && cache.headings != null) {
+            throw ContinuationStop(ContinuationDecline.RESUME_KEY)
+        }
+        budget.step(model.numVars.toLong() + model.m, (model.numVars.toLong() + model.m) * 32L)
+        val headings = basis.basicVars.toList()
+        val statuses = basis.status.toList()
+        val sameAuthority = if (model.exactState != null) cache.state === model.exactState else
+            key != null && cache.key?.contentEquals(key) == true
+        val matching = sameAuthority && cache.headings == headings && cache.statuses == statuses
+        budget.step()
+        if (!matching) {
+            invalidated = cache.headings != null
+            cache.clear()
+            cache.state = model.exactState
+            cache.key = key
+            cache.headings = headings
+            cache.statuses = statuses
+        }
+    } catch (stop: ContinuationStop) {
+        decline = stop.reason
+    }
+    return ContinuationSelection(combineContinuationMetrics(exported, ExactContinuationMetrics(
+        work = budget.work, allocation = budget.allocation, elapsedNs = budget.elapsedNs,
+        phase = budget.phase, decline = decline, invalidated = invalidated,
+        workByPhase = budget.workByPhase.toMap(), allocationByPhase = budget.allocationByPhase.toMap(),
+    )))
 }
 
 private fun remainingContinuationLimits(limits: ExactContinuationLimits, session: ExactContinuation?) = limits.copy(

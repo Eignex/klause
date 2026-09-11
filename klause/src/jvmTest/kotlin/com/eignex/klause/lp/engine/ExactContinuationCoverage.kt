@@ -48,7 +48,8 @@ internal object ExactContinuationCoverage {
                 val exact = ExactLpModel(
                     List(n) { j -> listOf(ExactLpEntry(j, ExactLpNumber.of(-1L))) +
                         if (extra == 1) listOf(ExactLpEntry(n, one)) else emptyList() },
-                    List(n) { ExactLpNumber.of(-1L) } + if (extra == 1) listOf(ExactLpNumber.of((n - 1).toLong())) else emptyList(),
+                    List(n) { ExactLpNumber.of(-1L) } +
+                        if (extra == 1) listOf(ExactLpNumber.of((n - 1).toLong())) else emptyList(),
                     List(n) { ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(ExactLpNumber.of(2L)))) } +
                         List(m) { ExactLpColumn(ExactLpBounds(lower = ExactLpSide(zero))) },
                     List(m) { ExactLpRow() }, ExactLpObjective(List(n + m) { zero }),

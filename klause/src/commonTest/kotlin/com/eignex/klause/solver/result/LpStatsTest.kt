@@ -23,7 +23,8 @@ class LpStatsTest {
         observer.observeContinuation(ExactContinuationMetrics(
             builds = 2, pivots = 3, restarts = 1, work = 19, allocation = 23,
             phase = ContinuationPhase.IMPORT, decline = ContinuationDecline.WORK,
-            workByPhase = mapOf(ContinuationPhase.IMPORT to 19), allocationByPhase = mapOf(ContinuationPhase.IMPORT to 23),
+            workByPhase = mapOf(ContinuationPhase.IMPORT to 19),
+            allocationByPhase = mapOf(ContinuationPhase.IMPORT to 23),
         ))
         observer.observeContinuation(ExactContinuationMetrics(
             pivots = 2, resumed = true, work = 7, workByPhase = mapOf(ContinuationPhase.FEASIBILITY to 7),

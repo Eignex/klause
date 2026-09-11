@@ -1,10 +1,10 @@
 package com.eignex.klause.solver.result
 
 import com.eignex.klause.lp.engine.ExactBasisMetrics
-import com.eignex.klause.simplex.exact.ExactContinuationMetrics
 import com.eignex.klause.lp.engine.LpCertificationObserver
 import com.eignex.klause.lp.engine.LpCertifier
 import com.eignex.klause.lp.engine.LpSolveMetrics
+import com.eignex.klause.simplex.exact.ExactContinuationMetrics
 import com.eignex.kumulant.stat.summary.CountStat
 import com.eignex.kumulant.stat.summary.MaxResult
 import com.eignex.kumulant.stat.summary.MaxStat

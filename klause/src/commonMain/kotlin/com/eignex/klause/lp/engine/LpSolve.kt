@@ -1,6 +1,7 @@
 package com.eignex.klause.lp.engine
 
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.simplex.exact.ContinuationDecline
 import com.eignex.klause.simplex.exact.BigRationalConflict
 import com.eignex.klause.simplex.exact.ExactContinuationLimits
 import com.eignex.klause.simplex.exact.ExactContinuationMetrics
@@ -137,7 +138,11 @@ internal fun certifyLpResult(
     val state = model.exactState
     var capturedTarget: LpContinuationTarget? = null
     fun continuationTarget(): LpContinuationTarget = capturedTarget ?: captureContinuationTarget(
-        model, solver, result, continuationCache, continuationLimits, cancellation,
+        model,
+        solver,
+        result,
+        continuationLimits,
+        cancellation,
     ).also { capturedTarget = it }
     if (state != null) {
         if (cancellation()) return CertifiedLpResult(null, null, null, null, null, false, { null })
@@ -176,8 +181,13 @@ internal fun certifyLpResult(
         }
         if (solver.solvedExactState !== state) {
             val continued = continueExactLp(
-                model, continuationTarget().basis, continuationCache, cancellation, continuationLimits,
-                fullEffort = fullContinuation, targetMetrics = continuationTarget().metrics,
+                model,
+                continuationTarget().basis,
+                continuationCache,
+                cancellation,
+                continuationLimits,
+                fullEffort = fullContinuation,
+                targetMetrics = continuationTarget().metrics,
             )
             observer?.observeContinuation(continued.metrics)
             val accepted = policy.acceptNullable(LpCertifier.RATIONAL, continued.takeIf { it.metrics.success })
@@ -288,8 +298,13 @@ internal fun certifyLpResult(
         (state != null || result == null || model.hasContinuous)
     ) {
         continued = continueExactLp(
-            model, continuationTarget().basis, continuationCache, cancellation, continuationLimits,
-            fullEffort = fullContinuation, targetMetrics = continuationTarget().metrics,
+            model,
+            continuationTarget().basis,
+            continuationCache,
+            cancellation,
+            continuationLimits,
+            fullEffort = fullContinuation,
+            targetMetrics = continuationTarget().metrics,
         )
         observer?.observeContinuation(continued.metrics)
         observer?.observe(LpCertifier.RATIONAL, continued.metrics.success)
@@ -297,8 +312,10 @@ internal fun certifyLpResult(
         witness = accepted?.witness?.let { policy.acceptNullable(LpCertifier.EXACT_BASIS, it) }
         conflict = accepted?.conflict?.let { policy.acceptNullable(LpCertifier.EXACT_FARKAS, it) }
     }
-    // Strict margin and source extension keep their separate migration gate.
-    if (state == null && model.rowStrict.any { it } && witness == null && ray == null && conflict == null &&
+    // Legacy owners without current targets and strict margins retain their migration fallback.
+    if (state == null && continued?.metrics?.success != true &&
+        (model.rowStrict.any { it } || continued?.metrics?.decline == ContinuationDecline.NO_BASIS) &&
+        witness == null && ray == null && conflict == null &&
         (result == null || model.hasContinuous)
     ) {
         val outcome = if (cancellation()) null else rationalOutcome(model, cancellation)
@@ -321,9 +338,10 @@ internal fun certifyLpResult(
             conflict = refutation
         }
     }
-    if (continued == null) capturedTarget?.let {
-        continuationCache.continuation?.account(it.metrics.work, it.metrics.allocation, it.metrics.elapsedNs)
+    if (continued == null) {
+        capturedTarget?.let {
         observer?.observeContinuation(it.metrics)
+    }
     }
     if (ray != null || conflict != null) bound = null
     val unboundedness = if (bound == null && witness != null) {
@@ -372,8 +390,8 @@ internal fun certifyLpResult(
         basisVerification = exactBasis?.metrics,
         continuation = continued?.metrics ?: capturedTarget?.metrics,
         conflictSupport =
-        continued?.support?.takeIf { conflict === continued.conflict } ?:
-        exactBasis?.conflictSupport?.takeIf { conflict === exactBasis.conflict }
+        continued?.support?.takeIf { conflict === continued.conflict }
+            ?: exactBasis?.conflictSupport?.takeIf { conflict === exactBasis.conflict }
             ?: reconstruction?.conflictSupport?.takeIf { conflict === reconstruction.conflict }
             ?: conflict?.let { proof ->
                 val y = MutableList(model.m) { BigFraction.ZERO }

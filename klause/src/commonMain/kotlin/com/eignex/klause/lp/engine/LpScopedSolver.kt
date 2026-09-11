@@ -2,8 +2,8 @@ package com.eignex.klause.lp.engine
 
 import com.eignex.klause.simplex.basis.BasisArithmeticException
 import com.eignex.klause.simplex.basis.BasisOperationWork
-import com.eignex.klause.util.Cancellation
 import com.eignex.klause.simplex.exact.ExactContinuationLimits
+import com.eignex.klause.util.Cancellation
 
 internal data class LpScopedMetrics(
     val editAttempts: Long,
