@@ -33,6 +33,7 @@ import com.eignex.klause.lp.engine.newTableauCutSolver
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.lp.relaxation.LpExplanation
 import com.eignex.klause.lp.relaxation.LpRelaxation
+import com.eignex.klause.lp.relaxation.withCpBounds
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.simplex.exact.BigFraction
@@ -137,11 +138,19 @@ internal fun LpEngine.dualSimplex(model: LpModel, cancellation: Cancellation): T
  * factorized.
  */
 @Suppress("TooGenericExceptionCaught") // replacement cleanup must preserve arbitrary solve and close failures
-private fun LpEngine.solveNode(
+internal fun LpEngine.solveNode(
     model: LpModel,
     warm: Basis?,
     cancellation: Cancellation,
-): Pair<LpSolver, FloatLpResult?> {
+): Pair<LpSolver, FloatLpResult?>? {
+    nodeUsesTrail = cpAdapter.currentModel === model
+    if (nodeUsesTrail) return propagator.solveFloat(warm, cancellation)
+    model.trailModel()?.let { exact ->
+        nodeUsesTrail = true
+        cpAdapter.localModel()
+        if (!propagator.install(model, exact)) return null
+        return propagator.solveFloat(warm, cancellation)
+    }
     nodeSimplex?.let { kept ->
         if (kept.rebind(model, cancellation)) return kept to kept.resolveBounds()
     }
@@ -273,6 +282,7 @@ private fun LpEngine.foldSelectedCuts(
     sink: SolveStatsSink,
 ): Pair<LpRelaxation, FloatLpResult> {
     if (cutPool.size == 0) return base to res
+    base.sourceMap?.withCpBounds(base.model, session)?.let(cutPool::remap)
     cutPool.observe(res.primal)
     cutPool.retainMostActive()
     val selected = cutPool.select(res.primal, objectiveCoefficients(base.model), cutPool.maxCuts)
@@ -367,7 +377,7 @@ internal fun LpEngine.sparseSafePrune(
             // exactly), a Farkas proof here IS one over the active submodel, so the common refutation
             // prunes without ever building the per-node model. Strictness-only conflicts (no non-strict
             // certificate exists) still fall through to the exact rational path below.
-            val gatedRay = filter.simplex.infeasibleRay
+            val gatedRay = filter.simplex.infeasibleRay?.copyOf()
             if (gatedRay != null) {
                 for (i in 0 until gatedModel.m) if (!filter.enforced[i]) gatedRay[i] = 0.0
                 val ray = solveContext.certificationPolicy.acceptNullable(
@@ -421,15 +431,26 @@ internal fun LpEngine.sparseSafePrune(
         for (i in 0 until model.m) if (model.rowStrict[i]) dv.rhs[i] -= STRICT_FILTER_EPS * (1.0 + abs(dv.rhs[i]))
     }
     // Always solve: an infeasible relaxation prunes the node regardless of incumbent or objective.
-    val (simplex, floatResult) = try {
+    val attempted = try {
         solveNode(model, warm, cancellation)
     } finally {
         if (strictSaved != null && dv != null) strictSaved.copyInto(dv.rhs)
     }
+    if (attempted == null) {
+        sink.lp.observeEngineCost(LpRoute.NODE, propagator.lastMetrics)
+        noteSolveOps(propagator.lastMetrics.workOps)
+        return LpNodeOutcome(false, null)
+    }
+    val (simplex, floatResult) = attempted
     // Read the cost off the solver rather than the result: a solve that terminates dual-unbounded
     // returns none, and those are the solves that prune — costing only the ones that return a result
     // would drop the most valuable work from the average.
-    observeSolveCost(sink, simplex)
+    if (nodeUsesTrail) {
+        sink.lp.observeEngineCost(LpRoute.NODE, propagator.lastMetrics)
+        noteSolveOps(propagator.lastMetrics.workOps)
+    } else {
+        observeSolveCost(sink, simplex)
+    }
     // Feed the budget from the solve itself. A solve that produced no result at all was infeasible or
     // bailed numerically, which says nothing about how much budget the next one deserves.
     floatResult?.let {
@@ -549,7 +570,7 @@ internal fun LpEngine.sparseSafePrune(
             }
             sink.lp.observeCutAccounting(fresh.size, 0, 0)
             if (fresh.isEmpty()) break
-            recordSearchCuts(fresh, boundRes.primal, boundRel) // persist the global cuts into the pool
+            recordSearchCuts(fresh, boundRes.primal, boundRel, session)
             for (c in fresh) if (!c.global) localCuts.add(c)
             val selectedCuts = cutPool.select(
                 boundRes.primal,
@@ -1069,6 +1090,7 @@ internal fun LpEngine.harvestRootCuts(
             var result = initial ?: return emptyList()
             var round = 0
             while (round++ < CUT_POOL_ROUNDS && !cancellation()) {
+                relaxation.sourceMap?.withCpBounds(relaxation.model, session)?.let(pool::remap)
                 pool.observe(result.primal)
                 val ctx = CutContext(problem, relaxation, result.primal, session)
                 // Structural separators read the LP point and factor structure (not the constraint rows), so a

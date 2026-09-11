@@ -14,12 +14,12 @@ import com.eignex.klause.util.Cancellation
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 /**
- * The best-bound tree-search subsolver ([lbTreeSearch]) is a primal heuristic: it must propose only
- * fully-pinned, propagation-feasible assignments, and on a small problem its best-first dive should
- * reach an optimal one. Checked by brute force.
+ * The shared tree-search heuristic [lbTreeSearch] proposes propagation-feasible assignments.
+ * The randomized corpus is exercised by the explicit JVM integration task.
  */
 class LpBoundingLbTreeSearchTest {
 
@@ -37,7 +37,6 @@ class LpBoundingLbTreeSearchTest {
     private fun engine(p: Problem, obj: LinearObjective) =
         LpEngine(p, obj, LpParams(lpPlan = LpPlan(bounding = true)), SolveStatsSink(backend = "lbtree"))
 
-    @Test
     fun `the subsolver returns only feasible incumbents`() {
         val rng = Random(20260625)
         var produced = 0
@@ -84,8 +83,37 @@ class LpBoundingLbTreeSearchTest {
         val sink = SolveStatsSink(backend = "lbtree")
         val lp = LpEngine(p, obj, LpParams(lpPlan = LpPlan(bounding = true)), sink)
         val sample = lp.lbTreeSearch(obj, Cancellation.Never)
-        assertTrue(sample != null, "best-bound search should find a feasible incumbent")
-        assertEquals(2.0, obj.evaluate(sample), "best-bound search should dive to the optimal cost 2")
+        assertTrue(sample != null, "shared search should find a feasible incumbent")
+        assertEquals(2.0, obj.evaluate(sample), "shared search should dive to the optimal cost 2")
         assertTrue(sink.snapshot().lp.rootPasses.sum > 0.0, "every tree-search LP must be attributed to root work")
+    }
+
+    @Test
+    fun `the shared primal search certifies real values in source units`() {
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 1,
+            intDomains = arrayOf(IntDomain(0, 1)),
+            factors = arrayOf<Factor>(
+                Linear(
+                intVars = intArrayOf(0),
+                intCoeffs = doubleArrayOf(1.0),
+                realVars = intArrayOf(0),
+                realCoeffs = doubleArrayOf(1.0),
+                op = LinearOp.GE,
+                bound = 1.5,
+            )
+            ),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(2.0),
+        )
+        val objective = LinearObjective(intCoefficients = longArrayOf(1), realCoefficients = doubleArrayOf(2.0))
+
+        val sample = engine(problem, objective).use { assertNotNull(it.lbTreeSearch(objective, Cancellation.Never)) }
+
+        assertEquals(1L, sample.ints[0])
+        assertEquals(0.5, sample.reals[0])
+        assertEquals(2.0, objective.evaluate(sample))
     }
 }

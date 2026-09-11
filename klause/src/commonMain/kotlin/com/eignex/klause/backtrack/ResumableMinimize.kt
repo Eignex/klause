@@ -224,7 +224,16 @@ internal class ResumableMinimize(
     private val restart = RestartSchedule.from(params)
     private var decisionLimit = minOf(params.maxDecisions, params.maxInstructions ?: Long.MAX_VALUE)
     private val brancher = BacktrackBrancher(session, params, sink, restart, LpGuidedBranching())
-    private val searchSession = SearchComponentSet(listOf(cp), branchers = listOf(brancher)).session(
+    private val searchSession = SearchComponentSet(
+        buildList {
+            add(cp)
+            if (lpEngine.lpRelaxer != null) {
+                lpEngine.cpAdapter.attach(session, feasibility = false)
+                add(lpEngine.propagator)
+            }
+        },
+        branchers = listOf(brancher),
+    ).session(
         cancellation = params.cancellation,
         learnedDb = params.sharedLearnedDb(),
     )
@@ -337,6 +346,7 @@ internal class ResumableMinimize(
         check(!closed) { "search is closed" }
         searchSession.popTo(0)
         val seeded = session.reseedFrom(assumptions)
+        lpEngine.cpAdapter.reset()
         cp.rebase()
         searchSession.resetRootFacts()
         rootIsExhausted = seeded is PropagationResult.Unsat || session.isUnsatAtRoot

@@ -47,6 +47,7 @@ internal class LpScopedSolver(
     private val trackDegeneracy: Boolean = false,
     private val maxRetainedRows: Int = Int.MAX_VALUE,
     private val appendSelection: LpAppendSelection = LpAppendSelection.PRODUCTION_FRESH,
+    private val pricing: LpPricingOptions = LpPricingOptions(),
 ) : AutoCloseable {
     private var trail = LpBoundTrail(initial)
     private var solver: PersistentLpSolver? = null
@@ -136,6 +137,21 @@ internal class LpScopedSolver(
         token: Cancellation = cancellation,
         counterResults: LpCounterResults? = null,
     ): CertifiedLpResult? {
+        val attempt = solveFloat(warm, token) ?: return null
+        val certified = certifyLpResult(
+            requireNotNull(state.toWorkingModel()),
+            attempt.first,
+            attempt.second,
+            token,
+            policy = context.certificationPolicy,
+            counterResults = counterResults,
+        )
+        if (token()) return null
+        lastResult = certified
+        return certified
+    }
+
+    fun solveFloat(warm: Basis? = null, token: Cancellation = cancellation): Pair<LpSolver, FloatLpResult?>? {
         lastResult = null
         lastMetrics = LpSolveMetrics()
         if (!prepare(token)) return null
@@ -151,17 +167,7 @@ internal class LpScopedSolver(
             recordSolveCompletion(current, failure)
         }
         if (token()) return null
-        val certified = certifyLpResult(
-            requireNotNull(state.toWorkingModel()),
-            current,
-            result,
-            token,
-            policy = context.certificationPolicy,
-            counterResults = counterResults,
-        )
-        if (token()) return null
-        lastResult = certified
-        return certified
+        return current to result
     }
 
     private inline fun edit(token: Cancellation, append: Boolean = false, change: (LpBoundTrail) -> Boolean): Boolean {
@@ -415,6 +421,7 @@ internal class LpScopedSolver(
                 workLimit,
                 trackDegeneracy,
                 context.engineFactory,
+                pricing,
             )
             createdOwners++
             peakOwners = maxOf(peakOwners, createdOwners - closedOwners)

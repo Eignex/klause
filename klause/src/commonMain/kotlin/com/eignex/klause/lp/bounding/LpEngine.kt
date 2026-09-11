@@ -39,7 +39,8 @@ import com.eignex.klause.lp.relaxation.LeafRealResult
 import com.eignex.klause.lp.relaxation.LpExplanation
 import com.eignex.klause.lp.relaxation.LpRelaxation
 import com.eignex.klause.lp.relaxation.gatedEnforcement
-import com.eignex.klause.lp.relaxation.rebound
+import com.eignex.klause.lp.relaxation.withCpBounds
+import com.eignex.klause.lp.relaxation.withModel
 import com.eignex.klause.propagation.ConflictAnalyzer.AnalysisResult.Learned
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.simplex.exact.BigFraction
@@ -85,7 +86,7 @@ internal class LpEngine(
     val problem: Problem,
     private val objective: LinearObjective,
     params0: LpParams,
-    private val sink: SolveStatsSink,
+    internal val sink: SolveStatsSink,
     internal val solveContext: LpSolveContext = LpSolveContext.Production,
 ) : AutoCloseable {
     private var closed = false
@@ -106,13 +107,22 @@ internal class LpEngine(
                 failure?.addSuppressed(closeFailure) ?: run { failure = closeFailure }
             }
         }
+        try {
+            propagator.releaseSolver()
+        } catch (closeFailure: Throwable) {
+            failure?.addSuppressed(closeFailure) ?: run { failure = closeFailure }
+        }
         failure?.let { throw it }
     }
 
     override fun close() {
         if (closed) return
         closed = true
-        releasePersistentSolvers()
+        try {
+            releasePersistentSolvers()
+        } finally {
+            propagator.close()
+        }
     }
 
     internal fun requireOpen() {
@@ -120,8 +130,11 @@ internal class LpEngine(
     }
 
     /** Attribute an auxiliary root/presolve simplex invocation to this solve's shared sink. */
-    internal fun observeRootSolve(solver: LpSolver) {
-        sink.lp.observeEngineCost(LpRoute.ROOT, solver.lastMetrics)
+    internal fun observeRootSolve(
+        solver: LpSolver,
+        metrics: com.eignex.klause.lp.engine.LpSolveMetrics = solver.lastMetrics,
+    ) {
+        sink.lp.observeEngineCost(LpRoute.ROOT, metrics)
     }
 
     internal fun rootCertificationObserver() = sink.lp.certificationObserver(LpRoute.ROOT)
@@ -197,12 +210,11 @@ internal class LpEngine(
         emptyList()
     }
 
-    // Persistent pool of global cuts: seeded from the root harvest in [initRootLp] and grown
-    // by during-search separation. Every cut is global, so the pool is sound at every node.
+    // Source premises keep local cuts dormant until their complete guards hold again.
     val cutPool = CutPool()
 
     /** The global cuts folded into every node's relaxation — the live contents of [cutPool]. */
-    val lpGlobalCuts: List<Cut> get() = cutPool.cuts()
+    val lpGlobalCuts: List<Cut> get() = cutPool.cuts().filter { it.global }
 
     /**
      * Exchange this engine's global cuts with a portfolio peer via [exchange]: import the cuts
@@ -217,8 +229,7 @@ internal class LpEngine(
         val relaxation = persistentRelaxation ?: return
         exchange.exchange(
             object : CutSharing {
-                override fun exportGlobalCuts(): List<SharedCut> =
-                    cutPool.cuts().mapNotNull { if (it.global) SharedCut.fromCut(it, relaxation) else null }
+                override fun exportGlobalCuts(): List<SharedCut> = cutPool.exportGlobalCuts()
 
                 override fun importCuts(cuts: List<SharedCut>) {
                     for (c in cuts) c.toCut(relaxation)?.let { cutPool.add(it, relaxation) }
@@ -227,15 +238,12 @@ internal class LpEngine(
         )
     }
 
-    /**
-     * Persist the globally-valid members of [cuts] into the [cutPool]; node-local cuts are
-     * ignored here (the caller uses them transiently). The pool is trimmed to its cap by activity at
-     * [primal]. The cut-free persistent base is untouched — every node folds the violated subset via
-     * [CutPool.select]. Sound: every persisted cut is global, valid at every solution.
-     */
-    fun recordSearchCuts(cuts: List<Cut>, primal: DoubleArray, relaxation: LpRelaxation) {
+    fun recordSearchCuts(cuts: List<Cut>, primal: DoubleArray, relaxation: LpRelaxation, session: PropagationSession) {
+        val sources = relaxation.sourceMap?.withCpBounds(relaxation.model, session)
+        val active = relaxation.withModel(relaxation.model, sources)
+        sources?.let(cutPool::remap)
         var added = 0
-        for (c in cuts) if (c.global && cutPool.add(c, relaxation)) added++
+        for (c in cuts) if (cutPool.add(c, active)) added++
         if (added == 0) return
         if (cutPool.size > cutPool.maxCuts) {
             cutPool.observe(primal)
@@ -427,39 +435,42 @@ internal class LpEngine(
     var lpHints: LpHintSink? = null
     private var lpBackjump: Learned? = null
 
-    // Persistent global LP: for a node-invariant relaxation (no auxiliary columns, no live-M
-    // rows) the per-node delta is column bounds only, so the relaxation is built once from the declared
-    // domains and re-bound at each node instead of rebuilt. The base is cut-free — global cuts are folded
-    // per node by [LpBounding] via [CutPool.select], so the pool can grow without invalidating the base.
+    // A fixed source layout allows bound-only adoption without rebuilding its factorization.
     private var persistentResolved = false
     private var persistentRelaxation: LpRelaxation? = null
 
-    /**
-     * The engine the node bound re-solves on, kept across nodes so its basis and LU factorization carry
-     * with it ([PersistentLpSolver.resolveBounds]).
-     *
-     * Held here rather than per call because a factorization is the expensive half of a node solve and a
-     * rebound relaxation does not invalidate it. Only the cut-free base relaxation is eligible: the
-     * cut-augmented build is a different matrix, so it gets its own engine and never displaces this one.
-     */
+    // Strict residual filtering retains its dedicated floating owner until its exact-state migration.
     internal var nodeSimplex: PersistentLpSolver? = null
+    internal var nodeUsesTrail: Boolean = false
 
-    /**
-     * The **cut-free** LP relaxation for the current node: the persistent relaxation re-bound to
-     * [session]'s live column bounds when eligible, else a fresh per-node build. On first call it builds a
-     * base relaxation from the declared domains; if that base is [LpRelaxation.persistentEligible] it is
-     * cached and every node re-binds it — bit-identical to a rebuild for eligible models, but skipping the
-     * matrix reconstruction. The harvested global cuts are not baked in here: the bound path folds the
-     * subset its LP point actually violates via [CutPool.select], so the base stays
-     * node-invariant and the per-node cut count is bounded by efficacy rather than the whole pool.
-     */
+    internal val cpAdapter = CpLpAdapter(this)
+    internal val propagator = LpPropagator(
+        cpAdapter,
+        effort = {
+            LpEffortProfile(
+                iterations = nodePivotBudget(),
+                work = nodeWorkBudget(),
+                trackDegeneracy = adaptiveWork,
+                pricing = pricingOptions,
+            )
+        },
+        solveContext = solveContext,
+        cancellation = params.cancellation,
+    )
+
     internal fun nodeRelaxation(relaxer: CpToLpRelaxation, session: PropagationSession): LpRelaxation {
+        val relaxation = buildNodeRelaxation(relaxer, session)
+        relaxation.sourceMap?.withCpBounds(relaxation.model, session)?.let(cutPool::remap)
+        return relaxation
+    }
+
+    private fun buildNodeRelaxation(relaxer: CpToLpRelaxation, session: PropagationSession): LpRelaxation {
         if (!persistentResolved) {
             persistentResolved = true
             val base = relaxer.build(PropagationSession(problem))
             if (base.persistentEligible) persistentRelaxation = base
         }
-        persistentRelaxation?.let { return it.rebound(session) }
+        persistentRelaxation?.let { cpAdapter.relaxation(it, session)?.let { rebound -> return rebound } }
         // Residual real models rebuild only when an activating pin changed: with no integer columns
         // every row and bound is a function of the aux-bool pin set alone, so an unchanged fingerprint
         // means the previously built relaxation is byte-identical — the common case along a dive,
