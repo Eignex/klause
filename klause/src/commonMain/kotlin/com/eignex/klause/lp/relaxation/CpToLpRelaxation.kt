@@ -181,6 +181,7 @@ internal fun LpRelaxation.gatedEnforcement(session: PropagationSession, out: Boo
  * eligible relaxation, which the caller checks before building the persistent relaxation once.
  */
 internal fun LpRelaxation.rebound(session: PropagationSession): LpRelaxation {
+    require(persistentEligible) { "scoped or changing rows require a rebuilt relaxation" }
     val n = model.n
     val lo = LongArray(n)
     val hi = LongArray(n)
@@ -214,8 +215,9 @@ internal fun LpRelaxation.rebound(session: PropagationSession): LpRelaxation {
             }
         }
     }
+    val reboundModel = model.rebind(lo, hi)
     return LpRelaxation(
-        model = model.rebind(lo, hi),
+        model = reboundModel,
         colVarId = colVarId,
         colIsBool = colIsBool,
         objectiveConstant = objectiveConstant,
@@ -225,7 +227,7 @@ internal fun LpRelaxation.rebound(session: PropagationSession): LpRelaxation {
         persistentEligible = true,
         colReq = colReq,
         colPresentUpper = colPresentUpper,
-        sourceMap = sourceMap,
+        sourceMap = sourceMap?.withBounds(reboundModel),
     )
 }
 
@@ -941,6 +943,7 @@ internal class CpToLpRelaxation(
             // column is dropped (defensive — separators should only emit over existing columns).
             val cutParents = HashMap<Int, CutProvenance>()
             for (cut in extraCuts) {
+                if (cut.provenance?.let { !cutProofApplies(it, problem, domains) } == true) continue
                 if (cut.cols.all { it in 0 until builder.varCount }) {
                     cut.provenance?.let { cutParents[builder.rowCount] = it }
                     builder.addRow(cut.cols, cut.coeffs, cut.rel, cut.rhs, cut.global)
@@ -956,7 +959,7 @@ internal class CpToLpRelaxation(
             // CP-var-backed (re-bound from its own domain) or an auxiliary column carrying a presence
             // rule (re-bound by pinning). The global cuts folded in here are fixed rows over existing
             // columns. Empty relaxations are not worth persisting.
-            val eligible = structurallyPersistent && model.n > 0 &&
+            val eligible = structurallyPersistent && model.n > 0 && extraCuts.all { it.global } &&
                 colVarIds.indices.all { colVarIds[it] >= 0 || reqs[it] != null }
             return LpRelaxation(
                 model = model,
@@ -972,8 +975,15 @@ internal class CpToLpRelaxation(
                 hullFactorIds = hullFactorIds.toIntArray(),
                 colRealId = IntArray(colRealId.size) { colRealId[it] },
                 colRealSign = IntArray(colRealSign.size) { colRealSign[it] },
-                sourceMap = cpCutSources(model, problem, colVarIds, kinds,
-                    IntArray(colRealId.size) { colRealId[it] }, IntArray(colRealSign.size) { colRealSign[it] }, cutParents),
+                sourceMap = cpCutSources(
+                    model,
+                    problem,
+                    colVarIds,
+                    kinds,
+                    IntArray(colRealId.size) { colRealId[it] },
+                    IntArray(colRealSign.size) { colRealSign[it] },
+                    cutParents,
+                ),
                 gatedRows = gatedRowList.toIntArray(),
                 gatedAux = gatedAuxList.toIntArray(),
                 gatedWhenTrue = BooleanArray(gatedWhenTrueList.size) { gatedWhenTrueList[it] == 1 },

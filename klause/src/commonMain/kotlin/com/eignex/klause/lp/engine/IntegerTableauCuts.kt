@@ -1,8 +1,8 @@
 package com.eignex.klause.lp.engine
 
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.basis.IndexedVector
 import com.eignex.klause.simplex.basis.KotlinBasisSolver
+import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.Int128
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.LongArrayList
@@ -50,7 +50,9 @@ internal fun integerTableauCuts(
     if (m == 0 || n == 0 || maxCuts <= 0) return emptyList()
     if (model.hasContinuous || model.colContinuous.any { it } || model.rowStrict.any { it } ||
         model.probeClampedLo.any { it } || primal.size != n
-    ) return emptyList()
+    ) {
+        return emptyList()
+    }
 
     // Float LU of the basis `B` (its column `t` is the basic column `basic[t]`, which may be a slack);
     // btran gives the tableau rows.
@@ -184,6 +186,7 @@ private fun bestRoundedCut(
                 fwOk = false
                 0L
             }
+            if (f == Long.MIN_VALUE) fwOk = false
             if (!fwOk) break
             fw[r] = f
         }
@@ -239,7 +242,13 @@ private fun bestRoundedCut(
 
 /** Turn the `≤` cut `Σ vals_k·z_k ≤ rhsLe` (shifted columns) into klause's `Σ a_k·x_k ≥ b` form,
  *  unshifting `z_k = x_k − lo_k` and gcd-reducing; null if a coefficient or the rhs overflows `Long`. */
-private fun emitGeCut(model: LpModel, cols: IntArrayList, leVals: LongArrayList, rhsLe: Long, provenance: TableauCutProvenance): Cut? {
+private fun emitGeCut(
+    model: LpModel,
+    cols: IntArrayList,
+    leVals: LongArrayList,
+    rhsLe: Long,
+    provenance: TableauCutProvenance,
+): Cut? {
     // Σ vals_k z_k ≤ rhsLe ⇔ Σ (−vals_k) x_k ≥ −rhsLe − Σ vals_k·lo_k.
     val rhsAcc = Int128()
     rhsAcc.addLong(rhsLe)
@@ -277,7 +286,7 @@ private fun ceilDiv(a: Long, b: Long): Long {
 }
 
 private fun tableauProvenance(model: LpModel, weights: LongArray, divisor: Long, mir: Boolean): TableauCutProvenance {
-    val columns = List(model.n) { CutColumnPremise(it, model.loShift[it], integral = true) }
+    val touched = HashSet<Int>()
     val rows = weights.indices.filter { weights[it] != 0L }.map { row ->
         val cols = ArrayList<Int>()
         val values = ArrayList<Long>()
@@ -286,14 +295,23 @@ private fun tableauProvenance(model: LpModel, weights: LongArray, divisor: Long,
             model.forEachInColumn(col) { r, value ->
                 if (r == row) {
                     cols.add(col)
+                    touched.add(col)
                     values.add(value)
                     rhs += BigFraction.ofLong(value) * BigFraction.ofLong(model.loShift[col])
                 }
             }
         }
-        CutInputRow(row, model.rowGlobal[row], weights[row], rhs,
+        CutInputRow(
+            row,
+            model.rowGlobal[row],
+            weights[row],
+            rhs,
             if (model.hasUpper[model.slackCol(row)]) Relation.EQ else Relation.LE,
-            cols.toIntArray(), values.toLongArray(), model.rowPremises[row])
+            cols.toIntArray(),
+            values.toLongArray(),
+            model.rowPremises[row],
+        )
     }
+    val columns = touched.sorted().map { CutColumnPremise(it, model.loShift[it], integral = true) }
     return TableauCutProvenance(model, columns, rows, divisor, mir)
 }
