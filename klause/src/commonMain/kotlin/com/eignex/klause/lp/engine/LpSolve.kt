@@ -41,6 +41,7 @@ internal class CertifiedLpResult(
     val unboundedness: ExactLpUnboundedness? = null,
     val boundConflict: LpBoundConflict? = null,
     val conflictSupport: LpExactSupport? = null,
+    val reconstruction: ReconstructionMetrics? = null,
 ) {
     val verdict: LpVerdict = when {
         farkasRay != null || rationalConflict != null || boundConflict != null -> LpVerdict.INFEASIBLE
@@ -171,7 +172,22 @@ internal fun certifyLpResult(
     var witness = remembered?.witness
     var ray: LongArray? = null
     var conflict: BigRationalConflict? = null
-    if (result != null && witness == null) {
+    var reconstruction: ReconstructedCertificate? = null
+    if (result != null && (witness == null || bound?.value != witness.objective) && !cancellation()) {
+        reconstruction = reconstructCertificate(
+            model,
+            result.primal,
+            result.duals,
+            result.basis,
+            cancellation = cancellation,
+        )
+        observer?.observe(LpCertifier.RATIONAL, reconstruction.witness != null || reconstruction.bound != null)
+        val point = policy.acceptNullable(LpCertifier.RATIONAL, reconstruction.witness)
+        if (point != null && (witness == null || point.objective < witness.objective)) witness = point
+        val stronger = policy.acceptNullable(LpCertifier.RATIONAL, reconstruction.bound)
+        if (stronger != null && (bound == null || stronger.value > bound.value)) bound = stronger
+    }
+    if (result != null && witness == null && !cancellation()) {
         witness = component?.exactWitness(observer, policy)
             ?: policy.acceptNullable(
                 LpCertifier.EXACT_BASIS,
@@ -200,8 +216,17 @@ internal fun certifyLpResult(
             }
         }
     }
+    if (result == null && witness == null && ray == null && conflict == null && !cancellation()) {
+        solver.infeasibleRay?.let { candidate ->
+            reconstruction = reconstructCertificate(model, ray = candidate, cancellation = cancellation)
+            observer?.observe(LpCertifier.RATIONAL, reconstruction.conflict != null)
+            conflict = policy.acceptNullable(LpCertifier.RATIONAL, reconstruction.conflict)
+        }
+    }
     // Retain the migration fallback; this is feasibility recovery, not an optimization solve.
-    if (state == null && witness == null && ray == null && (result == null || model.hasContinuous)) {
+    if (state == null && witness == null && ray == null && conflict == null && !cancellation() &&
+        (result == null || model.hasContinuous)
+    ) {
         val outcome = rationalOutcome(model, cancellation)
         val point = if (outcome.feasibility == RationalFeasibility.FEASIBLE) {
             outcome.exactWitness?.let { shifted ->
@@ -222,12 +247,6 @@ internal fun certifyLpResult(
             conflict = refutation
         }
     }
-    if (result != null && witness != null && bound?.value != witness.objective && !cancellation()) {
-        val reconstructed = reconstructedLpBound(model, result.duals, cancellation)
-        observer?.observe(LpCertifier.RATIONAL, reconstructed != null)
-        val accepted = policy.acceptNullable(LpCertifier.RATIONAL, reconstructed)
-        if (accepted != null && (bound == null || accepted.value > bound.value)) bound = accepted
-    }
     if (ray != null || conflict != null) bound = null
     val unboundedness = if (bound == null && witness != null) {
         solver.recessionDirection?.let { direction ->
@@ -246,7 +265,6 @@ internal fun certifyLpResult(
         // Freeze the value before mutable objective/bound arrays can change; evaluation is opt-in.
         safeBound = { null },
     )
-    if (state != null && cancellation()) return CertifiedLpResult(null, null, null, null, null, false, { null })
     counterResults?.remember(model, certified, policy)
     return CertifiedLpResult(
         result,
@@ -272,7 +290,9 @@ internal fun certifyLpResult(
             compute
         } ?: { null },
         unboundedness = unboundedness,
-        conflictSupport = conflict?.let { proof ->
+        reconstruction = reconstruction?.metrics,
+        conflictSupport =
+        reconstruction?.conflictSupport?.takeIf { conflict === reconstruction.conflict } ?: conflict?.let { proof ->
             val y = MutableList(model.m) { BigFraction.ZERO }
             for (i in proof.rows.indices) y[proof.rows[i]] = proof.multipliers[i].negated()
             model.exactSupport(y, objective = false)
@@ -314,18 +334,6 @@ private fun rationalLpBound(model: LpModel, duals: DoubleArray): CertifiedLpBoun
     return CertifiedLpBound(value, support = model.exactSupport(y, objective = true))
 }
 
-private fun reconstructedLpBound(model: LpModel, duals: DoubleArray, cancellation: Cancellation): CertifiedLpBound? {
-    if (duals.size != model.m) return null
-    val multipliers = ArrayList<BigFraction>(model.m)
-    for (dual in duals) {
-        if (cancellation()) return null
-        val part = reconstructRational(dual) ?: return null
-        multipliers += BigFraction.of(BigInteger.fromLong(part.numerator), BigInteger.fromLong(part.denominator))
-    }
-    val value = exactLagrangian(model, multipliers, cancellation) ?: return null
-    return CertifiedLpBound(value, support = model.exactSupport(multipliers, objective = true))
-}
-
 private fun LpModel.exactSupport(multipliers: List<BigFraction>, objective: Boolean): LpExactSupport? {
     val state = exactState ?: return null
     val y = multipliers.mapIndexed { row, value ->
@@ -348,7 +356,12 @@ private fun LpModel.exactSupport(multipliers: List<BigFraction>, objective: Bool
             sides += LpExactCitedSide(j, upper, side, witness)
         }
     }
-    return LpExactSupport(state, y.indices.filter { !y[it].isZero }.map { it to state.model.row(it) }, sides)
+    val rows = (
+        y.indices.filter {
+            !y[it].isZero
+        } + sides.filter { it.column >= n }.map { it.column - n }
+        ).distinct().sorted()
+    return LpExactSupport(state, rows.map { it to state.model.row(it) }, sides)
 }
 
 internal fun exactLagrangian(

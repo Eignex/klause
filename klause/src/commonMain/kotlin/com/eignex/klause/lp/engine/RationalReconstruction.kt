@@ -1,34 +1,20 @@
 package com.eignex.klause.lp.engine
 
+import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.Int128
+import com.ionspin.kotlin.bignum.integer.BigInteger
 import kotlin.math.abs
 import kotlin.math.floor
 
-/**
- * The simplest rational within [tolerance] of [value], with denominator at most [maxDenominator], or
- * null when none exists — the float is not a small rational in disguise, or the expansion overflowed.
- *
- * The entries of a simplex ray `ρ = eᵣᵀB⁻¹` are ratios of minors of `B`, so they are rationals whose
- * denominators divide `det B` — usually small integers, however large the basis. A float carrying such
- * a value to sixteen digits determines it uniquely once the denominator is bounded, which is what makes
- * recovery possible where rounding to a fixed scale is not: rounding produces the nearest multiple of
- * `2⁻ᵏ`, which is almost never the value itself, and a certificate needing an exact zero cannot use
- * "almost".
- *
- * Continued fractions give the best rational approximation for a given denominator bound, in increasing
- * order of denominator, so the first convergent inside [tolerance] is the simplest one — which is the
- * one most likely to be the value the float was rounded from. This is the reconstruction step of the
- * exact-LP literature (Applegate, Cook, Dash and Espinoza's QSopt_ex, and the iterative-refinement work
- * that followed), used here for the same reason: a float solve is cheap, and a float answer is usually
- * the exact answer in disguise.
- */
+// A tolerance selects a candidate convergent; only the caller's exact proof check accepts it.
 @Suppress("ReturnCount")
 internal fun reconstructRational(
     value: Double,
     maxDenominator: Long = DEFAULT_MAX_DENOMINATOR,
     tolerance: Double = DEFAULT_TOLERANCE,
 ): Rational? {
-    if (!value.isFinite()) return null
+    if (!value.isFinite() || maxDenominator < 1L || !tolerance.isFinite() || tolerance < 0.0) return null
+    if (abs(value) >= Long.MAX_VALUE.toDouble()) return null
     if (abs(value) < tolerance) return Rational(0L, 1L)
     // The recurrence is carried on the magnitude, so a negative value only signs the numerator.
     val negative = value < 0.0
@@ -136,3 +122,120 @@ private const val DEFAULT_TOLERANCE = 1e-9
 /** Enough terms for any denominator under the bound: the convergents grow at least as fast as the
  *  Fibonacci numbers, which pass 2⁴⁰ by the sixtieth. */
 private const val MAX_TERMS = 64
+
+internal fun reconstructionDenominator(
+    violation: BigFraction,
+    correction: BigFraction,
+    meter: ReconstructionMeter,
+): BigInteger {
+    require(violation.signum() > 0 && correction.signum() > 0)
+    val product = meter.fraction(violation * correction)
+    val square = meter.integer(product.den / product.num)
+    if (square <= BigInteger.ONE) return RECONSTRUCTION_FLOOR
+    var root = meter.integer(BigInteger.ONE shl ((square.bitLength() + 1) / 2))
+    while (true) {
+        val next = meter.integer((root + square / root) shr 1)
+        if (next >= root) return maxOf(RECONSTRUCTION_FLOOR, root)
+        root = next
+    }
+}
+
+internal fun nextReconstructionRound(round: Int): Int = (round.toLong() * 6L / 5L + 1L)
+    .coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
+
+internal val RECONSTRUCTION_FLOOR: BigInteger = BigInteger.ONE shl 24
+
+internal fun reconstructExactVector(
+    values: List<BigFraction>,
+    denominator: BigInteger,
+    meter: ReconstructionMeter,
+): List<BigFraction>? {
+    require(denominator.signum() > 0)
+    meter.phase = ReconstructionPhase.VECTOR
+    return try {
+        reconstructLongVector(values, denominator, meter)
+    } catch (_: ReconstructionOverflow) {
+        meter.vectorRestarts++
+        reconstructBigVector(values, denominator, meter)
+    }
+}
+
+@Suppress("ThrowsCount")
+private fun reconstructLongVector(
+    values: List<BigFraction>,
+    denominator: BigInteger,
+    meter: ReconstructionMeter,
+): List<BigFraction>? {
+    if (denominator.bitLength() > 63) throw ReconstructionOverflow()
+    val limit = denominator.longValue(exactRequired = true)
+    meter.storage(values.size.toLong() * 16L)
+    val parts = ArrayList<BigFraction>(values.size)
+    var common = 1L
+    for (value in values) {
+        meter.fraction(value)
+        if (value.num.bitLength() > 63 || value.den.bitLength() > 63) throw ReconstructionOverflow()
+        var n = value.num.abs().longValue(exactRequired = true)
+        var d = value.den.longValue(exactRequired = true)
+        var p0 = 0L
+        var p1 = 1L
+        var q0 = 1L
+        var q1 = 0L
+        while (d != 0L) {
+            meter.step()
+            val a = n / d
+            val p = mulAdd(a, p1, p0) ?: throw ReconstructionOverflow()
+            val q = mulAdd(a, q1, q0) ?: throw ReconstructionOverflow()
+            if (q > limit) break
+            p0 = p1
+            p1 = p
+            q0 = q1
+            q1 = q
+            val rest = n % d
+            n = d
+            d = rest
+        }
+        common = lcm(common, q1) ?: throw ReconstructionOverflow()
+        if (common > limit) return null
+        parts += meter.fraction(
+            BigFraction.of(BigInteger.fromLong(if (value.signum() < 0) -p1 else p1), BigInteger.fromLong(q1)),
+        )
+    }
+    return parts.toList()
+}
+
+private fun reconstructBigVector(
+    values: List<BigFraction>,
+    denominator: BigInteger,
+    meter: ReconstructionMeter,
+): List<BigFraction>? {
+    meter.integer(denominator)
+    meter.storage(values.size.toLong() * 16L)
+    val parts = ArrayList<BigFraction>(values.size)
+    var common = BigInteger.ONE
+    for (value in values) {
+        meter.fraction(value)
+        var n = value.num.abs()
+        var d = value.den
+        var p0 = BigInteger.ZERO
+        var p1 = BigInteger.ONE
+        var q0 = BigInteger.ONE
+        var q1 = BigInteger.ZERO
+        while (!d.isZero()) {
+            val a = meter.integer(n / d)
+            val p = meter.integer(a * p1 + p0)
+            val q = meter.integer(a * q1 + q0)
+            if (q > denominator) break
+            p0 = p1
+            p1 = p
+            q0 = q1
+            q1 = q
+            val rest = meter.integer(n % d)
+            n = d
+            d = rest
+        }
+        common = meter.integer(common / common.gcd(q1) * q1)
+        if (common > denominator) return null
+        parts += meter.fraction(BigFraction.of(if (value.signum() < 0) -p1 else p1, q1))
+    }
+    return parts.toList()
+}

@@ -1,5 +1,7 @@
 package com.eignex.klause.lp.engine
 
+import com.eignex.klause.simplex.exact.BigFraction
+import com.ionspin.kotlin.bignum.integer.BigInteger
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -76,6 +78,72 @@ class RationalReconstructionTest {
     @Test
     fun `a vector holding an unreconstructable entry is declined whole`() {
         assertNull(reconstructIntegerVector(doubleArrayOf(0.5, kotlin.math.PI), maxDenominator = 1_000L))
+    }
+
+    @Test
+    fun `unchanged coprime denominators still obey the whole vector limit`() {
+        val values = listOf(3, 5).map { BigFraction.of(BigInteger.ONE, BigInteger.fromInt(it)) }
+
+        val result = reconstructExactVector(values, BigInteger.fromInt(10), ReconstructionMeter())
+
+        assertNull(result)
+    }
+
+    @Test
+    fun `whole vector restarts when its common denominator leaves Long`() {
+        val values = listOf(
+            4_294_967_291L,
+            4_294_967_279L,
+        ).map { BigFraction.of(BigInteger.ONE, BigInteger.fromLong(it)) }
+        val meter = ReconstructionMeter()
+
+        val result = reconstructExactVector(values, BigInteger.ONE shl 80, meter)
+
+        assertEquals(values, result)
+        assertEquals(1, meter.vectorRestarts)
+    }
+
+    @Test
+    fun `signed exact continued fractions retain the last admissible convergent`() {
+        for (sign in listOf(-1L, 1L)) {
+            val value = BigFraction.of(BigInteger.fromLong(31L * sign), BigInteger.fromInt(100))
+            val result = reconstructExactVector(listOf(value), BigInteger.fromInt(10), ReconstructionMeter())
+            assertEquals(listOf(BigFraction.of(BigInteger.fromLong(sign), BigInteger.fromInt(3))), result)
+        }
+    }
+
+    @Test
+    fun `error correction makes the denominator bound nonincreasing`() {
+        val violation = BigFraction.of(BigInteger.ONE, BigInteger.ONE shl 100)
+        val correction = BigFraction.ofLong(2L)
+        val next = BigFraction.of(BigInteger.fromInt(22), BigInteger.fromInt(10))
+
+        val first = reconstructionDenominator(violation, correction, ReconstructionMeter())
+        val second = reconstructionDenominator(violation, next, ReconstructionMeter())
+
+        assertTrue(second < first)
+        assertEquals(
+            RECONSTRUCTION_FLOOR,
+            reconstructionDenominator(BigFraction.ONE, correction, ReconstructionMeter()),
+        )
+        assertEquals(
+            listOf(1, 2, 3, 4, 5, 7, 9),
+            generateSequence(0, ::nextReconstructionRound).drop(1).take(7).toList(),
+        )
+    }
+
+    @Test
+    fun `common denominator overflow restarts before declining the whole vector`() {
+        val values = listOf(
+            4_294_967_291L,
+            4_294_967_279L,
+        ).map { BigFraction.of(BigInteger.ONE, BigInteger.fromLong(it)) }
+        val meter = ReconstructionMeter()
+
+        val result = reconstructExactVector(values, BigInteger.fromLong(Long.MAX_VALUE), meter)
+
+        assertNull(result)
+        assertEquals(1, meter.vectorRestarts)
     }
 
     private fun assertNotNullRational(r: Rational?): Rational {
