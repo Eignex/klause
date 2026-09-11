@@ -23,11 +23,19 @@ class CliStatsTest {
 
     @Test
     fun `rational basis resource work is visible without a float solve`() {
-        val stats = SolveStats(lp = LpStats(basisVerification = LpBasisVerificationStats(
-            calls = 1L, builds = 2L, restarts = 1L, work = mapOf("FACTOR" to 13L),
-            allocation = mapOf("FACTOR" to 23L), declines = mapOf("FILL" to 1L),
+        val stats = SolveStats(
+            lp = LpStats(
+                basisVerification = LpBasisVerificationStats(
+            calls = 1L,
+            builds = 2L,
+            restarts = 1L,
+            work = mapOf("FACTOR" to 13L),
+            allocation = mapOf("FACTOR" to 23L),
+            declines = mapOf("FILL" to 1L),
             terminalDeclines = mapOf("FACTOR_FILL" to 1L),
-        )))
+        )
+            )
+        )
 
         val pairs = lpStatPairs(stats).toMap()
 

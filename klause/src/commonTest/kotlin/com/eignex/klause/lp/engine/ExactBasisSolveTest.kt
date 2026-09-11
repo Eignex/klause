@@ -1,7 +1,6 @@
 package com.eignex.klause.lp.engine
 
 import com.eignex.klause.simplex.exact.BigFraction
-import com.ionspin.kotlin.bignum.integer.BigInteger
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse

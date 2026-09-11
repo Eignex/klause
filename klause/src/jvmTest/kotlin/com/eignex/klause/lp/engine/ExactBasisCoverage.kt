@@ -11,14 +11,14 @@ import com.eignex.klause.simplex.exact.BigRationalConflict
 import com.eignex.klause.solver.objective.toLinearObjective
 import com.eignex.klause.theory.qflra.QfLraSystem
 import com.eignex.klause.util.Cancellation
-import java.nio.file.Files
-import java.nio.file.Path
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import java.nio.file.Files
+import java.nio.file.Path
 
 internal object ExactBasisCoverage {
     @JvmStatic
@@ -30,9 +30,13 @@ internal object ExactBasisCoverage {
             "boundary/49-diagonal", "boundary/129-diagonal",
         )
         for (input in inputs) {
-            val source = if (input.startsWith("boundary/")) "" else Files.readString(
+            val source = if (input.startsWith("boundary/")) {
+                ""
+            } else {
+                Files.readString(
                 root.resolve("klause-bench/smoke-corpus/$input"),
             )
+            }
             val model = if (input.startsWith("boundary/")) {
                 val rows = if (input == "boundary/49-diagonal") 49 else 129
                 LpBuilder().apply {
@@ -48,14 +52,24 @@ internal object ExactBasisCoverage {
             } else {
                 val parsed = SmtLib.parse(source)
                 if (parsed.model.numBoolVars != 0) {
-                    println(buildJsonObject { put("input", input); put("ineligible", "BOOLEAN_BRANCH") })
+                    println(
+                        buildJsonObject {
+                        put("input", input);
+                        put("ineligible", "BOOLEAN_BRANCH")
+                    }
+                    )
                     continue
                 }
                 val exact = QfLraSystem(parsed.model).build { null }.toExactLpModel()
                 LpExactState(exact).toWorkingModel()
             }
             if (model == null) {
-                println(buildJsonObject { put("input", input); put("ineligible", "SOURCE_PROJECTION") })
+                println(
+                    buildJsonObject {
+                    put("input", input);
+                    put("ineligible", "SOURCE_PROJECTION")
+                }
+                )
                 continue
             }
             val started = System.nanoTime()
@@ -77,7 +91,8 @@ internal object ExactBasisCoverage {
                 certified.witness?.let { checkPoint(model, it) }
                 certified.rationalConflict?.let { checkConflict(model, it) }
                 certified.farkasRay?.let { check(sourceFarkasValid(model, it)) }
-                println(buildJsonObject {
+                println(
+                    buildJsonObject {
                     put("input", input)
                     put("role", "live-verdict")
                     put("verdict", certified.verdict.name)
@@ -87,9 +102,15 @@ internal object ExactBasisCoverage {
                     put("floatWork", solver.lastWorkOps)
                     put("reconstructionWork", certified.reconstruction?.work ?: 0L)
                     put("reconstructionAllocation", certified.reconstruction?.allocation ?: 0L)
-                })
+                }
+                )
                 if (basis == null) {
-                    println(buildJsonObject { put("input", input); put("ineligible", "NO_CANDIDATE_BASIS") })
+                    println(
+                        buildJsonObject {
+                        put("input", input);
+                        put("ineligible", "NO_CANDIDATE_BASIS")
+                    }
+                    )
                 } else {
                     println(authority(input, model, basis))
                     role = "offered"
@@ -100,7 +121,12 @@ internal object ExactBasisCoverage {
                     if (exact.metrics.decline == null || exact.witness != null || exact.conflict != null) {
                         role = "reuse"
                         val repeated = verifyExactBasis(
-                            model, basis, row, solver.exactBasisCache, token, observer = observer,
+                            model,
+                            basis,
+                            row,
+                            solver.exactBasisCache,
+                            token,
+                            observer = observer,
                         )
                         repeated.witness?.let { checkPoint(model, it) }
                         repeated.conflict?.let { checkConflict(model, it) }
@@ -129,12 +155,20 @@ internal object ExactBasisCoverage {
         put("peakFill", metrics.peakFill)
         put("decline", metrics.decline?.name ?: "NONE")
         put("phase", metrics.phase.name)
-        put("operations", buildJsonObject {
-            for (operation in metrics.operations) put(operation.phase.name, buildJsonObject {
+        put(
+            "operations",
+            buildJsonObject {
+            for (operation in metrics.operations) {
+                put(
+                    operation.phase.name,
+                    buildJsonObject {
                 put("work", operation.work)
                 put("allocation", operation.allocation)
-            })
-        })
+            }
+                )
+            }
+        }
+        )
     }
 
     private fun strength(input: String, role: String, exact: ExactBasisVerification): JsonObject = buildJsonObject {
@@ -173,12 +207,22 @@ internal object ExactBasisCoverage {
         put("scale", fraction(model.exactState?.model?.objective?.scale?.value ?: BigFraction.ONE))
         put("external", fraction(model.exactState?.model?.objective?.externalConstant?.value ?: BigFraction.ZERO))
         val bounds = List(model.numVars) { model.exactBounds(it) }
-        put("lower", JsonArray(bounds.map {
+        put(
+            "lower",
+            JsonArray(
+                bounds.map {
             it.lower?.let { side -> JsonPrimitive(fraction(side.number.value)) } ?: JsonNull
-        }))
-        put("upper", JsonArray(bounds.map {
+        }
+            )
+        )
+        put(
+            "upper",
+            JsonArray(
+                bounds.map {
             it.upper?.let { side -> JsonPrimitive(fraction(side.number.value)) } ?: JsonNull
-        }))
+        }
+            )
+        )
         put("lowerStrict", JsonArray(bounds.map { JsonPrimitive(it.lower?.strict == true) }))
         put("upperStrict", JsonArray(bounds.map { JsonPrimitive(it.upper?.strict == true) }))
         put("headings", JsonArray(basis.basicVars.map(::JsonPrimitive)))
