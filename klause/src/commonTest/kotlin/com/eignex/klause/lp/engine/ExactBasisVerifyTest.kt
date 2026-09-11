@@ -462,9 +462,9 @@ class ExactBasisVerifyTest {
         val source = ExactLpModel(
             listOf(
                 listOf(
-                ExactLpEntry(0, ExactLpNumber.of(large + BigFraction.ONE)),
-                ExactLpEntry(1, ExactLpNumber.of(large + BigFraction.ofLong(3L))),
-            )
+                    ExactLpEntry(0, ExactLpNumber.of(large + BigFraction.ONE)),
+                    ExactLpEntry(1, ExactLpNumber.of(large + BigFraction.ofLong(3L))),
+                ),
             ),
             listOf(zero, ExactLpNumber.of(1L)),
             listOf(ExactLpColumn(ExactLpBounds()), ExactLpColumn(fixed), ExactLpColumn(fixed)),
@@ -580,15 +580,15 @@ class ExactBasisVerifyTest {
         assertTrue(trail.push())
         assertTrue(
             trail.append(
-            LpScopedRow(
-                1L,
-                listOf(0 to one),
-                one,
-                ExactLpColumn(fixed),
-                ExactLpRow(global = false, premises = premises),
+                LpScopedRow(
+                    1L,
+                    listOf(0 to one),
+                    one,
+                    ExactLpColumn(fixed),
+                    ExactLpRow(global = false, premises = premises),
+                ),
+                scoped = true,
             ),
-            scoped = true,
-        )
         )
         val state = trail.state
         val cache = ExactBasisCache()
