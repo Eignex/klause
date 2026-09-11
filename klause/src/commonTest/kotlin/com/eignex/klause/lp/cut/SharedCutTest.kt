@@ -56,7 +56,7 @@ class SharedCutTest {
 
         val shared = assertNotNull(SharedCut.fromCut(cut, r1), "export should name both columns")
         // The portable form carries CP variables, not columns.
-        assertEquals(setOf(0, 2), shared.vars.toSet())
+        assertEquals(setOf(0, 2), shared.source.expression.terms.keys.map { it.id }.toSet())
 
         val back2 = assertNotNull(shared.toCut(r2), "r2 has columns for vars 0 and 2")
         // The inequality over CP variables is identical after crossing to r2, whatever r2's columns are.
@@ -69,13 +69,9 @@ class SharedCutTest {
         assertTrue(cut.cols.contentEquals(back1.cols) && cut.coeffs.contentEquals(back1.coeffs))
 
         // Equal inequalities hash equally regardless of term order.
-        val reordered = SharedCut(
-            intArrayOf(2, 0),
-            booleanArrayOf(false, false),
-            longArrayOf(5, 3),
-            shared.rel,
-            shared.rhs,
-        )
+        val reordered = assertNotNull(SharedCut.fromCut(
+            Cut(intArrayOf(r1.intColOf[2], r1.intColOf[0]), longArrayOf(5, 3), Relation.LE, 7, global = true), r1,
+        ))
         assertEquals(shared.key, reordered.key)
     }
 
@@ -89,14 +85,11 @@ class SharedCutTest {
             arrayOf<Factor>(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 2)),
         )
         val r = relax(p, LinearObjective(intCoefficients = longArrayOf(1, 1)))
-        val shared = SharedCut(
-            intArrayOf(0, 99),
-            booleanArrayOf(false, false),
-            longArrayOf(1, 1),
-            Relation.LE,
-            2,
-        )
-        assertTrue(shared.toCut(r) == null, "a variable with no column cannot be expressed and is dropped")
+        val shared = assertNotNull(SharedCut.fromCut(
+            Cut(intArrayOf(r.intColOf[0], r.intColOf[1]), longArrayOf(1, 1), Relation.LE, 2, global = true), r,
+        ))
+        val unrelated = relax(Problem(0, 0, emptyArray(), emptyArray()), LinearObjective())
+        assertTrue(shared.toCut(unrelated) == null, "a variable with no column cannot be expressed and is dropped")
     }
 
     private fun satisfies(f: Linear, x: IntArray): Boolean {

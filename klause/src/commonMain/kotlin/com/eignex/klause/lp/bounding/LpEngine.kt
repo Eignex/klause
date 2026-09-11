@@ -221,7 +221,7 @@ internal class LpEngine(
                     cutPool.cuts().mapNotNull { if (it.global) SharedCut.fromCut(it, relaxation) else null }
 
                 override fun importCuts(cuts: List<SharedCut>) {
-                    for (c in cuts) c.toCut(relaxation)?.let { cutPool.add(it) }
+                    for (c in cuts) c.toCut(relaxation)?.let { cutPool.add(it, relaxation) }
                 }
             },
         )
@@ -233,9 +233,9 @@ internal class LpEngine(
      * [primal]. The cut-free persistent base is untouched — every node folds the violated subset via
      * [CutPool.select]. Sound: every persisted cut is global, valid at every solution.
      */
-    fun recordSearchCuts(cuts: List<Cut>, primal: DoubleArray) {
+    fun recordSearchCuts(cuts: List<Cut>, primal: DoubleArray, relaxation: LpRelaxation) {
         var added = 0
-        for (c in cuts) if (c.global && cutPool.add(c)) added++
+        for (c in cuts) if (c.global && cutPool.add(c, relaxation)) added++
         if (added == 0) return
         if (cutPool.size > cutPool.maxCuts) {
             cutPool.observe(primal)

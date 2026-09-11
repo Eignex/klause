@@ -1,5 +1,6 @@
 package com.eignex.klause.lp.engine
 
+import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.basis.IndexedVector
 import com.eignex.klause.simplex.basis.KotlinBasisSolver
 import com.eignex.klause.util.Int128
@@ -46,7 +47,10 @@ internal fun integerTableauCuts(
 ): List<Cut> {
     val m = model.m
     val n = model.n
-    if (m == 0 || n == 0) return emptyList()
+    if (m == 0 || n == 0 || maxCuts <= 0) return emptyList()
+    if (model.hasContinuous || model.colContinuous.any { it } || model.rowStrict.any { it } ||
+        model.probeClampedLo.any { it } || primal.size != n
+    ) return emptyList()
 
     // Float LU of the basis `B` (its column `t` is the basic column `basic[t]`, which may be a slack);
     // btran gives the tableau rows.
@@ -83,16 +87,14 @@ internal fun integerTableauCuts(
             }
             val w = roundDuals(model, unit.toDoubleArray())?.mult ?: continue
 
-            var global = true
             var anyWeight = false
             for (r in 0 until m) {
                 if (w[r] == 0L) continue
                 anyWeight = true
-                if (!model.rowGlobal[r]) global = false
             }
             if (!anyWeight) continue
 
-            val cut = bestRoundedCut(model, w, isLeRow, zStar, mir, global) ?: continue
+            val cut = bestRoundedCut(model, w, isLeRow, zStar, mir) ?: continue
             cuts.add(cut)
         }
         return cuts
@@ -131,7 +133,6 @@ private fun bestRoundedCut(
     isLeRow: BooleanArray,
     zStar: DoubleArray,
     mir: Boolean,
-    global: Boolean,
 ): Cut? {
     val m = model.m
     val n = model.n
@@ -229,7 +230,7 @@ private fun bestRoundedCut(
         val score = if (norm > 0.0) violation / norm else 0.0
         if (score <= bestScore) continue
 
-        val cut = emitGeCut(model, cutCols, cutVals, rhsLe, global) ?: continue
+        val cut = emitGeCut(model, cutCols, cutVals, rhsLe, tableauProvenance(model, w, d, mir)) ?: continue
         best = cut
         bestScore = score
     }
@@ -238,13 +239,14 @@ private fun bestRoundedCut(
 
 /** Turn the `≤` cut `Σ vals_k·z_k ≤ rhsLe` (shifted columns) into klause's `Σ a_k·x_k ≥ b` form,
  *  unshifting `z_k = x_k − lo_k` and gcd-reducing; null if a coefficient or the rhs overflows `Long`. */
-private fun emitGeCut(model: LpModel, cols: IntArrayList, leVals: LongArrayList, rhsLe: Long, global: Boolean): Cut? {
+private fun emitGeCut(model: LpModel, cols: IntArrayList, leVals: LongArrayList, rhsLe: Long, provenance: TableauCutProvenance): Cut? {
     // Σ vals_k z_k ≤ rhsLe ⇔ Σ (−vals_k) x_k ≥ −rhsLe − Σ vals_k·lo_k.
     val rhsAcc = Int128()
     rhsAcc.addLong(rhsLe)
     for (idx in 0 until cols.size) rhsAcc.addProduct(leVals[idx], model.loShift[cols[idx]])
     // rhsAcc = rhsLe + Σ vals_k·lo_k; the GE rhs is its negation.
     if (!rhsAcc.fitsLong()) return null
+    if (rhsAcc.toLong() == Long.MIN_VALUE) return null
     var rhs = -rhsAcc.toLong()
 
     val count = cols.size
@@ -252,6 +254,7 @@ private fun emitGeCut(model: LpModel, cols: IntArrayList, leVals: LongArrayList,
     val outVals = LongArray(count)
     var g = 0L
     for (idx in 0 until count) {
+        if (leVals[idx] == Long.MIN_VALUE) return null
         val v = -leVals[idx]
         outCols[idx] = cols[idx]
         outVals[idx] = v
@@ -263,7 +266,7 @@ private fun emitGeCut(model: LpModel, cols: IntArrayList, leVals: LongArrayList,
         // Σ (vals/g) x ≥ rhs/g, integral LHS ⇒ ≥ ⌈rhs/g⌉.
         rhs = ceilDiv(rhs, g)
     }
-    return Cut(outCols, outVals, Relation.GE, rhs, global)
+    return Cut(outCols, outVals, Relation.GE, rhs, tableau = provenance.reduced(g))
 }
 
 /** `⌈ a / b ⌉` for `b > 0`. */
@@ -271,4 +274,26 @@ private fun ceilDiv(a: Long, b: Long): Long {
     val q = a / b
     val r = a % b
     return if (r > 0L) q + 1L else q
+}
+
+private fun tableauProvenance(model: LpModel, weights: LongArray, divisor: Long, mir: Boolean): TableauCutProvenance {
+    val columns = List(model.n) { CutColumnPremise(it, model.loShift[it], integral = true) }
+    val rows = weights.indices.filter { weights[it] != 0L }.map { row ->
+        val cols = ArrayList<Int>()
+        val values = ArrayList<Long>()
+        var rhs = BigFraction.ofLong(model.rhs[row])
+        for (col in 0 until model.n) {
+            model.forEachInColumn(col) { r, value ->
+                if (r == row) {
+                    cols.add(col)
+                    values.add(value)
+                    rhs += BigFraction.ofLong(value) * BigFraction.ofLong(model.loShift[col])
+                }
+            }
+        }
+        CutInputRow(row, model.rowGlobal[row], weights[row], rhs,
+            if (model.hasUpper[model.slackCol(row)]) Relation.EQ else Relation.LE,
+            cols.toIntArray(), values.toLongArray(), model.rowPremises[row])
+    }
+    return TableauCutProvenance(model, columns, rows, divisor, mir)
 }
