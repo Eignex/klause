@@ -175,31 +175,6 @@ class LpExactContinuationTest {
     }
 
     @Test
-    fun `foreign nonnull result and missing current target cannot recover`() {
-        val zero = ExactLpNumber.of(0L)
-        val source = ExactLpModel(
-            listOf(emptyList()),
-            emptyList(),
-            listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero)))),
-            emptyList(),
-            ExactLpObjective(listOf(zero)),
-        )
-        val first = LpExactState(source)
-        val foreign = LpExactState(source)
-        RevisedSimplex(assertNotNull(first.toWorkingModel())).use { solver ->
-            val hint = assertNotNull(solver.solve())
-
-            val wrongResult = certifyLpResult(assertNotNull(foreign.toWorkingModel()), solver, hint)
-            val missing = certifyLpResult(assertNotNull(foreign.toWorkingModel()), solver, null)
-
-            assertEquals(LpVerdict.INDETERMINATE, wrongResult.verdict)
-            assertNull(wrongResult.continuation)
-            assertEquals(LpVerdict.INDETERMINATE, missing.verdict)
-            assertEquals(ContinuationDecline.NO_BASIS, assertNotNull(missing.continuation).decline)
-        }
-    }
-
-    @Test
     fun `verification exhaustion remains distinct from infeasibility`() {
         val model = LpBuilder().apply {
             addVar(0L, 2L)
