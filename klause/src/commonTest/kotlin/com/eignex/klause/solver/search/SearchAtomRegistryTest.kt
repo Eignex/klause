@@ -4,6 +4,7 @@ import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.theory.qflra.SourceBoundAtom
 import com.eignex.klause.theory.qflra.SourceBoundTerm
+import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -34,8 +35,17 @@ class SearchAtomRegistryTest {
     fun `both theory alternatives wake Boolean clauses and retract at one shared level`() {
         for (positive in listOf(true, false)) {
             val receiver = BoundReceiver()
-            val session = SearchSession(listOf(receiver, ClauseSearchComponent(listOf(Clause(intArrayOf(3, 0)), Clause(intArrayOf(2, 1))))), atoms = SearchAtomRegistry(1))
-            val atom = assertNotNull(SourceBoundAtom.integerSplit(session, listOf(SourceBoundTerm(SearchIntValue(0), BigFraction.ONE)), BigFraction.ZERO))
+            val session = SearchSession(
+                listOf(receiver, ClauseSearchComponent(listOf(Clause(intArrayOf(3, 0)), Clause(intArrayOf(2, 1))))),
+                atoms = SearchAtomRegistry(1),
+            )
+            val atom = assertNotNull(
+                SourceBoundAtom.integerSplit(
+                    session,
+                    listOf(SourceBoundTerm(SearchIntValue(0), BigFraction.ONE)),
+                    BigFraction.ZERO,
+                ),
+            )
             val assertion = if (positive) atom.positive else atom.negative
             assertIs<ComponentResult.Consistent>(session.initialize())
 
@@ -45,12 +55,23 @@ class SearchAtomRegistryTest {
             assertEquals(listOf(assertion.literal to 1), receiver.active)
             assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Theory(assertion)))
             assertEquals(1, session.decisionLevel)
-            assertIs<ComponentResult.Conflict>(session.push(SearchDecision.Theory(if (positive) atom.negative else atom.positive)))
+            assertIs<ComponentResult.Conflict>(
+                session.push(SearchDecision.Theory(if (positive) atom.negative else atom.positive)),
+            )
             assertEquals(1, receiver.active.size)
             session.popTo(0)
             assertTrue(receiver.active.isEmpty())
             assertNull(session.boolValue(1))
-            assertSame(atom.positive, assertNotNull(SourceBoundAtom.integerSplit(session, listOf(SourceBoundTerm(SearchIntValue(0), BigFraction.ONE)), BigFraction.ZERO)).positive)
+            assertSame(
+                atom.positive,
+                assertNotNull(
+                    SourceBoundAtom.integerSplit(
+                        session,
+                        listOf(SourceBoundTerm(SearchIntValue(0), BigFraction.ONE)),
+                        BigFraction.ZERO,
+                    ),
+                ).positive,
+            )
         }
     }
 
@@ -91,11 +112,23 @@ class SearchAtomRegistryTest {
         val atom = assertNotNull(session.registerAtom(Symbol("a"), Symbol("b")))
         session.push(SearchDecision.Bool(0))
         session.push(SearchDecision.Theory(atom.positive))
-        val premise = SearchAtomPremise.All(listOf(SearchAtomPremise.Asserted(SearchDecision.Bool(0)), SearchAtomPremise.All(listOf(SearchAtomPremise.Asserted(SearchDecision.Theory(atom.positive))))))
+        val premise = SearchAtomPremise.All(
+            listOf(
+                SearchAtomPremise.Asserted(SearchDecision.Bool(0)),
+                SearchAtomPremise.All(listOf(SearchAtomPremise.Asserted(SearchDecision.Theory(atom.positive)))),
+            ),
+        )
 
         assertEquals(setOf(1, 3), assertNotNull(session.explainAtoms(premise)).literals.toSet())
         assertNull(session.explainAtoms(SearchAtomPremise.All(listOf(premise, SearchAtomPremise.Unavailable))))
         assertNull(session.explainAtoms(premise, maxNodes = 2))
+        assertNull(
+            session.explainAtoms(
+                SearchAtomPremise.Asserted(SearchDecision.Bool(0)),
+                SearchDecision.Theory(atom.positive),
+                maxNodes = 1,
+            ),
+        )
         assertNull(session.explainAtoms(SearchAtomPremise.Asserted(SearchDecision.Theory(Symbol("opaque")))))
         session.popTo(1)
         assertNull(session.explainAtoms(premise))
@@ -137,7 +170,77 @@ class SearchAtomRegistryTest {
         assertIs<ComponentResult.Consistent>(last.push(SearchDecision.Theory(atom.negative)))
         assertEquals(false, last.boolValue((1 shl 30) - 1))
         assertNull(SearchSession(emptyList()).registerAtom(Symbol("a"), Symbol("b")))
-        assertNull(SearchSession(emptyList(), atoms = SearchAtomRegistry(0, maxAtoms = 0)).registerAtom(Symbol("a"), Symbol("b")))
+        assertNull(
+            SearchSession(
+                emptyList(),
+                atoms = SearchAtomRegistry(0, maxAtoms = 0),
+            ).registerAtom(Symbol("a"), Symbol("b")),
+        )
+    }
+
+    @Test
+    fun `source clause ingress accepts registered atoms and rejects future names before storage`() {
+        for (registered in listOf(false, true)) {
+            val receiver = BoundReceiver()
+            val session = SearchSession(
+                listOf(receiver, ClauseSearchComponent(listOf(Clause(intArrayOf(2))))),
+                atoms = SearchAtomRegistry(1),
+            )
+            if (registered) session.registerAtom(Symbol("a"), Symbol("b"))
+
+            val initialized = session.initialize()
+
+            if (registered) {
+                assertIs<ComponentResult.Consistent>(initialized)
+                assertEquals(true, session.boolValue(1))
+                assertEquals(listOf(2 to 0), receiver.active)
+            } else {
+                assertIs<ComponentResult.Indeterminate>(initialized)
+                session.registerAtom(Symbol("a"), Symbol("b"))
+                assertIs<ComponentResult.Consistent>(session.propagate())
+                assertNull(session.boolValue(1))
+                assertTrue(receiver.active.isEmpty())
+            }
+        }
+    }
+
+    @Test
+    fun `fixed source heuristic retracts registered atoms without indexing them in its heap`() {
+        val component = LinearComponent()
+        val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(2))
+        component.initializeAtoms(session)
+        val branching = HeuristicBooleanBranching(Vsids(), numBoolVars = 2)
+        session.openRun(2, booleanBranching = branching, observer = branching)
+        assertNotNull(branching.alternatives(session))
+        session.push(SearchDecision.Bool(0))
+        val conflict = assertIs<ComponentResult.Conflict>(session.push(SearchDecision.Theory(component.split.positive)))
+        val learned = assertIs<SearchConflictResolution.Backjump>(
+            session.explainedConflict(conflict.explanation),
+        ).conflict
+        branching.onLearnedConflict(learned)
+
+        session.popTo(learned.decisionLevel)
+        assertIs<SearchLearnedConflictResult.Resume>(learned.apply(session))
+        assertTrue(component.active.contains(component.split.negative.literal to 1))
+        assertIs<ComponentResult.Consistent>(session.restart())
+        assertNotNull(branching.alternatives(session))
+        assertTrue(component.active.isEmpty())
+        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(0)))
+        assertTrue(component.active.contains(component.split.negative.literal to 1))
+    }
+
+    @Test
+    fun `cancelled registration consumes no Boolean ids`() {
+        var cancelled = true
+        val session = SearchSession(
+            emptyList(),
+            cancellation = Cancellation { cancelled },
+            atoms = SearchAtomRegistry(1),
+        )
+        assertNull(session.registerAtom(Symbol("a"), Symbol("b")))
+        cancelled = false
+        assertEquals(2, assertNotNull(session.registerAtom(Symbol("a"), Symbol("b"))).positive.literal)
+        assertEquals(0, session.decisionLevel)
     }
 
     @Test
@@ -166,7 +269,10 @@ class SearchAtomRegistryTest {
         val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(2))
         session.push(SearchDecision.Bool(0))
 
-        assertEquals(SearchConflictResolution.Chronological, session.explainedConflict(SearchExplanation(intArrayOf(1, 3))))
+        assertEquals(
+            SearchConflictResolution.Chronological,
+            session.explainedConflict(SearchExplanation(intArrayOf(1, 3))),
+        )
         assertNull(session.reasonFor(1))
     }
 
@@ -176,11 +282,14 @@ class SearchAtomRegistryTest {
         val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(2))
         component.initializeAtoms(session)
         var learned: SearchLearnedConflict? = null
-        val result = session.solve(0, observer = object : SearchRunObserver {
+        val result = session.solve(
+            0,
+            observer = object : SearchRunObserver {
             override fun onLearnedConflict(conflict: SearchLearnedConflict) {
                 learned = conflict
             }
-        })
+        }
+        )
 
         assertIs<SearchResult.Satisfied>(result)
         val conflict = assertNotNull(learned)
@@ -194,14 +303,23 @@ class SearchAtomRegistryTest {
         assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(0)))
         assertEquals(false, session.boolValue(component.split.positive.literal ushr 1))
         assertTrue(component.active.contains(component.split.negative.literal to 1))
-        assertContentEquals(conflict.guardLiterals, session.reasonFor(component.split.positive.literal ushr 1)?.literals)
+        assertEquals(
+            conflict.guardLiterals.toSet(),
+            session.reasonFor(component.split.positive.literal ushr 1)?.literals?.toSet(),
+        )
 
-        for (x in -2..2) for (y in -2..2) for (z in -2..2) for (guard in listOf(false, true)) {
-            if (y > x || z > x || guard && y + z < 1) continue
+        for (x in -2..2) {
+            for (y in -2..2) {
+                for (z in -2..2) {
+                    for (guard in listOf(false, true)) {
+            if (y > x || z > x || (guard && y + z < 1)) continue
             val sourceTruth = mapOf(0 to guard, 2 to (x <= 0), 3 to (y <= 0), 4 to (z <= 0))
             assertTrue(conflict.guardLiterals.any { sourceTruth.getValue(it ushr 1) == (it and 1 == 0) })
             for (reason in component.reasons) {
                 assertTrue(reason.literals.any { sourceTruth.getValue(it ushr 1) == (it and 1 == 0) })
+            }
+        }
+                }
             }
         }
     }
@@ -237,7 +355,9 @@ class SearchAtomRegistryTest {
     }
 
     // Root constraints are y <= x, z <= x and guard => y + z >= 1.
-    private class LinearComponent(private val unnameable: Boolean = false) : BoundReceiver(), SearchBrancher {
+    private class LinearComponent(private val unnameable: Boolean = false) :
+        BoundReceiver(),
+        SearchBrancher {
         lateinit var split: SearchTheoryAtom
         private lateinit var y: SearchTheoryAtom
         private lateinit var z: SearchTheoryAtom
@@ -245,7 +365,13 @@ class SearchAtomRegistryTest {
 
         fun initializeAtoms(context: SearchContext) {
             val atoms = (0..2).map { variable ->
-                assertNotNull(SourceBoundAtom.integerSplit(context, listOf(SourceBoundTerm(SearchIntValue(variable), BigFraction.ONE)), BigFraction.ZERO))
+                assertNotNull(
+                    SourceBoundAtom.integerSplit(
+                        context,
+                        listOf(SourceBoundTerm(SearchIntValue(variable), BigFraction.ONE)),
+                        BigFraction.ZERO,
+                    ),
+                )
             }
             split = atoms[0]
             y = atoms[1]
@@ -256,7 +382,9 @@ class SearchAtomRegistryTest {
             super<BoundReceiver>.assert(decision, context)
             if (decision == SearchDecision.Theory(split.positive)) {
                 for (consequence in listOf(y.positive, z.positive)) {
-                    val reason = assertNotNull(context.explainAtoms(SearchAtomPremise.Asserted(decision), SearchDecision.Theory(consequence)))
+                    val reason = assertNotNull(
+                        context.explainAtoms(SearchAtomPremise.Asserted(decision), SearchDecision.Theory(consequence)),
+                    )
                     reasons.add(reason)
                     val result = context.imply(consequence.literal, reason)
                     if (result !is ComponentResult.Consistent) return result
@@ -266,9 +394,22 @@ class SearchAtomRegistryTest {
         }
 
         override fun propagate(context: SearchContext): ComponentResult {
-            if (context.boolValue(0) != true || context.boolValue(y.positive.literal ushr 1) != true || context.boolValue(z.positive.literal ushr 1) != true) return ComponentResult.Consistent
-            val premises = listOf(SearchAtomPremise.Asserted(SearchDecision.Bool(0)), SearchAtomPremise.Asserted(SearchDecision.Theory(y.positive)), SearchAtomPremise.Asserted(SearchDecision.Theory(z.positive)))
-            val explanation = context.explainAtoms(SearchAtomPremise.All(if (unnameable) premises + SearchAtomPremise.Unavailable else premises))
+            if (context.boolValue(
+                    0,
+                ) != true || context.boolValue(
+                    y.positive.literal ushr 1,
+                ) != true || context.boolValue(z.positive.literal ushr 1) != true
+            ) {
+                    return ComponentResult.Consistent
+                }
+            val premises = listOf(
+                SearchAtomPremise.Asserted(SearchDecision.Bool(0)),
+                SearchAtomPremise.Asserted(SearchDecision.Theory(y.positive)),
+                SearchAtomPremise.Asserted(SearchDecision.Theory(z.positive)),
+            )
+            val explanation = context.explainAtoms(
+                SearchAtomPremise.All(if (unnameable) premises + SearchAtomPremise.Unavailable else premises),
+            )
             if (explanation != null) reasons.add(explanation)
             return ComponentResult.Conflict(explanation)
         }
