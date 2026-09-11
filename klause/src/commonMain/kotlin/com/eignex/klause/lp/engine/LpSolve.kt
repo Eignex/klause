@@ -224,25 +224,25 @@ internal fun certifyLpResult(
         }
     }
     // Retain the migration fallback; this is feasibility recovery, not an optimization solve.
-    if (state == null && witness == null && ray == null && conflict == null && !cancellation() &&
+    if (state == null && witness == null && ray == null && conflict == null &&
         (result == null || model.hasContinuous)
     ) {
-        val outcome = rationalOutcome(model, cancellation)
-        val point = if (outcome.feasibility == RationalFeasibility.FEASIBLE) {
+        val outcome = if (cancellation()) null else rationalOutcome(model, cancellation)
+        val point = if (outcome?.feasibility == RationalFeasibility.FEASIBLE) {
             outcome.exactWitness?.let { shifted ->
                 checkedLpWitness(model, shifted.mapIndexed { j, value -> value + model.exactShift(j) })
             }
         } else {
             null
         }
-        val refutation = if (outcome.feasibility == RationalFeasibility.INFEASIBLE) {
+        val refutation = if (outcome?.feasibility == RationalFeasibility.INFEASIBLE) {
             outcome.conflict?.takeIf { checkedLpConflict(model, it) }
         } else {
             null
         }
         val success = point != null || refutation != null
         observer?.observe(LpCertifier.RATIONAL, success)
-        if (policy.acceptNullable(LpCertifier.RATIONAL, outcome.takeIf { success }) != null) {
+        if (policy.acceptNullable(LpCertifier.RATIONAL, outcome?.takeIf { success }) != null) {
             witness = point
             conflict = refutation
         }

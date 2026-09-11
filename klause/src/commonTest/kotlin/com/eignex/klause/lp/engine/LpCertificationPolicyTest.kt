@@ -38,7 +38,7 @@ class LpCertificationPolicyTest {
 
         assertEquals(LpVerdict.INDETERMINATE, result.verdict)
         assertEquals(
-            listOf(LpCertifier.EXACT_FARKAS, LpCertifier.RATIONAL),
+            listOf(LpCertifier.EXACT_FARKAS, LpCertifier.RATIONAL, LpCertifier.RATIONAL),
             policy.attempts.map { it.first },
         )
         assertTrue(policy.attempts.all { it.second })
