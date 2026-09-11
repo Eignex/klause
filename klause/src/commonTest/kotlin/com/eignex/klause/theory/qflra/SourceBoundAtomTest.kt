@@ -182,8 +182,7 @@ class SourceBoundAtomTest {
         return if (bound.upper) {
             comparison < 0 || (comparison == 0 && !bound.strict)
         } else {
-            comparison > 0 ||
-                comparison == 0 && !bound.strict
+            comparison > 0 || (comparison == 0 && !bound.strict)
         }
     }
 }

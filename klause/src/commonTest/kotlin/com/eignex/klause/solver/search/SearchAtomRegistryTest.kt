@@ -285,10 +285,10 @@ class SearchAtomRegistryTest {
         val result = session.solve(
             0,
             observer = object : SearchRunObserver {
-            override fun onLearnedConflict(conflict: SearchLearnedConflict) {
-                learned = conflict
-            }
-        }
+                override fun onLearnedConflict(conflict: SearchLearnedConflict) {
+                    learned = conflict
+                }
+            },
         )
 
         assertIs<SearchResult.Satisfied>(result)
@@ -312,13 +312,13 @@ class SearchAtomRegistryTest {
             for (y in -2..2) {
                 for (z in -2..2) {
                     for (guard in listOf(false, true)) {
-            if (y > x || z > x || (guard && y + z < 1)) continue
-            val sourceTruth = mapOf(0 to guard, 2 to (x <= 0), 3 to (y <= 0), 4 to (z <= 0))
-            assertTrue(conflict.guardLiterals.any { sourceTruth.getValue(it ushr 1) == (it and 1 == 0) })
-            for (reason in component.reasons) {
-                assertTrue(reason.literals.any { sourceTruth.getValue(it ushr 1) == (it and 1 == 0) })
-            }
-        }
+                        if (y > x || z > x || (guard && y + z < 1)) continue
+                        val sourceTruth = mapOf(0 to guard, 2 to (x <= 0), 3 to (y <= 0), 4 to (z <= 0))
+                        assertTrue(conflict.guardLiterals.any { sourceTruth.getValue(it ushr 1) == (it and 1 == 0) })
+                        for (reason in component.reasons) {
+                            assertTrue(reason.literals.any { sourceTruth.getValue(it ushr 1) == (it and 1 == 0) })
+                        }
+                    }
                 }
             }
         }
@@ -400,8 +400,8 @@ class SearchAtomRegistryTest {
                     y.positive.literal ushr 1,
                 ) != true || context.boolValue(z.positive.literal ushr 1) != true
             ) {
-                    return ComponentResult.Consistent
-                }
+                return ComponentResult.Consistent
+            }
             val premises = listOf(
                 SearchAtomPremise.Asserted(SearchDecision.Bool(0)),
                 SearchAtomPremise.Asserted(SearchDecision.Theory(y.positive)),
