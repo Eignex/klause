@@ -134,7 +134,7 @@ class OpenTheoryMinimizeTest {
 
     @Test
     fun `a budget spent mid-descent bounds the optimum by the standing incumbent`() {
-        val values = listOf(4L, 12L).map { decisions ->
+        val values = listOf(4L, 10L).map { decisions ->
             val parsed = stepped()
             val x = parsed.intVarNames.getValue("x")
             val objective = LinearObjective(intCoefficients = LongArray(parsed.model.numIntVars).also { it[x] = 1L })
@@ -143,6 +143,7 @@ class OpenTheoryMinimizeTest {
                 OpenTheoryMinimizer(parsed.model, objective).minimize(TheoryParams(maxDecisions = decisions)),
             )
 
+            assertEquals(com.eignex.klause.solver.result.TerminationReason.BudgetExhausted, result.reason)
             val incumbent = assertNotNull(result.incumbent)
             val value = assertNotNull(result.value)
             val yValue = incumbent.intValue(parsed.intVarNames.getValue("y")).toInt()

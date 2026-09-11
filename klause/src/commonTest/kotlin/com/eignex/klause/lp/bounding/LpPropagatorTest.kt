@@ -59,6 +59,19 @@ class LpPropagatorTest {
     }
 
     @Test
+    fun `a consumer can finish without installing optional LP state`() {
+        val policy = object : LpSearchPolicy {
+            override fun check(context: SearchContext): ComponentCheck = ComponentCheck.Feasible
+        }
+        LpPropagator(policy).use { lp ->
+            val session = SearchSession(listOf(lp))
+            session.initialize()
+
+            assertEquals(ComponentCheck.Feasible, lp.check(session))
+        }
+    }
+
+    @Test
     fun `failed bound invalidation overrides a cached feasible consumer check`() {
         val zero = ExactLpNumber.of(0L)
         val source = ExactLpModel(
@@ -69,8 +82,7 @@ class LpPropagatorTest {
             ExactLpObjective(listOf(zero)),
         )
         val policy = object : LpSearchPolicy {
-            override fun check(context: SearchContext): ComponentCheck =
-                ComponentCheck.Feasible
+            override fun check(context: SearchContext): ComponentCheck = ComponentCheck.Feasible
         }
         LpPropagator(policy).use { lp ->
             assertTrue(lp.install(Any(), source))

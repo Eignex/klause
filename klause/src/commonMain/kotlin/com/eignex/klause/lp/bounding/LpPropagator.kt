@@ -70,6 +70,7 @@ internal class LpPropagator(
     private var modelKey: Any? = null
     private var rootState: LpExactState? = null
     private var closed = false
+    private var invalidated = false
     private var nextWitness = 0L
     private var preparedWork = 0L
     private var preparedRefactors = 0L
@@ -200,7 +201,7 @@ internal class LpPropagator(
         } catch (primary: Throwable) {
             val metrics = lastMetrics
             try {
-                reset()
+                invalidate()
             } catch (cleanup: Throwable) {
                 primary.addSuppressed(cleanup)
             } finally {
@@ -263,7 +264,7 @@ internal class LpPropagator(
     }
 
     override fun check(context: SearchContext): ComponentCheck =
-        if (closed || owner == null || context.cancelled()) ComponentCheck.Indeterminate else policy.check(context)
+        if (closed || invalidated || context.cancelled()) ComponentCheck.Indeterminate else policy.check(context)
 
     override fun nextBranch(context: SearchContext): List<SearchDecision>? {
         if (closed || context.cancelled()) return null
@@ -287,7 +288,7 @@ internal class LpPropagator(
         if (current != null && current.state.depth > decisionLevel &&
             !current.pop(decisionLevel, Cancellation.Never)
         ) {
-            reset()
+            invalidate()
         }
         lastMetrics = LpSolveMetrics()
         val active = state?.assertions?.map { it.witness }?.toSet().orEmpty()
@@ -311,6 +312,7 @@ internal class LpPropagator(
     fun reset() {
         val previous = owner
         owner = null
+        invalidated = false
         modelKey = null
         rootState = null
         proofContext = null
@@ -325,7 +327,11 @@ internal class LpPropagator(
     }
 
     private fun invalidate(): Boolean {
-        reset()
+        try {
+            reset()
+        } finally {
+            invalidated = true
+        }
         return false
     }
 
