@@ -24,11 +24,6 @@ internal class BasisWorkspace(val size: Int, private val workspace: Workspace = 
     var count = 0
         private set
 
-    init {
-        workspace.reserve(size, 1)
-        workspace.reserveI32(size, 1)
-    }
-
     fun set(i: Int, value: Double) {
         if (marks[i] == 0) {
             marks[i] = 1

@@ -81,11 +81,6 @@ internal class BasisFactors(matrix: SparseMatrix, private val workspace: Workspa
     )
     val dimension: Int = source.rows
 
-    init {
-        workspace.reserve(dimension, LU_DOUBLE_BUFFERS)
-        workspace.reserveI32(dimension, LU_INDEX_BUFFERS)
-    }
-
     fun build(basisColumns: IntArray, policy: LuPivotPolicy = LuPivotPolicy()): LuBuildResult =
         build(basisColumns, IntArray(dimension) { -1 }, policy)
 
@@ -171,9 +166,6 @@ internal class BasisFactors(matrix: SparseMatrix, private val workspace: Workspa
             }
         }
 }
-
-private const val LU_DOUBLE_BUFFERS = 2
-private const val LU_INDEX_BUFFERS = 4
 
 private class LuBuffers(
     val stagedRows: IntArray,
