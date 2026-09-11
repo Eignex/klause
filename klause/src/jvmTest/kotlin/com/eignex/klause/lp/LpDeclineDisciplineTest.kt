@@ -190,8 +190,11 @@ private class RecordingComponentSolver(
     override fun exactBound(observer: LpCertificationObserver?, policy: LpCertificationPolicy): CertifiedLpBound? =
         component.exactBound(observer, policy)
 
-    override fun exactWitness(observer: LpCertificationObserver?, policy: LpCertificationPolicy): ExactLpWitness? =
-        component.exactWitness(observer, policy)
+    override fun exactWitness(
+        observer: LpCertificationObserver?,
+        policy: LpCertificationPolicy,
+        cancellation: Cancellation,
+    ): ExactLpWitness? = component.exactWitness(observer, policy, cancellation)
 }
 
 private class RecordingTableauSolver(private val tableau: TableauCutSolver, calls: MutableList<DeclineCall>) :

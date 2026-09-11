@@ -141,14 +141,26 @@ internal class ComponentLpSolver(
         return CertifiedLpBound(value)
     }
 
-    override fun exactWitness(observer: LpCertificationObserver?, policy: LpCertificationPolicy): ExactLpWitness? {
+    override fun exactWitness(
+        observer: LpCertificationObserver?,
+        policy: LpCertificationPolicy,
+        cancellation: Cancellation,
+    ): ExactLpWitness? {
+        val sourceKey = certificationKey ?: return null
+        if (exactLpStateKey(model)?.contentEquals(sourceKey) != true || cancellation()) return null
         val results = blockResults ?: return null
         val point = MutableList(model.n) { model.exactShift(it) }
         for (index in parts.indices) {
             val part = parts[index]
+            if (cancellation()) return null
+            val exact = verifyExactBasis(
+                part.model, results[index].basis, cache = solvers[index].exactBasisCache ?: ExactBasisCache(),
+                cancellation = cancellation, observer = observer,
+            )
+            if (exact.singularRank != null) solvers[index].rejectSingularBasis(part.model, results[index].basis)
             val witness = policy.acceptNullable(
                 LpCertifier.EXACT_BASIS,
-                exactBasisWitness(part.model, results[index].basis, observer),
+                exact.witness,
             ) ?: policy.acceptNullable(
                 LpCertifier.EXACT_POINT,
                 exactPointWitness(part.model, results[index].primal, observer),

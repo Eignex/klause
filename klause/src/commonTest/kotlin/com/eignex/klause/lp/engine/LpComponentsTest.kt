@@ -165,7 +165,7 @@ class LpComponentsTest {
     }
 
     @Test
-    fun `component bases certify a continuous model beyond the monolithic row cap`() {
+    fun `component bases certify a continuous model beyond the retired determinant cap`() {
         val builder = LpBuilder()
         repeat(50) {
             val column = builder.addRealVar(0.0, 1.0)
@@ -175,7 +175,7 @@ class LpComponentsTest {
         val solver = assertIs<ComponentLpSolver>(newLpSolver(model))
         val result = assertNotNull(solver.solve())
 
-        assertEquals(null, exactBasisFeasible(model, result.basis))
+        assertNotNull(verifyExactBasis(model, result.basis).witness)
         assertNotNull(solver.exactWitness())
         assertEquals(LpVerdict.ATTAINED_OPTIMUM, solveAndCertify(model).verdict)
     }

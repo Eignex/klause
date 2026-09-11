@@ -42,6 +42,7 @@ internal class CertifiedLpResult(
     val boundConflict: LpBoundConflict? = null,
     val conflictSupport: LpExactSupport? = null,
     val reconstruction: ReconstructionMetrics? = null,
+    val basisVerification: ExactBasisMetrics? = null,
 ) {
     val verdict: LpVerdict = when {
         farkasRay != null || rationalConflict != null || boundConflict != null -> LpVerdict.INFEASIBLE
@@ -173,6 +174,7 @@ internal fun certifyLpResult(
     var ray: LongArray? = null
     var conflict: BigRationalConflict? = null
     var reconstruction: ReconstructedCertificate? = null
+    var exactBasis: ExactBasisVerification? = null
     if (result != null && (witness == null || bound?.value != witness.objective) && !cancellation()) {
         reconstruction = reconstructCertificate(
             model,
@@ -188,12 +190,22 @@ internal fun certifyLpResult(
         if (stronger != null && (bound == null || stronger.value > bound.value)) bound = stronger
     }
     if (result != null && witness == null && !cancellation()) {
-        witness = component?.exactWitness(observer, policy)
-            ?: policy.acceptNullable(
-                LpCertifier.EXACT_BASIS,
-                exactBasisWitness(model, result.basis, observer, cancellation),
-            )
-            ?: policy.acceptNullable(LpCertifier.EXACT_POINT, exactPointWitness(model, result.primal, observer))
+        witness = component?.exactWitness(observer, policy, cancellation)
+    }
+    if (result != null && (witness == null || bound?.value != witness.objective) && !cancellation()) {
+        val checked = verifyExactBasis(
+            model, result.basis, cache = solver.exactBasisCache ?: ExactBasisCache(),
+            cancellation = cancellation, observer = observer,
+        )
+        exactBasis = checked
+        if (checked.singularRank != null) solver.rejectSingularBasis(model, result.basis)
+        val point = policy.acceptNullable(LpCertifier.EXACT_BASIS, checked.witness)
+        if (point != null && (witness == null || point.objective < witness.objective)) witness = point
+        val stronger = policy.acceptNullable(LpCertifier.EXACT_BASIS, checked.bound)
+        if (stronger != null && (bound == null || stronger.value > bound.value)) bound = stronger
+    }
+    if (result != null && witness == null && !cancellation()) {
+        witness = policy.acceptNullable(LpCertifier.EXACT_POINT, exactPointWitness(model, result.primal, observer))
     }
     // An independently checked point refutes infeasibility; rejecting a ray candidate does not.
     if (result == null && witness == null) {
@@ -208,8 +220,6 @@ internal fun certifyLpResult(
                     certifyLpFarkas(
                         model,
                         it,
-                        basis = solver.infeasibleBasis,
-                        basisRow = solver.infeasibleRow,
                         observer = observer,
                     ),
                 )
@@ -221,6 +231,18 @@ internal fun certifyLpResult(
             reconstruction = reconstructCertificate(model, ray = candidate, cancellation = cancellation)
             observer?.observe(LpCertifier.RATIONAL, reconstruction.conflict != null)
             conflict = policy.acceptNullable(LpCertifier.RATIONAL, reconstruction.conflict)
+        }
+    }
+    if (result == null && witness == null && ray == null && conflict == null && !cancellation()) {
+        solver.infeasibleBasis?.let { basis ->
+            val checked = verifyExactBasis(
+                model, basis, rayRow = solver.infeasibleRow, cache = solver.exactBasisCache ?: ExactBasisCache(),
+                cancellation = cancellation, observer = observer,
+            )
+            exactBasis = checked
+            if (checked.singularRank != null) solver.rejectSingularBasis(model, basis)
+            conflict = policy.acceptNullable(LpCertifier.EXACT_FARKAS, checked.conflict)
+            if (conflict != null && state == null) ray = checked.integerRay
         }
     }
     // Retain the migration fallback; this is feasibility recovery, not an optimization solve.
@@ -291,8 +313,11 @@ internal fun certifyLpResult(
         } ?: { null },
         unboundedness = unboundedness,
         reconstruction = reconstruction?.metrics,
+        basisVerification = exactBasis?.metrics,
         conflictSupport =
-        reconstruction?.conflictSupport?.takeIf { conflict === reconstruction.conflict } ?: conflict?.let { proof ->
+        exactBasis?.conflictSupport?.takeIf { conflict === exactBasis.conflict }
+            ?: reconstruction?.conflictSupport?.takeIf { conflict === reconstruction.conflict }
+            ?: conflict?.let { proof ->
             val y = MutableList(model.m) { BigFraction.ZERO }
             for (i in proof.rows.indices) y[proof.rows[i]] = proof.multipliers[i].negated()
             model.exactSupport(y, objective = false)
