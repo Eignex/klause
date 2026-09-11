@@ -106,7 +106,7 @@ internal class RevisedSimplex(
     private val trackDegeneracy: Boolean = false,
     private val basisSolverFactory: ((SparseMatrix) -> BasisSolver)? = null,
     private val pricing: LpPricingOptions = LpPricingOptions(),
-    private val reuseRationalOrder: Boolean = false,
+    private val reuseRationalOrder: Boolean = true,
 ) : TableauCutSolver,
     PersistentLpSolver {
     private val m = model.m
@@ -926,6 +926,8 @@ internal class RevisedSimplex(
     }
 
     override fun prepareLogicals(token: Cancellation): Basis? {
+        continuationAvailable = false
+        stoppedContinuationBasis = null
         exactBasisCache.clear()
         resetSolveState(false)
         basisKept = false

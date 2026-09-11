@@ -19,7 +19,7 @@ import kotlin.test.assertTrue
 
 class ExactBasisOrderingTest {
     @Test
-    fun `live nonsymmetric order verifies original coefficients beyond double precision`() {
+    fun `default live order verifies original coefficients beyond double precision`() {
         val wide = 9_007_199_254_740_993L
         val zero = ExactLpNumber.of(0L)
         val fixed = ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(zero)))
@@ -32,7 +32,7 @@ class ExactBasisOrderingTest {
         )
         val model = assertNotNull(LpExactState(source).toWorkingModel())
         val warm = Basis(intArrayOf(1, 0), arrayOf(VarStatus.BASIC, VarStatus.BASIC, VarStatus.FIXED, VarStatus.FIXED))
-        RevisedSimplex(model, reuseRationalOrder = true).use { solver ->
+        RevisedSimplex(model).use { solver ->
             val candidate = assertNotNull(solver.solve(warm))
             val checked = verifyExactBasis(model, candidate.basis, cache = solver.exactBasisCache)
             val standalone = verifyExactBasis(model, candidate.basis)
@@ -108,17 +108,25 @@ class ExactBasisOrderingTest {
         val epsilon = BigFraction.ofLong(1L shl 60).reciprocal()
         for (delta in listOf(epsilon, BigFraction.ZERO)) {
             val source = ExactLpModel(
-                listOf(listOf(ExactLpEntry(0, one), ExactLpEntry(1, one)), listOf(
-                    ExactLpEntry(0, one), ExactLpEntry(1, ExactLpNumber.of(BigFraction.ONE + delta)),
-                )),
+                listOf(
+                    listOf(ExactLpEntry(0, one), ExactLpEntry(1, one)),
+                    listOf(
+                        ExactLpEntry(0, one),
+                        ExactLpEntry(1, ExactLpNumber.of(BigFraction.ONE + delta)),
+                    ),
+                ),
                 listOf(ExactLpNumber.of(2L), ExactLpNumber.of(BigFraction.ofLong(2L) + delta)),
                 List(2) { ExactLpColumn(ExactLpBounds()) } + List(2) {
                     ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(zero)))
                 },
-                List(2) { ExactLpRow() }, ExactLpObjective(List(4) { zero }),
+                List(2) { ExactLpRow() },
+                ExactLpObjective(List(4) { zero }),
             )
             val model = assertNotNull(LpExactState(source).toWorkingModel())
-            val basis = Basis(intArrayOf(0, 1), arrayOf(VarStatus.BASIC, VarStatus.BASIC, VarStatus.FIXED, VarStatus.FIXED))
+            val basis = Basis(
+                intArrayOf(0, 1),
+                arrayOf(VarStatus.BASIC, VarStatus.BASIC, VarStatus.FIXED, VarStatus.FIXED),
+            )
             RevisedSimplex(model, reuseRationalOrder = true).use { solver ->
                 val result = verifyExactBasis(model, basis, cache = solver.exactBasisCache)
                 assertEquals(0, result.metrics.orderProposals)
@@ -138,10 +146,14 @@ class ExactBasisOrderingTest {
         val zero = ExactLpNumber.of(0L)
         val one = ExactLpNumber.of(1L)
         val source = ExactLpModel(
-            listOf(listOf(ExactLpEntry(0, one))), listOf(one),
-            listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero))),
-                ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(zero)))),
-            listOf(ExactLpRow()), ExactLpObjective(listOf(zero, zero)),
+            listOf(listOf(ExactLpEntry(0, one))),
+            listOf(one),
+            listOf(
+                ExactLpColumn(ExactLpBounds(ExactLpSide(zero))),
+                ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(zero))),
+            ),
+            listOf(ExactLpRow()),
+            ExactLpObjective(listOf(zero, zero)),
         )
         val state = LpExactState(source)
         val model = assertNotNull(state.toWorkingModel())
@@ -154,13 +166,17 @@ class ExactBasisOrderingTest {
             assertNotNull(declined.witness)
             solver.exactBasisCache.clear()
             val alternate = Basis(intArrayOf(1), arrayOf(VarStatus.AT_LOWER, VarStatus.BASIC))
-            assertEquals(ExactBasisOrderDecline.STALE,
-                verifyExactBasis(model, alternate, cache = solver.exactBasisCache).metrics.orderDecline)
+            assertEquals(
+                ExactBasisOrderDecline.STALE,
+                verifyExactBasis(model, alternate, cache = solver.exactBasisCache).metrics.orderDecline,
+            )
             solver.exactBasisCache.clear()
             assertEquals(1, verifyExactBasis(model, warm, cache = solver.exactBasisCache).metrics.orderProposals)
             solver.close()
-            assertEquals(ExactBasisOrderDecline.STALE,
-                verifyExactBasis(model, warm, cache = solver.exactBasisCache).metrics.orderDecline)
+            assertEquals(
+                ExactBasisOrderDecline.STALE,
+                verifyExactBasis(model, warm, cache = solver.exactBasisCache).metrics.orderDecline,
+            )
             assertNull(solver.continuationBasis(model))
         }
     }
@@ -224,7 +240,8 @@ class ExactBasisOrderingTest {
         val premises = ExactLpPremises(emptyList(), listOf(23))
         val fixed = ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(zero)))
         val source = ExactLpModel(
-            listOf(listOf(ExactLpEntry(0, one), ExactLpEntry(1, one))), listOf(zero, one),
+            listOf(listOf(ExactLpEntry(0, one), ExactLpEntry(1, one))),
+            listOf(zero, one),
             listOf(ExactLpColumn(ExactLpBounds()), fixed, fixed),
             listOf(ExactLpRow(), ExactLpRow(global = false, premises = premises)),
             ExactLpObjective(List(3) { zero }),
@@ -233,8 +250,12 @@ class ExactBasisOrderingTest {
         val model = assertNotNull(state.toWorkingModel())
         val basis = Basis(intArrayOf(0, 1), arrayOf(VarStatus.BASIC, VarStatus.BASIC, VarStatus.FIXED))
         val off = verifyExactBasis(model, basis, rayRow = 1)
-        val hinted = verifyExactBasis(model, basis, rayRow = 1,
-            cache = ExactBasisCache { RationalBasisOrder(intArrayOf(0, 1), intArrayOf(0, 1)) })
+        val hinted = verifyExactBasis(
+            model,
+            basis,
+            rayRow = 1,
+            cache = ExactBasisCache { RationalBasisOrder(intArrayOf(0, 1), intArrayOf(0, 1)) },
+        )
 
         assertNotNull(hinted.conflict)
         assertEquals(off.conflict?.multipliers, hinted.conflict.multipliers)
@@ -249,19 +270,22 @@ class ExactBasisOrderingTest {
         val zero = ExactLpNumber.of(0L)
         val one = ExactLpNumber.of(1L)
         val source = ExactLpModel(
-            listOf(listOf(ExactLpEntry(0, one))), listOf(one),
-            listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero))),
-                ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(zero)))),
-            listOf(ExactLpRow()), ExactLpObjective(listOf(one, zero)),
+            listOf(listOf(ExactLpEntry(0, one))),
+            listOf(one),
+            listOf(
+                ExactLpColumn(ExactLpBounds(ExactLpSide(zero))),
+                ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(zero))),
+            ),
+            listOf(ExactLpRow()),
+            ExactLpObjective(listOf(one, zero)),
         )
         val model = assertNotNull(LpExactState(source).toWorkingModel())
         val basis = Basis(intArrayOf(0), arrayOf(VarStatus.BASIC, VarStatus.FIXED))
         val solver = RevisedSimplex(model, basisSolverFactory = { matrix ->
             val delegate = KotlinBasisSolver(matrix)
             object : BasisSolver by delegate {
-                override fun ftran(x: IndexedVector, expectedDensity: Double) {
+                override fun ftran(x: IndexedVector, expectedDensity: Double): Unit =
                     throw BasisArithmeticException("injected solve failure")
-                }
             }
         })
         assertNull(solver.solve(basis))
@@ -275,22 +299,105 @@ class ExactBasisOrderingTest {
         solver.close()
         assertNull(solver.continuationBasis(model))
     }
+
+    @Test
+    fun `logical preparation discards a retired target after a pivot`() {
+        val zero = ExactLpNumber.of(0L)
+        val one = ExactLpNumber.of(1L)
+        val source = ExactLpModel(
+            List(2) { listOf(ExactLpEntry(it, one)) },
+            List(2) { one },
+            List(2) { ExactLpColumn(ExactLpBounds(ExactLpSide(zero))) } +
+                List(2) { ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(zero))) },
+            List(2) { ExactLpRow() },
+            ExactLpObjective(List(4) { zero }),
+        )
+        val model = assertNotNull(LpExactState(source).toWorkingModel())
+        var failAfterPivot = true
+        RevisedSimplex(model, basisSolverFactory = { matrix ->
+            val delegate = KotlinBasisSolver(matrix)
+            object : BasisSolver by delegate {
+                override fun ftran(x: IndexedVector, expectedDensity: Double) {
+                    if (failAfterPivot && delegate.updateCount > 0) {
+                        throw BasisArithmeticException("injected failure after pivot")
+                    }
+                    delegate.ftran(x, expectedDensity)
+                }
+            }
+        }).use { solver ->
+            assertNull(solver.solve())
+            val retired = assertNotNull(solver.continuationBasis(model))
+            assertEquals(1, retired.basicVars.count { it < 2 })
+            failAfterPivot = false
+
+            val logicals = assertNotNull(solver.prepareLogicals(Cancellation.Never))
+
+            assertContentEquals(intArrayOf(2, 3), logicals.basicVars)
+            assertNull(solver.continuationBasis(model))
+            val solved = assertNotNull(solver.solve(logicals))
+            val current = assertNotNull(solver.continuationBasis(model))
+            assertContentEquals(solved.basis.basicVars, current.basicVars)
+            assertEquals(2, current.basicVars.count { it < 2 })
+        }
+    }
+
+    @Test
+    fun `only rejection of the current basis invalidates its continuation target`() {
+        val zero = ExactLpNumber.of(0L)
+        val one = ExactLpNumber.of(1L)
+        val source = ExactLpModel(
+            listOf(listOf(ExactLpEntry(0, one))),
+            listOf(one),
+            listOf(
+                ExactLpColumn(ExactLpBounds(ExactLpSide(zero))),
+                ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(zero))),
+            ),
+            listOf(ExactLpRow()),
+            ExactLpObjective(listOf(zero, zero)),
+        )
+        val model = assertNotNull(LpExactState(source).toWorkingModel())
+        RevisedSimplex(model).use { solver ->
+            val solved = assertNotNull(solver.solve())
+            val foreign = assertNotNull(LpExactState(source).toWorkingModel())
+            assertFalse(solver.rejectSingularBasis(foreign, solved.basis))
+            assertNotNull(solver.continuationBasis(model))
+
+            assertTrue(solver.rejectSingularBasis(model, solved.basis))
+
+            assertNull(solver.continuationBasis(model))
+        }
+    }
+
     @Test
     fun `same basis rhs and objective edits reuse only factors`() {
         val zero = ExactLpNumber.of(0L)
         val one = ExactLpNumber.of(1L)
         val matrix = listOf(listOf(ExactLpEntry(0, one)))
-        val columns = listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero))),
-            ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(zero))))
-        val source = ExactLpModel(matrix, listOf(one), columns, listOf(ExactLpRow()),
-            ExactLpObjective(listOf(one, zero)))
+        val columns = listOf(
+            ExactLpColumn(ExactLpBounds(ExactLpSide(zero))),
+            ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(zero))),
+        )
+        val source = ExactLpModel(
+            matrix,
+            listOf(one),
+            columns,
+            listOf(ExactLpRow()),
+            ExactLpObjective(listOf(one, zero)),
+        )
         val model = assertNotNull(LpExactState(source).toWorkingModel())
         RevisedSimplex(model, reuseRationalOrder = true).use { solver ->
             val basis = Basis(intArrayOf(0), arrayOf(VarStatus.BASIC, VarStatus.FIXED))
             assertNotNull(solver.solve(basis))
             val initial = verifyExactBasis(model, basis, cache = solver.exactBasisCache)
-            val changed = LpExactState(ExactLpModel(matrix, listOf(ExactLpNumber.of(2L)), columns,
-                listOf(ExactLpRow()), ExactLpObjective(listOf(ExactLpNumber.of(3L), zero))))
+            val changed = LpExactState(
+                ExactLpModel(
+                    matrix,
+                    listOf(ExactLpNumber.of(2L)),
+                    columns,
+                    listOf(ExactLpRow()),
+                    ExactLpObjective(listOf(ExactLpNumber.of(3L), zero)),
+                ),
+            )
             assertTrue(solver.adopt(changed, Cancellation.Never))
             val current = assertNotNull(changed.toWorkingModel())
 
@@ -308,13 +415,19 @@ class ExactBasisOrderingTest {
     }
 
     @Test
-    fun `default off and unsupported exact owners preserve complete certification`() {
+    fun `explicit off and unsupported exact owners preserve complete certification`() {
         val zero = ExactLpNumber.of(0L)
         val one = ExactLpNumber.of(1L)
-        val source = ExactLpModel(listOf(listOf(ExactLpEntry(0, one))), listOf(one),
-            listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero))),
-                ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(zero)))),
-            listOf(ExactLpRow()), ExactLpObjective(listOf(zero, zero)))
+        val source = ExactLpModel(
+            listOf(listOf(ExactLpEntry(0, one))),
+            listOf(one),
+            listOf(
+                ExactLpColumn(ExactLpBounds(ExactLpSide(zero))),
+                ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(zero))),
+            ),
+            listOf(ExactLpRow()),
+            ExactLpObjective(listOf(zero, zero)),
+        )
         val model = assertNotNull(LpExactState(source).toWorkingModel())
         for (enabled in listOf(false, true)) {
             var exports = 0
@@ -342,10 +455,16 @@ class ExactBasisOrderingTest {
     fun `accepted live updates decline ordering while exact witnesses remain available`() {
         val zero = ExactLpNumber.of(0L)
         val one = ExactLpNumber.of(1L)
-        val source = ExactLpModel(listOf(listOf(ExactLpEntry(0, one))), listOf(one),
-            listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero))),
-                ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(zero)))),
-            listOf(ExactLpRow()), ExactLpObjective(listOf(zero, zero)))
+        val source = ExactLpModel(
+            listOf(listOf(ExactLpEntry(0, one))),
+            listOf(one),
+            listOf(
+                ExactLpColumn(ExactLpBounds(ExactLpSide(zero))),
+                ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(zero))),
+            ),
+            listOf(ExactLpRow()),
+            ExactLpObjective(listOf(zero, zero)),
+        )
         val model = assertNotNull(LpExactState(source).toWorkingModel())
         RevisedSimplex(model, reuseRationalOrder = true).use { solver ->
             val candidate = assertNotNull(solver.solve())
@@ -360,13 +479,21 @@ class ExactBasisOrderingTest {
     fun `repaired logical headings feed the accepted live order`() {
         val zero = ExactLpNumber.of(0L)
         val one = ExactLpNumber.of(1L)
-        val source = ExactLpModel(List(2) { listOf(ExactLpEntry(0, one), ExactLpEntry(1, one)) },
-            listOf(one, one), List(2) { ExactLpColumn(ExactLpBounds(ExactLpSide(zero))) } + List(2) {
+        val source = ExactLpModel(
+            List(2) { listOf(ExactLpEntry(0, one), ExactLpEntry(1, one)) },
+            listOf(one, one),
+            List(2) { ExactLpColumn(ExactLpBounds(ExactLpSide(zero))) } + List(2) {
                 ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(zero)))
-            }, List(2) { ExactLpRow() }, ExactLpObjective(List(4) { zero }))
+            },
+            List(2) { ExactLpRow() },
+            ExactLpObjective(List(4) { zero }),
+        )
         val model = assertNotNull(LpExactState(source).toWorkingModel())
         RevisedSimplex(model, reuseRationalOrder = true).use { solver ->
-            val warm = Basis(intArrayOf(0, 1), arrayOf(VarStatus.BASIC, VarStatus.BASIC, VarStatus.FIXED, VarStatus.FIXED))
+            val warm = Basis(
+                intArrayOf(0, 1),
+                arrayOf(VarStatus.BASIC, VarStatus.BASIC, VarStatus.FIXED, VarStatus.FIXED),
+            )
             val candidate = assertNotNull(solver.solve(warm))
             assertTrue(candidate.basis.basicVars.any { it >= 2 })
             val checked = verifyExactBasis(model, candidate.basis, cache = solver.exactBasisCache)
@@ -386,8 +513,12 @@ class ExactBasisOrderingTest {
         val cache = ExactBasisCache { RationalBasisOrder(intArrayOf(0), intArrayOf(0)) }
         val complete = verifyExactBasis(model, basis, cache = cache)
         cache.clear()
-        val limited = verifyExactBasis(model, basis, cache = cache,
-            limits = ExactBasisLimits(RationalBasisLimits(work = complete.metrics.work * 2L / 3L)))
+        val limited = verifyExactBasis(
+            model,
+            basis,
+            cache = cache,
+            limits = ExactBasisLimits(RationalBasisLimits(work = complete.metrics.work * 2L / 3L)),
+        )
 
         assertEquals(ExactBasisDecline.WORK, limited.metrics.decline)
         assertEquals(1, limited.metrics.orderProposals)
@@ -400,10 +531,16 @@ class ExactBasisOrderingTest {
     fun `hinted fixed width overflow restarts the whole exact factor operation`() {
         val zero = ExactLpNumber.of(0L)
         val wide = ExactLpNumber.of(BigFraction.of(BigInteger.ONE shl 140, BigInteger.ONE))
-        val source = ExactLpModel(listOf(listOf(ExactLpEntry(0, wide))), listOf(wide),
-            listOf(ExactLpColumn(ExactLpBounds()),
-                ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(zero)))),
-            listOf(ExactLpRow()), ExactLpObjective(listOf(zero, zero)))
+        val source = ExactLpModel(
+            listOf(listOf(ExactLpEntry(0, wide))),
+            listOf(wide),
+            listOf(
+                ExactLpColumn(ExactLpBounds()),
+                ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(zero))),
+            ),
+            listOf(ExactLpRow()),
+            ExactLpObjective(listOf(zero, zero)),
+        )
         val model = assertNotNull(LpExactState(source).toWorkingModel())
         val basis = Basis(intArrayOf(0), arrayOf(VarStatus.BASIC, VarStatus.FIXED))
         RevisedSimplex(model, reuseRationalOrder = true).use { solver ->
@@ -423,11 +560,18 @@ class ExactBasisOrderingTest {
     fun `matrix edits below double precision invalidate exact factors and live hints`() {
         val zero = ExactLpNumber.of(0L)
         val wide = 9_007_199_254_740_992L
-        val columns = listOf(ExactLpColumn(ExactLpBounds()),
-            ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(zero))))
+        val columns = listOf(
+            ExactLpColumn(ExactLpBounds()),
+            ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(zero))),
+        )
         val models = listOf(wide, wide + 1L).map { coefficient ->
-            val source = ExactLpModel(listOf(listOf(ExactLpEntry(0, ExactLpNumber.of(coefficient)))),
-                listOf(ExactLpNumber.of(wide)), columns, listOf(ExactLpRow()), ExactLpObjective(listOf(zero, zero)))
+            val source = ExactLpModel(
+                listOf(listOf(ExactLpEntry(0, ExactLpNumber.of(coefficient)))),
+                listOf(ExactLpNumber.of(wide)),
+                columns,
+                listOf(ExactLpRow()),
+                ExactLpObjective(listOf(zero, zero)),
+            )
             assertNotNull(LpExactState(source).toWorkingModel())
         }
         val first = models[0]
@@ -439,8 +583,10 @@ class ExactBasisOrderingTest {
             val changed = verifyExactBasis(next, basis, cache = solver.exactBasisCache)
             assertEquals(0, changed.metrics.reuse)
             assertEquals(ExactBasisOrderDecline.STALE, changed.metrics.orderDecline)
-            assertEquals(BigFraction.ofLong(wide) * BigFraction.ofLong(wide + 1L).reciprocal(),
-                changed.witness?.primal?.single())
+            assertEquals(
+                BigFraction.ofLong(wide) * BigFraction.ofLong(wide + 1L).reciprocal(),
+                changed.witness?.primal?.single(),
+            )
             assertFalse(solver.adopt(assertNotNull(next.exactState), Cancellation.Never))
             assertNull(solver.continuationBasis(next))
         }
@@ -450,10 +596,16 @@ class ExactBasisOrderingTest {
     fun `work stopped basis targets retain current declarations without a solved claim`() {
         val zero = ExactLpNumber.of(0L)
         val one = ExactLpNumber.of(1L)
-        val source = ExactLpModel(listOf(listOf(ExactLpEntry(0, one))), listOf(one),
-            listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero))),
-                ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(zero)))),
-            listOf(ExactLpRow()), ExactLpObjective(listOf(zero, zero)))
+        val source = ExactLpModel(
+            listOf(listOf(ExactLpEntry(0, one))),
+            listOf(one),
+            listOf(
+                ExactLpColumn(ExactLpBounds(ExactLpSide(zero))),
+                ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(zero))),
+            ),
+            listOf(ExactLpRow()),
+            ExactLpObjective(listOf(zero, zero)),
+        )
         val model = assertNotNull(LpExactState(source).toWorkingModel())
         RevisedSimplex(model, workLimit = 1L).use { solver ->
             assertNull(solver.solve())
@@ -463,5 +615,4 @@ class ExactBasisOrderingTest {
             assertEquals(VarStatus.BASIC, target.status[1])
         }
     }
-
 }
