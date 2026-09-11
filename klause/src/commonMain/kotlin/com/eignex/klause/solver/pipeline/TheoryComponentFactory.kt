@@ -5,10 +5,8 @@ import com.eignex.klause.solver.result.SmtStatsSink
 import com.eignex.klause.solver.search.SearchIntValue
 import com.eignex.klause.solver.search.SearchRealValue
 import com.eignex.klause.solver.search.TheoryComponent
-import com.eignex.klause.theory.TheorySearchComponent
 import com.eignex.klause.theory.difference.DifferenceSearchComponent
 import com.eignex.klause.theory.qflra.ExactLiraSearchComponent
-import com.eignex.klause.theory.qflra.ExactLraSolver
 
 /** Builds the theory component selected by this plan. */
 internal fun ComponentPlan.theoryComponent(spec: Problem, smtStats: SmtStatsSink? = null): TheoryComponent? {
@@ -20,7 +18,7 @@ internal fun ComponentPlan.theoryComponent(spec: Problem, smtStats: SmtStatsSink
             cpIntVars,
         )
 
-        ProblemPipeline.EXACT_LRA -> TheorySearchComponent(ExactLraSolver(fragment)) { assignment, model ->
+        ProblemPipeline.EXACT_LRA -> ExactLiraSearchComponent(fragment) { assignment, model ->
             assignment.reals.forEachIndexed { variable, value -> model.put(SearchRealValue(variable), value) }
         }.also { component -> smtStats?.let(component::observeWith) }
 

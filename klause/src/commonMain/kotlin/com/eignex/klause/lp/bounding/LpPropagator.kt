@@ -4,9 +4,12 @@ import com.eignex.klause.lp.engine.Basis
 import com.eignex.klause.lp.engine.CertifiedLpResult
 import com.eignex.klause.lp.engine.DEFAULT_REFACTOR_UPDATE_LIMIT
 import com.eignex.klause.lp.engine.ExactLpModel
+import com.eignex.klause.lp.engine.ExactLpPremises
 import com.eignex.klause.lp.engine.ExactLpSide
 import com.eignex.klause.lp.engine.FloatLpResult
+import com.eignex.klause.lp.engine.LpExactCitedSide
 import com.eignex.klause.lp.engine.LpExactState
+import com.eignex.klause.lp.engine.LpExactSupport
 import com.eignex.klause.lp.engine.LpPricingOptions
 import com.eignex.klause.lp.engine.LpScopedMetrics
 import com.eignex.klause.lp.engine.LpScopedRow
@@ -22,6 +25,7 @@ import com.eignex.klause.solver.search.SearchBrancher
 import com.eignex.klause.solver.search.SearchComponent
 import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchDecision
+import com.eignex.klause.solver.search.SearchExplanation
 import com.eignex.klause.solver.search.explainAtoms
 import com.eignex.klause.util.Cancellation
 import com.ionspin.kotlin.bignum.integer.BigInteger
@@ -62,6 +66,7 @@ internal class LpPropagator(
     SearchBrancher,
     AutoCloseable {
     private var owner: LpScopedSolver? = null
+    private var proofContext: SearchContext? = null
     private var modelKey: Any? = null
     private var rootState: LpExactState? = null
     private var closed = false
@@ -78,6 +83,45 @@ internal class LpPropagator(
     val metrics: LpScopedMetrics? get() = owner?.metrics
 
     fun boundPremise(witness: Long): SearchAtomPremise = witnesses[witness] ?: SearchAtomPremise.Unavailable
+
+    fun explainConflict(support: LpExactSupport?, context: SearchContext): SearchExplanation? {
+        val current = state ?: return null
+        if (support == null || support.state !== current || proofContext !== context || context.cancelled()) return null
+        val leaves = ArrayList<SearchAtomPremise>()
+        for ((row, metadata) in support.rows) {
+            if (row !in 0 until current.model.m || current.model.row(row) != metadata ||
+                !current.rows.row(row).active
+            ) {
+                return null
+            }
+            if (!metadata.global) leaves += metadata.premises.asPremise()
+        }
+        for (cited in support.sides) {
+            if (cited.column !in 0 until current.model.numVars) return null
+            val active = current.activeSide(cited.column, cited.upper) ?: return null
+            if (active.side != cited.side || active.witness != cited.witness) return null
+            val declared = rootState?.takeIf { cited.column < it.model.numVars }
+                ?.activeSide(cited.column, cited.upper)
+            leaves += if (declared == active) {
+                SearchAtomPremise.All(emptyList())
+            } else {
+                boundPremise(active.witness)
+            }
+            cited.side.premises?.let { leaves += it.asPremise() }
+        }
+        return context.explainAtoms(SearchAtomPremise.All(leaves))
+    }
+
+    private fun ExactLpPremises?.asPremise(): SearchAtomPremise {
+        if (this == null || boundEntries().isNotEmpty() || literalEntries().isEmpty()) {
+            return SearchAtomPremise.Unavailable
+        }
+        return SearchAtomPremise.All(
+            literalEntries().map {
+                SearchAtomPremise.Asserted(SearchDecision.Bool(it))
+            },
+        )
+    }
 
     fun install(key: Any, model: ExactLpModel): Boolean {
         if (closed || cancellation()) return false
@@ -187,11 +231,15 @@ internal class LpPropagator(
     }
 
     override fun initialize(context: SearchContext): ComponentResult {
+        if (proofContext != null && proofContext !== context) return ComponentResult.Indeterminate
         policy.initialize(context)
+        proofContext = context
         return ComponentResult.Consistent
     }
 
     override fun assert(decision: SearchDecision, context: SearchContext): ComponentResult {
+        if (proofContext != null && proofContext !== context) return ComponentResult.Indeterminate
+        proofContext = context
         if (owner != null && !atLevel(context.decisionLevel, Cancellation.Never)) return ComponentResult.Indeterminate
         sourcePremises?.record(decision, context)
         return policy.assert(decision, context)
@@ -201,15 +249,21 @@ internal class LpPropagator(
         if (closed || context.cancelled()) return ComponentResult.Indeterminate
         val result = policy.propagate(context)
         if (result !is ComponentResult.Consistent) return result
-        val conflict = state?.conflict ?: return result
-        val premises = listOf(conflict.lower, conflict.upper).map {
-            witnesses[it.witness] ?: SearchAtomPremise.Unavailable
-        }
-        return ComponentResult.Conflict(context.explainAtoms(SearchAtomPremise.All(premises)))
+        val current = state ?: return result
+        val conflict = current.conflict ?: return result
+        val row = conflict.column - current.model.n
+        val support = LpExactSupport(
+            current,
+            if (row >= 0) listOf(row to current.model.row(row)) else emptyList(),
+            listOf(conflict.lower, conflict.upper).map {
+                LpExactCitedSide(it.column, it.upper, it.side, it.witness)
+            },
+        )
+        return ComponentResult.Conflict(explainConflict(support, context))
     }
 
     override fun check(context: SearchContext): ComponentCheck =
-        if (closed || context.cancelled()) ComponentCheck.Indeterminate else policy.check(context)
+        if (closed || owner == null || context.cancelled()) ComponentCheck.Indeterminate else policy.check(context)
 
     override fun nextBranch(context: SearchContext): List<SearchDecision>? {
         if (closed || context.cancelled()) return null
@@ -259,6 +313,7 @@ internal class LpPropagator(
         owner = null
         modelKey = null
         rootState = null
+        proofContext = null
         sourcePremises = null
         witnesses.clear()
         solved = false

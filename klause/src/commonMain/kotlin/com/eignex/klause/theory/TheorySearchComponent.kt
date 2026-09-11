@@ -44,6 +44,7 @@ class TheorySearchComponent<A>(
         when (decision) {
             is SearchDecision.Bool -> {
                 val variable = decision.literal ushr 1
+                if (variable !in bools.indices) return ComponentResult.Consistent
                 bools[variable] = if (decision.literal and 1 == 0) TRUE else FALSE
                 boolLevels[variable] = context.decisionLevel
             }
