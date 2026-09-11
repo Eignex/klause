@@ -18,8 +18,8 @@ internal class LpWorkingModel(val source: LpExactState, auxiliary: ExactLpModel)
             require(bounds.size == model.numVars && rhs.size == model.m && objective.size == model.numVars)
             require(
                 (0 until model.m).all {
-                source.rows.row(it).active || objective.cost(model.n + it).value.isZero
-            }
+                    source.rows.row(it).active || objective.cost(model.n + it).value.isZero
+                },
             ) { "inactive logical costs require explicit auxiliary authority" }
             return LpWorkingModel(
                 source,

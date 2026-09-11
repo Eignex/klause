@@ -9,10 +9,10 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.util.Bits
 import com.eignex.klause.util.Cancellation
 import kotlin.coroutines.cancellation.CancellationException
-import kotlin.test.assertIs
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertIs
 
 class BakedProblemTest {
 
@@ -20,12 +20,19 @@ class BakedProblemTest {
     fun `conditioned root intersects bounds holes and survivor sets with the source`() {
         val source = Problem(0, 1, arrayOf(holey()), emptyArray()).bake()
         val cases = listOf(
-            Assumptions.None.withTightenedMin(0, 1).withTightenedMax(0, 5) to holey().withMinAtLeast(1).withMaxAtMost(5),
+            Assumptions.None.withTightenedMin(
+                0,
+                1,
+            ).withTightenedMax(0, 5) to holey().withMinAtLeast(1).withMaxAtMost(5),
             Assumptions.None.withIntHole(0, 3) to holey().excludeValue(3),
-            Assumptions(intArrayOf(), booleanArrayOf(), intArrayOf(), longArrayOf(), DeducedRestrictions(
-                intSetKeys = intArrayOf(0), intSetOffsets = intArrayOf(0, 4),
+            Assumptions(
+                intArrayOf(), booleanArrayOf(), intArrayOf(), longArrayOf(),
+                DeducedRestrictions(
+                intSetKeys = intArrayOf(0),
+                intSetOffsets = intArrayOf(0, 4),
                 intSetValues = longArrayOf(-1, 2, 3, 7),
-            )) to IntDomain(3, 3),
+            )
+            ) to IntDomain(3, 3),
         )
         for ((assumptions, expected) in cases) {
             val root = source.conditionedRoot(assumptions, Cancellation.Never)

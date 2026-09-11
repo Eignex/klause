@@ -1,16 +1,16 @@
 package com.eignex.klause.lp.engine
 
-import com.eignex.klause.util.Cancellation
 import com.eignex.klause.simplex.basis.BasisSolver
-import com.eignex.klause.simplex.basis.KotlinBasisSolver
 import com.eignex.klause.simplex.basis.IndexedVector
-import kotlin.test.assertFailsWith
-import kotlin.test.assertNull
-import kotlin.test.assertSame
+import com.eignex.klause.simplex.basis.KotlinBasisSolver
+import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class RevisedSimplexScratchTest {
