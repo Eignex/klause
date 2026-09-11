@@ -10,6 +10,7 @@ import com.eignex.klause.simplex.basis.BasisSolver
 import com.eignex.klause.simplex.basis.BasisUpdate
 import com.eignex.klause.simplex.basis.IndexedVector
 import com.eignex.klause.simplex.basis.KotlinBasisSolver
+import com.eignex.klause.simplex.basis.RationalBasisOrder
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.argsortBy
@@ -105,6 +106,7 @@ internal class RevisedSimplex(
     private val trackDegeneracy: Boolean = false,
     private val basisSolverFactory: ((SparseMatrix) -> BasisSolver)? = null,
     private val pricing: LpPricingOptions = LpPricingOptions(),
+    private val reuseRationalOrder: Boolean = false,
 ) : TableauCutSolver,
     PersistentLpSolver {
     private val m = model.m
@@ -244,15 +246,70 @@ internal class RevisedSimplex(
     /** Whether [basisSolver] currently factorizes the seated [basicVar]. False before the first
      *  factorization and after one came back singular. */
     private var basisFactorized = false
-    override val exactBasisCache = ExactBasisCache()
+    override val exactBasisCache = ExactBasisCache(if (reuseRationalOrder) ::proposedRationalOrder else null)
     private var rejectedExactBasis: IntArray? = null
+
+    private fun proposedRationalOrder(authority: ExactBasisAuthority): RationalBasisOrder? {
+        val meter = authority.meter
+        val state = model.exactState
+        val original = constructionState
+        if (state == null || original == null) return null
+        meter.charge(2L * state.model.keySize + numVars + 8L * m, 256L + 8L * numVars + 8L * m)
+        if (authority.model.exactState !== state || !original.sameMatrix(state) ||
+            !authority.headings.contentEquals(basicVar) || !basisFactorized || !trackedHeadingsConsistent()
+        ) {
+            meter.orderDecline = ExactBasisOrderDecline.STALE
+            return null
+        }
+        val current = basisSolver ?: return null
+        if (current.updateCount != 0) {
+            meter.orderDecline = ExactBasisOrderDecline.UPDATED
+            return null
+        }
+        // Reserve the owner's snapshot, all four copy getters, translation and validation scratch.
+        meter.charge(16L * m + numVars, 768L + 48L * m + 4L * numVars)
+        val order = current.ordering() ?: return null
+        meter.poll()
+        val sourceColumns = order.columns
+        val units = order.unitRows
+        val rows = order.rows
+        val slots = order.slots
+        if (sourceColumns.size != m || units.size != m || rows.size != m || slots.size != m) {
+            meter.orderDecline = ExactBasisOrderDecline.INVALID
+            return null
+        }
+        val positions = IntArray(numVars) { -1 }
+        for (slot in authority.headings.indices) positions[authority.headings[slot]] = slot
+        val translated = IntArray(m)
+        for (slot in 0 until m) {
+            val column = sourceColumns[slot]
+            val unit = units[slot]
+            if ((column !in 0 until numVars || unit != -1) && (column != -1 || unit !in 0 until m)) {
+                meter.orderDecline = ExactBasisOrderDecline.INVALID
+                return null
+            }
+            val heading = if (column >= 0) column else n + unit
+            if (heading != basicVar[slot] || slots[slot] !in 0 until m) {
+                meter.orderDecline = ExactBasisOrderDecline.STALE
+                return null
+            }
+        }
+        for (pivot in 0 until m) {
+            val slot = slots[pivot]
+            val heading = if (sourceColumns[slot] >= 0) sourceColumns[slot] else n + units[slot]
+            translated[pivot] = positions[heading]
+        }
+        return RationalBasisOrder(rows, translated)
+    }
 
     override fun continuationBasis(model: LpModel): Basis? {
         if (!continuationAvailable) return null
         val state = model.exactState ?: return null
         if (this.model.exactState !== state || constructionState?.sameMatrix(state) != true ||
             state.conflict != null || (0 until numVars).any { !model.exactBounds(it).consistent }
-        ) return null
+        ) {
+            return null
+        }
         val stopped = stoppedContinuationBasis
         val headings = stopped?.basicVars ?: basicVar
         val seats = stopped?.status ?: status
@@ -1022,6 +1079,7 @@ internal class RevisedSimplex(
             trackDegeneracy,
             basisSolverFactory,
             pricing,
+            reuseRationalOrder,
         )
         val logicalColumns = IntArray(nextModel.m) { nextModel.n + it }
         val adapter = BasisExtensionAdapter { candidate.createBasisSolver() }

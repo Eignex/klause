@@ -3,6 +3,7 @@ package com.eignex.klause.lp.engine
 import com.eignex.klause.simplex.basis.RationalBasisBuild
 import com.eignex.klause.simplex.basis.RationalBasisFactors
 import com.eignex.klause.simplex.basis.RationalBasisLimits
+import com.eignex.klause.simplex.basis.RationalBasisOrder
 import com.eignex.klause.simplex.basis.RationalBasisSolve
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.BigRationalConflict
@@ -31,6 +32,7 @@ internal enum class ExactBasisDecline {
 }
 
 internal data class ExactBasisWork(val phase: ExactBasisPhase, val work: Long, val allocation: Long)
+internal enum class ExactBasisOrderDecline { UNSUPPORTED, UPDATED, STALE, INVALID }
 internal data class ExactBasisMetrics(
     val eligible: Boolean,
     val factoryCalls: Int,
@@ -44,6 +46,11 @@ internal data class ExactBasisMetrics(
     val operations: List<ExactBasisWork>,
     val decline: ExactBasisDecline?,
     val phase: ExactBasisPhase,
+    val orderOffers: Int = 0,
+    val orderProposals: Int = 0,
+    val orderAttempts: Int = 0,
+    val orderFallbacks: Int = 0,
+    val orderDecline: ExactBasisOrderDecline? = null,
 ) {
     val work: Long get() = operations.sumOf { it.work }
     val allocation: Long get() = operations.sumOf { it.allocation }
@@ -70,11 +77,38 @@ private class CachedExactBasis(
 )
 
 // A cache belongs to one numerical owner. Failed builds spend only their enclosing invocation budget.
-internal class ExactBasisCache {
+internal class ExactBasisCache(private val propose: ((ExactBasisAuthority) -> RationalBasisOrder?)? = null) {
     private var cached: CachedExactBasis? = null
 
     fun clear() {
         cached = null
+    }
+
+    fun proposedOrder(current: ExactBasisAuthority): RationalBasisOrder? {
+        val provider = propose ?: return null
+        val meter = current.meter
+        meter.poll()
+        meter.orderOffers++
+        val proposed = provider(current)
+        meter.poll()
+        if (proposed == null) {
+            if (meter.orderDecline == null) meter.orderDecline = ExactBasisOrderDecline.UNSUPPORTED
+            return null
+        }
+        val n = current.model.m
+        if (proposed.rows.size != n || proposed.columns.size != n) {
+            meter.orderDecline = ExactBasisOrderDecline.INVALID
+            return null
+        }
+        meter.charge(6L * n, 256L + 18L * n)
+        val rows = proposed.rows.copyOf()
+        val columns = proposed.columns.copyOf()
+        if (!orderPermutation(rows) || !orderPermutation(columns)) {
+            meter.orderDecline = ExactBasisOrderDecline.INVALID
+            return null
+        }
+        meter.orderProposals++
+        return RationalBasisOrder(rows, columns)
     }
 
     fun find(current: ExactBasisAuthority): RationalBasisFactors? {
@@ -131,9 +165,10 @@ internal fun verifyExactBasis(
         val factors = cached ?: run {
             val matrix = authority.basisMatrix()
             meter.phase = ExactBasisPhase.FACTOR
+            val proposed = cache.proposedOrder(authority)
             val allowance = meter.factorLimits()
             meter.factoryCalls++
-            val build = RationalBasisFactors.factor(matrix, limits = allowance, cancellation = meter.token)
+            val build = RationalBasisFactors.factor(matrix, proposed, allowance, meter.token)
             meter.record(build.stats)
             when (build) {
                 is RationalBasisBuild.Ready -> build.factors.also { cache.install(authority, it) }
@@ -198,6 +233,15 @@ internal fun verifyExactBasis(
     )
     if (rayRow == null) observer?.observe(LpCertifier.RATIONAL, bound != null)
     return result
+}
+
+private fun orderPermutation(order: IntArray): Boolean {
+    val seen = BooleanArray(order.size)
+    for (value in order) {
+        if (value !in seen.indices || seen[value]) return false
+        seen[value] = true
+    }
+    return true
 }
 
 private fun solveExactBasis(

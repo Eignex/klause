@@ -34,6 +34,19 @@ internal class BasisRepair(columns: IntArray, unitRows: IntArray) {
 
 internal interface BasisSnapshot : AutoCloseable
 
+// Pivot positions map to source rows and slots of the accepted ordered basis, never inverse headings.
+internal class BasisOrdering(columns: IntArray, unitRows: IntArray, rows: IntArray, slots: IntArray) {
+    private val sourceColumns = columns.copyOf()
+    private val sourceUnits = unitRows.copyOf()
+    private val pivotRows = rows.copyOf()
+    private val pivotSlots = slots.copyOf()
+
+    val columns: IntArray get() = sourceColumns.copyOf()
+    val unitRows: IntArray get() = sourceUnits.copyOf()
+    val rows: IntArray get() = pivotRows.copyOf()
+    val slots: IntArray get() = pivotSlots.copyOf()
+}
+
 // One mutable owner per fixed source matrix. Headings name source columns in original basis-slot order;
 // a repaired slot may instead name a synthesized unit row. Accepted updates adopt the new basis even when
 // advising a rebuild; SINGULAR preserves the old factors. Numerical repair rejection is not an exact rank claim.
@@ -58,6 +71,7 @@ internal interface BasisSolver : AutoCloseable {
         if (refactorize(basicIndex)) BasisRepair(basicIndex.copyOf(), IntArray(n) { -1 }) else null
 
     fun snapshot(): BasisSnapshot? = null
+    fun ordering(): BasisOrdering? = null
     fun restore(snapshot: BasisSnapshot): Boolean = false
     fun extend(matrix: SparseMatrix, extension: BasisExtension): BasisExtensionResult? = null
     override fun close() {}
