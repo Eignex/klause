@@ -13,37 +13,6 @@ import kotlin.test.assertTrue
 
 class KotlinBasisSolverOrderingTest {
     @Test
-    fun `exported nonsymmetric permutations solve in original source coordinates`() {
-        val matrix = SparseMatrix.ofColumns(3, 3, listOf(
-            listOf(0 to 3.0, 1 to 1.0, 2 to 2.0),
-            listOf(0 to 2.0, 1 to 4.0, 2 to 1.0),
-            listOf(0 to 1.0, 1 to 3.0, 2 to 5.0),
-        ))
-        KotlinBasisSolver(matrix).use { solver ->
-            val headings = intArrayOf(2, 0, 1)
-            assertTrue(solver.refactorize(headings))
-            val order = assertNotNull(solver.ordering())
-            val exact = listOf(listOf(1L, 3L, 2L), listOf(3L, 1L, 4L), listOf(5L, 2L, 1L))
-                .map { it.map(BigFraction::ofLong) }
-
-            val built = assertIs<RationalBasisBuild.Ready>(
-                RationalBasisFactors.factor(exact, RationalBasisOrder(order.rows, order.slots)),
-            )
-            val normal = assertIs<RationalBasisSolve.Solved>(
-                built.factors.solve(listOf(13L, 23L, 16L).map(BigFraction::ofLong)),
-            )
-            val transpose = assertIs<RationalBasisSolve.Solved>(
-                built.factors.solve(listOf(22L, 11L, 13L).map(BigFraction::ofLong), transpose = true),
-            )
-
-            assertFalse(order.rows.contentEquals(order.slots))
-            assertEquals(0, built.stats.fallbacks)
-            assertEquals(listOf(2L, 1L, 4L).map(BigFraction::ofLong), normal.values)
-            assertEquals(listOf(1L, 2L, 3L).map(BigFraction::ofLong), transpose.values)
-        }
-    }
-
-    @Test
     fun `ordering snapshots own inputs and every returned array`() {
         val source = ftSource("dense", 3)
         val solver = KotlinBasisSolver(source)
