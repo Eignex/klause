@@ -1,5 +1,13 @@
 package com.eignex.klause.lp.bounding
 
+import com.eignex.klause.lp.engine.LpVerdict
+import com.eignex.klause.lp.engine.RevisedSimplex
+import com.eignex.klause.simplex.basis.BasisArithmeticException
+import com.eignex.klause.simplex.basis.BasisSolver
+import com.eignex.klause.simplex.basis.IndexedVector
+import com.eignex.klause.simplex.basis.KotlinBasisSolver
+import com.eignex.klause.simplex.exact.ExactContinuationLimits
+import com.eignex.klause.solver.result.LpStatsSink
 import com.eignex.klause.lp.engine.ExactLpBounds
 import com.eignex.klause.lp.engine.ExactLpColumn
 import com.eignex.klause.lp.engine.ExactLpEntry
@@ -35,6 +43,48 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class LpPropagatorTest {
+    @Test
+    fun `raising live effort resumes exact state and records only new work`() {
+        val zero = ExactLpNumber.of(0L)
+        val source = ExactLpModel(
+            List(3) { listOf(ExactLpEntry(it, ExactLpNumber.of(-1L))) }, List(3) { ExactLpNumber.of(-1L) },
+            List(6) { ExactLpColumn(ExactLpBounds(lower = ExactLpSide(zero))) },
+            List(3) { ExactLpRow() }, ExactLpObjective(List(6) { zero }),
+        )
+        val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+            override fun newPersistentSolver(
+                model: LpModel, cancellation: Cancellation, refactorUpdateLimit: Int, iterationLimit: Int,
+                workLimit: Long, trackDegeneracy: Boolean, pricing: LpPricingOptions,
+            ): PersistentLpSolver = RevisedSimplex(model, cancellation, basisSolverFactory = { matrix ->
+                val delegate = KotlinBasisSolver(matrix)
+                object : BasisSolver by delegate {
+                    override fun ftran(x: IndexedVector, expectedDensity: Double) {
+                        throw BasisArithmeticException("injected numerical solve failure")
+                    }
+                }
+            })
+        }
+        var profile = LpEffortProfile(continuation = ExactContinuationLimits(maxPivots = 1))
+        val stats = LpStatsSink()
+        LpPropagator(object : LpSearchPolicy {}, effort = { profile }, solveContext = LpSolveContext(engineFactory = factory),
+            certificationObserver = stats.certificationObserver()).use { lp ->
+            assertTrue(lp.install(Any(), source))
+            val short = assertNotNull(lp.solve())
+            profile = profile.copy(continuation = ExactContinuationLimits(maxPivots = 3))
+
+            val full = assertNotNull(lp.solve())
+
+            assertEquals(LpVerdict.INDETERMINATE, short.verdict)
+            assertEquals(List(3) { BigFraction.ONE }, full.exactPrimal)
+            assertEquals(0, assertNotNull(full.continuation).builds)
+            assertEquals(2, full.continuation.pivots)
+            val observed = stats.snapshot().continuation
+            assertEquals(2L, observed.calls)
+            assertEquals(3L, observed.pivots)
+            assertEquals(assertNotNull(short.continuation).work + full.continuation.work, observed.work.values.sum())
+        }
+    }
+
     @Test
     fun `an unnamed local row withholds the entire exact conflict clause`() {
         val zero = ExactLpNumber.of(0L)

@@ -3,6 +3,7 @@ package com.eignex.klause.lp.engine
 import com.eignex.klause.simplex.basis.BasisArithmeticException
 import com.eignex.klause.simplex.basis.BasisOperationWork
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.simplex.exact.ExactContinuationLimits
 
 internal data class LpScopedMetrics(
     val editAttempts: Long,
@@ -49,6 +50,7 @@ internal class LpScopedSolver(
     private val appendSelection: LpAppendSelection = LpAppendSelection.PRODUCTION_FRESH,
     private val pricing: LpPricingOptions = LpPricingOptions(),
 ) : AutoCloseable {
+    private val continuationCache = LpExactContinuationCache()
     private var trail = LpBoundTrail(initial)
     private var solver: PersistentLpSolver? = null
     private var closed = false
@@ -146,6 +148,9 @@ internal class LpScopedSolver(
         warm: Basis? = null,
         token: Cancellation = cancellation,
         counterResults: LpCounterResults? = null,
+        continuationLimits: ExactContinuationLimits = ExactContinuationLimits(),
+        fullContinuation: Boolean = true,
+        observer: LpCertificationObserver? = null,
     ): CertifiedLpResult? {
         val attempt = solveFloat(warm, token) ?: return null
         val certified = certifyLpResult(
@@ -155,6 +160,10 @@ internal class LpScopedSolver(
             token,
             policy = context.certificationPolicy,
             counterResults = counterResults,
+            continuationCache = continuationCache,
+            continuationLimits = continuationLimits,
+            fullContinuation = fullContinuation,
+            observer = observer,
         )
         if (token()) return null
         lastResult = certified
@@ -492,6 +501,7 @@ internal class LpScopedSolver(
     override fun close() {
         if (closed) return
         closed = true
+        continuationCache.clear()
         lastResult = null
         val current = solver
         solver = null

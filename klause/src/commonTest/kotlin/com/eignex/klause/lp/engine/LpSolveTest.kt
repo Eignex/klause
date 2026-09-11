@@ -642,6 +642,7 @@ class LpSolveTest {
     fun `unboundedness requires a feasible point and an improving recession direction`() {
         val model = LpBuilder().apply { addOpenAboveVar(0L, cost = -1L) }.build(Sense.MINIMIZE)
         val solver = object : LpSolver {
+            override fun continuationBasis(model: LpModel): Basis = Basis(intArrayOf(), arrayOf(VarStatus.AT_LOWER))
             override val infeasibleRay: DoubleArray? = null
             override val recessionDirection = doubleArrayOf(1.0)
             override fun solve(warm: Basis?): FloatLpResult? = null
@@ -681,6 +682,7 @@ class LpSolveTest {
             addRow(intArrayOf(x), longArrayOf(1L), Relation.GE, 2L)
         }.build(Sense.MINIMIZE)
         val solver = object : LpSolver {
+            override fun continuationBasis(model: LpModel): Basis = Basis(intArrayOf(2), arrayOf(VarStatus.AT_LOWER, VarStatus.AT_LOWER, VarStatus.BASIC))
             override val infeasibleRay: DoubleArray? = null
             override val recessionDirection = doubleArrayOf(0.0, 1.0)
             override fun solve(warm: Basis?): FloatLpResult? = null
@@ -768,6 +770,7 @@ class LpSolveTest {
         }.build(Sense.MINIMIZE)
         val candidate = doubleArrayOf(1.0, -1.0)
         val solver = object : LpSolver {
+            override fun continuationBasis(model: LpModel): Basis = Basis(intArrayOf(2, 3), arrayOf(VarStatus.AT_LOWER, VarStatus.AT_LOWER, VarStatus.BASIC, VarStatus.BASIC))
             override val infeasibleRay = candidate
             override fun solve(warm: Basis?): FloatLpResult? = null
             override fun solvePrimal(warm: Basis?): FloatLpResult? = null

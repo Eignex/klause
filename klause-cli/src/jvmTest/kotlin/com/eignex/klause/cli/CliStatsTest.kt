@@ -5,6 +5,7 @@ import com.eignex.klause.solver.result.LpBasisVerificationStats
 import com.eignex.klause.solver.result.LpCertifierRouteStats
 import com.eignex.klause.solver.result.LpCertifierStats
 import com.eignex.klause.solver.result.LpRouteSolveStats
+import com.eignex.klause.solver.result.LpContinuationStats
 import com.eignex.klause.solver.result.LpStats
 import com.eignex.klause.solver.result.OpenHintStats
 import com.eignex.klause.solver.result.OpenTheoryWorkStats
@@ -20,6 +21,20 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class CliStatsTest {
+
+    @Test
+    fun `continuation costs remain visible for LP and SMT declines`() {
+        val continuation = LpContinuationStats(calls = 1, work = mapOf("IMPORT" to 13), declines = mapOf("IMPORT_WORK" to 1))
+        val stats = SolveStats(lp = LpStats(continuation = continuation), smt = SmtStats(continuation = continuation))
+
+        val lp = lpStatPairs(stats).toMap()
+        val smt = openTheoryStatPairs(stats, 1L).toMap()
+
+        assertEquals("13", lp["lpContinuationWork"])
+        assertEquals("1", lp["lpContinuationDecline_IMPORT_WORK"])
+        assertEquals("13", smt["smtContinuationWork"])
+        assertEquals("1", smt["smtContinuationDecline_IMPORT_WORK"])
+    }
 
     @Test
     fun `rational basis resource work is visible without a float solve`() {

@@ -1,6 +1,7 @@
 package com.eignex.klause.solver.result
 
 import com.eignex.klause.lp.engine.ExactBasisMetrics
+import com.eignex.klause.simplex.exact.ExactContinuationMetrics
 import com.eignex.klause.lp.engine.LpCertificationObserver
 import com.eignex.klause.lp.engine.LpCertifier
 import com.eignex.klause.lp.engine.LpSolveMetrics
@@ -99,6 +100,58 @@ data class LpBasisVerificationStats(
 
 private fun mergeBasisCounts(first: Map<String, Long>, second: Map<String, Long>): Map<String, Long> =
     (first.keys + second.keys).associateWith { (first[it] ?: 0L) + (second[it] ?: 0L) }
+
+/** Exact continuation costs, including abandoned imports and arithmetic restarts. */
+data class LpContinuationStats(
+    /** Offered recovery invocations. */
+    val calls: Long = 0,
+    /** Invocations with validated neutral input and target declarations. */
+    val eligible: Long = 0,
+    /** Invocations producing a complete numerical source proof before policy. */
+    val successes: Long = 0,
+    /** Imported tableau builds, including abandoned builds. */
+    val builds: Long = 0,
+    /** Completed import pivots, including replay after overflow. */
+    val imports: Long = 0,
+    /** Completed feasibility pivots, including abandoned lanes. */
+    val pivots: Long = 0,
+    /** Dependent target columns replaced by logicals. */
+    val repairs: Long = 0,
+    /** Whole fixed-width operation restarts. */
+    val restarts: Long = 0,
+    /** Invocations resuming a compatible state. */
+    val resumes: Long = 0,
+    /** Invocations invalidating incompatible retained state. */
+    val invalidations: Long = 0,
+    /** Complete source verifier invocations. */
+    val checks: Long = 0,
+    /** Modeled work per phase. */
+    val work: Map<String, Long> = emptyMap(),
+    /** Modeled cumulative allocation reservations per phase. */
+    val allocation: Map<String, Long> = emptyMap(),
+    /** Terminal declines keyed by phase and reason. */
+    val declines: Map<String, Long> = emptyMap(),
+    /** Active invocation time, excluding time between resumes. */
+    val elapsedNs: Long = 0,
+) {
+    /** Add disjoint invocation deltas. */
+    fun mergedWith(other: LpContinuationStats) = LpContinuationStats(
+        calls + other.calls, eligible + other.eligible, successes + other.successes, builds + other.builds,
+        imports + other.imports, pivots + other.pivots, repairs + other.repairs, restarts + other.restarts,
+        resumes + other.resumes, invalidations + other.invalidations, checks + other.checks,
+        mergeBasisCounts(work, other.work), mergeBasisCounts(allocation, other.allocation),
+        mergeBasisCounts(declines, other.declines), elapsedNs + other.elapsedNs,
+    )
+}
+
+internal fun ExactContinuationMetrics.toStats() = LpContinuationStats(
+    calls = 1, eligible = if (eligible) 1 else 0, successes = if (success) 1 else 0,
+    builds = builds.toLong(), imports = imports.toLong(), pivots = pivots.toLong(), repairs = repairs.toLong(),
+    restarts = restarts.toLong(), resumes = if (resumed) 1 else 0, invalidations = if (invalidated) 1 else 0,
+    checks = checks.toLong(), work = workByPhase.mapKeys { it.key.name },
+    allocation = allocationByPhase.mapKeys { it.key.name },
+    declines = decline?.let { mapOf("${phase.name}_${it.name}" to 1L) } ?: emptyMap(), elapsedNs = elapsedNs,
+)
 
 /** Consumer route for a single engine invocation. */
 internal enum class LpRoute { NODE, STANDALONE, COMPONENT, ROOT }
@@ -293,6 +346,8 @@ data class LpStats(
     val exactBasisFeasible: LpCertifierStats = LpCertifierStats(),
     /** Complete rational basis verification work and resource exits. */
     val basisVerification: LpBasisVerificationStats = LpBasisVerificationStats(),
+    /** Exact continuation invocation totals. */
+    val continuation: LpContinuationStats = LpContinuationStats(),
     /** Per-route attempts of the exact Farkas certifier. */
     val exactFarkasRay: LpCertifierStats = LpCertifierStats(),
     /** Per-route attempts of the exact primal-point certifier. */
@@ -403,6 +458,7 @@ data class LpStats(
         safeObjectiveLowerBound = safeObjectiveLowerBound.mergedWith(o.safeObjectiveLowerBound),
         exactBasisFeasible = exactBasisFeasible.mergedWith(o.exactBasisFeasible),
         basisVerification = basisVerification.mergedWith(o.basisVerification),
+        continuation = continuation.mergedWith(o.continuation),
         exactFarkasRay = exactFarkasRay.mergedWith(o.exactFarkasRay),
         exactPointFeasible = exactPointFeasible.mergedWith(o.exactPointFeasible),
         rationalOutcome = rationalOutcome.mergedWith(o.rationalOutcome),
@@ -528,6 +584,7 @@ internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
     }
 
     private var basisVerification = LpBasisVerificationStats()
+    private var continuation = LpContinuationStats()
 
     private val certificationObservers: Array<LpCertificationObserver> by lazy {
         Array(LpRoute.entries.size) { index ->
@@ -540,6 +597,9 @@ internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
                     val routeIndex = route.ordinal
                     certifierRouteAttempts[routeIndex][i]++
                     if (success) certifierRouteSuccesses[routeIndex][i]++ else certifierRouteDeclines[routeIndex][i]++
+                }
+                override fun observeContinuation(metrics: ExactContinuationMetrics) {
+                    continuation = continuation.mergedWith(metrics.toStats())
                 }
                 override fun observeBasisVerification(metrics: ExactBasisMetrics) {
                     basisVerification = basisVerification.mergedWith(
@@ -820,6 +880,7 @@ internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
         safeObjectiveLowerBound = certifierStats(LpCertifier.SAFE_OBJECTIVE),
         exactBasisFeasible = certifierStats(LpCertifier.EXACT_BASIS),
         basisVerification = basisVerification,
+        continuation = continuation,
         exactFarkasRay = certifierStats(LpCertifier.EXACT_FARKAS),
         exactPointFeasible = certifierStats(LpCertifier.EXACT_POINT),
         rationalOutcome = certifierStats(LpCertifier.RATIONAL),

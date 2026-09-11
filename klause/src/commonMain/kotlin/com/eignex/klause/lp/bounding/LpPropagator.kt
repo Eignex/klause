@@ -7,6 +7,7 @@ import com.eignex.klause.lp.engine.ExactLpModel
 import com.eignex.klause.lp.engine.ExactLpPremises
 import com.eignex.klause.lp.engine.ExactLpSide
 import com.eignex.klause.lp.engine.FloatLpResult
+import com.eignex.klause.lp.engine.LpCertificationObserver
 import com.eignex.klause.lp.engine.LpExactCitedSide
 import com.eignex.klause.lp.engine.LpExactState
 import com.eignex.klause.lp.engine.LpExactSupport
@@ -18,6 +19,7 @@ import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.lp.engine.LpSolveMetrics
 import com.eignex.klause.lp.engine.LpSolver
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.simplex.exact.ExactContinuationLimits
 import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchAtomPremise
@@ -37,6 +39,8 @@ internal data class LpEffortProfile(
     val maxRows: Int = Int.MAX_VALUE,
     val refactorUpdates: Int = DEFAULT_REFACTOR_UPDATE_LIMIT,
     val pricing: LpPricingOptions = LpPricingOptions(),
+    val continuation: ExactContinuationLimits = ExactContinuationLimits(),
+    val fullContinuation: Boolean = true,
 )
 
 internal interface LpSearchPolicy {
@@ -62,6 +66,7 @@ internal class LpPropagator(
     private val effort: () -> LpEffortProfile = { LpEffortProfile() },
     private val solveContext: LpSolveContext = LpSolveContext.Production,
     private val cancellation: Cancellation = Cancellation.Never,
+    private val certificationObserver: LpCertificationObserver? = null,
 ) : SearchComponent,
     SearchBrancher,
     AutoCloseable {
@@ -183,7 +188,11 @@ internal class LpPropagator(
     fun solveFloat(warm: Basis? = null, token: Cancellation = cancellation): Pair<LpSolver, FloatLpResult?>? =
         solveOwned { current -> current.solveFloat(if (solved) null else warm, token).also { solved = true } }
 
-    fun solve(): CertifiedLpResult? = solveOwned { it.solve() }
+    fun solve(): CertifiedLpResult? = solveOwned {
+        val profile = effort()
+        it.solve(continuationLimits = profile.continuation, fullContinuation = profile.fullContinuation,
+            observer = certificationObserver)
+    }
 
     private inline fun <T> solveOwned(action: (LpScopedSolver) -> T): T? = withOwner { current ->
         try {
