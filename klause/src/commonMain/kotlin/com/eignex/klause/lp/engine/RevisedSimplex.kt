@@ -110,6 +110,9 @@ internal class RevisedSimplex(
     private val m = model.m
     private val n = model.n
     private val numVars = model.numVars
+    private val constructionState = model.exactState
+    private var continuationAvailable = false
+    private var stoppedContinuationBasis: Basis? = null
 
     /** Devex reference weights γ_i per basic row position (approximate ‖B⁻ᵀeᵢ‖²); all 1 at a fresh
      *  reference frame, reset on every refactorization. */
@@ -243,6 +246,19 @@ internal class RevisedSimplex(
     private var basisFactorized = false
     override val exactBasisCache = ExactBasisCache()
     private var rejectedExactBasis: IntArray? = null
+
+    override fun continuationBasis(model: LpModel): Basis? {
+        if (!continuationAvailable) return null
+        val state = model.exactState ?: return null
+        if (this.model.exactState !== state || constructionState?.sameMatrix(state) != true ||
+            state.conflict != null || (0 until numVars).any { !model.exactBounds(it).consistent }
+        ) return null
+        val stopped = stoppedContinuationBasis
+        val headings = stopped?.basicVars ?: basicVar
+        val seats = stopped?.status ?: status
+        if (!basisStatusConsistent(model, headings, seats)) return null
+        return Basis(headings.copyOf(), seats.copyOf(), captureEligible = false)
+    }
 
     override fun rejectSingularBasis(model: LpModel, basis: Basis): Boolean {
         val matches = if (model.exactState == null) this.model === model else this.model.exactState === model.exactState
@@ -396,6 +412,8 @@ internal class RevisedSimplex(
 
     @Suppress("TooGenericExceptionCaught")
     override fun close() {
+        continuationAvailable = false
+        stoppedContinuationBasis = null
         exactBasisCache.clear()
         val snapshots = restartSnapshots.toList()
         restartSnapshots.clear()
@@ -876,6 +894,8 @@ internal class RevisedSimplex(
     }
 
     override fun adopt(state: LpExactState, token: Cancellation): Boolean {
+        continuationAvailable = false
+        stoppedContinuationBasis = null
         val current = model.exactState ?: return false
         if (!current.sameMatrix(state) || token()) return false
         val next = state.toWorkingModel() ?: return false
@@ -907,6 +927,8 @@ internal class RevisedSimplex(
 
     @Suppress("TooGenericExceptionCaught")
     override fun restoreBasisRestart(snapshot: EngineBasisRestartSnapshot, token: Cancellation): Boolean {
+        continuationAvailable = false
+        stoppedContinuationBasis = null
         val current = basisSolver ?: return false
         val restored = try {
             snapshot.restore(
@@ -938,6 +960,8 @@ internal class RevisedSimplex(
     }
 
     private fun invalidateUncertainBasisState() {
+        continuationAvailable = false
+        stoppedContinuationBasis = null
         basisFactorized = false
         basisKept = false
         ownerColumns = IntArray(0)
@@ -1190,6 +1214,8 @@ internal class RevisedSimplex(
 
     // A checked basis failure cannot supply a terminal claim or a factorization safe to keep.
     private inline fun numericalSolve(block: () -> FloatLpResult?): FloatLpResult? = try {
+        stoppedContinuationBasis = null
+        continuationAvailable = true
         val candidate = block()
         val result = if (model.exactState != null && cancellation()) {
             solvedExactState = null
@@ -1211,7 +1237,10 @@ internal class RevisedSimplex(
             }
         }
     } catch (_: BasisArithmeticException) {
+        val continuation = continuationBasis(model)
         close()
+        stoppedContinuationBasis = continuation
+        continuationAvailable = continuation != null
         optimalBasis = null
         optimalPrimal = null
         infeasibleBasis = null
