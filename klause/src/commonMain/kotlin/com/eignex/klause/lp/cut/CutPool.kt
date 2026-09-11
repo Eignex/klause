@@ -23,8 +23,8 @@ internal class CutPool(
 
     private class Entry(
         var cut: Cut?,
-        val key: Any,
-        val source: SourceCut? = null,
+        var key: Any,
+        var source: SourceCut? = null,
         var activity: Double = 0.0,
         var inactiveCount: Int = 0,
     )
@@ -34,31 +34,53 @@ internal class CutPool(
 
     /** Add [cut] unless an equal one (by [Cut.key]) is already pooled; returns true if newly added. */
     fun add(cut: Cut): Boolean {
-        if (!seen.add(cut.key())) return false
-        entries.add(Entry(cut, cut.key()))
-        return true
+        val proof = cut.provenance
+        val row = proof?.conclusion
+        val source = if (row != null && cut.global == proof.global) {
+            SourceCut(row.expression, row.relation, row.rhs, proof)
+        } else {
+            null
+        }
+        return store(cut, source)
     }
 
-    fun add(cut: Cut, relaxation: LpRelaxation): Boolean {
-        return when (val mapped = SourceCut.fromCut(cut, relaxation)) {
-            is CutMapping.Mapped -> add(mapped.value, checkNotNull(relaxation.sourceMap))
-            is CutMapping.Declined -> {
-                val unscoped = cut.provenance == null && cut.tableau == null && cut.global
-                if (unscoped && mapped.reason == CutMappingDecline.MISSING_SOURCE) add(cut) else false
-            }
+    fun add(cut: Cut, relaxation: LpRelaxation): Boolean = when (val mapped = SourceCut.fromCut(cut, relaxation)) {
+        is CutMapping.Mapped -> add(mapped.value, checkNotNull(relaxation.sourceMap))
+
+        is CutMapping.Declined -> {
+            val unscoped = cut.provenance == null && cut.tableau == null && cut.global
+            if (unscoped && mapped.reason == CutMappingDecline.MISSING_SOURCE) add(cut) else false
         }
     }
 
     fun add(cut: SourceCut, map: CutSourceMap): Boolean {
         if (cut.provenance.model !== map.model) return false
-        val key = listOf(
-            cut.key,
-            cut.provenance.model,
-            cut.provenance.facts.filter { !it.global },
-            cut.provenance.assumptions,
-        )
-        if (!seen.add(key)) return false
-        entries.add(Entry(cut.toCut(map).orNull(), key, cut))
+        return store(cut.toCut(map).orNull(), cut)
+    }
+
+    private fun store(cut: Cut?, source: SourceCut?): Boolean {
+        val key: Any = if (source == null) {
+            checkNotNull(cut).key()
+        } else {
+            listOf(source.key, source.provenance.model,
+                source.provenance.facts.filter { !it.global }, source.provenance.assumptions)
+        }
+        if (key in seen) return false
+        val mixed = if (cut?.global == true) entries.firstOrNull {
+            (it.source == null) != (source == null) && it.cut?.global == true && it.cut?.key() == cut.key()
+        } else null
+        if (mixed != null) {
+            if (source != null) {
+                seen.remove(mixed.key)
+                mixed.key = key
+                mixed.source = source
+                mixed.cut = cut
+                seen.add(key)
+            }
+            return false
+        }
+        seen.add(key)
+        entries.add(Entry(cut, key, source))
         return true
     }
 

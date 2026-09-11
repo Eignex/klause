@@ -52,6 +52,7 @@ internal class CutProvenance(
     facts: List<CutProofFact>,
     assumptions: Set<String> = emptySet(),
     rules: List<CutRoundingRule> = emptyList(),
+    val conclusion: CutPremise.Row? = null,
 ) {
     private val factSnapshot = facts.distinct().toList()
     private val assumptionSnapshot = assumptions.toSet()
