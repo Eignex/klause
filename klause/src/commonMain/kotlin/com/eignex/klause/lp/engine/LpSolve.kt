@@ -194,14 +194,18 @@ internal fun certifyLpResult(
     }
     if (result != null && (witness == null || bound?.value != witness.objective) && !cancellation()) {
         val checked = verifyExactBasis(
-            model, result.basis, cache = solver.exactBasisCache ?: ExactBasisCache(),
-            cancellation = cancellation, observer = observer,
+            model,
+            result.basis,
+            cache = solver.exactBasisCache ?: ExactBasisCache(),
+            cancellation = cancellation,
+            observer = observer,
         )
         exactBasis = checked
         if (checked.singularRank != null) solver.rejectSingularBasis(model, result.basis)
         val point = policy.acceptNullable(LpCertifier.EXACT_BASIS, checked.witness)
         if (point != null && (witness == null || point.objective < witness.objective)) witness = point
-        val stronger = policy.acceptNullable(LpCertifier.EXACT_BASIS, checked.bound)
+        val basisBound = policy.acceptNullable(LpCertifier.EXACT_BASIS, checked.bound)
+        val stronger = policy.acceptNullable(LpCertifier.RATIONAL, basisBound)
         if (stronger != null && (bound == null || stronger.value > bound.value)) bound = stronger
     }
     if (result != null && witness == null && !cancellation()) {
@@ -236,8 +240,12 @@ internal fun certifyLpResult(
     if (result == null && witness == null && ray == null && conflict == null && !cancellation()) {
         solver.infeasibleBasis?.let { basis ->
             val checked = verifyExactBasis(
-                model, basis, rayRow = solver.infeasibleRow, cache = solver.exactBasisCache ?: ExactBasisCache(),
-                cancellation = cancellation, observer = observer,
+                model,
+                basis,
+                rayRow = solver.infeasibleRow,
+                cache = solver.exactBasisCache ?: ExactBasisCache(),
+                cancellation = cancellation,
+                observer = observer,
             )
             exactBasis = checked
             if (checked.singularRank != null) solver.rejectSingularBasis(model, basis)
@@ -318,10 +326,10 @@ internal fun certifyLpResult(
         exactBasis?.conflictSupport?.takeIf { conflict === exactBasis.conflict }
             ?: reconstruction?.conflictSupport?.takeIf { conflict === reconstruction.conflict }
             ?: conflict?.let { proof ->
-            val y = MutableList(model.m) { BigFraction.ZERO }
-            for (i in proof.rows.indices) y[proof.rows[i]] = proof.multipliers[i].negated()
-            model.exactSupport(y, objective = false)
-        },
+                val y = MutableList(model.m) { BigFraction.ZERO }
+                for (i in proof.rows.indices) y[proof.rows[i]] = proof.multipliers[i].negated()
+                model.exactSupport(y, objective = false)
+            },
     )
 }
 

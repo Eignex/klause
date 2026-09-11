@@ -82,6 +82,8 @@ data class LpBasisVerificationStats(
     val allocation: Map<String, Long> = emptyMap(),
     /** Terminal reasons, including resource exits retaining a complete independent proof. */
     val declines: Map<String, Long> = emptyMap(),
+    /** Terminal counts keyed by operation phase and reason, separated by an underscore. */
+    val terminalDeclines: Map<String, Long> = emptyMap(),
     /** Offered calls by consumer route. */
     val routes: Map<String, Long> = emptyMap(),
 ) {
@@ -90,7 +92,8 @@ data class LpBasisVerificationStats(
         calls + other.calls, eligible + other.eligible, factoryCalls + other.factoryCalls, builds + other.builds,
         reuse + other.reuse, solves + other.solves, restarts + other.restarts, checks + other.checks,
         mergeBasisCounts(work, other.work), mergeBasisCounts(allocation, other.allocation),
-        mergeBasisCounts(declines, other.declines), mergeBasisCounts(routes, other.routes),
+        mergeBasisCounts(declines, other.declines), mergeBasisCounts(terminalDeclines, other.terminalDeclines),
+        mergeBasisCounts(routes, other.routes),
     )
 }
 
@@ -548,6 +551,9 @@ internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
                             work = metrics.operations.associate { it.phase.name to it.work },
                             allocation = metrics.operations.associate { it.phase.name to it.allocation },
                             declines = metrics.decline?.let { mapOf(it.name to 1L) } ?: emptyMap(),
+                            terminalDeclines = metrics.decline?.let {
+                                mapOf("${metrics.phase.name}_${it.name}" to 1L)
+                            } ?: emptyMap(),
                             routes = mapOf(route.name to 1L),
                         ),
                     )
