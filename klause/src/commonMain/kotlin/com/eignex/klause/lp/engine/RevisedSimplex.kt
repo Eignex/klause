@@ -114,6 +114,27 @@ internal class RevisedSimplex(
     /** Devex reference weights γ_i per basic row position (approximate ‖B⁻ᵀeᵢ‖²); all 1 at a fresh
      *  reference frame, reset on every refactorization. */
     private val gamma = DoubleArray(m) { 1.0 }
+    private val dualRhs = DoubleArray(m)
+    private val dualValues = DoubleArray(m)
+    private val qualityRhs = DoubleArray(m)
+    private val basicRhs = DoubleArray(m)
+    private val boundChange = DoubleArray(m)
+    private val pricingOrder = IntArray(numVars)
+    private val pricingScratch = IntArray(numVars)
+    private val dualBeta = DoubleArray(m)
+    private val primalBeta = DoubleArray(m)
+    private val phaseOneBeta = DoubleArray(m)
+    private val phaseOneGradient = DoubleArray(m)
+    private val phaseOneDuals = DoubleArray(m)
+    private val alphaValues = DoubleArray(m)
+    private val pivotRowEntries = DoubleArray(numVars)
+    private val enteringRatios = DoubleArray(numVars)
+    private val eligibleColumns = IntArrayList(numVars)
+    private val eligibleOrdered = IntArray(numVars)
+    private val theoryColumns = IntArrayList(numVars)
+    private val touchedColumns = IntArray(numVars)
+    private val columnEpochs = IntArray(numVars)
+    private val reconcileQueue = IntArrayList(m)
 
     /**
      * The LP's columns with the logical ones explicit, fixed for this engine's lifetime.
@@ -570,7 +591,8 @@ internal class RevisedSimplex(
 
     private fun shouldSampleQuality(): Boolean = refactorPolicy.shouldSample(cancelled = false) && !cancellation()
 
-    private fun denseColumn(column: Int): DoubleArray = DoubleArray(m).also { dense ->
+    private fun denseColumn(column: Int): DoubleArray = qualityRhs.also { dense ->
+        dense.fill(0.0)
         koblas.sparseKernels.scatter(
             rowIdx,
             colPtr[column],
@@ -668,7 +690,10 @@ internal class RevisedSimplex(
         solver.btran(pivotEtaVec, btranDensity)
         refactorPolicy.recordBasisSolve(operationDelta(before, operationWork(solver)) { it.btran })
         if (shouldSampleQuality()) {
-            val rhs = DoubleArray(m).also { it[r] = 1.0 }
+            val rhs = qualityRhs.also {
+                it.fill(0.0)
+                it[r] = 1.0
+            }
             sampleSolveQuality(solver, rhs, pivotEtaVec, transpose = true, cadenceChecked = true)
         }
         btranDensity = pivotEtaVec.density
@@ -717,8 +742,12 @@ internal class RevisedSimplex(
     private fun duals(): DoubleArray {
         // Zero objective (the gated feasibility filter): the duals solve `Bᵀy = 0`, so the whole
         // BTRAN — a full pass over the factors, once per iteration — is a zero vector.
-        if (allZeroCost) return DoubleArray(m)
-        return btranDense(DoubleArray(m) { model.costD(basicVar[it]) }, DoubleArray(m), dualVec)
+        if (allZeroCost) {
+            dualValues.fill(0.0)
+            return dualValues
+        }
+        for (i in 0 until m) dualRhs[i] = model.costD(basicVar[i])
+        return btranDense(dualRhs, dualValues, dualVec)
     }
 
     /** Whether every objective coefficient is zero (pure feasibility): [duals] is then identically 0. */
@@ -1279,20 +1308,21 @@ internal class RevisedSimplex(
         }
         resetGamma() // fresh Devex reference frame for this solve
         val maxIter = if (iterationLimit > 0) iterationLimit else 50 * (m + numVars) + 200
-        val rhsAdj = DoubleArray(m)
-        val beta = DoubleArray(m)
+        val rhsAdj = basicRhs
+        val beta = dualBeta
         var useCached = kept && model.exactState != null && restoreBasicValues(beta)
-        val pivotRowEntry = DoubleArray(numVars) // ρ·A_j per nonbasic, reused by the bound-flip ratio test
-        val ratioBuf = DoubleArray(numVars) // |d_j / a_j| per eligible nonbasic
-        val elig = IntArrayList()
-        val eligOrdered = IntArray(numVars) // scratch for the ratio-ordered permutation of [elig]
-        val theoryCandidates = IntArrayList()
+        val pivotRowEntry = pivotRowEntries // ρ·A_j per nonbasic, reused by the bound-flip ratio test
+        val ratioBuf = enteringRatios // |d_j / a_j| per eligible nonbasic
+        val elig = eligibleColumns
+        val eligOrdered = eligibleOrdered // scratch for the ratio-ordered permutation of [elig]
+        val theoryCandidates = theoryColumns
         // The columns this iteration's pivot row reached, and the iteration that reached them. A stamp
         // rather than a clear: the row is formed over ρ's nonzeros, and zeroing [pivotRowEntry] between
         // iterations would reintroduce the pass over every column that forming it this way removes.
-        val touched = IntArray(numVars)
+        val touched = touchedColumns
         var touchedCount = 0
-        val touchEpoch = IntArray(numVars)
+        val touchEpoch = columnEpochs
+        touchEpoch.fill(0)
         var epoch = 0
         // Whether an iterate's basic values are in [beta], so a solve that stops short can still hand
         // back its bound. The buffer is reused, and holds the last iterate the loop completed.
@@ -1610,9 +1640,9 @@ internal class RevisedSimplex(
 
     private fun retainBasicValues(beta: DoubleArray) {
         if (model.exactState == null) return
-        cachedBeta = beta.copyOf()
+        cachedBeta = (cachedBeta ?: DoubleArray(m)).also { beta.copyInto(it) }
         cachedModel = model
-        cachedStatus = status.copyOf()
+        cachedStatus = cachedStatus?.also { status.copyInto(it) } ?: status.copyOf()
     }
 
     private fun restoreBasicValues(out: DoubleArray): Boolean {
@@ -1631,7 +1661,8 @@ internal class RevisedSimplex(
         }
         if ((0 until m).any { previous.exactRhs(it) != model.exactRhs(it) }) return false
         values.copyInto(out)
-        val rhs = DoubleArray(m)
+        val rhs = basicRhs
+        rhs.fill(0.0)
         var changed = false
         for (j in 0 until numVars) {
             if (status[j] == VarStatus.BASIC) continue
@@ -1643,7 +1674,7 @@ internal class RevisedSimplex(
         }
         work.add(numVars)
         if (changed) {
-            val change = DoubleArray(m)
+            val change = boundChange
             ftranDense(rhs, change, rhsVec, boundUpdateFtran = true)
             koblas.vectorKernels.axpy(out, 0, 1.0, change, 0, m)
             work.add(m)
@@ -1660,14 +1691,16 @@ internal class RevisedSimplex(
      * basis is dual-feasible, so the arbitrary evicted-to-lower statuses never break the dual simplex.
      */
     private fun reconcileUnenforced(enforced: BooleanArray): IterationResult {
-        val alphaBuf = DoubleArray(m)
+        val alphaBuf = alphaValues
         var guard = 0
         var i = 0
-        val requeued = ArrayDeque<Int>()
+        val requeued = reconcileQueue
+        requeued.clear()
+        var queuePosition = 0
         while (true) {
             val row = when {
                 i < m -> i++
-                requeued.isNotEmpty() -> requeued.removeFirst()
+                queuePosition < requeued.size -> requeued[queuePosition++]
                 else -> return IterationResult.CONTINUE
             }
             val sc = n + row
@@ -1734,9 +1767,11 @@ internal class RevisedSimplex(
         enforced: BooleanArray?,
     ): EnteringChoice {
         // Stable ascending order by ratio, matching the tie order a stable sort by the same key gives.
-        val order = argsortBy(elig.size) { a, b -> ratioBuf[elig[a]].compareTo(ratioBuf[elig[b]]) }
-        for (position in order.indices) ordered[position] = elig[order[position]]
-        for (position in order.indices) elig[position] = ordered[position]
+        val order = argsortBy(elig.size, pricingOrder, pricingScratch) { a, b ->
+            ratioBuf[elig[a]].compareTo(ratioBuf[elig[b]])
+        }
+        for (position in 0 until elig.size) ordered[position] = elig[order[position]]
+        for (position in 0 until elig.size) elig[position] = ordered[position]
         var acc = 0.0
         var flipCount = 0
         for (idx in 0 until elig.size) {
@@ -1810,7 +1845,7 @@ internal class RevisedSimplex(
         }
         addTheoryPricingWork(candidateOrderingWork(candidates.size))
         if (pricingResourceStopped()) return EnteringChoice.ResourceStopped
-        val order = argsortBy(candidates.size) { a, b ->
+        val order = argsortBy(candidates.size, pricingOrder, pricingScratch) { a, b ->
             val left = candidates[a]
             val right = candidates[b]
             val sparsity = columnNnz(left).compareTo(columnNnz(right))
@@ -1820,7 +1855,7 @@ internal class RevisedSimplex(
         var bestSupport = Int.MAX_VALUE
         var bestNnz = Int.MAX_VALUE
         var bestTie = Long.MAX_VALUE
-        val samples = minOf(THEORY_SAMPLE_LIMIT, order.size)
+        val samples = minOf(THEORY_SAMPLE_LIMIT, candidates.size)
         for (position in 0 until samples) {
             if (pricingResourceStopped()) return EnteringChoice.ResourceStopped
             val candidate = candidates[order[position]]
@@ -1958,7 +1993,7 @@ internal class RevisedSimplex(
         return FloatLpResult(
             basis,
             model.objectiveD(obj),
-            y,
+            y.copyOf(),
             primal,
             pivots,
             maxLuFill,
@@ -2001,7 +2036,7 @@ internal class RevisedSimplex(
         return FloatLpResult(
             Basis(basicVar.copyOf(), status.copyOf(), captureEligible = basisCaptureEligible),
             model.objectiveD(obj),
-            y,
+            y.copyOf(),
             primal,
             pivots,
             maxLuFill,
@@ -2088,10 +2123,9 @@ internal class RevisedSimplex(
 
     /** Current basic values `β = B⁻¹(b − Σ_{j nonbasic at upper} A_j·u_j)` into [out], which is
      *  returned. */
-    private fun basicValues(out: DoubleArray = DoubleArray(m)): DoubleArray {
-        val rhsAdj = DoubleArray(m)
-        adjustedRhs(rhsAdj)
-        return ftranDense(rhsAdj, out, rhsVec)
+    private fun basicValues(out: DoubleArray): DoubleArray {
+        adjustedRhs(basicRhs)
+        return ftranDense(basicRhs, out, rhsVec)
     }
 
     private fun primalFeasible(beta: DoubleArray): Boolean {
@@ -2114,10 +2148,10 @@ internal class RevisedSimplex(
      */
     @Suppress("CyclomaticComplexMethod", "NestedBlockDepth", "ReturnCount", "LongMethod")
     private fun primalPhase1(progress: SolveProgress): IterationResult {
-        val beta = basicValues()
-        val gamma = DoubleArray(m)
-        val pi = DoubleArray(m)
-        val alphaBuf = DoubleArray(m)
+        val beta = basicValues(phaseOneBeta)
+        val gamma = phaseOneGradient
+        val pi = phaseOneDuals
+        val alphaBuf = alphaValues
         val maxIter = 50 * (m + numVars) + 200
         while (progress.primalIterations < maxIter) {
             val iteration = progress.primalIterations++
@@ -2273,7 +2307,7 @@ internal class RevisedSimplex(
             }
         }
         if (model.exactState != null) repairNonbasicStatuses()
-        val beta = basicValues()
+        val beta = basicValues(primalBeta)
         when (refactorAtQualitySafePoint()) {
             null -> Unit
             RefactorResult.UNCHANGED -> return restartPrimal(progress)
@@ -2292,7 +2326,7 @@ internal class RevisedSimplex(
         }
         val maxIter = 50 * (m + numVars) + 200
         val blandStall = 2 * (m + numVars) + BLAND_STALL_BASE
-        val alphaBuf = DoubleArray(m)
+        val alphaBuf = alphaValues
         while (progress.primalIterations < maxIter) {
             val iteration = progress.primalIterations++
             if (iteration % CANCEL_POLL == 0 && cancellation()) return null

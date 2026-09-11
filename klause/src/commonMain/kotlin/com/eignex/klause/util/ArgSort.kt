@@ -29,9 +29,18 @@ internal inline fun argsortByIntKey(n: Int, key: (Int) -> Int): IntArray {
  * result deterministic and matches `sortedWith`.
  */
 internal inline fun argsortBy(n: Int, compare: (Int, Int) -> Int): IntArray {
-    var src = IntArray(n) { it }
+    val order = IntArray(n)
+    if (n < 2) return order
+    return argsortBy(n, order, IntArray(n), compare)
+}
+
+internal inline fun argsortBy(n: Int, order: IntArray, scratch: IntArray, compare: (Int, Int) -> Int): IntArray {
+    require(n >= 0 && n <= order.size && n <= scratch.size)
+    require(order !== scratch)
+    for (i in 0 until n) order[i] = i
+    var src = order
     if (n < 2) return src
-    var dst = IntArray(n)
+    var dst = scratch
     var width = 1
     while (width < n) {
         var lo = 0

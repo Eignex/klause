@@ -9,6 +9,25 @@ import kotlin.test.assertTrue
 
 class BasisWorkTest {
     @Test
+    fun `each operation phase preserves saturation independently of unit totals`() {
+        for (kind in BasisOperationKind.entries) {
+            val meter = BasisOperationMeter()
+            meter.success(kind, Long.MAX_VALUE)
+            val report = meter.snapshot()
+
+            assertEquals(Long.MAX_VALUE, report.units)
+            assertTrue(report.saturated)
+        }
+        for (phase in listOf(
+            BasisPhaseWork(attempts = Long.MAX_VALUE, declines = 0),
+            BasisPhaseWork(successes = Long.MAX_VALUE, declines = 0),
+            BasisPhaseWork(declines = Long.MAX_VALUE),
+        )) {
+            assertTrue(BasisOperationWork(update = phase).saturated)
+        }
+    }
+
+    @Test
     fun `repeated traces report identical phase work`() {
         val source = SparseMatrix.ofColumns(
             2,

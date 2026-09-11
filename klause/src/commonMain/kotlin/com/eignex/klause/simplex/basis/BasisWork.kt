@@ -69,30 +69,28 @@ internal data class BasisOperationWork(
         complete && other.complete,
     )
 
-    val units: Long get() = listOf(
-        refactorization,
-        repair,
-        extension,
-        snapshot,
-        restore,
-        ftran,
-        btran,
-        update,
-    ).fold(0L) { total, phase -> saturatedAdd(total, phase.units) }
-    val saturated: Boolean get() = units == Long.MAX_VALUE || listOf(
-        refactorization,
-        repair,
-        extension,
-        snapshot,
-        restore,
-        ftran,
-        btran,
-        update,
-    ).any { phase ->
-        phase.attempts == Long.MAX_VALUE || phase.successes == Long.MAX_VALUE ||
-            phase.declines == Long.MAX_VALUE || phase.units == Long.MAX_VALUE
-    }
+    val units: Long
+        get() {
+            var total = 0L
+            total = saturatedAdd(total, refactorization.units)
+            total = saturatedAdd(total, repair.units)
+            total = saturatedAdd(total, extension.units)
+            total = saturatedAdd(total, snapshot.units)
+            total = saturatedAdd(total, restore.units)
+            total = saturatedAdd(total, ftran.units)
+            total = saturatedAdd(total, btran.units)
+            return saturatedAdd(total, update.units)
+        }
+    val saturated: Boolean
+        get() = units == Long.MAX_VALUE ||
+            refactorization.saturated || repair.saturated || extension.saturated || snapshot.saturated ||
+            restore.saturated || ftran.saturated || btran.saturated || update.saturated
+
 }
+
+private val BasisPhaseWork.saturated: Boolean
+    get() = attempts == Long.MAX_VALUE || successes == Long.MAX_VALUE ||
+        declines == Long.MAX_VALUE || units == Long.MAX_VALUE
 
 internal class BasisOperationMeter {
     private val phases = Array(BasisOperationKind.entries.size) { MutableBasisPhase() }

@@ -1,6 +1,5 @@
 package com.eignex.klause.simplex.basis
 
-import com.eignex.klause.util.argsortBy
 import com.eignex.koblas.Workspace
 import com.eignex.koblas.borrow
 import com.eignex.koblas.borrowI32
@@ -91,7 +90,8 @@ internal class ForrestTomlinFactors private constructor(
 
     fun forward(work: BasisWorkspace): Long {
         lastSolveEntries = 0
-        for (transform in transforms) {
+        for (i in transforms.indices) {
+            val transform = transforms[i]
             try {
                 transform.forward(work)
             } finally {
@@ -243,10 +243,10 @@ internal class ForrestTomlinFactors private constructor(
                 gatheredIndices, 0, gatheredValues, 0,
                 compactExactZeros = true,
             )
-            val order = argsortBy(gathered) { a, b -> gatheredIndices[a].compareTo(gatheredIndices[b]) }
+            gatheredIndices.sort(0, gathered)
             BasisSlice(
-                IntArray(gathered) { gatheredIndices[order[it]] },
-                DoubleArray(gathered) { gatheredValues[order[it]] },
+                gatheredIndices.copyOf(gathered),
+                DoubleArray(gathered) { work.values[gatheredIndices[it]] },
             )
         }
     }

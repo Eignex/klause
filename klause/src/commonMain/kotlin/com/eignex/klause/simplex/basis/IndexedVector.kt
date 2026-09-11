@@ -25,7 +25,7 @@ internal class IndexedVector(val size: Int) {
 
     fun nrm2(): Double = koblas.sparseKernels.nrm2(indices, 0, count, values)
 
-    fun forEachStored(block: (Int, Double) -> Unit) {
+    inline fun forEachStored(block: (Int, Double) -> Unit) {
         for (k in 0 until count) {
             val i = indices[k]
             block(i, values[i])
@@ -74,8 +74,7 @@ internal class IndexedVector(val size: Int) {
 
     fun gather(out: DoubleArray): DoubleArray {
         require(out.size == size)
-        out.fill(0.0)
-        forEachStored { i, value -> out[i] = value }
+        values.copyInto(out)
         return out
     }
 
