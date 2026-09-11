@@ -26,11 +26,13 @@ import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 internal object ExactContinuationCoverage {
     @JvmStatic
     fun main(args: Array<String>) {
+        verifyForeignStateRecovery()
         `higher effort finds a conflict after prior feasibility pivots`()
         val root = Path.of(args.single())
         val inputs = listOf(
@@ -69,9 +71,9 @@ internal object ExactContinuationCoverage {
                     if (parsed.model.numBoolVars != 0) {
                         println(
                             buildJsonObject {
-                            put("input", input);
-                            put("ineligible", "BOOLEAN_BRANCH")
-                        }
+                                put("input", input)
+                                put("ineligible", "BOOLEAN_BRANCH")
+                            },
                         )
                         continue
                     }
@@ -81,9 +83,9 @@ internal object ExactContinuationCoverage {
             if (model == null) {
                 println(
                     buildJsonObject {
-                    put("input", input);
-                    put("ineligible", "SOURCE_PROJECTION")
-                }
+                        put("input", input)
+                        put("ineligible", "SOURCE_PROJECTION")
+                    },
                 )
                 continue
             }
@@ -103,14 +105,14 @@ internal object ExactContinuationCoverage {
                 live.rationalConflict?.let { checkConflict(model, it) }
                 println(
                     buildJsonObject {
-                    put("input", input);
-                    put("role", "live-verdict");
-                    put("verdict", live.verdict.name)
-                    put("floatPivots", solver.lastPivots);
-                    put("floatWork", solver.lastWorkOps)
-                    put("continuationWork", live.continuation?.work ?: 0L)
-                    put("continuationNs", live.continuation?.elapsedNs ?: 0L)
-                }
+                        put("input", input)
+                        put("role", "live-verdict")
+                        put("verdict", live.verdict.name)
+                        put("floatPivots", solver.lastPivots)
+                        put("floatWork", solver.lastWorkOps)
+                        put("continuationWork", live.continuation?.work ?: 0L)
+                        put("continuationNs", live.continuation?.elapsedNs ?: 0L)
+                    },
                 )
                 val cache = LpExactContinuationCache()
                 for ((slice, ceiling) in listOf("short" to 20, "full" to 60)) {
@@ -132,33 +134,33 @@ internal object ExactContinuationCoverage {
 
     private fun record(input: String, slice: String, result: LpContinuationVerification): JsonObject = buildJsonObject {
         val m = result.metrics
-        put("input", input);
-        put("role", "result");
+        put("input", input)
+        put("role", "result")
         put("slice", slice)
-        put("eligible", m.eligible);
-        put("builds", m.builds);
-        put("imports", m.imports);
+        put("eligible", m.eligible)
+        put("builds", m.builds)
+        put("imports", m.imports)
         put("pivots", m.pivots)
-        put("retainedPivots", m.retainedPivots);
+        put("retainedPivots", m.retainedPivots)
         put("importPosition", m.importPosition)
-        put("repairs", m.repairs);
-        put("restarts", m.restarts);
+        put("repairs", m.repairs)
+        put("restarts", m.restarts)
         put("resumed", m.resumed)
-        put("work", m.work);
-        put("allocation", m.allocation);
+        put("work", m.work)
+        put("allocation", m.allocation)
         put("elapsedNs", m.elapsedNs)
-        put("phase", m.phase.name);
+        put("phase", m.phase.name)
         put("decline", m.decline?.name ?: "NONE")
         put("workByPhase", buildJsonObject { for ((phase, value) in m.workByPhase) put(phase.name, value) })
         put("allocationByPhase", buildJsonObject { for ((phase, value) in m.allocationByPhase) put(phase.name, value) })
-        put("witness", result.witness != null);
+        put("witness", result.witness != null)
         put("conflict", result.conflict != null)
         result.witness?.let {
-            put("primal", fractions(it.primal));
+            put("primal", fractions(it.primal))
             put("objective", fraction(it.objective))
         }
         result.conflict?.let {
-            put("conflictRows", JsonArray(it.rows.map(::JsonPrimitive)));
+            put("conflictRows", JsonArray(it.rows.map(::JsonPrimitive)))
             put("multipliers", fractions(it.multipliers))
         }
     }
@@ -270,4 +272,29 @@ internal object ExactContinuationCoverage {
         assertTrue(ray.all { it <= BigFraction.ZERO })
         assertTrue(rhs > BigFraction.ZERO)
     }
+    private fun verifyForeignStateRecovery() {
+        val zero = ExactLpNumber.of(0L)
+        val source = ExactLpModel(
+            listOf(emptyList()),
+            emptyList(),
+            listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero)))),
+            emptyList(),
+            ExactLpObjective(listOf(zero)),
+        )
+        val first = LpExactState(source)
+        val foreign = LpExactState(source)
+        RevisedSimplex(assertNotNull(first.toWorkingModel())).use { solver ->
+            val hint = assertNotNull(solver.solve())
+
+            val wrongResult = certifyLpResult(assertNotNull(foreign.toWorkingModel()), solver, hint)
+            val missing = certifyLpResult(assertNotNull(foreign.toWorkingModel()), solver, null)
+
+            assertEquals(LpVerdict.INDETERMINATE, wrongResult.verdict)
+            assertNull(wrongResult.continuation)
+            assertEquals(LpVerdict.INDETERMINATE, missing.verdict)
+            assertEquals(ContinuationDecline.NO_BASIS, assertNotNull(missing.continuation).decline)
+        }
+    }
+
+
 }
