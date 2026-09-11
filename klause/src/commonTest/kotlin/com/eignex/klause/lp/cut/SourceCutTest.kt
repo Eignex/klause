@@ -97,11 +97,12 @@ class SourceCutTest {
             proof,
         )
         val map = CutSourceMap(
-            modelToken, 9,
+            modelToken,
+            9,
             listOf(
-            CutColumnSource(term, BigFraction.ofLong(-2), BigFraction.ONE),
-            CutColumnSource(y, BigFraction.ofLong(2), BigFraction.ofLong(-3)),
-        )
+                CutColumnSource(term, BigFraction.ofLong(-2), BigFraction.ONE),
+                CutColumnSource(y, BigFraction.ofLong(2), BigFraction.ofLong(-3)),
+            ),
         )
 
         val mapped = assertNotNull(source.toCut(map).orNull())
@@ -315,8 +316,8 @@ class SourceCutTest {
             for (yi in 0L..3L) {
                 if (2 * xi <= yi) {
                     assertTrue(
-                    portable.expression.value { BigFraction.ofLong(if (it == x) xi else yi) } >= portable.rhs,
-                )
+                        portable.expression.value { BigFraction.ofLong(if (it == x) xi else yi) } >= portable.rhs,
+                    )
                 }
             }
         }
@@ -413,12 +414,12 @@ class SourceCutTest {
         }
         assertTrue(
             integerTableauCuts(
-            model,
-            Basis(intArrayOf(0), Array(2) { VarStatus.AT_LOWER }),
-            doubleArrayOf(0.5),
-            1,
-            false,
-        ).isEmpty()
+                model,
+                Basis(intArrayOf(0), Array(2) { VarStatus.AT_LOWER }),
+                doubleArrayOf(0.5),
+                1,
+                false,
+            ).isEmpty(),
         )
     }
 
@@ -630,16 +631,22 @@ class SourceCutTest {
     @Test
     fun `coprime denominator growth declines before producing an oversized scale`() {
         val source = SourceCut(
-            CutExpression(mapOf(
+            CutExpression(
+                mapOf(
                 x to BigFraction.of(BigInteger.ONE, BigInteger.fromLong(17)),
                 y to BigFraction.of(BigInteger.ONE, BigInteger.fromLong(19)),
-            )),
-            Relation.LE, BigFraction.ONE, CutProvenance(modelToken, 0, emptyList()),
+            )
+            ),
+            Relation.LE,
+            BigFraction.ONE,
+            CutProvenance(modelToken, 0, emptyList()),
         )
         val map = CutSourceMap(modelToken, 0, listOf(CutColumnSource(x), CutColumnSource(y)))
 
-        assertEquals(CutMapping.Declined(CutMappingDecline.ARITHMETIC_LIMIT),
-            source.toCut(map, CutMappingLimits(bits = 8)))
+        assertEquals(
+            CutMapping.Declined(CutMappingDecline.ARITHMETIC_LIMIT),
+            source.toCut(map, CutMappingLimits(bits = 8)),
+        )
     }
 
     @Test
@@ -647,8 +654,16 @@ class SourceCutTest {
         val columns = intArrayOf(0)
         val coefficients = longArrayOf(2)
         val premises = LpRowPremises(intArrayOf(0), booleanArrayOf(true), longArrayOf(3), intArrayOf(2))
-        val row = CutInputRow(0, false, 1, BigFraction.ofLong(3), Relation.LE,
-            columns, coefficients, premises)
+        val row = CutInputRow(
+            0,
+            false,
+            1,
+            BigFraction.ofLong(3),
+            Relation.LE,
+            columns,
+            coefficients,
+            premises,
+        )
         columns[0] = 8
         coefficients[0] = 9
         premises.thresholds[0] = 10
@@ -671,10 +686,22 @@ class SourceCutTest {
         val model = builder.build(Sense.MINIMIZE)
         val map = CutSourceMap(modelToken, 0, listOf(CutColumnSource(x)))
         val relaxation = LpRelaxation(
-            model, intArrayOf(0), booleanArrayOf(false), 0, intArrayOf(0), intArrayOf(), sourceMap = map,
+            model,
+            intArrayOf(0),
+            booleanArrayOf(false),
+            0,
+            intArrayOf(0),
+            intArrayOf(),
+            sourceMap = map,
         )
-        val cut = Cut(intArrayOf(0), longArrayOf(1), Relation.LE, 1,
-            global = true, provenance = CutProvenance(Any(), 0, emptyList()))
+        val cut = Cut(
+            intArrayOf(0),
+            longArrayOf(1),
+            Relation.LE,
+            1,
+            global = true,
+            provenance = CutProvenance(Any(), 0, emptyList()),
+        )
         val pool = CutPool()
 
         assertFalse(pool.add(cut, relaxation))

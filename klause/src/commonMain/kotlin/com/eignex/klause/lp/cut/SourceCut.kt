@@ -141,7 +141,11 @@ internal class SourceCut(
             return CutMapping.Declined(CutMappingDecline.LONG_RANGE)
         }
         val proof = CutProvenance(
-            map.model, provenance.epoch, facts, provenance.assumptions, provenance.rules,
+            map.model,
+            provenance.epoch,
+            facts,
+            provenance.assumptions,
+            provenance.rules,
             CutPremise.Row(expression, relation, rhs),
         )
         if (!limits.accepts(proof)) return CutMapping.Declined(CutMappingDecline.ARITHMETIC_LIMIT)
@@ -225,9 +229,9 @@ private class SourceCutMapper(
             return (view.colPtr[column] until view.colPtr[column + 1]).map {
                 view.rowIdx[it] to (
                     BigFraction.ofDouble(
-                    view.colVal[it],
-                ) ?: decline(CutMappingDecline.ARITHMETIC_LIMIT)
-                )
+                        view.colVal[it],
+                    ) ?: decline(CutMappingDecline.ARITHMETIC_LIMIT)
+                    )
             }
         }
         charge(model.csc.colPtr[column + 1] - model.csc.colPtr[column])
@@ -342,7 +346,11 @@ private class SourceCutMapper(
         if (facts.size > limits.terms) decline(CutMappingDecline.ARITHMETIC_LIMIT)
         val assumptions = sources.assumptions + (inherited?.assumptions ?: emptySet())
         val proof = CutProvenance(
-            sources.model, sources.epoch, facts, assumptions, rules,
+            sources.model,
+            sources.epoch,
+            facts,
+            assumptions,
+            rules,
             CutPremise.Row(inequality, cut.rel, BigFraction.ofLong(cut.rhs)),
         )
         if (!limits.accepts(proof)) decline(CutMappingDecline.ARITHMETIC_LIMIT)
