@@ -123,10 +123,10 @@ class SearchSession(
                     ComponentResult.Indeterminate
                 } else {
                     assignImplied(
-                    literal,
-                    null,
-                    publishedTheory = true,
-                )
+                        literal,
+                        null,
+                        publishedTheory = true,
+                    )
                 }
             } else {
                 pendingAssertions.addLast(PendingAssertion(decision, activeComponent))

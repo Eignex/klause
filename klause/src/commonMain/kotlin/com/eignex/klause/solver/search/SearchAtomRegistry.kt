@@ -30,8 +30,8 @@ class SearchAtomRegistry(
         if (positive is RegisteredTheoryDecision || negative is RegisteredTheoryDecision ||
             positive == negative
         ) {
-                return null
-            }
+            return null
+        }
         val previous = names[positive]
         if (previous != null) {
             val complement = assertions[(previous.literal xor 1) - sourceBooleanCount * 2]
