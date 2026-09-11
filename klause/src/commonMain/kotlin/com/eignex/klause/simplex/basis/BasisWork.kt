@@ -85,7 +85,6 @@ internal data class BasisOperationWork(
         get() = units == Long.MAX_VALUE ||
             refactorization.saturated || repair.saturated || extension.saturated || snapshot.saturated ||
             restore.saturated || ftran.saturated || btran.saturated || update.saturated
-
 }
 
 private val BasisPhaseWork.saturated: Boolean
