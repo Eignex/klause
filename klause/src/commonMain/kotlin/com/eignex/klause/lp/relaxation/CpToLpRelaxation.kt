@@ -182,6 +182,11 @@ internal fun LpRelaxation.gatedEnforcement(session: PropagationSession, out: Boo
  */
 internal fun LpRelaxation.rebound(session: PropagationSession): LpRelaxation {
     require(persistentEligible) { "scoped or changing rows require a rebuilt relaxation" }
+    val (lo, hi) = columnBounds(session)
+    return withModel(model.rebind(lo, hi))
+}
+
+internal fun LpRelaxation.columnBounds(session: PropagationSession): Pair<LongArray, LongArray> {
     val n = model.n
     val lo = LongArray(n)
     val hi = LongArray(n)
@@ -215,21 +220,31 @@ internal fun LpRelaxation.rebound(session: PropagationSession): LpRelaxation {
             }
         }
     }
-    val reboundModel = model.rebind(lo, hi)
-    return LpRelaxation(
-        model = reboundModel,
-        colVarId = colVarId,
-        colIsBool = colIsBool,
-        objectiveConstant = objectiveConstant,
-        intColOf = intColOf,
-        boolColOf = boolColOf,
-        circuitArcs = circuitArcs,
-        persistentEligible = true,
-        colReq = colReq,
-        colPresentUpper = colPresentUpper,
-        sourceMap = sourceMap?.withBounds(reboundModel),
-    )
+    return lo to hi
 }
+
+internal fun LpRelaxation.withModel(
+    reboundModel: LpModel,
+    sources: CutSourceMap? = sourceMap?.withBounds(reboundModel),
+): LpRelaxation = LpRelaxation(
+    model = reboundModel,
+    colVarId = colVarId,
+    colIsBool = colIsBool,
+    objectiveConstant = objectiveConstant,
+    intColOf = intColOf,
+    boolColOf = boolColOf,
+    circuitArcs = circuitArcs,
+    persistentEligible = persistentEligible,
+    colReq = colReq,
+    colPresentUpper = colPresentUpper,
+    hullFactorIds = hullFactorIds,
+    colRealId = colRealId,
+    colRealSign = colRealSign,
+    gatedRows = gatedRows,
+    gatedAux = gatedAux,
+    gatedWhenTrue = gatedWhenTrue,
+    sourceMap = sources,
+)
 
 /**
  * The per-variable bounds the relaxation reads to size its columns: an integer variable's live domain

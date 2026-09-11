@@ -145,7 +145,7 @@ private class CpSatisfactionTraversal(
             if (params.lpConfig != null) {
                 val lp = LpFeasibilityComponent(problem, cp, params, sink, solveContext)
                 lpResources += lp
-                components += lp
+                components += lp.component
             }
             components += params.componentFactory?.invoke().orEmpty()
             val session = SearchComponentSet(components, branchers = listOf(traversal.brancher)).session(
@@ -500,8 +500,7 @@ private class LpFeasibilityComponent(
     params: BacktrackParams,
     sink: SolveStatsSink?,
     solveContext: LpSolveContext,
-) : SearchComponent,
-    LpSearchResource {
+) : LpSearchResource {
     private val engine = LpEngine(
         problem,
         LinearObjective(intCoefficients = LongArray(problem.numIntVars)),
@@ -517,17 +516,7 @@ private class LpFeasibilityComponent(
         solveContext,
     )
 
-    override fun propagate(context: SearchContext): ComponentResult {
-        if (context.cancelled()) return ComponentResult.Indeterminate
-        // No incumbent and no objective column: `pruneNode` reports only what the relaxation refutes.
-        val refuted = engine.pruneNode(
-            cp.session,
-            Double.POSITIVE_INFINITY,
-            objectiveVar = -1,
-            objectiveAscending = true,
-        )
-        return if (refuted) ComponentResult.Conflict() else ComponentResult.Consistent
-    }
+    val component: SearchComponent = engine.propagator.also { engine.cpAdapter.attach(cp.session, feasibility = true) }
 
     override fun releasePersistentSolvers() = engine.releasePersistentSolvers()
 

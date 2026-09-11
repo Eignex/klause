@@ -59,16 +59,34 @@ internal class CutSourceMap(
         }
     }
 
-    fun withBounds(bounds: LpModel): CutSourceMap = CutSourceMap(
+    fun withBounds(bounds: LpModel, active: Set<CutPremise> = emptySet()): CutSourceMap = CutSourceMap(
         model,
         epoch + 1,
         columnSnapshot,
         globalSnapshot,
-        columnBounds(bounds, columnSnapshot),
+        columnBounds(bounds, columnSnapshot) + active,
         fixedSnapshot,
         assumptionSnapshot,
         parentSnapshot,
     )
+}
+
+internal fun CutSourceMap.withCpBounds(
+    model: LpModel,
+    session: com.eignex.klause.propagation.PropagationSession,
+): CutSourceMap {
+    val facts = HashSet<CutPremise>()
+    for (variable in 0 until session.problem.numBoolVars) {
+        val value = session.boolValue(variable) ?: continue
+        facts.add(CutPremise.Literal((variable shl 1) or if (value) 0 else 1))
+    }
+    for (variable in 0 until session.problem.numIntVars) {
+        val domain = session.intDomain(variable)
+        val expression = CutExpression(mapOf(CutSource(CutSourceKind.INTEGER, variable) to BigFraction.ONE))
+        facts.add(CutPremise.Bound(expression, false, BigFraction.ofLong(domain.min)))
+        facts.add(CutPremise.Bound(expression, true, BigFraction.ofLong(domain.max)))
+    }
+    return withBounds(model, facts)
 }
 
 internal fun cpCutSources(

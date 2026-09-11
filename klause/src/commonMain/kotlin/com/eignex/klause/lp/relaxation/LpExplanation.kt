@@ -1,10 +1,15 @@
 package com.eignex.klause.lp.relaxation
 
 import com.eignex.klause.ir.Lit
+import com.eignex.klause.lp.engine.CutExpression
+import com.eignex.klause.lp.engine.CutPremise
+import com.eignex.klause.lp.engine.CutSourceKind
+import com.eignex.klause.lp.engine.ExactLpNumber
 import com.eignex.klause.lp.engine.IntegerCertificate
 import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.integerFarkasRay
 import com.eignex.klause.propagation.PropagationSession
+import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.Int128
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
@@ -191,6 +196,14 @@ internal object LpExplanation {
         val model = relaxation.model
         for (r in rows) {
             if (model.rowGlobal[r]) continue
+            val source = relaxation.sourceMap?.parent(r)
+            if (source != null) {
+                if (source.model !== session.problem || source.assumptions.isNotEmpty()) return false
+                for (fact in source.facts) {
+                    if (!fact.global && !addSourcePremise(lits, seen, fact.premise, session)) return false
+                }
+                continue
+            }
             val prem = model.rowPremises[r] ?: return false
             for (k in prem.vars.indices) {
                 val lit = if (prem.isUpper[k]) {
@@ -216,23 +229,52 @@ internal object LpExplanation {
         cert: IntegerCertificate,
         session: PropagationSession,
     ): Boolean {
-        val model = relaxation.model
-        for (i in 0 until model.m) {
-            if (!cert.dualNonzeroRow(i) || model.rowGlobal[i]) continue
-            val prem = model.rowPremises[i] ?: return false
-            for (k in prem.vars.indices) {
-                val lit = if (prem.isUpper[k]) {
-                    session.boundLeLit(prem.vars[k], prem.thresholds[k], positive = false)
-                } else {
-                    session.boundGeLit(prem.vars[k], prem.thresholds[k], positive = false)
-                }
-                if (seen.add(lit)) lits.add(lit)
-            }
-            for (bl in prem.boolLits) {
-                val neg = Lit.negate(bl)
-                if (seen.add(neg)) lits.add(neg)
-            }
+        val rows = (0 until relaxation.model.m).filter { cert.dualNonzeroRow(it) }.toIntArray()
+        return addRowPremiseLits(lits, seen, relaxation, rows, session)
+    }
+
+    private fun addSourcePremise(
+        lits: IntArrayList,
+        seen: IntHashSet,
+        premise: CutPremise,
+        session: PropagationSession,
+    ): Boolean {
+        if (premise is CutPremise.Fixed) {
+            val expression = CutExpression(mapOf(premise.source to BigFraction.ONE))
+            return addSourcePremise(lits, seen, CutPremise.Bound(expression, false, premise.value), session) &&
+                addSourcePremise(lits, seen, CutPremise.Bound(expression, true, premise.value), session)
         }
+        val literal = when (premise) {
+            is CutPremise.Literal -> {
+                if ((premise.literal ushr 1) !in 0 until session.problem.numBoolVars ||
+                    session.boolValue(premise.literal ushr 1) != (premise.literal and 1 == 0)
+                ) {
+                    return false
+                }
+                premise.literal xor 1
+            }
+
+            is CutPremise.Bound -> {
+                val term = premise.expression.terms.entries.singleOrNull() ?: return false
+                if (term.key.kind != CutSourceKind.INTEGER || term.value != BigFraction.ONE ||
+                    term.key.id !in 0 until session.problem.numIntVars || premise.strict
+                ) {
+                    return false
+                }
+                val value = ExactLpNumber.of(premise.value - premise.expression.constant).legacyLong() ?: return false
+                val domain = session.intDomain(term.key.id)
+                if (premise.upper) {
+                    if (domain.max > value) return false
+                    session.boundLeLit(term.key.id, value, positive = false)
+                } else {
+                    if (domain.min < value) return false
+                    session.boundGeLit(term.key.id, value, positive = false)
+                }
+            }
+
+            else -> return false
+        }
+        if (seen.add(literal)) lits.add(literal)
         return true
     }
 }
