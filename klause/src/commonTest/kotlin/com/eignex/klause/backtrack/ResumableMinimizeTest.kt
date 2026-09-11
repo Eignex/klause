@@ -14,6 +14,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class ResumableMinimizeTest {
@@ -100,6 +101,38 @@ class ResumableMinimizeTest {
                 }
                 val result = assertIs<MinimizeResult.Optimal>(first.runSlice(Cancellation.Never, 1000L, 256L) {})
                 assertEquals(0L, result.sample.ints[0])
+                first.replacingObjective(objective, params).use { replacement ->
+                    assertIs<MinimizeResult.Optimal>(replacement.runSlice(Cancellation.Never, 1000L, 256L) {})
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `throwing publication token leaves the original search usable`() {
+        val problem = Problem(0, 1, arrayOf(IntDomain(0L, 3L)), emptyArray()).bake()
+        val objective = LinearObjective(intCoefficients = longArrayOf(1L))
+        val params = BacktrackParams(randomSeed = 0L)
+        val failure = IllegalStateException("publication token")
+        var initialized = false
+        val exchange = object : ClauseExchange {
+            override fun onRestart(session: PropagationSession) = Unit
+            override fun onSearchStart(session: PropagationSession) {
+                initialized = true
+            }
+        }
+        val token = Cancellation {
+            if (initialized) throw failure
+            false
+        }
+        ResumableMinimize(BacktrackSolver(problem), objective, params).use { first ->
+            val thrown = assertFailsWith<IllegalStateException> {
+                first.replacingObjective(objective, params.copy(cancellation = token, clauseExchange = exchange))
+            }
+            assertSame(failure, thrown)
+            assertIs<MinimizeResult.Optimal>(first.runSlice(Cancellation.Never, 1000L, 256L) {})
+            first.replacingObjective(objective, params).use { replacement ->
+                assertIs<MinimizeResult.Optimal>(replacement.runSlice(Cancellation.Never, 1000L, 256L) {})
             }
         }
     }
