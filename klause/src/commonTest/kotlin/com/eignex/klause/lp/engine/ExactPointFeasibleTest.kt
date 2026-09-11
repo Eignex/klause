@@ -52,6 +52,4 @@ class ExactPointFeasibleTest {
         assertTrue(witness.primal.single() != decimal)
         assertNull(checkedLpWitness(model, listOf(decimal)))
     }
-
-
 }

@@ -49,7 +49,8 @@ class ExactBasisVerifyTest {
             listOf(ExactLpRow()),
             ExactLpObjective(
                 listOf(ExactLpNumber.of(5L), ExactLpNumber.of(2L)),
-                constant = ExactLpNumber.of(7L), scale = ExactLpNumber.of(3L),
+                constant = ExactLpNumber.of(7L),
+                scale = ExactLpNumber.of(3L),
                 externalConstant = ExactLpNumber.of(11L),
             ),
         )
@@ -76,7 +77,8 @@ class ExactBasisVerifyTest {
                 ExactLpColumn(ExactLpBounds(three, three)),
                 ExactLpColumn(ExactLpBounds(ExactLpSide(zero))),
             ),
-            listOf(ExactLpRow()), ExactLpObjective(List(4) { zero }),
+            listOf(ExactLpRow()),
+            ExactLpObjective(List(4) { zero }),
         )
         val model = assertNotNull(LpExactState(source).toWorkingModel())
         val basis = Basis(intArrayOf(3), arrayOf(VarStatus.FREE, VarStatus.AT_UPPER, VarStatus.FIXED, VarStatus.BASIC))
@@ -102,9 +104,11 @@ class ExactBasisVerifyTest {
             listOf(
                 ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(ExactLpNumber.of(2L)))),
                 ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(ExactLpNumber.of(2L)))),
-                ExactLpColumn(fixed), ExactLpColumn(fixed),
+                ExactLpColumn(fixed),
+                ExactLpColumn(fixed),
             ),
-            List(2) { ExactLpRow() }, ExactLpObjective(listOf(ExactLpNumber.of(1L), ExactLpNumber.of(1L), zero, zero)),
+            List(2) { ExactLpRow() },
+            ExactLpObjective(listOf(ExactLpNumber.of(1L), ExactLpNumber.of(1L), zero, zero)),
         )
         val model = assertNotNull(LpExactState(source).toWorkingModel())
         val basis = Basis(intArrayOf(1, 0), arrayOf(VarStatus.BASIC, VarStatus.BASIC, VarStatus.FIXED, VarStatus.FIXED))
@@ -126,7 +130,8 @@ class ExactBasisVerifyTest {
             listOf(listOf(ExactLpEntry(0, ExactLpNumber.of(1L)), ExactLpEntry(1, ExactLpNumber.of(1L)))),
             listOf(zero, ExactLpNumber.of(1L)),
             listOf(ExactLpColumn(ExactLpBounds()), ExactLpColumn(fixed), ExactLpColumn(fixed)),
-            List(2) { ExactLpRow() }, ExactLpObjective(List(3) { zero }),
+            List(2) { ExactLpRow() },
+            ExactLpObjective(List(3) { zero }),
         )
         val model = assertNotNull(LpExactState(source).toWorkingModel())
         val basis = Basis(intArrayOf(0, 1), arrayOf(VarStatus.BASIC, VarStatus.BASIC, VarStatus.FIXED))
@@ -145,14 +150,18 @@ class ExactBasisVerifyTest {
     fun `BTRAN with nonzero free column residue cannot prove infeasibility`() {
         val zero = ExactLpNumber.of(0L)
         val source = ExactLpModel(
-            listOf(listOf(ExactLpEntry(0, ExactLpNumber.of(1L)))), listOf(ExactLpNumber.of(2L)),
+            listOf(listOf(ExactLpEntry(0, ExactLpNumber.of(1L)))),
+            listOf(ExactLpNumber.of(2L)),
             listOf(ExactLpColumn(ExactLpBounds()), ExactLpColumn(ExactLpBounds(ExactLpSide(zero)))),
-            listOf(ExactLpRow()), ExactLpObjective(listOf(zero, zero)),
+            listOf(ExactLpRow()),
+            ExactLpObjective(listOf(zero, zero)),
         )
         val model = assertNotNull(LpExactState(source).toWorkingModel())
 
         val checked = verifyExactBasis(
-            model, Basis(intArrayOf(0), arrayOf(VarStatus.BASIC, VarStatus.AT_LOWER)), rayRow = 0,
+            model,
+            Basis(intArrayOf(0), arrayOf(VarStatus.BASIC, VarStatus.AT_LOWER)),
+            rayRow = 0,
         )
 
         assertNull(checked.conflict)
@@ -204,7 +213,9 @@ class ExactBasisVerifyTest {
 
         val changed = verifyExactBasis(model, basis, cache = cache)
         val reordered = verifyExactBasis(
-            model, Basis(intArrayOf(1, 0), basis.status), cache = cache,
+            model,
+            Basis(intArrayOf(1, 0), basis.status),
+            cache = cache,
         )
 
         assertEquals(BigFraction.ofDouble(0.5), changed.witness?.primal?.first())
@@ -224,10 +235,16 @@ class ExactBasisVerifyTest {
 
         val singular = verifyExactBasis(model, basis, cache = cache)
         val limited = verifyExactBasis(
-            model, basis, cache = cache, limits = ExactBasisLimits(RationalBasisLimits(fill = 0)),
+            model,
+            basis,
+            cache = cache,
+            limits = ExactBasisLimits(RationalBasisLimits(fill = 0)),
         )
         val retried = verifyExactBasis(
-            model, basis, cache = cache, limits = ExactBasisLimits(RationalBasisLimits(fill = 0)),
+            model,
+            basis,
+            cache = cache,
+            limits = ExactBasisLimits(RationalBasisLimits(fill = 0)),
         )
 
         assertEquals(1, singular.singularRank)
@@ -275,7 +292,8 @@ class ExactBasisVerifyTest {
             }
         }.build(Sense.MINIMIZE)
         val basis = Basis(
-            IntArray(129) { 129 + it }, Array(258) { if (it < 129) VarStatus.AT_LOWER else VarStatus.BASIC },
+            IntArray(129) { 129 + it },
+            Array(258) { if (it < 129) VarStatus.AT_LOWER else VarStatus.BASIC },
         )
 
         val checked = verifyExactBasis(model, basis)
@@ -284,22 +302,26 @@ class ExactBasisVerifyTest {
         assertEquals(0, checked.metrics.factoryCalls)
         assertNull(checked.witness)
     }
+
     @Test
     fun `logical support retains local row premises even with zero dual`() {
         val zero = ExactLpNumber.of(0L)
         val one = ExactLpNumber.of(1L)
         val premises = ExactLpPremises(emptyList(), listOf(17))
         val source = ExactLpModel(
-            listOf(listOf(ExactLpEntry(0, one))), listOf(one),
+            listOf(listOf(ExactLpEntry(0, one))),
+            listOf(one),
             listOf(
                 ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(one))),
                 ExactLpColumn(ExactLpBounds(ExactLpSide(zero))),
             ),
-            listOf(ExactLpRow(global = false, premises = premises)), ExactLpObjective(listOf(zero, one)),
+            listOf(ExactLpRow(global = false, premises = premises)),
+            ExactLpObjective(listOf(zero, one)),
         )
         val state = LpExactState(source)
         val checked = verifyExactBasis(
-            assertNotNull(state.toWorkingModel()), Basis(intArrayOf(0), arrayOf(VarStatus.BASIC, VarStatus.AT_LOWER)),
+            assertNotNull(state.toWorkingModel()),
+            Basis(intArrayOf(0), arrayOf(VarStatus.BASIC, VarStatus.AT_LOWER)),
         )
 
         val support = assertNotNull(checked.bound?.support)
@@ -314,16 +336,20 @@ class ExactBasisVerifyTest {
     fun `strict selected side proves contradiction with zero surplus`() {
         val zero = ExactLpNumber.of(0L)
         val source = ExactLpModel(
-            listOf(listOf(ExactLpEntry(0, ExactLpNumber.of(1L)))), listOf(zero),
+            listOf(listOf(ExactLpEntry(0, ExactLpNumber.of(1L)))),
+            listOf(zero),
             listOf(
                 ExactLpColumn(ExactLpBounds(ExactLpSide(zero, strict = true))),
                 ExactLpColumn(ExactLpBounds(ExactLpSide(zero))),
             ),
-            listOf(ExactLpRow()), ExactLpObjective(listOf(zero, zero)),
+            listOf(ExactLpRow()),
+            ExactLpObjective(listOf(zero, zero)),
         )
         val model = assertNotNull(LpExactState(source).toWorkingModel())
         val checked = verifyExactBasis(
-            model, Basis(intArrayOf(1), arrayOf(VarStatus.AT_LOWER, VarStatus.BASIC)), rayRow = 0,
+            model,
+            Basis(intArrayOf(1), arrayOf(VarStatus.AT_LOWER, VarStatus.BASIC)),
+            rayRow = 0,
         )
 
         assertTrue(checkedLpConflict(model, assertNotNull(checked.conflict)))
@@ -335,12 +361,14 @@ class ExactBasisVerifyTest {
     fun `persistent bound and objective adoption reuses factors without pivots`() {
         val zero = ExactLpNumber.of(0L)
         val source = ExactLpModel(
-            listOf(listOf(ExactLpEntry(0, ExactLpNumber.of(-1L)))), listOf(ExactLpNumber.of(-2L)),
+            listOf(listOf(ExactLpEntry(0, ExactLpNumber.of(-1L)))),
+            listOf(ExactLpNumber.of(-2L)),
             listOf(
                 ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(ExactLpNumber.of(10L)))),
                 ExactLpColumn(ExactLpBounds(ExactLpSide(zero))),
             ),
-            listOf(ExactLpRow()), ExactLpObjective(listOf(ExactLpNumber.of(1L), zero)),
+            listOf(ExactLpRow()),
+            ExactLpObjective(listOf(ExactLpNumber.of(1L), zero)),
         )
         val trail = LpBoundTrail(source)
         var model = assertNotNull(trail.state.toWorkingModel())
@@ -370,12 +398,14 @@ class ExactBasisVerifyTest {
     fun `restored and replacement owners do not inherit rational factors`() {
         val zero = ExactLpNumber.of(0L)
         val source = ExactLpModel(
-            listOf(listOf(ExactLpEntry(0, ExactLpNumber.of(1L)))), listOf(ExactLpNumber.of(1L)),
+            listOf(listOf(ExactLpEntry(0, ExactLpNumber.of(1L)))),
+            listOf(ExactLpNumber.of(1L)),
             listOf(
                 ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(ExactLpNumber.of(2L)))),
                 ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(zero))),
             ),
-            listOf(ExactLpRow()), ExactLpObjective(listOf(zero, zero)),
+            listOf(ExactLpRow()),
+            ExactLpObjective(listOf(zero, zero)),
         )
         val model = assertNotNull(LpExactState(source).toWorkingModel())
         RevisedSimplex(model).use { solver ->
@@ -385,13 +415,15 @@ class ExactBasisVerifyTest {
             assertTrue(solver.restoreBasisRestart(snapshot))
             val restored = assertNotNull(solver.resolveBounds())
             assertEquals(
-                1, verifyExactBasis(model, restored.basis, cache = solver.exactBasisCache).metrics.factoryCalls,
+                1,
+                verifyExactBasis(model, restored.basis, cache = solver.exactBasisCache).metrics.factoryCalls,
             )
             snapshot.close()
             RevisedSimplex(model).use { replacement ->
                 val result = assertNotNull(replacement.solve())
                 assertEquals(
-                    1, verifyExactBasis(model, result.basis, cache = replacement.exactBasisCache).metrics.factoryCalls,
+                    1,
+                    verifyExactBasis(model, result.basis, cache = replacement.exactBasisCache).metrics.factoryCalls,
                 )
             }
         }
@@ -402,12 +434,14 @@ class ExactBasisVerifyTest {
         val huge = BigFraction.of(BigInteger.ONE shl 140, BigInteger.ONE)
         val zero = ExactLpNumber.of(0L)
         val source = ExactLpModel(
-            listOf(listOf(ExactLpEntry(0, ExactLpNumber.of(1L)))), listOf(ExactLpNumber.of(huge)),
+            listOf(listOf(ExactLpEntry(0, ExactLpNumber.of(1L)))),
+            listOf(ExactLpNumber.of(huge)),
             listOf(
                 ExactLpColumn(ExactLpBounds()),
                 ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(zero))),
             ),
-            listOf(ExactLpRow()), ExactLpObjective(listOf(zero, zero)),
+            listOf(ExactLpRow()),
+            ExactLpObjective(listOf(zero, zero)),
         )
         val model = assertNotNull(LpExactState(source).toWorkingModel())
 
@@ -426,13 +460,16 @@ class ExactBasisVerifyTest {
         val zero = ExactLpNumber.of(0L)
         val fixed = ExactLpBounds(ExactLpSide(zero), ExactLpSide(zero))
         val source = ExactLpModel(
-            listOf(listOf(
+            listOf(
+                listOf(
                 ExactLpEntry(0, ExactLpNumber.of(large + BigFraction.ONE)),
                 ExactLpEntry(1, ExactLpNumber.of(large + BigFraction.ofLong(3L))),
-            )),
+            )
+            ),
             listOf(zero, ExactLpNumber.of(1L)),
             listOf(ExactLpColumn(ExactLpBounds()), ExactLpColumn(fixed), ExactLpColumn(fixed)),
-            List(2) { ExactLpRow() }, ExactLpObjective(List(3) { zero }),
+            List(2) { ExactLpRow() },
+            ExactLpObjective(List(3) { zero }),
         )
         val state = LpExactState(source)
         val model = assertNotNull(state.toWorkingModel())
@@ -440,7 +477,8 @@ class ExactBasisVerifyTest {
             override val solvedExactState = state
             override val infeasibleRay = doubleArrayOf(Double.NaN, Double.NaN)
             override val infeasibleBasis = Basis(
-                intArrayOf(0, 1), arrayOf(VarStatus.BASIC, VarStatus.BASIC, VarStatus.FIXED),
+                intArrayOf(0, 1),
+                arrayOf(VarStatus.BASIC, VarStatus.BASIC, VarStatus.FIXED),
             )
             override val infeasibleRow = 1
             override fun solve(warm: Basis?): FloatLpResult? = null
@@ -465,7 +503,9 @@ class ExactBasisVerifyTest {
         }.build(Sense.MINIMIZE)
         val hint = FloatLpResult(
             Basis(intArrayOf(1), arrayOf(VarStatus.AT_LOWER, VarStatus.BASIC)),
-            0.0, doubleArrayOf(Double.NaN), doubleArrayOf(0.0),
+            0.0,
+            doubleArrayOf(Double.NaN),
+            doubleArrayOf(0.0),
         )
         val result = newLpSolver(model).use { certifyLpResult(model, it, hint) }
 
@@ -485,7 +525,9 @@ class ExactBasisVerifyTest {
         val complete = verifyExactBasis(model, basis)
         val work = complete.metrics.work
         val checked = verifyExactBasis(
-            model, basis, limits = ExactBasisLimits(RationalBasisLimits(work = work * 2L / 3L)),
+            model,
+            basis,
+            limits = ExactBasisLimits(RationalBasisLimits(work = work * 2L / 3L)),
         )
 
         assertEquals(ExactBasisDecline.WORK, checked.metrics.decline)
@@ -527,19 +569,27 @@ class ExactBasisVerifyTest {
         val one = ExactLpNumber.of(1L)
         val fixed = ExactLpBounds(ExactLpSide(zero), ExactLpSide(zero))
         val source = ExactLpModel(
-            listOf(listOf(ExactLpEntry(0, one))), listOf(zero),
+            listOf(listOf(ExactLpEntry(0, one))),
+            listOf(zero),
             listOf(ExactLpColumn(ExactLpBounds()), ExactLpColumn(fixed)),
-            listOf(ExactLpRow()), ExactLpObjective(listOf(zero, zero)),
+            listOf(ExactLpRow()),
+            ExactLpObjective(listOf(zero, zero)),
         )
         val premises = ExactLpPremises(emptyList(), listOf(23))
         val trail = LpBoundTrail(source)
         assertTrue(trail.push())
-        assertTrue(trail.append(
+        assertTrue(
+            trail.append(
             LpScopedRow(
-                1L, listOf(0 to one), one, ExactLpColumn(fixed), ExactLpRow(global = false, premises = premises),
+                1L,
+                listOf(0 to one),
+                one,
+                ExactLpColumn(fixed),
+                ExactLpRow(global = false, premises = premises),
             ),
             scoped = true,
-        ))
+        )
+        )
         val state = trail.state
         val cache = ExactBasisCache()
         val basis = Basis(intArrayOf(0, 1), arrayOf(VarStatus.BASIC, VarStatus.BASIC, VarStatus.FIXED))
@@ -567,7 +617,8 @@ class ExactBasisVerifyTest {
         val solver = object : LpSolver {
             override val infeasibleRay = doubleArrayOf(Double.NaN, Double.NaN)
             override val infeasibleBasis = Basis(
-                intArrayOf(0, 1), arrayOf(VarStatus.BASIC, VarStatus.BASIC, VarStatus.FIXED),
+                intArrayOf(0, 1),
+                arrayOf(VarStatus.BASIC, VarStatus.BASIC, VarStatus.FIXED),
             )
             override val infeasibleRow = 1
             override fun solve(warm: Basis?): FloatLpResult? = null
@@ -590,7 +641,9 @@ class ExactBasisVerifyTest {
         }.build(Sense.MINIMIZE)
         val hint = FloatLpResult(
             Basis(intArrayOf(1), arrayOf(VarStatus.AT_LOWER, VarStatus.BASIC)),
-            0.0, doubleArrayOf(Double.NaN), doubleArrayOf(0.0),
+            0.0,
+            doubleArrayOf(Double.NaN),
+            doubleArrayOf(0.0),
         )
         val policy = LpCertificationPolicy { certifier, success -> certifier != LpCertifier.EXACT_BASIS && success }
 
@@ -617,5 +670,4 @@ class ExactBasisVerifyTest {
         assertNull(result.bound)
         assertEquals(LpVerdict.FEASIBLE, result.verdict)
     }
-
 }
