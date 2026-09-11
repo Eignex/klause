@@ -13,6 +13,23 @@ import kotlin.test.assertTrue
 
 class LpModelTest {
     @Test
+    fun `objective helpers clear every previous structural and logical cost`() {
+        val source = LpBuilder().apply {
+            addVar(0L, 2L, cost = 7L)
+            addVar(0L, 2L, cost = 11L)
+            addRow(intArrayOf(0, 1), longArrayOf(1L, 1L), Relation.LE, 2L)
+        }.build(Sense.MINIMIZE)
+        source.cost[2] = 13L
+
+        val single = source.withSingleColumnObjective(1, -1L)
+        val row = source.withRowObjective(intArrayOf(0), longArrayOf(3L))
+
+        assertContentEquals(longArrayOf(0L, -1L, 0L), single.cost)
+        assertContentEquals(longArrayOf(3L, 0L, 0L), row.cost)
+        assertContentEquals(longArrayOf(7L, 11L, 13L), source.cost)
+    }
+
+    @Test
     fun `mixed rows preserve coalescing shifts and maximizing costs`() {
         val model = LpBuilder().apply {
             val x = addVar(2L, 7L, cost = 3L)
@@ -198,8 +215,8 @@ class LpModelTest {
 
         val copies = listOf(
             model.rebind(longArrayOf(0L), longArrayOf(4L)),
-            model.withSingleColumnObjective(0, -1L, 0),
-            model.withRowObjective(intArrayOf(0), longArrayOf(3L), intArrayOf(0)),
+            model.withSingleColumnObjective(0, -1L),
+            model.withRowObjective(intArrayOf(0), longArrayOf(3L)),
         )
 
         for (copy in copies) {
@@ -224,8 +241,8 @@ class LpModelTest {
         val model = LpBuilder().apply { addVar(2L, 5L, cost = 3L) }.build(Sense.MINIMIZE)
         val before = exactLpStateKey(model)
 
-        val single = model.withSingleColumnObjective(0, -1L, 0)
-        val row = single.withRowObjective(intArrayOf(0), longArrayOf(7L), intArrayOf(0))
+        val single = model.withSingleColumnObjective(0, -1L)
+        val row = single.withRowObjective(intArrayOf(0), longArrayOf(7L))
 
         assertContentEquals(before, exactLpStateKey(model))
         assertEquals(3L, model.cost[0])

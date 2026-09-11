@@ -22,6 +22,24 @@ import com.eignex.klause.ir.ObjectiveSense as ObjectiveDirection
 class OpenTheoryMinimizeTest {
 
     @Test
+    fun `replacing an open objective starts from the original unbounded source root`() {
+        val parsed = modelOf("""
+            (declare-const x Int)
+            (assert (>= x 2))
+            (assert (<= x 5))
+        """.trimIndent())
+        val x = parsed.intVarNames.getValue("x")
+        val positive = LinearObjective(intCoefficients = LongArray(parsed.model.numIntVars).also { it[x] = 1L })
+        val negative = LinearObjective(intCoefficients = LongArray(parsed.model.numIntVars).also { it[x] = -1L })
+        val first = OpenTheoryMinimizer(parsed.model, positive)
+        assertEquals("2", assertIs<OpenTheoryOptimum.Optimal>(first.minimize()).value.toString())
+
+        val second = first.replacingObjective(negative)
+        assertEquals("-5", assertIs<OpenTheoryOptimum.Optimal>(second.minimize()).value.toString())
+        assertEquals("2", assertIs<OpenTheoryOptimum.Optimal>(second.replacingObjective(positive).minimize()).value.toString())
+    }
+
+    @Test
     fun `optimization envelope reports the whole descent time`() {
         val round = SolveStats(run = RunStats(backend = "exact-lia", wallMs = 25, timedOut = true))
         val envelope = SolveStats(run = RunStats(backend = "exact-lia", wallMs = 1_000))

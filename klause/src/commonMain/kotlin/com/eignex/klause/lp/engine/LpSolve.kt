@@ -786,6 +786,7 @@ internal fun BigFraction.ceilLong(): Long? {
 
 // A bounded value snapshot prevents sibling, objective and premise changes from reusing counters.
 internal class LpCounterResults {
+    private var state: LpExactState? = null
     private var key: ByteArray? = null
     private var evidence: CertifiedLpResult? = null
     private var acceptedBy: LpCertificationPolicy? = null
@@ -794,6 +795,7 @@ internal class LpCounterResults {
 
     fun declineStorage() {
         storageDeclined = true
+        state = null
         key = null
         evidence = null
         acceptedBy = null
@@ -802,10 +804,12 @@ internal class LpCounterResults {
     fun read(model: LpModel, policy: LpCertificationPolicy): CertifiedLpResult? {
         val current = keyOf(model)
         if (policy !== ProductionLpCertificationPolicy || current == null ||
-            key?.contentEquals(current) != true || acceptedBy !== policy
+            key?.contentEquals(current) != true || acceptedBy !== policy || state !== model.exactState
         ) {
+            state = null
             key = null
             evidence = null
+            acceptedBy = null
             return null
         }
         return evidence
@@ -817,6 +821,7 @@ internal class LpCounterResults {
             return
         }
         if (policy !== ProductionLpCertificationPolicy || (result.witness == null && result.bound == null)) return
+        state = model.exactState
         key = current
         // No float vectors, lazy model views, candidate rejections or infeasibility claims are cached.
         evidence = CertifiedLpResult(null, result.bound, result.witness, null, null, false, { null })

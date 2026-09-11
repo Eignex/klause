@@ -54,6 +54,9 @@ internal class LpScopedSolver(
     private var trail = LpBoundTrail(initial)
     private var solver: PersistentLpSolver? = null
     private var closed = false
+    private var workingActive = false
+    var lastWorkingMetrics: LpWorkingMetrics? = null
+        private set
     private var editAttempts = 0L
     private var editSuccesses = 0L
     private var preparationAttempts = 0L
@@ -93,6 +96,7 @@ internal class LpScopedSolver(
     }
 
     fun prepare(token: Cancellation = cancellation): Boolean {
+        requireAvailable()
         if (closed || token() || state.model.m > maxRetainedRows) return false
         if (solver != null) return true
         solver = prepared(state, token)?.first ?: return false
@@ -112,6 +116,7 @@ internal class LpScopedSolver(
     fun pop(targetDepth: Int, token: Cancellation = cancellation): Boolean = edit(token) { it.pop(targetDepth, token) }
 
     fun resetRoot(initial: LpExactState, token: Cancellation = cancellation): Boolean {
+        requireAvailable()
         editAttempts++
         if (closed || token() || initial.depth != 0 || !state.sameMatrix(initial)) return false
         val current = solver
@@ -135,11 +140,16 @@ internal class LpScopedSolver(
 
     fun compact(token: Cancellation = cancellation): Boolean = edit(token) { it.compact(token) }
 
-    fun captureBasisRestart(token: Cancellation = cancellation): EngineBasisRestartSnapshot? =
-        if (closed || token()) null else solver?.captureBasisRestart(token)
+    fun captureBasisRestart(token: Cancellation = cancellation): EngineBasisRestartSnapshot? {
+        requireAvailable()
+        return if (closed || token()) null else solver?.captureBasisRestart(token)
+    }
 
-    fun restoreBasisRestart(snapshot: EngineBasisRestartSnapshot, token: Cancellation = cancellation): Boolean =
-        !closed && !token() && solver?.restoreBasisRestart(snapshot, token) == true
+    fun restoreBasisRestart(snapshot: EngineBasisRestartSnapshot, token: Cancellation = cancellation): Boolean {
+        requireAvailable()
+        lastResult = null
+        return !closed && !token() && solver?.restoreBasisRestart(snapshot, token) == true
+    }
 
     val basisLifecycleWork: BasisOperationWork? get() = solver?.basisLifecycleWork
 
@@ -171,6 +181,7 @@ internal class LpScopedSolver(
     }
 
     fun solveFloat(warm: Basis? = null, token: Cancellation = cancellation): Pair<LpSolver, FloatLpResult?>? {
+        requireAvailable()
         lastResult = null
         lastMetrics = LpSolveMetrics()
         if (!prepare(token)) return null
@@ -190,6 +201,7 @@ internal class LpScopedSolver(
     }
 
     private inline fun edit(token: Cancellation, append: Boolean = false, change: (LpBoundTrail) -> Boolean): Boolean {
+        requireAvailable()
         editAttempts++
         if (closed || token()) return false
         val next = LpBoundTrail(state)
@@ -206,6 +218,77 @@ internal class LpScopedSolver(
         if (current == null && token()) return false
         publish(next)
         return true
+    }
+
+    internal fun requireAvailable() {
+        check(!workingActive) { "source owner is suspended by a working scope" }
+    }
+
+    fun <T> withWorkingModel(
+        working: LpWorkingModel,
+        token: Cancellation = cancellation,
+        block: (LpWorkingScope) -> T,
+    ): T {
+        requireAvailable()
+        check(!closed) { "scoped solver is closed" }
+        require(working.source === state) { "working model belongs to another source state" }
+        val scopeToken = Cancellation { cancellation() || token() }
+        val child = LpScopedSolver(
+            working.state, scopeToken, context, refactorUpdateLimit, iterationLimit, workLimit,
+            trackDegeneracy, maxRetainedRows, appendSelection, pricing,
+        )
+        val scope = LpWorkingScope(working, child, scopeToken)
+        workingActive = true
+        lastResult = null
+        lastWorkingMetrics = null
+        var failure: Throwable? = null
+        try {
+            return block(scope)
+        } catch (primary: Throwable) {
+            failure = primary
+            throw primary
+        } finally {
+            try {
+                scope.close(failure)
+            } finally {
+                lastWorkingMetrics = scope.metrics
+                lastResult = null
+                workingActive = false
+            }
+        }
+    }
+
+    // The caller supplies the objective-independent region; root depth alone is not provenance.
+    fun replaceObjective(
+        objective: ExactLpObjective,
+        baseRegion: LpExactState,
+        token: Cancellation = cancellation,
+    ): Boolean {
+        requireAvailable()
+        if (closed || token() || baseRegion.depth != 0) return false
+        val next = LpBoundTrail(baseRegion)
+        if (!next.replaceObjective(objective, token)) return false
+        if (state.sameMatrix(next.state)) return resetRoot(next.state, token)
+        editAttempts++
+        val replacement = prepared(next.state, token) ?: return false
+        var published = false
+        var failure: Throwable? = null
+        try {
+            if (token()) return false
+            val old = solver
+            if (old != null) recordPendingAppendSolve(old)
+            solver = replacement.first
+            clearPendingAppendSolve()
+            publish(next)
+            published = true
+            if (old != null) closeOwner(old)
+            return true
+        } catch (primary: Throwable) {
+            failure = primary
+            throw primary
+        } finally {
+            if (!published) closeOwner(replacement.first, failure)
+        }
     }
 
     private fun publish(next: LpBoundTrail) {
@@ -499,6 +582,7 @@ internal class LpScopedSolver(
     }
 
     override fun close() {
+        requireAvailable()
         if (closed) return
         closed = true
         continuationCache.clear()

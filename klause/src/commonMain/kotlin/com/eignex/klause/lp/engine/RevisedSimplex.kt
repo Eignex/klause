@@ -472,6 +472,12 @@ internal class RevisedSimplex(
         continuationAvailable = false
         stoppedContinuationBasis = null
         exactBasisCache.clear()
+        solvedExactState = null
+        optimalBasis = null
+        optimalPrimal = null
+        infeasibleBasis = null
+        infeasibleRow = -1
+        infeasibleRay = null
         val snapshots = restartSnapshots.toList()
         restartSnapshots.clear()
         var failure: Throwable? = null
@@ -922,6 +928,14 @@ internal class RevisedSimplex(
         if (next.n != n || next.m != m) return false
         model = next
         cancellation = token
+        continuationAvailable = false
+        stoppedContinuationBasis = null
+        solvedExactState = null
+        optimalBasis = null
+        optimalPrimal = null
+        infeasibleBasis = null
+        infeasibleRow = -1
+        infeasibleRay = null
         return true
     }
 
@@ -1273,6 +1287,7 @@ internal class RevisedSimplex(
     private var basisKept = false
 
     // A checked basis failure cannot supply a terminal claim or a factorization safe to keep.
+    @Suppress("TooGenericExceptionCaught")
     private inline fun numericalSolve(block: () -> FloatLpResult?): FloatLpResult? = try {
         stoppedContinuationBasis = null
         continuationAvailable = true
@@ -1296,9 +1311,14 @@ internal class RevisedSimplex(
                 infeasibleRay = null
             }
         }
-    } catch (_: BasisArithmeticException) {
+    } catch (primary: BasisArithmeticException) {
         val continuation = continuationBasis(model)
-        close()
+        try {
+            close()
+        } catch (cleanup: Throwable) {
+            primary.addSuppressed(cleanup)
+            throw primary
+        }
         stoppedContinuationBasis = continuation
         continuationAvailable = continuation != null
         optimalBasis = null
@@ -1309,9 +1329,17 @@ internal class RevisedSimplex(
         cachedBeta = null
         solvedExactState = null
         null
+    } catch (primary: Throwable) {
+        try {
+            close()
+        } catch (cleanup: Throwable) {
+            primary.addSuppressed(cleanup)
+        }
+        throw primary
     }
 
     private fun resetSolveState(warmAttempted: Boolean) {
+        degenerateColumns = 0
         solvedExactState = null
         optimalBasis = null
         optimalPrimal = null

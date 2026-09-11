@@ -66,6 +66,18 @@ class LpBoundingLbTreeSearchTest {
     }
 
     @Test
+    fun `tree objective uses its own relaxation after the parent found a different optimum`() {
+        val problem = Problem(0, 1, arrayOf(IntDomain(0, 3)), emptyArray())
+        val positive = LinearObjective(intCoefficients = longArrayOf(1L))
+        val negative = LinearObjective(intCoefficients = longArrayOf(-1L))
+        engine(problem, positive).use { parent ->
+            assertEquals(0L, assertNotNull(parent.lbTreeSearch(positive, Cancellation.Never)).ints[0])
+            assertEquals(3L, assertNotNull(parent.lbTreeSearch(negative, Cancellation.Never)).ints[0])
+            assertEquals(0L, assertNotNull(parent.lbTreeSearch(positive, Cancellation.Never)).ints[0])
+        }
+    }
+
+    @Test
     fun `the subsolver dives to an optimal incumbent on a small problem`() {
         // Triangle vertex cover: cost = x0+x1+x2 over {0,1}³, pair-covering rows ⇒ optimum cost 2.
         val p = Problem(

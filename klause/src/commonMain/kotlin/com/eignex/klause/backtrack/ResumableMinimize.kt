@@ -25,6 +25,7 @@ import com.eignex.klause.propagation.CpSearchComponent
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.baked
+import com.eignex.klause.propagation.conditionedRoot
 import com.eignex.klause.solver.ResumableSearch
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.incumbent.Candidate
@@ -105,8 +106,11 @@ internal class ResumableMinimize(
     private val pausable: Boolean = true,
     // Repair owns the handle across fragment terminals and explicitly closes it after the final fragment.
     private val rebindable: Boolean = false,
+    initialCandidate: Sample? = null,
+    private val problem: BakedProblem = solver.problem,
 ) : ResumableSearch {
-    private val problem: BakedProblem = solver.problem
+    private var initialCandidate = initialCandidate
+    private var replaced = false
 
     /** Set when a leaf's residual continuous LP was neither certified feasible nor infeasible, so an
      *  exhausted search with no incumbent must report `unknown` rather than Infeasible. */
@@ -260,19 +264,26 @@ internal class ResumableMinimize(
     override val stats: SolveStats get() = sink.snapshot()
 
     init {
-        val seeded = session.seed(params.assumptions)
-        cp.rebase()
-        if (seeded is PropagationResult.Unsat || session.isUnsatAtRoot) {
-            rootExhausted = (problem.baked as? PropagationResult.Unsat)?.let(::coreOf)
-            rootIsExhausted = true
-        } else {
-            when (searchSession.initialize()) {
-                ComponentResult.Consistent -> params.clauseExchange?.onSearchStart(session)
-                is ComponentResult.Conflict -> rootExhausted = null
-                ComponentResult.Indeterminate -> Unit
+        try {
+            val seeded = session.seed(params.assumptions)
+            cp.rebase()
+            if (seeded is PropagationResult.Unsat || session.isUnsatAtRoot ||
+                problem.baked is PropagationResult.Unsat
+            ) {
+                rootExhausted = (problem.baked as? PropagationResult.Unsat)?.let(::coreOf)
+                rootIsExhausted = true
+            } else {
+                when (searchSession.initialize()) {
+                    ComponentResult.Consistent -> params.clauseExchange?.onSearchStart(session)
+                    is ComponentResult.Conflict -> rootExhausted = null
+                    ComponentResult.Indeterminate -> Unit
+                }
             }
+            run = searchSession.openRun(problem.numBoolVars, traversal)
+        } catch (primary: Throwable) {
+            closeAfter(primary)
+            throw primary
         }
-        run = searchSession.openRun(problem.numBoolVars, traversal)
     }
 
     override fun runSlice(
@@ -302,6 +313,32 @@ internal class ResumableMinimize(
             closeAfter(failure)
             throw failure
         }
+    }
+
+    internal fun replacingObjective(next: LinearObjective, freshParams: BacktrackParams): ResumableMinimize {
+        check(!replaced) { "search has been replaced" }
+        val sample = incumbents.current()?.assignment?.let {
+            Sample(it.bools.copyOf(), it.ints.copyOf())
+        }
+        val root = solver.problem.conditionedRoot(freshParams.assumptions, freshParams.cancellation)
+        val rootPins = (root.baked as? PropagationResult.Implied)?.toAssumptions() ?: Assumptions.None
+        val replacement = ResumableMinimize(
+            solver,
+            next,
+            freshParams.copy(assumptions = rootPins.mergedWith(freshParams.assumptions)),
+            pausable,
+            initialCandidate = sample,
+            problem = root,
+        )
+        try {
+            close()
+        } catch (primary: Throwable) {
+            replacement.closeAfter(primary)
+            throw primary
+        } finally {
+            replaced = true
+        }
+        return replacement
     }
 
     override fun close() {
@@ -576,7 +613,49 @@ internal class ResumableMinimize(
         }
     }
 
+    private fun revalidateInitialCandidate(): MinimizeResult.WithSample? {
+        val sample = initialCandidate ?: return null
+        initialCandidate = null
+        val token = params.cancellation or Cancellation.after(LP_VERIFY_BUDGET)
+        if (token() || sample.bools.size != problem.numBoolVars || sample.ints.size != problem.numIntVars) return null
+        val validation = PropagationSession(problem, token)
+        if (validation.seed(params.assumptions) is PropagationResult.Unsat || validation.isUnsatAtRoot) return null
+        for (variable in sample.bools.indices) {
+            if (validation.pinBool(variable, sample.bools[variable]) is PropagationResult.Unsat) return null
+        }
+        for (variable in sample.ints.indices) {
+            if (validation.pinInt(variable, sample.ints[variable]) is PropagationResult.Unsat) return null
+        }
+        if (validation.fixpointCancelled || token()) return null
+        val accepted = if (problem.numRealVars == 0) {
+            sample
+        } else {
+            val real = leafRealFeasibility(
+                problem,
+                objective,
+                sample,
+                token,
+                componentSplit = params.lpPlan.componentSplit,
+                sink = sink.lp,
+                context = solver.lpSolveContext,
+                pricing = LpPricingOptions(params.zeroObjectivePricing, params.randomSeed ?: 0L),
+            )
+            if (real.verdict !in listOf(
+                    LpVerdict.FEASIBLE,
+                    LpVerdict.ATTAINED_OPTIMUM,
+                    LpVerdict.UNBOUNDED,
+                )
+            ) {
+                    return null
+                }
+            sample.copy(reals = real.reals)
+        }
+        if (token()) return null
+        return recordIfImproving(accepted, objective.evaluate(accepted))
+    }
+
     private fun firstRunWorkBody(): MinimizeResult.WithSample? {
+        revalidateInitialCandidate()?.let { return it }
         val rootToken = rootLpBudget()
         if (rootLpDutyCycle.allows(lpEngine.totalSolveWork())) {
             val before = lpEngine.totalSolveWork()

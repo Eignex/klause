@@ -171,6 +171,15 @@ class OpenTheoryMinimizer internal constructor(
      */
     val theoryPipeline: ProblemPipeline get() = route
 
+    internal fun replacingObjective(next: LinearObjective): OpenTheoryMinimizer = OpenTheoryMinimizer(
+        source,
+        next,
+        presolveConfig,
+        solutionSetSensitive,
+        presolveCancellation,
+        presolveBudget,
+    )
+
     /** Minimizes the objective, tightening the bound until a round refutes it. */
     fun minimize(params: TheoryParams = TheoryParams()): OpenTheoryOptimum {
         // Preparation is the descent's first phase, so the caller's stop reaches it and its own summary is

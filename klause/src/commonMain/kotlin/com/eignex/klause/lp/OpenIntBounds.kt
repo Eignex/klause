@@ -130,8 +130,6 @@ internal fun tightenOpenIntBounds(
     }
 
     var warm: Basis? = null
-    var prevPos = -1
-    var prevNeg = -1
     var solves = 0
     for (v in 0 until n) {
         if (cancellation() || solves >= OBBT_MAX_SIDE_SOLVES) break
@@ -146,12 +144,8 @@ internal fun tightenOpenIntBounds(
             val model = base.withSingleColumnObjective(
                 posCol[v],
                 if (maximize) -1L else 1L,
-                prevPos,
                 negCol = negCol[v],
-                prevNegCol = prevNeg,
             )
-            prevPos = posCol[v]
-            prevNeg = negCol[v]
             val solver = newLpSolver(model, cancellation, factory = context.engineFactory)
             val result = try {
                 solver.solvePrimal(warm)
@@ -217,7 +211,7 @@ private fun tightenByNeighborhoodProbes(
         for (maximize in booleanArrayOf(true, false)) {
             if (if (maximize) cur.hi != null else cur.lo != null) continue
             solves++
-            val model = nb.model.withSingleColumnObjective(p, if (maximize) -1L else 1L, prevCol = -1, negCol = q)
+            val model = nb.model.withSingleColumnObjective(p, if (maximize) -1L else 1L, negCol = q)
             val solver = newLpSolver(model, cancellation, factory = context.engineFactory)
             val result = try {
                 solver.solvePrimal(null)
