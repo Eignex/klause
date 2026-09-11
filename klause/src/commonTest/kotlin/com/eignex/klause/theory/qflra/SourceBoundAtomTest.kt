@@ -100,9 +100,9 @@ class SourceBoundAtomTest {
         val upper = first.positive.payload as SourceBoundAtom
         for (a in -2L..3L) {
             for (b in -2L..3L) {
-            val point = mapOf<SearchValueKey, BigFraction>(x to BigFraction.ofLong(a), y to BigFraction.ofLong(b))
-            assertEquals(2 * a + b + 3 <= 7, holds(upper, point))
-        }
+                val point = mapOf<SearchValueKey, BigFraction>(x to BigFraction.ofLong(a), y to BigFraction.ofLong(b))
+                assertEquals(2 * a + b + 3 <= 7, holds(upper, point))
+            }
         }
     }
 
@@ -183,7 +183,7 @@ class SourceBoundAtomTest {
             comparison < 0 || (comparison == 0 && !bound.strict)
         } else {
             comparison > 0 ||
-            comparison == 0 && !bound.strict
+                comparison == 0 && !bound.strict
         }
     }
 }
