@@ -687,7 +687,7 @@ class LpDeclineDisciplineTest {
     }
 
     @Test
-    fun `exact SMT dependencies have no floating LP reach`() {
+    fun `open theory uses the shared LP owner while exact arithmetic stays independent`() {
         val root = repositoryRoot()
         val exactRoot = root.resolve("klause/src/commonMain/kotlin/com/eignex/klause")
         val exactSources = kotlinSources(exactRoot.resolve("theory/qflra")) +
@@ -705,13 +705,26 @@ class LpDeclineDisciplineTest {
         for (path in exactSources) {
             val code = LpBoundaryScanner.codeOnly(path.readText())
             val relative = root.relativize(path).toString()
-            assertFalse("com.eignex.klause.lp.engine" in code, relative)
+            val allowed = when (path.fileName.toString()) {
+                "QfLiraSolver.kt" -> setOf("LpSolveContext", "LpVerdict")
+
+                "QfLraSystem.kt" -> setOf(
+                    "ExactLpBounds", "ExactLpColumn", "ExactLpEntry", "ExactLpModel", "ExactLpNumber",
+                    "ExactLpObjective", "ExactLpRow", "ExactLpSide", "LpScopedRow",
+                )
+
+                else -> emptySet()
+            }
+            for (reference in Regex("com\\.eignex\\.klause\\.lp\\.engine\\.([A-Za-z_*]+)").findAll(code)) {
+                assertTrue(reference.groupValues[1] in allowed, "$relative: ${reference.value}")
+            }
             assertFalse("solveAndCertify" in code, relative)
-            assertFalse("LpSolveContext" in code, relative)
             assertFalse("newLpSolver" in code, relative)
+            assertFalse("newPersistentSolver" in code, relative)
         }
         assertTrue("bigRationalOutcome" in source(root, exactPaths.single { it.endsWith("ExactLraSolver.kt") }))
         assertTrue("ExactIntegerSearch" in source(root, exactPaths.single { it.endsWith("QfLiraSolver.kt") }))
+        assertTrue("LpPropagator(" in source(root, exactPaths.single { it.endsWith("QfLiraSolver.kt") }))
     }
 
     private class Harness(val factory: ConsumerRecordingFactory, val policy: DecliningPolicy) {

@@ -1,11 +1,18 @@
 package com.eignex.klause.theory.qflra
 
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
+import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntBounds
+import com.eignex.klause.ir.LinearForm
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.RealConstants
+import com.eignex.klause.ir.RealConsts
+import com.eignex.klause.ir.TaggedLinearRow
+import com.eignex.klause.ir.Term
 import com.eignex.klause.lp.engine.FloatLpResult
 import com.eignex.klause.lp.engine.LpEngineFactory
 import com.eignex.klause.lp.engine.LpModel
@@ -27,6 +34,7 @@ import com.eignex.klause.solver.search.SearchLearnedConflictResult
 import com.eignex.klause.solver.search.SearchRealValue
 import com.eignex.klause.solver.search.SearchResult
 import com.eignex.klause.solver.search.SearchSession
+import com.eignex.klause.solver.search.SearchSolveParams
 import com.eignex.klause.theory.TheoryCheck
 import com.eignex.klause.theory.TheoryContext
 import com.eignex.klause.util.Bits
@@ -35,6 +43,7 @@ import com.ionspin.kotlin.bignum.integer.BigInteger
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
@@ -135,6 +144,159 @@ class LiveLpTheoryTest {
     }
 
     @Test
+    fun `learned transformed and free source bounds replay after restart and extend a witness`() {
+        val open = Bits(2).also {
+            it.set(0)
+            it.set(1)
+        }
+        val source = Problem(
+            1,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(0, 0), longArrayOf(0, 0), open, open),
+            factors = arrayOf(
+                ReifiedLinear(0, intArrayOf(2, -2), intArrayOf(0, 1), LinearOp.GE, 1),
+                Linear(intArrayOf(2, -2), intArrayOf(0, 1), LinearOp.LE, 3),
+                Linear(intArrayOf(2, 2), intArrayOf(0, 1), LinearOp.GE, 1),
+            ),
+        )
+        source.componentPlan().search(source, emptyMap()).use { planned ->
+            val component = assertIs<ExactLiraSearchComponent>(planned.theory)
+            val session = planned.session
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+            val alternatives = assertNotNull(component.nextBranch(session)).map {
+                assertIs<RegisteredTheoryDecision>(assertIs<SearchDecision.Theory>(it).decision)
+            }
+            val transformed = alternatives.first {
+                val atom = assertIs<SourceBoundAtom>(it.payload)
+                val activity = atom.terms.filter { term -> term.source == SearchIntValue(0) }
+                    .fold(BigFraction.ZERO) { sum, term -> sum + term.coefficient }
+                if (atom.upper) activity > atom.threshold else activity < atom.threshold
+            }
+            assertEquals(2, assertIs<SourceBoundAtom>(transformed.payload).terms.size)
+            val free = assertNotNull(
+                SourceBoundAtom.integerSplit(
+                    session,
+                    listOf(
+                        SourceBoundTerm(SearchIntValue(0), BigFraction.ONE),
+                        SourceBoundTerm(SearchIntValue(1), BigFraction.ONE),
+                    ),
+                    BigFraction.ZERO,
+                ),
+            ).positive
+            for (excluded in listOf(transformed, free)) {
+                val conflict = assertIs<ComponentResult.Conflict>(session.push(SearchDecision.Theory(excluded)))
+                val expected = if (excluded == transformed) {
+                    intArrayOf(Lit.make(0, false), excluded.literal xor 1)
+                } else {
+                    intArrayOf(excluded.literal xor 1)
+                }
+                assertContentEquals(expected.sortedArray(), assertNotNull(conflict.explanation).literals.sortedArray())
+                val learned = assertIs<SearchConflictResolution.Backjump>(
+                    session.explainedConflict(conflict.explanation),
+                ).conflict
+                session.popTo(learned.decisionLevel)
+                assertIs<SearchLearnedConflictResult.Resume>(learned.apply(session))
+                assertIs<ComponentResult.Consistent>(session.restart())
+                assertNull(session.boolValue(transformed.literal ushr 1))
+                assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+                assertEquals(!Lit.isPositive(transformed.literal), session.boolValue(transformed.literal ushr 1))
+                assertEquals(!Lit.isPositive(excluded.literal), session.boolValue(excluded.literal ushr 1))
+            }
+            val result = assertIs<SearchResult.Satisfied>(session.solve(source.numBoolVars))
+            val values = assertNotNull(result.model.valueOf<ExactLiraAssignment>(component)).ints
+            assertEquals(BigInteger.ONE, values[0] - values[1])
+            assertTrue(values[0] + values[1] >= BigInteger.ONE)
+            for (excluded in listOf(transformed, free)) {
+                val atom = assertIs<SourceBoundAtom>(excluded.payload)
+                val activity = atom.terms.fold(BigFraction.ZERO) { sum, term ->
+                    sum + term.coefficient * BigFraction.of(
+                        values[assertIs<SearchIntValue>(term.source).variable],
+                        BigInteger.ONE,
+                    )
+                }
+                assertTrue(if (atom.upper) activity > atom.threshold else activity < atom.threshold)
+            }
+            assertEquals(2, session.learnedClauseCount)
+        }
+    }
+
+    @Test
+    fun `Boolean substitutions restore source thresholds and cancelled premises on siblings`() {
+        for (coefficients in listOf(doubleArrayOf(1.0), doubleArrayOf(1.0, -1.0))) {
+            val factor = object : Factor by ReifiedRealLinear(
+                0,
+                intArrayOf(),
+                doubleArrayOf(),
+                intArrayOf(0),
+                doubleArrayOf(1.0),
+                LinearOp.LE,
+                1.0,
+            ) {
+                override val linearForm = LinearForm.Conjunction(
+                    listOf(
+                        TaggedLinearRow(
+                            intArrayOf(
+                                Term.ofLit(Lit.make(0, false)),
+                            ) + IntArray(coefficients.size) { Term.ofRealVar(0) },
+                            RealConstants(RealConsts(doubleArrayOf(2.0)), RealConsts(coefficients), 1.0, false),
+                            LinearOp.LE,
+                        ),
+                    ),
+                )
+            }
+            val source = Problem(
+                1,
+                intBounds = IntBounds.fromModelBounds(longArrayOf(), longArrayOf(), null, null),
+                numRealVars = 1,
+                realLower = doubleArrayOf(0.0),
+                realUpper = doubleArrayOf(2.0),
+                factors = arrayOf(factor),
+            )
+            ExactLiraSearchComponent(source).use { component ->
+                val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(1))
+                session.initialize()
+                repeat(2) {
+                    val conflict = assertIs<ComponentResult.Conflict>(
+                        session.push(SearchDecision.Bool(Lit.make(0, false))),
+                    )
+                    assertContentEquals(intArrayOf(Lit.make(0, true)), assertNotNull(conflict.explanation).literals)
+                    session.popTo(0)
+                    assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+                    val result = assertIs<SearchResult.Satisfied>(session.solve(1))
+                    val value = assertNotNull(result.model.valueOf<ExactLraAssignment>(component)).reals.single()
+                    assertTrue(value >= BigFraction.ZERO && value <= BigFraction.ofLong(2))
+                    assertTrue(
+                        coefficients.fold(BigFraction.ZERO) { sum, coefficient ->
+                            sum + assertNotNull(BigFraction.ofDouble(coefficient)) * value
+                        } <= BigFraction.ONE,
+                    )
+                    session.popTo(0)
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `a false equality explores its disequality arms and restores equality on a sibling`() {
+        val source = Problem(
+            1,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(-1), longArrayOf(0), null, null),
+            factors = arrayOf(ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.EQ, 0)),
+        )
+        ExactLiraSearchComponent(source).use { component ->
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(1))
+            session.initialize()
+            for (truth in listOf(false, true)) {
+                session.push(SearchDecision.Bool(Lit.make(0, truth)))
+                val result = assertIs<SearchResult.Satisfied>(session.solve(1))
+                val value = assertNotNull(result.model.valueOf<ExactLiraAssignment>(component)).ints.single()
+                assertEquals(if (truth) BigInteger.ZERO else -BigInteger.ONE, value)
+                session.popTo(0)
+            }
+        }
+    }
+
+    @Test
     fun `strict closure fallback returns a source interior witness`() {
         val source = Problem(
             numBoolVars = 0,
@@ -152,6 +314,15 @@ class LiveLpTheoryTest {
                     bound = 0.0,
                     strict = true,
                 ),
+                Linear(
+                    intVars = intArrayOf(),
+                    intCoeffs = doubleArrayOf(),
+                    realVars = intArrayOf(0),
+                    realCoeffs = doubleArrayOf(1.0),
+                    op = LinearOp.LE,
+                    bound = 1.0,
+                    strict = true,
+                ),
             ),
         )
         ExactLiraSearchComponent(source).use { component ->
@@ -159,7 +330,7 @@ class LiveLpTheoryTest {
             session.initialize()
             val result = assertIs<SearchResult.Satisfied>(session.solve(0))
             val witness = assertNotNull(result.model.valueOf<ExactLraAssignment>(component)).reals.single()
-            assertTrue(witness > BigFraction.ZERO && witness <= BigFraction.ONE)
+            assertTrue(witness > BigFraction.ZERO && witness < BigFraction.ONE)
         }
     }
 
@@ -188,6 +359,48 @@ class LiveLpTheoryTest {
             val result = assertIs<SearchResult.Satisfied>(session.solve(0))
             val witness = assertNotNull(result.model.valueOf<ExactLraAssignment>(component)).reals.single()
             assertTrue(witness >= BigFraction.MINUS_ONE && witness < BigFraction.ZERO)
+        }
+    }
+
+    @Test
+    fun `infeasible comparison alternatives leave the final source disjunct available`() {
+        val declaration = Linear(
+            intVars = intArrayOf(),
+            intCoeffs = doubleArrayOf(),
+            realVars = intArrayOf(0),
+            realCoeffs = doubleArrayOf(1.0),
+            op = LinearOp.EQ,
+            bound = 0.0,
+        )
+        val factor = object : Factor by declaration {
+            override val linearForm = LinearForm.Disjunction(
+                listOf(
+                    Triple(2.0, LinearOp.GE, 1.0),
+                    Triple(3.0, LinearOp.LE, -1.0),
+                    Triple(5.0, LinearOp.EQ, 0.0),
+                ).map { (coefficient, op, rhs) ->
+                    TaggedLinearRow(
+                        intArrayOf(Term.ofRealVar(0)),
+                        RealConstants(RealConsts(doubleArrayOf()), RealConsts(doubleArrayOf(coefficient)), rhs, false),
+                        op,
+                    )
+                },
+            )
+        }
+        val source = Problem(
+            0,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(), longArrayOf(), null, null),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(0.0),
+            factors = arrayOf(factor),
+        )
+        ExactLiraSearchComponent(source).use { component ->
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(0))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            val result = assertIs<SearchResult.Satisfied>(session.solve(0))
+            val witness = assertNotNull(result.model.valueOf<ExactLraAssignment>(component)).reals.single()
+            assertEquals(BigFraction.ZERO, witness)
         }
     }
 
@@ -378,6 +591,86 @@ class LiveLpTheoryTest {
                     assertIs<SearchResult.Exhausted>(result)
                 }
             }
+        }
+    }
+
+    @Test
+    fun `production ownership closes on initialization conflict terminal decline and solve exception`() {
+        for (scenario in listOf("conflict", "decline", "exception")) {
+            var created = 0
+            var closed = 0
+            val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+                override fun newPersistentSolver(
+                    model: LpModel,
+                    cancellation: Cancellation,
+                    refactorUpdateLimit: Int,
+                    iterationLimit: Int,
+                    workLimit: Long,
+                    trackDegeneracy: Boolean,
+                    pricing: LpPricingOptions,
+                ): PersistentLpSolver {
+                    created++
+                    val delegate = ProductionLpEngineFactory.newPersistentSolver(
+                        model,
+                        cancellation,
+                        refactorUpdateLimit,
+                        iterationLimit,
+                        workLimit,
+                        trackDegeneracy,
+                        pricing,
+                    )
+                    return object : PersistentLpSolver by delegate {
+                        override fun resolveBounds(): FloatLpResult? {
+                            if (scenario == "exception") error("injected source solve failure")
+                            return delegate.resolveBounds()
+                        }
+
+                        override fun close() {
+                            closed++
+                            delegate.close()
+                        }
+                    }
+                }
+            }
+            val source = Problem(
+                0,
+                intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(1), null, null),
+                numRealVars = 1,
+                realLower = doubleArrayOf(0.0),
+                realUpper = doubleArrayOf(0.0),
+                factors = arrayOf(
+                    Linear(
+                        intVars = intArrayOf(0),
+                        intCoeffs = doubleArrayOf(2.0),
+                        realVars = intArrayOf(0),
+                        realCoeffs = doubleArrayOf(1.0),
+                        op = LinearOp.GE,
+                        bound = if (scenario == "conflict") 3.0 else 1.0,
+                    ),
+                ),
+            )
+            source.componentPlan().search(source, emptyMap()).use { planned ->
+                val component = assertIs<ExactLiraSearchComponent>(planned.theory)
+                component.solveWith(LpSolveContext(factory))
+                when (scenario) {
+                    "conflict" -> assertIs<ComponentResult.Conflict>(planned.session.initialize())
+
+                    "exception" -> assertEquals(
+                        "injected source solve failure",
+                        assertFailsWith<IllegalStateException> { planned.session.initialize() }.message,
+                    )
+
+                    else -> {
+                        assertIs<ComponentResult.Consistent>(planned.session.initialize())
+                        assertIs<SearchResult.Indeterminate>(
+                            planned.session.solve(0, SearchSolveParams(maxDecisions = 0)),
+                        )
+                        assertNull(planned.session.model().valueOf<ExactLiraAssignment>(component))
+                    }
+                }
+            }
+            assertEquals(1, created, scenario)
+            assertEquals(1, closed, scenario)
         }
     }
 
