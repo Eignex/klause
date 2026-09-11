@@ -3,6 +3,7 @@ package com.eignex.klause.propagation
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.util.Cancellation
+import kotlin.coroutines.cancellation.CancellationException
 
 /**
  * Result of the propagation engine's root bake. A [BakedProblem] retains the deductions that
@@ -68,3 +69,44 @@ fun Problem.propagate(
     cancellation: Cancellation = Cancellation.Never,
     skipExpensiveBake: Boolean = false,
 ): PropagationResult = runRootPropagation(this, assumptions, cancellation, skipExpensiveBake)
+
+@Suppress("ThrowsCount") // Each preparation stage must finish before the replacement root is published.
+internal fun BakedProblem.conditionedRoot(assumptions: Assumptions, token: Cancellation): BakedProblem {
+    if (token()) throw CancellationException("root preparation cancelled")
+    val state = PropagationState(
+        PropagationProblem(this),
+        (rootDeductions as? PropagationResult.Implied)?.toAssumptions() ?: Assumptions.None,
+    )
+    val seeded = state.seeded && state.seedAssumptions(assumptions)
+    val conflict = if (seeded) state.runToFixpoint(allFactors = true, cancellation = token) else null
+    if (state.runCancelled || token()) throw CancellationException("root preparation cancelled")
+    val deductions = if (rootDeductions is PropagationResult.Unsat || !seeded || conflict != null) {
+        PropagationResult.Unsat()
+    } else {
+        val keys = (0 until numBoolVars).filter { state.boolValues[it] != null }.toIntArray()
+        PropagationResult.Implied(
+            boolKeys = keys,
+            boolValues = BooleanArray(keys.size) { state.boolValues[keys[it]]!! },
+            intKeys = intArrayOf(),
+            intValues = longArrayOf(),
+        )
+    }
+    val conditioned = BakedProblem(
+        numBoolVars = numBoolVars,
+        numIntVars = numIntVars,
+        intDomains = state.intDomains.copyOf(),
+        factors = factors,
+        seedDeductions = deductions,
+        cancellation = token,
+        impliedFactorMask = impliedFactorMask,
+        hasSymmetryBreaking = hasSymmetryBreaking,
+        numRealVars = numRealVars,
+        realLower = realLower,
+        realUpper = realUpper,
+        packedOpenIntLo = intBounds.openLowerBits,
+        packedOpenIntHi = intBounds.openUpperBits,
+        modelBounds = intBounds,
+    )
+    if (token()) throw CancellationException("root preparation cancelled")
+    return conditioned
+}

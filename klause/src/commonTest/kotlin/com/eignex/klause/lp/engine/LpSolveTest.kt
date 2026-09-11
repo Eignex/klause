@@ -16,6 +16,28 @@ import kotlin.test.assertTrue
 
 class LpSolveTest {
     @Test
+    fun `native counter results require the same source state identity`() {
+        val zero = ExactLpNumber.of(0L)
+        val one = ExactLpNumber.of(1L)
+        val source = ExactLpModel(
+            listOf(emptyList()), emptyList(),
+            listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(one)))),
+            emptyList(), ExactLpObjective(listOf(one)),
+        )
+        val first = assertNotNull(LpExactState(source).toWorkingModel())
+        val foreign = assertNotNull(LpExactState(source).toWorkingModel())
+        val cache = LpCounterResults()
+        val result = solveAndCertify(first)
+        cache.remember(first, result, ProductionLpCertificationPolicy)
+        assertNotNull(cache.read(first, ProductionLpCertificationPolicy))
+
+        assertNull(cache.read(foreign, ProductionLpCertificationPolicy))
+        assertNull(cache.read(first, ProductionLpCertificationPolicy))
+        cache.remember(first, result, ProductionLpCertificationPolicy)
+        assertNull(cache.read(first, LpCertificationPolicy { _, _ -> false }))
+    }
+
+    @Test
     fun `supplied legacy certificates cannot raise an exact state bound`() {
         val legacy = LpBuilder().apply { addVar(5L, 10L, cost = 1L) }.build(Sense.MINIMIZE)
         val certificate = assertNotNull(integerCertify(legacy, doubleArrayOf()))
@@ -602,7 +624,7 @@ class LpSolveTest {
         val model = LpBuilder().apply { addVar(0L, 3L, cost = 1L) }.build(Sense.MINIMIZE)
         val cache = LpCounterResults()
         assertEquals(BigFraction.ZERO, solveAndCertify(model, counterResults = cache).lowerBound)
-        val next = model.withSingleColumnObjective(0, -1L, 0)
+        val next = model.withSingleColumnObjective(0, -1L)
 
         assertNotNull(cache.read(model, ProductionLpCertificationPolicy))
         assertNull(cache.read(next, ProductionLpCertificationPolicy))

@@ -1,6 +1,12 @@
 package com.eignex.klause.lp.engine
 
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.simplex.basis.BasisSolver
+import com.eignex.klause.simplex.basis.KotlinBasisSolver
+import com.eignex.klause.simplex.basis.IndexedVector
+import kotlin.test.assertFailsWith
+import kotlin.test.assertNull
+import kotlin.test.assertSame
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -8,6 +14,62 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class RevisedSimplexScratchTest {
+    @Test
+    fun `legacy rebind retires an old ray before the next solve`() {
+        val model = LpBuilder().apply {
+            addVar(0L, 1L, cost = 1L)
+            addRow(intArrayOf(0), longArrayOf(1L), Relation.GE, 2L)
+        }.build(Sense.MINIMIZE)
+        RevisedSimplex(model).use { solver ->
+            assertNull(solver.solve())
+            assertNotNull(solver.infeasibleRay)
+
+            assertTrue(solver.rebind(model.rebind(longArrayOf(0L), longArrayOf(3L)), Cancellation.Never))
+
+            assertNull(solver.infeasibleRay)
+            assertNull(solver.infeasibleBasis)
+            assertEquals(2.0, assertNotNull(solver.resolveBounds()).objective)
+        }
+    }
+
+    @Test
+    fun `arbitrary solve failure preserves primary cleanup order and clears result artifacts`() {
+        val model = LpBuilder().apply {
+            addVar(0L, 3L, cost = 1L)
+            addRow(intArrayOf(0), longArrayOf(1L), Relation.GE, 2L)
+        }.build(Sense.MINIMIZE)
+        val primary = IllegalStateException("solve")
+        val cleanup = IllegalStateException("cleanup")
+        var fail = false
+        val solver = RevisedSimplex(model, basisSolverFactory = { matrix ->
+            val delegate = KotlinBasisSolver(matrix)
+            object : BasisSolver by delegate {
+                override fun ftran(x: IndexedVector, expectedDensity: Double) {
+                    if (fail) throw primary
+                    delegate.ftran(x, expectedDensity)
+                }
+                override fun close() {
+                    delegate.close()
+                    if (fail) throw cleanup
+                }
+            }
+        })
+        assertNotNull(solver.solve())
+        fail = true
+
+        val failure = assertFailsWith<IllegalStateException> { solver.resolveBounds() }
+
+        assertSame(primary, failure)
+        assertSame(cleanup, failure.suppressedExceptions.single())
+        assertNull(solver.infeasibleRay)
+        assertNull(solver.infeasibleBasis)
+        assertTrue(solver.gomoryCuts(1).isEmpty())
+        assertTrue(solver.mirCuts(1).isEmpty())
+        fail = false
+        assertEquals(2.0, assertNotNull(solver.solve()).objective)
+        solver.close()
+    }
+
     @Test
     fun `retained optimal duals survive objective adoption and zero cost solves`() {
         val zero = ExactLpNumber.of(0L)

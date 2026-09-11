@@ -17,6 +17,23 @@ import kotlin.test.assertTrue
 
 class SearchAtomRegistryTest {
     @Test
+    fun `new source roots cannot inherit registered learned facts from matching numeric names`() {
+        val previous = SearchSession(emptyList(), atoms = SearchAtomRegistry(0))
+        val old = assertNotNull(previous.registerAtom(Symbol("old bound"), Symbol("old complement")))
+        previous.learn(SearchExplanation(intArrayOf(old.positive.literal)))
+        assertIs<ComponentResult.Consistent>(previous.propagate())
+        assertEquals(true, previous.boolValue(0))
+        val next = SearchSession(emptyList(), atoms = SearchAtomRegistry(0))
+        val fresh = assertNotNull(next.registerAtom(Symbol("new bound"), Symbol("new complement")))
+        assertEquals(old.positive.literal, fresh.positive.literal)
+
+        assertIs<ComponentResult.Indeterminate>(next.push(SearchDecision.Theory(old.positive)))
+        assertIs<ComponentResult.Consistent>(next.push(SearchDecision.Theory(fresh.negative)))
+        assertEquals(false, next.boolValue(0))
+        assertFailsWith<IllegalArgumentException> { previous.resetRootFacts() }
+    }
+
+    @Test
     fun `registration reuses both polarities and rejects incompatible complements`() {
         val session = SearchSession(emptyList(), atoms = SearchAtomRegistry(3, maxAtoms = 1))
         val first = assertNotNull(session.registerAtom(Symbol("yes"), Symbol("no")))

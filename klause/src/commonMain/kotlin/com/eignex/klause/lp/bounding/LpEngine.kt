@@ -125,6 +125,24 @@ internal class LpEngine(
         }
     }
 
+    internal fun forObjective(next: LinearObjective, token: Cancellation): LpEngine {
+        requireOpen()
+        return LpEngine(
+            problem,
+            next,
+            LpParams(
+                params.lpPlan,
+                params.lpConfig,
+                token,
+                params.solveBudgetMillis,
+                params.randomSeed,
+                params.zeroObjectivePricing,
+            ),
+            sink,
+            solveContext,
+        )
+    }
+
     internal fun requireOpen() {
         check(!closed) { "LP engine is closed" }
     }
@@ -655,9 +673,9 @@ internal class LpEngine(
         return false
     }
 
-    /** Lower-bound dominance against the incumbent — the cheapest, always-applicable arm. */
+    /** Discrete objective lower-bound dominance against the incumbent. */
     private inner class LinearBound : RelaxationBound {
-        override val applicable: Boolean get() = true
+        override val applicable: Boolean = objective.realCoefficients.all { it == 0.0 }
 
         override fun prune(
             session: PropagationSession,

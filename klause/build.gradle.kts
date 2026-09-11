@@ -78,3 +78,12 @@ tasks.register<JavaExec>("lpTreeIntegration") {
     classpath(jvmTestCompilation.output.allOutputs, jvmTestCompilation.runtimeDependencyFiles)
     mainClass.set("com.eignex.klause.backtrack.lp.LpTreeSearchIntegration")
 }
+
+
+tasks.register<JavaExec>("workingModelCoverage") {
+    group = "verification"
+    description = "Validate permanent integer and mixed-real objective replacement."
+    dependsOn(jvmTestCompilation.compileTaskProvider)
+    classpath(jvmTestCompilation.output.allOutputs, jvmTestCompilation.runtimeDependencyFiles)
+    mainClass.set("com.eignex.klause.lp.engine.WorkingModelCoverage")
+}

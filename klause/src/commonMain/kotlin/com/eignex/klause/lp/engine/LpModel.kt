@@ -255,25 +255,16 @@ internal class LpModel(
      * `−unitCost`, so the objective is still exactly `unitCost·x`. Objective arrays are copied so
      * retained models and their proof snapshots keep the objective they were built with.
      */
-    fun withSingleColumnObjective(
-        col: Int,
-        unitCost: Long,
-        prevCol: Int,
-        negCol: Int = -1,
-        prevNegCol: Int = -1,
-    ): LpModel {
+    fun withSingleColumnObjective(col: Int, unitCost: Long, negCol: Int = -1): LpModel {
         require(exactState == null) { "exact state objectives require the bound trail" }
-        val cost = cost.copyOf()
-        if (prevCol >= 0) cost[prevCol] = 0L
-        if (prevNegCol >= 0) cost[prevNegCol] = 0L
+        val cost = LongArray(numVars)
         cost[col] = unitCost
         if (negCol >= 0) cost[negCol] = -unitCost
         var constant = mulExact(unitCost, loShift[col])
         if (negCol >= 0) constant = subExact(constant, mulExact(unitCost, loShift[negCol]))
         val dv = doubleView?.copyObjective()
         if (dv != null) {
-            if (prevCol >= 0) dv.cost[prevCol] = 0.0
-            if (prevNegCol >= 0) dv.cost[prevNegCol] = 0.0
+            dv.cost.fill(0.0)
             dv.cost[col] = unitCost.toDouble()
             if (negCol >= 0) dv.cost[negCol] = -unitCost.toDouble()
             dv.objConstant = dv.cost[col] * dv.loShift[col] +
@@ -296,12 +287,12 @@ internal class LpModel(
      * *direction* — is `aᵢᵀx` bounded in this system — needs a row's coefficients as the objective, not
      * a unit cost on one column.
      *
-     * Copies the objective arrays before resetting [prevCols] and assigning the replacement costs.
+     * Replaces every structural and logical cost without modifying retained models.
      */
-    fun withRowObjective(cols: IntArray, coeffs: LongArray, prevCols: IntArray): LpModel {
+    fun withRowObjective(cols: IntArray, coeffs: LongArray): LpModel {
         require(exactState == null) { "exact state objectives require the bound trail" }
-        val cost = cost.copyOf()
-        for (c in prevCols) cost[c] = 0L
+        require(cols.size == coeffs.size && cols.all { it in 0 until n })
+        val cost = LongArray(numVars)
         var constant = 0L
         for (k in cols.indices) {
             cost[cols[k]] = coeffs[k]
@@ -309,7 +300,7 @@ internal class LpModel(
         }
         val dv = doubleView?.copyObjective()
         if (dv != null) {
-            for (c in prevCols) dv.cost[c] = 0.0
+            dv.cost.fill(0.0)
             var dc = 0.0
             for (k in cols.indices) {
                 dv.cost[cols[k]] = coeffs[k].toDouble()
@@ -369,7 +360,7 @@ internal class LpDoubleView(
     override val upper: DoubleArray,
     override val hasUpper: BooleanArray,
     /** `Σ cost·loShift` folded out by the lower-bound shift; mutable because
-     *  [LpModel.withSingleColumnObjective] rewrites [cost] in place and must keep this consistent. */
+     *  [LpModel.withSingleColumnObjective] copies [cost] and replaces this constant with the new objective. */
     var objConstant: Double,
     val loShift: DoubleArray,
 ) : ExactSimplexDoubleView
