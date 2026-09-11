@@ -568,7 +568,7 @@ class LpSolveTest {
             addRow(intArrayOf(x), longArrayOf(1L), Relation.GE, 2L)
         }.build(Sense.MINIMIZE)
         val hint = FloatLpResult(
-            Basis(intArrayOf(1), arrayOf(VarStatus.AT_LOWER, VarStatus.BASIC)),
+            Basis(intArrayOf(), arrayOf(VarStatus.AT_LOWER, VarStatus.BASIC)),
             0.0,
             doubleArrayOf(Double.NaN),
             doubleArrayOf(0.0),

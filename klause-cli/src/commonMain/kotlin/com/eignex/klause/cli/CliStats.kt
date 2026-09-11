@@ -30,7 +30,7 @@ internal fun lpStatPairs(stats: SolveStats): List<Pair<String, String>> {
     val splits = stats.lp.componentSplits.sum
     val routed = stats.lp.standalonePasses.sum + stats.lp.componentPasses.sum + stats.lp.rootPasses.sum
     if (solves == 0.0 && stats.lp.nodePasses.sum == 0.0 && routed == 0.0 &&
-        lagrangian == 0.0 && energetic == 0.0 && splits == 0.0
+        lagrangian == 0.0 && energetic == 0.0 && splits == 0.0 && stats.lp.basisVerification.calls == 0L
     ) {
         return emptyList()
     }
@@ -128,6 +128,23 @@ internal fun lpStatPairs(stats: SolveStats): List<Pair<String, String>> {
     appendCertifierStats(out, "ExactFarkasRay", stats.lp.exactFarkasRay)
     appendCertifierStats(out, "ExactPointFeasible", stats.lp.exactPointFeasible)
     appendCertifierStats(out, "RationalOutcome", stats.lp.rationalOutcome)
+    val basis = stats.lp.basisVerification
+    if (basis.calls > 0L) {
+        out += "lpRationalBasisCalls" to "${basis.calls}"
+        out += "lpRationalBasisEligible" to "${basis.eligible}"
+        out += "lpRationalBasisFactories" to "${basis.factoryCalls}"
+        out += "lpRationalBasisBuilds" to "${basis.builds}"
+        out += "lpRationalBasisReuse" to "${basis.reuse}"
+        out += "lpRationalBasisSolves" to "${basis.solves}"
+        out += "lpRationalBasisRestarts" to "${basis.restarts}"
+        out += "lpRationalBasisChecks" to "${basis.checks}"
+        out += "lpRationalBasisWork" to "${basis.work.values.sum()}"
+        out += "lpRationalBasisAllocation" to "${basis.allocation.values.sum()}"
+        for ((phase, work) in basis.work) out += "lpRationalBasisWork_$phase" to "$work"
+        for ((phase, bytes) in basis.allocation) out += "lpRationalBasisAllocation_$phase" to "$bytes"
+        for ((reason, count) in basis.declines) out += "lpRationalBasisDecline_$reason" to "$count"
+        for ((route, count) in basis.routes) out += "lpRationalBasisRoute_$route" to "$count"
+    }
     if (stats.lp.warmStartAttempts.sum > 0.0) {
         out += "lpWarmStartAttempts" to "${stats.lp.warmStartAttempts.sum.toLong()}"
         out += "lpWarmStartHits" to "${stats.lp.warmStartHits.sum.toLong()}"

@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.result
 
+import com.eignex.klause.lp.engine.ExactBasisMetrics
 import com.eignex.klause.lp.engine.LpCertificationObserver
 import com.eignex.klause.lp.engine.LpCertifier
 import com.eignex.klause.lp.engine.LpSolveMetrics
@@ -56,6 +57,45 @@ data class LpCertifierRouteStats(
         SumResult(declines.sum + other.declines.sum),
     )
 }
+
+/** Complete modeled work and declines of rational basis verification, including abandoned attempts. */
+data class LpBasisVerificationStats(
+    /** Offered verification calls. */
+    val calls: Long = 0L,
+    /** Calls with valid, bounded source authority and basis declarations. */
+    val eligible: Long = 0L,
+    /** Factor factory invocations. */
+    val factoryCalls: Long = 0L,
+    /** Factor builds, including precision restarts and abandoned attempts. */
+    val builds: Long = 0L,
+    /** Calls reusing completed factors. */
+    val reuse: Long = 0L,
+    /** Triangular solve invocations, including failed solves. */
+    val solves: Long = 0L,
+    /** Arithmetic restarts across factors, solves and source verification. */
+    val restarts: Long = 0L,
+    /** Independent source point, dual and ray checks. */
+    val checks: Long = 0L,
+    /** Modeled work by operation phase. */
+    val work: Map<String, Long> = emptyMap(),
+    /** Cumulative modeled allocation reservations by operation phase. */
+    val allocation: Map<String, Long> = emptyMap(),
+    /** Terminal reasons, including resource exits retaining a complete independent proof. */
+    val declines: Map<String, Long> = emptyMap(),
+    /** Offered calls by consumer route. */
+    val routes: Map<String, Long> = emptyMap(),
+) {
+    /** Combine independent complete observations without dropping failed work. */
+    fun mergedWith(other: LpBasisVerificationStats) = LpBasisVerificationStats(
+        calls + other.calls, eligible + other.eligible, factoryCalls + other.factoryCalls, builds + other.builds,
+        reuse + other.reuse, solves + other.solves, restarts + other.restarts, checks + other.checks,
+        mergeBasisCounts(work, other.work), mergeBasisCounts(allocation, other.allocation),
+        mergeBasisCounts(declines, other.declines), mergeBasisCounts(routes, other.routes),
+    )
+}
+
+private fun mergeBasisCounts(first: Map<String, Long>, second: Map<String, Long>): Map<String, Long> =
+    (first.keys + second.keys).associateWith { (first[it] ?: 0L) + (second[it] ?: 0L) }
 
 /** Consumer route for a single engine invocation. */
 internal enum class LpRoute { NODE, STANDALONE, COMPONENT, ROOT }
@@ -232,11 +272,11 @@ data class LpStats(
     val certifyDeclinedNumeric: SumResult = ZERO_COUNT,
     /** Solves that reached the rational decider — the slow lane every decline falls into. */
     val rationalFallbacks: SumResult = ZERO_COUNT,
-    /** Largest row count seen at a certified solve, against which `MAX_EXACT_BASIS` (48) is applied. */
+    /** Largest row count seen at a certified solve. */
     val certifyMaxRows: MaxResult = NO_MAX,
     /** Farkas certificates produced by rational reconstruction of the float ray. */
     val farkasReconstructed: SumResult = ZERO_COUNT,
-    /** Farkas certificates produced by the exact basis solve (the `MAX_EXACT_BASIS`-capped route). */
+    /** Farkas certificates produced by rational basis verification. */
     val farkasExactBasis: SumResult = ZERO_COUNT,
     /** Farkas certificates produced by rounding the float ray. */
     val farkasRounded: SumResult = ZERO_COUNT,
@@ -248,6 +288,8 @@ data class LpStats(
     val safeObjectiveLowerBound: LpCertifierStats = LpCertifierStats(),
     /** Per-route attempts of the exact basis feasibility certifier. */
     val exactBasisFeasible: LpCertifierStats = LpCertifierStats(),
+    /** Complete rational basis verification work and resource exits. */
+    val basisVerification: LpBasisVerificationStats = LpBasisVerificationStats(),
     /** Per-route attempts of the exact Farkas certifier. */
     val exactFarkasRay: LpCertifierStats = LpCertifierStats(),
     /** Per-route attempts of the exact primal-point certifier. */
@@ -357,6 +399,7 @@ data class LpStats(
         integerCertify = integerCertify.mergedWith(o.integerCertify),
         safeObjectiveLowerBound = safeObjectiveLowerBound.mergedWith(o.safeObjectiveLowerBound),
         exactBasisFeasible = exactBasisFeasible.mergedWith(o.exactBasisFeasible),
+        basisVerification = basisVerification.mergedWith(o.basisVerification),
         exactFarkasRay = exactFarkasRay.mergedWith(o.exactFarkasRay),
         exactPointFeasible = exactPointFeasible.mergedWith(o.exactPointFeasible),
         rationalOutcome = rationalOutcome.mergedWith(o.rationalOutcome),
@@ -481,6 +524,8 @@ internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
         }
     }
 
+    private var basisVerification = LpBasisVerificationStats()
+
     private val certificationObservers: Array<LpCertificationObserver> by lazy {
         Array(LpRoute.entries.size) { index ->
             val route = LpRoute.entries[index]
@@ -492,6 +537,20 @@ internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
                     val routeIndex = route.ordinal
                     certifierRouteAttempts[routeIndex][i]++
                     if (success) certifierRouteSuccesses[routeIndex][i]++ else certifierRouteDeclines[routeIndex][i]++
+                }
+                override fun observeBasisVerification(metrics: ExactBasisMetrics) {
+                    basisVerification = basisVerification.mergedWith(
+                        LpBasisVerificationStats(
+                            calls = 1L, eligible = if (metrics.eligible) 1L else 0L,
+                            factoryCalls = metrics.factoryCalls.toLong(), builds = metrics.builds.toLong(),
+                            reuse = metrics.reuse.toLong(), solves = metrics.solves.toLong(),
+                            restarts = metrics.restarts.toLong(), checks = metrics.verificationChecks.toLong(),
+                            work = metrics.operations.associate { it.phase.name to it.work },
+                            allocation = metrics.operations.associate { it.phase.name to it.allocation },
+                            declines = metrics.decline?.let { mapOf(it.name to 1L) } ?: emptyMap(),
+                            routes = mapOf(route.name to 1L),
+                        ),
+                    )
                 }
                 override fun observeExactInput(accepted: Boolean) {
                     exactInputAttempts++
@@ -754,6 +813,7 @@ internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
         integerCertify = certifierStats(LpCertifier.INTEGER),
         safeObjectiveLowerBound = certifierStats(LpCertifier.SAFE_OBJECTIVE),
         exactBasisFeasible = certifierStats(LpCertifier.EXACT_BASIS),
+        basisVerification = basisVerification,
         exactFarkasRay = certifierStats(LpCertifier.EXACT_FARKAS),
         exactPointFeasible = certifierStats(LpCertifier.EXACT_POINT),
         rationalOutcome = certifierStats(LpCertifier.RATIONAL),

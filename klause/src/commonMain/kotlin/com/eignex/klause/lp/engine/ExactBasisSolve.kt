@@ -1,345 +1,216 @@
 package com.eignex.klause.lp.engine
 
+import com.eignex.klause.simplex.basis.RationalBasisLimits
+import com.eignex.klause.simplex.basis.RationalBasisStats
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.Int128
-import com.ionspin.kotlin.bignum.integer.BigInteger
+import kotlin.time.TimeSource
 
-internal fun exactPointWitness(
-    model: LpModel,
-    primal: DoubleArray,
-    observer: LpCertificationObserver? = null,
-): ExactLpWitness? {
-    val point = if (primal.size == model.n && primal.all { it.isFinite() } && model.finiteExactInput()) {
-        checkedLpWitness(model, primal.map { checkNotNull(BigFraction.ofDouble(it)) }) ?: run {
-            var common = BigInteger.ONE
-            val limit = BigInteger.fromLong(MAX_POINT_DENOMINATOR)
-            val candidate = primal.map { value ->
-                val part = reconstructRational(value, maxDenominator = MAX_POINT_DENOMINATOR) ?: return@run null
-                val denominator = BigInteger.fromLong(part.denominator)
-                common = common / common.gcd(denominator) * denominator
-                if (common > limit) return@run null
-                BigFraction.of(BigInteger.fromLong(part.numerator), denominator)
+internal class ExactBasisStop(val reason: ExactBasisDecline) : RuntimeException()
+
+internal class ExactBasisMeter(val limits: ExactBasisLimits, private val cancellation: Cancellation) {
+    private val started = TimeSource.Monotonic.markNow()
+    private val work = LongArray(ExactBasisPhase.entries.size)
+    private val allocation = LongArray(ExactBasisPhase.entries.size)
+    var phase = ExactBasisPhase.ASSEMBLY
+    var eligible = false
+    var builds = 0
+    var factoryCalls = 0
+    var reuse = 0
+    var solves = 0
+    var restarts = 0
+    var maxBits = 0
+    var peakFill = 0
+    var verificationChecks = 0
+
+    val token = Cancellation { cancellation() || started.elapsedNow() >= limits.factor.time }
+
+    fun poll() {
+        if (cancellation()) throw ExactBasisStop(ExactBasisDecline.CANCELLED)
+        if (started.elapsedNow() >= limits.factor.time) throw ExactBasisStop(ExactBasisDecline.TIME)
+    }
+
+    fun charge(units: Long = 1L, bytes: Long = 0L) {
+        poll()
+        if (units > limits.factor.work - work.sum()) throw ExactBasisStop(ExactBasisDecline.WORK)
+        if (bytes > limits.factor.allocationBytes - allocation.sum()) throw ExactBasisStop(ExactBasisDecline.MEMORY)
+        work[phase.ordinal] += units
+        allocation[phase.ordinal] += bytes
+    }
+
+    fun fraction(value: BigFraction): BigFraction {
+        val bits = maxOf(value.num.bitLength(), value.den.bitLength())
+        maxBits = maxOf(maxBits, bits)
+        if (bits > limits.factor.bits) throw ExactBasisStop(ExactBasisDecline.BITS)
+        charge(bytes = 64L + (bits.toLong() + 7L) / 4L)
+        return value
+    }
+
+    private fun arithmetic(a: BigFraction, b: BigFraction) {
+        fraction(a)
+        fraction(b)
+        val bits = maxOf(a.num.bitLength(), a.den.bitLength()).toLong() +
+            maxOf(b.num.bitLength(), b.den.bitLength()) + 1L
+        val limbs = (bits + 63L) / 64L
+        charge(limbs * limbs, 1024L + 64L * bits)
+    }
+
+    fun add(a: BigFraction, b: BigFraction): BigFraction {
+        arithmetic(a, b)
+        return fraction(a + b)
+    }
+
+    fun subtractProduct(a: BigFraction, b: BigFraction, c: BigFraction): BigFraction {
+        arithmetic(b, c)
+        val product = fraction(b * c)
+        arithmetic(a, product)
+        return fraction(a - product)
+    }
+
+    fun factorLimits(): RationalBasisLimits {
+        poll()
+        return limits.factor.copy(
+            work = limits.factor.work - work.sum(),
+            allocationBytes = limits.factor.allocationBytes - allocation.sum(),
+            time = (limits.factor.time - started.elapsedNow()).coerceAtLeast(kotlin.time.Duration.ZERO),
+        )
+    }
+
+    fun verificationLimits(): ReconstructionLimits {
+        poll()
+        return limits.verification.copy(
+            maxWork = minOf(limits.verification.maxWork, limits.factor.work - work.sum()),
+            maxAllocation = minOf(limits.verification.maxAllocation, limits.factor.allocationBytes - allocation.sum()),
+        )
+    }
+
+    // Nested operations already spent this work, including their failed attempts. Account before polling.
+    fun record(stats: RationalBasisStats) {
+        work[phase.ordinal] += stats.work
+        allocation[phase.ordinal] += stats.allocationBytes
+        builds += stats.builds
+        restarts += stats.restarts
+        maxBits = maxOf(maxBits, stats.maxBits)
+        peakFill = maxOf(peakFill, stats.peakFill)
+    }
+
+    fun record(metrics: ReconstructionMetrics) {
+        work[phase.ordinal] += metrics.work
+        allocation[phase.ordinal] += metrics.allocation
+        restarts += metrics.vectorRestarts + metrics.verificationRestarts
+        maxBits = maxOf(maxBits, metrics.maxBits)
+        verificationChecks += metrics.pointChecks + metrics.dualChecks + metrics.rayChecks
+    }
+
+    fun stop(reason: ReconstructionDecline): Nothing {
+        if (reason == ReconstructionDecline.CANCELLED) poll()
+        throw ExactBasisStop(
+            when (reason) {
+                ReconstructionDecline.CANCELLED -> ExactBasisDecline.CANCELLED
+                ReconstructionDecline.ALLOCATION -> ExactBasisDecline.MEMORY
+                ReconstructionDecline.WORK -> ExactBasisDecline.WORK
+                ReconstructionDecline.BITS -> ExactBasisDecline.BITS
+                ReconstructionDecline.DIMENSION -> ExactBasisDecline.DIMENSION
+                ReconstructionDecline.CANDIDATE -> ExactBasisDecline.CANDIDATE
+                ReconstructionDecline.INVALID_INPUT, ReconstructionDecline.NONFINITE -> ExactBasisDecline.INVALID_INPUT
+            },
+        )
+    }
+
+    fun snapshot(decline: ExactBasisDecline?) = ExactBasisMetrics(
+        eligible, factoryCalls, builds, reuse, solves, restarts, verificationChecks, maxBits, peakFill,
+        ExactBasisPhase.entries.map { ExactBasisWork(it, work[it.ordinal], allocation[it.ordinal]) }, decline, phase,
+    )
+}
+
+internal class ExactBasisAuthority(val model: LpModel, basis: Basis, val meter: ExactBasisMeter) {
+    val headings: IntArray
+    val statuses: Array<VarStatus>
+    val matrix: List<List<Pair<Int, BigFraction>>>
+    val seats: List<BigFraction>
+    val rhs: List<BigFraction>
+    val costs: List<BigFraction>
+    val origins: List<BigFraction>
+
+    init {
+        meter.charge()
+        if (model.m > meter.limits.factor.dimension ||
+            model.numVars.toLong() > meter.limits.verification.maxCoordinates
+        ) {
+            throw ExactBasisStop(ExactBasisDecline.DIMENSION)
+        }
+        if (basis.basicVars.size != model.m || basis.status.size != model.numVars) {
+            throw ExactBasisStop(ExactBasisDecline.INVALID_BASIS)
+        }
+        meter.charge(model.numVars.toLong(), model.numVars.toLong() * 64L)
+        headings = basis.basicVars.copyOf()
+        statuses = basis.status.copyOf()
+        val seen = BooleanArray(model.numVars)
+        for (j in headings) {
+            meter.charge()
+            if (j !in seen.indices || seen[j] || statuses[j] != VarStatus.BASIC) {
+                throw ExactBasisStop(ExactBasisDecline.INVALID_BASIS)
             }
-            checkedLpWitness(model, candidate)
+            seen[j] = true
         }
-    } else {
-        null
-    }
-    observer?.observe(LpCertifier.EXACT_POINT, point != null)
-    return point
-}
-
-internal fun exactBasisWitness(
-    model: LpModel,
-    basis: Basis,
-    observer: LpCertificationObserver? = null,
-    cancellation: Cancellation = Cancellation.Never,
-): ExactLpWitness? {
-    if (model.exactState != null) {
-        val point = exactStateBasisWitness(model, basis, cancellation)
-        observer?.observe(LpCertifier.EXACT_BASIS, point != null)
-        return point
-    }
-    var point: ExactLpWitness? = null
-    exactBasisFeasibleUnchecked(model, basis, observer) { candidate ->
-        point = checkedLpWitness(model, candidate)
-    }
-    observer?.observe(LpCertifier.EXACT_BASIS, point != null)
-    return point
-}
-
-internal fun exactPointFeasible(
-    model: LpModel,
-    primal: DoubleArray,
-    observer: LpCertificationObserver? = null,
-): Boolean = exactPointWitness(model, primal, observer) != null
-
-/**
- * Exact primal-feasibility check of a reported LP [Basis] over an integer-coefficient [LpModel], in
- * bounded 128-bit arithmetic — the feasibility twin of [integerFarkasRay]. The float simplex reports
- * which `m` columns are basic and where each nonbasic column is pinned; this
- * reconstructs the basic solution `x_B = B⁻¹ b'` **exactly** (Cramer's rule over fraction-free / Bareiss
- * determinants, so every intermediate is an exact integer) and checks `0 ≤ x_B ≤ u` exactly.
- *
- * Returns:
- *  - `true`  — the basic solution is primal-feasible, so the LP has a feasible point (a certified SAT);
- *  - `false` — a basic variable provably violates its bounds (the float basis is not primal-feasible);
- *  - `null`  — the exact arithmetic could not settle it: a singular basis, or any 128-bit overflow /
- *    non-representable determinant (the plan's cap — the verdict then degrades to `unknown`, never a
- *    wrong SAT).
- *
- * Soundness rests on exactness: a `true` is a genuine rational feasible point (basic values `x_t =
- * detₜ/det` with nonbasic columns at their bounds satisfy `A x = b` by construction of the basis and the
- * bound checks confirm the box). Continuous models are certified over their scaled-integer
- * rationalization ([rationalizeToIntegerModel]), where a positive integer scale preserves the feasible
- * region so the proof carries back exactly.
- */
-internal fun exactBasisFeasible(model: LpModel, basis: Basis, observer: LpCertificationObserver? = null): Boolean? = (
-    if (model.exactState != null) {
-        exactStateBasisWitness(model, basis, Cancellation.Never)?.let { true }
-    } else {
-        exactBasisFeasibleUnchecked(model, basis, observer)
-    }
-    ).also {
-    observer?.observe(LpCertifier.EXACT_BASIS, it == true)
-}
-
-private fun exactBasisFeasibleUnchecked(
-    model: LpModel,
-    basis: Basis,
-    observer: LpCertificationObserver?,
-    onPoint: ((List<BigFraction>) -> Unit)? = null,
-): Boolean? {
-    if (!model.finiteExactInput() || !validBasisDeclaration(model, basis)) return null
-    val rationalized = rationalizeToIntegerModel(model, outwardRealUppers = true, observer = observer) ?: return null
-    val integral = rationalized.model
-    val m = integral.m
-    if (m > MAX_EXACT_BASIS) return null
-    val basic = basis.basicVars
-    val point = MutableList(model.numVars) { j ->
-        if (basis.status[j] == VarStatus.AT_UPPER) BigFraction.ofLong(integral.upper[j]) else BigFraction.ZERO
-    }
-    // An outward-rounded seat is not the declared exact upper-bound status.
-    for (j in 0 until model.n) {
-        if (basis.status[j] == VarStatus.AT_UPPER && point[j] != model.exactUpper(j)) return null
-    }
-    if (m == 0) {
-        val source = List(model.n) { j -> point[j] + model.exactShift(j) }
-        if (checkedLpWitness(model, source) == null) return false
-        onPoint?.invoke(source)
-        return true
-    }
-
-    // b'[i] = rhs[i] − Σ_{nonbasic j at upper} A[i][j]·u[j]. Nonbasic-at-lower columns are 0 (lower is 0
-    // in the normalized model), so only upper-pinned columns move the right-hand side.
-    val rhsAdj = LongArray(m) { integral.rhs[it] }
-    for (j in 0 until integral.numVars) {
-        if (basis.status[j] != VarStatus.AT_UPPER) continue
-        if (!integral.hasUpper[j]) return null // an unbounded column pinned at upper is nonsensical here
-        val u = integral.upper[j]
-        forEachColumnEntry(integral, j) { i, a ->
-            val acc = Int128()
-            acc.addLong(rhsAdj[i])
-            val prod = Int128()
-            prod.addProduct(a, u)
-            acc.subtract(prod)
-            if (!acc.fitsLong()) return null
-            rhsAdj[i] = acc.toLong()
+        val sourceSize = model.exactState?.model?.keySize ?: model.csc.colVal.size.toLong() * 3L
+        meter.charge(sourceSize)
+        if (!model.finiteExactInput()) throw ExactBasisStop(ExactBasisDecline.INVALID_INPUT)
+        var entries = 0
+        matrix = List(model.numVars) { j ->
+            val column = ArrayList<Pair<Int, BigFraction>>()
+            model.forEachRationalColumn(j) { row, value ->
+                if (++entries > meter.limits.verification.maxEntries) throw ExactBasisStop(ExactBasisDecline.DIMENSION)
+                meter.charge(bytes = 32L)
+                column += row to meter.fraction(value)
+            }
+            column.toList()
         }
-    }
-
-    // Basis matrix B (m×m), column t = basic column basic[t]; B[i][t] = A[i][basic[t]].
-    val b = Array(m) { LongArray(m) }
-    for (t in 0 until m) {
-        forEachColumnEntry(integral, basic[t]) { i, a -> b[i][t] = a }
-    }
-
-    val minor = Array(m) { b[it].copyOf() }
-    val det = bareissDet(minor) ?: return null
-    if (det == 0L) return null // singular basis — cannot reconstruct the point
-
-    for (t in 0 until m) {
-        for (i in 0 until m) {
-            b[i].copyInto(minor[i])
-            minor[i][t] = rhsAdj[i]
+        seats = List(model.numVars) { j ->
+            meter.charge()
+            val bounds = model.exactBounds(j)
+            val seat = when (statuses[j]) {
+                VarStatus.BASIC -> if (seen[j]) BigFraction.ZERO else null
+                VarStatus.AT_LOWER -> bounds.lower?.number?.value
+                VarStatus.AT_UPPER -> bounds.upper?.number?.value
+                VarStatus.FIXED -> if (bounds.fixed) bounds.lower?.number?.value else null
+                VarStatus.FREE -> if (bounds.lower == null && bounds.upper == null) BigFraction.ZERO else null
+            } ?: throw ExactBasisStop(ExactBasisDecline.INVALID_BASIS)
+            meter.fraction(seat)
         }
-        val detT = bareissDet(minor) ?: return null
-        point[basic[t]] = BigFraction.of(BigInteger.fromLong(detT), BigInteger.fromLong(det))
+        rhs = List(model.m) { meter.fraction(model.exactRhs(it)) }
+        costs = List(model.m) { meter.fraction(model.exactCost(headings[it])) }
+        origins = List(model.n) { meter.fraction(model.exactShift(it)) }
+        meter.eligible = true
     }
-    val source = List(model.n) { j -> point[j] + model.exactShift(j) }
-    if (checkedLpWitness(model, source) == null) return false
-    onPoint?.invoke(source)
-    return true
-}
 
-private fun validBasisDeclaration(model: LpModel, basis: Basis): Boolean {
-    if (basis.status.size != model.numVars || basis.basicVars.size != model.m) return false
-    val seen = BooleanArray(model.numVars)
-    for (j in basis.basicVars) {
-        if (j !in seen.indices || seen[j] || basis.status[j] != VarStatus.BASIC) return false
-        seen[j] = true
-    }
-    return basis.status.indices.all { j ->
-        when (basis.status[j]) {
-            VarStatus.BASIC -> seen[j]
-            VarStatus.AT_LOWER -> j >= model.n || !model.probeClampedLo[j]
-            VarStatus.AT_UPPER -> model.hasFiniteUpper(j) && (j >= model.n || !model.probeClampedHi[j])
-            VarStatus.FIXED -> model.fixed(j)
-            VarStatus.FREE -> !model.hasFiniteLower(j) && !model.hasFiniteUpper(j)
-        }
-    }
-}
-
-private fun exactStateBasisWitness(model: LpModel, basis: Basis, cancellation: Cancellation): ExactLpWitness? {
-    if (cancellation()) return null
-    if (model.m > MAX_EXACT_BASIS || !validBasisDeclaration(model, basis)) return null
-    val point = MutableList(model.numVars) { j ->
-        when (basis.status[j]) {
-            VarStatus.AT_UPPER -> model.exactUpper(j)
-            VarStatus.AT_LOWER, VarStatus.FIXED -> model.exactLower(j)
-            VarStatus.FREE, VarStatus.BASIC -> BigFraction.ZERO
-        }
-    }
-    for (j in 0 until model.numVars) {
-        if (basis.status[j] == VarStatus.AT_LOWER && !model.hasFiniteLower(j)) return null
-    }
-    val matrix = Array(model.m) { MutableList(model.m + 1) { BigFraction.ZERO } }
-    for (i in 0 until model.m) matrix[i][model.m] = model.exactRhs(i)
-    for (j in 0 until model.numVars) {
-        if (basis.status[j] == VarStatus.BASIC) continue
-        model.forEachRationalColumn(j) { i, value -> matrix[i][model.m] -= value * point[j] }
-    }
-    for (column in 0 until model.m) {
-        model.forEachRationalColumn(basis.basicVars[column]) { row, value -> matrix[row][column] = value }
-    }
-    for (column in 0 until model.m) {
-        if (cancellation()) return null
-        val pivot = (column until model.m).firstOrNull { !matrix[it][column].isZero } ?: return null
-        val row = matrix[pivot]
-        matrix[pivot] = matrix[column]
-        matrix[column] = row
-        val inverse = row[column].reciprocal()
-        for (entry in column..model.m) {
-            val value = row[entry] * inverse
-            if (!value.withinBasisBudget()) return null
-            row[entry] = value
-        }
-        for (i in 0 until model.m) {
-            if (cancellation()) return null
-            if (i == column) continue
-            val scale = matrix[i][column]
-            if (scale.isZero) continue
-            for (entry in column..model.m) {
-                val value = matrix[i][entry] - scale * row[entry]
-                if (!value.withinBasisBudget()) return null
-                matrix[i][entry] = value
+    fun basisMatrix(): List<List<BigFraction>> {
+        meter.charge(model.m.toLong() * model.m, model.m.toLong() * model.m * 8L + model.m * 64L)
+        val result = List(model.m) { MutableList(model.m) { BigFraction.ZERO } }
+        for (slot in headings.indices) {
+            for ((row, value) in matrix[headings[slot]]) {
+                meter.charge()
+                result[row][slot] = value
             }
         }
+        return result
     }
-    for (i in 0 until model.m) point[basis.basicVars[i]] = matrix[i][model.m]
-    if (point.indices.any { !model.withinExactBounds(it, point[it]) }) return null
-    return checkedLpWitness(model, List(model.n) { point[it] + model.exactShift(it) })
-}
 
-private const val MAX_RATIONAL_DIGITS = 1234
-
-private fun BigFraction.withinBasisBudget(): Boolean =
-    num.toString().length <= MAX_RATIONAL_DIGITS && den.toString().length <= MAX_RATIONAL_DIGITS
-
-/**
- * The exact Farkas ray `ρ = B⁻ᵀeᵣ` of the dual-unbounded [basis] with leaving row [row], scaled by
- * `|det B|` so every entry is an integer. Null when the basis is singular, oversized, or a minor escapes
- * the exact range — the caller then falls back to rounding the float ray.
- *
- * Rounding the float ray cannot serve here. A certificate must satisfy `ρ·Aⱼ = 0` *exactly* for every
- * column with no finite upper bound: a variable split as `x = x⁺ − x⁻` has `A_{x⁻} = −A_{x⁺}`, so a
- * nonzero `ρ·A_{x⁺}` leaves one of the two halves unbounded above in the box max whichever sign the ray
- * takes, and no scaling repairs it. The float ray satisfies the condition only to within its own error,
- * and per-entry rounding turns that residual into a nonzero integer. Solving the basis exactly gives the
- * annihilation for free: `ρ·Aⱼ = eᵣᵀB⁻¹Aⱼ` is an entry of a unit vector for every basic column.
- *
- * Cramer's rule supplies it without an inverse: `ρᵢ·det B = det(Bᵀ with column i replaced by eᵣ)`. The
- * result is normalized to a *positive* multiple of `ρ`, since a negative multiple of a Farkas ray is not
- * one.
- */
-internal fun exactFarkasRay(model: LpModel, basis: Basis, row: Int): LongArray? {
-    if (model.doubleView != null || !model.finiteExactInput() || !validBasisDeclaration(model, basis)) return null
-    val m = model.m
-    if (m == 0 || row < 0 || row >= m || m > MAX_EXACT_BASIS) return null
-    val basic = basis.basicVars
-    if (basic.size != m) return null
-
-    // Bᵀ[t][i] = B[i][t] = A[i][basic[t]].
-    val bt = Array(m) { LongArray(m) }
-    for (t in 0 until m) {
-        forEachColumnEntry(model, basic[t]) { i, a -> bt[t][i] = a }
-    }
-    val minor = Array(m) { bt[it].copyOf() }
-    val det = bareissDet(minor) ?: return null
-    if (det == 0L) return null
-
-    val ray = LongArray(m)
-    for (i in 0 until m) {
-        for (t in 0 until m) {
-            bt[t].copyInto(minor[t])
-            minor[t][i] = if (t == row) 1L else 0L
+    fun primalRhs(): List<BigFraction> {
+        meter.charge(bytes = model.m * 32L)
+        val result = rhs.toMutableList()
+        for (j in seats.indices) {
+            meter.charge()
+            if (statuses[j] == VarStatus.BASIC || seats[j].isZero) continue
+            for ((row, value) in matrix[j]) result[row] = meter.subtractProduct(result[row], value, seats[j])
         }
-        ray[i] = bareissDet(minor) ?: return null
+        return result
     }
-    if (det < 0L) {
-        for (i in 0 until m) {
-            if (ray[i] == Long.MIN_VALUE) return null
-            ray[i] = -ray[i]
-        }
-    }
-    return ray
-}
 
-/** Iterate column [col]'s nonzero entries of the integer [model] as `(row, coeff)` — structural columns
- *  from the CSC, a slack column as the implicit unit vector. */
-private inline fun forEachColumnEntry(model: LpModel, col: Int, action: (row: Int, coeff: Long) -> Unit) {
-    if (col < model.n) {
-        model.forEachInColumn(col, action)
-    } else {
-        action(col - model.n, 1L)
+    fun sourcePrimal(basics: List<BigFraction>): List<BigFraction> {
+        meter.charge(bytes = model.numVars * 32L)
+        val point = seats.toMutableList()
+        for (i in headings.indices) point[headings[i]] = basics[i]
+        return List(model.n) { meter.add(point[it], origins[it]) }
     }
 }
-
-/**
- * Determinant of the `n×n` integer matrix [a] by fraction-free (Bareiss) Gaussian elimination — every
- * intermediate is an exact integer (a minor of the original), so no rounding. Returns the determinant,
- * `0` for a singular matrix, or null when any step escapes the exactly-divisible 64-bit range (the
- * 128-bit product of two entries divided by the previous pivot must land back in a `Long`); the caller
- * then declines. Mutates a copy, not [a]'s rows are copied by the caller when reused.
- */
-@Suppress("ReturnCount")
-private fun bareissDet(a: Array<LongArray>): Long? {
-    val n = a.size
-    var prev = 1L
-    var sign = 1
-    val acc = Int128()
-    val sub = Int128()
-    for (k in 0 until n) {
-        if (a[k][k] == 0L) {
-            var swap = -1
-            for (i in k + 1 until n) {
-                if (a[i][k] != 0L) {
-                    swap = i
-                    break
-                }
-            }
-            if (swap == -1) return 0L // a zero column at this stage ⇒ singular
-            val tmp = a[k]
-            a[k] = a[swap]
-            a[swap] = tmp
-            sign = -sign
-        }
-        val pivot = a[k][k]
-        for (i in k + 1 until n) {
-            for (j in k + 1 until n) {
-                // a[i][j] = (a[i][j]·pivot − a[i][k]·a[k][j]) / prev, exact by Bareiss's identity.
-                acc.clear()
-                acc.addProduct(a[i][j], pivot)
-                sub.clear()
-                sub.addProduct(a[i][k], a[k][j])
-                acc.subtract(sub)
-                a[i][j] = acc.divExactByLong(prev) ?: return null
-            }
-            a[i][k] = 0L
-        }
-        prev = pivot
-    }
-    val d = a[n - 1][n - 1]
-    return if (sign < 0) {
-        if (d == Long.MIN_VALUE) null else -d
-    } else {
-        d
-    }
-}
-
-/** Largest basis dimension the fraction-free solve attempts; beyond it the exact minors overflow 128
- *  bits for all but trivial coefficients, so the check declines (degrading the verdict to `unknown`). */
-private const val MAX_EXACT_BASIS = 48
-
-private const val MAX_POINT_DENOMINATOR = 1L shl 40

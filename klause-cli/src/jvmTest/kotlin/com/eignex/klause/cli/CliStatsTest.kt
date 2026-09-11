@@ -1,6 +1,7 @@
 package com.eignex.klause.cli
 
 import com.eignex.klause.solver.result.LocalSearchStats
+import com.eignex.klause.solver.result.LpBasisVerificationStats
 import com.eignex.klause.solver.result.LpCertifierRouteStats
 import com.eignex.klause.solver.result.LpCertifierStats
 import com.eignex.klause.solver.result.LpRouteSolveStats
@@ -19,6 +20,22 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class CliStatsTest {
+
+    @Test
+    fun `rational basis resource work is visible without a float solve`() {
+        val stats = SolveStats(lp = LpStats(basisVerification = LpBasisVerificationStats(
+            calls = 1L, builds = 2L, restarts = 1L, work = mapOf("FACTOR" to 13L),
+            allocation = mapOf("FACTOR" to 23L), declines = mapOf("FILL" to 1L),
+        )))
+
+        val pairs = lpStatPairs(stats).toMap()
+
+        assertEquals("1", pairs["lpRationalBasisCalls"])
+        assertEquals("2", pairs["lpRationalBasisBuilds"])
+        assertEquals("13", pairs["lpRationalBasisWork"])
+        assertEquals("23", pairs["lpRationalBasisAllocation"])
+        assertEquals("1", pairs["lpRationalBasisDecline_FILL"])
+    }
 
     @Test
     fun `presolve stats report which passes fired and the constraint drop, all presolve-prefixed`() {

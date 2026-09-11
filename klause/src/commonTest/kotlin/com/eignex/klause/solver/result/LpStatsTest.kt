@@ -11,6 +11,29 @@ import kotlin.test.assertTrue
 class LpStatsTest {
 
     @Test
+    fun `rational basis accounting retains failed work and consumer routes`() {
+        val first = LpBasisVerificationStats(
+            calls = 1L, factoryCalls = 1L, builds = 2L, restarts = 1L,
+            work = mapOf("FACTOR" to 19L), allocation = mapOf("FACTOR" to 29L),
+            declines = mapOf("FILL" to 1L), routes = mapOf("NODE" to 1L),
+        )
+        val second = LpBasisVerificationStats(
+            calls = 1L, eligible = 1L, reuse = 1L, solves = 2L, checks = 3L,
+            work = mapOf("FACTOR" to 0L, "VERIFICATION" to 11L), routes = mapOf("COMPONENT" to 1L),
+        )
+
+        val combined = first.mergedWith(second)
+
+        assertEquals(2L, combined.calls)
+        assertEquals(2L, combined.builds)
+        assertEquals(1L, combined.restarts)
+        assertEquals(30L, combined.work.values.sum())
+        assertEquals(29L, combined.allocation.values.sum())
+        assertEquals(mapOf("FILL" to 1L), combined.declines)
+        assertEquals(mapOf("NODE" to 1L, "COMPONENT" to 1L), combined.routes)
+    }
+
+    @Test
     fun `route and certifier observations preserve zero attempt routes`() {
         val sink = LpStatsSink()
         val observer = sink.certificationObserver(LpRoute.NODE)

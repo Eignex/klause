@@ -26,6 +26,7 @@ internal interface LpCertificationObserver {
     fun observe(certifier: LpCertifier, success: Boolean)
     fun observeExactInput(accepted: Boolean)
     fun observeSolve(metrics: LpSolveMetrics, component: Boolean)
+    fun observeBasisVerification(metrics: ExactBasisMetrics) {}
 }
 
 /** Primitive cost reading from one engine invocation.  It can cross the engine boundary without
@@ -102,6 +103,10 @@ internal interface LpSolver : AutoCloseable {
     val infeasibleRow: Int get() = -1
 
     val solvedExactState: LpExactState? get() = null
+
+    val exactBasisCache: ExactBasisCache? get() = null
+
+    fun rejectSingularBasis(model: LpModel, basis: Basis): Boolean = false
 
     /**
      * Pivots the last solve spent, whether or not it returned a [FloatLpResult].
@@ -190,6 +195,7 @@ internal interface ComponentLpSolverCapability : LpSolver {
     fun exactWitness(
         observer: LpCertificationObserver? = null,
         policy: LpCertificationPolicy = ProductionLpCertificationPolicy,
+        cancellation: Cancellation = Cancellation.Never,
     ): ExactLpWitness?
 }
 

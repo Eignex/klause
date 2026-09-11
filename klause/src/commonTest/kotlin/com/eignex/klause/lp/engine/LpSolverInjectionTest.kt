@@ -225,7 +225,8 @@ class LpSolverInjectionTest {
                     override fun exactWitness(
                         observer: LpCertificationObserver?,
                         policy: LpCertificationPolicy,
-                    ): ExactLpWitness? = delegate.exactWitness(observer, policy)
+                        cancellation: Cancellation,
+                    ): ExactLpWitness? = delegate.exactWitness(observer, policy, cancellation)
                 }
             }
         }

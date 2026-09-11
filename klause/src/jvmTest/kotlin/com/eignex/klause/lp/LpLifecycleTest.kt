@@ -136,7 +136,8 @@ private class LifecycleFactory : LpEngineFactory {
             override fun exactWitness(
                 observer: LpCertificationObserver?,
                 policy: LpCertificationPolicy,
-            ): ExactLpWitness? = delegate.exactWitness(observer, policy)
+                cancellation: Cancellation,
+            ): ExactLpWitness? = delegate.exactWitness(observer, policy, cancellation)
 
             override fun close() = record.close(delegate::close, fails(record))
         }

@@ -241,6 +241,16 @@ internal class RevisedSimplex(
     /** Whether [basisSolver] currently factorizes the seated [basicVar]. False before the first
      *  factorization and after one came back singular. */
     private var basisFactorized = false
+    override val exactBasisCache = ExactBasisCache()
+    private var rejectedExactBasis: IntArray? = null
+
+    override fun rejectSingularBasis(model: LpModel, basis: Basis): Boolean {
+        val matches = if (model.exactState == null) this.model === model else this.model.exactState === model.exactState
+        if (!matches || !basis.basicVars.contentEquals(basicVar)) return false
+        rejectedExactBasis = basis.basicVars.copyOf()
+        invalidateUncertainBasisState()
+        return true
+    }
 
     // The solve carriers, one per role and reused for this engine's whole life. Reuse is not only
     // about allocation: a solver may recognise the vector its own solve filled and reuse the form it
@@ -386,6 +396,7 @@ internal class RevisedSimplex(
 
     @Suppress("TooGenericExceptionCaught")
     override fun close() {
+        exactBasisCache.clear()
         val snapshots = restartSnapshots.toList()
         restartSnapshots.clear()
         var failure: Throwable? = null
@@ -518,6 +529,7 @@ internal class RevisedSimplex(
     }
 
     private fun invalidateBasisDependentState() {
+        exactBasisCache.clear()
         cachedBeta = null
         cachedModel = null
         cachedStatus = null
@@ -719,6 +731,7 @@ internal class RevisedSimplex(
         // advisory, and SINGULAR parted them from the basis so only a rebuild recovers. Rebuild on
         // anything but an APPLIED still inside the chain limit.
         if (outcome != BasisUpdate.SINGULAR) {
+            exactBasisCache.clear()
             ownerColumns[r] = q
             ownerUnitRows[r] = -1
         }
@@ -838,6 +851,7 @@ internal class RevisedSimplex(
     }
 
     override fun prepareLogicals(token: Cancellation): Basis? {
+        exactBasisCache.clear()
         resetSolveState(false)
         basisKept = false
         cachedBeta = null
@@ -2075,6 +2089,7 @@ internal class RevisedSimplex(
     /** Seed the basis from a prior [warm] basis; false (⇒ cold start) on a structural mismatch or an
      *  out-of-range column. A singular warm factorization is caught by [solve]'s refactor fallback. */
     private fun tryWarmStart(warm: Basis): Boolean {
+        if (rejectedExactBasis?.contentEquals(warm.basicVars) == true) return false
         basisCaptureEligible = basisCaptureEligible && warm.captureEligible
         if (warm.basicVars.size != m || warm.status.size != numVars) return false
         for (t in 0 until m) if (warm.basicVars[t] !in 0 until numVars) return false
@@ -2098,6 +2113,7 @@ internal class RevisedSimplex(
     }
 
     private fun coldStart() {
+        exactBasisCache.clear()
         for (i in 0 until m) {
             basicVar[i] = model.slackCol(i)
             status[model.slackCol(i)] = VarStatus.BASIC
@@ -2114,6 +2130,7 @@ internal class RevisedSimplex(
      *  whenever every row's slack value `rhs_i` is within the slack's bounds — the common `≤`/`rhs ≥ 0`
      *  case — which is the starting point [solvePrimal] needs. */
     private fun lowerStart() {
+        exactBasisCache.clear()
         for (i in 0 until m) {
             basicVar[i] = model.slackCol(i)
             status[model.slackCol(i)] = VarStatus.BASIC

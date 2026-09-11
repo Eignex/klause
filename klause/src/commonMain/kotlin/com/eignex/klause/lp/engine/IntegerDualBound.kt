@@ -1,5 +1,6 @@
 package com.eignex.klause.lp.engine
 
+import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.Int128
 import kotlin.math.abs
 import kotlin.math.ceil
@@ -295,8 +296,9 @@ internal fun integerFarkasRay(
     basisRow: Int = -1,
     onRoute: ((FarkasRoute) -> Unit)? = null,
     observer: LpCertificationObserver? = null,
+    cancellation: Cancellation = Cancellation.Never,
 ): LongArray? {
-    if (model.exactState != null) {
+    if (model.exactState != null || cancellation()) {
         onRoute?.invoke(FarkasRoute.NONE)
         return null
     }
@@ -312,7 +314,17 @@ internal fun integerFarkasRay(
             outwardRealUppers = true,
             observer = observer,
         )?.model
-        if (integral != null) return integerFarkasRay(integral, ray, scaleBits, basis, basisRow, onRoute, observer)
+        if (integral != null) {
+            var route = FarkasRoute.NONE
+            val certified = integerFarkasRay(
+                integral, ray, scaleBits, onRoute = { route = it }, observer = observer, cancellation = cancellation,
+            )
+                ?.takeIf { sourceFarkasValid(model, it) }
+            if (certified != null) {
+                onRoute?.invoke(route)
+                return certified
+            }
+        }
     }
     // Reconstruction first: the ray's entries are ratios of minors of B, so they are small rationals, and
     // recovering them exactly annihilates the open columns the same way a basis solve does — without the
@@ -328,16 +340,10 @@ internal fun integerFarkasRay(
             return negated
         }
     }
-    // The exact basis solve next: it annihilates the open columns exactly too, but is capped at
-    // [MAX_EXACT_BASIS] rows (see [exactFarkasRay]).
     if (basis != null) {
-        val exact = exactFarkasRay(model, basis, basisRow)
-        val certified = when {
-            exact == null -> null
-            farkasCertifies(model, exact) -> exact
-            exact.any { it == Long.MIN_VALUE } -> null
-            else -> LongArray(exact.size) { -exact[it] }.takeIf { farkasCertifies(model, it) }
-        }
+        val checked = verifyExactBasis(model, basis, rayRow = basisRow, cancellation = cancellation)
+        observer?.observeBasisVerification(checked.metrics)
+        val certified = checked.integerRay
         observer?.observe(LpCertifier.EXACT_FARKAS, certified != null)
         if (certified != null) {
             onRoute?.invoke(FarkasRoute.EXACT_BASIS)
