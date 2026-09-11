@@ -66,4 +66,24 @@ class IntegerTableauCutsTest {
 
         assertTrue(cuts.isEmpty())
     }
+
+    @Test
+    fun `continuous and synthetic lower bounds decline at the tableau entry point`() {
+        for (continuous in listOf(false, true)) {
+            val builder = LpBuilder()
+            if (continuous) builder.addRealVar(0.0, 3.0) else builder.addFreeVar(null, null)
+            builder.addRow(mapOf(0 to 2L), Relation.LE, 3)
+            val model = builder.build(Sense.MINIMIZE)
+
+            val cuts = integerTableauCuts(
+                model,
+                Basis(intArrayOf(0), Array(2) { VarStatus.AT_LOWER }),
+                doubleArrayOf(1.5),
+                1,
+                mir = false,
+            )
+
+            assertTrue(cuts.isEmpty())
+        }
+    }
 }

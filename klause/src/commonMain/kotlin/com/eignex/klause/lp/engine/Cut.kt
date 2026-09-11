@@ -25,7 +25,10 @@ internal class Cut(
     val coeffs: LongArray = coeffs.copyOf()
     val global: Boolean = global && tableau == null && (provenance?.global != false)
 
-    init { require(cols.size == coeffs.size) }
+    init {
+        require(cols.size == coeffs.size)
+        require(provenance == null || tableau == null)
+    }
 
     /** A stable key for deduplicating cuts across separation rounds (ignores column order). */
     fun key(): String {

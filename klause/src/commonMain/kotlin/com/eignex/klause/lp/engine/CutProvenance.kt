@@ -5,7 +5,9 @@ import com.eignex.klause.simplex.exact.BigFraction
 internal enum class CutSourceKind { INTEGER, BOOLEAN, REAL, TERM }
 
 internal data class CutSource(val kind: CutSourceKind, val id: Int) {
-    init { require(id >= 0) }
+    init {
+        require(id >= 0)
+    }
 }
 
 internal class CutExpression(terms: Map<CutSource, BigFraction>, val constant: BigFraction = BigFraction.ZERO) {
@@ -22,8 +24,12 @@ internal class CutExpression(terms: Map<CutSource, BigFraction>, val constant: B
 }
 
 internal sealed interface CutPremise {
-    data class Bound(val expression: CutExpression, val upper: Boolean, val value: BigFraction, val strict: Boolean = false) :
-        CutPremise
+    data class Bound(
+        val expression: CutExpression,
+        val upper: Boolean,
+        val value: BigFraction,
+        val strict: Boolean = false,
+    ) : CutPremise
     data class Integral(val expression: CutExpression) : CutPremise
     data class Fixed(val source: CutSource, val value: BigFraction) : CutPremise
     data class ObjectiveCutoff(val expression: CutExpression, val upper: BigFraction) : CutPremise
@@ -70,7 +76,14 @@ internal class CutInputRow(
 ) {
     private val columnSnapshot = columns.copyOf()
     private val coefficientSnapshot = coefficients.copyOf()
-    private val premiseSnapshot = premises?.let { LpRowPremises(it.vars.copyOf(), it.isUpper.copyOf(), it.thresholds.copyOf(), it.boolLits.copyOf()) }
+    private val premiseSnapshot = premises?.let {
+        LpRowPremises(
+            it.vars.copyOf(),
+            it.isUpper.copyOf(),
+            it.thresholds.copyOf(),
+            it.boolLits.copyOf(),
+        )
+    }
     val columns: IntArray get() = columnSnapshot.copyOf()
     val coefficients: LongArray get() = coefficientSnapshot.copyOf()
     val premises: LpRowPremises? get() = premiseSnapshot?.let {
@@ -90,5 +103,12 @@ internal class TableauCutProvenance(
     private val rowSnapshot = rows.toList()
     val columns: List<CutColumnPremise> get() = columnSnapshot.toList()
     val rows: List<CutInputRow> get() = rowSnapshot.toList()
-    fun reduced(divisor: Long): TableauCutProvenance = TableauCutProvenance(model, columnSnapshot, rowSnapshot, this.divisor, mir, divisor)
+    fun reduced(divisor: Long): TableauCutProvenance = TableauCutProvenance(
+        model,
+        columnSnapshot,
+        rowSnapshot,
+        this.divisor,
+        mir,
+        divisor,
+    )
 }

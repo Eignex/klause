@@ -5,10 +5,10 @@ import com.eignex.klause.lp.engine.CutExpression
 import com.eignex.klause.lp.engine.CutPremise
 import com.eignex.klause.lp.engine.CutProofFact
 import com.eignex.klause.lp.engine.CutProvenance
-import com.eignex.klause.lp.engine.CutSource
 import com.eignex.klause.lp.engine.CutRoundingRule
-import com.eignex.klause.lp.engine.CutWeightedRow
+import com.eignex.klause.lp.engine.CutSource
 import com.eignex.klause.lp.engine.CutSourceKind
+import com.eignex.klause.lp.engine.CutWeightedRow
 import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.Relation
 import com.eignex.klause.lp.engine.exactRhs
@@ -18,7 +18,9 @@ import com.eignex.klause.lp.relaxation.LpRelaxation
 import com.eignex.klause.simplex.exact.BigFraction
 import com.ionspin.kotlin.bignum.integer.BigInteger
 
-internal enum class CutMappingDecline { MISSING_SOURCE, MISSING_PROVENANCE, MODEL_SCOPE, INACTIVE_GUARD, ARITHMETIC_LIMIT, LONG_RANGE }
+internal enum class CutMappingDecline {
+    MISSING_SOURCE, MISSING_PROVENANCE, MODEL_SCOPE, INACTIVE_GUARD, ARITHMETIC_LIMIT, LONG_RANGE
+}
 
 internal sealed interface CutMapping<out T> {
     data class Mapped<T>(val value: T) : CutMapping<T>
@@ -28,8 +30,37 @@ internal sealed interface CutMapping<out T> {
 internal fun <T> CutMapping<T>.orNull(): T? = (this as? CutMapping.Mapped)?.value
 
 internal class CutMappingLimits(val terms: Int = 4096, val bits: Int = 4096) {
-    init { require(terms > 0 && bits > 0) }
+    init {
+        require(terms > 0 && bits > 0)
+    }
     fun accepts(value: BigFraction): Boolean = value.num.bitLength() <= bits && value.den.bitLength() <= bits
+
+    fun accepts(proof: CutProvenance): Boolean {
+        var remaining = terms
+        fun expression(value: CutExpression): Boolean {
+            remaining -= value.terms.size + 1
+            return remaining >= 0 && accepts(value.constant) && value.terms.values.all { accepts(it) }
+        }
+        for (fact in proof.facts) {
+            if (--remaining < 0) return false
+            val valid = when (val premise = fact.premise) {
+                is CutPremise.Bound -> expression(premise.expression) && accepts(premise.value)
+                is CutPremise.Integral -> expression(premise.expression)
+                is CutPremise.Fixed -> accepts(premise.value)
+                is CutPremise.Literal -> true
+                is CutPremise.Row -> expression(premise.expression) && accepts(premise.rhs)
+                is CutPremise.ObjectiveCutoff -> expression(premise.expression) && accepts(premise.upper)
+            }
+            if (!valid) return false
+        }
+        for (rule in proof.rules) {
+            if (--remaining < 0) return false
+            for (row in rule.rows) {
+                if (!expression(row.row.expression) || !accepts(row.row.rhs)) return false
+            }
+        }
+        return true
+    }
 }
 
 internal class SourceCut(
@@ -48,9 +79,12 @@ internal class SourceCut(
         if (provenance.facts.any { !it.global && !map.isActive(it.premise) }) {
             return CutMapping.Declined(CutMappingDecline.INACTIVE_GUARD)
         }
-        if (expression.terms.size > limits.terms || provenance.facts.size > limits.terms ||
-            !limits.accepts(rhs) || !limits.accepts(expression.constant) || expression.terms.values.any { !limits.accepts(it) }
-        ) return CutMapping.Declined(CutMappingDecline.ARITHMETIC_LIMIT)
+        if (expression.terms.size > limits.terms || !limits.accepts(provenance) ||
+            !limits.accepts(rhs) || !limits.accepts(expression.constant) ||
+            expression.terms.values.any { !limits.accepts(it) }
+        ) {
+            return CutMapping.Declined(CutMappingDecline.ARITHMETIC_LIMIT)
+        }
         val coefficients = LinkedHashMap<Int, BigFraction>()
         var bound = rhs - expression.constant
         val facts = provenance.facts.toMutableList()
@@ -59,17 +93,23 @@ internal class SourceCut(
             val col = columns.indexOfFirst { it?.source == source }
             if (col >= 0) {
                 val definition = checkNotNull(columns[col])
+                if (!limits.accepts(definition.scale) || !limits.accepts(definition.offset)) {
+                    return CutMapping.Declined(CutMappingDecline.ARITHMETIC_LIMIT)
+                }
                 val scaled = coefficient * definition.scale.reciprocal()
                 coefficients[col] = (coefficients[col] ?: BigFraction.ZERO) + scaled
                 bound += scaled * definition.offset
             } else {
                 val fixed = map.fixed[source] ?: return CutMapping.Declined(CutMappingDecline.MISSING_SOURCE)
+                if (!limits.accepts(fixed)) return CutMapping.Declined(CutMappingDecline.ARITHMETIC_LIMIT)
                 val premise = CutPremise.Fixed(source, fixed)
                 if (!map.isActive(premise)) return CutMapping.Declined(CutMappingDecline.INACTIVE_GUARD)
                 facts.add(CutProofFact(premise, map.isGlobal(premise)))
                 bound -= coefficient * fixed
             }
-            if (coefficients.size > limits.terms || !limits.accepts(bound) || coefficients.values.any { !limits.accepts(it) }) {
+            if (coefficients.size > limits.terms || !limits.accepts(bound) ||
+                coefficients.values.any { !limits.accepts(it) }
+            ) {
                 return CutMapping.Declined(CutMappingDecline.ARITHMETIC_LIMIT)
             }
         }
@@ -80,19 +120,34 @@ internal class SourceCut(
             scale = scale / scale.gcd(value.den) * value.den
             if (scale.bitLength() > limits.bits) return CutMapping.Declined(CutMappingDecline.ARITHMETIC_LIMIT)
         }
-        val integers = all.map { it.num * (scale / it.den) }
+        val scaledIntegers = all.map { it.num * (scale / it.den) }
+        val divisor = scaledIntegers.fold(BigInteger.ZERO) { gcd, value -> gcd.gcd(value.abs()) }
+        val integers = if (divisor.isZero()) scaledIntegers else scaledIntegers.map { it / divisor }
         val min = BigInteger.fromLong(Long.MIN_VALUE)
         val max = BigInteger.fromLong(Long.MAX_VALUE)
-        if (integers.any { it < min || it > max }) return CutMapping.Declined(CutMappingDecline.LONG_RANGE)
+        if (integers.any { it < min || it > max || (relation == Relation.GE && it == min) }) {
+            return CutMapping.Declined(CutMappingDecline.LONG_RANGE)
+        }
         val proof = CutProvenance(map.model, provenance.epoch, facts, provenance.assumptions, provenance.rules)
+        if (!limits.accepts(proof)) return CutMapping.Declined(CutMappingDecline.ARITHMETIC_LIMIT)
         return CutMapping.Mapped(
-            Cut(values.keys.toIntArray(), integers.dropLast(1).map { it.longValue() }.toLongArray(), relation,
-                integers.last().longValue(), global = proof.global, provenance = proof),
+            Cut(
+                values.keys.toIntArray(),
+                integers.dropLast(1).map { it.longValue() }.toLongArray(),
+                relation,
+                integers.last().longValue(),
+                global = proof.global,
+                provenance = proof,
+            ),
         )
     }
 
     companion object {
-        fun fromCut(cut: Cut, relaxation: LpRelaxation, limits: CutMappingLimits = CutMappingLimits()): CutMapping<SourceCut> {
+        fun fromCut(
+            cut: Cut,
+            relaxation: LpRelaxation,
+            limits: CutMappingLimits = CutMappingLimits(),
+        ): CutMapping<SourceCut> {
             val map = relaxation.sourceMap ?: return CutMapping.Declined(CutMappingDecline.MISSING_SOURCE)
             return try {
                 SourceCutMapper(relaxation.model, map, limits).map(cut)
@@ -105,34 +160,58 @@ internal class SourceCut(
 
 private class CutMappingFailure(val reason: CutMappingDecline) : RuntimeException()
 
-private class SourceCutMapper(private val model: LpModel, private val sources: CutSourceMap, private val limits: CutMappingLimits) {
+private class SourceCutMapper(
+    private val model: LpModel,
+    private val sources: CutSourceMap,
+    private val limits: CutMappingLimits,
+) {
     private val definitions = sources.columns
+    private var remaining = limits.terms
+    private fun charge(amount: Int = 1) {
+        remaining -= amount
+        if (remaining < 0) decline(CutMappingDecline.ARITHMETIC_LIMIT)
+    }
     private fun decline(reason: CutMappingDecline): Nothing = throw CutMappingFailure(reason)
     private fun checked(value: BigFraction): BigFraction {
         if (!limits.accepts(value)) decline(CutMappingDecline.ARITHMETIC_LIMIT)
         return value
     }
 
-    private fun expression(columns: List<Int>, coefficients: List<BigFraction>, constant: BigFraction = BigFraction.ZERO): CutExpression {
-        if (columns.size > limits.terms) decline(CutMappingDecline.ARITHMETIC_LIMIT)
+    private fun expression(
+        columns: List<Int>,
+        coefficients: List<BigFraction>,
+        constant: BigFraction = BigFraction.ZERO,
+    ): CutExpression {
+        charge(columns.size)
         val terms = LinkedHashMap<CutSource, BigFraction>()
         var offset = checked(constant)
         for (k in columns.indices) {
             val coefficient = checked(coefficients[k])
             if (coefficient.isZero) continue
             val definition = definitions.getOrNull(columns[k]) ?: decline(CutMappingDecline.MISSING_SOURCE)
-            terms[definition.source] = checked((terms[definition.source] ?: BigFraction.ZERO) + coefficient * definition.scale)
-            offset = checked(offset + coefficient * definition.offset)
+            terms[definition.source] = checked(
+                (terms[definition.source] ?: BigFraction.ZERO) + coefficient * checked(definition.scale),
+            )
+            offset = checked(offset + coefficient * checked(definition.offset))
         }
         return CutExpression(terms, offset)
     }
 
     private fun entries(column: Int): List<Pair<Int, BigFraction>> {
-        model.exactState?.model?.let { return it.entries(column).map { e -> e.row to e.number.value } }
-        val view = model.doubleView
-        if (view != null) return (view.colPtr[column] until view.colPtr[column + 1]).map {
-            view.rowIdx[it] to (BigFraction.ofDouble(view.colVal[it]) ?: decline(CutMappingDecline.ARITHMETIC_LIMIT))
+        charge()
+        model.exactState?.model?.let {
+            val entries = it.entries(column)
+            charge(entries.size)
+            return entries.map { e -> e.row to checked(e.number.value) }
         }
+        val view = model.doubleView
+        if (view != null) {
+            charge(view.colPtr[column + 1] - view.colPtr[column])
+            return (view.colPtr[column] until view.colPtr[column + 1]).map {
+                view.rowIdx[it] to (BigFraction.ofDouble(view.colVal[it]) ?: decline(CutMappingDecline.ARITHMETIC_LIMIT))
+            }
+        }
+        charge(model.csc.colPtr[column + 1] - model.csc.colPtr[column])
         return (model.csc.colPtr[column] until model.csc.colPtr[column + 1]).map {
             model.csc.rowIdx[it] to BigFraction.ofLong(model.csc.colVal[it])
         }
@@ -149,15 +228,17 @@ private class SourceCutMapper(private val model: LpModel, private val sources: C
                 columns[col] = checked((columns[col] ?: BigFraction.ZERO) + coefficient)
             } else if (col in model.n until model.numVars) {
                 val row = col - model.n
-                constant = checked(constant + coefficient * model.exactRhs(row))
+                constant = checked(constant + coefficient * checked(model.exactRhs(row)))
                 for (j in 0 until model.n) {
                     for ((r, value) in entries(j)) {
                         if (r != row) continue
                         columns[j] = checked((columns[j] ?: BigFraction.ZERO) - coefficient * value)
-                        constant = checked(constant + coefficient * value * model.exactShift(j))
+                        constant = checked(constant + coefficient * value * checked(model.exactShift(j)))
                     }
                 }
-            } else decline(CutMappingDecline.MISSING_SOURCE)
+            } else {
+                decline(CutMappingDecline.MISSING_SOURCE)
+            }
         }
         val inequality = expression(columns.keys.toList(), columns.values.toList(), constant)
         val facts = ArrayList<CutProofFact>()
@@ -166,6 +247,7 @@ private class SourceCutMapper(private val model: LpModel, private val sources: C
         val tableau = cut.tableau
         if (inherited != null) {
             if (inherited.model !== sources.model) decline(CutMappingDecline.MODEL_SCOPE)
+            if (!cut.global && inherited.global) decline(CutMappingDecline.MISSING_PROVENANCE)
             facts.addAll(inherited.facts)
             rules.addAll(inherited.rules)
         } else if (tableau != null) {
@@ -176,7 +258,12 @@ private class SourceCutMapper(private val model: LpModel, private val sources: C
                 facts.add(CutProofFact(bound, sources.isGlobal(bound)))
                 if (column.integral) {
                     val integral = CutPremise.Integral(expr)
-                    if (!sources.isGlobal(integral) && !sources.isActive(integral)) decline(CutMappingDecline.MISSING_PROVENANCE)
+                    if (!sources.isGlobal(
+                            integral,
+                        ) && !sources.isActive(integral)
+                    ) {
+                            decline(CutMappingDecline.MISSING_PROVENANCE)
+                        }
                     facts.add(CutProofFact(integral, sources.isGlobal(integral)))
                 }
             }
@@ -187,18 +274,41 @@ private class SourceCutMapper(private val model: LpModel, private val sources: C
                 val rowFact = CutPremise.Row(rowExpression, row.relation, row.rhs)
                 val parent = sources.parent(row.index)
                 if (parent != null) {
-                    if (parent.model !== sources.model || !sources.assumptions.containsAll(parent.assumptions)) decline(CutMappingDecline.MODEL_SCOPE)
+                    if (!row.global && parent.global) decline(CutMappingDecline.MISSING_PROVENANCE)
+                    if (parent.model !== sources.model || !sources.assumptions.containsAll(
+                            parent.assumptions,
+                        )
+                    ) {
+                            decline(CutMappingDecline.MODEL_SCOPE)
+                        }
                     if (facts.size + parent.facts.size > limits.terms) decline(CutMappingDecline.ARITHMETIC_LIMIT)
                     facts.addAll(parent.facts)
+                    if (rules.size + parent.rules.size > limits.terms) decline(CutMappingDecline.ARITHMETIC_LIMIT)
                     rules.addAll(parent.rules)
                 } else if (row.global) {
                     facts.add(CutProofFact(rowFact, true))
                 } else {
                     val premises = row.premises ?: decline(CutMappingDecline.MISSING_PROVENANCE)
-                    if (premises.vars.isEmpty() && premises.boolLits.isEmpty()) decline(CutMappingDecline.MISSING_PROVENANCE)
+                    if (premises.vars.isEmpty() && premises.boolLits.isEmpty()) {
+                        decline(
+                        CutMappingDecline.MISSING_PROVENANCE,
+                    )
+                    }
+                    if (premises.vars.size != premises.isUpper.size || premises.vars.size != premises.thresholds.size ||
+                        premises.vars.any { it < 0 }
+                    ) {
+                        decline(CutMappingDecline.MISSING_PROVENANCE)
+                    }
                     for (i in premises.vars.indices) {
-                        val expr = CutExpression(mapOf(CutSource(CutSourceKind.INTEGER, premises.vars[i]) to BigFraction.ONE))
-                        facts.add(CutProofFact(CutPremise.Bound(expr, premises.isUpper[i], BigFraction.ofLong(premises.thresholds[i])), false))
+                        val expr = CutExpression(
+                            mapOf(CutSource(CutSourceKind.INTEGER, premises.vars[i]) to BigFraction.ONE),
+                        )
+                        facts.add(
+                            CutProofFact(
+                                CutPremise.Bound(expr, premises.isUpper[i], BigFraction.ofLong(premises.thresholds[i])),
+                                false,
+                            ),
+                        )
                     }
                     for (literal in premises.boolLits) facts.add(CutProofFact(CutPremise.Literal(literal), false))
                 }
@@ -207,10 +317,13 @@ private class SourceCutMapper(private val model: LpModel, private val sources: C
             rules.add(CutRoundingRule(tableau.divisor, tableau.mir, tableau.reduction, weightedRows))
         } else if (cut.global) {
             facts.add(CutProofFact(CutPremise.Row(inequality, cut.rel, BigFraction.ofLong(cut.rhs)), true))
-        } else decline(CutMappingDecline.MISSING_PROVENANCE)
+        } else {
+            decline(CutMappingDecline.MISSING_PROVENANCE)
+        }
         if (facts.size > limits.terms) decline(CutMappingDecline.ARITHMETIC_LIMIT)
         val assumptions = sources.assumptions + (inherited?.assumptions ?: emptySet())
         val proof = CutProvenance(sources.model, sources.epoch, facts, assumptions, rules)
+        if (!limits.accepts(proof)) decline(CutMappingDecline.ARITHMETIC_LIMIT)
         return CutMapping.Mapped(SourceCut(inequality, cut.rel, BigFraction.ofLong(cut.rhs), proof))
     }
 }

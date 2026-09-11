@@ -2,8 +2,8 @@ package com.eignex.klause.lp.bounding
 
 import com.eignex.klause.lp.cut.CutContext
 import com.eignex.klause.lp.cut.CutPool
-import com.eignex.klause.lp.cut.SharedCut
 import com.eignex.klause.lp.cut.CutSeparator
+import com.eignex.klause.lp.cut.SharedCut
 import com.eignex.klause.lp.engine.Basis
 import com.eignex.klause.lp.engine.CertifiedLpResult
 import com.eignex.klause.lp.engine.Cut
@@ -1074,11 +1074,27 @@ internal fun LpEngine.harvestRootCuts(
                 // Structural separators read the LP point and factor structure (not the constraint rows), so a
                 // cut they separate over the undecided root is valid at every solution — force it global.
                 val structural = separators.flatMap { it.separate(ctx) }
-                    .map { if (it.global) it else Cut(it.cols, it.coeffs, it.rel, it.rhs, global = true) }
+                    .mapNotNull {
+                        when {
+                            it.provenance != null || it.tableau != null -> SharedCut.fromCut(
+                                it,
+                                relaxation,
+                            )?.toCut(relaxation)
+
+                            it.global -> it
+
+                            else -> Cut(it.cols, it.coeffs, it.rel, it.rhs, global = true)
+                        }
+                    }
                 // Source mapping discharges every rounding bound and recursively retains parent premises.
                 val gomoryCuts = if (gomory) simplex.gomoryCuts(GOMORY_CUTS_PER_ROUND) else emptyList()
                 val mirCuts = if (mir) simplex.mirCuts(GOMORY_CUTS_PER_ROUND) else emptyList()
-                val mappedTableau = (gomoryCuts + mirCuts).mapNotNull { SharedCut.fromCut(it, relaxation)?.toCut(relaxation) }
+                val mappedTableau = (gomoryCuts + mirCuts).mapNotNull {
+                    SharedCut.fromCut(
+                        it,
+                        relaxation,
+                    )?.toCut(relaxation)
+                }
                 val candidates = structural + mappedTableau
                 val added = candidates.count { pool.add(it, relaxation) }
                 observeRootCutAccounting(candidates.size, 0, 0)

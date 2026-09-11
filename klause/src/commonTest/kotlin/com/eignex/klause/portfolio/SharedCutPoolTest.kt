@@ -90,9 +90,15 @@ class SharedCutPoolTest {
     fun `pool drains since a cursor and ignores duplicate keys`() {
         val pool = SharedCutPool()
         val r = relax(LinearObjective(intCoefficients = longArrayOf(1, 1, 1)))
-        val a = assertNotNull(SharedCut.fromCut(Cut(intArrayOf(0, 1), longArrayOf(1, 1), Relation.LE, 2, global = true), r))
-        val aGain = assertNotNull(SharedCut.fromCut(Cut(intArrayOf(1, 0), longArrayOf(1, 1), Relation.LE, 2, global = true), r)) // same inequality ⇒ same key
-        val b = assertNotNull(SharedCut.fromCut(Cut(intArrayOf(0, 2), longArrayOf(2, 1), Relation.LE, 3, global = true), r))
+        val a = assertNotNull(
+            SharedCut.fromCut(Cut(intArrayOf(0, 1), longArrayOf(1, 1), Relation.LE, 2, global = true), r),
+        )
+        val aGain = assertNotNull(
+            SharedCut.fromCut(Cut(intArrayOf(1, 0), longArrayOf(1, 1), Relation.LE, 2, global = true), r),
+        ) // same inequality ⇒ same key
+        val b = assertNotNull(
+            SharedCut.fromCut(Cut(intArrayOf(0, 2), longArrayOf(2, 1), Relation.LE, 3, global = true), r),
+        )
         pool.publish(listOf(a, aGain, b))
 
         val first = pool.drainSince(0)

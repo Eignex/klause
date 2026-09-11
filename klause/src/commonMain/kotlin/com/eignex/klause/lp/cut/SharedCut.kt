@@ -5,7 +5,9 @@ import com.eignex.klause.lp.relaxation.LpRelaxation
 
 /** A globally justified source inequality exchanged by workers of the same source model. */
 class SharedCut internal constructor(internal val source: SourceCut) {
-    init { require(source.provenance.global) }
+    init {
+        require(source.provenance.global)
+    }
 
     internal val key: Long = source.key.fold(source.provenance.model.hashCode().toLong()) { hash, c ->
         hash * 0x100000001b3L + c.code

@@ -9,16 +9,10 @@ import kotlin.math.abs
 import kotlin.math.sqrt
 
 /**
- * An activity-managed pool of globally-valid cuts. Cuts are added with deduplication by
- * [Cut.key]; a hard [maxCuts] cap bounds the per-node LP cost the pool imposes once its cuts are folded
- * into every node's relaxation. [observe] accumulates decayed tightness and removes a cut after the
- * configured consecutive inactive observations; [retainMostActive] then applies the hard cap.
- *
- * Eviction is sound: every pooled cut is valid at every solution ([Cut.global]), so dropping one only
- * loosens the relaxation — it never removes a feasible point. The pool replaces the unbounded
- * accumulation the root harvest used, which could grow without limit (the ghoulomb over-harvest: ~15795
- * cuts for zero prunes). Below the cap the pool preserves insertion order, so it is behaviour-neutral
- * on a harvest that never overflows.
+ * An activity-managed cut pool. Portable entries retain their source proof and become available only
+ * while their guards hold in [remap]'s context. Raw cuts belong to their original column layout and
+ * become unavailable after remapping. Eviction only loosens a relaxation; insertion order breaks
+ * activity ties, and [retainMostActive] enforces the existing [maxCuts] cap.
  */
 internal class CutPool(
     val maxCuts: Int = DEFAULT_MAX_CUTS,
@@ -27,7 +21,13 @@ internal class CutPool(
     private val seen = HashSet<Any>()
     private val entries = ArrayList<Entry>()
 
-    private class Entry(var cut: Cut?, val key: Any, val source: SourceCut? = null, var activity: Double = 0.0, var inactiveCount: Int = 0)
+    private class Entry(
+        var cut: Cut?,
+        val key: Any,
+        val source: SourceCut? = null,
+        var activity: Double = 0.0,
+        var inactiveCount: Int = 0,
+    )
 
     /** Number of pooled cuts. */
     val size: Int get() = entries.size
@@ -40,13 +40,23 @@ internal class CutPool(
     }
 
     fun add(cut: Cut, relaxation: LpRelaxation): Boolean {
-        val mapped = SourceCut.fromCut(cut, relaxation).orNull() ?: return add(cut)
-        return add(mapped, checkNotNull(relaxation.sourceMap))
+        return when (val mapped = SourceCut.fromCut(cut, relaxation)) {
+            is CutMapping.Mapped -> add(mapped.value, checkNotNull(relaxation.sourceMap))
+            is CutMapping.Declined -> {
+                val unscoped = cut.provenance == null && cut.tableau == null && cut.global
+                if (unscoped && mapped.reason == CutMappingDecline.MISSING_SOURCE) add(cut) else false
+            }
+        }
     }
 
     fun add(cut: SourceCut, map: CutSourceMap): Boolean {
         if (cut.provenance.model !== map.model) return false
-        val key = listOf(cut.key, cut.provenance.model, cut.provenance.facts.filter { !it.global }, cut.provenance.assumptions)
+        val key = listOf(
+            cut.key,
+            cut.provenance.model,
+            cut.provenance.facts.filter { !it.global },
+            cut.provenance.assumptions,
+        )
         if (!seen.add(key)) return false
         entries.add(Entry(cut.toCut(map).orNull(), key, cut))
         return true
