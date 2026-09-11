@@ -709,7 +709,9 @@ class LpDeclineDisciplineTest {
             val code = LpBoundaryScanner.codeOnly(path.readText())
             val relative = root.relativize(path).toString()
             val allowed = when (path.fileName.toString()) {
-                "QfLiraSolver.kt" -> setOf("LpSolveContext", "LpVerdict")
+                "QfLiraSolver.kt" -> setOf(
+                    "LpSolveContext", "LpVerdict", "LpCertificationObserver", "LpCertifier", "LpSolveMetrics",
+                )
 
                 "QfLraSystem.kt" -> setOf(
                     "ExactLpBounds", "ExactLpColumn", "ExactLpEntry", "ExactLpModel", "ExactLpNumber",

@@ -190,8 +190,11 @@ internal class LpPropagator(
 
     fun solve(): CertifiedLpResult? = solveOwned {
         val profile = effort()
-        it.solve(continuationLimits = profile.continuation, fullContinuation = profile.fullContinuation,
-            observer = certificationObserver)
+        it.solve(
+            continuationLimits = profile.continuation,
+            fullContinuation = profile.fullContinuation,
+            observer = certificationObserver,
+        )
     }
 
     private inline fun <T> solveOwned(action: (LpScopedSolver) -> T): T? = withOwner { current ->

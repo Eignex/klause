@@ -764,7 +764,9 @@ class LiveLpTheoryTest {
             ) else Problem(
                 0, intBounds = IntBounds.fromModelBounds(longArrayOf(), longArrayOf(), null, null),
                 numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(2.0),
-                factors = arrayOf(Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0), LinearOp.GE, 1.0)),
+                factors = arrayOf(
+                    Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0), LinearOp.GE, 1.0),
+                ),
             )
             val stats = SmtStatsSink()
             ExactLiraSearchComponent(source).use { component ->
@@ -787,7 +789,9 @@ class LiveLpTheoryTest {
         val source = Problem(
             0, intBounds = IntBounds.fromModelBounds(longArrayOf(), longArrayOf(), null, null),
             numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(2.0),
-            factors = arrayOf(Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(3.0), LinearOp.EQ, 1.0)),
+            factors = arrayOf(
+                    Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(3.0), LinearOp.EQ, 1.0),
+                ),
         )
         val factory = object : LpEngineFactory by ProductionLpEngineFactory {
             override fun newPersistentSolver(
@@ -838,7 +842,11 @@ class LiveLpTheoryTest {
             assertNotNull(component.nextBranch(session))
             val requests = stats.snapshot().reductionRequests
             val split = assertNotNull(SourceBoundAtom.integerSplit(
-                session, listOf(SourceBoundTerm(SearchIntValue(0), BigFraction.ONE), SourceBoundTerm(SearchIntValue(1), BigFraction.ONE)),
+                session,
+                listOf(
+                    SourceBoundTerm(SearchIntValue(0), BigFraction.ONE),
+                    SourceBoundTerm(SearchIntValue(1), BigFraction.ONE),
+                ),
                 BigFraction.ofLong(2),
             ))
             assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Theory(split.negative)))

@@ -31,7 +31,8 @@ internal fun lpStatPairs(stats: SolveStats): List<Pair<String, String>> {
     val splits = stats.lp.componentSplits.sum
     val routed = stats.lp.standalonePasses.sum + stats.lp.componentPasses.sum + stats.lp.rootPasses.sum
     if (solves == 0.0 && stats.lp.nodePasses.sum == 0.0 && routed == 0.0 &&
-        lagrangian == 0.0 && energetic == 0.0 && splits == 0.0 && stats.lp.basisVerification.calls == 0L && stats.lp.continuation.calls == 0L
+        lagrangian == 0.0 && energetic == 0.0 && splits == 0.0 &&
+        stats.lp.basisVerification.calls == 0L && stats.lp.continuation.calls == 0L
     ) {
         return emptyList()
     }

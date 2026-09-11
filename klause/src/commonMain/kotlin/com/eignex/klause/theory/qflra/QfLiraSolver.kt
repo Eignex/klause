@@ -16,9 +16,8 @@ import com.eignex.klause.lp.bounding.LpPropagator
 import com.eignex.klause.lp.bounding.LpSearchPolicy
 import com.eignex.klause.lp.engine.LpCertificationObserver
 import com.eignex.klause.lp.engine.LpCertifier
-import com.eignex.klause.lp.engine.LpSolveMetrics
-import com.eignex.klause.simplex.exact.ExactContinuationMetrics
 import com.eignex.klause.lp.engine.LpSolveContext
+import com.eignex.klause.lp.engine.LpSolveMetrics
 import com.eignex.klause.lp.engine.LpVerdict
 import com.eignex.klause.lp.exactColumnLower
 import com.eignex.klause.lp.exactColumnUpper
@@ -26,6 +25,7 @@ import com.eignex.klause.lp.exactComparison
 import com.eignex.klause.lp.exactMixedEchelonHermite
 import com.eignex.klause.lp.exactMixedTriangularBounds
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.simplex.exact.ExactContinuationMetrics
 import com.eignex.klause.simplex.exact.ExactDoubleBoundedSplit
 import com.eignex.klause.simplex.exact.ExactRationalFeasibilityModel
 import com.eignex.klause.simplex.exact.ExactRationalInequality

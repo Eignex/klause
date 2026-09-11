@@ -52,7 +52,10 @@ class ExactContinuationTest {
         val input = ExactContinuationInput(
             List(2) { listOf(0 to BigFraction.ONE, 1 to BigFraction.ONE) },
             List(2) { BigFraction.ONE }, List(4) { BigFraction.ZERO }, List(4) { null },
-            listOf(1, 0), listOf(ContinuationStatus.BASIC, ContinuationStatus.BASIC, ContinuationStatus.LOWER, ContinuationStatus.LOWER),
+            listOf(1, 0),
+            listOf(
+                ContinuationStatus.BASIC, ContinuationStatus.BASIC, ContinuationStatus.LOWER, ContinuationStatus.LOWER,
+            ),
         )
 
         val result = ExactContinuation(input).resume()
@@ -69,7 +72,9 @@ class ExactContinuationTest {
         val input = ExactContinuationInput(
             listOf(listOf(0 to BigFraction.ONE), listOf(1 to BigFraction.ONE)), List(2) { BigFraction.ONE },
             List(4) { BigFraction.ZERO }, List(4) { null }, listOf(1, 0),
-            listOf(ContinuationStatus.BASIC, ContinuationStatus.BASIC, ContinuationStatus.LOWER, ContinuationStatus.LOWER),
+            listOf(
+                ContinuationStatus.BASIC, ContinuationStatus.BASIC, ContinuationStatus.LOWER, ContinuationStatus.LOWER,
+            ),
         )
 
         val result = ExactContinuation(input).resume()
@@ -116,7 +121,9 @@ class ExactContinuationTest {
         val input = ExactContinuationInput(
             listOf(listOf(0 to BigFraction.ONE), listOf(1 to BigFraction.ONE)), List(2) { BigFraction.ONE },
             List(4) { BigFraction.ZERO }, List(4) { null }, listOf(1, 0),
-            listOf(ContinuationStatus.BASIC, ContinuationStatus.BASIC, ContinuationStatus.LOWER, ContinuationStatus.LOWER),
+            listOf(
+                ContinuationStatus.BASIC, ContinuationStatus.BASIC, ContinuationStatus.LOWER, ContinuationStatus.LOWER,
+            ),
         )
         val session = ExactContinuation(input)
 
@@ -136,7 +143,9 @@ class ExactContinuationTest {
             listOf(listOf(0 to huge, 1 to BigFraction.ONE), listOf(0 to BigFraction.ONE, 1 to huge)),
             List(2) { BigFraction.ONE }, List(4) { BigFraction.ZERO },
             listOf(null, null, BigFraction.ZERO, BigFraction.ZERO), listOf(0, 1),
-            listOf(ContinuationStatus.BASIC, ContinuationStatus.BASIC, ContinuationStatus.FIXED, ContinuationStatus.FIXED),
+            listOf(
+                ContinuationStatus.BASIC, ContinuationStatus.BASIC, ContinuationStatus.FIXED, ContinuationStatus.FIXED,
+            ),
         )
 
         val result = ExactContinuation(input).resume()
@@ -226,10 +235,14 @@ class ExactContinuationTest {
         val input = ExactContinuationInput(
             listOf(listOf(0 to BigFraction.ONE), listOf(1 to BigFraction.ONE)), List(2) { BigFraction.ONE },
             List(4) { BigFraction.ZERO }, List(4) { null }, listOf(1, 0),
-            listOf(ContinuationStatus.BASIC, ContinuationStatus.BASIC, ContinuationStatus.LOWER, ContinuationStatus.LOWER),
+            listOf(
+                ContinuationStatus.BASIC, ContinuationStatus.BASIC, ContinuationStatus.LOWER, ContinuationStatus.LOWER,
+            ),
         )
         var checkpoints = 0
-        ExactContinuation(input).resume(ExactContinuationLimits(maxImportPivots = 1), Cancellation { checkpoints++; false })
+        ExactContinuation(input).resume(
+            ExactContinuationLimits(maxImportPivots = 1), Cancellation { checkpoints++; false },
+        )
         val session = ExactContinuation(input)
         var calls = 0
 
@@ -242,6 +255,27 @@ class ExactContinuationTest {
         assertEquals(0, resumed.metrics.builds)
         assertEquals(1, resumed.metrics.imports)
         assertEquals(listOf(1, 0), resumed.headings)
+    }
+
+    @Test
+    fun `fixed width intermediate scalars respect the configured bit limit`() {
+        val h = BigFraction.ofLong(1L shl 20)
+        val input = ExactContinuationInput(
+            listOf(listOf(0 to h, 1 to BigFraction.ONE), listOf(0 to BigFraction.ONE, 1 to h)),
+            List(2) { BigFraction.ONE }, List(4) { BigFraction.ZERO },
+            listOf(null, null, BigFraction.ZERO, BigFraction.ZERO),
+            listOf(0, 1),
+            listOf(
+                ContinuationStatus.BASIC, ContinuationStatus.BASIC, ContinuationStatus.FIXED, ContinuationStatus.FIXED,
+            ),
+        )
+
+        val result = ExactContinuation(input).resume(ExactContinuationLimits(maxBits = 24))
+
+        assertEquals(ContinuationDecline.BITS, result.metrics.decline)
+        assertEquals(ContinuationPhase.IMPORT, result.metrics.phase)
+        assertNull(result.values)
+        assertNull(result.ray)
     }
 
 }

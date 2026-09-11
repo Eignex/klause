@@ -24,7 +24,9 @@ class CliStatsTest {
 
     @Test
     fun `continuation costs remain visible for LP and SMT declines`() {
-        val continuation = LpContinuationStats(calls = 1, work = mapOf("IMPORT" to 13), declines = mapOf("IMPORT_WORK" to 1))
+        val continuation = LpContinuationStats(
+            calls = 1, work = mapOf("IMPORT" to 13), declines = mapOf("IMPORT_WORK" to 1),
+        )
         val stats = SolveStats(lp = LpStats(continuation = continuation), smt = SmtStats(continuation = continuation))
 
         val lp = lpStatPairs(stats).toMap()

@@ -66,7 +66,8 @@ class LpPropagatorTest {
         }
         var profile = LpEffortProfile(continuation = ExactContinuationLimits(maxPivots = 1))
         val stats = LpStatsSink()
-        LpPropagator(object : LpSearchPolicy {}, effort = { profile }, solveContext = LpSolveContext(engineFactory = factory),
+        LpPropagator(
+            object : LpSearchPolicy {}, effort = { profile }, solveContext = LpSolveContext(engineFactory = factory),
             certificationObserver = stats.certificationObserver()).use { lp ->
             assertTrue(lp.install(Any(), source))
             val short = assertNotNull(lp.solve())

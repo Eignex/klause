@@ -130,7 +130,9 @@ class RevisedSimplexResolveBoundsTest {
             assertTrue(solver.mirCuts(1).isEmpty())
             assertNull(solver.infeasibleRay)
             assertEquals(1L, trail.state.assertions.single().witness)
-            val certified = certifyLpResult(assertNotNull(trail.state.toWorkingModel()), solver, result)
+            val certified = certifyLpResult(
+                assertNotNull(trail.state.toWorkingModel()), solver, result, Cancellation { cancelled },
+            )
             assertEquals(LpVerdict.INDETERMINATE, certified.verdict)
         }
     }
