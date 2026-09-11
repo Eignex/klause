@@ -266,8 +266,8 @@ internal object ExactBasisOrderingCoverage {
                                         check(snapshot.columns.contentEquals(current))
                                         check(snapshot.unitRows.all { it == -1 })
                                         RationalBasisOrder(snapshot.rows, snapshot.slots)
-                                        }
-                            }
+                                    }
+                                }
                             }
                             val cache = ExactBasisCache(provider)
                             val id = "trace/$name/$index/$round/$enabled"
