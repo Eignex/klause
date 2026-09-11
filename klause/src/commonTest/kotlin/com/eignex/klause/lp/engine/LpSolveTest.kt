@@ -725,7 +725,7 @@ class LpSolveTest {
     }
 
     @Test
-    fun `near zero reconstruction cannot use a missing upper bound as finite support`() {
+    fun `exact tiny dual retains finite support that rounding to zero loses`() {
         val model = LpBuilder().apply {
             val x = addRealVar(0.0, null, cost = -1e-10)
             addRealRow(intArrayOf(x), doubleArrayOf(1.0), Relation.LE, 1.0)
@@ -750,11 +750,12 @@ class LpSolveTest {
         val result = certifyLpResult(model, solver, hint, policy = policy)
 
         assertEquals(0L, assertNotNull(reconstructRational(-1e-10)).numerator)
-        assertEquals(LpVerdict.FEASIBLE, result.verdict)
+        assertEquals(LpVerdict.ATTAINED_OPTIMUM, result.verdict)
         assertEquals(listOf(BigFraction.ONE), result.exactPrimal)
         assertEquals(BigFraction.ofDouble(-1e-10), result.witness?.objective)
-        assertTrue(assertNotNull(result.lowerBound) < assertNotNull(result.witness).objective)
-        assertEquals(listOf(false), attempts)
+        assertEquals(result.witness?.objective, result.lowerBound)
+        assertNull(exactLagrangian(model, listOf(BigFraction.ZERO)))
+        assertEquals(listOf(true, true), attempts)
     }
 
     @Test
@@ -842,5 +843,155 @@ class LpSolveTest {
         assertEquals(BigFraction.ZERO, lhs)
         assertTrue(rhs < BigFraction.ZERO)
         assertEquals(setOf(7, 9), conflict.rows.map { model.rowPremises[it]!!.boolLits.single() }.toSet())
+    }
+
+    @Test
+    fun `reconstruction alone can certify thirds through the live policy seam`() {
+        val model = LpBuilder().apply {
+            addVar(0L, 1L, cost = 1L)
+            addRow(intArrayOf(0), longArrayOf(3L), Relation.EQ, 1L)
+        }.build(Sense.MINIMIZE)
+        val onlyReconstruction = LpSolveContext(
+            certificationPolicy = LpCertificationPolicy { route, success -> route == LpCertifier.RATIONAL && success },
+        )
+
+        val result = solveAndCertify(model, context = onlyReconstruction)
+
+        val point = assertNotNull(result.witness).primal.single()
+        assertEquals(BigFraction.ONE, BigFraction.ofLong(3L) * point)
+        assertEquals(point, result.lowerBound)
+        assertEquals(LpVerdict.ATTAINED_OPTIMUM, result.verdict)
+        assertTrue(assertNotNull(result.reconstruction).pointSuccesses > 0)
+    }
+
+    @Test
+    fun `policy rejection withholds all reconstructed proof packages`() {
+        val model = LpBuilder().apply { addVar(0L, 1L, cost = 1L) }.build(Sense.MINIMIZE)
+        val reject = LpSolveContext(certificationPolicy = LpCertificationPolicy { _, _ -> false })
+
+        val result = solveAndCertify(model, context = reject)
+
+        assertEquals(LpVerdict.INDETERMINATE, result.verdict)
+        assertNull(result.witness)
+        assertNull(result.bound)
+        assertTrue(assertNotNull(result.reconstruction).pointSuccesses > 0)
+        assertTrue(result.reconstruction.dualSuccesses > 0)
+    }
+
+    @Test
+    fun `completed exact reconstruction survives cancellation after policy acceptance`() {
+        val zero = ExactLpNumber.of(0L)
+        val one = ExactLpNumber.of(1L)
+        val source = ExactLpModel(
+            listOf(emptyList()),
+            emptyList(),
+            listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(one)))),
+            emptyList(),
+            ExactLpObjective(listOf(one)),
+        )
+        var cancelled = false
+        val context = LpSolveContext(
+            certificationPolicy = LpCertificationPolicy { route, success ->
+                if (route == LpCertifier.RATIONAL && success) cancelled = true
+                success
+            },
+        )
+
+        val state = LpExactState(source)
+        val candidate = FloatLpResult(
+            Basis(intArrayOf(), arrayOf(VarStatus.AT_LOWER)),
+            0.0,
+            doubleArrayOf(),
+            doubleArrayOf(0.0),
+            exactState = state,
+        )
+        val solver = object : LpSolver {
+            override val solvedExactState = state
+            override val infeasibleRay: DoubleArray? = null
+            override fun solve(warm: Basis?) = candidate
+            override fun solvePrimal(warm: Basis?) = candidate
+        }
+        val result = certifyLpResult(
+            assertNotNull(state.toWorkingModel()),
+            solver,
+            candidate,
+            Cancellation { cancelled },
+            policy = context.certificationPolicy,
+        )
+
+        assertTrue(cancelled)
+        assertEquals(LpVerdict.ATTAINED_OPTIMUM, result.verdict)
+        assertEquals(BigFraction.ZERO, result.lowerBound)
+        assertEquals(listOf(BigFraction.ZERO), result.exactPrimal)
+        assertNotNull(result.bound?.support)
+    }
+
+    @Test
+    fun `stale exact candidate cannot enter reconstruction after a trail edit`() {
+        val zero = ExactLpNumber.of(0L)
+        val one = ExactLpNumber.of(1L)
+        val source = ExactLpModel(
+            listOf(emptyList()),
+            emptyList(),
+            listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(one)))),
+            emptyList(),
+            ExactLpObjective(listOf(one)),
+        )
+        val trail = LpBoundTrail(source)
+        val old = trail.state
+        val candidate = FloatLpResult(
+            Basis(intArrayOf(), arrayOf(VarStatus.AT_LOWER)),
+            0.0,
+            doubleArrayOf(),
+            doubleArrayOf(0.0),
+            exactState = old,
+        )
+        val solver = object : LpSolver {
+            override val solvedExactState = old
+            override val infeasibleRay: DoubleArray? = null
+            override fun solve(warm: Basis?) = candidate
+            override fun solvePrimal(warm: Basis?) = candidate
+        }
+        assertTrue(trail.assertBound(0, false, ExactLpSide(one), 5L))
+
+        val result = certifyLpResult(assertNotNull(trail.state.toWorkingModel()), solver, candidate)
+
+        assertEquals(LpVerdict.INDETERMINATE, result.verdict)
+        assertNull(result.reconstruction)
+        assertNull(result.witness)
+    }
+
+    @Test
+    fun `rational ray beyond Long reaches the live exact conflict surface`() {
+        val zero = ExactLpNumber.of(0L)
+        val one = ExactLpNumber.of(1L)
+        val huge = assertNotNull(BigFraction.ofDouble(1e30))
+        val source = ExactLpModel(
+            listOf(listOf(ExactLpEntry(0, one), ExactLpEntry(1, ExactLpNumber.of(huge.negated())))),
+            listOf(one, zero),
+            listOf(
+                ExactLpColumn(ExactLpBounds()),
+                ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(zero))),
+                ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(zero))),
+            ),
+            listOf(ExactLpRow(), ExactLpRow()),
+            ExactLpObjective(listOf(zero, zero, zero)),
+        )
+        val state = LpExactState(source)
+        val solver = object : LpSolver {
+            override val solvedExactState = state
+            override val infeasibleRay = doubleArrayOf(1e30, 1.0)
+            override fun solve(warm: Basis?): FloatLpResult? = null
+            override fun solvePrimal(warm: Basis?): FloatLpResult? = null
+        }
+
+        val result = certifyLpResult(assertNotNull(state.toWorkingModel()), solver, null)
+
+        assertEquals(LpVerdict.INFEASIBLE, result.verdict)
+        val conflict = assertNotNull(result.rationalConflict)
+        assertEquals(BigFraction.ZERO, conflict.multipliers[0] - huge * conflict.multipliers[1])
+        assertTrue(conflict.multipliers[0] < BigFraction.ZERO)
+        assertNotNull(result.conflictSupport)
+        assertTrue(assertNotNull(result.reconstruction).raySuccesses > 0)
     }
 }
