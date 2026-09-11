@@ -70,13 +70,3 @@ tasks.register<JavaExec>("basisTrace") {
     workingDir(rootDir)
     systemProperty("klause.workspace.root", rootDir.absolutePath)
 }
-
-tasks.register<JavaExec>("lpWave2Acceptance") {
-    group = "verification"
-    description = "Measure or evaluate the bounded LP Wave 2 integrated acceptance campaign."
-    dependsOn(jvmTestCompilation.compileTaskProvider)
-    classpath(jvmTestCompilation.output.allOutputs, jvmTestCompilation.runtimeDependencyFiles)
-    mainClass.set("com.eignex.klause.lp.LpWave2AcceptanceKt")
-    workingDir(rootDir)
-    systemProperty("klause.workspace.root", rootDir.absolutePath)
-}
