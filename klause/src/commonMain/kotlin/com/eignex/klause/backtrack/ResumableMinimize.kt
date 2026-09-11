@@ -333,17 +333,11 @@ internal class ResumableMinimize(
         )
         try {
             if (freshParams.cancellation()) throw CancellationException("objective replacement cancelled")
-        } catch (primary: Throwable) {
-            replacement.closeAfter(primary)
-            throw primary
-        }
-        try {
+            replaced = true
             close()
         } catch (primary: Throwable) {
             replacement.closeAfter(primary)
             throw primary
-        } finally {
-            replaced = true
         }
         return replacement
     }
