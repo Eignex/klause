@@ -50,7 +50,8 @@ class SourceBoundAtom private constructor(
     val terms: List<SourceBoundTerm> get() = sourceTerms.toList()
 
     override fun equals(other: Any?): Boolean = other is SourceBoundAtom &&
-        sourceTerms == other.sourceTerms && threshold == other.threshold && upper == other.upper && strict == other.strict
+        sourceTerms == other.sourceTerms && threshold == other.threshold && upper == other.upper &&
+        strict == other.strict
 
     override fun hashCode(): Int = ((sourceTerms.hashCode() * 31 + threshold.hashCode()) * 31 + upper.hashCode()) *
         31 + strict.hashCode()

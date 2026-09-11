@@ -10304,6 +10304,47 @@ public final class com/eignex/klause/solver/search/HintedBooleanBranching : com/
 	public fun alternatives (Lcom/eignex/klause/solver/search/SearchContext;)Ljava/util/List;
 }
 
+public final class com/eignex/klause/solver/search/RegisteredTheoryDecision : com/eignex/klause/solver/search/SearchTheoryDecision {
+	public final fun getLiteral ()I
+	public final fun getPayload ()Lcom/eignex/klause/solver/search/SearchTheoryDecision;
+}
+
+public abstract interface class com/eignex/klause/solver/search/SearchAtomPremise {
+}
+
+public final class com/eignex/klause/solver/search/SearchAtomPremise$All : com/eignex/klause/solver/search/SearchAtomPremise {
+	public fun <init> (Ljava/util/List;)V
+}
+
+public final class com/eignex/klause/solver/search/SearchAtomPremise$Asserted : com/eignex/klause/solver/search/SearchAtomPremise {
+	public fun <init> (Lcom/eignex/klause/solver/search/SearchDecision;)V
+	public final fun component1 ()Lcom/eignex/klause/solver/search/SearchDecision;
+	public final fun copy (Lcom/eignex/klause/solver/search/SearchDecision;)Lcom/eignex/klause/solver/search/SearchAtomPremise$Asserted;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/search/SearchAtomPremise$Asserted;Lcom/eignex/klause/solver/search/SearchDecision;ILjava/lang/Object;)Lcom/eignex/klause/solver/search/SearchAtomPremise$Asserted;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getDecision ()Lcom/eignex/klause/solver/search/SearchDecision;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/solver/search/SearchAtomPremise$Unavailable : com/eignex/klause/solver/search/SearchAtomPremise {
+	public static final field INSTANCE Lcom/eignex/klause/solver/search/SearchAtomPremise$Unavailable;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/solver/search/SearchAtomRegistry {
+	public fun <init> (II)V
+	public synthetic fun <init> (IIILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getSourceBooleanCount ()I
+}
+
+public final class com/eignex/klause/solver/search/SearchAtomRegistryKt {
+	public static final fun explainAtoms (Lcom/eignex/klause/solver/search/SearchContext;Lcom/eignex/klause/solver/search/SearchAtomPremise;Lcom/eignex/klause/solver/search/SearchDecision;I)Lcom/eignex/klause/solver/search/SearchExplanation;
+	public static synthetic fun explainAtoms$default (Lcom/eignex/klause/solver/search/SearchContext;Lcom/eignex/klause/solver/search/SearchAtomPremise;Lcom/eignex/klause/solver/search/SearchDecision;IILjava/lang/Object;)Lcom/eignex/klause/solver/search/SearchExplanation;
+}
+
 public final class com/eignex/klause/solver/search/SearchBoolValue : com/eignex/klause/solver/search/SearchValueKey {
 	public fun <init> (I)V
 	public final fun component1 ()I
@@ -10439,6 +10480,7 @@ public final class com/eignex/klause/solver/search/SearchConflictResolver$Defaul
 }
 
 public abstract interface class com/eignex/klause/solver/search/SearchContext {
+	public fun atomLiteral (Lcom/eignex/klause/solver/search/SearchDecision;)Ljava/lang/Integer;
 	public abstract fun boolValue (I)Ljava/lang/Boolean;
 	public abstract fun cancelled ()Z
 	public abstract fun consumeCheck ()Z
@@ -10448,6 +10490,12 @@ public abstract interface class com/eignex/klause/solver/search/SearchContext {
 	public abstract fun intUpperBound (I)Ljava/lang/Long;
 	public abstract fun publish (I)Lcom/eignex/klause/solver/search/ComponentResult;
 	public abstract fun publish (Lcom/eignex/klause/solver/search/SearchDecision;)Lcom/eignex/klause/solver/search/ComponentResult;
+	public fun registerAtom (Lcom/eignex/klause/solver/search/SearchTheoryDecision;Lcom/eignex/klause/solver/search/SearchTheoryDecision;)Lcom/eignex/klause/solver/search/SearchTheoryAtom;
+}
+
+public final class com/eignex/klause/solver/search/SearchContext$DefaultImpls {
+	public static fun atomLiteral (Lcom/eignex/klause/solver/search/SearchContext;Lcom/eignex/klause/solver/search/SearchDecision;)Ljava/lang/Integer;
+	public static fun registerAtom (Lcom/eignex/klause/solver/search/SearchContext;Lcom/eignex/klause/solver/search/SearchTheoryDecision;Lcom/eignex/klause/solver/search/SearchTheoryDecision;)Lcom/eignex/klause/solver/search/SearchTheoryAtom;
 }
 
 public abstract interface class com/eignex/klause/solver/search/SearchDecision {
@@ -10968,8 +11016,9 @@ public final class com/eignex/klause/solver/search/SearchRunObserver$None : com/
 }
 
 public final class com/eignex/klause/solver/search/SearchSession : com/eignex/klause/solver/search/ClauseWatchHost, com/eignex/klause/solver/search/SearchContext {
-	public fun <init> (Ljava/util/List;JLcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/solver/search/SearchLearnedDbParams;Ljava/util/List;)V
-	public synthetic fun <init> (Ljava/util/List;JLcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/solver/search/SearchLearnedDbParams;Ljava/util/List;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Ljava/util/List;JLcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/solver/search/SearchLearnedDbParams;Ljava/util/List;Lcom/eignex/klause/solver/search/SearchAtomRegistry;)V
+	public synthetic fun <init> (Ljava/util/List;JLcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/solver/search/SearchLearnedDbParams;Ljava/util/List;Lcom/eignex/klause/solver/search/SearchAtomRegistry;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun atomLiteral (Lcom/eignex/klause/solver/search/SearchDecision;)Ljava/lang/Integer;
 	public fun boolValue (I)Ljava/lang/Boolean;
 	public fun cancelled ()Z
 	public final fun check ()Lcom/eignex/klause/solver/search/ComponentCheck;
@@ -10994,6 +11043,7 @@ public final class com/eignex/klause/solver/search/SearchSession : com/eignex/kl
 	public fun publish (Lcom/eignex/klause/solver/search/SearchDecision;)Lcom/eignex/klause/solver/search/ComponentResult;
 	public final fun push (Lcom/eignex/klause/solver/search/SearchDecision;)Lcom/eignex/klause/solver/search/ComponentResult;
 	public final fun reasonFor (I)Lcom/eignex/klause/solver/search/SearchExplanation;
+	public fun registerAtom (Lcom/eignex/klause/solver/search/SearchTheoryDecision;Lcom/eignex/klause/solver/search/SearchTheoryDecision;)Lcom/eignex/klause/solver/search/SearchTheoryAtom;
 	public final fun resetRootFacts ()V
 	public final fun restart ()Lcom/eignex/klause/solver/search/ComponentResult;
 	public final fun solve (ILcom/eignex/klause/solver/search/SearchSolveParams;Lcom/eignex/klause/solver/search/SearchCandidateHints;Lcom/eignex/klause/solver/search/BooleanBranching;Lcom/eignex/klause/solver/search/SearchRunObserver;)Lcom/eignex/klause/solver/search/SearchResult;
@@ -11015,6 +11065,12 @@ public final class com/eignex/klause/solver/search/SearchSolveParams {
 	public final fun getRestart ()Lcom/eignex/klause/solver/search/SearchRestartPolicy;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/solver/search/SearchTheoryAtom {
+	public final fun alternatives ()Ljava/util/List;
+	public final fun getNegative ()Lcom/eignex/klause/solver/search/RegisteredTheoryDecision;
+	public final fun getPositive ()Lcom/eignex/klause/solver/search/RegisteredTheoryDecision;
 }
 
 public abstract interface class com/eignex/klause/solver/search/SearchTheoryDecision {
@@ -11246,6 +11302,51 @@ public final class com/eignex/klause/theory/qflra/ExactLraSolver : com/eignex/kl
 	public fun <init> (Lcom/eignex/klause/ir/Problem;)V
 	public fun check ([ZLcom/eignex/klause/theory/TheoryContext;)Lcom/eignex/klause/theory/TheoryCheck;
 	public fun getModel ()Lcom/eignex/klause/ir/Problem;
+}
+
+public final class com/eignex/klause/theory/qflra/SourceBoundAtom : com/eignex/klause/solver/search/SearchTheoryDecision {
+	public static final field Companion Lcom/eignex/klause/theory/qflra/SourceBoundAtom$Companion;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getStrict ()Z
+	public final fun getTerms ()Ljava/util/List;
+	public final fun getThreshold ()Lcom/eignex/klause/simplex/exact/BigFraction;
+	public final fun getUpper ()Z
+	public fun hashCode ()I
+}
+
+public final class com/eignex/klause/theory/qflra/SourceBoundAtom$Companion {
+	public final fun integerSplit (Lcom/eignex/klause/solver/search/SearchContext;Ljava/util/List;Lcom/eignex/klause/simplex/exact/BigFraction;Lcom/eignex/klause/simplex/exact/BigFraction;Lcom/eignex/klause/theory/qflra/SourceBoundLimits;)Lcom/eignex/klause/solver/search/SearchTheoryAtom;
+	public static synthetic fun integerSplit$default (Lcom/eignex/klause/theory/qflra/SourceBoundAtom$Companion;Lcom/eignex/klause/solver/search/SearchContext;Ljava/util/List;Lcom/eignex/klause/simplex/exact/BigFraction;Lcom/eignex/klause/simplex/exact/BigFraction;Lcom/eignex/klause/theory/qflra/SourceBoundLimits;ILjava/lang/Object;)Lcom/eignex/klause/solver/search/SearchTheoryAtom;
+	public final fun rationalSplit (Lcom/eignex/klause/solver/search/SearchContext;Ljava/util/List;Lcom/eignex/klause/simplex/exact/BigFraction;ZLcom/eignex/klause/simplex/exact/BigFraction;Lcom/eignex/klause/theory/qflra/SourceBoundLimits;)Lcom/eignex/klause/solver/search/SearchTheoryAtom;
+	public static synthetic fun rationalSplit$default (Lcom/eignex/klause/theory/qflra/SourceBoundAtom$Companion;Lcom/eignex/klause/solver/search/SearchContext;Ljava/util/List;Lcom/eignex/klause/simplex/exact/BigFraction;ZLcom/eignex/klause/simplex/exact/BigFraction;Lcom/eignex/klause/theory/qflra/SourceBoundLimits;ILjava/lang/Object;)Lcom/eignex/klause/solver/search/SearchTheoryAtom;
+}
+
+public final class com/eignex/klause/theory/qflra/SourceBoundLimits {
+	public fun <init> ()V
+	public fun <init> (II)V
+	public synthetic fun <init> (IIILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()I
+	public final fun component2 ()I
+	public final fun copy (II)Lcom/eignex/klause/theory/qflra/SourceBoundLimits;
+	public static synthetic fun copy$default (Lcom/eignex/klause/theory/qflra/SourceBoundLimits;IIILjava/lang/Object;)Lcom/eignex/klause/theory/qflra/SourceBoundLimits;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getMaxBits ()I
+	public final fun getMaxTerms ()I
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/theory/qflra/SourceBoundTerm {
+	public fun <init> (Lcom/eignex/klause/solver/search/SearchValueKey;Lcom/eignex/klause/simplex/exact/BigFraction;)V
+	public final fun component1 ()Lcom/eignex/klause/solver/search/SearchValueKey;
+	public final fun component2 ()Lcom/eignex/klause/simplex/exact/BigFraction;
+	public final fun copy (Lcom/eignex/klause/solver/search/SearchValueKey;Lcom/eignex/klause/simplex/exact/BigFraction;)Lcom/eignex/klause/theory/qflra/SourceBoundTerm;
+	public static synthetic fun copy$default (Lcom/eignex/klause/theory/qflra/SourceBoundTerm;Lcom/eignex/klause/solver/search/SearchValueKey;Lcom/eignex/klause/simplex/exact/BigFraction;ILjava/lang/Object;)Lcom/eignex/klause/theory/qflra/SourceBoundTerm;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCoefficient ()Lcom/eignex/klause/simplex/exact/BigFraction;
+	public final fun getSource ()Lcom/eignex/klause/solver/search/SearchValueKey;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
 }
 
 public final class com/eignex/klause/util/Bits {

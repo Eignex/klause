@@ -27,7 +27,11 @@ class SearchAtomRegistry(
     }
 
     internal fun register(positive: SearchTheoryDecision, negative: SearchTheoryDecision): SearchTheoryAtom? {
-        if (positive is RegisteredTheoryDecision || negative is RegisteredTheoryDecision || positive == negative) return null
+        if (positive is RegisteredTheoryDecision || negative is RegisteredTheoryDecision ||
+            positive == negative
+        ) {
+                return null
+            }
         val previous = names[positive]
         if (previous != null) {
             val complement = assertions[(previous.literal xor 1) - sourceBooleanCount * 2]
@@ -56,8 +60,10 @@ class SearchAtomRegistry(
 
     internal fun literal(decision: SearchDecision): Int? = when (decision) {
         is SearchDecision.Bool -> decision.literal.takeIf(::accepts)
+
         is SearchDecision.Theory -> (decision.decision as? RegisteredTheoryDecision)
             ?.takeIf { it.owner === this }?.literal
+
         else -> null
     }
 
@@ -89,7 +95,10 @@ class SearchTheoryAtom internal constructor(
 /** Source antecedents for a component-proved deduction; every leaf must be nameable and active. */
 sealed interface SearchAtomPremise {
     /** A source Boolean or owner-bound theory assertion. */
-    data class Asserted(val decision: SearchDecision) : SearchAtomPremise
+    data class Asserted(
+        /** The asserted source fact whose Boolean witness must be active. */
+        val decision: SearchDecision,
+    ) : SearchAtomPremise
 
     /** All premises of an independently justified intermediate deduction. Empty means a root axiom. */
     class All(premises: List<SearchAtomPremise>) : SearchAtomPremise {
@@ -126,12 +135,15 @@ fun SearchContext.explainAtoms(
                 if (boolValue(literal ushr 1) != (literal and 1 == 0)) return null
                 literals.add(literal xor 1)
             }
+
             is SearchAtomPremise.All -> {
                 if (current.premises.size > remaining - pending.size) return null
                 pending.addAll(current.premises)
             }
+
             SearchAtomPremise.Unavailable -> return null
         }
     }
+    if (literals.size > maxNodes) return null
     return SearchExplanation(literals.toIntArray())
 }

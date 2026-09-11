@@ -76,14 +76,18 @@ class SearchSession(
     }
 
     override fun registerAtom(positive: SearchTheoryDecision, negative: SearchTheoryDecision): SearchTheoryAtom? =
-        atoms?.register(positive, negative)
+        if (cancelled()) null else atoms?.register(positive, negative)
 
-    override fun atomLiteral(decision: SearchDecision): Int? = atoms?.literal(decision)
+    override fun atomLiteral(decision: SearchDecision): Int? = if (atoms == null) {
+        (decision as? SearchDecision.Bool)?.literal
+    } else {
+        atoms.literal(decision)
+    }
 
     private fun acceptsLiteral(literal: Int): Boolean = atoms?.accepts(literal) ?: true
 
     private fun namedExplanation(explanation: SearchExplanation?): SearchExplanation? =
-        explanation?.takeIf { it.literals.all(::acceptsLiteral) }
+        if (atoms == null) explanation else explanation?.takeIf { it.literals.all(::acceptsLiteral) }
 
     override fun intLowerBound(variable: Int): Long? = intFacts[variable]?.lower
 
@@ -115,7 +119,15 @@ class SearchSession(
         is SearchDecision.Theory -> {
             if (decision.decision is RegisteredTheoryDecision) {
                 val literal = atomLiteral(decision)
-                if (literal == null) ComponentResult.Indeterminate else assignImplied(literal, null, publishedTheory = true)
+                if (literal == null) {
+                    ComponentResult.Indeterminate
+                } else {
+                    assignImplied(
+                    literal,
+                    null,
+                    publishedTheory = true,
+                )
+                }
             } else {
                 pendingAssertions.addLast(PendingAssertion(decision, activeComponent))
                 ComponentResult.Consistent
@@ -157,7 +169,9 @@ class SearchSession(
                 } else {
                     activeComponent?.let { boolPublisher.put(variable, it) }
                 }
-                pendingAssertions.addLast(PendingAssertion(SearchDecision.Bool(literal), if (publishedTheory) null else activeComponent))
+                pendingAssertions.addLast(
+                    PendingAssertion(SearchDecision.Bool(literal), if (publishedTheory) null else activeComponent),
+                )
                 ComponentResult.Consistent
             }
 
@@ -590,7 +604,14 @@ class SearchSession(
             "Boolean traversal must stay within the reserved source namespace"
         }
         decisionsExhausted = false
-        observeUnassignments(booleanBranching as? SearchUnassignListener)
+        val listener = booleanBranching as? SearchUnassignListener
+        observeUnassignments(
+            if (atoms != null && listener != null) {
+                SearchUnassignListener { variable -> if (variable < numBoolVars) listener.onUnassign(variable) }
+            } else {
+                listener
+            },
+        )
         return SearchRun(
             this,
             params,

@@ -23,6 +23,9 @@ class ClauseSearchComponent(clauses: Iterable<Clause>) :
     private var unitsPending = false
 
     override fun initialize(context: SearchContext): ComponentResult = withContext(context) {
+        if (sourceClauses.any { clause -> clause.any { context.atomLiteral(SearchDecision.Bool(it)) == null } }) {
+            return@withContext ComponentResult.Indeterminate
+        }
         for (literals in sourceClauses) {
             val index = store.add(literals.copyOf(), lbd = literals.size)
             if (index < 0) continue

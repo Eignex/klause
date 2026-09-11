@@ -18,7 +18,9 @@ class SourceBoundAtomTest {
     @Test
     fun `integer branches exactly partition negative fractional and beyond Long values`() {
         val cases = listOf(
-            "3" to "1", "-3" to "-2", "0" to "0",
+            "3" to "1",
+            "-3" to "-2",
+            "0" to "0",
             "18446744073709551619" to "9223372036854775809",
             "-18446744073709551619" to "-9223372036854775810",
         )
@@ -26,7 +28,13 @@ class SourceBoundAtomTest {
             val session = SearchSession(emptyList(), atoms = SearchAtomRegistry(0))
             val value = BigFraction.of(BigInteger.parseString(numerator), BigInteger.TWO)
             val floor = BigInteger.parseString(floorText)
-            val atom = assertNotNull(SourceBoundAtom.integerSplit(session, listOf(SourceBoundTerm(SearchIntValue(0), BigFraction.ONE)), value))
+            val atom = assertNotNull(
+                SourceBoundAtom.integerSplit(
+                    session,
+                    listOf(SourceBoundTerm(SearchIntValue(0), BigFraction.ONE)),
+                    value,
+                ),
+            )
             val upper = atom.positive.payload as SourceBoundAtom
             val lower = atom.negative.payload as SourceBoundAtom
 
@@ -47,8 +55,13 @@ class SourceBoundAtomTest {
             val atom = assertNotNull(
                 SourceBoundAtom.rationalSplit(
                     session,
-                    listOf(SourceBoundTerm(SearchRealValue(0), half), SourceBoundTerm(SearchIntValue(0), BigFraction.ONE)),
-                    half, strict, constant = BigFraction.ONE,
+                    listOf(
+                        SourceBoundTerm(SearchRealValue(0), half),
+                        SourceBoundTerm(SearchIntValue(0), BigFraction.ONE),
+                    ),
+                    half,
+                    strict,
+                    constant = BigFraction.ONE,
                 ),
             )
             val upper = atom.positive.payload as SourceBoundAtom
@@ -56,7 +69,10 @@ class SourceBoundAtomTest {
 
             assertEquals(half.negated(), upper.threshold)
             for (real in -3L..1L) {
-                val point = mapOf<SearchValueKey, BigFraction>(SearchRealValue(0) to BigFraction.ofLong(real), SearchIntValue(0) to BigFraction.ZERO)
+                val point = mapOf<SearchValueKey, BigFraction>(
+                    SearchRealValue(0) to BigFraction.ofLong(real),
+                    SearchIntValue(0) to BigFraction.ZERO,
+                )
                 assertEquals(1, listOf(upper, lower).count { holds(it, point) })
                 if (real == -1L) assertEquals(!strict, holds(upper, point))
             }
@@ -68,17 +84,25 @@ class SourceBoundAtomTest {
         val session = SearchSession(emptyList(), atoms = SearchAtomRegistry(0))
         val x = SearchIntValue(0)
         val y = SearchIntValue(1)
-        val input = mutableListOf(SourceBoundTerm(x, BigFraction.ONE), SourceBoundTerm(y, BigFraction.ONE), SourceBoundTerm(x, BigFraction.ONE))
-        val first = assertNotNull(SourceBoundAtom.integerSplit(session, input, BigFraction.ofLong(7), constant = BigFraction.ofLong(3)))
+        val input = mutableListOf(
+            SourceBoundTerm(x, BigFraction.ONE),
+            SourceBoundTerm(y, BigFraction.ONE),
+            SourceBoundTerm(x, BigFraction.ONE),
+        )
+        val first = assertNotNull(
+            SourceBoundAtom.integerSplit(session, input, BigFraction.ofLong(7), constant = BigFraction.ofLong(3)),
+        )
         input.clear()
         val reordered = listOf(SourceBoundTerm(y, BigFraction.ONE), SourceBoundTerm(x, BigFraction.ofLong(2)))
         val second = assertNotNull(SourceBoundAtom.integerSplit(session, reordered, BigFraction.ofLong(4)))
 
         assertSame(first.positive, second.positive)
         val upper = first.positive.payload as SourceBoundAtom
-        for (a in -2L..3L) for (b in -2L..3L) {
+        for (a in -2L..3L) {
+            for (b in -2L..3L) {
             val point = mapOf<SearchValueKey, BigFraction>(x to BigFraction.ofLong(a), y to BigFraction.ofLong(b))
             assertEquals(2 * a + b + 3 <= 7, holds(upper, point))
+        }
         }
     }
 
@@ -87,7 +111,9 @@ class SourceBoundAtomTest {
         val unsupported = object : SearchValueKey {}
         val cases = listOf(
             listOf(SourceBoundTerm(SearchRealValue(0), BigFraction.ONE)) to SourceBoundLimits(),
-            listOf(SourceBoundTerm(SearchIntValue(0), BigFraction.of(BigInteger.ONE, BigInteger.TWO))) to SourceBoundLimits(),
+            listOf(
+                SourceBoundTerm(SearchIntValue(0), BigFraction.of(BigInteger.ONE, BigInteger.TWO)),
+            ) to SourceBoundLimits(),
             listOf(SourceBoundTerm(unsupported, BigFraction.ONE)) to SourceBoundLimits(),
             listOf(SourceBoundTerm(SearchIntValue(-1), BigFraction.ONE)) to SourceBoundLimits(),
             listOf(SourceBoundTerm(SearchIntValue(0), BigFraction.ONE)) to SourceBoundLimits(maxTerms = 0),
@@ -106,10 +132,35 @@ class SourceBoundAtomTest {
     @Test
     fun `threshold growth and fractional integer constants decline before registration`() {
         val session = SearchSession(emptyList(), atoms = SearchAtomRegistry(0))
-        assertNull(SourceBoundAtom.integerSplit(session, emptyList(), BigFraction.ofLong(3), limits = SourceBoundLimits(maxBits = 2)))
-        assertNull(SourceBoundAtom.integerSplit(session, emptyList(), BigFraction.ONE, constant = BigFraction.of(BigInteger.ONE, BigInteger.TWO)))
-        assertNull(SourceBoundAtom.rationalSplit(session, emptyList(), BigFraction.ofLong(3), constant = BigFraction.ofLong(-3), limits = SourceBoundLimits(maxBits = 2)))
-        assertEquals(0, assertNotNull(SourceBoundAtom.integerSplit(session, emptyList(), BigFraction.ZERO)).positive.literal)
+        assertNull(
+            SourceBoundAtom.integerSplit(
+                session,
+                emptyList(),
+                BigFraction.ofLong(3),
+                limits = SourceBoundLimits(maxBits = 2),
+            ),
+        )
+        assertNull(
+            SourceBoundAtom.integerSplit(
+                session,
+                emptyList(),
+                BigFraction.ONE,
+                constant = BigFraction.of(BigInteger.ONE, BigInteger.TWO),
+            ),
+        )
+        assertNull(
+            SourceBoundAtom.rationalSplit(
+                session,
+                emptyList(),
+                BigFraction.ofLong(3),
+                constant = BigFraction.ofLong(-3),
+                limits = SourceBoundLimits(maxBits = 2),
+            ),
+        )
+        assertEquals(
+            0,
+            assertNotNull(SourceBoundAtom.integerSplit(session, emptyList(), BigFraction.ZERO)).positive.literal,
+        )
     }
 
     @Test
@@ -128,6 +179,11 @@ class SourceBoundAtomTest {
         var activity = BigFraction.ZERO
         for (term in bound.terms) activity += term.coefficient * point.getValue(term.source)
         val comparison = activity.compareTo(bound.threshold)
-        return if (bound.upper) comparison < 0 || comparison == 0 && !bound.strict else comparison > 0 || comparison == 0 && !bound.strict
+        return if (bound.upper) {
+            comparison < 0 || (comparison == 0 && !bound.strict)
+        } else {
+            comparison > 0 ||
+            comparison == 0 && !bound.strict
+        }
     }
 }
