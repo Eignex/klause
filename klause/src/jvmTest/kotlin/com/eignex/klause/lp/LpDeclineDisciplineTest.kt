@@ -710,7 +710,11 @@ class LpDeclineDisciplineTest {
             val relative = root.relativize(path).toString()
             val allowed = when (path.fileName.toString()) {
                 "QfLiraSolver.kt" -> setOf(
-                    "LpSolveContext", "LpVerdict", "LpCertificationObserver", "LpCertifier", "LpSolveMetrics",
+                    "LpSolveContext",
+                    "LpVerdict",
+                    "LpCertificationObserver",
+                    "LpCertifier",
+                    "LpSolveMetrics",
                 )
 
                 "QfLraSystem.kt" -> setOf(

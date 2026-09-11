@@ -1,8 +1,8 @@
 package com.eignex.klause.lp.engine
 
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.simplex.exact.ContinuationPhase
 import com.eignex.klause.simplex.exact.ContinuationDecline
+import com.eignex.klause.simplex.exact.ContinuationPhase
 import com.eignex.klause.simplex.exact.ExactContinuationLimits
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
@@ -57,7 +57,8 @@ class LpExactContinuationTest {
     fun `native exact conflict retains all original bound witnesses`() {
         val zero = ExactLpNumber.of(0L)
         val source = ExactLpModel(
-            listOf(listOf(ExactLpEntry(0, ExactLpNumber.of(1L)))), listOf(zero),
+            listOf(listOf(ExactLpEntry(0, ExactLpNumber.of(1L)))),
+            listOf(zero),
             listOf(ExactLpColumn(ExactLpBounds()), ExactLpColumn(ExactLpBounds())),
             listOf(ExactLpRow(global = false, premises = ExactLpPremises(emptyList(), listOf(9)))),
             ExactLpObjective(listOf(zero, zero)),
@@ -84,9 +85,11 @@ class LpExactContinuationTest {
     fun `strict closure is not a source witness`() {
         val zero = ExactLpNumber.of(0L)
         val source = ExactLpModel(
-            listOf(emptyList()), emptyList(),
+            listOf(emptyList()),
+            emptyList(),
             listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero, strict = true), ExactLpSide(ExactLpNumber.of(1L))))),
-            emptyList(), ExactLpObjective(listOf(zero)),
+            emptyList(),
+            ExactLpObjective(listOf(zero)),
         )
         val model = assertNotNull(LpExactState(source).toWorkingModel())
 
@@ -103,7 +106,9 @@ class LpExactContinuationTest {
 
         val missing = continueExactLp(model, null)
         val cancelled = continueExactLp(
-            model, Basis(intArrayOf(), arrayOf(VarStatus.AT_LOWER)), cancellation = Cancellation { true },
+            model,
+            Basis(intArrayOf(), arrayOf(VarStatus.AT_LOWER)),
+            cancellation = Cancellation { true },
         )
 
         assertEquals(ContinuationDecline.NO_BASIS, missing.metrics.decline)
@@ -117,9 +122,11 @@ class LpExactContinuationTest {
         val zero = ExactLpNumber.of(0L)
         val one = ExactLpNumber.of(1L)
         val source = ExactLpModel(
-            listOf(listOf(ExactLpEntry(0, one))), listOf(one),
+            listOf(listOf(ExactLpEntry(0, one))),
+            listOf(one),
             listOf(ExactLpColumn(ExactLpBounds()), ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(zero)))),
-            listOf(ExactLpRow()), ExactLpObjective(listOf(zero, zero)),
+            listOf(ExactLpRow()),
+            ExactLpObjective(listOf(zero, zero)),
         )
         val state = LpExactState(source)
         LpScopedSolver(state, workLimit = 1L).use { owner ->
@@ -130,14 +137,17 @@ class LpExactContinuationTest {
             assertNull(result.float)
         }
     }
+
     @Test
     fun `either witness policy can withhold continuation acceptance`() {
         val zero = ExactLpNumber.of(0L)
         val one = ExactLpNumber.of(1L)
         val source = ExactLpModel(
-            listOf(listOf(ExactLpEntry(0, one))), listOf(one),
+            listOf(listOf(ExactLpEntry(0, one))),
+            listOf(one),
             listOf(ExactLpColumn(ExactLpBounds()), ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(zero)))),
-            listOf(ExactLpRow()), ExactLpObjective(listOf(zero, zero)),
+            listOf(ExactLpRow()),
+            ExactLpObjective(listOf(zero, zero)),
         )
         val state = LpExactState(source)
         val model = assertNotNull(state.toWorkingModel())
@@ -149,9 +159,12 @@ class LpExactContinuationTest {
                 Basis(intArrayOf(1), arrayOf(VarStatus.FREE, VarStatus.BASIC))
         }
         for (rejected in listOf(LpCertifier.RATIONAL, LpCertifier.EXACT_BASIS)) {
-            val result = certifyLpResult(model, solver, null, policy = LpCertificationPolicy { route, success ->
+            val result = certifyLpResult(
+                model, solver, null,
+                policy = LpCertificationPolicy { route, success ->
                 success && route != rejected
-            })
+            }
+            )
 
             assertEquals(LpVerdict.INDETERMINATE, result.verdict)
             assertNull(result.witness)
@@ -163,8 +176,11 @@ class LpExactContinuationTest {
     fun `foreign nonnull result and missing current target cannot recover`() {
         val zero = ExactLpNumber.of(0L)
         val source = ExactLpModel(
-            listOf(emptyList()), emptyList(), listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero)))),
-            emptyList(), ExactLpObjective(listOf(zero)),
+            listOf(emptyList()),
+            emptyList(),
+            listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero)))),
+            emptyList(),
+            ExactLpObjective(listOf(zero)),
         )
         val first = LpExactState(source)
         val foreign = LpExactState(source)
@@ -206,9 +222,11 @@ class LpExactContinuationTest {
     fun `source root cost and target status changes invalidate exact progress`() {
         val zero = ExactLpNumber.of(0L)
         val source = ExactLpModel(
-            listOf(emptyList()), emptyList(),
+            listOf(emptyList()),
+            emptyList(),
             listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(ExactLpNumber.of(2L))))),
-            emptyList(), ExactLpObjective(listOf(zero)),
+            emptyList(),
+            ExactLpObjective(listOf(zero)),
         )
         val first = LpExactState(source)
         val cache = LpExactContinuationCache()
@@ -236,9 +254,11 @@ class LpExactContinuationTest {
         val column = listOf(ExactLpEntry(0, one), ExactLpEntry(1, one))
         val fixed = ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(zero)))
         val source = ExactLpModel(
-            listOf(column, column), listOf(one, one),
+            listOf(column, column),
+            listOf(one, one),
             listOf(ExactLpColumn(ExactLpBounds()), ExactLpColumn(ExactLpBounds()), fixed, fixed),
-            listOf(ExactLpRow(), ExactLpRow()), ExactLpObjective(List(4) { zero }),
+            listOf(ExactLpRow(), ExactLpRow()),
+            ExactLpObjective(List(4) { zero }),
         )
         val state = LpExactState(source)
         val model = assertNotNull(state.toWorkingModel())
@@ -268,12 +288,14 @@ class LpExactContinuationTest {
     fun `either conflict policy can withhold continuation acceptance`() {
         val zero = ExactLpNumber.of(0L)
         val source = ExactLpModel(
-            listOf(listOf(ExactLpEntry(0, ExactLpNumber.of(1L)))), listOf(zero),
+            listOf(listOf(ExactLpEntry(0, ExactLpNumber.of(1L)))),
+            listOf(zero),
             listOf(
                 ExactLpColumn(ExactLpBounds(ExactLpSide(ExactLpNumber.of(2L)))),
                 ExactLpColumn(ExactLpBounds(ExactLpSide(zero))),
             ),
-            listOf(ExactLpRow()), ExactLpObjective(listOf(zero, zero)),
+            listOf(ExactLpRow()),
+            ExactLpObjective(listOf(zero, zero)),
         )
         val model = assertNotNull(LpExactState(source).toWorkingModel())
         val solver = object : LpSolver {
@@ -284,9 +306,12 @@ class LpExactContinuationTest {
                 Basis(intArrayOf(0), arrayOf(VarStatus.BASIC, VarStatus.AT_LOWER))
         }
         for (rejected in listOf(LpCertifier.RATIONAL, LpCertifier.EXACT_FARKAS)) {
-            val result = certifyLpResult(model, solver, null, policy = LpCertificationPolicy { route, success ->
+            val result = certifyLpResult(
+                model, solver, null,
+                policy = LpCertificationPolicy { route, success ->
                 success && route != rejected
-            })
+            }
+            )
 
             assertEquals(LpVerdict.INDETERMINATE, result.verdict)
             assertNull(result.rationalConflict)
@@ -325,10 +350,13 @@ class LpExactContinuationTest {
         }
         for (withheld in listOf(LpCertifier.RATIONAL, LpCertifier.EXACT_BASIS)) {
             var rationalCalls = 0
-            val result = certifyLpResult(model, solver, null, policy = LpCertificationPolicy { route, success ->
+            val result = certifyLpResult(
+                model, solver, null,
+                policy = LpCertificationPolicy { route, success ->
                 if (route == LpCertifier.RATIONAL) rationalCalls++
                 success && route != withheld
-            })
+            }
+            )
 
             assertTrue(assertNotNull(result.continuation).success)
             assertEquals(LpVerdict.INDETERMINATE, result.verdict)
@@ -352,10 +380,13 @@ class LpExactContinuationTest {
         }
         for (withheld in listOf(LpCertifier.RATIONAL, LpCertifier.EXACT_FARKAS)) {
             var rationalCalls = 0
-            val result = certifyLpResult(model, solver, null, policy = LpCertificationPolicy { route, success ->
+            val result = certifyLpResult(
+                model, solver, null,
+                policy = LpCertificationPolicy { route, success ->
                 if (route == LpCertifier.RATIONAL) rationalCalls++
                 success && route != withheld
-            })
+            }
+            )
 
             assertTrue(assertNotNull(result.continuation).success)
             assertEquals(LpVerdict.INDETERMINATE, result.verdict)
@@ -368,16 +399,21 @@ class LpExactContinuationTest {
     fun `new identities receive effort after the previous session is exhausted`() {
         val zero = ExactLpNumber.of(0L)
         val source = ExactLpModel(
-            listOf(emptyList()), emptyList(),
+            listOf(emptyList()),
+            emptyList(),
             listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(ExactLpNumber.of(2L))))),
-            emptyList(), ExactLpObjective(listOf(zero)),
+            emptyList(),
+            ExactLpObjective(listOf(zero)),
         )
         val lower = Basis(intArrayOf(), arrayOf(VarStatus.AT_LOWER))
         val upper = Basis(intArrayOf(), arrayOf(VarStatus.AT_UPPER))
         val limits = ExactContinuationLimits(maxWork = 10000L)
         for (native in listOf(true, false)) {
-            val model = if (native) assertNotNull(LpExactState(source).toWorkingModel()) else
+            val model = if (native) {
+                assertNotNull(LpExactState(source).toWorkingModel())
+            } else {
                 LpBuilder().apply { addVar(0L, 2L) }.build(Sense.MINIMIZE)
+            }
             val cache = LpExactContinuationCache()
             var result = continueExactLp(model, lower, cache, limits = limits)
             repeat(64) {
@@ -407,9 +443,11 @@ class LpExactContinuationTest {
     fun `admission rejects cancellation dimensions and large bounds before exporting a target`() {
         val zero = ExactLpNumber.of(0L)
         val source = ExactLpModel(
-            listOf(emptyList()), emptyList(),
+            listOf(emptyList()),
+            emptyList(),
             listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(ExactLpNumber.ofIeee(1e308))))),
-            emptyList(), ExactLpObjective(listOf(zero)),
+            emptyList(),
+            ExactLpObjective(listOf(zero)),
         )
         val model = assertNotNull(LpExactState(source).toWorkingModel())
         var exports = 0
@@ -417,14 +455,25 @@ class LpExactContinuationTest {
             override val infeasibleRay: DoubleArray? = null
             override fun solve(warm: Basis?): FloatLpResult? = null
             override fun solvePrimal(warm: Basis?): FloatLpResult? = null
-            override fun continuationBasis(model: LpModel): Basis? { exports++; return null }
+            override fun continuationBasis(model: LpModel): Basis? {
+                exports++;
+                return null
+            }
         }
 
         val bits = captureContinuationTarget(
-            model, solver, null, ExactContinuationLimits(maxBits = 64), Cancellation.Never,
+            model,
+            solver,
+            null,
+            ExactContinuationLimits(maxBits = 64),
+            Cancellation.Never,
         )
         val dimension = captureContinuationTarget(
-            model, solver, null, ExactContinuationLimits(maxColumns = 0), Cancellation.Never,
+            model,
+            solver,
+            null,
+            ExactContinuationLimits(maxColumns = 0),
+            Cancellation.Never,
         )
         val cancelled = captureContinuationTarget(model, solver, null, ExactContinuationLimits(), Cancellation { true })
 
@@ -432,18 +481,23 @@ class LpExactContinuationTest {
         assertEquals(ContinuationDecline.DIMENSION, dimension.metrics.decline)
         assertEquals(ContinuationDecline.CANCELLED, cancelled.metrics.decline)
         assertEquals(0, exports)
+        for (declined in listOf(bits, dimension, cancelled)) {
+            assertEquals(ContinuationPhase.ADMISSION, declined.metrics.phase)
+        }
     }
 
     @Test
     fun `native source recovers the nonfinite adjusted right hand side`() {
         val zero = ExactLpNumber.of(0L)
         val source = ExactLpModel(
-            listOf(listOf(ExactLpEntry(0, ExactLpNumber.of(2L)))), listOf(ExactLpNumber.of(1L)),
+            listOf(listOf(ExactLpEntry(0, ExactLpNumber.of(2L)))),
+            listOf(ExactLpNumber.of(1L)),
             listOf(
                 ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(ExactLpNumber.ofIeee(1e308)))),
                 ExactLpColumn(ExactLpBounds(ExactLpSide(zero))),
             ),
-            listOf(ExactLpRow()), ExactLpObjective(listOf(ExactLpNumber.of(-1L), zero)),
+            listOf(ExactLpRow()),
+            ExactLpObjective(listOf(ExactLpNumber.of(-1L), zero)),
         )
         LpScopedSolver(LpExactState(source)).use { owner ->
             val result = assertNotNull(owner.solve())
@@ -455,5 +509,4 @@ class LpExactContinuationTest {
             assertTrue(assertNotNull(result.continuation).success)
         }
     }
-
 }

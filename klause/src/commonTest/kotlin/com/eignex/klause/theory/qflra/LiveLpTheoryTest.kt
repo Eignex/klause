@@ -14,22 +14,22 @@ import com.eignex.klause.ir.RealConsts
 import com.eignex.klause.ir.TaggedLinearRow
 import com.eignex.klause.ir.Term
 import com.eignex.klause.lp.engine.FloatLpResult
-import com.eignex.klause.lp.engine.LpEngineFactory
 import com.eignex.klause.lp.engine.LpCertificationPolicy
-import com.eignex.klause.solver.result.SmtStatsSink
-import com.eignex.klause.simplex.basis.BasisArithmeticException
-import com.eignex.klause.simplex.basis.BasisSolver
-import com.eignex.klause.simplex.basis.IndexedVector
-import com.eignex.klause.simplex.basis.KotlinBasisSolver
-import com.eignex.klause.lp.engine.RevisedSimplex
+import com.eignex.klause.lp.engine.LpEngineFactory
 import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.LpPricingOptions
 import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.lp.engine.PersistentLpSolver
 import com.eignex.klause.lp.engine.ProductionLpEngineFactory
+import com.eignex.klause.lp.engine.RevisedSimplex
+import com.eignex.klause.simplex.basis.BasisArithmeticException
+import com.eignex.klause.simplex.basis.BasisSolver
+import com.eignex.klause.simplex.basis.IndexedVector
+import com.eignex.klause.simplex.basis.KotlinBasisSolver
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.pipeline.componentPlan
 import com.eignex.klause.solver.pipeline.search
+import com.eignex.klause.solver.result.SmtStatsSink
 import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.RegisteredTheoryDecision
@@ -755,19 +755,28 @@ class LiveLpTheoryTest {
             assertIs<ComponentCheck.Indeterminate>(session.check())
         }
     }
+
     @Test
     fun `closed real and integer leaves cannot bypass withheld shared proofs`() {
         for (integer in listOf(false, true)) {
-            val source = if (integer) Problem(
-                0, intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(2), null, null),
+            val source = if (integer) {
+                Problem(
+                0,
+                intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(2), null, null),
                 factors = arrayOf(Linear(longArrayOf(1), intArrayOf(0), LinearOp.GE, 1L)),
-            ) else Problem(
-                0, intBounds = IntBounds.fromModelBounds(longArrayOf(), longArrayOf(), null, null),
-                numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(2.0),
+            )
+            } else {
+                Problem(
+                0,
+                intBounds = IntBounds.fromModelBounds(longArrayOf(), longArrayOf(), null, null),
+                numRealVars = 1,
+                realLower = doubleArrayOf(0.0),
+                realUpper = doubleArrayOf(2.0),
                 factors = arrayOf(
                     Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0), LinearOp.GE, 1.0),
                 ),
             )
+            }
             val stats = SmtStatsSink()
             ExactLiraSearchComponent(source).use { component ->
                 component.solveWith(LpSolveContext(certificationPolicy = LpCertificationPolicy { _, _ -> false }))
@@ -787,22 +796,29 @@ class LiveLpTheoryTest {
     @Test
     fun `shared theory recovers a stopped float owner and records continuation work`() {
         val source = Problem(
-            0, intBounds = IntBounds.fromModelBounds(longArrayOf(), longArrayOf(), null, null),
-            numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(2.0),
+            0,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(), longArrayOf(), null, null),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(2.0),
             factors = arrayOf(
-                    Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(3.0), LinearOp.EQ, 1.0),
-                ),
+                Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(3.0), LinearOp.EQ, 1.0),
+            ),
         )
         val factory = object : LpEngineFactory by ProductionLpEngineFactory {
             override fun newPersistentSolver(
-                model: LpModel, cancellation: Cancellation, refactorUpdateLimit: Int, iterationLimit: Int,
-                workLimit: Long, trackDegeneracy: Boolean, pricing: LpPricingOptions,
+                model: LpModel,
+                cancellation: Cancellation,
+                refactorUpdateLimit: Int,
+                iterationLimit: Int,
+                workLimit: Long,
+                trackDegeneracy: Boolean,
+                pricing: LpPricingOptions,
             ): PersistentLpSolver = RevisedSimplex(model, cancellation, basisSolverFactory = { matrix ->
                 val delegate = KotlinBasisSolver(matrix)
                 object : BasisSolver by delegate {
-                    override fun ftran(x: IndexedVector, expectedDensity: Double) {
+                    override fun ftran(x: IndexedVector, expectedDensity: Double): Unit =
                         throw BasisArithmeticException("injected numerical solve failure")
-                    }
                 }
             })
         }
@@ -824,9 +840,13 @@ class LiveLpTheoryTest {
 
     @Test
     fun `a free coordinate restriction replaces a retained reduction before shared branching`() {
-        val open = Bits(2).also { it.set(0); it.set(1) }
+        val open = Bits(2).also {
+            it.set(0);
+            it.set(1)
+        }
         val source = Problem(
-            1, intBounds = IntBounds.fromModelBounds(longArrayOf(0, 0), longArrayOf(0, 0), open, open),
+            1,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(0, 0), longArrayOf(0, 0), open, open),
             factors = arrayOf(
                 ReifiedLinear(0, intArrayOf(2, -2), intArrayOf(0, 1), LinearOp.GE, 1),
                 Linear(intArrayOf(2, -2), intArrayOf(0, 1), LinearOp.LE, 3),
@@ -841,14 +861,16 @@ class LiveLpTheoryTest {
             assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
             assertNotNull(component.nextBranch(session))
             val requests = stats.snapshot().reductionRequests
-            val split = assertNotNull(SourceBoundAtom.integerSplit(
+            val split = assertNotNull(
+                SourceBoundAtom.integerSplit(
                 session,
                 listOf(
                     SourceBoundTerm(SearchIntValue(0), BigFraction.ONE),
                     SourceBoundTerm(SearchIntValue(1), BigFraction.ONE),
                 ),
                 BigFraction.ofLong(2),
-            ))
+            )
+            )
             assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Theory(split.negative)))
 
             component.nextBranch(session)
@@ -857,8 +879,11 @@ class LiveLpTheoryTest {
                 if (component.check(session) !is ComponentCheck.Feasible) {
                     val alternatives = assertNotNull(component.nextBranch(session))
                     val branch = alternatives.first { decision ->
-                        val atom = assertIs<SourceBoundAtom>(assertIs<RegisteredTheoryDecision>(
-                            assertIs<SearchDecision.Theory>(decision).decision).payload)
+                        val atom = assertIs<SourceBoundAtom>(
+                            assertIs<RegisteredTheoryDecision>(
+                            assertIs<SearchDecision.Theory>(decision).decision,
+                        ).payload
+                        )
                         val activity = atom.terms.fold(BigFraction.ZERO) { sum, term ->
                             val sourceValue = if (assertIs<SearchIntValue>(term.source).variable == 0) 2L else 1L
                             sum + term.coefficient * BigFraction.ofLong(sourceValue)
@@ -874,5 +899,4 @@ class LiveLpTheoryTest {
             assertTrue(point[0] + point[1] >= BigInteger.fromLong(3))
         }
     }
-
 }

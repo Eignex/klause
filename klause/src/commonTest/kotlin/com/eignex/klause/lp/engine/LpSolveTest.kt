@@ -771,8 +771,10 @@ class LpSolveTest {
         }.build(Sense.MINIMIZE)
         val candidate = doubleArrayOf(1.0, -1.0)
         val solver = object : LpSolver {
-            override fun continuationBasis(model: LpModel): Basis =
-                Basis(intArrayOf(2, 3), arrayOf(VarStatus.AT_LOWER, VarStatus.AT_LOWER, VarStatus.BASIC, VarStatus.BASIC))
+            override fun continuationBasis(model: LpModel): Basis = Basis(
+                intArrayOf(2, 3),
+                arrayOf(VarStatus.AT_LOWER, VarStatus.AT_LOWER, VarStatus.BASIC, VarStatus.BASIC),
+            )
             override val infeasibleRay = candidate
             override fun solve(warm: Basis?): FloatLpResult? = null
             override fun solvePrimal(warm: Basis?): FloatLpResult? = null

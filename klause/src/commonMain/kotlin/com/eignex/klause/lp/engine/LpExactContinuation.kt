@@ -28,7 +28,10 @@ internal class LpExactContinuationCache {
     val usedTimeNs get() = continuation?.usedTimeNs ?: inputTimeNs
 
     fun accountInput(work: Long, allocation: Long, timeNs: Long) {
-        continuation?.let { it.account(work, allocation, timeNs); return }
+        continuation?.let {
+            it.account(work, allocation, timeNs);
+            return
+        }
         inputWork += work
         inputAllocation += allocation
         inputTimeNs += timeNs
@@ -82,13 +85,13 @@ internal fun captureContinuationTarget(
     return LpContinuationTarget(
         basis,
         ExactContinuationMetrics(
-        work = budget.work,
-        allocation = budget.allocation,
-        elapsedNs = budget.elapsedNs,
-        decline = decline,
-        workByPhase = budget.workByPhase.toMap(),
-        allocationByPhase = budget.allocationByPhase.toMap(),
-    )
+            work = budget.work,
+            allocation = budget.allocation,
+            elapsedNs = budget.elapsedNs,
+            decline = decline,
+            workByPhase = budget.workByPhase.toMap(),
+            allocationByPhase = budget.allocationByPhase.toMap(),
+        ),
     )
 }
 
@@ -191,10 +194,15 @@ internal fun continueExactLp(
                                 } else {
                                     ContinuationDecline.TIME
                                 }
+
                                 ReconstructionDecline.WORK -> ContinuationDecline.WORK
+
                                 ReconstructionDecline.ALLOCATION -> ContinuationDecline.ALLOCATION
+
                                 ReconstructionDecline.BITS -> ContinuationDecline.BITS
+
                                 ReconstructionDecline.DIMENSION -> ContinuationDecline.DIMENSION
+
                                 else -> ContinuationDecline.CANDIDATE
                             }
                         } ?: ContinuationDecline.CANDIDATE
@@ -275,11 +283,14 @@ private fun selectContinuation(
     exported: ExactContinuationMetrics,
 ): ContinuationSelection {
     val envelope = admissionLimits(limits)
-    val budget = ContinuationBudget(envelope.copy(
+    val budget = ContinuationBudget(
+        envelope.copy(
         maxWork = (envelope.maxWork - exported.work).coerceAtLeast(0),
         maxAllocation = (envelope.maxAllocation - exported.allocation).coerceAtLeast(0),
         maxTimeNs = (envelope.maxTimeNs - exported.elapsedNs).coerceAtLeast(0),
-    ), cancellation)
+    ),
+        cancellation
+    )
     budget.phase = ContinuationPhase.ADMISSION
     var decline: ContinuationDecline? = null
     var invalidated = false
@@ -299,15 +310,20 @@ private fun selectContinuation(
             }
             budget.step(minOf(size, 4096L) * 4L, minOf(size, 4096L) * 64L)
             exactLpStateKey(model)
-        } else null
+        } else {
+            null
+        }
         if (model.exactState == null && key == null && cache.headings != null) {
             throw ContinuationStop(ContinuationDecline.RESUME_KEY)
         }
         budget.step(model.numVars.toLong() + model.m, (model.numVars.toLong() + model.m) * 32L)
         val headings = basis.basicVars.toList()
         val statuses = basis.status.toList()
-        val sameAuthority = if (model.exactState != null) cache.state === model.exactState else
+        val sameAuthority = if (model.exactState != null) {
+            cache.state === model.exactState
+        } else {
             key != null && cache.key?.contentEquals(key) == true
+        }
         val matching = sameAuthority && cache.headings == headings && cache.statuses == statuses
         budget.step()
         if (!matching) {
@@ -321,11 +337,21 @@ private fun selectContinuation(
     } catch (stop: ContinuationStop) {
         decline = stop.reason
     }
-    return ContinuationSelection(combineContinuationMetrics(exported, ExactContinuationMetrics(
-        work = budget.work, allocation = budget.allocation, elapsedNs = budget.elapsedNs,
-        phase = budget.phase, decline = decline, invalidated = invalidated,
-        workByPhase = budget.workByPhase.toMap(), allocationByPhase = budget.allocationByPhase.toMap(),
-    )))
+    return ContinuationSelection(
+        combineContinuationMetrics(
+            exported,
+            ExactContinuationMetrics(
+        work = budget.work,
+        allocation = budget.allocation,
+        elapsedNs = budget.elapsedNs,
+        phase = budget.phase,
+        decline = decline,
+        invalidated = invalidated,
+        workByPhase = budget.workByPhase.toMap(),
+        allocationByPhase = budget.allocationByPhase.toMap(),
+    )
+        )
+    )
 }
 
 private fun remainingContinuationLimits(limits: ExactContinuationLimits, session: ExactContinuation?) = limits.copy(

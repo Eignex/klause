@@ -1,13 +1,13 @@
 package com.eignex.klause.solver.result
 
-import com.eignex.klause.simplex.exact.ExactContinuationMetrics
-import com.eignex.klause.simplex.exact.ContinuationPhase
-import com.eignex.klause.simplex.exact.ContinuationDecline
 import com.eignex.klause.lp.engine.ExactBasisDecline
 import com.eignex.klause.lp.engine.ExactBasisMetrics
 import com.eignex.klause.lp.engine.ExactBasisPhase
 import com.eignex.klause.lp.engine.LpCertifier
 import com.eignex.klause.lp.engine.LpSolveMetrics
+import com.eignex.klause.simplex.exact.ContinuationDecline
+import com.eignex.klause.simplex.exact.ContinuationPhase
+import com.eignex.klause.simplex.exact.ExactContinuationMetrics
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -20,16 +20,24 @@ class LpStatsTest {
     fun `continuation invocation deltas retain abandoned work and terminal phase`() {
         val sink = LpStatsSink()
         val observer = sink.certificationObserver()
-        observer.observeContinuation(ExactContinuationMetrics(
+        observer.observeContinuation(
+            ExactContinuationMetrics(
             builds = 2, pivots = 3, restarts = 1, work = 19, allocation = 23,
             phase = ContinuationPhase.IMPORT, decline = ContinuationDecline.WORK,
             workByPhase = mapOf(ContinuationPhase.IMPORT to 19),
             allocationByPhase = mapOf(ContinuationPhase.IMPORT to 23),
-        ))
-        observer.observeContinuation(ExactContinuationMetrics(
-            pivots = 2, resumed = true, work = 7, workByPhase = mapOf(ContinuationPhase.FEASIBILITY to 7),
-            phase = ContinuationPhase.FEASIBILITY, decline = ContinuationDecline.WORK,
-        ))
+        )
+        )
+        observer.observeContinuation(
+            ExactContinuationMetrics(
+            pivots = 2,
+            resumed = true,
+            work = 7,
+            workByPhase = mapOf(ContinuationPhase.FEASIBILITY to 7),
+            phase = ContinuationPhase.FEASIBILITY,
+            decline = ContinuationDecline.WORK,
+        )
+        )
 
         val stats = sink.snapshot().continuation
 
