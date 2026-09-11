@@ -108,8 +108,12 @@ class CutPoolTest {
         val source = CutSource(CutSourceKind.INTEGER, 0)
         val token = Any()
         val map = CutSourceMap(token, 0, listOf(CutColumnSource(source)))
-        val portable = SourceCut(CutExpression(mapOf(source to BigFraction.ONE)), Relation.LE,
-            BigFraction.ofLong(5), CutProvenance(token, 0, emptyList()))
+        val portable = SourceCut(
+            CutExpression(mapOf(source to BigFraction.ONE)),
+            Relation.LE,
+            BigFraction.ofLong(5),
+            CutProvenance(token, 0, emptyList()),
+        )
         for (portableFirst in listOf(false, true)) {
             val pool = CutPool()
             if (portableFirst) {
@@ -129,8 +133,12 @@ class CutPoolTest {
         val source = CutSource(CutSourceKind.INTEGER, 0)
         val token = Any()
         val map = CutSourceMap(token, 0, listOf(CutColumnSource(source)))
-        val portable = SourceCut(CutExpression(mapOf(source to BigFraction.ONE)), Relation.LE,
-            BigFraction.ofLong(5), CutProvenance(token, 0, emptyList()))
+        val portable = SourceCut(
+            CutExpression(mapOf(source to BigFraction.ONE)),
+            Relation.LE,
+            BigFraction.ofLong(5),
+            CutProvenance(token, 0, emptyList()),
+        )
         val pool = CutPool(maxConsecutiveInactive = 2)
         pool.add(cut(0, 1, 5))
         pool.observe(doubleArrayOf(0.0))
@@ -146,8 +154,12 @@ class CutPoolTest {
         val source = CutSource(CutSourceKind.INTEGER, 0)
         val token = Any()
         val map = CutSourceMap(token, 0, listOf(CutColumnSource(source)))
-        val portable = SourceCut(CutExpression(mapOf(source to BigFraction.ONE)), Relation.LE,
-            BigFraction.ofLong(5), CutProvenance(token, 0, emptyList()))
+        val portable = SourceCut(
+            CutExpression(mapOf(source to BigFraction.ONE)),
+            Relation.LE,
+            BigFraction.ofLong(5),
+            CutProvenance(token, 0, emptyList()),
+        )
         val root = CutPool()
         root.add(portable, map)
         val search = CutPool()
@@ -165,8 +177,12 @@ class CutPoolTest {
         val source = CutSource(CutSourceKind.INTEGER, 0)
         val token = Any()
         val map = CutSourceMap(token, 0, listOf(CutColumnSource(source)))
-        val portable = SourceCut(CutExpression(mapOf(source to BigFraction.ofLong(2))), Relation.LE,
-            BigFraction.ofLong(2), CutProvenance(token, 0, emptyList()))
+        val portable = SourceCut(
+            CutExpression(mapOf(source to BigFraction.ofLong(2))),
+            Relation.LE,
+            BigFraction.ofLong(2),
+            CutProvenance(token, 0, emptyList()),
+        )
         val mapped = assertNotNull(portable.toCut(map).orNull())
         for (candidate in listOf(cut(0, 2, 2), mapped)) {
             val pool = CutPool(maxConsecutiveInactive = 1)
@@ -177,5 +193,4 @@ class CutPoolTest {
             assertEquals(0, pool.size)
         }
     }
-
 }
