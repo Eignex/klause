@@ -633,9 +633,9 @@ class SourceCutTest {
         val source = SourceCut(
             CutExpression(
                 mapOf(
-                x to BigFraction.of(BigInteger.ONE, BigInteger.fromLong(17)),
-                y to BigFraction.of(BigInteger.ONE, BigInteger.fromLong(19)),
-            )
+                    x to BigFraction.of(BigInteger.ONE, BigInteger.fromLong(17)),
+                    y to BigFraction.of(BigInteger.ONE, BigInteger.fromLong(19)),
+                ),
             ),
             Relation.LE,
             BigFraction.ONE,

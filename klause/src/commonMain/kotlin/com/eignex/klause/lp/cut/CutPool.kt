@@ -73,8 +73,8 @@ internal class CutPool(
         if (key in seen) return false
         val mixed = if (cut?.global == true) {
             entries.firstOrNull {
-            (it.source == null) != (source == null) && it.cut?.global == true && it.cut?.key() == cut.key()
-        }
+                (it.source == null) != (source == null) && it.cut?.global == true && it.cut?.key() == cut.key()
+            }
         } else {
             null
         }
