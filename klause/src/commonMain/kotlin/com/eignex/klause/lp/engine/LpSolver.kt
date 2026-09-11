@@ -108,6 +108,8 @@ internal interface LpSolver : AutoCloseable {
 
     fun rejectSingularBasis(model: LpModel, basis: Basis): Boolean = false
 
+    fun continuationBasis(model: LpModel): Basis? = null
+
     /**
      * Pivots the last solve spent, whether or not it returned a [FloatLpResult].
      *
