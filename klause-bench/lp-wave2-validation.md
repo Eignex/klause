@@ -100,3 +100,10 @@ Raw JSONL, per-repetition logs, input checksums, the machine-readable summary, a
 are retained under `/home/rasmus/Workspaces/lp-evidence/session-2.4`. The summary intentionally exits
 nonzero with `passed=false`, `capturedCpFactorization=NOT_ESTABLISHED`, and
 `wallTimeEvidence=DESCRIPTIVE_NOT_ESTABLISHED`.
+
+The runner is evidence for the measured candidate `a1e51591f4dcefd66682ba5128388b3a34ebcb80`, not a
+floating benchmark for later stack heads. It refuses a different checkout before creating output or
+running an arm because the campaign-era Koblas artifacts expose `SparseWorkspace`, while later sources
+use `SparseSlices`. To reproduce the frozen campaign, create a detached worktree at the measured
+candidate and invoke that checkout's `klause-bench/lp-wave2-validation/run.sh`. Do not substitute the
+current snapshot or current source and call it the same campaign.

@@ -4,9 +4,19 @@ set -euo pipefail
 root=$(cd "$(dirname "$0")/../.." && pwd)
 manifest="$root/klause-bench/lp-wave2-validation-manifest.json"
 output=${1:-/home/rasmus/Workspaces/lp-evidence/session-2.4/run}
+campaign_candidate_revision=a1e51591f4dcefd66682ba5128388b3a34ebcb80
 historical_revision=cd66668668851eea37350db5af0d416fb27a7a0e
-historical=$(mktemp -d /tmp/klause-lp-wave2-historical-XXXXXX)
 
+current_revision=$(git -C "$root" rev-parse HEAD)
+if [[ "$current_revision" != "$campaign_candidate_revision" ]]; then
+    printf '%s\n' \
+        "LP Wave 2.4 evidence is frozen at candidate $campaign_candidate_revision." \
+        "Create a detached worktree at that revision and run its copy of this script;" \
+        "the campaign-era Koblas pin is incompatible with later source APIs." >&2
+    exit 2
+fi
+
+historical=$(mktemp -d /tmp/klause-lp-wave2-historical-XXXXXX)
 cleanup() {
     git -C "$root" worktree remove --force "$historical" >/dev/null 2>&1 || true
 }
