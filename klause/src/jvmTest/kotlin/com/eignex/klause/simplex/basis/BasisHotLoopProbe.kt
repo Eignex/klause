@@ -19,8 +19,11 @@ fun main(args: Array<String>) {
 
 private class HotLoopProbe(private val trace: BasisTrace) : AutoCloseable {
     private val matrix = SparseMatrix.wrap(
-        trace.matrix.rows, trace.matrix.columns, trace.matrix.copyColumnPointers(),
-        trace.matrix.copyRowIndices(), DoubleArray(trace.matrix.entries) { trace.matrix.valueAt(it) },
+        trace.matrix.rows,
+        trace.matrix.columns,
+        trace.matrix.copyColumnPointers(),
+        trace.matrix.copyRowIndices(),
+        DoubleArray(trace.matrix.entries) { trace.matrix.valueAt(it) },
     )
     private val solver = KotlinBasisSolver(matrix)
     private val headings = IntArray(matrix.rows)
@@ -38,10 +41,17 @@ private class HotLoopProbe(private val trace: BasisTrace) : AutoCloseable {
         for (operation in trace.operations) {
             when (operation) {
                 is BasisTraceOperation.Factorize -> {
-                    operation.headings.forEachIndexed { i, heading -> headings[i] = headingColumn(heading, trace.sourceColumns) }
+                    operation.headings.forEachIndexed { i, heading ->
+                        headings[i] = headingColumn(
+                            heading,
+                            trace.sourceColumns,
+                        )
+                    }
                     check(solver.refactorize(headings) == operation.success)
                 }
+
                 is BasisTraceOperation.Solve -> Unit
+
                 is BasisTraceOperation.Update -> {
                     val entering = headingColumn(operation.entering, trace.sourceColumns)
                     prepare(operation.leavingSlot, entering)
@@ -56,8 +66,11 @@ private class HotLoopProbe(private val trace: BasisTrace) : AutoCloseable {
         }
         println("shape\t${trace.metadata.id}\t${matrix.rows}\t${matrix.cols}\t${matrix.nnz}\t${solver.updateCount}")
         for (transpose in listOf(false, true)) {
-            val rhs = trace.operations.filterIsInstance<BasisTraceOperation.Solve>().firstOrNull { it.transpose == transpose }?.rhs?.values()
-                ?: trace.operations.filterIsInstance<BasisTraceOperation.Solve>().first().rhs.values()
+            val rhs =
+                trace.operations.filterIsInstance<BasisTraceOperation.Solve>().firstOrNull {
+                    it.transpose == transpose
+                }?.rhs?.values()
+                    ?: trace.operations.filterIsInstance<BasisTraceOperation.Solve>().first().rhs.values()
             repeat(1000) { solve(rhs, transpose) }
             measure(if (transpose) "btran" else "ftran", 1000, { input.scatter(rhs) }) {
                 if (transpose) solver.btran(input, 1.0) else solver.ftran(input, 1.0)
@@ -156,7 +169,10 @@ private class HotLoopProbe(private val trace: BasisTrace) : AutoCloseable {
                 after.ftran.units - before.ftran.units + after.btran.units - before.btran.units +
                 after.update.units - before.update.units
         }
-        println("measure\t${trace.metadata.id}\t$name\t$count\t${bytes.toDouble() / count}\t${nanos.toDouble() / count}")
+        println(
+            "measure\t${trace.metadata.id}\t$name\t$count\t" +
+                "${bytes.toDouble() / count}\t${nanos.toDouble() / count}",
+        )
         println("work\t${trace.metadata.id}\t$name\t${units.toDouble() / count}")
     }
 
