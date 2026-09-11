@@ -13,12 +13,20 @@ package com.eignex.klause.lp.engine
  * cut-augmented model may be learned. Defaults to `false` — the sound direction.
  */
 internal class Cut(
-    val cols: IntArray,
-    val coeffs: LongArray,
+    cols: IntArray,
+    coeffs: LongArray,
     val rel: Relation,
     val rhs: Long,
-    val global: Boolean = false,
+    global: Boolean = false,
+    val provenance: CutProvenance? = null,
+    val tableau: TableauCutProvenance? = null,
 ) {
+    val cols: IntArray = cols.copyOf()
+    val coeffs: LongArray = coeffs.copyOf()
+    val global: Boolean = global && tableau == null && (provenance?.global != false)
+
+    init { require(cols.size == coeffs.size) }
+
     /** A stable key for deduplicating cuts across separation rounds (ignores column order). */
     fun key(): String {
         val terms = cols.indices.sortedBy { cols[it] }.joinToString(",") { "${cols[it]}:${coeffs[it]}" }

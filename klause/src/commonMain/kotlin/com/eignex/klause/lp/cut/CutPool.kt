@@ -2,6 +2,8 @@ package com.eignex.klause.lp.cut
 
 import com.eignex.klause.lp.engine.Cut
 import com.eignex.klause.lp.engine.Relation
+import com.eignex.klause.lp.relaxation.CutSourceMap
+import com.eignex.klause.lp.relaxation.LpRelaxation
 import com.eignex.klause.util.MutableIntLongMap
 import kotlin.math.abs
 import kotlin.math.sqrt
@@ -22,10 +24,10 @@ internal class CutPool(
     val maxCuts: Int = DEFAULT_MAX_CUTS,
     private val maxConsecutiveInactive: Int = DEFAULT_MAX_CONSECUTIVE_INACTIVE,
 ) {
-    private val seen = HashSet<String>()
+    private val seen = HashSet<Any>()
     private val entries = ArrayList<Entry>()
 
-    private class Entry(val cut: Cut, var activity: Double = 0.0, var inactiveCount: Int = 0)
+    private class Entry(var cut: Cut?, val key: Any, val source: SourceCut? = null, var activity: Double = 0.0, var inactiveCount: Int = 0)
 
     /** Number of pooled cuts. */
     val size: Int get() = entries.size
@@ -33,8 +35,35 @@ internal class CutPool(
     /** Add [cut] unless an equal one (by [Cut.key]) is already pooled; returns true if newly added. */
     fun add(cut: Cut): Boolean {
         if (!seen.add(cut.key())) return false
-        entries.add(Entry(cut))
+        entries.add(Entry(cut, cut.key()))
         return true
+    }
+
+    fun add(cut: Cut, relaxation: LpRelaxation): Boolean {
+        val mapped = SourceCut.fromCut(cut, relaxation).orNull() ?: return add(cut)
+        return add(mapped, checkNotNull(relaxation.sourceMap))
+    }
+
+    fun add(cut: SourceCut, map: CutSourceMap): Boolean {
+        if (cut.provenance.model !== map.model) return false
+        val key = listOf(cut.key, cut.provenance.model, cut.provenance.facts.filter { !it.global }, cut.provenance.assumptions)
+        if (!seen.add(key)) return false
+        entries.add(Entry(cut.toCut(map).orNull(), key, cut))
+        return true
+    }
+
+    fun remap(map: CutSourceMap): Map<CutMappingDecline, Int> {
+        val declines = HashMap<CutMappingDecline, Int>()
+        for (entry in entries) {
+            val mapped = entry.source?.toCut(map) ?: CutMapping.Declined(CutMappingDecline.MISSING_PROVENANCE)
+            entry.cut = mapped.orNull()
+            if (mapped is CutMapping.Declined) declines[mapped.reason] = (declines[mapped.reason] ?: 0) + 1
+        }
+        return declines.toMap()
+    }
+
+    fun exportGlobalCuts(): List<SharedCut> = entries.mapNotNull { entry ->
+        entry.source?.takeIf { it.provenance.global }?.let { SharedCut(it) }
     }
 
     /** Add each of [cuts] (deduplicated); returns how many were newly added. */
@@ -45,12 +74,13 @@ internal class CutPool(
     }
 
     /** The pooled cuts, in insertion order (after any [retainMostActive] eviction). */
-    fun cuts(): List<Cut> = entries.map { it.cut }
+    fun cuts(): List<Cut> = entries.mapNotNull { it.cut }
 
     /** Observe one solved LP point, update decayed tightness, and expire cuts inactive for too long. */
     fun observe(primal: DoubleArray) {
         for (entry in entries) {
-            val active = slack(entry.cut, primal) <= ACTIVE_TOLERANCE
+            val cut = entry.cut ?: continue
+            val active = slack(cut, primal) <= ACTIVE_TOLERANCE
             entry.activity *= ACTIVITY_DECAY
             if (active) {
                 entry.activity += 1.0
@@ -73,7 +103,7 @@ internal class CutPool(
 
     private fun rebuildSeen() {
         seen.clear()
-        for (entry in entries) seen.add(entry.cut.key())
+        for (entry in entries) seen.add(entry.key)
     }
 
     /** Distance of the LP [primal] point from cut tightness — 0 when the point sits on the cut. */
@@ -112,11 +142,12 @@ internal class CutPool(
     ): List<Cut> {
         if (max <= 0) return emptyList()
         val scored = entries.mapNotNull { entry ->
-            val efficacy = efficacy(entry.cut, primal)
+            val cut = entry.cut ?: return@mapNotNull null
+            val efficacy = efficacy(cut, primal)
             if (efficacy < minEfficacy) {
                 null
             } else {
-                entry.cut to (efficacy + objectiveParallelism(entry.cut, objective))
+                cut to (efficacy + objectiveParallelism(cut, objective))
             }
         }.sortedByDescending { it.second }
         val selected = ArrayList<Cut>()

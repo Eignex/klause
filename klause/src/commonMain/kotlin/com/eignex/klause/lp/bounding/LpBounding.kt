@@ -2,6 +2,7 @@ package com.eignex.klause.lp.bounding
 
 import com.eignex.klause.lp.cut.CutContext
 import com.eignex.klause.lp.cut.CutPool
+import com.eignex.klause.lp.cut.SharedCut
 import com.eignex.klause.lp.cut.CutSeparator
 import com.eignex.klause.lp.engine.Basis
 import com.eignex.klause.lp.engine.CertifiedLpResult
@@ -548,7 +549,7 @@ internal fun LpEngine.sparseSafePrune(
             }
             sink.lp.observeCutAccounting(fresh.size, 0, 0)
             if (fresh.isEmpty()) break
-            recordSearchCuts(fresh, boundRes.primal) // persist the global cuts into the pool
+            recordSearchCuts(fresh, boundRes.primal, boundRel) // persist the global cuts into the pool
             for (c in fresh) if (!c.global) localCuts.add(c)
             val selectedCuts = cutPool.select(
                 boundRes.primal,
@@ -1074,12 +1075,12 @@ internal fun LpEngine.harvestRootCuts(
                 // cut they separate over the undecided root is valid at every solution — force it global.
                 val structural = separators.flatMap { it.separate(ctx) }
                     .map { if (it.global) it else Cut(it.cols, it.coeffs, it.rel, it.rhs, global = true) }
-                // Gomory/MIR combine rows; tableauCuts already marks one global iff its row weights avoid every
-                // non-global (big-M) row. Only the genuinely-global ones may join the tree-wide pool.
+                // Source mapping discharges every rounding bound and recursively retains parent premises.
                 val gomoryCuts = if (gomory) simplex.gomoryCuts(GOMORY_CUTS_PER_ROUND) else emptyList()
                 val mirCuts = if (mir) simplex.mirCuts(GOMORY_CUTS_PER_ROUND) else emptyList()
-                val candidates = structural + (gomoryCuts + mirCuts).filter { it.global }
-                val added = pool.addAll(candidates)
+                val mappedTableau = (gomoryCuts + mirCuts).mapNotNull { SharedCut.fromCut(it, relaxation)?.toCut(relaxation) }
+                val candidates = structural + mappedTableau
+                val added = candidates.count { pool.add(it, relaxation) }
                 observeRootCutAccounting(candidates.size, 0, 0)
                 if (added == 0) break
                 val selected = pool.cuts()

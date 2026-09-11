@@ -27,6 +27,7 @@ import com.eignex.klause.lp.cut.CircuitArcModel
 import com.eignex.klause.lp.cut.CircuitSeparator
 import com.eignex.klause.lp.emitLpRelaxation
 import com.eignex.klause.lp.engine.Cut
+import com.eignex.klause.lp.engine.CutProvenance
 import com.eignex.klause.lp.engine.LpBuilder
 import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.LpPricingOptions
@@ -121,6 +122,7 @@ internal class LpRelaxation(
     val gatedAux: IntArray = EmptyIntArray,
     /** The pin value activating gated entry k (`true` = the atom row, `false` = its complement). */
     val gatedWhenTrue: BooleanArray = BooleanArray(0),
+    val sourceMap: CutSourceMap? = null,
 )
 
 /**
@@ -223,6 +225,7 @@ internal fun LpRelaxation.rebound(session: PropagationSession): LpRelaxation {
         persistentEligible = true,
         colReq = colReq,
         colPresentUpper = colPresentUpper,
+        sourceMap = sourceMap,
     )
 }
 
@@ -936,8 +939,10 @@ internal class CpToLpRelaxation(
 
             // Separator-produced cuts, over already-created columns. A cut referencing an absent
             // column is dropped (defensive — separators should only emit over existing columns).
+            val cutParents = HashMap<Int, CutProvenance>()
             for (cut in extraCuts) {
                 if (cut.cols.all { it in 0 until builder.varCount }) {
+                    cut.provenance?.let { cutParents[builder.rowCount] = it }
                     builder.addRow(cut.cols, cut.coeffs, cut.rel, cut.rhs, cut.global)
                 }
             }
@@ -967,6 +972,8 @@ internal class CpToLpRelaxation(
                 hullFactorIds = hullFactorIds.toIntArray(),
                 colRealId = IntArray(colRealId.size) { colRealId[it] },
                 colRealSign = IntArray(colRealSign.size) { colRealSign[it] },
+                sourceMap = cpCutSources(model, problem, colVarIds, kinds,
+                    IntArray(colRealId.size) { colRealId[it] }, IntArray(colRealSign.size) { colRealSign[it] }, cutParents),
                 gatedRows = gatedRowList.toIntArray(),
                 gatedAux = gatedAuxList.toIntArray(),
                 gatedWhenTrue = BooleanArray(gatedWhenTrueList.size) { gatedWhenTrueList[it] == 1 },

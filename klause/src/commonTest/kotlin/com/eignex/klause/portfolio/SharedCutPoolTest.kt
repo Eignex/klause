@@ -16,6 +16,7 @@ import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.objective.LinearObjective
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 /** [SharedCutPool] + [PoolCutExchange]: a global cut one arm harvests must reach another arm's local
@@ -88,10 +89,10 @@ class SharedCutPoolTest {
     @Test
     fun `pool drains since a cursor and ignores duplicate keys`() {
         val pool = SharedCutPool()
-        val noBool = booleanArrayOf(false, false)
-        val a = SharedCut(intArrayOf(0, 1), noBool, longArrayOf(1, 1), Relation.LE, 2)
-        val aGain = SharedCut(intArrayOf(1, 0), noBool, longArrayOf(1, 1), Relation.LE, 2) // same inequality ⇒ same key
-        val b = SharedCut(intArrayOf(0, 2), noBool, longArrayOf(2, 1), Relation.LE, 3)
+        val r = relax(LinearObjective(intCoefficients = longArrayOf(1, 1, 1)))
+        val a = assertNotNull(SharedCut.fromCut(Cut(intArrayOf(0, 1), longArrayOf(1, 1), Relation.LE, 2, global = true), r))
+        val aGain = assertNotNull(SharedCut.fromCut(Cut(intArrayOf(1, 0), longArrayOf(1, 1), Relation.LE, 2, global = true), r)) // same inequality ⇒ same key
+        val b = assertNotNull(SharedCut.fromCut(Cut(intArrayOf(0, 2), longArrayOf(2, 1), Relation.LE, 3, global = true), r))
         pool.publish(listOf(a, aGain, b))
 
         val first = pool.drainSince(0)
