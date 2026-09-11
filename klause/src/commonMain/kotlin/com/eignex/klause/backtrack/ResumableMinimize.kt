@@ -60,6 +60,7 @@ import com.eignex.klause.solver.search.SearchSolveParams
 import com.eignex.klause.solver.search.SearchTraversalPolicy
 import com.eignex.klause.solver.search.VarRef
 import com.eignex.klause.util.Cancellation
+import kotlin.coroutines.cancellation.CancellationException
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TimeSource
 
@@ -330,6 +331,11 @@ internal class ResumableMinimize(
             initialCandidate = sample,
             problem = root,
         )
+        if (freshParams.cancellation()) {
+            val cancelled = CancellationException("objective replacement cancelled")
+            replacement.closeAfter(cancelled)
+            throw cancelled
+        }
         try {
             close()
         } catch (primary: Throwable) {
@@ -646,8 +652,8 @@ internal class ResumableMinimize(
                     LpVerdict.UNBOUNDED,
                 )
             ) {
-                    return null
-                }
+                return null
+            }
             sample.copy(reals = real.reals)
         }
         if (token()) return null

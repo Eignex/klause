@@ -20,9 +20,11 @@ class LpSolveTest {
         val zero = ExactLpNumber.of(0L)
         val one = ExactLpNumber.of(1L)
         val source = ExactLpModel(
-            listOf(emptyList()), emptyList(),
+            listOf(emptyList()),
+            emptyList(),
             listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(one)))),
-            emptyList(), ExactLpObjective(listOf(one)),
+            emptyList(),
+            ExactLpObjective(listOf(one)),
         )
         val first = assertNotNull(LpExactState(source).toWorkingModel())
         val foreign = assertNotNull(LpExactState(source).toWorkingModel())
