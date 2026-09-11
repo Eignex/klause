@@ -331,10 +331,11 @@ internal class ResumableMinimize(
             initialCandidate = sample,
             problem = root,
         )
-        if (freshParams.cancellation()) {
-            val cancelled = CancellationException("objective replacement cancelled")
-            replacement.closeAfter(cancelled)
-            throw cancelled
+        try {
+            if (freshParams.cancellation()) throw CancellationException("objective replacement cancelled")
+        } catch (primary: Throwable) {
+            replacement.closeAfter(primary)
+            throw primary
         }
         try {
             close()
