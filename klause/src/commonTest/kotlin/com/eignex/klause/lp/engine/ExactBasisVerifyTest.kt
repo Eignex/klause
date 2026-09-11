@@ -601,4 +601,21 @@ class ExactBasisVerifyTest {
         assertEquals(1, result.basisVerification?.factoryCalls)
     }
 
+    @Test
+    fun `basis witness survives withheld rational objective proof`() {
+        val model = LpBuilder().apply {
+            addRealVar(0.0, 3.0, cost = 1.0)
+            addRealRow(intArrayOf(0), doubleArrayOf(3.0), Relation.EQ, 1.0)
+        }.build(Sense.MINIMIZE)
+        val policy = LpCertificationPolicy { certifier, success ->
+            certifier == LpCertifier.EXACT_BASIS && success
+        }
+
+        val result = solveAndCertify(model, context = LpSolveContext(certificationPolicy = policy))
+
+        assertNotNull(result.witness)
+        assertNull(result.bound)
+        assertEquals(LpVerdict.FEASIBLE, result.verdict)
+    }
+
 }

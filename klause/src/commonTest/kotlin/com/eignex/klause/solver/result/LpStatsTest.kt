@@ -1,5 +1,8 @@
 package com.eignex.klause.solver.result
 
+import com.eignex.klause.lp.engine.ExactBasisDecline
+import com.eignex.klause.lp.engine.ExactBasisMetrics
+import com.eignex.klause.lp.engine.ExactBasisPhase
 import com.eignex.klause.lp.engine.LpCertifier
 import com.eignex.klause.lp.engine.LpSolveMetrics
 import kotlin.test.Test
@@ -15,10 +18,11 @@ class LpStatsTest {
         val first = LpBasisVerificationStats(
             calls = 1L, factoryCalls = 1L, builds = 2L, restarts = 1L,
             work = mapOf("FACTOR" to 19L), allocation = mapOf("FACTOR" to 29L),
-            declines = mapOf("FILL" to 1L), routes = mapOf("NODE" to 1L),
+            declines = mapOf("WORK" to 1L), terminalDeclines = mapOf("FACTOR_WORK" to 1L), routes = mapOf("NODE" to 1L),
         )
         val second = LpBasisVerificationStats(
             calls = 1L, eligible = 1L, reuse = 1L, solves = 2L, checks = 3L,
+            declines = mapOf("WORK" to 1L), terminalDeclines = mapOf("VERIFICATION_WORK" to 1L),
             work = mapOf("FACTOR" to 0L, "VERIFICATION" to 11L), routes = mapOf("COMPONENT" to 1L),
         )
 
@@ -29,8 +33,27 @@ class LpStatsTest {
         assertEquals(1L, combined.restarts)
         assertEquals(30L, combined.work.values.sum())
         assertEquals(29L, combined.allocation.values.sum())
-        assertEquals(mapOf("FILL" to 1L), combined.declines)
+        assertEquals(mapOf("WORK" to 2L), combined.declines)
+        assertEquals(mapOf("FACTOR_WORK" to 1L, "VERIFICATION_WORK" to 1L), combined.terminalDeclines)
         assertEquals(mapOf("NODE" to 1L, "COMPONENT" to 1L), combined.routes)
+    }
+
+    @Test
+    fun `basis observer retains terminal phase with the decline reason`() {
+        val sink = LpStatsSink()
+        val observer = sink.certificationObserver(LpRoute.NODE)
+        val metrics = ExactBasisMetrics(
+            eligible = true, factoryCalls = 1, builds = 1, reuse = 0, solves = 0, restarts = 0,
+            verificationChecks = 0, maxBits = 1, peakFill = 1, operations = emptyList(),
+            decline = ExactBasisDecline.WORK, phase = ExactBasisPhase.FACTOR,
+        )
+
+        observer.observeBasisVerification(metrics)
+        observer.observeBasisVerification(metrics.copy(phase = ExactBasisPhase.VERIFICATION))
+
+        val stats = sink.snapshot().basisVerification
+        assertEquals(mapOf("WORK" to 2L), stats.declines)
+        assertEquals(mapOf("FACTOR_WORK" to 1L, "VERIFICATION_WORK" to 1L), stats.terminalDeclines)
     }
 
     @Test

@@ -16,7 +16,18 @@ internal data class ExactBasisLimits(
 
 internal enum class ExactBasisPhase { ASSEMBLY, FACTOR, PRIMAL, DUAL, RAY, VERIFICATION, PROJECTION }
 internal enum class ExactBasisDecline {
-    INVALID_INPUT, INVALID_BASIS, SINGULAR, DIMENSION, WORK, MEMORY, FILL, BITS, TIME, CANCELLED, CANDIDATE, PROJECTION,
+    INVALID_INPUT,
+    INVALID_BASIS,
+    SINGULAR,
+    DIMENSION,
+    WORK,
+    MEMORY,
+    FILL,
+    BITS,
+    TIME,
+    CANCELLED,
+    CANDIDATE,
+    PROJECTION,
 }
 
 internal data class ExactBasisWork(val phase: ExactBasisPhase, val work: Long, val allocation: Long)
@@ -84,8 +95,12 @@ internal class ExactBasisCache {
     fun install(current: ExactBasisAuthority, completed: RationalBasisFactors) {
         current.meter.charge(bytes = 64L + current.headings.size * 4L)
         cached = CachedExactBasis(
-            current.model.n, current.model.m, current.model.exactState,
-            current.matrix, current.headings.copyOf(), completed,
+            current.model.n,
+            current.model.m,
+            current.model.exactState,
+            current.matrix,
+            current.headings.copyOf(),
+            completed,
         )
     }
 }
@@ -110,7 +125,7 @@ internal fun verifyExactBasis(
     var decline: ExactBasisDecline? = null
     try {
         val authority = ExactBasisAuthority(model, basis, meter)
-        if (rayRow != null && rayRow !in 0 until model.m) throw ExactBasisStop(ExactBasisDecline.INVALID_BASIS)
+        if (rayRow != null && rayRow !in 0 until model.m) meter.stop(ExactBasisDecline.INVALID_BASIS)
         val cached = cache.find(authority)
         if (cached != null) meter.reuse++
         val factors = cached ?: run {
@@ -122,13 +137,15 @@ internal fun verifyExactBasis(
             meter.record(build.stats)
             when (build) {
                 is RationalBasisBuild.Ready -> build.factors.also { cache.install(authority, it) }
+
                 is RationalBasisBuild.Singular -> {
                     singularRank = build.rank
-                    throw ExactBasisStop(ExactBasisDecline.SINGULAR)
+                    meter.stop(ExactBasisDecline.SINGULAR)
                 }
+
                 is RationalBasisBuild.Declined -> {
                     if (build.reason.name == "CANCELLED") meter.poll()
-                    throw ExactBasisStop(ExactBasisDecline.valueOf(build.reason.name))
+                    meter.stop(ExactBasisDecline.valueOf(build.reason.name))
                 }
             }
         }
@@ -165,13 +182,21 @@ internal fun verifyExactBasis(
         decline = stop.reason
     }
     val result = ExactBasisVerification(
-        witness, bound, conflict, support, integerRay, complementary, singularRank, meter.snapshot(decline),
+        witness,
+        bound,
+        conflict,
+        support,
+        integerRay,
+        complementary,
+        singularRank,
+        meter.snapshot(decline),
     )
     observer?.observeBasisVerification(result.metrics)
     observer?.observe(
         if (rayRow == null) LpCertifier.EXACT_BASIS else LpCertifier.EXACT_FARKAS,
-        if (rayRow == null) witness != null || bound != null else conflict != null,
+        if (rayRow == null) witness != null else conflict != null,
     )
+    if (rayRow == null) observer?.observe(LpCertifier.RATIONAL, bound != null)
     return result
 }
 
@@ -187,6 +212,7 @@ private fun solveExactBasis(
     meter.record(result.stats)
     return when (result) {
         is RationalBasisSolve.Solved -> result.values
+
         is RationalBasisSolve.Declined -> {
             if (result.reason.name == "CANCELLED") meter.poll()
             throw ExactBasisStop(ExactBasisDecline.valueOf(result.reason.name))
@@ -204,8 +230,13 @@ private fun verifyBasisCandidates(
 ): ReconstructedCertificate {
     meter.phase = ExactBasisPhase.VERIFICATION
     val result = verifyRationalCertificate(
-        model, primal, dual, ray, Basis(authority.headings, authority.statuses),
-        meter.token, meter.verificationLimits(),
+        model,
+        primal,
+        dual,
+        ray,
+        Basis(authority.headings, authority.statuses),
+        meter.token,
+        meter.verificationLimits(),
     )
     meter.record(result.metrics)
     return result

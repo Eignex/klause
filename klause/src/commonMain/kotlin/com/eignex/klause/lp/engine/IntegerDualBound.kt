@@ -317,7 +317,12 @@ internal fun integerFarkasRay(
         if (integral != null) {
             var route = FarkasRoute.NONE
             val certified = integerFarkasRay(
-                integral, ray, scaleBits, onRoute = { route = it }, observer = observer, cancellation = cancellation,
+                integral,
+                ray,
+                scaleBits,
+                onRoute = { route = it },
+                observer = observer,
+                cancellation = cancellation,
             )
                 ?.takeIf { sourceFarkasValid(model, it) }
             if (certified != null) {

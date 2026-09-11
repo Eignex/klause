@@ -34,5 +34,4 @@ internal fun exactPointFeasible(
     observer: LpCertificationObserver? = null,
 ): Boolean = exactPointWitness(model, primal, observer) != null
 
-
 private const val MAX_POINT_DENOMINATOR = 1L shl 40

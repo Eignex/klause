@@ -143,6 +143,7 @@ internal fun lpStatPairs(stats: SolveStats): List<Pair<String, String>> {
         for ((phase, work) in basis.work) out += "lpRationalBasisWork_$phase" to "$work"
         for ((phase, bytes) in basis.allocation) out += "lpRationalBasisAllocation_$phase" to "$bytes"
         for ((reason, count) in basis.declines) out += "lpRationalBasisDecline_$reason" to "$count"
+        for ((terminal, count) in basis.terminalDeclines) out += "lpRationalBasisTerminal_$terminal" to "$count"
         for ((route, count) in basis.routes) out += "lpRationalBasisRoute_$route" to "$count"
     }
     if (stats.lp.warmStartAttempts.sum > 0.0) {

@@ -102,6 +102,8 @@ internal class ExactBasisMeter(val limits: ExactBasisLimits, private val cancell
         verificationChecks += metrics.pointChecks + metrics.dualChecks + metrics.rayChecks
     }
 
+    fun stop(reason: ExactBasisDecline): Nothing = throw ExactBasisStop(reason)
+
     fun stop(reason: ReconstructionDecline): Nothing {
         if (reason == ReconstructionDecline.CANCELLED) poll()
         throw ExactBasisStop(

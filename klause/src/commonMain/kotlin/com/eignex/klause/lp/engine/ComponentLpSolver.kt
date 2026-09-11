@@ -154,8 +154,11 @@ internal class ComponentLpSolver(
             val part = parts[index]
             if (cancellation()) return null
             val exact = verifyExactBasis(
-                part.model, results[index].basis, cache = solvers[index].exactBasisCache ?: ExactBasisCache(),
-                cancellation = cancellation, observer = observer,
+                part.model,
+                results[index].basis,
+                cache = solvers[index].exactBasisCache ?: ExactBasisCache(),
+                cancellation = cancellation,
+                observer = observer,
             )
             if (exact.singularRank != null) solvers[index].rejectSingularBasis(part.model, results[index].basis)
             val witness = policy.acceptNullable(
