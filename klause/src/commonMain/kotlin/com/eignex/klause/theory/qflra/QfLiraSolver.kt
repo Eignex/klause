@@ -14,6 +14,10 @@ import com.eignex.klause.lp.ExactMixedTriangularBounds
 import com.eignex.klause.lp.asFraction
 import com.eignex.klause.lp.bounding.LpPropagator
 import com.eignex.klause.lp.bounding.LpSearchPolicy
+import com.eignex.klause.lp.engine.LpCertificationObserver
+import com.eignex.klause.lp.engine.LpCertifier
+import com.eignex.klause.lp.engine.LpSolveMetrics
+import com.eignex.klause.simplex.exact.ExactContinuationMetrics
 import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.lp.engine.LpVerdict
 import com.eignex.klause.lp.exactColumnLower
@@ -151,6 +155,14 @@ class ExactLiraSearchComponent(
             },
             solveContext = solveContext,
             cancellation = Cancellation { context?.cancelled() == true },
+            certificationObserver = object : LpCertificationObserver {
+                override fun observe(certifier: LpCertifier, success: Boolean) = Unit
+                override fun observeExactInput(accepted: Boolean) = Unit
+                override fun observeSolve(metrics: LpSolveMetrics, component: Boolean) = Unit
+                override fun observeContinuation(metrics: ExactContinuationMetrics) {
+                    smtStats?.observeContinuation(metrics)
+                }
+            },
         )
     }
     private val system by lazy { LiveQfLraSystem(model, lp) }
@@ -348,6 +360,14 @@ class ExactLiraSearchComponent(
                 SearchDecision.Theory(ExactLiraDecision(address, direction = it))
             }
         }
+        val closed = closedLpLeaf() ?: run {
+            outcome = ComponentCheck.Indeterminate
+            return null
+        }
+        if (closed && candidate == null) {
+            outcome = ComponentCheck.Indeterminate
+            return null
+        }
         val reduced = node.retainedReduction ?: reduction.reduce(
             bools,
             node.withPublishedBounds(model.numIntVars, context::intLowerBound, context::intUpperBound),
@@ -377,6 +397,12 @@ class ExactLiraSearchComponent(
                 if (!value.isInteger()) return registeredSplit(reduced, integer, value, context)
             }
         }
+        val extension = (0 until reduced.system.realColumns + reduced.system.integerColumns)
+            .any { !reduced.system.boundedColumn(it) }
+        if (closed && !extension) {
+            outcome = ComponentCheck.Indeterminate
+            return null
+        }
         smtStats?.observePrivateCheck()
         when (val bounded = ExactReducedLiraSystem(reduced).solve(node, Cancellation(context::cancelled), smtStats)) {
             is ExactReducedSearchResult.Split -> {
@@ -400,6 +426,14 @@ class ExactLiraSearchComponent(
             }
         }
         return null
+    }
+
+    private fun closedLpLeaf(): Boolean? {
+        val current = lp.state?.model ?: return null
+        return (0 until current.m).none { current.row(it).strict } && (0 until current.numVars).all {
+            val bounds = current.column(it).bounds
+            bounds.lower?.strict != true && bounds.upper?.strict != true
+        }
     }
 
     private fun registeredSplit(

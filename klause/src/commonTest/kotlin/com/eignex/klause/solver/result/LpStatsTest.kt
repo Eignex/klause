@@ -1,5 +1,8 @@
 package com.eignex.klause.solver.result
 
+import com.eignex.klause.simplex.exact.ExactContinuationMetrics
+import com.eignex.klause.simplex.exact.ContinuationPhase
+import com.eignex.klause.simplex.exact.ContinuationDecline
 import com.eignex.klause.lp.engine.ExactBasisDecline
 import com.eignex.klause.lp.engine.ExactBasisMetrics
 import com.eignex.klause.lp.engine.ExactBasisPhase
@@ -12,6 +15,29 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class LpStatsTest {
+
+    @Test
+    fun `continuation invocation deltas retain abandoned work and terminal phase`() {
+        val sink = LpStatsSink()
+        val observer = sink.certificationObserver()
+        observer.observeContinuation(ExactContinuationMetrics(
+            builds = 2, pivots = 3, restarts = 1, work = 19, allocation = 23,
+            phase = ContinuationPhase.IMPORT, decline = ContinuationDecline.WORK,
+            workByPhase = mapOf(ContinuationPhase.IMPORT to 19), allocationByPhase = mapOf(ContinuationPhase.IMPORT to 23),
+        ))
+        observer.observeContinuation(ExactContinuationMetrics(
+            pivots = 2, resumed = true, work = 7, workByPhase = mapOf(ContinuationPhase.FEASIBILITY to 7),
+            phase = ContinuationPhase.FEASIBILITY, decline = ContinuationDecline.WORK,
+        ))
+
+        val stats = sink.snapshot().continuation
+
+        assertEquals(2L, stats.calls)
+        assertEquals(5L, stats.pivots)
+        assertEquals(1L, stats.restarts)
+        assertEquals(26L, stats.work.values.sum())
+        assertEquals(mapOf("IMPORT_WORK" to 1L, "FEASIBILITY_WORK" to 1L), stats.declines)
+    }
 
     @Test
     fun `rational basis accounting retains failed work and consumer routes`() {

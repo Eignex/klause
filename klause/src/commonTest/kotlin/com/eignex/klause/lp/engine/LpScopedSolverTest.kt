@@ -5,6 +5,7 @@ import com.eignex.klause.simplex.basis.BasisRepair
 import com.eignex.klause.simplex.basis.BasisSolver
 import com.eignex.klause.simplex.basis.KotlinBasisSolver
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.simplex.exact.ExactContinuationMetrics
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -16,6 +17,35 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class LpScopedSolverTest {
+    @Test
+    fun `cancelled publication retains continuation cost without exposing its witness`() {
+        val zero = ExactLpNumber.of(0L)
+        val source = ExactLpModel(
+            listOf(listOf(ExactLpEntry(0, ExactLpNumber.of(1L)))), listOf(ExactLpNumber.of(1L)),
+            listOf(ExactLpColumn(ExactLpBounds()), ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(zero)))),
+            listOf(ExactLpRow()), ExactLpObjective(listOf(zero, zero)),
+        )
+        var cancelled = false
+        var observed: ExactContinuationMetrics? = null
+        val observer = object : LpCertificationObserver {
+            override fun observe(certifier: LpCertifier, success: Boolean) = Unit
+            override fun observeExactInput(accepted: Boolean) = Unit
+            override fun observeSolve(metrics: LpSolveMetrics, component: Boolean) = Unit
+            override fun observeContinuation(metrics: ExactContinuationMetrics) {
+                observed = metrics
+                cancelled = true
+            }
+        }
+        LpScopedSolver(LpExactState(source), Cancellation { cancelled }, workLimit = 1L).use { owner ->
+            val result = owner.solve(observer = observer)
+
+            assertNull(result)
+            assertNull(owner.lastResult)
+            assertTrue(assertNotNull(observed).success)
+            assertTrue(observed.work > 0L)
+        }
+    }
+
     @Test
     fun `rejected preparation preserves the primary failure when cleanup also throws`() {
         val zero = ExactLpNumber.of(0L)

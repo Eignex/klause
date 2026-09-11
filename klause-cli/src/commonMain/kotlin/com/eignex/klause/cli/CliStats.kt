@@ -1,6 +1,7 @@
 package com.eignex.klause.cli
 
 import com.eignex.klause.solver.result.LpCertifierRouteStats
+import com.eignex.klause.solver.result.LpContinuationStats
 import com.eignex.klause.solver.result.LpCertifierStats
 import com.eignex.klause.solver.result.LpRouteSolveStats
 import com.eignex.klause.solver.result.LpStats
@@ -30,7 +31,7 @@ internal fun lpStatPairs(stats: SolveStats): List<Pair<String, String>> {
     val splits = stats.lp.componentSplits.sum
     val routed = stats.lp.standalonePasses.sum + stats.lp.componentPasses.sum + stats.lp.rootPasses.sum
     if (solves == 0.0 && stats.lp.nodePasses.sum == 0.0 && routed == 0.0 &&
-        lagrangian == 0.0 && energetic == 0.0 && splits == 0.0 && stats.lp.basisVerification.calls == 0L
+        lagrangian == 0.0 && energetic == 0.0 && splits == 0.0 && stats.lp.basisVerification.calls == 0L && stats.lp.continuation.calls == 0L
     ) {
         return emptyList()
     }
@@ -128,6 +129,7 @@ internal fun lpStatPairs(stats: SolveStats): List<Pair<String, String>> {
     appendCertifierStats(out, "ExactFarkasRay", stats.lp.exactFarkasRay)
     appendCertifierStats(out, "ExactPointFeasible", stats.lp.exactPointFeasible)
     appendCertifierStats(out, "RationalOutcome", stats.lp.rationalOutcome)
+    out += continuationStatPairs("lp", stats.lp.continuation)
     val basis = stats.lp.basisVerification
     if (basis.calls > 0L) {
         out += "lpRationalBasisCalls" to "${basis.calls}"
@@ -320,6 +322,7 @@ private fun smtStatPairs(stats: SolveStats, solveTimeMs: Long): List<Pair<String
     if (this == SmtStats()) return emptyList()
     val sharedChecks = stats.openTheory.openTheoryChecks - privateChecks
     val out = ArrayList<Pair<String, String>>()
+    out += continuationStatPairs("smt", continuation)
     out += "smtPrivateChecks" to "$privateChecks"
     out += "smtSharedChecks" to "$sharedChecks"
     out += "smtTheoryChecks" to "${stats.openTheory.openTheoryChecks}"
@@ -420,4 +423,28 @@ internal fun presolveStatPairs(stats: SolveStats): List<Pair<String, String>> {
         if (lp.relaxationNnz != 0) out += "lpHarvestRelaxationNnz" to "${lp.relaxationNnz}"
     }
     return out
+}
+
+private fun continuationStatPairs(prefix: String, stats: LpContinuationStats): List<Pair<String, String>> {
+    if (stats.calls == 0L) return emptyList()
+    return buildList {
+        val key = "${prefix}Continuation"
+        add("${key}Calls" to "${stats.calls}")
+        add("${key}Eligible" to "${stats.eligible}")
+        add("${key}Successes" to "${stats.successes}")
+        add("${key}Builds" to "${stats.builds}")
+        add("${key}Imports" to "${stats.imports}")
+        add("${key}Pivots" to "${stats.pivots}")
+        add("${key}Repairs" to "${stats.repairs}")
+        add("${key}Restarts" to "${stats.restarts}")
+        add("${key}Resumes" to "${stats.resumes}")
+        add("${key}Invalidations" to "${stats.invalidations}")
+        add("${key}Checks" to "${stats.checks}")
+        add("${key}Work" to "${stats.work.values.sum()}")
+        add("${key}Allocation" to "${stats.allocation.values.sum()}")
+        add("${key}Ns" to "${stats.elapsedNs}")
+        for ((phase, value) in stats.work) add("${key}Work_$phase" to "$value")
+        for ((phase, value) in stats.allocation) add("${key}Allocation_$phase" to "$value")
+        for ((terminal, value) in stats.declines) add("${key}Decline_$terminal" to "$value")
+    }
 }

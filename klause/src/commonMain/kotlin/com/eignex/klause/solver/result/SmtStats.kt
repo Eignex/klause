@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.result
 
+import com.eignex.klause.simplex.exact.ExactContinuationMetrics
 import com.eignex.klause.simplex.exact.ExactSimplexRunResult
 import com.eignex.klause.simplex.exact.ExactSimplexStage
 import com.eignex.klause.simplex.exact.Frac128Escalation
@@ -64,6 +65,8 @@ data class SmtStats(
     val wideWitnessCandidates: Long = 0,
     /** Accepted witnesses with wide exact integer source data. */
     val wideWitnessAccepted: Long = 0,
+    /** Shared LP exact continuation invocation deltas. */
+    val continuation: LpContinuationStats = LpContinuationStats(),
 ) {
     /** Combine independent solve slices. */
     fun mergedWith(other: SmtStats): SmtStats = SmtStats(
@@ -94,11 +97,18 @@ data class SmtStats(
         strictWitnessAccepted + other.strictWitnessAccepted,
         wideWitnessCandidates + other.wideWitnessCandidates,
         wideWitnessAccepted + other.wideWitnessAccepted,
+        continuation.mergedWith(other.continuation),
     )
 }
 
 /** Mutable exact-SMT telemetry for one top-level open-theory request. */
 internal class SmtStatsSink : RationalSimplexObserver {
+    private var continuation = LpContinuationStats()
+
+    fun observeContinuation(metrics: ExactContinuationMetrics) {
+        continuation = continuation.mergedWith(metrics.toStats())
+    }
+
     private var privateChecks = 0L
     private var conflicts = 0L
     private var explainedConflicts = 0L
@@ -199,7 +209,7 @@ internal class SmtStatsSink : RationalSimplexObserver {
         frac128Attempts, frac128Eligible, frac128Accepted, frac128Escalations,
         frac128OverflowEscalations, frac128InputEscalations, escalationNs,
         witnessCandidates, witnessAccepted, strictWitnessCandidates, strictWitnessAccepted,
-        wideWitnessCandidates, wideWitnessAccepted,
+        wideWitnessCandidates, wideWitnessAccepted, continuation,
     )
 }
 

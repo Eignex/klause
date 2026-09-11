@@ -27,6 +27,7 @@ internal interface LpCertificationObserver {
     fun observeExactInput(accepted: Boolean)
     fun observeSolve(metrics: LpSolveMetrics, component: Boolean)
     fun observeBasisVerification(metrics: ExactBasisMetrics) {}
+    fun observeContinuation(metrics: com.eignex.klause.simplex.exact.ExactContinuationMetrics) {}
 }
 
 /** Primitive cost reading from one engine invocation.  It can cross the engine boundary without

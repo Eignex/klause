@@ -2,6 +2,8 @@ package com.eignex.klause.lp.engine
 
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.BigRationalConflict
+import com.eignex.klause.simplex.exact.ExactContinuationLimits
+import com.eignex.klause.simplex.exact.ExactContinuationMetrics
 import com.eignex.klause.simplex.exact.ExactSimplexBound
 import com.eignex.klause.simplex.exact.RationalFeasibility
 import com.eignex.klause.simplex.exact.rationalOutcome
@@ -43,6 +45,7 @@ internal class CertifiedLpResult(
     val conflictSupport: LpExactSupport? = null,
     val reconstruction: ReconstructionMetrics? = null,
     val basisVerification: ExactBasisMetrics? = null,
+    val continuation: ExactContinuationMetrics? = null,
 ) {
     val verdict: LpVerdict = when {
         farkasRay != null || rationalConflict != null || boundConflict != null -> LpVerdict.INFEASIBLE
@@ -126,9 +129,16 @@ internal fun certifyLpResult(
     observer: LpCertificationObserver? = null,
     policy: LpCertificationPolicy = ProductionLpCertificationPolicy,
     counterResults: LpCounterResults? = null,
+    continuationCache: LpExactContinuationCache = LpExactContinuationCache(),
+    continuationLimits: ExactContinuationLimits = ExactContinuationLimits(),
+    fullContinuation: Boolean = true,
 ): CertifiedLpResult {
     if (!model.finiteExactInput()) return CertifiedLpResult(null, null, null, null, null, false, { null })
     val state = model.exactState
+    var capturedTarget: LpContinuationTarget? = null
+    fun continuationTarget(): LpContinuationTarget = capturedTarget ?: captureContinuationTarget(
+        model, solver, result, continuationCache, continuationLimits, cancellation,
+    ).also { capturedTarget = it }
     if (state != null) {
         if (cancellation()) return CertifiedLpResult(null, null, null, null, null, false, { null })
         state.conflict?.let {
@@ -161,8 +171,22 @@ internal fun certifyLpResult(
                 conflictSupport = support,
             )
         }
-        if (solver.solvedExactState !== state || (result != null && result.exactState !== state)) {
+        if (result != null && (solver.solvedExactState !== state || result.exactState !== state)) {
             return CertifiedLpResult(null, null, null, null, null, false, { null })
+        }
+        if (solver.solvedExactState !== state) {
+            val continued = continueExactLp(
+                model, continuationTarget().basis, continuationCache, cancellation, continuationLimits,
+                fullEffort = fullContinuation, targetMetrics = continuationTarget().metrics,
+            )
+            observer?.observeContinuation(continued.metrics)
+            val accepted = policy.acceptNullable(LpCertifier.RATIONAL, continued.takeIf { it.metrics.success })
+            val point = accepted?.witness?.let { policy.acceptNullable(LpCertifier.EXACT_BASIS, it) }
+            val refutation = accepted?.conflict?.let { policy.acceptNullable(LpCertifier.EXACT_FARKAS, it) }
+            return CertifiedLpResult(
+                null, null, point, null, refutation, model.hasIntegralObjective(), { null },
+                conflictSupport = continued.support.takeIf { refutation != null }, continuation = continued.metrics,
+            )
         }
     }
     val remembered = counterResults?.read(model, policy)
@@ -175,6 +199,7 @@ internal fun certifyLpResult(
     var conflict: BigRationalConflict? = null
     var reconstruction: ReconstructedCertificate? = null
     var exactBasis: ExactBasisVerification? = null
+    var continued: LpContinuationVerification? = null
     if (result != null && (witness == null || bound?.value != witness.objective) && !cancellation()) {
         reconstruction = reconstructCertificate(
             model,
@@ -201,7 +226,10 @@ internal fun certifyLpResult(
             observer = observer,
         )
         exactBasis = checked
-        if (checked.singularRank != null) solver.rejectSingularBasis(model, result.basis)
+        if (checked.singularRank != null) {
+            continuationTarget()
+            solver.rejectSingularBasis(model, result.basis)
+        }
         val point = policy.acceptNullable(LpCertifier.EXACT_BASIS, checked.witness)
         if (point != null && (witness == null || point.objective < witness.objective)) witness = point
         val basisBound = policy.acceptNullable(LpCertifier.EXACT_BASIS, checked.bound)
@@ -248,13 +276,29 @@ internal fun certifyLpResult(
                 observer = observer,
             )
             exactBasis = checked
-            if (checked.singularRank != null) solver.rejectSingularBasis(model, basis)
+            if (checked.singularRank != null) {
+                continuationTarget()
+                solver.rejectSingularBasis(model, basis)
+            }
             conflict = policy.acceptNullable(LpCertifier.EXACT_FARKAS, checked.conflict)
             if (conflict != null && state == null) ray = checked.integerRay
         }
     }
-    // Retain the migration fallback; this is feasibility recovery, not an optimization solve.
-    if (state == null && witness == null && ray == null && conflict == null &&
+    if (witness == null && ray == null && conflict == null &&
+        (state != null || result == null || model.hasContinuous)
+    ) {
+        continued = continueExactLp(
+            model, continuationTarget().basis, continuationCache, cancellation, continuationLimits,
+            fullEffort = fullContinuation, targetMetrics = continuationTarget().metrics,
+        )
+        observer?.observeContinuation(continued.metrics)
+        observer?.observe(LpCertifier.RATIONAL, continued.metrics.success)
+        val accepted = policy.acceptNullable(LpCertifier.RATIONAL, continued.takeIf { it.metrics.success })
+        witness = accepted?.witness?.let { policy.acceptNullable(LpCertifier.EXACT_BASIS, it) }
+        conflict = accepted?.conflict?.let { policy.acceptNullable(LpCertifier.EXACT_FARKAS, it) }
+    }
+    // Strict margin and source extension keep their separate migration gate.
+    if (state == null && model.rowStrict.any { it } && witness == null && ray == null && conflict == null &&
         (result == null || model.hasContinuous)
     ) {
         val outcome = if (cancellation()) null else rationalOutcome(model, cancellation)
@@ -276,6 +320,10 @@ internal fun certifyLpResult(
             witness = point
             conflict = refutation
         }
+    }
+    if (continued == null) capturedTarget?.let {
+        continuationCache.continuation?.account(it.metrics.work, it.metrics.allocation, it.metrics.elapsedNs)
+        observer?.observeContinuation(it.metrics)
     }
     if (ray != null || conflict != null) bound = null
     val unboundedness = if (bound == null && witness != null) {
@@ -322,7 +370,9 @@ internal fun certifyLpResult(
         unboundedness = unboundedness,
         reconstruction = reconstruction?.metrics,
         basisVerification = exactBasis?.metrics,
+        continuation = continued?.metrics ?: capturedTarget?.metrics,
         conflictSupport =
+        continued?.support?.takeIf { conflict === continued.conflict } ?:
         exactBasis?.conflictSupport?.takeIf { conflict === exactBasis.conflict }
             ?: reconstruction?.conflictSupport?.takeIf { conflict === reconstruction.conflict }
             ?: conflict?.let { proof ->
