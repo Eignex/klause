@@ -6,22 +6,23 @@ import com.eignex.klause.formats.smtlib.SmtLib
 import com.eignex.klause.formats.smtlib.toExactLpModel
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.propagation.PropagationSession
+import com.eignex.klause.simplex.basis.BasisExtension
 import com.eignex.klause.simplex.basis.BasisTraceCodec
 import com.eignex.klause.simplex.basis.BasisTraceOperation
 import com.eignex.klause.simplex.basis.BasisUpdate
 import com.eignex.klause.simplex.basis.IndexedVector
 import com.eignex.klause.simplex.basis.KotlinBasisSolver
-import com.eignex.klause.simplex.basis.RationalBasisOrder
-import com.eignex.klause.simplex.basis.RationalBasisFactors
 import com.eignex.klause.simplex.basis.RationalBasisBuild
+import com.eignex.klause.simplex.basis.RationalBasisFactors
+import com.eignex.klause.simplex.basis.RationalBasisOrder
 import com.eignex.klause.simplex.basis.RationalBasisSolve
 import com.eignex.klause.simplex.basis.headingColumn
-import com.eignex.koblas.SparseMatrix
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.BigRationalConflict
 import com.eignex.klause.solver.objective.toLinearObjective
 import com.eignex.klause.theory.qflra.QfLraSystem
 import com.eignex.klause.util.Cancellation
+import com.eignex.koblas.SparseMatrix
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
@@ -30,16 +31,20 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import java.nio.file.Files
 import java.nio.file.Path
-import kotlin.test.assertTrue
-import kotlin.test.assertFalse
-import kotlin.test.assertNotNull
-import kotlin.test.assertIs
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertIs
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 internal object ExactBasisOrderingCoverage {
     @JvmStatic
     fun main(args: Array<String>) {
         verifyNonsymmetricOrder()
+        verifyExtensionOrder()
+        if (args.contentEquals(arrayOf("--probes-only"))) return
         val root = Path.of(args.single())
         val inputs = listOf(
             "mps/blend-tiny.mps", "mps/feasible-tiny.mps", "mps/infeasible-tiny.mps", "mps/float-tiny.mps",
@@ -94,9 +99,14 @@ internal object ExactBasisOrderingCoverage {
                     val started = System.nanoTime()
                     val token = Cancellation { System.nanoTime() - started >= 10_000_000_000L }
                     var floatOwner: KotlinBasisSolver? = null
-                    RevisedSimplex(model, token, iterationLimit = 4096, workLimit = 50_000_000L,
+                    RevisedSimplex(
+                        model,
+                        token,
+                        iterationLimit = 4096,
+                        workLimit = 50_000_000L,
                         basisSolverFactory = { KotlinBasisSolver(it).also { owner -> floatOwner = owner } },
-                        reuseRationalOrder = enabled).use { solver ->
+                        reuseRationalOrder = enabled,
+                    ).use { solver ->
                         val candidate = solver.solve()
                         val basis = candidate?.basis ?: solver.infeasibleBasis
                         val row = if (candidate == null) solver.infeasibleRow else null
@@ -116,18 +126,20 @@ internal object ExactBasisOrderingCoverage {
                         val certifyNanos = System.nanoTime() - certifyStart
                         certified.witness?.let { checkPoint(model, it) }
                         certified.rationalConflict?.let { checkConflict(model, it) }
-                        println(buildJsonObject {
-                            put("input", id)
-                            put("role", "real-verdict")
-                            put("verdict", certified.verdict.name)
-                            put("nanos", certifyNanos)
-                            put("exactState", model.exactState != null)
-                            put("orderingEligibleBeforeVerification", eligible)
-                            put("updateCount", floatOwner?.updateCount ?: -1)
-                            put("basis", basis != null)
-                            put("floatWork", solver.lastWorkOps)
-                            put("pivots", solver.lastPivots)
-                        })
+                        println(
+                            buildJsonObject {
+                                put("input", id)
+                                put("role", "real-verdict")
+                                put("verdict", certified.verdict.name)
+                                put("nanos", certifyNanos)
+                                put("exactState", model.exactState != null)
+                                put("orderingEligibleBeforeVerification", eligible)
+                                put("updateCount", floatOwner?.updateCount ?: -1)
+                                put("basis", basis != null)
+                                put("floatWork", solver.lastWorkOps)
+                                put("pivots", solver.lastPivots)
+                            },
+                        )
                         if (basis != null) {
                             solver.exactBasisCache.clear()
                             measured(id, "real-offer", model, basis, row, solver.exactBasisCache)
@@ -146,11 +158,13 @@ internal object ExactBasisOrderingCoverage {
         val checked = verifyExactBasis(model, basis, row, cache)
         val nanos = System.nanoTime() - started
         println(record(input, role, checked.metrics))
-        println(buildJsonObject {
-            put("input", input)
-            put("role", "$role-time")
-            put("nanos", nanos)
-        })
+        println(
+            buildJsonObject {
+                put("input", input)
+                put("role", "$role-time")
+                put("nanos", nanos)
+            },
+        )
         checked.witness?.let { checkPoint(model, it) }
         checked.conflict?.let { checkConflict(model, it) }
         println(strength(input, role, checked))
@@ -158,17 +172,31 @@ internal object ExactBasisOrderingCoverage {
 
     private fun traces(root: Path) {
         val corpus = root.resolve("klause/src/jvmTest/resources/basis-corpus")
-        val names = listOf("mps-afiro", "mps-adlittle", "mzn-graph-coloring", "mzn-timetabling",
-            "smt-lia-wide-span", "smt-lia-unsat")
+        val names = listOf(
+            "mps-afiro",
+            "mps-adlittle",
+            "mzn-graph-coloring",
+            "mzn-timetabling",
+            "smt-lia-wide-span",
+            "smt-lia-unsat",
+        )
         for (name in names) {
             val trace = BasisTraceCodec.read(corpus.resolve("$name.kbtrace"))
             val source = trace.matrix
-            val matrix = SparseMatrix.wrap(source.rows, source.columns, source.copyColumnPointers(),
-                source.copyRowIndices(), DoubleArray(source.entries) { source.valueAt(it) })
+            val matrix = SparseMatrix.wrap(
+                source.rows,
+                source.columns,
+                source.copyColumnPointers(),
+                source.copyRowIndices(),
+                DoubleArray(source.entries) { source.valueAt(it) },
+            )
             val builds = trace.operations.indices.filter {
                 (trace.operations[it] as? BasisTraceOperation.Factorize)?.success == true
             }
-            val update = trace.operations.indexOfFirst { it is BasisTraceOperation.Update && it.outcome != BasisUpdate.SINGULAR }
+            val update = trace.operations.indexOfFirst {
+                it is BasisTraceOperation.Update &&
+                    it.outcome != BasisUpdate.SINGULAR
+            }
             val samples = (listOfNotNull(builds.firstOrNull(), builds.lastOrNull()) + listOf(update)).toSet()
             for (round in -1..2) {
                 KotlinBasisSolver(matrix).use { solver ->
@@ -176,61 +204,89 @@ internal object ExactBasisOrderingCoverage {
                     for ((index, operation) in trace.operations.withIndex()) {
                         when (operation) {
                             is BasisTraceOperation.Factorize -> {
-                                val current = operation.headings.map { headingColumn(it, trace.sourceColumns) }.toIntArray()
+                                val current = operation.headings.map {
+                                    headingColumn(
+                                        it,
+                                        trace.sourceColumns,
+                                    )
+                                }.toIntArray()
                                 val success = solver.refactorize(current)
                                 check(success == operation.success) { "$name/$index build divergence" }
                                 headings = current.takeIf { success }
                             }
+
                             is BasisTraceOperation.Update -> {
                                 val current = headings ?: continue
                                 val entering = headingColumn(operation.entering, trace.sourceColumns)
                                 val spike = IndexedVector(source.rows).also { it.scatterColumn(matrix, entering) }
                                 solver.ftran(spike)
                                 val outcome = solver.update(operation.leavingSlot, entering, spike)
-                                check((outcome == BasisUpdate.SINGULAR) == (operation.outcome == BasisUpdate.SINGULAR)) {
+                                check(
+                                    (outcome == BasisUpdate.SINGULAR) == (operation.outcome == BasisUpdate.SINGULAR),
+                                ) {
                                     "$name/$index update divergence"
                                 }
                                 if (outcome != BasisUpdate.SINGULAR) current[operation.leavingSlot] = entering
                             }
+
                             is BasisTraceOperation.Solve -> Unit
                         }
                         val current = headings ?: continue
                         if (index !in samples) continue
                         val rhs = trace.operations.drop(index + 1).filterIsInstance<BasisTraceOperation.Solve>()
                             .firstOrNull { !it.transpose }?.rhs?.values() ?: DoubleArray(source.rows)
-                        val exact = ExactLpModel(List(source.columns) { column ->
-                            (source.columnStart(column) until source.columnEnd(column)).map { entry ->
-                                ExactLpEntry(source.rowAt(entry), ExactLpNumber.ofIeee(source.valueAt(entry)))
-                            }
-                        }, rhs.map(ExactLpNumber::ofIeee), List(source.columns + source.rows) {
-                            ExactLpColumn(ExactLpBounds())
-                        }, List(source.rows) { ExactLpRow() },
-                            ExactLpObjective(List(source.columns + source.rows) { ExactLpNumber.of(0L) }))
+                        val exact = ExactLpModel(
+                            List(source.columns) { column ->
+                                (source.columnStart(column) until source.columnEnd(column)).map { entry ->
+                                    ExactLpEntry(source.rowAt(entry), ExactLpNumber.ofIeee(source.valueAt(entry)))
+                                }
+                            },
+                            rhs.map(ExactLpNumber::ofIeee),
+                            List(source.columns + source.rows) {
+                                ExactLpColumn(ExactLpBounds())
+                            },
+                            List(source.rows) { ExactLpRow() },
+                            ExactLpObjective(List(source.columns + source.rows) { ExactLpNumber.of(0L) }),
+                        )
                         val model = requireNotNull(LpExactState(exact).toWorkingModel())
                         val statuses = Array(model.numVars) { VarStatus.FREE }
                         current.forEach { statuses[it] = VarStatus.BASIC }
                         val basis = Basis(current.copyOf(), statuses)
                         for (enabled in if (round % 2 == 0) listOf(false, true) else listOf(true, false)) {
-                            val provider: ((ExactBasisAuthority) -> RationalBasisOrder?)? = if (!enabled) null else {
-                                authority ->
-                                authority.meter.charge(16L * source.rows, 768L + 48L * source.rows)
-                                val snapshot = solver.ordering()
-                                if (snapshot == null) {
-                                    authority.meter.orderDecline = ExactBasisOrderDecline.UPDATED
-                                    null
-                                } else {
-                                    check(snapshot.columns.contentEquals(current))
-                                    check(snapshot.unitRows.all { it == -1 })
-                                    RationalBasisOrder(snapshot.rows, snapshot.slots)
-                                }
+                            val provider: ((ExactBasisAuthority) -> RationalBasisOrder?)? = if (!enabled) {
+                                null
+                            } else {
+                                { authority ->
+                                    authority.meter.charge(16L * source.rows, 768L + 48L * source.rows)
+                                    val snapshot = solver.ordering()
+                                    if (snapshot == null) {
+                                        authority.meter.orderDecline = ExactBasisOrderDecline.UPDATED
+                                        null
+                                    } else {
+                                        check(snapshot.columns.contentEquals(current))
+                                        check(snapshot.unitRows.all { it == -1 })
+                                        RationalBasisOrder(snapshot.rows, snapshot.slots)
+                                        }
+                            }
                             }
                             val cache = ExactBasisCache(provider)
                             val id = "trace/$name/$index/$round/$enabled"
                             measured(id, "trace-offer", model, basis, null, cache)
-                            val second = ExactLpModel(List(exact.n) { exact.entries(it) },
+                            val second = ExactLpModel(
+                                List(exact.n) { exact.entries(it) },
                                 List(exact.m) { ExactLpNumber.of(exact.rhs(it).value + BigFraction.ONE) },
-                                List(exact.numVars) { exact.column(it) }, List(exact.m) { exact.row(it) }, exact.objective)
-                            measured("$id/rhs", "trace-rhs", requireNotNull(LpExactState(second).toWorkingModel()), basis, null, cache)
+                                List(exact.numVars) { exact.column(it) },
+                                List(exact.m) { exact.row(it) },
+                                exact.objective,
+                            )
+                            measured(
+                                "$id/rhs",
+                                "trace-rhs",
+                                requireNotNull(LpExactState(second).toWorkingModel()),
+                                basis,
+                                null,
+                                cache,
+                            )
                         }
                     }
                 }
@@ -238,12 +294,65 @@ internal object ExactBasisOrderingCoverage {
         }
     }
 
+    private fun verifyExtensionOrder() {
+        val source = SparseMatrix.ofColumns(
+            2,
+            3,
+            listOf(listOf(1 to 2.0), listOf(0 to 3.0), listOf(0 to 1.0, 1 to 1.0)),
+        )
+        val target = SparseMatrix.ofColumns(
+            3,
+            4,
+            listOf(
+                listOf(0 to 1.0, 1 to 2.0, 2 to 1.0),
+                listOf(0 to 2.0, 1 to 1.0),
+                listOf(1 to 4.0, 2 to 3.0),
+                listOf(1 to 1.0),
+            ),
+        )
+        KotlinBasisSolver(source).use { solver ->
+            assertTrue(solver.refactorize(intArrayOf(0, 1)))
+            val extension = BasisExtension(intArrayOf(0, 1), intArrayOf(-1, -1), intArrayOf(2, 0), intArrayOf(1, 2, 0))
+            val fresh = assertNotNull(solver.extend(target, extension))
+            fresh.solver.use { owner ->
+                val order = assertNotNull(owner.ordering())
+                assertContentEquals(intArrayOf(1, 2, -1), order.columns)
+                assertContentEquals(intArrayOf(-1, -1, 1), order.unitRows)
+                val b = listOf(listOf(2L, 0L, 0L), listOf(1L, 4L, 1L), listOf(0L, 3L, 0L))
+                    .map { it.map(BigFraction::ofLong) }
+                val factors = assertIs<RationalBasisBuild.Ready>(
+                    RationalBasisFactors.factor(b, RationalBasisOrder(order.rows, order.slots)),
+                )
+                assertEquals(0, factors.stats.fallbacks)
+            }
+            val spike = IndexedVector(2).also { it.scatterColumn(source, 2) }
+            solver.ftran(spike)
+            assertEquals(BasisUpdate.APPLIED, solver.update(0, 2, spike))
+            val updated = assertNotNull(
+                solver.extend(
+                    target,
+                    BasisExtension(
+                        intArrayOf(2, 1),
+                        intArrayOf(-1, -1),
+                        intArrayOf(2, 0),
+                        intArrayOf(1, 2, 0),
+                    ),
+                ),
+            )
+            updated.solver.use { assertNull(it.ordering()) }
+        }
+    }
+
     private fun verifyNonsymmetricOrder() {
-        val matrix = SparseMatrix.ofColumns(3, 3, listOf(
-            listOf(0 to 3.0, 1 to 1.0, 2 to 2.0),
-            listOf(0 to 2.0, 1 to 4.0, 2 to 1.0),
-            listOf(0 to 1.0, 1 to 3.0, 2 to 5.0),
-        ))
+        val matrix = SparseMatrix.ofColumns(
+            3,
+            3,
+            listOf(
+                listOf(0 to 3.0, 1 to 1.0, 2 to 2.0),
+                listOf(0 to 2.0, 1 to 4.0, 2 to 1.0),
+                listOf(0 to 1.0, 1 to 3.0, 2 to 5.0),
+            ),
+        )
         KotlinBasisSolver(matrix).use { solver ->
             val headings = intArrayOf(2, 0, 1)
             assertTrue(solver.refactorize(headings))
@@ -323,7 +432,13 @@ internal object ExactBasisOrderingCoverage {
         put("singularRank", exact.singularRank?.let(::JsonPrimitive) ?: JsonNull)
         put("decline", exact.metrics.decline?.name ?: "NONE")
         put("supportRows", exact.conflictSupport?.rows?.map { it.first }?.joinToString(",") ?: "NONE")
-        put("supportSides", exact.conflictSupport?.sides?.joinToString { "${it.column}:${it.upper}:${it.side.number.value}:${it.side.strict}:${it.witness}" } ?: "NONE")
+        put(
+            "supportSides",
+            exact.conflictSupport?.sides?.joinToString {
+                "${it.column}:${it.upper}:${it.side.number.value}:${it.side.strict}:${it.witness}"
+            }
+                ?: "NONE",
+        )
     }
 
     private fun fraction(value: BigFraction): String = "${value.num}/${value.den}"
