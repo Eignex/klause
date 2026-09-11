@@ -29,7 +29,7 @@ internal class LpExactContinuationCache {
 
     fun accountInput(work: Long, allocation: Long, timeNs: Long) {
         continuation?.let {
-            it.account(work, allocation, timeNs);
+            it.account(work, allocation, timeNs)
             return
         }
         inputWork += work
@@ -88,6 +88,7 @@ internal fun captureContinuationTarget(
             work = budget.work,
             allocation = budget.allocation,
             elapsedNs = budget.elapsedNs,
+            phase = budget.phase,
             decline = decline,
             workByPhase = budget.workByPhase.toMap(),
             allocationByPhase = budget.allocationByPhase.toMap(),
@@ -285,11 +286,11 @@ private fun selectContinuation(
     val envelope = admissionLimits(limits)
     val budget = ContinuationBudget(
         envelope.copy(
-        maxWork = (envelope.maxWork - exported.work).coerceAtLeast(0),
-        maxAllocation = (envelope.maxAllocation - exported.allocation).coerceAtLeast(0),
-        maxTimeNs = (envelope.maxTimeNs - exported.elapsedNs).coerceAtLeast(0),
-    ),
-        cancellation
+            maxWork = (envelope.maxWork - exported.work).coerceAtLeast(0),
+            maxAllocation = (envelope.maxAllocation - exported.allocation).coerceAtLeast(0),
+            maxTimeNs = (envelope.maxTimeNs - exported.elapsedNs).coerceAtLeast(0),
+        ),
+        cancellation,
     )
     budget.phase = ContinuationPhase.ADMISSION
     var decline: ContinuationDecline? = null
@@ -341,16 +342,16 @@ private fun selectContinuation(
         combineContinuationMetrics(
             exported,
             ExactContinuationMetrics(
-        work = budget.work,
-        allocation = budget.allocation,
-        elapsedNs = budget.elapsedNs,
-        phase = budget.phase,
-        decline = decline,
-        invalidated = invalidated,
-        workByPhase = budget.workByPhase.toMap(),
-        allocationByPhase = budget.allocationByPhase.toMap(),
-    )
-        )
+                work = budget.work,
+                allocation = budget.allocation,
+                elapsedNs = budget.elapsedNs,
+                phase = budget.phase,
+                decline = decline,
+                invalidated = invalidated,
+                workByPhase = budget.workByPhase.toMap(),
+                allocationByPhase = budget.allocationByPhase.toMap(),
+            ),
+        ),
     )
 }
 

@@ -761,21 +761,21 @@ class LiveLpTheoryTest {
         for (integer in listOf(false, true)) {
             val source = if (integer) {
                 Problem(
-                0,
-                intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(2), null, null),
-                factors = arrayOf(Linear(longArrayOf(1), intArrayOf(0), LinearOp.GE, 1L)),
-            )
+                    0,
+                    intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(2), null, null),
+                    factors = arrayOf(Linear(longArrayOf(1), intArrayOf(0), LinearOp.GE, 1L)),
+                )
             } else {
                 Problem(
-                0,
-                intBounds = IntBounds.fromModelBounds(longArrayOf(), longArrayOf(), null, null),
-                numRealVars = 1,
-                realLower = doubleArrayOf(0.0),
-                realUpper = doubleArrayOf(2.0),
-                factors = arrayOf(
-                    Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0), LinearOp.GE, 1.0),
-                ),
-            )
+                    0,
+                    intBounds = IntBounds.fromModelBounds(longArrayOf(), longArrayOf(), null, null),
+                    numRealVars = 1,
+                    realLower = doubleArrayOf(0.0),
+                    realUpper = doubleArrayOf(2.0),
+                    factors = arrayOf(
+                        Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0), LinearOp.GE, 1.0),
+                    ),
+                )
             }
             val stats = SmtStatsSink()
             ExactLiraSearchComponent(source).use { component ->
@@ -841,7 +841,7 @@ class LiveLpTheoryTest {
     @Test
     fun `a free coordinate restriction replaces a retained reduction before shared branching`() {
         val open = Bits(2).also {
-            it.set(0);
+            it.set(0)
             it.set(1)
         }
         val source = Problem(
@@ -863,13 +863,13 @@ class LiveLpTheoryTest {
             val requests = stats.snapshot().reductionRequests
             val split = assertNotNull(
                 SourceBoundAtom.integerSplit(
-                session,
-                listOf(
-                    SourceBoundTerm(SearchIntValue(0), BigFraction.ONE),
-                    SourceBoundTerm(SearchIntValue(1), BigFraction.ONE),
+                    session,
+                    listOf(
+                        SourceBoundTerm(SearchIntValue(0), BigFraction.ONE),
+                        SourceBoundTerm(SearchIntValue(1), BigFraction.ONE),
+                    ),
+                    BigFraction.ofLong(2),
                 ),
-                BigFraction.ofLong(2),
-            )
             )
             assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Theory(split.negative)))
 
@@ -881,8 +881,8 @@ class LiveLpTheoryTest {
                     val branch = alternatives.first { decision ->
                         val atom = assertIs<SourceBoundAtom>(
                             assertIs<RegisteredTheoryDecision>(
-                            assertIs<SearchDecision.Theory>(decision).decision,
-                        ).payload
+                                assertIs<SearchDecision.Theory>(decision).decision,
+                            ).payload,
                         )
                         val activity = atom.terms.fold(BigFraction.ZERO) { sum, term ->
                             val sourceValue = if (assertIs<SearchIntValue>(term.source).variable == 0) 2L else 1L

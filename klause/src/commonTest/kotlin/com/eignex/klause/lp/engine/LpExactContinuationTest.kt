@@ -160,10 +160,12 @@ class LpExactContinuationTest {
         }
         for (rejected in listOf(LpCertifier.RATIONAL, LpCertifier.EXACT_BASIS)) {
             val result = certifyLpResult(
-                model, solver, null,
+                model,
+                solver,
+                null,
                 policy = LpCertificationPolicy { route, success ->
-                success && route != rejected
-            }
+                    success && route != rejected
+                },
             )
 
             assertEquals(LpVerdict.INDETERMINATE, result.verdict)
@@ -307,10 +309,12 @@ class LpExactContinuationTest {
         }
         for (rejected in listOf(LpCertifier.RATIONAL, LpCertifier.EXACT_FARKAS)) {
             val result = certifyLpResult(
-                model, solver, null,
+                model,
+                solver,
+                null,
                 policy = LpCertificationPolicy { route, success ->
-                success && route != rejected
-            }
+                    success && route != rejected
+                },
             )
 
             assertEquals(LpVerdict.INDETERMINATE, result.verdict)
@@ -351,11 +355,13 @@ class LpExactContinuationTest {
         for (withheld in listOf(LpCertifier.RATIONAL, LpCertifier.EXACT_BASIS)) {
             var rationalCalls = 0
             val result = certifyLpResult(
-                model, solver, null,
+                model,
+                solver,
+                null,
                 policy = LpCertificationPolicy { route, success ->
-                if (route == LpCertifier.RATIONAL) rationalCalls++
-                success && route != withheld
-            }
+                    if (route == LpCertifier.RATIONAL) rationalCalls++
+                    success && route != withheld
+                },
             )
 
             assertTrue(assertNotNull(result.continuation).success)
@@ -381,11 +387,13 @@ class LpExactContinuationTest {
         for (withheld in listOf(LpCertifier.RATIONAL, LpCertifier.EXACT_FARKAS)) {
             var rationalCalls = 0
             val result = certifyLpResult(
-                model, solver, null,
+                model,
+                solver,
+                null,
                 policy = LpCertificationPolicy { route, success ->
-                if (route == LpCertifier.RATIONAL) rationalCalls++
-                success && route != withheld
-            }
+                    if (route == LpCertifier.RATIONAL) rationalCalls++
+                    success && route != withheld
+                },
             )
 
             assertTrue(assertNotNull(result.continuation).success)
@@ -456,7 +464,7 @@ class LpExactContinuationTest {
             override fun solve(warm: Basis?): FloatLpResult? = null
             override fun solvePrimal(warm: Basis?): FloatLpResult? = null
             override fun continuationBasis(model: LpModel): Basis? {
-                exports++;
+                exports++
                 return null
             }
         }
