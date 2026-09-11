@@ -1,18 +1,23 @@
 package com.eignex.klause.lp.bounding
 
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.factor.table.Table
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.lp.cut.SourceCut
+import com.eignex.klause.lp.cut.orNull
 import com.eignex.klause.lp.engine.Cut
 import com.eignex.klause.lp.engine.CutExpression
+import com.eignex.klause.lp.engine.CutInputRow
 import com.eignex.klause.lp.engine.CutPremise
 import com.eignex.klause.lp.engine.CutProofFact
 import com.eignex.klause.lp.engine.CutProvenance
 import com.eignex.klause.lp.engine.CutSource
 import com.eignex.klause.lp.engine.CutSourceKind
+import com.eignex.klause.lp.engine.LpBuilder
 import com.eignex.klause.lp.engine.LpEngineFactory
 import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.LpPricingOptions
@@ -20,9 +25,15 @@ import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.lp.engine.PersistentLpSolver
 import com.eignex.klause.lp.engine.ProductionLpEngineFactory
 import com.eignex.klause.lp.engine.Relation
+import com.eignex.klause.lp.engine.Sense
+import com.eignex.klause.lp.engine.TableauCutProvenance
 import com.eignex.klause.lp.engine.exactBounds
 import com.eignex.klause.lp.engine.exactShift
+import com.eignex.klause.lp.engine.integerFarkasRay
 import com.eignex.klause.lp.relaxation.LpExplanation
+import com.eignex.klause.lp.relaxation.LpRelaxation
+import com.eignex.klause.lp.relaxation.cpCutSources
+import com.eignex.klause.lp.relaxation.withCpBounds
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.CpSearchComponent
 import com.eignex.klause.propagation.PropagationSession
@@ -37,17 +48,21 @@ import com.eignex.klause.util.IntHashSet
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class CpLpAdapterTest {
     @Test
     fun `shared bound changes and pop reuse factors with source equivalent proof views`() {
         val problem = Problem(
-            0, 2, Array(2) { IntDomain(-3, 7) },
+            0,
+            2,
+            Array(2) { IntDomain(-3, 7) },
             arrayOf(
-            Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),
-        )
+                Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),
+            ),
         )
         var constructions = 0
         var rebinds = 0
@@ -108,17 +123,17 @@ class CpLpAdapterTest {
             assertEquals(0, engine.propagator.lastMetrics.initialRefactorizations)
             for (x in 0L..7L) {
                 for (y in -3L..7L) {
-                val column = child.intColOf[0]
-                assertEquals(BigFraction.ZERO, child.model.exactShift(column))
-                assertEquals(BigFraction.ofLong(7), child.model.exactBounds(column).upper?.number?.value)
-                val shifted = longArrayOf(x - child.model.loShift[0], y - child.model.loShift[1])
-                var activity = 0L
-                for (j in shifted.indices) child.model.forEachInColumn(j) { _, a -> activity += a * shifted[j] }
-                assertEquals(x + y >= 1L, activity <= child.model.rhs[0])
-                val objectiveValue = child.model.objConstant + child.objectiveConstant +
-                    shifted.indices.sumOf { child.model.cost[it] * shifted[it] }
-                assertEquals(2 * x + y + 5, objectiveValue)
-            }
+                    val column = child.intColOf[0]
+                    assertEquals(BigFraction.ZERO, child.model.exactShift(column))
+                    assertEquals(BigFraction.ofLong(7), child.model.exactBounds(column).upper?.number?.value)
+                    val shifted = longArrayOf(x - child.model.loShift[0], y - child.model.loShift[1])
+                    var activity = 0L
+                    for (j in shifted.indices) child.model.forEachInColumn(j) { _, a -> activity += a * shifted[j] }
+                    assertEquals(x + y >= 1L, activity <= child.model.rhs[0])
+                    val objectiveValue = child.model.objConstant + child.objectiveConstant +
+                        shifted.indices.sumOf { child.model.cost[it] * shifted[it] }
+                    assertEquals(2 * x + y + 5, objectiveValue)
+                }
             }
             assertEquals(1.0, result.objective)
             shared.popTo(0)
@@ -184,8 +199,8 @@ class CpLpAdapterTest {
             val relaxation = engine.nodeRelaxation(relaxer, cp.session)
             val expression = CutExpression(
                 mapOf(
-                CutSource(CutSourceKind.INTEGER, 0) to BigFraction.ONE,
-            )
+                    CutSource(CutSourceKind.INTEGER, 0) to BigFraction.ONE,
+                ),
             )
             val facts = listOf(
                 CutProofFact(CutPremise.Literal(0), false),
@@ -208,26 +223,26 @@ class CpLpAdapterTest {
             val reason = IntArrayList()
             assertTrue(
                 LpExplanation.addRowPremiseLits(
-                reason,
-                IntHashSet(),
-                cutRelaxation,
-                intArrayOf(cutRelaxation.model.m - 1),
-                cp.session,
-            )
+                    reason,
+                    IntHashSet(),
+                    cutRelaxation,
+                    intArrayOf(cutRelaxation.model.m - 1),
+                    cp.session,
+                ),
             )
             val boundLiteral = cp.session.boundGeLit(0, 1, positive = false)
             assertEquals(setOf(1, boundLiteral), reason.toIntArray().toSet())
             for (guard in listOf(false, true)) {
                 for (x in 0L..2L) {
-                val antecedent = reason.toIntArray().none { literal ->
-                    when (literal) {
-                        1 -> !guard
-                        boundLiteral -> x < 1L
-                        else -> error("unexpected source literal")
+                    val antecedent = reason.toIntArray().none { literal ->
+                        when (literal) {
+                            1 -> !guard
+                            boundLiteral -> x < 1L
+                            else -> error("unexpected source literal")
+                        }
                     }
+                    assertTrue(!antecedent || x >= 1L)
                 }
-                assertTrue(!antecedent || x >= 1L)
-            }
             }
 
             shared.popTo(0)
@@ -248,11 +263,13 @@ class CpLpAdapterTest {
     @Test
     fun `interior domain removal updates auxiliary presence without changed source endpoints`() {
         val problem = Problem(
-            0, 3, arrayOf(IntDomain(0, 4), IntDomain(0, 5), IntDomain(0, 4)),
+            0,
+            3,
+            arrayOf(IntDomain(0, 4), IntDomain(0, 5), IntDomain(0, 4)),
             arrayOf(
-            Table(intArrayOf(0, 1), longArrayOf(0, 5, 2, 2, 4, 0)),
-            AllDifferent(intArrayOf(0, 2), 0, 5),
-        )
+                Table(intArrayOf(0, 1), longArrayOf(0, 5, 2, 2, 4, 0)),
+                AllDifferent(intArrayOf(0, 2), 0, 5),
+            ),
         )
         LpEngine(
             problem,
@@ -306,6 +323,171 @@ class CpLpAdapterTest {
             shared.initialize()
             assertEquals(1L, engine.nodeRelaxation(relaxer, cp.session).model.loShift[0])
             assertEquals(0, assertNotNull(engine.propagator.state).depth)
+        }
+    }
+
+    @Test
+    fun `a cancelled column retains its load bearing live M guard through recursive cuts and siblings`() {
+        val problem = Problem(
+            1, 3, Array(3) { IntDomain(0, 2) },
+            arrayOf(
+            Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),
+            Linear(intArrayOf(1, 1), intArrayOf(1, 2), LinearOp.GE, 1),
+            Linear(intArrayOf(1, 1), intArrayOf(0, 2), LinearOp.GE, 1),
+            ReifiedLinear(0, intArrayOf(1, 1, 1), intArrayOf(0, 1, 2), LinearOp.LE, 1),
+        )
+        )
+        val objective = LinearObjective(intCoefficients = LongArray(3))
+        LpEngine(
+            problem,
+            objective,
+            LpParams(lpPlan = LpPlan(bounding = true)),
+            SolveStatsSink(backend = "live-guard"),
+        ).use { engine ->
+            val cp = CpSearchComponent(PropagationSession(problem))
+            engine.cpAdapter.attach(cp.session, feasibility = false)
+            val shared = SearchSession(listOf(cp, engine.propagator))
+            shared.initialize()
+            for (variable in 0..2) shared.push(SearchDecision.IntAtMost(variable, 1))
+            val relaxer = assertNotNull(engine.lpRelaxer)
+            val live = engine.nodeRelaxation(relaxer, cp.session)
+            val boolColumn = live.boolColOf[0]
+            var row = -1
+            live.model.forEachInColumn(boolColumn) { index, coefficient ->
+                if (coefficient > 0) row = index
+            }
+            assertTrue(row >= 0)
+            assertFalse(live.model.rowGlobal[row])
+            val coefficients = LongArray(live.model.n)
+            for (column in coefficients.indices) {
+                live.model.forEachInColumn(column) { index, value ->
+                if (index == row) coefficients[column] = value
+            }
+            }
+            val rhs = live.model.rhs[row] + coefficients.indices.sumOf { coefficients[it] * live.model.loShift[it] } -
+                coefficients[boolColumn]
+            assertEquals(1L, rhs)
+            val premises = assertNotNull(live.model.rowPremises[row])
+            val facts = premises.vars.indices.map { index ->
+                CutProofFact(
+                    CutPremise.Bound(
+                    CutExpression(mapOf(CutSource(CutSourceKind.INTEGER, premises.vars[index]) to BigFraction.ONE)),
+                    premises.isUpper[index],
+                    BigFraction.ofLong(premises.thresholds[index]),
+                ),
+                    false
+                )
+            } + CutProofFact(CutPremise.Literal(0), false)
+            shared.push(SearchDecision.Bool(0))
+            val active = engine.nodeRelaxation(relaxer, cp.session)
+            val parent = Cut(
+                IntArray(3) { active.intColOf[it] },
+                LongArray(3) { coefficients[live.intColOf[it]] },
+                Relation.LE,
+                rhs,
+                provenance = CutProvenance(problem, 0, facts),
+            )
+            val withParent = relaxer.build(cp.session, listOf(parent))
+            val parentRow = withParent.model.m - 1
+            val recursive = Cut(
+                parent.cols,
+                parent.coeffs,
+                parent.rel,
+                parent.rhs,
+                tableau = TableauCutProvenance(
+                    withParent.model,
+                    emptyList(),
+                    listOf(
+                        CutInputRow(
+                        parentRow,
+                        false,
+                        1,
+                        BigFraction.ofLong(parent.rhs),
+                        parent.rel,
+                        parent.cols,
+                        parent.coeffs,
+                        null,
+                    )
+                    ),
+                    divisor = 1,
+                    mir = false,
+                ),
+            )
+            val source = assertNotNull(SourceCut.fromCut(recursive, withParent).orNull())
+            val child = assertNotNull(
+                source.toCut(
+                assertNotNull(withParent.sourceMap)
+                    .withCpBounds(withParent.model, cp.session),
+            ).orNull()
+            )
+            assertTrue(child.cols.none { withParent.colIsBool[it] })
+            assertTrue(assertNotNull(child.provenance).facts.contains(CutProofFact(CutPremise.Literal(0), false)))
+
+            val builder = LpBuilder()
+            repeat(3) { builder.addVar(0, 1) }
+            builder.addRow(mapOf(0 to -1L, 1 to -1L), Relation.LE, -1)
+            builder.addRow(mapOf(1 to -1L, 2 to -1L), Relation.LE, -1)
+            builder.addRow(mapOf(0 to -1L, 2 to -1L), Relation.LE, -1)
+            builder.addRow(intArrayOf(0, 1, 2), longArrayOf(1, 1, 1), Relation.LE, 1, global = false)
+            val model = builder.build(Sense.MINIMIZE)
+            val proofView = LpRelaxation(
+                model,
+                intArrayOf(0, 1, 2),
+                BooleanArray(3),
+                0,
+                intArrayOf(0, 1, 2),
+                intArrayOf(-1),
+                sourceMap = cpCutSources(
+                    model,
+                    problem,
+                    intArrayOf(0, 1, 2),
+                    BooleanArray(3),
+                    IntArray(3) { -1 },
+                    IntArray(3) { 1 },
+                    mapOf(3 to assertNotNull(child.provenance)),
+                ),
+            )
+            val solved = assertNotNull(engine.solveNode(model, null, Cancellation.Never))
+            assertNull(solved.second)
+            val ray = assertNotNull(integerFarkasRay(model, assertNotNull(solved.first.infeasibleRay)))
+            val clause = assertNotNull(LpExplanation.infeasibilityClause(proofView, ray, cp.session))
+            val boundLiterals = IntArray(3) { cp.session.boundLeLit(it, 1, positive = false) }
+            assertEquals(setOf(1) + boundLiterals.toSet(), clause.toSet())
+            var excludedWithoutGuard = 0
+            for (b in listOf(false, true)) {
+                for (x in 0L..2L) {
+                    for (y in 0L..2L) {
+                        for (z in 0L..2L) {
+                if (x + y < 1 || y + z < 1 || x + z < 1 || b != (x + y + z <= 1)) continue
+                val values = longArrayOf(x, y, z)
+                val boundEscape = boundLiterals.indices.any { values[it] > 1 }
+                assertTrue(!b || boundEscape)
+                assertTrue(
+                    clause.any { literal ->
+                    if (literal == 1) !b else values[boundLiterals.indexOf(literal)] > 1
+                }
+                )
+                if (!boundEscape) excludedWithoutGuard++
+            }
+                    }
+                }
+            }
+            assertTrue(excludedWithoutGuard > 0)
+            engine.recordSearchCuts(listOf(child), DoubleArray(withParent.model.n), withParent, cp.session)
+            assertEquals(1, engine.cutPool.cuts().size)
+            shared.popTo(0)
+            engine.nodeRelaxation(relaxer, cp.session)
+            assertTrue(engine.cutPool.cuts().isEmpty())
+            for (variable in 0..2) shared.push(SearchDecision.IntAtMost(variable, 1))
+            shared.push(SearchDecision.Bool(1))
+            engine.nodeRelaxation(relaxer, cp.session)
+            assertTrue(engine.cutPool.cuts().isEmpty())
+            shared.popTo(0)
+            for (variable in 0..2) shared.push(SearchDecision.IntAtMost(variable, 1))
+            shared.push(SearchDecision.Bool(0))
+            engine.nodeRelaxation(relaxer, cp.session)
+            assertEquals(1, engine.cutPool.cuts().size)
+            assertTrue(engine.cutPool.exportGlobalCuts().isEmpty())
         }
     }
 }

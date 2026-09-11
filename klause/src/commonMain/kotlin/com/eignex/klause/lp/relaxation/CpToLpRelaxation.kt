@@ -173,19 +173,6 @@ internal fun LpRelaxation.gatedEnforcement(session: PropagationSession, out: Boo
     }
 }
 
-/**
- * The same relaxation re-bound to [session]'s live column bounds, reusing the fixed matrix and column
- * maps (see [LpRelaxation.persistentEligible] and [LpModel.rebind]). A CP-var column takes its live
- * domain (or pin); an auxiliary column with a [LpRelaxation.colReq] rule is pinned to `[0, 0]` once any
- * required value has left its variable's live domain, else `[0, present-upper]`. Only valid on an
- * eligible relaxation, which the caller checks before building the persistent relaxation once.
- */
-internal fun LpRelaxation.rebound(session: PropagationSession): LpRelaxation {
-    require(persistentEligible) { "scoped or changing rows require a rebuilt relaxation" }
-    val (lo, hi) = columnBounds(session)
-    return withModel(model.rebind(lo, hi))
-}
-
 internal fun LpRelaxation.columnBounds(session: PropagationSession): Pair<LongArray, LongArray> {
     val n = model.n
     val lo = LongArray(n)

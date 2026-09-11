@@ -96,13 +96,13 @@ class LpBoundingLbTreeSearchTest {
             intDomains = arrayOf(IntDomain(0, 1)),
             factors = arrayOf<Factor>(
                 Linear(
-                intVars = intArrayOf(0),
-                intCoeffs = doubleArrayOf(1.0),
-                realVars = intArrayOf(0),
-                realCoeffs = doubleArrayOf(1.0),
-                op = LinearOp.GE,
-                bound = 1.5,
-            )
+                    intVars = intArrayOf(0),
+                    intCoeffs = doubleArrayOf(1.0),
+                    realVars = intArrayOf(0),
+                    realCoeffs = doubleArrayOf(1.0),
+                    op = LinearOp.GE,
+                    bound = 1.5,
+                ),
             ),
             numRealVars = 1,
             realLower = doubleArrayOf(0.0),

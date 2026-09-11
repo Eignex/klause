@@ -2,6 +2,7 @@ package com.eignex.klause.backtrack.lp
 
 import com.eignex.klause.lp.bounding.LpEngine
 import com.eignex.klause.lp.bounding.LpFractionalBranch
+import com.eignex.klause.lp.bounding.LpParams
 import com.eignex.klause.lp.bounding.solveNode
 import com.eignex.klause.lp.engine.ExactLpNumber
 import com.eignex.klause.lp.engine.LpCertifier
@@ -30,7 +31,15 @@ internal fun LpEngine.lbTreeSearch(objective: LinearObjective, cancellation: Can
     val relaxer = lpRelaxer ?: return null
     // The heuristic has an independent source root; the optimizing caller keeps its own trail.
     val token = Cancellation { cancellation() || params.cancellation() }
-    val dive = LpEngine(problem, objective, params.copy(cancellation = token), sink, solveContext)
+    val diveParams = LpParams(
+        params.lpPlan,
+        params.lpConfig,
+        token,
+        params.solveBudgetMillis,
+        params.randomSeed,
+        params.zeroObjectivePricing,
+    )
+    val dive = LpEngine(problem, objective, diveParams, sink, solveContext)
     return dive.use {
         val cp = CpSearchComponent(PropagationSession(problem, token), branching = CpBranching.None)
         val native = cp.session

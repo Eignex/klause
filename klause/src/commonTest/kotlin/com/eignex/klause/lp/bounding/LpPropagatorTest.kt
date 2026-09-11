@@ -6,6 +6,7 @@ import com.eignex.klause.lp.engine.ExactLpModel
 import com.eignex.klause.lp.engine.ExactLpNumber
 import com.eignex.klause.lp.engine.ExactLpObjective
 import com.eignex.klause.lp.engine.ExactLpSide
+import com.eignex.klause.lp.engine.FloatLpResult
 import com.eignex.klause.lp.engine.LpEngineFactory
 import com.eignex.klause.lp.engine.LpExactState
 import com.eignex.klause.lp.engine.LpModel
@@ -20,9 +21,11 @@ import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class LpPropagatorTest {
@@ -45,13 +48,13 @@ class LpPropagatorTest {
             assertTrue(
                 lp.append(
                     LpScopedRow(
-                0,
-                listOf(0 to one),
-                one,
-                ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(zero))),
-            ),
-                scoped = true
-                )
+                        0,
+                        listOf(0 to one),
+                        one,
+                        ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(zero))),
+                    ),
+                    scoped = true,
+                ),
             )
             assertEquals(BigFraction.ONE, assertNotNull(lp.solve()).witness?.objective)
 
@@ -139,15 +142,81 @@ class LpPropagatorTest {
             assertFalse(
                 lp.append(
                     LpScopedRow(
-                0,
-                listOf(0 to ExactLpNumber.of(1L)),
-                ExactLpNumber.of(0L),
-                ExactLpColumn(ExactLpBounds()),
-            ),
-                scoped = true
-                )
+                        0,
+                        listOf(0 to ExactLpNumber.of(1L)),
+                        ExactLpNumber.of(0L),
+                        ExactLpColumn(ExactLpBounds()),
+                    ),
+                    scoped = true,
+                ),
             )
             assertEquals(ComponentCheck.Indeterminate, lp.check(SearchSession(emptyList())))
         }
+    }
+
+    @Test
+    fun `a throwing solve invalidates its owner and preserves the cleanup failure`() {
+        val primary = IllegalStateException("solve failed")
+        val cleanup = IllegalStateException("close failed")
+        var fail = true
+        var constructions = 0
+        var closes = 0
+        val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+            override fun newPersistentSolver(
+                model: LpModel,
+                cancellation: Cancellation,
+                refactorUpdateLimit: Int,
+                iterationLimit: Int,
+                workLimit: Long,
+                trackDegeneracy: Boolean,
+                pricing: LpPricingOptions,
+            ): PersistentLpSolver {
+                constructions++
+                val delegate = ProductionLpEngineFactory.newPersistentSolver(
+                    model,
+                    cancellation,
+                    refactorUpdateLimit,
+                    iterationLimit,
+                    workLimit,
+                    trackDegeneracy,
+                    pricing,
+                )
+                return object : PersistentLpSolver by delegate {
+                    override fun resolveBounds(): FloatLpResult? {
+                        if (fail) throw primary
+                        return delegate.resolveBounds()
+                    }
+                    override fun close() {
+                        closes++
+                        delegate.close()
+                        if (fail) throw cleanup
+                    }
+                }
+            }
+        }
+        val zero = ExactLpNumber.of(0L)
+        val source = ExactLpModel(
+            listOf(emptyList()),
+            emptyList(),
+            listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(ExactLpNumber.of(1L))))),
+            emptyList(),
+            ExactLpObjective(listOf(zero)),
+        )
+        LpPropagator(object : LpSearchPolicy {}, solveContext = LpSolveContext(factory)).use { lp ->
+            assertTrue(lp.install(Any(), source))
+
+            val thrown = assertFailsWith<IllegalStateException> { lp.solveFloat() }
+
+            assertSame(primary, thrown)
+            assertEquals(listOf(cleanup), thrown.suppressedExceptions)
+            assertEquals(1, closes)
+            assertNull(lp.state)
+            assertNull(lp.solveFloat())
+            fail = false
+            assertTrue(lp.install(Any(), source))
+            assertNotNull(lp.solveFloat()?.second)
+            assertEquals(2, constructions)
+        }
+        assertEquals(2, closes)
     }
 }
