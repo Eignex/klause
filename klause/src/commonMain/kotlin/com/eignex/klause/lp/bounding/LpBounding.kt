@@ -330,6 +330,7 @@ internal fun LpEngine.sparseSafePrune(
     warm: Basis? = null,
     cutsAllowed: Boolean = false,
 ): LpNodeOutcome {
+    if (cancellation()) return LpNodeOutcome(false, null)
     // Gated residual fast path (pure-real satisfaction models): re-solve the persistent, structurally
     // node-invariant gated model with its kept LU factorization — a feasible node (the common case
     // along a dive) costs a few dual pivots instead of a fresh build + factorization. Any other

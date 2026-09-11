@@ -346,7 +346,7 @@ internal class ResumableMinimize(
         check(!closed) { "search is closed" }
         searchSession.popTo(0)
         val seeded = session.reseedFrom(assumptions)
-        lpEngine.cpAdapter.reset()
+        lpEngine.cpAdapter.resetRoot()
         cp.rebase()
         searchSession.resetRootFacts()
         rootIsExhausted = seeded is PropagationResult.Unsat || session.isUnsatAtRoot

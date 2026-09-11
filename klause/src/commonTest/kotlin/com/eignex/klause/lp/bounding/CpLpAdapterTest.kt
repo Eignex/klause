@@ -51,6 +51,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class CpLpAdapterTest {
@@ -152,6 +153,39 @@ class CpLpAdapterTest {
             assertEquals(0, rebinds)
         }
         assertEquals(constructions, closes)
+    }
+
+    @Test
+    fun `cancelled pruning entry preserves authority and performs no solver work`() {
+        val problem = Problem(0, 1, arrayOf(IntDomain(0, 5)), emptyArray())
+        val objective = LinearObjective(intCoefficients = longArrayOf(1))
+        val sink = SolveStatsSink(backend = "cancelled")
+        var cancelled = false
+        val token = Cancellation { cancelled }
+        LpEngine(
+            problem,
+            objective,
+            LpParams(lpPlan = LpPlan(bounding = true), cancellation = token),
+            sink,
+        ).use { engine ->
+            val native = PropagationSession(problem)
+            val relaxer = assertNotNull(engine.lpRelaxer)
+            val root = engine.nodeRelaxation(relaxer, native)
+            assertNotNull(engine.solveNode(root.model, null, token))
+            val authority = engine.propagator.state
+            val metrics = engine.propagator.metrics
+            cancelled = true
+
+            val outcome = engine.sparseSafePrune(relaxer, native, -1.0, sink, token, -1, true)
+
+            assertFalse(outcome.prune)
+            assertNull(outcome.basis)
+            assertSame(authority, engine.propagator.state)
+            assertEquals(metrics, engine.propagator.metrics)
+            cancelled = false
+            assertNotNull(engine.solveNode(root.model, null, token)?.second)
+            assertEquals(0, engine.propagator.lastMetrics.initialRefactorizations)
+        }
     }
 
     @Test
@@ -316,12 +350,17 @@ class CpLpAdapterTest {
             val shared = SearchSession(listOf(cp, engine.propagator))
             shared.initialize()
             val relaxer = assertNotNull(engine.lpRelaxer)
-            assertEquals(4L, engine.nodeRelaxation(relaxer, cp.session).model.loShift[0])
+            val before = engine.nodeRelaxation(relaxer, cp.session)
+            assertEquals(4.0, assertNotNull(engine.solveNode(before.model, null, Cancellation.Never)?.second).objective)
             cp.session.reseedFrom(Assumptions(ints = mapOf(0 to 1L)))
             cp.rebase()
             shared.resetRootFacts()
             shared.initialize()
-            assertEquals(1L, engine.nodeRelaxation(relaxer, cp.session).model.loShift[0])
+            val after = engine.nodeRelaxation(relaxer, cp.session)
+            assertEquals(1L, after.model.loShift[0])
+            assertEquals(1.0, assertNotNull(engine.solveNode(after.model, null, Cancellation.Never)?.second).objective)
+            assertEquals(1L, assertNotNull(engine.propagator.metrics).createdOwners)
+            assertEquals(0, engine.propagator.lastMetrics.initialRefactorizations)
             assertEquals(0, assertNotNull(engine.propagator.state).depth)
         }
     }
@@ -329,13 +368,15 @@ class CpLpAdapterTest {
     @Test
     fun `a cancelled column retains its load bearing live M guard through recursive cuts and siblings`() {
         val problem = Problem(
-            1, 3, Array(3) { IntDomain(0, 2) },
+            1,
+            3,
+            Array(3) { IntDomain(0, 2) },
             arrayOf(
-            Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),
-            Linear(intArrayOf(1, 1), intArrayOf(1, 2), LinearOp.GE, 1),
-            Linear(intArrayOf(1, 1), intArrayOf(0, 2), LinearOp.GE, 1),
-            ReifiedLinear(0, intArrayOf(1, 1, 1), intArrayOf(0, 1, 2), LinearOp.LE, 1),
-        )
+                Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),
+                Linear(intArrayOf(1, 1), intArrayOf(1, 2), LinearOp.GE, 1),
+                Linear(intArrayOf(1, 1), intArrayOf(0, 2), LinearOp.GE, 1),
+                ReifiedLinear(0, intArrayOf(1, 1, 1), intArrayOf(0, 1, 2), LinearOp.LE, 1),
+            ),
         )
         val objective = LinearObjective(intCoefficients = LongArray(3))
         LpEngine(
@@ -361,8 +402,8 @@ class CpLpAdapterTest {
             val coefficients = LongArray(live.model.n)
             for (column in coefficients.indices) {
                 live.model.forEachInColumn(column) { index, value ->
-                if (index == row) coefficients[column] = value
-            }
+                    if (index == row) coefficients[column] = value
+                }
             }
             val rhs = live.model.rhs[row] + coefficients.indices.sumOf { coefficients[it] * live.model.loShift[it] } -
                 coefficients[boolColumn]
@@ -371,11 +412,11 @@ class CpLpAdapterTest {
             val facts = premises.vars.indices.map { index ->
                 CutProofFact(
                     CutPremise.Bound(
-                    CutExpression(mapOf(CutSource(CutSourceKind.INTEGER, premises.vars[index]) to BigFraction.ONE)),
-                    premises.isUpper[index],
-                    BigFraction.ofLong(premises.thresholds[index]),
-                ),
-                    false
+                        CutExpression(mapOf(CutSource(CutSourceKind.INTEGER, premises.vars[index]) to BigFraction.ONE)),
+                        premises.isUpper[index],
+                        BigFraction.ofLong(premises.thresholds[index]),
+                    ),
+                    false,
                 )
             } + CutProofFact(CutPremise.Literal(0), false)
             shared.push(SearchDecision.Bool(0))
@@ -399,15 +440,15 @@ class CpLpAdapterTest {
                     emptyList(),
                     listOf(
                         CutInputRow(
-                        parentRow,
-                        false,
-                        1,
-                        BigFraction.ofLong(parent.rhs),
-                        parent.rel,
-                        parent.cols,
-                        parent.coeffs,
-                        null,
-                    )
+                            parentRow,
+                            false,
+                            1,
+                            BigFraction.ofLong(parent.rhs),
+                            parent.rel,
+                            parent.cols,
+                            parent.coeffs,
+                            null,
+                        ),
                     ),
                     divisor = 1,
                     mir = false,
@@ -416,9 +457,9 @@ class CpLpAdapterTest {
             val source = assertNotNull(SourceCut.fromCut(recursive, withParent).orNull())
             val child = assertNotNull(
                 source.toCut(
-                assertNotNull(withParent.sourceMap)
-                    .withCpBounds(withParent.model, cp.session),
-            ).orNull()
+                    assertNotNull(withParent.sourceMap)
+                        .withCpBounds(withParent.model, cp.session),
+                ).orNull(),
             )
             assertTrue(child.cols.none { withParent.colIsBool[it] })
             assertTrue(assertNotNull(child.provenance).facts.contains(CutProofFact(CutPremise.Literal(0), false)))
@@ -458,17 +499,17 @@ class CpLpAdapterTest {
                 for (x in 0L..2L) {
                     for (y in 0L..2L) {
                         for (z in 0L..2L) {
-                if (x + y < 1 || y + z < 1 || x + z < 1 || b != (x + y + z <= 1)) continue
-                val values = longArrayOf(x, y, z)
-                val boundEscape = boundLiterals.indices.any { values[it] > 1 }
-                assertTrue(!b || boundEscape)
-                assertTrue(
-                    clause.any { literal ->
-                    if (literal == 1) !b else values[boundLiterals.indexOf(literal)] > 1
-                }
-                )
-                if (!boundEscape) excludedWithoutGuard++
-            }
+                            if (x + y < 1 || y + z < 1 || x + z < 1 || b != (x + y + z <= 1)) continue
+                            val values = longArrayOf(x, y, z)
+                            val boundEscape = boundLiterals.indices.any { values[it] > 1 }
+                            assertTrue(!b || boundEscape)
+                            assertTrue(
+                                clause.any { literal ->
+                                    if (literal == 1) !b else values[boundLiterals.indexOf(literal)] > 1
+                                },
+                            )
+                            if (!boundEscape) excludedWithoutGuard++
+                        }
                     }
                 }
             }

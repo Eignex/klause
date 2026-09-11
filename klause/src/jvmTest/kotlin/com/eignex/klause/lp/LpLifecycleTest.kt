@@ -28,6 +28,7 @@ import com.eignex.klause.lp.engine.LpBuilder
 import com.eignex.klause.lp.engine.LpCertificationObserver
 import com.eignex.klause.lp.engine.LpCertificationPolicy
 import com.eignex.klause.lp.engine.LpEngineFactory
+import com.eignex.klause.lp.engine.LpExactState
 import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.LpNeighborhood
 import com.eignex.klause.lp.engine.LpPricingOptions
@@ -194,7 +195,21 @@ private class LifecycleFactory : LpEngineFactory {
             pricing,
         )
         val record = record(LifecycleKind.PERSISTENT)
-        return object : PersistentLpSolver, LpSolver by delegate {
+        return object : PersistentLpSolver by delegate {
+            override fun prepareLogicals(token: Cancellation): Basis? {
+                record.use()
+                return try {
+                    delegate.prepareLogicals(token)
+                } finally {
+                    record.factorizations += delegate.lastRefactorizations
+                }
+            }
+
+            override fun adopt(state: LpExactState, token: Cancellation): Boolean {
+                record.use()
+                return delegate.adopt(state, token)
+            }
+
             override fun solve(warm: Basis?): FloatLpResult? = record.solve(delegate) { delegate.solve(warm) }
 
             override fun rebind(next: LpModel, token: Cancellation): Boolean {
@@ -463,7 +478,7 @@ class LpLifecycleTest {
     }
 
     @Test
-    fun `failed acquisition retains ownership of the current solver`() {
+    fun `failed source epoch acquisition releases the displaced solver`() {
         val factory = LifecycleFactory().also { it.failPersistentAcquisitionAt = 2 }
         val engine = reifiedEngine(factory)
         engine.pruneNode(PropagationSession(reifiedProblem()), Double.POSITIVE_INFINITY, -1, true)
@@ -473,7 +488,7 @@ class LpLifecycleTest {
             engine.pruneNode(pinned, Double.POSITIVE_INFINITY, -1, true)
         }
 
-        assertFalse(factory.persistent.single().closed)
+        assertTrue(factory.persistent.single().closed)
         engine.close()
         factory.assertAllClosed()
     }

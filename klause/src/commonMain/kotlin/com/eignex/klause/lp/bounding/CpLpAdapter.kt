@@ -39,8 +39,8 @@ internal class CpLpAdapter(private val engine: LpEngine) : LpSearchPolicy {
     }
 
     override fun initialize(context: SearchContext) {
+        if (native === sharedNative && (shared == null || shared === context)) resetRoot() else reset()
         shared = context
-        reset()
     }
 
     override fun propagate(context: SearchContext): ComponentResult {
@@ -63,6 +63,11 @@ internal class CpLpAdapter(private val engine: LpEngine) : LpSearchPolicy {
     fun localModel() {
         persistentState = false
         currentModel = null
+    }
+
+    fun resetRoot() {
+        currentModel = null
+        if (!persistentState || !engine.propagator.resetRoot()) reset()
     }
 
     fun reset() {
@@ -101,8 +106,8 @@ internal class CpLpAdapter(private val engine: LpEngine) : LpSearchPolicy {
         }
         // Standalone callers may replace a root or sibling without delivering shared retract events.
         if (weakens) {
-            core.reset()
-            if (!core.install(base, base.model.trailModel() ?: return null) || !core.atLevel(depth)) return null
+            if (!core.resetRoot() && !core.install(base, base.model.trailModel() ?: return null)) return null
+            if (!core.atLevel(depth)) return null
         }
         for (column in lower.indices) {
             val origin = requireNotNull(core.state).model.column(column).origin.value

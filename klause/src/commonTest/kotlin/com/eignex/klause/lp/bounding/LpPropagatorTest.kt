@@ -219,4 +219,89 @@ class LpPropagatorTest {
         }
         assertEquals(2, closes)
     }
+
+    @Test
+    fun `root restoration retains the installation authority across owner release`() {
+        val zero = ExactLpNumber.of(0L)
+        val source = ExactLpModel(
+            listOf(emptyList()),
+            emptyList(),
+            listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(ExactLpNumber.of(5L))))),
+            emptyList(),
+            ExactLpObjective(listOf(ExactLpNumber.of(1L))),
+        )
+        LpPropagator(object : LpSearchPolicy {}).use { lp ->
+            assertTrue(lp.install(Any(), source))
+            assertTrue(lp.assertBound(0, false, ExactLpSide(ExactLpNumber.of(3L))))
+            assertEquals(BigFraction.ofLong(3), assertNotNull(lp.solve()).witness?.objective)
+            lp.releaseSolver()
+
+            assertTrue(lp.resetRoot())
+
+            assertTrue(source.sameAuthority(assertNotNull(lp.state).model))
+            assertTrue(assertNotNull(lp.state).assertions.isEmpty())
+            assertEquals(BigFraction.ZERO, assertNotNull(lp.solve()).witness?.objective)
+        }
+    }
+
+    @Test
+    fun `an unavailable root reset invalidates bound authority`() {
+        for (cancelled in listOf(false, true)) {
+            var fail = false
+            var closes = 0
+            val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+                override fun newPersistentSolver(
+                    model: LpModel,
+                    cancellation: Cancellation,
+                    refactorUpdateLimit: Int,
+                    iterationLimit: Int,
+                    workLimit: Long,
+                    trackDegeneracy: Boolean,
+                    pricing: LpPricingOptions,
+                ): PersistentLpSolver {
+                    val delegate = ProductionLpEngineFactory.newPersistentSolver(
+                        model,
+                        cancellation,
+                        refactorUpdateLimit,
+                        iterationLimit,
+                        workLimit,
+                        trackDegeneracy,
+                        pricing,
+                    )
+                    return object : PersistentLpSolver by delegate {
+                        override fun adopt(state: LpExactState, token: Cancellation): Boolean =
+                            !(fail && !cancelled) && delegate.adopt(state, token)
+                        override fun close() {
+                            closes++
+                            delegate.close()
+                        }
+                    }
+                }
+            }
+            val zero = ExactLpNumber.of(0L)
+            val source = ExactLpModel(
+                listOf(emptyList()),
+                emptyList(),
+                listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(ExactLpNumber.of(5L))))),
+                emptyList(),
+                ExactLpObjective(listOf(ExactLpNumber.of(1L))),
+            )
+            LpPropagator(
+                object : LpSearchPolicy {},
+                solveContext = LpSolveContext(factory),
+                cancellation = Cancellation { fail && cancelled },
+            ).use { lp ->
+                assertTrue(lp.install(Any(), source))
+                assertNotNull(lp.solve())
+                assertTrue(lp.assertBound(0, false, ExactLpSide(ExactLpNumber.of(3L))))
+                fail = true
+
+                assertFalse(lp.resetRoot())
+
+                assertNull(lp.state)
+                assertNull(lp.solve())
+                assertEquals(1, closes)
+            }
+        }
+    }
 }
