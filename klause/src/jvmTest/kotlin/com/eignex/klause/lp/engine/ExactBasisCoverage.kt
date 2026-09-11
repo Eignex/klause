@@ -34,8 +34,8 @@ internal object ExactBasisCoverage {
                 ""
             } else {
                 Files.readString(
-                root.resolve("klause-bench/smoke-corpus/$input"),
-            )
+                    root.resolve("klause-bench/smoke-corpus/$input"),
+                )
             }
             val model = if (input.startsWith("boundary/")) {
                 val rows = if (input == "boundary/49-diagonal") 49 else 129
@@ -54,9 +54,9 @@ internal object ExactBasisCoverage {
                 if (parsed.model.numBoolVars != 0) {
                     println(
                         buildJsonObject {
-                        put("input", input);
-                        put("ineligible", "BOOLEAN_BRANCH")
-                    }
+                            put("input", input)
+                            put("ineligible", "BOOLEAN_BRANCH")
+                        },
                     )
                     continue
                 }
@@ -66,9 +66,9 @@ internal object ExactBasisCoverage {
             if (model == null) {
                 println(
                     buildJsonObject {
-                    put("input", input);
-                    put("ineligible", "SOURCE_PROJECTION")
-                }
+                        put("input", input)
+                        put("ineligible", "SOURCE_PROJECTION")
+                    },
                 )
                 continue
             }
@@ -93,23 +93,23 @@ internal object ExactBasisCoverage {
                 certified.farkasRay?.let { check(sourceFarkasValid(model, it)) }
                 println(
                     buildJsonObject {
-                    put("input", input)
-                    put("role", "live-verdict")
-                    put("verdict", certified.verdict.name)
-                    put("rows", model.m)
-                    put("columns", model.numVars)
-                    put("pivots", solver.lastPivots)
-                    put("floatWork", solver.lastWorkOps)
-                    put("reconstructionWork", certified.reconstruction?.work ?: 0L)
-                    put("reconstructionAllocation", certified.reconstruction?.allocation ?: 0L)
-                }
+                        put("input", input)
+                        put("role", "live-verdict")
+                        put("verdict", certified.verdict.name)
+                        put("rows", model.m)
+                        put("columns", model.numVars)
+                        put("pivots", solver.lastPivots)
+                        put("floatWork", solver.lastWorkOps)
+                        put("reconstructionWork", certified.reconstruction?.work ?: 0L)
+                        put("reconstructionAllocation", certified.reconstruction?.allocation ?: 0L)
+                    },
                 )
                 if (basis == null) {
                     println(
                         buildJsonObject {
-                        put("input", input);
-                        put("ineligible", "NO_CANDIDATE_BASIS")
-                    }
+                            put("input", input)
+                            put("ineligible", "NO_CANDIDATE_BASIS")
+                        },
                     )
                 } else {
                     println(authority(input, model, basis))
@@ -158,16 +158,16 @@ internal object ExactBasisCoverage {
         put(
             "operations",
             buildJsonObject {
-            for (operation in metrics.operations) {
-                put(
-                    operation.phase.name,
-                    buildJsonObject {
-                put("work", operation.work)
-                put("allocation", operation.allocation)
-            }
-                )
-            }
-        }
+                for (operation in metrics.operations) {
+                    put(
+                        operation.phase.name,
+                        buildJsonObject {
+                            put("work", operation.work)
+                            put("allocation", operation.allocation)
+                        },
+                    )
+                }
+            },
         )
     }
 
@@ -211,17 +211,17 @@ internal object ExactBasisCoverage {
             "lower",
             JsonArray(
                 bounds.map {
-            it.lower?.let { side -> JsonPrimitive(fraction(side.number.value)) } ?: JsonNull
-        }
-            )
+                    it.lower?.let { side -> JsonPrimitive(fraction(side.number.value)) } ?: JsonNull
+                },
+            ),
         )
         put(
             "upper",
             JsonArray(
                 bounds.map {
-            it.upper?.let { side -> JsonPrimitive(fraction(side.number.value)) } ?: JsonNull
-        }
-            )
+                    it.upper?.let { side -> JsonPrimitive(fraction(side.number.value)) } ?: JsonNull
+                },
+            ),
         )
         put("lowerStrict", JsonArray(bounds.map { JsonPrimitive(it.lower?.strict == true) }))
         put("upperStrict", JsonArray(bounds.map { JsonPrimitive(it.upper?.strict == true) }))
