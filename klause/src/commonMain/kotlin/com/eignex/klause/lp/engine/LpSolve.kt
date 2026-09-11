@@ -1,8 +1,8 @@
 package com.eignex.klause.lp.engine
 
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.simplex.exact.ContinuationDecline
 import com.eignex.klause.simplex.exact.BigRationalConflict
+import com.eignex.klause.simplex.exact.ContinuationDecline
 import com.eignex.klause.simplex.exact.ExactContinuationLimits
 import com.eignex.klause.simplex.exact.ExactContinuationMetrics
 import com.eignex.klause.simplex.exact.ExactSimplexBound
@@ -340,8 +340,8 @@ internal fun certifyLpResult(
     }
     if (continued == null) {
         capturedTarget?.let {
-        observer?.observeContinuation(it.metrics)
-    }
+            observer?.observeContinuation(it.metrics)
+        }
     }
     if (ray != null || conflict != null) bound = null
     val unboundedness = if (bound == null && witness != null) {

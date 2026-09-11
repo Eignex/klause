@@ -21,9 +21,11 @@ class LpScopedSolverTest {
     fun `cancelled publication retains continuation cost without exposing its witness`() {
         val zero = ExactLpNumber.of(0L)
         val source = ExactLpModel(
-            listOf(listOf(ExactLpEntry(0, ExactLpNumber.of(1L)))), listOf(ExactLpNumber.of(1L)),
+            listOf(listOf(ExactLpEntry(0, ExactLpNumber.of(1L)))),
+            listOf(ExactLpNumber.of(1L)),
             listOf(ExactLpColumn(ExactLpBounds()), ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(zero)))),
-            listOf(ExactLpRow()), ExactLpObjective(listOf(zero, zero)),
+            listOf(ExactLpRow()),
+            ExactLpObjective(listOf(zero, zero)),
         )
         var cancelled = false
         var observed: ExactContinuationMetrics? = null

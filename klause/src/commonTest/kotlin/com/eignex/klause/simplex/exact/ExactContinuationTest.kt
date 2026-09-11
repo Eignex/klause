@@ -6,16 +6,18 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
-import kotlin.test.assertTrue
 
 class ExactContinuationTest {
     @Test
     fun `higher effort resumes the same feasible tableau`() {
         val n = 4
         val input = ExactContinuationInput(
-            List(n) { listOf(it to BigFraction.MINUS_ONE) }, List(n) { BigFraction.MINUS_ONE },
-            List(2 * n) { BigFraction.ZERO }, List(2 * n) { null },
-            List(n) { n + it }, List(2 * n) { if (it < n) ContinuationStatus.LOWER else ContinuationStatus.BASIC },
+            List(n) { listOf(it to BigFraction.MINUS_ONE) },
+            List(n) { BigFraction.MINUS_ONE },
+            List(2 * n) { BigFraction.ZERO },
+            List(2 * n) { null },
+            List(n) { n + it },
+            List(2 * n) { if (it < n) ContinuationStatus.LOWER else ContinuationStatus.BASIC },
         )
         val session = ExactContinuation(input)
 
@@ -34,9 +36,12 @@ class ExactContinuationTest {
     @Test
     fun `ordered import keeps native free upper only and fixed coordinates`() {
         val input = ExactContinuationInput(
-            listOf(listOf(0 to BigFraction.ONE), listOf(0 to BigFraction.ONE)), listOf(BigFraction.ofLong(-3)),
-            listOf(null, null, BigFraction.ZERO), listOf(null, BigFraction.ofLong(-2), BigFraction.ZERO),
-            listOf(0), listOf(ContinuationStatus.BASIC, ContinuationStatus.UPPER, ContinuationStatus.FIXED),
+            listOf(listOf(0 to BigFraction.ONE), listOf(0 to BigFraction.ONE)),
+            listOf(BigFraction.ofLong(-3)),
+            listOf(null, null, BigFraction.ZERO),
+            listOf(null, BigFraction.ofLong(-2), BigFraction.ZERO),
+            listOf(0),
+            listOf(ContinuationStatus.BASIC, ContinuationStatus.UPPER, ContinuationStatus.FIXED),
         )
 
         val result = ExactContinuation(input).resume()
@@ -51,10 +56,15 @@ class ExactContinuationTest {
     fun `dependent target columns retain a logical complement`() {
         val input = ExactContinuationInput(
             List(2) { listOf(0 to BigFraction.ONE, 1 to BigFraction.ONE) },
-            List(2) { BigFraction.ONE }, List(4) { BigFraction.ZERO }, List(4) { null },
+            List(2) { BigFraction.ONE },
+            List(4) { BigFraction.ZERO },
+            List(4) { null },
             listOf(1, 0),
             listOf(
-                ContinuationStatus.BASIC, ContinuationStatus.BASIC, ContinuationStatus.LOWER, ContinuationStatus.LOWER,
+                ContinuationStatus.BASIC,
+                ContinuationStatus.BASIC,
+                ContinuationStatus.LOWER,
+                ContinuationStatus.LOWER,
             ),
         )
 
@@ -70,10 +80,16 @@ class ExactContinuationTest {
     @Test
     fun `nonsingular target order is retained after seating permutations`() {
         val input = ExactContinuationInput(
-            listOf(listOf(0 to BigFraction.ONE), listOf(1 to BigFraction.ONE)), List(2) { BigFraction.ONE },
-            List(4) { BigFraction.ZERO }, List(4) { null }, listOf(1, 0),
+            listOf(listOf(0 to BigFraction.ONE), listOf(1 to BigFraction.ONE)),
+            List(2) { BigFraction.ONE },
+            List(4) { BigFraction.ZERO },
+            List(4) { null },
+            listOf(1, 0),
             listOf(
-                ContinuationStatus.BASIC, ContinuationStatus.BASIC, ContinuationStatus.LOWER, ContinuationStatus.LOWER,
+                ContinuationStatus.BASIC,
+                ContinuationStatus.BASIC,
+                ContinuationStatus.LOWER,
+                ContinuationStatus.LOWER,
             ),
         )
 
@@ -87,9 +103,12 @@ class ExactContinuationTest {
     fun `oversized rational import uses exact source values`() {
         val large = BigFraction.of(BigInteger.ONE shl 180, BigInteger.ONE)
         val input = ExactContinuationInput(
-            listOf(listOf(0 to large)), listOf(BigFraction.ONE),
-            listOf(null, BigFraction.ZERO), listOf(null, BigFraction.ZERO),
-            listOf(0), listOf(ContinuationStatus.BASIC, ContinuationStatus.FIXED),
+            listOf(listOf(0 to large)),
+            listOf(BigFraction.ONE),
+            listOf(null, BigFraction.ZERO),
+            listOf(null, BigFraction.ZERO),
+            listOf(0),
+            listOf(ContinuationStatus.BASIC, ContinuationStatus.FIXED),
         )
 
         val result = ExactContinuation(input).resume()
@@ -102,8 +121,11 @@ class ExactContinuationTest {
     @Test
     fun `cancelled import does not lose its completed checkpoint`() {
         val input = ExactContinuationInput(
-            listOf(listOf(0 to BigFraction.ONE)), listOf(BigFraction.ONE),
-            List(2) { BigFraction.ZERO }, List(2) { null }, listOf(0),
+            listOf(listOf(0 to BigFraction.ONE)),
+            listOf(BigFraction.ONE),
+            List(2) { BigFraction.ZERO },
+            List(2) { null },
+            listOf(0),
             listOf(ContinuationStatus.BASIC, ContinuationStatus.LOWER),
         )
         val session = ExactContinuation(input)
@@ -119,10 +141,16 @@ class ExactContinuationTest {
     @Test
     fun `import limit resumes seating without rebuilding`() {
         val input = ExactContinuationInput(
-            listOf(listOf(0 to BigFraction.ONE), listOf(1 to BigFraction.ONE)), List(2) { BigFraction.ONE },
-            List(4) { BigFraction.ZERO }, List(4) { null }, listOf(1, 0),
+            listOf(listOf(0 to BigFraction.ONE), listOf(1 to BigFraction.ONE)),
+            List(2) { BigFraction.ONE },
+            List(4) { BigFraction.ZERO },
+            List(4) { null },
+            listOf(1, 0),
             listOf(
-                ContinuationStatus.BASIC, ContinuationStatus.BASIC, ContinuationStatus.LOWER, ContinuationStatus.LOWER,
+                ContinuationStatus.BASIC,
+                ContinuationStatus.BASIC,
+                ContinuationStatus.LOWER,
+                ContinuationStatus.LOWER,
             ),
         )
         val session = ExactContinuation(input)
@@ -136,15 +164,21 @@ class ExactContinuationTest {
         assertEquals(1, last.metrics.imports)
         assertEquals(listOf(1, 0), last.headings)
     }
+
     @Test
     fun `overflow during a pivot discards partial import and charges both builds`() {
         val huge = BigFraction.of(BigInteger.ONE shl 100, BigInteger.ONE)
         val input = ExactContinuationInput(
             listOf(listOf(0 to huge, 1 to BigFraction.ONE), listOf(0 to BigFraction.ONE, 1 to huge)),
-            List(2) { BigFraction.ONE }, List(4) { BigFraction.ZERO },
-            listOf(null, null, BigFraction.ZERO, BigFraction.ZERO), listOf(0, 1),
+            List(2) { BigFraction.ONE },
+            List(4) { BigFraction.ZERO },
+            listOf(null, null, BigFraction.ZERO, BigFraction.ZERO),
+            listOf(0, 1),
             listOf(
-                ContinuationStatus.BASIC, ContinuationStatus.BASIC, ContinuationStatus.FIXED, ContinuationStatus.FIXED,
+                ContinuationStatus.BASIC,
+                ContinuationStatus.BASIC,
+                ContinuationStatus.FIXED,
+                ContinuationStatus.FIXED,
             ),
         )
 
@@ -161,8 +195,11 @@ class ExactContinuationTest {
     @Test
     fun `resource ceilings decline without certifying a candidate`() {
         val input = ExactContinuationInput(
-            listOf(listOf(0 to BigFraction.ONE)), listOf(BigFraction.ONE),
-            List(2) { BigFraction.ZERO }, List(2) { null }, listOf(0),
+            listOf(listOf(0 to BigFraction.ONE)),
+            listOf(BigFraction.ONE),
+            List(2) { BigFraction.ZERO },
+            List(2) { null },
+            listOf(0),
             listOf(ContinuationStatus.BASIC, ContinuationStatus.LOWER),
         )
         val cases = listOf(
@@ -183,8 +220,11 @@ class ExactContinuationTest {
     @Test
     fun `fixed nonbasics cannot repair an impossible row`() {
         val input = ExactContinuationInput(
-            listOf(listOf(0 to BigFraction.ONE)), listOf(BigFraction.ONE),
-            List(2) { BigFraction.ZERO }, List(2) { BigFraction.ZERO }, listOf(1),
+            listOf(listOf(0 to BigFraction.ONE)),
+            listOf(BigFraction.ONE),
+            List(2) { BigFraction.ZERO },
+            List(2) { BigFraction.ZERO },
+            listOf(1),
             listOf(ContinuationStatus.FIXED, ContinuationStatus.BASIC),
         )
 
@@ -199,8 +239,11 @@ class ExactContinuationTest {
     fun `free nonbasics move in either direction during feasibility`() {
         for (rhs in listOf(BigFraction.ONE, BigFraction.MINUS_ONE)) {
             val input = ExactContinuationInput(
-                listOf(listOf(0 to BigFraction.ONE)), listOf(rhs),
-                listOf(null, BigFraction.ZERO), listOf(null, BigFraction.ZERO), listOf(1),
+                listOf(listOf(0 to BigFraction.ONE)),
+                listOf(rhs),
+                listOf(null, BigFraction.ZERO),
+                listOf(null, BigFraction.ZERO),
+                listOf(1),
                 listOf(ContinuationStatus.FREE, ContinuationStatus.BASIC),
             )
 
@@ -214,8 +257,11 @@ class ExactContinuationTest {
     @Test
     fun `an exhausted slice does not buy additional pivots on repeat`() {
         val input = ExactContinuationInput(
-            List(3) { listOf(it to BigFraction.MINUS_ONE) }, List(3) { BigFraction.MINUS_ONE },
-            List(6) { BigFraction.ZERO }, List(6) { null }, listOf(3, 4, 5),
+            List(3) { listOf(it to BigFraction.MINUS_ONE) },
+            List(3) { BigFraction.MINUS_ONE },
+            List(6) { BigFraction.ZERO },
+            List(6) { null },
+            listOf(3, 4, 5),
             List(6) { if (it < 3) ContinuationStatus.LOWER else ContinuationStatus.BASIC },
         )
         val session = ExactContinuation(input)
@@ -233,15 +279,25 @@ class ExactContinuationTest {
     @Test
     fun `cancellation during import preserves the last complete pivot`() {
         val input = ExactContinuationInput(
-            listOf(listOf(0 to BigFraction.ONE), listOf(1 to BigFraction.ONE)), List(2) { BigFraction.ONE },
-            List(4) { BigFraction.ZERO }, List(4) { null }, listOf(1, 0),
+            listOf(listOf(0 to BigFraction.ONE), listOf(1 to BigFraction.ONE)),
+            List(2) { BigFraction.ONE },
+            List(4) { BigFraction.ZERO },
+            List(4) { null },
+            listOf(1, 0),
             listOf(
-                ContinuationStatus.BASIC, ContinuationStatus.BASIC, ContinuationStatus.LOWER, ContinuationStatus.LOWER,
+                ContinuationStatus.BASIC,
+                ContinuationStatus.BASIC,
+                ContinuationStatus.LOWER,
+                ContinuationStatus.LOWER,
             ),
         )
         var checkpoints = 0
         ExactContinuation(input).resume(
-            ExactContinuationLimits(maxImportPivots = 1), Cancellation { checkpoints++; false },
+            ExactContinuationLimits(maxImportPivots = 1),
+            Cancellation {
+                checkpoints++;
+                false
+            },
         )
         val session = ExactContinuation(input)
         var calls = 0
@@ -262,20 +318,28 @@ class ExactContinuationTest {
         val h = BigFraction.ofLong(1L shl 20)
         val input = ExactContinuationInput(
             listOf(listOf(0 to h, 1 to BigFraction.ONE), listOf(0 to BigFraction.ONE, 1 to h)),
-            List(2) { BigFraction.ONE }, List(4) { BigFraction.ZERO },
+            List(2) { BigFraction.ONE },
+            List(4) { BigFraction.ZERO },
             listOf(null, null, BigFraction.ZERO, BigFraction.ZERO),
             listOf(0, 1),
             listOf(
-                ContinuationStatus.BASIC, ContinuationStatus.BASIC, ContinuationStatus.FIXED, ContinuationStatus.FIXED,
+                ContinuationStatus.BASIC,
+                ContinuationStatus.BASIC,
+                ContinuationStatus.FIXED,
+                ContinuationStatus.FIXED,
             ),
         )
 
-        val result = ExactContinuation(input).resume(ExactContinuationLimits(maxBits = 24))
+        for (resumed in listOf(false, true)) {
+            val session = ExactContinuation(input)
+            if (resumed) assertNotNull(session.resume().values)
 
-        assertEquals(ContinuationDecline.BITS, result.metrics.decline)
-        assertEquals(ContinuationPhase.IMPORT, result.metrics.phase)
-        assertNull(result.values)
-        assertNull(result.ray)
+            val result = session.resume(ExactContinuationLimits(maxBits = 24))
+
+            assertEquals(ContinuationDecline.BITS, result.metrics.decline)
+            assertEquals(if (resumed) ContinuationPhase.INPUT else ContinuationPhase.IMPORT, result.metrics.phase)
+            assertNull(result.values)
+            assertNull(result.ray)
+        }
     }
-
 }

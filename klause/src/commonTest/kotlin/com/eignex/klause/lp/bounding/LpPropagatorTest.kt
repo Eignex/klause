@@ -1,13 +1,5 @@
 package com.eignex.klause.lp.bounding
 
-import com.eignex.klause.lp.engine.LpVerdict
-import com.eignex.klause.lp.engine.RevisedSimplex
-import com.eignex.klause.simplex.basis.BasisArithmeticException
-import com.eignex.klause.simplex.basis.BasisSolver
-import com.eignex.klause.simplex.basis.IndexedVector
-import com.eignex.klause.simplex.basis.KotlinBasisSolver
-import com.eignex.klause.simplex.exact.ExactContinuationLimits
-import com.eignex.klause.solver.result.LpStatsSink
 import com.eignex.klause.lp.engine.ExactLpBounds
 import com.eignex.klause.lp.engine.ExactLpColumn
 import com.eignex.klause.lp.engine.ExactLpEntry
@@ -24,9 +16,17 @@ import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.LpPricingOptions
 import com.eignex.klause.lp.engine.LpScopedRow
 import com.eignex.klause.lp.engine.LpSolveContext
+import com.eignex.klause.lp.engine.LpVerdict
 import com.eignex.klause.lp.engine.PersistentLpSolver
 import com.eignex.klause.lp.engine.ProductionLpEngineFactory
+import com.eignex.klause.lp.engine.RevisedSimplex
+import com.eignex.klause.simplex.basis.BasisArithmeticException
+import com.eignex.klause.simplex.basis.BasisSolver
+import com.eignex.klause.simplex.basis.IndexedVector
+import com.eignex.klause.simplex.basis.KotlinBasisSolver
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.simplex.exact.ExactContinuationLimits
+import com.eignex.klause.solver.result.LpStatsSink
 import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.solver.search.SearchAtomRegistry
 import com.eignex.klause.solver.search.SearchContext
@@ -47,28 +47,37 @@ class LpPropagatorTest {
     fun `raising live effort resumes exact state and records only new work`() {
         val zero = ExactLpNumber.of(0L)
         val source = ExactLpModel(
-            List(3) { listOf(ExactLpEntry(it, ExactLpNumber.of(-1L))) }, List(3) { ExactLpNumber.of(-1L) },
+            List(3) { listOf(ExactLpEntry(it, ExactLpNumber.of(-1L))) },
+            List(3) { ExactLpNumber.of(-1L) },
             List(6) { ExactLpColumn(ExactLpBounds(lower = ExactLpSide(zero))) },
-            List(3) { ExactLpRow() }, ExactLpObjective(List(6) { zero }),
+            List(3) { ExactLpRow() },
+            ExactLpObjective(List(6) { zero }),
         )
         val factory = object : LpEngineFactory by ProductionLpEngineFactory {
             override fun newPersistentSolver(
-                model: LpModel, cancellation: Cancellation, refactorUpdateLimit: Int, iterationLimit: Int,
-                workLimit: Long, trackDegeneracy: Boolean, pricing: LpPricingOptions,
+                model: LpModel,
+                cancellation: Cancellation,
+                refactorUpdateLimit: Int,
+                iterationLimit: Int,
+                workLimit: Long,
+                trackDegeneracy: Boolean,
+                pricing: LpPricingOptions,
             ): PersistentLpSolver = RevisedSimplex(model, cancellation, basisSolverFactory = { matrix ->
                 val delegate = KotlinBasisSolver(matrix)
                 object : BasisSolver by delegate {
-                    override fun ftran(x: IndexedVector, expectedDensity: Double) {
+                    override fun ftran(x: IndexedVector, expectedDensity: Double): Unit =
                         throw BasisArithmeticException("injected numerical solve failure")
-                    }
                 }
             })
         }
         var profile = LpEffortProfile(continuation = ExactContinuationLimits(maxPivots = 1))
         val stats = LpStatsSink()
         LpPropagator(
-            object : LpSearchPolicy {}, effort = { profile }, solveContext = LpSolveContext(engineFactory = factory),
-            certificationObserver = stats.certificationObserver()).use { lp ->
+            object : LpSearchPolicy {},
+            effort = { profile },
+            solveContext = LpSolveContext(engineFactory = factory),
+            certificationObserver = stats.certificationObserver(),
+        ).use { lp ->
             assertTrue(lp.install(Any(), source))
             val short = assertNotNull(lp.solve())
             profile = profile.copy(continuation = ExactContinuationLimits(maxPivots = 3))

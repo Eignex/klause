@@ -7,8 +7,19 @@ import kotlin.time.TimeSource.Monotonic
 internal enum class ContinuationStatus { BASIC, LOWER, UPPER, FIXED, FREE }
 internal enum class ContinuationPhase { ADMISSION, INPUT, IMPORT, REPAIR, FEASIBILITY, VERIFY }
 internal enum class ContinuationDecline {
-    INVALID_INPUT, INVALID_BASIS, NO_BASIS, RESUME_KEY, DIMENSION, WORK, ALLOCATION,
-    BITS, TIME, CANCELLED, IMPORT_LIMIT, PIVOTS, CANDIDATE,
+    INVALID_INPUT,
+    INVALID_BASIS,
+    NO_BASIS,
+    RESUME_KEY,
+    DIMENSION,
+    WORK,
+    ALLOCATION,
+    BITS,
+    TIME,
+    CANCELLED,
+    IMPORT_LIMIT,
+    PIVOTS,
+    CANDIDATE,
 }
 
 internal data class ExactContinuationLimits(
@@ -170,19 +181,19 @@ internal class ExactContinuation(private val input: ExactContinuationInput) {
                         builds++
                         (
                             if (big) {
-                            RationalContinuationLane(input, BigFracOps, budget)
-                        } else {
-                            RationalContinuationLane(input, Frac128Ops(), budget)
-                        }
-                        ).also { lane = it }
+                                RationalContinuationLane(input, BigFracOps, budget)
+                            } else {
+                                RationalContinuationLane(input, Frac128Ops(), budget)
+                            }
+                            ).also { lane = it }
                     }
                     result = current.advance(
                         budget,
                         beforeImport = {
                             if (imports >= limits.maxImportPivots) {
                                 throw ContinuationStop(
-                                ContinuationDecline.IMPORT_LIMIT,
-                            )
+                                    ContinuationDecline.IMPORT_LIMIT,
+                                )
                             }
                         },
                         imported = { imports++ },
@@ -243,8 +254,8 @@ internal class ExactContinuation(private val input: ExactContinuationInput) {
             val upper = input.upper[j]?.let(::visit)
             if (lower != null && upper != null && lower > upper) {
                 throw ContinuationStop(
-                ContinuationDecline.INVALID_INPUT,
-            )
+                    ContinuationDecline.INVALID_INPUT,
+                )
             }
             val valid = when (input.statuses[j]) {
                 ContinuationStatus.BASIC -> seen[j]
@@ -261,8 +272,8 @@ internal class ExactContinuation(private val input: ExactContinuationInput) {
                 budget.step()
                 if (row !in 0 until input.m || row <= previous) {
                     throw ContinuationStop(
-                    ContinuationDecline.INVALID_INPUT,
-                )
+                        ContinuationDecline.INVALID_INPUT,
+                    )
                 }
                 visit(value)
                 previous = row
@@ -310,6 +321,7 @@ private class RationalContinuationLane<F>(
     override var pivots = 0
         private set
     private var ordered = false
+    private var scalarPeak = 0
 
     init {
         budget.step(input.m.toLong() * width, input.m.toLong() * width * 8L + input.total * 48L)
@@ -342,6 +354,8 @@ private class RationalContinuationLane<F>(
         pivoted: () -> Unit,
         repaired: () -> Unit,
     ): LaneResult {
+        budget.step()
+        if (scalarPeak > budget.limits.maxBits) throw ContinuationStop(ContinuationDecline.BITS)
         budget.phase = ContinuationPhase.IMPORT
         while (position < input.m) {
             findConflict(budget)?.let { return it }
@@ -498,17 +512,23 @@ private class RationalContinuationLane<F>(
         if (ops.overflowed()) throw ContinuationOverflow()
         if (value is BigFraction) {
             budget.fraction(value)
+            scalarPeak = maxOf(scalarPeak, value.num.bitLength(), value.den.bitLength())
         } else {
             value as Frac128
             val negative = value.nHi < 0L
             val low = if (negative) 0uL - value.nLo.toULong() else value.nLo.toULong()
             val high = if (negative) value.nHi.toULong().inv() + if (low == 0uL) 1uL else 0uL else value.nHi.toULong()
-            fun bits(hi: ULong, lo: ULong) = if (hi == 0uL) 64 - lo.countLeadingZeroBits() else
+            fun bits(hi: ULong, lo: ULong) = if (hi == 0uL) {
+                64 - lo.countLeadingZeroBits()
+            } else {
                 128 - hi.countLeadingZeroBits()
-            if (maxOf(bits(high, low), bits(value.dHi.toULong(), value.dLo.toULong())) > budget.limits.maxBits) {
+            }
+            val size = maxOf(bits(high, low), bits(value.dHi.toULong(), value.dLo.toULong()))
+            if (size > budget.limits.maxBits) {
                 throw ContinuationStop(ContinuationDecline.BITS)
             }
             budget.step(bytes = 48L)
+            scalarPeak = maxOf(scalarPeak, size)
         }
         return value
     }
@@ -535,6 +555,7 @@ private class RationalContinuationLane<F>(
     @Suppress("UNCHECKED_CAST")
     private fun fromBig(value: BigFraction, budget: ContinuationBudget): F {
         budget.fraction(value)
+        scalarPeak = maxOf(scalarPeak, value.num.bitLength(), value.den.bitLength())
         if (ops === BigFracOps) return value as F
         val negative = value.signum() < 0
         if (value.num.bitLength() > 127 || value.den.bitLength() > 127) throw ContinuationOverflow()
@@ -559,9 +580,9 @@ private class RationalContinuationLane<F>(
         val magnitude = (BigInteger.fromULong(high) shl 64) + BigInteger.fromULong(low)
         return budget.fraction(
             BigFraction.of(
-            if (negative) -magnitude else magnitude,
-            (BigInteger.fromLong(value.dHi) shl 64) + BigInteger.fromULong(value.dLo.toULong()),
-        )
+                if (negative) -magnitude else magnitude,
+                (BigInteger.fromLong(value.dHi) shl 64) + BigInteger.fromULong(value.dLo.toULong()),
+            ),
         )
     }
 }

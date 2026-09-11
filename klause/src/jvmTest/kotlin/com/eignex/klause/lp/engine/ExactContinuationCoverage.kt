@@ -7,15 +7,12 @@ import com.eignex.klause.formats.smtlib.toExactLpModel
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.simplex.exact.BigRationalConflict
+import com.eignex.klause.simplex.exact.ContinuationDecline
+import com.eignex.klause.simplex.exact.ContinuationStatus
 import com.eignex.klause.simplex.exact.ExactContinuation
 import com.eignex.klause.simplex.exact.ExactContinuationInput
-import com.eignex.klause.simplex.exact.ContinuationStatus
-import com.eignex.klause.simplex.exact.ContinuationDecline
-import kotlin.test.assertEquals
-import kotlin.test.assertNotNull
-import kotlin.test.assertTrue
 import com.eignex.klause.simplex.exact.ExactContinuationLimits
-import com.eignex.klause.simplex.exact.BigRationalConflict
 import com.eignex.klause.solver.objective.toLinearObjective
 import com.eignex.klause.theory.qflra.QfLraSystem
 import com.eignex.klause.util.Cancellation
@@ -27,6 +24,9 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import java.nio.file.Files
 import java.nio.file.Path
+import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 
 internal object ExactContinuationCoverage {
     @JvmStatic
@@ -46,13 +46,16 @@ internal object ExactContinuationCoverage {
                 val one = ExactLpNumber.of(1L)
                 val m = n + extra
                 val exact = ExactLpModel(
-                    List(n) { j -> listOf(ExactLpEntry(j, ExactLpNumber.of(-1L))) +
-                        if (extra == 1) listOf(ExactLpEntry(n, one)) else emptyList() },
+                    List(n) { j ->
+                        listOf(ExactLpEntry(j, ExactLpNumber.of(-1L))) +
+                            if (extra == 1) listOf(ExactLpEntry(n, one)) else emptyList()
+                    },
                     List(n) { ExactLpNumber.of(-1L) } +
                         if (extra == 1) listOf(ExactLpNumber.of((n - 1).toLong())) else emptyList(),
                     List(n) { ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(ExactLpNumber.of(2L)))) } +
                         List(m) { ExactLpColumn(ExactLpBounds(lower = ExactLpSide(zero))) },
-                    List(m) { ExactLpRow() }, ExactLpObjective(List(n + m) { zero }),
+                    List(m) { ExactLpRow() },
+                    ExactLpObjective(List(n + m) { zero }),
                 )
                 LpExactState(exact).toWorkingModel()
             } else {
@@ -64,36 +67,61 @@ internal object ExactContinuationCoverage {
                 } else {
                     val parsed = SmtLib.parse(source)
                     if (parsed.model.numBoolVars != 0) {
-                        println(buildJsonObject { put("input", input); put("ineligible", "BOOLEAN_BRANCH") })
+                        println(
+                            buildJsonObject {
+                            put("input", input);
+                            put("ineligible", "BOOLEAN_BRANCH")
+                        }
+                        )
                         continue
                     }
                     LpExactState(QfLraSystem(parsed.model).build { null }.toExactLpModel()).toWorkingModel()
                 }
             }
             if (model == null) {
-                println(buildJsonObject { put("input", input); put("ineligible", "SOURCE_PROJECTION") })
+                println(
+                    buildJsonObject {
+                    put("input", input);
+                    put("ineligible", "SOURCE_PROJECTION")
+                }
+                )
                 continue
             }
             val start = System.nanoTime()
             val token = Cancellation { System.nanoTime() - start >= 10_000_000_000L }
-            RevisedSimplex(model, token, iterationLimit = 4096,
-                workLimit = if (input.startsWith("boundary/")) 1L else 50_000_000L).use { solver ->
+            RevisedSimplex(
+                model,
+                token,
+                iterationLimit = 4096,
+                workLimit = if (input.startsWith("boundary/")) 1L else 50_000_000L,
+            ).use { solver ->
                 val candidate = solver.solve()
                 val target = solver.continuationBasis(model) ?: candidate?.basis ?: solver.infeasibleBasis
                 println(authority(input, model, target))
                 val live = certifyLpResult(model, solver, candidate, token)
                 live.witness?.let { checkPoint(model, it) }
                 live.rationalConflict?.let { checkConflict(model, it) }
-                println(buildJsonObject {
-                    put("input", input); put("role", "live-verdict"); put("verdict", live.verdict.name)
-                    put("floatPivots", solver.lastPivots); put("floatWork", solver.lastWorkOps)
+                println(
+                    buildJsonObject {
+                    put("input", input);
+                    put("role", "live-verdict");
+                    put("verdict", live.verdict.name)
+                    put("floatPivots", solver.lastPivots);
+                    put("floatWork", solver.lastWorkOps)
                     put("continuationWork", live.continuation?.work ?: 0L)
                     put("continuationNs", live.continuation?.elapsedNs ?: 0L)
-                })
+                }
+                )
                 val cache = LpExactContinuationCache()
                 for ((slice, ceiling) in listOf("short" to 20, "full" to 60)) {
-                    val result = continueExactLp(model, target, cache, token,
-                        ExactContinuationLimits(maxPivots = ceiling), fullEffort = slice == "full")
+                    val result = continueExactLp(
+                        model,
+                        target,
+                        cache,
+                        token,
+                        ExactContinuationLimits(maxPivots = ceiling),
+                        fullEffort = slice == "full",
+                    )
                     result.witness?.let { checkPoint(model, it) }
                     result.conflict?.let { checkConflict(model, it) }
                     println(record(input, slice, result))
@@ -104,18 +132,34 @@ internal object ExactContinuationCoverage {
 
     private fun record(input: String, slice: String, result: LpContinuationVerification): JsonObject = buildJsonObject {
         val m = result.metrics
-        put("input", input); put("role", "result"); put("slice", slice)
-        put("eligible", m.eligible); put("builds", m.builds); put("imports", m.imports); put("pivots", m.pivots)
-        put("retainedPivots", m.retainedPivots); put("importPosition", m.importPosition)
-        put("repairs", m.repairs); put("restarts", m.restarts); put("resumed", m.resumed)
-        put("work", m.work); put("allocation", m.allocation); put("elapsedNs", m.elapsedNs)
-        put("phase", m.phase.name); put("decline", m.decline?.name ?: "NONE")
+        put("input", input);
+        put("role", "result");
+        put("slice", slice)
+        put("eligible", m.eligible);
+        put("builds", m.builds);
+        put("imports", m.imports);
+        put("pivots", m.pivots)
+        put("retainedPivots", m.retainedPivots);
+        put("importPosition", m.importPosition)
+        put("repairs", m.repairs);
+        put("restarts", m.restarts);
+        put("resumed", m.resumed)
+        put("work", m.work);
+        put("allocation", m.allocation);
+        put("elapsedNs", m.elapsedNs)
+        put("phase", m.phase.name);
+        put("decline", m.decline?.name ?: "NONE")
         put("workByPhase", buildJsonObject { for ((phase, value) in m.workByPhase) put(phase.name, value) })
         put("allocationByPhase", buildJsonObject { for ((phase, value) in m.allocationByPhase) put(phase.name, value) })
-        put("witness", result.witness != null); put("conflict", result.conflict != null)
-        result.witness?.let { put("primal", fractions(it.primal)); put("objective", fraction(it.objective)) }
+        put("witness", result.witness != null);
+        put("conflict", result.conflict != null)
+        result.witness?.let {
+            put("primal", fractions(it.primal));
+            put("objective", fraction(it.objective))
+        }
         result.conflict?.let {
-            put("conflictRows", JsonArray(it.rows.map(::JsonPrimitive))); put("multipliers", fractions(it.multipliers))
+            put("conflictRows", JsonArray(it.rows.map(::JsonPrimitive)));
+            put("multipliers", fractions(it.multipliers))
         }
     }
 
@@ -205,7 +249,8 @@ internal object ExactContinuationCoverage {
         val input = ExactContinuationInput(
             List(n) { listOf(it to BigFraction.MINUS_ONE, n to BigFraction.ONE) },
             List(n) { BigFraction.MINUS_ONE } + BigFraction.ofLong(3),
-            List(2 * n + 1) { BigFraction.ZERO }, List(2 * n + 1) { null },
+            List(2 * n + 1) { BigFraction.ZERO },
+            List(2 * n + 1) { null },
             List(n + 1) { n + it },
             List(2 * n + 1) { if (it < n) ContinuationStatus.LOWER else ContinuationStatus.BASIC },
         )
@@ -225,6 +270,4 @@ internal object ExactContinuationCoverage {
         assertTrue(ray.all { it <= BigFraction.ZERO })
         assertTrue(rhs > BigFraction.ZERO)
     }
-
-
 }
