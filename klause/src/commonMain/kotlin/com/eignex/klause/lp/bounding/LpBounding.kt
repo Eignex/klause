@@ -13,7 +13,6 @@ import com.eignex.klause.lp.engine.IntegerCertificate
 import com.eignex.klause.lp.engine.LpCertifier
 import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.LpSolver
-import com.eignex.klause.lp.engine.PersistentLpSolver
 import com.eignex.klause.lp.engine.TableauCutSolver
 import com.eignex.klause.lp.engine.acceptNullable
 import com.eignex.klause.lp.engine.ceilLong
@@ -125,17 +124,10 @@ internal fun LpEngine.dualSimplex(model: LpModel, cancellation: Cancellation): T
     )
 }
 
-/**
- * The node bound's engine and its solve.
- *
- * A rebound relaxation shares its matrix and objective with the last node's, so the kept engine's basis
- * and LU factorization are still valid and the dual simplex resumes from them — the expensive half of a
- * node solve, skipped. Anything else (the first node, a rebuilt or cut-augmented relaxation) builds a
- * fresh engine, which then becomes the kept one; [PersistentLpSolver.rebind] decides which case this is
- * and cannot mistake them, since it tests object identity of the matrix and cost arrays.
- *
- * [warm] is used only on the fresh path: a kept engine already has that basis seated, and better, has it
- * factorized.
+/*
+ * Eligible CP nodes adopt exact bound changes into the retained scoped owner. A local row/layout
+ * change replaces that owner. Nonprojectable legacy models use persistent rebind when compatible.
+ * Warm hints apply only to a fresh solve; a retained scoped owner already has its basis factorized.
  */
 @Suppress("TooGenericExceptionCaught") // replacement cleanup must preserve arbitrary solve and close failures
 internal fun LpEngine.solveNode(

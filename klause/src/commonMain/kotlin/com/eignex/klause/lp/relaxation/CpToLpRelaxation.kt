@@ -83,12 +83,11 @@ internal class LpRelaxation(
     /** Arc-indicator models of any Circuit factors, for the subtour-elimination separator. */
     val circuitArcs: List<CircuitArcModel> = emptyList(),
     /**
-     * Whether this relaxation's layout is node-invariant, so a search node may [rebound] it (re-bind
-     * column bounds over the fixed matrix) instead of rebuilding. True when no row's coefficients
-     * depend on the live domains and every structural column is re-derivable from the live session —
-     * either CP-var-backed (re-bound from its own domain) or an auxiliary column with a [colReq]
-     * presence rule (re-bound by pinning). For an eligible relaxation [rebound] reproduces exactly the
-     * model a per-node build would emit.
+     * Whether this relaxation keeps the same layout across search nodes, allowing column bounds
+     * to follow a trail over the fixed matrix. True when no row's coefficients depend on live domains
+     * and every structural column can be derived from the live session: either a CP variable's domain
+     * or an auxiliary column's [colReq] presence rule. These live bounds reproduce the feasible region
+     * of a per-node build.
      */
     val persistentEligible: Boolean = false,
     /**
@@ -463,7 +462,7 @@ internal class CpToLpRelaxation(
      * table, …) stay candidates here — their rows are fixed and the live restriction rides on the
      * column bounds, which the per-column presence rule re-binds; an un-ruled aux column is what keeps
      * a not-yet-wired hull off the persistent path (checked at build). When this holds and every
-     * column is re-derivable, a node may [rebound] the once-built relaxation instead of rebuilding it.
+     * column is re-derivable, live column bounds suffice to reuse the fixed relaxation layout.
      */
     private val structurallyPersistent: Boolean =
         !objectiveCone && !cumulative && !diffn &&
