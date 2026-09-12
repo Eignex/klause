@@ -1,6 +1,8 @@
 package com.eignex.klause.lp.bounding
 
+import com.eignex.klause.lp.engine.CutExpression
 import com.eignex.klause.lp.engine.CutPremise
+import com.eignex.klause.lp.engine.CutSource
 import com.eignex.klause.lp.engine.CutSourceKind
 import com.eignex.klause.lp.engine.LpBuilder
 import com.eignex.klause.lp.engine.LpModel
@@ -62,13 +64,13 @@ internal object RelaxationTidy {
         val upper = source.upper.copyOfRange(0, source.n)
         val hasUpper = source.hasUpper.copyOfRange(0, source.n)
         removeInitiallyRedundant(rows, lower, upper, hasUpper, removed, counts)
+        selectParallelSides(rows, removed, counts)
 
         val bounds = ArrayList<RelaxationTidyBound>()
         canonicalizeSingletons(source, sources, rows, lower, upper, hasUpper, bounds, counts)
         if (config.cancellation()) return counts.declineResult(RelaxationTidyDecline.CANCELLED)
 
         removeDerivedRedundant(source, rows, lower, upper, hasUpper, bounds, removed, counts)
-        selectParallelSides(rows, removed, counts)
         if (config.cancellation()) return counts.declineResult(RelaxationTidyDecline.CANCELLED)
 
         val retained = rows.filter { !it.removed }.sortedBy { it.sourceRow }
@@ -371,7 +373,6 @@ private fun canonicalizeSingletons(
                         sourceColumn.scale.signum() < 0,
                         mapped,
                         columnValue,
-                        sources,
                     ),
                     tidyBound(
                         row,
@@ -380,7 +381,6 @@ private fun canonicalizeSingletons(
                         sourceColumn.scale.signum() > 0,
                         mapped,
                         columnValue,
-                        sources,
                     ),
                 ),
             )
@@ -458,7 +458,6 @@ private fun canonicalizeSingletons(
                 outputUpper,
                 roundedSource,
                 columnValue,
-                sources,
                 roundedSource != mapped,
             ),
         )
@@ -473,13 +472,13 @@ private fun tidyBound(
     columnUpper: Boolean = sourceUpper,
     sourceValue: BigFraction,
     columnValue: Long,
-    sources: CutSourceMap,
     rounded: Boolean = false,
 ): RelaxationTidyBound {
     val premises = buildSet<CutPremise> {
         row.premises?.let { premise ->
             for (i in premise.vars.indices) {
-                val expression = sources.columnForInt(premise.vars[i])?.expression() ?: continue
+                val source = CutSource(CutSourceKind.INTEGER, premise.vars[i])
+                val expression = CutExpression(mapOf(source to BigFraction.ONE))
                 add(CutPremise.Bound(expression, premise.isUpper[i], BigFraction.ofLong(premise.thresholds[i])))
             }
             for (literal in premise.boolLits) add(CutPremise.Literal(literal))

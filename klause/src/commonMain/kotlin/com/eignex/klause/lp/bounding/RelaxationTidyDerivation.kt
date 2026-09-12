@@ -1,7 +1,11 @@
 package com.eignex.klause.lp.bounding
 
+import com.eignex.klause.lp.engine.CutExpression
 import com.eignex.klause.lp.engine.CutPremise
+import com.eignex.klause.lp.engine.CutSource
+import com.eignex.klause.lp.engine.CutSourceKind
 import com.eignex.klause.lp.engine.LpModel
+import com.eignex.klause.lp.engine.LpRowPremises
 import com.eignex.klause.lp.relaxation.CutColumnSource
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.addExact
@@ -151,7 +155,7 @@ internal class RelaxationTidyDerivation(
             if (map.rounding != null) return null
             source[map.sourceRow] = (source[map.sourceRow] ?: BigFraction.ZERO) + weight * map.sourceMultiplier
             for (fixing in map.fixings) {
-                val multiplier = weight * map.sourceMultiplier * BigFraction.ofLong(-fixing.coefficient)
+                val multiplier = weight * map.sourceMultiplier * BigFraction.ofLong(fixing.coefficient).negated()
                 fixed[fixing.column] = (fixed[fixing.column] ?: BigFraction.ZERO) + multiplier
             }
         }
@@ -192,17 +196,7 @@ internal class RelaxationTidyDerivation(
                 return false
             }
         }
-        return boundSnapshot.all { bound ->
-            if (bound.column !in 0 until sourceModel.n || bound.sourceRow !in 0 until sourceModel.m ||
-                bound.sourceValue.den.signum() <= 0 || rowMapSnapshot.none { it.sourceRow == bound.sourceRow }
-            ) {
-                return@all false
-            }
-            val source = columnSourceSnapshot[bound.column] ?: return@all false
-            val value = source.scale * bound.sourceValue + source.offset
-            value == BigFraction.ofLong(bound.columnValue) &&
-                bound.columnUpper == if (source.scale.signum() > 0) bound.sourceUpper else !bound.sourceUpper
-        }
+        return boundSnapshot.all(::validateBound)
     }
 
     /** A transformed primal is already in source coordinates because tidy never eliminates a column. */
@@ -394,22 +388,101 @@ internal class RelaxationTidyDerivation(
         val columnThreshold = reducedRhs * BigFraction.ofLong(coefficient).reciprocal()
         val sourceColumn = columnSourceSnapshot[column] ?: return false
         val sourceThreshold = (columnThreshold - sourceColumn.offset) * sourceColumn.scale.reciprocal()
-        if (sourceThreshold != rounding.sourceValue) return false
+        val equality = sourceModel.hasUpper[sourceModel.slackCol(map.sourceRow)]
+        if (sourceThreshold != rounding.sourceValue || rounding.strict != sourceModel.rowStrict[map.sourceRow]) {
+            return false
+        }
         if (rounding.infeasibleEquality) {
             return outputCoefficients.isEmpty() && outputNaturalRhs == BigFraction.MINUS_ONE &&
                 rounding.sourceUpper == null && rounding.columnUpper == null && rounding.roundedValue == null &&
-                sourceThreshold.den != BigInteger.ONE
+                equality && !rounding.strict && sourceThreshold.den != BigInteger.ONE && map.sourceMultiplier.isZero
         }
+        if (equality) return false
         if (outputCoefficients.size != 1) return false
         val outputCoefficient = outputCoefficients[column] ?: return false
-        val sourceUpper = rounding.sourceUpper ?: return false
-        val upper = rounding.columnUpper ?: return false
+        val upper = coefficient > 0L
+        val sourceUpper = if (sourceColumn.scale.signum() > 0) upper else !upper
+        if (rounding.sourceUpper != sourceUpper || rounding.columnUpper != upper) return false
         val rounded = rounding.roundedValue ?: return false
         if (rounded != independentlyRound(sourceThreshold, sourceUpper, rounding.strict)) return false
         if (outputCoefficient != if (upper) 1L else -1L) return false
+        if (map.sourceMultiplier != BigFraction.ofLong(kotlin.math.abs(coefficient)).reciprocal()) return false
         val columnValue = sourceColumn.scale * rounded + sourceColumn.offset
         val expectedNatural = if (upper) columnValue else columnValue.negated()
         return outputNaturalRhs == expectedNatural && rounded.den == BigInteger.ONE
+    }
+
+    private fun validateBound(bound: RelaxationTidyBound): Boolean {
+        if (bound.column !in 0 until sourceModel.n || bound.sourceRow !in 0 until sourceModel.m ||
+            bound.sourceValue.den.signum() <= 0
+        ) {
+            return false
+        }
+        val map = rowMapSnapshot.firstOrNull { it.sourceRow == bound.sourceRow } ?: return false
+        val coefficients = rowCoefficients(sourceModel, bound.sourceRow)
+        if (map.fixings.any { !validFixing(coefficients, it) }) return false
+        val live = coefficients.filterKeys { column -> map.fixings.none { it.column == column } }
+        if (live.size != 1) return false
+        val (column, coefficient) = live.entries.single()
+        if (column != bound.column || coefficient == 0L || coefficient == Long.MIN_VALUE) return false
+        var rhs = BigFraction.ofLong(sourceModel.flippedRhs[bound.sourceRow])
+        for (fixing in map.fixings) {
+            rhs -= BigFraction.ofLong(fixing.coefficient) * BigFraction.ofLong(fixing.value)
+        }
+        val columnSource = columnSourceSnapshot[column] ?: return false
+        val columnThreshold = rhs * BigFraction.ofLong(coefficient).reciprocal()
+        val sourceThreshold = (columnThreshold - columnSource.offset) * columnSource.scale.reciprocal()
+        val equality = sourceModel.hasUpper[sourceModel.slackCol(bound.sourceRow)]
+        val expectedSourceUpper: Boolean
+        val expectedColumnUpper: Boolean
+        val expectedSourceValue: BigFraction
+        if (equality) {
+            if (sourceModel.rowStrict[bound.sourceRow] || sourceThreshold.den != BigInteger.ONE) return false
+            expectedSourceUpper = bound.sourceUpper
+            expectedColumnUpper = if (columnSource.scale.signum() > 0) bound.sourceUpper else !bound.sourceUpper
+            expectedSourceValue = sourceThreshold
+        } else {
+            expectedColumnUpper = coefficient > 0L
+            expectedSourceUpper = if (columnSource.scale.signum() > 0) expectedColumnUpper else !expectedColumnUpper
+            expectedSourceValue = independentlyRound(
+                sourceThreshold,
+                expectedSourceUpper,
+                sourceModel.rowStrict[bound.sourceRow],
+            )
+        }
+        val columnValue = columnSource.scale * expectedSourceValue + columnSource.offset
+        if (bound.sourceUpper != expectedSourceUpper || bound.columnUpper != expectedColumnUpper ||
+            bound.sourceValue != expectedSourceValue || columnValue != BigFraction.ofLong(bound.columnValue) ||
+            bound.rounded != (expectedSourceValue != sourceThreshold) ||
+            bound.global != sourceModel.rowGlobal[bound.sourceRow]
+        ) {
+            return false
+        }
+        return bound.premises == expectedPremises(sourceModel.rowPremises[bound.sourceRow], map.fixings)
+    }
+
+    private fun expectedPremises(
+        rowPremises: LpRowPremises?,
+        fixings: List<RelaxationTidyFixing>,
+    ): Set<CutPremise> = buildSet {
+        rowPremises?.let { premises ->
+            for (index in premises.vars.indices) {
+                val source = CutSource(CutSourceKind.INTEGER, premises.vars[index])
+                val expression = CutExpression(mapOf(source to BigFraction.ONE))
+                add(
+                    CutPremise.Bound(
+                        expression,
+                        premises.isUpper[index],
+                        BigFraction.ofLong(premises.thresholds[index]),
+                    ),
+                )
+            }
+            for (literal in premises.boolLits) add(CutPremise.Literal(literal))
+        }
+        for (fixing in fixings) {
+            add(fixing.lower)
+            add(fixing.upper)
+        }
     }
 }
 
