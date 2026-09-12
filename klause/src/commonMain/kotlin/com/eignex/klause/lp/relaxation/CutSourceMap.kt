@@ -40,6 +40,10 @@ internal class CutSourceMap(
     val columns: List<CutColumnSource?> get() = columnSnapshot.toList()
     val fixed: Map<CutSource, BigFraction> get() = fixedSnapshot.toMap()
     val assumptions: Set<String> get() = assumptionSnapshot.toSet()
+    fun column(index: Int): CutColumnSource? = columnSnapshot.getOrNull(index)
+    fun columnForInt(variable: Int): CutColumnSource? = columnSnapshot.firstOrNull {
+        it?.source == CutSource(CutSourceKind.INTEGER, variable)
+    }
     fun parent(row: Int): CutProvenance? = parentSnapshot[row]
     fun isGlobal(premise: CutPremise): Boolean = implied(premise, globalSnapshot)
     fun isActive(premise: CutPremise): Boolean = isGlobal(premise) || implied(premise, activeSnapshot)
@@ -69,6 +73,24 @@ internal class CutSourceMap(
         assumptionSnapshot,
         parentSnapshot,
     )
+
+    /** Compact row-indexed cut provenance through a proof-mapped relaxation transform. */
+    fun remapRows(sourceRows: IntArray): CutSourceMap {
+        val remapped = HashMap<Int, CutProvenance>()
+        for (outputRow in sourceRows.indices) {
+            parentSnapshot[sourceRows[outputRow]]?.let { remapped[outputRow] = it }
+        }
+        return CutSourceMap(
+            model,
+            epoch,
+            columnSnapshot,
+            globalSnapshot,
+            activeSnapshot,
+            fixedSnapshot,
+            assumptionSnapshot,
+            remapped,
+        )
+    }
 }
 
 internal fun CutSourceMap.withCpBounds(
