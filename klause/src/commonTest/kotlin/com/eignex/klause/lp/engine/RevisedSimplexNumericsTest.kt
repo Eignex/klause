@@ -63,7 +63,7 @@ class RevisedSimplexNumericsTest {
         val stable = b.addRealVar(0.0, 2.0, cost = 1.0005)
         b.addRealRow(intArrayOf(narrow, stable), doubleArrayOf(1e-6, 1.0), Relation.GE, 1.0)
         val model = b.build(Sense.MINIMIZE)
-        val simplex = RevisedSimplex(model)
+        val simplex = RevisedSimplex(model, scalingOptions = LpScalingOptions(enabled = false))
 
         val result = assertNotNull(simplex.solve())
 

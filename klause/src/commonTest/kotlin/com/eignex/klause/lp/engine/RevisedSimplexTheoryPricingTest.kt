@@ -127,11 +127,13 @@ class RevisedSimplexTheoryPricingTest {
             model,
             basisSolverFactory = recordingFactory(baselineUpdates),
             pricing = LpPricingOptions(LpZeroObjectivePricing.LARGEST_PIVOT),
+            scalingOptions = LpScalingOptions(enabled = false),
         )
         val theory = RevisedSimplex(
             model,
             basisSolverFactory = recordingFactory(theoryUpdates),
             pricing = LpPricingOptions(LpZeroObjectivePricing.MIN_BOUND_SUPPORT, 7L),
+            scalingOptions = LpScalingOptions(enabled = false),
         )
 
         assertNotNull(baseline.solve())

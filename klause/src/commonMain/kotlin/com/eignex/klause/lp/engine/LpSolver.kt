@@ -95,6 +95,9 @@ internal interface LpSolver : AutoCloseable {
      * unavailable; unboundedness also requires an independently checked feasible point. */
     val recessionDirection: DoubleArray? get() = null
 
+    /** Scaling eligibility, fallback and source-unit residuals for this numerical owner. */
+    val scalingMetrics: LpScalingMetrics get() = LpScalingMetrics(decline = LpScalingDecline.DISABLED)
+
     /** The dual-unbounded basis behind [infeasibleRay], for the exact ray solve that a model with an
      *  unbounded column needs. Null on an engine that keeps no basis; certification then falls back to
      *  rounding [infeasibleRay]. */
@@ -364,3 +367,54 @@ internal fun newPersistentLpSolver(
     trackDegeneracy,
     pricing,
 )
+
+/** Explicit rollback factory for callers comparing or recovering with the unscaled float view. */
+internal object UnscaledLpEngineFactory : LpEngineFactory {
+    private val disabled = LpScalingOptions(enabled = false)
+
+    override fun newGeneralSolver(model: LpModel, cancellation: Cancellation, pricing: LpPricingOptions): LpSolver =
+        RevisedSimplex(model, cancellation, pricing = pricing, scalingOptions = disabled)
+
+    override fun newComponentSolver(
+        model: LpModel,
+        parts: List<LpNeighborhood>,
+        solvers: List<LpSolver>,
+        isolated: IntArray,
+    ): ComponentLpSolverCapability = ComponentLpSolver(model, parts, solvers, isolated)
+
+    override fun newTableauSolver(
+        model: LpModel,
+        cancellation: Cancellation,
+        iterationLimit: Int,
+        workLimit: Long,
+        trackDegeneracy: Boolean,
+        pricing: LpPricingOptions,
+    ): TableauCutSolver = RevisedSimplex(
+        model,
+        cancellation,
+        iterationLimit = iterationLimit,
+        workLimit = workLimit,
+        trackDegeneracy = trackDegeneracy,
+        pricing = pricing,
+        scalingOptions = disabled,
+    )
+
+    override fun newPersistentSolver(
+        model: LpModel,
+        cancellation: Cancellation,
+        refactorUpdateLimit: Int,
+        iterationLimit: Int,
+        workLimit: Long,
+        trackDegeneracy: Boolean,
+        pricing: LpPricingOptions,
+    ): PersistentLpSolver = RevisedSimplex(
+        model,
+        cancellation,
+        refactorUpdateLimit = refactorUpdateLimit,
+        iterationLimit = iterationLimit,
+        workLimit = workLimit,
+        trackDegeneracy = trackDegeneracy,
+        pricing = pricing,
+        scalingOptions = disabled,
+    )
+}
