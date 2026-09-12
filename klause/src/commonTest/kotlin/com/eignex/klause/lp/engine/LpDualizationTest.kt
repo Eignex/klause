@@ -33,7 +33,10 @@ class LpDualizationTest {
         val attempt = LpRootDualizationAttempt(LpDualizationOptions(enabled = true))
 
         val basis = assertNotNull(attempt.solve(source))
-        val result = solveAndCertify(source.model, ExactLpBasis(basis.basicVars.toList(), basis.status.map { ExactLpStatus.valueOf(it.name) }))
+        val result = solveAndCertify(
+            source.model,
+            ExactLpBasis(basis.basicVars.toList(), basis.status.map { ExactLpStatus.valueOf(it.name) }),
+        )
 
         assertEquals(LpVerdict.ATTAINED_OPTIMUM, result.verdict)
         assertEquals(listOf(BigFraction.ofLong(3L)), result.exactPrimal)
@@ -80,7 +83,9 @@ class LpDualizationTest {
         val x = builder.addVar(0L, 3L)
         builder.addRow(intArrayOf(x), longArrayOf(1L), Relation.GE, 1L)
         val source = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).trailModel()))
-        val attempt = LpRootDualizationAttempt(LpDualizationOptions(enabled = true, minRowColumnRatio = 1, constructionWork = 1L))
+        val attempt = LpRootDualizationAttempt(
+            LpDualizationOptions(enabled = true, minRowColumnRatio = 1, constructionWork = 1L),
+        )
 
         assertNull(attempt.solve(source))
         assertFailsWith<IllegalStateException> { attempt.solve(source) }
@@ -107,11 +112,18 @@ class LpDualizationTest {
     fun `strict source bounds are explicitly unsupported`() {
         val zero = ExactLpNumber.of(0L)
         val one = ExactLpNumber.of(1L)
-        val source = LpExactState(ExactLpModel(
-            listOf(listOf(ExactLpEntry(0, one))), listOf(one),
-            listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero, strict = true))), ExactLpColumn(ExactLpBounds(ExactLpSide(zero)))),
-            listOf(ExactLpRow()), ExactLpObjective(listOf(one, zero)),
-        ))
+        val source = LpExactState(
+            ExactLpModel(
+            listOf(listOf(ExactLpEntry(0, one))),
+            listOf(one),
+            listOf(
+                ExactLpColumn(ExactLpBounds(ExactLpSide(zero, strict = true))),
+                ExactLpColumn(ExactLpBounds(ExactLpSide(zero))),
+            ),
+            listOf(ExactLpRow()),
+            ExactLpObjective(listOf(one, zero)),
+        )
+        )
         val attempt = LpRootDualizationAttempt(LpDualizationOptions(enabled = true, minRowColumnRatio = 1))
 
         assertNull(attempt.solve(source))
@@ -123,12 +135,18 @@ class LpDualizationTest {
     fun `scalar limits reject oversized source authority`() {
         val zero = ExactLpNumber.of(0L)
         val big = ExactLpNumber.of(1L shl 40)
-        val source = LpExactState(ExactLpModel(
-            listOf(listOf(ExactLpEntry(0, big))), listOf(big),
+        val source = LpExactState(
+            ExactLpModel(
+            listOf(listOf(ExactLpEntry(0, big))),
+            listOf(big),
             List(2) { ExactLpColumn(ExactLpBounds(ExactLpSide(zero))) },
-            listOf(ExactLpRow()), ExactLpObjective(listOf(big, zero)),
-        ))
-        val attempt = LpRootDualizationAttempt(LpDualizationOptions(enabled = true, minRowColumnRatio = 1, maxBits = 24))
+            listOf(ExactLpRow()),
+            ExactLpObjective(listOf(big, zero)),
+        )
+        )
+        val attempt = LpRootDualizationAttempt(
+            LpDualizationOptions(enabled = true, minRowColumnRatio = 1, maxBits = 24),
+        )
 
         assertNull(attempt.solve(source))
 
@@ -142,13 +160,17 @@ class LpDualizationTest {
         repeat(10) { builder.addRow(intArrayOf(x), longArrayOf(1L), Relation.GE, 3L) }
         val model = assertNotNull(builder.build(Sense.MINIMIZE).trailModel())
 
-        val result = solveAndCertify(model, context = LpSolveContext(rootDualization = LpDualizationOptions(enabled = true)))
+        val result = solveAndCertify(
+            model,
+            context = LpSolveContext(rootDualization = LpDualizationOptions(enabled = true)),
+        )
 
         assertEquals(LpVerdict.ATTAINED_OPTIMUM, result.verdict)
         assertEquals(BigFraction.ofLong(6L), result.lowerBound)
         assertEquals(listOf(BigFraction.ofLong(3L)), result.exactPrimal)
         assertTrue(assertNotNull(result.float).warmStarted)
     }
+
     @Test
     fun `nonfinite auxiliary hints decline and close the numerical owner`() {
         val builder = LpBuilder()
@@ -157,13 +179,28 @@ class LpDualizationTest {
         val source = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).trailModel()))
         var closed = false
         val factory = object : LpEngineFactory by ProductionLpEngineFactory {
-            override fun newTableauSolver(model: LpModel, cancellation: Cancellation, iterationLimit: Int, workLimit: Long, trackDegeneracy: Boolean, pricing: LpPricingOptions): TableauCutSolver = object : TableauCutSolver {
+            override fun newTableauSolver(
+                model: LpModel,
+                cancellation: Cancellation,
+                iterationLimit: Int,
+                workLimit: Long,
+                trackDegeneracy: Boolean,
+                pricing: LpPricingOptions,
+            ): TableauCutSolver = object : TableauCutSolver {
                 override val infeasibleRay: DoubleArray? = null
-                override fun solve(warm: Basis?) = FloatLpResult(Basis(intArrayOf(0), Array(model.numVars) { VarStatus.AT_LOWER }), 0.0, doubleArrayOf(0.0), DoubleArray(model.n) { Double.NaN }, exactState = model.exactState)
+                override fun solve(warm: Basis?) = FloatLpResult(
+                    Basis(intArrayOf(0), Array(model.numVars) { VarStatus.AT_LOWER }),
+                    0.0,
+                    doubleArrayOf(0.0),
+                    DoubleArray(model.n) { Double.NaN },
+                    exactState = model.exactState,
+                )
                 override fun solvePrimal(warm: Basis?) = solve(warm)
                 override fun gomoryCuts(maxCuts: Int) = emptyList<Cut>()
                 override fun mirCuts(maxCuts: Int) = emptyList<Cut>()
-                override fun close() { closed = true }
+                override fun close() {
+                    closed = true
+                }
             }
         }
         val attempt = LpRootDualizationAttempt(LpDualizationOptions(enabled = true, minRowColumnRatio = 1))
@@ -182,9 +219,23 @@ class LpDualizationTest {
         builder.addRow(intArrayOf(x), longArrayOf(1L), Relation.GE, 3L)
         val source = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).trailModel()))
         val factory = object : LpEngineFactory by ProductionLpEngineFactory {
-            override fun newTableauSolver(model: LpModel, cancellation: Cancellation, iterationLimit: Int, workLimit: Long, trackDegeneracy: Boolean, pricing: LpPricingOptions): TableauCutSolver = object : TableauCutSolver {
+            override fun newTableauSolver(
+                model: LpModel,
+                cancellation: Cancellation,
+                iterationLimit: Int,
+                workLimit: Long,
+                trackDegeneracy: Boolean,
+                pricing: LpPricingOptions,
+            ): TableauCutSolver = object : TableauCutSolver {
                 override val infeasibleRay: DoubleArray? = null
-                override fun solve(warm: Basis?) = FloatLpResult(Basis(intArrayOf(2), Array(model.numVars) { VarStatus.AT_LOWER }), -6.0, doubleArrayOf(-3.0), doubleArrayOf(0.0, 0.0, 2.0), optimal = false, exactState = model.exactState)
+                override fun solve(warm: Basis?) = FloatLpResult(
+                    Basis(intArrayOf(2), Array(model.numVars) { VarStatus.AT_LOWER }),
+                    -6.0,
+                    doubleArrayOf(-3.0),
+                    doubleArrayOf(0.0, 0.0, 2.0),
+                    optimal = false,
+                    exactState = model.exactState,
+                )
                 override fun solvePrimal(warm: Basis?) = solve(warm)
                 override fun gomoryCuts(maxCuts: Int) = emptyList<Cut>()
                 override fun mirCuts(maxCuts: Int) = emptyList<Cut>()
@@ -208,14 +259,24 @@ class LpDualizationTest {
         val source = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).trailModel()))
         var closed = false
         val factory = object : LpEngineFactory by ProductionLpEngineFactory {
-            override fun newTableauSolver(model: LpModel, cancellation: Cancellation, iterationLimit: Int, workLimit: Long, trackDegeneracy: Boolean, pricing: LpPricingOptions): TableauCutSolver = object : TableauCutSolver {
+            override fun newTableauSolver(
+                model: LpModel,
+                cancellation: Cancellation,
+                iterationLimit: Int,
+                workLimit: Long,
+                trackDegeneracy: Boolean,
+                pricing: LpPricingOptions,
+            ): TableauCutSolver = object : TableauCutSolver {
                 override val infeasibleRay: DoubleArray? = null
                 override val lastMetrics: LpSolveMetrics get() = error("measurement")
                 override fun solve(warm: Basis?): FloatLpResult? = error("primary")
                 override fun solvePrimal(warm: Basis?) = solve(warm)
                 override fun gomoryCuts(maxCuts: Int) = emptyList<Cut>()
                 override fun mirCuts(maxCuts: Int) = emptyList<Cut>()
-                override fun close() { closed = true; error("cleanup") }
+                override fun close() {
+                    closed = true;
+                    error("cleanup")
+                }
             }
         }
         val attempt = LpRootDualizationAttempt(LpDualizationOptions(enabled = true, minRowColumnRatio = 1))
@@ -227,5 +288,4 @@ class LpDualizationTest {
         assertEquals(listOf("measurement", "cleanup"), failure.suppressedExceptions.map { it.message })
         assertTrue(attempt.metrics.constructionWork > 0L)
     }
-
 }

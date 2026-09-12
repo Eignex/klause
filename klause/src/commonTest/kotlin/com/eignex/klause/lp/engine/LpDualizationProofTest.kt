@@ -15,15 +15,28 @@ class LpDualizationProofTest {
     @Test
     fun `upper only structural and ranged logical costs retain objective units and origin`() {
         val one = ExactLpNumber.of(1L)
-        val source = LpExactState(ExactLpModel(
-            listOf(listOf(ExactLpEntry(0, one))), listOf(ExactLpNumber.of(5L)),
+        val source = LpExactState(
+            ExactLpModel(
+            listOf(listOf(ExactLpEntry(0, one))),
+            listOf(ExactLpNumber.of(5L)),
             listOf(
-                ExactLpColumn(ExactLpBounds(upper = ExactLpSide(ExactLpNumber.of(4L))), origin = ExactLpNumber.of(10L), integral = false),
+                ExactLpColumn(
+                    ExactLpBounds(upper = ExactLpSide(ExactLpNumber.of(4L))),
+                    origin = ExactLpNumber.of(10L),
+                    integral = false,
+                ),
                 ExactLpColumn(ExactLpBounds(ExactLpSide(one), ExactLpSide(ExactLpNumber.of(3L))), integral = false),
             ),
             listOf(ExactLpRow()),
-            ExactLpObjective(listOf(ExactLpNumber.of(-3L), ExactLpNumber.of(2L)), ExactLpNumber.of(7L), ExactLpNumber.of(2L), ExactLpNumber.of(5L), Sense.MAXIMIZE),
-        ))
+            ExactLpObjective(
+                listOf(ExactLpNumber.of(-3L), ExactLpNumber.of(2L)),
+                ExactLpNumber.of(7L),
+                ExactLpNumber.of(2L),
+                ExactLpNumber.of(5L),
+                Sense.MAXIMIZE,
+            ),
+        )
+        )
         val attempt = LpRootDualizationAttempt(LpDualizationOptions(enabled = true, minRowColumnRatio = 1))
 
         assertNotNull(attempt.solve(source))
@@ -34,7 +47,13 @@ class LpDualizationProofTest {
         val slack = BigFraction.ofLong(5L) - x
         assertTrue(x <= BigFraction.ofLong(4L))
         assertTrue(slack >= BigFraction.ONE && slack <= BigFraction.ofLong(3L))
-        val value = (BigFraction.ofLong(-3L) * x + BigFraction.ofLong(2L) * slack + BigFraction.ofLong(7L)) * BigFraction.ofLong(2L).reciprocal() + BigFraction.ofLong(5L)
+        val value = (
+            BigFraction.ofLong(
+            -3L,
+        ) * x + BigFraction.ofLong(
+            2L,
+        ) * slack + BigFraction.ofLong(7L)
+        ) * BigFraction.ofLong(2L).reciprocal() + BigFraction.ofLong(5L)
         assertEquals(value, result.lowerBound)
         assertEquals(BigFraction.ofLong(7L) * BigFraction.ofLong(2L).reciprocal(), value)
     }
@@ -45,7 +64,11 @@ class LpDualizationProofTest {
         val x = builder.addVar(0L, 10L)
         builder.addRow(intArrayOf(x), longArrayOf(1L), Relation.LE, -1L)
         val source = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).trailModel()))
-        val transform = LpDualization.create(source, LpDualizationOptions(), LpDualizationMeter(10000L, 4096, Cancellation.Never))
+        val transform = LpDualization.create(
+            source,
+            LpDualizationOptions(),
+            LpDualizationMeter(10000L, 4096, Cancellation.Never),
+        )
         // Lower x, upper x, lower logical.
         val direction = listOf(BigFraction.ONE, BigFraction.ZERO, BigFraction.ONE)
 
@@ -65,8 +88,16 @@ class LpDualizationProofTest {
         val x = builder.addVar(0L, 10L)
         builder.addRow(intArrayOf(x), longArrayOf(1L), Relation.LE, -1L)
         val source = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).trailModel()))
-        val transform = LpDualization.create(source, LpDualizationOptions(), LpDualizationMeter(10000L, 4096, Cancellation.Never))
-        val conflict = BigRationalConflict(intArrayOf(0), listOf(BigFraction.ONE), listOf(ExactSimplexBound(0, false), ExactSimplexBound(1, false)))
+        val transform = LpDualization.create(
+            source,
+            LpDualizationOptions(),
+            LpDualizationMeter(10000L, 4096, Cancellation.Never),
+        )
+        val conflict = BigRationalConflict(
+            intArrayOf(0),
+            listOf(BigFraction.ONE),
+            listOf(ExactSimplexBound(0, false), ExactSimplexBound(1, false)),
+        )
         val point = ExactLpWitness(List(3) { BigFraction.ZERO }, BigFraction.ZERO)
 
         val result = assertNotNull(transform.dualUnboundedness(conflict, point))
@@ -82,20 +113,36 @@ class LpDualizationProofTest {
     fun `dual infeasibility needs a separate source point to prove unboundedness`() {
         val zero = ExactLpNumber.of(0L)
         val minusOne = ExactLpNumber.of(-1L)
-        val source = LpExactState(ExactLpModel(
-            listOf(listOf(ExactLpEntry(0, minusOne))), listOf(zero),
+        val source = LpExactState(
+            ExactLpModel(
+            listOf(listOf(ExactLpEntry(0, minusOne))),
+            listOf(zero),
             List(2) { ExactLpColumn(ExactLpBounds(ExactLpSide(zero))) },
-            listOf(ExactLpRow()), ExactLpObjective(listOf(minusOne, zero)),
-        ))
-        val transform = LpDualization.create(source, LpDualizationOptions(), LpDualizationMeter(10000L, 4096, Cancellation.Never))
-        val conflict = BigRationalConflict(intArrayOf(0), listOf(BigFraction.ONE), List(2) { ExactSimplexBound(it, false) })
+            listOf(ExactLpRow()),
+            ExactLpObjective(listOf(minusOne, zero)),
+        )
+        )
+        val transform = LpDualization.create(
+            source,
+            LpDualizationOptions(),
+            LpDualizationMeter(10000L, 4096, Cancellation.Never),
+        )
+        val conflict = BigRationalConflict(
+            intArrayOf(0),
+            listOf(BigFraction.ONE),
+            List(2) { ExactSimplexBound(it, false) },
+        )
 
-        val result = assertNotNull(transform.sourceUnboundedness(conflict, ExactLpWitness(listOf(BigFraction.ZERO), BigFraction.ZERO)))
+        val result = assertNotNull(
+            transform.sourceUnboundedness(conflict, ExactLpWitness(listOf(BigFraction.ZERO), BigFraction.ZERO)),
+        )
 
         assertEquals(listOf(BigFraction.ONE), result.direction)
         assertEquals(BigFraction.ZERO, result.direction.single().negated() + result.direction.single())
         assertTrue(result.direction.single().negated() < BigFraction.ZERO)
-        assertNull(transform.sourceUnboundedness(conflict, ExactLpWitness(listOf(BigFraction.ofLong(-1L)), BigFraction.ONE)))
+        assertNull(
+            transform.sourceUnboundedness(conflict, ExactLpWitness(listOf(BigFraction.ofLong(-1L)), BigFraction.ONE)),
+        )
         assertNotNull(transform.dualConflict(listOf(BigFraction.ONE))?.conflict)
     }
 
@@ -103,15 +150,30 @@ class LpDualizationProofTest {
     fun `a fractional integer source point cannot justify MILP unboundedness`() {
         val zero = ExactLpNumber.of(0L)
         val minusOne = ExactLpNumber.of(-1L)
-        val source = LpExactState(ExactLpModel(
-            listOf(listOf(ExactLpEntry(0, minusOne))), listOf(zero),
+        val source = LpExactState(
+            ExactLpModel(
+            listOf(listOf(ExactLpEntry(0, minusOne))),
+            listOf(zero),
             List(2) { ExactLpColumn(ExactLpBounds(ExactLpSide(zero))) },
-            listOf(ExactLpRow()), ExactLpObjective(listOf(minusOne, zero)),
-        ))
-        val transform = LpDualization.create(source, LpDualizationOptions(), LpDualizationMeter(10000L, 4096, Cancellation.Never))
-        val conflict = BigRationalConflict(intArrayOf(0), listOf(BigFraction.ONE), List(2) { ExactSimplexBound(it, false) })
+            listOf(ExactLpRow()),
+            ExactLpObjective(listOf(minusOne, zero)),
+        )
+        )
+        val transform = LpDualization.create(
+            source,
+            LpDualizationOptions(),
+            LpDualizationMeter(10000L, 4096, Cancellation.Never),
+        )
+        val conflict = BigRationalConflict(
+            intArrayOf(0),
+            listOf(BigFraction.ONE),
+            List(2) { ExactSimplexBound(it, false) },
+        )
 
-        val result = transform.sourceUnboundedness(conflict, ExactLpWitness(listOf(BigFraction.ofLong(2L).reciprocal()), BigFraction.ZERO))
+        val result = transform.sourceUnboundedness(
+            conflict,
+            ExactLpWitness(listOf(BigFraction.ofLong(2L).reciprocal()), BigFraction.ZERO),
+        )
 
         assertNull(result)
     }
@@ -125,11 +187,21 @@ class LpDualizationProofTest {
         val attempt = LpRootDualizationAttempt(LpDualizationOptions(enabled = true))
         assertNotNull(attempt.solve(source))
 
-        val refused = assertNotNull(certifyDualizedSource(assertNotNull(source.toWorkingModel()), attempt, LpCertificationPolicy { _, _ -> false }))
+        val refused = assertNotNull(
+            certifyDualizedSource(
+                assertNotNull(source.toWorkingModel()),
+                attempt,
+                LpCertificationPolicy { _, _ -> false },
+            ),
+        )
         val foreign = certifyDualizedSource(assertNotNull(LpExactState(source.model).toWorkingModel()), attempt)
 
         assertEquals(LpVerdict.INDETERMINATE, refused.verdict)
         assertNull(foreign)
-        assertNull(certifyDualizedSource(assertNotNull(source.toWorkingModel()), attempt, cancellation = Cancellation { true }))
+        assertNull(
+            certifyDualizedSource(
+                assertNotNull(source.toWorkingModel()), attempt, cancellation = Cancellation { true },
+            ),
+        )
     }
 }

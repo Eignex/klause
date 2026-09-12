@@ -426,11 +426,7 @@ internal object UnscaledLpEngineFactory : LpEngineFactory {
     )
 }
 
-internal class LpRootAdmission(
-    private val sourceModel: LpModel,
-    val workLimit: Long?,
-    val iterationLimit: Int?,
-) {
+internal class LpRootAdmission(private val sourceModel: LpModel, val workLimit: Long?, val iterationLimit: Int?) {
     private val source = requireNotNull(sourceModel.exactState)
     private var claimed = false
 

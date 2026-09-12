@@ -89,11 +89,21 @@ internal fun solveAndCertify(
             captureEligible = false,
         )
     }
-    val dualization = if (warm == null && context.rootDualization.enabled) LpRootDualizationAttempt(context.rootDualization) else null
-    val proposal = if (dualization == null) basis else try {
+    val dualization = if (warm == null && context.rootDualization.enabled) {
+        LpRootDualizationAttempt(
+        context.rootDualization,
+    )
+    } else {
+        null
+    }
+    val proposal = if (dualization == null) {
+        basis
+    } else {
+        try {
         dualization.solve(state, context, pricing, cancellation) ?: basis
     } finally {
         observer?.observeDualization(dualization.metrics)
+    }
     }
     val solved = solveAndCertify(
         working,
@@ -107,8 +117,20 @@ internal fun solveAndCertify(
     )
     if (dualization == null) return solved
     val mapped = certifyDualizedSource(working, dualization, context.certificationPolicy, cancellation)
-    if (cancellation()) return CertifiedLpResult(null, null, null, null, null, false, { null }, dualization = dualization.metrics)
-    val bound = mapped?.bound?.takeIf { candidate -> solved.bound?.let { candidate.value > it.value } != false } ?: solved.bound
+    if (cancellation()) {
+        return CertifiedLpResult(
+        null,
+        null,
+        null,
+        null,
+        null,
+        false,
+        { null },
+        dualization = dualization.metrics,
+    )
+    }
+    val bound =
+        mapped?.bound?.takeIf { candidate -> solved.bound?.let { candidate.value > it.value } != false } ?: solved.bound
     val witness = solved.witness ?: mapped?.witness
     return CertifiedLpResult(
         solved.float, bound, witness, solved.farkasRay, solved.rationalConflict, working.hasIntegralObjective(),

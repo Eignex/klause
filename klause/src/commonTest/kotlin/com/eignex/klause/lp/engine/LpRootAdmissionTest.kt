@@ -1,15 +1,15 @@
 package com.eignex.klause.lp.engine
 
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.lp.bounding.LpEffortProfile
 import com.eignex.klause.lp.bounding.LpEngine
 import com.eignex.klause.lp.bounding.LpParams
-import com.eignex.klause.lp.bounding.solveNode
-import com.eignex.klause.solver.objective.LinearObjective
-import com.eignex.klause.solver.result.SolveStatsSink
-import com.eignex.klause.lp.bounding.LpEffortProfile
 import com.eignex.klause.lp.bounding.LpPropagator
 import com.eignex.klause.lp.bounding.LpSearchPolicy
+import com.eignex.klause.lp.bounding.solveNode
 import com.eignex.klause.lp.bounding.trailModel
+import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -25,16 +25,28 @@ class LpRootAdmissionTest {
     fun `root admission preserves source authority and reserves preparation work`() {
         val zero = ExactLpNumber.of(0L)
         val one = ExactLpNumber.of(1L)
-        val source = LpExactState(ExactLpModel(
-            listOf(listOf(ExactLpEntry(0, one))), listOf(one),
+        val source = LpExactState(
+            ExactLpModel(
+            listOf(listOf(ExactLpEntry(0, one))),
+            listOf(one),
             List(2) { ExactLpColumn(ExactLpBounds(ExactLpSide(zero))) },
-            listOf(ExactLpRow()), ExactLpObjective(listOf(one, zero)),
-        ))
+            listOf(ExactLpRow()),
+            ExactLpObjective(listOf(one, zero)),
+        )
+        )
         val model = assertNotNull(source.toWorkingModel())
         val pricing = LpPricingOptions(LpZeroObjectivePricing.LARGEST_PIVOT, 19L)
         var created = 0
         val factory = object : LpEngineFactory by ProductionLpEngineFactory {
-            override fun newPersistentSolver(model: LpModel, cancellation: Cancellation, refactorUpdateLimit: Int, iterationLimit: Int, workLimit: Long, trackDegeneracy: Boolean, pricing: LpPricingOptions): PersistentLpSolver {
+            override fun newPersistentSolver(
+                model: LpModel,
+                cancellation: Cancellation,
+                refactorUpdateLimit: Int,
+                iterationLimit: Int,
+                workLimit: Long,
+                trackDegeneracy: Boolean,
+                pricing: LpPricingOptions,
+            ): PersistentLpSolver {
                 created++
                 assertSame(source, model.exactState)
                 assertEquals(17, refactorUpdateLimit)
@@ -49,8 +61,17 @@ class LpRootAdmissionTest {
                         assertSame(source, state)
                         return true
                     }
-                    override fun prepareLogicals(token: Cancellation) = Basis(intArrayOf(1), arrayOf(VarStatus.AT_LOWER, VarStatus.BASIC))
-                    override fun solve(warm: Basis?) = FloatLpResult(prepareLogicals(), 1.0, doubleArrayOf(-1.0), doubleArrayOf(1.0), exactState = source)
+                    override fun prepareLogicals(token: Cancellation) = Basis(
+                        intArrayOf(1),
+                        arrayOf(VarStatus.AT_LOWER, VarStatus.BASIC),
+                    )
+                    override fun solve(warm: Basis?) = FloatLpResult(
+                        prepareLogicals(),
+                        1.0,
+                        doubleArrayOf(-1.0),
+                        doubleArrayOf(1.0),
+                        exactState = source,
+                    )
                     override fun solvePrimal(warm: Basis?) = solve(warm)
                     override fun rebind(next: LpModel, token: Cancellation) = false
                     override fun resolveBounds() = solve(null)
@@ -59,7 +80,19 @@ class LpRootAdmissionTest {
             }
         }
         val receipt = LpRootAdmission(model, 1001L, 7)
-        LpPropagator(object : LpSearchPolicy {}, { LpEffortProfile(work = 5000L, iterations = 30, refactorUpdates = 17, trackDegeneracy = true, pricing = pricing) }, LpSolveContext(factory)).use { owner ->
+        LpPropagator(
+            object : LpSearchPolicy {},
+            {
+                LpEffortProfile(
+                    work = 5000L,
+                    iterations = 30,
+                    refactorUpdates = 17,
+                    trackDegeneracy = true,
+                    pricing = pricing,
+                )
+            },
+            LpSolveContext(factory),
+        ).use { owner ->
             assertTrue(owner.install(model, source.model, receipt))
             assertSame(source, owner.state)
             val result = assertNotNull(owner.solveFloat())
@@ -122,7 +155,12 @@ class LpRootAdmissionTest {
         val source = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).trailModel()))
         val model = assertNotNull(source.toWorkingModel())
         val receipt = LpRootAdmission(model, 10L, null)
-        LpEngine(Problem(0, 0, emptyArray(), emptyArray()), LinearObjective(), LpParams(), SolveStatsSink(backend = "admission")).use { engine ->
+        LpEngine(
+            Problem(0, 0, emptyArray(), emptyArray()),
+            LinearObjective(),
+            LpParams(),
+            SolveStatsSink(backend = "admission"),
+        ).use { engine ->
             assertTrue(engine.propagator.install(Any(), source.model))
             val previous = engine.propagator.state
             val previousKey = engine.cpAdapter.currentModel

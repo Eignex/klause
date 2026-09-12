@@ -31,8 +31,20 @@ internal data class LpDualizationOptions(
 }
 
 internal enum class LpDualizationDecline {
-    DISABLED, NOT_TALL, PARENT_BUDGET, AUTHORITY, STRICT, BOUNDS, DIMENSION, BITS, WORK, CANCELLED,
-    PROJECTION, AUXILIARY, BASIS, POLICY,
+    DISABLED,
+    NOT_TALL,
+    PARENT_BUDGET,
+    AUTHORITY,
+    STRICT,
+    BOUNDS,
+    DIMENSION,
+    BITS,
+    WORK,
+    CANCELLED,
+    PROJECTION,
+    AUXILIARY,
+    BASIS,
+    POLICY,
 }
 
 internal data class LpDualizationMetrics(
@@ -89,7 +101,11 @@ internal class LpDualization private constructor(
 ) {
     val model: ExactLpModel get() = working.state.model
 
-    fun sourceDual(point: List<BigFraction>, meter: LpDualizationMeter, homogeneous: Boolean = false): List<BigFraction>? {
+    fun sourceDual(
+        point: List<BigFraction>,
+        meter: LpDualizationMeter,
+        homogeneous: Boolean = false,
+    ): List<BigFraction>? {
         if (point.size != model.n) return null
         val original = source.model
         val result = MutableList(original.m) {
@@ -100,7 +116,9 @@ internal class LpDualization private constructor(
             val side = sides[j]
             if (side.sourceColumn >= original.n) {
                 val row = side.sourceColumn - original.n
-                result[row] = meter.number(result[row] + meter.number(point[j]) * BigFraction.ofLong(side.sign.toLong()))
+                result[row] = meter.number(
+                    result[row] + meter.number(point[j]) * BigFraction.ofLong(side.sign.toLong()),
+                )
             }
         }
         return result
@@ -115,7 +133,9 @@ internal class LpDualization private constructor(
         val original = source.model
         if (auxiliary.basicVars.size != model.m || auxiliary.status.size != model.numVars ||
             auxiliary.basicVars.distinct().size != model.m || witness.primal.size != original.n
-        ) return null
+        ) {
+            return null
+        }
         val values = MutableList(original.numVars) { BigFraction.ZERO }
         for (j in 0 until original.n) values[j] = meter.number(witness.primal[j] - original.column(j).origin.value)
         for (i in 0 until original.m) values[original.n + i] = meter.number(original.rhs(i).value)
@@ -172,7 +192,12 @@ internal class LpDualization private constructor(
     ): ExactLpUnboundedness? = mapped(options, token) { meter ->
         val rho = conflictVector(dualConflict, model.m, meter) ?: return@mapped null
         val dualModel = working.state.toWorkingModel() ?: return@mapped null
-        val checked = verifyRationalCertificate(dualModel, ray = rho, cancellation = token, limits = options.proofLimits().copy(maxWork = maxOf(0L, options.proofWork - meter.work)))
+        val checked = verifyRationalCertificate(
+            dualModel,
+            ray = rho,
+            cancellation = token,
+            limits = options.proofLimits().copy(maxWork = maxOf(0L, options.proofWork - meter.work)),
+        )
         if (checked.conflict == null) return@mapped null
         meter.completed(checked.metrics.work)
         // The destination checks determine orientation; a Farkas API may have accepted the opposite sign.
@@ -203,7 +228,12 @@ internal class LpDualization private constructor(
     ): ExactLpUnboundedness? = mapped(options, token) { meter ->
         val original = source.toWorkingModel() ?: return@mapped null
         val rho = conflictVector(sourceConflict, source.model.m, meter) ?: return@mapped null
-        val checked = verifyRationalCertificate(original, ray = rho, cancellation = token, limits = options.proofLimits().copy(maxWork = maxOf(0L, options.proofWork - meter.work)))
+        val checked = verifyRationalCertificate(
+            original,
+            ray = rho,
+            cancellation = token,
+            limits = options.proofLimits().copy(maxWork = maxOf(0L, options.proofWork - meter.work)),
+        )
         val conflict = checked.conflict ?: return@mapped null
         meter.completed(checked.metrics.work)
         val oriented = conflictVector(conflict, source.model.m, meter) ?: return@mapped null
@@ -216,12 +246,24 @@ internal class LpDualization private constructor(
         val direction = sides.mapIndexed { index, side ->
             val value = coefficients[side.sourceColumn]
             val signed = if (side.upper) value.negated() else value
-            meter.number(if (model.column(index).bounds.lower == null) signed else if (signed.signum() > 0) signed else BigFraction.ZERO)
+            meter.number(
+                if (model.column(
+                        index,
+                    ).bounds.lower == null
+                ) {
+                        signed
+                    } else if (signed.signum() > 0) {
+                        signed
+                    } else {
+                        BigFraction.ZERO
+                    },
+            )
         }
         exactUnboundedness(working.state.toWorkingModel() ?: return@mapped null, dualWitness, direction, meter)
     }
 
     companion object {
+        @Suppress("ThrowsCount")
         fun create(source: LpExactState, options: LpDualizationOptions, meter: LpDualizationMeter): LpDualization {
             val original = source.model
             if (original.numVars > options.maxCoordinates) throw DualizationStop(LpDualizationDecline.DIMENSION)
@@ -233,20 +275,30 @@ internal class LpDualization private constructor(
                 meter.step()
                 val bounds = original.column(j).bounds
                 if (!bounds.consistent) throw DualizationStop(LpDualizationDecline.BOUNDS)
-                if (bounds.lower?.strict == true || bounds.upper?.strict == true) throw DualizationStop(LpDualizationDecline.STRICT)
+                if (bounds.lower?.strict == true || bounds.upper?.strict == true) {
+                    throw DualizationStop(
+                    LpDualizationDecline.STRICT,
+                )
+                }
                 for (side in listOfNotNull(bounds.lower, bounds.upper)) meter.number(side.number.value)
                 meter.number(original.column(j).origin.value)
             }
             for (i in 0 until original.m) {
                 if (original.row(i).strict) throw DualizationStop(LpDualizationDecline.STRICT)
-                constant = meter.number(constant + meter.number(original.rhs(i).value) * meter.number(original.objective.cost(original.n + i).value))
+                constant = meter.number(
+                    constant + meter.number(
+                        original.rhs(i).value,
+                    ) * meter.number(original.objective.cost(original.n + i).value),
+                )
             }
             for (j in 0 until original.n) {
                 for (entry in original.entries(j)) {
                     meter.step()
                     if (++entries > options.maxEntries) throw DualizationStop(LpDualizationDecline.DIMENSION)
                     rows[entry.row] += ExactLpEntry(j, ExactLpNumber.of(meter.number(entry.number.value)))
-                    costs[j] = meter.number(costs[j] - entry.number.value * original.objective.cost(original.n + entry.row).value)
+                    costs[j] = meter.number(
+                        costs[j] - entry.number.value * original.objective.cost(original.n + entry.row).value,
+                    )
                 }
             }
             val matrix = ArrayList<List<ExactLpEntry>>()
@@ -258,14 +310,36 @@ internal class LpDualization private constructor(
                 meter.step()
                 val structural = column < original.n
                 val sign = if (upper == structural) -1L else 1L
-                val data = if (structural) listOf(ExactLpEntry(column, ExactLpNumber.of(1L))) else rows[column - original.n]
+                val data = if (structural) {
+                    listOf(
+                    ExactLpEntry(column, ExactLpNumber.of(1L)),
+                )
+                } else {
+                    rows[column - original.n]
+                }
                 transformedEntries += data.size
-                if (matrix.size.toLong() + 1 + original.n > options.maxCoordinates || transformedEntries > options.maxEntries) {
+                if (matrix.size.toLong() + 1 + original.n > options.maxCoordinates ||
+                    transformedEntries > options.maxEntries
+                ) {
                     throw DualizationStop(LpDualizationDecline.DIMENSION)
                 }
-                matrix += data.map { ExactLpEntry(it.row, ExactLpNumber.of(meter.number(it.number.value * BigFraction.ofLong(sign)))) }
-                columns += ExactLpColumn(if (free) ExactLpBounds() else ExactLpBounds(ExactLpSide(ExactLpNumber.of(0L))), integral = false)
-                val cost = if (structural) bound.number.value.negated() else bound.number.value - original.rhs(column - original.n).value
+                matrix += data.map {
+                    ExactLpEntry(
+                        it.row,
+                        ExactLpNumber.of(meter.number(it.number.value * BigFraction.ofLong(sign))),
+                    )
+                }
+                columns += ExactLpColumn(
+                    if (free) ExactLpBounds() else ExactLpBounds(ExactLpSide(ExactLpNumber.of(0L))),
+                    integral = false,
+                )
+                val cost = if (structural) {
+                    bound.number.value.negated()
+                } else {
+                    bound.number.value - original.rhs(
+                    column - original.n,
+                ).value
+                }
                 objective += ExactLpNumber.of(meter.number(cost * BigFraction.ofLong(sign)))
                 sides += LpDualSide(column, upper, sign.toInt())
             }
@@ -284,7 +358,9 @@ internal class LpDualization private constructor(
             val exact = ExactLpModel(
                 matrix,
                 costs.map(ExactLpNumber::of),
-                columns + List(original.n) { ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(zero)), integral = false) },
+                columns + List(
+                    original.n,
+                ) { ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(zero)), integral = false) },
                 List(original.n) { ExactLpRow() },
                 ExactLpObjective(
                     objective + List(original.n) { zero },
@@ -314,7 +390,9 @@ private fun recession(model: LpModel, direction: List<BigFraction>, meter: LpDua
     val all = MutableList(model.numVars) { BigFraction.ZERO }
     for (j in direction.indices) {
         all[j] = meter.number(direction[j])
-        model.forEachRationalColumn(j) { row, value -> all[model.n + row] = meter.number(all[model.n + row] - value * all[j]) }
+        model.forEachRationalColumn(
+            j,
+        ) { row, value -> all[model.n + row] = meter.number(all[model.n + row] - value * all[j]) }
     }
     var improvement = BigFraction.ZERO
     for (j in all.indices) {
@@ -353,16 +431,24 @@ private fun exactUnboundedness(
         val bounds = original.column(j).bounds
         if (bounds.lower?.let { point[j] < it.number.value || (it.strict && point[j] == it.number.value) } == true ||
             bounds.upper?.let { point[j] > it.number.value || (it.strict && point[j] == it.number.value) } == true
-        ) return null
+        ) {
+            return null
+        }
         val exported = meter.number(point[j] + original.column(j).origin.value)
         if (original.column(j).integral && (exported.den != BigInteger.ONE || ray[j].den != BigInteger.ONE)) return null
         objective = meter.number(objective + original.objective.cost(j).value * point[j])
     }
-    objective = meter.number(objective * original.objective.scale.value.reciprocal() + original.objective.externalConstant.value)
+    objective = meter.number(
+        objective * original.objective.scale.value.reciprocal() + original.objective.externalConstant.value,
+    )
     return ExactLpUnboundedness(ExactLpWitness(witness.primal.toList(), objective), direction.toList())
 }
 
-private inline fun <T> mapped(options: LpDualizationOptions, token: Cancellation, block: (LpDualizationMeter) -> T?): T? = try {
+private inline fun <T> mapped(
+    options: LpDualizationOptions,
+    token: Cancellation,
+    block: (LpDualizationMeter) -> T?,
+): T? = try {
     block(LpDualizationMeter(options.proofWork, options.maxBits, token)).takeUnless { token() }
 } catch (_: DualizationStop) {
     null
@@ -383,7 +469,7 @@ internal class LpRootDualizationAttempt(private val options: LpDualizationOption
         metrics = metrics.copy(decline = reason)
     }
 
-    @Suppress("TooGenericExceptionCaught")
+    @Suppress("TooGenericExceptionCaught", "ThrowingExceptionFromFinally", "ThrowsCount")
     fun solve(
         source: LpExactState,
         context: LpSolveContext = LpSolveContext.Production,
@@ -398,7 +484,9 @@ internal class LpRootDualizationAttempt(private val options: LpDualizationOption
         sourceState = source
         val decline = when {
             !options.enabled -> LpDualizationDecline.DISABLED
-            source.model.n == 0 || source.model.m.toLong() < options.minRowColumnRatio.toLong() * source.model.n -> LpDualizationDecline.NOT_TALL
+            source.model.n == 0 ||
+                source.model.m.toLong() < options.minRowColumnRatio.toLong() * source.model.n ->
+                LpDualizationDecline.NOT_TALL
             else -> null
         }
         if (decline != null) {
@@ -407,8 +495,11 @@ internal class LpRootDualizationAttempt(private val options: LpDualizationOption
         }
         metrics = metrics.copy(eligible = true)
         require(parentWork >= 0L && parentPivots >= 0 && sourcePreparationWork >= 0L)
-        val constructionLimit = if (parentWork == 0L) options.constructionWork else
+        val constructionLimit = if (parentWork == 0L) {
+            options.constructionWork
+        } else {
             minOf(options.constructionWork, maxOf(0L, parentWork / 8L - sourcePreparationWork))
+        }
         val solveLimit = if (parentWork == 0L) options.solveWork else minOf(options.solveWork, parentWork / 2L)
         val proofLimit = if (parentWork == 0L) options.proofWork else minOf(options.proofWork, parentWork / 8L)
         val pivotLimit = if (parentPivots == 0) options.solvePivots else minOf(options.solvePivots, parentPivots)
@@ -425,9 +516,18 @@ internal class LpRootDualizationAttempt(private val options: LpDualizationOption
             val original: LpModel
             try {
                 construction.step((transform.model.numVars.toLong() + source.model.numVars) * 4L)
-                val auxiliary = transform.working.state.toWorkingModel() ?: throw DualizationStop(LpDualizationDecline.PROJECTION)
+                val auxiliary = transform.working.state.toWorkingModel() ?: throw DualizationStop(
+                    LpDualizationDecline.PROJECTION,
+                )
                 original = source.toWorkingModel() ?: throw DualizationStop(LpDualizationDecline.PROJECTION)
-                solver = newTableauCutSolver(auxiliary, token, pivotLimit, solveLimit, factory = context.engineFactory, pricing = pricing)
+                solver = newTableauCutSolver(
+                    auxiliary,
+                    token,
+                    pivotLimit,
+                    solveLimit,
+                    factory = context.engineFactory,
+                    pricing = pricing,
+                )
             } finally {
                 metrics = metrics.copy(setupNanos = setup.elapsedNow().inWholeNanoseconds)
             }
@@ -458,11 +558,20 @@ internal class LpRootDualizationAttempt(private val options: LpDualizationOption
             postsolve.step()
             if (result.primal.size != transform.model.n || result.duals.size != transform.model.m ||
                 result.primal.any { !it.isFinite() } || result.duals.any { !it.isFinite() }
-            ) throw DualizationStop(LpDualizationDecline.PROJECTION)
+            ) {
+                throw DualizationStop(LpDualizationDecline.PROJECTION)
+            }
             if (result.exactState !== transform.working.state) throw DualizationStop(LpDualizationDecline.AUTHORITY)
             val y = transform.sourceDual(result.primal.map { postsolve.number(exactDouble(it)) }, postsolve)
                 ?: throw DualizationStop(LpDualizationDecline.PROJECTION)
-            val x = if (result.optimal) transform.sourcePoint(result.duals.map { postsolve.number(exactDouble(it)) }, postsolve) else null
+            val x = if (result.optimal) {
+                transform.sourcePoint(
+                result.duals.map { postsolve.number(exactDouble(it)) },
+                postsolve,
+            )
+            } else {
+                null
+            }
             val checked = reconstructCertificate(
                 original,
                 primal = x?.map { it.toDouble() }?.toDoubleArray(),
@@ -473,7 +582,11 @@ internal class LpRootDualizationAttempt(private val options: LpDualizationOption
             postsolve.completed(checked.metrics.work)
             certificate = checked
             val point = checked.witness ?: throw DualizationStop(LpDualizationDecline.BASIS)
-            val basis = transform.sourceBasis(result.basis, point, postsolve) ?: throw DualizationStop(LpDualizationDecline.BASIS)
+            val basis = transform.sourceBasis(
+                result.basis,
+                point,
+                postsolve,
+            ) ?: throw DualizationStop(LpDualizationDecline.BASIS)
             postsolve.step()
             metrics = metrics.copy(basisRecovered = true)
             return basis

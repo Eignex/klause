@@ -168,7 +168,7 @@ internal class LpRootNodeResult(
     val dualization: LpDualizationMetrics?,
 )
 
-@Suppress("TooGenericExceptionCaught")
+@Suppress("TooGenericExceptionCaught", "ThrowingExceptionFromFinally")
 internal fun LpEngine.solveRootNode(
     dive: LpEngine,
     original: LpModel,
@@ -195,8 +195,11 @@ internal fun LpEngine.solveRootNode(
                     val estimate = (original.numVars.toLong() * 8L + original.csc.colVal.size.toLong() * 4L)
                     val decline = when {
                         token() -> LpDualizationDecline.CANCELLED
-                        original.n == 0 || original.m.toLong() < options.minRowColumnRatio.toLong() * original.n -> LpDualizationDecline.NOT_TALL
-                        original.numVars > options.maxCoordinates || original.csc.colVal.size > options.maxEntries -> LpDualizationDecline.DIMENSION
+                        original.n == 0 ||
+                            original.m.toLong() < options.minRowColumnRatio.toLong() * original.n ->
+                            LpDualizationDecline.NOT_TALL
+                        original.numVars > options.maxCoordinates ||
+                            original.csc.colVal.size > options.maxEntries -> LpDualizationDecline.DIMENSION
                         parentWork > 0L && estimate > parentWork / 8L -> LpDualizationDecline.WORK
                         else -> null
                     }
@@ -211,7 +214,15 @@ internal fun LpEngine.solveRootNode(
                             return@solveRootNodeWithCrash null
                         } else {
                             model = projection
-                            basis = dualization.solve(requireNotNull(source), solveContext, dive.pricingOptions, token, parentWork, parentPivots, preparationWork)
+                            basis = dualization.solve(
+                                requireNotNull(source),
+                                solveContext,
+                                dive.pricingOptions,
+                                token,
+                                parentWork,
+                                parentPivots,
+                                preparationWork,
+                            )
                         }
                     }
                 }
@@ -226,10 +237,22 @@ internal fun LpEngine.solveRootNode(
                 }
                 val admission = if (source != null && model.exactState === source) {
                     val work = if (parentWork == 0L) null else parentWork - auxiliaryWork - crashWork
-                    val pivots = if (parentPivots == 0) null else parentPivots - (dualization?.metrics?.solve?.pivots ?: 0)
-                    if ((work != null && work < 2L) || (pivots != null && pivots <= 0)) return@solveRootNodeWithCrash null
+                    val pivots = if (parentPivots ==
+                        0
+                    ) {
+                            null
+                        } else {
+                            parentPivots - (dualization?.metrics?.solve?.pivots ?: 0)
+                        }
+                    if ((work != null && work < 2L) ||
+                        (pivots != null && pivots <= 0)
+                    ) {
+                            return@solveRootNodeWithCrash null
+                        }
                     LpRootAdmission(model, work, pivots)
-                } else null
+                } else {
+                    null
+                }
                 val previousMetrics = dive.propagator.lastMetrics
                 var failure: Throwable? = null
                 try {
@@ -241,7 +264,9 @@ internal fun LpEngine.solveRootNode(
                     try {
                         sourceMetrics = if (dive.nodeUsesTrail) {
                             dive.propagator.lastMetrics.takeUnless { it === previousMetrics } ?: LpSolveMetrics()
-                        } else dive.nodeSimplex?.lastMetrics ?: LpSolveMetrics()
+                        } else {
+                            dive.nodeSimplex?.lastMetrics ?: LpSolveMetrics()
+                        }
                     } catch (measurement: Throwable) {
                         if (failure == null) throw measurement
                         failure.addSuppressed(measurement)
@@ -276,7 +301,9 @@ internal fun solveRootNodeWithCrash(
     var unchargedCrashWork = crash?.metrics?.workOps ?: 0L
     try {
         val attempt = solve() ?: return null
-        val combinedMetrics = solveMetrics(attempt.first) + LpSolveMetrics(workOps = unchargedCrashWork) + additionalMetrics()
+        val combinedMetrics = solveMetrics(
+            attempt.first,
+        ) + LpSolveMetrics(workOps = unchargedCrashWork) + additionalMetrics()
         unchargedCrashWork = 0L
         charged = true
         observe(attempt.first, combinedMetrics)
@@ -294,7 +321,13 @@ internal fun LpEngine.solveRootNodeWithCrash(
     solve: () -> Pair<LpSolver, FloatLpResult?>?,
     solveMetrics: (LpSolver) -> LpSolveMetrics,
     additionalMetrics: () -> LpSolveMetrics = { LpSolveMetrics() },
-): Pair<LpSolver, FloatLpResult?>? = solveRootNodeWithCrash(crash, solve, solveMetrics, this::observeRootSolve, additionalMetrics)
+): Pair<LpSolver, FloatLpResult?>? = solveRootNodeWithCrash(
+    crash,
+    solve,
+    solveMetrics,
+    this::observeRootSolve,
+    additionalMetrics,
+)
 
 internal fun rootCrashWorkLimit(nodeWorkLimit: Long): Long = if (nodeWorkLimit == 0L) {
     ROOT_CRASH_WORK_LIMIT

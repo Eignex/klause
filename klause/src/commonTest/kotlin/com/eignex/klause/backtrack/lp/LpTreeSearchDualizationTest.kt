@@ -8,7 +8,6 @@ import com.eignex.klause.lp.engine.LpSolveMetrics
 import com.eignex.klause.lp.engine.LpSolver
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.SolveStatsSink
-import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -21,7 +20,14 @@ class LpTreeSearchDualizationTest {
         val engine = LpEngine(Problem(0, 0, emptyArray(), emptyArray()), LinearObjective(), LpParams(), sink)
 
         engine.use {
-            assertNull(it.solveRootNodeWithCrash(null, { null }, { error("no solve owner") }, { LpSolveMetrics(workOps = 41L) }))
+            assertNull(
+                it.solveRootNodeWithCrash(
+                    null,
+                    { null },
+                    { error("no solve owner") },
+                    { LpSolveMetrics(workOps = 41L) },
+                ),
+            )
         }
 
         assertEquals(41L, engine.totalSolveWork())
@@ -34,7 +40,13 @@ class LpTreeSearchDualizationTest {
         val observed = ArrayList<Long>()
 
         val failure = assertFailsWith<IllegalStateException> {
-            solveRootNodeWithCrash(null, { error("auxiliary failure") }, { error("no owner") }, { _, metrics -> observed += metrics.workOps }, { LpSolveMetrics(workOps = 23L) })
+            solveRootNodeWithCrash(
+                null,
+                { error("auxiliary failure") },
+                { error("no owner") },
+                { _, metrics -> observed += metrics.workOps },
+                { LpSolveMetrics(workOps = 23L) },
+            )
         }
 
         assertEquals("auxiliary failure", failure.message)
@@ -50,9 +62,14 @@ class LpTreeSearchDualizationTest {
             override fun solvePrimal(warm: Basis?) = null
         }
 
-        solveRootNodeWithCrash(null, { solver to null }, { LpSolveMetrics(workOps = 17L) }, { _, metrics -> observed += metrics.workOps }, { LpSolveMetrics(workOps = 23L) })
+        solveRootNodeWithCrash(
+            null,
+            { solver to null },
+            { LpSolveMetrics(workOps = 17L) },
+            { _, metrics -> observed += metrics.workOps },
+            { LpSolveMetrics(workOps = 23L) },
+        )
 
         assertEquals(listOf(40L), observed)
     }
-
 }

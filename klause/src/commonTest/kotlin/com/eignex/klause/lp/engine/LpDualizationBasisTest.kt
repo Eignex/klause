@@ -15,11 +15,18 @@ class LpDualizationBasisTest {
     fun `free structural and equality logical recover a source basis`() {
         val zero = ExactLpNumber.of(0L)
         val one = ExactLpNumber.of(1L)
-        val source = LpExactState(ExactLpModel(
-            listOf(listOf(ExactLpEntry(0, one))), listOf(ExactLpNumber.of(2L)),
-            listOf(ExactLpColumn(ExactLpBounds(), integral = false), ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(zero)), integral = false)),
-            listOf(ExactLpRow()), ExactLpObjective(listOf(one, zero)),
-        ))
+        val source = LpExactState(
+            ExactLpModel(
+            listOf(listOf(ExactLpEntry(0, one))),
+            listOf(ExactLpNumber.of(2L)),
+            listOf(
+                ExactLpColumn(ExactLpBounds(), integral = false),
+                ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(zero)), integral = false),
+            ),
+            listOf(ExactLpRow()),
+            ExactLpObjective(listOf(one, zero)),
+        )
+        )
         val attempt = LpRootDualizationAttempt(LpDualizationOptions(enabled = true, minRowColumnRatio = 1))
 
         val basis = assertNotNull(attempt.solve(source))
@@ -40,10 +47,18 @@ class LpDualizationBasisTest {
         builder.addRow(intArrayOf(x, y), longArrayOf(1L, 1L), Relation.GE, 3L)
         builder.addRow(intArrayOf(x, y), longArrayOf(1L, 2L), Relation.GE, 4L)
         val source = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).trailModel()))
-        val transform = LpDualization.create(source, LpDualizationOptions(), LpDualizationMeter(10000L, 4096, Cancellation.Never))
+        val transform = LpDualization.create(
+            source,
+            LpDualizationOptions(),
+            LpDualizationMeter(10000L, 4096, Cancellation.Never),
+        )
         val bad = Basis(intArrayOf(0, 0), Array(transform.model.numVars) { VarStatus.BASIC })
 
-        val result = transform.sourceBasis(bad, ExactLpWitness(listOf(BigFraction.ZERO, BigFraction.ofLong(3L)), BigFraction.ZERO), LpDualizationMeter(10000L, 4096, Cancellation.Never))
+        val result = transform.sourceBasis(
+            bad,
+            ExactLpWitness(listOf(BigFraction.ZERO, BigFraction.ofLong(3L)), BigFraction.ZERO),
+            LpDualizationMeter(10000L, 4096, Cancellation.Never),
+        )
 
         assertNull(result)
     }
@@ -59,12 +74,17 @@ class LpDualizationBasisTest {
 
         LpScopedSolver(source).use { owner ->
             assertEquals(BigFraction.ofLong(6L), owner.solve(basis)?.lowerBound)
-            assertTrue(owner.append(LpScopedRow(
+            assertTrue(
+                owner.append(
+                    LpScopedRow(
                 id = 100L,
                 coefficients = listOf(0 to ExactLpNumber.of(1L)),
                 rhs = ExactLpNumber.of(4L),
                 logical = ExactLpColumn(ExactLpBounds(upper = ExactLpSide(ExactLpNumber.of(0L)))),
-            ), scoped = false))
+            ),
+                scoped = false
+                )
+            )
             val after = assertNotNull(owner.solve())
             assertEquals(BigFraction.ofLong(8L), after.lowerBound)
             assertEquals(listOf(BigFraction.ofLong(4L)), after.exactPrimal)
@@ -79,7 +99,10 @@ class LpDualizationBasisTest {
         val source = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).trailModel()))
         LpScopedSolver(source).use { owner ->
             assertEquals(BigFraction.ofLong(6L), owner.solve()?.lowerBound)
-            val working = LpWorkingModel.overrides(source, ExactLpObjective(List(source.model.numVars) { ExactLpNumber.of(if (it == 0) -1L else 0L) }))
+            val working = LpWorkingModel.overrides(
+                source,
+                ExactLpObjective(List(source.model.numVars) { ExactLpNumber.of(if (it == 0) -1L else 0L) }),
+            )
             owner.withWorkingModel(working) { scope ->
                 val attempt = LpRootDualizationAttempt(LpDualizationOptions(enabled = true))
                 val basis = assertNotNull(attempt.solve(scope.state))
@@ -90,25 +113,44 @@ class LpDualizationBasisTest {
             assertEquals(BigFraction.ofLong(6L), owner.solve()?.lowerBound)
         }
     }
+
     @Test
     fun `a singular mapped basis is repaired by the original source engine`() {
         val zero = ExactLpNumber.of(0L)
         val one = ExactLpNumber.of(1L)
-        val source = LpExactState(ExactLpModel(
-            listOf(emptyList()), listOf(zero),
-            listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(one))), ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(zero)))),
-            listOf(ExactLpRow()), ExactLpObjective(listOf(zero, zero)),
-        ))
-        val transform = LpDualization.create(source, LpDualizationOptions(), LpDualizationMeter(10000L, 4096, Cancellation.Never))
+        val source = LpExactState(
+            ExactLpModel(
+            listOf(emptyList()),
+            listOf(zero),
+            listOf(
+                ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(one))),
+                ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(zero))),
+            ),
+            listOf(ExactLpRow()),
+            ExactLpObjective(listOf(zero, zero)),
+        )
+        )
+        val transform = LpDualization.create(
+            source,
+            LpDualizationOptions(),
+            LpDualizationMeter(10000L, 4096, Cancellation.Never),
+        )
         val statuses = Array(transform.model.numVars) { VarStatus.AT_LOWER }
         statuses[2] = VarStatus.BASIC
-        val candidate = assertNotNull(transform.sourceBasis(Basis(intArrayOf(2), statuses), ExactLpWitness(listOf(BigFraction.ZERO), BigFraction.ZERO), LpDualizationMeter(10000L, 4096, Cancellation.Never)))
+        val candidate = assertNotNull(
+            transform.sourceBasis(
+                Basis(intArrayOf(2), statuses),
+                ExactLpWitness(listOf(BigFraction.ZERO), BigFraction.ZERO),
+                LpDualizationMeter(10000L, 4096, Cancellation.Never),
+            ),
+        )
 
-        val result = newPersistentLpSolver(assertNotNull(source.toWorkingModel())).use { assertNotNull(it.solve(candidate)) }
+        val result = newPersistentLpSolver(
+            assertNotNull(source.toWorkingModel()),
+        ).use { assertNotNull(it.solve(candidate)) }
 
         assertEquals(listOf(0), candidate.basicVars.toList())
         assertEquals(listOf(0.0), result.primal.toList())
         assertEquals(listOf(1), result.basis.basicVars.toList())
     }
-
 }
