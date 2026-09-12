@@ -165,6 +165,7 @@ internal class RelaxationTidyDerivation(
     /** Independent structural and algebraic validation; publication is rejected unless this succeeds. */
     fun validate(): Boolean {
         if (!sameColumnsAndObjective(sourceModel, transformedModel)) return false
+        if (!hasNormalizedRhs(sourceModel) || !hasNormalizedRhs(transformedModel)) return false
         if (columnSourceSnapshot.size != sourceModel.n) return false
         if (rowMapSnapshot.size != transformedModel.m ||
             rowMapSnapshot.map { it.outputRow } != (0 until transformedModel.m).toList() ||
@@ -232,6 +233,10 @@ internal class RelaxationTidyDerivation(
         val outputNaturalRhs = BigFraction.ofLong(transformedModel.flippedRhs[map.outputRow])
         val rounding = map.rounding
         if (rounding == null) {
+            val equality = sourceModel.hasUpper[sourceModel.slackCol(map.sourceRow)]
+            if ((equality && map.sourceMultiplier.isZero) || (!equality && map.sourceMultiplier.signum() <= 0)) {
+                return false
+            }
             if (sourceModel.rowStrict[map.sourceRow] != transformedModel.rowStrict[map.outputRow] ||
                 sourceModel.hasUpper[sourceModel.slackCol(map.sourceRow)] !=
                 transformedModel.hasUpper[transformedModel.slackCol(map.outputRow)]
@@ -497,6 +502,18 @@ private fun sameColumnsAndObjective(source: LpModel, output: LpModel): Boolean {
         source.cost[column] == output.cost[column] && source.upper[column] == output.upper[column] &&
             source.hasUpper[column] == output.hasUpper[column]
     }
+}
+
+private fun hasNormalizedRhs(model: LpModel): Boolean = (0 until model.m).all { row ->
+    var expected = BigInteger.fromLong(model.flippedRhs[row])
+    for (column in 0 until model.n) {
+        model.forEachInColumn(column) { entryRow, coefficient ->
+            if (entryRow == row) {
+                expected -= BigInteger.fromLong(coefficient) * BigInteger.fromLong(model.loShift[column])
+            }
+        }
+    }
+    expected == BigInteger.fromLong(model.rhs[row])
 }
 
 private fun rowCoefficients(model: LpModel, row: Int): Map<Int, Long> {
