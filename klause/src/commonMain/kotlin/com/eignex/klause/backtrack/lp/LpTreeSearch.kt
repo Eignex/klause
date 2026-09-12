@@ -3,12 +3,16 @@ package com.eignex.klause.backtrack.lp
 import com.eignex.klause.lp.bounding.LpEngine
 import com.eignex.klause.lp.bounding.LpFractionalBranch
 import com.eignex.klause.lp.bounding.solveNode
+import com.eignex.klause.lp.engine.CrashBasisAttempt
 import com.eignex.klause.lp.engine.ExactLpNumber
 import com.eignex.klause.lp.engine.LpCertifier
+import com.eignex.klause.lp.engine.LpModel
+import com.eignex.klause.lp.engine.LpSolveMetrics
 import com.eignex.klause.lp.engine.LpVerdict
 import com.eignex.klause.lp.engine.acceptNullable
 import com.eignex.klause.lp.engine.certifiedTightObjectiveLowerBound
 import com.eignex.klause.lp.engine.exactPointWitness
+import com.eignex.klause.lp.engine.triangularCrashBasis
 import com.eignex.klause.propagation.CpBranching
 import com.eignex.klause.propagation.CpSearchComponent
 import com.eignex.klause.propagation.PropagationSession
@@ -62,14 +66,24 @@ internal fun LpEngine.lbTreeSearch(objective: LinearObjective, cancellation: Can
                 targets = emptyMap()
                 if (expansions++ >= LB_TREE_BUDGET) return SearchNodeDisposition.Indeterminate
                 val relaxation = dive.nodeRelaxation(relaxer, native)
+                val crash = if (expansions == 1) {
+                    rootCrashBasis(relaxation.model, token, dive.nodeWorkBudget())
+                } else {
+                    null
+                }
                 val attempt = dive.solveNode(
                     relaxation.model,
-                    null,
+                    crash?.basis,
                     token,
                 ) ?: return SearchNodeDisposition.Expand
+                val solveMetrics = if (dive.nodeUsesTrail) {
+                    dive.propagator.lastMetrics
+                } else {
+                    attempt.first.lastMetrics
+                }
                 observeRootSolve(
                     attempt.first,
-                    if (dive.nodeUsesTrail) dive.propagator.lastMetrics else attempt.first.lastMetrics,
+                    solveMetrics + LpSolveMetrics(workOps = crash?.metrics?.workOps ?: 0L),
                 )
                 val result = attempt.second ?: return SearchNodeDisposition.Expand
                 val lower = certifiedTightObjectiveLowerBound(
@@ -146,4 +160,14 @@ internal fun LpEngine.lbTreeSearch(objective: LinearObjective, cancellation: Can
     }
 }
 
+internal fun rootCrashBasis(model: LpModel, token: Cancellation, nodeWorkLimit: Long): CrashBasisAttempt =
+    triangularCrashBasis(model, token, rootCrashWorkLimit(nodeWorkLimit))
+
+internal fun rootCrashWorkLimit(nodeWorkLimit: Long): Long = if (nodeWorkLimit == 0L) {
+    ROOT_CRASH_WORK_LIMIT
+} else {
+    maxOf(1L, minOf(nodeWorkLimit / 8L, ROOT_CRASH_WORK_LIMIT))
+}
+
 private const val LB_TREE_BUDGET = 256L
+private const val ROOT_CRASH_WORK_LIMIT = 100_000L
