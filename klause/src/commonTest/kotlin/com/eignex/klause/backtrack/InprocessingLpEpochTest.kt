@@ -17,15 +17,22 @@ class InprocessingLpEpochTest {
     @Test
     fun `epoch loop needs an explicit option an engine and an unseeded root`() {
         val problem = Problem(0, 1, arrayOf(IntDomain(0, 4)), emptyArray())
-        LpEngine(problem, LinearObjective(intCoefficients = longArrayOf(1)),
-            LpParams(lpPlan = LpPlan(bounding = true)), SolveStatsSink(backend = "epochs"),
+        LpEngine(
+            problem,
+            LinearObjective(intCoefficients = longArrayOf(1)),
+            LpParams(lpPlan = LpPlan(bounding = true)),
+            SolveStatsSink(backend = "epochs"),
         ).use { engine ->
             assertFalse(BacktrackParams().lpEpochs)
             assertNull(Inprocessing.from(BacktrackParams(), engine))
             assertNull(Inprocessing.from(BacktrackParams(lpEpochs = true)))
-            assertNull(Inprocessing.from(BacktrackParams(lpEpochs = true, assumptions = Assumptions.None.withInt(0, 1)), engine))
+            assertNull(
+                Inprocessing.from(
+                    BacktrackParams(lpEpochs = true, assumptions = Assumptions.None.withInt(0, 1)),
+                    engine,
+                ),
+            )
             assertNotNull(Inprocessing.from(BacktrackParams(lpEpochs = true), engine))
         }
     }
-
 }

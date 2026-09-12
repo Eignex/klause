@@ -60,12 +60,23 @@ class LpPropagatorEpochTest {
         var failPreparation = false
         val factory = object : LpEngineFactory by ProductionLpEngineFactory {
             override fun newPersistentSolver(
-                model: LpModel, cancellation: Cancellation, refactorUpdateLimit: Int,
-                iterationLimit: Int, workLimit: Long, trackDegeneracy: Boolean, pricing: LpPricingOptions,
+                model: LpModel,
+                cancellation: Cancellation,
+                refactorUpdateLimit: Int,
+                iterationLimit: Int,
+                workLimit: Long,
+                trackDegeneracy: Boolean,
+                pricing: LpPricingOptions,
             ): PersistentLpSolver {
                 constructions++
                 val delegate = ProductionLpEngineFactory.newPersistentSolver(
-                    model, cancellation, refactorUpdateLimit, iterationLimit, workLimit, trackDegeneracy, pricing,
+                    model,
+                    cancellation,
+                    refactorUpdateLimit,
+                    iterationLimit,
+                    workLimit,
+                    trackDegeneracy,
+                    pricing,
                 )
                 return object : PersistentLpSolver by delegate {
                     override fun prepareLogicals(token: Cancellation): Basis? =
@@ -106,12 +117,23 @@ class LpPropagatorEpochTest {
         val publicationFailure = IllegalStateException("publication failed")
         val factory = object : LpEngineFactory by ProductionLpEngineFactory {
             override fun newPersistentSolver(
-                model: LpModel, cancellation: Cancellation, refactorUpdateLimit: Int,
-                iterationLimit: Int, workLimit: Long, trackDegeneracy: Boolean, pricing: LpPricingOptions,
+                model: LpModel,
+                cancellation: Cancellation,
+                refactorUpdateLimit: Int,
+                iterationLimit: Int,
+                workLimit: Long,
+                trackDegeneracy: Boolean,
+                pricing: LpPricingOptions,
             ): PersistentLpSolver {
                 val retired = constructions++ == 0
                 val delegate = ProductionLpEngineFactory.newPersistentSolver(
-                    model, cancellation, refactorUpdateLimit, iterationLimit, workLimit, trackDegeneracy, pricing,
+                    model,
+                    cancellation,
+                    refactorUpdateLimit,
+                    iterationLimit,
+                    workLimit,
+                    trackDegeneracy,
+                    pricing,
                 )
                 return object : PersistentLpSolver by delegate {
                     override fun close() {
@@ -149,10 +171,12 @@ class LpPropagatorEpochTest {
             val old = lp.state
             var cancelled = false
             var published = false
-            assertFalse(lp.replaceEpoch(Any(), source, null, Cancellation { cancelled }, {
-                cancelled = true
-                true
-            }, { published = true }))
+            assertFalse(
+                lp.replaceEpoch(Any(), source, null, Cancellation { cancelled }, {
+                    cancelled = true
+                    true
+                }, { published = true }),
+            )
             assertFalse(published)
             assertSame(old, lp.state)
             assertNotNull(lp.solve())
@@ -180,7 +204,10 @@ class LpPropagatorEpochTest {
         builder.addRow(intArrayOf(0, 1), longArrayOf(1, 1), Relation.GE, 1)
         builder.addRow(intArrayOf(0, 1), longArrayOf(2, 2), Relation.LE, 6)
         val source = assertNotNull(builder.build(Sense.MINIMIZE).trailModel())
-        val warm = Basis(intArrayOf(0, 1), arrayOf(VarStatus.BASIC, VarStatus.BASIC, VarStatus.AT_LOWER, VarStatus.AT_LOWER))
+        val warm = Basis(
+            intArrayOf(0, 1),
+            arrayOf(VarStatus.BASIC, VarStatus.BASIC, VarStatus.AT_LOWER, VarStatus.AT_LOWER),
+        )
         LpPropagator(object : LpSearchPolicy {}).use { lp ->
             assertTrue(lp.replaceEpoch(Any(), source, warm, Cancellation.Never, { true }, {}))
             val result = assertNotNull(lp.solve())

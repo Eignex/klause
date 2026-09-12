@@ -36,12 +36,17 @@ class LpEpochPassTest {
     @Test
     fun `equal row counts do not retain the old big M matrix`() {
         val problem = Problem(
-            1, 2, Array(2) { IntDomain(0, 6) },
+            1,
+            2,
+            Array(2) { IntDomain(0, 6) },
             arrayOf(ReifiedLinear(0, intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 5)),
         )
         val session = PropagationSession(problem)
-        LpEngine(problem, LinearObjective(intCoefficients = longArrayOf(1, 1)),
-            LpParams(lpPlan = LpPlan(bounding = true)), SolveStatsSink(backend = "epochs"),
+        LpEngine(
+            problem,
+            LinearObjective(intCoefficients = longArrayOf(1, 1)),
+            LpParams(lpPlan = LpPlan(bounding = true)),
+            SolveStatsSink(backend = "epochs"),
         ).use { engine ->
             assertTrue(engine.rebuildEpoch(session, Cancellation.Never))
             val first = assertNotNull(engine.epochState)
@@ -54,18 +59,20 @@ class LpEpochPassTest {
             val rebound = engine.nodeRelaxation(assertNotNull(engine.lpRelaxer), session)
             assertNotNull(engine.solveNode(rebound.model, null, Cancellation.Never))
             val model = rebound.model
-            for (x in 0L..4L) for (y in 0L..6L) {
-                val values = LongArray(model.n)
-                values[rebound.intColOf[0]] = x
-                values[rebound.intColOf[1]] = y
-                values[rebound.boolColOf[0]] = if (x + y <= 5L) 1L else 0L
-                val activity = LongArray(model.m)
-                for (column in 0 until model.n) {
-                    model.forEachInColumn(column) { row, a ->
-                        activity[row] += a * (values[column] - model.loShift[column])
+            for (x in 0L..4L) {
+                for (y in 0L..6L) {
+                    val values = LongArray(model.n)
+                    values[rebound.intColOf[0]] = x
+                    values[rebound.intColOf[1]] = y
+                    values[rebound.boolColOf[0]] = if (x + y <= 5L) 1L else 0L
+                    val activity = LongArray(model.m)
+                    for (column in 0 until model.n) {
+                        model.forEachInColumn(column) { row, a ->
+                            activity[row] += a * (values[column] - model.loShift[column])
+                        }
                     }
+                    for (row in activity.indices) assertTrue(activity[row] <= model.rhs[row])
                 }
-                for (row in activity.indices) assertTrue(activity[row] <= model.rhs[row])
             }
         }
     }
@@ -76,8 +83,11 @@ class LpEpochPassTest {
         val narrow = PropagationSession(problem)
         narrow.implyIntAtLeast(0, 0)
         narrow.implyIntAtMost(0, 4)
-        LpEngine(problem, LinearObjective(intCoefficients = longArrayOf(1)),
-            LpParams(lpPlan = LpPlan(bounding = true)), SolveStatsSink(backend = "epochs"),
+        LpEngine(
+            problem,
+            LinearObjective(intCoefficients = longArrayOf(1)),
+            LpParams(lpPlan = LpPlan(bounding = true)),
+            SolveStatsSink(backend = "epochs"),
         ).use { engine ->
             assertTrue(engine.rebuildEpoch(narrow, Cancellation.Never))
             val epoch = engine.epochState
@@ -95,8 +105,11 @@ class LpEpochPassTest {
         val problem = Problem(0, 1, arrayOf(IntDomain(0, 5)), emptyArray())
         val session = PropagationSession(problem)
         session.implyIntAtLeast(0, 2)
-        LpEngine(problem, LinearObjective(intCoefficients = longArrayOf(1)),
-            LpParams(lpPlan = LpPlan(bounding = true)), SolveStatsSink(backend = "epochs"),
+        LpEngine(
+            problem,
+            LinearObjective(intCoefficients = longArrayOf(1)),
+            LpParams(lpPlan = LpPlan(bounding = true)),
+            SolveStatsSink(backend = "epochs"),
         ).use { engine ->
             assertTrue(engine.rebuildEpoch(session, Cancellation.Never))
             val rebound = engine.nodeRelaxation(assertNotNull(engine.lpRelaxer), PropagationSession(problem))
@@ -110,8 +123,11 @@ class LpEpochPassTest {
     fun `cancelled rebuild preserves hints and committed rebuild clears them`() {
         val problem = Problem(0, 1, arrayOf(IntDomain(0, 5)), emptyArray())
         val session = PropagationSession(problem)
-        LpEngine(problem, LinearObjective(intCoefficients = longArrayOf(1)),
-            LpParams(lpPlan = LpPlan(bounding = true)), SolveStatsSink(backend = "epochs"),
+        LpEngine(
+            problem,
+            LinearObjective(intCoefficients = longArrayOf(1)),
+            LpParams(lpPlan = LpPlan(bounding = true)),
+            SolveStatsSink(backend = "epochs"),
         ).use { engine ->
             val hints = LpHints(1, 0)
             engine.lpHints = hints
@@ -130,8 +146,11 @@ class LpEpochPassTest {
     fun `root epochs are scoped to the original objective engine and reseed generation`() {
         val problem = Problem(0, 1, arrayOf(IntDomain(0, 5)), emptyArray())
         val session = PropagationSession(problem)
-        LpEngine(problem, LinearObjective(intCoefficients = longArrayOf(1)),
-            LpParams(lpPlan = LpPlan(bounding = true)), SolveStatsSink(backend = "epochs"),
+        LpEngine(
+            problem,
+            LinearObjective(intCoefficients = longArrayOf(1)),
+            LpParams(lpPlan = LpPlan(bounding = true)),
+            SolveStatsSink(backend = "epochs"),
         ).use { engine ->
             assertTrue(engine.rebuildEpoch(session, Cancellation.Never))
             val old = engine.epochState
@@ -149,8 +168,11 @@ class LpEpochPassTest {
     fun `raw positional cuts are not installed by a matrix epoch`() {
         val problem = Problem(0, 1, arrayOf(IntDomain(0, 5)), emptyArray())
         val session = PropagationSession(problem)
-        LpEngine(problem, LinearObjective(intCoefficients = longArrayOf(1)),
-            LpParams(lpPlan = LpPlan(bounding = true)), SolveStatsSink(backend = "epochs"),
+        LpEngine(
+            problem,
+            LinearObjective(intCoefficients = longArrayOf(1)),
+            LpParams(lpPlan = LpPlan(bounding = true)),
+            SolveStatsSink(backend = "epochs"),
         ).use { engine ->
             engine.cutPool.add(Cut(intArrayOf(0), longArrayOf(1), Relation.GE, 9, global = true))
             assertTrue(engine.rebuildEpoch(session, Cancellation.Never))
@@ -165,15 +187,23 @@ class LpEpochPassTest {
         val problem = Problem(0, 1, arrayOf(IntDomain(0, 5)), emptyArray())
         val session = PropagationSession(problem)
         session.implyIntAtLeast(0, 2)
-        LpEngine(problem, LinearObjective(intCoefficients = longArrayOf(1)),
-            LpParams(lpPlan = LpPlan(bounding = true)), SolveStatsSink(backend = "epochs"),
+        LpEngine(
+            problem,
+            LinearObjective(intCoefficients = longArrayOf(1)),
+            LpParams(lpPlan = LpPlan(bounding = true)),
+            SolveStatsSink(backend = "epochs"),
         ).use { engine ->
             assertTrue(engine.rebuildEpoch(session, Cancellation.Never))
             val map = assertNotNull(assertNotNull(engine.epochState).relaxation.sourceMap)
             val expression = CutExpression(mapOf(CutSource(CutSourceKind.INTEGER, 0) to BigFraction.ONE))
             val threshold = BigFraction.ofLong(2)
             val fact = CutPremise.Bound(expression, false, threshold)
-            val cut = SourceCut(expression, Relation.GE, threshold, CutProvenance(problem, map.epoch, listOf(CutProofFact(fact, false))))
+            val cut = SourceCut(
+                expression,
+                Relation.GE,
+                threshold,
+                CutProvenance(problem, map.epoch, listOf(CutProofFact(fact, false))),
+            )
             assertNotNull(cut.toCut(map).orNull())
             assertTrue(engine.cutPool.add(cut, map))
             val wider = engine.nodeRelaxation(assertNotNull(engine.lpRelaxer), PropagationSession(problem))
@@ -186,8 +216,11 @@ class LpEpochPassTest {
     fun `the pass excludes assumption seeded roots and preserves variable ids`() {
         val problem = Problem(0, 1, arrayOf(IntDomain(0, 5)), emptyArray())
         val session = PropagationSession(problem)
-        LpEngine(problem, LinearObjective(intCoefficients = longArrayOf(1)),
-            LpParams(lpPlan = LpPlan(bounding = true)), SolveStatsSink(backend = "epochs"),
+        LpEngine(
+            problem,
+            LinearObjective(intCoefficients = longArrayOf(1)),
+            LpParams(lpPlan = LpPlan(bounding = true)),
+            SolveStatsSink(backend = "epochs"),
         ).use { engine ->
             val pass = LpEpochPass(engine)
             assertTrue(pass.preservesVariables)
@@ -196,11 +229,15 @@ class LpEpochPassTest {
             assertNull(engine.epochState)
         }
     }
+
     @Test
     fun `reset discards epoch state through the existing inprocessing lifecycle`() {
         val problem = Problem(0, 1, arrayOf(IntDomain(0, 4)), emptyArray())
-        LpEngine(problem, LinearObjective(intCoefficients = longArrayOf(1)),
-            LpParams(lpPlan = LpPlan(bounding = true)), SolveStatsSink(backend = "epochs"),
+        LpEngine(
+            problem,
+            LinearObjective(intCoefficients = longArrayOf(1)),
+            LpParams(lpPlan = LpPlan(bounding = true)),
+            SolveStatsSink(backend = "epochs"),
         ).use { engine ->
             val loop = assertNotNull(Inprocessing.from(BacktrackParams(lpEpochs = true), engine))
             assertTrue(engine.rebuildEpoch(PropagationSession(problem), Cancellation.Never))

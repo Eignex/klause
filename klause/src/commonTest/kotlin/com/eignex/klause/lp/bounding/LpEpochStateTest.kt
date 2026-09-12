@@ -43,14 +43,19 @@ class LpEpochStateTest {
     @Test
     fun `row hints remap by source identity instead of row position`() {
         val problem = Problem(
-            0, 2, Array(2) { IntDomain(0, 5) },
+            0,
+            2,
+            Array(2) { IntDomain(0, 5) },
             arrayOf(
                 Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 7),
                 Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.LE, 2),
             ),
         )
         val previous = CpToLpRelaxation(problem, null).build(RootDomains(problem))
-        val basis = Basis(intArrayOf(0, 3), arrayOf(VarStatus.BASIC, VarStatus.AT_UPPER, VarStatus.AT_LOWER, VarStatus.BASIC))
+        val basis = Basis(
+            intArrayOf(0, 3),
+            arrayOf(VarStatus.BASIC, VarStatus.AT_UPPER, VarStatus.AT_LOWER, VarStatus.BASIC),
+        )
         val builder = LpBuilder()
         repeat(2) { builder.addVar(0, 5) }
         builder.addRow(intArrayOf(0, 1), longArrayOf(1, -1), Relation.LE, 2)
@@ -58,7 +63,10 @@ class LpEpochStateTest {
         val next = previous.withModel(builder.build(Sense.MINIMIZE), previous.sourceMap)
         val mapped = assertNotNull(LpEpochState.remapBasis(previous, next, basis))
         assertContentEquals(intArrayOf(0, 2), mapped.basicVars)
-        assertContentEquals(arrayOf(VarStatus.BASIC, VarStatus.AT_UPPER, VarStatus.BASIC, VarStatus.AT_LOWER), mapped.status)
+        assertContentEquals(
+            arrayOf(VarStatus.BASIC, VarStatus.AT_UPPER, VarStatus.BASIC, VarStatus.AT_LOWER),
+            mapped.status,
+        )
         val foreign = CpToLpRelaxation(Problem(0, 2, Array(2) { IntDomain(0, 5) }, problem.factors), null)
             .build(RootDomains(problem))
         assertNull(LpEpochState.remapBasis(previous, foreign, basis))
@@ -67,7 +75,9 @@ class LpEpochStateTest {
     @Test
     fun `transformed tidy models are not admitted by matching dimensions`() {
         val problem = Problem(
-            0, 1, arrayOf(IntDomain(0, 5)),
+            0,
+            1,
+            arrayOf(IntDomain(0, 5)),
             arrayOf(Linear(intArrayOf(2), intArrayOf(0), LinearOp.LE, 5)),
         )
         val result = CpToLpRelaxation(problem, null, tidy = RelaxationTidyConfig(enabled = true))
