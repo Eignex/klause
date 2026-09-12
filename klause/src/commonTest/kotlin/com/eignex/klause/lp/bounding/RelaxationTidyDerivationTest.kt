@@ -116,6 +116,57 @@ class RelaxationTidyDerivationTest {
     }
 
     @Test
+    fun `negative inequality multiplier is rejected independently`() {
+        val sourceBuilder = LpBuilder()
+        sourceBuilder.addVar(0, 10)
+        sourceBuilder.addVar(0, 10)
+        sourceBuilder.addRow(intArrayOf(0, 1), longArrayOf(1, 1), Relation.LE, 5)
+        val source = sourceBuilder.build(Sense.MINIMIZE)
+        val outputBuilder = LpBuilder()
+        outputBuilder.addVar(0, 10)
+        outputBuilder.addVar(0, 10)
+        outputBuilder.addRow(intArrayOf(0, 1), longArrayOf(-1, -1), Relation.LE, -5)
+        val output = outputBuilder.build(Sense.MINIMIZE)
+        val relaxation = relaxation(source)
+        val derivation = RelaxationTidyDerivation(
+            source,
+            output,
+            RelaxationTidyScope(assertNotNull(relaxation.sourceMap).model, 0, null, true),
+            listOf(RelaxationTidyRowMap(0, 0, BigFraction.MINUS_ONE)),
+            emptyList(),
+            emptyList(),
+            relaxation.sourceMap.columns,
+            RelaxationTidyStats(),
+        )
+
+        assertFalse(derivation.validate())
+    }
+
+    @Test
+    fun `inconsistent shifted rhs is rejected independently`() {
+        val builder = LpBuilder()
+        builder.addVar(0, 10)
+        builder.addVar(0, 10)
+        builder.addRow(intArrayOf(0, 1), longArrayOf(1, 1), Relation.LE, 5)
+        val applied = tidy(builder.build(Sense.MINIMIZE))
+        val original = applied.derivation
+        val forgedOutput = original.transformedModel.withRhs(longArrayOf(-1))
+        val forged = RelaxationTidyDerivation(
+            original.sourceModel,
+            forgedOutput,
+            original.scope,
+            original.rowMaps,
+            original.removedRows,
+            original.bounds,
+            original.columnSources,
+            original.stats,
+        )
+
+        assertFalse(forged.validate())
+        assertTrue(original.validate())
+    }
+
+    @Test
     fun `forged exported singleton bound is rejected independently`() {
         val builder = LpBuilder()
         builder.addVar(0, 10)
@@ -175,7 +226,7 @@ class RelaxationTidyDerivationTest {
     }
 
     @Test
-    fun `assumption and cutoff fixings remain conditional`() {
+    fun `assumption and cutoff only fixings are declined safely`() {
         val builder = LpBuilder()
         builder.addVar(2, 2)
         builder.addVar(0, 4)
@@ -216,9 +267,11 @@ class RelaxationTidyDerivationTest {
         val assumed = run(setOf("pin"), null)
         val cutoffBound = run(emptySet(), cutoff)
 
-        assertTrue(assumed.derivation.rowMaps.single().fixings.isNotEmpty())
+        assertTrue(assumed.derivation.rowMaps.single().fixings.isEmpty())
+        assertEquals(1, assumed.derivation.stats.declined(RelaxationTidyDecline.UNSUPPORTED_SOURCE_MAP))
         assertFalse(assumed.derivation.appliesTo(assumed.derivation.scope.copy(assumptions = emptySet())))
-        assertTrue(cutoffBound.derivation.rowMaps.single().fixings.isNotEmpty())
+        assertTrue(cutoffBound.derivation.rowMaps.single().fixings.isEmpty())
+        assertEquals(1, cutoffBound.derivation.stats.declined(RelaxationTidyDecline.UNSUPPORTED_SOURCE_MAP))
         assertFalse(cutoffBound.derivation.appliesTo(cutoffBound.derivation.scope.copy(cutoff = null)))
     }
 
@@ -261,4 +314,25 @@ class RelaxationTidyDerivationTest {
             sourceMap = CutSourceMap(root, 0, columns, globals, assumptions = assumptions),
         )
     }
+
+    private fun LpModel.withRhs(replacement: LongArray): LpModel = LpModel(
+        n,
+        m,
+        csc,
+        replacement,
+        cost,
+        upper,
+        hasUpper,
+        loShift,
+        objConstant,
+        sense,
+        tag,
+        rowGlobal,
+        rowStrict,
+        rowPremises,
+        flippedRhs,
+        probeClampedLo,
+        probeClampedHi,
+        colContinuous,
+    )
 }

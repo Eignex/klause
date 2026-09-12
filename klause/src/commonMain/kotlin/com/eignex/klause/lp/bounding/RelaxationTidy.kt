@@ -55,7 +55,7 @@ internal object RelaxationTidy {
         }
 
         val rows = sourceRows(source)
-        substituteFixed(source, sources, scope, rows, counts, config.cancellation)
+        substituteFixed(source, sources, rows, counts, config.cancellation)
         if (config.cancellation()) return counts.declineResult(RelaxationTidyDecline.CANCELLED)
 
         val removed = ArrayList<RelaxationTidyRemovedRow>()
@@ -172,7 +172,6 @@ private fun sourceRows(model: LpModel): MutableList<WorkingRow> {
 private fun substituteFixed(
     model: LpModel,
     sources: CutSourceMap,
-    scope: RelaxationTidyScope,
     rows: MutableList<WorkingRow>,
     counts: Counts,
     cancellation: Cancellation,
@@ -197,11 +196,7 @@ private fun substituteFixed(
             val expression = sourceColumn.expression()
             val lower = CutPremise.Bound(expression, false, BigFraction.ofLong(value))
             val upper = CutPremise.Bound(expression, true, BigFraction.ofLong(value))
-            val allowed = if (scope.assumptions.isEmpty() && scope.cutoff == null) {
-                sources.isGlobal(lower) && sources.isGlobal(upper)
-            } else {
-                sources.isActive(lower) && sources.isActive(upper)
-            }
+            val allowed = sources.isGlobal(lower) && sources.isGlobal(upper)
             if (!allowed) {
                 counts.recordDecline(RelaxationTidyDecline.UNSUPPORTED_SOURCE_MAP)
                 continue
