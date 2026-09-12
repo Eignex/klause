@@ -62,11 +62,11 @@ internal class CutSourceMap(
     fun isGlobal(premise: CutPremise): Boolean = implied(premise, globalSnapshot) ||
         (
             premise is CutPremise.Integral && premise.expression.constant.den == BigInteger.ONE &&
-            premise.expression.terms.all { (source, coefficient) ->
-                coefficient.den == BigInteger.ONE &&
-                    (source.kind == CutSourceKind.INTEGER || source.kind == CutSourceKind.BOOLEAN)
-            }
-        )
+                premise.expression.terms.all { (source, coefficient) ->
+                    coefficient.den == BigInteger.ONE &&
+                        (source.kind == CutSourceKind.INTEGER || source.kind == CutSourceKind.BOOLEAN)
+                }
+            )
     fun isActive(premise: CutPremise): Boolean = isGlobal(premise) || implied(premise, activeSnapshot)
 
     fun presenceGuard(premise: CutPremise.Bound): CutPremise.Excluded? {

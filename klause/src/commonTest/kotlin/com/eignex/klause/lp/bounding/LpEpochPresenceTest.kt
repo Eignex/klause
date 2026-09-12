@@ -72,19 +72,20 @@ class LpEpochPresenceTest {
         val auxiliary = CutSource(CutSourceKind.AUXILIARY, 0)
         val definition = CutAuxiliaryDefinition(listOf(1L), emptyList(), 4L, false)
         val map = CutSourceMap(
-            root, 0L,
+            root,
+            0L,
             listOf(
-            CutColumnSource(term, BigFraction.ofLong(-2), BigFraction.ONE),
-            CutColumnSource(auxiliary, BigFraction.ofLong(2), BigFraction.ofLong(-3)),
-        ),
-            auxiliaryDefinitions = mapOf(auxiliary to definition)
+                CutColumnSource(term, BigFraction.ofLong(-2), BigFraction.ONE),
+                CutColumnSource(auxiliary, BigFraction.ofLong(2), BigFraction.ofLong(-3)),
+            ),
+            auxiliaryDefinitions = mapOf(auxiliary to definition),
         )
         val cut = SourceCut(
             CutExpression(
                 mapOf(
-                term to BigFraction.ofLong(2).reciprocal(),
-                auxiliary to BigFraction.ofLong(3),
-            )
+                    term to BigFraction.ofLong(2).reciprocal(),
+                    auxiliary to BigFraction.ofLong(3),
+                ),
             ),
             Relation.LE,
             BigFraction.ofLong(5),
@@ -158,24 +159,26 @@ class LpEpochPresenceTest {
         val lower = CutPremise.Bound(CutExpression(mapOf(auxiliary to BigFraction.ONE)), false, BigFraction.ZERO)
         val upper = lower.copy(upper = true)
         val cut = SourceCut(
-            expression, Relation.LE, BigFraction.ofLong(2),
+            expression,
+            Relation.LE,
+            BigFraction.ofLong(2),
             CutProvenance(
-            root,
-            0L,
-            listOf(CutProofFact(original, true), CutProofFact(lower, true), CutProofFact(upper, true)),
-            conclusion = conclusion,
-            transformations = listOf(
-                CutRowTransform.Algebraic(
-                original,
-                conclusion,
-                BigFraction.ONE,
-                false,
-                false,
-                listOf(CutFixing(lower, upper)),
-            )
+                root,
+                0L,
+                listOf(CutProofFact(original, true), CutProofFact(lower, true), CutProofFact(upper, true)),
+                conclusion = conclusion,
+                transformations = listOf(
+                    CutRowTransform.Algebraic(
+                        original,
+                        conclusion,
+                        BigFraction.ONE,
+                        false,
+                        false,
+                        listOf(CutFixing(lower, upper)),
+                    ),
+                ),
+                auxiliaryDefinitions = mapOf(auxiliary to definition),
             ),
-            auxiliaryDefinitions = mapOf(auxiliary to definition),
-        )
         )
         val map = CutSourceMap(
             root,

@@ -131,7 +131,7 @@ internal fun lpStatPairs(stats: SolveStats): List<Pair<String, String>> {
     appendCertifierStats(out, "ExactPointFeasible", stats.lp.exactPointFeasible)
     appendCertifierStats(out, "RationalOutcome", stats.lp.rationalOutcome)
     out += continuationStatPairs("lp", stats.lp.continuation)
-    for ((name, value) in stats.lp.epochs.toSortedMap()) out += "lp_epoch_$name" to value.toString()
+    for ((name, value) in stats.lp.epochs.entries.sortedBy { it.key }) out += "lp_epoch_$name" to value.toString()
     val basis = stats.lp.basisVerification
     if (basis.calls > 0L) {
         out += "lpRationalBasisCalls" to "${basis.calls}"
