@@ -97,9 +97,9 @@ class LpEpochBatchTest {
         val invalid = LpExactState(
             source.copy(
                 columns = listOf(
-            source.column(0).copy(bounds = ExactLpBounds(source.column(0).bounds.lower, ExactLpSide(huge))),
-        )
-            )
+                    source.column(0).copy(bounds = ExactLpBounds(source.column(0).bounds.lower, ExactLpSide(huge))),
+                ),
+            ),
         )
         RevisedSimplex(model).use { solver ->
             assertNotNull(solver.solve())
@@ -260,9 +260,9 @@ class LpEpochBatchTest {
     fun `cancelled adoption preserves the continuation target and successful adoption retires it`() {
         val source = assertNotNull(
             LpBuilder().apply {
-            addVar(0, 10, cost = 1)
-            addRow(intArrayOf(0), longArrayOf(1), Relation.EQ, 1)
-        }.build(Sense.MINIMIZE).trailModel()
+                addVar(0, 10, cost = 1)
+                addRow(intArrayOf(0), longArrayOf(1), Relation.EQ, 1)
+            }.build(Sense.MINIMIZE).trailModel(),
         )
         for (stop in listOf(1, 2)) {
             val initial = LpExactState(source)
