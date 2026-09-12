@@ -198,11 +198,11 @@ internal class LpEngine(
     internal val pricingOptions: LpPricingOptions
         get() = LpPricingOptions(params.zeroObjectivePricing, params.randomSeed ?: 0L)
 
+    private val auxiliarySources = LpAuxiliarySources()
+
     /** Construct the relaxer for [plan]'s hull flags, or null when bounding is off. Factored so the
      *  ineffective-hull probe can build variants with whole families ([plan]) or individual factor
      *  hulls ([suppressedHullFactors]) turned off. */
-    private val auxiliarySources = LpAuxiliarySources()
-
     private fun buildRelaxer(plan: LpPlan, suppressedHullFactors: Set<Int> = emptySet()): CpToLpRelaxation? =
         if (plan.bounding) {
             CpToLpRelaxation(
