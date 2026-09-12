@@ -114,15 +114,15 @@ class LpDualizationTest {
         val one = ExactLpNumber.of(1L)
         val source = LpExactState(
             ExactLpModel(
-            listOf(listOf(ExactLpEntry(0, one))),
-            listOf(one),
-            listOf(
-                ExactLpColumn(ExactLpBounds(ExactLpSide(zero, strict = true))),
-                ExactLpColumn(ExactLpBounds(ExactLpSide(zero))),
+                listOf(listOf(ExactLpEntry(0, one))),
+                listOf(one),
+                listOf(
+                    ExactLpColumn(ExactLpBounds(ExactLpSide(zero, strict = true))),
+                    ExactLpColumn(ExactLpBounds(ExactLpSide(zero))),
+                ),
+                listOf(ExactLpRow()),
+                ExactLpObjective(listOf(one, zero)),
             ),
-            listOf(ExactLpRow()),
-            ExactLpObjective(listOf(one, zero)),
-        )
         )
         val attempt = LpRootDualizationAttempt(LpDualizationOptions(enabled = true, minRowColumnRatio = 1))
 
@@ -137,12 +137,12 @@ class LpDualizationTest {
         val big = ExactLpNumber.of(1L shl 40)
         val source = LpExactState(
             ExactLpModel(
-            listOf(listOf(ExactLpEntry(0, big))),
-            listOf(big),
-            List(2) { ExactLpColumn(ExactLpBounds(ExactLpSide(zero))) },
-            listOf(ExactLpRow()),
-            ExactLpObjective(listOf(big, zero)),
-        )
+                listOf(listOf(ExactLpEntry(0, big))),
+                listOf(big),
+                List(2) { ExactLpColumn(ExactLpBounds(ExactLpSide(zero))) },
+                listOf(ExactLpRow()),
+                ExactLpObjective(listOf(big, zero)),
+            ),
         )
         val attempt = LpRootDualizationAttempt(
             LpDualizationOptions(enabled = true, minRowColumnRatio = 1, maxBits = 24),
@@ -274,7 +274,7 @@ class LpDualizationTest {
                 override fun gomoryCuts(maxCuts: Int) = emptyList<Cut>()
                 override fun mirCuts(maxCuts: Int) = emptyList<Cut>()
                 override fun close() {
-                    closed = true;
+                    closed = true
                     error("cleanup")
                 }
             }

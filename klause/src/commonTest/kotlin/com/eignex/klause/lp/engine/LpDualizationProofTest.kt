@@ -17,25 +17,25 @@ class LpDualizationProofTest {
         val one = ExactLpNumber.of(1L)
         val source = LpExactState(
             ExactLpModel(
-            listOf(listOf(ExactLpEntry(0, one))),
-            listOf(ExactLpNumber.of(5L)),
-            listOf(
-                ExactLpColumn(
-                    ExactLpBounds(upper = ExactLpSide(ExactLpNumber.of(4L))),
-                    origin = ExactLpNumber.of(10L),
-                    integral = false,
+                listOf(listOf(ExactLpEntry(0, one))),
+                listOf(ExactLpNumber.of(5L)),
+                listOf(
+                    ExactLpColumn(
+                        ExactLpBounds(upper = ExactLpSide(ExactLpNumber.of(4L))),
+                        origin = ExactLpNumber.of(10L),
+                        integral = false,
+                    ),
+                    ExactLpColumn(ExactLpBounds(ExactLpSide(one), ExactLpSide(ExactLpNumber.of(3L))), integral = false),
                 ),
-                ExactLpColumn(ExactLpBounds(ExactLpSide(one), ExactLpSide(ExactLpNumber.of(3L))), integral = false),
+                listOf(ExactLpRow()),
+                ExactLpObjective(
+                    listOf(ExactLpNumber.of(-3L), ExactLpNumber.of(2L)),
+                    ExactLpNumber.of(7L),
+                    ExactLpNumber.of(2L),
+                    ExactLpNumber.of(5L),
+                    Sense.MAXIMIZE,
+                ),
             ),
-            listOf(ExactLpRow()),
-            ExactLpObjective(
-                listOf(ExactLpNumber.of(-3L), ExactLpNumber.of(2L)),
-                ExactLpNumber.of(7L),
-                ExactLpNumber.of(2L),
-                ExactLpNumber.of(5L),
-                Sense.MAXIMIZE,
-            ),
-        )
         )
         val attempt = LpRootDualizationAttempt(LpDualizationOptions(enabled = true, minRowColumnRatio = 1))
 
@@ -49,11 +49,11 @@ class LpDualizationProofTest {
         assertTrue(slack >= BigFraction.ONE && slack <= BigFraction.ofLong(3L))
         val value = (
             BigFraction.ofLong(
-            -3L,
-        ) * x + BigFraction.ofLong(
-            2L,
-        ) * slack + BigFraction.ofLong(7L)
-        ) * BigFraction.ofLong(2L).reciprocal() + BigFraction.ofLong(5L)
+                -3L,
+            ) * x + BigFraction.ofLong(
+                2L,
+            ) * slack + BigFraction.ofLong(7L)
+            ) * BigFraction.ofLong(2L).reciprocal() + BigFraction.ofLong(5L)
         assertEquals(value, result.lowerBound)
         assertEquals(BigFraction.ofLong(7L) * BigFraction.ofLong(2L).reciprocal(), value)
     }
@@ -115,12 +115,12 @@ class LpDualizationProofTest {
         val minusOne = ExactLpNumber.of(-1L)
         val source = LpExactState(
             ExactLpModel(
-            listOf(listOf(ExactLpEntry(0, minusOne))),
-            listOf(zero),
-            List(2) { ExactLpColumn(ExactLpBounds(ExactLpSide(zero))) },
-            listOf(ExactLpRow()),
-            ExactLpObjective(listOf(minusOne, zero)),
-        )
+                listOf(listOf(ExactLpEntry(0, minusOne))),
+                listOf(zero),
+                List(2) { ExactLpColumn(ExactLpBounds(ExactLpSide(zero))) },
+                listOf(ExactLpRow()),
+                ExactLpObjective(listOf(minusOne, zero)),
+            ),
         )
         val transform = LpDualization.create(
             source,
@@ -152,12 +152,12 @@ class LpDualizationProofTest {
         val minusOne = ExactLpNumber.of(-1L)
         val source = LpExactState(
             ExactLpModel(
-            listOf(listOf(ExactLpEntry(0, minusOne))),
-            listOf(zero),
-            List(2) { ExactLpColumn(ExactLpBounds(ExactLpSide(zero))) },
-            listOf(ExactLpRow()),
-            ExactLpObjective(listOf(minusOne, zero)),
-        )
+                listOf(listOf(ExactLpEntry(0, minusOne))),
+                listOf(zero),
+                List(2) { ExactLpColumn(ExactLpBounds(ExactLpSide(zero))) },
+                listOf(ExactLpRow()),
+                ExactLpObjective(listOf(minusOne, zero)),
+            ),
         )
         val transform = LpDualization.create(
             source,
@@ -200,7 +200,9 @@ class LpDualizationProofTest {
         assertNull(foreign)
         assertNull(
             certifyDualizedSource(
-                assertNotNull(source.toWorkingModel()), attempt, cancellation = Cancellation { true },
+                assertNotNull(source.toWorkingModel()),
+                attempt,
+                cancellation = Cancellation { true },
             ),
         )
     }

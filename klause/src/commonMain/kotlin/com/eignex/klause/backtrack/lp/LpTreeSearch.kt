@@ -195,12 +195,16 @@ internal fun LpEngine.solveRootNode(
                     val estimate = (original.numVars.toLong() * 8L + original.csc.colVal.size.toLong() * 4L)
                     val decline = when {
                         token() -> LpDualizationDecline.CANCELLED
+
                         original.n == 0 ||
                             original.m.toLong() < options.minRowColumnRatio.toLong() * original.n ->
                             LpDualizationDecline.NOT_TALL
+
                         original.numVars > options.maxCoordinates ||
                             original.csc.colVal.size > options.maxEntries -> LpDualizationDecline.DIMENSION
+
                         parentWork > 0L && estimate > parentWork / 8L -> LpDualizationDecline.WORK
+
                         else -> null
                     }
                     if (decline != null) {
@@ -240,15 +244,15 @@ internal fun LpEngine.solveRootNode(
                     val pivots = if (parentPivots ==
                         0
                     ) {
-                            null
-                        } else {
-                            parentPivots - (dualization?.metrics?.solve?.pivots ?: 0)
-                        }
+                        null
+                    } else {
+                        parentPivots - (dualization?.metrics?.solve?.pivots ?: 0)
+                    }
                     if ((work != null && work < 2L) ||
                         (pivots != null && pivots <= 0)
                     ) {
-                            return@solveRootNodeWithCrash null
-                        }
+                        return@solveRootNodeWithCrash null
+                    }
                     LpRootAdmission(model, work, pivots)
                 } else {
                     null

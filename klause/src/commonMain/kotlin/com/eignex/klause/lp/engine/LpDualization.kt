@@ -251,12 +251,12 @@ internal class LpDualization private constructor(
                         index,
                     ).bounds.lower == null
                 ) {
-                        signed
-                    } else if (signed.signum() > 0) {
-                        signed
-                    } else {
-                        BigFraction.ZERO
-                    },
+                    signed
+                } else if (signed.signum() > 0) {
+                    signed
+                } else {
+                    BigFraction.ZERO
+                },
             )
         }
         exactUnboundedness(working.state.toWorkingModel() ?: return@mapped null, dualWitness, direction, meter)
@@ -277,8 +277,8 @@ internal class LpDualization private constructor(
                 if (!bounds.consistent) throw DualizationStop(LpDualizationDecline.BOUNDS)
                 if (bounds.lower?.strict == true || bounds.upper?.strict == true) {
                     throw DualizationStop(
-                    LpDualizationDecline.STRICT,
-                )
+                        LpDualizationDecline.STRICT,
+                    )
                 }
                 for (side in listOfNotNull(bounds.lower, bounds.upper)) meter.number(side.number.value)
                 meter.number(original.column(j).origin.value)
@@ -312,8 +312,8 @@ internal class LpDualization private constructor(
                 val sign = if (upper == structural) -1L else 1L
                 val data = if (structural) {
                     listOf(
-                    ExactLpEntry(column, ExactLpNumber.of(1L)),
-                )
+                        ExactLpEntry(column, ExactLpNumber.of(1L)),
+                    )
                 } else {
                     rows[column - original.n]
                 }
@@ -337,8 +337,8 @@ internal class LpDualization private constructor(
                     bound.number.value.negated()
                 } else {
                     bound.number.value - original.rhs(
-                    column - original.n,
-                ).value
+                        column - original.n,
+                    ).value
                 }
                 objective += ExactLpNumber.of(meter.number(cost * BigFraction.ofLong(sign)))
                 sides += LpDualSide(column, upper, sign.toInt())
@@ -484,9 +484,11 @@ internal class LpRootDualizationAttempt(private val options: LpDualizationOption
         sourceState = source
         val decline = when {
             !options.enabled -> LpDualizationDecline.DISABLED
+
             source.model.n == 0 ||
                 source.model.m.toLong() < options.minRowColumnRatio.toLong() * source.model.n ->
                 LpDualizationDecline.NOT_TALL
+
             else -> null
         }
         if (decline != null) {
@@ -566,9 +568,9 @@ internal class LpRootDualizationAttempt(private val options: LpDualizationOption
                 ?: throw DualizationStop(LpDualizationDecline.PROJECTION)
             val x = if (result.optimal) {
                 transform.sourcePoint(
-                result.duals.map { postsolve.number(exactDouble(it)) },
-                postsolve,
-            )
+                    result.duals.map { postsolve.number(exactDouble(it)) },
+                    postsolve,
+                )
             } else {
                 null
             }

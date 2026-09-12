@@ -17,15 +17,15 @@ class LpDualizationBasisTest {
         val one = ExactLpNumber.of(1L)
         val source = LpExactState(
             ExactLpModel(
-            listOf(listOf(ExactLpEntry(0, one))),
-            listOf(ExactLpNumber.of(2L)),
-            listOf(
-                ExactLpColumn(ExactLpBounds(), integral = false),
-                ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(zero)), integral = false),
+                listOf(listOf(ExactLpEntry(0, one))),
+                listOf(ExactLpNumber.of(2L)),
+                listOf(
+                    ExactLpColumn(ExactLpBounds(), integral = false),
+                    ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(zero)), integral = false),
+                ),
+                listOf(ExactLpRow()),
+                ExactLpObjective(listOf(one, zero)),
             ),
-            listOf(ExactLpRow()),
-            ExactLpObjective(listOf(one, zero)),
-        )
         )
         val attempt = LpRootDualizationAttempt(LpDualizationOptions(enabled = true, minRowColumnRatio = 1))
 
@@ -77,13 +77,13 @@ class LpDualizationBasisTest {
             assertTrue(
                 owner.append(
                     LpScopedRow(
-                id = 100L,
-                coefficients = listOf(0 to ExactLpNumber.of(1L)),
-                rhs = ExactLpNumber.of(4L),
-                logical = ExactLpColumn(ExactLpBounds(upper = ExactLpSide(ExactLpNumber.of(0L)))),
-            ),
-                scoped = false
-                )
+                        id = 100L,
+                        coefficients = listOf(0 to ExactLpNumber.of(1L)),
+                        rhs = ExactLpNumber.of(4L),
+                        logical = ExactLpColumn(ExactLpBounds(upper = ExactLpSide(ExactLpNumber.of(0L)))),
+                    ),
+                    scoped = false,
+                ),
             )
             val after = assertNotNull(owner.solve())
             assertEquals(BigFraction.ofLong(8L), after.lowerBound)
@@ -120,15 +120,15 @@ class LpDualizationBasisTest {
         val one = ExactLpNumber.of(1L)
         val source = LpExactState(
             ExactLpModel(
-            listOf(emptyList()),
-            listOf(zero),
-            listOf(
-                ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(one))),
-                ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(zero))),
+                listOf(emptyList()),
+                listOf(zero),
+                listOf(
+                    ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(one))),
+                    ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(zero))),
+                ),
+                listOf(ExactLpRow()),
+                ExactLpObjective(listOf(zero, zero)),
             ),
-            listOf(ExactLpRow()),
-            ExactLpObjective(listOf(zero, zero)),
-        )
         )
         val transform = LpDualization.create(
             source,

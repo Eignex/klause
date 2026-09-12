@@ -91,8 +91,8 @@ internal fun solveAndCertify(
     }
     val dualization = if (warm == null && context.rootDualization.enabled) {
         LpRootDualizationAttempt(
-        context.rootDualization,
-    )
+            context.rootDualization,
+        )
     } else {
         null
     }
@@ -100,10 +100,10 @@ internal fun solveAndCertify(
         basis
     } else {
         try {
-        dualization.solve(state, context, pricing, cancellation) ?: basis
-    } finally {
-        observer?.observeDualization(dualization.metrics)
-    }
+            dualization.solve(state, context, pricing, cancellation) ?: basis
+        } finally {
+            observer?.observeDualization(dualization.metrics)
+        }
     }
     val solved = solveAndCertify(
         working,
@@ -119,15 +119,15 @@ internal fun solveAndCertify(
     val mapped = certifyDualizedSource(working, dualization, context.certificationPolicy, cancellation)
     if (cancellation()) {
         return CertifiedLpResult(
-        null,
-        null,
-        null,
-        null,
-        null,
-        false,
-        { null },
-        dualization = dualization.metrics,
-    )
+            null,
+            null,
+            null,
+            null,
+            null,
+            false,
+            { null },
+            dualization = dualization.metrics,
+        )
     }
     val bound =
         mapped?.bound?.takeIf { candidate -> solved.bound?.let { candidate.value > it.value } != false } ?: solved.bound

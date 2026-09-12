@@ -27,12 +27,12 @@ class LpRootAdmissionTest {
         val one = ExactLpNumber.of(1L)
         val source = LpExactState(
             ExactLpModel(
-            listOf(listOf(ExactLpEntry(0, one))),
-            listOf(one),
-            List(2) { ExactLpColumn(ExactLpBounds(ExactLpSide(zero))) },
-            listOf(ExactLpRow()),
-            ExactLpObjective(listOf(one, zero)),
-        )
+                listOf(listOf(ExactLpEntry(0, one))),
+                listOf(one),
+                List(2) { ExactLpColumn(ExactLpBounds(ExactLpSide(zero))) },
+                listOf(ExactLpRow()),
+                ExactLpObjective(listOf(one, zero)),
+            ),
         )
         val model = assertNotNull(source.toWorkingModel())
         val pricing = LpPricingOptions(LpZeroObjectivePricing.LARGEST_PIVOT, 19L)
