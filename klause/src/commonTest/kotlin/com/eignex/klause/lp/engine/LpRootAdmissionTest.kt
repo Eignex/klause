@@ -343,4 +343,152 @@ class LpRootAdmissionTest {
             assertFalse(owner.install(model, source.model, receipt))
         }
     }
+
+    @Test
+    fun `a completed root invocation releases its ceiling even without a float result`() {
+        val builder = LpBuilder()
+        val x = builder.addVar(0, 4, cost = 1)
+        builder.addRow(intArrayOf(x), longArrayOf(1), Relation.GE, 1)
+        val source = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).trailModel()))
+        val model = assertNotNull(source.toWorkingModel())
+        val seen = ArrayList<LpFloatAllowance?>()
+        var constructions = 0
+        val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+            override fun newPersistentSolver(
+                model: LpModel,
+                cancellation: Cancellation,
+                refactorUpdateLimit: Int,
+                iterationLimit: Int,
+                workLimit: Long,
+                trackDegeneracy: Boolean,
+                pricing: LpPricingOptions,
+            ): PersistentLpSolver {
+                constructions++
+                assertEquals(500L, workLimit)
+                assertEquals(7, iterationLimit)
+                val delegate = ProductionLpEngineFactory.newPersistentSolver(
+                    model, cancellation, refactorUpdateLimit, iterationLimit, workLimit, trackDegeneracy, pricing,
+                )
+                return object : PersistentLpSolver by delegate {
+                    override fun resolveBounds(allowance: LpFloatAllowance?): FloatLpResult? {
+                        seen.add(allowance)
+                        delegate.resolveBounds(allowance)
+                        return null
+                    }
+                }
+            }
+        }
+        var profile = LpEffortProfile(work = 5000L, iterations = 30)
+        LpPropagator(object : LpSearchPolicy {}, { profile }, LpSolveContext(factory)).use { owner ->
+            assertTrue(owner.install(model, source.model, LpRootAdmission(model, 1001L, 7)))
+            assertNull(assertNotNull(owner.solveFloat()).second)
+            profile = LpEffortProfile(work = 100L, iterations = 2)
+
+            assertNull(assertNotNull(owner.solveFloat()).second)
+
+            assertEquals(listOf(null, LpFloatAllowance(100L, 2)), seen)
+            assertEquals(1, constructions)
+            assertSame(source, owner.state)
+        }
+    }
+
+    @Test
+    fun `withheld root results retire the owner and preserve work through cleanup failure`() {
+        for (failCleanup in listOf(false, true)) {
+            val builder = LpBuilder()
+            val x = builder.addVar(0, 4, cost = 1)
+            builder.addRow(intArrayOf(x), longArrayOf(1), Relation.GE, 1)
+            val source = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).trailModel()))
+            val model = assertNotNull(source.toWorkingModel())
+            val cleanup = IllegalStateException("root cleanup failed")
+            var cancelled = false
+            var calls = 0
+            var numericalWork = 0L
+            var preparationWork = 0L
+            val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+                override fun newPersistentSolver(
+                    model: LpModel,
+                    cancellation: Cancellation,
+                    refactorUpdateLimit: Int,
+                    iterationLimit: Int,
+                    workLimit: Long,
+                    trackDegeneracy: Boolean,
+                    pricing: LpPricingOptions,
+                ): PersistentLpSolver {
+                    val delegate = ProductionLpEngineFactory.newPersistentSolver(
+                        model, cancellation, refactorUpdateLimit, iterationLimit, workLimit, trackDegeneracy, pricing,
+                    )
+                    return object : PersistentLpSolver by delegate {
+                        override fun prepareLogicals(token: Cancellation): Basis? =
+                            delegate.prepareLogicals(token).also { preparationWork = delegate.lastMetrics.workOps }
+                        override fun resolveBounds(allowance: LpFloatAllowance?): FloatLpResult? {
+                            calls++
+                            return delegate.resolveBounds(allowance).also {
+                                numericalWork = delegate.lastWorkOps
+                                cancelled = true
+                            }
+                        }
+                        override fun close() {
+                            delegate.close()
+                            if (failCleanup) throw cleanup
+                        }
+                    }
+                }
+            }
+            LpPropagator(object : LpSearchPolicy {}, solveContext = LpSolveContext(factory)).use { owner ->
+                assertTrue(owner.install(model, source.model, LpRootAdmission(model, 1001L, 7)))
+
+                if (failCleanup) {
+                    assertSame(cleanup, assertFailsWith<IllegalStateException> {
+                        owner.solveFloat(token = Cancellation { cancelled })
+                    })
+                } else {
+                    assertNull(owner.solveFloat(token = Cancellation { cancelled }))
+                }
+
+                assertEquals(preparationWork + numericalWork, owner.lastMetrics.workOps)
+                assertTrue(owner.lastMetrics.workOps > 0L)
+                assertNull(owner.state)
+                cancelled = false
+                val recorded = owner.lastMetrics
+                assertNull(owner.solveFloat())
+                assertEquals(recorded, owner.lastMetrics)
+                assertEquals(1, calls)
+            }
+        }
+    }
+
+    @Test
+    fun `releasing an unattempted root owner cannot bypass admission`() {
+        val builder = LpBuilder()
+        builder.addVar(0, 1)
+        val source = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).trailModel()))
+        val model = assertNotNull(source.toWorkingModel())
+        val receipt = LpRootAdmission(model, 10L, 1)
+        LpPropagator(object : LpSearchPolicy {}).use { owner ->
+            assertTrue(owner.install(model, source.model, receipt))
+
+            owner.releaseSolver()
+
+            assertNull(owner.state)
+            assertNull(owner.solveFloat())
+            assertFalse(owner.install(model, source.model, receipt))
+        }
+    }
+
+    @Test
+    fun `epoch publication cannot replace an unattempted admitted root`() {
+        val builder = LpBuilder()
+        builder.addVar(0, 1)
+        val source = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).trailModel()))
+        val model = assertNotNull(source.toWorkingModel())
+        LpPropagator(object : LpSearchPolicy {}).use { owner ->
+            assertTrue(owner.install(model, source.model, LpRootAdmission(model, 10L, 1)))
+
+            assertFalse(owner.replaceEpoch(Any(), source.model, null, Cancellation.Never, { true }) {})
+
+            assertSame(source, owner.state)
+        }
+    }
+
 }

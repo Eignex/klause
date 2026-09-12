@@ -173,7 +173,7 @@ internal class LpPropagator(
         publish: () -> Unit,
     ): Boolean {
         lastEpochMetrics = LpSolveMetrics()
-        if (closed || token() || (owner?.state?.depth ?: 0) != 0 ||
+        if (closed || pendingRootAdmission || token() || (owner?.state?.depth ?: 0) != 0 ||
             (preserveSourcePremises && modelKey !== key)
         ) {
             return false
@@ -217,6 +217,7 @@ internal class LpPropagator(
                 witnesses.clear()
                 nextWitness = 0L
                 solved = true
+                pendingRootAdmission = false
                 invalidated = false
                 preparedWork = candidate.metrics.preparationWork
                 preparedRefactors = candidate.metrics.preparationRefactorizations

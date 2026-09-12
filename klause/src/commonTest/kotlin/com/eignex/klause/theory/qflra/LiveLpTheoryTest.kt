@@ -1,5 +1,6 @@
 package com.eignex.klause.theory.qflra
 
+import com.eignex.klause.lp.engine.LpFloatAllowance
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.arithmetic.ReifiedRealLinear

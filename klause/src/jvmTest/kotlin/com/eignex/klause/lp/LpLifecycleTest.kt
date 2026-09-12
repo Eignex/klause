@@ -1,5 +1,6 @@
 package com.eignex.klause.lp
 
+import com.eignex.klause.lp.engine.LpFloatAllowance
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.backtrack.ResumableMinimize

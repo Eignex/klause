@@ -1,6 +1,8 @@
 package com.eignex.klause.lp.engine
 
 import com.eignex.klause.lp.bounding.trailModel
+import com.eignex.klause.simplex.exact.ContinuationDecline
+import com.eignex.klause.simplex.exact.ExactContinuationLimits
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -137,4 +139,58 @@ class LpFloatAllowanceTest {
             assertEquals(-16.0, completed.objective)
         }
     }
+
+    @Test
+    fun `float allowances and owner replacement preserve exhausted exact consumption`() {
+        val builder = LpBuilder()
+        builder.addVar(0, 2)
+        val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).trailModel()))
+        val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+            override fun newPersistentSolver(
+                model: LpModel,
+                cancellation: Cancellation,
+                refactorUpdateLimit: Int,
+                iterationLimit: Int,
+                workLimit: Long,
+                trackDegeneracy: Boolean,
+                pricing: LpPricingOptions,
+            ): PersistentLpSolver {
+                val delegate = ProductionLpEngineFactory.newPersistentSolver(
+                    model, cancellation, refactorUpdateLimit, iterationLimit, workLimit, trackDegeneracy, pricing,
+                )
+                return object : PersistentLpSolver by delegate {
+                    override fun resolveBounds(allowance: LpFloatAllowance?): FloatLpResult? {
+                        delegate.resolveBounds(allowance)
+                        return null
+                    }
+                    override fun continuationBasis(model: LpModel) = Basis(intArrayOf(), arrayOf(VarStatus.AT_LOWER))
+                }
+            }
+        }
+        val context = LpSolveContext(factory)
+        val limits = ExactContinuationLimits(maxWork = 100L)
+        val spent = LpScopedSolver(state, context = context).use { owner ->
+            assertTrue(owner.importEpochBudget(LpEpochBudget(state.model, 100L, 0L, 0L, 0, 0, 0)))
+            val exhausted = assertNotNull(owner.solve(continuationLimits = limits))
+            assertEquals(ContinuationDecline.WORK, exhausted.continuation?.decline)
+            val consumed = assertNotNull(owner.exportEpochBudget())
+
+            for (allowance in listOf(LpFloatAllowance(1L, 1), LpFloatAllowance(10_000L, 100), LpFloatAllowance(0L, 0))) {
+                assertNotNull(owner.solveFloat(allowance = allowance))
+                assertEquals(consumed, owner.exportEpochBudget())
+            }
+            consumed
+        }
+        LpScopedSolver(state, context = context).use { replacement ->
+            assertTrue(replacement.importEpochBudget(spent))
+
+            val exhausted = assertNotNull(replacement.solve(continuationLimits = limits))
+
+            assertEquals(ContinuationDecline.WORK, exhausted.continuation?.decline)
+            assertEquals(0, exhausted.continuation?.builds)
+            assertNull(exhausted.witness)
+            assertTrue(assertNotNull(replacement.exportEpochBudget()).work >= spent.work)
+        }
+    }
+
 }
