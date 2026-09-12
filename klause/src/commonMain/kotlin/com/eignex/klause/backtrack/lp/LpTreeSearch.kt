@@ -3,11 +3,14 @@ package com.eignex.klause.backtrack.lp
 import com.eignex.klause.lp.bounding.LpEngine
 import com.eignex.klause.lp.bounding.LpFractionalBranch
 import com.eignex.klause.lp.bounding.solveNode
+import com.eignex.klause.lp.engine.Basis
 import com.eignex.klause.lp.engine.CrashBasisAttempt
 import com.eignex.klause.lp.engine.ExactLpNumber
+import com.eignex.klause.lp.engine.FloatLpResult
 import com.eignex.klause.lp.engine.LpCertifier
 import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.LpSolveMetrics
+import com.eignex.klause.lp.engine.LpSolver
 import com.eignex.klause.lp.engine.LpVerdict
 import com.eignex.klause.lp.engine.acceptNullable
 import com.eignex.klause.lp.engine.certifiedTightObjectiveLowerBound
@@ -71,20 +74,19 @@ internal fun LpEngine.lbTreeSearch(objective: LinearObjective, cancellation: Can
                 } else {
                     null
                 }
-                val attempt = dive.solveNode(
-                    relaxation.model,
-                    crash?.basis,
-                    token,
+                val attempt = this@lbTreeSearch.solveRootNodeWithCrash(
+                    crash,
+                    solve = {
+                        dive.solveNode(
+                            relaxation.model,
+                            crash?.basis,
+                            token,
+                        )
+                    },
+                    solveMetrics = { solver ->
+                        if (dive.nodeUsesTrail) dive.propagator.lastMetrics else solver.lastMetrics
+                    },
                 ) ?: return SearchNodeDisposition.Expand
-                val solveMetrics = if (dive.nodeUsesTrail) {
-                    dive.propagator.lastMetrics
-                } else {
-                    attempt.first.lastMetrics
-                }
-                observeRootSolve(
-                    attempt.first,
-                    solveMetrics + LpSolveMetrics(workOps = crash?.metrics?.workOps ?: 0L),
-                )
                 val result = attempt.second ?: return SearchNodeDisposition.Expand
                 val lower = certifiedTightObjectiveLowerBound(
                     relaxation.model,
@@ -163,6 +165,32 @@ internal fun LpEngine.lbTreeSearch(objective: LinearObjective, cancellation: Can
 internal fun rootCrashBasis(model: LpModel, token: Cancellation, nodeWorkLimit: Long): CrashBasisAttempt =
     triangularCrashBasis(model, token, rootCrashWorkLimit(nodeWorkLimit))
 
+internal fun solveRootNodeWithCrash(
+    crash: CrashBasisAttempt?,
+    solve: () -> Pair<LpSolver, FloatLpResult?>?,
+    solveMetrics: (LpSolver) -> LpSolveMetrics,
+    observe: (LpSolver, LpSolveMetrics) -> Unit,
+): Pair<LpSolver, FloatLpResult?>? {
+    var unchargedCrashWork = crash?.metrics?.workOps ?: 0L
+    try {
+        val attempt = solve() ?: return null
+        val combinedMetrics = solveMetrics(attempt.first) + LpSolveMetrics(workOps = unchargedCrashWork)
+        unchargedCrashWork = 0L
+        observe(attempt.first, combinedMetrics)
+        return attempt
+    } finally {
+        if (unchargedCrashWork > 0L) {
+            observe(CRASH_WORK_ONLY_SOLVER, LpSolveMetrics(workOps = unchargedCrashWork))
+        }
+    }
+}
+
+internal fun LpEngine.solveRootNodeWithCrash(
+    crash: CrashBasisAttempt?,
+    solve: () -> Pair<LpSolver, FloatLpResult?>?,
+    solveMetrics: (LpSolver) -> LpSolveMetrics,
+): Pair<LpSolver, FloatLpResult?>? = solveRootNodeWithCrash(crash, solve, solveMetrics, this::observeRootSolve)
+
 internal fun rootCrashWorkLimit(nodeWorkLimit: Long): Long = if (nodeWorkLimit == 0L) {
     ROOT_CRASH_WORK_LIMIT
 } else {
@@ -171,3 +199,9 @@ internal fun rootCrashWorkLimit(nodeWorkLimit: Long): Long = if (nodeWorkLimit =
 
 private const val LB_TREE_BUDGET = 256L
 private const val ROOT_CRASH_WORK_LIMIT = 100_000L
+
+private val CRASH_WORK_ONLY_SOLVER = object : LpSolver {
+    override val infeasibleRay: DoubleArray? = null
+    override fun solve(warm: Basis?) = null
+    override fun solvePrimal(warm: Basis?) = null
+}
