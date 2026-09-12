@@ -164,6 +164,13 @@ internal class RelaxationTidyDerivation(
 
     /** Independent structural and algebraic validation; publication is rejected unless this succeeds. */
     fun validate(): Boolean {
+        if (sourceModel.exactState != null || transformedModel.exactState != null ||
+            sourceModel.doubleView != null || transformedModel.doubleView != null ||
+            sourceModel.hasContinuous || transformedModel.hasContinuous ||
+            sourceModel.colContinuous.any { it } || transformedModel.colContinuous.any { it }
+        ) {
+            return false
+        }
         if (!sameColumnsAndObjective(sourceModel, transformedModel)) return false
         if (!hasNormalizedRhs(sourceModel) || !hasNormalizedRhs(transformedModel)) return false
         if (columnSourceSnapshot.size != sourceModel.n) return false
@@ -392,6 +399,7 @@ internal class RelaxationTidyDerivation(
         val rounding = requireNotNull(map.rounding)
         val columnThreshold = reducedRhs * BigFraction.ofLong(coefficient).reciprocal()
         val sourceColumn = columnSourceSnapshot[column] ?: return false
+        if (sourceColumn.source.kind !in setOf(CutSourceKind.INTEGER, CutSourceKind.BOOLEAN)) return false
         val sourceThreshold = (columnThreshold - sourceColumn.offset) * sourceColumn.scale.reciprocal()
         val equality = sourceModel.hasUpper[sourceModel.slackCol(map.sourceRow)]
         if (sourceThreshold != rounding.sourceValue || rounding.strict != sourceModel.rowStrict[map.sourceRow]) {
@@ -435,6 +443,7 @@ internal class RelaxationTidyDerivation(
             rhs -= BigFraction.ofLong(fixing.coefficient) * BigFraction.ofLong(fixing.value)
         }
         val columnSource = columnSourceSnapshot[column] ?: return false
+        if (columnSource.source.kind !in setOf(CutSourceKind.INTEGER, CutSourceKind.BOOLEAN)) return false
         val columnThreshold = rhs * BigFraction.ofLong(coefficient).reciprocal()
         val sourceThreshold = (columnThreshold - columnSource.offset) * columnSource.scale.reciprocal()
         val equality = sourceModel.hasUpper[sourceModel.slackCol(bound.sourceRow)]
