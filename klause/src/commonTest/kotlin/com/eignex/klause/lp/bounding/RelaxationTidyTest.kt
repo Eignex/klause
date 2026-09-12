@@ -1,11 +1,13 @@
 package com.eignex.klause.lp.bounding
 
+import com.eignex.klause.lp.engine.CutExpression
 import com.eignex.klause.lp.engine.CutPremise
 import com.eignex.klause.lp.engine.CutSource
 import com.eignex.klause.lp.engine.CutSourceKind
 import com.eignex.klause.lp.engine.FloatLpStatus
 import com.eignex.klause.lp.engine.LpBuilder
 import com.eignex.klause.lp.engine.LpModel
+import com.eignex.klause.lp.engine.LpRowPremises
 import com.eignex.klause.lp.engine.Relation
 import com.eignex.klause.lp.engine.Sense
 import com.eignex.klause.lp.engine.solveLp
@@ -41,6 +43,22 @@ class RelaxationTidyTest {
             mapOf(1 to 0, 3 to 2),
             applied.derivation.removedRows.associate { it.sourceRow to it.supplyingSourceRow },
         )
+    }
+
+    @Test
+    fun `parallel singleton selection retains the proof supplier`() {
+        val builder = LpBuilder()
+        builder.addVar(0, 10)
+        builder.addRow(intArrayOf(0), longArrayOf(1), Relation.LE, 5)
+        builder.addRow(intArrayOf(0), longArrayOf(1), Relation.LE, 4)
+
+        val applied = tidy(builder.build(Sense.MINIMIZE))
+
+        assertEquals(1, applied.relaxation.model.m)
+        assertEquals(1, applied.derivation.bounds.size)
+        assertEquals(1, applied.derivation.bounds.single().sourceRow)
+        assertEquals(1, applied.derivation.stats.applied(RelaxationTidyRule.PARALLEL_SIDE))
+        assertTrue(applied.derivation.validate())
     }
 
     @Test
@@ -151,6 +169,52 @@ class RelaxationTidyTest {
         assertEquals(5, bound.columnValue)
         assertFalse(bound.sourceUpper)
         assertTrue(bound.columnUpper)
+        assertTrue(applied.derivation.validate())
+    }
+
+    @Test
+    fun `row premises remain in source variable units`() {
+        val builder = LpBuilder()
+        builder.addVar(1, 9)
+        builder.addRow(
+            intArrayOf(0),
+            longArrayOf(1),
+            Relation.LE,
+            6,
+            global = false,
+            premises = LpRowPremises(intArrayOf(7), booleanArrayOf(true), longArrayOf(3)),
+        )
+        val model = builder.build(Sense.MINIMIZE)
+        val root = Any()
+        val columnSource = CutColumnSource(
+            CutSource(CutSourceKind.INTEGER, 0),
+            scale = BigFraction.ofLong(-2),
+            offset = BigFraction.ofLong(9),
+        )
+        val relaxation = LpRelaxation(
+            model,
+            intArrayOf(0),
+            booleanArrayOf(false),
+            0,
+            intArrayOf(0),
+            IntArray(0),
+            sourceMap = CutSourceMap(root, 0, listOf(columnSource)),
+        )
+
+        val applied = assertIs<RelaxationTidyResult.Applied>(
+            RelaxationTidy.apply(
+                relaxation,
+                RelaxationTidyScope(root, 0, null, true),
+                RelaxationTidyConfig(enabled = true),
+            ),
+        )
+        val expected = CutPremise.Bound(
+            CutExpression(mapOf(CutSource(CutSourceKind.INTEGER, 7) to BigFraction.ONE)),
+            true,
+            BigFraction.ofLong(3),
+        )
+
+        assertTrue(expected in applied.derivation.bounds.single().premises)
         assertTrue(applied.derivation.validate())
     }
 

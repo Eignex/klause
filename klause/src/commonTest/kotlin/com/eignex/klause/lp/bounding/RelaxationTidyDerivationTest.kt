@@ -11,6 +11,7 @@ import com.eignex.klause.lp.relaxation.CutColumnSource
 import com.eignex.klause.lp.relaxation.CutSourceMap
 import com.eignex.klause.lp.relaxation.LpRelaxation
 import com.eignex.klause.simplex.exact.BigFraction
+import com.ionspin.kotlin.bignum.integer.BigInteger
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -65,6 +66,21 @@ class RelaxationTidyDerivationTest {
     }
 
     @Test
+    fun `algebraic lift negates the minimum long coefficient exactly`() {
+        val builder = LpBuilder()
+        builder.addVar(0, 0)
+        builder.addVar(0, 10)
+        builder.addVar(0, 10)
+        builder.addRow(intArrayOf(0, 1, 2), longArrayOf(Long.MIN_VALUE, 1, 1), Relation.LE, 5)
+
+        val applied = tidy(builder.build(Sense.MINIMIZE))
+        val lift = assertNotNull(applied.derivation.liftRowMultipliers(listOf(BigFraction.ONE)))
+        val positiveTwoToThe63 = BigFraction.of(BigInteger.fromLong(Long.MAX_VALUE) + BigInteger.ONE, BigInteger.ONE)
+
+        assertEquals(positiveTwoToThe63, lift.fixingEqualities[0])
+    }
+
+    @Test
     fun `rounded singleton does not masquerade as a real Farkas map`() {
         val builder = LpBuilder()
         builder.addVar(0, 10)
@@ -91,6 +107,32 @@ class RelaxationTidyDerivationTest {
             original.rowMaps.map { it.copy(sourceMultiplier = BigFraction.ofLong(2)) },
             original.removedRows,
             original.bounds,
+            original.columnSources,
+            original.stats,
+        )
+
+        assertFalse(forged.validate())
+        assertTrue(original.validate())
+    }
+
+    @Test
+    fun `forged exported singleton bound is rejected independently`() {
+        val builder = LpBuilder()
+        builder.addVar(0, 10)
+        builder.addRow(intArrayOf(0), longArrayOf(1), Relation.LE, 5)
+        val applied = tidy(builder.build(Sense.MINIMIZE))
+        val original = applied.derivation
+        val forgedBound = original.bounds.single().copy(
+            sourceValue = BigFraction.ZERO,
+            columnValue = 0,
+        )
+        val forged = RelaxationTidyDerivation(
+            original.sourceModel,
+            original.transformedModel,
+            original.scope,
+            original.rowMaps,
+            original.removedRows,
+            listOf(forgedBound),
             original.columnSources,
             original.stats,
         )
