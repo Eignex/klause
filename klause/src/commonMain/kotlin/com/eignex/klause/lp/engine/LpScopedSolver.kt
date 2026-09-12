@@ -125,6 +125,34 @@ internal class LpScopedSolver(
         token: Cancellation = cancellation,
     ): Boolean = edit(token) { it.assertBound(column, upper, side, witness, token) }
 
+    @Suppress("TooGenericExceptionCaught") // Numerical refresh can retire factors before a cleanup failure.
+    fun assertBounds(
+        assertions: List<LpBoundAssertion>,
+        token: Cancellation = cancellation,
+    ): LpBoundBatchResult {
+        requireAvailable()
+        if (closed || token()) return LpBoundBatchResult.Declined(0)
+        val next = LpBoundTrail(state)
+        val result = next.assertBounds(assertions, token)
+        editAttempts += result.count
+        if (result is LpBoundBatchResult.Declined || next.state === state) return result
+        try {
+            val current = solver
+            if (current != null && !current.adopt(next.state, token)) return LpBoundBatchResult.Declined(result.count)
+            if (current == null && token()) return LpBoundBatchResult.Declined(result.count)
+        } catch (primary: Throwable) {
+            try {
+                close()
+            } catch (cleanup: Throwable) {
+                primary.addSuppressed(cleanup)
+            }
+            throw primary
+        }
+        publish(next)
+        editSuccesses += result.count - 1L
+        return result
+    }
+
     fun pop(targetDepth: Int, token: Cancellation = cancellation): Boolean = edit(token) { it.pop(targetDepth, token) }
 
     fun resetRoot(initial: LpExactState, token: Cancellation = cancellation): Boolean {

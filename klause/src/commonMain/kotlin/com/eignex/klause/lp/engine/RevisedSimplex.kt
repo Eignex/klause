@@ -1003,12 +1003,12 @@ internal class RevisedSimplex(
     }
 
     override fun adopt(state: LpExactState, token: Cancellation): Boolean {
-        continuationAvailable = false
-        stoppedContinuationBasis = null
         val current = model.exactState ?: return false
         if (!current.sameMatrix(state) || token()) return false
         val next = state.toWorkingModel() ?: return false
         if (token()) return false
+        continuationAvailable = false
+        stoppedContinuationBasis = null
         refreshNumerical(next)
         cancellation = token
         solvedExactState = null

@@ -4,9 +4,12 @@ import com.eignex.klause.lp.engine.Basis
 import com.eignex.klause.lp.engine.CertifiedLpResult
 import com.eignex.klause.lp.engine.DEFAULT_REFACTOR_UPDATE_LIMIT
 import com.eignex.klause.lp.engine.ExactLpModel
+import com.eignex.klause.lp.engine.ExactLpBounds
 import com.eignex.klause.lp.engine.ExactLpPremises
 import com.eignex.klause.lp.engine.ExactLpSide
 import com.eignex.klause.lp.engine.FloatLpResult
+import com.eignex.klause.lp.engine.LpBoundAssertion
+import com.eignex.klause.lp.engine.LpBoundBatchResult
 import com.eignex.klause.lp.engine.LpCertificationObserver
 import com.eignex.klause.lp.engine.LpExactCitedSide
 import com.eignex.klause.lp.engine.LpExactState
@@ -319,6 +322,47 @@ internal class LpPropagator(
         witnesses[witness] = premise
         lastMetrics = LpSolveMetrics()
         return true
+    }
+
+    fun assertBounds(lower: List<ExactLpSide>, upper: List<ExactLpSide>): LpBoundBatchResult {
+        val current = owner ?: return LpBoundBatchResult.Declined(0)
+        current.state.conflict?.let { return LpBoundBatchResult.Conflict(0, it) }
+        if (lower.size != upper.size || lower.size > current.state.model.numVars || cancellation()) {
+            return LpBoundBatchResult.Declined(0)
+        }
+        val assertions = ArrayList<LpBoundAssertion>()
+        columns@ for (column in lower.indices) {
+            var activeLower = current.state.activeSide(column, false)?.side
+            var activeUpper = current.state.activeSide(column, true)?.side
+            for (upperSide in listOf(false, true)) {
+                if (cancellation()) return LpBoundBatchResult.Declined(assertions.size)
+                val side = if (upperSide) upper[column] else lower[column]
+                val previous = if (upperSide) activeUpper else activeLower
+                if (previous == side) continue
+                if (nextWitness > Long.MAX_VALUE - assertions.size - 1L) {
+                    return LpBoundBatchResult.Declined(assertions.size + 1)
+                }
+                assertions.add(
+                    LpBoundAssertion(column, upperSide, side, nextWitness + assertions.size, current.state.depth),
+                )
+                val comparison = previous?.let { side.number.value.compareTo(it.number.value) }
+                if (comparison == null || (if (upperSide) comparison < 0 else comparison > 0) ||
+                    (comparison == 0 && side.strict && !previous.strict)
+                ) {
+                    if (upperSide) activeUpper = side else activeLower = side
+                }
+                if (!ExactLpBounds(activeLower, activeUpper).consistent) break@columns
+            }
+        }
+        val result = current.assertBounds(assertions)
+        if (result !is LpBoundBatchResult.Declined) {
+            for (index in 0 until result.count) {
+                witnesses[assertions[index].witness] = SearchAtomPremise.Unavailable
+            }
+            nextWitness += result.count
+            if (result.count > 0) lastMetrics = LpSolveMetrics()
+        }
+        return result
     }
 
     fun append(row: LpScopedRow, scoped: Boolean): Boolean = owner?.append(row, scoped) == true

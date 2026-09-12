@@ -2,6 +2,14 @@ package com.eignex.klause.lp.engine
 
 import com.eignex.klause.util.Cancellation
 
+internal sealed interface LpBoundBatchResult {
+    val count: Int
+
+    data class Applied(override val count: Int) : LpBoundBatchResult
+    data class Conflict(override val count: Int, val reason: LpBoundConflict) : LpBoundBatchResult
+    data class Declined(override val count: Int) : LpBoundBatchResult
+}
+
 internal class LpBoundTrail(initial: LpExactState) {
     constructor(initial: ExactLpModel) : this(LpExactState(initial))
 
@@ -33,6 +41,87 @@ internal class LpBoundTrail(initial: LpExactState) {
             changedColumns = listOf(column),
         )
         return commit(next, token)
+    }
+
+    fun assertBounds(
+        assertions: List<LpBoundAssertion>,
+        token: Cancellation = Cancellation.Never,
+    ): LpBoundBatchResult {
+        if (token()) return LpBoundBatchResult.Declined(0)
+        state.conflict?.let { return LpBoundBatchResult.Conflict(0, it) }
+        if (assertions.isEmpty()) return LpBoundBatchResult.Applied(0)
+        if (state.toWorkingModel() == null) return assertUnprojectedBounds(assertions, token)
+        val before = state.assertions
+        val witnesses = before.mapTo(HashSet()) { it.witness }
+        val lower = Array(state.model.numVars) { state.activeSide(it, false) }
+        val upper = Array(state.model.numVars) { state.activeSide(it, true) }
+        val changed = LinkedHashSet<Int>()
+        var count = 0
+        var conflict = false
+        for (assertion in assertions) {
+            if (token() || assertion.column !in lower.indices || assertion.depth != state.depth ||
+                (assertion.column >= state.model.n && !state.rows.row(assertion.column - state.model.n).active) ||
+                assertion.witness < 0L || !witnesses.add(assertion.witness) ||
+                state.boundRevision > Long.MAX_VALUE - count - 1L
+            ) {
+                return LpBoundBatchResult.Declined(count + 1)
+            }
+            val sides = if (assertion.upper) upper else lower
+            val previous = sides[assertion.column]
+            val comparison = previous?.let { assertion.side.number.value.compareTo(it.side.number.value) }
+            if (comparison == null || (if (assertion.upper) comparison < 0 else comparison > 0) ||
+                (comparison == 0 && assertion.side.strict && !previous.side.strict)
+            ) {
+                val number = assertion.side.number
+                if (!(number.ieeeBits?.let { Double.fromBits(it) } ?: number.value.toDouble()).isFinite()) {
+                    return LpBoundBatchResult.Declined(count + 1)
+                }
+                sides[assertion.column] = assertion
+            }
+            count++
+            changed.add(assertion.column)
+            if (token()) return LpBoundBatchResult.Declined(count)
+            if (!ExactLpBounds(lower[assertion.column]?.side, upper[assertion.column]?.side).consistent) {
+                conflict = true
+                break
+            }
+        }
+        val next = snapshot(
+            assertions = before + assertions.take(count),
+            boundRevision = state.boundRevision + count,
+            changedColumns = changed.sorted(),
+        )
+        if (!commit(next, token)) return LpBoundBatchResult.Declined(count)
+        return if (conflict) {
+            LpBoundBatchResult.Conflict(count, requireNotNull(state.conflict))
+        } else {
+            LpBoundBatchResult.Applied(count)
+        }
+    }
+
+    private fun assertUnprojectedBounds(
+        assertions: List<LpBoundAssertion>,
+        token: Cancellation,
+    ): LpBoundBatchResult {
+        val staged = LpBoundTrail(state)
+        var count = 0
+        for (assertion in assertions) {
+            if (assertion.depth != state.depth || !staged.assertBound(
+                    assertion.column, assertion.upper, assertion.side, assertion.witness, token,
+                )
+            ) {
+                return LpBoundBatchResult.Declined(count + 1)
+            }
+            count++
+            if (staged.state.conflict != null) break
+        }
+        val next = snapshot(
+            assertions = staged.state.assertions,
+            boundRevision = staged.state.boundRevision,
+            changedColumns = assertions.take(count).map { it.column }.distinct().sorted(),
+        )
+        if (!commit(next, token)) return LpBoundBatchResult.Declined(count)
+        return state.conflict?.let { LpBoundBatchResult.Conflict(count, it) } ?: LpBoundBatchResult.Applied(count)
     }
 
     fun pop(targetDepth: Int, token: Cancellation = Cancellation.Never): Boolean {

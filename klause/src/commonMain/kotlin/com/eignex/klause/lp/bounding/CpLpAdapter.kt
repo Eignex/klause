@@ -12,6 +12,7 @@ import com.eignex.klause.lp.engine.ExactLpPremise
 import com.eignex.klause.lp.engine.ExactLpPremises
 import com.eignex.klause.lp.engine.ExactLpRow
 import com.eignex.klause.lp.engine.ExactLpSide
+import com.eignex.klause.lp.engine.LpBoundBatchResult
 import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.exactBounds
 import com.eignex.klause.lp.engine.finiteExactInput
@@ -160,22 +161,16 @@ internal class CpLpAdapter(private val engine: LpEngine) : LpSearchPolicy {
             if (!core.resetRoot() && !core.install(base, base.model.trailModel() ?: return null)) return null
             if (!core.atLevel(depth)) return null
         }
-        for (column in lower.indices) {
-            val origin = requireNotNull(core.state).model.column(column).origin.value
-            if (!core.assertBound(
-                    column,
-                    false,
-                    ExactLpSide(ExactLpNumber.of(BigFraction.ofLong(lower[column]) - origin)),
-                ) ||
-                !core.assertBound(
-                    column,
-                    true,
-                    ExactLpSide(ExactLpNumber.of(BigFraction.ofLong(upper[column]) - origin)),
-                )
-            ) {
-                return null
-            }
-        }
+        val initial = requireNotNull(core.state).model
+        val result = core.assertBounds(
+            lower.indices.map { column ->
+                ExactLpSide(ExactLpNumber.of(BigFraction.ofLong(lower[column]) - initial.column(column).origin.value))
+            },
+            upper.indices.map { column ->
+                ExactLpSide(ExactLpNumber.of(BigFraction.ofLong(upper[column]) - initial.column(column).origin.value))
+            },
+        )
+        if (result !is LpBoundBatchResult.Applied) return null
         // CP certifiers read shifted Long arrays. Translation preserves row duals and source primals.
         val authority = requireNotNull(core.state).model
         val proof = authority.recentered(lower.map(ExactLpNumber::of)).toLegacy() ?: return null
