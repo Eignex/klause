@@ -12,6 +12,7 @@ import com.eignex.klause.lp.engine.LpExactCitedSide
 import com.eignex.klause.lp.engine.LpExactState
 import com.eignex.klause.lp.engine.LpExactSupport
 import com.eignex.klause.lp.engine.LpPricingOptions
+import com.eignex.klause.lp.engine.LpRootAdmission
 import com.eignex.klause.lp.engine.LpScopedMetrics
 import com.eignex.klause.lp.engine.LpScopedRow
 import com.eignex.klause.lp.engine.LpScopedSolver
@@ -129,20 +130,26 @@ internal class LpPropagator(
         )
     }
 
-    fun install(key: Any, model: ExactLpModel): Boolean {
+    fun install(key: Any, model: ExactLpModel, rootAdmission: LpRootAdmission? = null): Boolean {
+        val admitted = if (rootAdmission != null) rootAdmission.claim(key, model) ?: return false else null
         if (closed || cancellation()) return false
-        if (modelKey === key && owner != null) return true
+        if (modelKey === key && owner != null) return rootAdmission == null
         reset()
-        val initial = LpExactState(model)
-        owner = newOwner(initial)
+        val initial = admitted ?: LpExactState(model)
+        owner = newOwner(initial, rootAdmission)
         rootState = initial
         modelKey = key
         sourcePremises = LpSourcePremises(key)
         return true
     }
 
-    private fun newOwner(initial: LpExactState): LpScopedSolver {
-        val profile = effort()
+    private fun newOwner(initial: LpExactState, rootAdmission: LpRootAdmission? = null): LpScopedSolver {
+        val ordinary = effort()
+        // Initial admission prepares logicals and solves in two separately metered invocations.
+        val profile = if (rootAdmission == null) ordinary else ordinary.copy(
+            work = rootAdmission.workLimit?.div(2L) ?: 0L,
+            iterations = rootAdmission.iterationLimit ?: 0,
+        )
         return LpScopedSolver(
             initial,
             cancellation,
