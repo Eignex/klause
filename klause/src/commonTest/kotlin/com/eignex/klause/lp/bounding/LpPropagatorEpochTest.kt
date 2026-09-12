@@ -2,9 +2,9 @@ package com.eignex.klause.lp.bounding
 
 import com.eignex.klause.lp.engine.Basis
 import com.eignex.klause.lp.engine.FloatLpResult
-import com.eignex.klause.lp.engine.LpFloatAllowance
 import com.eignex.klause.lp.engine.LpBuilder
 import com.eignex.klause.lp.engine.LpEngineFactory
+import com.eignex.klause.lp.engine.LpFloatAllowance
 import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.LpPricingOptions
 import com.eignex.klause.lp.engine.LpSolveContext
@@ -236,7 +236,13 @@ class LpPropagatorEpochTest {
                 pricing: LpPricingOptions,
             ): PersistentLpSolver {
                 val delegate = ProductionLpEngineFactory.newPersistentSolver(
-                    model, cancellation, refactorUpdateLimit, iterationLimit, workLimit, trackDegeneracy, pricing,
+                    model,
+                    cancellation,
+                    refactorUpdateLimit,
+                    iterationLimit,
+                    workLimit,
+                    trackDegeneracy,
+                    pricing,
                 )
                 return object : PersistentLpSolver by delegate {
                     override fun resolveBounds(allowance: LpFloatAllowance?): FloatLpResult? {
@@ -260,5 +266,4 @@ class LpPropagatorEpochTest {
             assertEquals(listOf(null, LpFloatAllowance(5000L, 30), null, LpFloatAllowance(100L, 2)), seen)
         }
     }
-
 }

@@ -3,8 +3,8 @@ package com.eignex.klause.lp.bounding
 import com.eignex.klause.lp.engine.Basis
 import com.eignex.klause.lp.engine.CertifiedLpResult
 import com.eignex.klause.lp.engine.DEFAULT_REFACTOR_UPDATE_LIMIT
-import com.eignex.klause.lp.engine.ExactLpModel
 import com.eignex.klause.lp.engine.ExactLpBounds
+import com.eignex.klause.lp.engine.ExactLpModel
 import com.eignex.klause.lp.engine.ExactLpPremises
 import com.eignex.klause.lp.engine.ExactLpSide
 import com.eignex.klause.lp.engine.FloatLpResult

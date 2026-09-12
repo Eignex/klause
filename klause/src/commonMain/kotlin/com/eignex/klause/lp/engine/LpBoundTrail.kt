@@ -99,15 +99,16 @@ internal class LpBoundTrail(initial: LpExactState) {
         }
     }
 
-    private fun assertUnprojectedBounds(
-        assertions: List<LpBoundAssertion>,
-        token: Cancellation,
-    ): LpBoundBatchResult {
+    private fun assertUnprojectedBounds(assertions: List<LpBoundAssertion>, token: Cancellation): LpBoundBatchResult {
         val staged = LpBoundTrail(state)
         var count = 0
         for (assertion in assertions) {
             if (assertion.depth != state.depth || !staged.assertBound(
-                    assertion.column, assertion.upper, assertion.side, assertion.witness, token,
+                    assertion.column,
+                    assertion.upper,
+                    assertion.side,
+                    assertion.witness,
+                    token,
                 )
             ) {
                 return LpBoundBatchResult.Declined(count + 1)

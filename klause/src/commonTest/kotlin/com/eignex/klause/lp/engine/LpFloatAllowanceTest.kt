@@ -156,7 +156,13 @@ class LpFloatAllowanceTest {
                 pricing: LpPricingOptions,
             ): PersistentLpSolver {
                 val delegate = ProductionLpEngineFactory.newPersistentSolver(
-                    model, cancellation, refactorUpdateLimit, iterationLimit, workLimit, trackDegeneracy, pricing,
+                    model,
+                    cancellation,
+                    refactorUpdateLimit,
+                    iterationLimit,
+                    workLimit,
+                    trackDegeneracy,
+                    pricing,
                 )
                 return object : PersistentLpSolver by delegate {
                     override fun resolveBounds(allowance: LpFloatAllowance?): FloatLpResult? {
@@ -175,7 +181,11 @@ class LpFloatAllowanceTest {
             assertEquals(ContinuationDecline.WORK, exhausted.continuation?.decline)
             val consumed = assertNotNull(owner.exportEpochBudget())
 
-            for (allowance in listOf(LpFloatAllowance(1L, 1), LpFloatAllowance(10_000L, 100), LpFloatAllowance(0L, 0))) {
+            for (allowance in listOf(
+                LpFloatAllowance(1L, 1),
+                LpFloatAllowance(10_000L, 100),
+                LpFloatAllowance(0L, 0),
+            )) {
                 assertNotNull(owner.solveFloat(allowance = allowance))
                 assertEquals(consumed, owner.exportEpochBudget())
             }
@@ -192,5 +202,4 @@ class LpFloatAllowanceTest {
             assertTrue(assertNotNull(replacement.exportEpochBudget()).work >= spent.work)
         }
     }
-
 }

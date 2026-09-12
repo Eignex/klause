@@ -165,16 +165,23 @@ class LpExactStateTest {
         val one = ExactLpNumber.of(1L)
         val tiny = ExactLpNumber.of(BigFraction.of(BigInteger.ONE, BigInteger.ONE shl 2048))
         val boundModel = ExactLpModel(
-            listOf(listOf(ExactLpEntry(0, one))), listOf(one),
+            listOf(listOf(ExactLpEntry(0, one))),
+            listOf(one),
             listOf(ExactLpColumn(ExactLpBounds(upper = ExactLpSide(tiny))), ExactLpColumn(ExactLpBounds())),
-            listOf(ExactLpRow()), ExactLpObjective(listOf(zero, zero)),
+            listOf(ExactLpRow()),
+            ExactLpObjective(listOf(zero, zero)),
         )
         assertEquals(0.0, assertNotNull(LpExactState(boundModel).toWorkingModel()).upperD(0))
         for (role in listOf("matrix", "cost", "scale")) {
             val model = ExactLpModel(
-                listOf(listOf(ExactLpEntry(0, if (role == "matrix") tiny else one))), listOf(one),
-                List(2) { ExactLpColumn(ExactLpBounds()) }, listOf(ExactLpRow()),
-                ExactLpObjective(listOf(if (role == "cost") tiny else zero, zero), scale = if (role == "scale") tiny else one),
+                listOf(listOf(ExactLpEntry(0, if (role == "matrix") tiny else one))),
+                listOf(one),
+                List(2) { ExactLpColumn(ExactLpBounds()) },
+                listOf(ExactLpRow()),
+                ExactLpObjective(
+                    listOf(if (role == "cost") tiny else zero, zero),
+                    scale = if (role == "scale") tiny else one,
+                ),
             )
 
             assertNull(LpExactState(model).toWorkingModel())
@@ -186,20 +193,28 @@ class LpExactStateTest {
         val zero = ExactLpNumber.of(0L)
         val huge = BigInteger.ONE shl 2048
         val values = listOf(
-            ExactLpNumber.of(Long.MIN_VALUE), ExactLpNumber.of(Long.MAX_VALUE),
+            ExactLpNumber.of(Long.MIN_VALUE),
+            ExactLpNumber.of(Long.MAX_VALUE),
             ExactLpNumber.of(BigFraction.of(BigInteger.ONE, BigInteger.fromInt(3))),
-            ExactLpNumber.ofIeee(-0.0), ExactLpNumber.ofIeee(Double.MIN_VALUE),
+            ExactLpNumber.ofIeee(-0.0),
+            ExactLpNumber.ofIeee(Double.MIN_VALUE),
             ExactLpNumber.of(BigFraction.of(-BigInteger.ONE, huge)),
             ExactLpNumber.of(BigFraction.of(huge, BigInteger.ONE)),
             ExactLpNumber.of(BigFraction.of(huge + BigInteger.ONE, huge - BigInteger.ONE)),
         )
         for (number in values) {
-            val copy = number.ieeeBits?.let { ExactLpNumber.ofIeee(Double.fromBits(it)) } ?: ExactLpNumber.of(number.value)
+            val copy = number.ieeeBits?.let {
+                ExactLpNumber.ofIeee(
+                    Double.fromBits(it),
+                )
+            } ?: ExactLpNumber.of(number.value)
             val hash = number.hashCode()
             val expected = number.ieeeBits?.let { Double.fromBits(it) } ?: number.value.toDouble()
             val model = ExactLpModel(
-                listOf(emptyList()), emptyList(),
-                listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(number), ExactLpSide(number)))), emptyList(),
+                listOf(emptyList()),
+                emptyList(),
+                listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(number), ExactLpSide(number)))),
+                emptyList(),
                 ExactLpObjective(listOf(zero)),
             )
             val state = LpExactState(model)
@@ -225,10 +240,14 @@ class LpExactStateTest {
         val zero = ExactLpNumber.of(0L)
         val three = ExactLpNumber.of(3L)
         val model = ExactLpModel(
-            listOf(emptyList()), emptyList(),
+            listOf(emptyList()),
+            emptyList(),
             listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(ExactLpNumber.of(10L))))),
-            emptyList(), ExactLpObjective(
-                listOf(ExactLpNumber.of(5L)), scale = ExactLpNumber.of(2L), externalConstant = ExactLpNumber.of(5L),
+            emptyList(),
+            ExactLpObjective(
+                listOf(ExactLpNumber.of(5L)),
+                scale = ExactLpNumber.of(2L),
+                externalConstant = ExactLpNumber.of(5L),
             ),
         )
         val trail = LpBoundTrail(model)
@@ -258,7 +277,10 @@ class LpExactStateTest {
         for (scale in listOf(third, ExactLpNumber.ofIeee(Double.MIN_VALUE), ExactLpNumber.ofIeee(2.0))) {
             for (constant in listOf(third, ExactLpNumber.ofIeee(-0.0), ExactLpNumber.ofIeee(Double.MIN_VALUE))) {
                 val model = ExactLpModel(
-                    listOf(emptyList()), emptyList(), listOf(ExactLpColumn(ExactLpBounds())), emptyList(),
+                    listOf(emptyList()),
+                    emptyList(),
+                    listOf(ExactLpColumn(ExactLpBounds())),
+                    emptyList(),
                     ExactLpObjective(listOf(zero), scale = scale, externalConstant = constant),
                 )
                 val working = assertNotNull(LpExactState(model).toWorkingModel())
@@ -272,5 +294,4 @@ class LpExactStateTest {
             }
         }
     }
-
 }

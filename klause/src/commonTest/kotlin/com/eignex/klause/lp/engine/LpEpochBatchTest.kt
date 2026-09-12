@@ -62,9 +62,11 @@ class LpEpochBatchTest {
         val zero = ExactLpNumber.of(0L)
         val huge = ExactLpNumber.of(BigFraction.of(BigInteger.ONE shl 2048, BigInteger.ONE))
         val source = ExactLpModel(
-            List(2) { emptyList() }, emptyList(),
+            List(2) { emptyList() },
+            emptyList(),
             listOf(ExactLpColumn(ExactLpBounds()), ExactLpColumn(ExactLpBounds(upper = ExactLpSide(huge)))),
-            emptyList(), ExactLpObjective(listOf(zero, zero)),
+            emptyList(),
+            ExactLpObjective(listOf(zero, zero)),
         )
         for (repairFirst in listOf(false, true)) {
             val trail = LpBoundTrail(source)
@@ -92,9 +94,13 @@ class LpEpochBatchTest {
         val source = assertNotNull(LpBuilder().apply { addVar(0, 10, cost = 1) }.build(Sense.MINIMIZE).trailModel())
         val model = assertNotNull(LpExactState(source).toWorkingModel())
         val huge = ExactLpNumber.of(BigFraction.of(BigInteger.ONE shl 2048, BigInteger.ONE))
-        val invalid = LpExactState(source.copy(columns = listOf(
+        val invalid = LpExactState(
+            source.copy(
+                columns = listOf(
             source.column(0).copy(bounds = ExactLpBounds(source.column(0).bounds.lower, ExactLpSide(huge))),
-        )))
+        )
+            )
+        )
         RevisedSimplex(model).use { solver ->
             assertNotNull(solver.solve())
             assertNotNull(solver.continuationBasis(model))
@@ -164,7 +170,10 @@ class LpEpochBatchTest {
         val zero = ExactLpNumber.of(0L)
         val huge = ExactLpNumber.of(BigFraction.of(BigInteger.ONE shl 2048, BigInteger.ONE))
         val source = ExactLpModel(
-            listOf(emptyList()), emptyList(), listOf(ExactLpColumn(ExactLpBounds())), emptyList(),
+            listOf(emptyList()),
+            emptyList(),
+            listOf(ExactLpColumn(ExactLpBounds())),
+            emptyList(),
             ExactLpObjective(listOf(zero)),
         )
         val trail = LpBoundTrail(source)
@@ -216,7 +225,11 @@ class LpEpochBatchTest {
         for (overflow in listOf(false, true)) {
             val initial = LpExactState(source, boundRevision = if (overflow) Long.MAX_VALUE - 1 else 0L)
             val trail = LpBoundTrail(initial)
-            val second = update.copy(upper = true, side = ExactLpSide(ExactLpNumber.of(8L)), witness = if (overflow) 1 else 0)
+            val second = update.copy(
+                upper = true,
+                side = ExactLpSide(ExactLpNumber.of(8L)),
+                witness = if (overflow) 1 else 0,
+            )
 
             assertIs<LpBoundBatchResult.Declined>(trail.assertBounds(listOf(update, second)))
 
@@ -245,10 +258,12 @@ class LpEpochBatchTest {
 
     @Test
     fun `cancelled adoption preserves the continuation target and successful adoption retires it`() {
-        val source = assertNotNull(LpBuilder().apply {
+        val source = assertNotNull(
+            LpBuilder().apply {
             addVar(0, 10, cost = 1)
             addRow(intArrayOf(0), longArrayOf(1), Relation.EQ, 1)
-        }.build(Sense.MINIMIZE).trailModel())
+        }.build(Sense.MINIMIZE).trailModel()
+        )
         for (stop in listOf(1, 2)) {
             val initial = LpExactState(source)
             val model = assertNotNull(initial.toWorkingModel())

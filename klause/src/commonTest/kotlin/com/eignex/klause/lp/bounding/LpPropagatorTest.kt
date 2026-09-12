@@ -1,6 +1,5 @@
 package com.eignex.klause.lp.bounding
 
-import com.eignex.klause.lp.engine.LpFloatAllowance
 import com.eignex.klause.lp.engine.ExactLpBounds
 import com.eignex.klause.lp.engine.ExactLpColumn
 import com.eignex.klause.lp.engine.ExactLpEntry
