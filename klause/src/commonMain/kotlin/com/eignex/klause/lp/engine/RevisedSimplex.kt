@@ -189,6 +189,9 @@ internal class RevisedSimplex(
     private var numericalRecoveryRefactorizations = 0
     private var primalRefactorizations = 0
     private var warmAttempts = 0
+    private var objectiveWarmAttempts = 0
+    private var objectiveWarmHits = 0
+    private var objectiveWarmRepairs = 0
     internal var lastDevexWeightCorrections: Int = 0
         private set
     internal var lastHarrisMinistepSelections: Int = 0
@@ -429,6 +432,9 @@ internal class RevisedSimplex(
         reconcileRecoveryRefactorizations = reconcileRecoveryRefactorizations,
         numericalRecoveryRefactorizations = numericalRecoveryRefactorizations,
         primalRefactorizations = primalRefactorizations,
+        objectiveWarmAttempts = objectiveWarmAttempts,
+        objectiveWarmHits = objectiveWarmHits,
+        objectiveWarmRepairs = objectiveWarmRepairs,
     )
 
     init {
@@ -1481,6 +1487,9 @@ internal class RevisedSimplex(
         reconcileRecoveryRefactorizations = 0
         numericalRecoveryRefactorizations = 0
         primalRefactorizations = 0
+        objectiveWarmAttempts = 0
+        objectiveWarmHits = 0
+        objectiveWarmRepairs = 0
         warmAttempts = if (warmAttempted) 1 else 0
         singularRefactorizations = 0
         smallPivotBails = 0
@@ -1552,13 +1561,25 @@ internal class RevisedSimplex(
                 }
             }
         }
-        if (model.exactState != null) {
-            repairNonbasicStatuses()
-            val sameObjective = cachedModel?.exactState?.model?.objective == model.exactState?.model?.objective
-            val sameSeats = cachedStatus?.contentEquals(status) == true
-            if ((!kept || !sameObjective || !sameSeats) && !dualFeasible()) {
-                return solvePrimalCore(null, reuse = true, reset = false, progress = progress)
+        if (model.exactState != null) repairNonbasicStatuses()
+        val before = cachedModel?.exactState
+        val after = model.exactState
+        val objectiveOnly = kept && before != null && after != null && before.sameMatrix(after) &&
+            before.boundRevision == after.boundRevision && before.popRevision == after.popRevision &&
+            before.rowRevision == after.rowRevision && before.model.objective != after.model.objective
+        if (objectiveOnly) {
+            objectiveWarmAttempts++
+            objectiveWarmHits++
+            return solvePrimalCore(null, reuse = true, reset = false, progress = progress)
+        }
+        val sameObjective = before?.model?.objective == after?.model?.objective
+        val sameSeats = cachedStatus?.contentEquals(status) == true
+        if ((warmStarted || after != null) && (!kept || !sameObjective || !sameSeats) && !dualFeasible()) {
+            if (kept && before != null && after != null && before.model.objective != after.model.objective) {
+                objectiveWarmAttempts++
+                objectiveWarmRepairs++
             }
+            return solvePrimalCore(null, reuse = true, reset = false, progress = progress)
         }
         resetGamma() // fresh Devex reference frame for this solve
         val maxIter = if (iterationLimit > 0) iterationLimit else 50 * (m + numVars) + 200
@@ -2449,12 +2470,14 @@ internal class RevisedSimplex(
     @Suppress("CyclomaticComplexMethod", "NestedBlockDepth", "ReturnCount", "LongMethod")
     private fun primalPhase1(progress: SolveProgress): IterationResult {
         val beta = basicValues(phaseOneBeta)
+        if (workLimit > 0L && work.ops >= workLimit) return IterationResult.FAILED
         val gamma = phaseOneGradient
         val pi = phaseOneDuals
         val alphaBuf = alphaValues
-        val maxIter = 50 * (m + numVars) + 200
+        val maxIter = if (iterationLimit > 0) iterationLimit else 50 * (m + numVars) + 200
         while (progress.primalIterations < maxIter) {
             val iteration = progress.primalIterations++
+            if (workLimit > 0L && work.ops >= workLimit) return IterationResult.FAILED
             if (iteration % CANCEL_POLL == 0 && cancellation()) return IterationResult.FAILED
             var w = 0.0
             for (i in 0 until m) {
@@ -2611,6 +2634,7 @@ internal class RevisedSimplex(
         }
         if (model.exactState != null) repairNonbasicStatuses()
         val beta = basicValues(primalBeta)
+        if (workLimit > 0L && work.ops >= workLimit) return null
         when (refactorAtQualitySafePoint()) {
             null -> Unit
             RefactorResult.UNCHANGED -> return restartPrimal(progress)
@@ -2627,11 +2651,12 @@ internal class RevisedSimplex(
             basicValues(beta)
             if (!primalFeasible(beta)) return null // phase-1 could not reach feasibility
         }
-        val maxIter = 50 * (m + numVars) + 200
+        val maxIter = if (iterationLimit > 0) iterationLimit else 50 * (m + numVars) + 200
         val blandStall = 2 * (m + numVars) + BLAND_STALL_BASE
         val alphaBuf = alphaValues
         while (progress.primalIterations < maxIter) {
             val iteration = progress.primalIterations++
+            if (workLimit > 0L && work.ops >= workLimit) return null
             if (iteration % CANCEL_POLL == 0 && cancellation()) return null
             // Bland's rule once degenerate pivots pile up: lowest-index entering, lowest-variable leaving
             // tie-break. Guarantees termination on a degenerate LP that the Dantzig rule could cycle on.

@@ -47,6 +47,9 @@ internal data class LpSolveMetrics(
     val reconcileRecoveryRefactorizations: Int = 0,
     val numericalRecoveryRefactorizations: Int = 0,
     val primalRefactorizations: Int = 0,
+    val objectiveWarmAttempts: Int = 0,
+    val objectiveWarmHits: Int = 0,
+    val objectiveWarmRepairs: Int = 0,
 ) {
     operator fun plus(other: LpSolveMetrics) = LpSolveMetrics(
         pivots + other.pivots, workOps + other.workOps, warmAttempts + other.warmAttempts,
@@ -59,6 +62,9 @@ internal data class LpSolveMetrics(
         reconcileRecoveryRefactorizations + other.reconcileRecoveryRefactorizations,
         numericalRecoveryRefactorizations + other.numericalRecoveryRefactorizations,
         primalRefactorizations + other.primalRefactorizations,
+        objectiveWarmAttempts + other.objectiveWarmAttempts,
+        objectiveWarmHits + other.objectiveWarmHits,
+        objectiveWarmRepairs + other.objectiveWarmRepairs,
     )
 }
 
