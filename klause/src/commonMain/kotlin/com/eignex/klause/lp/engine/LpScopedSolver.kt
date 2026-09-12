@@ -180,7 +180,12 @@ internal class LpScopedSolver(
         return certified
     }
 
-    fun solveFloat(warm: Basis? = null, token: Cancellation = cancellation): Pair<LpSolver, FloatLpResult?>? {
+    fun solveFloat(
+        warm: Basis? = null,
+        token: Cancellation = cancellation,
+        allowance: LpFloatAllowance? = null,
+    ): Pair<LpSolver, FloatLpResult?>? {
+        require(warm == null || allowance == null) { "an explicit allowance requires retained factors" }
         requireAvailable()
         lastResult = null
         lastMetrics = LpSolveMetrics()
@@ -189,7 +194,7 @@ internal class LpScopedSolver(
         var failure: Throwable? = null
         val result = try {
             if (!current.adopt(state, token)) return null
-            if (warm == null) current.resolveBounds() else current.solve(warm)
+            if (warm == null) current.resolveBounds(allowance) else current.solve(warm)
         } catch (primary: Throwable) {
             failure = primary
             throw primary

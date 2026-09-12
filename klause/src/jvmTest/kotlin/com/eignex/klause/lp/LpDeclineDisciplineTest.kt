@@ -1,5 +1,6 @@
 package com.eignex.klause.lp
 
+import com.eignex.klause.lp.engine.LpFloatAllowance
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.factor.arithmetic.Linear
@@ -225,9 +226,9 @@ private class RecordingPersistentSolver(
         return persistent.rebind(next, token)
     }
 
-    override fun resolveBounds(): FloatLpResult? {
+    override fun resolveBounds(allowance: LpFloatAllowance?): FloatLpResult? {
         calls += DeclineCall.RESOLVE_BOUNDS
-        return persistent.resolveBounds()
+        return persistent.resolveBounds(allowance)
     }
 
     override fun resolveGated(enforced: BooleanArray): FloatLpResult? {

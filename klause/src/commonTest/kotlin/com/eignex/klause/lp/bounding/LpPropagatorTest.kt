@@ -1,5 +1,6 @@
 package com.eignex.klause.lp.bounding
 
+import com.eignex.klause.lp.engine.LpFloatAllowance
 import com.eignex.klause.lp.engine.ExactLpBounds
 import com.eignex.klause.lp.engine.ExactLpColumn
 import com.eignex.klause.lp.engine.ExactLpEntry
@@ -351,9 +352,9 @@ class LpPropagatorTest {
                     pricing,
                 )
                 return object : PersistentLpSolver by delegate {
-                    override fun resolveBounds(): FloatLpResult? {
+                    override fun resolveBounds(allowance: LpFloatAllowance?): FloatLpResult? {
                         if (fail) throw primary
-                        return delegate.resolveBounds()
+                        return delegate.resolveBounds(allowance)
                     }
                     override fun close() {
                         closes++

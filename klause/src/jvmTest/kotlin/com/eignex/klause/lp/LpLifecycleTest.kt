@@ -1,5 +1,6 @@
 package com.eignex.klause.lp
 
+import com.eignex.klause.lp.engine.LpFloatAllowance
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.backtrack.ResumableMinimize
@@ -218,7 +219,8 @@ private class LifecycleFactory : LpEngineFactory {
                 return delegate.rebind(next, token)
             }
 
-            override fun resolveBounds(): FloatLpResult? = record.solve(delegate) { delegate.resolveBounds() }
+            override fun resolveBounds(allowance: LpFloatAllowance?): FloatLpResult? =
+                record.solve(delegate) { delegate.resolveBounds(allowance) }
 
             override fun resolveGated(enforced: BooleanArray): FloatLpResult? = record.solve(delegate) {
                 if (gatedSolveDeclines) null else delegate.resolveGated(enforced)

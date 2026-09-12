@@ -256,9 +256,9 @@ class LpWorkingModelTest {
                             if (working && preparation) throw primary
                             return delegate.prepareLogicals(token)
                         }
-                        override fun resolveBounds(): FloatLpResult? {
+                        override fun resolveBounds(allowance: LpFloatAllowance?): FloatLpResult? {
                             if (working && !preparation) throw primary
-                            return delegate.resolveBounds()
+                            return delegate.resolveBounds(allowance)
                         }
                         override fun close() {
                             delegate.close()
@@ -362,7 +362,7 @@ class LpWorkingModelTest {
             ): PersistentLpSolver {
                 val delegate = RevisedSimplex(model, cancellation, pricing = pricing)
                 return object : PersistentLpSolver by delegate {
-                    override fun resolveBounds(): FloatLpResult? = null
+                    override fun resolveBounds(allowance: LpFloatAllowance?): FloatLpResult? = null
                     override fun continuationBasis(model: LpModel) = Basis(intArrayOf(), arrayOf(VarStatus.AT_LOWER))
                 }
             }
@@ -408,7 +408,7 @@ class LpWorkingModelTest {
             ): PersistentLpSolver {
                 val delegate = RevisedSimplex(model, cancellation, pricing = pricing)
                 return object : PersistentLpSolver by delegate {
-                    override fun resolveBounds(): FloatLpResult? = null
+                    override fun resolveBounds(allowance: LpFloatAllowance?): FloatLpResult? = null
                     override fun continuationBasis(model: LpModel) = Basis(intArrayOf(), arrayOf(VarStatus.AT_LOWER))
                 }
             }

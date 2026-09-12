@@ -11,6 +11,7 @@ import com.eignex.klause.lp.engine.LpCertificationObserver
 import com.eignex.klause.lp.engine.LpExactCitedSide
 import com.eignex.klause.lp.engine.LpExactState
 import com.eignex.klause.lp.engine.LpExactSupport
+import com.eignex.klause.lp.engine.LpFloatAllowance
 import com.eignex.klause.lp.engine.LpPricingOptions
 import com.eignex.klause.lp.engine.LpRootAdmission
 import com.eignex.klause.lp.engine.LpScopedMetrics
@@ -81,6 +82,7 @@ internal class LpPropagator(
     private var preparedWork = 0L
     private var preparedRefactors = 0L
     private var solved = false
+    private var pendingRootAdmission = false
     private val witnesses = HashMap<Long, SearchAtomPremise>()
     var sourcePremises: LpSourcePremises? = null
         private set
@@ -137,6 +139,7 @@ internal class LpPropagator(
         reset()
         val initial = admitted ?: LpExactState(model)
         owner = newOwner(initial, rootAdmission)
+        pendingRootAdmission = rootAdmission != null
         rootState = initial
         modelKey = key
         sourcePremises = LpSourcePremises(key)
@@ -196,8 +199,25 @@ internal class LpPropagator(
     fun append(row: LpScopedRow, scoped: Boolean): Boolean = owner?.append(row, scoped) == true
     fun deactivate(row: Long): Boolean = owner?.deactivate(row) == true
 
-    fun solveFloat(warm: Basis? = null, token: Cancellation = cancellation): Pair<LpSolver, FloatLpResult?>? =
-        solveOwned { current -> current.solveFloat(if (solved) null else warm, token).also { solved = true } }
+    fun solveFloat(warm: Basis? = null, token: Cancellation = cancellation): Pair<LpSolver, FloatLpResult?>? {
+        val admitted = pendingRootAdmission
+        val result = solveOwned { current ->
+            val allowance = if (solved && !admitted) effort().let { LpFloatAllowance(it.work, it.iterations) } else null
+            current.solveFloat(if (solved) null else warm, token, allowance).also { solved = true }
+        }
+        if (admitted) {
+            pendingRootAdmission = false
+            if (result == null) {
+                val recorded = lastMetrics
+                try {
+                    invalidate()
+                } finally {
+                    lastMetrics = recorded
+                }
+            }
+        }
+        return result
+    }
 
     fun solve(): CertifiedLpResult? = solveOwned {
         val profile = effort()
@@ -322,6 +342,10 @@ internal class LpPropagator(
     override fun onRestart(context: SearchContext) = policy.restart(context)
 
     fun releaseSolver() {
+        if (pendingRootAdmission) {
+            invalidate()
+            return
+        }
         val current = owner ?: return
         val retained = current.state
         owner = null
@@ -342,6 +366,7 @@ internal class LpPropagator(
         sourcePremises = null
         witnesses.clear()
         solved = false
+        pendingRootAdmission = false
         nextWitness = 0L
         preparedWork = 0L
         preparedRefactors = 0L
