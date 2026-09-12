@@ -41,7 +41,7 @@ internal fun <T> CutMapping<T>.orNull(): T? = (this as? CutMapping.Mapped)?.valu
 internal fun CutProvenance.retainReferencedDefinitions(additional: CutExpression? = null): CutProvenance? {
     val referenced = HashSet<CutSource>()
     fun expression(value: CutExpression) {
-        referenced.addAll(value.terms.keys.filter { it.kind == CutSourceKind.TERM })
+        referenced.addAll(value.terms.keys.filter { it.kind == CutSourceKind.AUXILIARY })
     }
     additional?.let(::expression)
     conclusion?.let { expression(it.expression) }
@@ -51,7 +51,7 @@ internal fun CutProvenance.retainReferencedDefinitions(additional: CutExpression
             is CutPremise.Row -> expression(premise.expression)
             is CutPremise.Integral -> expression(premise.expression)
             is CutPremise.ObjectiveCutoff -> expression(premise.expression)
-            is CutPremise.Fixed -> if (premise.source.kind == CutSourceKind.TERM) referenced.add(premise.source)
+            is CutPremise.Fixed -> if (premise.source.kind == CutSourceKind.AUXILIARY) referenced.add(premise.source)
             is CutPremise.Literal, is CutPremise.Excluded -> Unit
         }
     }
@@ -93,11 +93,11 @@ internal class CutMappingLimits(val terms: Int = 4096, val bits: Int = 4096) {
         fun expression(value: CutExpression): Boolean {
             remaining -= value.terms.size + 1
             return remaining >= 0 && accepts(value.constant) && value.terms.values.all { accepts(it) } &&
-                value.terms.keys.all { it.kind != CutSourceKind.TERM || it in proof.auxiliaryDefinitions }
+                value.terms.keys.all { it.kind != CutSourceKind.AUXILIARY || it in proof.auxiliaryDefinitions }
         }
         for ((source, definition) in proof.auxiliaryDefinitions) {
             remaining -= definition.role.size + definition.required.size + 1
-            if (remaining < 0 || source.kind != CutSourceKind.TERM || definition.role.isEmpty() ||
+            if (remaining < 0 || source.kind != CutSourceKind.AUXILIARY || definition.role.isEmpty() ||
                 definition.required.size % 2 != 0 || definition.presentUpper < 0L ||
                 definition.required.indices.step(
                     2,
@@ -115,7 +115,7 @@ internal class CutMappingLimits(val terms: Int = 4096, val bits: Int = 4096) {
                 is CutPremise.Integral -> expression(premise.expression)
 
                 is CutPremise.Fixed -> accepts(premise.value) &&
-                    (premise.source.kind != CutSourceKind.TERM || premise.source in proof.auxiliaryDefinitions)
+                    (premise.source.kind != CutSourceKind.AUXILIARY || premise.source in proof.auxiliaryDefinitions)
 
                 is CutPremise.Excluded -> premise.source.kind == CutSourceKind.INTEGER && accepts(premise.value)
 
@@ -188,7 +188,7 @@ internal class SourceCut(
         if (provenance.auxiliaryDefinitions.any { (source, definition) ->
                 map.auxiliaryDefinitions[source] != definition
             } ||
-            expression.terms.keys.any { it.kind == CutSourceKind.TERM && it !in provenance.auxiliaryDefinitions }
+            expression.terms.keys.any { it.kind == CutSourceKind.AUXILIARY && it !in provenance.auxiliaryDefinitions }
         ) {
             return CutMapping.Declined(CutMappingDecline.MISSING_SOURCE)
         }

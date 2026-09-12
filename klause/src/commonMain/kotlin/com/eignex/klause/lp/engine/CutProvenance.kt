@@ -2,7 +2,7 @@ package com.eignex.klause.lp.engine
 
 import com.eignex.klause.simplex.exact.BigFraction
 
-internal enum class CutSourceKind { INTEGER, BOOLEAN, REAL, TERM }
+internal enum class CutSourceKind { INTEGER, BOOLEAN, REAL, TERM, AUXILIARY }
 
 internal data class CutSource(val kind: CutSourceKind, val id: Int) {
     init {

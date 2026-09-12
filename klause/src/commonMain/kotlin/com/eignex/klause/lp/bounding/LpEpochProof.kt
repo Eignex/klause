@@ -86,7 +86,7 @@ internal class LpEpochProof private constructor(
             for (side in listOf(fixing.lower, fixing.upper)) {
                 val global = sources.isGlobal(side)
                 val term = side.expression.terms.keys.singleOrNull()
-                val premise = if (!global && term?.kind == CutSourceKind.TERM) {
+                val premise = if (!global && term?.kind == CutSourceKind.AUXILIARY) {
                     sources.presenceGuard(
                         side,
                     ) ?: return null

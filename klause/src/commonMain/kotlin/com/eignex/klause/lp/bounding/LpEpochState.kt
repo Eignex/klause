@@ -182,25 +182,25 @@ internal class LpEpochState(
                 if (relaxation.tidyProof != null && proof == null) return null
                 keys.add(
                     listOf(
-                    coefficients[row], model.flippedRhs[row], model.hasUpper[model.n + row],
-                    model.rowStrict[row], model.rowGlobal[row], premise?.vars?.toList(),
-                    premise?.isUpper?.toList(), premise?.thresholds?.toList(), premise?.boolLits?.toList(),
-                    parent?.model, parent?.assumptions, parent?.conclusion, parent?.facts,
-                    proof?.transformations?.map { transform ->
-                        when (transform) {
-                            is CutRowTransform.Algebraic -> listOf(
-                                transform.input,
-                                transform.conclusion,
-                                transform.multiplier,
-                                transform.inputStrict,
-                                transform.outputStrict,
-                                transform.fixings,
-                            )
+                        coefficients[row], model.flippedRhs[row], model.hasUpper[model.n + row],
+                        model.rowStrict[row], model.rowGlobal[row], premise?.vars?.toList(),
+                        premise?.isUpper?.toList(), premise?.thresholds?.toList(), premise?.boolLits?.toList(),
+                        parent?.model, parent?.assumptions, parent?.conclusion, parent?.facts,
+                        proof?.transformations?.map { transform ->
+                            when (transform) {
+                                is CutRowTransform.Algebraic -> listOf(
+                                    transform.input,
+                                    transform.conclusion,
+                                    transform.multiplier,
+                                    transform.inputStrict,
+                                    transform.outputStrict,
+                                    transform.fixings,
+                                )
 
-                            is CutRowTransform.Lattice -> transform
-                        }
-                    },
-                )
+                                is CutRowTransform.Lattice -> transform
+                            }
+                        },
+                    ),
                 )
             }
             return keys

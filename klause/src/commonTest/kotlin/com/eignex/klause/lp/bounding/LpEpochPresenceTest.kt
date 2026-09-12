@@ -9,14 +9,18 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.cut.SourceCut
 import com.eignex.klause.lp.cut.orNull
+import com.eignex.klause.lp.engine.CutAuxiliaryDefinition
 import com.eignex.klause.lp.engine.CutExpression
+import com.eignex.klause.lp.engine.CutFixing
 import com.eignex.klause.lp.engine.CutPremise
 import com.eignex.klause.lp.engine.CutProofFact
 import com.eignex.klause.lp.engine.CutProvenance
+import com.eignex.klause.lp.engine.CutRowTransform
 import com.eignex.klause.lp.engine.CutSource
 import com.eignex.klause.lp.engine.CutSourceKind
 import com.eignex.klause.lp.engine.Relation
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
+import com.eignex.klause.lp.relaxation.CutColumnSource
 import com.eignex.klause.lp.relaxation.CutSourceMap
 import com.eignex.klause.lp.relaxation.LpExplanation
 import com.eignex.klause.lp.relaxation.RootDomains
@@ -31,6 +35,161 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class LpEpochPresenceTest {
+    @Test
+    fun `integer affine expressions have an intrinsic source lattice`() {
+        val integer = CutSource(CutSourceKind.INTEGER, 0)
+        val boolean = CutSource(CutSourceKind.BOOLEAN, 0)
+        val map = CutSourceMap(Any(), 0L, listOf(CutColumnSource(integer), CutColumnSource(boolean)))
+        val expression = CutExpression(
+            mapOf(integer to BigFraction.ofLong(-2), boolean to BigFraction.ONE),
+            BigFraction.ofLong(9),
+        )
+
+        assertTrue(map.isGlobal(CutPremise.Integral(expression)))
+    }
+
+    @Test
+    fun `fractional integer coordinates require explicit lattice evidence`() {
+        val integer = CutSource(CutSourceKind.INTEGER, 0)
+        val map = CutSourceMap(Any(), 0L, listOf(CutColumnSource(integer)))
+        val expression = CutExpression(mapOf(integer to BigFraction.ofLong(2).reciprocal()))
+
+        assertFalse(map.isGlobal(CutPremise.Integral(expression)))
+    }
+
+    @Test
+    fun `generic terms do not acquire an intrinsic source lattice`() {
+        val term = CutSource(CutSourceKind.TERM, 0)
+        val map = CutSourceMap(Any(), 0L, listOf(CutColumnSource(term)))
+
+        assertFalse(map.isGlobal(CutPremise.Integral(CutExpression(mapOf(term to BigFraction.ONE)))))
+    }
+
+    @Test
+    fun `generic and auxiliary terms with equal ids retain distinct affine coordinates`() {
+        val root = Any()
+        val term = CutSource(CutSourceKind.TERM, 0)
+        val auxiliary = CutSource(CutSourceKind.AUXILIARY, 0)
+        val definition = CutAuxiliaryDefinition(listOf(1L), emptyList(), 4L, false)
+        val map = CutSourceMap(
+            root, 0L,
+            listOf(
+            CutColumnSource(term, BigFraction.ofLong(-2), BigFraction.ONE),
+            CutColumnSource(auxiliary, BigFraction.ofLong(2), BigFraction.ofLong(-3)),
+        ),
+            auxiliaryDefinitions = mapOf(auxiliary to definition)
+        )
+        val cut = SourceCut(
+            CutExpression(
+                mapOf(
+                term to BigFraction.ofLong(2).reciprocal(),
+                auxiliary to BigFraction.ofLong(3),
+            )
+            ),
+            Relation.LE,
+            BigFraction.ofLong(5),
+            CutProvenance(root, 0L, emptyList(), auxiliaryDefinitions = mapOf(auxiliary to definition)),
+        )
+
+        val mapped = assertNotNull(cut.toCut(map).orNull())
+
+        assertEquals(listOf(0, 1), mapped.cols.toList())
+        assertEquals(listOf(-1L, 6L), mapped.coeffs.toList())
+        assertEquals(1L, mapped.rhs)
+    }
+
+    @Test
+    fun `an auxiliary cannot use a generic term definition with the same id`() {
+        val root = Any()
+        val term = CutSource(CutSourceKind.TERM, 0)
+        val auxiliary = CutSource(CutSourceKind.AUXILIARY, 0)
+        val definition = CutAuxiliaryDefinition(listOf(1L), emptyList(), 4L, false)
+        val map = CutSourceMap(
+            root,
+            0L,
+            listOf(CutColumnSource(auxiliary)),
+            auxiliaryDefinitions = mapOf(term to definition),
+        )
+        val cut = SourceCut(
+            CutExpression(mapOf(auxiliary to BigFraction.ONE)),
+            Relation.LE,
+            BigFraction.ONE,
+            CutProvenance(root, 0L, emptyList(), auxiliaryDefinitions = mapOf(auxiliary to definition)),
+        )
+
+        assertNull(cut.toCut(map).orNull())
+    }
+
+    @Test
+    fun `auxiliary definition changes invalidate a portable cut`() {
+        val root = Any()
+        val auxiliary = CutSource(CutSourceKind.AUXILIARY, 0)
+        val original = CutAuxiliaryDefinition(listOf(1L), emptyList(), 4L, false)
+        val replacement = CutAuxiliaryDefinition(listOf(2L), emptyList(), 4L, false)
+        val map = CutSourceMap(
+            root,
+            0L,
+            listOf(CutColumnSource(auxiliary)),
+            auxiliaryDefinitions = mapOf(auxiliary to replacement),
+        )
+        val cut = SourceCut(
+            CutExpression(mapOf(auxiliary to BigFraction.ONE)),
+            Relation.LE,
+            BigFraction.ONE,
+            CutProvenance(root, 0L, emptyList(), auxiliaryDefinitions = mapOf(auxiliary to original)),
+        )
+
+        assertNull(cut.toCut(map).orNull())
+    }
+
+    @Test
+    fun `transformation dependencies retain auxiliary definitions absent from the cut expression`() {
+        val root = Any()
+        val term = CutSource(CutSourceKind.TERM, 0)
+        val auxiliary = CutSource(CutSourceKind.AUXILIARY, 0)
+        val definition = CutAuxiliaryDefinition(listOf(1L), emptyList(), 0L, false)
+        val expression = CutExpression(mapOf(term to BigFraction.ONE))
+        val original = CutPremise.Row(
+            CutExpression(mapOf(term to BigFraction.ONE, auxiliary to BigFraction.ONE)),
+            Relation.LE,
+            BigFraction.ofLong(2),
+        )
+        val conclusion = CutPremise.Row(expression, Relation.LE, BigFraction.ofLong(2))
+        val lower = CutPremise.Bound(CutExpression(mapOf(auxiliary to BigFraction.ONE)), false, BigFraction.ZERO)
+        val upper = lower.copy(upper = true)
+        val cut = SourceCut(
+            expression, Relation.LE, BigFraction.ofLong(2),
+            CutProvenance(
+            root,
+            0L,
+            listOf(CutProofFact(original, true), CutProofFact(lower, true), CutProofFact(upper, true)),
+            conclusion = conclusion,
+            transformations = listOf(
+                CutRowTransform.Algebraic(
+                original,
+                conclusion,
+                BigFraction.ONE,
+                false,
+                false,
+                listOf(CutFixing(lower, upper)),
+            )
+            ),
+            auxiliaryDefinitions = mapOf(auxiliary to definition),
+        )
+        )
+        val map = CutSourceMap(
+            root,
+            0L,
+            listOf(CutColumnSource(term)),
+            auxiliaryDefinitions = mapOf(auxiliary to definition),
+        )
+
+        val mapped = assertNotNull(cut.toCut(map).orNull())
+
+        assertEquals(mapOf(auxiliary to definition), assertNotNull(mapped.provenance).auxiliaryDefinitions)
+        assertNull(cut.toCut(CutSourceMap(root, 0L, map.columns)).orNull())
+    }
+
     @Test
     fun `interior absence explains zero upper and restored membership invalidates the guard`() {
         val problem = Problem(

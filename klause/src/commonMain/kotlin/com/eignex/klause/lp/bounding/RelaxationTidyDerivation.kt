@@ -192,8 +192,8 @@ internal class RelaxationTidyDerivation(
                 cancellation,
             ) || !hasNormalizedRhs(transformedModel, cancellation)
         ) {
-                return false
-            }
+            return false
+        }
         if (columnSourceSnapshot.size != sourceModel.n) return false
         if (rowMapSnapshot.size != transformedModel.m ||
             rowMapSnapshot.map { it.outputRow } != (0 until transformedModel.m).toList() ||
@@ -530,7 +530,7 @@ internal class RelaxationTidyDerivation(
 
     private fun integralSource(source: CutSource): Boolean = source.kind == CutSourceKind.INTEGER ||
         source.kind == CutSourceKind.BOOLEAN || (
-            source.kind == CutSourceKind.TERM &&
+            source.kind == CutSourceKind.AUXILIARY &&
                 sourceMap?.isGlobal(CutPremise.Integral(CutExpression(mapOf(source to BigFraction.ONE)))) == true
             )
 

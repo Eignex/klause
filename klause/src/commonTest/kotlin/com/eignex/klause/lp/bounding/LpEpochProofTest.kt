@@ -43,10 +43,12 @@ class LpEpochProofTest {
     fun `cancellation interrupts fixed substitution within a wide row`() {
         val size = 64
         val problem = Problem(
-            0, size, Array(size) { IntDomain(0, 1) },
+            0,
+            size,
+            Array(size) { IntDomain(0, 1) },
             arrayOf(
-            Linear(IntArray(size) { 1 }, IntArray(size) { it }, LinearOp.LE, size / 2),
-        )
+                Linear(IntArray(size) { 1 }, IntArray(size) { it }, LinearOp.LE, size / 2),
+            ),
         )
         val session = PropagationSession(problem)
         repeat(size) { session.implyIntAtMost(it, 0) }
@@ -74,18 +76,20 @@ class LpEpochProofTest {
     fun `cancellation during validation leaves a checked proof reusable`() {
         val size = 32
         val problem = Problem(
-            0, size, Array(size) { IntDomain(0, 1) },
+            0,
+            size,
+            Array(size) { IntDomain(0, 1) },
             arrayOf(
-            Linear(IntArray(size) { 1 }, IntArray(size) { it }, LinearOp.LE, size / 2),
-        )
+                Linear(IntArray(size) { 1 }, IntArray(size) { it }, LinearOp.LE, size / 2),
+            ),
         )
         val plain = CpToLpRelaxation(problem, null).build(RootDomains(problem))
         val tidy = assertIs<RelaxationTidyResult.Applied>(
             RelaxationTidy.apply(
-            plain,
-            RelaxationTidyScope(problem, assertNotNull(plain.sourceMap).epoch, null, true),
-            RelaxationTidyConfig(enabled = true),
-        )
+                plain,
+                RelaxationTidyScope(problem, assertNotNull(plain.sourceMap).epoch, null, true),
+                RelaxationTidyConfig(enabled = true),
+            ),
         )
         var checks = 0
 
@@ -105,18 +109,20 @@ class LpEpochProofTest {
     fun `cancellation interrupts basis remapping without consuming the donor basis`() {
         val size = 32
         val problem = Problem(
-            0, size, Array(size) { IntDomain(0, 1) },
+            0,
+            size,
+            Array(size) { IntDomain(0, 1) },
             arrayOf(
-            Linear(IntArray(size) { 1 }, IntArray(size) { it }, LinearOp.LE, size / 2),
-        )
+                Linear(IntArray(size) { 1 }, IntArray(size) { it }, LinearOp.LE, size / 2),
+            ),
         )
         val plain = CpToLpRelaxation(problem, null).build(RootDomains(problem))
         val tidy = assertIs<RelaxationTidyResult.Applied>(
             RelaxationTidy.apply(
-            plain,
-            RelaxationTidyScope(problem, assertNotNull(plain.sourceMap).epoch, null, true),
-            RelaxationTidyConfig(enabled = true),
-        )
+                plain,
+                RelaxationTidyScope(problem, assertNotNull(plain.sourceMap).epoch, null, true),
+                RelaxationTidyConfig(enabled = true),
+            ),
         ).relaxation
         val basis = Basis(intArrayOf(size), Array(size + 1) { if (it == size) VarStatus.BASIC else VarStatus.AT_LOWER })
         var checks = 0

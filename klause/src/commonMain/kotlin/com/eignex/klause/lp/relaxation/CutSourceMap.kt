@@ -11,6 +11,7 @@ import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.exactBounds
 import com.eignex.klause.lp.engine.exactShift
 import com.eignex.klause.simplex.exact.BigFraction
+import com.ionspin.kotlin.bignum.integer.BigInteger
 
 internal data class CutColumnSource(
     val source: CutSource,
@@ -27,7 +28,7 @@ internal class LpAuxiliarySources {
     private val identities = HashMap<CutAuxiliaryDefinition, CutSource>()
     fun matches(source: CutSource, definition: CutAuxiliaryDefinition): Boolean = identities[definition] == source
     fun source(definition: CutAuxiliaryDefinition): CutSource = identities.getOrPut(definition) {
-        CutSource(CutSourceKind.TERM, identities.size)
+        CutSource(CutSourceKind.AUXILIARY, identities.size)
     }
 }
 
@@ -58,7 +59,14 @@ internal class CutSourceMap(
         it?.source == CutSource(CutSourceKind.INTEGER, variable)
     }
     fun parent(row: Int): CutProvenance? = parentSnapshot[row]
-    fun isGlobal(premise: CutPremise): Boolean = implied(premise, globalSnapshot)
+    fun isGlobal(premise: CutPremise): Boolean = implied(premise, globalSnapshot) ||
+        (
+            premise is CutPremise.Integral && premise.expression.constant.den == BigInteger.ONE &&
+            premise.expression.terms.all { (source, coefficient) ->
+                coefficient.den == BigInteger.ONE &&
+                    (source.kind == CutSourceKind.INTEGER || source.kind == CutSourceKind.BOOLEAN)
+            }
+        )
     fun isActive(premise: CutPremise): Boolean = isGlobal(premise) || implied(premise, activeSnapshot)
 
     fun presenceGuard(premise: CutPremise.Bound): CutPremise.Excluded? {
@@ -230,7 +238,9 @@ internal fun cpCutSources(
                 )?.let { globals.add(CutPremise.Bound(expression, true, it)) }
             }
 
-            CutSourceKind.TERM -> {
+            CutSourceKind.TERM -> Unit
+
+            CutSourceKind.AUXILIARY -> {
                 val definition = requireNotNull(auxiliary[source])
                 globals.add(CutPremise.Bound(expression, false, BigFraction.ZERO))
                 globals.add(CutPremise.Bound(expression, true, BigFraction.ofLong(definition.presentUpper)))
@@ -349,7 +359,7 @@ private fun sourceEndpoint(
                 ) ?: return null
             }
 
-            CutSourceKind.TERM -> return null
+            CutSourceKind.TERM, CutSourceKind.AUXILIARY -> return null
         }
         value += coefficient * endpoint
     }
