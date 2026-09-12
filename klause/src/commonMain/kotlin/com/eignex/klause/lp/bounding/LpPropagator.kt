@@ -76,6 +76,9 @@ internal class LpPropagator(
     private var proofContext: SearchContext? = null
     private var modelKey: Any? = null
     private var rootState: LpExactState? = null
+
+    // Local cut models may reinstall after an epoch; their initial bounds still need source premises.
+    private var sourceRootBounds = true
     private var closed = false
     private var invalidated = false
     private var nextWitness = 0L
@@ -87,6 +90,8 @@ internal class LpPropagator(
     var sourcePremises: LpSourcePremises? = null
         private set
     var lastMetrics = LpSolveMetrics()
+        private set
+    var lastEpochMetrics = LpSolveMetrics()
         private set
     val state: LpExactState? get() = owner?.state
     val metrics: LpScopedMetrics? get() = owner?.metrics
@@ -111,7 +116,7 @@ internal class LpPropagator(
             if (active.side != cited.side || active.witness != cited.witness) return null
             val declared = rootState?.takeIf { cited.column < it.model.numVars }
                 ?.activeSide(cited.column, cited.upper)
-            leaves += if (declared == active) {
+            leaves += if (sourceRootBounds && declared == active) {
                 SearchAtomPremise.All(emptyList())
             } else {
                 boundPremise(active.witness)
@@ -144,6 +149,57 @@ internal class LpPropagator(
         modelKey = key
         sourcePremises = LpSourcePremises(key)
         return true
+    }
+
+    fun replaceEpoch(
+        key: Any,
+        model: ExactLpModel,
+        warm: Basis?,
+        token: Cancellation,
+        validatePublication: () -> Boolean,
+        publish: () -> Unit,
+    ): Boolean {
+        lastEpochMetrics = LpSolveMetrics()
+        if (closed || token() || (owner?.state?.depth ?: 0) != 0) return false
+        val initial = LpExactState(model)
+        val candidate = newOwner(initial)
+        var preparing = true
+        val preparationToken = Cancellation { cancellation() || (preparing && token()) }
+        var published = false
+        return AutoCloseable { if (!published) candidate.close() }.use {
+            try {
+                val attempt = candidate.solveFloat(warm, preparationToken) ?: return@use false
+                val basis = attempt.second?.basis ?: attempt.first.infeasibleBasis ?: return@use false
+                if (basis.basicVars.size != model.m || basis.status.size != model.numVars ||
+                    basis.basicVars.distinct().size != model.m ||
+                    token() || !validatePublication() || token()
+                ) {
+                    return@use false
+                }
+                val previous = owner
+                owner = candidate
+                rootState = initial
+                sourceRootBounds = false
+                modelKey = key
+                sourcePremises = LpSourcePremises(key)
+                witnesses.clear()
+                nextWitness = 0L
+                solved = true
+                invalidated = false
+                preparedWork = candidate.metrics.preparationWork
+                preparedRefactors = candidate.metrics.preparationRefactorizations
+                lastMetrics = LpSolveMetrics()
+                published = true
+                preparing = false
+                previous.use { publish() }
+                true
+            } finally {
+                lastEpochMetrics = candidate.lastMetrics + LpSolveMetrics(
+                    workOps = candidate.metrics.preparationWork,
+                    initialRefactorizations = candidate.metrics.preparationRefactorizations.toInt(),
+                )
+            }
+        }
     }
 
     private fun newOwner(initial: LpExactState, rootAdmission: LpRootAdmission? = null): LpScopedSolver {

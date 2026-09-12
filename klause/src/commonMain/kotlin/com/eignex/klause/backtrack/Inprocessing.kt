@@ -1,5 +1,7 @@
 package com.eignex.klause.backtrack
 
+import com.eignex.klause.lp.bounding.LpEngine
+import com.eignex.klause.lp.bounding.LpEpochPass
 import com.eignex.klause.propagation.PropagationSession
 
 /**
@@ -90,9 +92,10 @@ internal class Inprocessing(private val passes: List<InprocessingPass>, private 
          * and with assumption pins standing those derivations would hold only under the pins yet be
          * stored as unconditional learned clauses.
          */
-        fun from(params: BacktrackParams): Inprocessing? {
+        fun from(params: BacktrackParams, lpEngine: LpEngine? = null): Inprocessing? {
             if (!params.assumptions.isEmpty) return null
             val passes = buildList {
+                if (params.lpEpochs && lpEngine != null) add(LpEpochPass(lpEngine))
                 // Subsumption first: it only shrinks the database, so vivification's probing works
                 // the surviving clauses instead of ones about to be dropped.
                 if (params.subsumption) add(SubsumptionPass())

@@ -5,6 +5,7 @@ import com.eignex.klause.lp.bounding.LP_HARVEST_MAX_RELAXATION_COST
 import com.eignex.klause.lp.bounding.LpEngine
 import com.eignex.klause.lp.bounding.LpParams
 import com.eignex.klause.lp.bounding.LpPlan
+import com.eignex.klause.lp.bounding.ShavedBound
 import com.eignex.klause.lp.bounding.impliedEqualities
 import com.eignex.klause.lp.bounding.redundantConstraints
 import com.eignex.klause.lp.bounding.rootInfeasible
@@ -21,6 +22,36 @@ import com.eignex.klause.solver.result.LpRoute
 import com.eignex.klause.solver.result.LpStats
 import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.util.Cancellation
+
+internal fun harvestEpochBounds(source: LpEngine, token: Cancellation): List<ShavedBound> {
+    val plan = source.params.lpPlan
+    if ((!plan.variableShaving && !plan.objectiveShaving) || token() || !source.epochShapeEligible) {
+        return emptyList()
+    }
+    var child: LpEngine? = null
+    val bounded = Cancellation { token() || child?.workSpentExceeds(1_000_000L) == true }
+    val engine = source.newEpochHarvestEngine(bounded)
+    child = engine
+    return engine.use {
+        try {
+            val bounds = if (plan.variableShaving) engine.shaveVariableBounds(bounded).toMutableList() else ArrayList()
+            if (plan.objectiveShaving && !bounded()) {
+                engine.shaveEpochObjective(bounded)?.let { objective ->
+                    val previous = bounds.indexOfFirst { it.varId == objective.varId }
+                    if (previous < 0) {
+                        bounds.add(objective)
+                    } else {
+                        val old = bounds[previous]
+                        bounds[previous] = ShavedBound(old.varId, maxOf(old.lo, objective.lo), minOf(old.hi, objective.hi))
+                    }
+                }
+            }
+            bounds
+        } finally {
+            source.noteEpochWork(engine.totalSolveWork())
+        }
+    }
+}
 
 /**
  * Fold the LP relaxation's proven domain tightenings into [problem] permanently — the

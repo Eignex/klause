@@ -74,6 +74,17 @@ internal class CutSourceMap(
         parentSnapshot,
     )
 
+    fun atEpoch(next: Long): CutSourceMap = CutSourceMap(
+        model,
+        next,
+        columnSnapshot,
+        globalSnapshot,
+        activeSnapshot,
+        fixedSnapshot,
+        assumptionSnapshot,
+        parentSnapshot,
+    )
+
     /** Compact row-indexed cut provenance through a proof-mapped relaxation transform. */
     fun remapRows(sourceRows: IntArray): CutSourceMap {
         val remapped = HashMap<Int, CutProvenance>()

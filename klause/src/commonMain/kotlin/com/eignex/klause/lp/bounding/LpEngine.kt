@@ -7,7 +7,9 @@ import com.eignex.klause.bound.LagrangianBound
 import com.eignex.klause.bound.LagrangianDualBound
 import com.eignex.klause.bound.SchedulingFeasibilityBound
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
+import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.cut.AggregationMirSeparator
@@ -145,6 +147,26 @@ internal class LpEngine(
 
     internal fun requireOpen() {
         check(!closed) { "LP engine is closed" }
+    }
+
+    internal fun newEpochHarvestEngine(token: Cancellation): LpEngine = LpEngine(
+        problem,
+        objective,
+        LpParams(
+            lpPlan = params.lpPlan.copy(boundEvery = 1),
+            cancellation = token,
+            randomSeed = params.randomSeed,
+            zeroObjectivePricing = params.zeroObjectivePricing,
+        ),
+        sink,
+        solveContext,
+    )
+
+    internal fun shaveEpochObjective(token: Cancellation): ShavedBound? {
+        val single = objective.singleIntObjective() ?: return null
+        val lower = shaveObjectiveLb(single.varId, single.ascending, token) ?: return null
+        val upper = PropagationSession(problem).intDomain(single.varId).max
+        return if (lower <= upper) ShavedBound(single.varId, lower, upper) else null
     }
 
     /** Attribute an auxiliary root/presolve simplex invocation to this solve's shared sink. */
@@ -391,6 +413,10 @@ internal class LpEngine(
     /** Deterministic cumulative LP work, for policies that compare snapshots without mutating it. */
     internal fun totalSolveWork(): Long = totalSolveOps
 
+    internal fun noteEpochWork(work: Long) {
+        totalSolveOps = saturatingAdd(totalSolveOps, work)
+    }
+
     internal fun pendingNodeSolveWork(): Long = pendingSolveOps
 
     private fun saturatingAdd(a: Long, b: Long): Long = if (b > 0L && a > Long.MAX_VALUE - b) Long.MAX_VALUE else a + b
@@ -459,6 +485,115 @@ internal class LpEngine(
     // A fixed source layout allows bound-only adoption without rebuilding its factorization.
     private var persistentResolved = false
     private var persistentRelaxation: LpRelaxation? = null
+    internal var epochState: LpEpochState? = null
+        private set
+    internal var epochRootAllowed = true
+        private set
+    private var epochNumber = 0L
+    internal var epochRebuilds = 0
+        private set
+    internal val epochMetrics = LpEpochMetrics()
+    internal val epochShapeEligible: Boolean get() = problem.numRealVars == 0 &&
+        problem.numIntVars + problem.numBoolVars <= LP_EPOCH_MAX_COLUMNS &&
+        problem.factors.size <= LP_EPOCH_MAX_ROWS &&
+        problem.factors.all { it is Linear || it is ReifiedLinear || it is Clause }
+
+    internal fun retireEpochRoot() {
+        epochRootAllowed = false
+        discardEpoch()
+    }
+
+    internal fun discardEpoch() {
+        if (epochState == null) return
+        epochState = null
+        persistentResolved = false
+        persistentRelaxation = null
+        lpBasisByDepth.clear()
+        lpCounterResults = LpCounterResults()
+        lpBackjump = null
+        try {
+            lpHints?.clear()
+        } finally {
+            cpAdapter.reset()
+        }
+    }
+
+    internal fun rebuildEpoch(session: PropagationSession, token: Cancellation): Boolean {
+        requireOpen()
+        epochMetrics.attempts++
+        if (!epochRootAllowed || token() || session.problem !== problem || session.decisionLevel != 0 ||
+            !epochShapeEligible || epochNumber == Long.MAX_VALUE ||
+            nodeSimplex != null || gatedFilter != null
+        ) {
+            epochMetrics.rootDeclines++
+            return false
+        }
+        val root = LpEpochRoot.capture(session) ?: run {
+            epochMetrics.rootDeclines++
+            return false
+        }
+        val keys = cutPool.cuts().map {
+            listOf(it.key(), it.global, it.provenance?.model, it.provenance?.facts, it.provenance?.assumptions)
+        }.toSet()
+        val oldEpoch = epochState
+        if (oldEpoch != null && !oldEpoch.root.changed(session) && keys == oldEpoch.cutKeys) {
+            epochMetrics.unchanged++
+            return true
+        }
+        val relaxer = lpRelaxer ?: return false
+        val regenerationStart = TimeSource.Monotonic.markNow()
+        val built = try {
+            val plain = relaxer.build(session)
+            if (!LpEpochState.supports(plain) || token()) {
+                epochMetrics.modelDeclines++
+                return false
+            }
+            val cuts = cutPool.exportGlobalCuts().mapNotNull { it.toCut(plain) }.take(LP_EPOCH_MAX_ROWS)
+            if (cuts.isEmpty()) plain else relaxer.build(session, cuts)
+        } finally {
+            epochMetrics.regenerationNanos += regenerationStart.elapsedNow().inWholeNanoseconds
+            noteEpochWork(problem.factors.size.toLong() + problem.numIntVars + problem.numBoolVars)
+        }
+        if (!LpEpochState.supports(built) || token()) {
+            epochMetrics.modelDeclines++
+            return false
+        }
+        val oldBase = oldEpoch?.relaxation ?: persistentRelaxation
+        if (oldBase != null && oldBase.sourceMap?.columns != built.sourceMap?.columns) {
+            epochMetrics.modelDeclines++
+            return false
+        }
+        val number = epochNumber + 1L
+        val map = requireNotNull(built.sourceMap).atEpoch(number)
+        val next = built.withModel(built.model, map)
+        val nextState = LpEpochState(root, next, keys, number)
+        val warm = oldBase?.let { LpEpochState.remapBasis(it, next, lpBasisByDepth.firstOrNull()) }
+        noteEpochWork(next.model.n.toLong() + next.model.m + next.model.csc.colVal.size)
+        val preparationStart = TimeSource.Monotonic.markNow()
+        return try {
+            cpAdapter.installEpoch(next, session, warm, token, { root.admits(session) }) {
+                epochState = nextState
+                epochNumber = number
+                epochRebuilds++
+                epochMetrics.rows = next.model.m
+                epochMetrics.columns = next.model.n
+                epochMetrics.nonzeros = next.model.csc.colVal.size
+                persistentRelaxation = next
+                persistentResolved = true
+                lpBasisByDepth.clear()
+                lpCounterResults = LpCounterResults()
+                lpBackjump = null
+                residualCache = null
+                residualCacheKey = null
+                nodeUsesTrail = false
+                pendingSolveOps = 0L
+                lpHints?.clear()
+            }.also { if (!it) epochMetrics.preparationDeclines++ }
+        } finally {
+            epochMetrics.preparationNanos += preparationStart.elapsedNow().inWholeNanoseconds
+            noteEpochWork(propagator.lastEpochMetrics.workOps)
+        }
+    }
 
     // Strict residual filtering retains its dedicated floating owner until its exact-state migration.
     internal var nodeSimplex: PersistentLpSolver? = null
@@ -486,6 +621,7 @@ internal class LpEngine(
     }
 
     private fun buildNodeRelaxation(relaxer: CpToLpRelaxation, session: PropagationSession): LpRelaxation {
+        epochState?.let { if (!it.admits(session)) discardEpoch() }
         if (!persistentResolved) {
             persistentResolved = true
             val base = relaxer.build(PropagationSession(problem))
@@ -515,7 +651,8 @@ internal class LpEngine(
         return relaxer.build(session)
     }
 
-    internal val lpCounterResults = LpCounterResults()
+    internal var lpCounterResults = LpCounterResults()
+        private set
 
     // Pin-fingerprint cache for the residual real relaxation (realResidual plans, no integer columns).
     private var residualCacheKey: IntArray? = null

@@ -1,5 +1,6 @@
 package com.eignex.klause.lp.bounding
 
+import com.eignex.klause.lp.engine.Basis
 import com.eignex.klause.lp.engine.ExactLpColumn
 import com.eignex.klause.lp.engine.ExactLpEntry
 import com.eignex.klause.lp.engine.ExactLpModel
@@ -21,6 +22,7 @@ import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchDecision
+import com.eignex.klause.util.Cancellation
 
 internal class CpLpAdapter(private val engine: LpEngine) : LpSearchPolicy {
     private var native: PropagationSession? = null
@@ -75,6 +77,24 @@ internal class CpLpAdapter(private val engine: LpEngine) : LpSearchPolicy {
         persistentState = false
         currentModel = null
         engine.propagator.reset()
+    }
+
+    fun installEpoch(
+        base: LpRelaxation,
+        session: PropagationSession,
+        warm: Basis?,
+        token: Cancellation,
+        validatePublication: () -> Boolean,
+        publish: () -> Unit,
+    ): Boolean {
+        if (session.decisionLevel != 0 || (shared?.decisionLevel ?: 0) != 0) return false
+        val model = base.model.trailModel() ?: return false
+        return engine.propagator.replaceEpoch(base, model, warm, token, validatePublication) {
+            native = session
+            persistentState = true
+            currentModel = null
+            publish()
+        }
     }
 
     fun relaxation(base: LpRelaxation, session: PropagationSession): LpRelaxation? {

@@ -246,7 +246,7 @@ internal class ResumableMinimize(
     private var rootExhausted: UnsatCore? = null
     private var rootIsExhausted = false
     private var firstRun = true
-    private val inprocessing = Inprocessing.from(params)
+    private val inprocessing = Inprocessing.from(params, lpEngine)
     private val pooledIncumbents = params.pooledIncumbents?.let { IncumbentSubscription(it) }
     private val traversal = OptimizationTraversalPolicy()
 
@@ -263,6 +263,8 @@ internal class ResumableMinimize(
     /** Live counters; [SolveStatsSink.snapshot] reads elapsed time without needing the sink stopped, so
      *  this is meaningful mid-search as well as after one. */
     override val stats: SolveStats get() = sink.snapshot()
+    internal val lpEpochAttempts: Int get() = lpEngine.epochMetrics.attempts
+    internal val lpEpochRebuilds: Int get() = lpEngine.epochRebuilds
 
     init {
         try {
@@ -383,6 +385,7 @@ internal class ResumableMinimize(
         check(rebindable) { "search is not rebindable" }
         check(!closed) { "search is closed" }
         searchSession.popTo(0)
+        lpEngine.retireEpochRoot()
         val seeded = session.reseedFrom(assumptions)
         lpEngine.cpAdapter.resetRoot()
         cp.rebase()

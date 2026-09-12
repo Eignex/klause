@@ -223,6 +223,8 @@ data class BacktrackParams(
      * meaningful when at least one pass (e.g. [vivification]) is enabled. Must be positive.
      */
     val inprocessingCadence: Int = 1,
+    /** Enable bounded LP matrix epochs at unseeded optimization restarts. */
+    val lpEpochs: Boolean = false,
     /**
      * Externally-supplied objective upper bound for branch-and-bound minimisation. When
      * non-null, the [com.eignex.klause.solver.Optimizer.improvements] / `minimize`
