@@ -42,7 +42,11 @@ internal fun harvestEpochBounds(source: LpEngine, token: Cancellation): List<Sha
                         bounds.add(objective)
                     } else {
                         val old = bounds[previous]
-                        bounds[previous] = ShavedBound(old.varId, maxOf(old.lo, objective.lo), minOf(old.hi, objective.hi))
+                        bounds[previous] = ShavedBound(
+                            old.varId,
+                            maxOf(old.lo, objective.lo),
+                            minOf(old.hi, objective.hi),
+                        )
                     }
                 }
             }

@@ -50,6 +50,7 @@ import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.LpRoute
 import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.CheckedLongOverflowException
 import com.eignex.klause.util.EmptyDoubleArray
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntArrayList
@@ -550,6 +551,9 @@ internal class LpEngine(
             }
             val cuts = cutPool.exportGlobalCuts().mapNotNull { it.toCut(plain) }.take(LP_EPOCH_MAX_ROWS)
             if (cuts.isEmpty()) plain else relaxer.build(session, cuts)
+        } catch (_: CheckedLongOverflowException) {
+            epochMetrics.modelDeclines++
+            return false
         } finally {
             epochMetrics.regenerationNanos += regenerationStart.elapsedNow().inWholeNanoseconds
             noteEpochWork(problem.factors.size.toLong() + problem.numIntVars + problem.numBoolVars)

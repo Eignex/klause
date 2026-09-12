@@ -71,6 +71,26 @@ class LpEpochPassTest {
     }
 
     @Test
+    fun `overflowing regeneration declines and preserves the prepared owner`() {
+        val problem = Problem(0, 1, arrayOf(IntDomain(-Long.MAX_VALUE, Long.MAX_VALUE)), emptyArray())
+        val narrow = PropagationSession(problem)
+        narrow.implyIntAtLeast(0, 0)
+        narrow.implyIntAtMost(0, 4)
+        LpEngine(problem, LinearObjective(intCoefficients = longArrayOf(1)),
+            LpParams(lpPlan = LpPlan(bounding = true)), SolveStatsSink(backend = "epochs"),
+        ).use { engine ->
+            assertTrue(engine.rebuildEpoch(narrow, Cancellation.Never))
+            val epoch = engine.epochState
+            val owner = engine.propagator.state
+            assertFalse(engine.rebuildEpoch(PropagationSession(problem), Cancellation.Never))
+            assertEquals(1, engine.epochMetrics.modelDeclines)
+            assertSame(epoch, engine.epochState)
+            assertSame(owner, engine.propagator.state)
+            assertNotNull(engine.propagator.solve())
+        }
+    }
+
+    @Test
     fun `a replacement root discards its epoch before the next solve`() {
         val problem = Problem(0, 1, arrayOf(IntDomain(0, 5)), emptyArray())
         val session = PropagationSession(problem)
