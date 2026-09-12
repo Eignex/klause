@@ -461,29 +461,27 @@ internal class RelaxationTidyDerivation(
         return bound.premises == expectedPremises(sourceModel.rowPremises[bound.sourceRow], map.fixings)
     }
 
-    private fun expectedPremises(
-        rowPremises: LpRowPremises?,
-        fixings: List<RelaxationTidyFixing>,
-    ): Set<CutPremise> = buildSet {
-        rowPremises?.let { premises ->
-            for (index in premises.vars.indices) {
-                val source = CutSource(CutSourceKind.INTEGER, premises.vars[index])
-                val expression = CutExpression(mapOf(source to BigFraction.ONE))
-                add(
-                    CutPremise.Bound(
-                        expression,
-                        premises.isUpper[index],
-                        BigFraction.ofLong(premises.thresholds[index]),
-                    ),
-                )
+    private fun expectedPremises(rowPremises: LpRowPremises?, fixings: List<RelaxationTidyFixing>): Set<CutPremise> =
+        buildSet {
+            rowPremises?.let { premises ->
+                for (index in premises.vars.indices) {
+                    val source = CutSource(CutSourceKind.INTEGER, premises.vars[index])
+                    val expression = CutExpression(mapOf(source to BigFraction.ONE))
+                    add(
+                        CutPremise.Bound(
+                            expression,
+                            premises.isUpper[index],
+                            BigFraction.ofLong(premises.thresholds[index]),
+                        ),
+                    )
+                }
+                for (literal in premises.boolLits) add(CutPremise.Literal(literal))
             }
-            for (literal in premises.boolLits) add(CutPremise.Literal(literal))
+            for (fixing in fixings) {
+                add(fixing.lower)
+                add(fixing.upper)
+            }
         }
-        for (fixing in fixings) {
-            add(fixing.lower)
-            add(fixing.upper)
-        }
-    }
 }
 
 private fun sameColumnsAndObjective(source: LpModel, output: LpModel): Boolean {
