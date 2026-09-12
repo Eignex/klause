@@ -409,10 +409,7 @@ class RelaxationTidyDerivationTest {
         booleanArrayOf(true),
     )
 
-    private fun LpModel.withSlackData(
-        cost: LongArray = this.cost,
-        upper: LongArray = this.upper,
-    ): LpModel = LpModel(
+    private fun LpModel.withSlackData(cost: LongArray = this.cost, upper: LongArray = this.upper): LpModel = LpModel(
         n,
         m,
         csc,
