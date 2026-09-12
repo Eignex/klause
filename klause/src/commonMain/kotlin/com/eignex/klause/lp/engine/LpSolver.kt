@@ -24,6 +24,7 @@ internal enum class LpRefactorReason {
 /** Optional, solve-scoped observer for certification and exact-input eligibility. */
 internal interface LpCertificationObserver {
     fun observe(certifier: LpCertifier, success: Boolean)
+    fun observeDualization(metrics: LpDualizationMetrics) {}
     fun observeExactInput(accepted: Boolean)
     fun observeSolve(metrics: LpSolveMetrics, component: Boolean)
     fun observeBasisVerification(metrics: ExactBasisMetrics) {}

@@ -47,6 +47,7 @@ internal class CertifiedLpResult(
     val reconstruction: ReconstructionMetrics? = null,
     val basisVerification: ExactBasisMetrics? = null,
     val continuation: ExactContinuationMetrics? = null,
+    val dualization: LpDualizationMetrics? = null,
 ) {
     val verdict: LpVerdict = when {
         farkasRay != null || rationalConflict != null || boundConflict != null -> LpVerdict.INFEASIBLE
@@ -73,6 +74,7 @@ internal fun solveAndCertify(
     context: LpSolveContext = LpSolveContext.Production,
     counterResults: LpCounterResults? = null,
     pricing: LpPricingOptions = LpPricingOptions(),
+    observer: LpCertificationObserver? = null,
 ): CertifiedLpResult {
     val state = LpExactState(model)
     val working = state.toWorkingModel()
@@ -87,13 +89,31 @@ internal fun solveAndCertify(
             captureEligible = false,
         )
     }
-    return solveAndCertify(
+    val dualization = if (warm == null && context.rootDualization.enabled) LpRootDualizationAttempt(context.rootDualization) else null
+    val proposal = if (dualization == null) basis else try {
+        dualization.solve(state, context, pricing, cancellation) ?: basis
+    } finally {
+        observer?.observeDualization(dualization.metrics)
+    }
+    val solved = solveAndCertify(
         working,
-        basis,
+        proposal,
         cancellation,
+        componentSplit = dualization?.metrics?.basisRecovered != true,
+        observer = observer,
         context = context,
         counterResults = counterResults,
         pricing = pricing,
+    )
+    if (dualization == null) return solved
+    val mapped = certifyDualizedSource(working, dualization, context.certificationPolicy, cancellation)
+    if (cancellation()) return CertifiedLpResult(null, null, null, null, null, false, { null }, dualization = dualization.metrics)
+    val bound = mapped?.bound?.takeIf { candidate -> solved.bound?.let { candidate.value > it.value } != false } ?: solved.bound
+    val witness = solved.witness ?: mapped?.witness
+    return CertifiedLpResult(
+        solved.float, bound, witness, solved.farkasRay, solved.rationalConflict, working.hasIntegralObjective(),
+        { solved.safeLowerBound }, solved.unboundedness, solved.boundConflict, solved.conflictSupport,
+        solved.reconstruction, solved.basisVerification, solved.continuation, dualization.metrics,
     )
 }
 
@@ -853,3 +873,21 @@ internal fun exactLpStateKey(model: ExactLpModel): ByteArray? {
 }
 
 private const val MAX_COUNTER_KEY_VALUES = 4096L
+
+internal fun certifyDualizedSource(
+    model: LpModel,
+    attempt: LpRootDualizationAttempt,
+    policy: LpCertificationPolicy = ProductionLpCertificationPolicy,
+    cancellation: Cancellation = Cancellation.Never,
+): CertifiedLpResult? {
+    if (model.exactState !== attempt.sourceState || cancellation()) return null
+    val candidate = attempt.certificate ?: return null
+    val bound = policy.acceptNullable(LpCertifier.RATIONAL, candidate.bound)
+    val witness = policy.acceptNullable(LpCertifier.RATIONAL, candidate.witness)
+    if (cancellation()) return null
+    return CertifiedLpResult(
+        null, bound, witness, null, null, model.hasIntegralObjective(), { null },
+        reconstruction = candidate.metrics,
+        dualization = attempt.metrics,
+    )
+}
