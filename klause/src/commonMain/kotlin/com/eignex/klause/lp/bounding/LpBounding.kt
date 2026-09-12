@@ -130,7 +130,7 @@ internal fun LpEngine.dualSimplex(model: LpModel, cancellation: Cancellation): T
  * change replaces that owner. Nonprojectable legacy models use persistent rebind when compatible.
  * Warm hints apply only to a fresh solve; a retained scoped owner already has its basis factorized.
  */
-@Suppress("TooGenericExceptionCaught") // replacement cleanup must preserve arbitrary solve and close failures
+@Suppress("TooGenericExceptionCaught", "ThrowsCount") // replacement cleanup must preserve arbitrary solve and close failures
 internal fun LpEngine.solveNode(
     model: LpModel,
     warm: Basis?,

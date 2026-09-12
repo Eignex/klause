@@ -146,10 +146,14 @@ internal class LpPropagator(
     private fun newOwner(initial: LpExactState, rootAdmission: LpRootAdmission? = null): LpScopedSolver {
         val ordinary = effort()
         // Initial admission prepares logicals and solves in two separately metered invocations.
-        val profile = if (rootAdmission == null) ordinary else ordinary.copy(
-            work = rootAdmission.workLimit?.div(2L) ?: 0L,
-            iterations = rootAdmission.iterationLimit ?: 0,
-        )
+        val profile = if (rootAdmission == null) {
+            ordinary
+        } else {
+            ordinary.copy(
+                work = rootAdmission.workLimit?.div(2L) ?: 0L,
+                iterations = rootAdmission.iterationLimit ?: 0,
+            )
+        }
         return LpScopedSolver(
             initial,
             cancellation,
