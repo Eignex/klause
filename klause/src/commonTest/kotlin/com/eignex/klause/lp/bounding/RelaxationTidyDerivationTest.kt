@@ -189,6 +189,36 @@ class RelaxationTidyDerivationTest {
     }
 
     @Test
+    fun `nonzero transformed slack cost is rejected independently`() {
+        val builder = LpBuilder()
+        builder.addVar(0, 2)
+        builder.addRow(intArrayOf(0), longArrayOf(1), Relation.LE, 5)
+        val applied = tidy(builder.build(Sense.MINIMIZE))
+        val original = applied.derivation
+        val forgedCost = original.transformedModel.cost.copyOf()
+        forgedCost[original.transformedModel.slackCol(0)] = 7
+        val forged = original.withTransformedModel(original.transformedModel.withSlackData(cost = forgedCost))
+
+        assertFalse(forged.validate())
+        assertTrue(original.validate())
+    }
+
+    @Test
+    fun `nonzero equality slack bound is rejected independently`() {
+        val builder = LpBuilder()
+        builder.addVar(0, 10)
+        builder.addRow(intArrayOf(0), longArrayOf(1), Relation.EQ, 5)
+        val applied = tidy(builder.build(Sense.MINIMIZE))
+        val original = applied.derivation
+        val forgedUpper = original.transformedModel.upper.copyOf()
+        forgedUpper[original.transformedModel.slackCol(0)] = 3
+        val forged = original.withTransformedModel(original.transformedModel.withSlackData(upper = forgedUpper))
+
+        assertFalse(forged.validate())
+        assertTrue(original.validate())
+    }
+
+    @Test
     fun `forged exported singleton bound is rejected independently`() {
         val builder = LpBuilder()
         builder.addVar(0, 10)
@@ -378,4 +408,40 @@ class RelaxationTidyDerivationTest {
         probeClampedHi,
         booleanArrayOf(true),
     )
+
+    private fun LpModel.withSlackData(
+        cost: LongArray = this.cost,
+        upper: LongArray = this.upper,
+    ): LpModel = LpModel(
+        n,
+        m,
+        csc,
+        rhs,
+        cost,
+        upper,
+        hasUpper,
+        loShift,
+        objConstant,
+        sense,
+        tag,
+        rowGlobal,
+        rowStrict,
+        rowPremises,
+        flippedRhs,
+        probeClampedLo,
+        probeClampedHi,
+        colContinuous,
+    )
+
+    private fun RelaxationTidyDerivation.withTransformedModel(model: LpModel): RelaxationTidyDerivation =
+        RelaxationTidyDerivation(
+            sourceModel,
+            model,
+            scope,
+            rowMaps,
+            removedRows,
+            bounds,
+            columnSources,
+            stats,
+        )
 }

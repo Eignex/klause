@@ -172,6 +172,7 @@ internal class RelaxationTidyDerivation(
             return false
         }
         if (!sameColumnsAndObjective(sourceModel, transformedModel)) return false
+        if (!hasNormalizedSlacks(sourceModel) || !hasNormalizedSlacks(transformedModel)) return false
         if (!hasNormalizedRhs(sourceModel) || !hasNormalizedRhs(transformedModel)) return false
         if (columnSourceSnapshot.size != sourceModel.n) return false
         if (rowMapSnapshot.size != transformedModel.m ||
@@ -523,6 +524,11 @@ private fun hasNormalizedRhs(model: LpModel): Boolean = (0 until model.m).all { 
         }
     }
     expected == BigInteger.fromLong(model.rhs[row])
+}
+
+private fun hasNormalizedSlacks(model: LpModel): Boolean = (0 until model.m).all { row ->
+    val slack = model.slackCol(row)
+    model.cost[slack] == 0L && (!model.hasUpper[slack] || model.upper[slack] == 0L)
 }
 
 private fun rowCoefficients(model: LpModel, row: Int): Map<Int, Long> {
