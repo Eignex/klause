@@ -304,6 +304,7 @@ internal fun certifyLpResult(
     var withheldWitness = false
     var withheldBound = false
     var withheldConflict = false
+    var pointAttempted = false
     fun refine() {
         if (refinement == null || state == null || cancellation()) return
         if (result == null) {
@@ -319,6 +320,8 @@ internal fun certifyLpResult(
                 (capturedTarget?.metrics?.allocation ?: 0L),
             needPoint = numericalWitness == null, direction = solver.recessionDirection,
             directElapsed = certificationStarted?.elapsedNow() ?: Duration.ZERO,
+            reconstructInitial = reconstruction == null,
+            preferBasis = result != null && policy === ProductionLpCertificationPolicy,
         )
         refined = recovered
         observer?.observe(
@@ -379,6 +382,14 @@ internal fun certifyLpResult(
         witness = component?.exactWitness(observer, policy, cancellation)
         numericalWitness = witness ?: numericalWitness
     }
+    if (result != null && numericalWitness == null && refinement != null &&
+        policy === ProductionLpCertificationPolicy && !cancellation()
+    ) {
+        pointAttempted = true
+        val point = exactPointWitness(model, result.primal, observer)
+        numericalWitness = point
+        witness = point
+    }
     if (result != null && (numericalWitness == null || numericalBound?.value != numericalWitness?.objective) &&
         !cancellation()
     ) {
@@ -409,7 +420,7 @@ internal fun certifyLpResult(
         val stronger = policy.acceptNullable(LpCertifier.RATIONAL, basisBound)
         if (stronger != null && (bound == null || stronger.value > requireNotNull(bound).value)) bound = stronger
     }
-    if (result != null && witness == null && !withheldWitness && !cancellation()) {
+    if (result != null && witness == null && !pointAttempted && !withheldWitness && !cancellation()) {
         val point = exactPointWitness(model, result.primal, observer)
         numericalWitness = point ?: numericalWitness
         witness = policy.acceptNullable(LpCertifier.EXACT_POINT, point)

@@ -14,6 +14,101 @@ import kotlin.test.assertTrue
 
 class RefinementLifecycleTest {
     @Test
+    fun `a declined refinement attempt does not repeat exact point certification`() {
+        val builder = LpBuilder()
+        val x = builder.addRealVar(0.0, 2.0, cost = 1.0)
+        builder.addRealRow(intArrayOf(x), doubleArrayOf(3.0), Relation.EQ, 1.0)
+        val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).trailModel()))
+        val hint = FloatLpResult(
+            Basis(intArrayOf(0), arrayOf(VarStatus.BASIC, VarStatus.FIXED)),
+            0.25,
+            duals = doubleArrayOf(0.0),
+            primal = doubleArrayOf(0.25),
+            exactState = state,
+        )
+        val solver = object : LpSolver {
+            override val solvedExactState = state
+            override val infeasibleRay: DoubleArray? = null
+            override fun solve(warm: Basis?) = hint
+            override fun solvePrimal(warm: Basis?) = hint
+        }
+        var pointChecks = 0
+        val observer = object : LpCertificationObserver {
+            override fun observe(certifier: LpCertifier, success: Boolean) {
+                if (certifier == LpCertifier.EXACT_POINT) pointChecks++
+            }
+            override fun observeExactInput(accepted: Boolean) = Unit
+            override fun observeSolve(metrics: LpSolveMetrics, component: Boolean) = Unit
+        }
+        LpScopedSolver(state).use { owner ->
+            val result = certifyLpResult(
+                assertNotNull(state.toWorkingModel()),
+                solver,
+                hint,
+                observer = observer,
+                refinement = LpRefinementRequest(owner, owner.refinementCache, LpRefinementLimits(maxWork = 0L)),
+            )
+
+            assertEquals(LpRefinementDecline.WORK, assertNotNull(result.refinement).decline)
+            assertEquals(1, pointChecks)
+        }
+    }
+
+    @Test
+    fun `a preferred basis point retains its provenance when correction cannot pivot`() {
+        val builder = LpBuilder()
+        val x = builder.addRealVar(0.0, 2.0, cost = 1.0)
+        val y = builder.addRealVar(0.0, 2.0)
+        builder.addRealRow(intArrayOf(x, y), doubleArrayOf(3.0, 1.0), Relation.EQ, 1.0)
+        val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).trailModel()))
+        val basis = Basis(intArrayOf(0), arrayOf(VarStatus.BASIC, VarStatus.AT_LOWER, VarStatus.FIXED))
+        LpScopedSolver(state).use { owner ->
+            val result = refineLp(
+                assertNotNull(state.toWorkingModel()),
+                LpRefinementRequest(owner, owner.refinementCache, LpRefinementLimits(maxPivots = 0)),
+                doubleArrayOf(0.25, 0.0),
+                doubleArrayOf(0.0),
+                basis,
+                preferBasis = true,
+            )
+
+            val point = assertNotNull(result.witness)
+            assertEquals(BigFraction.ONE, point.primal[0] * BigFraction.ofLong(3L))
+            assertTrue(assertNotNull(result.bound).value < point.objective)
+            assertTrue(result.witnessUsesBasis)
+            assertEquals(LpRefinementDecline.PIVOTS, result.metrics.decline)
+            assertNull(owner.lastWorkingMetrics)
+        }
+    }
+
+    @Test
+    fun `a preferred source basis certifies attainment without a correction child`() {
+        val builder = LpBuilder()
+        val x = builder.addRealVar(0.0, 2.0, cost = 1.0)
+        builder.addRealRow(intArrayOf(x), doubleArrayOf(3.0), Relation.EQ, 1.0)
+        val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).trailModel()))
+        val basis = Basis(intArrayOf(0), arrayOf(VarStatus.BASIC, VarStatus.FIXED))
+        LpScopedSolver(state).use { owner ->
+            val result = refineLp(
+                assertNotNull(state.toWorkingModel()),
+                LpRefinementRequest(owner, owner.refinementCache, LpRefinementLimits()),
+                doubleArrayOf(0.25),
+                doubleArrayOf(0.0),
+                basis,
+                preferBasis = true,
+            )
+
+            val point = assertNotNull(result.witness)
+            assertEquals(BigFraction.ONE, point.primal.single() * BigFraction.ofLong(3L))
+            assertEquals(point.objective, assertNotNull(result.bound).value)
+            assertTrue(result.witnessUsesBasis)
+            assertEquals(0, result.metrics.rounds)
+            assertEquals(1, result.metrics.luFactories)
+            assertNull(owner.lastWorkingMetrics)
+        }
+    }
+
+    @Test
     fun `a reconstructed source witness survives a withheld LU bound`() {
         val builder = LpBuilder()
         val x = builder.addRealVar(0.0, 2.0, cost = 1.0)

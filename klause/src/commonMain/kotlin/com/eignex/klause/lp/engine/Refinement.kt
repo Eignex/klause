@@ -180,12 +180,25 @@ private class RefinementMeter(
 
     fun multiply(a: BigFraction, b: BigFraction): BigFraction {
         operands(a, b)
-        return number(a * b)
+        return number(
+            when {
+                a.isZero || b.isZero -> BigFraction.ZERO
+                a == BigFraction.ONE -> b
+                b == BigFraction.ONE -> a
+                else -> a * b
+            },
+        )
     }
 
     fun add(a: BigFraction, b: BigFraction): BigFraction {
         operands(a, b)
-        return number(a + b)
+        return number(
+            when {
+                a.isZero -> b
+                b.isZero -> a
+                else -> a + b
+            },
+        )
     }
 
     private fun operands(a: BigFraction, b: BigFraction) {
@@ -499,8 +512,8 @@ private class RefinedCandidate(
         }
     }
 
-    fun accept(checked: ReconstructedCertificate, basis: Boolean = false) {
-        checked.witness?.let { acceptPoint(it, basis) }
+    fun accept(checked: ReconstructedCertificate, basis: Boolean = false, pointBasis: Boolean = basis) {
+        checked.witness?.let { acceptPoint(it, pointBasis) }
         checked.bound?.let { acceptBound(it, basis) }
         if (checked.conflict != null) {
             conflict = checked.conflict
@@ -508,7 +521,7 @@ private class RefinedCandidate(
             conflictUsesBasis = basis
         }
         val success = checked.witness != null || checked.bound != null || checked.conflict != null
-        usedBasis = usedBasis || (basis && success)
+        usedBasis = usedBasis || (basis && success) || (pointBasis && checked.witness != null)
     }
 }
 
@@ -529,11 +542,17 @@ private class RefinementRun(
         known: ExactLpWitness?,
         needPoint: Boolean,
         hint: DoubleArray?,
+        reconstructInitial: Boolean,
+        preferBasis: Boolean,
     ) {
         if (known != null) candidate.accept(check(source, known.primal, null, null, false))
         candidate.basis = basis
+        if (preferBasis && basis != null && source.source.m <= meter.basisLimits().factor.dimension) {
+            exactCandidate(source, basis, sourceFactors, candidate, recoverDual = false)
+            if (candidate.attained || candidate.conflict != null) return
+        }
         if (primal != null && duals != null && meter.limits.maxRounds > 0) {
-            improve(source, primal, duals, basis, null, candidate, sourceFactors)
+            improve(source, primal, duals, basis, null, candidate, sourceFactors, reconstructInitial)
         }
         if (candidate.attained || candidate.conflict != null) return
         // A finite lower bound rules out recession but says nothing about source feasibility.
@@ -604,13 +623,15 @@ private class RefinementRun(
         anchor: LpWorkingScope?,
         output: RefinedCandidate,
         factors: ExactBasisCache,
+        reconstructInitial: Boolean = true,
     ) {
         if (duals.size != a.source.m) meter.stop(LpRefinementDecline.CANDIDATE)
-        var x = a.seed(primal, proposed)
+        val pointUsesBasis = output.point != null && output.pointUsesBasis
+        var x = output.point?.let { a.fullPoint(it.primal) } ?: a.seed(primal, proposed)
         var y = duals.map { meter.number(BigFraction.ofDouble(it) ?: meter.stop(LpRefinementDecline.PROJECTION)) }
         var basis = proposed?.takeIf(a::validBasis)
         output.basis = basis
-        output.accept(check(a, a.sourcePoint(x), y, basis, true))
+        output.accept(check(a, a.sourcePoint(x), y, basis, reconstructInitial), pointBasis = pointUsesBasis)
         output.dual = y
         output.dualUsesBasis = false
         if (output.attained || output.conflict != null || meter.limits.maxRounds == 0) return
@@ -650,11 +671,11 @@ private class RefinementRun(
                     stalls = 0
                 }
                 val reconstruct = round >= nextReconstruction
-                output.accept(check(a, a.sourcePoint(x), y, basis, reconstruct))
+                output.accept(check(a, a.sourcePoint(x), y, basis, reconstruct), pointBasis = pointUsesBasis)
                 if (reconstruct) nextReconstruction = nextReconstructionRound(round)
                 if (output.attained || output.conflict != null) break
                 if (stalls >= 2) {
-                    exactCandidate(a, requireNotNull(basis), factors, output)
+                    if (!output.luAttempted) exactCandidate(a, requireNotNull(basis), factors, output)
                     break
                 }
                 residual = a.residual(x, y, basis, residual.primalExponent, residual.dualExponent)
@@ -704,7 +725,13 @@ private class RefinementRun(
         }
     }
 
-    private fun exactCandidate(a: RefinementAuthority, basis: Basis, cache: ExactBasisCache, output: RefinedCandidate) {
+    private fun exactCandidate(
+        a: RefinementAuthority,
+        basis: Basis,
+        cache: ExactBasisCache,
+        output: RefinedCandidate,
+        recoverDual: Boolean = true,
+    ) {
         output.luAttempted = true
         val checked = verifyExactBasis(
             a.model,
@@ -717,6 +744,7 @@ private class RefinementRun(
         checked.witness?.let { output.acceptPoint(it, true) }
         checked.bound?.let { output.acceptBound(it, true) }
         output.usedBasis = checked.witness != null || checked.bound != null || output.usedBasis
+        if (!recoverDual || (a === source && output.attained)) return
         // The public bound package deliberately contains no raw BTRAN vector.
         exactVectors(a, basis, cache, allowBuild = false) { authority, factors, budget ->
             budget.phase = ExactBasisPhase.DUAL
@@ -1022,6 +1050,8 @@ internal fun refineLp(
     needPoint: Boolean = true,
     direction: DoubleArray? = null,
     directElapsed: Duration = Duration.ZERO,
+    reconstructInitial: Boolean = true,
+    preferBasis: Boolean = false,
 ): LpRefinementResult {
     val state = model.exactState
     val limits = request.effectiveLimits()
@@ -1042,7 +1072,7 @@ internal fun refineLp(
         val authority = RefinementAuthority(state, meter)
         val current = RefinementRun(request, meter, authority)
         run = current
-        current.run(primal, duals, basis, witness, needPoint, direction)
+        current.run(primal, duals, basis, witness, needPoint, direction, reconstructInitial, preferBasis)
         meter.poll()
         reason = if (current.candidate.attained || current.candidate.conflict != null ||
             current.unboundedness != null

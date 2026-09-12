@@ -9,6 +9,42 @@ import kotlin.test.assertTrue
 
 class RefinementAuxiliaryTest {
     @Test
+    fun `an attained auxiliary recovers exact multipliers for a free source column`() {
+        val zero = ExactLpNumber.of(0L)
+        val one = ExactLpNumber.of(1L)
+        val state = LpExactState(
+            ExactLpModel(
+                listOf(listOf(ExactLpEntry(0, ExactLpNumber.of(3L)), ExactLpEntry(1, ExactLpNumber.of(8L)))),
+                listOf(one, one),
+                listOf(
+                    ExactLpColumn(ExactLpBounds(), integral = false),
+                    ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(zero)), integral = false),
+                    ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(zero)), integral = false),
+                ),
+                List(2) { ExactLpRow() },
+                ExactLpObjective(List(3) { zero }),
+            ),
+        )
+        LpScopedSolver(state).use { owner ->
+            val result = refineLp(
+                assertNotNull(state.toWorkingModel()),
+                LpRefinementRequest(owner, owner.refinementCache, LpRefinementLimits(maxRounds = 0)),
+            )
+
+            val conflict = assertNotNull(result.conflict)
+            val multipliers = conflict.rows.zip(conflict.multipliers).toMap()
+            assertEquals(
+                BigFraction.ZERO,
+                assertNotNull(multipliers[0]) * BigFraction.ofLong(3L) +
+                    assertNotNull(multipliers[1]) * BigFraction.ofLong(8L),
+            )
+            assertTrue(result.conflictUsesBasis)
+            assertNull(result.witness)
+            assertEquals(state, assertNotNull(result.support).state)
+        }
+    }
+
+    @Test
     fun `an improving cone on an infeasible source yields a source Farkas proof`() {
         val zero = ExactLpNumber.of(0L)
         val one = ExactLpNumber.of(1L)
