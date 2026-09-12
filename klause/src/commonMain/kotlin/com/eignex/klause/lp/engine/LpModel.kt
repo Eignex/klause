@@ -169,16 +169,14 @@ internal class LpModel(
 
     fun hasFiniteLower(j: Int): Boolean = exactState == null || exactState.model.column(j).bounds.lower != null
 
-    fun lowerD(j: Int): Double = exactState?.model?.column(j)?.bounds?.lower?.number?.let {
-        it.ieeeBits?.let(Double::fromBits) ?: it.value.toDouble()
-    } ?: 0.0
+    fun lowerD(j: Int): Double = exactState?.model?.column(j)?.bounds?.lower?.number?.approximation ?: 0.0
 
     fun fixed(j: Int): Boolean = exactState?.model?.column(j)?.bounds?.fixed
         ?: (hasFiniteLower(j) && hasFiniteUpper(j) && exactUpper(j).isZero)
 
     fun objectiveD(value: Double): Double = exactState?.model?.objective?.let {
-        val scale = it.scale.ieeeBits?.let(Double::fromBits) ?: it.scale.value.toDouble()
-        val constant = it.externalConstant.ieeeBits?.let(Double::fromBits) ?: it.externalConstant.value.toDouble()
+        val scale = it.scale.approximation
+        val constant = it.externalConstant.approximation
         value / scale + constant
     } ?: value
 
@@ -756,6 +754,10 @@ private fun LpDoubleView.copyObjective(): LpDoubleView = LpDoubleView(
 // This foundation deliberately does not implement ExactSimplexModel: legacy solvers require a
 // checked projection before they can see any of its values.
 internal class ExactLpNumber private constructor(val value: BigFraction, val ieeeBits: Long?) {
+    val approximation: Double by lazy(LazyThreadSafetyMode.PUBLICATION) {
+        ieeeBits?.let { Double.fromBits(it) } ?: value.toDouble()
+    }
+
     fun legacyLong(): Long? {
         if (ieeeBits != null || value.den != BigInteger.ONE ||
             value < BigFraction.ofLong(Long.MIN_VALUE) || value > BigFraction.ofLong(Long.MAX_VALUE)

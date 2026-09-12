@@ -165,7 +165,7 @@ private fun LpBoundAssertion.strongerThan(other: LpBoundAssertion): Boolean {
 }
 
 private fun ExactLpNumber.project(nonzeroRequired: Boolean = false): Double? {
-    val result = ieeeBits?.let { Double.fromBits(it) } ?: value.toDouble()
+    val result = approximation
     return result.takeIf { it.isFinite() && (!nonzeroRequired || it != 0.0 || value.isZero) }
 }
 
