@@ -98,6 +98,7 @@ internal object ProductionLpEngineFactory : LpEngineFactory {
 internal data class LpSolveContext(
     val engineFactory: LpEngineFactory = ProductionLpEngineFactory,
     val certificationPolicy: LpCertificationPolicy = ProductionLpCertificationPolicy,
+    val rootDualization: LpDualizationOptions = LpDualizationOptions(),
 ) {
     companion object {
         val Production = LpSolveContext()

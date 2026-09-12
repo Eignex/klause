@@ -24,6 +24,7 @@ internal enum class LpRefactorReason {
 /** Optional, solve-scoped observer for certification and exact-input eligibility. */
 internal interface LpCertificationObserver {
     fun observe(certifier: LpCertifier, success: Boolean)
+    fun observeDualization(metrics: LpDualizationMetrics) {}
     fun observeExactInput(accepted: Boolean)
     fun observeSolve(metrics: LpSolveMetrics, component: Boolean)
     fun observeBasisVerification(metrics: ExactBasisMetrics) {}
@@ -423,4 +424,23 @@ internal object UnscaledLpEngineFactory : LpEngineFactory {
         pricing = pricing,
         scalingOptions = disabled,
     )
+}
+
+internal class LpRootAdmission(private val sourceModel: LpModel, val workLimit: Long?, val iterationLimit: Int?) {
+    private val source = requireNotNull(sourceModel.exactState)
+    private var claimed = false
+
+    init {
+        require(source.depth == 0)
+        require(workLimit == null || workLimit >= 2L)
+        require(iterationLimit == null || iterationLimit > 0)
+    }
+
+    fun claim(key: Any, model: ExactLpModel?): LpExactState? {
+        if (claimed) return null
+        claimed = true
+        return source.takeIf {
+            key === sourceModel && model === source.model && sourceModel.exactState === source && source.depth == 0
+        }
+    }
 }

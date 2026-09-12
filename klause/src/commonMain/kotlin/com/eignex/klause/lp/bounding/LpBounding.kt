@@ -12,6 +12,7 @@ import com.eignex.klause.lp.engine.FloatLpResult
 import com.eignex.klause.lp.engine.IntegerCertificate
 import com.eignex.klause.lp.engine.LpCertifier
 import com.eignex.klause.lp.engine.LpModel
+import com.eignex.klause.lp.engine.LpRootAdmission
 import com.eignex.klause.lp.engine.LpSolver
 import com.eignex.klause.lp.engine.TableauCutSolver
 import com.eignex.klause.lp.engine.acceptNullable
@@ -129,12 +130,35 @@ internal fun LpEngine.dualSimplex(model: LpModel, cancellation: Cancellation): T
  * change replaces that owner. Nonprojectable legacy models use persistent rebind when compatible.
  * Warm hints apply only to a fresh solve; a retained scoped owner already has its basis factorized.
  */
-@Suppress("TooGenericExceptionCaught") // replacement cleanup must preserve arbitrary solve and close failures
+// Replacement cleanup must preserve arbitrary solve and close failures.
+@Suppress("TooGenericExceptionCaught", "ThrowsCount")
 internal fun LpEngine.solveNode(
     model: LpModel,
     warm: Basis?,
     cancellation: Cancellation,
+    rootAdmission: LpRootAdmission? = null,
 ): Pair<LpSolver, FloatLpResult?>? {
+    if (rootAdmission != null) {
+        val cancelled = try {
+            cancellation()
+        } catch (failure: Throwable) {
+            rootAdmission.claim(model, model.exactState?.model)
+            throw failure
+        }
+        if (cancelled) {
+            rootAdmission.claim(model, model.exactState?.model)
+            return null
+        }
+        val exact = model.exactState?.model
+        if (exact == null) {
+            rootAdmission.claim(model, null)
+            return null
+        }
+        if (!propagator.install(model, exact, rootAdmission)) return null
+        nodeUsesTrail = true
+        cpAdapter.localModel()
+        return propagator.solveFloat(warm, cancellation)
+    }
     nodeUsesTrail = cpAdapter.currentModel === model
     if (nodeUsesTrail) return propagator.solveFloat(warm, cancellation)
     model.trailModel()?.let { exact ->

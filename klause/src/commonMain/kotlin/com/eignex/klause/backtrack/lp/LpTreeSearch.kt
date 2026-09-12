@@ -3,17 +3,26 @@ package com.eignex.klause.backtrack.lp
 import com.eignex.klause.lp.bounding.LpEngine
 import com.eignex.klause.lp.bounding.LpFractionalBranch
 import com.eignex.klause.lp.bounding.solveNode
+import com.eignex.klause.lp.bounding.trailModel
 import com.eignex.klause.lp.engine.Basis
+import com.eignex.klause.lp.engine.CertifiedLpResult
 import com.eignex.klause.lp.engine.CrashBasisAttempt
 import com.eignex.klause.lp.engine.ExactLpNumber
 import com.eignex.klause.lp.engine.FloatLpResult
+import com.eignex.klause.lp.engine.LpCertificationObserver
 import com.eignex.klause.lp.engine.LpCertifier
+import com.eignex.klause.lp.engine.LpDualizationDecline
+import com.eignex.klause.lp.engine.LpDualizationMetrics
+import com.eignex.klause.lp.engine.LpExactState
 import com.eignex.klause.lp.engine.LpModel
+import com.eignex.klause.lp.engine.LpRootAdmission
+import com.eignex.klause.lp.engine.LpRootDualizationAttempt
 import com.eignex.klause.lp.engine.LpSolveMetrics
 import com.eignex.klause.lp.engine.LpSolver
 import com.eignex.klause.lp.engine.LpVerdict
 import com.eignex.klause.lp.engine.acceptNullable
 import com.eignex.klause.lp.engine.certifiedTightObjectiveLowerBound
+import com.eignex.klause.lp.engine.certifyDualizedSource
 import com.eignex.klause.lp.engine.exactPointWitness
 import com.eignex.klause.lp.engine.triangularCrashBasis
 import com.eignex.klause.propagation.CpBranching
@@ -69,36 +78,26 @@ internal fun LpEngine.lbTreeSearch(objective: LinearObjective, cancellation: Can
                 targets = emptyMap()
                 if (expansions++ >= LB_TREE_BUDGET) return SearchNodeDisposition.Indeterminate
                 val relaxation = dive.nodeRelaxation(relaxer, native)
-                val crash = if (expansions == 1) {
-                    rootCrashBasis(relaxation.model, token, dive.nodeWorkBudget())
-                } else {
-                    null
-                }
-                val attempt = this@lbTreeSearch.solveRootNodeWithCrash(
-                    crash,
-                    solve = {
-                        dive.solveNode(
-                            relaxation.model,
-                            crash?.basis,
-                            token,
-                        )
-                    },
-                    solveMetrics = { solver ->
-                        if (dive.nodeUsesTrail) dive.propagator.lastMetrics else solver.lastMetrics
-                    },
-                ) ?: return SearchNodeDisposition.Expand
-                val result = attempt.second ?: return SearchNodeDisposition.Expand
-                val lower = certifiedTightObjectiveLowerBound(
-                    relaxation.model,
-                    result.duals,
-                    rootCertificationObserver(),
-                    solveContext.certificationPolicy,
-                )?.let { BigFraction.ofDouble(it) }?.plus(BigFraction.ofLong(relaxation.objectiveConstant))
+                val node = this@lbTreeSearch.solveRootNode(dive, relaxation.model, token, expansions == 1)
+                val model = node.model
+                val result = node.float
+                val mapped = node.mapped
+                val lower = mapped?.lowerBound?.plus(BigFraction.ofLong(relaxation.objectiveConstant))
+                    ?: result?.let { candidate ->
+                        certifiedTightObjectiveLowerBound(
+                            model,
+                            candidate.duals,
+                            rootCertificationObserver(),
+                            solveContext.certificationPolicy,
+                        )?.let { BigFraction.ofDouble(it) }?.plus(BigFraction.ofLong(relaxation.objectiveConstant))
+                    }
                 if (lower != null && bestExact?.let { lower >= it } == true) return SearchNodeDisposition.Prune
-                val witness = solveContext.certificationPolicy.acceptNullable(
-                    LpCertifier.EXACT_POINT,
-                    exactPointWitness(relaxation.model, result.primal, rootCertificationObserver()),
-                ) ?: return SearchNodeDisposition.Expand
+                val witness = mapped?.witness ?: result?.let { candidate ->
+                    solveContext.certificationPolicy.acceptNullable(
+                        LpCertifier.EXACT_POINT,
+                        exactPointWitness(model, candidate.primal, rootCertificationObserver()),
+                    )
+                } ?: return SearchNodeDisposition.Expand
                 targets = relaxation.colVarId.indices.mapNotNull { column ->
                     val variable = relaxation.colVarId[column]
                     if (variable < 0 || relaxation.colIsBool[column]) {
@@ -162,6 +161,136 @@ internal fun LpEngine.lbTreeSearch(objective: LinearObjective, cancellation: Can
     }
 }
 
+internal class LpRootNodeResult(
+    val model: LpModel,
+    val float: FloatLpResult?,
+    val mapped: CertifiedLpResult?,
+    val dualization: LpDualizationMetrics?,
+)
+
+@Suppress("TooGenericExceptionCaught", "ThrowingExceptionFromFinally")
+internal fun LpEngine.solveRootNode(
+    dive: LpEngine,
+    original: LpModel,
+    token: Cancellation,
+    root: Boolean,
+    observer: LpCertificationObserver = rootCertificationObserver(),
+): LpRootNodeResult {
+    val options = solveContext.rootDualization
+    val dualization = if (root && options.enabled) LpRootDualizationAttempt(options) else null
+    val parentWork = dive.nodeWorkBudget()
+    val parentPivots = dive.nodePivotBudget()
+    var model = original
+    var source: LpExactState? = null
+    var preparationWork = 0L
+    var crashWork = 0L
+    var sourceMetrics = LpSolveMetrics()
+    var sourceReturned = false
+    val attempt = try {
+        solveRootNodeWithCrash(
+            null,
+            solve = {
+                var basis: Basis? = null
+                if (dualization != null) {
+                    val estimate = (original.numVars.toLong() * 8L + original.csc.colVal.size.toLong() * 4L)
+                    val decline = when {
+                        token() -> LpDualizationDecline.CANCELLED
+
+                        original.n == 0 ||
+                            original.m.toLong() < options.minRowColumnRatio.toLong() * original.n ->
+                            LpDualizationDecline.NOT_TALL
+
+                        original.numVars > options.maxCoordinates ||
+                            original.csc.colVal.size > options.maxEntries -> LpDualizationDecline.DIMENSION
+
+                        parentWork > 0L && estimate > parentWork / 8L -> LpDualizationDecline.WORK
+
+                        else -> null
+                    }
+                    if (decline != null) {
+                        dualization.decline(decline)
+                    } else {
+                        preparationWork = estimate
+                        source = original.exactState ?: original.trailModel()?.let(::LpExactState)
+                        val projection = source?.toWorkingModel()
+                        if (projection == null) {
+                            dualization.decline(LpDualizationDecline.PROJECTION)
+                            return@solveRootNodeWithCrash null
+                        } else {
+                            model = projection
+                            basis = dualization.solve(
+                                requireNotNull(source),
+                                solveContext,
+                                dive.pricingOptions,
+                                token,
+                                parentWork,
+                                parentPivots,
+                                preparationWork,
+                            )
+                        }
+                    }
+                }
+                if (token()) return@solveRootNodeWithCrash null
+                val auxiliaryWork = (dualization?.metrics?.totalWork ?: 0L) + preparationWork
+                if (root && basis == null) {
+                    val remaining = if (parentWork == 0L) 0L else parentWork - auxiliaryWork
+                    if (parentWork != 0L && remaining <= 1L) return@solveRootNodeWithCrash null
+                    val crash = rootCrashBasis(model, token, remaining)
+                    crashWork = crash.metrics.workOps
+                    basis = crash.basis
+                }
+                val admission = if (source != null && model.exactState === source) {
+                    val work = if (parentWork == 0L) null else parentWork - auxiliaryWork - crashWork
+                    val pivots = if (parentPivots ==
+                        0
+                    ) {
+                        null
+                    } else {
+                        parentPivots - (dualization?.metrics?.solve?.pivots ?: 0)
+                    }
+                    if ((work != null && work < 2L) ||
+                        (pivots != null && pivots <= 0)
+                    ) {
+                        return@solveRootNodeWithCrash null
+                    }
+                    LpRootAdmission(model, work, pivots)
+                } else {
+                    null
+                }
+                val previousMetrics = dive.propagator.lastMetrics
+                var failure: Throwable? = null
+                try {
+                    dive.solveNode(model, basis, token, admission).also { sourceReturned = it != null }
+                } catch (primary: Throwable) {
+                    failure = primary
+                    throw primary
+                } finally {
+                    try {
+                        sourceMetrics = if (dive.nodeUsesTrail) {
+                            dive.propagator.lastMetrics.takeUnless { it === previousMetrics } ?: LpSolveMetrics()
+                        } else {
+                            dive.nodeSimplex?.lastMetrics ?: LpSolveMetrics()
+                        }
+                    } catch (measurement: Throwable) {
+                        if (failure == null) throw measurement
+                        failure.addSuppressed(measurement)
+                    }
+                }
+            },
+            solveMetrics = { sourceMetrics },
+            additionalMetrics = {
+                (dualization?.metrics?.rootMetrics ?: LpSolveMetrics()) +
+                    LpSolveMetrics(workOps = preparationWork + crashWork) +
+                    if (sourceReturned) LpSolveMetrics() else sourceMetrics
+            },
+        )
+    } finally {
+        dualization?.let { observer.observeDualization(it.metrics) }
+    }
+    val mapped = dualization?.let { certifyDualizedSource(model, it, solveContext.certificationPolicy, token) }
+    return LpRootNodeResult(model, attempt?.second, mapped, dualization?.metrics)
+}
+
 internal fun rootCrashBasis(model: LpModel, token: Cancellation, nodeWorkLimit: Long): CrashBasisAttempt =
     triangularCrashBasis(model, token, rootCrashWorkLimit(nodeWorkLimit))
 
@@ -170,17 +299,23 @@ internal fun solveRootNodeWithCrash(
     solve: () -> Pair<LpSolver, FloatLpResult?>?,
     solveMetrics: (LpSolver) -> LpSolveMetrics,
     observe: (LpSolver, LpSolveMetrics) -> Unit,
+    additionalMetrics: () -> LpSolveMetrics = { LpSolveMetrics() },
 ): Pair<LpSolver, FloatLpResult?>? {
+    var charged = false
     var unchargedCrashWork = crash?.metrics?.workOps ?: 0L
     try {
         val attempt = solve() ?: return null
-        val combinedMetrics = solveMetrics(attempt.first) + LpSolveMetrics(workOps = unchargedCrashWork)
+        val combinedMetrics = solveMetrics(
+            attempt.first,
+        ) + LpSolveMetrics(workOps = unchargedCrashWork) + additionalMetrics()
         unchargedCrashWork = 0L
+        charged = true
         observe(attempt.first, combinedMetrics)
         return attempt
     } finally {
-        if (unchargedCrashWork > 0L) {
-            observe(CRASH_WORK_ONLY_SOLVER, LpSolveMetrics(workOps = unchargedCrashWork))
+        if (!charged) {
+            val metrics = LpSolveMetrics(workOps = unchargedCrashWork) + additionalMetrics()
+            if (metrics.workOps > 0L) observe(CRASH_WORK_ONLY_SOLVER, metrics)
         }
     }
 }
@@ -189,7 +324,14 @@ internal fun LpEngine.solveRootNodeWithCrash(
     crash: CrashBasisAttempt?,
     solve: () -> Pair<LpSolver, FloatLpResult?>?,
     solveMetrics: (LpSolver) -> LpSolveMetrics,
-): Pair<LpSolver, FloatLpResult?>? = solveRootNodeWithCrash(crash, solve, solveMetrics, this::observeRootSolve)
+    additionalMetrics: () -> LpSolveMetrics = { LpSolveMetrics() },
+): Pair<LpSolver, FloatLpResult?>? = solveRootNodeWithCrash(
+    crash,
+    solve,
+    solveMetrics,
+    this::observeRootSolve,
+    additionalMetrics,
+)
 
 internal fun rootCrashWorkLimit(nodeWorkLimit: Long): Long = if (nodeWorkLimit == 0L) {
     ROOT_CRASH_WORK_LIMIT
