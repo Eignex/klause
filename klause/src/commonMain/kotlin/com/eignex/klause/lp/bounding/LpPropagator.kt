@@ -16,6 +16,7 @@ import com.eignex.klause.lp.engine.LpPricingOptions
 import com.eignex.klause.lp.engine.LpRootAdmission
 import com.eignex.klause.lp.engine.LpScopedMetrics
 import com.eignex.klause.lp.engine.LpScopedRow
+import com.eignex.klause.lp.engine.LpScopedRows
 import com.eignex.klause.lp.engine.LpScopedSolver
 import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.lp.engine.LpSolveMetrics
@@ -73,12 +74,14 @@ internal class LpPropagator(
     SearchBrancher,
     AutoCloseable {
     private var owner: LpScopedSolver? = null
+    private var epochWarm: Basis? = null
     private var proofContext: SearchContext? = null
     private var modelKey: Any? = null
     private var rootState: LpExactState? = null
 
     // Local cut models may reinstall after an epoch; their initial bounds still need source premises.
     private var sourceRootBounds = true
+    private var baseSidePremises: Map<Pair<Int, Boolean>, SearchAtomPremise> = emptyMap()
     private var closed = false
     private var invalidated = false
     private var nextWitness = 0L
@@ -116,8 +119,12 @@ internal class LpPropagator(
             if (active.side != cited.side || active.witness != cited.witness) return null
             val declared = rootState?.takeIf { cited.column < it.model.numVars }
                 ?.activeSide(cited.column, cited.upper)
-            leaves += if (sourceRootBounds && declared == active) {
-                SearchAtomPremise.All(emptyList())
+            leaves += if (declared == active) {
+                if (sourceRootBounds) {
+                    SearchAtomPremise.All(emptyList())
+                } else {
+                    baseSidePremises[cited.column to cited.upper] ?: SearchAtomPremise.Unavailable
+                }
             } else {
                 boundPremise(active.witness)
             }
@@ -157,31 +164,53 @@ internal class LpPropagator(
         warm: Basis?,
         token: Cancellation,
         validatePublication: () -> Boolean,
+        premises: Map<Pair<Int, Boolean>, SearchAtomPremise> = emptyMap(),
+        rows: LpScopedRows? = null,
+        preserveSourcePremises: Boolean = false,
         publish: () -> Unit,
     ): Boolean {
         lastEpochMetrics = LpSolveMetrics()
-        if (closed || token() || (owner?.state?.depth ?: 0) != 0) return false
-        val initial = LpExactState(model)
+        if (closed || token() || (owner?.state?.depth ?: 0) != 0 ||
+            (preserveSourcePremises && modelKey !== key)
+        ) {
+                return false
+            }
+        val donor = owner
+        val donorState = donor?.state
+        val budget = donor?.exportEpochBudget().takeIf { preserveSourcePremises }
+        if (preserveSourcePremises && (
+            donorState?.model?.sameAuthority(model) != true ||
+                rows?.sameAuthority(donorState.rows) != true
+        )
+        ) {
+                    return false
+                }
+        val savedPremises = sourcePremises.takeIf { preserveSourcePremises }
+        val initial = LpExactState(model, rows = rows ?: LpScopedRows.initial(model.m))
         val candidate = newOwner(initial)
         var preparing = true
         val preparationToken = Cancellation { cancellation() || (preparing && token()) }
         var published = false
         return AutoCloseable { if (!published) candidate.close() }.use {
             try {
+                if (budget != null && !candidate.importEpochBudget(budget)) return@use false
                 val attempt = candidate.solveFloat(warm, preparationToken) ?: return@use false
                 val basis = attempt.second?.basis ?: attempt.first.infeasibleBasis ?: return@use false
                 if (basis.basicVars.size != model.m || basis.status.size != model.numVars ||
                     basis.basicVars.distinct().size != model.m ||
-                    token() || !validatePublication() || token()
+                    token() || !validatePublication() || token() || owner !== donor || donor?.state !== donorState ||
+                    (preserveSourcePremises && donor?.exportEpochBudget() != budget)
                 ) {
                     return@use false
                 }
                 val previous = owner
                 owner = candidate
+                epochWarm = Basis(basis.basicVars.copyOf(), basis.status.copyOf(), false)
                 rootState = initial
                 sourceRootBounds = false
+                baseSidePremises = premises.toMap()
                 modelKey = key
-                sourcePremises = LpSourcePremises(key)
+                sourcePremises = savedPremises ?: LpSourcePremises(key)
                 witnesses.clear()
                 nextWitness = 0L
                 solved = true
@@ -200,6 +229,46 @@ internal class LpPropagator(
                 )
             }
         }
+    }
+
+    fun refreshSourceEpoch(token: Cancellation, validatePublication: () -> Boolean): Boolean {
+        val current = state ?: return false
+        val key = modelKey ?: return false
+        val premises = epochBasePremises() ?: return false
+        return replaceEpoch(
+            key,
+            current.model,
+            epochWarm?.takeIf {
+                it.basicVars.size == current.model.m && it.status.size == current.model.numVars
+            },
+            token,
+            { state === current && validatePublication() },
+            premises,
+            current.rows,
+            preserveSourcePremises = true,
+        ) { }
+    }
+
+    fun epochBasePremises(): Map<Pair<Int, Boolean>, SearchAtomPremise>? {
+        val current = state ?: return null
+        if (current.depth != 0) return null
+        val result = HashMap<Pair<Int, Boolean>, SearchAtomPremise>()
+        for (column in 0 until current.model.numVars) {
+            for (upper in listOf(false, true)) {
+            val active = current.activeSide(column, upper) ?: continue
+            val declared = rootState?.takeIf { column < it.model.numVars }?.activeSide(column, upper)
+            result[column to upper] = if (declared == active) {
+                if (sourceRootBounds) {
+                    SearchAtomPremise.All(emptyList())
+                } else {
+                    baseSidePremises[column to upper] ?: SearchAtomPremise.Unavailable
+                }
+            } else {
+                boundPremise(active.witness)
+            }
+        }
+        }
+        return result.toMap()
     }
 
     private fun newOwner(initial: LpExactState, rootAdmission: LpRootAdmission? = null): LpScopedSolver {
@@ -281,7 +350,11 @@ internal class LpPropagator(
             continuationLimits = profile.continuation,
             fullContinuation = profile.fullContinuation,
             observer = certificationObserver,
-        )
+        ).also { result ->
+            result?.float?.basis?.let { basis ->
+                epochWarm = Basis(basis.basicVars.copyOf(), basis.status.copyOf(), false)
+            }
+        }
     }
 
     private inline fun <T> solveOwned(action: (LpScopedSolver) -> T): T? = withOwner { current ->
@@ -418,6 +491,8 @@ internal class LpPropagator(
         invalidated = false
         modelKey = null
         rootState = null
+        baseSidePremises = emptyMap()
+        epochWarm = null
         proofContext = null
         sourcePremises = null
         witnesses.clear()

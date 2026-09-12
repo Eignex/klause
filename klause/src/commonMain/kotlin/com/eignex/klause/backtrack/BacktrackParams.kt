@@ -225,6 +225,8 @@ data class BacktrackParams(
     val inprocessingCadence: Int = 1,
     /** Enable bounded LP matrix epochs at unseeded optimization restarts. */
     val lpEpochs: Boolean = false,
+    /** Tidy and publish the initial search-root relaxation once. */
+    val lpRootTidy: Boolean = false,
     /**
      * Externally-supplied objective upper bound for branch-and-bound minimisation. When
      * non-null, the [com.eignex.klause.solver.Optimizer.improvements] / `minimize`

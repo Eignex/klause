@@ -7,9 +7,7 @@ import com.eignex.klause.bound.LagrangianBound
 import com.eignex.klause.bound.LagrangianDualBound
 import com.eignex.klause.bound.SchedulingFeasibilityBound
 import com.eignex.klause.factor.arithmetic.Linear
-import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
-import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.cut.AggregationMirSeparator
@@ -18,6 +16,7 @@ import com.eignex.klause.lp.cut.AssignmentObjectiveCut
 import com.eignex.klause.lp.cut.CircuitSeparator
 import com.eignex.klause.lp.cut.CliqueCutSeparator
 import com.eignex.klause.lp.cut.CutExchange
+import com.eignex.klause.lp.cut.CutMapping
 import com.eignex.klause.lp.cut.CutPool
 import com.eignex.klause.lp.cut.CutSeparator
 import com.eignex.klause.lp.cut.CutSharing
@@ -38,6 +37,8 @@ import com.eignex.klause.lp.engine.newPersistentLpSolver
 import com.eignex.klause.lp.engine.solveAndCertify
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.lp.relaxation.LeafRealResult
+import com.eignex.klause.lp.relaxation.LpAssemblyCancelled
+import com.eignex.klause.lp.relaxation.LpAuxiliarySources
 import com.eignex.klause.lp.relaxation.LpExplanation
 import com.eignex.klause.lp.relaxation.LpRelaxation
 import com.eignex.klause.lp.relaxation.gatedEnforcement
@@ -200,6 +201,8 @@ internal class LpEngine(
     /** Construct the relaxer for [plan]'s hull flags, or null when bounding is off. Factored so the
      *  ineffective-hull probe can build variants with whole families ([plan]) or individual factor
      *  hulls ([suppressedHullFactors]) turned off. */
+    private val auxiliarySources = LpAuxiliarySources()
+
     private fun buildRelaxer(plan: LpPlan, suppressedHullFactors: Set<Int> = emptySet()): CpToLpRelaxation? =
         if (plan.bounding) {
             CpToLpRelaxation(
@@ -221,6 +224,7 @@ internal class LpEngine(
                 productMcCormick = plan.productMcCormick,
                 booleanRlt = plan.booleanRlt,
                 suppressedHullFactors = suppressedHullFactors,
+                auxiliarySources = auxiliarySources,
             )
         } else {
             null
@@ -494,10 +498,7 @@ internal class LpEngine(
     internal var epochRebuilds = 0
         private set
     internal val epochMetrics = LpEpochMetrics()
-    internal val epochShapeEligible: Boolean get() = problem.numRealVars == 0 &&
-        problem.numIntVars + problem.numBoolVars <= LP_EPOCH_MAX_COLUMNS &&
-        problem.factors.size <= LP_EPOCH_MAX_ROWS &&
-        problem.factors.all { it is Linear || it is ReifiedLinear || it is Clause }
+    internal val epochShapeEligible: Boolean get() = nodeSimplex == null && gatedFilter == null
 
     internal fun retireEpochRoot() {
         epochRootAllowed = false
@@ -519,7 +520,20 @@ internal class LpEngine(
         }
     }
 
+    internal fun observeEpoch(name: String, value: Long = 1L) = sink.lp.observeEpoch(name, value)
+
     internal fun rebuildEpoch(session: PropagationSession, token: Cancellation): Boolean {
+        val before = epochMetrics.counts()
+        val start = TimeSource.Monotonic.markNow()
+        try {
+            return rebuildEpochBody(session, token)
+        } finally {
+            for ((name, value) in epochMetrics.counts()) observeEpoch(name, value - before.getValue(name))
+            observeEpoch("total_ns", start.elapsedNow().inWholeNanoseconds)
+        }
+    }
+
+    private fun rebuildEpochBody(session: PropagationSession, token: Cancellation): Boolean {
         requireOpen()
         epochMetrics.attempts++
         if (!epochRootAllowed || token() || session.problem !== problem || session.decisionLevel != 0 ||
@@ -544,13 +558,29 @@ internal class LpEngine(
         val relaxer = lpRelaxer ?: return false
         val regenerationStart = TimeSource.Monotonic.markNow()
         val built = try {
-            val plain = relaxer.build(session)
+            val plain = relaxer.build(session, cancellation = token)
             if (!LpEpochState.supports(plain) || token()) {
+                LpEpochState.declineReason(plain)?.let { observeEpoch("declined_$it") }
                 epochMetrics.modelDeclines++
                 return false
             }
-            val cuts = cutPool.exportGlobalCuts().mapNotNull { it.toCut(plain) }.take(LP_EPOCH_MAX_ROWS)
-            if (cuts.isEmpty()) plain else relaxer.build(session, cuts)
+            val cuts = cutPool.mappedCuts(requireNotNull(plain.sourceMap)).mapNotNull { mapped ->
+                when (mapped) {
+                    is CutMapping.Mapped -> {
+                        observeEpoch(if (mapped.value.global) "retained_global_cuts" else "retained_conditional_cuts")
+                        mapped.value
+                    }
+
+                    is CutMapping.Declined -> {
+                        observeEpoch("cut_declined_${mapped.reason.name.lowercase()}")
+                        null
+                    }
+                }
+            }
+            if (cuts.isEmpty()) plain else relaxer.build(session, cuts, token)
+        } catch (_: LpAssemblyCancelled) {
+            observeEpoch("declined_cancelled")
+            return false
         } catch (_: CheckedLongOverflowException) {
             epochMetrics.modelDeclines++
             return false
@@ -563,13 +593,26 @@ internal class LpEngine(
             return false
         }
         val oldBase = oldEpoch?.relaxation ?: persistentRelaxation
-        if (oldBase != null && oldBase.sourceMap?.columns != built.sourceMap?.columns) {
-            epochMetrics.modelDeclines++
-            return false
-        }
         val number = epochNumber + 1L
         val map = requireNotNull(built.sourceMap).atEpoch(number)
-        val next = built.withModel(built.model, map)
+        val scoped = built.withModel(built.model, map)
+        val tidyStart = TimeSource.Monotonic.markNow()
+        val tidied = RelaxationTidy.apply(
+            scoped,
+            RelaxationTidyScope(problem, number, objective, true, searchRoot = root),
+            RelaxationTidyConfig(enabled = true, cancellation = token),
+        )
+        epochMetrics.tidyNanos += tidyStart.elapsedNow().inWholeNanoseconds
+        val next = when (tidied) {
+            is RelaxationTidyResult.Applied -> tidied.relaxation
+
+            is RelaxationTidyResult.Declined -> {
+                observeEpoch("declined_${tidied.reason.name.lowercase()}")
+                epochMetrics.modelDeclines++
+                return false
+            }
+        }
+        if (token() || !root.admits(session) || !LpEpochState.supports(next)) return false
         val nextState = LpEpochState(root, next, keys, number)
         val warm = oldBase?.let { LpEpochState.remapBasis(it, next, lpBasisByDepth.firstOrNull()) }
         noteEpochWork(next.model.n.toLong() + next.model.m + next.model.csc.colVal.size)
@@ -579,6 +622,26 @@ internal class LpEngine(
                 epochState = nextState
                 epochNumber = number
                 epochRebuilds++
+                observeEpoch("published")
+                if (oldBase != null && (
+                    oldBase.model.n != next.model.n || oldBase.model.m != next.model.m ||
+                        !oldBase.model.csc.colPtr.contentEquals(next.model.csc.colPtr) ||
+                        !oldBase.model.csc.rowIdx.contentEquals(next.model.csc.rowIdx) ||
+                        !oldBase.model.csc.colVal.contentEquals(next.model.csc.colVal)
+                )
+                ) {
+                    observeEpoch("matrix_changes")
+                }
+                observeEpoch("rows_before", built.model.m.toLong())
+                observeEpoch("rows_after", next.model.m.toLong())
+                observeEpoch("nonzeros_before", built.model.csc.colVal.size.toLong())
+                observeEpoch("nonzeros_after", next.model.csc.colVal.size.toLong())
+                observeEpoch("columns", next.model.n.toLong())
+                for ((rule, count) in requireNotNull(
+                    next.tidyStats,
+                ).applied) {
+                    observeEpoch("tidy_${rule.name.lowercase()}", count.toLong())
+                }
                 epochMetrics.rows = next.model.m
                 epochMetrics.columns = next.model.n
                 epochMetrics.nonzeros = next.model.csc.colVal.size
@@ -596,6 +659,9 @@ internal class LpEngine(
         } finally {
             epochMetrics.preparationNanos += preparationStart.elapsedNow().inWholeNanoseconds
             noteEpochWork(propagator.lastEpochMetrics.workOps)
+            observeEpoch("repair_work", propagator.lastEpochMetrics.workOps)
+            observeEpoch("repair_pivots", propagator.lastEpochMetrics.pivots.toLong())
+            observeEpoch("repair_refactors", propagator.lastEpochMetrics.initialRefactorizations.toLong())
         }
     }
 

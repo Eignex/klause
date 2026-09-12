@@ -1,10 +1,12 @@
 package com.eignex.klause.lp.relaxation
 
+import com.eignex.klause.lp.engine.CutAuxiliaryDefinition
 import com.eignex.klause.lp.engine.CutExpression
 import com.eignex.klause.lp.engine.CutPremise
 import com.eignex.klause.lp.engine.CutProvenance
 import com.eignex.klause.lp.engine.CutSource
 import com.eignex.klause.lp.engine.CutSourceKind
+import com.eignex.klause.lp.engine.ExactLpNumber
 import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.exactBounds
 import com.eignex.klause.lp.engine.exactShift
@@ -21,6 +23,14 @@ internal data class CutColumnSource(
     fun expression(): CutExpression = CutExpression(mapOf(source to scale), offset)
 }
 
+internal class LpAuxiliarySources {
+    private val identities = HashMap<CutAuxiliaryDefinition, CutSource>()
+    fun matches(source: CutSource, definition: CutAuxiliaryDefinition): Boolean = identities[definition] == source
+    fun source(definition: CutAuxiliaryDefinition): CutSource = identities.getOrPut(definition) {
+        CutSource(CutSourceKind.TERM, identities.size)
+    }
+}
+
 internal class CutSourceMap(
     val model: Any,
     val epoch: Long,
@@ -30,6 +40,7 @@ internal class CutSourceMap(
     fixed: Map<CutSource, BigFraction> = emptyMap(),
     assumptions: Set<String> = emptySet(),
     parentRows: Map<Int, CutProvenance> = emptyMap(),
+    auxiliaryDefinitions: Map<CutSource, CutAuxiliaryDefinition> = emptyMap(),
 ) {
     private val columnSnapshot = columns.toList()
     private val globalSnapshot = globalPremises.toSet()
@@ -37,6 +48,8 @@ internal class CutSourceMap(
     private val fixedSnapshot = fixed.toMap()
     private val assumptionSnapshot = assumptions.toSet()
     private val parentSnapshot = parentRows.toMap()
+    private val auxiliarySnapshot = auxiliaryDefinitions.toMap()
+    val auxiliaryDefinitions: Map<CutSource, CutAuxiliaryDefinition> get() = auxiliarySnapshot.toMap()
     val columns: List<CutColumnSource?> get() = columnSnapshot.toList()
     val fixed: Map<CutSource, BigFraction> get() = fixedSnapshot.toMap()
     val assumptions: Set<String> get() = assumptionSnapshot.toSet()
@@ -47,6 +60,24 @@ internal class CutSourceMap(
     fun parent(row: Int): CutProvenance? = parentSnapshot[row]
     fun isGlobal(premise: CutPremise): Boolean = implied(premise, globalSnapshot)
     fun isActive(premise: CutPremise): Boolean = isGlobal(premise) || implied(premise, activeSnapshot)
+
+    fun presenceGuard(premise: CutPremise.Bound): CutPremise.Excluded? {
+        val term = premise.expression.terms.entries.singleOrNull() ?: return null
+        if (term.value != BigFraction.ONE || !premise.expression.constant.isZero || !premise.upper ||
+            !premise.value.isZero || premise.strict
+        ) {
+                return null
+            }
+        val definition = auxiliarySnapshot[term.key] ?: return null
+        for (index in definition.required.indices step 2) {
+            val absent = CutPremise.Excluded(
+                CutSource(CutSourceKind.INTEGER, definition.required[index].toInt()),
+                BigFraction.ofLong(definition.required[index + 1]),
+            )
+            if (isActive(absent)) return absent
+        }
+        return null
+    }
 
     private fun implied(premise: CutPremise, facts: Set<CutPremise>): Boolean {
         if (premise in facts) return true
@@ -72,6 +103,7 @@ internal class CutSourceMap(
         fixedSnapshot,
         assumptionSnapshot,
         parentSnapshot,
+        auxiliarySnapshot,
     )
 
     fun atEpoch(next: Long): CutSourceMap = CutSourceMap(
@@ -83,6 +115,7 @@ internal class CutSourceMap(
         fixedSnapshot,
         assumptionSnapshot,
         parentSnapshot,
+        auxiliarySnapshot,
     )
 
     /** Compact row-indexed cut provenance through a proof-mapped relaxation transform. */
@@ -100,6 +133,7 @@ internal class CutSourceMap(
             fixedSnapshot,
             assumptionSnapshot,
             remapped,
+            auxiliarySnapshot,
         )
     }
 }
@@ -119,6 +153,17 @@ internal fun CutSourceMap.withCpBounds(
         facts.add(CutPremise.Bound(expression, false, BigFraction.ofLong(domain.min)))
         facts.add(CutPremise.Bound(expression, true, BigFraction.ofLong(domain.max)))
     }
+    for (definition in auxiliaryDefinitions.values) {
+        for (index in definition.required.indices step 2) {
+            val variable = definition.required[index].toInt()
+            val value = definition.required[index + 1]
+            if (!session.intDomain(variable).contains(value)) {
+                facts.add(
+                CutPremise.Excluded(CutSource(CutSourceKind.INTEGER, variable), BigFraction.ofLong(value)),
+            )
+            }
+        }
+    }
     return withBounds(model, facts)
 }
 
@@ -130,14 +175,24 @@ internal fun cpCutSources(
     realIds: IntArray,
     realSigns: IntArray,
     parents: Map<Int, CutProvenance>,
+    presence: List<CutAuxiliaryDefinition?> = List(model.n) { null },
+    auxiliarySources: LpAuxiliarySources = LpAuxiliarySources(),
+    domains: RelaxationDomains? = null,
 ): CutSourceMap {
     val globals = HashSet<CutPremise>()
+    val auxiliary = HashMap<CutSource, CutAuxiliaryDefinition>()
     val realCounts = realIds.filter { it >= 0 }.groupingBy { it }.eachCount()
     val columns = List(model.n) { col ->
         val real = realIds[col]
         val source = when {
             vars[col] >= 0 -> CutSource(if (booleans[col]) CutSourceKind.BOOLEAN else CutSourceKind.INTEGER, vars[col])
+
             real >= 0 && realSigns[col] == 1 && realCounts[real] == 1 -> CutSource(CutSourceKind.REAL, real)
+
+            presence[col] != null -> auxiliarySources.source(requireNotNull(presence[col])).also {
+                auxiliary[it] = requireNotNull(presence[col])
+            }
+
             else -> null
         }
         source?.let { CutColumnSource(it) }
@@ -175,10 +230,29 @@ internal fun cpCutSources(
                 )?.let { globals.add(CutPremise.Bound(expression, true, it)) }
             }
 
-            CutSourceKind.TERM -> Unit
+            CutSourceKind.TERM -> {
+                val definition = requireNotNull(auxiliary[source])
+                globals.add(CutPremise.Bound(expression, false, BigFraction.ZERO))
+                globals.add(CutPremise.Bound(expression, true, BigFraction.ofLong(definition.presentUpper)))
+                if (definition.integralExtension) globals.add(CutPremise.Integral(expression))
+            }
         }
     }
-    return CutSourceMap(problem, 0, columns, globals, columnBounds(model, columns), parentRows = parents)
+    val active = columnBounds(model, columns).toMutableSet()
+    if (domains != null) {
+        for (definition in auxiliary.values) {
+        for (index in definition.required.indices step 2) {
+            val variable = definition.required[index].toInt()
+            val value = definition.required[index + 1]
+            if (!domains.intDomain(variable).contains(value)) {
+                active.add(
+                CutPremise.Excluded(CutSource(CutSourceKind.INTEGER, variable), BigFraction.ofLong(value)),
+            )
+            }
+        }
+    }
+    }
+    return CutSourceMap(problem, 0, columns, globals, active, parentRows = parents, auxiliaryDefinitions = auxiliary)
 }
 
 private fun columnBounds(model: LpModel, columns: List<CutColumnSource?>): Set<CutPremise> {
@@ -230,6 +304,12 @@ internal fun cutProofApplies(
                 val expression = CutExpression(mapOf(premise.source to BigFraction.ONE))
                 sourceEndpoint(expression, false, problem, domains) == premise.value &&
                     sourceEndpoint(expression, true, problem, domains) == premise.value
+            }
+
+            is CutPremise.Excluded -> {
+                val value = ExactLpNumber.of(premise.value).legacyLong()
+                premise.source.kind == CutSourceKind.INTEGER && premise.source.id in 0 until problem.numIntVars &&
+                    value != null && !domains.intDomain(premise.source.id).contains(value)
             }
 
             is CutPremise.Literal -> (premise.literal ushr 1) in 0 until problem.numBoolVars &&

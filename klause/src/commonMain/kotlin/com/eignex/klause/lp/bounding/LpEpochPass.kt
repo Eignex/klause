@@ -20,14 +20,31 @@ internal class LpEpochPass(private val engine: LpEngine) : InprocessingPass {
     var declines = 0
         private set
 
+    override fun onRoot(session: PropagationSession, params: BacktrackParams) {
+        if (params.lpRootTidy || params.lpEpochs) {
+            engine.observeEpoch("root_opportunities")
+            runEpoch(session, params)
+        }
+    }
+
     override fun run(session: PropagationSession, params: BacktrackParams) {
-        if (!params.lpEpochs || !params.assumptions.isEmpty || session.decisionLevel != 0 ||
+        if (params.lpEpochs) {
+            engine.observeEpoch("restart_opportunities")
+            runEpoch(session, params)
+        }
+    }
+
+    private fun runEpoch(session: PropagationSession, params: BacktrackParams) {
+        if (!params.assumptions.isEmpty || session.decisionLevel != 0 ||
             !engine.epochRootAllowed || session.problem !== engine.problem || params.cancellation()
         ) {
             return
         }
         val before = engine.totalSolveWork()
-        if (!dutyCycle.allows(before)) return
+        if (!dutyCycle.allows(before)) {
+            engine.observeEpoch("duty_cycle_skips")
+            return
+        }
         runs++
         val start = TimeSource.Monotonic.markNow()
         val limit = minOf(engine.params.lpPlan.rootMaxWork, LP_EPOCH_MAX_WORK).coerceAtLeast(1L)
@@ -44,6 +61,7 @@ internal class LpEpochPass(private val engine: LpEngine) : InprocessingPass {
                 for (bound in facts) {
                     if (token()) break
                     exports++
+                    engine.observeEpoch("source_bounds")
                     params.globalVarBoundSink?.invoke(bound.varId, bound.lo, bound.hi)
                     if (session.implyIntAtLeast(bound.varId, bound.lo) is PropagationResult.Unsat ||
                         session.implyIntAtMost(bound.varId, bound.hi) is PropagationResult.Unsat

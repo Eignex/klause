@@ -607,6 +607,7 @@ internal class ResumableMinimize(
      */
     private fun firstRunWork(): MinimizeResult.WithSample? {
         sink.start()
+        inprocessing?.onRoot(session, params)
         // Charge the one-shot root LP work's wall time against the shared LP wall budget on every
         // exit path, so it competes with the per-node solves for the same fraction of the deadline.
         val rootWorkStart = TimeSource.Monotonic.markNow()

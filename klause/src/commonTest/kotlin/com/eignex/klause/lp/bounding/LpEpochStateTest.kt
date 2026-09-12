@@ -35,9 +35,13 @@ class LpEpochStateTest {
     }
 
     @Test
-    fun `a root with interior holes declines snapshot caching`() {
+    fun `a root with interior holes retains its membership scope`() {
         val problem = Problem(0, 1, arrayOf(IntDomain(0, 5).excludeValue(2)), emptyArray())
-        assertNull(LpEpochRoot.capture(PropagationSession(problem)))
+        val session = PropagationSession(problem)
+        val root = assertNotNull(LpEpochRoot.capture(session))
+        assertTrue(root.admits(session))
+        session.implyIntAtMost(0, 4)
+        assertTrue(root.admits(session))
     }
 
     @Test
@@ -73,7 +77,7 @@ class LpEpochStateTest {
     }
 
     @Test
-    fun `transformed tidy models are not admitted by matching dimensions`() {
+    fun `transformed tidy models retain a checked proof binding`() {
         val problem = Problem(
             0,
             1,
@@ -86,6 +90,6 @@ class LpEpochStateTest {
         assertTrue(map.validate())
         assertTrue(map.appliesTo(map.scope))
         assertTrue(map.bounds.isNotEmpty())
-        assertFalse(LpEpochState.supports(result))
+        assertTrue(LpEpochState.supports(result))
     }
 }

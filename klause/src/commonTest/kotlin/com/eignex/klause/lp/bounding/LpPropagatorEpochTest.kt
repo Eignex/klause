@@ -35,7 +35,7 @@ class LpPropagatorEpochTest {
             session.initialize()
             val declared = assertNotNull(lp.solve())
             assertNotNull(lp.explainConflict(declared.conflictSupport, session))
-            assertTrue(lp.replaceEpoch(Any(), source, null, Cancellation.Never, { true }, {}))
+            assertTrue(lp.replaceEpoch(Any(), source, null, Cancellation.Never, { true }) {})
             val first = assertNotNull(lp.solve())
             assertNotNull(first.conflictSupport)
             assertNull(lp.explainConflict(first.conflictSupport, session))
@@ -97,11 +97,11 @@ class LpPropagatorEpochTest {
             assertNotNull(lp.solve())
             val old = lp.state
             failPreparation = true
-            assertFalse(lp.replaceEpoch(Any(), source, null, Cancellation.Never, { true }, {}))
+            assertFalse(lp.replaceEpoch(Any(), source, null, Cancellation.Never, { true }) {})
             assertSame(old, lp.state)
             failPreparation = false
             assertFailsWith<IllegalStateException> {
-                lp.replaceEpoch(Any(), source, null, Cancellation.Never, { error("publication rejected") }, {})
+                lp.replaceEpoch(Any(), source, null, Cancellation.Never, { error("publication rejected") }) {}
             }
             assertSame(old, lp.state)
             assertNotNull(lp.solve())
@@ -151,7 +151,7 @@ class LpPropagatorEpochTest {
             assertTrue(lp.install(Any(), source))
             assertNotNull(lp.solve())
             val thrown = assertFailsWith<IllegalStateException> {
-                lp.replaceEpoch(Any(), source, null, Cancellation.Never, { true }, { throw publicationFailure })
+                lp.replaceEpoch(Any(), source, null, Cancellation.Never, { true }) { throw publicationFailure }
             }
             assertSame(publicationFailure, thrown)
             assertEquals(listOf(cleanupFailure), thrown.suppressedExceptions)
@@ -175,7 +175,7 @@ class LpPropagatorEpochTest {
                 lp.replaceEpoch(Any(), source, null, Cancellation { cancelled }, {
                     cancelled = true
                     true
-                }, { published = true }),
+                }) { published = true },
             )
             assertFalse(published)
             assertSame(old, lp.state)
@@ -191,7 +191,7 @@ class LpPropagatorEpochTest {
         val source = assertNotNull(builder.build(Sense.MINIMIZE).trailModel())
         LpPropagator(object : LpSearchPolicy {}).use { lp ->
             var expired = false
-            assertTrue(lp.replaceEpoch(Any(), source, null, Cancellation { expired }, { true }, {}))
+            assertTrue(lp.replaceEpoch(Any(), source, null, Cancellation { expired }, { true }) {})
             expired = true
             assertNotNull(lp.solve())
         }
@@ -209,7 +209,7 @@ class LpPropagatorEpochTest {
             arrayOf(VarStatus.BASIC, VarStatus.BASIC, VarStatus.AT_LOWER, VarStatus.AT_LOWER),
         )
         LpPropagator(object : LpSearchPolicy {}).use { lp ->
-            assertTrue(lp.replaceEpoch(Any(), source, warm, Cancellation.Never, { true }, {}))
+            assertTrue(lp.replaceEpoch(Any(), source, warm, Cancellation.Never, { true }) {})
             val result = assertNotNull(lp.solve())
             assertNotNull(result.exactPrimal)
             assertTrue(lp.lastEpochMetrics.singularRefactorizations > 0)

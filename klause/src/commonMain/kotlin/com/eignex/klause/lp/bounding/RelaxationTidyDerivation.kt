@@ -7,6 +7,7 @@ import com.eignex.klause.lp.engine.CutSourceKind
 import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.LpRowPremises
 import com.eignex.klause.lp.relaxation.CutColumnSource
+import com.eignex.klause.lp.relaxation.CutSourceMap
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.addExact
 import com.eignex.klause.util.mulExact
@@ -51,6 +52,7 @@ internal data class RelaxationTidyScope(
     val atRoot: Boolean,
     val assumptions: Set<String> = emptySet(),
     val cutoff: CutPremise.ObjectiveCutoff? = null,
+    val searchRoot: LpEpochRoot? = null,
 )
 
 internal data class RelaxationTidyFixing(
@@ -59,6 +61,7 @@ internal data class RelaxationTidyFixing(
     val value: Long,
     val lower: CutPremise.Bound,
     val upper: CutPremise.Bound,
+    val global: Boolean = true,
 )
 
 internal data class RelaxationTidyRounding(
@@ -127,6 +130,7 @@ internal class RelaxationTidyDerivation(
     bounds: List<RelaxationTidyBound>,
     columnSources: List<CutColumnSource?>,
     val stats: RelaxationTidyStats,
+    private val sourceMap: CutSourceMap? = null,
 ) {
     private val rowMapSnapshot = rowMaps.toList()
     private val removedSnapshot = removedRows.toList()
@@ -142,7 +146,7 @@ internal class RelaxationTidyDerivation(
         scope.root === candidate.root && scope.objective === candidate.objective &&
             scope.epoch == candidate.epoch && scope.atRoot == candidate.atRoot &&
             scope.assumptions == candidate.assumptions &&
-            scope.cutoff == candidate.cutoff
+            scope.cutoff == candidate.cutoff && scope.searchRoot === candidate.searchRoot
 
     /** Lift algebraic row weights. Integer-rounded singleton rows use a lattice proof, not a real Farkas map. */
     fun liftRowMultipliers(weights: List<BigFraction>): RelaxationTidyLift? {
@@ -227,8 +231,11 @@ internal class RelaxationTidyDerivation(
         for (fixing in map.fixings) {
             if (!validFixing(sourceCoefficients, fixing)) return false
         }
-        if (sourceModel.rowGlobal[map.sourceRow] != transformedModel.rowGlobal[map.outputRow] ||
-            sourceModel.rowPremises[map.sourceRow] !== transformedModel.rowPremises[map.outputRow]
+        val conditionalFixing = map.fixings.any { !it.global }
+        val expectedGlobal = sourceModel.rowGlobal[map.sourceRow] && !conditionalFixing
+        val expectedPremises = if (conditionalFixing) null else sourceModel.rowPremises[map.sourceRow]
+        if (expectedGlobal != transformedModel.rowGlobal[map.outputRow] ||
+            expectedPremises !== transformedModel.rowPremises[map.outputRow]
         ) {
             return false
         }
@@ -309,7 +316,15 @@ internal class RelaxationTidyDerivation(
             false,
             BigFraction.ofLong(fixing.value),
         )
-        return fixing.lower == expected && fixing.upper == expected.copy(upper = true)
+        if (fixing.lower != expected || fixing.upper != expected.copy(upper = true)) return false
+        val sources = sourceMap ?: return fixing.global
+        val global = sources.isGlobal(fixing.lower) && sources.isGlobal(fixing.upper)
+        return fixing.global == global && (
+            global || (
+                scope.searchRoot != null &&
+            sources.isActive(fixing.lower) && sources.isActive(fixing.upper)
+            )
+        )
     }
 
     private fun validateRedundant(removed: RelaxationTidyRemovedRow, coefficients: Map<Int, Long>): Boolean {
@@ -400,7 +415,7 @@ internal class RelaxationTidyDerivation(
         val rounding = requireNotNull(map.rounding)
         val columnThreshold = reducedRhs * BigFraction.ofLong(coefficient).reciprocal()
         val sourceColumn = columnSourceSnapshot[column] ?: return false
-        if (sourceColumn.source.kind !in setOf(CutSourceKind.INTEGER, CutSourceKind.BOOLEAN)) return false
+        if (!integralSource(sourceColumn.source)) return false
         val sourceThreshold = (columnThreshold - sourceColumn.offset) * sourceColumn.scale.reciprocal()
         val equality = sourceModel.hasUpper[sourceModel.slackCol(map.sourceRow)]
         if (sourceThreshold != rounding.sourceValue || rounding.strict != sourceModel.rowStrict[map.sourceRow]) {
@@ -444,7 +459,7 @@ internal class RelaxationTidyDerivation(
             rhs -= BigFraction.ofLong(fixing.coefficient) * BigFraction.ofLong(fixing.value)
         }
         val columnSource = columnSourceSnapshot[column] ?: return false
-        if (columnSource.source.kind !in setOf(CutSourceKind.INTEGER, CutSourceKind.BOOLEAN)) return false
+        if (!integralSource(columnSource.source)) return false
         val columnThreshold = rhs * BigFraction.ofLong(coefficient).reciprocal()
         val sourceThreshold = (columnThreshold - columnSource.offset) * columnSource.scale.reciprocal()
         val equality = sourceModel.hasUpper[sourceModel.slackCol(bound.sourceRow)]
@@ -469,12 +484,18 @@ internal class RelaxationTidyDerivation(
         if (bound.sourceUpper != expectedSourceUpper || bound.columnUpper != expectedColumnUpper ||
             bound.sourceValue != expectedSourceValue || columnValue != BigFraction.ofLong(bound.columnValue) ||
             bound.rounded != (expectedSourceValue != sourceThreshold) ||
-            bound.global != sourceModel.rowGlobal[bound.sourceRow]
+            bound.global != (sourceModel.rowGlobal[bound.sourceRow] && map.fixings.all { it.global })
         ) {
             return false
         }
         return bound.premises == expectedPremises(sourceModel.rowPremises[bound.sourceRow], map.fixings)
     }
+
+    private fun integralSource(source: CutSource): Boolean = source.kind == CutSourceKind.INTEGER ||
+        source.kind == CutSourceKind.BOOLEAN || (
+            source.kind == CutSourceKind.TERM &&
+            sourceMap?.isGlobal(CutPremise.Integral(CutExpression(mapOf(source to BigFraction.ONE)))) == true
+        )
 
     private fun expectedPremises(rowPremises: LpRowPremises?, fixings: List<RelaxationTidyFixing>): Set<CutPremise> =
         buildSet {

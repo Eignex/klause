@@ -62,7 +62,7 @@ internal object LpExplanation {
         // A continuous column's bounds are declared globals (or probe stand-ins), valid at every node.
         if (col < relaxation.colRealId.size && relaxation.colRealId[col] >= 0) return PREMISE_NONE
         val varId = relaxation.colVarId[col]
-        if (varId < 0) return PREMISE_AUX
+        if (varId < 0) return presencePremise(relaxation, session, col, lowerSide)
         val model = relaxation.model
         val lo = model.loShift[col]
         val hi = lo + model.upper[col]
@@ -82,6 +82,44 @@ internal object LpExplanation {
         } else {
             session.boundLeLit(varId, hi, positive = false)
         }
+    }
+
+    fun boundPremiseLits(
+        relaxation: LpRelaxation,
+        session: PropagationSession,
+        column: Int,
+        lowerSide: Boolean,
+    ): IntArray? {
+        if (relaxation.tidyProof?.active(session) == false) return null
+        return when (val literal = premiseLit(relaxation, session, column, lowerSide)) {
+            PREMISE_AUX -> null
+            PREMISE_NONE -> intArrayOf()
+            else -> intArrayOf(literal)
+        }
+    }
+
+    private fun presencePremise(
+        relaxation: LpRelaxation,
+        session: PropagationSession,
+        column: Int,
+        lowerSide: Boolean,
+    ): Int {
+        val required = relaxation.colReq.getOrNull(column) ?: return PREMISE_AUX
+        if (required.size % 2 != 0 || relaxation.colPresentUpper[column] < 0L) return PREMISE_AUX
+        val model = relaxation.model
+        if (model.loShift[column] != 0L || !model.hasUpper[column]) return PREMISE_AUX
+        if (lowerSide) return PREMISE_NONE
+        if (model.upper[column] == relaxation.colPresentUpper[column]) return PREMISE_NONE
+        if (model.upper[column] != 0L) return PREMISE_AUX
+        for (index in required.indices step 2) {
+            val variable = required[index]
+            if (variable !in 0L until session.problem.numIntVars.toLong()) return PREMISE_AUX
+            val value = required[index + 1]
+            if (!session.intDomain(variable.toInt()).contains(value)) {
+                return session.equalityLit(variable.toInt(), value)
+            }
+        }
+        return PREMISE_AUX
     }
 
     /**
@@ -105,11 +143,8 @@ internal object LpExplanation {
         for (col in relaxation.colVarId.indices) {
             val sign = cert.reducedCostSign(col)
             if (sign == 0) continue
-            when (val lit = premiseLit(relaxation, session, col, lowerSide = sign > 0)) {
-                PREMISE_AUX -> return null
-                PREMISE_NONE -> Unit
-                else -> if (seen.add(lit)) lits.add(lit)
-            }
+            val premises = boundPremiseLits(relaxation, session, col, lowerSide = sign > 0) ?: return null
+            for (lit in premises) if (seen.add(lit)) lits.add(lit)
         }
         return lits.toIntArray()
     }
@@ -143,11 +178,8 @@ internal object LpExplanation {
             }
             if (sign == 0) continue
             // ρ·A_j > 0 ⇒ the column's upper bound is load-bearing (upper side); < 0 ⇒ lower side.
-            when (val lit = premiseLit(relaxation, session, col, lowerSide = sign < 0)) {
-                PREMISE_AUX -> return null
-                PREMISE_NONE -> Unit
-                else -> if (seen.add(lit)) lits.add(lit)
-            }
+            val premises = boundPremiseLits(relaxation, session, col, lowerSide = sign < 0) ?: return null
+            for (lit in premises) if (seen.add(lit)) lits.add(lit)
         }
         return if (lits.isEmpty()) null else lits.toIntArray()
     }
@@ -166,16 +198,13 @@ internal object LpExplanation {
         val inRows = IntHashSet()
         for (r in rows) inRows.add(r)
         for (col in relaxation.colVarId.indices) {
-            val v = relaxation.colVarId[col]
-            if (v < 0 || relaxation.colIsBool[col]) continue
             var touches = false
             model.forEachInColumnD(col) { i, _ -> if (inRows.contains(i)) touches = true }
             if (!touches) continue
-            val d = session.intDomain(v)
-            val le = session.boundLeLit(v, d.max, positive = false)
-            if (seen.add(le)) lits.add(le)
-            val ge = session.boundGeLit(v, d.min, positive = false)
-            if (seen.add(ge)) lits.add(ge)
+            for (lower in listOf(false, true)) {
+                val premises = boundPremiseLits(relaxation, session, col, lower) ?: return null
+                for (literal in premises) if (seen.add(literal)) lits.add(literal)
+            }
         }
         return if (lits.size > 0) lits.toIntArray() else null
     }
@@ -194,7 +223,16 @@ internal object LpExplanation {
         session: PropagationSession,
     ): Boolean {
         val model = relaxation.model
+        val tidy = relaxation.tidyProof
+        if (relaxation.tidyDerivation != null && (tidy == null || !tidy.active(session))) return false
         for (r in rows) {
+            if (tidy != null) {
+                val proof = tidy.rowProof(r) ?: return false
+                for (fact in proof.facts) {
+                    if (!fact.global && !addSourcePremise(lits, seen, fact.premise, session)) return false
+                }
+                continue
+            }
             if (model.rowGlobal[r]) continue
             val source = relaxation.sourceMap?.parent(r)
             if (source != null) {
@@ -254,21 +292,45 @@ internal object LpExplanation {
                 premise.literal xor 1
             }
 
+            is CutPremise.Excluded -> {
+                if (premise.source.kind != CutSourceKind.INTEGER ||
+                    premise.source.id !in 0 until session.problem.numIntVars
+                ) {
+                        return false
+                    }
+                val value = ExactLpNumber.of(premise.value).legacyLong() ?: return false
+                if (session.intDomain(premise.source.id).contains(value)) return false
+                session.equalityLit(premise.source.id, value)
+            }
+
             is CutPremise.Bound -> {
                 val term = premise.expression.terms.entries.singleOrNull() ?: return false
-                if (term.key.kind != CutSourceKind.INTEGER || term.value != BigFraction.ONE ||
-                    term.key.id !in 0 until session.problem.numIntVars || premise.strict
-                ) {
-                    return false
-                }
-                val value = ExactLpNumber.of(premise.value - premise.expression.constant).legacyLong() ?: return false
-                val domain = session.intDomain(term.key.id)
-                if (premise.upper) {
-                    if (domain.max > value) return false
-                    session.boundLeLit(term.key.id, value, positive = false)
-                } else {
-                    if (domain.min < value) return false
-                    session.boundGeLit(term.key.id, value, positive = false)
+                if (term.value.isZero || premise.strict) return false
+                val threshold = (premise.value - premise.expression.constant) * term.value.reciprocal()
+                val value = ExactLpNumber.of(threshold).legacyLong() ?: return false
+                val upper = premise.upper == (term.value.signum() > 0)
+                when (term.key.kind) {
+                    CutSourceKind.INTEGER -> {
+                        if (term.key.id !in 0 until session.problem.numIntVars) return false
+                        val domain = session.intDomain(term.key.id)
+                        if (upper) {
+                            if (domain.max > value) return false
+                            session.boundLeLit(term.key.id, value, positive = false)
+                        } else {
+                            if (domain.min < value) return false
+                            session.boundGeLit(term.key.id, value, positive = false)
+                        }
+                    }
+
+                    CutSourceKind.BOOLEAN -> {
+                        if (term.key.id !in 0 until session.problem.numBoolVars) return false
+                        if ((upper && value >= 1L) || (!upper && value <= 0L)) return true
+                        if ((upper && value != 0L) || (!upper && value != 1L)) return false
+                        if (session.boolValue(term.key.id) != !upper) return false
+                        Lit.make(term.key.id, upper)
+                    }
+
+                    else -> return false
                 }
             }
 

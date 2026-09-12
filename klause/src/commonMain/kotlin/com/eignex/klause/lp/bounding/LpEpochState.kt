@@ -1,45 +1,60 @@
 package com.eignex.klause.lp.bounding
 
+import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.lp.engine.Basis
+import com.eignex.klause.lp.engine.CutRowTransform
 import com.eignex.klause.lp.engine.VarStatus
+import com.eignex.klause.lp.relaxation.CutColumnSource
 import com.eignex.klause.lp.relaxation.LpRelaxation
 import com.eignex.klause.propagation.PropagationSession
 
 internal class LpEpochRoot private constructor(
     private val session: PropagationSession,
-    private val lower: LongArray,
-    private val upper: LongArray,
+    private val domains: List<IntDomain>,
     private val pins: List<Boolean?>,
 ) {
-    fun admits(candidate: PropagationSession): Boolean = candidate === session &&
-        lower.indices.all {
-            val domain = candidate.intDomain(it)
-            domain.min >= lower[it] && domain.max <= upper[it]
-        } && pins.indices.all { pins[it] == null || candidate.boolValue(it) == pins[it] }
+    fun admitsCurrent(): Boolean = admits(session)
 
-    fun changed(candidate: PropagationSession): Boolean = candidate !== session ||
-        lower.indices.any {
-            val domain = candidate.intDomain(it)
-            domain.min != lower[it] || domain.max != upper[it] || domain.holeCount != 0L
-        } || pins.indices.any { candidate.boolValue(it) != pins[it] }
+    fun admits(candidate: PropagationSession): Boolean = candidate === session &&
+        !candidate.isUnsatAtRoot && domains.indices.all { subset(candidate.intDomain(it), domains[it]) } &&
+        pins.indices.all { pins[it] == null || candidate.boolValue(it) == pins[it] }
+
+    fun changed(candidate: PropagationSession): Boolean = candidate !== session || domains.indices.any {
+        val domain = candidate.intDomain(it)
+        domain.min != domains[it].min || domain.max != domains[it].max ||
+            domain.valueCount != domains[it].valueCount || !subset(domain, domains[it])
+    } || pins.indices.any { candidate.boolValue(it) != pins[it] }
 
     companion object {
         fun capture(session: PropagationSession): LpEpochRoot? {
-            if (session.decisionLevel != 0 || session.isUnsatAtRoot ||
-                session.problem.numIntVars + session.problem.numBoolVars > LP_EPOCH_MAX_COLUMNS ||
-                (0 until session.problem.numIntVars).any { session.intDomain(it).holeCount != 0L }
-            ) {
-                return null
+            if (session.decisionLevel != 0 || session.isUnsatAtRoot) return null
+            val domains = List(session.problem.numIntVars) { session.intDomain(it) }
+            var remaining = LP_EPOCH_MEMBERSHIP_WORK
+            for (domain in domains) {
+                val work = 1L + minOf(domain.holeCount, domain.valueCount)
+                if (work > remaining) return null
+                remaining -= work
             }
-            return LpEpochRoot(
-                session,
-                LongArray(session.problem.numIntVars) { session.intDomain(it).min },
-                LongArray(session.problem.numIntVars) { session.intDomain(it).max },
-                List(session.problem.numBoolVars) { session.boolValue(it) },
-            )
+            return LpEpochRoot(session, domains, List(session.problem.numBoolVars) { session.boolValue(it) })
+        }
+
+        private fun subset(candidate: IntDomain, saved: IntDomain): Boolean {
+            if (candidate === saved) return true
+            if (candidate.min < saved.min || candidate.max > saved.max) return false
+            if (saved.holeCount == 0L) return true
+            val values = candidate.spanOrNull(LP_EPOCH_MEMBERSHIP_WORK)
+            if (values != null && candidate.valueCount < saved.holeCount) {
+                return (0 until values.size).all { saved.contains(values.valueAt(it)) }
+            }
+            if (saved.holeCount > LP_EPOCH_MEMBERSHIP_WORK) return false
+            var valid = true
+            saved.forEachHoleInRange(candidate.min, candidate.max) { if (candidate.contains(it)) valid = false }
+            return valid
         }
     }
 }
+
+private const val LP_EPOCH_MEMBERSHIP_WORK = 1_000_000L
 
 internal class LpEpochState(
     val root: LpEpochRoot,
@@ -50,16 +65,26 @@ internal class LpEpochState(
     fun admits(session: PropagationSession): Boolean = root.admits(session)
 
     companion object {
-        fun supports(relaxation: LpRelaxation): Boolean {
+        fun supports(relaxation: LpRelaxation): Boolean = declineReason(relaxation) == null
+
+        fun declineReason(relaxation: LpRelaxation): String? {
             val model = relaxation.model
-            val sources = relaxation.sourceMap ?: return false
+            val sources = relaxation.sourceMap ?: return "source_map"
             val columns = sources.columns
-            return model.n in 1..LP_EPOCH_MAX_COLUMNS && model.m <= LP_EPOCH_MAX_ROWS &&
-                !model.hasContinuous && model.doubleView == null && model.exactState == null &&
-                relaxation.gatedRows.isEmpty() && relaxation.tidyDerivation == null &&
-                columns.size == model.n && columns.all { it != null } &&
-                columns.distinct().size == model.n &&
-                relaxation.colVarId.all { it >= 0 } && sources.assumptions.isEmpty()
+            return when {
+                model.n == 0 -> "empty_model"
+                model.hasContinuous || model.doubleView != null -> "continuous_cp_rebind"
+                model.exactState != null -> "exact_cp_rebind"
+                relaxation.gatedRows.isNotEmpty() -> "gated_owner"
+                relaxation.tidyDerivation != null && relaxation.tidyProof == null -> "tidy_proof"
+                columns.size != model.n || columns.any { it == null } -> "column_source"
+                columns.distinct().size != model.n -> "aliased_source"
+                relaxation.colVarId.indices.any {
+                    relaxation.colVarId[it] < 0 && relaxation.colPresence[it] == null
+                } -> "presence_definition"
+                sources.assumptions.isNotEmpty() -> "assumption_scope"
+                else -> null
+            }
         }
 
         fun remapBasis(previous: LpRelaxation, next: LpRelaxation, basis: Basis?): Basis? {
@@ -71,24 +96,36 @@ internal class LpEpochState(
             }
             val oldColumns = previous.sourceMap?.columns ?: return null
             val newColumns = next.sourceMap?.columns ?: return null
-            if (oldColumns != newColumns || oldColumns.any { it == null }) return null
+            if (oldColumns.any { it == null } || newColumns.any { it == null }) return null
+            val oldCounts = oldColumns.groupingBy { it }.eachCount()
+            val newCounts = newColumns.groupingBy { it }.eachCount()
+            val newIndex = newColumns.withIndex().associate { it.value to it.index }
+            val columnMap = oldColumns.map { source ->
+                if (oldCounts[source] == 1 && newCounts[source] == 1 &&
+                    previous.sourceMap.auxiliaryDefinitions[source?.source] ==
+                    next.sourceMap.auxiliaryDefinitions[source?.source]
+                ) {
+                    newIndex[source] ?: -1
+                } else {
+                    -1
+                }
+            }
             val oldRows = rowKeys(previous)
             val newRows = rowKeys(next)
             val uniqueOld = oldRows.groupingBy { it }.eachCount()
             val uniqueNew = newRows.groupingBy { it }.eachCount()
             val nextRows = newRows.withIndex().associate { it.value to it.index }
             val model = next.model
-            val statuses = Array(model.numVars) { j ->
-                if (j < model.n && basis.status[j] == VarStatus.AT_UPPER && model.hasUpper[j]) {
-                    VarStatus.AT_UPPER
-                } else {
-                    VarStatus.AT_LOWER
+            val statuses = Array(model.numVars) { VarStatus.AT_LOWER }
+            for ((old, mapped) in columnMap.withIndex()) {
+                if (mapped >= 0 && basis.status[old] == VarStatus.AT_UPPER && model.hasUpper[mapped]) {
+                    statuses[mapped] = VarStatus.AT_UPPER
                 }
             }
             val headings = ArrayList<Int>()
             for (column in basis.basicVars) {
                 val mapped = if (column < previous.model.n) {
-                    column
+                    columnMap[column]
                 } else {
                     val key = oldRows.getOrNull(column - previous.model.n) ?: continue
                     if (uniqueOld[key] != 1 || uniqueNew[key] != 1) continue
@@ -108,33 +145,58 @@ internal class LpEpochState(
 
         private fun rowKeys(relaxation: LpRelaxation): List<List<Any?>> {
             val model = relaxation.model
-            val coefficients = Array(model.m) { LongArray(model.n) }
+            val coefficients = Array(model.m) { HashMap<CutColumnSource?, Long>() }
             for (column in 0 until model.n) {
-                model.forEachInColumn(column) { row, value -> coefficients[row][column] = value }
+                model.forEachInColumn(column) { row, value ->
+                    if (value != 0L) coefficients[row][relaxation.sourceMap?.column(column)] = value
+                }
             }
             return List(model.m) { row ->
                 val premise = model.rowPremises[row]
                 val parent = relaxation.sourceMap?.parent(row)
                 listOf(
-                    coefficients[row].toList(), model.flippedRhs[row], model.hasUpper[model.n + row],
+                    coefficients[row], model.flippedRhs[row], model.hasUpper[model.n + row],
                     model.rowStrict[row], model.rowGlobal[row], premise?.vars?.toList(),
                     premise?.isUpper?.toList(), premise?.thresholds?.toList(), premise?.boolLits?.toList(),
                     parent?.model, parent?.assumptions, parent?.conclusion, parent?.facts,
+                    relaxation.tidyProof?.rowProof(row)?.transformations?.map { transform ->
+                        when (transform) {
+                            is CutRowTransform.Algebraic -> listOf(
+                                transform.input,
+                                transform.conclusion,
+                                transform.multiplier,
+                                transform.inputStrict,
+                                transform.outputStrict,
+                                transform.fixings,
+                            )
+
+                            is CutRowTransform.Lattice -> transform
+                        }
+                    },
                 )
             }
         }
     }
 }
 
-internal const val LP_EPOCH_MAX_COLUMNS = 256
-internal const val LP_EPOCH_MAX_ROWS = 256
-
 internal class LpEpochMetrics {
+    fun counts(): Map<String, Long> = mapOf(
+        "attempts" to attempts.toLong(),
+        "unchanged" to unchanged.toLong(),
+        "root_declines" to rootDeclines.toLong(),
+        "model_declines" to modelDeclines.toLong(),
+        "preparation_declines" to preparationDeclines.toLong(),
+        "regeneration_ns" to regenerationNanos,
+        "tidy_ns" to tidyNanos,
+        "preparation_ns" to preparationNanos,
+    )
+
     var attempts = 0
     var unchanged = 0
     var rootDeclines = 0
     var modelDeclines = 0
     var preparationDeclines = 0
+    var tidyNanos = 0L
     var regenerationNanos = 0L
     var preparationNanos = 0L
     var rows = 0

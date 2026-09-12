@@ -1,11 +1,15 @@
 package com.eignex.klause.lp.cut
 
+import com.eignex.klause.lp.bounding.LpEpochProof
 import com.eignex.klause.lp.engine.Cut
+import com.eignex.klause.lp.engine.CutAuxiliaryDefinition
 import com.eignex.klause.lp.engine.CutExpression
+import com.eignex.klause.lp.engine.CutLatticeResult
 import com.eignex.klause.lp.engine.CutPremise
 import com.eignex.klause.lp.engine.CutProofFact
 import com.eignex.klause.lp.engine.CutProvenance
 import com.eignex.klause.lp.engine.CutRoundingRule
+import com.eignex.klause.lp.engine.CutRowTransform
 import com.eignex.klause.lp.engine.CutSource
 import com.eignex.klause.lp.engine.CutSourceKind
 import com.eignex.klause.lp.engine.CutWeightedRow
@@ -34,6 +38,50 @@ internal sealed interface CutMapping<out T> {
 
 internal fun <T> CutMapping<T>.orNull(): T? = (this as? CutMapping.Mapped)?.value
 
+internal fun CutProvenance.retainReferencedDefinitions(additional: CutExpression? = null): CutProvenance? {
+    val referenced = HashSet<CutSource>()
+    fun expression(value: CutExpression) {
+        referenced.addAll(value.terms.keys.filter { it.kind == CutSourceKind.TERM })
+    }
+    additional?.let(::expression)
+    conclusion?.let { expression(it.expression) }
+    for (fact in facts) {
+        when (val premise = fact.premise) {
+        is CutPremise.Bound -> expression(premise.expression)
+        is CutPremise.Row -> expression(premise.expression)
+        is CutPremise.Integral -> expression(premise.expression)
+        is CutPremise.ObjectiveCutoff -> expression(premise.expression)
+        is CutPremise.Fixed -> if (premise.source.kind == CutSourceKind.TERM) referenced.add(premise.source)
+        is CutPremise.Literal, is CutPremise.Excluded -> Unit
+    }
+    }
+    for (rule in rules) for (row in rule.rows) expression(row.row.expression)
+    for (transform in transformations) {
+        expression(transform.input.expression)
+        expression(transform.conclusion.expression)
+        when (transform) {
+            is CutRowTransform.Algebraic -> for (fixing in transform.fixings) {
+                expression(fixing.lower.expression)
+                expression(fixing.upper.expression)
+            }
+
+            is CutRowTransform.Lattice -> expression(transform.integral.expression)
+        }
+    }
+    val definitions = auxiliaryDefinitions
+    if (referenced.any { it !in definitions }) return null
+    return CutProvenance(
+        model,
+        epoch,
+        facts,
+        assumptions,
+        rules,
+        conclusion,
+        transformations,
+        definitions.filterKeys { it in referenced },
+    )
+}
+
 internal class CutMappingLimits(val terms: Int = 4096, val bits: Int = 4096) {
     init {
         require(terms > 0 && bits > 0)
@@ -44,16 +92,37 @@ internal class CutMappingLimits(val terms: Int = 4096, val bits: Int = 4096) {
         var remaining = terms
         fun expression(value: CutExpression): Boolean {
             remaining -= value.terms.size + 1
-            return remaining >= 0 && accepts(value.constant) && value.terms.values.all { accepts(it) }
+            return remaining >= 0 && accepts(value.constant) && value.terms.values.all { accepts(it) } &&
+                value.terms.keys.all { it.kind != CutSourceKind.TERM || it in proof.auxiliaryDefinitions }
         }
+        for ((source, definition) in proof.auxiliaryDefinitions) {
+            remaining -= definition.role.size + definition.required.size + 1
+            if (remaining < 0 || source.kind != CutSourceKind.TERM || definition.role.isEmpty() ||
+                definition.required.size % 2 != 0 || definition.presentUpper < 0L ||
+                definition.required.indices.step(
+                    2,
+                ).any { definition.required[it] !in 0L..Int.MAX_VALUE.toLong() }
+            ) {
+                    return false
+                }
+        }
+        proof.conclusion?.let { if (!expression(it.expression) || !accepts(it.rhs)) return false }
         for (fact in proof.facts) {
             if (--remaining < 0) return false
             val valid = when (val premise = fact.premise) {
                 is CutPremise.Bound -> expression(premise.expression) && accepts(premise.value)
+
                 is CutPremise.Integral -> expression(premise.expression)
-                is CutPremise.Fixed -> accepts(premise.value)
+
+                is CutPremise.Fixed -> accepts(premise.value) &&
+                    (premise.source.kind != CutSourceKind.TERM || premise.source in proof.auxiliaryDefinitions)
+
+                is CutPremise.Excluded -> premise.source.kind == CutSourceKind.INTEGER && accepts(premise.value)
+
                 is CutPremise.Literal -> true
+
                 is CutPremise.Row -> expression(premise.expression) && accepts(premise.rhs)
+
                 is CutPremise.ObjectiveCutoff -> expression(premise.expression) && accepts(premise.upper)
             }
             if (!valid) return false
@@ -62,6 +131,39 @@ internal class CutMappingLimits(val terms: Int = 4096, val bits: Int = 4096) {
             if (--remaining < 0) return false
             for (row in rule.rows) {
                 if (!expression(row.row.expression) || !accepts(row.row.rhs)) return false
+            }
+        }
+        for (transform in proof.transformations) {
+            if (--remaining < 0 || !expression(transform.input.expression) || !accepts(transform.input.rhs) ||
+                !expression(transform.conclusion.expression) || !accepts(transform.conclusion.rhs)
+            ) {
+                    return false
+                }
+            when (transform) {
+                is CutRowTransform.Algebraic -> {
+                    if (!accepts(transform.multiplier)) return false
+                    for (fixing in transform.fixings) {
+                        if (--remaining < 0 || !expression(fixing.lower.expression) || !accepts(fixing.lower.value) ||
+                            !expression(fixing.upper.expression) || !accepts(fixing.upper.value)
+                        ) {
+                                return false
+                            }
+                    }
+                }
+
+                is CutRowTransform.Lattice -> {
+                    if (!expression(transform.integral.expression)) return false
+                    when (val result = transform.result) {
+                        is CutLatticeResult.RoundedBound -> if (!accepts(
+                                result.threshold,
+                            ) || !accepts(result.roundedThreshold)
+                        ) {
+                                return false
+                            }
+
+                        is CutLatticeResult.InfeasibleEquality -> if (!accepts(result.threshold)) return false
+                    }
+                }
             }
         }
         return true
@@ -78,8 +180,17 @@ internal class SourceCut(
         .joinToString(",") { "${it.key.kind}:${it.key.id}:${it.value}" } + "|$relation|${rhs - expression.constant}"
 
     fun toCut(map: CutSourceMap, limits: CutMappingLimits = CutMappingLimits()): CutMapping<Cut> {
+        val provenance = this.provenance.retainReferencedDefinitions(expression)
+            ?: return CutMapping.Declined(CutMappingDecline.MISSING_SOURCE)
         if (provenance.model !== map.model || !map.assumptions.containsAll(provenance.assumptions)) {
             return CutMapping.Declined(CutMappingDecline.MODEL_SCOPE)
+        }
+        if (provenance.auxiliaryDefinitions.any { (source, definition) ->
+                map.auxiliaryDefinitions[source] != definition
+            } ||
+            expression.terms.keys.any { it.kind == CutSourceKind.TERM && it !in provenance.auxiliaryDefinitions }
+        ) {
+            return CutMapping.Declined(CutMappingDecline.MISSING_SOURCE)
         }
         if (provenance.facts.any { !it.global && !map.isActive(it.premise) }) {
             return CutMapping.Declined(CutMappingDecline.INACTIVE_GUARD)
@@ -147,6 +258,8 @@ internal class SourceCut(
             provenance.assumptions,
             provenance.rules,
             CutPremise.Row(expression, relation, rhs),
+            provenance.transformations,
+            provenance.auxiliaryDefinitions,
         )
         if (!limits.accepts(proof)) return CutMapping.Declined(CutMappingDecline.ARITHMETIC_LIMIT)
         return CutMapping.Mapped(
@@ -169,7 +282,7 @@ internal class SourceCut(
         ): CutMapping<SourceCut> {
             val map = relaxation.sourceMap ?: return CutMapping.Declined(CutMappingDecline.MISSING_SOURCE)
             return try {
-                SourceCutMapper(relaxation.model, map, limits).map(cut)
+                SourceCutMapper(relaxation.model, map, limits, relaxation.tidyProof).map(cut)
             } catch (decline: CutMappingFailure) {
                 CutMapping.Declined(decline.reason)
             }
@@ -183,6 +296,7 @@ private class SourceCutMapper(
     private val model: LpModel,
     private val sources: CutSourceMap,
     private val limits: CutMappingLimits,
+    private val tidy: LpEpochProof?,
 ) {
     private val definitions = sources.columns
     private var remaining = limits.terms
@@ -266,6 +380,14 @@ private class SourceCutMapper(
         val inequality = expression(columns.keys.toList(), columns.values.toList(), constant)
         val facts = ArrayList<CutProofFact>()
         val rules = ArrayList<CutRoundingRule>()
+        val transformations = ArrayList<CutRowTransform>()
+        val auxiliary = sources.auxiliaryDefinitions.toMutableMap()
+        fun inheritDefinitions(definitions: Map<CutSource, CutAuxiliaryDefinition>) {
+            for ((source, definition) in definitions) {
+                if (auxiliary[source]?.let { it != definition } == true) decline(CutMappingDecline.MODEL_SCOPE)
+                auxiliary[source] = definition
+            }
+        }
         val inherited = cut.provenance
         val tableau = cut.tableau
         if (inherited != null) {
@@ -273,6 +395,8 @@ private class SourceCutMapper(
             if (!cut.global && inherited.global) decline(CutMappingDecline.MISSING_PROVENANCE)
             facts.addAll(inherited.facts)
             rules.addAll(inherited.rules)
+            transformations.addAll(inherited.transformations)
+            inheritDefinitions(inherited.auxiliaryDefinitions)
         } else if (tableau != null) {
             if (tableau.model !== model) decline(CutMappingDecline.MODEL_SCOPE)
             for (column in tableau.columns) {
@@ -295,7 +419,12 @@ private class SourceCutMapper(
             for (row in tableau.rows) {
                 val rowExpression = expression(row.columns.toList(), row.coefficients.map { BigFraction.ofLong(it) })
                 val rowFact = CutPremise.Row(rowExpression, row.relation, row.rhs)
-                val parent = sources.parent(row.index)
+                val parent = if (tidy != null) {
+                    if (tidy.model !== model) decline(CutMappingDecline.MODEL_SCOPE)
+                    tidy.rowProof(row.index) ?: decline(CutMappingDecline.MISSING_PROVENANCE)
+                } else {
+                    sources.parent(row.index)
+                }
                 if (parent != null) {
                     if (!row.global && parent.global) decline(CutMappingDecline.MISSING_PROVENANCE)
                     if (parent.model !== sources.model || !sources.assumptions.containsAll(
@@ -308,6 +437,8 @@ private class SourceCutMapper(
                     facts.addAll(parent.facts)
                     if (rules.size + parent.rules.size > limits.terms) decline(CutMappingDecline.ARITHMETIC_LIMIT)
                     rules.addAll(parent.rules)
+                    transformations.addAll(parent.transformations)
+                    inheritDefinitions(parent.auxiliaryDefinitions)
                 } else if (row.global) {
                     facts.add(CutProofFact(rowFact, true))
                 } else {
@@ -352,7 +483,9 @@ private class SourceCutMapper(
             assumptions,
             rules,
             CutPremise.Row(inequality, cut.rel, BigFraction.ofLong(cut.rhs)),
-        )
+            transformations,
+            auxiliary,
+        ).retainReferencedDefinitions(inequality) ?: decline(CutMappingDecline.MISSING_SOURCE)
         if (!limits.accepts(proof)) decline(CutMappingDecline.ARITHMETIC_LIMIT)
         return CutMapping.Mapped(SourceCut(inequality, cut.rel, BigFraction.ofLong(cut.rhs), proof))
     }

@@ -48,6 +48,7 @@ internal fun Mdd.emitLpRelaxation(builder: RelaxationBuilder) {
                     0L,
                     if (live.contains(value)) 1L else 0L,
                     presence = longArrayOf(seq[layer].toLong(), value),
+                    definition = LpAuxiliaryColumn(listOf(p.toLong()), 1L, true),
                 )
                 (outCols[layer][src] ?: IntArrayList().also { outCols[layer][src] = it }).add(col)
                 (inCols[layer + 1][dst] ?: IntArrayList().also { inCols[layer + 1][dst] = it }).add(col)

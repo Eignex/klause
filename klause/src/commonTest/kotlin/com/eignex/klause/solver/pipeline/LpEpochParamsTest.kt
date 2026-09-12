@@ -12,9 +12,11 @@ class LpEpochParamsTest {
     fun `epoch override preserves omission and accepts explicit booleans`() {
         assertNull(backtrackOverride(EngineParams(emptyList()), allowSelectors = true))
         for (enabled in listOf(false, true)) {
-            val input = EngineParams(listOf("lp-epochs=$enabled"))
+            val input = EngineParams(listOf("lp-epochs=$enabled", "lp-root-tidy=$enabled"))
             val edit = assertNotNull(backtrackOverride(input, allowSelectors = true))
-            assertEquals(enabled, edit(BacktrackParams(lpEpochs = !enabled)).lpEpochs)
+            val changed = edit(BacktrackParams(lpEpochs = !enabled, lpRootTidy = !enabled))
+            assertEquals(enabled, changed.lpEpochs)
+            assertEquals(enabled, changed.lpRootTidy)
             input.finish("cp", BACKTRACK_OVERRIDE_KEYS.joinToString())
         }
     }

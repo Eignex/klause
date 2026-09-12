@@ -40,7 +40,7 @@ internal fun Element.estimateLpHull(boxes: RootBoxes): LpSizeEstimate? {
     var k = 0L
     var linked = 0L
     for (p in arr.indices) {
-        if ((p + indexOffset).toLong() !in box) continue
+        if ((p.toLong() + indexOffset.toLong()) !in box) continue
         k++
         if (linkable && boxes.statesBothBounds(arr[p].toInt())) linked++
     }
@@ -60,13 +60,14 @@ private fun Element.emitSelectorsAndIndexChannel(
     val box = builder.rootDomain(idx)
     val live = builder.liveDomain(idx)
     for (p in arr.indices) {
-        val idxVal = p + off
-        if (idxVal.toLong() !in box) continue
+        val idxVal = p.toLong() + off.toLong()
+        if (idxVal !in box) continue
         selCols.add(
             builder.auxColumn(
                 0L,
-                if (idxVal.toLong() in live) 1L else 0L,
-                presence = longArrayOf(idx.toLong(), idxVal.toLong()),
+                if (idxVal in live) 1L else 0L,
+                presence = longArrayOf(idx.toLong(), idxVal),
+                definition = LpAuxiliaryColumn(listOf(p.toLong()), 1L, true),
             ),
         )
         positions.add(p)
@@ -78,7 +79,7 @@ private fun Element.emitSelectorsAndIndexChannel(
     val idxVals = LongArray(k + 1)
     for (t in 0 until k) {
         idxCols[t] = selCols[t]
-        idxVals[t] = (positions[t] + off).toLong()
+        idxVals[t] = (positions[t].toLong() + off.toLong())
     }
     idxCols[k] = builder.intColumn(idx)
     idxVals[k] = -1L

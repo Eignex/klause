@@ -45,7 +45,14 @@ class LinearLinearizerTest {
         override fun hullEnabled(): Boolean = true
         override fun intColumn(intVar: Int): Int = error("unused")
         override fun boolColumn(boolVar: Int): Int = error("unused")
-        override fun auxColumn(lo: Long, hi: Long, presence: LongArray?): Int = error("unused")
+        override fun auxColumn(
+            lo: Long,
+            hi: Long,
+            presence: LongArray?,
+            definition: com.eignex.klause.lp.LpAuxiliaryColumn?,
+        ): Int = error(
+            "unused",
+        )
         override fun liveDomain(intVar: Int): IntDomain = error("unused")
         override fun rootDomain(intVar: Int): IntDomain = error("unused")
         override fun statesLowerBound(intVar: Int): Boolean = true

@@ -32,7 +32,7 @@ internal fun lpStatPairs(stats: SolveStats): List<Pair<String, String>> {
     val routed = stats.lp.standalonePasses.sum + stats.lp.componentPasses.sum + stats.lp.rootPasses.sum
     if (solves == 0.0 && stats.lp.nodePasses.sum == 0.0 && routed == 0.0 &&
         lagrangian == 0.0 && energetic == 0.0 && splits == 0.0 &&
-        stats.lp.basisVerification.calls == 0L && stats.lp.continuation.calls == 0L
+        stats.lp.basisVerification.calls == 0L && stats.lp.continuation.calls == 0L && stats.lp.epochs.isEmpty()
     ) {
         return emptyList()
     }
@@ -131,6 +131,7 @@ internal fun lpStatPairs(stats: SolveStats): List<Pair<String, String>> {
     appendCertifierStats(out, "ExactPointFeasible", stats.lp.exactPointFeasible)
     appendCertifierStats(out, "RationalOutcome", stats.lp.rationalOutcome)
     out += continuationStatPairs("lp", stats.lp.continuation)
+    for ((name, value) in stats.lp.epochs.toSortedMap()) out += "lp_epoch_$name" to value.toString()
     val basis = stats.lp.basisVerification
     if (basis.calls > 0L) {
         out += "lpRationalBasisCalls" to "${basis.calls}"

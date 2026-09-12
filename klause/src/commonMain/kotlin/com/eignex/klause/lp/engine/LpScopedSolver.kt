@@ -52,6 +52,7 @@ internal class LpScopedSolver(
 ) : AutoCloseable {
     private val continuationCache = LpExactContinuationCache()
     internal val refinementCache = LpRefinementCache()
+    private var exactAttempted = false
     private var trail = LpBoundTrail(initial)
     private var solver: PersistentLpSolver? = null
     private var closed = false
@@ -94,6 +95,16 @@ internal class LpScopedSolver(
 
     init {
         require(maxRetainedRows >= 0 && refactorUpdateLimit > 0 && iterationLimit >= 0 && workLimit >= 0L)
+    }
+
+    fun exportEpochBudget(): LpEpochBudget? {
+        requireAvailable()
+        return if (closed) null else continuationCache.exportBudget(state)
+    }
+
+    fun importEpochBudget(budget: LpEpochBudget): Boolean {
+        requireAvailable()
+        return !closed && !exactAttempted && continuationCache.importBudget(state, budget)
     }
 
     fun prepare(token: Cancellation = cancellation): Boolean {
@@ -165,6 +176,7 @@ internal class LpScopedSolver(
         refinementLimits: LpRefinementLimits = LpRefinementLimits(),
     ): CertifiedLpResult? {
         val attempt = solveFloat(warm, token) ?: return null
+        exactAttempted = true
         val certified = certifyLpResult(
             requireNotNull(state.toWorkingModel()),
             attempt.first,

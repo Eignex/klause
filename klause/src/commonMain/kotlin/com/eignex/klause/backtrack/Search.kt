@@ -131,22 +131,22 @@ private class CpSatisfactionTraversal(
         try {
             val completion = BacktrackCompletion.of(problem, cp, params, sink, solveContext)
             completion.lpResource?.let(lpResources::add)
+            val lp = if (params.lpConfig != null || params.lpRootTidy || params.lpEpochs) {
+                LpFeasibilityComponent(problem, cp, params, sink, solveContext).also(lpResources::add)
+            } else {
+                null
+            }
             val traversal = CpSatisfactionTraversalPolicy(
                 cp.session,
                 params,
                 sink,
                 seedDecisionLevels = params.assumptions.boolKeys.size + params.assumptions.intKeys.size,
+                lpEngine = lp?.engine,
             )
             val components = ArrayList<SearchComponent>()
             components += cp
             completion.addTo(components)
-            // Only an arm that asked for the relaxation pays for it; the engine itself then declines on a
-            // model with no LP-emittable structure.
-            if (params.lpConfig != null) {
-                val lp = LpFeasibilityComponent(problem, cp, params, sink, solveContext)
-                lpResources += lp
-                components += lp.component
-            }
+            lp?.let { components += it.component }
             components += params.componentFactory?.invoke().orEmpty()
             val session = SearchComponentSet(components, branchers = listOf(traversal.brancher)).session(
                 cancellation = params.cancellation,
@@ -178,6 +178,7 @@ private class CpSatisfactionTraversal(
                     return@sequence
                 }
             }
+            traversal.onRoot()
             val run = session.openRun(problem.numBoolVars, traversal)
             while (true) {
                 when (val event = run.next()) {
@@ -261,6 +262,7 @@ private class CpSatisfactionTraversalPolicy(
     private val params: BacktrackParams,
     sink: SolveStatsSink?,
     seedDecisionLevels: Int,
+    lpEngine: LpEngine?,
 ) : SearchTraversalPolicy,
     SearchRunLifecycle {
     private val restart = RestartSchedule.from(params)
@@ -284,7 +286,11 @@ private class CpSatisfactionTraversalPolicy(
     override val nodePolicy: SearchNodePolicy = SearchNodePolicy.ExpandAll
     override val lifecycle: SearchRunLifecycle get() = this
 
-    private val inprocessing = Inprocessing.from(params)
+    private val inprocessing = Inprocessing.from(params, lpEngine)
+
+    fun onRoot() {
+        inprocessing?.onRoot(session, params)
+    }
     private val pooledIncumbents = params.pooledIncumbents?.let { IncumbentSubscription(it) }
 
     override fun onRestart(context: SearchContext): SearchRunDisposition {
@@ -501,7 +507,7 @@ private class LpFeasibilityComponent(
     sink: SolveStatsSink?,
     solveContext: LpSolveContext,
 ) : LpSearchResource {
-    private val engine = LpEngine(
+    val engine = LpEngine(
         problem,
         LinearObjective(intCoefficients = LongArray(problem.numIntVars)),
         LpParams(

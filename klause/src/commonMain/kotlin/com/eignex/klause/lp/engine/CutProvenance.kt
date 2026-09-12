@@ -31,6 +31,7 @@ internal sealed interface CutPremise {
         val strict: Boolean = false,
     ) : CutPremise
     data class Integral(val expression: CutExpression) : CutPremise
+    data class Excluded(val source: CutSource, val value: BigFraction) : CutPremise
     data class Fixed(val source: CutSource, val value: BigFraction) : CutPremise
     data class ObjectiveCutoff(val expression: CutExpression, val upper: BigFraction) : CutPremise
     data class Literal(val literal: Int) : CutPremise
@@ -46,6 +47,59 @@ internal class CutRoundingRule(val divisor: Long, val mir: Boolean, val reductio
     val rows: List<CutWeightedRow> get() = snapshot.toList()
 }
 
+internal data class CutFixing(val lower: CutPremise.Bound, val upper: CutPremise.Bound)
+
+internal sealed interface CutLatticeResult {
+    data class RoundedBound(
+        val sourceUpper: Boolean,
+        val threshold: BigFraction,
+        val roundedThreshold: BigFraction,
+        val strict: Boolean,
+    ) : CutLatticeResult
+    data class InfeasibleEquality(val threshold: BigFraction) : CutLatticeResult
+}
+
+internal sealed interface CutRowTransform {
+    val input: CutPremise.Row
+    val conclusion: CutPremise.Row
+
+    class Algebraic(
+        override val input: CutPremise.Row,
+        override val conclusion: CutPremise.Row,
+        val multiplier: BigFraction,
+        val inputStrict: Boolean,
+        val outputStrict: Boolean,
+        fixings: List<CutFixing>,
+    ) : CutRowTransform {
+        private val fixingSnapshot = fixings.toList()
+        val fixings: List<CutFixing> get() = fixingSnapshot.toList()
+    }
+
+    data class Lattice(
+        override val input: CutPremise.Row,
+        override val conclusion: CutPremise.Row,
+        val integral: CutPremise.Integral,
+        val result: CutLatticeResult,
+    ) : CutRowTransform
+}
+
+internal class CutAuxiliaryDefinition(
+    role: List<Long>,
+    required: List<Long>,
+    val presentUpper: Long,
+    val integralExtension: Boolean,
+) {
+    private val roleSnapshot = role.toList()
+    private val requiredSnapshot = required.toList()
+    val role: List<Long> get() = roleSnapshot.toList()
+    val required: List<Long> get() = requiredSnapshot.toList()
+
+    override fun equals(other: Any?): Boolean = other is CutAuxiliaryDefinition &&
+        roleSnapshot == other.roleSnapshot && requiredSnapshot == other.requiredSnapshot &&
+        presentUpper == other.presentUpper && integralExtension == other.integralExtension
+    override fun hashCode(): Int = listOf(roleSnapshot, requiredSnapshot, presentUpper, integralExtension).hashCode()
+}
+
 internal class CutProvenance(
     val model: Any,
     val epoch: Long,
@@ -53,13 +107,19 @@ internal class CutProvenance(
     assumptions: Set<String> = emptySet(),
     rules: List<CutRoundingRule> = emptyList(),
     val conclusion: CutPremise.Row? = null,
+    transformations: List<CutRowTransform> = emptyList(),
+    auxiliaryDefinitions: Map<CutSource, CutAuxiliaryDefinition> = emptyMap(),
 ) {
     private val factSnapshot = facts.distinct().toList()
     private val assumptionSnapshot = assumptions.toSet()
     private val ruleSnapshot = rules.toList()
+    private val transformationSnapshot = transformations.toList()
+    private val auxiliarySnapshot = auxiliaryDefinitions.toMap()
     val facts: List<CutProofFact> get() = factSnapshot.toList()
     val assumptions: Set<String> get() = assumptionSnapshot.toSet()
     val rules: List<CutRoundingRule> get() = ruleSnapshot.toList()
+    val transformations: List<CutRowTransform> get() = transformationSnapshot.toList()
+    val auxiliaryDefinitions: Map<CutSource, CutAuxiliaryDefinition> get() = auxiliarySnapshot.toMap()
     val global: Boolean get() = assumptionSnapshot.isEmpty() && factSnapshot.all { it.global }
 }
 

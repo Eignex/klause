@@ -206,8 +206,17 @@ class LpEpochPassTest {
             )
             assertNotNull(cut.toCut(map).orNull())
             assertTrue(engine.cutPool.add(cut, map))
+            val donorCuts = engine.cutPool.cuts()
+            val mapped = engine.cutPool.mappedCuts(map)
+            assertEquals(donorCuts, engine.cutPool.cuts())
+            assertNotNull(mapped.single().orNull())
+            assertTrue(engine.rebuildEpoch(session, Cancellation.Never))
+            assertTrue(assertNotNull(engine.epochState).relaxation.tidyDerivation!!.sourceModel.m > 0)
+            assertEquals(donorCuts, engine.cutPool.cuts())
             val wider = engine.nodeRelaxation(assertNotNull(engine.lpRelaxer), PropagationSession(problem))
             assertNull(cut.toCut(assertNotNull(wider.sourceMap)).orNull())
+            assertTrue(engine.cutPool.cuts().isEmpty())
+            assertNotNull(engine.cutPool.mappedCuts(map).single().orNull())
             assertTrue(engine.cutPool.cuts().isEmpty())
         }
     }

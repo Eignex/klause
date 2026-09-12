@@ -55,7 +55,7 @@ internal object RelaxationTidy {
         }
 
         val rows = sourceRows(source)
-        substituteFixed(source, sources, rows, counts, config.cancellation)
+        substituteFixed(source, sources, rows, counts, config.cancellation, scope.searchRoot)
         if (config.cancellation()) return counts.declineResult(RelaxationTidyDecline.CANCELLED)
 
         val removed = ArrayList<RelaxationTidyRemovedRow>()
@@ -96,6 +96,7 @@ internal object RelaxationTidy {
             bounds,
             sources.columns,
             counts.stats(),
+            sources,
         )
         if (!derivation.validate() || config.cancellation()) {
             return counts.declineResult(
@@ -119,9 +120,10 @@ private class WorkingRow(
     var flippedRhs: Long,
     var relation: Relation,
     var strict: Boolean,
-    val global: Boolean,
-    val premises: LpRowPremises?,
+    var global: Boolean,
+    var premises: LpRowPremises?,
 ) {
+    val sourcePremises: LpRowPremises? = premises
     var sourceMultiplier: BigFraction = BigFraction.ONE
     val fixings = ArrayList<RelaxationTidyFixing>()
     var rounding: RelaxationTidyRounding? = null
@@ -175,6 +177,7 @@ private fun substituteFixed(
     rows: MutableList<WorkingRow>,
     counts: Counts,
     cancellation: Cancellation,
+    searchRoot: LpEpochRoot?,
 ) {
     for (row in rows) {
         if (cancellation()) return
@@ -196,8 +199,9 @@ private fun substituteFixed(
             val expression = sourceColumn.expression()
             val lower = CutPremise.Bound(expression, false, BigFraction.ofLong(value))
             val upper = CutPremise.Bound(expression, true, BigFraction.ofLong(value))
-            val allowed = sources.isGlobal(lower) && sources.isGlobal(upper)
-            if (!allowed) {
+            val global = sources.isGlobal(lower) && sources.isGlobal(upper)
+            val active = searchRoot?.admitsCurrent() == true && sources.isActive(lower) && sources.isActive(upper)
+            if (!global && !active) {
                 counts.recordDecline(RelaxationTidyDecline.UNSUPPORTED_SOURCE_MAP)
                 continue
             }
@@ -208,7 +212,7 @@ private fun substituteFixed(
                 overflow = true
                 break
             }
-            replacements.add(RelaxationTidyFixing(column, coefficient, value, lower, upper))
+            replacements.add(RelaxationTidyFixing(column, coefficient, value, lower, upper, global))
         }
         if (overflow) {
             counts.recordDecline(RelaxationTidyDecline.ARITHMETIC_OVERFLOW)
@@ -218,6 +222,10 @@ private fun substituteFixed(
         if (replacements.isNotEmpty()) {
             row.flippedRhs = flipped
             row.fixings.addAll(replacements)
+            if (replacements.any { !it.global }) {
+                row.global = false
+                row.premises = null
+            }
             repeat(replacements.size) { counts.applied(RelaxationTidyRule.FIXED_SUBSTITUTION) }
         }
     }
@@ -302,7 +310,12 @@ private fun canonicalizeSingletons(
             continue
         }
         val sourceColumn = sources.column(column)
-        if (sourceColumn == null || sourceColumn.source.kind !in setOf(CutSourceKind.INTEGER, CutSourceKind.BOOLEAN)) {
+        if (sourceColumn == null || !sources.isGlobal(
+            CutPremise.Integral(
+                CutExpression(mapOf(sourceColumn.source to BigFraction.ONE)),
+            )
+        )
+        ) {
             counts.recordDecline(RelaxationTidyDecline.UNSUPPORTED_COLUMN)
             continue
         }
@@ -470,7 +483,7 @@ private fun tidyBound(
     rounded: Boolean = false,
 ): RelaxationTidyBound {
     val premises = buildSet<CutPremise> {
-        row.premises?.let { premise ->
+        row.sourcePremises?.let { premise ->
             for (i in premise.vars.indices) {
                 val source = CutSource(CutSourceKind.INTEGER, premise.vars[i])
                 val expression = CutExpression(mapOf(source to BigFraction.ONE))

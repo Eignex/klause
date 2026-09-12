@@ -74,7 +74,7 @@ class LinearRowLpProjectionTest {
         override fun rootDomain(intVar: Int): IntDomain = IntDomain(0, 10)
         override fun statesLowerBound(intVar: Int): Boolean = !openLo
         override fun statesUpperBound(intVar: Int): Boolean = !openHi
-        override fun auxColumn(lo: Long, hi: Long, presence: LongArray?): Int = 300
+        override fun auxColumn(lo: Long, hi: Long, presence: LongArray?, definition: LpAuxiliaryColumn?): Int = 300
         override fun hullEnabled(): Boolean = true
         override fun boolRow(
             literals: IntArray,

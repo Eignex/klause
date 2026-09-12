@@ -13,28 +13,99 @@ import com.eignex.klause.simplex.exact.ExactContinuationLimits
 import com.eignex.klause.simplex.exact.ExactContinuationMetrics
 import com.eignex.klause.util.Cancellation
 
+internal data class LpEpochBudget(
+    val authority: ExactLpModel,
+    val work: Long,
+    val allocation: Long,
+    val timeNs: Long,
+    val pivots: Int,
+    val importPivots: Int,
+    val scalarPeak: Int,
+) {
+    init {
+        require(work >= 0L && allocation >= 0L && timeNs >= 0L && pivots >= 0 && importPivots >= 0 && scalarPeak >= 0)
+    }
+}
+
 internal class LpExactContinuationCache {
     internal var state: LpExactState? = null
     internal var key: ByteArray? = null
     internal var headings: List<Int>? = null
     internal var statuses: List<VarStatus>? = null
     internal var continuation: ExactContinuation? = null
-
+    private var epochAuthority: ExactLpModel? = null
+    private var carriedPivots = 0
+    private var carriedImports = 0
+    private var carriedScalarPeak = 0
     private var inputWork = 0L
     private var inputAllocation = 0L
     private var inputTimeNs = 0L
     val usedWork get() = continuation?.usedWork ?: inputWork
     val usedAllocation get() = continuation?.usedAllocation ?: inputAllocation
     val usedTimeNs get() = continuation?.usedTimeNs ?: inputTimeNs
+    val usedPivots get() = addCount(carriedPivots, continuation?.usedPivots ?: 0)
+    val usedImportPivots get() = addCount(carriedImports, continuation?.usedImportPivots ?: 0)
+    val scalarPeak get() = maxOf(carriedScalarPeak, continuation?.normalizedScalarPeak ?: 0)
+
+    fun exportBudget(current: LpExactState): LpEpochBudget? {
+        if (state !== current && epochAuthority?.sameAuthority(current.model) != true) return null
+        return LpEpochBudget(
+            current.model,
+            usedWork,
+            usedAllocation,
+            usedTimeNs,
+            usedPivots,
+            usedImportPivots,
+            scalarPeak,
+        )
+    }
+
+    fun importBudget(current: LpExactState, budget: LpEpochBudget): Boolean {
+        if (state != null || key != null || headings != null || continuation != null || epochAuthority != null ||
+            usedWork != 0L || usedAllocation != 0L || usedTimeNs != 0L ||
+            !current.model.sameAuthority(budget.authority)
+        ) {
+                return false
+            }
+        epochAuthority = budget.authority
+        inputWork = budget.work
+        inputAllocation = budget.allocation
+        inputTimeNs = budget.timeNs
+        carriedPivots = budget.pivots
+        carriedImports = budget.importPivots
+        carriedScalarPeak = budget.scalarPeak
+        return true
+    }
+
+    fun retainsBudget(current: LpExactState?): Boolean =
+        current != null && epochAuthority?.sameAuthority(current.model) == true
+
+    fun discardLane() {
+        inputWork = usedWork
+        inputAllocation = usedAllocation
+        inputTimeNs = usedTimeNs
+        carriedPivots = usedPivots
+        carriedImports = usedImportPivots
+        carriedScalarPeak = scalarPeak
+        continuation = null
+        headings = null
+        statuses = null
+    }
+
+    fun limits(limits: ExactContinuationLimits): ExactContinuationLimits = limits.copy(
+        maxPivots = (limits.maxPivots - carriedPivots).coerceAtLeast(0),
+        maxImportPivots = (limits.maxImportPivots - carriedImports).coerceAtLeast(0),
+    )
 
     fun accountInput(work: Long, allocation: Long, timeNs: Long) {
+        require(work >= 0L && allocation >= 0L && timeNs >= 0L)
         continuation?.let {
             it.account(work, allocation, timeNs)
             return
         }
-        inputWork += work
-        inputAllocation += allocation
-        inputTimeNs += timeNs
+        inputWork = addCost(inputWork, work)
+        inputAllocation = addCost(inputAllocation, allocation)
+        inputTimeNs = addCost(inputTimeNs, timeNs)
     }
 
     fun initialize(input: ExactContinuationInput): ExactContinuation = continuation ?: ExactContinuation(input).also {
@@ -46,12 +117,21 @@ internal class LpExactContinuationCache {
         inputWork = 0L
         inputAllocation = 0L
         inputTimeNs = 0L
+        carriedPivots = 0
+        carriedImports = 0
+        carriedScalarPeak = 0
+        epochAuthority = null
         state = null
         key = null
         headings = null
         statuses = null
         continuation = null
     }
+
+    private fun addCost(left: Long, right: Long): Long =
+        if (left > Long.MAX_VALUE - right) Long.MAX_VALUE else left + right
+
+    private fun addCount(left: Int, right: Int): Int = if (left > Int.MAX_VALUE - right) Int.MAX_VALUE else left + right
 }
 
 internal class LpContinuationTarget(val basis: Basis?, val metrics: ExactContinuationMetrics)
@@ -139,10 +219,13 @@ internal fun continueExactLp(
         captureNs = capture.elapsedNs
         session.account(capture.work, capture.allocation, captureNs)
         captureCharged = true
-        var result = session.resume(limits.copy(maxPivots = minOf(shortPivots, limits.maxPivots)), cancellation)
+        var result = session.resume(
+            cache.limits(limits.copy(maxPivots = minOf(shortPivots, limits.maxPivots))),
+            cancellation,
+        )
         metrics = result.metrics
         if (fullEffort && result.metrics.decline == ContinuationDecline.PIVOTS && limits.maxPivots > shortPivots) {
-            val next = session.resume(limits, cancellation)
+            val next = session.resume(cache.limits(limits), cancellation)
             metrics = combineContinuationMetrics(metrics, next.metrics)
             result = next
         }
@@ -329,12 +412,13 @@ private fun selectContinuation(
         budget.step()
         if (!matching) {
             invalidated = cache.headings != null
-            cache.clear()
+            if (cache.retainsBudget(model.exactState)) cache.discardLane() else cache.clear()
             cache.state = model.exactState
             cache.key = key
             cache.headings = headings
             cache.statuses = statuses
         }
+        if (cache.scalarPeak > limits.maxBits) throw ContinuationStop(ContinuationDecline.BITS)
     } catch (stop: ContinuationStop) {
         decline = stop.reason
     }
