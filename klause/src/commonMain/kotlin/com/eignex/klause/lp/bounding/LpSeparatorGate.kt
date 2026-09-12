@@ -53,7 +53,8 @@ internal class LpSeparatorGate(
             probing[i] = false
             return true
         }
-        sinceProbe[i]++
+        if (reprobeDelay[i] == Int.MAX_VALUE) return false
+        if (sinceProbe[i] < Int.MAX_VALUE) sinceProbe[i]++
         if (sinceProbe[i] >= reprobeDelay[i]) {
             probing[i] = true
             return true
@@ -75,7 +76,12 @@ internal class LpSeparatorGate(
                 windowProductive[i] = 0
                 reprobeDelay[i] = reprobeBase
             } else {
-                reprobeDelay[i] = minOf(reprobeDelay[i] * 2, reprobeMax)
+                val current = reprobeDelay[i]
+                reprobeDelay[i] = if (current >= reprobeMax || current > reprobeMax / 2) {
+                    reprobeMax
+                } else {
+                    current * 2
+                }
             }
             return
         }

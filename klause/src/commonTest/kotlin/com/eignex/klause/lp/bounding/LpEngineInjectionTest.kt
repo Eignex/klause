@@ -7,9 +7,12 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.OpenIntBounds
+import com.eignex.klause.lp.engine.Basis
 import com.eignex.klause.lp.engine.EngineConstruction
 import com.eignex.klause.lp.engine.LpCertificationPolicy
 import com.eignex.klause.lp.engine.LpSolveContext
+import com.eignex.klause.lp.engine.LpSolveMetrics
+import com.eignex.klause.lp.engine.LpSolver
 import com.eignex.klause.lp.engine.LpZeroObjectivePricing
 import com.eignex.klause.lp.engine.RecordingLpEngineFactory
 import com.eignex.klause.lp.tightenOpenIntBounds
@@ -35,6 +38,20 @@ class LpEngineInjectionTest {
             Linear(intArrayOf(1, 1), intArrayOf(1, 2), LinearOp.GE, 1),
             Linear(intArrayOf(1, 1), intArrayOf(0, 2), LinearOp.GE, 1),
         ),
+    )
+
+    private fun metricSolver(workOps: Long = 0L): LpSolver = object : LpSolver {
+        override val infeasibleRay: DoubleArray? = null
+        override val lastWorkOps: Long = workOps
+        override fun solve(warm: Basis?) = null
+        override fun solvePrimal(warm: Basis?) = null
+    }
+
+    private fun accountingEngine(backend: String): LpEngine = LpEngine(
+        Problem(numBoolVars = 0, numIntVars = 0, intDomains = emptyArray(), factors = emptyArray()),
+        LinearObjective(),
+        LpParams(),
+        SolveStatsSink(backend = backend),
     )
 
     @Test
@@ -100,6 +117,29 @@ class LpEngineInjectionTest {
         val construction = factory.calls.single { it.kind == EngineConstruction.TABLEAU }
         assertEquals(LpZeroObjectivePricing.LARGEST_PIVOT, construction.zeroObjectivePricing)
         assertEquals(37L, construction.tieSeed)
+    }
+
+    @Test
+    fun `root work is cumulative without entering the node charge`() {
+        val engine = accountingEngine("root-work")
+
+        engine.observeRootSolve(metricSolver(13L))
+
+        assertEquals(13L, engine.totalSolveWork())
+        assertEquals(0L, engine.pendingNodeSolveWork())
+        assertTrue(engine.workSpentExceeds(13L))
+    }
+
+    @Test
+    fun `root work uses supplied metrics and saturates`() {
+        val engine = accountingEngine("root-work-override")
+        val solver = metricSolver(1L)
+
+        engine.observeRootSolve(solver, LpSolveMetrics(workOps = Long.MAX_VALUE - 3L))
+        engine.observeRootSolve(solver, LpSolveMetrics(workOps = 7L))
+
+        assertEquals(Long.MAX_VALUE, engine.totalSolveWork())
+        assertEquals(0L, engine.pendingNodeSolveWork())
     }
 
     @Test

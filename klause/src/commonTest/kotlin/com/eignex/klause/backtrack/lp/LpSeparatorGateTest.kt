@@ -80,4 +80,18 @@ class LpSeparatorGateTest {
         assertFalse(gate.isEnabled(0))
         repeat(10_000) { assertFalse(gate.shouldRun(0), "an irreversible disable never re-probes") }
     }
+
+    @Test
+    fun `reprobe delay saturates at a non power of two ceiling`() {
+        val gate = LpSeparatorGate(count = 1, warmup = 1, window = 1, reprobeBase = 2, reprobeMax = 3)
+        gate.shouldRun(0)
+        gate.record(0, productive = false)
+
+        assertFalse(gate.shouldRun(0))
+        assertTrue(gate.shouldRun(0))
+        gate.record(0, productive = false)
+
+        repeat(2) { assertFalse(gate.shouldRun(0)) }
+        assertTrue(gate.shouldRun(0), "failed probes stop growing at the configured ceiling")
+    }
 }

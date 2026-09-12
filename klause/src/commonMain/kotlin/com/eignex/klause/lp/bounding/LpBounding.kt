@@ -1081,10 +1081,12 @@ internal fun LpEngine.harvestRootCuts(
                 observeRootSolve(simplex)
             }
             var result = initial ?: return emptyList()
+            var resultObserved = false
             var round = 0
             while (round++ < CUT_POOL_ROUNDS && !cancellation()) {
                 relaxation.sourceMap?.withCpBounds(relaxation.model, session)?.let(pool::remap)
                 pool.observe(result.primal)
+                resultObserved = true
                 val ctx = CutContext(problem, relaxation, result.primal, session)
                 // Structural separators read the LP point and factor structure (not the constraint rows), so a
                 // cut they separate over the undecided root is valid at every solution — force it global.
@@ -1127,9 +1129,11 @@ internal fun LpEngine.harvestRootCuts(
                 }
                 if (next == null) break
                 result = next
+                resultObserved = false
             }
             // Bound the pool the search nodes inherit by per-cut activity (tightness at the final LP point):
             // a large harvest is trimmed to the most-active cuts, the rest evicted (sound — all global).
+            if (!resultObserved) pool.observe(result.primal)
             pool.retainMostActive()
         } catch (failure: Throwable) {
             primaryFailure = failure
