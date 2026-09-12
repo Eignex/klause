@@ -30,6 +30,8 @@ internal class CutPool(
         var inactiveCount: Int = 0,
     )
 
+    private data class ScoredCut(val cut: Cut, val norm: Double, val score: Double)
+
     /** Number of pooled cuts. */
     val size: Int get() = entries.size
 
@@ -182,40 +184,44 @@ internal class CutPool(
         minOrthogonality: Double = MIN_ORTHOGONALITY,
     ): List<Cut> {
         if (max <= 0) return emptyList()
+        val objectiveNorm = l2(objective)
         val scored = entries.mapNotNull { entry ->
             val cut = entry.cut ?: return@mapNotNull null
-            val efficacy = efficacy(cut, primal)
+            val norm = l2(cut)
+            val efficacy = efficacy(cut, primal, norm)
             if (efficacy < minEfficacy) {
                 null
             } else {
-                cut to (efficacy + objectiveParallelism(cut, objective))
+                ScoredCut(cut, norm, efficacy + objectiveParallelism(cut, objective, norm, objectiveNorm))
             }
-        }.sortedByDescending { it.second }
-        val selected = ArrayList<Cut>()
+        }.sortedByDescending { it.score }
+        val selected = ArrayList<ScoredCut>()
         val maxCos = 1.0 - minOrthogonality
-        for ((cut, _) in scored) {
+        for (candidate in scored) {
             if (selected.size >= max) break
-            if (selected.none { cosine(it, cut) > maxCos }) selected.add(cut)
+            if (selected.none { cosine(it, candidate) > maxCos }) selected.add(candidate)
         }
-        return selected
+        return selected.map { it.cut }
     }
 
-    private fun objectiveParallelism(cut: Cut, objective: DoubleArray): Double {
-        val cutNorm = l2(cut)
-        var objectiveNormSquared = 0.0
-        for (coefficient in objective) objectiveNormSquared += coefficient * coefficient
-        if (cutNorm == 0.0 || objectiveNormSquared == 0.0) return 0.0
+    private fun objectiveParallelism(
+        cut: Cut,
+        objective: DoubleArray,
+        cutNorm: Double,
+        objectiveNorm: Double,
+    ): Double {
+        if (cutNorm == 0.0 || objectiveNorm == 0.0 || !cutNorm.isFinite() || !objectiveNorm.isFinite()) return 0.0
         var dot = 0.0
         for (k in cut.cols.indices) {
             val col = cut.cols[k]
             if (col in objective.indices) dot += cut.coeffs[k].toDouble() * objective[col]
         }
-        return abs(dot) / (cutNorm * sqrt(objectiveNormSquared))
+        return abs(dot) / (cutNorm * objectiveNorm)
     }
 
     /** Normalised violation of [cut] at [primal] — `violation / ‖coeffs‖₂`, `0` when satisfied. The
      *  violation is how far the point sits on the infeasible side of the inequality. */
-    private fun efficacy(cut: Cut, primal: DoubleArray): Double {
+    private fun efficacy(cut: Cut, primal: DoubleArray, norm: Double): Double {
         var lhs = 0.0
         for (k in cut.cols.indices) {
             val col = cut.cols[k]
@@ -231,7 +237,6 @@ internal class CutPool(
             Relation.EQ -> abs(lhs - cut.rhs)
         }
         if (violation <= 0.0) return 0.0
-        val norm = l2(cut)
         return if (norm > 0.0) violation / norm else 0.0
     }
 
@@ -242,21 +247,27 @@ internal class CutPool(
         return sqrt(s)
     }
 
+    private fun l2(values: DoubleArray): Double {
+        var s = 0.0
+        for (value in values) s += value * value
+        return sqrt(s)
+    }
+
     /** Cosine similarity of two cuts' coefficient vectors over their shared columns (`0` when disjoint,
      *  `1` when parallel). Used to keep the selected set near-orthogonal. */
-    private fun cosine(a: Cut, b: Cut): Double {
-        val na = l2(a)
-        val nb = l2(b)
+    private fun cosine(a: ScoredCut, b: ScoredCut): Double {
+        val na = a.norm
+        val nb = b.norm
         if (na == 0.0 || nb == 0.0) return 0.0
         // Map b's columns for an O(|a|) shared-support dot product.
         val bIndex = cosineIndex
         bIndex.clear()
-        for (k in b.cols.indices) bIndex.put(b.cols[k], b.coeffs[k])
+        for (k in b.cut.cols.indices) bIndex.put(b.cut.cols[k], b.cut.coeffs[k])
         var dot = 0.0
-        for (k in a.cols.indices) {
-            if (!bIndex.containsKey(a.cols[k])) continue
-            val bc = bIndex.getOrDefault(a.cols[k], 0L)
-            dot += a.coeffs[k].toDouble() * bc.toDouble()
+        for (k in a.cut.cols.indices) {
+            if (!bIndex.containsKey(a.cut.cols[k])) continue
+            val bc = bIndex.getOrDefault(a.cut.cols[k], 0L)
+            dot += a.cut.coeffs[k].toDouble() * bc.toDouble()
         }
         return abs(dot) / (na * nb)
     }

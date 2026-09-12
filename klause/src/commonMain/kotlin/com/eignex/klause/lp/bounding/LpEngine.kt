@@ -153,6 +153,7 @@ internal class LpEngine(
         metrics: com.eignex.klause.lp.engine.LpSolveMetrics = solver.lastMetrics,
     ) {
         sink.lp.observeEngineCost(LpRoute.ROOT, metrics)
+        totalSolveOps = saturatingAdd(totalSolveOps, metrics.workOps)
     }
 
     internal fun rootCertificationObserver() = sink.lp.certificationObserver(LpRoute.ROOT)
@@ -389,6 +390,8 @@ internal class LpEngine(
 
     /** Deterministic cumulative LP work, for policies that compare snapshots without mutating it. */
     internal fun totalSolveWork(): Long = totalSolveOps
+
+    internal fun pendingNodeSolveWork(): Long = pendingSolveOps
 
     private fun saturatingAdd(a: Long, b: Long): Long = if (b > 0L && a > Long.MAX_VALUE - b) Long.MAX_VALUE else a + b
 

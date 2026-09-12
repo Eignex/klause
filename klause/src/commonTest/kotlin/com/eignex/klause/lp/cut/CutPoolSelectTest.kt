@@ -85,4 +85,45 @@ class CutPoolSelectTest {
         pool.add(cut(Relation.LE, 10, 0 to 1L)) // x0=1 satisfies it with slack
         assertTrue(pool.select(doubleArrayOf(1.0), doubleArrayOf(0.0), max = 10).isEmpty())
     }
+
+    @Test
+    fun `select treats antiparallel normals as the same direction`() {
+        val pool = CutPool()
+        val positive = cut(Relation.GE, 2, 0 to 1L)
+        val negative = cut(Relation.GE, 2, 0 to -1L)
+        pool.add(positive)
+        pool.add(negative)
+
+        val selected = pool.select(doubleArrayOf(0.0), doubleArrayOf(0.0), max = 2)
+
+        assertEquals(1, selected.size)
+        assertTrue(selected.single() === positive, "stable ties keep the first antiparallel normal")
+    }
+
+    @Test
+    fun `objective scaling does not change selection`() {
+        val pool = CutPool()
+        val orthogonal = cut(Relation.GE, 1, 0 to 1L)
+        val parallel = cut(Relation.GE, 1, 1 to 1L)
+        pool.add(orthogonal)
+        pool.add(parallel)
+
+        val unit = pool.select(DoubleArray(2), doubleArrayOf(0.0, 1.0), max = 1)
+        val scaled = pool.select(DoubleArray(2), doubleArrayOf(0.0, 1_000_000.0), max = 1)
+
+        assertTrue(unit.single() === parallel)
+        assertTrue(scaled.single() === parallel)
+    }
+
+    @Test
+    fun `overflowed objective norm falls back to efficacy ordering`() {
+        val pool = CutPool()
+        val first = cut(Relation.GE, 2, 0 to 1L)
+        pool.add(first)
+        pool.add(cut(Relation.GE, 1, 1 to 1L))
+
+        val selected = pool.select(DoubleArray(2), doubleArrayOf(Double.MAX_VALUE, Double.MAX_VALUE), max = 1)
+
+        assertTrue(selected.single() === first)
+    }
 }
