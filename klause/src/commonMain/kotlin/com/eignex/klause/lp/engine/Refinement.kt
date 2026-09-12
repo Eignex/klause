@@ -627,11 +627,15 @@ private class RefinementRun(
     ) {
         if (duals.size != a.source.m) meter.stop(LpRefinementDecline.CANDIDATE)
         val pointUsesBasis = output.point != null && output.pointUsesBasis
-        var x = output.point?.let { a.fullPoint(it.primal) } ?: a.seed(primal, proposed)
+        val knownPoint = output.point?.let { a.fullPoint(it.primal) }
+        var x = knownPoint ?: a.seed(primal, proposed)
         var y = duals.map { meter.number(BigFraction.ofDouble(it) ?: meter.stop(LpRefinementDecline.PROJECTION)) }
         var basis = proposed?.takeIf(a::validBasis)
         output.basis = basis
-        output.accept(check(a, a.sourcePoint(x), y, basis, reconstructInitial), pointBasis = pointUsesBasis)
+        output.accept(
+            check(a, if (knownPoint == null) a.sourcePoint(x) else null, y, basis, reconstructInitial),
+            pointBasis = pointUsesBasis,
+        )
         output.dual = y
         output.dualUsesBasis = false
         if (output.attained || output.conflict != null || meter.limits.maxRounds == 0) return
@@ -671,7 +675,9 @@ private class RefinementRun(
                     stalls = 0
                 }
                 val reconstruct = round >= nextReconstruction
-                output.accept(check(a, a.sourcePoint(x), y, basis, reconstruct), pointBasis = pointUsesBasis)
+                if (knownPoint != null) meter.charge(x.size.toLong())
+                val primalCandidate = if (x == knownPoint) null else a.sourcePoint(x)
+                output.accept(check(a, primalCandidate, y, basis, reconstruct), pointBasis = pointUsesBasis)
                 if (reconstruct) nextReconstruction = nextReconstructionRound(round)
                 if (output.attained || output.conflict != null) break
                 if (stalls >= 2) {

@@ -14,7 +14,7 @@ import kotlin.test.assertTrue
 
 class RefinementLifecycleTest {
     @Test
-    fun `a declined refinement attempt does not repeat exact point certification`() {
+    fun `production source basis attainment avoids a redundant exact point attempt`() {
         val builder = LpBuilder()
         val x = builder.addRealVar(0.0, 2.0, cost = 1.0)
         builder.addRealRow(intArrayOf(x), doubleArrayOf(3.0), Relation.EQ, 1.0)
@@ -46,11 +46,58 @@ class RefinementLifecycleTest {
                 solver,
                 hint,
                 observer = observer,
-                refinement = LpRefinementRequest(owner, owner.refinementCache, LpRefinementLimits(maxWork = 0L)),
+                refinement = LpRefinementRequest(owner, owner.refinementCache, LpRefinementLimits()),
             )
 
-            assertEquals(LpRefinementDecline.WORK, assertNotNull(result.refinement).decline)
-            assertEquals(1, pointChecks)
+            assertEquals(LpVerdict.ATTAINED_OPTIMUM, result.verdict)
+            assertEquals(0, pointChecks)
+            assertEquals(0, assertNotNull(result.refinement).rounds)
+        }
+    }
+
+    @Test
+    fun `a declined refinement attempt does not repeat exact point certification`() {
+        for (rows in listOf(1, 129)) {
+            val builder = LpBuilder()
+            val x = builder.addRealVar(0.0, 2.0, cost = 1.0)
+            repeat(rows) { builder.addRealRow(intArrayOf(x), doubleArrayOf(3.0), Relation.EQ, 1.0) }
+            val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).trailModel()))
+            val hint = FloatLpResult(
+                Basis(
+                    IntArray(rows) { if (it == 0) 0 else it + 1 },
+                    Array(rows + 1) { if (it == 1) VarStatus.FIXED else VarStatus.BASIC },
+                ),
+                0.25,
+                duals = DoubleArray(rows),
+                primal = doubleArrayOf(0.25),
+                exactState = state,
+            )
+            val solver = object : LpSolver {
+                override val solvedExactState = state
+                override val infeasibleRay: DoubleArray? = null
+                override fun solve(warm: Basis?) = hint
+                override fun solvePrimal(warm: Basis?) = hint
+            }
+            var pointChecks = 0
+            val observer = object : LpCertificationObserver {
+                override fun observe(certifier: LpCertifier, success: Boolean) {
+                    if (certifier == LpCertifier.EXACT_POINT) pointChecks++
+                }
+                override fun observeExactInput(accepted: Boolean) = Unit
+                override fun observeSolve(metrics: LpSolveMetrics, component: Boolean) = Unit
+            }
+            LpScopedSolver(state).use { owner ->
+                val result = certifyLpResult(
+                    assertNotNull(state.toWorkingModel()),
+                    solver,
+                    hint,
+                    observer = observer,
+                    refinement = LpRefinementRequest(owner, owner.refinementCache, LpRefinementLimits(maxWork = 0L)),
+                )
+
+                assertEquals(LpRefinementDecline.WORK, assertNotNull(result.refinement).decline)
+                assertEquals(1, pointChecks)
+            }
         }
     }
 

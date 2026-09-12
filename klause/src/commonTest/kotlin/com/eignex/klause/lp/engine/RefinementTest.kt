@@ -13,6 +13,30 @@ import kotlin.test.assertTrue
 
 class RefinementTest {
     @Test
+    fun `an unchanged checked point can gain a certified objective bound`() {
+        val builder = LpBuilder()
+        val x = builder.addRealVar(0.0, 2.0, cost = 1.0)
+        builder.addRealRow(intArrayOf(x), doubleArrayOf(3.0), Relation.EQ, 1.0)
+        val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).trailModel()))
+        val third = BigFraction.of(BigInteger.ONE, BigInteger.fromInt(3))
+        LpScopedSolver(state).use { owner ->
+            val result = refineLp(
+                assertNotNull(state.toWorkingModel()),
+                LpRefinementRequest(owner, owner.refinementCache, LpRefinementLimits(maxRounds = 1)),
+                doubleArrayOf(0.5),
+                doubleArrayOf(0.0),
+                Basis(intArrayOf(0), arrayOf(VarStatus.BASIC, VarStatus.FIXED)),
+                witness = ExactLpWitness(listOf(third), third),
+            )
+
+            assertEquals(listOf(third), assertNotNull(result.witness).primal)
+            assertEquals(third, assertNotNull(result.bound).value)
+            assertEquals(1, result.metrics.rounds)
+            assertNull(result.conflict)
+        }
+    }
+
+    @Test
     fun `residual correction reaches a fractional optimum including logical cost`() {
         val zero = ExactLpNumber.of(0L)
         val one = ExactLpNumber.of(1L)

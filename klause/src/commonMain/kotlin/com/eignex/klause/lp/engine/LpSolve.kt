@@ -1,5 +1,6 @@
 package com.eignex.klause.lp.engine
 
+import com.eignex.klause.simplex.basis.RationalBasisLimits
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.BigRationalConflict
 import com.eignex.klause.simplex.exact.ContinuationDecline
@@ -383,7 +384,7 @@ internal fun certifyLpResult(
         numericalWitness = witness ?: numericalWitness
     }
     if (result != null && numericalWitness == null && refinement != null &&
-        policy === ProductionLpCertificationPolicy && !cancellation()
+        model.m > RationalBasisLimits().dimension && policy === ProductionLpCertificationPolicy && !cancellation()
     ) {
         pointAttempted = true
         val point = exactPointWitness(model, result.primal, observer)
