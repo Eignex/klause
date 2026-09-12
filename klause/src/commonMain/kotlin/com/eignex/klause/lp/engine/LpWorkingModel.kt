@@ -51,10 +51,12 @@ internal data class LpWorkingMetrics(
 }
 
 internal class LpWorkingScope internal constructor(
-    val model: LpWorkingModel,
+    model: LpWorkingModel,
     private val owner: LpScopedSolver,
     private val cancellation: Cancellation,
 ) {
+    var model: LpWorkingModel = model
+        private set
     private var closed = false
     private var attempts = 0L
     private var solves = LpSolveMetrics()
@@ -75,6 +77,32 @@ internal class LpWorkingScope internal constructor(
         continuationAllocation,
         children.toList(),
     )
+
+    @Suppress("TooGenericExceptionCaught") // Failed adoption must retire the child for every exception type.
+    fun replaceState(next: LpWorkingModel): Boolean {
+        check(!closed) { "working scope is closed" }
+        owner.requireAvailable()
+        require(next.source === model.source) { "working revision belongs to another source" }
+        return try {
+            if (!owner.resetRoot(next.state, cancellation)) return false
+            model = next
+            true
+        } catch (primary: Throwable) {
+            close(primary)
+            throw primary
+        }
+    }
+
+    fun solveFloat(warm: Basis? = null, allowance: LpFloatAllowance? = null): Pair<LpSolver, FloatLpResult?>? {
+        check(!closed) { "working scope is closed" }
+        owner.requireAvailable()
+        attempts++
+        return try {
+            owner.solveFloat(warm, cancellation, allowance)
+        } finally {
+            solves += owner.lastMetrics
+        }
+    }
 
     fun solve(
         warm: Basis? = null,
@@ -124,12 +152,16 @@ internal class LpWorkingScope internal constructor(
         }
     }
 
-    fun <T> withWorkingModel(next: LpWorkingModel, block: (LpWorkingScope) -> T): T {
+    fun <T> withWorkingModel(
+        next: LpWorkingModel,
+        allowance: LpFloatAllowance? = null,
+        block: (LpWorkingScope) -> T,
+    ): T {
         check(!closed) { "working scope is closed" }
         owner.requireAvailable()
         require(next.source === state) { "nested working model belongs to another authority" }
         return try {
-            owner.withWorkingModel(next, cancellation, block)
+            owner.withWorkingModel(next, cancellation, allowance, block)
         } finally {
             owner.lastWorkingMetrics?.let(children::add)
         }

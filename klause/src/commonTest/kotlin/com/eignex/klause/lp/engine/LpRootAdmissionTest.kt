@@ -220,7 +220,13 @@ class LpRootAdmissionTest {
                 assertEquals(500L, workLimit)
                 assertEquals(7, iterationLimit)
                 val delegate = ProductionLpEngineFactory.newPersistentSolver(
-                    model, cancellation, refactorUpdateLimit, iterationLimit, workLimit, trackDegeneracy, pricing,
+                    model,
+                    cancellation,
+                    refactorUpdateLimit,
+                    iterationLimit,
+                    workLimit,
+                    trackDegeneracy,
+                    pricing,
                 )
                 return object : PersistentLpSolver by delegate {
                     override fun resolveBounds(allowance: LpFloatAllowance?): FloatLpResult? {
@@ -269,7 +275,13 @@ class LpRootAdmissionTest {
                     pricing: LpPricingOptions,
                 ): PersistentLpSolver {
                     val delegate = ProductionLpEngineFactory.newPersistentSolver(
-                        model, cancellation, refactorUpdateLimit, iterationLimit, workLimit, trackDegeneracy, pricing,
+                        model,
+                        cancellation,
+                        refactorUpdateLimit,
+                        iterationLimit,
+                        workLimit,
+                        trackDegeneracy,
+                        pricing,
                     )
                     return object : PersistentLpSolver by delegate {
                         override fun prepareLogicals(token: Cancellation): Basis? =
@@ -292,9 +304,12 @@ class LpRootAdmissionTest {
                 assertTrue(owner.install(model, source.model, LpRootAdmission(model, 1001L, 7)))
 
                 if (failCleanup) {
-                    assertSame(cleanup, assertFailsWith<IllegalStateException> {
-                        owner.solveFloat(token = Cancellation { cancelled })
-                    })
+                    assertSame(
+                        cleanup,
+                        assertFailsWith<IllegalStateException> {
+                            owner.solveFloat(token = Cancellation { cancelled })
+                        },
+                    )
                 } else {
                     assertNull(owner.solveFloat(token = Cancellation { cancelled }))
                 }
@@ -328,5 +343,4 @@ class LpRootAdmissionTest {
             assertFalse(owner.install(model, source.model, receipt))
         }
     }
-
 }

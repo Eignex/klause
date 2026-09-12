@@ -75,9 +75,12 @@ class LpFloatAllowanceTest {
                 stopped = true
 
                 if (throws) {
-                    assertSame(failure, assertFailsWith<IllegalStateException> {
-                        solver.resolveBounds(LpFloatAllowance(0L, 0))
-                    })
+                    assertSame(
+                        failure,
+                        assertFailsWith<IllegalStateException> {
+                            solver.resolveBounds(LpFloatAllowance(0L, 0))
+                        },
+                    )
                 } else {
                     assertNull(solver.resolveBounds(LpFloatAllowance(0L, 0)))
                 }
@@ -115,8 +118,10 @@ class LpFloatAllowanceTest {
         val source = assertNotNull(builder.build(Sense.MINIMIZE).trailModel())
         val initial = LpExactState(source)
         val changed = ExactLpModel(
-            List(4) { source.entries(it) }, List(4) { ExactLpNumber.of(-1L) },
-            List(8) { source.column(it) }, List(4) { source.row(it) },
+            List(4) { source.entries(it) },
+            List(4) { ExactLpNumber.of(-1L) },
+            List(8) { source.column(it) },
+            List(4) { source.row(it) },
             ExactLpObjective(List(8) { ExactLpNumber.of(if (it < 4) -1L else 0L) }),
         )
         RevisedSimplex(assertNotNull(initial.toWorkingModel())).use { solver ->
@@ -132,5 +137,4 @@ class LpFloatAllowanceTest {
             assertEquals(-16.0, completed.objective)
         }
     }
-
 }

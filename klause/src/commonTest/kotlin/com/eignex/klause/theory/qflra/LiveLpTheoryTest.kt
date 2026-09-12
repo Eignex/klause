@@ -1,6 +1,5 @@
 package com.eignex.klause.theory.qflra
 
-import com.eignex.klause.lp.engine.LpFloatAllowance
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
@@ -17,6 +16,7 @@ import com.eignex.klause.ir.Term
 import com.eignex.klause.lp.engine.FloatLpResult
 import com.eignex.klause.lp.engine.LpCertificationPolicy
 import com.eignex.klause.lp.engine.LpEngineFactory
+import com.eignex.klause.lp.engine.LpFloatAllowance
 import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.LpPricingOptions
 import com.eignex.klause.lp.engine.LpSolveContext
@@ -708,7 +708,9 @@ class LiveLpTheoryTest {
                     pricing,
                 )
                 return object : PersistentLpSolver by delegate {
-                    override fun resolveBounds(allowance: LpFloatAllowance?): FloatLpResult? = delegate.resolveBounds(allowance).also { stopped = true }
+                    override fun resolveBounds(allowance: LpFloatAllowance?): FloatLpResult? = delegate.resolveBounds(
+                        allowance,
+                    ).also { stopped = true }
                     override fun close() {
                         closed++
                         delegate.close()

@@ -51,6 +51,7 @@ internal class LpScopedSolver(
     private val pricing: LpPricingOptions = LpPricingOptions(),
 ) : AutoCloseable {
     private val continuationCache = LpExactContinuationCache()
+    internal val refinementCache = LpRefinementCache()
     private var trail = LpBoundTrail(initial)
     private var solver: PersistentLpSolver? = null
     private var closed = false
@@ -161,6 +162,7 @@ internal class LpScopedSolver(
         continuationLimits: ExactContinuationLimits = ExactContinuationLimits(),
         fullContinuation: Boolean = true,
         observer: LpCertificationObserver? = null,
+        refinementLimits: LpRefinementLimits = LpRefinementLimits(),
     ): CertifiedLpResult? {
         val attempt = solveFloat(warm, token) ?: return null
         val certified = certifyLpResult(
@@ -174,6 +176,15 @@ internal class LpScopedSolver(
             continuationLimits = continuationLimits,
             fullContinuation = fullContinuation,
             observer = observer,
+            refinement = LpRefinementRequest(
+                this,
+                refinementCache,
+                refinementLimits,
+                workLimit,
+                iterationLimit,
+                preparationWork,
+                lastMetrics,
+            ),
         )
         if (token()) return null
         lastResult = certified
@@ -232,14 +243,20 @@ internal class LpScopedSolver(
     fun <T> withWorkingModel(
         working: LpWorkingModel,
         token: Cancellation = cancellation,
+        allowance: LpFloatAllowance? = null,
         block: (LpWorkingScope) -> T,
     ): T {
         requireAvailable()
         check(!closed) { "scoped solver is closed" }
         require(working.source === state) { "working model belongs to another source state" }
+        require(allowance == null || (allowance.work > 0L && allowance.iterations > 0))
+        val childWork = allowance?.work?.let { if (workLimit > 0L) minOf(it, workLimit) else it } ?: workLimit
+        val childIterations = allowance?.iterations?.let {
+            if (iterationLimit > 0) minOf(it, iterationLimit) else it
+        } ?: iterationLimit
         val scopeToken = Cancellation { cancellation() || token() }
         val child = LpScopedSolver(
-            working.state, scopeToken, context, refactorUpdateLimit, iterationLimit, workLimit,
+            working.state, scopeToken, context, refactorUpdateLimit, childIterations, childWork,
             trackDegeneracy, maxRetainedRows, appendSelection, pricing,
         )
         val scope = LpWorkingScope(working, child, scopeToken)
