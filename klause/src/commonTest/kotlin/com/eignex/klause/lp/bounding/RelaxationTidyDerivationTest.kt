@@ -93,6 +93,28 @@ class RelaxationTidyDerivationTest {
     }
 
     @Test
+    fun `rounded singleton with a continuous source is rejected independently`() {
+        val builder = LpBuilder()
+        builder.addVar(0, 10)
+        builder.addRow(intArrayOf(0), longArrayOf(2), Relation.LE, 5)
+        val applied = tidy(builder.build(Sense.MINIMIZE))
+        val original = applied.derivation
+        val forged = RelaxationTidyDerivation(
+            original.sourceModel.withContinuousColumn(),
+            original.transformedModel.withContinuousColumn(),
+            original.scope,
+            original.rowMaps,
+            original.removedRows,
+            original.bounds,
+            listOf(CutColumnSource(CutSource(CutSourceKind.REAL, 0))),
+            original.stats,
+        )
+
+        assertFalse(forged.validate())
+        assertTrue(original.validate())
+    }
+
+    @Test
     fun `forged source multiplier is rejected independently`() {
         val builder = LpBuilder()
         builder.addVar(0, 10)
@@ -334,5 +356,26 @@ class RelaxationTidyDerivationTest {
         probeClampedLo,
         probeClampedHi,
         colContinuous,
+    )
+
+    private fun LpModel.withContinuousColumn(): LpModel = LpModel(
+        n,
+        m,
+        csc,
+        rhs,
+        cost,
+        upper,
+        hasUpper,
+        loShift,
+        objConstant,
+        sense,
+        tag,
+        rowGlobal,
+        rowStrict,
+        rowPremises,
+        flippedRhs,
+        probeClampedLo,
+        probeClampedHi,
+        booleanArrayOf(true),
     )
 }

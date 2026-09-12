@@ -241,7 +241,10 @@ internal fun LpRelaxation.withModel(
     gatedAux = gatedAux,
     gatedWhenTrue = gatedWhenTrue,
     sourceMap = sources,
-    tidyDerivation = tidyDerivation?.takeIf { reboundModel === model },
+    tidyDerivation = tidyDerivation?.takeIf { derivation ->
+        reboundModel === model && sources != null && derivation.scope.root === sources.model &&
+            derivation.scope.epoch == sources.epoch && derivation.scope.assumptions == sources.assumptions
+    },
     tidyStats = tidyStats,
 )
 

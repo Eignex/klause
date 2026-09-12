@@ -40,6 +40,7 @@ class CpToLpRelaxationTidyTest {
         assertEquals(-2.5, solveLp(off.model).objectiveValue)
         assertEquals(-2.0, solveLp(on.model).objectiveValue)
         assertTrue(on.tidyDerivation.validate())
+        assertNull(on.withModel(on.model).tidyDerivation)
         assertNull(on.withModel(on.model.rebind(longArrayOf(0, 0), longArrayOf(10, 10))).tidyDerivation)
     }
 
