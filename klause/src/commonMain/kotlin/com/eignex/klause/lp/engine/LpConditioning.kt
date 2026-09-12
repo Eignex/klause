@@ -5,12 +5,12 @@ import kotlin.math.max
 import kotlin.math.min
 
 /**
- * The spread of a relaxation's structural coefficients — what a scaling decision is made on.
+ * The spread of a relaxation's structural coefficients used by [LpScalingView]'s eligibility gate.
  *
  * HiGHS gates its own equilibration on exactly this: `scaleLp` skips scaling outright when every
  * `|a_ij|` already lies in `[0.2, 5]`, on the grounds that a matrix that narrow has nothing to gain.
- * So the question "would scaling help klause's relaxations" is answered by measuring the spread
- * before writing any scaling, which is what this is for.
+ * The unscaled reading is retained alongside the live numerical view so acceptance and decline are
+ * observable in source terms.
  *
  * Only *structural* entries are measured. The logical columns [lpColumns] appends carry a single
  * `±1` each, so counting them would drag every ratio toward 1 and report a well-conditioned matrix
@@ -40,9 +40,8 @@ internal class LpConditioning(
     /**
      * Whether HiGHS would decline to scale this matrix — every magnitude already inside `[0.2, 5]`.
      *
-     * The decisive reading. When this is true of klause's relaxations there is nothing for
-     * equilibration to do and the scaling work closes; when it is false, [rowRatio] and
-     * [columnRatio] say whether the spread is the kind row and column factors can absorb.
+     * When this is true equilibration declines; otherwise [rowRatio] and [columnRatio] describe the
+     * spread the row and column factors attempt to absorb.
      */
     val withinHighsNoScalingWindow: Boolean
         get() = entries == 0 || (minValue >= NO_SCALING_MIN_VALUE && maxValue <= NO_SCALING_MAX_VALUE)

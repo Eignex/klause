@@ -107,12 +107,14 @@ internal class RevisedSimplex(
     private val basisSolverFactory: ((SparseMatrix) -> BasisSolver)? = null,
     private val pricing: LpPricingOptions = LpPricingOptions(),
     private val reuseRationalOrder: Boolean = true,
+    private val scalingOptions: LpScalingOptions = LpScalingOptions(),
 ) : TableauCutSolver,
     PersistentLpSolver {
     private val m = model.m
     private val n = model.n
     private val numVars = model.numVars
     private val constructionState = model.exactState
+    private var numerical = LpScalingView.create(model, scalingOptions)
     private var continuationAvailable = false
     private var stoppedContinuationBasis: Basis? = null
 
@@ -148,19 +150,19 @@ internal class RevisedSimplex(
      * factorizes, so a refactorization hands over the choice of columns rather than a square matrix
      * assembled for the occasion.
      */
-    private val columns: SparseMatrix = lpColumns(model)
+    private var columns: SparseMatrix = lpColumns(numerical)
 
     // The CSC of `columns` as flat arrays — the same structure the seam holds, read here for pricing rather
     // than copied into a second representation. Column j occupies colPtr(j) until colPtr(j+1).
-    private val colPtr: IntArray = columns.copyColumnPointers()
-    private val rowIdx: IntArray = columns.copyRowIndices()
-    private val colVal: DoubleArray = columns.values
+    private var colPtr: IntArray = columns.copyColumnPointers()
+    private var rowIdx: IntArray = columns.copyRowIndices()
+    private var colVal: DoubleArray = columns.values
 
     // `columns` by row. The pivot row is formed from the nonzeros of ρ = B⁻ᵀeᵣ over these, so a hypersparse ρ
     // costs the rows it touches instead of a pass over every column — which is what makes a hypersparse
     // BTRAN worth having, since dotting ρ against all numVars columns would swamp it.
-    private val rowCols: Array<IntArray>
-    private val rowVals: Array<DoubleArray>
+    private lateinit var rowCols: Array<IntArray>
+    private lateinit var rowVals: Array<DoubleArray>
 
     private val basicVar = IntArray(m)
     private val status = Array(numVars) { VarStatus.BASIC }
@@ -173,6 +175,7 @@ internal class RevisedSimplex(
         private set
     private var cachedBeta: DoubleArray? = null
     private var cachedModel: LpModel? = null
+    private var cachedNumerical: LpScalingView? = null
     private var cachedStatus: Array<VarStatus>? = null
     private var pivots = 0
     private var warmStarted = false
@@ -224,6 +227,17 @@ internal class RevisedSimplex(
     private val work = LpWork()
     private var maxLuFill = 0.0 // max (nnz of the held factors) / nnz(B) over this solve's factorizations
     private var maxLuDensity = 0.0 // max (nnz of the held factors) / m² — 1.0 means the factors are dense
+    private var sourcePrimalResidual = 0.0
+    private var sourceBoundViolation = 0.0
+    private var sourceBasicDualResidual = 0.0
+
+    override val scalingMetrics: LpScalingMetrics
+        get() = numerical.metrics.copy(
+            sourcePrimalResidual = sourcePrimalResidual,
+            sourceBoundViolation = sourceBoundViolation,
+            sourceBasicDualResidual = sourceBasicDualResidual,
+        )
+    internal val scaleVersion: Long get() = numerical.version
 
     /**
      * The basis, held across pivots by this engine's factorization owner.
@@ -236,7 +250,7 @@ internal class RevisedSimplex(
     private var retiredBasisWork: BasisOperationWork? = null
     private val basisRepairer = EngineBasisRepairer()
     private val restartSnapshots = mutableListOf<EngineBasisRestartSnapshot>()
-    private val refactorPolicy = RefactorPolicy(RefactorPolicyConfig(hardUpdateCap = refactorUpdateLimit))
+    private var refactorPolicy = RefactorPolicy(RefactorPolicyConfig(hardUpdateCap = refactorUpdateLimit))
     private var pendingSolveQuality: BasisSolveQuality? = null
 
     internal val lastBasisRepairMetrics: BasisRepairMetrics get() = basisRepairer.metrics
@@ -387,7 +401,7 @@ internal class RevisedSimplex(
         var count = 0
         for (j in 0 until numVars) {
             if (status[j] == VarStatus.BASIC) continue
-            if (abs(model.costD(j) - columnDot(y, j)) <= TOL) count++
+            if (abs(numerical.costD(j) - columnDot(y, j)) <= TOL) count++
         }
         degenerateColumns = count
     }
@@ -418,8 +432,11 @@ internal class RevisedSimplex(
     )
 
     init {
-        // Transpose `columns` once. Counting sort by row: tally each row's entries, then fill, so the whole
-        // transpose is two passes over nnz rather than a per-row scan of every column.
+        rebuildRowView()
+    }
+
+    private fun rebuildRowView() {
+        // Counting-sort the column view by row for hypersparse pivotal-row assembly.
         val counts = IntArray(m)
         for (k in rowIdx.indices) counts[rowIdx[k]]++
         rowCols = Array(m) { IntArray(counts[it]) }
@@ -510,6 +527,7 @@ internal class RevisedSimplex(
         ownerUnitRows = IntArray(0)
         cachedBeta = null
         cachedModel = null
+        cachedNumerical = null
         cachedStatus = null
         solvedExactState = null
         if (failure != null) throw failure
@@ -613,6 +631,7 @@ internal class RevisedSimplex(
         exactBasisCache.clear()
         cachedBeta = null
         cachedModel = null
+        cachedNumerical = null
         cachedStatus = null
         solvedExactState = null
         optimalBasis = null
@@ -840,12 +859,12 @@ internal class RevisedSimplex(
             dualValues.fill(0.0)
             return dualValues
         }
-        for (i in 0 until m) dualRhs[i] = model.costD(basicVar[i])
+        for (i in 0 until m) dualRhs[i] = numerical.costD(basicVar[i])
         return btranDense(dualRhs, dualValues, dualVec)
     }
 
     /** Whether every objective coefficient is zero (pure feasibility): [duals] is then identically 0. */
-    private val allZeroCost: Boolean get() = (0 until numVars).all { model.costD(it) == 0.0 }
+    private val allZeroCost: Boolean get() = (0 until numVars).all { numerical.costD(it) == 0.0 }
 
     /** Reset the Devex reference weights to 1 (a fresh reference frame). */
     private fun resetGamma() {
@@ -888,7 +907,10 @@ internal class RevisedSimplex(
      * a structural mismatch or a singular factorization silently falls back to a cold start, so reuse is
      * sound regardless of how the basis was obtained.
      */
-    override fun solve(warm: Basis?): FloatLpResult? = numericalSolve { solveCore(warm, reuse = false) }
+    override fun solve(warm: Basis?): FloatLpResult? {
+        val progress = SolveProgress()
+        return numericalSolve { reset -> solveCore(warm, reuse = false, reset = reset, progress = progress) }
+    }
 
     /**
      * Re-solve with per-row enforcement, keeping the basis AND its LU factorization from this
@@ -904,8 +926,12 @@ internal class RevisedSimplex(
      * invariant. When nothing usable is kept (first call, or the previous solve bailed), this is an
      * ordinary cold start — whose all-slack basis has every unenforced slack basic already.
      */
-    override fun resolveGated(enforced: BooleanArray): FloatLpResult? =
-        numericalSolve { solveCore(null, reuse = true, enforced = enforced) }
+    override fun resolveGated(enforced: BooleanArray): FloatLpResult? {
+        val progress = SolveProgress()
+        return numericalSolve { reset ->
+            solveCore(null, reuse = true, enforced = enforced, reset = reset, progress = progress)
+        }
+    }
 
     /**
      * Re-point this engine at [next] and [token], keeping the seated basis and its factorization, then
@@ -926,7 +952,7 @@ internal class RevisedSimplex(
         if (model.exactState != null || next.exactState != null) return false
         if (next.csc !== model.csc || next.cost !== model.cost) return false
         if (next.n != n || next.m != m) return false
-        model = next
+        refreshNumerical(next)
         cancellation = token
         continuationAvailable = false
         stoppedContinuationBasis = null
@@ -947,6 +973,7 @@ internal class RevisedSimplex(
         basisKept = false
         cachedBeta = null
         cachedModel = null
+        cachedNumerical = null
         cachedStatus = null
         if (model.exactState == null || token()) return null
         cancellation = token
@@ -973,7 +1000,7 @@ internal class RevisedSimplex(
         if (!current.sameMatrix(state) || token()) return false
         val next = state.toWorkingModel() ?: return false
         if (token()) return false
-        model = next
+        refreshNumerical(next)
         cancellation = token
         solvedExactState = null
         optimalBasis = null
@@ -982,6 +1009,61 @@ internal class RevisedSimplex(
         infeasibleRow = -1
         infeasibleRay = null
         return true
+    }
+
+    /** Refresh under the owner's immutable matrix scale, retiring scaled factors atomically on decline. */
+    private fun refreshNumerical(next: LpModel) {
+        val refreshed = numerical.refresh(next)
+        if (refreshed != null) {
+            model = next
+            numerical = refreshed
+            return
+        }
+        installUnscaledFallback(next)
+    }
+
+    @Suppress("TooGenericExceptionCaught")
+    private fun installUnscaledFallback(next: LpModel) {
+        val fallback = LpScalingView.identityAfterFallback(next, numerical.metrics)
+        val snapshots = restartSnapshots.toList()
+        restartSnapshots.clear()
+        var failure: Throwable? = null
+        for (snapshot in snapshots) {
+            try {
+                snapshot.close()
+            } catch (cleanup: Throwable) {
+                if (failure == null) failure = cleanup else failure.addSuppressed(cleanup)
+            }
+        }
+        basisSolver?.let { current ->
+            val operationWork = try {
+                current.basisOperationWork ?: BasisOperationWork(complete = false)
+            } catch (_: Throwable) {
+                BasisOperationWork(complete = false)
+            }
+            retiredBasisWork = retiredBasisWork?.mergedWith(operationWork) ?: operationWork
+            try {
+                current.close()
+            } catch (cleanup: Throwable) {
+                if (failure == null) failure = cleanup else failure.addSuppressed(cleanup)
+            }
+        }
+        basisSolver = null
+        basisFactorized = false
+        basisKept = false
+        ownerColumns = IntArray(0)
+        ownerUnitRows = IntArray(0)
+        model = next
+        numerical = fallback
+        columns = lpColumns(numerical)
+        colPtr = columns.copyColumnPointers()
+        rowIdx = columns.copyRowIndices()
+        colVal = columns.values
+        rebuildRowView()
+        refactorPolicy = RefactorPolicy(RefactorPolicyConfig(hardUpdateCap = refactorUpdateLimit))
+        rejectedExactBasis = null
+        invalidateBasisDependentState()
+        if (failure != null) throw failure
     }
 
     override fun captureBasisRestart(token: Cancellation): EngineBasisRestartSnapshot? {
@@ -1096,6 +1178,7 @@ internal class RevisedSimplex(
             basisSolverFactory,
             pricing,
             reuseRationalOrder,
+            scalingOptions,
         )
         val logicalColumns = IntArray(nextModel.m) { nextModel.n + it }
         val adapter = BasisExtensionAdapter { candidate.createBasisSolver() }
@@ -1103,6 +1186,10 @@ internal class RevisedSimplex(
         var basisWork: Long? = null
         var basisWorkComplete = false
         if (mode == LpAppendReplacementMode.TRANSFER) {
+            if (numerical.applied || candidate.numerical.applied) {
+                candidate.close()
+                return LpAppendReplacementAttempt(decline = LpAppendTransferDecline.STRUCTURAL)
+            }
             val transfer = observeAdapterAttempt(adapter) {
                 adapter.transfer(
                     oldSolver,
@@ -1279,7 +1366,10 @@ internal class RevisedSimplex(
     }
 
     /** Re-solve after a [rebind], continuing from the kept basis and factorization. */
-    override fun resolveBounds(): FloatLpResult? = numericalSolve { solveCore(null, reuse = true) }
+    override fun resolveBounds(): FloatLpResult? {
+        val progress = SolveProgress()
+        return numericalSolve { reset -> solveCore(null, reuse = true, reset = reset, progress = progress) }
+    }
 
     /** Whether the previous solve terminated with its basis still factorized, so [resolveGated] and
      *  [resolveBounds] may continue from it; the seated [basicVar]/[status] are still in place. False
@@ -1288,10 +1378,22 @@ internal class RevisedSimplex(
 
     // A checked basis failure cannot supply a terminal claim or a factorization safe to keep.
     @Suppress("TooGenericExceptionCaught")
-    private inline fun numericalSolve(block: () -> FloatLpResult?): FloatLpResult? = try {
+    private fun numericalSolve(block: (reset: Boolean) -> FloatLpResult?): FloatLpResult? = numericalSolve(block, true)
+
+    @Suppress("TooGenericExceptionCaught")
+    private fun numericalSolve(
+        block: (reset: Boolean) -> FloatLpResult?,
+        allowUnscaledFallback: Boolean,
+    ): FloatLpResult? = try {
         stoppedContinuationBasis = null
         continuationAvailable = true
-        val candidate = block()
+        val candidate = block(allowUnscaledFallback)
+        if (candidate == null && allowUnscaledFallback && numerical.applied && !cancellation() &&
+            infeasibleRay == null && (smallPivotBails > 0 || singularRefactorizations > 0)
+        ) {
+            installUnscaledFallback(model)
+            return numericalSolve(block, false)
+        }
         val result = if (model.exactState != null && cancellation()) {
             solvedExactState = null
             optimalBasis = null
@@ -1304,6 +1406,7 @@ internal class RevisedSimplex(
             if (model.exactState != null && it == null && solvedExactState == null) {
                 cachedBeta = null
                 cachedModel = null
+                cachedNumerical = null
                 cachedStatus = null
                 basisKept = false
                 infeasibleBasis = null
@@ -1311,7 +1414,31 @@ internal class RevisedSimplex(
                 infeasibleRay = null
             }
         }
+    } catch (primary: LpScalingArithmeticException) {
+        if (allowUnscaledFallback && numerical.applied && !cancellation()) {
+            installUnscaledFallback(model)
+            numericalSolve(block, false)
+        } else {
+            retireAfterArithmeticFailure(primary)
+        }
     } catch (primary: BasisArithmeticException) {
+        if (allowUnscaledFallback && numerical.applied && !cancellation()) {
+            installUnscaledFallback(model)
+            numericalSolve(block, false)
+        } else {
+            retireAfterArithmeticFailure(primary)
+        }
+    } catch (primary: Throwable) {
+        try {
+            close()
+        } catch (cleanup: Throwable) {
+            primary.addSuppressed(cleanup)
+        }
+        throw primary
+    }
+
+    @Suppress("TooGenericExceptionCaught")
+    private fun retireAfterArithmeticFailure(primary: ArithmeticException): FloatLpResult? {
         val continuation = continuationBasis(model)
         try {
             close()
@@ -1328,14 +1455,7 @@ internal class RevisedSimplex(
         infeasibleRay = null
         cachedBeta = null
         solvedExactState = null
-        null
-    } catch (primary: Throwable) {
-        try {
-            close()
-        } catch (cleanup: Throwable) {
-            primary.addSuppressed(cleanup)
-        }
-        throw primary
+        return null
     }
 
     private fun resetSolveState(warmAttempted: Boolean) {
@@ -1349,6 +1469,9 @@ internal class RevisedSimplex(
         pivots = 0
         maxLuFill = 0.0
         maxLuDensity = 0.0
+        sourcePrimalResidual = 0.0
+        sourceBoundViolation = 0.0
+        sourceBasicDualResidual = 0.0
         refactorizations = 0
         initialRefactorizations = 0
         warmStartRefactorizations = 0
@@ -1395,7 +1518,7 @@ internal class RevisedSimplex(
         basisKept = false
         // A kept factorization implies the basis it factorizes is still seated, so that is the warmest
         // start there is; a warm basis alone still pays for a factorization.
-        warmStarted = kept
+        warmStarted = if (reset) kept else warmStarted || kept
         // A warm basis can be singular; fall back to the (always non-singular) slack cold start.
         if (!kept) {
             if (warm == null) {
@@ -1508,9 +1631,9 @@ internal class RevisedSimplex(
                     val v = basicVar[i]
                     // An unenforced row's basic slack is free: its value is never a violation.
                     if (enforced != null && v >= n && !enforced[v - n]) continue
-                    val below = if (model.hasFiniteLower(v)) model.lowerD(v) - beta[i] else Double.NEGATIVE_INFINITY
+                    val below = if (model.hasFiniteLower(v)) numerical.lowerD(v) - beta[i] else Double.NEGATIVE_INFINITY
                     val above = if (model.hasFiniteUpper(v)) {
-                        beta[i] - model.upperD(v)
+                        beta[i] - numerical.upperD(v)
                     } else {
                         Double.NEGATIVE_INFINITY
                     }
@@ -1590,7 +1713,7 @@ internal class RevisedSimplex(
                     (atLower && a > 0) || (!atLower && a < 0)
                 }
                 if (!eligible) continue
-                ratioBuf[j] = abs((model.costD(j) - dotColumn(y, j)) / a)
+                ratioBuf[j] = abs((numerical.costD(j) - dotColumn(y, j)) / a)
                 elig.add(j)
             }
             val entering = if (elig.isEmpty()) {
@@ -1634,7 +1757,7 @@ internal class RevisedSimplex(
                 infeasibleBasis = Basis(basicVar.copyOf(), status.copyOf(), captureEligible = basisCaptureEligible)
                 infeasibleRow = r
                 // float ρ = B⁻ᵀeᵣ densely; integerFarkasRay rounds + certifies it.
-                infeasibleRay = pivotEtaVec.toDoubleArray()
+                infeasibleRay = DoubleArray(m) { numerical.sourceDual(it, pivotEtaVec[it]) }
                 basisKept = true // the seated basis stays dual-feasible for the next [resolve]
                 retainBasicValues(beta)
                 solvedExactState = model.exactState
@@ -1694,10 +1817,10 @@ internal class RevisedSimplex(
 
     /** `b − Σ_{j nonbasic at upper} A_j·u_j` into [out], the right-hand side the basic values solve. */
     private fun adjustedRhs(out: DoubleArray) {
-        for (i in 0 until m) out[i] = model.rhsD(i)
+        for (i in 0 until m) out[i] = numerical.rhsD(i)
         for (j in 0 until numVars) {
             if (status[j] == VarStatus.BASIC) continue
-            val u = seat(model, status[j], j)
+            val u = seat(numerical, status[j], j)
             if (u == 0.0) continue
             sparseAxpy(out, -u, j)
             work.add(2 * (colPtr[j + 1] - colPtr[j]))
@@ -1705,7 +1828,7 @@ internal class RevisedSimplex(
         work.add(m)
     }
 
-    private fun seat(source: LpModel, side: VarStatus, column: Int): Double = when (side) {
+    private fun seat(source: LpScalingView, side: VarStatus, column: Int): Double = when (side) {
         VarStatus.AT_UPPER -> source.upperD(column)
         VarStatus.AT_LOWER, VarStatus.FIXED -> source.lowerD(column)
         VarStatus.FREE, VarStatus.BASIC -> 0.0
@@ -1720,21 +1843,14 @@ internal class RevisedSimplex(
             VarStatus.AT_LOWER
         }
 
-    private fun boundRange(column: Int): Double {
-        if (!model.hasFiniteLower(column) || !model.hasFiniteUpper(column)) return Double.MAX_VALUE
-        return if (model.exactState == null) {
-            model.upperD(column)
-        } else {
-            (model.exactUpper(column) - model.exactLower(column)).toDouble()
-        }
-    }
+    private fun boundRange(column: Int): Double = numerical.boundRangeD(column)
 
     private fun defaultStatus(column: Int): VarStatus = when {
         model.exactState != null && model.fixed(column) -> VarStatus.FIXED
 
         model.hasFiniteLower(
             column,
-        ) && (model.costD(column) >= 0.0 || !model.hasFiniteUpper(column)) -> VarStatus.AT_LOWER
+        ) && (numerical.costD(column) >= 0.0 || !model.hasFiniteUpper(column)) -> VarStatus.AT_LOWER
 
         model.hasFiniteUpper(column) -> VarStatus.AT_UPPER
 
@@ -1757,7 +1873,7 @@ internal class RevisedSimplex(
         val y = duals()
         for (j in 0 until numVars) {
             if (status[j] == VarStatus.BASIC || model.fixed(j)) continue
-            val reduced = model.costD(j) - dotColumn(y, j)
+            val reduced = numerical.costD(j) - dotColumn(y, j)
             if (!reduced.isFinite()) return false
             when (status[j]) {
                 VarStatus.AT_LOWER -> if (reduced < -TOL) return false
@@ -1773,11 +1889,13 @@ internal class RevisedSimplex(
         if (model.exactState == null) return
         cachedBeta = (cachedBeta ?: DoubleArray(m)).also { beta.copyInto(it) }
         cachedModel = model
+        cachedNumerical = numerical
         cachedStatus = cachedStatus?.also { status.copyInto(it) } ?: status.copyOf()
     }
 
     private fun restoreBasicValues(out: DoubleArray): Boolean {
         val previous = cachedModel ?: return false
+        val previousNumerical = cachedNumerical ?: return false
         val values = cachedBeta ?: return false
         val seats = cachedStatus ?: return false
         val before = previous.exactState ?: return false
@@ -1797,7 +1915,7 @@ internal class RevisedSimplex(
         var changed = false
         for (j in 0 until numVars) {
             if (status[j] == VarStatus.BASIC) continue
-            val delta = seat(model, status[j], j) - seat(previous, seats[j], j)
+            val delta = seat(numerical, status[j], j) - seat(previousNumerical, seats[j], j)
             if (delta == 0.0) continue
             changed = true
             sparseAxpy(rhs, -delta, j)
@@ -2101,26 +2219,28 @@ internal class RevisedSimplex(
         // objective in original coordinates — matching the exact certify.
         var obj = model.objConstantD
         for (j in 0 until numVars) {
-            val c = model.costD(j)
-            if (c != 0.0 && status[j] != VarStatus.BASIC) obj += c * seat(model, status[j], j)
+            val c = numerical.costD(j)
+            if (c != 0.0 && status[j] != VarStatus.BASIC) obj += c * seat(numerical, status[j], j)
         }
         for (i in 0 until m) {
-            val c = model.costD(basicVar[i])
+            val c = numerical.costD(basicVar[i])
             if (c != 0.0) obj += c * beta[i]
         }
         val primal = DoubleArray(n)
         for (j in 0 until n) {
-            primal[j] = model.loShiftD(j) + seat(model, status[j], j)
+            primal[j] = model.loShiftD(j) + numerical.sourceCoordinate(j, seat(numerical, status[j], j))
         }
         for (i in 0 until m) {
             val v = basicVar[i]
-            if (v < n) primal[v] = model.loShiftD(v) + beta[i]
+            if (v < n) primal[v] = model.loShiftD(v) + numerical.sourceCoordinate(v, beta[i])
         }
         val basis = Basis(basicVar.copyOf(), status.copyOf(), captureEligible = basisCaptureEligible)
         optimalBasis = basis
         optimalPrimal = primal
-        val y = duals()
-        recordDegeneracy(y)
+        val scaledDuals = duals()
+        recordDegeneracy(scaledDuals)
+        val y = DoubleArray(m) { numerical.sourceDual(it, scaledDuals[it]) }
+        recordSourceResiduals(beta, y)
         return FloatLpResult(
             basis,
             model.objectiveD(obj),
@@ -2135,6 +2255,50 @@ internal class RevisedSimplex(
         )
     }
 
+    private fun recordSourceResiduals(beta: DoubleArray, sourceDuals: DoubleArray) {
+        val values = DoubleArray(numVars)
+        for (j in 0 until numVars) {
+            if (status[j] != VarStatus.BASIC) {
+                values[j] = numerical.sourceCoordinate(j, seat(numerical, status[j], j))
+            }
+        }
+        for (i in 0 until m) values[basicVar[i]] = numerical.sourceCoordinate(basicVar[i], beta[i])
+
+        val residual = DoubleArray(m) { -model.rhsD(it) }
+        for (j in 0 until n) {
+            if (values[j] != 0.0) {
+                model.forEachInColumnD(j) { row, coefficient -> residual[row] += coefficient * values[j] }
+            }
+        }
+        for (i in 0 until m) residual[i] += values[n + i]
+        sourcePrimalResidual = residual.maxOfOrNull { abs(it) } ?: 0.0
+
+        var boundViolation = 0.0
+        for (j in 0 until numVars) {
+            if (model.hasFiniteLower(j)) boundViolation = maxOf(boundViolation, model.lowerD(j) - values[j])
+            if (model.hasFiniteUpper(j)) boundViolation = maxOf(boundViolation, values[j] - model.upperD(j))
+        }
+        sourceBoundViolation = maxOf(0.0, boundViolation)
+
+        var dualResidual = 0.0
+        for (v in basicVar) {
+            val dot = if (v < n) {
+                var sum = 0.0
+                model.forEachInColumnD(v) { row, coefficient -> sum += coefficient * sourceDuals[row] }
+                sum
+            } else {
+                sourceDuals[v - n]
+            }
+            dualResidual = maxOf(dualResidual, abs(model.costD(v) - dot))
+        }
+        sourceBasicDualResidual = dualResidual
+        if (numerical.applied &&
+            (!sourcePrimalResidual.isFinite() || !sourceBoundViolation.isFinite() || !dualResidual.isFinite())
+        ) {
+            throw LpScalingArithmeticException()
+        }
+    }
+
     /**
      * The iterate a solve stopped short on, as a bound-only result.
      *
@@ -2147,23 +2311,25 @@ internal class RevisedSimplex(
         solvedExactState = model.exactState
         var obj = model.objConstantD
         for (j in 0 until numVars) {
-            val c = model.costD(j)
-            if (c != 0.0 && status[j] != VarStatus.BASIC) obj += c * seat(model, status[j], j)
+            val c = numerical.costD(j)
+            if (c != 0.0 && status[j] != VarStatus.BASIC) obj += c * seat(numerical, status[j], j)
         }
         for (i in 0 until m) {
-            val c = model.costD(basicVar[i])
+            val c = numerical.costD(basicVar[i])
             if (c != 0.0) obj += c * beta[i]
         }
         val primal = DoubleArray(n)
         for (j in 0 until n) {
-            primal[j] = model.loShiftD(j) + seat(model, status[j], j)
+            primal[j] = model.loShiftD(j) + numerical.sourceCoordinate(j, seat(numerical, status[j], j))
         }
         for (i in 0 until m) {
             val v = basicVar[i]
-            if (v < n) primal[v] = model.loShiftD(v) + beta[i]
+            if (v < n) primal[v] = model.loShiftD(v) + numerical.sourceCoordinate(v, beta[i])
         }
-        val y = duals()
-        recordDegeneracy(y)
+        val scaledDuals = duals()
+        recordDegeneracy(scaledDuals)
+        val y = DoubleArray(m) { numerical.sourceDual(it, scaledDuals[it]) }
+        recordSourceResiduals(beta, y)
         return FloatLpResult(
             Basis(basicVar.copyOf(), status.copyOf(), captureEligible = basisCaptureEligible),
             model.objectiveD(obj),
@@ -2265,8 +2431,8 @@ internal class RevisedSimplex(
     private fun primalFeasible(beta: DoubleArray): Boolean {
         for (i in 0 until m) {
             val v = basicVar[i]
-            if (model.hasFiniteLower(v) && beta[i] < model.lowerD(v) - FEAS_TOL) return false
-            if (model.hasFiniteUpper(v) && beta[i] > model.upperD(v) + FEAS_TOL) return false
+            if (model.hasFiniteLower(v) && beta[i] < numerical.lowerD(v) - FEAS_TOL) return false
+            if (model.hasFiniteUpper(v) && beta[i] > numerical.upperD(v) + FEAS_TOL) return false
         }
         return true
     }
@@ -2293,8 +2459,8 @@ internal class RevisedSimplex(
             var w = 0.0
             for (i in 0 until m) {
                 val v = basicVar[i]
-                val hi = if (model.hasFiniteUpper(v)) model.upperD(v) else Double.MAX_VALUE
-                val lo = if (model.hasFiniteLower(v)) model.lowerD(v) else -Double.MAX_VALUE
+                val hi = if (model.hasFiniteUpper(v)) numerical.upperD(v) else Double.MAX_VALUE
+                val lo = if (model.hasFiniteLower(v)) numerical.lowerD(v) else -Double.MAX_VALUE
                 gamma[i] = when {
                     beta[i] < lo - FEAS_TOL -> {
                         w += lo - beta[i]
@@ -2335,7 +2501,7 @@ internal class RevisedSimplex(
             }
             if (q == -1) {
                 if (model.exactState != null) {
-                    infeasibleRay = pi.copyOf()
+                    infeasibleRay = DoubleArray(m) { numerical.sourceDual(it, pi[it]) }
                     solvedExactState = model.exactState
                     basisKept = true
                     retainBasicValues(beta)
@@ -2352,8 +2518,8 @@ internal class RevisedSimplex(
                 val rate = -alpha[i] * dir // dβ_i/dt
                 if (abs(rate) < TOL) continue
                 val v = basicVar[i]
-                val hi = if (model.hasFiniteUpper(v)) model.upperD(v) else Double.MAX_VALUE
-                val lo = if (model.hasFiniteLower(v)) model.lowerD(v) else -Double.MAX_VALUE
+                val hi = if (model.hasFiniteUpper(v)) numerical.upperD(v) else Double.MAX_VALUE
+                val lo = if (model.hasFiniteLower(v)) numerical.lowerD(v) else -Double.MAX_VALUE
                 var t = Double.MAX_VALUE
                 var toUpper = false
                 when {
@@ -2416,7 +2582,10 @@ internal class RevisedSimplex(
      * returns is certified exactly downstream, so this never affects soundness, only which vertex is
      * reached.
      */
-    override fun solvePrimal(warm: Basis?): FloatLpResult? = numericalSolve { solvePrimalCore(warm) }
+    override fun solvePrimal(warm: Basis?): FloatLpResult? {
+        val progress = SolveProgress()
+        return numericalSolve { reset -> solvePrimalCore(warm, reset = reset, progress = progress) }
+    }
 
     @Suppress("CyclomaticComplexMethod", "NestedBlockDepth", "ReturnCount", "LongMethod")
     private fun solvePrimalCore(
@@ -2479,7 +2648,7 @@ internal class RevisedSimplex(
             var best = TOL
             for (j in 0 until numVars) {
                 if (status[j] == VarStatus.BASIC || model.fixed(j)) continue
-                val dj = model.costD(j) - dotColumn(y, j)
+                val dj = numerical.costD(j) - dotColumn(y, j)
                 val atLower = status[j] == VarStatus.AT_LOWER || (status[j] == VarStatus.FREE && dj < 0.0)
                 // From lower, increasing improves iff d_j < 0; from upper, decreasing improves iff d_j > 0.
                 val gain = if (atLower) -dj else dj
@@ -2509,9 +2678,9 @@ internal class RevisedSimplex(
                 var t = Double.MAX_VALUE
                 var toUpper = false
                 if (rate < -TOL && model.hasFiniteLower(basicVar[i])) {
-                    t = (beta[i] - model.lowerD(basicVar[i])) / -rate
+                    t = (beta[i] - numerical.lowerD(basicVar[i])) / -rate
                 } else if (rate > TOL && model.hasFiniteUpper(basicVar[i])) {
-                    t = (model.upperD(basicVar[i]) - beta[i]) / rate // β_i rises to its upper bound
+                    t = (numerical.upperD(basicVar[i]) - beta[i]) / rate // β_i rises to its upper bound
                     toUpper = true
                 }
                 if (t == Double.MAX_VALUE) continue
@@ -2675,17 +2844,17 @@ private enum class PivotFold {
  * to factor it where it lies. Built once per engine, and never rebuilt: a bound-only rebind shares the
  * model's matrix, and anything that replaces it builds a fresh engine.
  */
-private fun lpColumns(model: LpModel): SparseMatrix {
+private fun lpColumns(model: LpScalingView): SparseMatrix {
     val m = model.m
     val n = model.n
     var nnz = m // one per slack column
-    for (j in 0 until n) model.forEachInColumnD(j) { _, _ -> nnz++ }
+    for (j in 0 until n) model.forEachInColumn(j) { _, _ -> nnz++ }
     val rows = IntArray(nnz)
     val cols = IntArray(nnz)
     val vals = DoubleArray(nnz)
     var k = 0
     for (j in 0 until n) {
-        model.forEachInColumnD(j) { i, v ->
+        model.forEachInColumn(j) { i, v ->
             rows[k] = i
             cols[k] = j
             vals[k] = v
