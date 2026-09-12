@@ -118,6 +118,10 @@ internal class LpRefinementResult(
     val support: LpExactSupport?,
     val unboundedness: ExactLpUnboundedness?,
     val usedBasis: Boolean,
+    val witnessUsesBasis: Boolean,
+    val boundUsesBasis: Boolean,
+    val conflictUsesBasis: Boolean,
+    val unboundednessUsesBasis: Boolean,
     val sourceLuAttempted: Boolean,
     val metrics: LpRefinementMetrics,
 )
@@ -370,7 +374,13 @@ private class RefinementAuthority(val state: LpExactState, val meter: Refinement
         VarStatus.FREE -> if (bounds[j].lower == null && bounds[j].upper == null) BigFraction.ZERO else null
     }
 
-    fun residual(x: List<BigFraction>, y: List<BigFraction>, basis: Basis?, previous: Int): ResidualModel {
+    fun residual(
+        x: List<BigFraction>,
+        y: List<BigFraction>,
+        basis: Basis?,
+        previousPrimal: Int,
+        previousDual: Int,
+    ): ResidualModel {
         val activity = activity(x)
         val residual = List(rhs.size) { meter.add(rhs[it], activity[it].negated()) }
         val reduced = reduced(y)
@@ -399,8 +409,8 @@ private class RefinementAuthority(val state: LpExactState, val meter: Refinement
             }
             dualViolation = largerFraction(dualViolation, defect)
         }
-        val exponent = scaleExponent(primalViolation, previous, meter)
-        val dualExponent = minOf(exponent, scaleExponent(dualViolation, previous, meter))
+        val exponent = scaleExponent(primalViolation, previousPrimal, meter)
+        val dualExponent = minOf(exponent, scaleExponent(dualViolation, previousDual, meter))
         val sp = meter.number(BigFraction.of(BigInteger.ONE shl exponent, BigInteger.ONE))
         val sd = meter.number(BigFraction.of(BigInteger.ONE shl dualExponent, BigInteger.ONE))
         val columns = List(source.numVars) { j ->
@@ -416,7 +426,7 @@ private class RefinementAuthority(val state: LpExactState, val meter: Refinement
             List(source.m) { source.row(it).copy(strict = false) },
             ExactLpObjective(reduced.map { ExactLpNumber.of(meter.multiply(sd, it)) }),
         )
-        return ResidualModel(refinementWorking(state, working, meter), sp, sd, exponent)
+        return ResidualModel(refinementWorking(state, working, meter), sp, sd, exponent, dualExponent)
     }
 }
 
@@ -450,7 +460,8 @@ private class ResidualModel(
     val working: LpWorkingModel,
     val primalScale: BigFraction,
     val dualScale: BigFraction,
-    val exponent: Int,
+    val primalExponent: Int,
+    val dualExponent: Int,
 )
 
 private class RefinedCandidate(
@@ -462,15 +473,42 @@ private class RefinedCandidate(
     var basis: Basis? = null,
     var usedBasis: Boolean = false,
     var luAttempted: Boolean = false,
+    var pointUsesBasis: Boolean = false,
+    var boundUsesBasis: Boolean = false,
+    var conflictUsesBasis: Boolean = false,
+    var dualUsesBasis: Boolean = false,
 ) {
     val attained: Boolean get() = point != null && bound?.value == point?.objective
-    fun accept(checked: ReconstructedCertificate) {
-        checked.witness?.let { if (point == null || it.objective < requireNotNull(point).objective) point = it }
-        checked.bound?.let { if (bound == null || it.value > requireNotNull(bound).value) bound = it }
+    fun acceptPoint(value: ExactLpWitness, basis: Boolean) {
+        val current = point
+        if (current == null || value.objective < current.objective ||
+            (value.objective == current.objective && pointUsesBasis && !basis)
+        ) {
+            point = value
+            pointUsesBasis = basis
+        }
+    }
+
+    fun acceptBound(value: CertifiedLpBound, basis: Boolean) {
+        val current = bound
+        if (current == null || value.value > current.value ||
+            (value.value == current.value && boundUsesBasis && !basis)
+        ) {
+            bound = value
+            boundUsesBasis = basis
+        }
+    }
+
+    fun accept(checked: ReconstructedCertificate, basis: Boolean = false) {
+        checked.witness?.let { acceptPoint(it, basis) }
+        checked.bound?.let { acceptBound(it, basis) }
         if (checked.conflict != null) {
             conflict = checked.conflict
             support = checked.conflictSupport
+            conflictUsesBasis = basis
         }
+        val success = checked.witness != null || checked.bound != null || checked.conflict != null
+        usedBasis = usedBasis || (basis && success)
     }
 }
 
@@ -481,6 +519,7 @@ private class RefinementRun(
 ) {
     val candidate = RefinedCandidate()
     var unboundedness: ExactLpUnboundedness? = null
+    var unboundednessUsesBasis = false
     private val sourceFactors = ExactBasisCache()
 
     fun run(
@@ -499,21 +538,30 @@ private class RefinementRun(
         if (candidate.attained || candidate.conflict != null) return
         // A finite lower bound rules out recession but says nothing about source feasibility.
         var direction = if (candidate.bound == null) hint?.let { reconstructedDirection(it) } else null
+        var directionUsesBasis = false
         if (direction == null && candidate.bound == null && basis != null) {
             direction = directRay(source, basis, sourceFactors)
-            candidate.usedBasis = candidate.usedBasis || direction != null
+            directionUsesBasis = direction != null
+            candidate.usedBasis = candidate.usedBasis || directionUsesBasis
         }
         if (candidate.point == null && needPoint && meter.limits.maxAuxiliaries > 0) {
             feasibility()
         }
         if (candidate.conflict != null || candidate.bound != null) return
         if (direction == null && candidate.point != null && meter.metrics.auxiliaries < meter.limits.maxAuxiliaries) {
-            direction = recession()
+            recession()?.let {
+                direction = it.first
+                directionUsesBasis = it.second
+            }
         }
         val point = candidate.point
-        if (point != null && direction != null) {
-            unboundedness = exactRecession(source, point, direction, meter)
-            if (unboundedness != null) meter.metrics = meter.metrics.copy(rays = meter.metrics.rays + 1)
+        val ray = direction
+        if (point != null && ray != null) {
+            unboundedness = exactRecession(source, point, ray, meter)
+            if (unboundedness != null) {
+                unboundednessUsesBasis = candidate.pointUsesBasis || directionUsesBasis
+                meter.metrics = meter.metrics.copy(rays = meter.metrics.rays + 1)
+            }
         }
     }
 
@@ -564,8 +612,9 @@ private class RefinementRun(
         output.basis = basis
         output.accept(check(a, a.sourcePoint(x), y, basis, true))
         output.dual = y
+        output.dualUsesBasis = false
         if (output.attained || output.conflict != null || meter.limits.maxRounds == 0) return
-        var residual = a.residual(x, y, basis, 0)
+        var residual = a.residual(x, y, basis, 0, 0)
         var nextReconstruction = 1
         var stalls = 0
         withChild(residual.working, anchor) { scope, firstAllowance ->
@@ -592,6 +641,7 @@ private class RefinementRun(
                 basis = float.basis
                 output.basis = basis
                 output.dual = y
+                output.dualUsesBasis = false
                 meter.metrics = meter.metrics.copy(rounds = meter.metrics.rounds + 1)
                 if (attempt.first.lastPivots == 0) {
                     stalls++
@@ -607,7 +657,7 @@ private class RefinementRun(
                     exactCandidate(a, requireNotNull(basis), factors, output)
                     break
                 }
-                residual = a.residual(x, y, basis, residual.exponent)
+                residual = a.residual(x, y, basis, residual.primalExponent, residual.dualExponent)
             }
         }
     }
@@ -664,20 +714,14 @@ private class RefinementRun(
             limits = meter.basisLimits(),
         )
         meter.record(checked.metrics)
-        checked.witness?.let { output.point = it }
-        checked.bound?.let {
-            if (output.bound == null || it.value > requireNotNull(
-                    output.bound,
-                ).value
-            ) {
-                output.bound = it
-            }
-        }
-        output.usedBasis = output.point != null || output.bound != null || output.usedBasis
+        checked.witness?.let { output.acceptPoint(it, true) }
+        checked.bound?.let { output.acceptBound(it, true) }
+        output.usedBasis = checked.witness != null || checked.bound != null || output.usedBasis
         // The public bound package deliberately contains no raw BTRAN vector.
         exactVectors(a, basis, cache, allowBuild = false) { authority, factors, budget ->
             budget.phase = ExactBasisPhase.DUAL
             output.dual = exactSolve(factors, authority.costs, true, budget)
+            output.dualUsesBasis = true
         }
     }
 
@@ -750,40 +794,37 @@ private class RefinementRun(
     }
 
     private fun directRay(a: RefinementAuthority, basis: Basis, cache: ExactBasisCache): List<BigFraction>? {
-        var result: List<BigFraction>? = null
-        exactVectors(a, basis, cache) { authority, factors, budget ->
-            var attempts = 0
-            for (j in authority.statuses.indices) {
-                if (authority.statuses[j] == VarStatus.BASIC) continue
-                val signs = when {
-                    a.bounds[j].lower != null && a.bounds[j].upper != null -> emptyList()
-                    a.bounds[j].lower != null -> listOf(BigFraction.ONE)
-                    a.bounds[j].upper != null -> listOf(BigFraction.MINUS_ONE)
-                    else -> listOf(BigFraction.ONE, BigFraction.MINUS_ONE)
-                }
-                for (sign in signs) {
-                    if (++attempts > 8) return@exactVectors
+        if (!a.validBasis(basis)) return null
+        var attempts = 0
+        for (j in basis.status.indices) {
+            if (basis.status[j] == VarStatus.BASIC) continue
+            val signs = when {
+                a.bounds[j].lower != null && a.bounds[j].upper != null -> emptyList()
+                a.bounds[j].lower != null -> listOf(BigFraction.ONE)
+                a.bounds[j].upper != null -> listOf(BigFraction.MINUS_ONE)
+                else -> listOf(BigFraction.ONE, BigFraction.MINUS_ONE)
+            }
+            for (sign in signs) {
+                if (++attempts > 8) return null
+                var candidate: List<BigFraction>? = null
+                exactVectors(a, basis, cache) { authority, factors, budget ->
                     budget.phase = ExactBasisPhase.RAY
                     val rhs = MutableList(a.source.m) { BigFraction.ZERO }
                     for ((row, coefficient) in authority.matrix[j]) {
-                        rhs[row] = budget.subtractProduct(
-                            rhs[row],
-                            coefficient,
-                            sign,
-                        )
+                        rhs[row] = budget.subtractProduct(rhs[row], coefficient, sign)
                     }
                     val basics = exactSolve(factors, rhs, false, budget)
                     val ray = MutableList(a.source.numVars) { BigFraction.ZERO }
                     ray[j] = sign
                     for (i in authority.headings.indices) ray[authority.headings[i]] = basics[i]
-                    if (validDirection(a, ray, meter)) {
-                        result = ray
-                        return@exactVectors
-                    }
+                    candidate = ray
                 }
+                // FTRAN spending must be debited before source checking consumes the remainder.
+                val ray = candidate ?: return null
+                if (validDirection(a, ray, meter)) return ray
             }
         }
-        return result
+        return null
     }
 
     private fun feasibility() {
@@ -802,8 +843,7 @@ private class RefinementRun(
         if (point != null && point.primal[source.source.numVars] == BigFraction.ONE) {
             val x = source.bounds.indices.map { meter.add(shifts[it], point.primal[it]) }
             val checked = check(source, source.sourcePoint(x), null, null, false)
-            candidate.accept(checked)
-            candidate.usedBasis = candidate.usedBasis || (checked.witness != null && solved.usedBasis)
+            candidate.accept(checked, solved.pointUsesBasis)
         }
         if (candidate.point != null) return
         solved.dual?.let { y ->
@@ -814,12 +854,11 @@ private class RefinementRun(
                 limits = meter.proofLimits(),
             )
             meter.record(checked)
-            candidate.accept(checked)
-            candidate.usedBasis = candidate.usedBasis || (checked.conflict != null && solved.usedBasis)
+            candidate.accept(checked, solved.dualUsesBasis)
         }
     }
 
-    private fun recession(): List<BigFraction>? {
+    private fun recession(): Pair<List<BigFraction>, Boolean>? {
         val auxiliary = auxiliaryModel(
             source,
             List(source.source.numVars) { BigFraction.ZERO },
@@ -831,8 +870,8 @@ private class RefinementRun(
         if (point.primal[source.source.numVars] != BigFraction.ONE) return null
         val ray = point.primal.take(source.source.numVars)
         if (!validDirection(source, ray, meter)) return null
-        candidate.usedBasis = candidate.usedBasis || solved.usedBasis
-        return ray
+        candidate.usedBasis = candidate.usedBasis || solved.pointUsesBasis
+        return ray to solved.pointUsesBasis
     }
 
     private fun auxiliary(model: ExactLpModel): RefinedCandidate {
@@ -1031,6 +1070,10 @@ internal fun refineLp(
         candidate?.support,
         run?.unboundedness,
         candidate?.usedBasis == true,
+        candidate?.pointUsesBasis == true,
+        candidate?.boundUsesBasis == true,
+        candidate?.conflictUsesBasis == true,
+        run?.unboundednessUsesBasis == true,
         candidate?.luAttempted == true,
         metrics,
     )

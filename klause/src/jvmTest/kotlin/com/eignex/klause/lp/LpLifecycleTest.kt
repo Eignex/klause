@@ -1,6 +1,5 @@
 package com.eignex.klause.lp
 
-import com.eignex.klause.lp.engine.LpFloatAllowance
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.backtrack.ResumableMinimize
@@ -30,6 +29,7 @@ import com.eignex.klause.lp.engine.LpCertificationObserver
 import com.eignex.klause.lp.engine.LpCertificationPolicy
 import com.eignex.klause.lp.engine.LpEngineFactory
 import com.eignex.klause.lp.engine.LpExactState
+import com.eignex.klause.lp.engine.LpFloatAllowance
 import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.LpNeighborhood
 import com.eignex.klause.lp.engine.LpPricingOptions

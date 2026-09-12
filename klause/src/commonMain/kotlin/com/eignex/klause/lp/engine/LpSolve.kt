@@ -250,8 +250,8 @@ internal fun certifyLpResult(
         if (solver.solvedExactState !== state &&
             (
                 refinement?.source?.state !== state ||
-                (solver.recessionDirection == null && continuationTarget().basis != null)
-            )
+                    (solver.recessionDirection == null && continuationTarget().basis != null)
+                )
         ) {
             val continued = continueExactLp(
                 model,
@@ -331,7 +331,7 @@ internal fun certifyLpResult(
         numericalConflict = numericalConflict ?: recovered.conflict
         if (!withheldWitness && recovered.witness != null) {
             val point = policy.acceptNullable(LpCertifier.RATIONAL, recovered.witness)?.let {
-                if (recovered.usedBasis) policy.acceptNullable(LpCertifier.EXACT_BASIS, it) else it
+                if (recovered.witnessUsesBasis) policy.acceptNullable(LpCertifier.EXACT_BASIS, it) else it
             }
             withheldWitness = point == null
             if (point != null && (
@@ -345,7 +345,7 @@ internal fun certifyLpResult(
         }
         if (!withheldBound && recovered.bound != null) {
             val stronger = policy.acceptNullable(LpCertifier.RATIONAL, recovered.bound)?.let {
-                if (recovered.usedBasis) policy.acceptNullable(LpCertifier.EXACT_BASIS, it) else it
+                if (recovered.boundUsesBasis) policy.acceptNullable(LpCertifier.EXACT_BASIS, it) else it
             }
             withheldBound = stronger == null
             if (stronger != null && (bound == null || stronger.value > requireNotNull(bound).value)) bound = stronger
@@ -354,7 +354,7 @@ internal fun certifyLpResult(
             conflict = policy.acceptNullable(LpCertifier.RATIONAL, recovered.conflict)?.let {
                 policy.acceptNullable(LpCertifier.EXACT_FARKAS, it)
             }?.let {
-                if (recovered.usedBasis) policy.acceptNullable(LpCertifier.EXACT_BASIS, it) else it
+                if (recovered.conflictUsesBasis) policy.acceptNullable(LpCertifier.EXACT_BASIS, it) else it
             }
             withheldConflict = conflict == null
         }
@@ -384,7 +384,9 @@ internal fun certifyLpResult(
     ) {
         refine()
     }
-    if (result != null && (refined == null || refined.metrics.eligible == false) &&
+    val legacyBasis = refined == null || refined.metrics.decline == LpRefinementDecline.DISABLED ||
+        refined.metrics.decline == LpRefinementDecline.AUTHORITY
+    if (result != null && legacyBasis &&
         (witness == null || bound?.value != witness.objective) && !cancellation()
     ) {
         val checked = verifyExactBasis(
@@ -524,7 +526,7 @@ internal fun certifyLpResult(
     val unboundedness = if (bound == null && witness != null && !withheldWitness) {
         if (refined?.unboundedness != null) {
             policy.acceptNullable(LpCertifier.RATIONAL, refined.unboundedness)?.let {
-                if (refined.usedBasis) policy.acceptNullable(LpCertifier.EXACT_BASIS, it) else it
+                if (refined.unboundednessUsesBasis) policy.acceptNullable(LpCertifier.EXACT_BASIS, it) else it
             }
         } else {
             solver.recessionDirection?.let { direction ->
