@@ -21,6 +21,7 @@ import com.eignex.klause.lp.engine.finiteExactInput
 import com.eignex.klause.lp.relaxation.CutSourceMap
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.util.Cancellation
 
 internal class LpEpochProof private constructor(
     val derivation: RelaxationTidyDerivation,
@@ -45,10 +46,11 @@ internal class LpEpochProof private constructor(
         return LpEpochProof(derivation, candidate, mapping, construction)
     }
 
-    fun rowProof(outputRow: Int): CutProvenance? {
-        val map = derivation.rowMaps.getOrNull(outputRow) ?: return null
-        val original = row(derivation.sourceModel, map.sourceRow) ?: return null
-        val conclusion = row(derivation.transformedModel, outputRow) ?: return null
+    fun rowProof(outputRow: Int, cancellation: Cancellation = Cancellation.Never): CutProvenance? {
+        if (cancellation()) return null
+        val map = derivation.rowMap(outputRow) ?: return null
+        val original = row(derivation.sourceModel, map.sourceRow, cancellation = cancellation) ?: return null
+        val conclusion = row(derivation.transformedModel, outputRow, cancellation = cancellation) ?: return null
         val facts = ArrayList<CutProofFact>()
         val parent = sources.parent(outputRow)
         if (parent != null) {
@@ -69,24 +71,25 @@ internal class LpEpochProof private constructor(
                 facts.add(
                     CutProofFact(
                         CutPremise.Bound(
-                    expression,
-                    premises.isUpper[index],
-                    BigFraction.ofLong(premises.thresholds[index]),
-                ),
-                    false
-                    )
+                            expression,
+                            premises.isUpper[index],
+                            BigFraction.ofLong(premises.thresholds[index]),
+                        ),
+                        false,
+                    ),
                 )
             }
             for (literal in premises.boolLits) facts.add(CutProofFact(CutPremise.Literal(literal), false))
         }
         for (fixing in map.fixings) {
+            if (cancellation()) return null
             for (side in listOf(fixing.lower, fixing.upper)) {
                 val global = sources.isGlobal(side)
                 val term = side.expression.terms.keys.singleOrNull()
                 val premise = if (!global && term?.kind == CutSourceKind.TERM) {
                     sources.presenceGuard(
-                    side,
-                ) ?: return null
+                        side,
+                    ) ?: return null
                 } else {
                     side
                 }
@@ -98,24 +101,24 @@ internal class LpEpochProof private constructor(
         val algebraic = if (rounded == null) {
             conclusion
         } else {
-            row(derivation.sourceModel, map.sourceRow, map.fixings)
-            ?: return null
+            row(derivation.sourceModel, map.sourceRow, map.fixings, cancellation)
+                ?: return null
         }
         transforms.add(
             CutRowTransform.Algebraic(
-            original,
-            algebraic,
-            if (rounded == null) map.sourceMultiplier else BigFraction.ONE,
-            derivation.sourceModel.rowStrict[map.sourceRow],
-            if (rounded ==
-                null
-            ) {
+                original,
+                algebraic,
+                if (rounded == null) map.sourceMultiplier else BigFraction.ONE,
+                derivation.sourceModel.rowStrict[map.sourceRow],
+                if (rounded ==
+                    null
+                ) {
                     derivation.transformedModel.rowStrict[outputRow]
                 } else {
                     derivation.sourceModel.rowStrict[map.sourceRow]
                 },
-            map.fixings.map { CutFixing(it.lower, it.upper) },
-        )
+                map.fixings.map { CutFixing(it.lower, it.upper) },
+            ),
         )
         if (rounded != null) {
             val remaining = algebraic.expression.terms.entries.singleOrNull() ?: return null
@@ -146,14 +149,23 @@ internal class LpEpochProof private constructor(
         ).retainReferencedDefinitions()
     }
 
-    private fun row(model: LpModel, row: Int, fixings: List<RelaxationTidyFixing> = emptyList()): CutPremise.Row? {
+    private fun row(
+        model: LpModel,
+        row: Int,
+        fixings: List<RelaxationTidyFixing> = emptyList(),
+        cancellation: Cancellation,
+    ): CutPremise.Row? {
         val terms = HashMap<CutSource, BigFraction>()
         var constant = BigFraction.ZERO
         var rhs = BigFraction.ofLong(model.flippedRhs[row])
         val fixed = fixings.associateBy { it.column }
         for (column in 0 until model.n) {
+            if (cancellation()) return null
             var coefficient = 0L
-            model.forEachInColumn(column) { index, value -> if (index == row) coefficient = value }
+            for (entry in model.csc.colPtr[column] until model.csc.colPtr[column + 1]) {
+                if (cancellation()) return null
+                if (model.csc.rowIdx[entry] == row) coefficient = model.csc.colVal[entry]
+            }
             if (coefficient == 0L) continue
             val value = BigFraction.ofLong(coefficient)
             val fixing = fixed[column]
@@ -165,6 +177,7 @@ internal class LpEpochProof private constructor(
             terms[source.source] = (terms[source.source] ?: BigFraction.ZERO) + value * source.scale
             constant += value * source.offset
         }
+        if (cancellation()) return null
         return CutPremise.Row(
             CutExpression(terms, constant),
             if (model.hasUpper[model.slackCol(row)]) Relation.EQ else Relation.LE,
@@ -173,15 +186,21 @@ internal class LpEpochProof private constructor(
     }
 
     companion object {
-        fun create(derivation: RelaxationTidyDerivation, sources: CutSourceMap): LpEpochProof? {
+        fun create(
+            derivation: RelaxationTidyDerivation,
+            sources: CutSourceMap,
+            cancellation: Cancellation = Cancellation.Never,
+        ): LpEpochProof? {
+            if (cancellation()) return null
             if (derivation.scope.root !== sources.model || derivation.scope.epoch != sources.epoch ||
                 derivation.scope.assumptions != sources.assumptions || derivation.columnSources != sources.columns ||
-                derivation.scope.searchRoot?.admitsCurrent() == false || !derivation.validate()
+                derivation.scope.searchRoot?.admitsCurrent() == false || !derivation.validate(cancellation)
             ) {
                 return null
             }
             val model = derivation.transformedModel
-            return LpEpochProof(derivation, model, sources, naturalModel(model, sources))
+            val construction = naturalModel(model, sources, cancellation) ?: return null
+            return LpEpochProof(derivation, model, sources, construction)
         }
     }
 }
@@ -198,17 +217,28 @@ private data class NaturalModel(
     val clampedUpper: List<Boolean>,
 )
 
-private fun naturalModel(model: LpModel, sources: CutSourceMap): NaturalModel {
+private fun naturalModel(
+    model: LpModel,
+    sources: CutSourceMap,
+    cancellation: Cancellation = Cancellation.Never,
+): NaturalModel? {
+    if (cancellation()) return null
     val rhs = MutableList(model.m) { model.exactRhs(it) }
-    val columns = List(model.n) { column ->
+    val columns = ArrayList<List<Pair<Int, BigFraction>>>()
+    for (column in 0 until model.n) {
+        if (cancellation()) return null
         val entries = model.exactState?.model?.entries(column)?.map { it.row to it.number.value } ?: buildList {
             model.forEachInColumn(column) { row, value -> add(row to BigFraction.ofLong(value)) }
         }
-        for ((row, value) in entries) rhs[row] += value * model.exactShift(column)
-        entries.sortedBy { it.first }
+        for ((row, value) in entries) {
+            if (cancellation()) return null
+            rhs[row] += value * model.exactShift(column)
+        }
+        columns.add(entries.sortedBy { it.first })
     }
     var constant = model.exactConstant()
     for (column in 0 until model.n) constant -= model.exactCost(column) * model.exactShift(column)
+    if (cancellation()) return null
     return NaturalModel(
         columns,
         List(model.m) { row ->

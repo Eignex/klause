@@ -9,6 +9,7 @@ import com.eignex.klause.lp.engine.LpRowPremises
 import com.eignex.klause.lp.relaxation.CutColumnSource
 import com.eignex.klause.lp.relaxation.CutSourceMap
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.addExact
 import com.eignex.klause.util.mulExact
 import com.ionspin.kotlin.bignum.integer.BigInteger
@@ -138,6 +139,8 @@ internal class RelaxationTidyDerivation(
     private val columnSourceSnapshot = columnSources.toList()
 
     val rowMaps: List<RelaxationTidyRowMap> get() = rowMapSnapshot.toList()
+    fun rowMap(outputRow: Int): RelaxationTidyRowMap? = rowMapSnapshot.getOrNull(outputRow)
+
     val removedRows: List<RelaxationTidyRemovedRow> get() = removedSnapshot.toList()
     val bounds: List<RelaxationTidyBound> get() = boundSnapshot.toList()
     val columnSources: List<CutColumnSource?> get() = columnSourceSnapshot.toList()
@@ -167,7 +170,14 @@ internal class RelaxationTidyDerivation(
     }
 
     /** Independent structural and algebraic validation; publication is rejected unless this succeeds. */
-    fun validate(): Boolean {
+    fun validate(cancellation: Cancellation = Cancellation.Never): Boolean = try {
+        validateBody(cancellation)
+    } catch (_: TidyValidationCancelled) {
+        false
+    }
+
+    private fun validateBody(cancellation: Cancellation): Boolean {
+        checkTidyValidation(cancellation)
         if (sourceModel.exactState != null || transformedModel.exactState != null ||
             sourceModel.doubleView != null || transformedModel.doubleView != null ||
             sourceModel.hasContinuous || transformedModel.hasContinuous ||
@@ -177,7 +187,13 @@ internal class RelaxationTidyDerivation(
         }
         if (!sameColumnsAndObjective(sourceModel, transformedModel)) return false
         if (!hasNormalizedSlacks(sourceModel) || !hasNormalizedSlacks(transformedModel)) return false
-        if (!hasNormalizedRhs(sourceModel) || !hasNormalizedRhs(transformedModel)) return false
+        if (!hasNormalizedRhs(
+                sourceModel,
+                cancellation,
+            ) || !hasNormalizedRhs(transformedModel, cancellation)
+        ) {
+                return false
+            }
         if (columnSourceSnapshot.size != sourceModel.n) return false
         if (rowMapSnapshot.size != transformedModel.m ||
             rowMapSnapshot.map { it.outputRow } != (0 until transformedModel.m).toList() ||
@@ -190,18 +206,22 @@ internal class RelaxationTidyDerivation(
         if ((rowMapSnapshot.map { it.sourceRow } + removed).toSet() != (0 until sourceModel.m).toSet()) return false
 
         for (map in rowMapSnapshot) {
-            if (!validateRow(map)) return false
+            checkTidyValidation(cancellation)
+            if (!validateRow(map, cancellation)) return false
         }
         for (removedRow in removedSnapshot) {
+            checkTidyValidation(cancellation)
             if (removedRow.reason == RelaxationTidyRemovalReason.PARALLEL &&
                 removedRow.supplyingSourceRow !in 0 until sourceModel.m
             ) {
                 return false
             }
-            if (!validateRemovedRow(removedRow)) return false
+            if (!validateRemovedRow(removedRow, cancellation)) return false
             if (removedRow.boundUses.any { use ->
+                    checkTidyValidation(cancellation)
                     use.column !in 0 until sourceModel.n ||
                         boundSnapshot.none {
+                            checkTidyValidation(cancellation)
                             it.column == use.column && it.columnUpper == use.upper && it.sourceRow == use.sourceRow
                         }
                 }
@@ -209,7 +229,7 @@ internal class RelaxationTidyDerivation(
                 return false
             }
         }
-        return boundSnapshot.all(::validateBound)
+        return boundSnapshot.all { validateBound(it, cancellation) } && !cancellation()
     }
 
     /** A transformed primal is already in source coordinates because tidy never eliminates a column. */
@@ -223,12 +243,13 @@ internal class RelaxationTidyDerivation(
             objectiveValue(sourceModel, values) == objectiveValue(transformedModel, values)
     }
 
-    private fun validateRow(map: RelaxationTidyRowMap): Boolean {
-        val sourceCoefficients = rowCoefficients(sourceModel, map.sourceRow)
-        val outputCoefficients = rowCoefficients(transformedModel, map.outputRow)
+    private fun validateRow(map: RelaxationTidyRowMap, cancellation: Cancellation): Boolean {
+        val sourceCoefficients = rowCoefficients(sourceModel, map.sourceRow, cancellation)
+        val outputCoefficients = rowCoefficients(transformedModel, map.outputRow, cancellation)
         val substituted = map.fixings.associateBy { it.column }
         if (substituted.size != map.fixings.size) return false
         for (fixing in map.fixings) {
+            checkTidyValidation(cancellation)
             if (!validFixing(sourceCoefficients, fixing)) return false
         }
         val conditionalFixing = map.fixings.any { !it.global }
@@ -243,6 +264,7 @@ internal class RelaxationTidyDerivation(
         val sourceNaturalRhs = BigFraction.ofLong(sourceModel.flippedRhs[map.sourceRow])
         var reducedRhs = sourceNaturalRhs
         for (fixing in map.fixings) {
+            checkTidyValidation(cancellation)
             reducedRhs -= BigFraction.ofLong(fixing.coefficient) * BigFraction.ofLong(fixing.value)
         }
         val outputNaturalRhs = BigFraction.ofLong(transformedModel.flippedRhs[map.outputRow])
@@ -260,6 +282,7 @@ internal class RelaxationTidyDerivation(
             }
             if (outputNaturalRhs != reducedRhs * map.sourceMultiplier) return false
             for (column in 0 until sourceModel.n) {
+                checkTidyValidation(cancellation)
                 val expected = if (column in substituted) {
                     BigFraction.ZERO
                 } else {
@@ -280,9 +303,10 @@ internal class RelaxationTidyDerivation(
         return true
     }
 
-    private fun validateRemovedRow(removed: RelaxationTidyRemovedRow): Boolean {
-        val coefficients = rowCoefficients(sourceModel, removed.sourceRow).toMutableMap()
+    private fun validateRemovedRow(removed: RelaxationTidyRemovedRow, cancellation: Cancellation): Boolean {
+        val coefficients = rowCoefficients(sourceModel, removed.sourceRow, cancellation).toMutableMap()
         for (fixing in removed.fixings) {
+            checkTidyValidation(cancellation)
             if (!validFixing(coefficients, fixing)) return false
             coefficients.remove(fixing.column)
         }
@@ -297,9 +321,9 @@ internal class RelaxationTidyDerivation(
                 }
             }
 
-            RelaxationTidyRemovalReason.REDUNDANT -> validateRedundant(removed, coefficients)
+            RelaxationTidyRemovalReason.REDUNDANT -> validateRedundant(removed, coefficients, cancellation)
 
-            RelaxationTidyRemovalReason.PARALLEL -> validateParallel(removed, coefficients)
+            RelaxationTidyRemovalReason.PARALLEL -> validateParallel(removed, coefficients, cancellation)
         }
     }
 
@@ -322,16 +346,21 @@ internal class RelaxationTidyDerivation(
         return fixing.global == global && (
             global || (
                 scope.searchRoot != null &&
-            sources.isActive(fixing.lower) && sources.isActive(fixing.upper)
+                    sources.isActive(fixing.lower) && sources.isActive(fixing.upper)
+                )
             )
-        )
     }
 
-    private fun validateRedundant(removed: RelaxationTidyRemovedRow, coefficients: Map<Int, Long>): Boolean {
+    private fun validateRedundant(
+        removed: RelaxationTidyRemovedRow,
+        coefficients: Map<Int, Long>,
+        cancellation: Cancellation,
+    ): Boolean {
         val lower = LongArray(sourceModel.n)
         val upper = sourceModel.upper.copyOfRange(0, sourceModel.n)
         val hasUpper = sourceModel.hasUpper.copyOfRange(0, sourceModel.n)
         for (use in removed.boundUses) {
+            checkTidyValidation(cancellation)
             if (coefficients[use.column] != use.coefficient) return false
             val bound = boundSnapshot.firstOrNull {
                 it.column == use.column && it.columnUpper == use.upper && it.sourceRow == use.sourceRow
@@ -353,6 +382,7 @@ internal class RelaxationTidyDerivation(
         var min = BigInteger.ZERO
         var max = BigInteger.ZERO
         for ((column, coefficient) in coefficients) {
+            checkTidyValidation(cancellation)
             val c = BigInteger.fromLong(coefficient)
             if (coefficient > 0L) {
                 min += c * BigInteger.fromLong(lower[column])
@@ -374,7 +404,11 @@ internal class RelaxationTidyDerivation(
         }
     }
 
-    private fun validateParallel(removed: RelaxationTidyRemovedRow, coefficients: Map<Int, Long>): Boolean {
+    private fun validateParallel(
+        removed: RelaxationTidyRemovedRow,
+        coefficients: Map<Int, Long>,
+        cancellation: Cancellation,
+    ): Boolean {
         val supplier = removed.supplyingSourceRow ?: return false
         val output = rowMapSnapshot.firstOrNull { it.sourceRow == supplier }?.outputRow ?: return false
         if (sourceModel.hasUpper[sourceModel.slackCol(removed.sourceRow)] ||
@@ -382,7 +416,7 @@ internal class RelaxationTidyDerivation(
         ) {
             return false
         }
-        val supplying = rowCoefficients(transformedModel, output)
+        val supplying = rowCoefficients(transformedModel, output, cancellation)
         if (coefficients.keys != supplying.keys || coefficients.isEmpty()) return false
         val first = coefficients.keys.first()
         val scale = BigFraction.ofLong(coefficients.getValue(first)) *
@@ -409,7 +443,8 @@ internal class RelaxationTidyDerivation(
         reducedRhs: BigFraction,
         outputNaturalRhs: BigFraction,
     ): Boolean {
-        val live = sourceCoefficients.filterKeys { column -> map.fixings.none { it.column == column } }
+        val fixedColumns = map.fixings.map { it.column }.toSet()
+        val live = sourceCoefficients.filterKeys { it !in fixedColumns }
         if (live.size != 1) return false
         val (column, coefficient) = live.entries.single()
         val rounding = requireNotNull(map.rounding)
@@ -441,21 +476,23 @@ internal class RelaxationTidyDerivation(
         return outputNaturalRhs == expectedNatural && rounded.den == BigInteger.ONE
     }
 
-    private fun validateBound(bound: RelaxationTidyBound): Boolean {
+    private fun validateBound(bound: RelaxationTidyBound, cancellation: Cancellation): Boolean {
         if (bound.column !in 0 until sourceModel.n || bound.sourceRow !in 0 until sourceModel.m ||
             bound.sourceValue.den.signum() <= 0
         ) {
             return false
         }
         val map = rowMapSnapshot.firstOrNull { it.sourceRow == bound.sourceRow } ?: return false
-        val coefficients = rowCoefficients(sourceModel, bound.sourceRow)
+        val coefficients = rowCoefficients(sourceModel, bound.sourceRow, cancellation)
         if (map.fixings.any { !validFixing(coefficients, it) }) return false
-        val live = coefficients.filterKeys { column -> map.fixings.none { it.column == column } }
+        val fixedColumns = map.fixings.map { it.column }.toSet()
+        val live = coefficients.filterKeys { it !in fixedColumns }
         if (live.size != 1) return false
         val (column, coefficient) = live.entries.single()
         if (column != bound.column || coefficient == 0L || coefficient == Long.MIN_VALUE) return false
         var rhs = BigFraction.ofLong(sourceModel.flippedRhs[bound.sourceRow])
         for (fixing in map.fixings) {
+            checkTidyValidation(cancellation)
             rhs -= BigFraction.ofLong(fixing.coefficient) * BigFraction.ofLong(fixing.value)
         }
         val columnSource = columnSourceSnapshot[column] ?: return false
@@ -494,8 +531,8 @@ internal class RelaxationTidyDerivation(
     private fun integralSource(source: CutSource): Boolean = source.kind == CutSourceKind.INTEGER ||
         source.kind == CutSourceKind.BOOLEAN || (
             source.kind == CutSourceKind.TERM &&
-            sourceMap?.isGlobal(CutPremise.Integral(CutExpression(mapOf(source to BigFraction.ONE)))) == true
-        )
+                sourceMap?.isGlobal(CutPremise.Integral(CutExpression(mapOf(source to BigFraction.ONE)))) == true
+            )
 
     private fun expectedPremises(rowPremises: LpRowPremises?, fixings: List<RelaxationTidyFixing>): Set<CutPremise> =
         buildSet {
@@ -535,16 +572,16 @@ private fun sameColumnsAndObjective(source: LpModel, output: LpModel): Boolean {
     }
 }
 
-private fun hasNormalizedRhs(model: LpModel): Boolean = (0 until model.m).all { row ->
-    var expected = BigInteger.fromLong(model.flippedRhs[row])
+private fun hasNormalizedRhs(model: LpModel, cancellation: Cancellation): Boolean {
+    val expected = Array(model.m) { BigInteger.fromLong(model.flippedRhs[it]) }
     for (column in 0 until model.n) {
-        model.forEachInColumn(column) { entryRow, coefficient ->
-            if (entryRow == row) {
-                expected -= BigInteger.fromLong(coefficient) * BigInteger.fromLong(model.loShift[column])
-            }
+        checkTidyValidation(cancellation)
+        model.forEachInColumn(column) { row, coefficient ->
+            checkTidyValidation(cancellation)
+            expected[row] -= BigInteger.fromLong(coefficient) * BigInteger.fromLong(model.loShift[column])
         }
     }
-    expected == BigInteger.fromLong(model.rhs[row])
+    return expected.indices.all { expected[it] == BigInteger.fromLong(model.rhs[it]) }
 }
 
 private fun hasNormalizedSlacks(model: LpModel): Boolean = (0 until model.m).all { row ->
@@ -552,10 +589,14 @@ private fun hasNormalizedSlacks(model: LpModel): Boolean = (0 until model.m).all
     model.cost[slack] == 0L && (!model.hasUpper[slack] || model.upper[slack] == 0L)
 }
 
-private fun rowCoefficients(model: LpModel, row: Int): Map<Int, Long> {
+private fun rowCoefficients(model: LpModel, row: Int, cancellation: Cancellation): Map<Int, Long> {
     val result = HashMap<Int, Long>()
     for (column in 0 until model.n) {
-        model.forEachInColumn(column) { entryRow, value -> if (entryRow == row) result[column] = value }
+        checkTidyValidation(cancellation)
+        model.forEachInColumn(column) { entryRow, value ->
+            checkTidyValidation(cancellation)
+            if (entryRow == row) result[column] = value
+        }
     }
     return result
 }
@@ -614,4 +655,10 @@ private fun independentlyRound(value: BigFraction, upper: Boolean, strict: Boole
         if (strict && integral) ceiling + BigInteger.ONE else ceiling
     }
     return BigFraction.of(result, BigInteger.ONE)
+}
+
+private class TidyValidationCancelled : RuntimeException()
+
+private fun checkTidyValidation(cancellation: Cancellation) {
+    if (cancellation()) throw TidyValidationCancelled()
 }

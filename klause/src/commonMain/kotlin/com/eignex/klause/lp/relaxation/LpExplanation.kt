@@ -296,8 +296,8 @@ internal object LpExplanation {
                 if (premise.source.kind != CutSourceKind.INTEGER ||
                     premise.source.id !in 0 until session.problem.numIntVars
                 ) {
-                        return false
-                    }
+                    return false
+                }
                 val value = ExactLpNumber.of(premise.value).legacyLong() ?: return false
                 if (session.intDomain(premise.source.id).contains(value)) return false
                 session.equalityLit(premise.source.id, value)

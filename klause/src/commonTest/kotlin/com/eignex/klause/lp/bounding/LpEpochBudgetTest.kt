@@ -39,11 +39,11 @@ class LpEpochBudgetTest {
     fun `equivalent replacement cannot replenish exhausted feasibility pivots`() {
         val source = assertNotNull(
             LpBuilder().apply {
-            repeat(4) { j ->
-                addVar(0L, 10L)
-                addRow(intArrayOf(j), longArrayOf(3L), Relation.GE, 1L)
-            }
-        }.build(Sense.MINIMIZE).trailModel()
+                repeat(4) { j ->
+                    addVar(0L, 10L)
+                    addRow(intArrayOf(j), longArrayOf(3L), Relation.GE, 1L)
+                }
+            }.build(Sense.MINIMIZE).trailModel(),
         )
         val state = LpExactState(source)
         val basis = Basis(IntArray(4) { 4 + it }, Array(8) { if (it < 4) VarStatus.AT_LOWER else VarStatus.BASIC })

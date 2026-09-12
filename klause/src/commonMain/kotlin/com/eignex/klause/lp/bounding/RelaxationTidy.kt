@@ -98,7 +98,10 @@ internal object RelaxationTidy {
             counts.stats(),
             sources,
         )
-        if (!derivation.validate() || config.cancellation()) {
+        val rowSources = IntArray(retained.size) { retained[it].sourceRow }
+        val mapped = sources.remapRows(rowSources)
+        val proof = LpEpochProof.create(derivation, mapped, config.cancellation)
+        if (proof == null || config.cancellation()) {
             return counts.declineResult(
                 if (config.cancellation()) {
                     RelaxationTidyDecline.CANCELLED
@@ -107,9 +110,7 @@ internal object RelaxationTidy {
                 },
             )
         }
-        val rowSources = IntArray(retained.size) { retained[it].sourceRow }
-        val mapped = sources.remapRows(rowSources)
-        return RelaxationTidyResult.Applied(relaxation.withTidy(output, mapped, derivation), derivation)
+        return RelaxationTidyResult.Applied(relaxation.withTidy(output, mapped, derivation, proof), derivation)
     }
 }
 
@@ -179,6 +180,7 @@ private fun substituteFixed(
     cancellation: Cancellation,
     searchRoot: LpEpochRoot?,
 ) {
+    val rootAdmitted = searchRoot?.admitsCurrent() == true
     for (row in rows) {
         if (cancellation()) return
         val candidates = row.coefficients.keys.filter { column ->
@@ -189,6 +191,7 @@ private fun substituteFixed(
         var flipped = row.flippedRhs
         var overflow = false
         for (column in candidates) {
+            if (cancellation()) return
             counts.eligible(RelaxationTidyRule.FIXED_SUBSTITUTION)
             val sourceColumn = sources.column(column)
             if (sourceColumn == null) {
@@ -200,7 +203,7 @@ private fun substituteFixed(
             val lower = CutPremise.Bound(expression, false, BigFraction.ofLong(value))
             val upper = CutPremise.Bound(expression, true, BigFraction.ofLong(value))
             val global = sources.isGlobal(lower) && sources.isGlobal(upper)
-            val active = searchRoot?.admitsCurrent() == true && sources.isActive(lower) && sources.isActive(upper)
+            val active = !global && rootAdmitted && sources.isActive(lower) && sources.isActive(upper)
             if (!global && !active) {
                 counts.recordDecline(RelaxationTidyDecline.UNSUPPORTED_SOURCE_MAP)
                 continue
@@ -311,10 +314,10 @@ private fun canonicalizeSingletons(
         }
         val sourceColumn = sources.column(column)
         if (sourceColumn == null || !sources.isGlobal(
-            CutPremise.Integral(
-                CutExpression(mapOf(sourceColumn.source to BigFraction.ONE)),
+                CutPremise.Integral(
+                    CutExpression(mapOf(sourceColumn.source to BigFraction.ONE)),
+                ),
             )
-        )
         ) {
             counts.recordDecline(RelaxationTidyDecline.UNSUPPORTED_COLUMN)
             continue

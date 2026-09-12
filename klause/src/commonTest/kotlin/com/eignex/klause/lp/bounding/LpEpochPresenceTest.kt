@@ -56,13 +56,15 @@ class LpEpochPresenceTest {
         val term = assertNotNull(sources.column(column)).expression()
         val guard = assertNotNull(sources.presenceGuard(CutPremise.Bound(term, true, BigFraction.ZERO)))
         val cut = SourceCut(
-            term, Relation.LE, BigFraction.ZERO,
+            term,
+            Relation.LE,
+            BigFraction.ZERO,
             CutProvenance(
-            problem,
-            sources.epoch,
-            listOf(CutProofFact(guard, false)),
-            auxiliaryDefinitions = sources.auxiliaryDefinitions,
-        )
+                problem,
+                sources.epoch,
+                listOf(CutProofFact(guard, false)),
+                auxiliaryDefinitions = sources.auxiliaryDefinitions,
+            ),
         )
         assertNotNull(cut.toCut(sources).orNull())
         session.popToLevel(0)
@@ -93,8 +95,8 @@ class LpEpochPresenceTest {
             val activity = LongArray(relaxation.model.m)
             for (column in values.indices) {
                 relaxation.model.forEachInColumn(column) { row, coefficient ->
-                activity[row] += coefficient * values[column]
-            }
+                    activity[row] += coefficient * values[column]
+                }
             }
             for (row in activity.indices) assertEquals(relaxation.model.flippedRhs[row], activity[row])
         }
@@ -160,13 +162,15 @@ class LpEpochPresenceTest {
         val integer = CutSource(CutSourceKind.INTEGER, 0)
         val expression = CutExpression(mapOf(integer to BigFraction.ONE))
         val cut = SourceCut(
-            expression, Relation.LE, BigFraction.ONE,
+            expression,
+            Relation.LE,
+            BigFraction.ONE,
             CutProvenance(
-            problem,
-            original.epoch,
-            listOf(CutProofFact(CutPremise.Row(expression, Relation.LE, BigFraction.ONE), true)),
-            auxiliaryDefinitions = original.auxiliaryDefinitions,
-        )
+                problem,
+                original.epoch,
+                listOf(CutProofFact(CutPremise.Row(expression, Relation.LE, BigFraction.ONE), true)),
+                auxiliaryDefinitions = original.auxiliaryDefinitions,
+            ),
         )
         val target = CutSourceMap(problem, 10L, original.columns.filter { it?.source?.kind == CutSourceKind.INTEGER })
 

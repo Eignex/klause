@@ -47,13 +47,13 @@ internal fun CutProvenance.retainReferencedDefinitions(additional: CutExpression
     conclusion?.let { expression(it.expression) }
     for (fact in facts) {
         when (val premise = fact.premise) {
-        is CutPremise.Bound -> expression(premise.expression)
-        is CutPremise.Row -> expression(premise.expression)
-        is CutPremise.Integral -> expression(premise.expression)
-        is CutPremise.ObjectiveCutoff -> expression(premise.expression)
-        is CutPremise.Fixed -> if (premise.source.kind == CutSourceKind.TERM) referenced.add(premise.source)
-        is CutPremise.Literal, is CutPremise.Excluded -> Unit
-    }
+            is CutPremise.Bound -> expression(premise.expression)
+            is CutPremise.Row -> expression(premise.expression)
+            is CutPremise.Integral -> expression(premise.expression)
+            is CutPremise.ObjectiveCutoff -> expression(premise.expression)
+            is CutPremise.Fixed -> if (premise.source.kind == CutSourceKind.TERM) referenced.add(premise.source)
+            is CutPremise.Literal, is CutPremise.Excluded -> Unit
+        }
     }
     for (rule in rules) for (row in rule.rows) expression(row.row.expression)
     for (transform in transformations) {
@@ -103,8 +103,8 @@ internal class CutMappingLimits(val terms: Int = 4096, val bits: Int = 4096) {
                     2,
                 ).any { definition.required[it] !in 0L..Int.MAX_VALUE.toLong() }
             ) {
-                    return false
-                }
+                return false
+            }
         }
         proof.conclusion?.let { if (!expression(it.expression) || !accepts(it.rhs)) return false }
         for (fact in proof.facts) {
@@ -137,8 +137,8 @@ internal class CutMappingLimits(val terms: Int = 4096, val bits: Int = 4096) {
             if (--remaining < 0 || !expression(transform.input.expression) || !accepts(transform.input.rhs) ||
                 !expression(transform.conclusion.expression) || !accepts(transform.conclusion.rhs)
             ) {
-                    return false
-                }
+                return false
+            }
             when (transform) {
                 is CutRowTransform.Algebraic -> {
                     if (!accepts(transform.multiplier)) return false
@@ -146,8 +146,8 @@ internal class CutMappingLimits(val terms: Int = 4096, val bits: Int = 4096) {
                         if (--remaining < 0 || !expression(fixing.lower.expression) || !accepts(fixing.lower.value) ||
                             !expression(fixing.upper.expression) || !accepts(fixing.upper.value)
                         ) {
-                                return false
-                            }
+                            return false
+                        }
                     }
                 }
 
@@ -158,8 +158,8 @@ internal class CutMappingLimits(val terms: Int = 4096, val bits: Int = 4096) {
                                 result.threshold,
                             ) || !accepts(result.roundedThreshold)
                         ) {
-                                return false
-                            }
+                            return false
+                        }
 
                         is CutLatticeResult.InfeasibleEquality -> if (!accepts(result.threshold)) return false
                     }

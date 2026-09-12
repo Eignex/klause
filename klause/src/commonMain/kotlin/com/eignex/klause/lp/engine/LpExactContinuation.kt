@@ -65,8 +65,8 @@ internal class LpExactContinuationCache {
             usedWork != 0L || usedAllocation != 0L || usedTimeNs != 0L ||
             !current.model.sameAuthority(budget.authority)
         ) {
-                return false
-            }
+            return false
+        }
         epochAuthority = budget.authority
         inputWork = budget.work
         inputAllocation = budget.allocation

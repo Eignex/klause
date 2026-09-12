@@ -20,11 +20,15 @@ class LpMixedEpochTest {
     @Test
     fun `continuous CP rows decline the legacy bound adapter without changing domains`() {
         val problem = Problem(
-            0, 1, arrayOf(IntDomain(0, 4)),
+            0,
+            1,
+            arrayOf(IntDomain(0, 4)),
             arrayOf(
-            Linear(intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0), doubleArrayOf(0.5), LinearOp.GE, 1.0),
-        ),
-            numRealVars = 1, realLower = doubleArrayOf(-2.0), realUpper = doubleArrayOf(2.0)
+                Linear(intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0), doubleArrayOf(0.5), LinearOp.GE, 1.0),
+            ),
+            numRealVars = 1,
+            realLower = doubleArrayOf(-2.0),
+            realUpper = doubleArrayOf(2.0),
         )
         val objective = LinearObjective(intCoefficients = longArrayOf(1))
         val relaxation = CpToLpRelaxation(problem, objective).build(RootDomains(problem))

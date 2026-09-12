@@ -45,11 +45,11 @@ internal fun Table.emitLpRelaxation(builder: RelaxationBuilder) {
         }
         selCols.add(
             builder.auxColumn(
-            0L,
-            if (liveFeasible) 1L else 0L,
-            presence = presence,
-            definition = LpAuxiliaryColumn(listOf(t.toLong()), 1L, true),
-        )
+                0L,
+                if (liveFeasible) 1L else 0L,
+                presence = presence,
+                definition = LpAuxiliaryColumn(listOf(t.toLong()), 1L, true),
+            ),
         )
         rows.add(t)
     }

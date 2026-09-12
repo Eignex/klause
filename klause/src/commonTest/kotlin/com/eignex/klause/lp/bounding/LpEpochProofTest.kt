@@ -6,6 +6,7 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.cut.SourceCut
 import com.eignex.klause.lp.cut.orNull
+import com.eignex.klause.lp.engine.Basis
 import com.eignex.klause.lp.engine.Cut
 import com.eignex.klause.lp.engine.CutInputRow
 import com.eignex.klause.lp.engine.CutRowTransform
@@ -13,6 +14,7 @@ import com.eignex.klause.lp.engine.LpBuilder
 import com.eignex.klause.lp.engine.Relation
 import com.eignex.klause.lp.engine.Sense
 import com.eignex.klause.lp.engine.TableauCutProvenance
+import com.eignex.klause.lp.engine.VarStatus
 import com.eignex.klause.lp.engine.integerCertify
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.lp.relaxation.LpExplanation
@@ -23,6 +25,7 @@ import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.SolveStatsSink
+import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 import kotlin.test.Test
@@ -31,10 +34,101 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class LpEpochProofTest {
+    @Test
+    fun `cancellation interrupts fixed substitution within a wide row`() {
+        val size = 64
+        val problem = Problem(
+            0, size, Array(size) { IntDomain(0, 1) },
+            arrayOf(
+            Linear(IntArray(size) { 1 }, IntArray(size) { it }, LinearOp.LE, size / 2),
+        )
+        )
+        val session = PropagationSession(problem)
+        repeat(size) { session.implyIntAtMost(it, 0) }
+        val plain = CpToLpRelaxation(problem, null).build(session)
+        var checks = 0
+
+        val result = RelaxationTidy.apply(
+            plain,
+            RelaxationTidyScope(
+                problem,
+                assertNotNull(plain.sourceMap).epoch,
+                null,
+                true,
+                searchRoot = assertNotNull(LpEpochRoot.capture(session)),
+            ),
+            RelaxationTidyConfig(enabled = true, cancellation = Cancellation { ++checks >= 16 }),
+        )
+
+        assertEquals(RelaxationTidyDecline.CANCELLED, assertIs<RelaxationTidyResult.Declined>(result).reason)
+        assertEquals(0, result.stats.applied(RelaxationTidyRule.FIXED_SUBSTITUTION))
+        assertNull(plain.tidyProof)
+    }
+
+    @Test
+    fun `cancellation during validation leaves a checked proof reusable`() {
+        val size = 32
+        val problem = Problem(
+            0, size, Array(size) { IntDomain(0, 1) },
+            arrayOf(
+            Linear(IntArray(size) { 1 }, IntArray(size) { it }, LinearOp.LE, size / 2),
+        )
+        )
+        val plain = CpToLpRelaxation(problem, null).build(RootDomains(problem))
+        val tidy = assertIs<RelaxationTidyResult.Applied>(
+            RelaxationTidy.apply(
+            plain,
+            RelaxationTidyScope(problem, assertNotNull(plain.sourceMap).epoch, null, true),
+            RelaxationTidyConfig(enabled = true),
+        )
+        )
+        var checks = 0
+
+        val proof = LpEpochProof.create(
+            tidy.derivation,
+            assertNotNull(tidy.relaxation.sourceMap),
+            Cancellation { ++checks >= 16 },
+        )
+
+        assertNull(proof)
+        assertEquals(16, checks)
+        assertTrue(tidy.derivation.validate())
+        assertNotNull(tidy.relaxation.tidyProof?.rowProof(0))
+    }
+
+    @Test
+    fun `cancellation interrupts basis remapping without consuming the donor basis`() {
+        val size = 32
+        val problem = Problem(
+            0, size, Array(size) { IntDomain(0, 1) },
+            arrayOf(
+            Linear(IntArray(size) { 1 }, IntArray(size) { it }, LinearOp.LE, size / 2),
+        )
+        )
+        val plain = CpToLpRelaxation(problem, null).build(RootDomains(problem))
+        val tidy = assertIs<RelaxationTidyResult.Applied>(
+            RelaxationTidy.apply(
+            plain,
+            RelaxationTidyScope(problem, assertNotNull(plain.sourceMap).epoch, null, true),
+            RelaxationTidyConfig(enabled = true),
+        )
+        ).relaxation
+        val basis = Basis(intArrayOf(size), Array(size + 1) { if (it == size) VarStatus.BASIC else VarStatus.AT_LOWER })
+        var checks = 0
+
+        val mapped = LpEpochState.remapBasis(tidy, tidy, basis, Cancellation { ++checks >= 16 })
+
+        assertNull(mapped)
+        assertEquals(16, checks)
+        assertEquals(size, basis.basicVars.single())
+        assertNotNull(LpEpochState.remapBasis(tidy, tidy, basis))
+    }
+
     @Test
     fun `conditional substitution retains its premises after exact recentering`() {
         val problem = Problem(
@@ -51,10 +145,10 @@ class LpEpochProofTest {
         val plain = CpToLpRelaxation(problem, objective).build(session)
         val result = assertIs<RelaxationTidyResult.Applied>(
             RelaxationTidy.apply(
-            plain,
-            RelaxationTidyScope(problem, assertNotNull(plain.sourceMap).epoch, objective, true, searchRoot = root),
-            RelaxationTidyConfig(enabled = true),
-        )
+                plain,
+                RelaxationTidyScope(problem, assertNotNull(plain.sourceMap).epoch, objective, true, searchRoot = root),
+                RelaxationTidyConfig(enabled = true),
+            ),
         )
         assertTrue(result.derivation.rowMaps.any { it.fixings.any { fixing -> !fixing.global } })
         session.implyIntAtLeast(1, -1)
@@ -66,12 +160,12 @@ class LpEpochProofTest {
         val literals = IntArrayList()
         assertTrue(
             LpExplanation.addRowPremiseLits(
-            literals,
-            IntHashSet(),
-            rebound,
-            IntArray(rebound.model.m) { it },
-            session,
-        )
+                literals,
+                IntHashSet(),
+                rebound,
+                IntArray(rebound.model.m) { it },
+                session,
+            ),
         )
         assertTrue(session.boundGeLit(0, 1, positive = false) in literals.toIntArray())
         assertTrue(session.boundLeLit(0, 1, positive = false) in literals.toIntArray())
@@ -92,10 +186,10 @@ class LpEpochProofTest {
         val plain = CpToLpRelaxation(problem, null).build(session)
         val result = assertIs<RelaxationTidyResult.Applied>(
             RelaxationTidy.apply(
-            plain,
-            RelaxationTidyScope(problem, assertNotNull(plain.sourceMap).epoch, null, true),
-            RelaxationTidyConfig(enabled = true),
-        )
+                plain,
+                RelaxationTidyScope(problem, assertNotNull(plain.sourceMap).epoch, null, true),
+                RelaxationTidyConfig(enabled = true),
+            ),
         )
         val foreign = CpToLpRelaxation(
             Problem(0, 2, Array(2) { IntDomain(-3, 5) }, problem.factors),
@@ -115,10 +209,10 @@ class LpEpochProofTest {
         val plain = CpToLpRelaxation(problem, null).build(RootDomains(problem))
         val tidy = assertIs<RelaxationTidyResult.Applied>(
             RelaxationTidy.apply(
-            plain,
-            RelaxationTidyScope(problem, assertNotNull(plain.sourceMap).epoch, null, true),
-            RelaxationTidyConfig(enabled = true),
-        )
+                plain,
+                RelaxationTidyScope(problem, assertNotNull(plain.sourceMap).epoch, null, true),
+                RelaxationTidyConfig(enabled = true),
+            ),
         ).relaxation
         val row = 0
         val columns = (0 until tidy.model.n).filter { column ->
@@ -138,20 +232,22 @@ class LpEpochProofTest {
             tidy.model.flippedRhs[row],
             global = true,
             tableau = TableauCutProvenance(
-                tidy.model, emptyList(),
+                tidy.model,
+                emptyList(),
                 listOf(
                     CutInputRow(
-                row,
-                true,
-                1L,
-                BigFraction.ofLong(tidy.model.flippedRhs[row]),
-                Relation.LE,
-                columns,
-                coefficients,
-                null,
-            )
+                        row,
+                        true,
+                        1L,
+                        BigFraction.ofLong(tidy.model.flippedRhs[row]),
+                        Relation.LE,
+                        columns,
+                        coefficients,
+                        null,
+                    ),
                 ),
-                1L, false
+                1L,
+                false,
             ),
         )
 
@@ -191,16 +287,16 @@ class LpEpochProofTest {
         val plain = CpToLpRelaxation(problem, objective).build(session)
         val tidy = assertIs<RelaxationTidyResult.Applied>(
             RelaxationTidy.apply(
-            plain,
-            RelaxationTidyScope(
-                problem,
-                assertNotNull(plain.sourceMap).epoch,
-                objective,
-                true,
-                searchRoot = assertNotNull(LpEpochRoot.capture(session)),
+                plain,
+                RelaxationTidyScope(
+                    problem,
+                    assertNotNull(plain.sourceMap).epoch,
+                    objective,
+                    true,
+                    searchRoot = assertNotNull(LpEpochRoot.capture(session)),
+                ),
+                RelaxationTidyConfig(enabled = true),
             ),
-            RelaxationTidyConfig(enabled = true),
-        )
         ).relaxation
         val certificate = assertNotNull(integerCertify(tidy.model, DoubleArray(tidy.model.m) { -1.0 }, scaleBits = 0))
 

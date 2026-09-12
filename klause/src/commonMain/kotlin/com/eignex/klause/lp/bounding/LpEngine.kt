@@ -614,7 +614,7 @@ internal class LpEngine(
         }
         if (token() || !root.admits(session) || !LpEpochState.supports(next)) return false
         val nextState = LpEpochState(root, next, keys, number)
-        val warm = oldBase?.let { LpEpochState.remapBasis(it, next, lpBasisByDepth.firstOrNull()) }
+        val warm = oldBase?.let { LpEpochState.remapBasis(it, next, lpBasisByDepth.firstOrNull(), token) }
         noteEpochWork(next.model.n.toLong() + next.model.m + next.model.csc.colVal.size)
         val preparationStart = TimeSource.Monotonic.markNow()
         return try {
@@ -624,11 +624,11 @@ internal class LpEngine(
                 epochRebuilds++
                 observeEpoch("published")
                 if (oldBase != null && (
-                    oldBase.model.n != next.model.n || oldBase.model.m != next.model.m ||
-                        !oldBase.model.csc.colPtr.contentEquals(next.model.csc.colPtr) ||
-                        !oldBase.model.csc.rowIdx.contentEquals(next.model.csc.rowIdx) ||
-                        !oldBase.model.csc.colVal.contentEquals(next.model.csc.colVal)
-                )
+                        oldBase.model.n != next.model.n || oldBase.model.m != next.model.m ||
+                            !oldBase.model.csc.colPtr.contentEquals(next.model.csc.colPtr) ||
+                            !oldBase.model.csc.rowIdx.contentEquals(next.model.csc.rowIdx) ||
+                            !oldBase.model.csc.colVal.contentEquals(next.model.csc.colVal)
+                        )
                 ) {
                     observeEpoch("matrix_changes")
                 }

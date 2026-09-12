@@ -173,18 +173,18 @@ internal class LpPropagator(
         if (closed || token() || (owner?.state?.depth ?: 0) != 0 ||
             (preserveSourcePremises && modelKey !== key)
         ) {
-                return false
-            }
+            return false
+        }
         val donor = owner
         val donorState = donor?.state
         val budget = donor?.exportEpochBudget().takeIf { preserveSourcePremises }
         if (preserveSourcePremises && (
-            donorState?.model?.sameAuthority(model) != true ||
-                rows?.sameAuthority(donorState.rows) != true
-        )
+                donorState?.model?.sameAuthority(model) != true ||
+                    rows?.sameAuthority(donorState.rows) != true
+                )
         ) {
-                    return false
-                }
+            return false
+        }
         val savedPremises = sourcePremises.takeIf { preserveSourcePremises }
         val initial = LpExactState(model, rows = rows ?: LpScopedRows.initial(model.m))
         val candidate = newOwner(initial)
@@ -255,18 +255,18 @@ internal class LpPropagator(
         val result = HashMap<Pair<Int, Boolean>, SearchAtomPremise>()
         for (column in 0 until current.model.numVars) {
             for (upper in listOf(false, true)) {
-            val active = current.activeSide(column, upper) ?: continue
-            val declared = rootState?.takeIf { column < it.model.numVars }?.activeSide(column, upper)
-            result[column to upper] = if (declared == active) {
-                if (sourceRootBounds) {
-                    SearchAtomPremise.All(emptyList())
+                val active = current.activeSide(column, upper) ?: continue
+                val declared = rootState?.takeIf { column < it.model.numVars }?.activeSide(column, upper)
+                result[column to upper] = if (declared == active) {
+                    if (sourceRootBounds) {
+                        SearchAtomPremise.All(emptyList())
+                    } else {
+                        baseSidePremises[column to upper] ?: SearchAtomPremise.Unavailable
+                    }
                 } else {
-                    baseSidePremises[column to upper] ?: SearchAtomPremise.Unavailable
+                    boundPremise(active.witness)
                 }
-            } else {
-                boundPremise(active.witness)
             }
-        }
         }
         return result.toMap()
     }

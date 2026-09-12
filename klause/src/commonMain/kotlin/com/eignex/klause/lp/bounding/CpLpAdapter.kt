@@ -97,27 +97,27 @@ internal class CpLpAdapter(private val engine: LpEngine) : LpSearchPolicy {
         val premises = buildMap<Pair<Int, Boolean>, SearchAtomPremise> {
             for (column in 0 until model.n) {
                 for (upper in listOf(false, true)) {
-                val side = if (upper) model.column(column).bounds.upper else model.column(column).bounds.lower
-                if (side == null) continue
-                val source = base.sourceMap?.column(column)
-                val fact = source?.let {
-                    CutPremise.Bound(
-                        it.expression(),
-                        upper,
-                        side.number.value + model.column(column).origin.value,
-                    )
-                }
-                val premise = when {
-                    fact != null && base.sourceMap.isGlobal(fact) -> SearchAtomPremise.All(emptyList())
+                    val side = if (upper) model.column(column).bounds.upper else model.column(column).bounds.lower
+                    if (side == null) continue
+                    val source = base.sourceMap?.column(column)
+                    val fact = source?.let {
+                        CutPremise.Bound(
+                            it.expression(),
+                            upper,
+                            side.number.value + model.column(column).origin.value,
+                        )
+                    }
+                    val premise = when {
+                        fact != null && base.sourceMap.isGlobal(fact) -> SearchAtomPremise.All(emptyList())
 
-                    base.colIsBool[column] -> SearchAtomPremise.Asserted(
-                        SearchDecision.Bool(Lit.make(base.colVarId[column], !upper)),
-                    )
+                        base.colIsBool[column] -> SearchAtomPremise.Asserted(
+                            SearchDecision.Bool(Lit.make(base.colVarId[column], !upper)),
+                        )
 
-                    else -> SearchAtomPremise.Unavailable
+                        else -> SearchAtomPremise.Unavailable
+                    }
+                    put(column to upper, premise)
                 }
-                put(column to upper, premise)
-            }
             }
         }
         return engine.propagator.replaceEpoch(base, model, warm, token, validatePublication, premises) {

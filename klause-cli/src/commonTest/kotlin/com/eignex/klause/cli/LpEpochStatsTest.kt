@@ -18,8 +18,12 @@ import kotlin.test.assertTrue
 class LpEpochStatsTest {
     @Test
     fun `production epoch opportunities reach the CLI statistics stream`() {
-        val problem = Problem(1, 2, Array(2) { IntDomain(0, 4) },
-            arrayOf(ReifiedLinear(0, intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 3)))
+        val problem = Problem(
+            1,
+            2,
+            Array(2) { IntDomain(0, 4) },
+            arrayOf(ReifiedLinear(0, intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 3)),
+        )
         val result = assertIs<SolveResult.Sat>(BacktrackSolver(problem.bake()).solve(BacktrackParams(lpEpochs = true)))
 
         val printed = lpStatPairs(result.stats).toMap()

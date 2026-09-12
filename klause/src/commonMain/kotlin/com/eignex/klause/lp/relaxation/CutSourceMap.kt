@@ -66,8 +66,8 @@ internal class CutSourceMap(
         if (term.value != BigFraction.ONE || !premise.expression.constant.isZero || !premise.upper ||
             !premise.value.isZero || premise.strict
         ) {
-                return null
-            }
+            return null
+        }
         val definition = auxiliarySnapshot[term.key] ?: return null
         for (index in definition.required.indices step 2) {
             val absent = CutPremise.Excluded(
@@ -159,8 +159,8 @@ internal fun CutSourceMap.withCpBounds(
             val value = definition.required[index + 1]
             if (!session.intDomain(variable).contains(value)) {
                 facts.add(
-                CutPremise.Excluded(CutSource(CutSourceKind.INTEGER, variable), BigFraction.ofLong(value)),
-            )
+                    CutPremise.Excluded(CutSource(CutSourceKind.INTEGER, variable), BigFraction.ofLong(value)),
+                )
             }
         }
     }
@@ -241,16 +241,16 @@ internal fun cpCutSources(
     val active = columnBounds(model, columns).toMutableSet()
     if (domains != null) {
         for (definition in auxiliary.values) {
-        for (index in definition.required.indices step 2) {
-            val variable = definition.required[index].toInt()
-            val value = definition.required[index + 1]
-            if (!domains.intDomain(variable).contains(value)) {
-                active.add(
-                CutPremise.Excluded(CutSource(CutSourceKind.INTEGER, variable), BigFraction.ofLong(value)),
-            )
+            for (index in definition.required.indices step 2) {
+                val variable = definition.required[index].toInt()
+                val value = definition.required[index + 1]
+                if (!domains.intDomain(variable).contains(value)) {
+                    active.add(
+                        CutPremise.Excluded(CutSource(CutSourceKind.INTEGER, variable), BigFraction.ofLong(value)),
+                    )
+                }
             }
         }
-    }
     }
     return CutSourceMap(problem, 0, columns, globals, active, parentRows = parents, auxiliaryDefinitions = auxiliary)
 }

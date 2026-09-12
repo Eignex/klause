@@ -7,6 +7,7 @@ import com.eignex.klause.lp.engine.VarStatus
 import com.eignex.klause.lp.relaxation.CutColumnSource
 import com.eignex.klause.lp.relaxation.LpRelaxation
 import com.eignex.klause.propagation.PropagationSession
+import com.eignex.klause.util.Cancellation
 
 internal class LpEpochRoot private constructor(
     private val session: PropagationSession,
@@ -73,21 +74,36 @@ internal class LpEpochState(
             val columns = sources.columns
             return when {
                 model.n == 0 -> "empty_model"
+
                 model.hasContinuous || model.doubleView != null -> "continuous_cp_rebind"
+
                 model.exactState != null -> "exact_cp_rebind"
+
                 relaxation.gatedRows.isNotEmpty() -> "gated_owner"
+
                 relaxation.tidyDerivation != null && relaxation.tidyProof == null -> "tidy_proof"
+
                 columns.size != model.n || columns.any { it == null } -> "column_source"
+
                 columns.distinct().size != model.n -> "aliased_source"
+
                 relaxation.colVarId.indices.any {
                     relaxation.colVarId[it] < 0 && relaxation.colPresence[it] == null
                 } -> "presence_definition"
+
                 sources.assumptions.isNotEmpty() -> "assumption_scope"
+
                 else -> null
             }
         }
 
-        fun remapBasis(previous: LpRelaxation, next: LpRelaxation, basis: Basis?): Basis? {
+        fun remapBasis(
+            previous: LpRelaxation,
+            next: LpRelaxation,
+            basis: Basis?,
+            cancellation: Cancellation = Cancellation.Never,
+        ): Basis? {
+            if (cancellation()) return null
             if (basis == null || basis.status.size != previous.model.numVars ||
                 basis.basicVars.size != previous.model.m ||
                 previous.sourceMap?.model !== next.sourceMap?.model
@@ -100,30 +116,34 @@ internal class LpEpochState(
             val oldCounts = oldColumns.groupingBy { it }.eachCount()
             val newCounts = newColumns.groupingBy { it }.eachCount()
             val newIndex = newColumns.withIndex().associate { it.value to it.index }
+            val oldDefinitions = previous.sourceMap.auxiliaryDefinitions
+            val newDefinitions = next.sourceMap.auxiliaryDefinitions
             val columnMap = oldColumns.map { source ->
+                if (cancellation()) return null
                 if (oldCounts[source] == 1 && newCounts[source] == 1 &&
-                    previous.sourceMap.auxiliaryDefinitions[source?.source] ==
-                    next.sourceMap.auxiliaryDefinitions[source?.source]
+                    oldDefinitions[source?.source] == newDefinitions[source?.source]
                 ) {
                     newIndex[source] ?: -1
                 } else {
                     -1
                 }
             }
-            val oldRows = rowKeys(previous)
-            val newRows = rowKeys(next)
+            val oldRows = rowKeys(previous, cancellation) ?: return null
+            val newRows = rowKeys(next, cancellation) ?: return null
             val uniqueOld = oldRows.groupingBy { it }.eachCount()
             val uniqueNew = newRows.groupingBy { it }.eachCount()
             val nextRows = newRows.withIndex().associate { it.value to it.index }
             val model = next.model
             val statuses = Array(model.numVars) { VarStatus.AT_LOWER }
             for ((old, mapped) in columnMap.withIndex()) {
+                if (cancellation()) return null
                 if (mapped >= 0 && basis.status[old] == VarStatus.AT_UPPER && model.hasUpper[mapped]) {
                     statuses[mapped] = VarStatus.AT_UPPER
                 }
             }
-            val headings = ArrayList<Int>()
+            val headings = LinkedHashSet<Int>()
             for (column in basis.basicVars) {
+                if (cancellation()) return null
                 val mapped = if (column < previous.model.n) {
                     columnMap[column]
                 } else {
@@ -135,6 +155,7 @@ internal class LpEpochState(
                 headings.add(mapped)
             }
             for (row in 0 until model.m) {
+                if (cancellation()) return null
                 if (headings.size == model.m) break
                 val logical = model.n + row
                 if (logical !in headings) headings.add(logical)
@@ -143,23 +164,29 @@ internal class LpEpochState(
             return Basis(headings.toIntArray(), statuses)
         }
 
-        private fun rowKeys(relaxation: LpRelaxation): List<List<Any?>> {
+        private fun rowKeys(relaxation: LpRelaxation, cancellation: Cancellation): List<List<Any?>>? {
             val model = relaxation.model
             val coefficients = Array(model.m) { HashMap<CutColumnSource?, Long>() }
             for (column in 0 until model.n) {
+                if (cancellation()) return null
                 model.forEachInColumn(column) { row, value ->
                     if (value != 0L) coefficients[row][relaxation.sourceMap?.column(column)] = value
                 }
             }
-            return List(model.m) { row ->
+            val keys = ArrayList<List<Any?>>()
+            for (row in 0 until model.m) {
+                if (cancellation()) return null
                 val premise = model.rowPremises[row]
                 val parent = relaxation.sourceMap?.parent(row)
-                listOf(
+                val proof = relaxation.tidyProof?.rowProof(row, cancellation)
+                if (relaxation.tidyProof != null && proof == null) return null
+                keys.add(
+                    listOf(
                     coefficients[row], model.flippedRhs[row], model.hasUpper[model.n + row],
                     model.rowStrict[row], model.rowGlobal[row], premise?.vars?.toList(),
                     premise?.isUpper?.toList(), premise?.thresholds?.toList(), premise?.boolLits?.toList(),
                     parent?.model, parent?.assumptions, parent?.conclusion, parent?.facts,
-                    relaxation.tidyProof?.rowProof(row)?.transformations?.map { transform ->
+                    proof?.transformations?.map { transform ->
                         when (transform) {
                             is CutRowTransform.Algebraic -> listOf(
                                 transform.input,
@@ -174,7 +201,9 @@ internal class LpEpochState(
                         }
                     },
                 )
+                )
             }
+            return keys
         }
     }
 }

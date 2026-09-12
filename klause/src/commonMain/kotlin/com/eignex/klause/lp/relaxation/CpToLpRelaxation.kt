@@ -262,6 +262,7 @@ internal fun LpRelaxation.withTidy(
     tidyModel: LpModel,
     sources: CutSourceMap,
     derivation: RelaxationTidyDerivation,
+    proof: LpEpochProof,
 ): LpRelaxation = LpRelaxation(
     model = tidyModel,
     colVarId = colVarId,
@@ -280,7 +281,7 @@ internal fun LpRelaxation.withTidy(
     sourceMap = sources,
     tidyDerivation = derivation,
     tidyStats = derivation.stats,
-    tidyProof = requireNotNull(LpEpochProof.create(derivation, sources)),
+    tidyProof = proof,
 )
 
 private fun LpRelaxation.withTidyDecline(
@@ -754,10 +755,10 @@ internal class CpToLpRelaxation(
             checkCancellation()
             if (definition != null) {
                 require(
-                presence != null && lo == 0L && hi in 0L..definition.presentUpper &&
-                    currentFactorId >= 0 && presence.size % 2 == 0 &&
-                    presence.indices.step(2).all { presence[it] in 0L until problem.numIntVars.toLong() },
-            )
+                    presence != null && lo == 0L && hi in 0L..definition.presentUpper &&
+                        currentFactorId >= 0 && presence.size % 2 == 0 &&
+                        presence.indices.step(2).all { presence[it] in 0L until problem.numIntVars.toLong() },
+                )
             }
 
             val c = builder.addVar(lo, hi, cost = 0L, tag = -1)
@@ -769,13 +770,13 @@ internal class CpToLpRelaxation(
             colPresentUpper.add(definition?.presentUpper ?: hi)
             colPresence.add(
                 definition?.let {
-                CutAuxiliaryDefinition(
-                    listOf(currentFactorId.toLong(), currentEmissionRoute) + it.role,
-                    requireNotNull(presence).toList(),
-                    it.presentUpper,
-                    it.integralExtension,
-                )
-            }
+                    CutAuxiliaryDefinition(
+                        listOf(currentFactorId.toLong(), currentEmissionRoute) + it.role,
+                        requireNotNull(presence).toList(),
+                        it.presentUpper,
+                        it.integralExtension,
+                    )
+                },
             )
             return c
         }
@@ -1098,8 +1099,8 @@ internal class CpToLpRelaxation(
                         !auxiliarySources.matches(source, definition) || definition !in colPresence
                     } == true
                 ) {
-                        continue
-                    }
+                    continue
+                }
                 if (cut.provenance?.let { !cutProofApplies(it, problem, domains) } == true) continue
                 if (cut.cols.all { it in 0 until builder.varCount }) {
                     cut.provenance?.let { cutParents[builder.rowCount] = it }
