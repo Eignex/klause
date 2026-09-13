@@ -14,6 +14,38 @@ import kotlin.test.assertTrue
 
 class RefinementLifecycleTest {
     @Test
+    fun `correction headings do not replace preferred source factors`() {
+        val builder = LpBuilder()
+        val x = builder.addRealVar(0.0, 2.0, cost = -1.0)
+        builder.addRealRow(intArrayOf(x), doubleArrayOf(1.0), Relation.LE, 1.0)
+        val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).trailModel()))
+        val model = assertNotNull(state.toWorkingModel())
+        val basis = Basis(intArrayOf(1), arrayOf(VarStatus.AT_LOWER, VarStatus.BASIC))
+        val cache = ExactBasisCache()
+        assertNotNull(verifyExactBasis(model, basis, cache = cache).witness)
+        LpScopedSolver(state).use { owner ->
+            val result = refineLp(
+                model,
+                LpRefinementRequest(owner, owner.refinementCache, LpRefinementLimits()),
+                doubleArrayOf(0.0),
+                doubleArrayOf(0.0),
+                basis,
+                preferBasis = true,
+                preferredBasisCache = cache,
+            )
+            val retained = verifyExactBasis(model, basis, cache = cache)
+
+            assertEquals(BigFraction.MINUS_ONE, assertNotNull(result.witness).objective)
+            assertEquals(result.witness.objective, assertNotNull(result.bound).value)
+            assertTrue(result.metrics.rounds > 0)
+            assertEquals(1, result.metrics.luReuse)
+            assertEquals(0, result.metrics.luFactories)
+            assertEquals(1, retained.metrics.reuse)
+            assertEquals(0, retained.metrics.factoryCalls)
+        }
+    }
+
+    @Test
     fun `production source basis attainment avoids a redundant exact point attempt`() {
         val builder = LpBuilder()
         val x = builder.addRealVar(0.0, 2.0, cost = 1.0)

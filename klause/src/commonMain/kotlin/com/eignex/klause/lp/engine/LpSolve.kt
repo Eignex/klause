@@ -323,6 +323,9 @@ internal fun certifyLpResult(
             directElapsed = certificationStarted?.elapsedNow() ?: Duration.ZERO,
             reconstructInitial = reconstruction == null,
             preferBasis = result != null && policy === ProductionLpCertificationPolicy,
+            preferredBasisCache = solver.exactBasisCache.takeIf {
+                result != null && policy === ProductionLpCertificationPolicy
+            },
         )
         refined = recovered
         observer?.observe(

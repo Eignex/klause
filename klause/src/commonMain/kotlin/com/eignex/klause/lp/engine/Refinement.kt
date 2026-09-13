@@ -528,12 +528,13 @@ private class RefinedCandidate(
 private class RefinementRun(
     private val request: LpRefinementRequest,
     private val meter: RefinementMeter,
-    private val source: RefinementAuthority,
+    private val sourceModel: LpModel,
+    private val sourceFactors: ExactBasisCache,
 ) {
+    private val source by lazy { RefinementAuthority(requireNotNull(sourceModel.exactState), meter) }
     val candidate = RefinedCandidate()
     var unboundedness: ExactLpUnboundedness? = null
     var unboundednessUsesBasis = false
-    private val sourceFactors = ExactBasisCache()
 
     fun run(
         primal: DoubleArray?,
@@ -545,12 +546,12 @@ private class RefinementRun(
         reconstructInitial: Boolean,
         preferBasis: Boolean,
     ) {
-        if (known != null) candidate.accept(check(source, known.primal, null, null, false))
         candidate.basis = basis
-        if (preferBasis && basis != null && source.source.m <= meter.basisLimits().factor.dimension) {
-            exactCandidate(source, basis, sourceFactors, candidate, recoverDual = false)
+        if (preferBasis && basis != null && sourceModel.m <= meter.basisLimits().factor.dimension) {
+            checkBasis(sourceModel, basis, sourceFactors, candidate)
             if (candidate.attained || candidate.conflict != null) return
         }
+        if (known != null) candidate.accept(check(source, known.primal, null, null, false))
         if (primal != null && duals != null && meter.limits.maxRounds > 0) {
             improve(source, primal, duals, basis, null, candidate, sourceFactors, reconstructInitial)
         }
@@ -736,11 +737,21 @@ private class RefinementRun(
         basis: Basis,
         cache: ExactBasisCache,
         output: RefinedCandidate,
-        recoverDual: Boolean = true,
     ) {
+        checkBasis(a.model, basis, cache, output)
+        if (a === source && output.attained) return
+        // The public bound package deliberately contains no raw BTRAN vector.
+        exactVectors(a, basis, cache, allowBuild = false) { authority, factors, budget ->
+            budget.phase = ExactBasisPhase.DUAL
+            output.dual = exactSolve(factors, authority.costs, true, budget)
+            output.dualUsesBasis = true
+        }
+    }
+
+    private fun checkBasis(model: LpModel, basis: Basis, cache: ExactBasisCache, output: RefinedCandidate) {
         output.luAttempted = true
         val checked = verifyExactBasis(
-            a.model,
+            model,
             basis,
             cache = cache,
             cancellation = meter.token,
@@ -750,13 +761,6 @@ private class RefinementRun(
         checked.witness?.let { output.acceptPoint(it, true) }
         checked.bound?.let { output.acceptBound(it, true) }
         output.usedBasis = checked.witness != null || checked.bound != null || output.usedBasis
-        if (!recoverDual || (a === source && output.attained)) return
-        // The public bound package deliberately contains no raw BTRAN vector.
-        exactVectors(a, basis, cache, allowBuild = false) { authority, factors, budget ->
-            budget.phase = ExactBasisPhase.DUAL
-            output.dual = exactSolve(factors, authority.costs, true, budget)
-            output.dualUsesBasis = true
-        }
     }
 
     private fun exactVectors(
@@ -1058,6 +1062,7 @@ internal fun refineLp(
     directElapsed: Duration = Duration.ZERO,
     reconstructInitial: Boolean = true,
     preferBasis: Boolean = false,
+    preferredBasisCache: ExactBasisCache? = null,
 ): LpRefinementResult {
     val state = model.exactState
     val limits = request.effectiveLimits()
@@ -1075,8 +1080,8 @@ internal fun refineLp(
         meter.prior(directWork, directAllocation, directElapsed)
         meter.charge()
         meter.metrics = meter.metrics.copy(eligible = true)
-        val authority = RefinementAuthority(state, meter)
-        val current = RefinementRun(request, meter, authority)
+        val factors = preferredBasisCache?.takeIf { preferBasis && basis != null } ?: ExactBasisCache()
+        val current = RefinementRun(request, meter, model, factors)
         run = current
         current.run(primal, duals, basis, witness, needPoint, direction, reconstructInitial, preferBasis)
         meter.poll()
