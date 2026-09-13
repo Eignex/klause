@@ -11,6 +11,7 @@ import com.eignex.klause.presolve.PresolveShared.withPassDelta
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.propagation.propagatorProjection
+import com.ionspin.kotlin.bignum.integer.BigInteger
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -147,18 +148,125 @@ class LinearSubSumAggregationTest {
         )
     }
 
+    @Test
+    fun `interacting definitions preserve the feasible set in either order`() {
+        for (duplicate in listOf(false, true)) {
+            for (reversed in listOf(false, true)) {
+                for (sign in listOf(-1, 1)) {
+                    val first = Linear(intArrayOf(sign, -sign, -sign), intArrayOf(0, 2, 3), LinearOp.EQ, 0)
+                    val second = if (duplicate) {
+                        first
+                    } else {
+                        Linear(intArrayOf(sign, -sign, -sign), intArrayOf(1, 2, 3), LinearOp.EQ, 0)
+                    }
+                    val factors = if (reversed) listOf(second, first) else listOf(first, second)
+                    val problem = Problem(0, 4, Array(4) { IntDomain(0, 1) }, factors)
+                    val delta = Presolve.aggregateSubSums(problem)
+
+                    val output = problem.bake().withPassDelta(delta, BakeConfig.NONE)
+
+                    assertTrue(delta.addedFactors.isNotEmpty())
+                    assertEquals(
+                        feasible(problem.factors, LongArray(4), LongArray(4) { 1 }),
+                        feasible(output.factors, LongArray(4), LongArray(4) { 1 }),
+                    )
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `a used definition stays valid through later dependencies and repeated passes`() {
+        val definition = Linear(intArrayOf(1, -1, -1), intArrayOf(1, 2, 3), LinearOp.EQ, 0)
+        val target = Linear(intArrayOf(2, 2, 1), intArrayOf(2, 3, 4), LinearOp.LE, 3)
+        val dependency = Linear(intArrayOf(1, -1, 1), intArrayOf(0, 1, 2), LinearOp.EQ, 0)
+        for (factors in listOf(listOf(definition, target, dependency), listOf(dependency, target, definition))) {
+            val problem = Problem(0, 5, Array(5) { IntDomain(0, 2) }, factors)
+            val expected = feasible(problem.factors, LongArray(5), LongArray(5) { 2 })
+            val delta = Presolve.aggregateSubSums(problem)
+
+            var output = problem.bake().withPassDelta(delta, BakeConfig.NONE)
+
+            assertTrue(delta.addedFactors.isNotEmpty())
+            assertEquals(expected, feasible(output.factors, LongArray(5), LongArray(5) { 2 }))
+            repeat(3) {
+                output = output.bake().withPassDelta(Presolve.aggregateSubSums(output), BakeConfig.NONE)
+                assertEquals(expected, feasible(output.factors, LongArray(5), LongArray(5) { 2 }))
+            }
+        }
+    }
+
+    @Test
+    fun `unrepresentable substitutions retain their original constraints`() {
+        val cases = listOf(
+            Linear(longArrayOf(1, Long.MIN_VALUE, -1), intArrayOf(0, 1, 2), LinearOp.EQ, 0) to
+                Linear(longArrayOf(Long.MIN_VALUE, -1), intArrayOf(1, 2), LinearOp.LE, 0),
+            Linear(longArrayOf(-1, 1, 1), intArrayOf(0, 1, 2), LinearOp.EQ, Long.MIN_VALUE) to
+                Linear(intArrayOf(1, 1), intArrayOf(1, 2), LinearOp.LE, 0),
+            Linear(intArrayOf(1, 1, 1), intArrayOf(0, 1, 2), LinearOp.EQ, 0) to
+                Linear(longArrayOf(Long.MIN_VALUE, Long.MIN_VALUE), intArrayOf(1, 2), LinearOp.LE, 0),
+            Linear(intArrayOf(1, -1, -1), intArrayOf(0, 1, 2), LinearOp.EQ, 2) to
+                Linear(longArrayOf(Long.MAX_VALUE, Long.MAX_VALUE), intArrayOf(1, 2), LinearOp.LE, 0),
+            Linear(intArrayOf(1, -1, -1), intArrayOf(0, 1, 2), LinearOp.EQ, 1) to
+                Linear(longArrayOf(Long.MIN_VALUE, Long.MIN_VALUE), intArrayOf(1, 2), LinearOp.LE, 0),
+            sumDef() to Linear(longArrayOf(1, 1), intArrayOf(1, 2), LinearOp.LE, Long.MIN_VALUE),
+            sumDef() to Linear(longArrayOf(Long.MAX_VALUE, 1, 1), intArrayOf(0, 1, 2), LinearOp.LE, 0),
+        )
+        for ((definition, target) in cases) {
+            val problem = Problem(0, 4, Array(4) { IntDomain(0, 1) }, listOf(definition, target))
+
+            val delta = Presolve.aggregateSubSums(problem)
+
+            assertTrue(delta.isEmpty)
+        }
+    }
+
+    @Test
+    fun `representable boundary substitutions preserve exact feasible sets`() {
+        val cases = listOf(
+            Linear(longArrayOf(-1, Long.MIN_VALUE, -1), intArrayOf(0, 1, 2), LinearOp.EQ, 0) to
+                Linear(longArrayOf(Long.MIN_VALUE, -1), intArrayOf(1, 2), LinearOp.LE, 0),
+            sumDef() to Linear(
+                longArrayOf(Long.MAX_VALUE, Long.MIN_VALUE, Long.MIN_VALUE),
+                intArrayOf(0, 1, 2),
+                LinearOp.LE,
+                0,
+            ),
+            Linear(longArrayOf(-1, Long.MAX_VALUE, -1), intArrayOf(0, 1, 2), LinearOp.EQ, 0) to
+                Linear(longArrayOf(Long.MAX_VALUE, -1), intArrayOf(1, 2), LinearOp.LE, 0),
+            Linear(intArrayOf(1, -1, -1), intArrayOf(0, 1, 2), LinearOp.EQ, 1) to
+                Linear(longArrayOf(1_000_000_000_000_000, 1_000_000_000_000_000), intArrayOf(1, 2), LinearOp.LE, 0),
+        )
+        for ((definition, target) in cases) {
+            val problem = Problem(0, 4, Array(4) { IntDomain(0, 1) }, listOf(definition, target))
+            val delta = Presolve.aggregateSubSums(problem)
+            val output =
+                problem.factors.filterIndexed { index, _ -> index !in delta.droppedIndices } + delta.addedFactors
+
+            assertTrue(delta.addedFactors.isNotEmpty())
+            assertEquals(
+                feasible(problem.factors, LongArray(4), LongArray(4) { 1 }),
+                feasible(output.toTypedArray(), LongArray(4), LongArray(4) { 1 }),
+            )
+        }
+    }
+
     private fun feasible(factors: Array<Factor>, mins: LongArray, maxs: LongArray): Set<List<Long>> {
         val out = HashSet<List<Long>>()
         val assign = mins.copyOf()
         fun holds(): Boolean = factors.all { f ->
             f as Linear
-            var sum = 0L
-            for (j in f.vars.indices) sum += checkNotNull(f.integerConstants).coeffs[j] * assign[f.vars[j]]
+            var sum = BigInteger.ZERO
+            for (j in f.vars.indices) {
+                sum += BigInteger.fromLong(checkNotNull(f.integerConstants).coeffs[j]) *
+                    BigInteger.fromLong(assign[f.vars[j]])
+            }
+            val bound = BigInteger.fromLong(checkNotNull(f.integerConstants).bound)
             when (f.op) {
-                LinearOp.LE -> sum <= checkNotNull(f.integerConstants).bound
-                LinearOp.EQ -> sum == checkNotNull(f.integerConstants).bound
-                LinearOp.NE -> sum != checkNotNull(f.integerConstants).bound
-                LinearOp.GE -> sum >= checkNotNull(f.integerConstants).bound
+                LinearOp.LE -> sum <= bound
+                LinearOp.EQ -> sum == bound
+                LinearOp.NE -> sum != bound
+                LinearOp.GE -> sum >= bound
             }
         }
         fun recurse(i: Int) {

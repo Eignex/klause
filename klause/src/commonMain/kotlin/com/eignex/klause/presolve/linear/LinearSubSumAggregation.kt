@@ -7,9 +7,12 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.presolve.PassDelta
 import com.eignex.klause.presolve.equivalentLinear
+import com.eignex.klause.util.CheckedLongOverflowException
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.MutableIntLongMap
 import com.eignex.klause.util.MutableIntObjectMap
+import com.eignex.klause.util.addExact
+import com.eignex.klause.util.mulExact
 
 /**
  * Common linear sub-sum extraction (the contract-direction counterpart of [AffineSingletons], which
@@ -55,18 +58,22 @@ internal object LinearSubSumAggregation {
         val dropped = IntArrayList()
         val added = ArrayList<Factor>()
         val rewritten = HashSet<Int>() // one substitution per row per pass; the round engine re-runs
+        val retainedDefinitions = HashSet<Int>()
         for (def in definitions) {
+            if (def.defIndex in rewritten) continue
             val anchor = rarestPartner(def.form, rowsByVar) ?: continue
             for (r in 0 until anchor.size) {
                 val i = anchor[r]
-                if (i == def.defIndex || i in rewritten) continue
+                if (i == def.defIndex || i in rewritten || i in retainedDefinitions) continue
                 val row = rows[i] ?: continue
                 val constants = row.integerConstants ?: continue
                 val k = matchMultiplier(row, constants, def) ?: continue
-                if (overflowsBoundShift(k, def.b, constants.bound)) continue
-                added.add(rewrite(row, constants, def, k))
+                val replacement = rewrite(row, constants, def, k) ?: continue
+                added.add(replacement)
                 dropped.add(i)
                 rewritten.add(i)
+                // Every substitution keeps its defining equality as an unchanged premise.
+                retainedDefinitions.add(def.defIndex)
             }
         }
         if (dropped.isEmpty()) return PassDelta()
@@ -84,12 +91,18 @@ internal object LinearSubSumAggregation {
             val c = f.integerConstants ?: continue
             val p = unitPivotIndex(f.vars, c) ?: continue
             val sign = c.coeff(p) // ±1
-            val form = HashMap<Int, Long>(f.vars.size)
-            // A zero-coefficient term is vacuous (coalescing keeps it, but it names no real partner), so it
-            // is not part of the sub-sum — dropping it also keeps [matchMultiplier]'s `c / A_j` well-defined.
-            for (j in f.vars.indices) if (j != p && c.coeff(j) != 0L) form[f.vars[j]] = -sign * c.coeff(j)
-            if (form.size < 2) continue // fewer than two real partners is no sub-sum to aggregate
-            out.add(Definition(i, f.vars[p], sign * c.bound, form))
+            val definition = try {
+                val form = HashMap<Int, Long>(f.vars.size)
+                // A zero coefficient names no partner and cannot determine a multiplier.
+                for (j in f.vars.indices) {
+                    if (j != p && c.coeff(j) != 0L) form[f.vars[j]] = mulExact(-sign, c.coeff(j))
+                }
+                if (form.size < 2) continue
+                Definition(i, f.vars[p], mulExact(sign, c.bound), form)
+            } catch (_: CheckedLongOverflowException) {
+                continue
+            }
+            out.add(definition)
         }
         return out
     }
@@ -126,6 +139,7 @@ internal object LinearSubSumAggregation {
             if (!coeffByVar.containsKey(x)) return null // partner missing → not a full sub-sum
             val c = coeffByVar.getOrDefault(x, 0L)
             if (a == 0L) return null // a zero form coefficient is no term (collectDefinitions drops these)
+            if (c == Long.MIN_VALUE && a == -1L) return null
             if (c % a != 0L) return null
             val ratio = c / a
             if (ratio == 0L) return null
@@ -142,27 +156,27 @@ internal object LinearSubSumAggregation {
      *  overflow-risky and the fold declined — real coefficients sit far below this. */
     private const val OVERFLOW_GUARD = 1_000_000_000_000_000L
 
-    private fun overflowsBoundShift(k: Long, b: Long, bound: Long): Boolean {
-        if (b != 0L && (abs(k) > OVERFLOW_GUARD / abs(b))) return true
-        val shift = k * b
-        return abs(shift) > OVERFLOW_GUARD || abs(bound) > OVERFLOW_GUARD
-    }
-
-    private fun abs(x: Long): Long = if (x < 0L) -x else x
-
     /** [row] with `k·Σ A_j·x_j` replaced by the single term `k·y`: drop every partner term, add `k` to
      *  `y`'s coefficient, and shift the bound by `k·B` (moving `k·(y − B)` to the left leaves the same
      *  relation). Coalescing in [Linear]'s constructor folds `k·y` into any existing `y` term. */
-    private fun rewrite(row: Linear, constants: IntegerConstants, def: Definition, k: Long): Linear {
-        val vars = IntArrayList(row.vars.size)
-        val coeffs = ArrayList<Long>(row.vars.size)
-        for (j in row.vars.indices) {
-            if (def.form.containsKey(row.vars[j])) continue // absorbed into k·y
-            vars.add(row.vars[j])
-            coeffs.add(constants.coeff(j))
+    private fun rewrite(row: Linear, constants: IntegerConstants, def: Definition, k: Long): Linear? = try {
+        val shift = mulExact(k, def.b)
+        if (shift !in -OVERFLOW_GUARD..OVERFLOW_GUARD || constants.bound !in -OVERFLOW_GUARD..OVERFLOW_GUARD) {
+            null
+        } else {
+            val vars = IntArrayList(row.vars.size)
+            val coeffs = ArrayList<Long>(row.vars.size)
+            for (j in row.vars.indices) {
+                if (def.form.containsKey(row.vars[j])) continue // absorbed into k·y
+                if (row.vars[j] == def.y) addExact(constants.coeff(j), k)
+                vars.add(row.vars[j])
+                coeffs.add(constants.coeff(j))
+            }
+            vars.add(def.y)
+            coeffs.add(k)
+            Linear(coeffs.toLongArray(), vars.toIntArray(), row.op, addExact(constants.bound, shift))
         }
-        vars.add(def.y)
-        coeffs.add(k)
-        return Linear(coeffs.toLongArray(), vars.toIntArray(), row.op, constants.bound + k * def.b)
+    } catch (_: CheckedLongOverflowException) {
+        null
     }
 }
