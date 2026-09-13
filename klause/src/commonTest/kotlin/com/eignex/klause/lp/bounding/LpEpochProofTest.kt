@@ -66,7 +66,8 @@ class LpEpochProofTest {
             longArrayOf(4, 0, 2, 3).copyInto(model.csc.colVal)
         }
 
-        assertTrue(proof.forEachRowProof { row, actual ->
+        assertTrue(
+            proof.forEachRowProof { row, actual ->
             val expected = assertNotNull(proof.rowProof(row))
             assertEquals(expected.facts, actual.facts)
             assertEquals(expected.conclusion, actual.conclusion)
@@ -74,7 +75,8 @@ class LpEpochProofTest {
             val after = assertIs<CutRowTransform.Algebraic>(actual.transformations.single())
             assertEquals(before.input, after.input)
             assertEquals(before.conclusion, after.conclusion)
-        })
+        }
+        )
     }
 
     @Test
@@ -105,7 +107,8 @@ class LpEpochProofTest {
                 val proof = assertNotNull(LpEpochProof.create(original.derivation, mapping))
                 var visited = 0
 
-                assertTrue(proof.forEachRowProof { row, actual ->
+                assertTrue(
+                    proof.forEachRowProof { row, actual ->
                     val expected = assertNotNull(proof.rowProof(row))
                     assertEquals(visited++, row)
                     assertSame(expected.model, actual.model)
@@ -130,7 +133,8 @@ class LpEpochProofTest {
                         }
                     }
                     if (withParent && row == 0) assertSame(parent, proof.sources.parent(row))
-                })
+                }
+                )
                 assertEquals(relaxation.model.m, visited)
             }
         }
@@ -152,9 +156,11 @@ class LpEpochProofTest {
         val proof = assertNotNull(relaxation.tidyProof)
         val source = proof.derivation.sourceModel
         for (target in listOf(source, proof.derivation.transformedModel)) {
-            assertFalse(proof.forEachRowProof { row, _ ->
+            assertFalse(
+                proof.forEachRowProof { row, _ ->
                 if (row == 0) target.csc.colVal[0]++
-            })
+            }
+            )
             target.csc.colVal[0]--
             assertTrue(proof.forEachRowProof { _, _ -> })
         }

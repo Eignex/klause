@@ -43,9 +43,16 @@ class LpEpochStateTest {
         intArrayOf(1, 1, 1, 0, 1, 0).copyInto(next.model.csc.rowIdx)
         longArrayOf(5, 0, 8, 7, 3, 4).copyInto(previous.model.csc.colVal)
         longArrayOf(5, 0, 8, 7, 3, 4).copyInto(next.model.csc.colVal)
-        val basis = Basis(intArrayOf(3, 4), arrayOf(
-            VarStatus.AT_LOWER, VarStatus.AT_LOWER, VarStatus.AT_LOWER, VarStatus.BASIC, VarStatus.BASIC,
-        ))
+        val basis = Basis(
+            intArrayOf(3, 4),
+            arrayOf(
+            VarStatus.AT_LOWER,
+            VarStatus.AT_LOWER,
+            VarStatus.AT_LOWER,
+            VarStatus.BASIC,
+            VarStatus.BASIC,
+        )
+        )
 
         val mapped = assertNotNull(LpEpochState.remapBasis(previous, next, basis))
 

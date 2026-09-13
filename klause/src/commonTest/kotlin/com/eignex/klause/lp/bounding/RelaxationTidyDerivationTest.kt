@@ -30,14 +30,25 @@ class RelaxationTidyDerivationTest {
         builder.addRow(intArrayOf(0, 1), longArrayOf(1, 1), Relation.LE, 7)
         val derivation = tidy(builder.build(Sense.MINIMIZE)).derivation
         var polls = 0
-        assertTrue(derivation.validate(Cancellation { polls++; false }))
+        assertTrue(
+            derivation.validate(
+                Cancellation {
+            polls++;
+            false
+        }
+            )
+        )
 
         for (model in listOf(derivation.sourceModel, derivation.transformedModel)) {
             var seen = 0
-            assertFalse(derivation.validate(Cancellation {
+            assertFalse(
+                derivation.validate(
+                    Cancellation {
                 if (++seen == polls) model.csc.colVal[0]++
                 false
-            }))
+            }
+                )
+            )
             model.csc.colVal[0]--
             assertTrue(derivation.validate())
         }
