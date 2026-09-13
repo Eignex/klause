@@ -180,9 +180,9 @@ internal class LpPropagator(
         }
         val donor = owner
         val donorState = donor?.state
-        val budget = donor?.exportEpochBudget().takeIf { preserveSourcePremises }
+        val receipt = donor?.exportEpochReceipt().takeIf { preserveSourcePremises }
         if (preserveSourcePremises && (
-                donorState?.model?.sameAuthority(model) != true ||
+                receipt == null || donorState?.model?.sameAuthority(model) != true ||
                     rows?.sameAuthority(donorState.rows) != true
                 )
         ) {
@@ -196,13 +196,13 @@ internal class LpPropagator(
         var published = false
         return AutoCloseable { if (!published) candidate.close() }.use {
             try {
-                if (budget != null && !candidate.importEpochBudget(budget)) return@use false
+                if (receipt != null && !candidate.importEpochReceipt(receipt)) return@use false
                 val attempt = candidate.solveFloat(warm, preparationToken) ?: return@use false
                 val basis = attempt.second?.basis ?: attempt.first.infeasibleBasis ?: return@use false
                 if (basis.basicVars.size != model.m || basis.status.size != model.numVars ||
                     basis.basicVars.distinct().size != model.m ||
                     token() || !validatePublication() || token() || owner !== donor || donor?.state !== donorState ||
-                    (preserveSourcePremises && donor?.exportEpochBudget() != budget)
+                    (preserveSourcePremises && donor?.exportEpochReceipt() != receipt)
                 ) {
                     return@use false
                 }

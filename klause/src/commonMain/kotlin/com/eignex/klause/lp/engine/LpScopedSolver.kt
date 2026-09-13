@@ -53,6 +53,8 @@ internal class LpScopedSolver(
     private val continuationCache = LpExactContinuationCache()
     internal val refinementCache = LpRefinementCache()
     private var exactAttempted = false
+    private var epochBudgetImported = false
+    private var epochReceiptImported = false
     private var trail = LpBoundTrail(initial)
     private var solver: PersistentLpSolver? = null
     private var closed = false
@@ -104,7 +106,42 @@ internal class LpScopedSolver(
 
     fun importEpochBudget(budget: LpEpochBudget): Boolean {
         requireAvailable()
-        return !closed && !exactAttempted && continuationCache.importBudget(state, budget)
+        if (closed || exactAttempted || epochBudgetImported || epochReceiptImported ||
+            !continuationCache.importBudget(state, budget)
+        ) {
+            return false
+        }
+        epochBudgetImported = true
+        return true
+    }
+
+    fun exportEpochReceipt(): LpEpochReceipt? {
+        requireAvailable()
+        return if (closed) {
+            null
+        } else {
+            LpEpochReceipt(
+            state.model,
+            state.rows,
+            continuationCache.exportBudget(state),
+            refinementCache.epochBudget(state),
+        )
+        }
+    }
+
+    fun importEpochReceipt(receipt: LpEpochReceipt): Boolean {
+        requireAvailable()
+        if (closed || state.depth != 0 || exactAttempted || epochBudgetImported || epochReceiptImported ||
+            !refinementCache.pristineForEpoch() || !state.model.sameAuthority(receipt.authority) ||
+            !state.rows.sameAuthority(receipt.rows) ||
+            receipt.continuation?.authority?.sameAuthority(receipt.authority) == false
+        ) {
+            return false
+        }
+        if (receipt.continuation != null && !continuationCache.importBudget(state, receipt.continuation)) return false
+        refinementCache.restoreEpochBudget(receipt.refinement, state)
+        epochReceiptImported = true
+        return true
     }
 
     fun prepare(token: Cancellation = cancellation): Boolean {

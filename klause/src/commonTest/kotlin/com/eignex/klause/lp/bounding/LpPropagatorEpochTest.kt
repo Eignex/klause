@@ -7,6 +7,7 @@ import com.eignex.klause.lp.engine.LpEngineFactory
 import com.eignex.klause.lp.engine.LpFloatAllowance
 import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.LpPricingOptions
+import com.eignex.klause.lp.engine.LpRefinementDecline
 import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.lp.engine.PersistentLpSolver
 import com.eignex.klause.lp.engine.ProductionLpEngineFactory
@@ -25,6 +26,152 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class LpPropagatorEpochTest {
+
+    @Test
+    fun `source replacements preserve refinement attempt suppression`() {
+        val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+            override fun newPersistentSolver(
+                model: LpModel,
+                cancellation: Cancellation,
+                refactorUpdateLimit: Int,
+                iterationLimit: Int,
+                workLimit: Long,
+                trackDegeneracy: Boolean,
+                pricing: LpPricingOptions,
+            ): PersistentLpSolver {
+                val delegate = ProductionLpEngineFactory.newPersistentSolver(
+                    model,
+                    cancellation,
+                    refactorUpdateLimit,
+                    iterationLimit,
+                    workLimit,
+                    trackDegeneracy,
+                    pricing,
+                )
+                return object : PersistentLpSolver by delegate {
+                    override fun resolveBounds(allowance: LpFloatAllowance?): FloatLpResult? {
+                        val result = delegate.resolveBounds(allowance) ?: return null
+                        return FloatLpResult(
+                            result.basis,
+                            0.25,
+                            doubleArrayOf(0.0),
+                            doubleArrayOf(0.25),
+                            exactState = delegate.solvedExactState,
+                        )
+                    }
+                }
+            }
+        }
+
+        val builder = LpBuilder()
+        val x = builder.addRealVar(0.0, 2.0, cost = 1.0)
+        builder.addRealRow(intArrayOf(x), doubleArrayOf(3.0), Relation.EQ, 1.0)
+        val source = assertNotNull(builder.build(Sense.MINIMIZE).trailModel())
+
+        for (outcome in listOf("published", "rejected", "cancelled")) {
+            LpPropagator(object : LpSearchPolicy {}, solveContext = LpSolveContext(factory)).use { lp ->
+                val key = Any()
+                assertTrue(lp.install(key, source))
+                val first = assertNotNull(lp.solve())
+                assertNotNull(first.refinement)
+                assertNull(first.continuation)
+
+                repeat(2) {
+                    val old = assertNotNull(lp.state)
+                    var cancelled = false
+                    val replaced = lp.replaceEpoch(
+                        key,
+                        source,
+                        null,
+                        Cancellation { cancelled },
+                        {
+                            cancelled = outcome == "cancelled"
+                            outcome != "rejected"
+                        },
+                        rows = old.rows,
+                        preserveSourcePremises = true,
+                    ) {}
+                    assertEquals(outcome == "published", replaced, outcome)
+                    if (!replaced) assertSame(old, lp.state)
+                    val result = assertNotNull(lp.solve())
+
+                    assertEquals(LpRefinementDecline.REPEATED, assertNotNull(result.refinement).decline, outcome)
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `refinement during publication validation invalidates the candidate receipt`() {
+        val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+            override fun newPersistentSolver(
+                model: LpModel,
+                cancellation: Cancellation,
+                refactorUpdateLimit: Int,
+                iterationLimit: Int,
+                workLimit: Long,
+                trackDegeneracy: Boolean,
+                pricing: LpPricingOptions,
+            ): PersistentLpSolver {
+                val delegate = ProductionLpEngineFactory.newPersistentSolver(
+                    model,
+                    cancellation,
+                    refactorUpdateLimit,
+                    iterationLimit,
+                    workLimit,
+                    trackDegeneracy,
+                    pricing,
+                )
+                return object : PersistentLpSolver by delegate {
+                    override fun resolveBounds(allowance: LpFloatAllowance?): FloatLpResult? {
+                        val result = delegate.resolveBounds(allowance) ?: return null
+                        return FloatLpResult(
+                            result.basis,
+                            0.25,
+                            doubleArrayOf(0.0),
+                            doubleArrayOf(0.25),
+                            exactState = delegate.solvedExactState,
+                        )
+                    }
+                }
+            }
+        }
+
+        val builder = LpBuilder()
+        val x = builder.addRealVar(0.0, 2.0, cost = 1.0)
+        builder.addRealRow(intArrayOf(x), doubleArrayOf(3.0), Relation.EQ, 1.0)
+        val source = assertNotNull(builder.build(Sense.MINIMIZE).trailModel())
+
+        LpPropagator(object : LpSearchPolicy {}, solveContext = LpSolveContext(factory)).use { lp ->
+            val key = Any()
+            assertTrue(lp.install(key, source))
+            val old = assertNotNull(lp.state)
+            var published = false
+
+            val replaced = lp.replaceEpoch(
+                key,
+                source,
+                null,
+                Cancellation.Never,
+                {
+                    val result = assertNotNull(lp.solve())
+                    assertNotNull(result.refinement)
+                    assertNull(result.continuation)
+                    assertSame(old, lp.state)
+                    true
+                },
+                rows = old.rows,
+                preserveSourcePremises = true,
+            ) { published = true }
+
+            assertFalse(replaced)
+            assertFalse(published)
+            assertSame(old, lp.state)
+            val result = assertNotNull(lp.solve())
+            assertEquals(LpRefinementDecline.REPEATED, assertNotNull(result.refinement).decline)
+        }
+    }
+
     @Test
     fun `conditional initial bounds cannot become empty premise proofs after reset`() {
         val builder = LpBuilder()
