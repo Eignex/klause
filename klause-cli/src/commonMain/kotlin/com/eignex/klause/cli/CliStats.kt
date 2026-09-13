@@ -81,6 +81,9 @@ internal fun lpStatPairs(stats: SolveStats): List<Pair<String, String>> {
     if (stats.lp.demoted) out += "lpDemoted" to "1"
     if (stats.lp.luMaxFill.max.isFinite()) out += "lpLuMaxFill" to round4(stats.lp.luMaxFill.max)
     if (stats.lp.luMaxDensity.max.isFinite()) out += "lpLuMaxDensity" to round4(stats.lp.luMaxDensity.max)
+    if (stats.lp.luMaxDim.max.isFinite() && stats.lp.luMaxDim.max > 0.0) {
+        out += "lpLuMaxDim" to "${stats.lp.luMaxDim.max.toLong()}"
+    }
     // Printed only when nonzero: a solve that meets neither says nothing, so a line appearing at all
     // is the whole signal.
     if (stats.lp.singularRefactorizations.sum > 0.0) {

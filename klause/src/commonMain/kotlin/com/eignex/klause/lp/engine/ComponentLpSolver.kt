@@ -60,6 +60,7 @@ internal class ComponentLpSolver(
         var pivots = 0
         var maxFill = 0.0
         var maxDensity = 0.0
+        var maxDim = 0
         val results = ArrayList<FloatLpResult>(parts.size)
         for (j in isolated) {
             val c = model.costD(j)
@@ -102,7 +103,10 @@ internal class ComponentLpSolver(
             }
             pivots += r.pivots
             if (r.luMaxFill > maxFill) maxFill = r.luMaxFill
-            if (r.luMaxDensity > maxDensity) maxDensity = r.luMaxDensity
+            if (r.luMaxDensity > maxDensity) {
+                maxDensity = r.luMaxDensity
+                maxDim = r.luMaxDim
+            }
         }
         blockResults = results
         return FloatLpResult(
@@ -113,6 +117,7 @@ internal class ComponentLpSolver(
             pivots = pivots,
             luMaxFill = maxFill,
             luMaxDensity = maxDensity,
+            luMaxDim = maxDim,
             blocks = parts.size,
             optimal = results.all { it.optimal },
         )
