@@ -121,11 +121,11 @@ internal class LpScopedSolver(
             null
         } else {
             LpEpochReceipt(
-            state.model,
-            state.rows,
-            continuationCache.exportBudget(state),
-            refinementCache.epochBudget(state),
-        )
+                state.model,
+                state.rows,
+                continuationCache.exportBudget(state),
+                refinementCache.epochBudget(state),
+            )
         }
     }
 

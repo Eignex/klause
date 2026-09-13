@@ -21,11 +21,12 @@ class LpProofRowsTest {
         val model = builder.build(Sense.MINIMIZE)
         var visits = 0
         val index = LpProofRowIndex.create(
-            model, LpProofRowShape(0, 2, 76),
+            model,
+            LpProofRowShape(0, 2, 76),
             Cancellation {
-            if (++visits == 5) model.csc.colVal[0] = 2
-            false
-        }
+                if (++visits == 5) model.csc.colVal[0] = 2
+                false
+            },
         )
 
         assertFalse(index.unchanged())
@@ -61,14 +62,15 @@ class LpProofRowsTest {
             var changed = false
             assertFailsWith<LpProofRowsInvalidated> {
                 LpProofRowIndex.create(
-                    model, shape,
+                    model,
+                    shape,
                     Cancellation {
-                    if (!changed) {
-                        changed = true
-                        if (change == "pointer") model.csc.colPtr[1] = 0 else model.csc.rowIdx[0] = 1
-                    }
-                    false
-                }
+                        if (!changed) {
+                            changed = true
+                            if (change == "pointer") model.csc.colPtr[1] = 0 else model.csc.rowIdx[0] = 1
+                        }
+                        false
+                    },
                 )
             }
             model.csc.colPtr[1] = 1
@@ -100,9 +102,9 @@ class LpProofRowsTest {
             val visited = ArrayList<Pair<Int, Long>>()
             assertTrue(
                 index.forEachCoefficient(row, Cancellation.Never) { column, value ->
-                visited.add(column to value)
-                true
-            }
+                    visited.add(column to value)
+                    true
+                },
             )
             assertEquals(expected.filterValues { it != 0L }.toList().sortedBy { it.first }, visited)
         }
@@ -161,13 +163,13 @@ class LpProofRowsTest {
             val rows = LpProofRows.create(model, model, Cancellation.Never)
             assertTrue(
                 assertNotNull(rows.source).forEachCoefficient(0, Cancellation.Never) { _, _ ->
-                when (change) {
-                    "value" -> model.csc.colVal[0] = 3
-                    "support" -> model.csc.rowIdx[0] = 1
-                    "pointer" -> model.csc.colPtr[1] = 0
-                }
-                true
-            }
+                    when (change) {
+                        "value" -> model.csc.colVal[0] = 3
+                        "support" -> model.csc.rowIdx[0] = 1
+                        "pointer" -> model.csc.colPtr[1] = 0
+                    }
+                    true
+                },
             )
             assertFalse(rows.unchanged(Cancellation.Never), change)
             model.csc.colVal[0] = 2
@@ -196,19 +198,19 @@ class LpProofRowsTest {
         assertTrue(
             rows.unchanged(
                 Cancellation {
-            if (++callbacks > 1) source.csc.colVal[0]++
-            false
-        }
-            )
+                    if (++callbacks > 1) source.csc.colVal[0]++
+                    false
+                },
+            ),
         )
         assertEquals(1, callbacks)
         assertFalse(
             rows.unchanged(
                 Cancellation {
-            source.csc.colVal[0]++
-            false
-        }
-            )
+                    source.csc.colVal[0]++
+                    false
+                },
+            ),
         )
     }
 
@@ -220,11 +222,12 @@ class LpProofRowsTest {
         val model = builder.build(Sense.MINIMIZE)
         var calls = 0
         LpProofRows.create(
-            model, model,
+            model,
+            model,
             Cancellation {
-            calls++;
-            false
-        }
+                calls++
+                false
+            },
         )
 
         for (stop in 1..calls) {

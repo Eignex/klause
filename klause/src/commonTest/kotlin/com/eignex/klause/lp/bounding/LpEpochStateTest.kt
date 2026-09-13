@@ -46,12 +46,12 @@ class LpEpochStateTest {
         val basis = Basis(
             intArrayOf(3, 4),
             arrayOf(
-            VarStatus.AT_LOWER,
-            VarStatus.AT_LOWER,
-            VarStatus.AT_LOWER,
-            VarStatus.BASIC,
-            VarStatus.BASIC,
-        )
+                VarStatus.AT_LOWER,
+                VarStatus.AT_LOWER,
+                VarStatus.AT_LOWER,
+                VarStatus.BASIC,
+                VarStatus.BASIC,
+            ),
         )
 
         val mapped = assertNotNull(LpEpochState.remapBasis(previous, next, basis))

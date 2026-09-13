@@ -19,11 +19,12 @@ internal class LpWork {
         private set
 
     fun add(n: Int) {
-        ops += n.toLong()
+        add(n.toLong())
     }
 
     fun add(n: Long) {
-        ops += n
+        require(n >= 0)
+        ops = if (n > Long.MAX_VALUE - ops) Long.MAX_VALUE else ops + n
     }
 
     /** Start a fresh solve's accounting. */

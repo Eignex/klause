@@ -1,15 +1,164 @@
 package com.eignex.klause.simplex.basis
 
+import com.eignex.klause.util.Cancellation
 import com.eignex.koblas.SparseMatrix
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class KotlinBasisSolverRepairTest {
+    @Test
+    fun `repair retains a nonzero pivot at the absolute tolerance`() {
+        val source = matrix(arrayOf(doubleArrayOf(1e-10)))
+        KotlinBasisSolver(source).use { solver ->
+            val repair = assertNotNull(solver.refactorizeRepairing(intArrayOf(0)))
+
+            assertFalse(repair.repaired)
+            assertBasisSolves(solver, source, repair.columns, repair.unitRows)
+        }
+    }
+
+    @Test
+    fun `cancellation at every repair boundary leaves no usable partial factors`() {
+        val source = matrix(arrayOf(doubleArrayOf(2.0, 1.0), doubleArrayOf(1.0, 3.0)))
+        var boundaries = 0
+        KotlinBasisSolver(source).use { solver ->
+            assertNotNull(
+                solver.refactorizeRepairing(
+                    intArrayOf(0, 1),
+                    BasisRepairControl(
+                        Cancellation {
+                            boundaries++
+                            false
+                        },
+                    ),
+                ),
+            )
+        }
+
+        for (boundary in 1..boundaries) {
+            KotlinBasisSolver(source).use { solver ->
+                assertTrue(solver.refactorize(intArrayOf(0, 1)))
+                var polls = 0
+                val control = BasisRepairControl(Cancellation { ++polls == boundary })
+
+                val result = solver.refactorizeRepairing(intArrayOf(0, 1), control)
+
+                assertNull(result, "boundary=$boundary")
+                assertEquals(boundary, polls)
+                assertEquals(BasisRepairStop.CANCELLED, control.stop)
+                assertTrue(solver.singular)
+                assertNull(solver.ordering())
+                assertNull(solver.snapshot())
+                assertFailsWith<IllegalStateException> { solver.ftran(IndexedVector(2)) }
+                assertTrue(solver.refactorize(intArrayOf(0, 1)))
+            }
+        }
+    }
+
+    @Test
+    fun `callbacks cannot access partial factors or mutate the admitted request`() {
+        val source = matrix(arrayOf(doubleArrayOf(2.0, 1.0), doubleArrayOf(1.0, 3.0)))
+        val requested = intArrayOf(0, 1)
+        KotlinBasisSolver(source).use { solver ->
+            val control = BasisRepairControl(
+                Cancellation {
+                    requested.fill(-1)
+                    assertFailsWith<IllegalStateException> { solver.ordering() }
+                    assertFailsWith<IllegalStateException> { solver.snapshot() }
+                    assertFailsWith<IllegalStateException> { solver.refactorize(intArrayOf(0, 1)) }
+                    assertFailsWith<IllegalStateException> { solver.ftran(IndexedVector(2)) }
+                    assertFailsWith<IllegalStateException> { solver.close() }
+                    false
+                },
+            )
+
+            val repair = assertNotNull(solver.refactorizeRepairing(requested, control))
+
+            assertFalse(repair.repaired)
+            assertEquals(setOf(0, 1), repair.columns.toSet())
+            assertBasisSolves(solver, source, repair.columns, repair.unitRows)
+        }
+    }
+
+    @Test
+    fun `a throwing cancellation callback invalidates factors and releases the owner`() {
+        val source = matrix(arrayOf(doubleArrayOf(1.0)))
+        var boundaries = 0
+        KotlinBasisSolver(source).use { solver ->
+            assertNotNull(
+                solver.refactorizeRepairing(
+                    intArrayOf(0),
+                    BasisRepairControl(
+                        Cancellation {
+                            boundaries++
+                            false
+                        },
+                    ),
+                ),
+            )
+        }
+        for (boundary in listOf(1, boundaries)) {
+            KotlinBasisSolver(source).use { solver ->
+                assertTrue(solver.refactorize(intArrayOf(0)))
+                val primary = IllegalStateException("callback")
+                var polls = 0
+
+                val failure = assertFailsWith<IllegalStateException> {
+                    solver.refactorizeRepairing(
+                        intArrayOf(0),
+                        BasisRepairControl(
+                            Cancellation {
+                                if (++polls == boundary) throw primary else false
+                            },
+                        ),
+                    )
+                }
+
+                assertTrue(failure === primary)
+                assertTrue(solver.singular)
+                assertFalse(assertNotNull(solver.basisWork.build).successful)
+                assertNull(solver.ordering())
+                assertTrue(solver.refactorize(intArrayOf(0)))
+            }
+        }
+    }
+
+    @Test
+    fun `finite repair work includes the completed attempt and cannot be refreshed`() {
+        val source = matrix(arrayOf(doubleArrayOf(2.0, 1.0), doubleArrayOf(1.0, 3.0)))
+        val full = BasisRepairControl()
+        KotlinBasisSolver(source).use { solver ->
+            assertNotNull(solver.refactorizeRepairing(intArrayOf(0, 1), full))
+            assertEquals(full.spentWork, solver.basisOperationWork.units)
+        }
+        for (limit in listOf(0L, 1L, full.spentWork, full.spentWork + 1)) {
+            KotlinBasisSolver(source).use { solver ->
+                val control = BasisRepairControl(maxWork = limit)
+
+                val repair = solver.refactorizeRepairing(intArrayOf(0, 1), control)
+
+                assertEquals(limit > full.spentWork, repair != null)
+                assertEquals(repair == null, solver.singular)
+                assertEquals(control.spentWork, solver.basisOperationWork.units)
+                if (repair == null) {
+                    assertEquals(BasisRepairStop.WORK, control.stop)
+                    val before = solver.basisOperationWork
+                    assertNull(solver.refactorizeRepairing(intArrayOf(0, 1), control))
+                    assertEquals(before.ftran, solver.basisOperationWork.ftran)
+                    assertEquals(before.update, solver.basisOperationWork.update)
+                }
+            }
+        }
+    }
+
     @Test
     fun `repair reports the complete permuted source and logical basis`() {
         val source = SparseMatrix.ofColumns(

@@ -68,14 +68,14 @@ class LpEpochProofTest {
 
         assertTrue(
             proof.forEachRowProof { row, actual ->
-            val expected = assertNotNull(proof.rowProof(row))
-            assertEquals(expected.facts, actual.facts)
-            assertEquals(expected.conclusion, actual.conclusion)
-            val before = assertIs<CutRowTransform.Algebraic>(expected.transformations.single())
-            val after = assertIs<CutRowTransform.Algebraic>(actual.transformations.single())
-            assertEquals(before.input, after.input)
-            assertEquals(before.conclusion, after.conclusion)
-        }
+                val expected = assertNotNull(proof.rowProof(row))
+                assertEquals(expected.facts, actual.facts)
+                assertEquals(expected.conclusion, actual.conclusion)
+                val before = assertIs<CutRowTransform.Algebraic>(expected.transformations.single())
+                val after = assertIs<CutRowTransform.Algebraic>(actual.transformations.single())
+                assertEquals(before.input, after.input)
+                assertEquals(before.conclusion, after.conclusion)
+            },
         )
     }
 
@@ -109,31 +109,31 @@ class LpEpochProofTest {
 
                 assertTrue(
                     proof.forEachRowProof { row, actual ->
-                    val expected = assertNotNull(proof.rowProof(row))
-                    assertEquals(visited++, row)
-                    assertSame(expected.model, actual.model)
-                    assertEquals(expected.epoch, actual.epoch)
-                    assertEquals(expected.assumptions, actual.assumptions)
-                    assertEquals(expected.facts, actual.facts)
-                    assertEquals(expected.rules, actual.rules)
-                    assertEquals(expected.conclusion, actual.conclusion)
-                    assertEquals(expected.auxiliaryDefinitions, actual.auxiliaryDefinitions)
-                    assertEquals(expected.transformations.size, actual.transformations.size)
-                    for ((left, right) in expected.transformations.zip(actual.transformations)) {
-                        if (left is CutRowTransform.Algebraic) {
-                            val algebraic = assertIs<CutRowTransform.Algebraic>(right)
-                            assertEquals(left.input, algebraic.input)
-                            assertEquals(left.conclusion, algebraic.conclusion)
-                            assertEquals(left.multiplier, algebraic.multiplier)
-                            assertEquals(left.inputStrict, algebraic.inputStrict)
-                            assertEquals(left.outputStrict, algebraic.outputStrict)
-                            assertEquals(left.fixings, algebraic.fixings)
-                        } else {
-                            assertEquals(left, right)
+                        val expected = assertNotNull(proof.rowProof(row))
+                        assertEquals(visited++, row)
+                        assertSame(expected.model, actual.model)
+                        assertEquals(expected.epoch, actual.epoch)
+                        assertEquals(expected.assumptions, actual.assumptions)
+                        assertEquals(expected.facts, actual.facts)
+                        assertEquals(expected.rules, actual.rules)
+                        assertEquals(expected.conclusion, actual.conclusion)
+                        assertEquals(expected.auxiliaryDefinitions, actual.auxiliaryDefinitions)
+                        assertEquals(expected.transformations.size, actual.transformations.size)
+                        for ((left, right) in expected.transformations.zip(actual.transformations)) {
+                            if (left is CutRowTransform.Algebraic) {
+                                val algebraic = assertIs<CutRowTransform.Algebraic>(right)
+                                assertEquals(left.input, algebraic.input)
+                                assertEquals(left.conclusion, algebraic.conclusion)
+                                assertEquals(left.multiplier, algebraic.multiplier)
+                                assertEquals(left.inputStrict, algebraic.inputStrict)
+                                assertEquals(left.outputStrict, algebraic.outputStrict)
+                                assertEquals(left.fixings, algebraic.fixings)
+                            } else {
+                                assertEquals(left, right)
+                            }
                         }
-                    }
-                    if (withParent && row == 0) assertSame(parent, proof.sources.parent(row))
-                }
+                        if (withParent && row == 0) assertSame(parent, proof.sources.parent(row))
+                    },
                 )
                 assertEquals(relaxation.model.m, visited)
             }
@@ -158,8 +158,8 @@ class LpEpochProofTest {
         for (target in listOf(source, proof.derivation.transformedModel)) {
             assertFalse(
                 proof.forEachRowProof { row, _ ->
-                if (row == 0) target.csc.colVal[0]++
-            }
+                    if (row == 0) target.csc.colVal[0]++
+                },
             )
             target.csc.colVal[0]--
             assertTrue(proof.forEachRowProof { _, _ -> })

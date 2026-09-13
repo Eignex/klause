@@ -33,10 +33,10 @@ class RelaxationTidyDerivationTest {
         assertTrue(
             derivation.validate(
                 Cancellation {
-            polls++;
-            false
-        }
-            )
+                    polls++
+                    false
+                },
+            ),
         )
 
         for (model in listOf(derivation.sourceModel, derivation.transformedModel)) {
@@ -44,10 +44,10 @@ class RelaxationTidyDerivationTest {
             assertFalse(
                 derivation.validate(
                     Cancellation {
-                if (++seen == polls) model.csc.colVal[0]++
-                false
-            }
-                )
+                        if (++seen == polls) model.csc.colVal[0]++
+                        false
+                    },
+                ),
             )
             model.csc.colVal[0]--
             assertTrue(derivation.validate())
