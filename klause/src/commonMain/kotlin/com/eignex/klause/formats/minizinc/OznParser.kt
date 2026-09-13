@@ -12,6 +12,7 @@ internal class OznParser(private val tokens: List<OznToken>) {
         var sawOutput = false
         while (peek().kind != OznTokenKind.EOF) {
             val item = parseItem()
+            expectPunct(";")
             when (item) {
                 is OznItem.Output -> {
                     if (sawOutput) throw OznParseException("duplicate output item at line ${peek().line}")
@@ -38,7 +39,6 @@ internal class OznParser(private val tokens: List<OznToken>) {
     private fun parseOutputItem(): OznItem.Output {
         expectKeyword("output")
         val expr = parseExpr()
-        expectPunct(";")
         return OznItem.Output(listOf(expr))
     }
 
@@ -72,7 +72,6 @@ internal class OznParser(private val tokens: List<OznToken>) {
         } else {
             null
         }
-        expectPunct(";")
         return OznItem.VarDecl(name, init)
     }
 
@@ -131,6 +130,11 @@ internal class OznParser(private val tokens: List<OznToken>) {
         val decls = ArrayList<OznItem.VarDecl>()
         while (!peekPunct("}")) {
             decls.add(parseVarDecl())
+            if (peekPunct("}")) break
+            if (!peekPunct(";") && !peekPunct(",")) {
+                throw OznParseException("expected `;`, `,` or `}` at line ${peek().line}")
+            }
+            advance()
         }
         expectPunct("}")
         expectKeyword("in")
