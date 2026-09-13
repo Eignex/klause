@@ -73,8 +73,18 @@ internal class LpEpochProof private constructor(
     private fun rowProof(outputRow: Int, cancellation: Cancellation, rows: LpProofRows?): CutProvenance? {
         if (cancellation()) return null
         val map = derivation.rowMap(outputRow) ?: return null
-        val original = row(derivation.sourceModel, map.sourceRow, cancellation = cancellation, index = rows?.source) ?: return null
-        val conclusion = row(derivation.transformedModel, outputRow, cancellation = cancellation, index = rows?.transformed) ?: return null
+        val original = row(
+            derivation.sourceModel,
+            map.sourceRow,
+            cancellation = cancellation,
+            index = rows?.source,
+        ) ?: return null
+        val conclusion = row(
+            derivation.transformedModel,
+            outputRow,
+            cancellation = cancellation,
+            index = rows?.transformed,
+        ) ?: return null
         val facts = ArrayList<CutProofFact>()
         val parent = sources.parent(outputRow)
         if (parent != null) {

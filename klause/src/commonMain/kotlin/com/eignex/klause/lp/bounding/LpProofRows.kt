@@ -5,10 +5,7 @@ import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.addExact
 import com.eignex.klause.util.mulExact
 
-internal class LpProofRows private constructor(
-    val source: LpProofRowIndex?,
-    val transformed: LpProofRowIndex?,
-) {
+internal class LpProofRows private constructor(val source: LpProofRowIndex?, val transformed: LpProofRowIndex?) {
     fun unchanged(cancellation: Cancellation): Boolean {
         if (cancellation()) return false
         // A callback between these comparisons could invalidate an already checked owner.
@@ -54,11 +51,7 @@ internal class LpProofRowIndex private constructor(
         return result
     }
 
-    fun forEachCoefficient(
-        row: Int,
-        cancellation: Cancellation,
-        consume: (Int, Long) -> Boolean,
-    ): Boolean {
+    fun forEachCoefficient(row: Int, cancellation: Cancellation, consume: (Int, Long) -> Boolean): Boolean {
         var entry = offsets[row]
         val end = offsets[row + 1]
         while (entry < end) {
@@ -100,11 +93,11 @@ internal class LpProofRowIndex private constructor(
                 checkProofRows(cancellation)
                 pointers[column] = model.csc.colPtr[column]
             }
-            if (pointers[0] != shape.start || pointers.last() != shape.end) throw LpProofRowsInvalidated()
+            if (pointers[0] != shape.start || pointers.last() != shape.end) invalidateProofRows()
             for (column in 0 until model.n) {
                 checkProofRows(cancellation)
                 if (pointers[column] > pointers[column + 1] || pointers[column] < shape.start) {
-                    throw LpProofRowsInvalidated()
+                    invalidateProofRows()
                 }
             }
             val size = shape.end - shape.start
@@ -114,7 +107,7 @@ internal class LpProofRowIndex private constructor(
             for (entry in 0 until size) {
                 checkProofRows(cancellation)
                 val row = model.csc.rowIdx[shape.start + entry]
-                if (row !in 0 until model.m) throw LpProofRowsInvalidated()
+                if (row !in 0 until model.m) invalidateProofRows()
                 sourceRows[entry] = row
                 sourceValues[entry] = model.csc.colVal[shape.start + entry]
                 offsets[row + 1]++
@@ -174,3 +167,5 @@ internal class LpProofRowsInvalidated : RuntimeException()
 private fun checkProofRows(cancellation: Cancellation) {
     if (cancellation()) throw LpProofRowsCancelled()
 }
+
+private fun invalidateProofRows(): Nothing = throw LpProofRowsInvalidated()
