@@ -11,6 +11,7 @@ import com.eignex.klause.lp.relaxation.CutColumnSource
 import com.eignex.klause.lp.relaxation.CutSourceMap
 import com.eignex.klause.lp.relaxation.LpRelaxation
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.util.Cancellation
 import com.ionspin.kotlin.bignum.integer.BigInteger
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -21,6 +22,26 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class RelaxationTidyDerivationTest {
+
+    @Test
+    fun `validation rejects mutations at its final cancellation boundary`() {
+        val builder = LpBuilder()
+        repeat(2) { builder.addVar(0, 10) }
+        builder.addRow(intArrayOf(0, 1), longArrayOf(1, 1), Relation.LE, 7)
+        val derivation = tidy(builder.build(Sense.MINIMIZE)).derivation
+        var polls = 0
+        assertTrue(derivation.validate(Cancellation { polls++; false }))
+
+        for (model in listOf(derivation.sourceModel, derivation.transformedModel)) {
+            var seen = 0
+            assertFalse(derivation.validate(Cancellation {
+                if (++seen == polls) model.csc.colVal[0]++
+                false
+            }))
+            model.csc.colVal[0]--
+            assertTrue(derivation.validate())
+        }
+    }
 
     @Test
     fun `source witness reconstruction preserves shifted objective and rows`() {

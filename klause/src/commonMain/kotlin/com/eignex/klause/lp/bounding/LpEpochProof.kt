@@ -46,11 +46,35 @@ internal class LpEpochProof private constructor(
         return LpEpochProof(derivation, candidate, mapping, construction)
     }
 
-    fun rowProof(outputRow: Int, cancellation: Cancellation = Cancellation.Never): CutProvenance? {
+    fun rowProof(outputRow: Int, cancellation: Cancellation = Cancellation.Never): CutProvenance? =
+        rowProof(outputRow, cancellation, null)
+
+    fun forEachRowProof(
+        cancellation: Cancellation = Cancellation.Never,
+        consume: (Int, CutProvenance) -> Unit,
+    ): Boolean = try {
+        val rows = LpProofRows.create(derivation.sourceModel, derivation.transformedModel, cancellation)
+        var complete = true
+        for (row in 0 until derivation.transformedModel.m) {
+            val proof = rowProof(row, cancellation, rows)
+            if (proof == null) {
+                complete = false
+                break
+            }
+            consume(row, proof)
+        }
+        complete && rows.unchanged(cancellation)
+    } catch (_: LpProofRowsCancelled) {
+        false
+    } catch (_: LpProofRowsInvalidated) {
+        false
+    }
+
+    private fun rowProof(outputRow: Int, cancellation: Cancellation, rows: LpProofRows?): CutProvenance? {
         if (cancellation()) return null
         val map = derivation.rowMap(outputRow) ?: return null
-        val original = row(derivation.sourceModel, map.sourceRow, cancellation = cancellation) ?: return null
-        val conclusion = row(derivation.transformedModel, outputRow, cancellation = cancellation) ?: return null
+        val original = row(derivation.sourceModel, map.sourceRow, cancellation = cancellation, index = rows?.source) ?: return null
+        val conclusion = row(derivation.transformedModel, outputRow, cancellation = cancellation, index = rows?.transformed) ?: return null
         val facts = ArrayList<CutProofFact>()
         val parent = sources.parent(outputRow)
         if (parent != null) {
@@ -101,7 +125,7 @@ internal class LpEpochProof private constructor(
         val algebraic = if (rounded == null) {
             conclusion
         } else {
-            row(derivation.sourceModel, map.sourceRow, map.fixings, cancellation)
+            row(derivation.sourceModel, map.sourceRow, map.fixings, cancellation, rows?.source)
                 ?: return null
         }
         transforms.add(
@@ -154,28 +178,36 @@ internal class LpEpochProof private constructor(
         row: Int,
         fixings: List<RelaxationTidyFixing> = emptyList(),
         cancellation: Cancellation,
+        index: LpProofRowIndex? = null,
     ): CutPremise.Row? {
         val terms = HashMap<CutSource, BigFraction>()
         var constant = BigFraction.ZERO
         var rhs = BigFraction.ofLong(model.flippedRhs[row])
         val fixed = fixings.associateBy { it.column }
-        for (column in 0 until model.n) {
-            if (cancellation()) return null
-            var coefficient = 0L
-            for (entry in model.csc.colPtr[column] until model.csc.colPtr[column + 1]) {
-                if (cancellation()) return null
-                if (model.csc.rowIdx[entry] == row) coefficient = model.csc.colVal[entry]
-            }
-            if (coefficient == 0L) continue
+        fun append(column: Int, coefficient: Long): Boolean {
             val value = BigFraction.ofLong(coefficient)
             val fixing = fixed[column]
             if (fixing != null) {
                 rhs -= value * BigFraction.ofLong(fixing.value)
-                continue
+                return true
             }
-            val source = sources.column(column) ?: return null
+            val source = sources.column(column) ?: return false
             terms[source.source] = (terms[source.source] ?: BigFraction.ZERO) + value * source.scale
             constant += value * source.offset
+            return true
+        }
+        if (index != null) {
+            if (!index.forEachCoefficient(row, cancellation, ::append)) return null
+        } else {
+            for (column in 0 until model.n) {
+                if (cancellation()) return null
+                var coefficient = 0L
+                for (entry in model.csc.colPtr[column] until model.csc.colPtr[column + 1]) {
+                    if (cancellation()) return null
+                    if (model.csc.rowIdx[entry] == row) coefficient = model.csc.colVal[entry]
+                }
+                if (coefficient != 0L && !append(column, coefficient)) return null
+            }
         }
         if (cancellation()) return null
         return CutPremise.Row(

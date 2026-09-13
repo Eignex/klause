@@ -48,6 +48,145 @@ import kotlin.test.assertTrue
 
 class LpEpochProofTest {
     @Test
+    fun `streamed proofs preserve duplicate and zero coefficient semantics`() {
+        val problem = Problem(
+            0,
+            2,
+            Array(2) { IntDomain(0, 5) },
+            arrayOf(
+                Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 7),
+                Linear(intArrayOf(2, -1), intArrayOf(0, 1), LinearOp.LE, 3),
+            ),
+        )
+        val relaxation = CpToLpRelaxation(problem, null, tidy = RelaxationTidyConfig(enabled = true))
+            .build(RootDomains(problem))
+        val proof = assertNotNull(relaxation.tidyProof)
+        for (model in listOf(proof.derivation.sourceModel, proof.derivation.transformedModel)) {
+            intArrayOf(1, 1, 0, 0).copyInto(model.csc.rowIdx)
+            longArrayOf(4, 0, 2, 3).copyInto(model.csc.colVal)
+        }
+
+        assertTrue(proof.forEachRowProof { row, actual ->
+            val expected = assertNotNull(proof.rowProof(row))
+            assertEquals(expected.facts, actual.facts)
+            assertEquals(expected.conclusion, actual.conclusion)
+            val before = assertIs<CutRowTransform.Algebraic>(expected.transformations.single())
+            val after = assertIs<CutRowTransform.Algebraic>(actual.transformations.single())
+            assertEquals(before.input, after.input)
+            assertEquals(before.conclusion, after.conclusion)
+        })
+    }
+
+    @Test
+    fun `streamed proofs preserve scanner metadata algebra and parent identity`() {
+        for (fixed in listOf(false, true)) {
+            val problem = Problem(
+                0,
+                3,
+                arrayOf(if (fixed) IntDomain(1, 1) else IntDomain(0, 4), IntDomain(0, 5), IntDomain(0, 5)),
+                arrayOf(
+                    Linear(intArrayOf(2, 3), intArrayOf(0, 1), LinearOp.LE, 7),
+                    Linear(intArrayOf(1, 2), intArrayOf(1, 2), LinearOp.LE, 8),
+                ),
+            )
+            val relaxation = CpToLpRelaxation(problem, null, tidy = RelaxationTidyConfig(enabled = true))
+                .build(RootDomains(problem))
+            val original = assertNotNull(relaxation.tidyProof)
+            val sources = original.sources
+            val parent = assertNotNull(original.rowProof(0))
+            for (withParent in listOf(false, true)) {
+                val mapping = CutSourceMap(
+                    sources.model,
+                    sources.epoch,
+                    sources.columns,
+                    parent.facts.filter { it.global }.map { it.premise }.toSet(),
+                    parentRows = if (withParent) mapOf(0 to parent) else emptyMap(),
+                )
+                val proof = assertNotNull(LpEpochProof.create(original.derivation, mapping))
+                var visited = 0
+
+                assertTrue(proof.forEachRowProof { row, actual ->
+                    val expected = assertNotNull(proof.rowProof(row))
+                    assertEquals(visited++, row)
+                    assertSame(expected.model, actual.model)
+                    assertEquals(expected.epoch, actual.epoch)
+                    assertEquals(expected.assumptions, actual.assumptions)
+                    assertEquals(expected.facts, actual.facts)
+                    assertEquals(expected.rules, actual.rules)
+                    assertEquals(expected.conclusion, actual.conclusion)
+                    assertEquals(expected.auxiliaryDefinitions, actual.auxiliaryDefinitions)
+                    assertEquals(expected.transformations.size, actual.transformations.size)
+                    for ((left, right) in expected.transformations.zip(actual.transformations)) {
+                        if (left is CutRowTransform.Algebraic) {
+                            val algebraic = assertIs<CutRowTransform.Algebraic>(right)
+                            assertEquals(left.input, algebraic.input)
+                            assertEquals(left.conclusion, algebraic.conclusion)
+                            assertEquals(left.multiplier, algebraic.multiplier)
+                            assertEquals(left.inputStrict, algebraic.inputStrict)
+                            assertEquals(left.outputStrict, algebraic.outputStrict)
+                            assertEquals(left.fixings, algebraic.fixings)
+                        } else {
+                            assertEquals(left, right)
+                        }
+                    }
+                    if (withParent && row == 0) assertSame(parent, proof.sources.parent(row))
+                })
+                assertEquals(relaxation.model.m, visited)
+            }
+        }
+    }
+
+    @Test
+    fun `a late streamed mutation or decline rejects the entire batch`() {
+        val problem = Problem(
+            0,
+            2,
+            Array(2) { IntDomain(0, 5) },
+            arrayOf(
+                Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 7),
+                Linear(intArrayOf(2, -1), intArrayOf(0, 1), LinearOp.LE, 3),
+            ),
+        )
+        val relaxation = CpToLpRelaxation(problem, null, tidy = RelaxationTidyConfig(enabled = true))
+            .build(RootDomains(problem))
+        val proof = assertNotNull(relaxation.tidyProof)
+        val source = proof.derivation.sourceModel
+        for (target in listOf(source, proof.derivation.transformedModel)) {
+            assertFalse(proof.forEachRowProof { row, _ ->
+                if (row == 0) target.csc.colVal[0]++
+            })
+            target.csc.colVal[0]--
+            assertTrue(proof.forEachRowProof { _, _ -> })
+        }
+        val last = source.m - 1
+        source.rowGlobal[last] = false
+        source.rowPremises[last] = null
+        var visited = 0
+        assertFalse(proof.forEachRowProof { _, _ -> visited++ })
+        assertEquals(relaxation.model.m - 1, visited)
+        assertNull(proof.rowProof(relaxation.model.m - 1))
+        source.rowGlobal[last] = true
+        assertTrue(proof.forEachRowProof { _, _ -> })
+    }
+
+    @Test
+    fun `stream cancellation after a consumed proof rejects partial results`() {
+        val problem = Problem(
+            0,
+            2,
+            Array(2) { IntDomain(0, 5) },
+            arrayOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 7)),
+        )
+        val relaxation = CpToLpRelaxation(problem, null, tidy = RelaxationTidyConfig(enabled = true))
+            .build(RootDomains(problem))
+        val proof = assertNotNull(relaxation.tidyProof)
+        var cancelled = false
+
+        assertFalse(proof.forEachRowProof(Cancellation { cancelled }) { _, _ -> cancelled = true })
+        assertTrue(proof.forEachRowProof { _, _ -> })
+    }
+
+    @Test
     fun `binding detects and recovers from mutations of the same model`() {
         val problem = Problem(
             0,
@@ -448,6 +587,15 @@ class LpEpochProofTest {
         assertFalse(assertNotNull(rebound.tidyProof.rowProof(0)).global)
         assertEquals(1, assertNotNull(rebound.tidyProof.rowProof(0)).transformations.size)
         assertFalse(rebound.tidyProof.active(PropagationSession(problem)))
+        val donor = Basis(
+            IntArray(rebound.model.m) { rebound.model.n + it },
+            Array(rebound.model.numVars) {
+                if (it >= rebound.model.n) VarStatus.BASIC else VarStatus.AT_LOWER
+            },
+        )
+        val mapped = assertNotNull(LpEpochState.remapBasis(rebound, rebound, donor))
+        assertTrue(donor.basicVars.contentEquals(mapped.basicVars))
+        assertTrue(donor.status.contentEquals(mapped.status))
     }
 
     @Test

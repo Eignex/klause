@@ -10,6 +10,7 @@ import com.eignex.klause.lp.engine.Relation
 import com.eignex.klause.lp.engine.Sense
 import com.eignex.klause.lp.engine.VarStatus
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
+import com.eignex.klause.lp.relaxation.CutSourceMap
 import com.eignex.klause.lp.relaxation.RootDomains
 import com.eignex.klause.lp.relaxation.withModel
 import com.eignex.klause.propagation.PropagationSession
@@ -21,6 +22,37 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class LpEpochStateTest {
+    @Test
+    fun `row hints preserve last nonzero coefficients for duplicate source keys`() {
+        val problem = Problem(
+            0,
+            3,
+            Array(3) { IntDomain(0, 5) },
+            arrayOf(
+                Linear(intArrayOf(1, 1, 1), intArrayOf(0, 1, 2), LinearOp.LE, 7),
+                Linear(intArrayOf(1, -1, 1), intArrayOf(0, 1, 2), LinearOp.LE, 7),
+            ),
+        )
+        val first = CpToLpRelaxation(problem, null).build(RootDomains(problem))
+        val second = CpToLpRelaxation(problem, null).build(RootDomains(problem))
+        val sources = assertNotNull(first.sourceMap)
+        val mapping = CutSourceMap(sources.model, sources.epoch, List(3) { sources.column(0) })
+        val previous = first.withModel(first.model, mapping)
+        val next = second.withModel(second.model, mapping)
+        intArrayOf(0, 0, 0, 1, 0, 1).copyInto(previous.model.csc.rowIdx)
+        intArrayOf(1, 1, 1, 0, 1, 0).copyInto(next.model.csc.rowIdx)
+        longArrayOf(5, 0, 8, 7, 3, 4).copyInto(previous.model.csc.colVal)
+        longArrayOf(5, 0, 8, 7, 3, 4).copyInto(next.model.csc.colVal)
+        val basis = Basis(intArrayOf(3, 4), arrayOf(
+            VarStatus.AT_LOWER, VarStatus.AT_LOWER, VarStatus.AT_LOWER, VarStatus.BASIC, VarStatus.BASIC,
+        ))
+
+        val mapped = assertNotNull(LpEpochState.remapBasis(previous, next, basis))
+
+        assertContentEquals(intArrayOf(4, 3), mapped.basicVars)
+        assertContentEquals(intArrayOf(3, 4), basis.basicVars)
+    }
+
     @Test
     fun `snapshot guards admit narrower domains and reject a replacement root`() {
         val problem = Problem(1, 1, arrayOf(IntDomain(0, 5)), emptyArray())

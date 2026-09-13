@@ -174,6 +174,10 @@ internal class RelaxationTidyDerivation(
         validateBody(cancellation)
     } catch (_: TidyValidationCancelled) {
         false
+    } catch (_: LpProofRowsCancelled) {
+        false
+    } catch (_: LpProofRowsInvalidated) {
+        false
     }
 
     private fun validateBody(cancellation: Cancellation): Boolean {
@@ -187,6 +191,7 @@ internal class RelaxationTidyDerivation(
         }
         if (!sameColumnsAndObjective(sourceModel, transformedModel)) return false
         if (!hasNormalizedSlacks(sourceModel) || !hasNormalizedSlacks(transformedModel)) return false
+        val rows = LpProofRows.create(sourceModel, transformedModel, cancellation)
         if (!hasNormalizedRhs(
                 sourceModel,
                 cancellation,
@@ -207,7 +212,7 @@ internal class RelaxationTidyDerivation(
 
         for (map in rowMapSnapshot) {
             checkTidyValidation(cancellation)
-            if (!validateRow(map, cancellation)) return false
+            if (!validateRow(map, rows, cancellation)) return false
         }
         for (removedRow in removedSnapshot) {
             checkTidyValidation(cancellation)
@@ -216,7 +221,7 @@ internal class RelaxationTidyDerivation(
             ) {
                 return false
             }
-            if (!validateRemovedRow(removedRow, cancellation)) return false
+            if (!validateRemovedRow(removedRow, rows, cancellation)) return false
             if (removedRow.boundUses.any { use ->
                     checkTidyValidation(cancellation)
                     use.column !in 0 until sourceModel.n ||
@@ -229,7 +234,7 @@ internal class RelaxationTidyDerivation(
                 return false
             }
         }
-        return boundSnapshot.all { validateBound(it, cancellation) } && !cancellation()
+        return boundSnapshot.all { validateBound(it, rows, cancellation) } && rows.unchanged(cancellation)
     }
 
     /** A transformed primal is already in source coordinates because tidy never eliminates a column. */
@@ -243,9 +248,15 @@ internal class RelaxationTidyDerivation(
             objectiveValue(sourceModel, values) == objectiveValue(transformedModel, values)
     }
 
-    private fun validateRow(map: RelaxationTidyRowMap, cancellation: Cancellation): Boolean {
-        val sourceCoefficients = rowCoefficients(sourceModel, map.sourceRow, cancellation)
-        val outputCoefficients = rowCoefficients(transformedModel, map.outputRow, cancellation)
+    private fun validateRow(
+        map: RelaxationTidyRowMap,
+        rows: LpProofRows,
+        cancellation: Cancellation,
+    ): Boolean {
+        val sourceCoefficients = (rows.source?.coefficients(map.sourceRow, cancellation)
+            ?: rowCoefficients(sourceModel, map.sourceRow, cancellation))
+        val outputCoefficients = (rows.transformed?.coefficients(map.outputRow, cancellation)
+            ?: rowCoefficients(transformedModel, map.outputRow, cancellation))
         val substituted = map.fixings.associateBy { it.column }
         if (substituted.size != map.fixings.size) return false
         for (fixing in map.fixings) {
@@ -303,8 +314,13 @@ internal class RelaxationTidyDerivation(
         return true
     }
 
-    private fun validateRemovedRow(removed: RelaxationTidyRemovedRow, cancellation: Cancellation): Boolean {
-        val coefficients = rowCoefficients(sourceModel, removed.sourceRow, cancellation).toMutableMap()
+    private fun validateRemovedRow(
+        removed: RelaxationTidyRemovedRow,
+        rows: LpProofRows,
+        cancellation: Cancellation,
+    ): Boolean {
+        val coefficients = (rows.source?.coefficients(removed.sourceRow, cancellation)
+            ?: rowCoefficients(sourceModel, removed.sourceRow, cancellation)).toMutableMap()
         for (fixing in removed.fixings) {
             checkTidyValidation(cancellation)
             if (!validFixing(coefficients, fixing)) return false
@@ -323,7 +339,7 @@ internal class RelaxationTidyDerivation(
 
             RelaxationTidyRemovalReason.REDUNDANT -> validateRedundant(removed, coefficients, cancellation)
 
-            RelaxationTidyRemovalReason.PARALLEL -> validateParallel(removed, coefficients, cancellation)
+            RelaxationTidyRemovalReason.PARALLEL -> validateParallel(removed, coefficients, rows, cancellation)
         }
     }
 
@@ -407,6 +423,7 @@ internal class RelaxationTidyDerivation(
     private fun validateParallel(
         removed: RelaxationTidyRemovedRow,
         coefficients: Map<Int, Long>,
+        rows: LpProofRows,
         cancellation: Cancellation,
     ): Boolean {
         val supplier = removed.supplyingSourceRow ?: return false
@@ -416,7 +433,8 @@ internal class RelaxationTidyDerivation(
         ) {
             return false
         }
-        val supplying = rowCoefficients(transformedModel, output, cancellation)
+        val supplying = (rows.transformed?.coefficients(output, cancellation)
+            ?: rowCoefficients(transformedModel, output, cancellation))
         if (coefficients.keys != supplying.keys || coefficients.isEmpty()) return false
         val first = coefficients.keys.first()
         val scale = BigFraction.ofLong(coefficients.getValue(first)) *
@@ -476,14 +494,19 @@ internal class RelaxationTidyDerivation(
         return outputNaturalRhs == expectedNatural && rounded.den == BigInteger.ONE
     }
 
-    private fun validateBound(bound: RelaxationTidyBound, cancellation: Cancellation): Boolean {
+    private fun validateBound(
+        bound: RelaxationTidyBound,
+        rows: LpProofRows,
+        cancellation: Cancellation,
+    ): Boolean {
         if (bound.column !in 0 until sourceModel.n || bound.sourceRow !in 0 until sourceModel.m ||
             bound.sourceValue.den.signum() <= 0
         ) {
             return false
         }
         val map = rowMapSnapshot.firstOrNull { it.sourceRow == bound.sourceRow } ?: return false
-        val coefficients = rowCoefficients(sourceModel, bound.sourceRow, cancellation)
+        val coefficients = (rows.source?.coefficients(bound.sourceRow, cancellation)
+            ?: rowCoefficients(sourceModel, bound.sourceRow, cancellation))
         if (map.fixings.any { !validFixing(coefficients, it) }) return false
         val fixedColumns = map.fixings.map { it.column }.toSet()
         val live = coefficients.filterKeys { it !in fixedColumns }

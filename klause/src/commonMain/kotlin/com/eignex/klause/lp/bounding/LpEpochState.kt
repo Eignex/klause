@@ -2,6 +2,7 @@ package com.eignex.klause.lp.bounding
 
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.lp.engine.Basis
+import com.eignex.klause.lp.engine.CutProvenance
 import com.eignex.klause.lp.engine.CutRowTransform
 import com.eignex.klause.lp.engine.VarStatus
 import com.eignex.klause.lp.relaxation.CutColumnSource
@@ -174,12 +175,9 @@ internal class LpEpochState(
                 }
             }
             val keys = ArrayList<List<Any?>>()
-            for (row in 0 until model.m) {
-                if (cancellation()) return null
+            fun append(row: Int, proof: CutProvenance?) {
                 val premise = model.rowPremises[row]
                 val parent = relaxation.sourceMap?.parent(row)
-                val proof = relaxation.tidyProof?.rowProof(row, cancellation)
-                if (relaxation.tidyProof != null && proof == null) return null
                 keys.add(
                     listOf(
                         coefficients[row], model.flippedRhs[row], model.hasUpper[model.n + row],
@@ -202,6 +200,15 @@ internal class LpEpochState(
                         },
                     ),
                 )
+            }
+            val proof = relaxation.tidyProof
+            if (proof != null) {
+                if (!proof.forEachRowProof(cancellation, ::append)) return null
+            } else {
+                for (row in 0 until model.m) {
+                    if (cancellation()) return null
+                    append(row, null)
+                }
             }
             return keys
         }
