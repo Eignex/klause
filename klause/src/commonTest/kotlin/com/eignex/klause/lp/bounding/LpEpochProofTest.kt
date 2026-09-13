@@ -50,7 +50,9 @@ class LpEpochProofTest {
     @Test
     fun `binding detects and recovers from mutations of the same model`() {
         val problem = Problem(
-            0, 2, Array(2) { IntDomain(-3, 5) },
+            0,
+            2,
+            Array(2) { IntDomain(-3, 5) },
             arrayOf(
                 Linear(intArrayOf(2, 3), intArrayOf(0, 1), LinearOp.LE, 8),
                 Linear(intArrayOf(3, -2), intArrayOf(0, 1), LinearOp.LE, 7),
@@ -93,7 +95,9 @@ class LpEpochProofTest {
     @Test
     fun `binding compares premise arrays with their construction snapshot`() {
         val problem = Problem(
-            1, 2, Array(2) { IntDomain(-3, 5) },
+            1,
+            2,
+            Array(2) { IntDomain(-3, 5) },
             arrayOf(Linear(intArrayOf(2, 3), intArrayOf(0, 1), LinearOp.LE, 8)),
         )
         val plain = CpToLpRelaxation(problem, null).build(RootDomains(problem))
@@ -130,7 +134,9 @@ class LpEpochProofTest {
     @Test
     fun `binding accepts recentered narrowing and rejects widening`() {
         val problem = Problem(
-            0, 2, Array(2) { IntDomain(-3, 5) },
+            0,
+            2,
+            Array(2) { IntDomain(-3, 5) },
             arrayOf(Linear(intArrayOf(2, 3), intArrayOf(0, 1), LinearOp.LE, 8)),
         )
         val objective = LinearObjective(intCoefficients = longArrayOf(3, -2))
@@ -159,7 +165,9 @@ class LpEpochProofTest {
     @Test
     fun `binding preserves complete tags and scalar model identity checks`() {
         val problem = Problem(
-            0, 2, Array(2) { IntDomain(-3, 5) },
+            0,
+            2,
+            Array(2) { IntDomain(-3, 5) },
             arrayOf(Linear(intArrayOf(2, 3), intArrayOf(0, 1), LinearOp.LE, 8)),
         )
         val relaxation = CpToLpRelaxation(problem, null, tidy = RelaxationTidyConfig(enabled = true))
@@ -193,7 +201,9 @@ class LpEpochProofTest {
     @Test
     fun `binding distinguishes empty premises from absent premises`() {
         val problem = Problem(
-            0, 2, Array(2) { IntDomain(-3, 5) },
+            0,
+            2,
+            Array(2) { IntDomain(-3, 5) },
             arrayOf(Linear(intArrayOf(2, 3), intArrayOf(0, 1), LinearOp.LE, 8)),
         )
         val relaxation = CpToLpRelaxation(problem, null, tidy = RelaxationTidyConfig(enabled = true))
@@ -211,7 +221,9 @@ class LpEpochProofTest {
     @Test
     fun `binding ignores absent bound payloads`() {
         val problem = Problem(
-            0, 2, Array(2) { IntDomain(-3, 5) },
+            0,
+            2,
+            Array(2) { IntDomain(-3, 5) },
             arrayOf(Linear(intArrayOf(2, 3), intArrayOf(0, 1), LinearOp.LE, 8)),
         )
         val relaxation = CpToLpRelaxation(problem, null, tidy = RelaxationTidyConfig(enabled = true))
@@ -227,7 +239,9 @@ class LpEpochProofTest {
     @Test
     fun `binding rejects changed source mappings and parent proofs`() {
         val problem = Problem(
-            0, 2, Array(2) { IntDomain(-3, 5) },
+            0,
+            2,
+            Array(2) { IntDomain(-3, 5) },
             arrayOf(Linear(intArrayOf(2, 3), intArrayOf(0, 1), LinearOp.LE, 8)),
         )
         val relaxation = CpToLpRelaxation(problem, null, tidy = RelaxationTidyConfig(enabled = true))
@@ -236,7 +250,8 @@ class LpEpochProofTest {
         val sources = assertNotNull(relaxation.sourceMap)
         for (changed in listOf("columns", "assumptions", "parent", "auxiliary")) {
             val mapping = CutSourceMap(
-                sources.model, sources.epoch,
+                sources.model,
+                sources.epoch,
                 if (changed == "columns") sources.columns.reversed() else sources.columns,
                 assumptions = if (changed == "assumptions") setOf("assumption") else sources.assumptions,
                 parentRows = if (changed == "parent") {
@@ -262,7 +277,9 @@ class LpEpochProofTest {
     @Test
     fun `binding retains the identity of a saved parent proof`() {
         val problem = Problem(
-            0, 2, Array(2) { IntDomain(-3, 5) },
+            0,
+            2,
+            Array(2) { IntDomain(-3, 5) },
             arrayOf(Linear(intArrayOf(2, 3), intArrayOf(0, 1), LinearOp.LE, 8)),
         )
         val relaxation = CpToLpRelaxation(problem, null, tidy = RelaxationTidyConfig(enabled = true))
@@ -270,12 +287,17 @@ class LpEpochProofTest {
         val sources = assertNotNull(relaxation.sourceMap)
         val parent = CutProvenance(sources.model, sources.epoch, emptyList())
         val mapping = CutSourceMap(
-            sources.model, sources.epoch, sources.columns, parentRows = mapOf(0 to parent),
+            sources.model,
+            sources.epoch,
+            sources.columns,
+            parentRows = mapOf(0 to parent),
         )
         val proof = assertNotNull(LpEpochProof.create(assertNotNull(relaxation.tidyDerivation), mapping))
         for (preserve in listOf(true, false)) {
             val next = CutSourceMap(
-                sources.model, sources.epoch, sources.columns,
+                sources.model,
+                sources.epoch,
+                sources.columns,
                 parentRows = mapOf(
                     0 to if (preserve) parent else CutProvenance(sources.model, sources.epoch, emptyList()),
                 ),
