@@ -29,6 +29,7 @@ import com.eignex.klause.solver.search.SearchAtomPremise
 import com.eignex.klause.solver.search.SearchExplanation
 import com.eignex.klause.solver.search.SearchIntValue
 import com.eignex.klause.solver.search.SearchRealValue
+import com.eignex.klause.util.Cancellation
 
 internal class QfLraSystem(private val model: Problem) {
     fun build(booleanValue: (Int) -> Boolean?): QfLraRelaxation {
@@ -180,6 +181,13 @@ internal class LiveQfLraSystem(private val source: Problem, private val lp: LpPr
                 ExactLpObjective(List(columns + terms.size) { ExactLpNumber.of(0L) }),
             ),
         )
+    }
+
+    fun refreshEpoch(token: Cancellation, validatePublication: () -> Boolean): Boolean {
+        val retainedDefinitions = definitions.toMap()
+        return lp.refreshSourceEpoch(token) {
+            definitions == retainedDefinitions && validatePublication()
+        }
     }
 
     fun assertRow(row: ExactRationalInequality, premise: SearchAtomPremise): Boolean = assertTerms(

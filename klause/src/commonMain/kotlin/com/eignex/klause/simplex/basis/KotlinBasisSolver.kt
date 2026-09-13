@@ -17,7 +17,7 @@ internal data class BasisSolveWork(
 
 // Single-threaded owner of source, factors, row transforms and scratch. Caller vectors never become retained buffers.
 // Mandatory operations/reports reject close; n and the last refactorization's singular flag remain readable.
-// Repair and snapshots stay within this fixed source identity. No cancellation or resource API is exposed.
+// Repair and snapshots stay within this fixed source identity; partial repair factors remain private.
 internal class KotlinBasisSolver(
     matrix: SparseMatrix,
     private val policy: LuPivotPolicy = LuPivotPolicy(),
@@ -48,6 +48,7 @@ internal class KotlinBasisSolver(
     private var unitRows = IntArray(0)
     private var retainedOrder: SymbolicLu? = null
     private var closed = false
+    private var repairActive = false
     override var singular = true
         private set
     var lastSolveWork: BasisSolveWork? = null
@@ -125,53 +126,257 @@ internal class KotlinBasisSolver(
         return true
     }
 
-    override fun refactorizeRepairing(basicIndex: IntArray): BasisRepair? {
+    @Suppress("TooGenericExceptionCaught")
+    override fun refactorizeRepairing(basicIndex: IntArray, control: BasisRepairControl): BasisRepair? {
         requireOpen()
         validateBasis(basicIndex)
-        operationMeter.attempt(BasisOperationKind.REPAIR)
-        var proposedOrder = retainedOrder.takeIf { reusePivotOrder }
+        val requested = basicIndex.copyOf()
+        val proposed = retainedOrder.takeIf { reusePivotOrder }
         invalidate()
-        val meter = BasisBuildAccumulator(BasisBuildKind.REPAIR)
-        val repairedColumns = IntArray(n) { -1 }
-        val repairedUnits = IntArray(n) { it }
-        val initial = builder.build(repairedColumns, repairedUnits, policy, proposedOrder)
-        meter.add(initial.report)
-        if (initial !is LuBuildResult.Built) {
-            val report = meter.report(false)
-            workMeter.reset(report)
-            operationMeter.decline(BasisOperationKind.REPAIR, report.units)
-            return null
-        }
-        var accepted: LuBuildResult.Built = initial
-        var installedReport = accepted.report
-        proposedOrder = accepted.factors.symbolic.takeIf { reusePivotOrder }
-        for (requestedSlot in basicIndex.indices) {
-            val entering = basicIndex[requestedSlot]
-            for (offset in repairedUnits.indices) {
-                val slot = (requestedSlot + offset) % n
-                if (repairedUnits[slot] < 0) continue
-                val trialColumns = repairedColumns.copyOf()
-                val trialUnits = repairedUnits.copyOf()
-                trialColumns[slot] = entering
-                trialUnits[slot] = -1
-                val trial = builder.build(trialColumns, trialUnits, policy, proposedOrder)
-                meter.add(trial.report)
-                if (trial is LuBuildResult.Built) {
-                    trialColumns.copyInto(repairedColumns)
-                    trialUnits.copyInto(repairedUnits)
-                    accepted = trial
-                    installedReport = trial.report
-                    proposedOrder = trial.factors.symbolic.takeIf { reusePivotOrder }
-                    break
+        repairActive = true
+        operationMeter.attempt(BasisOperationKind.REPAIR)
+        val attempt = RepairAttempt(control, requested, proposed)
+        var successful = false
+        var primary: Throwable? = null
+        var result: BasisRepair? = null
+        try {
+            result = attempt.run()
+            successful = result != null
+        } catch (failure: Throwable) {
+            primary = failure
+            control.charge(0, complete = false)
+        } finally {
+            try {
+                attempt.close()
+            } catch (cleanup: Throwable) {
+                successful = false
+                control.charge(0, complete = false)
+                if (primary != null) primary.addSuppressed(cleanup) else primary = cleanup
+            } finally {
+                repairActive = false
+                if (!successful) invalidate()
+                workMeter.reset(if (successful) attempt.report else attempt.builds.report(false))
+                when {
+                    successful -> operationMeter.success(BasisOperationKind.REPAIR, attempt.repairUnits)
+                    control.accountingComplete -> operationMeter.decline(BasisOperationKind.REPAIR, attempt.repairUnits)
+                    else -> operationMeter.declineUnknown(BasisOperationKind.REPAIR, attempt.repairUnits)
                 }
             }
         }
-        val report = meter.report(true, installedReport)
-        workMeter.reset(report)
-        operationMeter.success(BasisOperationKind.REPAIR, report.units)
-        install(accepted, repairedColumns, repairedUnits)
-        return BasisRepair(repairedColumns, repairedUnits)
+        primary?.let { throw it }
+        return result
     }
+
+    private inner class RepairAttempt(
+        private val control: BasisRepairControl,
+        private val requested: IntArray,
+        private val proposed: SymbolicLu?,
+    ) {
+        val builds = BasisBuildAccumulator(BasisBuildKind.REPAIR)
+        var report: BasisBuildWork? = null
+            private set
+        var repairUnits = 0L
+            private set
+        private var scratch: KotlinBasisSolver? = null
+
+        fun run(): BasisRepair? {
+            charge(requested.size.toLong())
+            if (!control.check()) return null
+            val owner = KotlinBasisSolver(source, policy, updateLimit, fillFactor, densityThreshold, reusePivotOrder)
+            scratch = owner
+            charge(2L * (sourcePointers.size.toLong() + sourceRows.size + sourceValues.size) + 6L * n + 2)
+            if (!control.check()) return null
+            val repairedColumns = IntArray(n) { -1 }
+            val repairedUnits = IntArray(n) { it }
+            charge(2L * n)
+            val initial = build(owner, repairedColumns, repairedUnits, proposed) ?: return null
+            owner.install(initial, repairedColumns, repairedUnits)
+            charge(4L * n + cacheCopyUnits(initial.factors))
+            val spike = IndexedVector(n)
+            charge(3L * n)
+            var unitsRemaining = n
+            for (requestedSlot in requested.indices) {
+                if (unitsRemaining == 0) break
+                if (!control.check()) return null
+                val entering = requested[requestedSlot]
+                if (!scatter(spike, entering)) return null
+                if (!control.check()) return null
+                if (!solve(owner, spike)) return null
+                val candidates = candidates(spike, repairedUnits, requestedSlot) ?: return null
+                for (slot in candidates) {
+                    if (!control.check()) return null
+                    val update = update(owner, slot, entering, spike)
+                    if (!control.check()) return null
+                    if (update == BasisUpdate.SINGULAR) continue
+                    repairedColumns[slot] = entering
+                    repairedUnits[slot] = -1
+                    unitsRemaining--
+                    charge(2)
+                    if (update == BasisUpdate.REFACTORIZE) {
+                        val rebuilt = build(owner, repairedColumns, repairedUnits, owner.retainedOrder) ?: return null
+                        owner.install(rebuilt, repairedColumns, repairedUnits)
+                        charge(4L * n + cacheCopyUnits(rebuilt.factors))
+                    }
+                    break
+                }
+            }
+            val final = build(
+                this@KotlinBasisSolver,
+                repairedColumns,
+                repairedUnits,
+                owner.retainedOrder,
+            ) ?: return null
+            val result = BasisRepair(repairedColumns, repairedUnits)
+            val installed = BasisSolveCache(final.factors, densityThreshold, workspace)
+            val installedColumns = repairedColumns.copyOf()
+            val installedUnits = repairedUnits.copyOf()
+            val installedOrder = SymbolicLu(
+                final.factors.symbolic.rowOrder.copyOf(),
+                final.factors.symbolic.columnOrder.copyOf(),
+            )
+            charge(6L * n + cacheCopyUnits(final.factors))
+            close()
+            report = builds.report(true, final.report)
+            if (!control.check()) {
+                report = builds.report(false)
+                return null
+            }
+            cache = installed
+            columns = installedColumns
+            unitRows = installedUnits
+            retainedOrder = installedOrder
+            singular = false
+            return result
+        }
+
+        private fun scatter(spike: IndexedVector, entering: Int): Boolean {
+            val start = sourcePointers[entering]
+            val end = sourcePointers[entering + 1]
+            for (at in start until end) {
+                if (at % 128 == 0 && !control.check()) return false
+                charge(1)
+                if (!sourceValues[at].isFinite()) return false
+            }
+            if (!control.check()) return false
+            val previous = spike.count
+            spike.scatterColumn(source, entering)
+            charge(previous.toLong() + end - start)
+            return control.check()
+        }
+
+        private fun cacheCopyUnits(factors: LuFactors): Long =
+            4L * (n.toLong() + 1) + 2L * (factors.lower.nnz.toLong() + factors.upper.nnz) + 37L * n + 3
+
+        private fun build(
+            owner: KotlinBasisSolver,
+            columns: IntArray,
+            units: IntArray,
+            order: SymbolicLu?,
+        ): LuBuildResult.Built? {
+            if (!control.check()) return null
+            val result = owner.builder.build(columns, units, policy, order.takeIf { reusePivotOrder })
+            builds.add(result.report)
+            charge(result.report.units)
+            if (!control.check()) return null
+            return result as? LuBuildResult.Built
+        }
+
+        private fun candidates(spike: IndexedVector, units: IntArray, requestedSlot: Int): List<Int>? {
+            val candidates = mutableListOf<Int>()
+            var maximum = 0.0
+            for (slot in 0 until n) {
+                if (slot % 128 == 0 && !control.check()) return null
+                val value = abs(spike[slot])
+                charge(1)
+                if (!value.isFinite()) return null
+                if (units[slot] >= 0 && value > 0.0 && value >= policy.absoluteTolerance) {
+                    candidates.add(slot)
+                    maximum = max(maximum, value)
+                }
+            }
+            if (!control.check()) return null
+            var comparisons = 0
+            try {
+                candidates.sortWith { left, right ->
+                    charge(1)
+                    if (++comparisons % 128 == 0 && !control.check()) throw RepairStopped()
+                    val magnitude = abs(spike[right]).compareTo(abs(spike[left]))
+                    if (magnitude != 0) {
+                        magnitude
+                    } else {
+                        ((left - requestedSlot + n) % n).compareTo((right - requestedSlot + n) % n)
+                    }
+                }
+            } catch (_: RepairStopped) {
+                return null
+            }
+            var retained = 0
+            for (slot in candidates) {
+                if (retained % 128 == 0 && !control.check()) return null
+                charge(1)
+                if (abs(spike[slot]) < policy.relativeThreshold * maximum) break
+                retained++
+            }
+            return candidates.subList(0, retained)
+        }
+
+        @Suppress("TooGenericExceptionCaught")
+        private fun solve(owner: KotlinBasisSolver, spike: IndexedVector): Boolean {
+            operationMeter.attempt(BasisOperationKind.FTRAN)
+            val before = owner.basisOperationWork
+            var successful = false
+            try {
+                owner.ftran(spike, 0.0)
+                successful = true
+            } finally {
+                recordKernel(before, owner.basisOperationWork, BasisOperationKind.FTRAN, successful)
+            }
+            return control.check()
+        }
+
+        private fun update(owner: KotlinBasisSolver, slot: Int, entering: Int, spike: IndexedVector): BasisUpdate {
+            operationMeter.attempt(BasisOperationKind.UPDATE)
+            val before = owner.basisOperationWork
+            var successful = false
+            try {
+                return owner.update(slot, entering, spike, spike).also { successful = it != BasisUpdate.SINGULAR }
+            } finally {
+                recordKernel(before, owner.basisOperationWork, BasisOperationKind.UPDATE, successful)
+            }
+        }
+
+        private fun recordKernel(
+            before: BasisOperationWork,
+            after: BasisOperationWork,
+            kind: BasisOperationKind,
+            successful: Boolean,
+        ) {
+            val monotonic = after.units >= before.units
+            val units = if (monotonic) after.units - before.units else 0
+            val complete = monotonic && !before.saturated && !after.saturated && before.complete && after.complete
+            control.chargeReported(units, complete)
+            when {
+                successful && complete -> operationMeter.success(kind, units)
+                complete -> operationMeter.decline(kind, units)
+                else -> operationMeter.declineUnknown(kind, units)
+            }
+        }
+
+        private fun charge(units: Long) {
+            repairUnits = saturatedAdd(repairUnits, units)
+            control.chargeReported(units)
+        }
+
+        fun close() {
+            val owner = scratch ?: return
+            scratch = null
+            val entries = owner.solveWorkspace.count.toLong() + owner.mapped.count
+            owner.close()
+            charge(entries)
+        }
+    }
+
+    private class RepairStopped : RuntimeException()
 
     override fun ftran(x: IndexedVector, expectedDensity: Double) = solve(x, expectedDensity, transpose = false)
 
@@ -363,6 +568,7 @@ internal class KotlinBasisSolver(
     }
 
     override fun ordering(): BasisOrdering? {
+        check(!repairActive) { "basis repair is active" }
         if (closed || singular) return null
         val current = cache ?: return null
         // FT transforms change the source elimination problem; their triangular labels are not LU pivots.
@@ -457,6 +663,7 @@ internal class KotlinBasisSolver(
     }
 
     override fun close() {
+        check(!repairActive) { "basis repair is active" }
         if (closed) return
         for (snapshot in liveSnapshots.toList()) snapshot.close()
         closed = true
@@ -554,7 +761,10 @@ internal class KotlinBasisSolver(
         )
     }
 
-    private fun requireOpen() = check(!closed) { "basis solver is closed" }
+    private fun requireOpen() {
+        check(!closed) { "basis solver is closed" }
+        check(!repairActive) { "basis repair is active" }
+    }
 
     private inner class KotlinBasisSnapshot(
         val owner: Any,

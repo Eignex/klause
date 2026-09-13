@@ -96,28 +96,34 @@ internal class LpScalingView private constructor(
     /** Refresh vectors under the immutable matrix scale. Null leaves this view untouched. */
     fun refresh(next: LpModel): LpScalingView? {
         if (next.n != n || next.m != m) return null
+        var nextRhs = rhs
+        var nextCost = cost
+        var nextLower = lower
+        var nextUpper = upper
         if (!applied) {
-            val vectors = sourceVectors(next)
-            return LpScalingView(
-                next,
-                rowExponents,
-                columnExponents,
-                colPtr,
-                rowIdx,
-                colVal,
-                vectors.rhs,
-                vectors.cost,
-                vectors.lower,
-                vectors.upper,
-                metrics.copy(
-                    sourcePrimalResidual = 0.0,
-                    sourceBoundViolation = 0.0,
-                    sourceBasicDualResidual = 0.0,
-                ),
-            )
+            for (i in rhs.indices) nextRhs = refreshedValue(rhs, nextRhs, i, next.rhsD(i))
+            for (j in cost.indices) nextCost = refreshedValue(cost, nextCost, j, next.costD(j))
+            for (j in lower.indices) nextLower = refreshedValue(lower, nextLower, j, next.lowerD(j))
+            for (j in upper.indices) nextUpper = refreshedValue(upper, nextUpper, j, next.upperD(j))
+        } else {
+            if (projectionLostNonzero(next) || !next.objConstantD.isFinite()) return null
+            for (i in rhs.indices) {
+                val value = checkedScale(next.rhsD(i), rowExponents[i]) ?: return null
+                nextRhs = refreshedValue(rhs, nextRhs, i, value)
+            }
+            for (j in cost.indices) {
+                val costValue = checkedScale(next.costD(j), columnExponents[j]) ?: return null
+                nextCost = refreshedValue(cost, nextCost, j, costValue)
+                val lowerValue = checkedScale(next.lowerD(j), -columnExponents[j]) ?: return null
+                nextLower = refreshedValue(lower, nextLower, j, lowerValue)
+                val upperValue = if (next.hasFiniteUpper(j)) {
+                    checkedScale(next.upperD(j), -columnExponents[j]) ?: return null
+                } else {
+                    0.0
+                }
+                nextUpper = refreshedValue(upper, nextUpper, j, upperValue)
+            }
         }
-        if (projectionLostNonzero(next)) return null
-        val vectors = scaledVectors(next, rowExponents, columnExponents) ?: return null
         return LpScalingView(
             next,
             rowExponents,
@@ -125,10 +131,10 @@ internal class LpScalingView private constructor(
             colPtr,
             rowIdx,
             colVal,
-            vectors.rhs,
-            vectors.cost,
-            vectors.lower,
-            vectors.upper,
+            nextRhs,
+            nextCost,
+            nextLower,
+            nextUpper,
             metrics.copy(sourcePrimalResidual = 0.0, sourceBoundViolation = 0.0, sourceBasicDualResidual = 0.0),
         )
     }
@@ -289,6 +295,13 @@ private fun sourceMatrixUnchecked(model: LpModel): NumericalMatrix {
         }
     }
     return NumericalMatrix(pointers, rows, values)
+}
+
+private fun refreshedValue(previous: DoubleArray, current: DoubleArray, index: Int, value: Double): DoubleArray {
+    if (current[index].toRawBits() == value.toRawBits()) return current
+    val next = if (current === previous) previous.copyOf() else current
+    next[index] = value
+    return next
 }
 
 private fun sourceVectors(model: LpModel): NumericalVectors = NumericalVectors(

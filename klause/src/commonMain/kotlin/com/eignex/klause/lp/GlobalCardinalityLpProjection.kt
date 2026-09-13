@@ -28,14 +28,19 @@ internal fun GlobalCardinality.emitLpRelaxation(builder: RelaxationBuilder) {
     // Selector columns per cover value, indexed by cover position via [coverIndexByValue], whose
     // Long keys address cover values across the full value range.
     val selByCover = Array(cover.size) { IntArrayList() }
-    for (x in xs) {
+    for ((position, x) in xs.withIndex()) {
         val box = builder.rootDomain(x)
         val live = builder.liveDomain(x)
         val sel = IntArrayList()
         val selVal = LongArrayList()
         box.values.forEach { v ->
             // The selector z_xv is present while value v stays in x's live domain.
-            val z = builder.auxColumn(0L, if (live.contains(v)) 1L else 0L, presence = longArrayOf(x.toLong(), v))
+            val z = builder.auxColumn(
+                0L,
+                if (live.contains(v)) 1L else 0L,
+                presence = longArrayOf(x.toLong(), v),
+                definition = LpAuxiliaryColumn(listOf(position.toLong(), v), 1L, true),
+            )
             sel.add(z)
             selVal.add(v)
             val ci = coverIndexByValue.getOrDefault(v, -1) // only cover values carry a count row

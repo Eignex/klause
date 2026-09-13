@@ -48,6 +48,7 @@ internal fun Regular.emitLpRelaxation(builder: RelaxationBuilder) {
                     0L,
                     if (live.contains(sym)) 1L else 0L,
                     presence = longArrayOf(seq[t].toLong(), sym),
+                    definition = LpAuxiliaryColumn(listOf(t.toLong(), state.toLong(), sym), 1L, true),
                 )
                 (outCols[t][state] ?: IntArrayList().also { outCols[t][state] = it }).add(col)
                 (inCols[t + 1][nxt] ?: IntArrayList().also { inCols[t + 1][nxt] = it }).add(col)

@@ -115,6 +115,9 @@ class PropagationSession(
         return out
     }
 
+    internal fun equalityLit(varId: Int, value: Long, positive: Boolean = true): Int =
+        Lit.make(state.atomVarEq(varId, value), positive)
+
     /** Literal `x_v ≥ threshold` ([positive]) or its negation — for LP/energetic explanation
      *  clauses, whose reason atoms are absolute variable bounds. */
     fun boundGeLit(v: Int, threshold: Long, positive: Boolean): Int = Lit.make(state.atomVarGe(v, threshold), positive)

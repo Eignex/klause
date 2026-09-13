@@ -6,6 +6,7 @@ import com.eignex.klause.simplex.basis.BasisExtensionResult
 import com.eignex.klause.simplex.basis.BasisOperationWork
 import com.eignex.klause.simplex.basis.BasisPhaseWork
 import com.eignex.klause.simplex.basis.BasisRepair
+import com.eignex.klause.simplex.basis.BasisRepairControl
 import com.eignex.klause.simplex.basis.BasisSnapshot
 import com.eignex.klause.simplex.basis.BasisSolver
 import com.eignex.klause.simplex.basis.IndexedVector
@@ -1298,11 +1299,11 @@ private class MixedRepairBasisSolver(private val delegate: BasisSolver) : BasisS
         return false
     }
 
-    override fun refactorizeRepairing(basicIndex: IntArray): BasisRepair? {
+    override fun refactorizeRepairing(basicIndex: IntArray, control: BasisRepairControl): BasisRepair? {
         if (n < 2) return null
         val requested = IntArray(n)
         requested[n - 1] = 1
-        val repair = delegate.refactorizeRepairing(requested) ?: return null
+        val repair = delegate.refactorizeRepairing(requested, control) ?: return null
         installedMixedRepair = repair.repaired
         return repair
     }

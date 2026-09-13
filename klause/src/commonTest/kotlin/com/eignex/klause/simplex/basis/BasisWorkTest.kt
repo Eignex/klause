@@ -9,6 +9,33 @@ import kotlin.test.assertTrue
 
 class BasisWorkTest {
     @Test
+    fun `repair keeps kernel history outside the final active factorization phases`() {
+        val source = ftSource("sparse", 5)
+        KotlinBasisSolver(source, updateLimit = 1).use { solver ->
+            val control = BasisRepairControl()
+
+            assertNotNull(solver.refactorizeRepairing(IntArray(5) { it }, control))
+
+            val active = solver.basisWork
+            val lifetime = solver.basisOperationWork
+            assertEquals(BasisPhaseWork(), active.ftran)
+            assertEquals(BasisPhaseWork(), active.update)
+            assertEquals(0, solver.updateCount)
+            assertTrue(lifetime.ftran.successes > 0)
+            assertTrue(lifetime.update.successes > 0)
+            assertTrue(assertNotNull(active.build).builds > 2)
+            assertEquals(control.spentWork, lifetime.units)
+            val snapshot = assertNotNull(solver.snapshot())
+            val beforeRestore = solver.basisOperationWork
+            assertTrue(solver.restore(snapshot))
+            assertEquals(beforeRestore.ftran, solver.basisOperationWork.ftran)
+            assertEquals(beforeRestore.update, solver.basisOperationWork.update)
+            assertEquals(active, solver.basisWork)
+            snapshot.close()
+        }
+    }
+
+    @Test
     fun `each operation phase preserves saturation independently of unit totals`() {
         for (kind in BasisOperationKind.entries) {
             val meter = BasisOperationMeter()

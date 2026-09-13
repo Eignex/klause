@@ -52,6 +52,9 @@ internal class LpScopedSolver(
 ) : AutoCloseable {
     private val continuationCache = LpExactContinuationCache()
     internal val refinementCache = LpRefinementCache()
+    private var exactAttempted = false
+    private var epochBudgetImported = false
+    private var epochReceiptImported = false
     private var trail = LpBoundTrail(initial)
     private var solver: PersistentLpSolver? = null
     private var closed = false
@@ -96,6 +99,51 @@ internal class LpScopedSolver(
         require(maxRetainedRows >= 0 && refactorUpdateLimit > 0 && iterationLimit >= 0 && workLimit >= 0L)
     }
 
+    fun exportEpochBudget(): LpEpochBudget? {
+        requireAvailable()
+        return if (closed) null else continuationCache.exportBudget(state)
+    }
+
+    fun importEpochBudget(budget: LpEpochBudget): Boolean {
+        requireAvailable()
+        if (closed || exactAttempted || epochBudgetImported || epochReceiptImported ||
+            !continuationCache.importBudget(state, budget)
+        ) {
+            return false
+        }
+        epochBudgetImported = true
+        return true
+    }
+
+    fun exportEpochReceipt(): LpEpochReceipt? {
+        requireAvailable()
+        return if (closed) {
+            null
+        } else {
+            LpEpochReceipt(
+                state.model,
+                state.rows,
+                continuationCache.exportBudget(state),
+                refinementCache.epochBudget(state),
+            )
+        }
+    }
+
+    fun importEpochReceipt(receipt: LpEpochReceipt): Boolean {
+        requireAvailable()
+        if (closed || state.depth != 0 || exactAttempted || epochBudgetImported || epochReceiptImported ||
+            !refinementCache.pristineForEpoch() || !state.model.sameAuthority(receipt.authority) ||
+            !state.rows.sameAuthority(receipt.rows) ||
+            receipt.continuation?.authority?.sameAuthority(receipt.authority) == false
+        ) {
+            return false
+        }
+        if (receipt.continuation != null && !continuationCache.importBudget(state, receipt.continuation)) return false
+        refinementCache.restoreEpochBudget(receipt.refinement, state)
+        epochReceiptImported = true
+        return true
+    }
+
     fun prepare(token: Cancellation = cancellation): Boolean {
         requireAvailable()
         if (closed || token() || state.model.m > maxRetainedRows) return false
@@ -113,6 +161,31 @@ internal class LpScopedSolver(
         witness: Long,
         token: Cancellation = cancellation,
     ): Boolean = edit(token) { it.assertBound(column, upper, side, witness, token) }
+
+    @Suppress("TooGenericExceptionCaught") // Numerical refresh can retire factors before a cleanup failure.
+    fun assertBounds(assertions: List<LpBoundAssertion>, token: Cancellation = cancellation): LpBoundBatchResult {
+        requireAvailable()
+        if (closed || token()) return LpBoundBatchResult.Declined(0)
+        val next = LpBoundTrail(state)
+        val result = next.assertBounds(assertions, token)
+        editAttempts += result.count
+        if (result is LpBoundBatchResult.Declined || next.state === state) return result
+        try {
+            val current = solver
+            if (current != null && !current.adopt(next.state, token)) return LpBoundBatchResult.Declined(result.count)
+            if (current == null && token()) return LpBoundBatchResult.Declined(result.count)
+        } catch (primary: Throwable) {
+            try {
+                close()
+            } catch (cleanup: Throwable) {
+                primary.addSuppressed(cleanup)
+            }
+            throw primary
+        }
+        publish(next)
+        editSuccesses += result.count - 1L
+        return result
+    }
 
     fun pop(targetDepth: Int, token: Cancellation = cancellation): Boolean = edit(token) { it.pop(targetDepth, token) }
 
@@ -165,6 +238,7 @@ internal class LpScopedSolver(
         refinementLimits: LpRefinementLimits = LpRefinementLimits(),
     ): CertifiedLpResult? {
         val attempt = solveFloat(warm, token) ?: return null
+        exactAttempted = true
         val certified = certifyLpResult(
             requireNotNull(state.toWorkingModel()),
             attempt.first,

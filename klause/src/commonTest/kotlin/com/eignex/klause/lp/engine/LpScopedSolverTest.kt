@@ -2,6 +2,7 @@ package com.eignex.klause.lp.engine
 
 import com.eignex.klause.simplex.basis.BasisArithmeticException
 import com.eignex.klause.simplex.basis.BasisRepair
+import com.eignex.klause.simplex.basis.BasisRepairControl
 import com.eignex.klause.simplex.basis.BasisSolver
 import com.eignex.klause.simplex.basis.KotlinBasisSolver
 import com.eignex.klause.simplex.exact.BigFraction
@@ -556,7 +557,10 @@ class LpScopedSolverTest {
                                     return factors.refactorize(basicIndex)
                                 }
 
-                                override fun refactorizeRepairing(basicIndex: IntArray): BasisRepair? {
+                                override fun refactorizeRepairing(
+                                    basicIndex: IntArray,
+                                    control: BasisRepairControl,
+                                ): BasisRepair? {
                                     if (fail) {
                                         when (failure) {
                                             "singular" -> return null
@@ -565,7 +569,7 @@ class LpScopedSolverTest {
                                             "cancel" -> cancelled = true
                                         }
                                     }
-                                    return factors.refactorizeRepairing(basicIndex)
+                                    return factors.refactorizeRepairing(basicIndex, control)
                                 }
                             }
                         },

@@ -343,4 +343,19 @@ class LpRootAdmissionTest {
             assertFalse(owner.install(model, source.model, receipt))
         }
     }
+
+    @Test
+    fun `epoch publication cannot replace an unattempted admitted root`() {
+        val builder = LpBuilder()
+        builder.addVar(0, 1)
+        val source = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).trailModel()))
+        val model = assertNotNull(source.toWorkingModel())
+        LpPropagator(object : LpSearchPolicy {}).use { owner ->
+            assertTrue(owner.install(model, source.model, LpRootAdmission(model, 10L, 1)))
+
+            assertFalse(owner.replaceEpoch(Any(), source.model, null, Cancellation.Never, { true }) {})
+
+            assertSame(source, owner.state)
+        }
+    }
 }

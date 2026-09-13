@@ -142,16 +142,24 @@ internal class ExactContinuation(private val input: ExactContinuationInput) {
     private var pivots = 0
     private var attempts = 0
     private var eligible = false
+    private var scalarHistory = 0
 
     val usedWork get() = work
     val usedAllocation get() = allocation
     val usedTimeNs get() = elapsed
+    val usedImportPivots get() = imports
+    val usedPivots get() = pivots
+    val normalizedScalarPeak get() = maxOf(scalarHistory, lane?.normalizedScalarPeak ?: 0)
 
     fun account(work: Long, allocation: Long, elapsedNs: Long) {
-        this.work += work
-        this.allocation += allocation
-        elapsed += elapsedNs
+        require(work >= 0L && allocation >= 0L && elapsedNs >= 0L)
+        this.work = saturatingAdd(this.work, work)
+        this.allocation = saturatingAdd(this.allocation, allocation)
+        elapsed = saturatingAdd(elapsed, elapsedNs)
     }
+
+    private fun saturatingAdd(left: Long, right: Long): Long =
+        if (left > Long.MAX_VALUE - right) Long.MAX_VALUE else left + right
 
     fun resume(
         limits: ExactContinuationLimits = ExactContinuationLimits(),
@@ -181,9 +189,9 @@ internal class ExactContinuation(private val input: ExactContinuationInput) {
                         builds++
                         (
                             if (big) {
-                                RationalContinuationLane(input, BigFracOps, budget)
+                                RationalContinuationLane(input, BigFracOps, budget, ::admitScalarPeak)
                             } else {
-                                RationalContinuationLane(input, Frac128Ops(), budget)
+                                RationalContinuationLane(input, Frac128Ops(), budget, ::admitScalarPeak)
                             }
                             ).also { lane = it }
                     }
@@ -206,6 +214,7 @@ internal class ExactContinuation(private val input: ExactContinuationInput) {
                 } catch (_: ContinuationOverflow) {
                     check(!big)
                     big = true
+                    admitScalarPeak(lane?.normalizedScalarPeak ?: 0)
                     lane = null
                     restarts++
                 }
@@ -223,12 +232,19 @@ internal class ExactContinuation(private val input: ExactContinuationInput) {
         return ExactContinuationResult(result?.values, result?.ray, result?.headings, result?.statuses, metrics)
     }
 
+    private fun admitScalarPeak(bits: Int) {
+        scalarHistory = maxOf(scalarHistory, bits)
+    }
+
     @Suppress("ThrowsCount")
     private fun validate(budget: ContinuationBudget) {
+        if (normalizedScalarPeak > budget.limits.maxBits) throw ContinuationStop(ContinuationDecline.BITS)
         var oversized = false
         fun visit(value: BigFraction): BigFraction {
             if (value.num.bitLength() > 127 || value.den.bitLength() > 127) oversized = true
-            return budget.fraction(value)
+            return budget.fraction(value).also {
+                admitScalarPeak(maxOf(it.num.bitLength(), it.den.bitLength()))
+            }
         }
         budget.step()
         val limits = budget.limits
@@ -292,6 +308,7 @@ private class LaneResult(
 )
 
 private interface ContinuationLane {
+    val normalizedScalarPeak: Int
     val pivots: Int
     val position: Int
     fun advance(
@@ -308,6 +325,7 @@ private class RationalContinuationLane<F>(
     private val input: ExactContinuationInput,
     private val ops: FracOps<F>,
     budget: ContinuationBudget,
+    private val admitScalarPeak: (Int) -> Unit,
 ) : ContinuationLane {
     private val width = input.total + input.m + 1
     private var table: List<MutableList<F>>
@@ -322,6 +340,11 @@ private class RationalContinuationLane<F>(
         private set
     private var ordered = false
     private var scalarPeak = 0
+        set(value) {
+            field = value
+            admitScalarPeak(value)
+        }
+    override val normalizedScalarPeak get() = scalarPeak
 
     init {
         budget.step(input.m.toLong() * width, input.m.toLong() * width * 8L + input.total * 48L)

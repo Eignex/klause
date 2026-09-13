@@ -866,11 +866,12 @@ internal fun reducedCostFixingReasons(
     for (col in relaxation.colVarId.indices) {
         val sign = cert.reducedCostSign(col)
         if (sign == 0) continue
-        val lit = LpExplanation.premiseLit(relaxation, session, col, lowerSide = sign > 0)
-        if (lit == LpExplanation.PREMISE_AUX) return null
-        if (lit == LpExplanation.PREMISE_NONE || !seen.add(lit)) continue
-        supportCols.add(col)
-        supportLits.add(lit)
+        val premises = LpExplanation.boundPremiseLits(relaxation, session, col, lowerSide = sign > 0) ?: return null
+        for (literal in premises) {
+            val direct = relaxation.colVarId[col] >= 0
+            supportCols.add(if (direct) col else -1)
+            supportLits.add(literal)
+        }
     }
     return ReducedCostFixingReasons(
         supportCols.toIntArray(),

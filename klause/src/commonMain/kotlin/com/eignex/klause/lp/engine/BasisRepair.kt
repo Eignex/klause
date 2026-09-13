@@ -1,6 +1,8 @@
 package com.eignex.klause.lp.engine
 
 import com.eignex.klause.simplex.basis.BasisArithmeticException
+import com.eignex.klause.simplex.basis.BasisRepairControl
+import com.eignex.klause.simplex.basis.BasisRepairStop
 import com.eignex.klause.simplex.basis.BasisSnapshot
 import com.eignex.klause.simplex.basis.BasisSolver
 import com.eignex.klause.simplex.exact.BigFraction
@@ -103,6 +105,7 @@ internal class EngineBasisRepairer(private val exactRankLimits: ExactRankLimits 
         statuses: Array<VarStatus>,
         exactModel: LpModel?,
         cancellation: Cancellation = Cancellation.Never,
+        control: BasisRepairControl = BasisRepairControl(cancellation),
     ): BasisRecoveryResult {
         attempts = saturatingIncrement(attempts)
         val evidence = exactBasisRankEvidence(exactModel, requested, exactRankLimits, cancellation)
@@ -111,9 +114,11 @@ internal class EngineBasisRepairer(private val exactRankLimits: ExactRankLimits 
         if (evidence == ExactBasisRankEvidence.CANCELLED || cancellation()) {
             return failed(BasisRepairDecline.CANCELLED, evidence)
         }
+        if (!control.check()) return stopped(control, evidence)
         val repaired = try {
-            solver.refactorizeRepairing(requested)
-        } catch (_: BasisArithmeticException) {
+            control.measure(solver) { solver.refactorizeRepairing(requested, control) }
+        } catch (failure: BasisArithmeticException) {
+            if (control.callbackFailure === failure) throw failure
             return fallback(
                 solver,
                 structuralColumns,
@@ -121,9 +126,10 @@ internal class EngineBasisRepairer(private val exactRankLimits: ExactRankLimits 
                 statuses,
                 evidence,
                 BasisRepairDecline.NUMERICAL_FAILURE,
-                cancellation,
+                control,
             )
-        } catch (_: ArithmeticException) {
+        } catch (failure: ArithmeticException) {
+            if (control.callbackFailure === failure) throw failure
             return fallback(
                 solver,
                 structuralColumns,
@@ -131,10 +137,10 @@ internal class EngineBasisRepairer(private val exactRankLimits: ExactRankLimits 
                 statuses,
                 evidence,
                 BasisRepairDecline.NUMERICAL_FAILURE,
-                cancellation,
+                control,
             )
         }
-        if (cancellation()) return failed(BasisRepairDecline.CANCELLED, evidence)
+        if (!control.check()) return stopped(control, evidence)
         if (repaired == null) {
             return fallback(
                 solver,
@@ -143,7 +149,7 @@ internal class EngineBasisRepairer(private val exactRankLimits: ExactRankLimits 
                 statuses,
                 evidence,
                 BasisRepairDecline.UNSUPPORTED,
-                cancellation,
+                control,
             )
         }
         val candidate = decodeBasisRepair(repaired, structuralColumns, bounds, statuses)
@@ -154,7 +160,7 @@ internal class EngineBasisRepairer(private val exactRankLimits: ExactRankLimits 
                 statuses,
                 evidence,
                 BasisRepairDecline.INVALID_REPAIR,
-                cancellation,
+                control,
             )
         successes = saturatingIncrement(successes)
         avoidedLogicalRebuilds = saturatingIncrement(avoidedLogicalRebuilds)
@@ -169,10 +175,10 @@ internal class EngineBasisRepairer(private val exactRankLimits: ExactRankLimits 
         statuses: Array<VarStatus>,
         evidence: ExactBasisRankEvidence,
         repairDecline: BasisRepairDecline,
-        cancellation: Cancellation,
+        control: BasisRepairControl,
     ): BasisRecoveryResult {
         recordDecline(repairDecline)
-        if (cancellation()) return failed(BasisRepairDecline.CANCELLED, evidence)
+        if (!control.check()) return stopped(control, evidence)
         logicalFallbacks = saturatingIncrement(logicalFallbacks)
         val logicals = IntArray(bounds.size - structuralColumns) { structuralColumns + it }
         val state = normalizeBasisState(logicals, bounds, statuses)
@@ -180,17 +186,22 @@ internal class EngineBasisRepairer(private val exactRankLimits: ExactRankLimits 
                 logicalFallbackFailures = saturatingIncrement(logicalFallbackFailures)
                 return failed(BasisRepairDecline.LOGICAL_FALLBACK_FAILED, evidence)
             }
+        control.charge(logicals.size.toLong())
+        if (!control.check()) return stopped(control, evidence)
         val factorized = try {
-            solver.refactorize(logicals)
-        } catch (_: BasisArithmeticException) {
+            control.measure(solver) { solver.refactorize(logicals) }
+        } catch (failure: BasisArithmeticException) {
+            if (control.callbackFailure === failure) throw failure
             false
-        } catch (_: ArithmeticException) {
+        } catch (failure: ArithmeticException) {
+            if (control.callbackFailure === failure) throw failure
             false
         }
-        if (!factorized || cancellation()) {
+        val admitted = control.check()
+        if (!factorized || !admitted) {
             logicalFallbackFailures = saturatingIncrement(logicalFallbackFailures)
             return failed(
-                if (cancellation()) BasisRepairDecline.CANCELLED else BasisRepairDecline.LOGICAL_FALLBACK_FAILED,
+                if (!admitted) stopDecline(control) else BasisRepairDecline.LOGICAL_FALLBACK_FAILED,
                 evidence,
             )
         }
@@ -198,6 +209,16 @@ internal class EngineBasisRepairer(private val exactRankLimits: ExactRankLimits 
         logicalFallbackSuccesses = saturatingIncrement(logicalFallbackSuccesses)
         return BasisRecoveryResult.Recovered(state, repaired = false, evidence)
     }
+
+    private fun stopDecline(control: BasisRepairControl): BasisRepairDecline =
+        if (control.stop == BasisRepairStop.CANCELLED) {
+            BasisRepairDecline.CANCELLED
+        } else {
+            BasisRepairDecline.RESOURCE_DECLINED
+        }
+
+    private fun stopped(control: BasisRepairControl, evidence: ExactBasisRankEvidence): BasisRecoveryResult.Failed =
+        failed(stopDecline(control), evidence)
 
     private fun failed(decline: BasisRepairDecline, evidence: ExactBasisRankEvidence): BasisRecoveryResult.Failed {
         recordDecline(decline)

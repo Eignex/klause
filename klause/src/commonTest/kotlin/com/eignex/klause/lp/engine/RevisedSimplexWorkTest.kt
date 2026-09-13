@@ -1,8 +1,13 @@
 package com.eignex.klause.lp.engine
 
+import com.eignex.klause.simplex.basis.BasisRepair
+import com.eignex.klause.simplex.basis.BasisRepairControl
+import com.eignex.klause.simplex.basis.BasisSolver
+import com.eignex.klause.simplex.basis.KotlinBasisSolver
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
@@ -13,6 +18,38 @@ import kotlin.test.assertTrue
  * model and the pivot path alone, so these pin exactly that.
  */
 class RevisedSimplexWorkTest {
+    @Test
+    fun `repair uses the retained invocation allowance and charges its completed overrun`() {
+        var factorCalls = 0
+        var repairAllowance: Long? = null
+        val retainedLimit = 1000L
+        RevisedSimplex(
+            cover(),
+            workLimit = 100000,
+            basisSolverFactory = { matrix ->
+                val delegate = KotlinBasisSolver(matrix)
+                object : BasisSolver by delegate {
+                    override fun refactorize(basicIndex: IntArray): Boolean {
+                        factorCalls++
+                        return false
+                    }
+
+                    override fun refactorizeRepairing(basicIndex: IntArray, control: BasisRepairControl): BasisRepair? {
+                        repairAllowance = control.maxWork
+                        control.charge(assertNotNull(control.maxWork) + 7)
+                        return null
+                    }
+                }
+            },
+        ).use { solver ->
+            val result = solver.resolveBounds(LpFloatAllowance(retainedLimit, 100))
+
+            assertNull(result)
+            assertTrue(assertNotNull(repairAllowance) in 1 until retainedLimit)
+            assertEquals(retainedLimit + 7, solver.lastWorkOps)
+            assertEquals(1, factorCalls)
+        }
+    }
 
     /** A covering LP that costs several pivots from the all-slack start. */
     private fun cover(): LpModel {

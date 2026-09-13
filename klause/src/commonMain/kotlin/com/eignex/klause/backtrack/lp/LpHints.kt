@@ -34,6 +34,16 @@ internal class LpHints(numIntVars: Int, numBoolVars: Int) : LpHintSink {
     private val intRc = DoubleArray(numIntVars) { Double.NaN }
     private val boolRc = DoubleArray(numBoolVars) { Double.NaN }
 
+    override fun clear() {
+        intVal.fill(Double.NaN)
+        boolVal.fill(Double.NaN)
+        intRc.fill(Double.NaN)
+        boolRc.fill(Double.NaN)
+        intStamp.fill(-1)
+        boolStamp.fill(-1)
+        solveStamp = 0
+    }
+
     /**
      * Record an LP solution: its fractional primal (per structural column,
      * `FloatLpResult.primal`) and, from the [duals], the decayed reduced-cost average of

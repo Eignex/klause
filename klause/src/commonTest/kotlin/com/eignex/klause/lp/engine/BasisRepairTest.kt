@@ -1,6 +1,11 @@
 package com.eignex.klause.lp.engine
 
+import com.eignex.klause.simplex.basis.BasisArithmeticException
+import com.eignex.klause.simplex.basis.BasisOperationWork
+import com.eignex.klause.simplex.basis.BasisPhaseWork
 import com.eignex.klause.simplex.basis.BasisRepair
+import com.eignex.klause.simplex.basis.BasisRepairControl
+import com.eignex.klause.simplex.basis.BasisRepairStop
 import com.eignex.klause.simplex.basis.BasisSnapshot
 import com.eignex.klause.simplex.basis.BasisSolver
 import com.eignex.klause.simplex.basis.KotlinBasisSolver
@@ -9,12 +14,190 @@ import com.eignex.koblas.SparseMatrix
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class BasisRepairTest {
+    @Test
+    fun `logical preparation preserves an arithmetic repair callback failure`() {
+        val model = exactWorkingModel(listOf(listOf(0 to 1L)))
+        val primary = BasisArithmeticException("preparation callback")
+        var armed = false
+        var factorCalls = 0
+        val cancellation = Cancellation { if (armed) throw primary else false }
+        RevisedSimplex(
+            model,
+            basisSolverFactory = { matrix ->
+                val delegate = KotlinBasisSolver(matrix)
+                object : BasisSolver by delegate {
+                    override fun refactorize(basicIndex: IntArray): Boolean {
+                        factorCalls++
+                        return false
+                    }
+
+                    override fun refactorizeRepairing(basicIndex: IntArray, control: BasisRepairControl): BasisRepair? {
+                        armed = true
+                        return delegate.refactorizeRepairing(basicIndex, control)
+                    }
+                }
+            },
+        ).use { solver ->
+            val actual = assertFailsWith<BasisArithmeticException> { solver.prepareLogicals(cancellation) }
+
+            assertTrue(actual === primary)
+            assertEquals(1, factorCalls)
+        }
+    }
+
+    @Test
+    fun `independent wrapper work is added to measured backend work`() {
+        KotlinBasisSolver(repairMatrix()).use { solver ->
+            val control = BasisRepairControl(maxWork = 1000)
+
+            control.measure(solver) {
+                control.charge(3)
+                assertTrue(solver.refactorize(intArrayOf(0, 1)))
+            }
+
+            assertEquals(3 + solver.basisOperationWork.units, control.spentWork)
+            assertTrue(control.accountingComplete)
+        }
+    }
+
+    @Test
+    fun `saturated reports retain known completed units without granting a fresh budget`() {
+        for (unitsSaturated in listOf(false, true)) {
+            val delegate = KotlinBasisSolver(repairMatrix())
+            var report = BasisOperationWork(repair = BasisPhaseWork(units = 10))
+            val solver = object : BasisSolver by delegate {
+                override val basisOperationWork get() = report
+            }
+            val control = BasisRepairControl(maxWork = Long.MAX_VALUE)
+
+            control.measure(solver) {
+                report = BasisOperationWork(
+                    repair = BasisPhaseWork(
+                        attempts = Long.MAX_VALUE,
+                        units = if (unitsSaturated) Long.MAX_VALUE else 18,
+                    ),
+                )
+            }
+
+            assertEquals(if (unitsSaturated) Long.MAX_VALUE - 10 else 8, control.spentWork)
+            assertFalse(control.accountingComplete)
+            assertEquals(BasisRepairStop.UNKNOWN_WORK, control.stop)
+            assertFalse(control.check())
+            delegate.close()
+        }
+    }
+
+    @Test
+    fun `logical fallback spends only the remaining repair allowance`() {
+        for (limit in listOf(5L, 1000L)) {
+            val delegate = KotlinBasisSolver(repairMatrix())
+            var fallbacks = 0
+            val solver = object : BasisSolver by delegate {
+                override fun refactorizeRepairing(basicIndex: IntArray, control: BasisRepairControl): BasisRepair? {
+                    control.charge(5)
+                    return null
+                }
+
+                override fun refactorize(basicIndex: IntArray): Boolean {
+                    fallbacks++
+                    return delegate.refactorize(basicIndex)
+                }
+            }
+            val control = BasisRepairControl(maxWork = limit)
+
+            val result = EngineBasisRepairer().recover(
+                solver,
+                intArrayOf(0, 1),
+                2,
+                Array(4) { BasisBoundState(true, false, false) },
+                arrayOf(VarStatus.BASIC, VarStatus.BASIC, VarStatus.AT_LOWER, VarStatus.AT_LOWER),
+                null,
+                control = control,
+            )
+
+            assertEquals(if (limit == 5L) 0 else 1, fallbacks)
+            assertEquals(limit > 5, result is BasisRecoveryResult.Recovered)
+            assertEquals(5L + if (fallbacks == 0) 0 else 2 + delegate.basisOperationWork.units, control.spentWork)
+            delegate.close()
+        }
+    }
+
+    @Test
+    fun `opaque repair work cannot authorize a bounded logical fallback`() {
+        val delegate = KotlinBasisSolver(repairMatrix())
+        var fallbacks = 0
+        val solver = object : BasisSolver by delegate {
+            override val basisOperationWork get() = null
+            override fun refactorizeRepairing(basicIndex: IntArray, control: BasisRepairControl): BasisRepair? = null
+            override fun refactorize(basicIndex: IntArray): Boolean {
+                fallbacks++
+                return delegate.refactorize(basicIndex)
+            }
+        }
+        val control = BasisRepairControl(maxWork = Long.MAX_VALUE)
+
+        val result = EngineBasisRepairer().recover(
+            solver,
+            intArrayOf(0, 1),
+            2,
+            Array(4) { BasisBoundState(true, false, false) },
+            arrayOf(VarStatus.BASIC, VarStatus.BASIC, VarStatus.AT_LOWER, VarStatus.AT_LOWER),
+            null,
+            control = control,
+        ) as BasisRecoveryResult.Failed
+
+        assertEquals(0, fallbacks)
+        assertEquals(BasisRepairStop.UNKNOWN_WORK, control.stop)
+        assertEquals(BasisRepairDecline.RESOURCE_DECLINED, result.decline)
+        assertFalse(control.accountingComplete)
+        delegate.close()
+    }
+
+    @Test
+    fun `arithmetic callback failures escape repair without logical fallback`() {
+        for (limit in listOf(null, 1000L)) {
+            val delegate = KotlinBasisSolver(repairMatrix())
+            var fallbacks = 0
+            var armed = false
+            val failure = BasisArithmeticException("callback")
+            val control = BasisRepairControl(Cancellation { if (armed) throw failure else false }, limit)
+            val solver = object : BasisSolver by delegate {
+                override fun refactorizeRepairing(basicIndex: IntArray, control: BasisRepairControl): BasisRepair? {
+                    armed = true
+                    return delegate.refactorizeRepairing(basicIndex, control)
+                }
+                override fun refactorize(basicIndex: IntArray): Boolean {
+                    fallbacks++
+                    return delegate.refactorize(basicIndex)
+                }
+            }
+
+            val actual = assertFailsWith<BasisArithmeticException> {
+                EngineBasisRepairer().recover(
+                    solver,
+                    intArrayOf(0, 1),
+                    2,
+                    Array(4) { BasisBoundState(true, false, false) },
+                    arrayOf(VarStatus.BASIC, VarStatus.BASIC, VarStatus.AT_LOWER, VarStatus.AT_LOWER),
+                    null,
+                    control = control,
+                )
+            }
+
+            assertTrue(actual === failure)
+            assertEquals(0, fallbacks)
+            assertTrue(delegate.singular)
+            delegate.close()
+        }
+    }
+
     @Test
     fun `repair decoding preserves permutation and maps synthesized units to logical columns`() {
         val repair = BasisRepair(intArrayOf(2, -1, 0), intArrayOf(-1, 1, -1))
@@ -59,7 +242,7 @@ class BasisRepairTest {
         val matrix = repairMatrix()
         val delegate = KotlinBasisSolver(matrix)
         val solver = object : BasisSolver by delegate {
-            override fun refactorizeRepairing(basicIndex: IntArray): BasisRepair =
+            override fun refactorizeRepairing(basicIndex: IntArray, control: BasisRepairControl): BasisRepair =
                 BasisRepair(intArrayOf(0, 0), intArrayOf(-1, -1))
         }
         val repairer = EngineBasisRepairer()
@@ -81,7 +264,7 @@ class BasisRepairTest {
     fun `failed fallback remains a numerical decline rather than exact singularity`() {
         val delegate = KotlinBasisSolver(repairMatrix())
         val solver = object : BasisSolver by delegate {
-            override fun refactorizeRepairing(basicIndex: IntArray): BasisRepair? = null
+            override fun refactorizeRepairing(basicIndex: IntArray, control: BasisRepairControl): BasisRepair? = null
             override fun refactorize(basicIndex: IntArray): Boolean = false
         }
         val repairer = EngineBasisRepairer()

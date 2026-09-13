@@ -33,6 +33,8 @@ data class TheoryParams(
     val maxDecisions: Long = Long.MAX_VALUE,
     /** Positive shared-decision restart cadence within each feasibility traversal, or null for none. */
     val sharedRestart: Long? = null,
+    /** Refresh a materially changed exact SOURCE root at a shared restart. */
+    val lpEpochs: Boolean = false,
     /** Retained shared learned-clause cap within each feasibility traversal, or null for no cap. */
     val maxLearnedClauses: Int? = null,
     /** LBD at or below which a learned clause is retained across reductions. */

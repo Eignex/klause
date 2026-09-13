@@ -5,6 +5,8 @@ import com.eignex.klause.simplex.basis.BasisArithmeticException
 import com.eignex.klause.simplex.basis.BasisExtension
 import com.eignex.klause.simplex.basis.BasisOperationWork
 import com.eignex.klause.simplex.basis.BasisPhaseWork
+import com.eignex.klause.simplex.basis.BasisRepairControl
+import com.eignex.klause.simplex.basis.BasisRepairStop
 import com.eignex.klause.simplex.basis.BasisSolveQuality
 import com.eignex.klause.simplex.basis.BasisSolver
 import com.eignex.klause.simplex.basis.BasisUpdate
@@ -542,12 +544,16 @@ internal class RevisedSimplex(
         if (failure != null) throw failure
     }
 
+    private var repairStop: BasisRepairStop? = null
+    private var repairCallbackFailure: Throwable? = null
+
     /**
      * Refactorize the seated basis — the columns of `columns` that `basicVar` names — and drop any updates
      * folded into it. False when it came back singular, which leaves this engine unable to solve until
      * a later call succeeds.
      */
     private fun refactorize(reason: LpRefactorReason): RefactorResult {
+        if (repairStop != null) return RefactorResult.FAILED
         refactorizations++
         when (reason) {
             LpRefactorReason.INITIAL -> initialRefactorizations++
@@ -574,8 +580,10 @@ internal class RevisedSimplex(
         }
         if (!basisFactorized) {
             singularRefactorizations++
-            return when (
-                val recovery = basisRepairer.recover(
+            val remaining = effectiveWorkLimit.takeIf { it > 0 }?.let { maxOf(0, it - work.ops) }
+            val control = BasisRepairControl(cancellation, remaining)
+            val recovery = try {
+                basisRepairer.recover(
                     solver,
                     basicVar,
                     n,
@@ -583,9 +591,16 @@ internal class RevisedSimplex(
                     status,
                     model,
                     cancellation,
+                    control,
                 )
-            ) {
+            } finally {
+                work.add(control.spentWork)
+                repairStop = control.stop
+                repairCallbackFailure = control.callbackFailure
+            }
+            return when (recovery) {
                 is BasisRecoveryResult.Failed -> {
+                    if (recovery.decline == BasisRepairDecline.CANCELLED) repairStop = BasisRepairStop.CANCELLED
                     invalidateBasisDependentState()
                     RefactorResult.FAILED
                 }
@@ -996,19 +1011,20 @@ internal class RevisedSimplex(
                 basisKept = true
                 Basis(basicVar.copyOf(), status.copyOf(), captureEligible = false)
             }
-        } catch (_: BasisArithmeticException) {
+        } catch (primary: BasisArithmeticException) {
+            if (repairCallbackFailure === primary) rethrowRepairCallback(primary)
             close()
             null
         }
     }
 
     override fun adopt(state: LpExactState, token: Cancellation): Boolean {
-        continuationAvailable = false
-        stoppedContinuationBasis = null
         val current = model.exactState ?: return false
         if (!current.sameMatrix(state) || token()) return false
         val next = state.toWorkingModel() ?: return false
         if (token()) return false
+        continuationAvailable = false
+        stoppedContinuationBasis = null
         refreshNumerical(next)
         cancellation = token
         solvedExactState = null
@@ -1403,7 +1419,7 @@ internal class RevisedSimplex(
         stoppedContinuationBasis = null
         continuationAvailable = true
         val candidate = block(allowUnscaledFallback)
-        if (candidate == null && allowUnscaledFallback && numerical.applied && !cancellation() &&
+        if (candidate == null && allowUnscaledFallback && numerical.applied && repairStop == null && !cancellation() &&
             infeasibleRay == null && (smallPivotBails > 0 || singularRefactorizations > 0)
         ) {
             installUnscaledFallback(model)
@@ -1430,20 +1446,32 @@ internal class RevisedSimplex(
             }
         }
     } catch (primary: LpScalingArithmeticException) {
-        if (allowUnscaledFallback && numerical.applied && !cancellation()) {
+        if (repairCallbackFailure === primary) rethrowRepairCallback(primary)
+        if (allowUnscaledFallback && numerical.applied && repairStop == null && !cancellation()) {
             installUnscaledFallback(model)
             numericalSolve(block, false)
         } else {
             retireAfterArithmeticFailure(primary)
         }
     } catch (primary: BasisArithmeticException) {
-        if (allowUnscaledFallback && numerical.applied && !cancellation()) {
+        if (repairCallbackFailure === primary) rethrowRepairCallback(primary)
+        if (allowUnscaledFallback && numerical.applied && repairStop == null && !cancellation()) {
             installUnscaledFallback(model)
             numericalSolve(block, false)
         } else {
             retireAfterArithmeticFailure(primary)
         }
     } catch (primary: Throwable) {
+        try {
+            close()
+        } catch (cleanup: Throwable) {
+            primary.addSuppressed(cleanup)
+        }
+        throw primary
+    }
+
+    @Suppress("TooGenericExceptionCaught")
+    private fun rethrowRepairCallback(primary: Throwable): Nothing {
         try {
             close()
         } catch (cleanup: Throwable) {
@@ -1474,6 +1502,8 @@ internal class RevisedSimplex(
     }
 
     private fun resetSolveState(warmAttempted: Boolean) {
+        repairStop = null
+        repairCallbackFailure = null
         degenerateColumns = 0
         solvedExactState = null
         optimalBasis = null
@@ -1548,6 +1578,7 @@ internal class RevisedSimplex(
                     if (warmStarted) LpRefactorReason.WARM_START else LpRefactorReason.INITIAL,
                 ) == RefactorResult.FAILED
             ) {
+                if (repairStop != null) return null
                 // The warm basis factorized singular, so the solve runs from the slack start after all.
                 coldStart()
                 warmStarted = false
@@ -1565,6 +1596,7 @@ internal class RevisedSimplex(
                 IterationResult.BASIS_CHANGED -> return restartDual(enforced, progress)
 
                 IterationResult.FAILED -> {
+                    if (repairStop != null) return null
                     coldStart()
                     if (refactorize(LpRefactorReason.RECONCILE_RECOVERY) == RefactorResult.FAILED) return null
                 }
@@ -2637,6 +2669,7 @@ internal class RevisedSimplex(
                 warmStarted = true
             }
             if (refactorize(LpRefactorReason.PRIMAL) == RefactorResult.FAILED) {
+                if (repairStop != null) return null
                 lowerStart()
                 warmStarted = false
                 if (refactorize(LpRefactorReason.SINGULAR_RECOVERY) == RefactorResult.FAILED) return null

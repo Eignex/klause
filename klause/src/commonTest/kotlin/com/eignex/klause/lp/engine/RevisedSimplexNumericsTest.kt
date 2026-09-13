@@ -1,6 +1,7 @@
 package com.eignex.klause.lp.engine
 
 import com.eignex.klause.simplex.basis.BasisArithmeticException
+import com.eignex.klause.simplex.basis.BasisRepairControl
 import com.eignex.klause.simplex.basis.BasisSolver
 import com.eignex.klause.simplex.basis.IndexedVector
 import com.eignex.klause.simplex.basis.KotlinBasisSolver
@@ -414,7 +415,7 @@ private class FailingRefactorBasisSolver(private val delegate: BasisSolver, priv
         return refactorizations < failAt && delegate.refactorize(basicIndex)
     }
 
-    override fun refactorizeRepairing(basicIndex: IntArray) = null
+    override fun refactorizeRepairing(basicIndex: IntArray, control: BasisRepairControl) = null
 
     override fun close() {
         closed = true

@@ -4,6 +4,20 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.util.EmptyIntArray
 
+/** An auxiliary source extension whose semantic role survives live-domain filtering. */
+class LpAuxiliaryColumn(
+    role: List<Long>,
+    /** Upper bound while every required membership remains possible. */
+    val presentUpper: Long,
+    /** Every source solution admits an integral extension satisfying this producer's rows. */
+    val integralExtension: Boolean,
+) {
+    private val roleSnapshot = role.toList()
+
+    /** Producer-local semantic key, independent of filtered emission order. */
+    val role: List<Long> get() = roleSnapshot.toList()
+}
+
 /**
  * The sink an LP factor projection emits its relaxation into. A factor
  * states linear constraints over the problem's integer variables by raw id; the driver behind this
@@ -84,7 +98,7 @@ interface RelaxationBuilder {
      * the column off the persistent path. Values are `Long` so a column keyed on a domain value beyond
      * Int range (a float-scaled bucket) re-binds against the true value rather than a truncated one.
      */
-    fun auxColumn(lo: Long, hi: Long, presence: LongArray? = null): Int
+    fun auxColumn(lo: Long, hi: Long, presence: LongArray? = null, definition: LpAuxiliaryColumn? = null): Int
 
     /**
      * Whether this factor's HULL contribution is enabled this build — its convex-hull family flag is

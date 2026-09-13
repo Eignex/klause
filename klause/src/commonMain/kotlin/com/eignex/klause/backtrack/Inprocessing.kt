@@ -1,5 +1,7 @@
 package com.eignex.klause.backtrack
 
+import com.eignex.klause.lp.bounding.LpEngine
+import com.eignex.klause.lp.bounding.LpEpochPass
 import com.eignex.klause.propagation.PropagationSession
 
 /**
@@ -19,6 +21,8 @@ internal interface InprocessingPass {
 
     /** Run one bounded slice with [session] at the post-seed root, leaving it there. */
     fun run(session: PropagationSession, params: BacktrackParams)
+
+    fun onRoot(session: PropagationSession, params: BacktrackParams) = Unit
 
     /** Drop per-search cursors; the engine was reseeded onto a new fragment. */
     fun reset()
@@ -72,6 +76,10 @@ internal class Inprocessing(private val passes: List<InprocessingPass>, private 
 
     private var restartsUntilRun = cadence
 
+    fun onRoot(session: PropagationSession, params: BacktrackParams) {
+        for (pass in passes) pass.onRoot(session, params)
+    }
+
     fun onRestart(session: PropagationSession, params: BacktrackParams) {
         if (--restartsUntilRun > 0) return
         restartsUntilRun = cadence
@@ -90,9 +98,10 @@ internal class Inprocessing(private val passes: List<InprocessingPass>, private 
          * and with assumption pins standing those derivations would hold only under the pins yet be
          * stored as unconditional learned clauses.
          */
-        fun from(params: BacktrackParams): Inprocessing? {
+        fun from(params: BacktrackParams, lpEngine: LpEngine? = null): Inprocessing? {
             if (!params.assumptions.isEmpty) return null
             val passes = buildList {
+                if ((params.lpEpochs || params.lpRootTidy) && lpEngine != null) add(LpEpochPass(lpEngine))
                 // Subsumption first: it only shrinks the database, so vivification's probing works
                 // the surviving clauses instead of ones about to be dropped.
                 if (params.subsumption) add(SubsumptionPass())

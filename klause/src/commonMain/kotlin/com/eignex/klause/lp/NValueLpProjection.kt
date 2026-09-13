@@ -32,19 +32,29 @@ internal fun NValue.emitLpRelaxation(builder: RelaxationBuilder) {
         if (existing >= 0) return existing
         // The "used" indicator is free in [0,1] regardless of the live domains — an empty
         // requirement keeps it present so the relaxation stays persistent.
-        val col = builder.auxColumn(0L, 1L, presence = EmptyLongArray)
+        val col = builder.auxColumn(
+            0L,
+            1L,
+            presence = EmptyLongArray,
+            definition = LpAuxiliaryColumn(listOf(0L, v), 1L, true),
+        )
         yCols.add(col)
         yByValue.put(v, col)
         return col
     }
-    for (x in xs) {
+    for ((position, x) in xs.withIndex()) {
         val box = builder.rootDomain(x)
         val live = builder.liveDomain(x)
         val sel = IntArrayList()
         val selVal = LongArrayList()
         box.values.forEach { v ->
             // The selector z_xv is present while value v stays in x's live domain.
-            val z = builder.auxColumn(0L, if (live.contains(v)) 1L else 0L, presence = longArrayOf(x.toLong(), v))
+            val z = builder.auxColumn(
+                0L,
+                if (live.contains(v)) 1L else 0L,
+                presence = longArrayOf(x.toLong(), v),
+                definition = LpAuxiliaryColumn(listOf(1L, position.toLong(), v), 1L, true),
+            )
             sel.add(z)
             selVal.add(v)
             builder.row(intArrayOf(z, yOf(v)), longArrayOf(1L, -1L), LinearOp.LE, 0L, Contribution.HULL) // y_v ≥ z

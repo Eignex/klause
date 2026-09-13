@@ -31,7 +31,12 @@ class WideLinearLpTest {
         override fun rootDomain(intVar: Int): IntDomain = boxes.getValue(intVar)
         override fun statesLowerBound(intVar: Int): Boolean = intVar !in openLo
         override fun statesUpperBound(intVar: Int): Boolean = intVar !in openHi
-        override fun auxColumn(lo: Long, hi: Long, presence: LongArray?): Int {
+        override fun auxColumn(
+            lo: Long,
+            hi: Long,
+            presence: LongArray?,
+            definition: com.eignex.klause.lp.LpAuxiliaryColumn?,
+        ): Int {
             val c = nextAux++
             auxBounds[c] = lo to hi
             return c

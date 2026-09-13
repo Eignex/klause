@@ -43,7 +43,14 @@ internal fun Table.emitLpRelaxation(builder: RelaxationBuilder) {
             presence[col * 2] = xs[col].toLong()
             presence[col * 2 + 1] = tuples[t * arity + col]
         }
-        selCols.add(builder.auxColumn(0L, if (liveFeasible) 1L else 0L, presence = presence))
+        selCols.add(
+            builder.auxColumn(
+                0L,
+                if (liveFeasible) 1L else 0L,
+                presence = presence,
+                definition = LpAuxiliaryColumn(listOf(t.toLong()), 1L, true),
+            ),
+        )
         rows.add(t)
     }
     val k = selCols.size
