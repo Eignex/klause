@@ -151,7 +151,7 @@ val BACKTRACK_OVERRIDE_KEYS = listOf(
     "max-decisions", "luby", "adaptive-restart", "ema-restart", "mode-switching-restart", "phase-saving",
     "target-phasing", "solution-phasing", "rephase-interval", "max-learned", "lbd-glue", "tiered-db",
     "mid-lbd", "vivification", "vivify-batch", "subsumption", "subsume-batch", "inprocessing-cadence",
-    "lp-objective-cone", "lp-auto-off-reprobe",
+    "lp-epochs", "lp-root-tidy", "lp-objective-cone", "lp-auto-off-reprobe",
     "lp-knapsack-lagrangian", "lp-component-split", "lp-bound-max-pivots", "lp-adaptive-work",
     "lp-branching",
     "pb-learning", "pb-objective-cutoff",
@@ -191,6 +191,8 @@ fun backtrackOverride(p: EngineParams, allowSelectors: Boolean): ((BacktrackPara
     val subsumption = p.bool("subsumption")
     val subsumeBatch = p.int("subsume-batch")
     val inprocessingCadence = p.int("inprocessing-cadence")
+    val lpEpochs = p.bool("lp-epochs")
+    val lpRootTidy = p.bool("lp-root-tidy")
     val lpCone = p.bool("lp-objective-cone")
     val lpAutoOff = p.bool("lp-auto-off-reprobe")
     val lpKnapsack = p.bool("lp-knapsack-lagrangian")
@@ -206,7 +208,7 @@ fun backtrackOverride(p: EngineParams, allowSelectors: Boolean): ((BacktrackPara
     val scalars = listOf(
         maxDecisions, luby, adaptiveRestart, emaRestart, modeSwitchingRestart, phaseSaving, targetPhasing,
         solutionPhasing, rephaseInterval, maxLearned, lbdGlue, tieredDb, midLbd, vivification, vivifyBatch,
-        subsumption, subsumeBatch, inprocessingCadence,
+        subsumption, subsumeBatch, inprocessingCadence, lpEpochs, lpRootTidy,
         lpCone, lpAutoOff, lpKnapsack, lpComponentSplit, lpBoundMaxPivots, lpAdaptiveWork, lpBranching, pbLearning,
         pbObjectiveCutoff,
         objectiveGuidedValues,
@@ -232,6 +234,8 @@ fun backtrackOverride(p: EngineParams, allowSelectors: Boolean): ((BacktrackPara
         subsumption?.let { out = out.copy(subsumption = it) }
         subsumeBatch?.let { out = out.copy(subsumeBatch = it) }
         inprocessingCadence?.let { out = out.copy(inprocessingCadence = it) }
+        lpEpochs?.let { out = out.copy(lpEpochs = it) }
+        lpRootTidy?.let { out = out.copy(lpRootTidy = it) }
         lpCone?.let { out = out.copy(lpPlan = out.lpPlan.copy(objectiveCone = it)) }
         lpAutoOff?.let { out = out.copy(lpPlan = out.lpPlan.copy(autoOffReprobe = it)) }
         lpKnapsack?.let { out = out.copy(lpPlan = out.lpPlan.copy(knapsackLagrangian = it)) }

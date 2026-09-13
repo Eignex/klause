@@ -158,4 +158,140 @@ class LpExactStateTest {
         assertTrue(state.sameMatrix(LpExactState(model.recentered(listOf(one)))))
         assertTrue(state.sameMatrix(LpExactState(model.copy(objective = ExactLpObjective(listOf(one, one))))))
     }
+
+    @Test
+    fun `an underflowed bound cannot authorize a nonzero matrix cost or scale`() {
+        val zero = ExactLpNumber.of(0L)
+        val one = ExactLpNumber.of(1L)
+        val tiny = ExactLpNumber.of(BigFraction.of(BigInteger.ONE, BigInteger.ONE shl 2048))
+        val boundModel = ExactLpModel(
+            listOf(listOf(ExactLpEntry(0, one))),
+            listOf(one),
+            listOf(ExactLpColumn(ExactLpBounds(upper = ExactLpSide(tiny))), ExactLpColumn(ExactLpBounds())),
+            listOf(ExactLpRow()),
+            ExactLpObjective(listOf(zero, zero)),
+        )
+        assertEquals(0.0, assertNotNull(LpExactState(boundModel).toWorkingModel()).upperD(0))
+        for (role in listOf("matrix", "cost", "scale")) {
+            val model = ExactLpModel(
+                listOf(listOf(ExactLpEntry(0, if (role == "matrix") tiny else one))),
+                listOf(one),
+                List(2) { ExactLpColumn(ExactLpBounds()) },
+                listOf(ExactLpRow()),
+                ExactLpObjective(
+                    listOf(if (role == "cost") tiny else zero, zero),
+                    scale = if (role == "scale") tiny else one,
+                ),
+            )
+
+            assertNull(LpExactState(model).toWorkingModel())
+        }
+    }
+
+    @Test
+    fun `repeated scalar projection preserves raw values and exact identity`() {
+        val zero = ExactLpNumber.of(0L)
+        val huge = BigInteger.ONE shl 2048
+        val values = listOf(
+            ExactLpNumber.of(Long.MIN_VALUE),
+            ExactLpNumber.of(Long.MAX_VALUE),
+            ExactLpNumber.of(BigFraction.of(BigInteger.ONE, BigInteger.fromInt(3))),
+            ExactLpNumber.ofIeee(-0.0),
+            ExactLpNumber.ofIeee(Double.MIN_VALUE),
+            ExactLpNumber.of(BigFraction.of(-BigInteger.ONE, huge)),
+            ExactLpNumber.of(BigFraction.of(huge, BigInteger.ONE)),
+            ExactLpNumber.of(BigFraction.of(huge + BigInteger.ONE, huge - BigInteger.ONE)),
+        )
+        for (number in values) {
+            val copy = number.ieeeBits?.let {
+                ExactLpNumber.ofIeee(
+                    Double.fromBits(it),
+                )
+            } ?: ExactLpNumber.of(number.value)
+            val hash = number.hashCode()
+            val expected = number.ieeeBits?.let { Double.fromBits(it) } ?: number.value.toDouble()
+            val model = ExactLpModel(
+                listOf(emptyList()),
+                emptyList(),
+                listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(number), ExactLpSide(number)))),
+                emptyList(),
+                ExactLpObjective(listOf(zero)),
+            )
+            val state = LpExactState(model)
+
+            repeat(2) {
+                val projection = state.toWorkingModel()
+                if (expected.isFinite()) {
+                    assertEquals(expected.toRawBits(), assertNotNull(projection).upperD(0).toRawBits())
+                    assertEquals(expected.toRawBits(), projection.lowerD(0).toRawBits())
+                } else {
+                    assertNull(projection)
+                }
+            }
+
+            assertEquals(copy, number)
+            assertEquals(hash, number.hashCode())
+            assertTrue(model.sameAuthority(state.model))
+        }
+    }
+
+    @Test
+    fun `bound and objective revisions project their own values`() {
+        val zero = ExactLpNumber.of(0L)
+        val three = ExactLpNumber.of(3L)
+        val model = ExactLpModel(
+            listOf(emptyList()),
+            emptyList(),
+            listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(ExactLpNumber.of(10L))))),
+            emptyList(),
+            ExactLpObjective(
+                listOf(ExactLpNumber.of(5L)),
+                scale = ExactLpNumber.of(2L),
+                externalConstant = ExactLpNumber.of(5L),
+            ),
+        )
+        val trail = LpBoundTrail(model)
+        val initial = assertNotNull(trail.state.toWorkingModel())
+        assertTrue(trail.assertBound(0, true, ExactLpSide(three), 0L))
+        assertTrue(trail.assertBound(0, false, ExactLpSide(ExactLpNumber.of(2L)), 1L))
+        assertNotNull(trail.state.toWorkingModel())
+
+        assertTrue(trail.replaceObjective(ExactLpObjective(listOf(three), scale = three, externalConstant = three)))
+        val updated = assertNotNull(trail.state.toWorkingModel())
+
+        assertEquals(3.0, updated.costD(0))
+        assertEquals(3.0, updated.upperD(0))
+        assertEquals(2.0, updated.lowerD(0))
+        assertEquals(7.0, updated.objectiveD(12.0))
+        assertEquals(5.0, initial.costD(0))
+        assertEquals(10.0, initial.upperD(0))
+        assertEquals(0.0, initial.lowerD(0))
+        assertEquals(11.0, initial.objectiveD(12.0))
+        assertSame(trail.state, updated.exactState)
+    }
+
+    @Test
+    fun `objective projections preserve input bits and arithmetic order`() {
+        val zero = ExactLpNumber.of(0L)
+        val third = ExactLpNumber.of(BigFraction.of(BigInteger.ONE, BigInteger.fromInt(3)))
+        for (scale in listOf(third, ExactLpNumber.ofIeee(Double.MIN_VALUE), ExactLpNumber.ofIeee(2.0))) {
+            for (constant in listOf(third, ExactLpNumber.ofIeee(-0.0), ExactLpNumber.ofIeee(Double.MIN_VALUE))) {
+                val model = ExactLpModel(
+                    listOf(emptyList()),
+                    emptyList(),
+                    listOf(ExactLpColumn(ExactLpBounds())),
+                    emptyList(),
+                    ExactLpObjective(listOf(zero), scale = scale, externalConstant = constant),
+                )
+                val working = assertNotNull(LpExactState(model).toWorkingModel())
+                val expectedScale = scale.ieeeBits?.let(Double::fromBits) ?: scale.value.toDouble()
+                val expectedConstant = constant.ieeeBits?.let(Double::fromBits) ?: constant.value.toDouble()
+
+                for (value in listOf(-0.0, Double.MIN_VALUE, 1.0, Double.MAX_VALUE)) {
+                    val expected = value / expectedScale + expectedConstant
+                    repeat(2) { assertEquals(expected.toRawBits(), working.objectiveD(value).toRawBits()) }
+                }
+            }
+        }
+    }
 }

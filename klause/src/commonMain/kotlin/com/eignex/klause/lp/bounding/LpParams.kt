@@ -38,6 +38,8 @@ class LpParams(
  * type) is what lets the engine live below the search layer.
  */
 internal interface LpHintSink {
+    fun clear()
+
     /** Record an LP solution's [primal] and [duals] against [relaxation]'s column→variable map. */
     fun record(relaxation: LpRelaxation, primal: DoubleArray, duals: DoubleArray)
 }

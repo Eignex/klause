@@ -15,6 +15,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 import kotlin.time.TimeSource
 
@@ -40,8 +41,14 @@ class CpToLpRelaxationTidyTest {
         assertEquals(-2.5, solveLp(off.model).objectiveValue)
         assertEquals(-2.0, solveLp(on.model).objectiveValue)
         assertTrue(on.tidyDerivation.validate())
-        assertNull(on.withModel(on.model).tidyDerivation)
-        assertNull(on.withModel(on.model.rebind(longArrayOf(0, 0), longArrayOf(10, 10))).tidyDerivation)
+        val retained = on.withModel(on.model)
+        assertSame(on.tidyDerivation, retained.tidyDerivation)
+        assertTrue(assertNotNull(retained.tidyDerivation).validate())
+        assertSame(problem, assertNotNull(retained.tidyProof).sources.model)
+        val rebound = on.withModel(on.model.rebind(longArrayOf(0, 0), longArrayOf(10, 10)))
+        assertSame(on.tidyDerivation, rebound.tidyDerivation)
+        assertTrue(assertNotNull(rebound.tidyDerivation).validate())
+        assertSame(problem, assertNotNull(rebound.tidyProof).sources.model)
     }
 
     @Test

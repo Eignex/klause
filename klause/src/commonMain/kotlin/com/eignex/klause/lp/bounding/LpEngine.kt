@@ -16,6 +16,7 @@ import com.eignex.klause.lp.cut.AssignmentObjectiveCut
 import com.eignex.klause.lp.cut.CircuitSeparator
 import com.eignex.klause.lp.cut.CliqueCutSeparator
 import com.eignex.klause.lp.cut.CutExchange
+import com.eignex.klause.lp.cut.CutMapping
 import com.eignex.klause.lp.cut.CutPool
 import com.eignex.klause.lp.cut.CutSeparator
 import com.eignex.klause.lp.cut.CutSharing
@@ -36,6 +37,8 @@ import com.eignex.klause.lp.engine.newPersistentLpSolver
 import com.eignex.klause.lp.engine.solveAndCertify
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.lp.relaxation.LeafRealResult
+import com.eignex.klause.lp.relaxation.LpAssemblyCancelled
+import com.eignex.klause.lp.relaxation.LpAuxiliarySources
 import com.eignex.klause.lp.relaxation.LpExplanation
 import com.eignex.klause.lp.relaxation.LpRelaxation
 import com.eignex.klause.lp.relaxation.gatedEnforcement
@@ -48,6 +51,7 @@ import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.LpRoute
 import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.CheckedLongOverflowException
 import com.eignex.klause.util.EmptyDoubleArray
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntArrayList
@@ -147,6 +151,26 @@ internal class LpEngine(
         check(!closed) { "LP engine is closed" }
     }
 
+    internal fun newEpochHarvestEngine(token: Cancellation): LpEngine = LpEngine(
+        problem,
+        objective,
+        LpParams(
+            lpPlan = params.lpPlan.copy(boundEvery = 1),
+            cancellation = token,
+            randomSeed = params.randomSeed,
+            zeroObjectivePricing = params.zeroObjectivePricing,
+        ),
+        sink,
+        solveContext,
+    )
+
+    internal fun shaveEpochObjective(token: Cancellation): ShavedBound? {
+        val single = objective.singleIntObjective() ?: return null
+        val lower = shaveObjectiveLb(single.varId, single.ascending, token) ?: return null
+        val upper = PropagationSession(problem).intDomain(single.varId).max
+        return if (lower <= upper) ShavedBound(single.varId, lower, upper) else null
+    }
+
     /** Attribute an auxiliary root/presolve simplex invocation to this solve's shared sink. */
     internal fun observeRootSolve(
         solver: LpSolver,
@@ -174,6 +198,8 @@ internal class LpEngine(
     internal val pricingOptions: LpPricingOptions
         get() = LpPricingOptions(params.zeroObjectivePricing, params.randomSeed ?: 0L)
 
+    private val auxiliarySources = LpAuxiliarySources()
+
     /** Construct the relaxer for [plan]'s hull flags, or null when bounding is off. Factored so the
      *  ineffective-hull probe can build variants with whole families ([plan]) or individual factor
      *  hulls ([suppressedHullFactors]) turned off. */
@@ -198,6 +224,7 @@ internal class LpEngine(
                 productMcCormick = plan.productMcCormick,
                 booleanRlt = plan.booleanRlt,
                 suppressedHullFactors = suppressedHullFactors,
+                auxiliarySources = auxiliarySources,
             )
         } else {
             null
@@ -391,6 +418,10 @@ internal class LpEngine(
     /** Deterministic cumulative LP work, for policies that compare snapshots without mutating it. */
     internal fun totalSolveWork(): Long = totalSolveOps
 
+    internal fun noteEpochWork(work: Long) {
+        totalSolveOps = saturatingAdd(totalSolveOps, work)
+    }
+
     internal fun pendingNodeSolveWork(): Long = pendingSolveOps
 
     private fun saturatingAdd(a: Long, b: Long): Long = if (b > 0L && a > Long.MAX_VALUE - b) Long.MAX_VALUE else a + b
@@ -459,6 +490,180 @@ internal class LpEngine(
     // A fixed source layout allows bound-only adoption without rebuilding its factorization.
     private var persistentResolved = false
     private var persistentRelaxation: LpRelaxation? = null
+    internal var epochState: LpEpochState? = null
+        private set
+    internal var epochRootAllowed = true
+        private set
+    private var epochNumber = 0L
+    internal var epochRebuilds = 0
+        private set
+    internal val epochMetrics = LpEpochMetrics()
+    internal val epochShapeEligible: Boolean get() = nodeSimplex == null && gatedFilter == null
+
+    internal fun retireEpochRoot() {
+        epochRootAllowed = false
+        discardEpoch()
+    }
+
+    internal fun discardEpoch() {
+        if (epochState == null) return
+        epochState = null
+        persistentResolved = false
+        persistentRelaxation = null
+        lpBasisByDepth.clear()
+        lpCounterResults = LpCounterResults()
+        lpBackjump = null
+        try {
+            lpHints?.clear()
+        } finally {
+            cpAdapter.reset()
+        }
+    }
+
+    internal fun observeEpoch(name: String, value: Long = 1L) = sink.lp.observeEpoch(name, value)
+
+    internal fun rebuildEpoch(session: PropagationSession, token: Cancellation): Boolean {
+        val before = epochMetrics.counts()
+        val start = TimeSource.Monotonic.markNow()
+        try {
+            return rebuildEpochBody(session, token)
+        } finally {
+            for ((name, value) in epochMetrics.counts()) observeEpoch(name, value - before.getValue(name))
+            observeEpoch("total_ns", start.elapsedNow().inWholeNanoseconds)
+        }
+    }
+
+    private fun rebuildEpochBody(session: PropagationSession, token: Cancellation): Boolean {
+        requireOpen()
+        epochMetrics.attempts++
+        if (!epochRootAllowed || token() || session.problem !== problem || session.decisionLevel != 0 ||
+            !epochShapeEligible || epochNumber == Long.MAX_VALUE ||
+            nodeSimplex != null || gatedFilter != null
+        ) {
+            epochMetrics.rootDeclines++
+            return false
+        }
+        val root = LpEpochRoot.capture(session) ?: run {
+            epochMetrics.rootDeclines++
+            return false
+        }
+        val keys = cutPool.cuts().map {
+            listOf(it.key(), it.global, it.provenance?.model, it.provenance?.facts, it.provenance?.assumptions)
+        }.toSet()
+        val oldEpoch = epochState
+        if (oldEpoch != null && !oldEpoch.root.changed(session) && keys == oldEpoch.cutKeys) {
+            epochMetrics.unchanged++
+            return true
+        }
+        val relaxer = lpRelaxer ?: return false
+        val regenerationStart = TimeSource.Monotonic.markNow()
+        val built = try {
+            val plain = relaxer.build(session, cancellation = token)
+            if (!LpEpochState.supports(plain) || token()) {
+                LpEpochState.declineReason(plain)?.let { observeEpoch("declined_$it") }
+                epochMetrics.modelDeclines++
+                return false
+            }
+            val cuts = cutPool.mappedCuts(requireNotNull(plain.sourceMap)).mapNotNull { mapped ->
+                when (mapped) {
+                    is CutMapping.Mapped -> {
+                        observeEpoch(if (mapped.value.global) "retained_global_cuts" else "retained_conditional_cuts")
+                        mapped.value
+                    }
+
+                    is CutMapping.Declined -> {
+                        observeEpoch("cut_declined_${mapped.reason.name.lowercase()}")
+                        null
+                    }
+                }
+            }
+            if (cuts.isEmpty()) plain else relaxer.build(session, cuts, token)
+        } catch (_: LpAssemblyCancelled) {
+            observeEpoch("declined_cancelled")
+            return false
+        } catch (_: CheckedLongOverflowException) {
+            epochMetrics.modelDeclines++
+            return false
+        } finally {
+            epochMetrics.regenerationNanos += regenerationStart.elapsedNow().inWholeNanoseconds
+            noteEpochWork(problem.factors.size.toLong() + problem.numIntVars + problem.numBoolVars)
+        }
+        if (!LpEpochState.supports(built) || token()) {
+            epochMetrics.modelDeclines++
+            return false
+        }
+        val oldBase = oldEpoch?.relaxation ?: persistentRelaxation
+        val number = epochNumber + 1L
+        val map = requireNotNull(built.sourceMap).atEpoch(number)
+        val scoped = built.withModel(built.model, map)
+        val tidyStart = TimeSource.Monotonic.markNow()
+        val tidied = RelaxationTidy.apply(
+            scoped,
+            RelaxationTidyScope(problem, number, objective, true, searchRoot = root),
+            RelaxationTidyConfig(enabled = true, cancellation = token),
+        )
+        epochMetrics.tidyNanos += tidyStart.elapsedNow().inWholeNanoseconds
+        val next = when (tidied) {
+            is RelaxationTidyResult.Applied -> tidied.relaxation
+
+            is RelaxationTidyResult.Declined -> {
+                observeEpoch("declined_${tidied.reason.name.lowercase()}")
+                epochMetrics.modelDeclines++
+                return false
+            }
+        }
+        if (token() || !root.admits(session) || !LpEpochState.supports(next)) return false
+        val nextState = LpEpochState(root, next, keys, number)
+        val warm = oldBase?.let { LpEpochState.remapBasis(it, next, lpBasisByDepth.firstOrNull(), token) }
+        noteEpochWork(next.model.n.toLong() + next.model.m + next.model.csc.colVal.size)
+        val preparationStart = TimeSource.Monotonic.markNow()
+        return try {
+            cpAdapter.installEpoch(next, session, warm, token, { root.admits(session) }) {
+                epochState = nextState
+                epochNumber = number
+                epochRebuilds++
+                observeEpoch("published")
+                if (oldBase != null && (
+                        oldBase.model.n != next.model.n || oldBase.model.m != next.model.m ||
+                            !oldBase.model.csc.colPtr.contentEquals(next.model.csc.colPtr) ||
+                            !oldBase.model.csc.rowIdx.contentEquals(next.model.csc.rowIdx) ||
+                            !oldBase.model.csc.colVal.contentEquals(next.model.csc.colVal)
+                        )
+                ) {
+                    observeEpoch("matrix_changes")
+                }
+                observeEpoch("rows_before", built.model.m.toLong())
+                observeEpoch("rows_after", next.model.m.toLong())
+                observeEpoch("nonzeros_before", built.model.csc.colVal.size.toLong())
+                observeEpoch("nonzeros_after", next.model.csc.colVal.size.toLong())
+                observeEpoch("columns", next.model.n.toLong())
+                for ((rule, count) in requireNotNull(
+                    next.tidyStats,
+                ).applied) {
+                    observeEpoch("tidy_${rule.name.lowercase()}", count.toLong())
+                }
+                epochMetrics.rows = next.model.m
+                epochMetrics.columns = next.model.n
+                epochMetrics.nonzeros = next.model.csc.colVal.size
+                persistentRelaxation = next
+                persistentResolved = true
+                lpBasisByDepth.clear()
+                lpCounterResults = LpCounterResults()
+                lpBackjump = null
+                residualCache = null
+                residualCacheKey = null
+                nodeUsesTrail = false
+                pendingSolveOps = 0L
+                lpHints?.clear()
+            }.also { if (!it) epochMetrics.preparationDeclines++ }
+        } finally {
+            epochMetrics.preparationNanos += preparationStart.elapsedNow().inWholeNanoseconds
+            noteEpochWork(propagator.lastEpochMetrics.workOps)
+            observeEpoch("repair_work", propagator.lastEpochMetrics.workOps)
+            observeEpoch("repair_pivots", propagator.lastEpochMetrics.pivots.toLong())
+            observeEpoch("repair_refactors", propagator.lastEpochMetrics.initialRefactorizations.toLong())
+        }
+    }
 
     // Strict residual filtering retains its dedicated floating owner until its exact-state migration.
     internal var nodeSimplex: PersistentLpSolver? = null
@@ -486,6 +691,7 @@ internal class LpEngine(
     }
 
     private fun buildNodeRelaxation(relaxer: CpToLpRelaxation, session: PropagationSession): LpRelaxation {
+        epochState?.let { if (!it.admits(session)) discardEpoch() }
         if (!persistentResolved) {
             persistentResolved = true
             val base = relaxer.build(PropagationSession(problem))
@@ -515,7 +721,8 @@ internal class LpEngine(
         return relaxer.build(session)
     }
 
-    internal val lpCounterResults = LpCounterResults()
+    internal var lpCounterResults = LpCounterResults()
+        private set
 
     // Pin-fingerprint cache for the residual real relaxation (realResidual plans, no integer columns).
     private var residualCacheKey: IntArray? = null

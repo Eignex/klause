@@ -18,5 +18,11 @@ internal class RootLpDutyCycle {
         hasRun = true
     }
 
+    fun reset() {
+        lastRootCost = 0L
+        lastRootEnd = 0L
+        hasRun = false
+    }
+
     private fun saturatedSubtract(after: Long, before: Long): Long = if (after <= before) 0L else after - before
 }

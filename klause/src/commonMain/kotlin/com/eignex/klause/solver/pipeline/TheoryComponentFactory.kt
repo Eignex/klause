@@ -1,6 +1,7 @@
 package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.solver.result.LpStatsSink
 import com.eignex.klause.solver.result.SmtStatsSink
 import com.eignex.klause.solver.search.SearchIntValue
 import com.eignex.klause.solver.search.SearchRealValue
@@ -9,7 +10,12 @@ import com.eignex.klause.theory.difference.DifferenceSearchComponent
 import com.eignex.klause.theory.qflra.ExactLiraSearchComponent
 
 /** Builds the theory component selected by this plan. */
-internal fun ComponentPlan.theoryComponent(spec: Problem, smtStats: SmtStatsSink? = null): TheoryComponent? {
+internal fun ComponentPlan.theoryComponent(
+    spec: Problem,
+    smtStats: SmtStatsSink? = null,
+    lpEpochs: Boolean = false,
+    lpStats: LpStatsSink? = null,
+): TheoryComponent? {
     val fragment = theoryFragment(spec)
     return when (theoryPipeline) {
         ProblemPipeline.DIFFERENCE_THEORY -> DifferenceSearchComponent.withRootBounds(
@@ -18,18 +24,24 @@ internal fun ComponentPlan.theoryComponent(spec: Problem, smtStats: SmtStatsSink
             cpIntVars,
         )
 
-        ProblemPipeline.EXACT_LRA -> ExactLiraSearchComponent(fragment) { assignment, model ->
+        ProblemPipeline.EXACT_LRA -> ExactLiraSearchComponent(fragment, lpEpochs = lpEpochs) { assignment, model ->
             assignment.reals.forEachIndexed { variable, value -> model.put(SearchRealValue(variable), value) }
-        }.also { component -> smtStats?.let(component::observeWith) }
+        }.also { component ->
+            smtStats?.let(component::observeWith)
+            lpStats?.let { component.observeEpochWith(it::observeEpoch) }
+        }
 
-        ProblemPipeline.EXACT_LIRA -> ExactLiraSearchComponent(fragment) { assignment, model ->
+        ProblemPipeline.EXACT_LIRA -> ExactLiraSearchComponent(fragment, lpEpochs = lpEpochs) { assignment, model ->
             assignment.ints.forEachIndexed { variable, value ->
                 if (intOwner(variable) == IntVariableOwner.THEORY) {
                     model.put(SearchIntValue(variable), value)
                 }
             }
             assignment.reals.forEachIndexed { variable, value -> model.put(SearchRealValue(variable), value) }
-        }.also { component -> smtStats?.let(component::observeWith) }
+        }.also { component ->
+            smtStats?.let(component::observeWith)
+            lpStats?.let { component.observeEpochWith(it::observeEpoch) }
+        }
 
         ProblemPipeline.FINITE_CP -> null
 
