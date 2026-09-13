@@ -39,7 +39,7 @@ internal class LpEpochProof private constructor(
             mapping.auxiliaryDefinitions != sources.auxiliaryDefinitions ||
             derivation.scope.searchRoot?.admitsCurrent() == false ||
             candidate.hasContinuous || candidate.doubleView != null || !candidate.finiteExactInput() ||
-            naturalModel(candidate, mapping) != construction || !narrows(candidate, derivation.transformedModel)
+            !construction.matches(candidate, mapping) || !narrows(candidate, derivation.transformedModel)
         ) {
             return null
         }
@@ -216,6 +216,74 @@ private data class NaturalModel(
     val clampedLower: List<Boolean>,
     val clampedUpper: List<Boolean>,
 )
+
+private fun NaturalModel.matches(model: LpModel, sources: CutSourceMap): Boolean {
+    if (model.n != columns.size || model.m != rows.size || model.numVars != costs.size) return false
+    val rhs = MutableList(model.m) { model.exactRhs(it) }
+    for (column in 0 until model.n) {
+        val start = model.csc.colPtr[column]
+        val end = model.csc.colPtr[column + 1]
+        val saved = columns[column]
+        if (end - start != saved.size) return false
+        val shift = model.exactShift(column)
+        for (entry in start until end) {
+            val row = model.csc.rowIdx[entry]
+            val value = BigFraction.ofLong(model.csc.colVal[entry])
+            val expected = saved[entry - start]
+            if (row != expected.first || value != expected.second) return false
+            if (!value.isZero && !shift.isZero) rhs[row] += value * shift
+        }
+    }
+    var currentConstant = model.exactConstant()
+    for (column in 0 until model.n) {
+        val cost = model.exactCost(column)
+        val shift = model.exactShift(column)
+        if (!cost.isZero && !shift.isZero) currentConstant -= cost * shift
+    }
+    if (currentConstant != constant || model.sense != sense || !model.tag.matches(tags) ||
+        !model.colContinuous.matches(continuous) || !model.probeClampedLo.matches(clampedLower) ||
+        !model.probeClampedHi.matches(clampedUpper)
+    ) {
+        return false
+    }
+    for (column in 0 until model.numVars) if (model.exactCost(column) != costs[column]) return false
+    return matchesRows(model, sources, rhs)
+}
+
+private fun NaturalModel.matchesRows(model: LpModel, sources: CutSourceMap, rhs: List<BigFraction>): Boolean {
+    for (row in 0 until model.m) {
+        val saved = rows[row]
+        val premise = model.rowPremises[row]
+        val slack = model.exactBounds(model.slackCol(row))
+        if (rhs[row] != saved[0] || slack.lower != saved[1] || slack.upper != saved[2] ||
+            model.rowStrict[row] != saved[3] || model.rowGlobal[row] != saved[4] ||
+            !premise?.vars.matches(saved[5]) || !premise?.isUpper.matches(saved[6]) ||
+            !premise?.thresholds.matches(saved[7]) || !premise?.boolLits.matches(saved[8]) ||
+            sources.parent(row) != saved[9]
+        ) {
+            return false
+        }
+    }
+    return true
+}
+
+private fun IntArray?.matches(snapshot: Any?): Boolean = if (this == null) {
+    snapshot == null
+} else {
+    snapshot is List<*> && size == snapshot.size && indices.all { this[it] == snapshot[it] }
+}
+
+private fun LongArray?.matches(snapshot: Any?): Boolean = if (this == null) {
+    snapshot == null
+} else {
+    snapshot is List<*> && size == snapshot.size && indices.all { this[it] == snapshot[it] }
+}
+
+private fun BooleanArray?.matches(snapshot: Any?): Boolean = if (this == null) {
+    snapshot == null
+} else {
+    snapshot is List<*> && size == snapshot.size && indices.all { this[it] == snapshot[it] }
+}
 
 private fun naturalModel(
     model: LpModel,

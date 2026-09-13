@@ -8,15 +8,23 @@ import com.eignex.klause.lp.cut.SourceCut
 import com.eignex.klause.lp.cut.orNull
 import com.eignex.klause.lp.engine.Basis
 import com.eignex.klause.lp.engine.Cut
+import com.eignex.klause.lp.engine.CutAuxiliaryDefinition
 import com.eignex.klause.lp.engine.CutInputRow
+import com.eignex.klause.lp.engine.CutProvenance
 import com.eignex.klause.lp.engine.CutRowTransform
+import com.eignex.klause.lp.engine.CutSource
+import com.eignex.klause.lp.engine.CutSourceKind
 import com.eignex.klause.lp.engine.LpBuilder
+import com.eignex.klause.lp.engine.LpExactState
+import com.eignex.klause.lp.engine.LpModel
+import com.eignex.klause.lp.engine.LpRowPremises
 import com.eignex.klause.lp.engine.Relation
 import com.eignex.klause.lp.engine.Sense
 import com.eignex.klause.lp.engine.TableauCutProvenance
 import com.eignex.klause.lp.engine.VarStatus
 import com.eignex.klause.lp.engine.integerCertify
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
+import com.eignex.klause.lp.relaxation.CutSourceMap
 import com.eignex.klause.lp.relaxation.LpExplanation
 import com.eignex.klause.lp.relaxation.LpRelaxation
 import com.eignex.klause.lp.relaxation.RootDomains
@@ -39,6 +47,246 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class LpEpochProofTest {
+    @Test
+    fun `binding detects and recovers from mutations of the same model`() {
+        val problem = Problem(
+            0, 2, Array(2) { IntDomain(-3, 5) },
+            arrayOf(
+                Linear(intArrayOf(2, 3), intArrayOf(0, 1), LinearOp.LE, 8),
+                Linear(intArrayOf(3, -2), intArrayOf(0, 1), LinearOp.LE, 7),
+            ),
+        )
+        val relaxation = CpToLpRelaxation(problem, null, tidy = RelaxationTidyConfig(enabled = true))
+            .build(RootDomains(problem))
+        val proof = assertNotNull(relaxation.tidyProof)
+        val model = relaxation.model
+        val row = model.m - 1
+        val column = model.n - 1
+        val mutations = listOf<Pair<String, () -> Unit>>(
+            "coefficient" to { model.csc.colVal[model.csc.colVal.lastIndex] = model.csc.colVal.last() xor 1L },
+            "row index" to { model.csc.rowIdx[model.csc.rowIdx.lastIndex] = model.csc.rowIdx.last() xor 1 },
+            "column pointer" to { model.csc.colPtr[model.n] = model.csc.colPtr[model.n] xor 1 },
+            "rhs" to { model.rhs[row] = model.rhs[row] xor 1L },
+            "cost" to { model.cost[column] = model.cost[column] xor 1L },
+            "slack cost" to { model.cost[model.n + row] = model.cost[model.n + row] xor 1L },
+            "origin" to { model.loShift[column] = model.loShift[column] xor 1L },
+            "tag" to { model.tag[column] = model.tag[column] xor 1 },
+            "continuous flag" to { model.colContinuous[column] = !model.colContinuous[column] },
+            "lower clamp" to { model.probeClampedLo[column] = !model.probeClampedLo[column] },
+            "upper clamp" to { model.probeClampedHi[column] = !model.probeClampedHi[column] },
+            "strict row" to { model.rowStrict[row] = !model.rowStrict[row] },
+            "global row" to { model.rowGlobal[row] = !model.rowGlobal[row] },
+            "slack presence" to { model.hasUpper[model.n + row] = !model.hasUpper[model.n + row] },
+        )
+
+        for ((name, mutate) in mutations) {
+            mutate()
+            assertNull(proof.bind(model, relaxation.sourceMap), name)
+            mutate()
+            val rebound = assertNotNull(proof.bind(model, relaxation.sourceMap), name)
+            assertSame(model, rebound.model)
+            assertSame(relaxation.sourceMap, rebound.sources)
+        }
+        assertNotNull(proof.rowProof(row))
+    }
+
+    @Test
+    fun `binding compares premise arrays with their construction snapshot`() {
+        val problem = Problem(
+            1, 2, Array(2) { IntDomain(-3, 5) },
+            arrayOf(Linear(intArrayOf(2, 3), intArrayOf(0, 1), LinearOp.LE, 8)),
+        )
+        val plain = CpToLpRelaxation(problem, null).build(RootDomains(problem))
+        val premise = LpRowPremises(intArrayOf(0), booleanArrayOf(true), longArrayOf(5), intArrayOf(0))
+        plain.model.rowGlobal[0] = false
+        plain.model.rowPremises[0] = premise
+        val relaxation = assertIs<RelaxationTidyResult.Applied>(
+            RelaxationTidy.apply(
+                plain,
+                RelaxationTidyScope(problem, assertNotNull(plain.sourceMap).epoch, null, true),
+                RelaxationTidyConfig(enabled = true),
+            ),
+        ).relaxation
+        val proof = assertNotNull(relaxation.tidyProof)
+        val mutations = listOf<Pair<String, () -> Unit>>(
+            "variable" to { premise.vars[0] = premise.vars[0] xor 1 },
+            "side" to { premise.isUpper[0] = !premise.isUpper[0] },
+            "threshold" to { premise.thresholds[0] = premise.thresholds[0] xor 1L },
+            "literal" to { premise.boolLits[0] = premise.boolLits[0] xor 1 },
+        )
+
+        for ((name, mutate) in mutations) {
+            mutate()
+            assertNull(proof.bind(relaxation.model, relaxation.sourceMap), name)
+            mutate()
+            assertNotNull(proof.bind(relaxation.model, relaxation.sourceMap), name)
+        }
+        relaxation.model.rowPremises[0] = null
+        assertNull(proof.bind(relaxation.model, relaxation.sourceMap))
+        relaxation.model.rowPremises[0] = premise
+        assertNotNull(proof.bind(relaxation.model, relaxation.sourceMap))
+    }
+
+    @Test
+    fun `binding accepts recentered narrowing and rejects widening`() {
+        val problem = Problem(
+            0, 2, Array(2) { IntDomain(-3, 5) },
+            arrayOf(Linear(intArrayOf(2, 3), intArrayOf(0, 1), LinearOp.LE, 8)),
+        )
+        val objective = LinearObjective(intCoefficients = longArrayOf(3, -2))
+        val relaxation = CpToLpRelaxation(problem, objective, tidy = RelaxationTidyConfig(enabled = true))
+            .build(RootDomains(problem))
+        val proof = assertNotNull(relaxation.tidyProof)
+        val model = relaxation.model
+        for (offset in listOf(-1L, 1L)) {
+            val lower = model.loShift.copyOf().also { it[0] += offset }
+            val upper = LongArray(model.n) { model.loShift[it] + model.upper[it] }
+            val candidate = model.rebind(lower, upper)
+            val mapping = assertNotNull(relaxation.sourceMap).withBounds(candidate)
+
+            val rebound = proof.bind(candidate, mapping)
+
+            if (offset < 0L) {
+                assertNull(rebound)
+            } else {
+                assertSame(candidate, assertNotNull(rebound).model)
+                assertSame(mapping, rebound.sources)
+                assertNotNull(rebound.rowProof(0))
+            }
+        }
+    }
+
+    @Test
+    fun `binding preserves complete tags and scalar model identity checks`() {
+        val problem = Problem(
+            0, 2, Array(2) { IntDomain(-3, 5) },
+            arrayOf(Linear(intArrayOf(2, 3), intArrayOf(0, 1), LinearOp.LE, 8)),
+        )
+        val relaxation = CpToLpRelaxation(problem, null, tidy = RelaxationTidyConfig(enabled = true))
+            .build(RootDomains(problem))
+        val proof = assertNotNull(relaxation.tidyProof)
+        val model = relaxation.model
+        for (changed in listOf("extra tag", "missing tag", "constant", "sense", "exact state")) {
+            val candidate = LpModel(
+                model.n, model.m, model.csc, model.rhs, model.cost, model.upper, model.hasUpper,
+                model.loShift, model.objConstant + if (changed == "constant") 1L else 0L,
+                if (changed == "sense") Sense.MAXIMIZE else model.sense,
+                when (changed) {
+                    "extra tag" -> model.tag + 0
+                    "missing tag" -> model.tag.copyOf(model.tag.size - 1)
+                    else -> model.tag
+                },
+                rowGlobal = model.rowGlobal, rowStrict = model.rowStrict, rowPremises = model.rowPremises,
+                flippedRhs = model.flippedRhs, probeClampedLo = model.probeClampedLo,
+                probeClampedHi = model.probeClampedHi, colContinuous = model.colContinuous,
+                exactState = if (changed == "exact state") {
+                    LpExactState(assertNotNull(model.trailModel()))
+                } else {
+                    null
+                },
+            )
+
+            assertNull(proof.bind(candidate, relaxation.sourceMap), changed)
+        }
+    }
+
+    @Test
+    fun `binding distinguishes empty premises from absent premises`() {
+        val problem = Problem(
+            0, 2, Array(2) { IntDomain(-3, 5) },
+            arrayOf(Linear(intArrayOf(2, 3), intArrayOf(0, 1), LinearOp.LE, 8)),
+        )
+        val relaxation = CpToLpRelaxation(problem, null, tidy = RelaxationTidyConfig(enabled = true))
+            .build(RootDomains(problem))
+        val proof = assertNotNull(relaxation.tidyProof)
+        val model = relaxation.model
+        assertNull(model.rowPremises[0])
+        model.rowPremises[0] = LpRowPremises(intArrayOf(), booleanArrayOf(), longArrayOf())
+        assertNull(proof.bind(model, relaxation.sourceMap))
+        model.rowPremises[0] = null
+
+        assertNotNull(proof.bind(model, relaxation.sourceMap))
+    }
+
+    @Test
+    fun `binding ignores absent bound payloads`() {
+        val problem = Problem(
+            0, 2, Array(2) { IntDomain(-3, 5) },
+            arrayOf(Linear(intArrayOf(2, 3), intArrayOf(0, 1), LinearOp.LE, 8)),
+        )
+        val relaxation = CpToLpRelaxation(problem, null, tidy = RelaxationTidyConfig(enabled = true))
+            .build(RootDomains(problem))
+        val proof = assertNotNull(relaxation.tidyProof)
+        val model = relaxation.model
+        assertFalse(model.hasUpper[model.n])
+        model.upper[model.n] = Long.MIN_VALUE
+
+        assertNotNull(proof.bind(model, relaxation.sourceMap))
+    }
+
+    @Test
+    fun `binding rejects changed source mappings and parent proofs`() {
+        val problem = Problem(
+            0, 2, Array(2) { IntDomain(-3, 5) },
+            arrayOf(Linear(intArrayOf(2, 3), intArrayOf(0, 1), LinearOp.LE, 8)),
+        )
+        val relaxation = CpToLpRelaxation(problem, null, tidy = RelaxationTidyConfig(enabled = true))
+            .build(RootDomains(problem))
+        val proof = assertNotNull(relaxation.tidyProof)
+        val sources = assertNotNull(relaxation.sourceMap)
+        for (changed in listOf("columns", "assumptions", "parent", "auxiliary")) {
+            val mapping = CutSourceMap(
+                sources.model, sources.epoch,
+                if (changed == "columns") sources.columns.reversed() else sources.columns,
+                assumptions = if (changed == "assumptions") setOf("assumption") else sources.assumptions,
+                parentRows = if (changed == "parent") {
+                    mapOf(0 to CutProvenance(sources.model, sources.epoch, emptyList()))
+                } else {
+                    emptyMap()
+                },
+                auxiliaryDefinitions = if (changed == "auxiliary") {
+                    mapOf(
+                        CutSource(CutSourceKind.AUXILIARY, 99) to
+                            CutAuxiliaryDefinition(listOf(1L), emptyList(), 1L, true),
+                    )
+                } else {
+                    sources.auxiliaryDefinitions
+                },
+            )
+
+            assertNull(proof.bind(relaxation.model, mapping), changed)
+        }
+        assertNotNull(proof.bind(relaxation.model, sources))
+    }
+
+    @Test
+    fun `binding retains the identity of a saved parent proof`() {
+        val problem = Problem(
+            0, 2, Array(2) { IntDomain(-3, 5) },
+            arrayOf(Linear(intArrayOf(2, 3), intArrayOf(0, 1), LinearOp.LE, 8)),
+        )
+        val relaxation = CpToLpRelaxation(problem, null, tidy = RelaxationTidyConfig(enabled = true))
+            .build(RootDomains(problem))
+        val sources = assertNotNull(relaxation.sourceMap)
+        val parent = CutProvenance(sources.model, sources.epoch, emptyList())
+        val mapping = CutSourceMap(
+            sources.model, sources.epoch, sources.columns, parentRows = mapOf(0 to parent),
+        )
+        val proof = assertNotNull(LpEpochProof.create(assertNotNull(relaxation.tidyDerivation), mapping))
+        for (preserve in listOf(true, false)) {
+            val next = CutSourceMap(
+                sources.model, sources.epoch, sources.columns,
+                parentRows = mapOf(
+                    0 to if (preserve) parent else CutProvenance(sources.model, sources.epoch, emptyList()),
+                ),
+            )
+
+            val rebound = proof.bind(relaxation.model, next)
+
+            if (preserve) assertNotNull(rebound) else assertNull(rebound)
+        }
+    }
+
     @Test
     fun `cancellation interrupts fixed substitution within a wide row`() {
         val size = 64
