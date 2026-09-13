@@ -530,32 +530,73 @@ internal fun reconstructCertificate(
     ray: DoubleArray? = null,
     cancellation: Cancellation = Cancellation.Never,
     limits: ReconstructionLimits = ReconstructionLimits(),
+): ReconstructedCertificate = reconstructCandidates(
+    model, primal?.size ?: 0, duals?.size ?: 0, ray?.size ?: 0,
+    primal?.let { values -> { meter -> reconstructIeee(values, meter) } },
+    duals?.let { values -> { meter -> reconstructIeee(values, meter) } },
+    ray?.let { values -> { meter -> reconstructIeee(values, meter) } },
+    basis, cancellation, limits,
+    validate = { meter ->
+        for (vector in listOfNotNull(primal, duals, ray)) {
+            meter.step(vector.size.toLong())
+            if (vector.any { !it.isFinite() }) throw ReconstructionStop(ReconstructionDecline.NONFINITE)
+        }
+    },
+)
+
+internal fun reconstructRationalCertificate(
+    model: LpModel,
+    primal: List<BigFraction>? = null,
+    duals: List<BigFraction>? = null,
+    basis: Basis? = null,
+    ray: List<BigFraction>? = null,
+    cancellation: Cancellation = Cancellation.Never,
+    limits: ReconstructionLimits = ReconstructionLimits(),
+): ReconstructedCertificate = reconstructCandidates(
+    model, primal?.size ?: 0, duals?.size ?: 0, ray?.size ?: 0,
+    primal?.let { values -> { meter -> values.map(meter::fraction) } },
+    duals?.let { values -> { meter -> values.map(meter::fraction) } },
+    ray?.let { values -> { meter -> values.map(meter::fraction) } },
+    basis, cancellation, limits,
+)
+
+private fun reconstructIeee(values: DoubleArray, meter: ReconstructionMeter): List<BigFraction> = values.map {
+    meter.fraction(exactDouble(it))
+}
+
+private fun reconstructCandidates(
+    model: LpModel,
+    primalSize: Int,
+    dualSize: Int,
+    raySize: Int,
+    primal: ((ReconstructionMeter) -> List<BigFraction>)?,
+    duals: ((ReconstructionMeter) -> List<BigFraction>)?,
+    ray: ((ReconstructionMeter) -> List<BigFraction>)?,
+    basis: Basis?,
+    cancellation: Cancellation,
+    limits: ReconstructionLimits,
+    validate: (ReconstructionMeter) -> Unit = {},
 ): ReconstructedCertificate {
     val meter = ReconstructionMeter(limits, cancellation)
     var run: ReconstructionRun? = null
     var decline: ReconstructionDecline? = null
     try {
         meter.step()
-        if ((primal != null && primal.size != model.n) || (duals != null && duals.size != model.m) ||
-            (ray != null && ray.size != model.m)
+        if ((primal != null && primalSize != model.n) || (duals != null && dualSize != model.m) ||
+            (ray != null && raySize != model.m)
         ) {
             throw ReconstructionStop(ReconstructionDecline.INVALID_INPUT)
         }
-        for (vector in listOfNotNull(primal, duals, ray)) {
-            meter.step(vector.size.toLong())
-            if (vector.any { !it.isFinite() }) throw ReconstructionStop(ReconstructionDecline.NONFINITE)
-        }
+        validate(meter)
         val authority = ReconstructionAuthority(model, meter)
         val current = ReconstructionRun(authority, meter)
         run = current
-        meter.storage(((primal?.size ?: 0).toLong() + (duals?.size ?: 0) + (ray?.size ?: 0)) * 24L)
-        val x = primal?.mapIndexed { j, value ->
-            meter.fraction(
-                meter.fraction(exactDouble(value)) - authority.origins[j],
-            )
+        meter.storage((primalSize.toLong() + dualSize + raySize) * 24L)
+        val x = primal?.let { values ->
+            values(meter).mapIndexed { j, value -> meter.fraction(value - authority.origins[j]) }
         }
-        val y = duals?.map { meter.fraction(exactDouble(it)) }
-        val rho = ray?.map { meter.fraction(exactDouble(it)) }
+        val y = duals?.invoke(meter)
+        val rho = ray?.invoke(meter)
         if (x != null) {
             current.point(x, basis)
             current.seated(x, basis)?.takeIf { it != x }?.let { current.point(it, basis) }

@@ -1054,9 +1054,9 @@ class LpScopedBasisTransferTest {
                             return checkNotNull(delegate.basisLifecycleWork)
                         }
 
-                    override fun resolveBounds(): FloatLpResult? {
+                    override fun resolveBounds(allowance: LpFloatAllowance?): FloatLpResult? {
                         if (replacement) throw primary
-                        return delegate.resolveBounds()
+                        return delegate.resolveBounds(allowance)
                     }
                 }
             }

@@ -29,6 +29,7 @@ import com.eignex.klause.lp.engine.LpCertificationObserver
 import com.eignex.klause.lp.engine.LpCertificationPolicy
 import com.eignex.klause.lp.engine.LpEngineFactory
 import com.eignex.klause.lp.engine.LpExactState
+import com.eignex.klause.lp.engine.LpFloatAllowance
 import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.LpNeighborhood
 import com.eignex.klause.lp.engine.LpPricingOptions
@@ -218,7 +219,8 @@ private class LifecycleFactory : LpEngineFactory {
                 return delegate.rebind(next, token)
             }
 
-            override fun resolveBounds(): FloatLpResult? = record.solve(delegate) { delegate.resolveBounds() }
+            override fun resolveBounds(allowance: LpFloatAllowance?): FloatLpResult? =
+                record.solve(delegate) { delegate.resolveBounds(allowance) }
 
             override fun resolveGated(enforced: BooleanArray): FloatLpResult? = record.solve(delegate) {
                 if (gatedSolveDeclines) null else delegate.resolveGated(enforced)

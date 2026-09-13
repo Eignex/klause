@@ -34,6 +34,7 @@ import com.eignex.klause.lp.engine.LpCertificationPolicy
 import com.eignex.klause.lp.engine.LpCertifier
 import com.eignex.klause.lp.engine.LpEngineFactory
 import com.eignex.klause.lp.engine.LpExactState
+import com.eignex.klause.lp.engine.LpFloatAllowance
 import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.LpNeighborhood
 import com.eignex.klause.lp.engine.LpPricingOptions
@@ -225,9 +226,9 @@ private class RecordingPersistentSolver(
         return persistent.rebind(next, token)
     }
 
-    override fun resolveBounds(): FloatLpResult? {
+    override fun resolveBounds(allowance: LpFloatAllowance?): FloatLpResult? {
         calls += DeclineCall.RESOLVE_BOUNDS
-        return persistent.resolveBounds()
+        return persistent.resolveBounds(allowance)
     }
 
     override fun resolveGated(enforced: BooleanArray): FloatLpResult? {

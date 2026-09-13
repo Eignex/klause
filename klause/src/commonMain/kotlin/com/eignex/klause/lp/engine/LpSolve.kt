@@ -1,5 +1,6 @@
 package com.eignex.klause.lp.engine
 
+import com.eignex.klause.simplex.basis.RationalBasisLimits
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.BigRationalConflict
 import com.eignex.klause.simplex.exact.ContinuationDecline
@@ -10,6 +11,8 @@ import com.eignex.klause.simplex.exact.RationalFeasibility
 import com.eignex.klause.simplex.exact.rationalOutcome
 import com.eignex.klause.util.Cancellation
 import com.ionspin.kotlin.bignum.integer.BigInteger
+import kotlin.time.Duration
+import kotlin.time.TimeSource
 
 // Bounds and witnesses remain independently available even when neither proves attainment.
 internal enum class LpVerdict { CERTIFIED_BOUND, FEASIBLE, ATTAINED_OPTIMUM, INFEASIBLE, UNBOUNDED, INDETERMINATE }
@@ -48,6 +51,7 @@ internal class CertifiedLpResult(
     val basisVerification: ExactBasisMetrics? = null,
     val continuation: ExactContinuationMetrics? = null,
     val dualization: LpDualizationMetrics? = null,
+    val refinement: LpRefinementMetrics? = null,
 ) {
     val verdict: LpVerdict = when {
         farkasRay != null || rationalConflict != null || boundConflict != null -> LpVerdict.INFEASIBLE
@@ -75,6 +79,7 @@ internal fun solveAndCertify(
     counterResults: LpCounterResults? = null,
     pricing: LpPricingOptions = LpPricingOptions(),
     observer: LpCertificationObserver? = null,
+    refinementLimits: LpRefinementLimits = LpRefinementLimits(),
 ): CertifiedLpResult {
     val state = LpExactState(model)
     val working = state.toWorkingModel()
@@ -114,6 +119,7 @@ internal fun solveAndCertify(
         context = context,
         counterResults = counterResults,
         pricing = pricing,
+        refinementLimits = refinementLimits,
     )
     if (dualization == null) return solved
     val mapped = certifyDualizedSource(working, dualization, context.certificationPolicy, cancellation)
@@ -135,7 +141,7 @@ internal fun solveAndCertify(
     return CertifiedLpResult(
         solved.float, bound, witness, solved.farkasRay, solved.rationalConflict, working.hasIntegralObjective(),
         { solved.safeLowerBound }, solved.unboundedness, solved.boundConflict, solved.conflictSupport,
-        solved.reconstruction, solved.basisVerification, solved.continuation, dualization.metrics,
+        solved.reconstruction, solved.basisVerification, solved.continuation, dualization.metrics, solved.refinement,
     )
 }
 
@@ -149,6 +155,7 @@ internal fun solveAndCertify(
     context: LpSolveContext = LpSolveContext.Production,
     counterResults: LpCounterResults? = null,
     pricing: LpPricingOptions = LpPricingOptions(),
+    refinementLimits: LpRefinementLimits = LpRefinementLimits(),
 ): CertifiedLpResult = newLpSolver(
     model,
     cancellation,
@@ -161,7 +168,23 @@ internal fun solveAndCertify(
     } finally {
         observer?.observeSolve(solver.lastMetrics, solver is ComponentLpSolverCapability)
     }
-    certifyLpResult(model, solver, result, cancellation, observer, context.certificationPolicy, counterResults)
+    val state = model.exactState
+    if (state == null || solver is ComponentLpSolverCapability) {
+        certifyLpResult(model, solver, result, cancellation, observer, context.certificationPolicy, counterResults)
+    } else {
+        LpScopedSolver(state, cancellation, context, pricing = pricing).use { anchor ->
+            certifyLpResult(
+                model,
+                solver,
+                result,
+                cancellation,
+                observer,
+                context.certificationPolicy,
+                counterResults,
+                refinement = LpRefinementRequest(anchor, anchor.refinementCache, refinementLimits),
+            )
+        }
+    }
 }
 
 internal fun certifyLpResult(
@@ -175,10 +198,14 @@ internal fun certifyLpResult(
     continuationCache: LpExactContinuationCache = LpExactContinuationCache(),
     continuationLimits: ExactContinuationLimits = ExactContinuationLimits(),
     fullContinuation: Boolean = true,
+    refinement: LpRefinementRequest? = null,
 ): CertifiedLpResult {
+    val certificationStarted = refinement?.let { TimeSource.Monotonic.markNow() }
     if (!model.finiteExactInput()) return CertifiedLpResult(null, null, null, null, null, false, { null })
     val state = model.exactState
     var capturedTarget: LpContinuationTarget? = null
+    var earlyContinuation: LpContinuationVerification? = null
+    var earlyWitness: ExactLpWitness? = null
     fun continuationTarget(): LpContinuationTarget = capturedTarget ?: captureContinuationTarget(
         model,
         solver,
@@ -221,7 +248,12 @@ internal fun certifyLpResult(
         if (result != null && (solver.solvedExactState !== state || result.exactState !== state)) {
             return CertifiedLpResult(null, null, null, null, null, false, { null })
         }
-        if (solver.solvedExactState !== state) {
+        if (solver.solvedExactState !== state &&
+            (
+                refinement?.source?.state !== state ||
+                    (solver.recessionDirection == null && continuationTarget().basis != null)
+                )
+        ) {
             val continued = continueExactLp(
                 model,
                 continuationTarget().basis,
@@ -235,10 +267,24 @@ internal fun certifyLpResult(
             val accepted = policy.acceptNullable(LpCertifier.RATIONAL, continued.takeIf { it.metrics.success })
             val point = accepted?.witness?.let { policy.acceptNullable(LpCertifier.EXACT_BASIS, it) }
             val refutation = accepted?.conflict?.let { policy.acceptNullable(LpCertifier.EXACT_FARKAS, it) }
-            return CertifiedLpResult(
-                null, null, point, null, refutation, model.hasIntegralObjective(), { null },
-                conflictSupport = continued.support.takeIf { refutation != null }, continuation = continued.metrics,
-            )
+            val boxedObjective = (0 until state.model.numVars).all { j ->
+                val column = state.model.column(j)
+                when (state.model.objective.cost(j).value.signum()) {
+                    1 -> column.bounds.lower != null
+                    -1 -> column.bounds.upper != null
+                    else -> true
+                }
+            }
+            if ((continued.metrics.success && (point == null || boxedObjective)) ||
+                refinement?.source?.state !== state
+            ) {
+                return CertifiedLpResult(
+                    null, null, point, null, refutation, model.hasIntegralObjective(), { null },
+                    conflictSupport = continued.support.takeIf { refutation != null }, continuation = continued.metrics,
+                )
+            }
+            earlyContinuation = continued
+            earlyWitness = point
         }
     }
     val remembered = counterResults?.read(model, policy)
@@ -246,13 +292,81 @@ internal fun certifyLpResult(
     var bound = result?.let { certifyLpBound(model, it.duals, observer, policy) }
         ?: result?.let { component?.exactBound(observer, policy) }
         ?: remembered?.bound
-    var witness = remembered?.witness
+    var witness = remembered?.witness ?: earlyWitness
     var ray: LongArray? = null
     var conflict: BigRationalConflict? = null
     var reconstruction: ReconstructedCertificate? = null
     var exactBasis: ExactBasisVerification? = null
-    var continued: LpContinuationVerification? = null
-    if (result != null && (witness == null || bound?.value != witness.objective) && !cancellation()) {
+    var continued: LpContinuationVerification? = earlyContinuation
+    var refined: LpRefinementResult? = null
+    var numericalWitness = earlyContinuation?.witness ?: witness
+    var numericalBound = bound
+    var numericalConflict: BigRationalConflict? = null
+    var withheldWitness = false
+    var withheldBound = false
+    var withheldConflict = false
+    var pointAttempted = false
+    fun refine() {
+        if (refinement == null || state == null || cancellation()) return
+        if (result == null) {
+            val decline = continuationTarget().metrics.decline
+            if (decline != null && decline != ContinuationDecline.NO_BASIS) return
+        }
+        val recovered = refineLp(
+            model, refinement, result?.primal, result?.duals,
+            result?.basis ?: continuationTarget().basis, numericalWitness, cancellation,
+            directWork = (reconstruction?.metrics?.work ?: 0L) + (exactBasis?.metrics?.work ?: 0L) +
+                (capturedTarget?.metrics?.work ?: 0L),
+            directAllocation = (reconstruction?.metrics?.allocation ?: 0L) + (exactBasis?.metrics?.allocation ?: 0L) +
+                (capturedTarget?.metrics?.allocation ?: 0L),
+            needPoint = numericalWitness == null, direction = solver.recessionDirection,
+            directElapsed = certificationStarted?.elapsedNow() ?: Duration.ZERO,
+            reconstructInitial = reconstruction == null,
+            preferBasis = result != null && policy === ProductionLpCertificationPolicy,
+            preferredBasisCache = solver.exactBasisCache.takeIf {
+                result != null && policy === ProductionLpCertificationPolicy
+            },
+        )
+        refined = recovered
+        observer?.observe(
+            LpCertifier.RATIONAL,
+            recovered.witness != null || recovered.bound != null ||
+                recovered.conflict != null || recovered.unboundedness != null,
+        )
+        numericalWitness = numericalWitness ?: recovered.witness
+        numericalBound = recovered.bound ?: numericalBound
+        numericalConflict = numericalConflict ?: recovered.conflict
+        if (!withheldWitness && recovered.witness != null) {
+            val point = policy.acceptNullable(LpCertifier.RATIONAL, recovered.witness)?.let {
+                if (recovered.witnessUsesBasis) policy.acceptNullable(LpCertifier.EXACT_BASIS, it) else it
+            }
+            withheldWitness = point == null
+            if (point != null && (
+                    witness == null || point.objective < requireNotNull(
+                        witness,
+                    ).objective
+                    )
+            ) {
+                witness = point
+            }
+        }
+        if (!withheldBound && recovered.bound != null) {
+            val stronger = policy.acceptNullable(LpCertifier.RATIONAL, recovered.bound)?.let {
+                if (recovered.boundUsesBasis) policy.acceptNullable(LpCertifier.EXACT_BASIS, it) else it
+            }
+            withheldBound = stronger == null
+            if (stronger != null && (bound == null || stronger.value > requireNotNull(bound).value)) bound = stronger
+        }
+        if (!withheldConflict && recovered.conflict != null && numericalWitness == null) {
+            conflict = policy.acceptNullable(LpCertifier.RATIONAL, recovered.conflict)?.let {
+                policy.acceptNullable(LpCertifier.EXACT_FARKAS, it)
+            }?.let {
+                if (recovered.conflictUsesBasis) policy.acceptNullable(LpCertifier.EXACT_BASIS, it) else it
+            }
+            withheldConflict = conflict == null
+        }
+    }
+    if (result != null && (bound?.value != witness?.objective || witness == null) && !cancellation()) {
         reconstruction = reconstructCertificate(
             model,
             result.primal,
@@ -261,15 +375,35 @@ internal fun certifyLpResult(
             cancellation = cancellation,
         )
         observer?.observe(LpCertifier.RATIONAL, reconstruction.witness != null || reconstruction.bound != null)
+        numericalWitness = reconstruction.witness ?: numericalWitness
+        numericalBound = reconstruction.bound ?: numericalBound
         val point = policy.acceptNullable(LpCertifier.RATIONAL, reconstruction.witness)
-        if (point != null && (witness == null || point.objective < witness.objective)) witness = point
+        if (point != null && (witness == null || point.objective < requireNotNull(witness).objective)) witness = point
         val stronger = policy.acceptNullable(LpCertifier.RATIONAL, reconstruction.bound)
-        if (stronger != null && (bound == null || stronger.value > bound.value)) bound = stronger
+        if (stronger != null && (bound == null || stronger.value > requireNotNull(bound).value)) bound = stronger
     }
     if (result != null && witness == null && !cancellation()) {
         witness = component?.exactWitness(observer, policy, cancellation)
+        numericalWitness = witness ?: numericalWitness
     }
-    if (result != null && (witness == null || bound?.value != witness.objective) && !cancellation()) {
+    if (result != null && numericalWitness == null && refinement != null &&
+        model.m > RationalBasisLimits().dimension && policy === ProductionLpCertificationPolicy && !cancellation()
+    ) {
+        pointAttempted = true
+        val point = exactPointWitness(model, result.primal, observer)
+        numericalWitness = point
+        witness = point
+    }
+    if (result != null && (numericalWitness == null || numericalBound?.value != numericalWitness?.objective) &&
+        !cancellation()
+    ) {
+        refine()
+    }
+    val legacyBasis = refined == null || refined.metrics.decline == LpRefinementDecline.DISABLED ||
+        refined.metrics.decline == LpRefinementDecline.AUTHORITY
+    if (result != null && legacyBasis &&
+        (witness == null || bound?.value != witness.objective) && !cancellation()
+    ) {
         val checked = verifyExactBasis(
             model,
             result.basis,
@@ -282,20 +416,25 @@ internal fun certifyLpResult(
             continuationTarget()
             solver.rejectSingularBasis(model, result.basis)
         }
-        val point = policy.acceptNullable(LpCertifier.EXACT_BASIS, checked.witness)
-        if (point != null && (witness == null || point.objective < witness.objective)) witness = point
-        val basisBound = policy.acceptNullable(LpCertifier.EXACT_BASIS, checked.bound)
+        numericalWitness = checked.witness ?: numericalWitness
+        numericalBound = checked.bound ?: numericalBound
+        val point = if (withheldWitness) null else policy.acceptNullable(LpCertifier.EXACT_BASIS, checked.witness)
+        if (point != null && (witness == null || point.objective < requireNotNull(witness).objective)) witness = point
+        val basisBound = if (withheldBound) null else policy.acceptNullable(LpCertifier.EXACT_BASIS, checked.bound)
         val stronger = policy.acceptNullable(LpCertifier.RATIONAL, basisBound)
-        if (stronger != null && (bound == null || stronger.value > bound.value)) bound = stronger
+        if (stronger != null && (bound == null || stronger.value > requireNotNull(bound).value)) bound = stronger
     }
-    if (result != null && witness == null && !cancellation()) {
-        witness = policy.acceptNullable(LpCertifier.EXACT_POINT, exactPointWitness(model, result.primal, observer))
+    if (result != null && witness == null && !pointAttempted && !withheldWitness && !cancellation()) {
+        val point = exactPointWitness(model, result.primal, observer)
+        numericalWitness = point ?: numericalWitness
+        witness = policy.acceptNullable(LpCertifier.EXACT_POINT, point)
     }
     // An independently checked point refutes infeasibility; rejecting a ray candidate does not.
-    if (result == null && witness == null) {
+    if (result == null && numericalWitness == null) {
         if (state != null) {
             conflict = solver.infeasibleRay?.let { exactStateConflict(model, it) }
             observer?.observe(LpCertifier.EXACT_FARKAS, conflict != null)
+            numericalConflict = conflict
             conflict = policy.acceptNullable(LpCertifier.EXACT_FARKAS, conflict)
         } else {
             ray = solver.infeasibleRay?.let {
@@ -310,14 +449,19 @@ internal fun certifyLpResult(
             }
         }
     }
-    if (result == null && witness == null && ray == null && conflict == null && !cancellation()) {
+    if (result == null && numericalWitness == null && ray == null && conflict == null &&
+        !cancellation()
+    ) {
         solver.infeasibleRay?.let { candidate ->
             reconstruction = reconstructCertificate(model, ray = candidate, cancellation = cancellation)
             observer?.observe(LpCertifier.RATIONAL, reconstruction.conflict != null)
+            numericalConflict = reconstruction.conflict
             conflict = policy.acceptNullable(LpCertifier.RATIONAL, reconstruction.conflict)
         }
     }
-    if (result == null && witness == null && ray == null && conflict == null && !cancellation()) {
+    if (result == null && numericalWitness == null && ray == null && conflict == null &&
+        !cancellation()
+    ) {
         solver.infeasibleBasis?.let { basis ->
             val checked = verifyExactBasis(
                 model,
@@ -332,12 +476,18 @@ internal fun certifyLpResult(
                 continuationTarget()
                 solver.rejectSingularBasis(model, basis)
             }
-            conflict = policy.acceptNullable(LpCertifier.EXACT_FARKAS, checked.conflict)
+            numericalConflict = checked.conflict
+            conflict = if (withheldConflict) null else policy.acceptNullable(LpCertifier.EXACT_FARKAS, checked.conflict)
             if (conflict != null && state == null) ray = checked.integerRay
         }
     }
-    if (witness == null && ray == null && conflict == null &&
-        (state != null || result == null || model.hasContinuous)
+    if (result == null && (numericalWitness == null || numericalBound == null) &&
+        ray == null && numericalConflict == null && conflict == null && !cancellation()
+    ) {
+        refine()
+    }
+    if (continued == null && witness == null && !withheldWitness && !withheldConflict &&
+        ray == null && conflict == null && (state != null || result == null || model.hasContinuous)
     ) {
         continued = continueExactLp(
             model,
@@ -350,6 +500,8 @@ internal fun certifyLpResult(
         )
         observer?.observeContinuation(continued.metrics)
         observer?.observe(LpCertifier.RATIONAL, continued.metrics.success)
+        numericalWitness = continued.witness
+        numericalConflict = continued.conflict
         val accepted = policy.acceptNullable(LpCertifier.RATIONAL, continued.takeIf { it.metrics.success })
         witness = accepted?.witness?.let { policy.acceptNullable(LpCertifier.EXACT_BASIS, it) }
         conflict = accepted?.conflict?.let { policy.acceptNullable(LpCertifier.EXACT_FARKAS, it) }
@@ -357,7 +509,7 @@ internal fun certifyLpResult(
     // Legacy owners without current targets and strict margins retain their migration fallback.
     if (state == null && continued?.metrics?.success != true &&
         (model.rowStrict.any { it } || continued?.metrics?.decline == ContinuationDecline.NO_BASIS) &&
-        witness == null && ray == null && conflict == null &&
+        witness == null && !withheldWitness && !withheldConflict && ray == null && conflict == null &&
         (result == null || model.hasContinuous)
     ) {
         val outcome = if (cancellation()) null else rationalOutcome(model, cancellation)
@@ -386,12 +538,33 @@ internal fun certifyLpResult(
         }
     }
     if (ray != null || conflict != null) bound = null
-    val unboundedness = if (bound == null && witness != null) {
-        solver.recessionDirection?.let { direction ->
-            policy.acceptNullable(LpCertifier.EXACT_POINT, checkedLpUnboundedness(model, witness, direction))
+    val unboundedness = if (bound == null && witness != null && !withheldWitness) {
+        if (refined?.unboundedness != null) {
+            policy.acceptNullable(LpCertifier.RATIONAL, refined.unboundedness)?.let {
+                if (refined.unboundednessUsesBasis) policy.acceptNullable(LpCertifier.EXACT_BASIS, it) else it
+            }
+        } else {
+            solver.recessionDirection?.let { direction ->
+                policy.acceptNullable(
+                    LpCertifier.EXACT_POINT,
+                    checkedLpUnboundedness(model, requireNotNull(witness), direction),
+                )
+            }
         }
     } else {
         null
+    }
+    if (refined != null && cancellation()) {
+        return CertifiedLpResult(
+            null,
+            null,
+            null,
+            null,
+            null,
+            false,
+            { null },
+            refinement = refined.metrics,
+        )
     }
     val certified = CertifiedLpResult(
         result,
@@ -428,11 +601,13 @@ internal fun certifyLpResult(
             compute
         } ?: { null },
         unboundedness = unboundedness,
+        refinement = refined?.metrics,
         reconstruction = reconstruction?.metrics,
         basisVerification = exactBasis?.metrics,
         continuation = continued?.metrics ?: capturedTarget?.metrics,
         conflictSupport =
-        continued?.support?.takeIf { conflict === continued.conflict }
+        refined?.support?.takeIf { conflict === refined.conflict }
+            ?: continued?.support?.takeIf { conflict === continued.conflict }
             ?: exactBasis?.conflictSupport?.takeIf { conflict === exactBasis.conflict }
             ?: reconstruction?.conflictSupport?.takeIf { conflict === reconstruction.conflict }
             ?: conflict?.let { proof ->
@@ -678,7 +853,22 @@ internal fun checkedLpUnboundedness(
 ): ExactLpUnboundedness? {
     if (direction.size != model.n || direction.any { !it.isFinite() }) return null
     val point = checkedLpWitness(model, witness.primal) ?: return null
+    val state = model.exactState
+    if (state != null && point.primal.indices.any {
+            state.model.column(it).integral && point.primal[it].den != BigInteger.ONE
+        }
+    ) {
+        return null
+    }
     val ray = direction.map { checkNotNull(BigFraction.ofDouble(it)) }
+    if (state != null && ray.indices.any {
+            state.model.column(
+                it,
+            ).integral && ray[it].den != BigInteger.ONE
+        }
+    ) {
+        return null
+    }
     val slackRay = MutableList(model.m) { BigFraction.ZERO }
     var improvement = BigFraction.ZERO
     for (j in 0 until model.n) {
@@ -691,6 +881,19 @@ internal fun checkedLpUnboundedness(
         if (model.hasFiniteLower(model.slackCol(row)) && slackRay[row].signum() < 0) return null
         if (model.hasFiniteUpper(model.slackCol(row)) && slackRay[row].signum() > 0) return null
         improvement += model.exactCost(model.slackCol(row)) * slackRay[row]
+    }
+    if (state != null) {
+        for (row in slackRay.indices) {
+            if (!state.model.column(model.n + row).integral) continue
+            if (slackRay[row].den != BigInteger.ONE) return null
+            var slackPoint = model.exactRhs(row)
+            for (j in point.primal.indices) {
+                model.forEachRationalColumn(j) { i, a ->
+                    if (i == row) slackPoint -= a * (point.primal[j] - model.exactShift(j))
+                }
+            }
+            if (slackPoint.den != BigInteger.ONE) return null
+        }
     }
     return if (improvement.signum() < 0) ExactLpUnboundedness(point, ray) else null
 }

@@ -226,6 +226,12 @@ internal interface TableauCutSolver : LpSolver {
     fun mirCuts(maxCuts: Int): List<Cut>
 }
 
+internal data class LpFloatAllowance(val work: Long, val iterations: Int) {
+    init {
+        require(work >= 0L && iterations >= 0)
+    }
+}
+
 /**
  * An [LpSolver] a caller keeps across many solves, re-pointing one instance at a successor model rather
  * than building a fresh engine for it. The basis and its factorization — the expensive half of a solve —
@@ -267,8 +273,11 @@ internal interface PersistentLpSolver : LpSolver {
      */
     fun rebind(next: LpModel, token: Cancellation): Boolean
 
-    /** Re-solve after a [rebind], continuing from the kept basis and factorization. */
-    fun resolveBounds(): FloatLpResult?
+    /**
+     * Re-solve with retained factors. Null [allowance] uses construction limits; explicit zero work
+     * is unbounded and zero iterations uses the size-derived limit. Neither zero means exhausted.
+     */
+    fun resolveBounds(allowance: LpFloatAllowance? = null): FloatLpResult?
 
     /**
      * Re-solve with per-row enforcement, continuing from the kept basis and factorization. A row with

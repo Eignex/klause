@@ -110,6 +110,9 @@ internal class RevisedSimplex(
     private val scalingOptions: LpScalingOptions = LpScalingOptions(),
 ) : TableauCutSolver,
     PersistentLpSolver {
+    private var floatAllowance: LpFloatAllowance? = null
+    private val effectiveWorkLimit: Long get() = floatAllowance?.work ?: workLimit
+    private val effectiveIterationLimit: Int get() = floatAllowance?.iterations ?: iterationLimit
     private val m = model.m
     private val n = model.n
     private val numVars = model.numVars
@@ -1372,9 +1375,15 @@ internal class RevisedSimplex(
     }
 
     /** Re-solve after a [rebind], continuing from the kept basis and factorization. */
-    override fun resolveBounds(): FloatLpResult? {
-        val progress = SolveProgress()
-        return numericalSolve { reset -> solveCore(null, reuse = true, reset = reset, progress = progress) }
+    override fun resolveBounds(allowance: LpFloatAllowance?): FloatLpResult? {
+        val previous = floatAllowance
+        floatAllowance = allowance
+        return try {
+            val progress = SolveProgress()
+            numericalSolve { reset -> solveCore(null, reuse = true, reset = reset, progress = progress) }
+        } finally {
+            floatAllowance = previous
+        }
     }
 
     /** Whether the previous solve terminated with its basis still factorized, so [resolveGated] and
@@ -1582,7 +1591,7 @@ internal class RevisedSimplex(
             return solvePrimalCore(null, reuse = true, reset = false, progress = progress)
         }
         resetGamma() // fresh Devex reference frame for this solve
-        val maxIter = if (iterationLimit > 0) iterationLimit else 50 * (m + numVars) + 200
+        val maxIter = if (effectiveIterationLimit > 0) effectiveIterationLimit else 50 * (m + numVars) + 200
         val rhsAdj = basicRhs
         val beta = dualBeta
         var useCached = kept && model.exactState != null && restoreBasicValues(beta)
@@ -1607,7 +1616,7 @@ internal class RevisedSimplex(
             // Work budget, checked before the iteration that would exceed it. Pivots are not a unit of
             // cost — one costs an order of magnitude more on a dense basis than a sparse one — so a
             // budget stated in work means the same thing on every model, which a pivot count does not.
-            if (workLimit > 0L && work.ops >= workLimit) {
+            if (effectiveWorkLimit > 0L && work.ops >= effectiveWorkLimit) {
                 return if (haveBeta) truncated(beta) else null
             }
             // Cooperative deadline: a pivot updates the factorization in place (cheap), but an unbounded
@@ -1681,7 +1690,7 @@ internal class RevisedSimplex(
                 gamma[r] = trueWeight
                 lastDevexWeightCorrections++
                 if (cancellation()) return if (model.exactState == null) truncated(beta) else null
-                if (workLimit > 0L && work.ops >= workLimit) return truncated(beta)
+                if (effectiveWorkLimit > 0L && work.ops >= effectiveWorkLimit) return truncated(beta)
             }
 
             val y = duals()
@@ -1763,7 +1772,7 @@ internal class RevisedSimplex(
                 if (!progress.dualNumericalRecoveryTried && worst <= FEAS_TOL && solver().updateCount > 0) {
                     progress.dualNumericalRecoveryTried = true
                     if (cancellation()) return if (model.exactState == null) truncated(beta) else null
-                    if (workLimit > 0L && work.ops >= workLimit) return truncated(beta)
+                    if (effectiveWorkLimit > 0L && work.ops >= effectiveWorkLimit) return truncated(beta)
                     when (refactorize(LpRefactorReason.NUMERICAL_RECOVERY)) {
                         RefactorResult.UNCHANGED -> Unit
                         RefactorResult.BASIS_CHANGED -> return restartDual(enforced, progress)
@@ -2213,7 +2222,8 @@ internal class RevisedSimplex(
         lastTheoryPricingWorkOps += amount
     }
 
-    private fun pricingResourceStopped(): Boolean = cancellation() || (workLimit > 0L && work.ops >= workLimit)
+    private fun pricingResourceStopped(): Boolean =
+        cancellation() || (effectiveWorkLimit > 0L && work.ops >= effectiveWorkLimit)
 
     private fun candidateOrderingWork(size: Int): Long {
         var levels = 0
@@ -2470,14 +2480,14 @@ internal class RevisedSimplex(
     @Suppress("CyclomaticComplexMethod", "NestedBlockDepth", "ReturnCount", "LongMethod")
     private fun primalPhase1(progress: SolveProgress): IterationResult {
         val beta = basicValues(phaseOneBeta)
-        if (workLimit > 0L && work.ops >= workLimit) return IterationResult.FAILED
+        if (effectiveWorkLimit > 0L && work.ops >= effectiveWorkLimit) return IterationResult.FAILED
         val gamma = phaseOneGradient
         val pi = phaseOneDuals
         val alphaBuf = alphaValues
-        val maxIter = if (iterationLimit > 0) iterationLimit else 50 * (m + numVars) + 200
+        val maxIter = if (effectiveIterationLimit > 0) effectiveIterationLimit else 50 * (m + numVars) + 200
         while (progress.primalIterations < maxIter) {
             val iteration = progress.primalIterations++
-            if (workLimit > 0L && work.ops >= workLimit) return IterationResult.FAILED
+            if (effectiveWorkLimit > 0L && work.ops >= effectiveWorkLimit) return IterationResult.FAILED
             if (iteration % CANCEL_POLL == 0 && cancellation()) return IterationResult.FAILED
             var w = 0.0
             for (i in 0 until m) {
@@ -2634,7 +2644,7 @@ internal class RevisedSimplex(
         }
         if (model.exactState != null) repairNonbasicStatuses()
         val beta = basicValues(primalBeta)
-        if (workLimit > 0L && work.ops >= workLimit) return null
+        if (effectiveWorkLimit > 0L && work.ops >= effectiveWorkLimit) return null
         when (refactorAtQualitySafePoint()) {
             null -> Unit
             RefactorResult.UNCHANGED -> return restartPrimal(progress)
@@ -2651,12 +2661,12 @@ internal class RevisedSimplex(
             basicValues(beta)
             if (!primalFeasible(beta)) return null // phase-1 could not reach feasibility
         }
-        val maxIter = if (iterationLimit > 0) iterationLimit else 50 * (m + numVars) + 200
+        val maxIter = if (effectiveIterationLimit > 0) effectiveIterationLimit else 50 * (m + numVars) + 200
         val blandStall = 2 * (m + numVars) + BLAND_STALL_BASE
         val alphaBuf = alphaValues
         while (progress.primalIterations < maxIter) {
             val iteration = progress.primalIterations++
-            if (workLimit > 0L && work.ops >= workLimit) return null
+            if (effectiveWorkLimit > 0L && work.ops >= effectiveWorkLimit) return null
             if (iteration % CANCEL_POLL == 0 && cancellation()) return null
             // Bland's rule once degenerate pivots pile up: lowest-index entering, lowest-variable leaving
             // tie-break. Guarantees termination on a degenerate LP that the Dantzig rule could cycle on.

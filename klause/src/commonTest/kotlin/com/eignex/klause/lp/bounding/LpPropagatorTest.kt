@@ -12,6 +12,7 @@ import com.eignex.klause.lp.engine.ExactLpSide
 import com.eignex.klause.lp.engine.FloatLpResult
 import com.eignex.klause.lp.engine.LpEngineFactory
 import com.eignex.klause.lp.engine.LpExactState
+import com.eignex.klause.lp.engine.LpFloatAllowance
 import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.LpPricingOptions
 import com.eignex.klause.lp.engine.LpScopedRow
@@ -351,9 +352,9 @@ class LpPropagatorTest {
                     pricing,
                 )
                 return object : PersistentLpSolver by delegate {
-                    override fun resolveBounds(): FloatLpResult? {
+                    override fun resolveBounds(allowance: LpFloatAllowance?): FloatLpResult? {
                         if (fail) throw primary
-                        return delegate.resolveBounds()
+                        return delegate.resolveBounds(allowance)
                     }
                     override fun close() {
                         closes++

@@ -16,6 +16,7 @@ import com.eignex.klause.ir.Term
 import com.eignex.klause.lp.engine.FloatLpResult
 import com.eignex.klause.lp.engine.LpCertificationPolicy
 import com.eignex.klause.lp.engine.LpEngineFactory
+import com.eignex.klause.lp.engine.LpFloatAllowance
 import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.LpPricingOptions
 import com.eignex.klause.lp.engine.LpSolveContext
@@ -627,9 +628,9 @@ class LiveLpTheoryTest {
                         pricing,
                     )
                     return object : PersistentLpSolver by delegate {
-                        override fun resolveBounds(): FloatLpResult? {
+                        override fun resolveBounds(allowance: LpFloatAllowance?): FloatLpResult? {
                             if (scenario == "exception") error("injected source solve failure")
-                            return delegate.resolveBounds()
+                            return delegate.resolveBounds(allowance)
                         }
 
                         override fun close() {
@@ -707,7 +708,9 @@ class LiveLpTheoryTest {
                     pricing,
                 )
                 return object : PersistentLpSolver by delegate {
-                    override fun resolveBounds(): FloatLpResult? = delegate.resolveBounds().also { stopped = true }
+                    override fun resolveBounds(allowance: LpFloatAllowance?): FloatLpResult? = delegate.resolveBounds(
+                        allowance,
+                    ).also { stopped = true }
                     override fun close() {
                         closed++
                         delegate.close()
