@@ -544,7 +544,7 @@ internal fun LpEngine.sparseSafePrune(
         }
         return LpNodeOutcome(false, null)
     }
-    sink.lp.observeLuFill(result.luMaxFill, result.luMaxDensity)
+    sink.lp.observeLuFill(result.luMaxFill, result.luMaxDensity, result.luMaxDim)
     // LP-guided branching: record the fractional primal + reduced costs so the descent can order
     // branch values toward the LP point and pick reduced-cost-impactful fractional variables. Purely
     // advisory — it never changes feasibility or the optimum.

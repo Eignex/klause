@@ -40,6 +40,9 @@ internal class FloatLpResult(
     val luMaxFill: Double = 0.0,
     /** Max factor density `(nnz of the factors)/m²` — approaching 1.0 means they filled in to dense. */
     val luMaxDensity: Double = 0.0,
+    /** Basis dimension `m` at which [luMaxDensity] was observed — density alone hides whether the
+     *  dense basis was tiny or large. */
+    val luMaxDim: Int = 0,
     /** Column components this solve decomposed into ([ComponentLpSolver]); 1 for a monolithic solve. */
     val blocks: Int = 1,
     /** Whether the solve started from a prior basis rather than the slack cold start. A warm basis saves
@@ -235,6 +238,7 @@ internal class RevisedSimplex(
     private val work = LpWork()
     private var maxLuFill = 0.0 // max (nnz of the held factors) / nnz(B) over this solve's factorizations
     private var maxLuDensity = 0.0 // max (nnz of the held factors) / m² — 1.0 means the factors are dense
+    private var maxLuDim = 0 // basis dimension m at which maxLuDensity was observed
     private var sourcePrimalResidual = 0.0
     private var sourceBoundViolation = 0.0
     private var sourceBasicDualResidual = 0.0
@@ -627,7 +631,10 @@ internal class RevisedSimplex(
             val fill = held / nnzB
             if (fill > maxLuFill) maxLuFill = fill
             val density = held / (m.toDouble() * m.toDouble())
-            if (density > maxLuDensity) maxLuDensity = density
+            if (density > maxLuDensity) {
+                maxLuDensity = density
+                maxLuDim = m
+            }
         }
         refactorPolicy.recordFactorization(
             solver.nnz,
@@ -1514,6 +1521,7 @@ internal class RevisedSimplex(
         pivots = 0
         maxLuFill = 0.0
         maxLuDensity = 0.0
+        maxLuDim = 0
         sourcePrimalResidual = 0.0
         sourceBoundViolation = 0.0
         sourceBasicDualResidual = 0.0
@@ -2312,6 +2320,7 @@ internal class RevisedSimplex(
             pivots,
             maxLuFill,
             maxLuDensity,
+            luMaxDim = maxLuDim,
             warmStarted = warmStarted,
             refactorizations = refactorizations,
             exactState = model.exactState,
@@ -2401,6 +2410,7 @@ internal class RevisedSimplex(
             pivots,
             maxLuFill,
             maxLuDensity,
+            luMaxDim = maxLuDim,
             warmStarted = warmStarted,
             refactorizations = refactorizations,
             optimal = false,
