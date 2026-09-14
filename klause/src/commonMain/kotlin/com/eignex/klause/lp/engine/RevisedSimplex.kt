@@ -2216,13 +2216,8 @@ internal class RevisedSimplex(
         val solveCharge = nnzB.toLong() + (basisSolver?.updateCount ?: 0).toLong() * m
         addTheoryPricingWork(solveCharge)
         lastTheoryPricingEstimatedFtranWorkOps += solveCharge
-        pricingSpikeVec.clear()
-        val nnz = columnNnz(candidate)
-        addTheoryPricingWork(nnz.toLong())
-        for (entry in colPtr[candidate] until colPtr[candidate + 1]) {
-            val value = colVal[entry]
-            if (value != 0.0) pricingSpikeVec.store(rowIdx[entry], value)
-        }
+        lastTheoryPricingWorkOps += columnNnz(candidate).toLong()
+        scatterColumn(candidate, pricingSpikeVec)
         if (pricingResourceStopped()) return TheoryProbe.ResourceStopped
         val solver = solver()
         val before = operationWork(solver)
