@@ -16,8 +16,8 @@ allprojects {
             mavenContent { snapshotsOnly() }
         }
     }
-    // koblas kernels and the test-only HFactor binding use java.lang.foreign; undeclared, that warns
-    // per run and is set to become an error.
+    // koblas kernels use java.lang.foreign; undeclared, that warns per run and is set to become an
+    // error.
     tasks.withType<Test>().configureEach { jvmArgs(enableNativeAccess) }
     tasks.withType<JavaExec>().configureEach { jvmArgs(enableNativeAccess) }
     pluginManager.withPlugin("application") {

@@ -14,11 +14,11 @@ fun main(args: Array<String>) {
     bean.isThreadAllocatedMemoryEnabled = true
     for (shape in listOf("sparse", "spiked", "dense", "near", "dense16")) {
         for (rebuild in listOf(false, true)) {
-            for (arm in listOf("ft", "eta", "hfactor")) {
+            for (arm in listOf("ft", "eta")) {
                 repeat(if (countsOnly) 0 else 8) { ftMeasure(shape, arm, rebuild, bean) }
             }
             repeat(if (countsOnly) 1 else 3) { repetition ->
-                for (arm in listOf("ft", "eta", "hfactor")) {
+                for (arm in listOf("ft", "eta")) {
                     val report = ftMeasure(shape, arm, rebuild, bean)
                     val fields = if (countsOnly) {
                         report.split(" ").filterNot {
@@ -43,8 +43,7 @@ private fun ftMeasure(shape: String, arm: String, rebuild: Boolean, bean: Thread
     val source = ftSource(if (shape == "dense16") "dense" else shape, n)
     val solver: BasisSolver = when (arm) {
         "ft" -> KotlinBasisSolver(source, updateLimit = 100)
-        "eta" -> BasisEtaReference(source)
-        else -> HfactorBasisSolver(source)
+        else -> BasisEtaReference(source)
     }
     val basis = IntArray(n) { n - 1 - it }
     val buildBefore = bean.getThreadAllocatedBytes(thread)
@@ -125,7 +124,7 @@ private fun ftMeasure(shape: String, arm: String, rebuild: Boolean, bean: Thread
     solver.close()
     check(residual <= if (shape == "near") 1e-8 else 1e-11) { "$shape $arm residual=$residual" }
     return "residual=$residual accepted=24 declined=0 advice=$advice rebuilds=$rebuilds " +
-        "peakFill=$peakFill arithmetic=${if (arm == "hfactor") "unavailable" else arithmetic} " +
+        "peakFill=$peakFill arithmetic=$arithmetic " +
         "updateProducts=$updateProducts copiedEntries=$copiedEntries buildBytes=$buildBytes buildNanos=$buildNanos " +
         "ftranBytes=$ftranBytes ftranNanos=$ftranNanos btranBytes=$btranBytes btranNanos=$btranNanos " +
         "updateBytes=$updateBytes updateNanos=$updateNanos " +

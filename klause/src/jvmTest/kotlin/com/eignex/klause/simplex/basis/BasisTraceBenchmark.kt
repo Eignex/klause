@@ -1,7 +1,6 @@
 package com.eignex.klause.simplex.basis
 
 import com.eignex.koblas.SparseMatrix
-import com.eignex.koblas.sparse.host.hfactor.HfactorSparseLu
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.io.path.extension
@@ -95,22 +94,12 @@ private fun replay(path: Path, benchmark: Boolean) {
     val trace = BasisTraceCodec.read(path)
     val artifactSha = sha256(Files.readAllBytes(path))
     if (!benchmark) {
-        val pair = BasisTraceReplay.replay(trace)
-        println(reportJson("replay", trace, artifactSha, pair.custom, repetitions = 1))
-        println(reportJson("replay", trace, artifactSha, pair.hfactor, repetitions = 1))
+        println(reportJson("replay", trace, artifactSha, BasisTraceReplay.replay(trace), repetitions = 1))
         return
     }
     BasisTraceReplay.replay(trace) // fixed warmup, never reported as a measured repetition
-    val reports = ArrayList<BasisReplayReport>()
-    repeat(3) {
-        val pair = BasisTraceReplay.replay(trace)
-        reports += pair.custom
-        reports += pair.hfactor
-    }
-    for (backend in listOf("custom", "hfactor")) {
-        val arm = reports.filter { it.backend == backend }
-        println(benchmarkJson(trace, artifactSha, arm))
-    }
+    val reports = List(3) { BasisTraceReplay.replay(trace) }
+    println(benchmarkJson(trace, artifactSha, reports))
 }
 
 private fun verifyCorpus(paths: List<Path>) {
@@ -142,10 +131,7 @@ private fun verifyCorpus(paths: List<Path>) {
     } ?: 0
     val mixed = traces.count(::hasMixedBasis)
     val large = traces.count { it.matrix.rows > 16 }
-    val replayErrors = traces.sumOf {
-        val replay = BasisTraceReplay.replay(it)
-        replay.custom.stateErrors + replay.hfactor.stateErrors
-    }
+    val replayErrors = traces.sumOf { BasisTraceReplay.replay(it).stateErrors }
     val failures = buildList {
         if (formats != BasisTraceFormat.entries.toSet()) {
             add("missing-format")
@@ -250,10 +236,8 @@ private fun commonFields(
     "route" to trace.metadata.route.name,
     "captureRevision" to trace.metadata.captureRevision,
     "configuration" to trace.metadata.configuration,
-    "backend" to report.backend,
     "artifactSha256" to artifactSha,
     "koblasArtifactSha256" to artifactHash(SparseMatrix::class.java),
-    "hfactorArtifactSha256" to artifactHash(HfactorSparseLu::class.java),
     "javaRuntime" to System.getProperty("java.runtime.version"),
     "kotlinRuntime" to KotlinVersion.CURRENT.toString(),
     "os" to "${System.getProperty("os.name")}/${System.getProperty("os.arch")}",
@@ -262,9 +246,7 @@ private fun commonFields(
     "nnz" to trace.matrix.entries,
     "density" to trace.matrix.entries.toDouble() / (trace.matrix.rows.toLong() * trace.matrix.columns),
     "repetitions" to repetitions,
-    "adapterInclusive" to report.adapterInclusive,
-    "adapterCopyIsolation" to if (report.adapterInclusive) "not-isolated-private-adapter" else "not-applicable",
-    "allocationCoverage" to report.allocationCoverage,
+    "allocationCoverage" to "java-thread",
     "builds" to report.builds,
     "ftrans" to report.ftrans,
     "btrans" to report.btrans,
@@ -294,9 +276,6 @@ private fun commonFields(
     "updateOnlyBytes" to report.timing.updateOnlyBytes.takeIf { timingValid },
     "preparedUpdateBytes" to report.timing.preparedUpdateBytes.takeIf { timingValid },
     "preparedUpdateMode" to "synthetic_prepared",
-    "repair" to "not_comparable",
-    "snapshots" to "not_comparable",
-    "extension" to "not_comparable",
 )
 
 private fun tracePaths(options: Map<String, String>): List<Path> {
