@@ -44,12 +44,12 @@ residual check. The captured trace supplies the factorization outcome and the up
 observed. Both are checked before anything else, so nothing downstream can mask them.
 
 Every accepted update is then rebuilt by a from-scratch Markowitz factorization of the same columns and solved
-through the rebuild, which reaches the basis by a different path than the Forrest-Tomlin chain and catches
-headings that stop describing a solvable system. On the default backend the rebuild shares the factorization
-code with the arm, so it cross-checks the update path rather than the factorization itself. A rebuild that
-declines is reported as `freshDeclines`, not failed: it applies threshold partial pivoting under a bounded
-Markowitz search while an update accepts on an absolute pivot test alone, so the two disagree on badly scaled
-bases by construction.
+through the rebuild. This is a measurement, not a third oracle: it runs only on a basis the residual check has
+already accepted and probes the same right-hand side, so it cannot find an unsolvable basis that check missed.
+It reports `freshRelativeResidual`, the accuracy a from-scratch build reaches on that probe and so a drift
+reference for the Forrest-Tomlin chain, and `freshDeclines`, a conditioning signal. A declining rebuild is
+reported rather than failed: it applies threshold partial pivoting under a bounded Markowitz search while an
+update accepts on an absolute pivot test alone, so the two disagree on badly scaled bases by construction.
 
 `benchmark` performs one warmup and three repetitions. Setup, build/rebuild, FTRAN, BTRAN, update-only,
 preparation-plus-update, composed lifecycle and setup-plus-lifecycle totals are reported separately with

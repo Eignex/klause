@@ -410,7 +410,7 @@ class BasisTraceTest {
             val result = replay(trace)
 
             assertEquals(0, result.stateErrors, fixture)
-            assertEquals(0, result.freshDeclines, fixture)
+            assertEquals(0, result.freshDeclines, "$fixture rebuild declined: the pivot policy moved, not a defect")
             assertTrue(result.acceptedUpdates > 0, fixture)
             assertTrue(result.freshRelativeResidual < 1e-9, fixture)
         }
