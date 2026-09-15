@@ -24,9 +24,6 @@ internal data class BasisReplayTiming(
 )
 
 internal data class BasisReplayReport(
-    val backend: String,
-    val adapterInclusive: Boolean,
-    val allocationCoverage: String,
     val builds: Int,
     val ftrans: Int,
     val btrans: Int,
@@ -44,8 +41,6 @@ internal data class BasisReplayReport(
     val timing: BasisReplayTiming,
 )
 
-internal data class BasisReplayPair(val custom: BasisReplayReport, val hfactor: BasisReplayReport)
-
 internal object BasisTraceReplay {
     private val allocationBean: ThreadMXBean by lazy {
         (ManagementFactory.getThreadMXBean() as ThreadMXBean).also { bean ->
@@ -55,46 +50,26 @@ internal object BasisTraceReplay {
 
     fun replay(
         trace: BasisTrace,
-        customFactory: (SparseMatrix) -> BasisSolver = ::KotlinBasisSolver,
-        referenceFactory: (SparseMatrix) -> BasisSolver = ::HfactorBasisSolver,
+        factory: (SparseMatrix) -> BasisSolver = ::KotlinBasisSolver,
         measureAllocations: Boolean = true,
-    ): BasisReplayPair {
+    ): BasisReplayReport {
         BasisTraceCodec.validate(trace)
         val matrix = trace.matrix.toSparseMatrix()
         val bean = if (measureAllocations) allocationBean else null
-        val custom = newArm("custom", false, matrix, trace, bean, customFactory)
-        var hfactor: Arm? = null
+        val arm = newArm(matrix, trace, bean, factory)
         var primaryFailure: Throwable? = null
         try {
-            val reference = newArm("hfactor", true, matrix, trace, bean, referenceFactory)
-            hfactor = reference
-            for ((index, operation) in trace.operations.withIndex()) {
-                val customErrors = custom.errorCount
-                val hfactorErrors = reference.errorCount
-                custom.apply(index, operation)
-                reference.apply(index, operation)
-                val customFailed = custom.errorCount != customErrors
-                val hfactorFailed = reference.errorCount != hfactorErrors
-                if (customFailed || hfactorFailed) {
-                    if (!customFailed) custom.stopForPeer(index)
-                    if (!hfactorFailed) reference.stopForPeer(index)
-                } else if (operation is BasisTraceOperation.Update && custom.lastAccepted != reference.lastAccepted) {
-                    custom.diverge(index)
-                    reference.diverge(index)
-                }
-            }
-            return BasisReplayPair(custom.report(), reference.report())
+            for ((index, operation) in trace.operations.withIndex()) arm.apply(index, operation)
+            return arm.report()
         } catch (failure: Throwable) {
             primaryFailure = failure
             throw failure
         } finally {
-            closeOwners(primaryFailure, custom, hfactor)
+            closeOwners(primaryFailure, arm)
         }
     }
 
     private fun newArm(
-        name: String,
-        adapter: Boolean,
         matrix: SparseMatrix,
         trace: BasisTrace,
         bean: ThreadMXBean?,
@@ -111,23 +86,25 @@ internal object BasisTraceReplay {
         val nanos = System.nanoTime() - beforeNanos
         val bytes = if (beforeBytes >= 0L) requireNotNull(bean).getThreadAllocatedBytes(thread) - beforeBytes else -1L
         var primaryFailure: Throwable? = null
+        var preparedSolver: BasisSolver? = null
         try {
-            val preparedSolver = factory(matrix)
-            return Arm(name, adapter, matrix, solver, preparedSolver, trace, bean, nanos, bytes)
+            preparedSolver = factory(matrix)
+            // The oracle is deliberately not built through [factory]: a replay that injects a faulty
+            // solver must not be able to corrupt the basis it is checked against.
+            val freshSolver = KotlinBasisSolver(matrix)
+            return Arm(solver, preparedSolver, freshSolver, trace, bean, nanos, bytes)
         } catch (failure: Throwable) {
             primaryFailure = failure
             throw failure
         } finally {
-            if (primaryFailure != null) closeOwners(primaryFailure, solver)
+            if (primaryFailure != null) closeOwners(primaryFailure, solver, preparedSolver)
         }
     }
 
     private class Arm(
-        private val name: String,
-        private val adapter: Boolean,
-        private val matrix: SparseMatrix,
         private val solver: BasisSolver,
         private val preparedSolver: BasisSolver,
+        private val freshSolver: BasisSolver,
         private val trace: BasisTrace,
         private val bean: ThreadMXBean?,
         setupNanos: Long,
@@ -153,9 +130,6 @@ internal object BasisTraceReplay {
         private var stateErrors = 0
         private val errors = ArrayList<String>()
         private val timing = BasisReplayTiming(setupNanos = setupNanos, setupBytes = setupBytes)
-        var lastAccepted: Boolean? = null
-            private set
-        val errorCount: Int get() = stateErrors
 
         fun apply(index: Int, operation: BasisTraceOperation) {
             try {
@@ -174,7 +148,6 @@ internal object BasisTraceReplay {
         private fun factorize(index: Int, operation: BasisTraceOperation.Factorize) {
             checkpoints++
             solved.clear()
-            lastAccepted = null
             val raw = operation.headings.map { headingColumn(it, trace.sourceColumns) }.toIntArray()
             val measured = measure { solver.refactorize(raw) }
             val preparedResult = preparedSolver.refactorize(raw)
@@ -253,7 +226,6 @@ internal object BasisTraceReplay {
             val capturedAccepted = operation.outcome != BasisUpdate.SINGULAR
             val armAccepted = measured.value != BasisUpdate.SINGULAR
             val preparedAccepted = prepared.value != BasisUpdate.SINGULAR
-            lastAccepted = armAccepted
             if (capturedAccepted != armAccepted) {
                 declined++
                 return fail(index, "update acceptance ${measured.value} != captured ${operation.outcome}")
@@ -274,8 +246,26 @@ internal object BasisTraceReplay {
             chainAge++
             maxChainAge = max(maxChainAge, chainAge)
             peakFill = max(peakFill, solver.nnz)
+            checkFreshBasis(index)
             checkBasisResidual(index)
             checkBasisResidual(index, preparedSolver, "synthetic prepared")
+        }
+
+        /**
+         * Rebuilds the updated basis from the source matrix and checks it independently.
+         *
+         * The update chain reaches this basis through Forrest-Tomlin updates; the oracle reaches the
+         * same basis through a from-scratch Markowitz factorization. A basis the chain accepted that
+         * no fresh factorization can build is a defect the captured outcome cannot expose on its own.
+         */
+        private fun checkFreshBasis(index: Int) {
+            val basis = headings ?: return
+            val columns = IntArray(basis.size) { headingColumn(basis[it], trace.sourceColumns) }
+            if (!freshSolver.refactorize(columns)) {
+                fail(index, "fresh factorization rejected a basis the update accepted")
+                return
+            }
+            checkBasisResidual(index, freshSolver, "fresh basis")
         }
 
         private fun prepareUpdate(operation: BasisTraceOperation.Update, entering: Int): Measurement<BasisUpdate> {
@@ -294,14 +284,6 @@ internal object BasisTraceReplay {
                 preparedSolver.update(operation.leavingSlot, entering, spike, pivot)
             }
         }
-
-        fun diverge(index: Int) {
-            fail(index, "cross-backend update divergence")
-            active = false
-            headings = null
-        }
-
-        fun stopForPeer(index: Int) = fail(index, "peer backend failed")
 
         private fun checkBasisResidual(
             operation: Int,
@@ -354,17 +336,13 @@ internal object BasisTraceReplay {
             errors += "operation=$operation $message"
             active = false
             headings = null
-            lastAccepted = null
         }
 
         override fun close() {
-            closeOwners(null, solver, preparedSolver)
+            closeOwners(null, solver, preparedSolver, freshSolver)
         }
 
         fun report() = BasisReplayReport(
-            name,
-            adapter,
-            if (adapter) "java-thread-only;native-heap-excluded" else "java-thread",
             builds,
             ftrans,
             btrans,

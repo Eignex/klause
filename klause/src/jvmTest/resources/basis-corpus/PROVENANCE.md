@@ -26,7 +26,8 @@ state rather than capture it.
 The initial captures used the isolated comparison artifacts retained for basis work: koblas source revision
 `d554656e3715bf1a332c13caadfa4dee641f3a5d`, JVM artifact SHA-256
 `dfe920d31c36229309ea172d0773e1ccf7b593615efe353ed3cc509875503d79`, and HFactor artifact SHA-256
-`1576fb462255c30d3dc0b1758d62fd8b1e35d8851e3e430c789ca61c981d807e`. Gradle resolves both as timestamped
+`1576fb462255c30d3dc0b1758d62fd8b1e35d8851e3e430c789ca61c981d807e`. Gradle resolved both as timestamped
 snapshot `20260909.114713-1` of version `0.1.1-b3-d554656e-SNAPSHOT`. They were consumed through the existing
-isolated repository; no shared snapshot was installed or replaced. Every benchmark result also emits the
-actually resolved artifact hashes when the runtime exposes jar locations.
+isolated repository; no shared snapshot was installed or replaced. The HFactor artifact named here records the
+capture environment; the traces are portable observations and replay does not need it. Every benchmark result
+also emits the actually resolved artifact hashes when the runtime exposes jar locations.

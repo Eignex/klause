@@ -34,21 +34,31 @@ capture or timing.
 ```
 
 `list`, `replay`, `benchmark`, and `verify` use committed fixtures by default and emit one NDJSON record per
-fixture/backend (or one corpus-verification record). Replay rebuilds identical portable headings on the custom
-Kotlin basis and comparison HFactor, recomputes each backend's update preparation on its own current factors,
-and checks `B*x=b` and `B^T*x=b` directly against the stored CSC matrix after builds and updates. A divergence
-stops both arms until the next complete checkpoint.
+fixture (or one corpus-verification record). Replay rebuilds portable headings on the basis under test,
+recomputes update preparation on its own current factors, and checks `B*x=b` and `B^T*x=b` directly against the
+stored CSC matrix after builds and updates. A replay stops at the failing operation and resumes at the next
+complete checkpoint.
 
-`benchmark` performs one warmup and three paired repetitions. Backend setup, build/rebuild, FTRAN, BTRAN,
-update-only, preparation-plus-update, composed lifecycle and setup-plus-lifecycle totals are reported separately
-with median/min/max nanoseconds; setup, individual operations and preparation-plus-update also report Java
-thread allocations. Independent residual checks are outside the timed regions. HFactor times include the
-comparison adapter's carrier copies; its allocation count excludes native heap. The private adapter copy
-component is not subtracted or estimated, and work counters are not compared across backends.
-Preparation-plus-update is labelled `synthetic_prepared`: a shadow basis recomputes the referenced solves and
-applies the update, while shadow setup and checkpoint builds stay outside that metric and the composed lifecycle.
-Repair, snapshots and extension are reported as not comparable because the HFactor adapter does not expose
-equivalent capabilities.
+Three oracles are independent of the basis under test and none of them compares it against a second copy of
+itself. The stored CSC matrix and the tracked headings give the residual check. The captured trace supplies the
+factorization outcome and the update acceptance the real solve observed. Every accepted update is rebuilt by a
+from-scratch Markowitz factorization of the same columns, which reaches the basis by a different path than the
+Forrest-Tomlin chain and contradicts an accepted update that no fresh factorization can build.
+
+`benchmark` performs one warmup and three repetitions. Setup, build/rebuild, FTRAN, BTRAN, update-only,
+preparation-plus-update, composed lifecycle and setup-plus-lifecycle totals are reported separately with
+median/min/max nanoseconds; setup, individual operations and preparation-plus-update also report Java thread
+allocations. The oracle checks are outside the timed regions. Preparation-plus-update is labelled
+`synthetic_prepared`: a shadow basis recomputes the referenced solves and applies the update, while shadow setup
+and checkpoint builds stay outside that metric and the composed lifecycle.
+
+Repair, snapshots and extension are covered by the dedicated engine tests rather than by replay, which drives
+only factorization, FTRAN, BTRAN and updates.
+
+The paired HFactor comparison arm was retired when `koblas-hfactor` was removed, together with its `backend` and
+`hfactorArtifactSha256` record fields and the `lp-wave2-hfactor` campaign runner. `klause-bench/lp-wave2-hfactor.md`
+is kept as the historical measurement record from when that arm existed; the campaign it describes cannot be
+re-run.
 
 Capture is opt-in and bounded to the limits in `basis-corpus/manifest.json`. It records raw matrix/RHS IEEE bits,
 source/unit headings, source mappings, strictness, update evidence and checkpoints; it never stores LU state or

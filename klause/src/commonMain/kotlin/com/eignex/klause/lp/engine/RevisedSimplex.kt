@@ -230,8 +230,8 @@ internal class RevisedSimplex(
      * [smallPivotBails] the pivots abandoned because the spike's pivot entry was below [TOL]. Both
      * paths end a solve without a [FloatLpResult], so a caller reading the result alone sees none of
      * them — which is why they are read off the engine, as [lastPivots] is. They are the measurement
-     * behind two open questions: whether the basis needs scaling, and how often accepting HFactor's
-     * rank-deficiency repair would save a cold start.
+     * behind two open questions: whether the basis needs scaling, and how often repairing a
+     * rank-deficient basis in place would save a cold start.
      */
     private var singularRefactorizations = 0
     private var smallPivotBails = 0

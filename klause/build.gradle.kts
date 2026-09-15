@@ -35,10 +35,6 @@ kotlin {
             implementation("com.eignex:kpermute:1.2.0")
             implementation("com.ionspin.kotlin:bignum:0.3.10")
         }
-        jvmTest.dependencies {
-            // HFactor is an explicit comparison arm; production owns its basis factors on every target.
-            implementation("com.eignex:koblas-hfactor:0.1.1-SNAPSHOT")
-        }
         commonTest.dependencies {
             implementation("org.jetbrains.kotlinx:kotlinx-serialization-core:1.11.0")
             implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")

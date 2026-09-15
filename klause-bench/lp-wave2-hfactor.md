@@ -1,5 +1,13 @@
 # LP Wave 2.4 latest-Koblas HFactor comparison
 
+## Status
+
+Historical record. Every measurement below was collected on 2026-09-11 against the revisions and artifacts named
+under "Compared build", while the HFactor comparison arm still existed. The arm was retired on 2026-09-15 with the
+removal of `koblas-hfactor`, so this campaign cannot be re-run and nothing here has been re-measured since. The
+campaign runner `lp-wave2-hfactor/run.sh` was removed with the arm; `lp-wave2-hfactor-manifest.json` is kept
+unchanged so the manifest hash cited below still resolves.
+
 ## Verdict
 
 **VALID_COMPARISON; WAVE_2_NOT_ESTABLISHED.** All six real-operation traces replayed successfully through the
