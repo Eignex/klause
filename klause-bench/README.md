@@ -39,11 +39,17 @@ recomputes update preparation on its own current factors, and checks `B*x=b` and
 stored CSC matrix after builds and updates. A replay stops at the failing operation and resumes at the next
 complete checkpoint.
 
-Three oracles are independent of the basis under test and none of them compares it against a second copy of
-itself. The stored CSC matrix and the tracked headings give the residual check. The captured trace supplies the
-factorization outcome and the update acceptance the real solve observed. Every accepted update is rebuilt by a
-from-scratch Markowitz factorization of the same columns, which reaches the basis by a different path than the
-Forrest-Tomlin chain and contradicts an accepted update that no fresh factorization can build.
+Two oracles are independent of the basis under test. The stored CSC matrix and the tracked headings give the
+residual check. The captured trace supplies the factorization outcome and the update acceptance the real solve
+observed. Both are checked before anything else, so nothing downstream can mask them.
+
+Every accepted update is then rebuilt by a from-scratch Markowitz factorization of the same columns and solved
+through the rebuild, which reaches the basis by a different path than the Forrest-Tomlin chain and catches
+headings that stop describing a solvable system. On the default backend the rebuild shares the factorization
+code with the arm, so it cross-checks the update path rather than the factorization itself. A rebuild that
+declines is reported as `freshDeclines`, not failed: it applies threshold partial pivoting under a bounded
+Markowitz search while an update accepts on an absolute pivot test alone, so the two disagree on badly scaled
+bases by construction.
 
 `benchmark` performs one warmup and three repetitions. Setup, build/rebuild, FTRAN, BTRAN, update-only,
 preparation-plus-update, composed lifecycle and setup-plus-lifecycle totals are reported separately with

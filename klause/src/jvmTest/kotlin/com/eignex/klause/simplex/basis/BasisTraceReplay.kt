@@ -36,6 +36,8 @@ internal data class BasisReplayReport(
     val absoluteResidual: Double,
     val relativeResidual: Double,
     val residualTolerance: Double,
+    val freshDeclines: Int,
+    val freshRelativeResidual: Double,
     val stateErrors: Int,
     val errors: List<String>,
     val timing: BasisReplayTiming,
@@ -87,17 +89,18 @@ internal object BasisTraceReplay {
         val bytes = if (beforeBytes >= 0L) requireNotNull(bean).getThreadAllocatedBytes(thread) - beforeBytes else -1L
         var primaryFailure: Throwable? = null
         var preparedSolver: BasisSolver? = null
+        var freshSolver: BasisSolver? = null
         try {
             preparedSolver = factory(matrix)
-            // The oracle is deliberately not built through [factory]: a replay that injects a faulty
+            // The rebuild is deliberately not built through [factory]: a replay that injects a faulty
             // solver must not be able to corrupt the basis it is checked against.
-            val freshSolver = KotlinBasisSolver(matrix)
+            freshSolver = KotlinBasisSolver(matrix)
             return Arm(solver, preparedSolver, freshSolver, trace, bean, nanos, bytes)
         } catch (failure: Throwable) {
             primaryFailure = failure
             throw failure
         } finally {
-            if (primaryFailure != null) closeOwners(primaryFailure, solver, preparedSolver)
+            if (primaryFailure != null) closeOwners(primaryFailure, solver, preparedSolver, freshSolver)
         }
     }
 
@@ -127,6 +130,8 @@ internal object BasisTraceReplay {
         private var absoluteResidual = 0.0
         private var relativeResidual = 0.0
         private var residualTolerance = 0.0
+        private var freshDeclines = 0
+        private var freshRelativeResidual = 0.0
         private var stateErrors = 0
         private val errors = ArrayList<String>()
         private val timing = BasisReplayTiming(setupNanos = setupNanos, setupBytes = setupBytes)
@@ -246,26 +251,31 @@ internal object BasisTraceReplay {
             chainAge++
             maxChainAge = max(maxChainAge, chainAge)
             peakFill = max(peakFill, solver.nnz)
-            checkFreshBasis(index)
             checkBasisResidual(index)
             checkBasisResidual(index, preparedSolver, "synthetic prepared")
+            checkFreshBasis(index)
         }
 
         /**
-         * Rebuilds the updated basis from the source matrix and checks it independently.
+         * Rebuilds the updated basis from the source matrix and solves through the rebuild.
          *
-         * The update chain reaches this basis through Forrest-Tomlin updates; the oracle reaches the
-         * same basis through a from-scratch Markowitz factorization. A basis the chain accepted that
-         * no fresh factorization can build is a defect the captured outcome cannot expose on its own.
+         * The update chain reaches this basis through Forrest-Tomlin updates; the rebuild reaches it
+         * through a from-scratch Markowitz factorization, so headings that no longer describe a
+         * solvable system fail here even when the chain's own solves look consistent.
+         *
+         * A rebuild that declines is not a defect and is counted rather than failed. The rebuild
+         * applies threshold partial pivoting under a bounded Markowitz search while [BasisSolver.update]
+         * accepts on an absolute pivot test alone, so the two disagree on badly scaled bases by
+         * construction, and [LuBuildRejection] is a floating-point decline rather than a rank claim.
          */
         private fun checkFreshBasis(index: Int) {
             val basis = headings ?: return
             val columns = IntArray(basis.size) { headingColumn(basis[it], trace.sourceColumns) }
             if (!freshSolver.refactorize(columns)) {
-                fail(index, "fresh factorization rejected a basis the update accepted")
+                freshDeclines++
                 return
             }
-            checkBasisResidual(index, freshSolver, "fresh basis")
+            checkBasisResidual(index, freshSolver, "fresh basis", accumulate = false)
         }
 
         private fun prepareUpdate(operation: BasisTraceOperation.Update, entering: Int): Measurement<BasisUpdate> {
@@ -289,6 +299,7 @@ internal object BasisTraceReplay {
             operation: Int,
             basisSolver: BasisSolver = solver,
             context: String = "observed",
+            accumulate: Boolean = true,
         ) {
             val basis = headings ?: return
             val rhs = DoubleArray(trace.matrix.rows) { row ->
@@ -301,7 +312,7 @@ internal object BasisTraceReplay {
             for (transpose in listOf(false, true)) {
                 val vector = IndexedVector(trace.matrix.rows).also { it.scatter(rhs) }
                 if (transpose) basisSolver.btran(vector, 0.0) else basisSolver.ftran(vector, 0.0)
-                checkResidual(operation, rhs, vector.toDoubleArray(), transpose, basis, context)
+                checkResidual(operation, rhs, vector.toDoubleArray(), transpose, basis, context, accumulate)
             }
         }
 
@@ -312,6 +323,7 @@ internal object BasisTraceReplay {
             transpose: Boolean,
             basis: List<BasisHeading> = requireNotNull(headings),
             context: String = "observed",
+            accumulate: Boolean = true,
         ) {
             if (rhs.any { !it.isFinite() } || solution.any { !it.isFinite() }) {
                 fail(operation, "$context source residual has nonfinite input")
@@ -322,10 +334,14 @@ internal object BasisTraceReplay {
                 fail(operation, "$context source residual is nonfinite")
                 return
             }
-            absoluteResidual = max(absoluteResidual, residual.absolute)
-            relativeResidual = max(relativeResidual, residual.relative)
+            if (accumulate) {
+                absoluteResidual = max(absoluteResidual, residual.absolute)
+                relativeResidual = max(relativeResidual, residual.relative)
+            } else {
+                freshRelativeResidual = max(freshRelativeResidual, residual.relative)
+            }
             val tolerance = RESIDUAL_ABSOLUTE + RESIDUAL_RELATIVE * residual.scale
-            residualTolerance = max(residualTolerance, tolerance)
+            if (accumulate) residualTolerance = max(residualTolerance, tolerance)
             if (residual.absolute > tolerance) {
                 fail(operation, "$context source residual ${residual.absolute} exceeds tolerance")
             }
@@ -355,6 +371,8 @@ internal object BasisTraceReplay {
             absoluteResidual,
             relativeResidual,
             residualTolerance,
+            freshDeclines,
+            freshRelativeResidual,
             stateErrors,
             errors.toList(),
             timing,
