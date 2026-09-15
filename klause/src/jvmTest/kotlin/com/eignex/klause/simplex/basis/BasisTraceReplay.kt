@@ -257,11 +257,14 @@ internal object BasisTraceReplay {
         }
 
         /**
-         * Rebuilds the updated basis from the source matrix and solves through the rebuild.
+         * Measures a from-scratch rebuild of the basis the update chain arrived at.
          *
-         * The update chain reaches this basis through Forrest-Tomlin updates; the rebuild reaches it
-         * through a from-scratch Markowitz factorization, so headings that no longer describe a
-         * solvable system fail here even when the chain's own solves look consistent.
+         * This runs only once the arm's own residual has already accepted the basis, and probes the
+         * same right-hand side, so it is a measurement rather than a third correctness oracle: it
+         * cannot find an unsolvable basis the arm's check missed. What it yields is
+         * [BasisReplayReport.freshRelativeResidual], the accuracy a Markowitz build reaches on that
+         * probe and so a drift reference for the Forrest-Tomlin chain, and
+         * [BasisReplayReport.freshDeclines], a conditioning signal.
          *
          * A rebuild that declines is not a defect and is counted rather than failed. The rebuild
          * applies threshold partial pivoting under a bounded Markowitz search while [BasisSolver.update]
