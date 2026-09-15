@@ -145,7 +145,7 @@ class BasisTraceTest {
     }
 
     @Test
-    fun `replay rejects an accepted update that no fresh factorization can build`() {
+    fun `replay rejects an accepted update that leaves the basis unsolvable`() {
         val fixture = singularUpdateTrace()
 
         val result = replay(fixture) { matrix ->
@@ -163,7 +163,7 @@ class BasisTraceTest {
             }
         }
 
-        assertTrue(result.errors.any { "fresh factorization rejected" in it })
+        assertTrue(result.errors.any { "source residual" in it })
     }
 
     @Test
@@ -402,14 +402,18 @@ class BasisTraceTest {
     }
 
     @Test
-    fun `persisted real corpus trace loads and replays`() {
-        val resource = requireNotNull(javaClass.getResourceAsStream("/basis-corpus/smt-lia-wide-span.kbtrace"))
-        val trace = BasisTraceCodec.decode(resource.use { it.readBytes() })
+    fun `persisted real corpus traces load and replay`() {
+        for (fixture in listOf("smt-lia-wide-span", "mps-afiro")) {
+            val resource = requireNotNull(javaClass.getResourceAsStream("/basis-corpus/$fixture.kbtrace"))
+            val trace = BasisTraceCodec.decode(resource.use { it.readBytes() })
 
-        val result = replay(trace)
+            val result = replay(trace)
 
-        assertEquals(BasisTraceFormat.SMTLIB, trace.metadata.format)
-        assertEquals(0, result.stateErrors)
+            assertEquals(0, result.stateErrors, fixture)
+            assertEquals(0, result.freshDeclines, fixture)
+            assertTrue(result.acceptedUpdates > 0, fixture)
+            assertTrue(result.freshRelativeResidual < 1e-9, fixture)
+        }
     }
 
     @Test

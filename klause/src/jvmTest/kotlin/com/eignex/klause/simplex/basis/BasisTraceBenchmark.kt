@@ -259,6 +259,8 @@ private fun commonFields(
     "absoluteResidual" to report.absoluteResidual,
     "relativeResidual" to report.relativeResidual,
     "residualTolerance" to report.residualTolerance,
+    "freshDeclines" to report.freshDeclines,
+    "freshRelativeResidual" to report.freshRelativeResidual,
     "stateErrors" to report.stateErrors,
     "errors" to report.errors.joinToString(" | "),
     "setupNanos" to report.timing.setupNanos.takeIf { timingValid },
