@@ -3,11 +3,8 @@ package com.eignex.klause.simplex.basis
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.MutableIntDoubleMap
+import com.eignex.klause.util.SparseSlices
 import com.eignex.koblas.SparseMatrix
-import com.eignex.koblas.Workspace
-import com.eignex.koblas.borrow
-import com.eignex.koblas.borrowI32
-import com.eignex.koblas.sparse.SparseSlices
 import kotlin.math.abs
 
 internal data class LuPivotPolicy(
@@ -71,7 +68,7 @@ internal class LuFactors(
     val upperTranspose: SparseMatrix,
 )
 
-internal class BasisFactors(matrix: SparseMatrix, private val workspace: Workspace = Workspace()) {
+internal class BasisFactors(matrix: SparseMatrix, private val workspace: BasisScratch = BasisScratch()) {
     private val source = SparseMatrix.wrap(
         matrix.rows,
         matrix.cols,
@@ -213,7 +210,7 @@ private class LuConstruction(
     private val unitRows: IntArray,
     private val policy: LuPivotPolicy,
     private val proposedOrder: SymbolicLu?,
-    private val workspace: Workspace,
+    private val workspace: BasisScratch,
     buffers: LuBuffers,
 ) {
     private val n = source.rows
@@ -505,7 +502,7 @@ private class LuEntries {
         rowMap: IntArray?,
         columnMap: IntArray?,
         transpose: Boolean = false,
-        workspace: Workspace,
+        workspace: BasisScratch,
     ): SparseMatrix = workspace.borrowI32(size) { row ->
         workspace.borrowI32(size) { column ->
             workspace.borrow(size) { stagedValues ->

@@ -30,7 +30,7 @@ kotlin {
             compileOnly("org.jetbrains.kotlinx:kotlinx-serialization-core:1.11.0")
             implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
             api("com.eignex:skema:0.3.0")
-            implementation("com.eignex:koblas:0.1.1-SNAPSHOT")
+            implementation("com.eignex:koblas:0.1.1-20260918.215912-232")
             implementation("com.eignex:kumulant:0.3.3")
             implementation("com.eignex:kpermute:1.2.0")
             implementation("com.ionspin.kotlin:bignum:0.3.10")
@@ -39,6 +39,19 @@ kotlin {
             implementation("org.jetbrains.kotlinx:kotlinx-serialization-core:1.11.0")
             implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
             implementation("org.jetbrains.kotlinx:kotlinx-serialization-protobuf:1.11.0")
+        }
+    }
+}
+
+// A timestamped KMP root still redirects to mutable platform snapshots. Publish constraints too,
+// so downstream Gradle consumers resolve the same binaries as this build.
+dependencies {
+    constraints {
+        for ((module, build) in mapOf("jvm" to 235, "linuxx64" to 231, "linuxarm64" to 232, "macosarm64" to 240)) {
+            val pinned = "0.1.1-20260918.215912-$build"
+            add("commonMainImplementation", "com.eignex:koblas-$module:$pinned") {
+                version { strictly(pinned) }
+            }
         }
     }
 }

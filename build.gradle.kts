@@ -6,7 +6,12 @@ plugins {
     kotlin("plugin.serialization") version "2.4.10" apply false
 }
 
-val enableNativeAccess = "--enable-native-access=ALL-UNNAMED"
+val koblasJvmArgs = buildList {
+    add("--enable-native-access=ALL-UNNAMED")
+    if (providers.gradleProperty("koblas.noSimd").orNull != "true") {
+        add("--add-modules=jdk.incubator.vector")
+    }
+}
 
 // koblas ships its sparse kernels as a snapshot ahead of the next release; the snapshot endpoint is
 // not part of the conventions' default repository set, so declare it here.
@@ -16,13 +21,12 @@ allprojects {
             mavenContent { snapshotsOnly() }
         }
     }
-    // koblas kernels use java.lang.foreign; undeclared, that warns per run and is set to become an
-    // error.
-    tasks.withType<Test>().configureEach { jvmArgs(enableNativeAccess) }
-    tasks.withType<JavaExec>().configureEach { jvmArgs(enableNativeAccess) }
+    // JVM reductions use the Vector API; installed vendor BLAS uses foreign downcalls.
+    tasks.withType<Test>().configureEach { jvmArgs(koblasJvmArgs) }
+    tasks.withType<JavaExec>().configureEach { jvmArgs(koblasJvmArgs) }
     pluginManager.withPlugin("application") {
         extensions.configure<JavaApplication> {
-            applicationDefaultJvmArgs = applicationDefaultJvmArgs + enableNativeAccess
+            applicationDefaultJvmArgs = applicationDefaultJvmArgs + koblasJvmArgs
         }
     }
     // The CLI dist's start scripts come from the conventions plugin, which assigns its own
@@ -30,7 +34,7 @@ allprojects {
     tasks.withType<CreateStartScripts>().configureEach {
         // Held in a local: referencing the script's own property from the action would put a script
         // object reference in the configuration cache, which cannot be serialized.
-        val extraJvmArg = enableNativeAccess
-        doFirst { defaultJvmOpts = (defaultJvmOpts ?: emptyList()) + extraJvmArg }
+        val extraJvmArgs = koblasJvmArgs
+        doFirst { defaultJvmOpts = ((defaultJvmOpts ?: emptyList()) + extraJvmArgs).distinct() }
     }
 }

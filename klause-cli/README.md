@@ -53,6 +53,18 @@ JAVA_HOME=$(ls -d ~/.gradle/jdks/*-25-*/ | head -1) \
   klause-cli/build/install/klause-cli-jvm/bin/klause-cli [flags] <file>
 ```
 
+The JVM launcher enables `jdk.incubator.vector` for koblas reductions and grants native access for
+installed BLAS libraries. Gradle test and Java execution tasks use the same options. To check the
+portable JVM reductions, use `-Pkoblas.noSimd=true`; a distribution built with that property also
+omits the Vector API option.
+
+The LP basis uses koblas containers, Level 1 kernels and sparse primitives, which work without a
+vendor library. Koblas packages no BLAS binaries. Dense Level 2/3 operations require an installed
+LP64 vendor: Linux selects oneMKL/AOCL on x64 or ArmPL on arm64, falling back to OpenBLAS; macOS
+uses system Accelerate. Selection is immutable and each vendor call uses one compute thread.
+There is no solver backend setting for this. See [dependency integration](../koblas-integration.md)
+for reproducible builds and artifact provenance.
+
 Standalone native executable (no JVM, instant startup, no JDK needed):
 
 ```

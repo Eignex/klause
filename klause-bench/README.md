@@ -43,6 +43,11 @@ Two oracles are independent of the basis under test. The stored CSC matrix and t
 residual check. The captured trace supplies the factorization outcome and the update acceptance the real solve
 observed. Both are checked before anything else, so nothing downstream can mask them.
 
+Replay records the koblas jar hash, kernel selection, and resolved vendor library/version. The selection
+identifies the engine composition, not the implementation of every operation: short and strided Level 1
+calls can use portable kernels. The sparse basis does not call vendor Level 2/3. Run with
+`-Pkoblas.noSimd=true` to check the portable JVM reductions against the same captured observations.
+
 Every accepted update is then rebuilt by a from-scratch Markowitz factorization of the same columns and solved
 through the rebuild. This is a measurement, not a third oracle: it runs only on a basis the residual check has
 already accepted and probes the same right-hand side, so it cannot find an unsolvable basis that check missed.

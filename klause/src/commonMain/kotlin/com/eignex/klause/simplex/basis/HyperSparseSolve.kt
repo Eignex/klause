@@ -1,11 +1,8 @@
 package com.eignex.klause.simplex.basis
 
+import com.eignex.klause.util.SparseSlices
 import com.eignex.klause.util.binarySearchInt
 import com.eignex.koblas.SparseMatrix
-import com.eignex.koblas.Workspace
-import com.eignex.koblas.borrow
-import com.eignex.koblas.borrowI32
-import com.eignex.koblas.sparse.SparseSlices
 
 internal data class TriangularSolveWork(
     val sparse: Boolean,
@@ -16,7 +13,7 @@ internal data class TriangularSolveWork(
 )
 
 // Exclusive scratch storage. Membership survives exact cancellation until clear; no tolerance dropping.
-internal class BasisWorkspace(val size: Int, private val workspace: Workspace = Workspace()) {
+internal class BasisWorkspace(val size: Int, private val workspace: BasisScratch = BasisScratch()) {
     val values = DoubleArray(size)
     val indices = IntArray(size)
     private val marks = IntArray(size)
