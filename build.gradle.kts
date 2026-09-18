@@ -35,6 +35,7 @@ allprojects {
         // Held in a local: referencing the script's own property from the action would put a script
         // object reference in the configuration cache, which cannot be serialized.
         val extraJvmArgs = koblasJvmArgs
+        inputs.property("koblasJvmArgs", extraJvmArgs)
         doFirst { defaultJvmOpts = ((defaultJvmOpts ?: emptyList()) + extraJvmArgs).distinct() }
     }
 }

@@ -70,7 +70,10 @@ class SparseSlicesTest {
 
         assertTrue(values[0].isNaN())
         assertEquals(0.0, values[1])
-        assertEquals(8 or SparseSlices.ARITHMETIC_NONFINITE or SparseSlices.ARITHMETIC_NONZERO_PRODUCT_UNDERFLOW, status[0])
+        assertEquals(
+            8 or SparseSlices.ARITHMETIC_NONFINITE or SparseSlices.ARITHMETIC_NONZERO_PRODUCT_UNDERFLOW,
+            status[0],
+        )
         assertContentEquals(intArrayOf(0, 1), touched)
     }
 
