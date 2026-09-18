@@ -68,7 +68,7 @@ internal class LuFactors(
     val upperTranspose: SparseMatrix,
 )
 
-internal class BasisFactors(matrix: SparseMatrix, private val workspace: BasisScratch = BasisScratch()) {
+internal class BasisFactors(matrix: SparseMatrix) {
     private val source = SparseMatrix.wrap(
         matrix.rows,
         matrix.cols,
@@ -77,6 +77,7 @@ internal class BasisFactors(matrix: SparseMatrix, private val workspace: BasisSc
         matrix.values.copyOf(),
     )
     val dimension: Int = source.rows
+    private val buffers = LuBuffers(dimension)
 
     fun build(basisColumns: IntArray, policy: LuPivotPolicy = LuPivotPolicy()): LuBuildResult =
         build(basisColumns, IntArray(dimension) { -1 }, policy)
@@ -96,82 +97,55 @@ internal class BasisFactors(matrix: SparseMatrix, private val workspace: BasisSc
         }
         val columns = basisColumns.copyOf()
         val units = unitRows.copyOf()
-        return withConstructionBuffers { buffers ->
-            fun attempt(order: SymbolicLu?) =
-                LuConstruction(source, columns, units, policy, order, workspace, buffers).build()
+        fun attempt(order: SymbolicLu?) = LuConstruction(source, columns, units, policy, order, buffers).build()
 
-            val proposal = proposedOrder?.let { copyProposal(it, dimension) }
-            if (proposal != null) {
-                val proposed = attempt(proposal)
-                if (proposed is LuAttemptResult.Built) {
-                    return@withConstructionBuffers proposed.result(
-                        LuBuildReport(true, true, false, null, null, proposed.work),
-                    )
-                }
-                val rejected = proposed as LuAttemptResult.Rejected
-                val fallback = attempt(null)
-                return@withConstructionBuffers fallback.result(
-                    LuBuildReport(
-                        true,
-                        false,
-                        true,
-                        rejected.reason,
-                        rejected.work,
-                        fallback.work,
-                    ),
+        val proposal = proposedOrder?.let { copyProposal(it, dimension) }
+        if (proposal != null) {
+            val proposed = attempt(proposal)
+            if (proposed is LuAttemptResult.Built) {
+                return proposed.result(
+                    LuBuildReport(true, true, false, null, null, proposed.work),
                 )
             }
-            if (proposedOrder != null) {
-                val fallback = attempt(null)
-                return@withConstructionBuffers fallback.result(
-                    LuBuildReport(
-                        true,
-                        false,
-                        true,
-                        LuBuildRejection.NO_USABLE_PIVOT,
-                        EMPTY_LU_BUILD_WORK,
-                        fallback.work,
-                    ),
-                )
-            }
-            val fresh = attempt(null)
-            fresh.result(LuBuildReport(false, false, false, null, null, fresh.work))
+            val rejected = proposed as LuAttemptResult.Rejected
+            val fallback = attempt(null)
+            return fallback.result(
+                LuBuildReport(
+                    true,
+                    false,
+                    true,
+                    rejected.reason,
+                    rejected.work,
+                    fallback.work,
+                ),
+            )
         }
+        if (proposedOrder != null) {
+            val fallback = attempt(null)
+            return fallback.result(
+                LuBuildReport(
+                    true,
+                    false,
+                    true,
+                    LuBuildRejection.NO_USABLE_PIVOT,
+                    EMPTY_LU_BUILD_WORK,
+                    fallback.work,
+                ),
+            )
+        }
+        val fresh = attempt(null)
+        return fresh.result(LuBuildReport(false, false, false, null, null, fresh.work))
     }
-
-    private inline fun <T> withConstructionBuffers(block: (LuBuffers) -> T): T =
-        workspace.borrowI32(dimension) { stagedRows ->
-            workspace.borrow(dimension) { stagedValues ->
-                workspace.borrowI32(dimension) { candidatePositions ->
-                    workspace.borrowI32(dimension) { affectedRows ->
-                        workspace.borrowI32(dimension) { affectedColumns ->
-                            workspace.borrow(dimension) { multipliers ->
-                                block(
-                                    LuBuffers(
-                                        stagedRows,
-                                        stagedValues,
-                                        candidatePositions,
-                                        affectedRows,
-                                        affectedColumns,
-                                        multipliers,
-                                    ),
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-        }
 }
 
-private class LuBuffers(
-    val stagedRows: IntArray,
-    val stagedValues: DoubleArray,
-    val candidatePositions: IntArray,
-    val affectedRows: IntArray,
-    val affectedColumns: IntArray,
-    val multipliers: DoubleArray,
-)
+private class LuBuffers(size: Int) {
+    val stagedRows = IntArray(size)
+    val stagedValues = DoubleArray(size)
+    val candidatePositions = IntArray(size)
+    val affectedRows = IntArray(size)
+    val affectedColumns = IntArray(size)
+    val multipliers = DoubleArray(size)
+}
 
 private val EMPTY_LU_BUILD_WORK = LuBuildWork(0, 0, 0, 0, 0, 0, 0, 0, 0)
 
@@ -210,7 +184,6 @@ private class LuConstruction(
     private val unitRows: IntArray,
     private val policy: LuPivotPolicy,
     private val proposedOrder: SymbolicLu?,
-    private val workspace: BasisScratch,
     buffers: LuBuffers,
 ) {
     private val n = source.rows
@@ -261,10 +234,10 @@ private class LuConstruction(
             pivots++
         }
         val symbolic = SymbolicLu(rowOrder, columnOrder)
-        val l = lower.matrix(n, symbolic.rowPosition, null, workspace = workspace)
-        val u = upper.matrix(n, null, symbolic.columnPosition, workspace = workspace)
-        val lt = lower.matrix(n, symbolic.rowPosition, null, transpose = true, workspace = workspace)
-        val ut = upper.matrix(n, null, symbolic.columnPosition, transpose = true, workspace = workspace)
+        val l = lower.matrix(n, symbolic.rowPosition, null)
+        val u = upper.matrix(n, null, symbolic.columnPosition)
+        val lt = lower.matrix(n, symbolic.rowPosition, null, transpose = true)
+        val ut = upper.matrix(n, null, symbolic.columnPosition, transpose = true)
         return LuAttemptResult.Built(LuFactors(basisColumns, unitRows, symbolic, l, u, lt, ut), work())
     }
 
@@ -497,28 +470,15 @@ private class LuEntries {
         columns.add(column)
     }
 
-    fun matrix(
-        n: Int,
-        rowMap: IntArray?,
-        columnMap: IntArray?,
-        transpose: Boolean = false,
-        workspace: BasisScratch,
-    ): SparseMatrix = workspace.borrowI32(size) { row ->
-        workspace.borrowI32(size) { column ->
-            workspace.borrow(size) { stagedValues ->
-                for (entry in 0 until size) {
-                    row[entry] = rowMap?.get(rows[entry]) ?: rows[entry]
-                    column[entry] = columnMap?.get(columns[entry]) ?: columns[entry]
-                    stagedValues[entry] = values[entry]
-                }
-                SparseMatrix.ofTriplets(
-                    n,
-                    n,
-                    if (transpose) column else row,
-                    if (transpose) row else column,
-                    stagedValues,
-                )
-            }
-        }
+    fun matrix(n: Int, rowMap: IntArray?, columnMap: IntArray?, transpose: Boolean = false): SparseMatrix {
+        val row = IntArray(size) { rowMap?.get(rows[it]) ?: rows[it] }
+        val column = IntArray(size) { columnMap?.get(columns[it]) ?: columns[it] }
+        return SparseMatrix.ofTriplets(
+            n,
+            n,
+            if (transpose) column else row,
+            if (transpose) row else column,
+            values.copyOf(size),
+        )
     }
 }

@@ -65,9 +65,24 @@ class HyperSparseSolveTest {
 
         assertEquals(1, vector.count)
         assertContentEquals(doubleArrayOf(1.0, 0.0, 0.0, 0.0), vector.toDoubleArray())
-        work.clear()
         assertContentEquals(DoubleArray(4), work.values)
         assertEquals(0, work.count)
+    }
+
+    @Test
+    fun `failed output mapping clears workspace for reuse`() {
+        val work = BasisWorkspace(2)
+        val vector = IndexedVector(2)
+        work.set(0, 3.0)
+        work.set(1, 4.0)
+
+        assertFailsWith<IllegalArgumentException> { work.write(vector, intArrayOf(0, 0)) }
+
+        assertContentEquals(DoubleArray(2), work.values)
+        assertEquals(0, work.count)
+        work.set(1, 5.0)
+        work.write(vector)
+        assertContentEquals(doubleArrayOf(0.0, 5.0), vector.toDoubleArray())
     }
 
     @Test

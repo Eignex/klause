@@ -34,11 +34,11 @@ internal class KotlinBasisSolver(
         sourceRows,
         sourceValues,
     )
-    private val workspace = BasisScratch()
-    private val builder = BasisFactors(source, workspace)
+    private val builder = BasisFactors(source)
     override val n = source.rows
-    private val solveWorkspace = BasisWorkspace(n, workspace)
-    private val mapped = BasisWorkspace(n, workspace)
+    private val solveWorkspace = BasisWorkspace(n)
+    private val mapped = BasisWorkspace(n)
+    private val qualityProduct = DoubleArray(n)
     private val identity = Any()
     private val liveSnapshots = mutableSetOf<KotlinBasisSnapshot>()
     private var cache: BasisSolveCache? = null
@@ -225,7 +225,7 @@ internal class KotlinBasisSolver(
                 owner.retainedOrder,
             ) ?: return null
             val result = BasisRepair(repairedColumns, repairedUnits)
-            val installed = BasisSolveCache(final.factors, densityThreshold, workspace)
+            val installed = BasisSolveCache(final.factors, densityThreshold)
             val installedColumns = repairedColumns.copyOf()
             val installedUnits = repairedUnits.copyOf()
             val installedOrder = SymbolicLu(
@@ -497,42 +497,41 @@ internal class KotlinBasisSolver(
         requireOpen()
         checkNotNull(cache) { "basis has no usable factors" }
         require(rhs.size == n && solution.size == n)
-        return workspace.borrow(n) { product ->
-            product.fill(0.0)
-            for (j in 0 until n) {
-                val unitRow = unitRows[j]
-                if (unitRow >= 0) {
-                    if (transpose) product[j] = solution[unitRow] else product[unitRow] += solution[j]
+        val product = qualityProduct
+        product.fill(0.0)
+        for (j in 0 until n) {
+            val unitRow = unitRows[j]
+            if (unitRow >= 0) {
+                if (transpose) product[j] = solution[unitRow] else product[unitRow] += solution[j]
+            } else {
+                val column = columns[j]
+                val start = sourcePointers[column]
+                val count = sourcePointers[column + 1] - start
+                if (transpose) {
+                    product[j] = solution.dot(sourceRows, start, sourceValues, start, count)
                 } else {
-                    val column = columns[j]
-                    val start = sourcePointers[column]
-                    val count = sourcePointers[column + 1] - start
-                    if (transpose) {
-                        product[j] = solution.dot(sourceRows, start, sourceValues, start, count)
-                    } else {
-                        koblas.sparseKernels.axpy(
-                            product,
-                            solution[j],
-                            sourceRows,
-                            start,
-                            sourceValues,
-                            start,
-                            count,
-                        )
-                    }
+                    koblas.sparseKernels.axpy(
+                        product,
+                        solution[j],
+                        sourceRows,
+                        start,
+                        sourceValues,
+                        start,
+                        count,
+                    )
                 }
             }
-            var residual = 0.0
-            var scale = 1.0
-            for (i in 0 until n) {
-                if (!product[i].isFinite() || !rhs[i].isFinite() || !solution[i].isFinite()) {
-                    return@borrow BasisSolveQuality(Double.POSITIVE_INFINITY, Double.POSITIVE_INFINITY)
-                }
-                residual = max(residual, abs(product[i] - rhs[i]))
-                scale = max(scale, max(abs(product[i]), abs(rhs[i])))
-            }
-            BasisSolveQuality(residual, residual / scale)
         }
+        var residual = 0.0
+        var scale = 1.0
+        for (i in 0 until n) {
+            if (!product[i].isFinite() || !rhs[i].isFinite() || !solution[i].isFinite()) {
+                return BasisSolveQuality(Double.POSITIVE_INFINITY, Double.POSITIVE_INFINITY)
+            }
+            residual = max(residual, abs(product[i] - rhs[i]))
+            scale = max(scale, max(abs(product[i]), abs(rhs[i])))
+        }
+        return BasisSolveQuality(residual, residual / scale)
     }
 
     override fun snapshot(): BasisSnapshot? {
@@ -603,7 +602,7 @@ internal class KotlinBasisSolver(
         }
         val units = own.restoreCopyUnits
         val restored = try {
-            BasisSolveCache.restore(state, densityThreshold, workspace)
+            BasisSolveCache.restore(state, densityThreshold)
         } catch (failure: BasisArithmeticException) {
             operationMeter.declineUnknown(BasisOperationKind.RESTORE, units)
             throw failure
@@ -644,7 +643,7 @@ internal class KotlinBasisSolver(
         )
         var transferred = false
         try {
-            val (extended, units) = buildExtendedCache(current, source, state, densityThreshold, target.workspace)
+            val (extended, units) = buildExtendedCache(current, source, state, densityThreshold)
             target.installExtension(extended, state.basisColumns, state.basisUnitRows, units)
             operationMeter.success(
                 BasisOperationKind.EXTENSION,
@@ -688,7 +687,7 @@ internal class KotlinBasisSolver(
     }
 
     private fun install(result: LuBuildResult.Built, columns: IntArray, unitRows: IntArray) {
-        cache = BasisSolveCache(result.factors, densityThreshold, workspace)
+        cache = BasisSolveCache(result.factors, densityThreshold)
         this.columns = columns.copyOf()
         this.unitRows = unitRows.copyOf()
         retainedOrder = SymbolicLu(
@@ -802,8 +801,8 @@ internal class BasisSolveCache private constructor(
     val ft: ForrestTomlinFactors,
     threshold: Double,
 ) {
-    constructor(factors: LuFactors, threshold: Double, workspace: BasisScratch) :
-        this(factors, ForrestTomlinFactors(factors, workspace), threshold)
+    constructor(factors: LuFactors, threshold: Double) :
+        this(factors, ForrestTomlinFactors(factors), threshold)
 
     val lower = HyperSparseSolve(factors.lower, lower = true, unitDiagonal = true, threshold)
     val upper = HyperSparseSolve(ft.upper, lower = false, unitDiagonal = false, threshold)
@@ -813,20 +812,16 @@ internal class BasisSolveCache private constructor(
     fun snapshot() = BasisCacheState(factors.copyOwned(), ft.snapshot())
 
     companion object {
-        fun transfer(
-            factors: LuFactors,
-            state: ForrestTomlinState,
-            threshold: Double,
-            workspace: BasisScratch,
-        ): BasisSolveCache = BasisSolveCache(
-            factors,
-            ForrestTomlinFactors.transfer(factors, state, workspace),
-            threshold,
-        )
+        fun transfer(factors: LuFactors, state: ForrestTomlinState, threshold: Double): BasisSolveCache =
+            BasisSolveCache(
+                factors,
+                ForrestTomlinFactors.transfer(factors, state),
+                threshold,
+            )
 
-        fun restore(state: BasisCacheState, threshold: Double, workspace: BasisScratch): BasisSolveCache {
+        fun restore(state: BasisCacheState, threshold: Double): BasisSolveCache {
             val factors = state.factors.copyOwned()
-            return BasisSolveCache(factors, ForrestTomlinFactors.restore(factors, state.ft, workspace), threshold)
+            return BasisSolveCache(factors, ForrestTomlinFactors.restore(factors, state.ft), threshold)
         }
     }
 }
