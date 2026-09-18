@@ -148,7 +148,6 @@ internal fun buildExtendedCache(
     oldSource: SparseMatrix,
     extension: BasisExtensionState,
     threshold: Double,
-    workspace: BasisScratch,
 ): Pair<BasisSolveCache, Long> {
     val offset = extension.newRows.size
     val oldFactors = old.factors
@@ -211,7 +210,7 @@ internal fun buildExtendedCache(
             copiedEntries,
         ),
     )
-    return BasisSolveCache.transfer(factors, ft, threshold, workspace) to units
+    return BasisSolveCache.transfer(factors, ft, threshold) to units
 }
 
 private fun mappedHeadings(old: IntArray, columnMap: IntArray, oldDimension: Int, extension: Int): IntArray =

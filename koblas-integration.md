@@ -46,7 +46,7 @@ checkout is a separate migration and is not substituted into this build.
 
 | Consumer | Integration contract |
 |---|---|
-| `simplex.basis` | Zero-based sorted unique CSC, owned source/factor copies, explicit stored zeros, retained permutations and snapshots. `BasisScratch` lends exact-size dirty arrays exclusively and returns them in `finally`; retained factors copy before return. |
+| `simplex.basis` | Zero-based sorted unique CSC, owned source/factor copies, explicit stored zeros, retained permutations and snapshots. Each builder owns fixed-size LU scratch; solve-quality checks reuse one dense product buffer. Factor materialization and updates allocate their owned output arrays directly. |
 | Sparse slice workflows | Validate windows, indices, capacity and overlap before mutation. Unique scatter/touched support, first-touch order, structural zeros until explicit compaction, positive-zero clearing. Checked scatter delegates to generic primitives; checked dot preserves scalar input order and underflow/nonfinite diagnostics. |
 | `lp.engine` | Pricing and column updates use indexed kernels; checked workflows retain solver semantics. Scaling/refinement keep guarded powers of two, exact accumulation and source maps. No dense vendor Level 2/3 call is required. |
 | `util.SparseSlices` | Shared validated slice workflows serve the LP engine and basis without adding a solver-layer dependency. Other array/permutation/domain helpers have no koblas consumers. |

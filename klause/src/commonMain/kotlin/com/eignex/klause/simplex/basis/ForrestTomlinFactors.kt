@@ -17,9 +17,8 @@ internal class ForrestTomlinFactors private constructor(
     factors: LuFactors,
     state: ForrestTomlinState?,
     takeOwnership: Boolean,
-    private val workspace: BasisScratch,
 ) {
-    constructor(factors: LuFactors, workspace: BasisScratch = BasisScratch()) : this(factors, null, false, workspace)
+    constructor(factors: LuFactors) : this(factors, null, false)
 
     private val sharedOrder = state?.order?.let { if (takeOwnership) it else it.copyOf() }
     val upper = if (state == null) {
@@ -40,9 +39,9 @@ internal class ForrestTomlinFactors private constructor(
         if (takeOwnership) it.restoreOwned() else it.restore()
     }?.toMutableList() ?: mutableListOf()
     private val n = upper.columns.size
-    private val column = BasisWorkspace(n, workspace)
-    private val row = BasisWorkspace(n, workspace)
-    private val multipliers = BasisWorkspace(n, workspace)
+    private val column = BasisWorkspace(n)
+    private val row = BasisWorkspace(n)
+    private val multipliers = BasisWorkspace(n)
     private val initialEntries = state?.initialEntries ?: factors.upper.nnz
     var upperEntries = state?.upperEntries ?: initialEntries
         private set
@@ -233,27 +232,27 @@ internal class ForrestTomlinFactors private constructor(
         return BasisSlice(indices, values)
     }
 
-    private fun compact(work: BasisWorkspace): BasisSlice = workspace.borrowI32(n) { gatheredIndices ->
-        workspace.borrow(n) { gatheredValues ->
-            val gathered = SparseSlices.gatherTouched(
-                work.indices, 0, work.count, work.values,
-                gatheredIndices, 0, gatheredValues, 0,
-                compactExactZeros = true,
-            )
-            gatheredIndices.sort(0, gathered)
-            BasisSlice(
-                gatheredIndices.copyOf(gathered),
-                DoubleArray(gathered) { work.values[gatheredIndices[it]] },
-            )
+    private fun compact(work: BasisWorkspace): BasisSlice {
+        var count = 0
+        for (k in 0 until work.count) {
+            if (work.values[work.indices[k]] != 0.0) count++
         }
+        val indices = IntArray(count)
+        var out = 0
+        for (k in 0 until work.count) {
+            val i = work.indices[k]
+            if (work.values[i] != 0.0) indices[out++] = i
+        }
+        indices.sort()
+        return BasisSlice(indices, DoubleArray(count) { work.values[indices[it]] })
     }
 
     companion object {
-        fun restore(factors: LuFactors, state: ForrestTomlinState, workspace: BasisScratch): ForrestTomlinFactors =
-            ForrestTomlinFactors(factors, state, false, workspace)
+        fun restore(factors: LuFactors, state: ForrestTomlinState): ForrestTomlinFactors =
+            ForrestTomlinFactors(factors, state, false)
 
-        fun transfer(factors: LuFactors, state: ForrestTomlinState, workspace: BasisScratch): ForrestTomlinFactors =
-            ForrestTomlinFactors(factors, state, true, workspace)
+        fun transfer(factors: LuFactors, state: ForrestTomlinState): ForrestTomlinFactors =
+            ForrestTomlinFactors(factors, state, true)
     }
 }
 

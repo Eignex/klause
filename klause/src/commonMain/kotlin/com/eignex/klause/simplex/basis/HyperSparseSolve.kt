@@ -13,7 +13,7 @@ internal data class TriangularSolveWork(
 )
 
 // Exclusive scratch storage. Membership survives exact cancellation until clear; no tolerance dropping.
-internal class BasisWorkspace(val size: Int, private val workspace: BasisScratch = BasisScratch()) {
+internal class BasisWorkspace(val size: Int) {
     val values = DoubleArray(size)
     val indices = IntArray(size)
     private val marks = IntArray(size)
@@ -62,19 +62,14 @@ internal class BasisWorkspace(val size: Int, private val workspace: BasisScratch
 
     fun write(vector: IndexedVector, order: IntArray? = null) {
         vector.clear()
-        workspace.borrowI32(size) { outIndices ->
-            workspace.borrow(size) { outValues ->
-                val gathered = SparseSlices.gatherClearTouched(
-                    indices, 0, count, values, marks,
-                    outIndices, 0, outValues, 0,
-                    compactExactZeros = true,
-                )
-                count = 0
-                for (k in 0 until gathered) {
-                    val i = outIndices[k]
-                    vector.store(order?.get(i) ?: i, outValues[k])
-                }
+        try {
+            for (k in 0 until count) {
+                val i = indices[k]
+                val value = values[i]
+                if (value != 0.0) vector.store(order?.get(i) ?: i, value)
             }
+        } finally {
+            clear()
         }
     }
 }
