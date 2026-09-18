@@ -1,8 +1,8 @@
 package com.eignex.klause.simplex.basis
 
+import com.eignex.klause.util.SparseSlices
 import com.eignex.koblas.SparseMatrix
 import com.eignex.koblas.koblas
-import com.eignex.koblas.sparse.SparseSlices
 
 // Dense values with unique sparse support. Explicit zeros stay stored until clear; arrays never escape.
 internal class IndexedVector(val size: Int) {

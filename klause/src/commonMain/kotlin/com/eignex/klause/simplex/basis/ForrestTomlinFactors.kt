@@ -1,9 +1,6 @@
 package com.eignex.klause.simplex.basis
 
-import com.eignex.koblas.Workspace
-import com.eignex.koblas.borrow
-import com.eignex.koblas.borrowI32
-import com.eignex.koblas.sparse.SparseSlices
+import com.eignex.klause.util.SparseSlices
 import kotlin.math.abs
 
 internal data class ForrestTomlinWork(
@@ -20,9 +17,9 @@ internal class ForrestTomlinFactors private constructor(
     factors: LuFactors,
     state: ForrestTomlinState?,
     takeOwnership: Boolean,
-    private val workspace: Workspace,
+    private val workspace: BasisScratch,
 ) {
-    constructor(factors: LuFactors, workspace: Workspace = Workspace()) : this(factors, null, false, workspace)
+    constructor(factors: LuFactors, workspace: BasisScratch = BasisScratch()) : this(factors, null, false, workspace)
 
     private val sharedOrder = state?.order?.let { if (takeOwnership) it else it.copyOf() }
     val upper = if (state == null) {
@@ -252,10 +249,10 @@ internal class ForrestTomlinFactors private constructor(
     }
 
     companion object {
-        fun restore(factors: LuFactors, state: ForrestTomlinState, workspace: Workspace): ForrestTomlinFactors =
+        fun restore(factors: LuFactors, state: ForrestTomlinState, workspace: BasisScratch): ForrestTomlinFactors =
             ForrestTomlinFactors(factors, state, false, workspace)
 
-        fun transfer(factors: LuFactors, state: ForrestTomlinState, workspace: Workspace): ForrestTomlinFactors =
+        fun transfer(factors: LuFactors, state: ForrestTomlinState, workspace: BasisScratch): ForrestTomlinFactors =
             ForrestTomlinFactors(factors, state, true, workspace)
     }
 }

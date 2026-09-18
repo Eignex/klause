@@ -1,8 +1,6 @@
 package com.eignex.klause.simplex.basis
 
 import com.eignex.koblas.SparseMatrix
-import com.eignex.koblas.Workspace
-import com.eignex.koblas.borrow
 import com.eignex.koblas.koblas
 import kotlin.math.abs
 import kotlin.math.max
@@ -36,7 +34,7 @@ internal class KotlinBasisSolver(
         sourceRows,
         sourceValues,
     )
-    private val workspace = Workspace()
+    private val workspace = BasisScratch()
     private val builder = BasisFactors(source, workspace)
     override val n = source.rows
     private val solveWorkspace = BasisWorkspace(n, workspace)
@@ -804,7 +802,7 @@ internal class BasisSolveCache private constructor(
     val ft: ForrestTomlinFactors,
     threshold: Double,
 ) {
-    constructor(factors: LuFactors, threshold: Double, workspace: Workspace) :
+    constructor(factors: LuFactors, threshold: Double, workspace: BasisScratch) :
         this(factors, ForrestTomlinFactors(factors, workspace), threshold)
 
     val lower = HyperSparseSolve(factors.lower, lower = true, unitDiagonal = true, threshold)
@@ -819,14 +817,14 @@ internal class BasisSolveCache private constructor(
             factors: LuFactors,
             state: ForrestTomlinState,
             threshold: Double,
-            workspace: Workspace,
+            workspace: BasisScratch,
         ): BasisSolveCache = BasisSolveCache(
             factors,
             ForrestTomlinFactors.transfer(factors, state, workspace),
             threshold,
         )
 
-        fun restore(state: BasisCacheState, threshold: Double, workspace: Workspace): BasisSolveCache {
+        fun restore(state: BasisCacheState, threshold: Double, workspace: BasisScratch): BasisSolveCache {
             val factors = state.factors.copyOwned()
             return BasisSolveCache(factors, ForrestTomlinFactors.restore(factors, state.ft, workspace), threshold)
         }

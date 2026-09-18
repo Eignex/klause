@@ -1,6 +1,7 @@
 package com.eignex.klause.simplex.basis
 
 import com.eignex.koblas.SparseMatrix
+import com.eignex.koblas.koblas
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.io.path.extension
@@ -238,6 +239,9 @@ private fun commonFields(
     "configuration" to trace.metadata.configuration,
     "artifactSha256" to artifactSha,
     "koblasArtifactSha256" to artifactHash(SparseMatrix::class.java),
+    "koblasKernelSelection" to "${koblas.vectorKernels.name}/${koblas.sparseKernels.name}",
+    "koblasVendorLibrary" to koblas.vendor?.libraryPath,
+    "koblasVendorVersion" to koblas.vendor?.version,
     "javaRuntime" to System.getProperty("java.runtime.version"),
     "kotlinRuntime" to KotlinVersion.CURRENT.toString(),
     "os" to "${System.getProperty("os.name")}/${System.getProperty("os.arch")}",
