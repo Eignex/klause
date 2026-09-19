@@ -51,15 +51,31 @@ class ExactLiraSearchComponentTest {
             realUpper = DoubleArray(3) { Double.POSITIVE_INFINITY },
             factors = arrayOf(
                 Linear(
-                    intArrayOf(), doubleArrayOf(), intArrayOf(0, 1, 2),
-                    doubleArrayOf(1.0, 1.0, -1.0), LinearOp.EQ, 0.0,
+                    intArrayOf(),
+                    doubleArrayOf(),
+                    intArrayOf(0, 1, 2),
+                    doubleArrayOf(1.0, 1.0, -1.0),
+                    LinearOp.EQ,
+                    0.0,
                 ),
                 ReifiedRealLinear(
-                    0, intArrayOf(), doubleArrayOf(), intArrayOf(2), doubleArrayOf(1.0), LinearOp.LE, 1.0,
+                    0,
+                    intArrayOf(),
+                    doubleArrayOf(),
+                    intArrayOf(2),
+                    doubleArrayOf(1.0),
+                    LinearOp.LE,
+                    1.0,
                 ),
                 ReifiedRealLinear(
-                    1, intArrayOf(), doubleArrayOf(), intArrayOf(1, 0),
-                    doubleArrayOf(-2.0, -2.0), LinearOp.LE, -2.0, strict = true,
+                    1,
+                    intArrayOf(),
+                    doubleArrayOf(),
+                    intArrayOf(1, 0),
+                    doubleArrayOf(-2.0, -2.0),
+                    LinearOp.LE,
+                    -2.0,
+                    strict = true,
                 ),
             ),
         )
@@ -86,12 +102,20 @@ class ExactLiraSearchComponentTest {
     @Test
     fun `a strict all fixed expression is contradictory after source reconstruction`() {
         val model = Problem(
-            0, intBounds = openBounds(0), numRealVars = 1,
-            realLower = doubleArrayOf(2.0), realUpper = doubleArrayOf(2.0),
+            0,
+            intBounds = openBounds(0),
+            numRealVars = 1,
+            realLower = doubleArrayOf(2.0),
+            realUpper = doubleArrayOf(2.0),
             factors = arrayOf(
                 Linear(
-                    intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(2.0),
-                    LinearOp.LE, 4.0, strict = true,
+                    intArrayOf(),
+                    doubleArrayOf(),
+                    intArrayOf(0),
+                    doubleArrayOf(2.0),
+                    LinearOp.LE,
+                    4.0,
+                    strict = true,
                 ),
             ),
         )
@@ -108,17 +132,29 @@ class ExactLiraSearchComponentTest {
     fun `shared signed forms agree with source exact checks for strict complements`() {
         for (scale in listOf(0.5, -2.0)) {
             val model = Problem(
-                2, intBounds = openBounds(0), numRealVars = 2,
+                2,
+                intBounds = openBounds(0),
+                numRealVars = 2,
                 realLower = DoubleArray(2) { Double.NEGATIVE_INFINITY },
                 realUpper = DoubleArray(2) { Double.POSITIVE_INFINITY },
                 factors = arrayOf(
                     ReifiedRealLinear(
-                        0, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
-                        doubleArrayOf(1.0, 2.0), LinearOp.LE, 3.0,
+                        0,
+                        intArrayOf(),
+                        doubleArrayOf(),
+                        intArrayOf(0, 1),
+                        doubleArrayOf(1.0, 2.0),
+                        LinearOp.LE,
+                        3.0,
                     ),
                     ReifiedRealLinear(
-                        1, intArrayOf(), doubleArrayOf(), intArrayOf(1, 0),
-                        doubleArrayOf(2.0 * scale, scale), if (scale > 0) LinearOp.LE else LinearOp.GE, 3.0 * scale,
+                        1,
+                        intArrayOf(),
+                        doubleArrayOf(),
+                        intArrayOf(1, 0),
+                        doubleArrayOf(2.0 * scale, scale),
+                        if (scale > 0) LinearOp.LE else LinearOp.GE,
+                        3.0 * scale,
                     ),
                 ),
             )
@@ -141,8 +177,11 @@ class ExactLiraSearchComponentTest {
     @Test
     fun `rational canonical mixed terms retain source integer branching`() {
         val model = Problem(
-            0, intBounds = openBounds(), numRealVars = 1,
-            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.0),
+            0,
+            intBounds = openBounds(),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(0.0),
             factors = arrayOf(
                 Linear(intArrayOf(0), doubleArrayOf(2.0), intArrayOf(0), doubleArrayOf(3.0), LinearOp.EQ, 1.0),
             ),
