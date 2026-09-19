@@ -19,10 +19,9 @@ import com.eignex.klause.ir.TaggedLinearRow
 import com.eignex.klause.ir.Term
 import com.eignex.klause.ir.UnitConsts
 import com.eignex.klause.ir.linearRows
-import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.lp.engine.LpCertificationPolicy
+import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.simplex.exact.BigFraction
-import com.ionspin.kotlin.bignum.integer.BigInteger
 import com.eignex.klause.solver.result.SmtStatsSink
 import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.solver.search.ComponentResult
@@ -37,6 +36,7 @@ import com.eignex.klause.theory.TheoryContext
 import com.eignex.klause.theory.TheorySearchComponent
 import com.eignex.klause.util.Bits
 import com.eignex.klause.util.Cancellation
+import com.ionspin.kotlin.bignum.integer.BigInteger
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -49,10 +49,25 @@ class ExactLiraSearchComponentTest {
 
     @Test
     fun `a learned strict conflict backjumps to an exact source witness`() {
-        val model = Problem(1, intBounds = openBounds(0), numRealVars = 1,
-            realLower = doubleArrayOf(Double.NEGATIVE_INFINITY), realUpper = doubleArrayOf(1.0),
-            factors = arrayOf(ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0),
-                LinearOp.GE, 1.0, strict = true)))
+        val model = Problem(
+            1,
+            intBounds = openBounds(0),
+            numRealVars = 1,
+            realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
+            realUpper = doubleArrayOf(1.0),
+            factors = arrayOf(
+                ReifiedRealLinear(
+                0,
+                intArrayOf(),
+                doubleArrayOf(),
+                intArrayOf(0),
+                doubleArrayOf(1.0),
+                LinearOp.GE,
+                1.0,
+                strict = true,
+            )
+            ),
+        )
         ExactLiraSearchComponent(model).use { component ->
             val session = SearchSession(listOf(component))
             session.initialize()
@@ -68,13 +83,34 @@ class ExactLiraSearchComponentTest {
 
     @Test
     fun `strict mixed candidates use shared integer branching`() {
-        val model = Problem(0, intBounds = openBounds(), numRealVars = 1,
-            realLower = doubleArrayOf(Double.NEGATIVE_INFINITY), realUpper = doubleArrayOf(Double.POSITIVE_INFINITY),
+        val model = Problem(
+            0,
+            intBounds = openBounds(),
+            numRealVars = 1,
+            realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
+            realUpper = doubleArrayOf(Double.POSITIVE_INFINITY),
             factors = arrayOf(
                 Linear(intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0), doubleArrayOf(-1.0), LinearOp.EQ, 0.0),
-                Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0), LinearOp.GE, 0.0, strict = true),
-                Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0), LinearOp.LE, 1.5, strict = true),
-            ))
+                Linear(
+                    intArrayOf(),
+                    doubleArrayOf(),
+                    intArrayOf(0),
+                    doubleArrayOf(1.0),
+                    LinearOp.GE,
+                    0.0,
+                    strict = true,
+                ),
+                Linear(
+                    intArrayOf(),
+                    doubleArrayOf(),
+                    intArrayOf(0),
+                    doubleArrayOf(1.0),
+                    LinearOp.LE,
+                    1.5,
+                    strict = true,
+                ),
+            ),
+        )
         val stats = SmtStatsSink()
         ExactLiraSearchComponent(model).use { component ->
             component.observeWith(stats)
@@ -92,10 +128,24 @@ class ExactLiraSearchComponentTest {
 
     @Test
     fun `rejected strict LP evidence cannot invoke a private strict fallback`() {
-        val model = Problem(0, intBounds = openBounds(0), numRealVars = 1,
-            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0),
-            factors = arrayOf(Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0),
-                LinearOp.GE, 0.0, strict = true)))
+        val model = Problem(
+            0,
+            intBounds = openBounds(0),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(1.0),
+            factors = arrayOf(
+                Linear(
+                intArrayOf(),
+                doubleArrayOf(),
+                intArrayOf(0),
+                doubleArrayOf(1.0),
+                LinearOp.GE,
+                0.0,
+                strict = true,
+            )
+            ),
+        )
         val stats = SmtStatsSink()
         ExactLiraSearchComponent(model).use { component ->
             component.solveWith(LpSolveContext(certificationPolicy = LpCertificationPolicy { _, _ -> false }))

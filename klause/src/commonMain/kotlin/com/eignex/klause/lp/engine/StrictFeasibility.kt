@@ -26,7 +26,10 @@ internal class StrictFeasibility(private val source: RefinementAuthority) {
             meter.stop(LpRefinementDecline.DIMENSION)
         }
         for (row in 0 until source.source.m) {
-            if (source.source.row(row).strict && source.bounds[source.source.n + row].lower?.strict != true) {
+            val lower = source.bounds[source.source.n + row].lower
+            if (source.source.row(row).strict && lower?.strict != true &&
+                lower?.number?.value?.let { it > BigFraction.ZERO } != true
+            ) {
                 meter.stop(LpRefinementDecline.AUTHORITY)
             }
         }
@@ -55,14 +58,20 @@ internal class StrictFeasibility(private val source: RefinementAuthority) {
                 column < count -> source.bounds[column].let { bounds ->
                     ExactLpBounds(bounds.lower?.copy(strict = false), bounds.upper?.copy(strict = false))
                 }
+
                 column == count -> ExactLpBounds(zero, ExactLpSide(ExactLpNumber.of(1L)))
+
                 column < count + 1 + source.source.m -> ExactLpBounds(zero, zero)
+
                 else -> ExactLpBounds(zero)
             }
             ExactLpColumn(bounds, integral = false)
         }
         model = ExactLpModel(
-            matrix, rhs, columns, List(rows.toInt()) { ExactLpRow() },
+            matrix,
+            rhs,
+            columns,
+            List(rows.toInt()) { ExactLpRow() },
             ExactLpObjective(List(columns.size) { ExactLpNumber.of(if (it == count) -1L else 0L) }),
         )
     }

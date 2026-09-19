@@ -30,7 +30,6 @@ internal class LpExactState internal constructor(
     private var projection: LpMatrixProjection? = null
     private var projectionAttempted = false
 
-    val assertionCount: Int get() = activeAssertions.size
     val assertions: List<LpBoundAssertion> get() = activeAssertions.toList()
     val scopes: List<Int> get() = scopeMarks.toList()
     val changedColumns: List<Int> get() = changed.toList()

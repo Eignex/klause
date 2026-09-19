@@ -772,7 +772,7 @@ private class RefinementRun(
         )
         meter.record(checked.metrics)
         if (checked.singularRank != null) {
-            if (model === sourceModel) sourceSingularBasis = basis
+            if (model.exactState === sourceModel.exactState) sourceSingularBasis = basis
             output.basis = null
             meter.stop(LpRefinementDecline.CANDIDATE)
         }
@@ -897,8 +897,10 @@ private class RefinementRun(
                 val result = attempt.second
                 if (result == null) {
                     val checked = reconstructCertificate(
-                        a.model, ray = attempt.first.infeasibleRay,
-                        cancellation = meter.token, limits = meter.proofLimits(),
+                        a.model,
+                        ray = attempt.first.infeasibleRay,
+                        cancellation = meter.token,
+                        limits = meter.proofLimits(),
                     )
                     meter.record(checked)
                     output.accept(checked)
@@ -913,8 +915,10 @@ private class RefinementRun(
                 }
             }
             if (strict.positive(output.point)) {
-                candidate.accept(check(source, strict.sourcePoint(requireNotNull(output.point)), null, null, false),
-                    output.pointUsesBasis)
+                candidate.accept(
+                    check(source, strict.sourcePoint(requireNotNull(output.point)), null, null, false),
+                    output.pointUsesBasis,
+                )
             }
             if (candidate.point == null) {
                 val conflict = output.conflict
@@ -932,7 +936,10 @@ private class RefinementRun(
                 val ray = dual?.let(strict::sourceRay)
                 if (ray != null) {
                     val checked = verifyRationalCertificate(
-                        source.model, ray = ray, cancellation = meter.token, limits = meter.proofLimits(),
+                        source.model,
+                        ray = ray,
+                        cancellation = meter.token,
+                        limits = meter.proofLimits(),
                     )
                     meter.record(checked)
                     candidate.accept(checked, if (conflict != null) output.conflictUsesBasis else output.dualUsesBasis)
