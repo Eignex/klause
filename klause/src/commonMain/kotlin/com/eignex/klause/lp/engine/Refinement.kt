@@ -51,6 +51,11 @@ internal enum class LpRefinementDecline {
 
 internal data class LpRefinementMetrics(
     val eligible: Boolean = false,
+    val strictAttempts: Int = 0,
+    val strictWitnesses: Int = 0,
+    val strictConflicts: Int = 0,
+    val strictWork: Long = 0L,
+    val strictElapsed: Duration = Duration.ZERO,
     val rounds: Int = 0,
     val stalls: Int = 0,
     val auxiliaries: Int = 0,
@@ -123,12 +128,13 @@ internal class LpRefinementResult(
     val conflictUsesBasis: Boolean,
     val unboundednessUsesBasis: Boolean,
     val sourceLuAttempted: Boolean,
+    val sourceSingularBasis: Basis?,
     val metrics: LpRefinementMetrics,
 )
 
 private class RefinementStop(val reason: LpRefinementDecline) : RuntimeException()
 
-private class RefinementMeter(
+internal class RefinementMeter(
     val limits: LpRefinementLimits,
     private val cache: LpRefinementCache,
     private val cancellation: Cancellation,
@@ -141,6 +147,7 @@ private class RefinementMeter(
     private var directAllocation = 0L
     var metrics = LpRefinementMetrics()
     val token = Cancellation { cancellation() || cache.elapsed + started.elapsedNow() >= limits.time }
+    val spentWork: Long get() = cache.work
     val remainingWork: Long get() = (limits.maxWork - cache.work).coerceAtLeast(0L)
     val remainingAllocation: Long get() = (limits.maxAllocation - cache.allocation).coerceAtLeast(0L)
     val remainingPivots: Int get() = (limits.maxPivots - cache.pivots).coerceAtLeast(0)
@@ -274,7 +281,7 @@ private class RefinementMeter(
 
 private fun addSaturated(a: Long, b: Long): Long = if (b > Long.MAX_VALUE - a) Long.MAX_VALUE else a + b
 
-private class RefinementAuthority(val state: LpExactState, val meter: RefinementMeter) {
+internal class RefinementAuthority(val state: LpExactState, val meter: RefinementMeter) {
     val source = state.model
     val model: LpModel
     val matrix: List<List<Pair<Int, BigFraction>>>
@@ -469,7 +476,7 @@ private fun refinementWorking(source: LpExactState, model: ExactLpModel, meter: 
     return LpWorkingModel(source, model)
 }
 
-private class ResidualModel(
+internal class ResidualModel(
     val working: LpWorkingModel,
     val primalScale: BigFraction,
     val dualScale: BigFraction,
@@ -535,6 +542,7 @@ private class RefinementRun(
     val candidate = RefinedCandidate()
     var unboundedness: ExactLpUnboundedness? = null
     var unboundednessUsesBasis = false
+    var sourceSingularBasis: Basis? = null
 
     fun run(
         primal: DoubleArray?,
@@ -552,6 +560,10 @@ private class RefinementRun(
             if (candidate.attained || candidate.conflict != null) return
         }
         if (known != null) candidate.accept(check(source, known.primal, null, null, false))
+        if (candidate.point == null && needPoint && sourceModel.hasStrictSides() && meter.limits.maxAuxiliaries > 0) {
+            strictFeasibility()
+            return
+        }
         if (primal != null && duals != null && meter.limits.maxRounds > 0) {
             improve(source, primal, duals, basis, null, candidate, sourceFactors, reconstructInitial)
         }
@@ -564,7 +576,7 @@ private class RefinementRun(
             directionUsesBasis = direction != null
             candidate.usedBasis = candidate.usedBasis || directionUsesBasis
         }
-        if (candidate.point == null && needPoint && meter.limits.maxAuxiliaries > 0) {
+        if (candidate.point == null && needPoint && meter.metrics.auxiliaries < meter.limits.maxAuxiliaries) {
             feasibility()
         }
         if (candidate.conflict != null || candidate.bound != null) return
@@ -625,6 +637,7 @@ private class RefinementRun(
         output: RefinedCandidate,
         factors: ExactBasisCache,
         reconstructInitial: Boolean = true,
+        sufficient: (RefinedCandidate) -> Boolean = { it.attained || it.conflict != null },
     ) {
         if (duals.size != a.source.m) meter.stop(LpRefinementDecline.CANDIDATE)
         val pointUsesBasis = output.point != null && output.pointUsesBasis
@@ -639,7 +652,7 @@ private class RefinementRun(
         )
         output.dual = y
         output.dualUsesBasis = false
-        if (output.attained || output.conflict != null || meter.limits.maxRounds == 0) return
+        if (sufficient(output) || meter.limits.maxRounds == 0) return
         var residual = a.residual(x, y, basis, 0, 0)
         var nextReconstruction = 1
         var stalls = 0
@@ -680,7 +693,7 @@ private class RefinementRun(
                 val primalCandidate = if (x == knownPoint) null else a.sourcePoint(x)
                 output.accept(check(a, primalCandidate, y, basis, reconstruct), pointBasis = pointUsesBasis)
                 if (reconstruct) nextReconstruction = nextReconstructionRound(round)
-                if (output.attained || output.conflict != null) break
+                if (sufficient(output)) break
                 if (stalls >= 2) {
                     if (!output.luAttempted) exactCandidate(a, requireNotNull(basis), factors, output)
                     break
@@ -758,6 +771,11 @@ private class RefinementRun(
             limits = meter.basisLimits(),
         )
         meter.record(checked.metrics)
+        if (checked.singularRank != null) {
+            if (model === sourceModel) sourceSingularBasis = basis
+            output.basis = null
+            meter.stop(LpRefinementDecline.CANDIDATE)
+        }
         checked.witness?.let { output.acceptPoint(it, true) }
         checked.bound?.let { output.acceptBound(it, true) }
         output.usedBasis = checked.witness != null || checked.bound != null || output.usedBasis
@@ -863,6 +881,71 @@ private class RefinementRun(
             }
         }
         return null
+    }
+
+    private fun strictFeasibility() {
+        val started = TimeSource.Monotonic.markNow()
+        val before = meter.spentWork
+        meter.metrics = meter.metrics.copy(strictAttempts = meter.metrics.strictAttempts + 1)
+        try {
+            val strict = StrictFeasibility(source)
+            meter.metrics = meter.metrics.copy(auxiliaries = meter.metrics.auxiliaries + 1)
+            val output = RefinedCandidate()
+            withChild(refinementWorking(source.state, strict.model, meter), null) { scope, allowance ->
+                val attempt = numerical(scope, null, allowance, true) ?: return@withChild
+                val a = RefinementAuthority(scope.state, meter)
+                val result = attempt.second
+                if (result == null) {
+                    val checked = reconstructCertificate(
+                        a.model, ray = attempt.first.infeasibleRay,
+                        cancellation = meter.token, limits = meter.proofLimits(),
+                    )
+                    meter.record(checked)
+                    output.accept(checked)
+                } else {
+                    val factors = ExactBasisCache()
+                    improve(a, result.primal, result.duals, result.basis, scope, output, factors) {
+                        strict.positive(it.point) || it.conflict != null || it.bound?.value?.signum() == 0
+                    }
+                    if (!strict.positive(output.point) && output.conflict == null) {
+                        exactCandidate(a, output.basis ?: result.basis, factors, output)
+                    }
+                }
+            }
+            if (strict.positive(output.point)) {
+                candidate.accept(check(source, strict.sourcePoint(requireNotNull(output.point)), null, null, false),
+                    output.pointUsesBasis)
+            }
+            if (candidate.point == null) {
+                val conflict = output.conflict
+                val dual = if (conflict != null) {
+                    meter.charge(strict.model.m.toLong(), strict.model.m * 8L)
+                    MutableList(strict.model.m) { BigFraction.ZERO }.also { y ->
+                        for (index in conflict.rows.indices) {
+                            val row = conflict.rows[index]
+                            y[row] = meter.add(y[row], conflict.multipliers[index].negated())
+                        }
+                    }
+                } else {
+                    output.dual.takeIf { output.bound?.value?.let { it >= BigFraction.ZERO } == true }
+                }
+                val ray = dual?.let(strict::sourceRay)
+                if (ray != null) {
+                    val checked = verifyRationalCertificate(
+                        source.model, ray = ray, cancellation = meter.token, limits = meter.proofLimits(),
+                    )
+                    meter.record(checked)
+                    candidate.accept(checked, if (conflict != null) output.conflictUsesBasis else output.dualUsesBasis)
+                }
+            }
+        } finally {
+            meter.metrics = meter.metrics.copy(
+                strictWitnesses = if (candidate.point != null) 1 else 0,
+                strictConflicts = if (candidate.conflict != null) 1 else 0,
+                strictWork = addSaturated(meter.metrics.strictWork, meter.spentWork - before),
+                strictElapsed = meter.metrics.strictElapsed + started.elapsedNow(),
+            )
+        }
     }
 
     private fun feasibility() {
@@ -1086,7 +1169,7 @@ internal fun refineLp(
         current.run(primal, duals, basis, witness, needPoint, direction, reconstructInitial, preferBasis)
         meter.poll()
         reason = if (current.candidate.attained || current.candidate.conflict != null ||
-            current.unboundedness != null
+            current.unboundedness != null || meter.metrics.strictWitnesses > 0
         ) {
             null
         } else {
@@ -1116,6 +1199,7 @@ internal fun refineLp(
         candidate?.conflictUsesBasis == true,
         run?.unboundednessUsesBasis == true,
         candidate?.luAttempted == true,
+        run?.sourceSingularBasis,
         metrics,
     )
 }

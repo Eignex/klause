@@ -364,7 +364,7 @@ class ExactLiraSearchComponent(
                 }
             }
         }
-        // Strict closure points and unsupported certifiers leave the exact migration check pending.
+        // Source integer branching requires an independently checked continuous witness.
         return ComponentResult.Consistent
     }
 
@@ -435,11 +435,7 @@ class ExactLiraSearchComponent(
                 SearchDecision.Theory(ExactLiraDecision(address, direction = it))
             }
         }
-        val closed = closedLpLeaf() ?: run {
-            outcome = ComponentCheck.Indeterminate
-            return null
-        }
-        if (closed && candidate == null) {
+        if (candidate == null) {
             outcome = ComponentCheck.Indeterminate
             return null
         }
@@ -474,7 +470,7 @@ class ExactLiraSearchComponent(
         }
         val extension = (0 until reduced.system.realColumns + reduced.system.integerColumns)
             .any { !reduced.system.boundedColumn(it) }
-        if (closed && !extension) {
+        if (!extension) {
             outcome = ComponentCheck.Indeterminate
             return null
         }
@@ -501,14 +497,6 @@ class ExactLiraSearchComponent(
             }
         }
         return null
-    }
-
-    private fun closedLpLeaf(): Boolean? {
-        val current = lp.state?.model ?: return null
-        return (0 until current.m).none { current.row(it).strict } && (0 until current.numVars).all {
-            val bounds = current.column(it).bounds
-            bounds.lower?.strict != true && bounds.upper?.strict != true
-        }
     }
 
     private fun registeredSplit(

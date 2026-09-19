@@ -335,6 +335,10 @@ internal fun certifyLpResult(
             },
         )
         refined = recovered
+        recovered.sourceSingularBasis?.let { rejected ->
+            continuationTarget()
+            solver.rejectSingularBasis(model, rejected)
+        }
         observer?.observe(
             LpCertifier.RATIONAL,
             recovered.witness != null || recovered.bound != null ||
