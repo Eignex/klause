@@ -162,14 +162,17 @@ class ExactLiraSearchComponent(
                 override fun check(context: SearchContext): ComponentCheck = outcome ?: ComponentCheck.Indeterminate
                 override fun nextBranch(context: SearchContext): List<SearchDecision>? = branch(context)
                 override fun retract(decisionLevel: Int) = retractSource(decisionLevel)
+                override fun rowAssertionAllowed(context: SearchContext): Boolean =
+                    this@ExactLiraSearchComponent.context === context && node.sourceBranches.size <= 128 &&
+                        node.retainedReduction == null
+
                 override fun rowDecision(
                     state: LpExactState,
                     column: Int,
                     upper: Boolean,
                     side: ExactLpSide,
                     context: SearchContext,
-                ): SearchDecision? = if (this@ExactLiraSearchComponent.context === context && node.sourceBranches.size <= 128 &&
-                    node.retainedReduction == null) {
+                ): SearchDecision? = if (rowAssertionAllowed(context)) {
                     system.rowDecision(state, column, upper, side, context)
                 } else {
                     null
