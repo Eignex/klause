@@ -219,7 +219,8 @@ class LiveQfLraSystemTest {
     @Test
     fun `declared fixed columns retain exact source values and integer identity`() {
         val source = Problem(
-            0, intBounds = IntBounds.fromModelBounds(longArrayOf(7), longArrayOf(7), null, null),
+            0,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(7), longArrayOf(7), null, null),
             numRealVars = 1,
             realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
             realUpper = doubleArrayOf(Double.POSITIVE_INFINITY),
@@ -259,13 +260,17 @@ class LiveQfLraSystemTest {
     }
 
     private fun source(): Problem = Problem(
-        4, intBounds = IntBounds.fromModelBounds(longArrayOf(), longArrayOf(), null, null), numRealVars = 2,
+        4,
+        intBounds = IntBounds.fromModelBounds(longArrayOf(), longArrayOf(), null, null),
+        numRealVars = 2,
         realLower = DoubleArray(2) { Double.NEGATIVE_INFINITY },
-        realUpper = DoubleArray(2) { Double.POSITIVE_INFINITY }, factors = arrayOf(),
+        realUpper = DoubleArray(2) { Double.POSITIVE_INFINITY },
+        factors = arrayOf(),
     )
 
     private fun row(coefficients: List<Int>, rhs: Int): ExactRationalInequality = ExactRationalInequality(
-        coefficients.indices.toList().toIntArray(), coefficients.map { BigFraction.ofLong(it.toLong()) },
+        coefficients.indices.toList().toIntArray(),
+        coefficients.map { BigFraction.ofLong(it.toLong()) },
         BigFraction.ofLong(rhs.toLong()),
     )
 

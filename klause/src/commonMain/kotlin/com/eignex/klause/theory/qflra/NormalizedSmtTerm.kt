@@ -5,11 +5,7 @@ import com.eignex.klause.solver.search.SearchAtomPremise
 
 internal data class FixedSmtColumn(val value: BigFraction, val premise: SearchAtomPremise)
 
-internal data class SmtTermSubstitution(
-    val column: Int,
-    val coefficient: BigFraction,
-    val fixing: FixedSmtColumn,
-)
+internal data class SmtTermSubstitution(val column: Int, val coefficient: BigFraction, val fixing: FixedSmtColumn)
 
 internal data class NormalizedSmtTerm(
     val coefficients: Map<Int, BigFraction>,
