@@ -560,7 +560,9 @@ private class RefinementRun(
             if (candidate.attained || candidate.conflict != null) return
         }
         if (known != null) candidate.accept(check(source, known.primal, null, null, false))
-        if (candidate.point == null && needPoint && sourceModel.hasStrictSides() && meter.limits.maxAuxiliaries > 0) {
+        if (candidate.point == null && needPoint && meter.limits.maxAuxiliaries > 0 &&
+            sourceModel.hasStrictSides(meter)
+        ) {
             strictFeasibility()
             return
         }

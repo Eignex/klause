@@ -12,6 +12,56 @@ import kotlin.test.assertTrue
 
 class StrictFeasibilityTest {
     @Test
+    fun `strict eligibility declines before scanning an unadmitted source`() {
+        val zero = ExactLpNumber.of(0L)
+        val source = ExactLpModel(
+            List(3) { emptyList() }, emptyList(),
+            List(3) { ExactLpColumn(ExactLpBounds(ExactLpSide(zero, strict = true)), integral = false) },
+            emptyList(), ExactLpObjective(List(3) { zero }),
+        )
+        val cases = listOf(
+            LpRefinementLimits(maxCoordinates = 2) to LpRefinementDecline.DIMENSION,
+            LpRefinementLimits(maxWork = 2) to LpRefinementDecline.WORK,
+        )
+        for ((limits, decline) in cases) {
+            LpScopedSolver(LpExactState(source)).use { owner ->
+                val result = refineLp(
+                    assertNotNull(owner.state.toWorkingModel()),
+                    LpRefinementRequest(owner, owner.refinementCache, limits),
+                )
+
+                assertEquals(decline, result.metrics.decline)
+                assertEquals(0, result.metrics.strictAttempts)
+                assertEquals(1L, owner.refinementCache.work)
+                assertNull(result.witness)
+                assertNull(owner.lastWorkingMetrics)
+            }
+        }
+    }
+
+    @Test
+    fun `disabled auxiliaries skip strict eligibility admission`() {
+        val zero = ExactLpNumber.of(0L)
+        val source = ExactLpModel(
+            listOf(emptyList()), emptyList(),
+            listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero, strict = true)), integral = false)),
+            emptyList(), ExactLpObjective(listOf(zero)),
+        )
+        LpScopedSolver(LpExactState(source)).use { owner ->
+            val result = refineLp(
+                assertNotNull(owner.state.toWorkingModel()),
+                LpRefinementRequest(owner, owner.refinementCache,
+                    LpRefinementLimits(maxAuxiliaries = 0, maxCoordinates = 0, maxWork = 1)),
+            )
+
+            assertEquals(LpRefinementDecline.CANDIDATE, result.metrics.decline)
+            assertEquals(0, result.metrics.strictAttempts)
+            assertEquals(1L, owner.refinementCache.work)
+            assertNull(owner.lastWorkingMetrics)
+        }
+    }
+
+    @Test
     fun `a stronger closed logical bound preserves strict margin recovery`() {
         val zero = ExactLpNumber.of(0L)
         val one = ExactLpNumber.of(1L)
@@ -45,9 +95,11 @@ class StrictFeasibilityTest {
         val zero = ExactLpNumber.of(0L)
         val tiny = ExactLpNumber.of(BigFraction.of(BigInteger.ONE, BigInteger.ONE shl 40))
         val source = ExactLpModel(
-            listOf(emptyList()), emptyList(),
+            listOf(emptyList()),
+            emptyList(),
             listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero, strict = true), ExactLpSide(tiny)), integral = false)),
-            emptyList(), ExactLpObjective(listOf(zero)),
+            emptyList(),
+            ExactLpObjective(listOf(zero)),
         )
         LpScopedSolver(LpExactState(source)).use { owner ->
             val result = refineLp(
@@ -206,11 +258,11 @@ class StrictFeasibilityTest {
                 listOf(
                     ExactLpColumn(
                         ExactLpBounds(
-                    ExactLpSide(ExactLpNumber.of(0L), strict = true),
-                    ExactLpSide(ExactLpNumber.of(upper), strict = true),
-                ),
-                    integral = false
-                    )
+                            ExactLpSide(ExactLpNumber.of(0L), strict = true),
+                            ExactLpSide(ExactLpNumber.of(upper), strict = true),
+                        ),
+                        integral = false,
+                    ),
                 ),
                 emptyList(),
                 ExactLpObjective(listOf(ExactLpNumber.of(0L))),
@@ -256,8 +308,8 @@ class StrictFeasibilityTest {
         assertTrue(x > BigFraction.ZERO && x < BigFraction.ONE)
         assertEquals(
             (BigFraction.ofLong(6L) * x + BigFraction.ofLong(3L)) *
-            BigFraction.ofLong(2L).reciprocal() + BigFraction.ONE,
-                assertNotNull(result.witness).objective
+                BigFraction.ofLong(2L).reciprocal() + BigFraction.ONE,
+            assertNotNull(result.witness).objective,
         )
         assertEquals(LpVerdict.FEASIBLE, result.verdict)
         assertTrue(assertNotNull(result.lowerBound) < result.witness.objective)
