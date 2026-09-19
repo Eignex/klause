@@ -28,11 +28,15 @@ class SourceLpTest {
         val rows = listOf(
             ExactRationalInequality(intArrayOf(0, 1), listOf(a, BigFraction.ONE), BigFraction.ONE),
             ExactRationalInequality(
-                intArrayOf(0, 1), listOf(a.negated(), BigFraction.MINUS_ONE), BigFraction.MINUS_ONE,
+                intArrayOf(0, 1),
+                listOf(a.negated(), BigFraction.MINUS_ONE),
+                BigFraction.MINUS_ONE,
             ),
             ExactRationalInequality(intArrayOf(0, 1), listOf(BigFraction.ONE, b), BigFraction.ONE),
             ExactRationalInequality(
-                intArrayOf(0, 1), listOf(BigFraction.MINUS_ONE, b.negated()), BigFraction.MINUS_ONE,
+                intArrayOf(0, 1),
+                listOf(BigFraction.MINUS_ONE, b.negated()),
+                BigFraction.MINUS_ONE,
             ),
         )
         val context = LpSolveContext(onRefinementBasisVerification = observations::add)
@@ -66,8 +70,8 @@ class SourceLpTest {
         )
         val context = LpSolveContext(
             certificationPolicy = LpCertificationPolicy { certifier, success ->
-            success && certifier == LpCertifier.EXACT_BASIS
-        }
+                success && certifier == LpCertifier.EXACT_BASIS
+            },
         )
         val budget = SourceLpBudget(solveContext = { context }, onBasisVerification = observations::add)
         SourceLp(rows, 1, budget).use { source ->

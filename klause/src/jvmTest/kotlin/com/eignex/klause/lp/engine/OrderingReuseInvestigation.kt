@@ -184,12 +184,12 @@ internal object OrderingReuseInvestigation {
         if (parsed.model.numBoolVars != 0 || parsed.model.factors.any { it.linearForm is LinearForm.Disjunction }) {
             emit(
                 mapOf(
-                "id" to id,
-                "role" to "consumer",
-                "route" to "source",
-                "decline" to "BOOLEAN_OR_DISJUNCTION",
-                "nanos" to System.nanoTime() - start,
-            )
+                    "id" to id,
+                    "role" to "consumer",
+                    "route" to "source",
+                    "decline" to "BOOLEAN_OR_DISJUNCTION",
+                    "nanos" to System.nanoTime() - start,
+                ),
             )
             return
         }
@@ -256,23 +256,23 @@ internal object OrderingReuseInvestigation {
             } else {
                 mapOf(
                     "descending" to rows.firstOrNull()?.let {
-                    sourceDescendingDirection(rows, it, variables, helperToken, helperBudget)
-                }
+                        sourceDescendingDirection(rows, it, variables, helperToken, helperBudget)
+                    },
                 )
             }
             val helperNanos = System.nanoTime() - helperStart
             check(observation.created == observation.closed)
             emit(
                 mapOf(
-                "id" to id,
-                "role" to helper,
-                "nanos" to helperNanos,
-                "result" to value,
-                "budget" to budget(helperBudget),
-                "basis" to observation.basis.drop(priorMetrics),
-                "created" to observation.created,
-                "closed" to observation.closed,
-            )
+                    "id" to id,
+                    "role" to helper,
+                    "nanos" to helperNanos,
+                    "result" to value,
+                    "budget" to budget(helperBudget),
+                    "basis" to observation.basis.drop(priorMetrics),
+                    "created" to observation.created,
+                    "closed" to observation.closed,
+                ),
             )
         }
     }

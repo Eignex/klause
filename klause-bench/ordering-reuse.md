@@ -58,6 +58,13 @@ factory/build/reuse/solve counts reconcile exactly with returned refinement LU m
 `LpSolve` request constructor is outside this hook. Events include declines and accounting-only visits;
 an event is not a successful proof. Unexpected exceptions before recording can prevent an event.
 
+Reconciliation is limited to successful returned invocations, which covers this measured cohort.
+The reusable runner does not capture a fresh retained refinement ledger for null/cancelled results;
+exceptions can discard the current invocation's output even after basis events occur. Existing
+ownership boundaries still close owners, and process exit status/stderr are retained externally.
+Such invocations have incomplete accounting, never zero activity. An incomplete campaign cannot
+support no-loss or performance acceptance and must be retained and investigated before those claims.
+
 Counts below exclude warmup and distinguish the two arms:
 
 | Observation | OFF | ON |
