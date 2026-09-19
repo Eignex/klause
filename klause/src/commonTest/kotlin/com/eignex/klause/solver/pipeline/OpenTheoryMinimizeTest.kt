@@ -208,7 +208,8 @@ class OpenTheoryMinimizeTest {
         val result = assertIs<OpenTheoryOptimum.Unbounded>(OpenTheoryMinimizer(parsed.model, objective).minimize())
 
         assertEquals(result.value.toString(), result.witness.intValue(x))
-        assertTrue(result.stats.smt.simplexAttempts > 0)
+        assertTrue(result.stats.smt.sourceLp.operations > 0)
+        assertTrue(result.stats.smt.sourceLp.floatWork > 0)
     }
 
     @Test

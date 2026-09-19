@@ -7,8 +7,6 @@ import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchModel
 import com.eignex.klause.solver.search.TheoryComponent
-import com.eignex.klause.theory.qflra.ExactLiraSolver
-import com.eignex.klause.theory.qflra.ExactLraSolver
 
 /**
  * Adapts an existing complete open-model [Theory] to the shared component lifecycle.
@@ -32,10 +30,6 @@ class TheorySearchComponent<A>(
     /** Attach solve-scoped exact-theory telemetry before this component is traversed. */
     internal fun observeWith(stats: SmtStatsSink) {
         smtStats = stats
-        when (theory) {
-            is ExactLraSolver -> theory.observeWith(stats)
-            is ExactLiraSolver -> theory.observeWith(stats)
-        }
     }
 
     override fun initialize(context: SearchContext): ComponentResult = propagate(context)

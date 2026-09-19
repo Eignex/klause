@@ -33,7 +33,6 @@ import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.solver.search.SearchSolveParams
 import com.eignex.klause.theory.TheoryCheck
 import com.eignex.klause.theory.TheoryContext
-import com.eignex.klause.theory.TheorySearchComponent
 import com.eignex.klause.util.Bits
 import com.eignex.klause.util.Cancellation
 import com.ionspin.kotlin.bignum.integer.BigInteger
@@ -122,7 +121,7 @@ class ExactLiraSearchComponentTest {
             val point = assertNotNull(result.model.valueOf<ExactLiraAssignment>(component))
             assertEquals(BigInteger.ONE, point.ints.single())
             assertEquals(BigFraction.ONE, point.reals.single())
-            assertEquals(0L, stats.snapshot().privateChecks)
+            assertTrue(stats.snapshot().sourceLp.operations > 0L)
         }
     }
 
@@ -154,7 +153,7 @@ class ExactLiraSearchComponentTest {
             session.initialize()
 
             assertIs<SearchResult.Indeterminate>(session.solve(0))
-            assertEquals(0L, stats.snapshot().privateChecks)
+            assertEquals(0L, stats.snapshot().sourceLp.operations)
         }
     }
 
@@ -423,7 +422,7 @@ class ExactLiraSearchComponentTest {
         assertIs<ComponentResult.Conflict>(session.push(SearchDecision.Bool(Lit.make(0, positive = true))))
 
         val snapshot = stats.snapshot()
-        assertEquals(0L, snapshot.privateChecks)
+        assertEquals(0L, snapshot.sourceLp.operations)
         assertTrue(requireNotNull(component.lpMetrics).preparationAttempts > 0L)
         assertEquals(1L, snapshot.conflicts)
         assertEquals(1L, snapshot.explainedConflicts)
@@ -431,20 +430,28 @@ class ExactLiraSearchComponentTest {
     }
 
     @Test
-    fun `theory adapter forwards exact LIRA telemetry`() {
+    fun `shared exact LIRA component reports reduction conflicts`() {
         val model = Problem(
             numBoolVars = 0,
             intBounds = openBounds(),
             factors = arrayOf(Linear(intArrayOf(2), intArrayOf(0), LinearOp.EQ, 1)),
         )
         val stats = SmtStatsSink()
-        val component = TheorySearchComponent(ExactLiraSolver(model)).also { it.observeWith(stats) }
+        val component = ExactLiraSearchComponent(model).also { it.observeWith(stats) }
 
-        val result = SearchSession(listOf(component)).initialize()
+        val result = component.use {
+            val session = SearchSession(listOf(component))
+            session.initialize()
+            session.solve(0)
+        }
 
-        assertIs<ComponentResult.Conflict>(result)
+        assertIs<SearchResult.Exhausted>(result)
         val snapshot = stats.snapshot()
-        assertTrue(snapshot.privateChecks > 0L)
+        assertTrue(snapshot.reductionRequests > 0L)
+        assertTrue(snapshot.sourceLp.operations > 0L)
+        assertTrue(snapshot.sourceLp.modeledWork > 0L)
+        assertTrue(snapshot.sourceLp.preparationWork > 0L)
+        assertTrue(snapshot.sourceLp.floatWork > 0L)
         assertEquals(1L, snapshot.unexplainedConflicts)
         assertEquals(0L, snapshot.explainedConflicts)
     }

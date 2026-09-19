@@ -1,6 +1,6 @@
 package com.eignex.klause.lp.engine
 
-import com.eignex.klause.lp.bounding.trailModel
+import com.eignex.klause.lp.engine.authoritativeModel
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
@@ -29,7 +29,7 @@ class LpDualizationTest {
         val builder = LpBuilder()
         val x = builder.addVar(0L, 8L, cost = 2L)
         repeat(10) { builder.addRow(intArrayOf(x), longArrayOf(1L), Relation.GE, 3L) }
-        val source = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).trailModel()))
+        val source = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
         val attempt = LpRootDualizationAttempt(LpDualizationOptions(enabled = true))
 
         val basis = assertNotNull(attempt.solve(source))
@@ -51,7 +51,7 @@ class LpDualizationTest {
         val builder = LpBuilder()
         val x = builder.addVar(0L, 3L)
         builder.addRow(intArrayOf(x), longArrayOf(1L), Relation.GE, 1L)
-        val source = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).trailModel()))
+        val source = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
         val disabled = LpRootDualizationAttempt(LpDualizationOptions())
         val short = LpRootDualizationAttempt(LpDualizationOptions(enabled = true))
 
@@ -68,7 +68,7 @@ class LpDualizationTest {
         val builder = LpBuilder()
         val x = builder.addVar(0L, 3L)
         repeat(10) { builder.addRow(intArrayOf(x), longArrayOf(1L), Relation.GE, 1L) }
-        val source = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).trailModel()))
+        val source = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
         val attempt = LpRootDualizationAttempt(LpDualizationOptions(enabled = true))
 
         assertNull(attempt.solve(source, parentWork = 1L))
@@ -82,7 +82,7 @@ class LpDualizationTest {
         val builder = LpBuilder()
         val x = builder.addVar(0L, 3L)
         builder.addRow(intArrayOf(x), longArrayOf(1L), Relation.GE, 1L)
-        val source = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).trailModel()))
+        val source = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
         val attempt = LpRootDualizationAttempt(
             LpDualizationOptions(enabled = true, minRowColumnRatio = 1, constructionWork = 1L),
         )
@@ -99,7 +99,7 @@ class LpDualizationTest {
         val builder = LpBuilder()
         val x = builder.addVar(0L, 3L)
         builder.addRow(intArrayOf(x), longArrayOf(1L), Relation.GE, 1L)
-        val source = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).trailModel()))
+        val source = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
         val attempt = LpRootDualizationAttempt(LpDualizationOptions(enabled = true, minRowColumnRatio = 1))
 
         assertNull(attempt.solve(source, token = Cancellation { true }))
@@ -158,7 +158,7 @@ class LpDualizationTest {
         val builder = LpBuilder()
         val x = builder.addVar(0L, 8L, cost = 2L)
         repeat(10) { builder.addRow(intArrayOf(x), longArrayOf(1L), Relation.GE, 3L) }
-        val model = assertNotNull(builder.build(Sense.MINIMIZE).trailModel())
+        val model = assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel())
 
         val result = solveAndCertify(
             model,
@@ -176,7 +176,7 @@ class LpDualizationTest {
         val builder = LpBuilder()
         val x = builder.addVar(0L, 8L, cost = 2L)
         builder.addRow(intArrayOf(x), longArrayOf(1L), Relation.GE, 3L)
-        val source = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).trailModel()))
+        val source = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
         var closed = false
         val factory = object : LpEngineFactory by ProductionLpEngineFactory {
             override fun newTableauSolver(
@@ -217,7 +217,7 @@ class LpDualizationTest {
         val builder = LpBuilder()
         val x = builder.addVar(0L, 8L, cost = 2L)
         builder.addRow(intArrayOf(x), longArrayOf(1L), Relation.GE, 3L)
-        val source = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).trailModel()))
+        val source = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
         val factory = object : LpEngineFactory by ProductionLpEngineFactory {
             override fun newTableauSolver(
                 model: LpModel,
@@ -256,7 +256,7 @@ class LpDualizationTest {
         val builder = LpBuilder()
         val x = builder.addVar(0L, 8L)
         builder.addRow(intArrayOf(x), longArrayOf(1L), Relation.GE, 3L)
-        val source = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).trailModel()))
+        val source = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
         var closed = false
         val factory = object : LpEngineFactory by ProductionLpEngineFactory {
             override fun newTableauSolver(

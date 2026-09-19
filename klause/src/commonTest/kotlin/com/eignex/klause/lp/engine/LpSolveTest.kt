@@ -367,14 +367,16 @@ class LpSolveTest {
     }
 
     @Test
-    fun `uncapturable legacy input withholds key and lazy safe bound`() {
+    fun `uncapturable legacy key still permits a faithful exact bound`() {
         val model = LpBuilder().apply { addVar(0L, 3L, cost = 1L) }.build(Sense.MINIMIZE)
         model.colContinuous[0] = true
 
         val result = solveAndCertify(model)
 
         assertNull(exactLpStateKey(model))
-        assertNull(result.safeLowerBound)
+        assertEquals(BigFraction.ZERO, result.lowerBound)
+        assertEquals(0.0, result.safeLowerBound)
+        assertNotNull(checkedLpWitness(model, assertNotNull(result.exactPrimal)))
     }
 
     @Test
@@ -487,7 +489,8 @@ class LpSolveTest {
         val result = solveAndCertify(model)
 
         assertEquals(LpVerdict.ATTAINED_OPTIMUM, result.verdict)
-        assertNotNull(result.certificate)
+        assertEquals(BigFraction.ofLong(3L), result.lowerBound)
+        assertNotNull(checkedLpWitness(model, assertNotNull(result.exactPrimal)))
         assertNull(result.farkasRay)
         assertEquals(3L, result.integerObjectiveLowerBound)
         val float = assertNotNull(result.float)
@@ -506,9 +509,9 @@ class LpSolveTest {
         val result = solveAndCertify(model)
 
         assertEquals(LpVerdict.INFEASIBLE, result.verdict)
-        assertNotNull(result.farkasRay)
-        assertNull(result.float)
-        assertNull(result.certificate)
+        assertTrue(checkedLpConflict(model, assertNotNull(result.rationalConflict)))
+        assertNull(result.witness)
+        assertNull(result.lowerBound)
     }
 
     @Test
@@ -688,14 +691,16 @@ class LpSolveTest {
     }
 
     @Test
-    fun `an unsupported unbounded producer retains feasibility without claiming unboundedness`() {
+    fun `the common producer certifies legacy unboundedness in source coordinates`() {
         val model = LpBuilder().apply { addOpenAboveVar(0L, cost = -1L) }.build(Sense.MINIMIZE)
 
         val result = solveAndCertify(model)
 
-        assertEquals(LpVerdict.FEASIBLE, result.verdict)
-        assertEquals(listOf(BigFraction.ZERO), result.exactPrimal)
-        assertNull(result.unboundedness)
+        assertEquals(LpVerdict.UNBOUNDED, result.verdict)
+        val proof = assertNotNull(result.unboundedness)
+        assertNotNull(checkedLpWitness(model, proof.witness.primal))
+        assertTrue(proof.direction.single() > BigFraction.ZERO)
+        assertTrue(BigFraction.MINUS_ONE * proof.direction.single() < BigFraction.ZERO)
         assertNull(result.lowerBound)
     }
 

@@ -1,6 +1,6 @@
 package com.eignex.klause.lp.engine
 
-import com.eignex.klause.lp.bounding.trailModel
+import com.eignex.klause.lp.engine.authoritativeModel
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.Cancellation
 import com.ionspin.kotlin.bignum.integer.BigInteger
@@ -18,7 +18,7 @@ class RefinementLifecycleTest {
         val builder = LpBuilder()
         val x = builder.addRealVar(0.0, 2.0, cost = -1.0)
         builder.addRealRow(intArrayOf(x), doubleArrayOf(1.0), Relation.LE, 1.0)
-        val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).trailModel()))
+        val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
         val model = assertNotNull(state.toWorkingModel())
         val basis = Basis(intArrayOf(1), arrayOf(VarStatus.AT_LOWER, VarStatus.BASIC))
         val cache = ExactBasisCache()
@@ -50,7 +50,7 @@ class RefinementLifecycleTest {
         val builder = LpBuilder()
         val x = builder.addRealVar(0.0, 2.0, cost = 1.0)
         builder.addRealRow(intArrayOf(x), doubleArrayOf(3.0), Relation.EQ, 1.0)
-        val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).trailModel()))
+        val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
         val hint = FloatLpResult(
             Basis(intArrayOf(0), arrayOf(VarStatus.BASIC, VarStatus.FIXED)),
             0.25,
@@ -93,7 +93,7 @@ class RefinementLifecycleTest {
             val builder = LpBuilder()
             val x = builder.addRealVar(0.0, 2.0, cost = 1.0)
             repeat(rows) { builder.addRealRow(intArrayOf(x), doubleArrayOf(3.0), Relation.EQ, 1.0) }
-            val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).trailModel()))
+            val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
             val hint = FloatLpResult(
                 Basis(
                     IntArray(rows) { if (it == 0) 0 else it + 1 },
@@ -139,7 +139,7 @@ class RefinementLifecycleTest {
         val x = builder.addRealVar(0.0, 2.0, cost = 1.0)
         val y = builder.addRealVar(0.0, 2.0)
         builder.addRealRow(intArrayOf(x, y), doubleArrayOf(3.0, 1.0), Relation.EQ, 1.0)
-        val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).trailModel()))
+        val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
         val basis = Basis(intArrayOf(0), arrayOf(VarStatus.BASIC, VarStatus.AT_LOWER, VarStatus.FIXED))
         LpScopedSolver(state).use { owner ->
             val result = refineLp(
@@ -165,7 +165,7 @@ class RefinementLifecycleTest {
         val builder = LpBuilder()
         val x = builder.addRealVar(0.0, 2.0, cost = 1.0)
         builder.addRealRow(intArrayOf(x), doubleArrayOf(3.0), Relation.EQ, 1.0)
-        val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).trailModel()))
+        val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
         val basis = Basis(intArrayOf(0), arrayOf(VarStatus.BASIC, VarStatus.FIXED))
         LpScopedSolver(state).use { owner ->
             val result = refineLp(
@@ -192,7 +192,7 @@ class RefinementLifecycleTest {
         val builder = LpBuilder()
         val x = builder.addRealVar(0.0, 2.0, cost = 1.0)
         builder.addRealRow(intArrayOf(x), doubleArrayOf(3.0), Relation.EQ, 1.0)
-        val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).trailModel()))
+        val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
         val basis = Basis(intArrayOf(0), arrayOf(VarStatus.BASIC, VarStatus.FIXED))
         val hint = FloatLpResult(
             basis,
@@ -379,7 +379,7 @@ class RefinementLifecycleTest {
         val builder = LpBuilder()
         val x = builder.addRealVar(0.0, 2.0, cost = 1.0)
         builder.addRealRow(intArrayOf(x), doubleArrayOf(3.0), Relation.EQ, 1.0)
-        val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).trailModel()))
+        val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
         val model = assertNotNull(state.toWorkingModel())
         val hint = FloatLpResult(
             Basis(intArrayOf(0), arrayOf(VarStatus.BASIC, VarStatus.FIXED)),
@@ -413,7 +413,7 @@ class RefinementLifecycleTest {
     fun `failed child adoption retires the child and preserves source availability`() {
         val builder = LpBuilder()
         builder.addVar(0, 2, cost = 1)
-        val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).trailModel()))
+        val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
         var fail = false
         val failure = IllegalStateException("adoption failed")
         val context = LpSolveContext(
@@ -467,7 +467,7 @@ class RefinementLifecycleTest {
         val builder = LpBuilder()
         val x = builder.addVar(0, 2, cost = 1)
         builder.addRow(intArrayOf(x), longArrayOf(1L), Relation.GE, 1L)
-        val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).trailModel()))
+        val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
         val failure = IllegalStateException("cleanup failed")
         val context = LpSolveContext(
             engineFactory = object : LpEngineFactory by ProductionLpEngineFactory {
@@ -522,7 +522,7 @@ class RefinementLifecycleTest {
         val builder = LpBuilder()
         val x = builder.addVar(0, 3, cost = 1)
         builder.addRow(intArrayOf(x), longArrayOf(1), Relation.GE, 1)
-        val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).trailModel()))
+        val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
         val model = assertNotNull(state.toWorkingModel())
         LpScopedSolver(state).use { owner ->
             val (solver, hint) = assertNotNull(owner.solveFloat())

@@ -610,13 +610,30 @@ internal class LpScopedSolver(
         var failure: Throwable? = null
         try {
             if (token() || next.model.m > maxRetainedRows) return null
-            val working = next.toWorkingModel() ?: return null
+            val projection = LpProjectionMeter(
+                workLimit = if (workLimit > 0L) workLimit else Long.MAX_VALUE,
+                cancellation = token,
+            )
+            val working = try {
+                next.toWorkingModel(projection)?.also {
+                    // The new numerical owner projects vectors again while adopting this state.
+                    projection.reserveVectors(next.model)
+                }
+            } finally {
+                preparationWork = if (preparationWork > Long.MAX_VALUE - projection.work) {
+                    Long.MAX_VALUE
+                } else {
+                    preparationWork + projection.work
+                }
+            } ?: return null
+            val remainingWork = if (workLimit > 0L) workLimit - projection.work else 0L
+            if (workLimit > 0L && remainingWork <= 0L) return null
             candidate = newPersistentLpSolver(
                 working,
                 token,
                 refactorUpdateLimit,
                 iterationLimit,
-                workLimit,
+                remainingWork,
                 trackDegeneracy,
                 context.engineFactory,
                 pricing,
@@ -627,7 +644,12 @@ internal class LpScopedSolver(
             val basis = try {
                 candidate.prepareLogicals(token)
             } finally {
-                preparationWork += candidate.lastMetrics.workOps
+                preparationWork =
+                    if (preparationWork > Long.MAX_VALUE - candidate.lastMetrics.workOps) {
+                        Long.MAX_VALUE
+                    } else {
+                        preparationWork + candidate.lastMetrics.workOps
+                    }
                 preparationRefactorizations += candidate.lastRefactorizations
             } ?: return null
             if (basis.basicVars.size != next.model.m || basis.status.size != next.model.numVars ||
@@ -639,6 +661,8 @@ internal class LpScopedSolver(
             preparationSuccesses++
             accepted = true
             return candidate to basis
+        } catch (_: LpProjectionStop) {
+            return null
         } catch (_: BasisArithmeticException) {
             return null
         } catch (primary: Throwable) {

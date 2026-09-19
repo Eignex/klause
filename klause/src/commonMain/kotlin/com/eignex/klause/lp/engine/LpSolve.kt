@@ -7,8 +7,6 @@ import com.eignex.klause.simplex.exact.ContinuationDecline
 import com.eignex.klause.simplex.exact.ExactContinuationLimits
 import com.eignex.klause.simplex.exact.ExactContinuationMetrics
 import com.eignex.klause.simplex.exact.ExactSimplexBound
-import com.eignex.klause.simplex.exact.RationalFeasibility
-import com.eignex.klause.simplex.exact.rationalOutcome
 import com.eignex.klause.util.Cancellation
 import com.ionspin.kotlin.bignum.integer.BigInteger
 import kotlin.time.Duration
@@ -156,6 +154,50 @@ internal fun solveAndCertify(
     counterResults: LpCounterResults? = null,
     pricing: LpPricingOptions = LpPricingOptions(),
     refinementLimits: LpRefinementLimits = LpRefinementLimits(),
+): CertifiedLpResult {
+    val authoritative = if (model.exactState != null) {
+        model
+    } else {
+        val exact = model.authoritativeModel()
+            ?: return CertifiedLpResult(null, null, null, null, null, false, { null })
+        LpExactState(exact).toWorkingModel()
+            ?: return CertifiedLpResult(null, null, null, null, null, false, { null })
+    }
+    val counters = if (authoritative === model) {
+        counterResults
+    } else {
+        counterResults?.let { source ->
+            LpCounterResults().also { imported ->
+                source.read(model, context.certificationPolicy)?.let {
+                    imported.remember(authoritative, it, context.certificationPolicy)
+                }
+            }
+        }
+    }
+    val result = certifyAuthoritativeSolve(
+        authoritative, warm, cancellation, componentSplit, observer, context, counters, pricing, refinementLimits,
+    )
+    if (authoritative !== model) {
+        if ((result.witness?.let { checkedLpWitness(model, it.primal) } == null && result.witness != null) ||
+            result.rationalConflict?.let { !checkedLpConflict(model, it) } == true || cancellation()
+        ) {
+            return CertifiedLpResult(null, null, null, null, null, false, { null })
+        }
+        counterResults?.remember(model, result, context.certificationPolicy)
+    }
+    return result
+}
+
+private fun certifyAuthoritativeSolve(
+    model: LpModel,
+    warm: Basis?,
+    cancellation: Cancellation,
+    componentSplit: Boolean,
+    observer: LpCertificationObserver?,
+    context: LpSolveContext,
+    counterResults: LpCounterResults?,
+    pricing: LpPricingOptions,
+    refinementLimits: LpRefinementLimits,
 ): CertifiedLpResult = newLpSolver(
     model,
     cancellation,
@@ -187,6 +229,7 @@ internal fun solveAndCertify(
     }
 }
 
+// Certifies only the supplied solve and its current basis; source solves import authority before allocation.
 internal fun certifyLpResult(
     model: LpModel,
     solver: LpSolver,
@@ -509,32 +552,6 @@ internal fun certifyLpResult(
         val accepted = policy.acceptNullable(LpCertifier.RATIONAL, continued.takeIf { it.metrics.success })
         witness = accepted?.witness?.let { policy.acceptNullable(LpCertifier.EXACT_BASIS, it) }
         conflict = accepted?.conflict?.let { policy.acceptNullable(LpCertifier.EXACT_FARKAS, it) }
-    }
-    // Legacy owners without current targets and strict margins retain their migration fallback.
-    if (state == null && continued?.metrics?.success != true &&
-        (model.rowStrict.any { it } || continued?.metrics?.decline == ContinuationDecline.NO_BASIS) &&
-        witness == null && !withheldWitness && !withheldConflict && ray == null && conflict == null &&
-        (result == null || model.hasContinuous)
-    ) {
-        val outcome = if (cancellation()) null else rationalOutcome(model, cancellation)
-        val point = if (outcome?.feasibility == RationalFeasibility.FEASIBLE) {
-            outcome.exactWitness?.let { shifted ->
-                checkedLpWitness(model, shifted.mapIndexed { j, value -> value + model.exactShift(j) })
-            }
-        } else {
-            null
-        }
-        val refutation = if (outcome?.feasibility == RationalFeasibility.INFEASIBLE) {
-            outcome.conflict?.takeIf { checkedLpConflict(model, it) }
-        } else {
-            null
-        }
-        val success = point != null || refutation != null
-        observer?.observe(LpCertifier.RATIONAL, success)
-        if (policy.acceptNullable(LpCertifier.RATIONAL, outcome?.takeIf { success }) != null) {
-            witness = point
-            conflict = refutation
-        }
     }
     if (continued == null) {
         capturedTarget?.let {

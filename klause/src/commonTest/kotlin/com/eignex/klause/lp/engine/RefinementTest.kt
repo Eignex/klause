@@ -1,6 +1,6 @@
 package com.eignex.klause.lp.engine
 
-import com.eignex.klause.lp.bounding.trailModel
+import com.eignex.klause.lp.engine.authoritativeModel
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.Cancellation
 import com.ionspin.kotlin.bignum.integer.BigInteger
@@ -17,7 +17,7 @@ class RefinementTest {
         val builder = LpBuilder()
         val x = builder.addRealVar(0.0, 2.0, cost = 1.0)
         builder.addRealRow(intArrayOf(x), doubleArrayOf(3.0), Relation.EQ, 1.0)
-        val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).trailModel()))
+        val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
         val third = BigFraction.of(BigInteger.ONE, BigInteger.fromInt(3))
         LpScopedSolver(state).use { owner ->
             val result = refineLp(
@@ -108,7 +108,7 @@ class RefinementTest {
     fun `an unchanged exhausted attempt cannot buy another child`() {
         val builder = LpBuilder()
         builder.addVar(0, 2, cost = 1)
-        val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).trailModel()))
+        val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
         LpScopedSolver(state).use { owner ->
             val request = LpRefinementRequest(owner, owner.refinementCache, LpRefinementLimits(maxWork = 1L))
             val first = refineLp(assertNotNull(state.toWorkingModel()), request, doubleArrayOf(1.0), doubleArrayOf())
@@ -126,7 +126,7 @@ class RefinementTest {
     fun `cancellation withholds correction publication and leaves source available`() {
         val builder = LpBuilder()
         builder.addVar(0, 2, cost = 1)
-        val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).trailModel()))
+        val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
         LpScopedSolver(state).use { owner ->
             val result = refineLp(
                 assertNotNull(state.toWorkingModel()),

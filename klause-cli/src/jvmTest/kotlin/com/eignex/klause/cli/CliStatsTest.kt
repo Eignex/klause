@@ -13,6 +13,7 @@ import com.eignex.klause.solver.result.PresolveStats
 import com.eignex.klause.solver.result.RunStats
 import com.eignex.klause.solver.result.SchedulingStats
 import com.eignex.klause.solver.result.SearchStats
+import com.eignex.klause.solver.result.SourceLpWorkStats
 import com.eignex.klause.solver.result.SmtStats
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.kumulant.stat.summary.SumResult
@@ -343,17 +344,20 @@ class CliStatsTest {
     }
 
     @Test
-    fun `SMT stats distinguish private and shared checks without zero-denominator rates`() {
+    fun `SMT stats report source work without zero-denominator rates`() {
         val stats = SolveStats(
             run = RunStats(backend = "exact-lira"),
             openTheory = OpenTheoryWorkStats(openTheoryChecks = 5),
-            smt = SmtStats(privateChecks = 2, explainedConflicts = 0, witnessCandidates = 0),
+            smt = SmtStats(sourceLp = SourceLpWorkStats(operations = 2, modeledWork = 7, floatWork = 3)),
         )
 
         val pairs = openTheoryStatPairs(stats, solveTimeMs = 0).toMap()
 
-        assertEquals("2", pairs["smtPrivateChecks"])
-        assertEquals("3", pairs["smtSharedChecks"])
+        assertEquals("2", pairs["smtSourceLpOperations"])
+        assertEquals("7", pairs["smtSourceLpModeledWork"])
+        assertEquals("3", pairs["smtSourceLpFloatWork"])
+        assertTrue("smtPrivateChecks" !in pairs)
+        assertTrue("smtSimplexAttempts" !in pairs)
         assertEquals("5", pairs["smtTheoryChecks"])
         assertTrue("smtTheoryChecksPerSec" !in pairs)
         assertTrue("smtLiteralsPerExplainedConflict" !in pairs)
@@ -365,7 +369,7 @@ class CliStatsTest {
         val stats = SolveStats(
             run = RunStats(backend = "exact-lira", wallMs = 10),
             openTheory = OpenTheoryWorkStats(openTheoryChecks = 100),
-            smt = SmtStats(privateChecks = 1),
+            smt = SmtStats(reductionRequests = 1),
         )
 
         val pairs = openTheoryStatPairs(stats, solveTimeMs = 1_000).toMap()

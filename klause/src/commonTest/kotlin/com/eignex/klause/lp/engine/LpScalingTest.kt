@@ -1,6 +1,6 @@
 package com.eignex.klause.lp.engine
 
-import com.eignex.klause.lp.bounding.trailModel
+import com.eignex.klause.lp.engine.authoritativeModel
 import com.eignex.klause.simplex.exact.BigFraction
 import com.ionspin.kotlin.bignum.integer.BigInteger
 import kotlin.math.pow
@@ -212,7 +212,7 @@ class LpScalingTest {
                 for (changed in listOf("rhs", "cost", "upper", "all")) {
                     val inputModel = mixedScaleModel()
                     val model = if (exact) {
-                        assertNotNull(LpExactState(assertNotNull(inputModel.trailModel())).toWorkingModel())
+                        assertNotNull(LpExactState(assertNotNull(inputModel.authoritativeModel())).toWorkingModel())
                     } else {
                         inputModel
                     }
@@ -247,7 +247,7 @@ class LpScalingTest {
     @Test
     fun `scope and auxiliary refresh bind their own exact source and active vectors`() {
         for (enabled in listOf(false, true)) {
-            val trail = LpBoundTrail(assertNotNull(mixedScaleModel().trailModel()))
+            val trail = LpBoundTrail(assertNotNull(mixedScaleModel().authoritativeModel()))
             val original = assertNotNull(trail.state.toWorkingModel())
             val view = LpScalingView.create(original, LpScalingOptions(enabled = enabled))
             assertTrue(trail.push())
@@ -325,7 +325,7 @@ class LpScalingTest {
     @Test
     fun `matching vectors cannot bypass exact projection and constant checks`() {
         for (changed in listOf("rhs", "cost", "upper", "origin", "constant")) {
-            val state = LpExactState(assertNotNull(mixedScaleModel().trailModel()))
+            val state = LpExactState(assertNotNull(mixedScaleModel().authoritativeModel()))
             val model = assertNotNull(state.toWorkingModel())
             val view = LpScalingView.create(model)
             assertTrue(view.applied)

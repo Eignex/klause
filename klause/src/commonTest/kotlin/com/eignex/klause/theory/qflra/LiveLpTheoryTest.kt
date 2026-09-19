@@ -3,6 +3,7 @@ package com.eignex.klause.theory.qflra
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
+import com.eignex.klause.formats.smtlib.SmtLib
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.LinearForm
@@ -28,6 +29,11 @@ import com.eignex.klause.simplex.basis.BasisSolver
 import com.eignex.klause.simplex.basis.IndexedVector
 import com.eignex.klause.simplex.basis.KotlinBasisSolver
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.solver.pipeline.OpenTheoryEngine
+import com.eignex.klause.solver.pipeline.OpenTheoryResult
+import com.eignex.klause.solver.pipeline.OpenTheorySolveState
+import com.eignex.klause.solver.pipeline.ProblemPipeline
+import com.eignex.klause.solver.pipeline.TheoryParams
 import com.eignex.klause.solver.pipeline.componentPlan
 import com.eignex.klause.solver.pipeline.search
 import com.eignex.klause.solver.result.SmtStatsSink
@@ -58,6 +64,45 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class LiveLpTheoryTest {
+    @Test
+    fun `returned theory statistics include cleanup and remain immutable across rounds`() {
+        for (cancelAfterWork in listOf(false, true)) {
+            val model = SmtLib.parse(
+                """
+                (set-logic QF_LIRA)
+                (declare-const x Int) (declare-const y Int) (declare-const z Real)
+                (assert (= (- (* 2 x) (* 3 y)) 1))
+                (assert (> z (+ x y)))
+                (check-sat)
+                """.trimIndent(),
+            ).model
+            lateinit var state: OpenTheorySolveState
+            val params = TheoryParams(
+                cancellation = Cancellation {
+                cancelAfterWork && state.smt.snapshot().sourceLp.operations > 0L
+            }
+            )
+            state = OpenTheorySolveState(params)
+            val engine = OpenTheoryEngine(model, ProblemPipeline.EXACT_LIRA)
+
+            val result = engine.solve(params, state)
+
+            if (cancelAfterWork) {
+                assertIs<OpenTheoryResult.Unknown>(result)
+            } else {
+                assertIs<OpenTheoryResult.Sat>(result)
+            }
+            val captured = result.stats.smt.sourceLp
+            assertEquals(state.smt.snapshot().sourceLp, captured)
+            assertTrue(captured.operations > 0L)
+            assertTrue(captured.preparationWork > 0L)
+            assertTrue(captured.activeNs > 0L)
+            engine.solve(params, state)
+            assertEquals(captured, result.stats.smt.sourceLp)
+            if (!cancelAfterWork) assertTrue(state.smt.snapshot().sourceLp.activeNs > captured.activeNs)
+        }
+    }
+
     @Test
     fun `production factory retains one float owner across opposite assertions and pop`() {
         val source = Problem(
@@ -677,8 +722,8 @@ class LiveLpTheoryTest {
                     }
                 }
             }
-            assertEquals(1, created, scenario)
-            assertEquals(1, closed, scenario)
+            assertEquals(if (scenario == "decline") 3 else 1, created, scenario)
+            assertEquals(created, closed, scenario)
         }
     }
 
@@ -789,7 +834,7 @@ class LiveLpTheoryTest {
 
                 assertNull(component.nextBranch(session))
                 assertIs<ComponentCheck.Indeterminate>(component.check(session))
-                assertEquals(0L, stats.snapshot().privateChecks)
+                assertEquals(0L, stats.snapshot().sourceLp.operations)
                 assertTrue(stats.snapshot().continuation.calls > 0L)
                 assertTrue(stats.snapshot().continuation.work.values.sum() > 0L)
             }
@@ -842,7 +887,7 @@ class LiveLpTheoryTest {
             assertTrue(injectedFailures > 0)
             assertTrue(stats.snapshot().continuation.successes > 0L)
             assertTrue(stats.snapshot().continuation.pivots > 0L)
-            assertEquals(0L, stats.snapshot().privateChecks)
+            assertEquals(0L, stats.snapshot().sourceLp.operations)
         }
     }
 

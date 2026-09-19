@@ -7,7 +7,7 @@ import com.eignex.klause.lp.bounding.LpParams
 import com.eignex.klause.lp.bounding.LpPropagator
 import com.eignex.klause.lp.bounding.LpSearchPolicy
 import com.eignex.klause.lp.bounding.solveNode
-import com.eignex.klause.lp.bounding.trailModel
+import com.eignex.klause.lp.engine.authoritativeModel
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.util.Cancellation
@@ -110,7 +110,7 @@ class LpRootAdmissionTest {
     fun `a foreign equal valued authority consumes admission and leaves current state intact`() {
         val builder = LpBuilder()
         builder.addVar(0L, 3L)
-        val source = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).trailModel()))
+        val source = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
         val model = assertNotNull(source.toWorkingModel())
         val foreign = LpExactState(source.model)
         val foreignModel = assertNotNull(foreign.toWorkingModel())
@@ -130,7 +130,7 @@ class LpRootAdmissionTest {
     fun `zero and exhausted finite limits cannot become unlimited admission`() {
         val builder = LpBuilder()
         builder.addVar(0L, 3L)
-        val source = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).trailModel()))
+        val source = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
         val model = assertNotNull(source.toWorkingModel())
 
         assertFailsWith<IllegalArgumentException> { LpRootAdmission(model, 0L, null) }
@@ -143,7 +143,7 @@ class LpRootAdmissionTest {
     fun `a missing exact model consumes the receipt`() {
         val builder = LpBuilder()
         builder.addVar(0L, 3L)
-        val source = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).trailModel()))
+        val source = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
         val model = assertNotNull(source.toWorkingModel())
         val receipt = LpRootAdmission(model, 10L, null)
 
@@ -155,7 +155,7 @@ class LpRootAdmissionTest {
     fun `per call cancellation preserves installed state and consumes the root receipt`() {
         val builder = LpBuilder()
         builder.addVar(0L, 3L)
-        val source = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).trailModel()))
+        val source = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
         val model = assertNotNull(source.toWorkingModel())
         val receipt = LpRootAdmission(model, 10L, null)
         LpEngine(
@@ -182,7 +182,7 @@ class LpRootAdmissionTest {
         val builder = LpBuilder()
         val x = builder.addVar(0L, 3L)
         repeat(4) { builder.addRow(intArrayOf(x), longArrayOf(1L), Relation.GE, 1L) }
-        val source = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).trailModel()))
+        val source = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
         val model = assertNotNull(source.toWorkingModel())
         val receipt = LpRootAdmission(model, 2L, null)
         LpPropagator(object : LpSearchPolicy {}).use { owner ->
@@ -202,7 +202,7 @@ class LpRootAdmissionTest {
         val builder = LpBuilder()
         val x = builder.addVar(0, 4, cost = 1)
         builder.addRow(intArrayOf(x), longArrayOf(1), Relation.GE, 1)
-        val source = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).trailModel()))
+        val source = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
         val model = assertNotNull(source.toWorkingModel())
         val seen = ArrayList<LpFloatAllowance?>()
         var constructions = 0
@@ -257,7 +257,7 @@ class LpRootAdmissionTest {
             val builder = LpBuilder()
             val x = builder.addVar(0, 4, cost = 1)
             builder.addRow(intArrayOf(x), longArrayOf(1), Relation.GE, 1)
-            val source = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).trailModel()))
+            val source = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
             val model = assertNotNull(source.toWorkingModel())
             val cleanup = IllegalStateException("root cleanup failed")
             var cancelled = false
@@ -330,7 +330,7 @@ class LpRootAdmissionTest {
     fun `releasing an unattempted root owner cannot bypass admission`() {
         val builder = LpBuilder()
         builder.addVar(0, 1)
-        val source = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).trailModel()))
+        val source = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
         val model = assertNotNull(source.toWorkingModel())
         val receipt = LpRootAdmission(model, 10L, 1)
         LpPropagator(object : LpSearchPolicy {}).use { owner ->
@@ -348,7 +348,7 @@ class LpRootAdmissionTest {
     fun `epoch publication cannot replace an unattempted admitted root`() {
         val builder = LpBuilder()
         builder.addVar(0, 1)
-        val source = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).trailModel()))
+        val source = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
         val model = assertNotNull(source.toWorkingModel())
         LpPropagator(object : LpSearchPolicy {}).use { owner ->
             assertTrue(owner.install(model, source.model, LpRootAdmission(model, 10L, 1)))

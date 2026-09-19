@@ -100,15 +100,25 @@ class SolveStatsMergeTest {
     }
 
     @Test
-    fun `SMT counters and exclusive timings add across solve slices`() {
-        val left = SolveStats(smt = SmtStats(privateChecks = 2, reductionNs = 7, simplexNs = 11, escalationNs = 13))
-        val right = SolveStats(smt = SmtStats(privateChecks = 3, reductionNs = 17, simplexNs = 19, escalationNs = 23))
+    fun `SMT counters and source work add across solve slices`() {
+        val left = SolveStats(
+            smt = SmtStats(
+                reductionNs = 7,
+                sourceLp = SourceLpWorkStats(operations = 2, floatWork = 11, modeledWork = 13),
+            ),
+        )
+        val right = SolveStats(
+            smt = SmtStats(
+                reductionNs = 17,
+                sourceLp = SourceLpWorkStats(operations = 3, floatWork = 19, modeledWork = 23),
+            ),
+        )
 
         val merged = left.mergedWith(right).smt
 
-        assertEquals(5L, merged.privateChecks)
+        assertEquals(5L, merged.sourceLp.operations)
         assertEquals(24L, merged.reductionNs)
-        assertEquals(30L, merged.simplexNs)
-        assertEquals(36L, merged.escalationNs)
+        assertEquals(30L, merged.sourceLp.floatWork)
+        assertEquals(36L, merged.sourceLp.modeledWork)
     }
 }

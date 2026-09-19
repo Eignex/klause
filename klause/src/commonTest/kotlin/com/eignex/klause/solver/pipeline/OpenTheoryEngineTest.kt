@@ -109,7 +109,7 @@ class OpenTheoryEngineTest {
 
         assertEquals(TerminationReason.Cancelled, assertIs<OpenTheoryResult.Unknown>(result).reason)
         assertEquals(false, result.stats.run.timedOut)
-        assertEquals(0L, result.stats.smt.simplexAttempts)
+        assertEquals(0L, result.stats.smt.sourceLp.operations)
     }
 
     @Test

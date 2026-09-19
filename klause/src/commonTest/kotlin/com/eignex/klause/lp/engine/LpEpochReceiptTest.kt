@@ -1,6 +1,6 @@
 package com.eignex.klause.lp.engine
 
-import com.eignex.klause.lp.bounding.trailModel
+import com.eignex.klause.lp.engine.authoritativeModel
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -18,7 +18,7 @@ class LpEpochReceiptTest {
     fun `refinement spending is carried without inventing continuation spending`() {
         val builder = LpBuilder()
         builder.addVar(0, 4)
-        val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).trailModel()))
+        val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
         LpScopedSolver(state).use { donor ->
             donor.refinementCache.work = Long.MAX_VALUE
             donor.refinementCache.allocation = 1234L
@@ -46,7 +46,7 @@ class LpEpochReceiptTest {
     fun `both ledgers survive repeated equivalent replacements`() {
         val builder = LpBuilder()
         builder.addVar(0, 4)
-        val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).trailModel()))
+        val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
         val original = LpScopedSolver(state).use { donor ->
             assertTrue(donor.importEpochBudget(LpEpochBudget(state.model, 10L, 20L, 30L, 4, 5, 60)))
             donor.refinementCache.work = 70L
@@ -77,7 +77,7 @@ class LpEpochReceiptTest {
     fun `current attempts remain suppressed while changed limits retain spent work`() {
         val builder = LpBuilder()
         builder.addVar(0, 4)
-        val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).trailModel()))
+        val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
         val limits = LpRefinementLimits(maxWork = 7L)
         val receipt = LpScopedSolver(state).use { donor ->
             donor.refinementCache.work = 7L
@@ -109,7 +109,7 @@ class LpEpochReceiptTest {
     fun `a historical attempt does not suppress the replacement current state`() {
         val builder = LpBuilder()
         builder.addVar(0, 4)
-        val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).trailModel()))
+        val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
         val limits = LpRefinementLimits(maxWork = 7L)
         val receipt = LpScopedSolver(state).use { donor ->
             donor.refinementCache.work = 7L
@@ -137,7 +137,7 @@ class LpEpochReceiptTest {
         val builder = LpBuilder()
         builder.addVar(0, 4)
         builder.addRow(intArrayOf(0), longArrayOf(1), Relation.LE, 3)
-        val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).trailModel()))
+        val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
         val foreign = state.model.copy(objective = ExactLpObjective(List(2) { ExactLpNumber.of(1L) }))
         val receipt = LpScopedSolver(state).use { donor ->
             assertTrue(donor.importEpochBudget(LpEpochBudget(state.model, 10L, 20L, 30L, 4, 5, 60)))
@@ -164,7 +164,7 @@ class LpEpochReceiptTest {
     fun `direct refinement activity makes a destination ineligible for receipt import`() {
         val builder = LpBuilder()
         builder.addVar(0, 4)
-        val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).trailModel()))
+        val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
         val receipt = LpScopedSolver(state).use { assertNotNull(it.exportEpochReceipt()) }
 
         for (field in listOf("work", "allocation", "pivots", "elapsed", "attempt", "limits")) {
@@ -198,7 +198,7 @@ class LpEpochReceiptTest {
     fun `empty receipt imports are one shot across both budget APIs`() {
         val builder = LpBuilder()
         builder.addVar(0, 4)
-        val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).trailModel()))
+        val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
         val receipt = LpScopedSolver(state).use { assertNotNull(it.exportEpochReceipt()) }
         val continuation = LpEpochBudget(state.model, 0L, 0L, 0L, 0, 0, 0)
 
@@ -220,7 +220,7 @@ class LpEpochReceiptTest {
     fun `receipt import requires root depth without consuming a declined import`() {
         val builder = LpBuilder()
         builder.addVar(0, 4)
-        val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).trailModel()))
+        val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
         val receipt = LpScopedSolver(state).use { assertNotNull(it.exportEpochReceipt()) }
         LpScopedSolver(LpExactState(state.model)).use { replacement ->
             assertTrue(replacement.push())
@@ -237,7 +237,7 @@ class LpEpochReceiptTest {
     fun `exact certification makes a destination ineligible even without refinement`() {
         val builder = LpBuilder()
         builder.addVar(0, 4)
-        val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).trailModel()))
+        val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
         val receipt = LpScopedSolver(state).use { assertNotNull(it.exportEpochReceipt()) }
         LpScopedSolver(LpExactState(state.model)).use { replacement ->
             val result = assertNotNull(replacement.solve())
@@ -255,7 +255,7 @@ class LpEpochReceiptTest {
     fun `closed and working active owners cannot export or import receipts`() {
         val builder = LpBuilder()
         builder.addVar(0, 4)
-        val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).trailModel()))
+        val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
         val owner = LpScopedSolver(state)
         val receipt = assertNotNull(owner.exportEpochReceipt())
         owner.withWorkingModel(LpWorkingModel.overrides(state), allowance = LpFloatAllowance(10000L, 10)) {

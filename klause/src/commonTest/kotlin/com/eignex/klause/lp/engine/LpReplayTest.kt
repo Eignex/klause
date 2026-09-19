@@ -1,6 +1,9 @@
 package com.eignex.klause.lp.engine
 
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.simplex.exact.ContinuationDecline
+import com.eignex.klause.simplex.exact.ExactContinuationLimits
+import com.eignex.klause.util.Cancellation
 import com.ionspin.kotlin.bignum.integer.BigInteger
 import kotlin.random.Random
 import kotlin.test.Test
@@ -12,6 +15,212 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class LpReplayTest {
+    @Test
+    fun `replay exhausts one continuation allowance across unchanged and changing bases`() {
+        for (changing in listOf(false, true)) {
+            val model = LpBuilder().apply {
+                val x = addRealVar(0.0, 2.0)
+                addRealRow(intArrayOf(x), doubleArrayOf(1.0), Relation.GE, 1.0)
+            }.build(Sense.MINIMIZE)
+            var event = 0
+            val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+                override fun newGeneralSolver(
+                    model: LpModel,
+                    cancellation: Cancellation,
+                    pricing: LpPricingOptions,
+                ): LpSolver = object : LpSolver {
+                    override val infeasibleRay: DoubleArray? = null
+                    override val infeasibleBasis: Basis get() = if (changing && event % 2 == 0) {
+                        Basis(intArrayOf(0), arrayOf(VarStatus.BASIC, VarStatus.AT_LOWER))
+                    } else {
+                        Basis(intArrayOf(1), arrayOf(VarStatus.AT_LOWER, VarStatus.BASIC))
+                    }
+                    override fun solve(warm: Basis?): FloatLpResult? {
+                        event++;
+                        return null
+                    }
+                    override fun solvePrimal(warm: Basis?): FloatLpResult? = solve(warm)
+                }
+            }
+            val capture = LpCapture.capture(
+                model,
+                LpReplaySettings("continuation-allowance", 570L, componentSplit = false),
+                List(32) { LpReplayEvent.Solve() },
+            )
+
+            val report = LpReplay.replay(
+                capture,
+                context = LpSolveContext(factory),
+                continuationLimits = ExactContinuationLimits(maxWork = 5000L),
+            )
+
+            assertTrue(report.steps.first().continuation?.success == true)
+            assertEquals(ContinuationDecline.WORK, report.steps.last().continuation?.decline)
+            assertTrue(report.steps.sumOf { it.continuation?.work ?: 0L } <= 5000L)
+            assertFalse(report.steps.last().hasFeasibleWitness)
+            assertFalse(report.steps.last().hasInfeasibilityProof)
+        }
+    }
+
+    @Test
+    fun `strict replay exposes supplemental admission refusal`() {
+        val model = LpBuilder().apply {
+            val x = addRealVar(0.0, 1.0, cost = 1.0)
+            repeat(128) { addRealVar(0.0, 1.0) }
+            addRealRow(intArrayOf(x), doubleArrayOf(1.0), Relation.GE, 0.0, strict = true)
+        }.build(Sense.MINIMIZE)
+        val capture = LpCapture.capture(
+            model,
+            LpReplaySettings("strict-admission", 570L, componentSplit = false),
+            listOf(LpReplayEvent.Solve()),
+        )
+
+        val step = LpReplay.replay(capture).steps.single()
+
+        assertEquals(LpStrictReplayCapability.ADMISSION_DECLINED, step.strictRefinementCapability)
+        assertFalse(step.hasFeasibleWitness)
+        assertFalse(step.hasInfeasibilityProof)
+    }
+
+    @Test
+    fun `strict replay cancellation during auxiliary preparation publishes no witness`() {
+        val source = LpBuilder().apply {
+            val x = addRealVar(0.0, 1.0, cost = 1.0)
+            addRealRow(intArrayOf(x), doubleArrayOf(1.0), Relation.GE, 0.0, strict = true)
+        }.build(Sense.MINIMIZE)
+        var prepared = false
+        var closed = 0
+        val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+            override fun newPersistentSolver(
+                model: LpModel,
+                cancellation: Cancellation,
+                refactorUpdateLimit: Int,
+                iterationLimit: Int,
+                workLimit: Long,
+                trackDegeneracy: Boolean,
+                pricing: LpPricingOptions,
+            ): PersistentLpSolver {
+                val delegate = ProductionLpEngineFactory.newPersistentSolver(
+                    model,
+                    cancellation,
+                    refactorUpdateLimit,
+                    iterationLimit,
+                    workLimit,
+                    trackDegeneracy,
+                    pricing,
+                )
+                return object : PersistentLpSolver by delegate {
+                    override fun prepareLogicals(token: Cancellation): Basis? {
+                        val result = delegate.prepareLogicals(token)
+                        prepared = true
+                        repeat(2000) { cancellation() }
+                        return result
+                    }
+                    override fun close() {
+                        closed++;
+                        delegate.close()
+                    }
+                }
+            }
+        }
+        val capture = LpCapture.capture(
+            source,
+            LpReplaySettings("strict-cancel", 570L, componentSplit = false, cancellationPollLimit = 2000),
+            listOf(LpReplayEvent.Solve()),
+        )
+
+        val step = LpReplay.replay(capture, context = LpSolveContext(factory)).steps.single()
+
+        assertTrue(prepared)
+        assertEquals(1, closed)
+        assertFalse(step.hasFeasibleWitness)
+        assertFalse(step.hasInfeasibilityProof)
+        assertNull(step.exactWitness)
+    }
+
+    @Test
+    fun `strict replay retains source evidence without adding numerical source solves`() {
+        val source = LpBuilder().apply {
+            val x = addRealVar(0.0, 1.0, cost = 1.0)
+            addRealRow(intArrayOf(x), doubleArrayOf(1.0), Relation.GE, 0.0, strict = true)
+        }.build(Sense.MINIMIZE)
+        val calls = ArrayList<String>()
+        var sourceOwners = 0
+        var auxiliaries = 0
+        var closed = 0
+        val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+            override fun newGeneralSolver(
+                model: LpModel,
+                cancellation: Cancellation,
+                pricing: LpPricingOptions,
+            ): LpSolver {
+                sourceOwners++
+                val delegate = ProductionLpEngineFactory.newGeneralSolver(model, cancellation, pricing)
+                return object : LpSolver by delegate {
+                    override fun solve(warm: Basis?): FloatLpResult? {
+                        calls += "solve"
+                        return delegate.solve(warm)
+                    }
+                    override fun solvePrimal(warm: Basis?): FloatLpResult? {
+                        calls += "solvePrimal"
+                        return delegate.solvePrimal(warm)
+                    }
+                    override fun close() {
+                        closed++
+                        delegate.close()
+                    }
+                }
+            }
+            override fun newPersistentSolver(
+                model: LpModel,
+                cancellation: Cancellation,
+                refactorUpdateLimit: Int,
+                iterationLimit: Int,
+                workLimit: Long,
+                trackDegeneracy: Boolean,
+                pricing: LpPricingOptions,
+            ): PersistentLpSolver {
+                assertTrue(model.n > source.n)
+                auxiliaries++
+                val delegate = ProductionLpEngineFactory.newPersistentSolver(
+                    model,
+                    cancellation,
+                    refactorUpdateLimit,
+                    iterationLimit,
+                    workLimit,
+                    trackDegeneracy,
+                    pricing,
+                )
+                return object : PersistentLpSolver by delegate {
+                    override fun close() {
+                        closed++
+                        delegate.close()
+                    }
+                }
+            }
+        }
+        val capture = LpCapture.capture(
+            source,
+            LpReplaySettings("strict-repeat", 570L, componentSplit = false),
+            listOf(LpReplayEvent.Solve(), LpReplayEvent.SolvePrimal()),
+        )
+
+        val report = LpReplay.replay(capture, context = LpSolveContext(factory))
+
+        assertEquals(listOf("solve", "solvePrimal"), calls)
+        assertEquals(1, sourceOwners)
+        assertEquals(1, auxiliaries)
+        assertEquals(sourceOwners + auxiliaries, closed)
+        assertEquals(1, report.steps.sumOf { it.refinement?.strictAttempts ?: 0 })
+        assertTrue(report.steps.last().supplementalEvidenceReused)
+        for (step in report.steps) {
+            assertEquals(LpVerdict.FEASIBLE, step.productionVerdict)
+            assertEquals(BigFraction.ZERO, step.rationalLowerBound)
+            assertNotNull(checkedLpWitness(source, assertNotNull(step.exactWitness)))
+            assertTrue(assertNotNull(step.exactWitness).single() > BigFraction.ZERO)
+        }
+    }
+
     @Test
     fun `row replay preserves interleaved persistent guards through nested backjumps`() {
         val zero = ExactLpNumber.of(0L)
@@ -330,7 +539,7 @@ class LpReplayTest {
             0L,
             LpReplaySolverKind.PERSISTENT,
             componentSplit = false,
-            cancellationPollLimit = 12,
+            cancellationPollLimit = 32,
         )
         val capture = LpExactCapture.capture(
             model,
@@ -561,10 +770,10 @@ class LpReplayTest {
             var validations = 0
 
             assertFails {
-                LpReplay.replay(LpCapture.decode(capture.encode())) { _, _ ->
+                LpReplay.replay(LpCapture.decode(capture.encode()), validator = { _, _ ->
                     validations++
                     LpIndependentCheck(LpIndependentValidation.VALIDATED, LpIndependentClaim.PROVED_OPTIMUM)
-                }
+                })
             }
             assertEquals(0, validations, "${future::class.simpleName} executed a prefix before rejection")
         }

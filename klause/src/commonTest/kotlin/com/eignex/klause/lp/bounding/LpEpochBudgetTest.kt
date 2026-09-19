@@ -17,6 +17,7 @@ import com.eignex.klause.lp.engine.LpScopedSolver
 import com.eignex.klause.lp.engine.Relation
 import com.eignex.klause.lp.engine.Sense
 import com.eignex.klause.lp.engine.VarStatus
+import com.eignex.klause.lp.engine.authoritativeModel
 import com.eignex.klause.lp.engine.continueExactLp
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ContinuationDecline
@@ -43,7 +44,7 @@ class LpEpochBudgetTest {
                     addVar(0L, 10L)
                     addRow(intArrayOf(j), longArrayOf(3L), Relation.GE, 1L)
                 }
-            }.build(Sense.MINIMIZE).trailModel(),
+            }.build(Sense.MINIMIZE).authoritativeModel(),
         )
         val state = LpExactState(source)
         val basis = Basis(IntArray(4) { 4 + it }, Array(8) { if (it < 4) VarStatus.AT_LOWER else VarStatus.BASIC })
@@ -77,7 +78,7 @@ class LpEpochBudgetTest {
 
     @Test
     fun `imported work remains spent across an equivalent basis change`() {
-        val source = assertNotNull(LpBuilder().apply { addVar(0L, 10L) }.build(Sense.MINIMIZE).trailModel())
+        val source = assertNotNull(LpBuilder().apply { addVar(0L, 10L) }.build(Sense.MINIMIZE).authoritativeModel())
         val state = LpExactState(source)
         val cache = LpExactContinuationCache()
         assertTrue(cache.importBudget(state, LpEpochBudget(state.model, 100L, 0L, 0L, 0, 0, 0)))
@@ -94,7 +95,7 @@ class LpEpochBudgetTest {
 
     @Test
     fun `a changed exact authority starts an unrelated budget`() {
-        val source = assertNotNull(LpBuilder().apply { addVar(0L, 10L) }.build(Sense.MINIMIZE).trailModel())
+        val source = assertNotNull(LpBuilder().apply { addVar(0L, 10L) }.build(Sense.MINIMIZE).authoritativeModel())
         val state = LpExactState(source)
         val cache = LpExactContinuationCache()
         assertTrue(cache.importBudget(state, LpEpochBudget(state.model, 100L, 0L, 0L, 0, 0, 500)))
@@ -123,7 +124,7 @@ class LpEpochBudgetTest {
 
     @Test
     fun `owner import is one shot and requires exact authority`() {
-        val source = assertNotNull(LpBuilder().apply { addVar(0L, 10L) }.build(Sense.MINIMIZE).trailModel())
+        val source = assertNotNull(LpBuilder().apply { addVar(0L, 10L) }.build(Sense.MINIMIZE).authoritativeModel())
         val state = LpExactState(source)
         val budget = LpEpochBudget(state.model, 100L, 50L, 10L, 2, 3, 40)
         LpScopedSolver(LpExactState(source)).use { owner ->
@@ -209,7 +210,7 @@ class LpEpochBudgetTest {
 
     @Test
     fun `near maximum costs remain exhausted through accounting and repeated transfer`() {
-        val source = assertNotNull(LpBuilder().apply { addVar(0L, 10L) }.build(Sense.MINIMIZE).trailModel())
+        val source = assertNotNull(LpBuilder().apply { addVar(0L, 10L) }.build(Sense.MINIMIZE).authoritativeModel())
         val state = LpExactState(source)
         val cache = LpExactContinuationCache()
         val budget = LpEpochBudget(state.model, Long.MAX_VALUE - 2L, Long.MAX_VALUE - 2L, Long.MAX_VALUE - 2L, 0, 0, 0)

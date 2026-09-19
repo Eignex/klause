@@ -16,6 +16,7 @@ import com.eignex.klause.lp.engine.LpRootAdmission
 import com.eignex.klause.lp.engine.LpSolver
 import com.eignex.klause.lp.engine.TableauCutSolver
 import com.eignex.klause.lp.engine.acceptNullable
+import com.eignex.klause.lp.engine.authoritativeModel
 import com.eignex.klause.lp.engine.ceilLong
 import com.eignex.klause.lp.engine.certifiedTightObjectiveLowerBound
 import com.eignex.klause.lp.engine.certifyLpFarkas
@@ -37,8 +38,6 @@ import com.eignex.klause.lp.relaxation.withCpBounds
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.simplex.exact.RationalFeasibility
-import com.eignex.klause.simplex.exact.rationalOutcome
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.LpRoute
 import com.eignex.klause.solver.result.SolveStatsSink
@@ -161,7 +160,7 @@ internal fun LpEngine.solveNode(
     }
     nodeUsesTrail = cpAdapter.currentModel === model
     if (nodeUsesTrail) return propagator.solveFloat(warm, cancellation)
-    model.trailModel()?.let { exact ->
+    model.authoritativeModel()?.let { exact ->
         nodeUsesTrail = true
         cpAdapter.localModel()
         if (!propagator.install(model, exact)) return null
@@ -435,24 +434,10 @@ internal fun LpEngine.sparseSafePrune(
             spread.rowRatio,
         )
     }
-    // The float LP relaxes strict rows to non-strict, so a node infeasible only through strictness
-    // looks feasible here and survives to an expensive leaf. Perturb each strict row's rhs inward by a
-    // small relative epsilon for the float solve only — a heuristic filter, restored before any
-    // certification so every proof is against the asserted model. A perturbed-infeasible node that the
-    // integer Farkas certificate cannot confirm (strictness carries no non-strict certificate) is
-    // decided by the exact strict-aware rational simplex.
-    val dv = model.doubleView
-    var strictSaved: DoubleArray? = null
-    if (dv != null && model.rowStrict.any { it }) {
-        strictSaved = dv.rhs.copyOf()
-        for (i in 0 until model.m) if (model.rowStrict[i]) dv.rhs[i] -= STRICT_FILTER_EPS * (1.0 + abs(dv.rhs[i]))
+    if (model.rowStrict.any { it }) {
+        strictSourcePrune(relaxation, session, bound, sink, cancellation, learn)?.let { return it }
     }
-    // Always solve: an infeasible relaxation prunes the node regardless of incumbent or objective.
-    val attempted = try {
-        solveNode(model, warm, cancellation)
-    } finally {
-        if (strictSaved != null && dv != null) strictSaved.copyInto(dv.rhs)
-    }
+    val attempted = solveNode(model, warm, cancellation)
     if (attempted == null) {
         sink.lp.observeEngineCost(LpRoute.NODE, propagator.lastMetrics)
         noteSolveOps(propagator.lastMetrics.workOps)
@@ -502,45 +487,6 @@ internal fun LpEngine.sparseSafePrune(
             // null (auxiliary column / unbacked non-global row / constraint-only) prunes reason-less.
             val clause = if (learn) LpExplanation.infeasibilityClause(relaxation, ray, session) else null
             return LpNodeOutcome(true, null, clause)
-        }
-        if (strictSaved != null && !cancellation()) {
-            val outcome = rationalOutcome(model, cancellation).also {
-                sink.lp.certificationObserver(LpRoute.NODE).observe(
-                    LpCertifier.RATIONAL,
-                    it.feasibility != RationalFeasibility.UNKNOWN,
-                )
-            }
-            val acceptedOutcome = solveContext.certificationPolicy.acceptNullable(
-                LpCertifier.RATIONAL,
-                outcome.takeIf { it.feasibility != RationalFeasibility.UNKNOWN },
-            )
-            if (acceptedOutcome?.feasibility == RationalFeasibility.FEASIBLE) {
-                val witness = acceptedOutcome.exactWitness?.let { shifted ->
-                    checkedLpWitness(model, shifted.mapIndexed { j, value -> value + model.exactShift(j) })
-                }
-                if (witness != null) {
-                    lpCounterResults.remember(
-                        model,
-                        CertifiedLpResult(null, null, witness, null, null, false, { null }),
-                        solveContext.certificationPolicy,
-                    )
-                }
-            }
-            if (acceptedOutcome?.feasibility == RationalFeasibility.INFEASIBLE &&
-                acceptedOutcome.conflict?.let { checkedLpConflict(model, it) } == true
-            ) {
-                sink.lp.observeInfeasiblePrune()
-                // No integer ray exists for a strictness-only conflict; cite the rational decider's
-                // load-bearing rows (their premises plus touched integer bound atoms), falling back to
-                // every active row's premises when the row set is unavailable.
-                val clause = if (learn) {
-                    acceptedOutcome.rows?.let { LpExplanation.premiseClauseForRows(relaxation, it, session) }
-                        ?: activePremiseClause(relaxation, session)
-                } else {
-                    null
-                }
-                return LpNodeOutcome(true, null, clause)
-            }
         }
         return LpNodeOutcome(false, null)
     }
@@ -1202,14 +1148,58 @@ internal const val SEARCH_CUT_ROUNDS: Int = 4
 internal const val LP_HARVEST_MAX_RELAXATION_COST = 250_000L
 
 /** Inward relative rhs perturbation applied to strict rows for the float filter solve. */
-private const val STRICT_FILTER_EPS = 1e-7
-
-/** Every active row's premises as one clause — the activating-literal set is jointly infeasible.
- *  Null when some non-global row has no recorded premise or nothing is cited. */
-private fun activePremiseClause(relaxation: LpRelaxation, session: PropagationSession): IntArray? {
-    val lits = IntArrayList()
-    val seen = IntHashSet()
-    val rows = IntArray(relaxation.model.m) { it }
-    val ok = LpExplanation.addRowPremiseLits(lits, seen, relaxation, rows, session)
-    return if (ok && lits.size > 0) lits.toIntArray() else null
+private fun LpEngine.strictSourcePrune(
+    relaxation: LpRelaxation,
+    session: PropagationSession,
+    bound: Double,
+    sink: SolveStatsSink,
+    cancellation: Cancellation,
+    learn: Boolean,
+): LpNodeOutcome? {
+    val model = relaxation.model
+    val exact = model.authoritativeModel() ?: return null
+    if (cancellation()) return LpNodeOutcome(false, null)
+    if (!propagator.install(model, exact)) return null
+    nodeUsesTrail = true
+    cpAdapter.localModel()
+    val result = try {
+        propagator.solve(cancellation)
+    } finally {
+        sink.lp.observeEngineCost(LpRoute.NODE, propagator.lastMetrics)
+        noteSolveOps(propagator.lastMetrics.workOps)
+    } ?: return null
+    if (cancellation()) return LpNodeOutcome(false, null)
+    result.witness?.let { witness ->
+        checkedLpWitness(model, witness.primal)?.let {
+            lpCounterResults.remember(
+                model,
+                CertifiedLpResult(null, null, it, null, null, false, { null }),
+                solveContext.certificationPolicy,
+            )
+        }
+    }
+    if (result.verdict == com.eignex.klause.lp.engine.LpVerdict.INFEASIBLE) {
+        // Every original row and live bound remains a premise when transformed support is unavailable.
+        val conflict = result.rationalConflict
+        if (conflict != null && !checkedLpConflict(model, conflict)) return null
+        sink.lp.observeInfeasiblePrune()
+        return LpNodeOutcome(
+            true,
+            null,
+            if (learn) {
+                LpExplanation.premiseClauseForRows(relaxation, IntArray(model.m) { it }, session)
+            } else {
+                null
+            },
+        )
+    }
+    val lower = result.lowerBound
+    val cutoff = if (sourceObjectiveRange(relaxation) != null) enclosingCutoff(bound) else null
+    if (lower != null && cutoff != null && lower + BigFraction.ofLong(relaxation.objectiveConstant) >= cutoff) {
+        sink.lp.observePrune()
+        return LpNodeOutcome(true, null)
+    }
+    return null
 }
+
+private const val STRICT_FILTER_EPS = 1e-7
