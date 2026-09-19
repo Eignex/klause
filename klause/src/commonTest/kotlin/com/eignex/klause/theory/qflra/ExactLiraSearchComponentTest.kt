@@ -42,6 +42,121 @@ import kotlin.test.assertTrue
 class ExactLiraSearchComponentTest {
 
     @Test
+    fun `permanent term bounds survive nested scopes and shared restarts`() {
+        val model = Problem(
+            numBoolVars = 3,
+            intBounds = openBounds(0),
+            numRealVars = 3,
+            realLower = DoubleArray(3) { Double.NEGATIVE_INFINITY },
+            realUpper = DoubleArray(3) { Double.POSITIVE_INFINITY },
+            factors = arrayOf(
+                Linear(
+                    intArrayOf(), doubleArrayOf(), intArrayOf(0, 1, 2),
+                    doubleArrayOf(1.0, 1.0, -1.0), LinearOp.EQ, 0.0,
+                ),
+                ReifiedRealLinear(
+                    0, intArrayOf(), doubleArrayOf(), intArrayOf(2), doubleArrayOf(1.0), LinearOp.LE, 1.0,
+                ),
+                ReifiedRealLinear(
+                    1, intArrayOf(), doubleArrayOf(), intArrayOf(1, 0),
+                    doubleArrayOf(-2.0, -2.0), LinearOp.LE, -2.0, strict = true,
+                ),
+            ),
+        )
+        ExactLiraSearchComponent(model, lpEpochs = true).use { component ->
+            val session = SearchSession(listOf(component))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            session.publish(SearchDecision.Bool(Lit.make(0, true)))
+            assertIs<ComponentResult.Consistent>(session.propagate())
+            repeat(2) {
+                assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(2, true))))
+                session.push(SearchDecision.Bool(Lit.make(1, true)))
+                assertIs<SearchResult.Exhausted>(session.solve(3))
+                session.popTo(1)
+                assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, false))))
+                assertIs<ComponentResult.Consistent>(session.restart())
+            }
+        }
+        assertIs<TheoryCheck.Infeasible>(ExactLraSolver(model).check(booleanArrayOf(true, true, true), exactContext()))
+        assertIs<TheoryCheck.Sat<ExactLraAssignment>>(
+            ExactLraSolver(model).check(booleanArrayOf(true, false, true), exactContext()),
+        )
+    }
+
+    @Test
+    fun `a strict all fixed expression is contradictory after source reconstruction`() {
+        val model = Problem(
+            0, intBounds = openBounds(0), numRealVars = 1,
+            realLower = doubleArrayOf(2.0), realUpper = doubleArrayOf(2.0),
+            factors = arrayOf(
+                Linear(
+                    intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(2.0),
+                    LinearOp.LE, 4.0, strict = true,
+                ),
+            ),
+        )
+        ExactLiraSearchComponent(model).use { component ->
+            val session = SearchSession(listOf(component))
+            session.initialize()
+
+            assertIs<SearchResult.Exhausted>(session.solve(0))
+        }
+        assertIs<TheoryCheck.Infeasible>(ExactLraSolver(model).check(booleanArrayOf(), exactContext()))
+    }
+
+    @Test
+    fun `shared signed forms agree with source exact checks for strict complements`() {
+        for (scale in listOf(0.5, -2.0)) {
+            val model = Problem(
+                2, intBounds = openBounds(0), numRealVars = 2,
+                realLower = DoubleArray(2) { Double.NEGATIVE_INFINITY },
+                realUpper = DoubleArray(2) { Double.POSITIVE_INFINITY },
+                factors = arrayOf(
+                    ReifiedRealLinear(
+                        0, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
+                        doubleArrayOf(1.0, 2.0), LinearOp.LE, 3.0,
+                    ),
+                    ReifiedRealLinear(
+                        1, intArrayOf(), doubleArrayOf(), intArrayOf(1, 0),
+                        doubleArrayOf(2.0 * scale, scale), if (scale > 0) LinearOp.LE else LinearOp.GE, 3.0 * scale,
+                    ),
+                ),
+            )
+            ExactLiraSearchComponent(model).use { component ->
+                val session = SearchSession(listOf(component))
+                session.initialize()
+                assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+                assertIs<ComponentResult.Conflict>(session.push(SearchDecision.Bool(Lit.make(1, false))))
+                session.popTo(1)
+                assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, true))))
+                assertIs<ComponentCheck.Feasible>(component.check(session))
+            }
+            assertIs<TheoryCheck.Infeasible>(ExactLraSolver(model).check(booleanArrayOf(true, false), exactContext()))
+            assertIs<TheoryCheck.Sat<ExactLraAssignment>>(
+                ExactLraSolver(model).check(booleanArrayOf(true, true), exactContext()),
+            )
+        }
+    }
+
+    @Test
+    fun `rational canonical mixed terms retain source integer branching`() {
+        val model = Problem(
+            0, intBounds = openBounds(), numRealVars = 1,
+            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.0),
+            factors = arrayOf(
+                Linear(intArrayOf(0), doubleArrayOf(2.0), intArrayOf(0), doubleArrayOf(3.0), LinearOp.EQ, 1.0),
+            ),
+        )
+        ExactLiraSearchComponent(model).use { component ->
+            val session = SearchSession(listOf(component))
+            session.initialize()
+
+            assertIs<SearchResult.Exhausted>(session.solve(1))
+        }
+        assertIs<TheoryCheck.Infeasible>(ExactLiraSolver(model).check(booleanArrayOf(), exactContext()))
+    }
+
+    @Test
     fun `repeated partial conflicts omit an irrelevant assertion after retraction`() {
         val source = partialModel()
         val model = Problem(3, intBounds = source.intBounds, factors = source.factors)

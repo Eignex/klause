@@ -801,13 +801,14 @@ class LiveLpTheoryTest {
         val source = Problem(
             0,
             intBounds = IntBounds.fromModelBounds(longArrayOf(), longArrayOf(), null, null),
-            numRealVars = 1,
-            realLower = doubleArrayOf(0.0),
-            realUpper = doubleArrayOf(2.0),
+            numRealVars = 2,
+            realLower = doubleArrayOf(0.0, 0.0),
+            realUpper = doubleArrayOf(2.0, 2.0),
             factors = arrayOf(
-                Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(3.0), LinearOp.EQ, 1.0),
+                Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0, 1), doubleArrayOf(3.0, 5.0), LinearOp.EQ, 1.0),
             ),
         )
+        var injectedFailures = 0
         val factory = object : LpEngineFactory by ProductionLpEngineFactory {
             override fun newPersistentSolver(
                 model: LpModel,
@@ -820,8 +821,10 @@ class LiveLpTheoryTest {
             ): PersistentLpSolver = RevisedSimplex(model, cancellation, basisSolverFactory = { matrix ->
                 val delegate = KotlinBasisSolver(matrix)
                 object : BasisSolver by delegate {
-                    override fun ftran(x: IndexedVector, expectedDensity: Double): Unit =
+                    override fun ftran(x: IndexedVector, expectedDensity: Double) {
+                        injectedFailures++
                         throw BasisArithmeticException("injected numerical solve failure")
+                    }
                 }
             })
         }
@@ -833,8 +836,10 @@ class LiveLpTheoryTest {
             assertIs<ComponentResult.Consistent>(session.initialize())
 
             val result = assertIs<SearchResult.Satisfied>(session.solve(0))
-            val point = assertNotNull(result.model.valueOf<ExactLraAssignment>(component)).reals.single()
-            assertEquals(BigFraction.ONE, BigFraction.ofLong(3) * point)
+            val point = assertNotNull(result.model.valueOf<ExactLraAssignment>(component)).reals
+            assertEquals(BigFraction.ONE, BigFraction.ofLong(3) * point[0] + BigFraction.ofLong(5) * point[1])
+            assertTrue(point.all { it >= BigFraction.ZERO && it <= BigFraction.ofLong(2) })
+            assertTrue(injectedFailures > 0)
             assertTrue(stats.snapshot().continuation.successes > 0L)
             assertTrue(stats.snapshot().continuation.pivots > 0L)
             assertEquals(0L, stats.snapshot().privateChecks)
