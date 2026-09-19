@@ -9,6 +9,7 @@ import com.eignex.klause.ir.Term
 import com.eignex.klause.ir.linearRows
 import com.eignex.klause.lp.asFraction
 import com.eignex.klause.lp.bounding.LpPropagator
+import com.eignex.klause.lp.engine.LpExactState
 import com.eignex.klause.lp.engine.ExactLpBounds
 import com.eignex.klause.lp.engine.ExactLpColumn
 import com.eignex.klause.lp.engine.ExactLpEntry
@@ -25,6 +26,8 @@ import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.BigRationalConflict
 import com.eignex.klause.simplex.exact.ExactRationalFeasibilityModel
 import com.eignex.klause.simplex.exact.ExactRationalInequality
+import com.eignex.klause.solver.search.SearchContext
+import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchAtomPremise
 import com.eignex.klause.solver.search.SearchExplanation
 import com.eignex.klause.solver.search.SearchIntValue
@@ -147,6 +150,7 @@ internal fun LinearRow.booleanVariables(): Set<Int> = buildSet {
 }
 
 internal class LiveQfLraSystem(private val source: Problem, private val lp: LpPropagator) {
+    private var rowSourceToken: Any? = null
     private val columns = source.numRealVars + source.numIntVars
     private val sourceColumns = source.exactLpSourceColumns()
     private val declaredFixed = sourceColumns.mapIndexedNotNull { index, column ->
@@ -163,6 +167,9 @@ internal class LiveQfLraSystem(private val source: Problem, private val lp: LpPr
     private val definitions = terms.withIndex().associate { (index, term) -> term to columns + index }.toMutableMap()
 
     fun install(): Boolean {
+        lp.state?.let { current ->
+            return rowSourceToken?.let { lp.ownsRowSource(source, current, it) } == true
+        }
         val structural = sourceColumns.map { column ->
             ExactLpColumn(
                 ExactLpBounds(
@@ -189,7 +196,37 @@ internal class LiveQfLraSystem(private val source: Problem, private val lp: LpPr
                 List(terms.size) { ExactLpRow() },
                 ExactLpObjective(List(columns + terms.size) { ExactLpNumber.of(0L) }),
             ),
-        )
+        ).also { installed ->
+            if (installed) rowSourceToken = lp.rowSource(source)
+        }
+    }
+
+    fun rowDecision(
+        state: LpExactState,
+        column: Int,
+        upper: Boolean,
+        side: ExactLpSide,
+        context: SearchContext,
+    ): SearchDecision? {
+        val token = rowSourceToken ?: return null
+        if (context.cancelled() || !lp.ownsRowSource(source, state, token) ||
+            state.model.n != columns || column !in 0 until columns
+        ) return null
+        val installed = state.model.column(column)
+        val expected = sourceColumns[column]
+        if (!installed.origin.value.isZero || installed.tag != expected.tag || installed.integral != expected.integral) {
+            return null
+        }
+        val value = if (column < source.numRealVars) SearchRealValue(column) else
+            SearchIntValue(column - source.numRealVars)
+        val atom = SourceBoundAtom.rationalSplit(
+            context,
+            listOf(SourceBoundTerm(value, BigFraction.ONE)),
+            side.number.value,
+            strict = if (upper) side.strict else !side.strict,
+        ) ?: return null
+        if (context.cancelled() || !lp.ownsRowSource(source, state, token)) return null
+        return atom.alternatives()[if (upper) 0 else 1]
     }
 
     fun refreshEpoch(token: Cancellation, validatePublication: () -> Boolean): Boolean {
