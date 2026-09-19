@@ -19,9 +19,14 @@ import com.eignex.klause.ir.TaggedLinearRow
 import com.eignex.klause.ir.Term
 import com.eignex.klause.ir.UnitConsts
 import com.eignex.klause.ir.linearRows
+import com.eignex.klause.lp.engine.LpSolveContext
+import com.eignex.klause.lp.engine.LpCertificationPolicy
+import com.eignex.klause.simplex.exact.BigFraction
+import com.ionspin.kotlin.bignum.integer.BigInteger
 import com.eignex.klause.solver.result.SmtStatsSink
 import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.solver.search.ComponentResult
+import com.eignex.klause.solver.search.SearchAtomRegistry
 import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchResult
@@ -36,10 +41,72 @@ import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class ExactLiraSearchComponentTest {
+
+    @Test
+    fun `a learned strict conflict backjumps to an exact source witness`() {
+        val model = Problem(1, intBounds = openBounds(0), numRealVars = 1,
+            realLower = doubleArrayOf(Double.NEGATIVE_INFINITY), realUpper = doubleArrayOf(1.0),
+            factors = arrayOf(ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0),
+                LinearOp.GE, 1.0, strict = true)))
+        ExactLiraSearchComponent(model).use { component ->
+            val session = SearchSession(listOf(component))
+            session.initialize()
+            assertIs<ComponentResult.Conflict>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+
+            val result = assertIs<SearchResult.Satisfied>(session.solve(1))
+
+            val point = assertNotNull(result.model.valueOf<ExactLraAssignment>(component))
+            assertEquals(false, point.bools.single())
+            assertTrue(point.reals.single() <= BigFraction.ONE)
+        }
+    }
+
+    @Test
+    fun `strict mixed candidates use shared integer branching`() {
+        val model = Problem(0, intBounds = openBounds(), numRealVars = 1,
+            realLower = doubleArrayOf(Double.NEGATIVE_INFINITY), realUpper = doubleArrayOf(Double.POSITIVE_INFINITY),
+            factors = arrayOf(
+                Linear(intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0), doubleArrayOf(-1.0), LinearOp.EQ, 0.0),
+                Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0), LinearOp.GE, 0.0, strict = true),
+                Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0), LinearOp.LE, 1.5, strict = true),
+            ))
+        val stats = SmtStatsSink()
+        ExactLiraSearchComponent(model).use { component ->
+            component.observeWith(stats)
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(0))
+            session.initialize()
+
+            val result = assertIs<SearchResult.Satisfied>(session.solve(0))
+
+            val point = assertNotNull(result.model.valueOf<ExactLiraAssignment>(component))
+            assertEquals(BigInteger.ONE, point.ints.single())
+            assertEquals(BigFraction.ONE, point.reals.single())
+            assertEquals(0L, stats.snapshot().privateChecks)
+        }
+    }
+
+    @Test
+    fun `rejected strict LP evidence cannot invoke a private strict fallback`() {
+        val model = Problem(0, intBounds = openBounds(0), numRealVars = 1,
+            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0),
+            factors = arrayOf(Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0),
+                LinearOp.GE, 0.0, strict = true)))
+        val stats = SmtStatsSink()
+        ExactLiraSearchComponent(model).use { component ->
+            component.solveWith(LpSolveContext(certificationPolicy = LpCertificationPolicy { _, _ -> false }))
+            component.observeWith(stats)
+            val session = SearchSession(listOf(component))
+            session.initialize()
+
+            assertIs<SearchResult.Indeterminate>(session.solve(0))
+            assertEquals(0L, stats.snapshot().privateChecks)
+        }
+    }
 
     @Test
     fun `permanent term bounds survive nested scopes and shared restarts`() {
@@ -86,8 +153,7 @@ class ExactLiraSearchComponentTest {
             assertIs<ComponentResult.Consistent>(session.propagate())
             repeat(2) {
                 assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(2, true))))
-                session.push(SearchDecision.Bool(Lit.make(1, true)))
-                assertIs<SearchResult.Exhausted>(session.solve(3))
+                assertIs<ComponentResult.Conflict>(session.push(SearchDecision.Bool(Lit.make(1, true))))
                 session.popTo(1)
                 assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, false))))
                 assertIs<ComponentResult.Consistent>(session.restart())

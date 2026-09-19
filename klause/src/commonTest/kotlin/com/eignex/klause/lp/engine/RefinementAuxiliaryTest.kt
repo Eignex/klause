@@ -105,7 +105,7 @@ class RefinementAuxiliaryTest {
     }
 
     @Test
-    fun `a strict closure boundary is not a source feasible point`() {
+    fun `a positive strict margin gives a source witness without attaining its infimum`() {
         val zero = ExactLpNumber.of(0L)
         val state = LpExactState(
             ExactLpModel(
@@ -130,7 +130,11 @@ class RefinementAuxiliaryTest {
                 LpRefinementRequest(owner, owner.refinementCache, LpRefinementLimits()),
             )
 
-            assertNull(result.witness)
+            val point = assertNotNull(result.witness)
+            assertTrue(point.primal.single() > BigFraction.ZERO)
+            assertTrue(point.primal.single() <= BigFraction.ONE)
+            assertEquals(point.primal.single(), point.objective)
+            assertEquals(1, result.metrics.strictWitnesses)
             assertNull(result.conflict)
             assertNull(result.unboundedness)
         }

@@ -244,7 +244,7 @@ class LpSolveTest {
     }
 
     @Test
-    fun `strict closure vertex proves only a bound`() {
+    fun `disabled strict margin leaves a closure vertex with only a bound`() {
         val zero = ExactLpNumber.of(0L)
         val model = ExactLpModel(
             listOf(emptyList()),
@@ -254,7 +254,7 @@ class LpSolveTest {
             ExactLpObjective(listOf(zero)),
         )
 
-        val result = solveAndCertify(model)
+        val result = solveAndCertify(model, refinementLimits = LpRefinementLimits(maxAuxiliaries = 0))
 
         assertEquals(LpVerdict.CERTIFIED_BOUND, result.verdict)
         assertEquals(BigFraction.ZERO, result.lowerBound)
