@@ -127,7 +127,7 @@ internal class LpPropagator(
         val bits = maxOf(inputBits, rowHistoryBits)
         if (bits !in 0..128) return null
         val productBits = 2L * bits + 1
-        val work = (nextWitness + 1) * (captured.depth + 4 * (productBits * productBits + 2)) +
+        val work = (nextWitness + captured.model.numVars + 1) * (captured.depth + 4 * (productBits * productBits + 2)) +
             (cells + captured.model.numVars + captured.depth + 1) * 8 * (bits + 1)
         val allocation = 32 * (nextWitness + cells + captured.model.numVars + captured.depth + 1)
         return work to allocation
@@ -447,7 +447,10 @@ internal class LpPropagator(
         return result
     }
 
-    fun append(row: LpScopedRow, scoped: Boolean): Boolean = owner?.append(row, scoped) == true
+    fun append(row: LpScopedRow, scoped: Boolean): Boolean {
+        rowNumericalPrepared = true
+        return owner?.append(row, scoped) == true
+    }
     fun deactivate(row: Long): Boolean {
         rowReasonEpoch = Any()
         return owner?.deactivate(row) == true

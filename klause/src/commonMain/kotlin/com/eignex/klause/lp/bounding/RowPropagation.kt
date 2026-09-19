@@ -112,6 +112,9 @@ internal class ExactRowPropagation(limits: RowPropagationLimits = RowPropagation
                 mappingDeclines++
                 continue
             }
+            if (!budget.arithmetic(candidate.side.number.value, BigFraction.ZERO) ||
+                !budget.arithmetic(candidate.side.number.value, BigFraction.ONE)
+            ) break
             val decision = lp.rowDecision(state, candidate.column, candidate.upper, candidate.side, context)
             if (!lp.rowPublicationCurrent(state, context, epoch)) return RowPropagationResult.Indeterminate
             if (decision !is SearchDecision.Theory ||
