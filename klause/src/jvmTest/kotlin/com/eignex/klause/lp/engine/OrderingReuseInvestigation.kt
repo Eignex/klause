@@ -37,7 +37,8 @@ internal object OrderingReuseInvestigation {
     fun main(args: Array<String>) {
         val kind = args[0]
         val path = Path.of(args[1])
-        for (round in -1..2) {
+        val rounds = if (args.getOrNull(2) == "--metadata-only") 0..0 else -1..2
+        for (round in rounds) {
             for (enabled in if (round % 2 == 0) listOf(false, true) else listOf(true, false)) {
                 val id = "${path.fileName}/$round/$enabled"
                 if (kind.startsWith("smt")) source(id, path, enabled) else scoped(id, path, kind, enabled)
@@ -356,6 +357,9 @@ internal object OrderingReuseInvestigation {
             "multipliers" to it.rationalConflict?.multipliers?.map(::f),
             "farkas" to it.farkasRay?.toList(), "direction" to it.unboundedness?.direction?.map(::f),
             "continuationWork" to it.continuation?.work, "refinementWork" to it.refinement?.work,
+            "refinementLuFactories" to it.refinement?.luFactories, "refinementLuBuilds" to it.refinement?.luBuilds,
+            "refinementLuReuse" to it.refinement?.luReuse, "refinementLuSolves" to it.refinement?.luSolves,
+            "refinementLuWork" to it.refinement?.luWork,
         )
     }
 
