@@ -58,6 +58,13 @@ internal interface LpSearchPolicy {
     fun fractionalBranch(context: SearchContext): LpFractionalBranch? = null
     fun retract(decisionLevel: Int) = Unit
     fun restart(context: SearchContext) = Unit
+    fun rowDecision(
+        state: LpExactState,
+        column: Int,
+        upper: Boolean,
+        side: ExactLpSide,
+        context: SearchContext,
+    ): SearchDecision? = null
 }
 
 internal data class LpFractionalBranch(
@@ -73,6 +80,7 @@ internal class LpPropagator(
     private val solveContext: LpSolveContext = LpSolveContext.Production,
     private val cancellation: Cancellation = Cancellation.Never,
     private val certificationObserver: LpCertificationObserver? = null,
+    private val rowPropagation: RowPropagation? = null,
 ) : SearchComponent,
     SearchBrancher,
     AutoCloseable {
@@ -80,6 +88,9 @@ internal class LpPropagator(
     private var epochWarm: Basis? = null
     private var proofContext: SearchContext? = null
     private var modelKey: Any? = null
+    private var rowSourceIdentity: Any? = null
+    var rowReasonEpoch: Any = Any()
+        private set
     private var rootState: LpExactState? = null
 
     // Local cut models may reinstall after an epoch; their initial bounds still need source premises.
@@ -103,6 +114,38 @@ internal class LpPropagator(
     val metrics: LpScopedMetrics? get() = owner?.metrics
 
     fun boundPremise(witness: Long): SearchAtomPremise = witnesses[witness] ?: SearchAtomPremise.Unavailable
+
+    fun rowSource(key: Any): Any? = rowSourceIdentity.takeIf { modelKey === key }
+
+    fun ownsRowSource(key: Any, captured: LpExactState, token: Any): Boolean =
+        modelKey === key && state === captured && rowSourceIdentity === token
+
+    fun rowPublicationCurrent(captured: LpExactState, context: SearchContext, epoch: Any): Boolean =
+        !closed && !invalidated && state === captured && proofContext === context && rowReasonEpoch === epoch &&
+            captured.depth == context.decisionLevel && !context.cancelled() && !cancellation()
+
+    fun rowDecision(
+        captured: LpExactState,
+        column: Int,
+        upper: Boolean,
+        side: ExactLpSide,
+        context: SearchContext,
+    ): SearchDecision? = policy.rowDecision(captured, column, upper, side, context)
+
+    fun rowBoundPremise(captured: LpExactState, assertion: LpBoundAssertion): SearchAtomPremise {
+        if (state !== captured) return SearchAtomPremise.Unavailable
+        val declared = rootState?.takeIf { assertion.column < it.model.numVars }
+            ?.activeSide(assertion.column, assertion.upper)
+        return if (declared == assertion) {
+            if (sourceRootBounds) SearchAtomPremise.All(emptyList()) else
+                baseSidePremises[assertion.column to assertion.upper] ?: SearchAtomPremise.Unavailable
+        } else {
+            boundPremise(assertion.witness)
+        }
+    }
+
+    fun propagateRows(context: SearchContext): RowPropagationResult =
+        rowPropagation?.propagate(this, context) ?: RowPropagationResult.Skipped
 
     fun explainConflict(support: LpExactSupport?, context: SearchContext): SearchExplanation? {
         val current = state ?: return null
@@ -157,6 +200,7 @@ internal class LpPropagator(
         pendingRootAdmission = rootAdmission != null
         rootState = initial
         modelKey = key
+        rowSourceIdentity = Any()
         sourcePremises = LpSourcePremises(key)
         return true
     }
@@ -213,6 +257,8 @@ internal class LpPropagator(
                 sourceRootBounds = false
                 baseSidePremises = premises.toMap()
                 modelKey = key
+                rowSourceIdentity = null
+                rowReasonEpoch = Any()
                 sourcePremises = savedPremises ?: LpSourcePremises(key)
                 witnesses.clear()
                 nextWitness = 0L
@@ -301,7 +347,10 @@ internal class LpPropagator(
 
     fun atLevel(depth: Int, token: Cancellation = cancellation): Boolean {
         val current = owner ?: return false
-        if (depth < current.state.depth && !current.pop(depth, token)) return invalidate()
+        if (depth < current.state.depth) {
+            rowReasonEpoch = Any()
+            if (!current.pop(depth, token)) return invalidate()
+        }
         while (current.state.depth < depth) if (!current.push(token)) return invalidate()
         return true
     }
@@ -367,7 +416,10 @@ internal class LpPropagator(
     }
 
     fun append(row: LpScopedRow, scoped: Boolean): Boolean = owner?.append(row, scoped) == true
-    fun deactivate(row: Long): Boolean = owner?.deactivate(row) == true
+    fun deactivate(row: Long): Boolean {
+        rowReasonEpoch = Any()
+        return owner?.deactivate(row) == true
+    }
 
     fun solveFloat(warm: Basis? = null, token: Cancellation = cancellation): Pair<LpSolver, FloatLpResult?>? {
         val admitted = pendingRootAdmission
@@ -429,6 +481,7 @@ internal class LpPropagator(
     }
 
     fun resetRoot(): Boolean {
+        rowReasonEpoch = Any()
         lastMetrics = LpSolveMetrics()
         val initial = rootState ?: return false
         if (withOwner { it.resetRoot(initial, cancellation) } != true) return invalidate()
@@ -501,6 +554,7 @@ internal class LpPropagator(
     }
 
     override fun retract(decisionLevel: Int) {
+        rowReasonEpoch = Any()
         val current = owner
         if (current != null && current.state.depth > decisionLevel &&
             !current.pop(decisionLevel, Cancellation.Never)
@@ -513,7 +567,10 @@ internal class LpPropagator(
         policy.retract(decisionLevel)
     }
 
-    override fun onRestart(context: SearchContext) = policy.restart(context)
+    override fun onRestart(context: SearchContext) {
+        rowReasonEpoch = Any()
+        policy.restart(context)
+    }
 
     fun releaseSolver() {
         if (pendingRootAdmission) {
@@ -535,6 +592,8 @@ internal class LpPropagator(
         owner = null
         invalidated = false
         modelKey = null
+        rowSourceIdentity = null
+        rowReasonEpoch = Any()
         rootState = null
         baseSidePremises = emptyMap()
         epochWarm = null
