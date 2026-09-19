@@ -5,9 +5,9 @@ import com.eignex.klause.lp.engine.LpVerdict
 import com.eignex.klause.lp.engine.Relation
 import com.eignex.klause.lp.engine.Sense
 import com.eignex.klause.lp.engine.solveAndCertify
+import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.BigRationalConflict
 import com.eignex.klause.simplex.exact.ExactSimplexBound
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.Cancellation
 import com.ionspin.kotlin.bignum.integer.BigInteger
 import kotlin.test.Test
@@ -45,29 +45,11 @@ class LpSolveTest {
 
             val support = assertNotNull(model.exactConflictSupport(proof))
 
-            assertEquals(listOf(-2L, -(1L + second)).map(BigFraction::ofLong), support.conflictMultipliers)
             assertEquals(if (second == 1L) listOf(0, 1) else listOf(0), support.rows.map { it.first })
             assertEquals(if (second == 1L) listOf(0, 1, 2, 3) else listOf(0, 2), support.sides.map { it.column })
             assertTrue(support.sides.first().side.strict)
             assertEquals(premise, support.sides.first().side.premises)
         }
-    }
-
-    @Test
-    fun `conflict multipliers own their input and objective supports omit them`() {
-        val source = ExactLpModel(
-            listOf(emptyList()), emptyList(),
-            listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(ExactLpNumber.of(0L))))),
-            emptyList(), ExactLpObjective(listOf(ExactLpNumber.of(1L))),
-        )
-        val state = LpExactState(source)
-        val vector = mutableListOf(BigFraction.ONE)
-        val support = LpExactSupport(state, emptyList(), emptyList(), vector)
-        vector[0] = BigFraction.ZERO
-
-        assertEquals(listOf(BigFraction.ONE), support.conflictMultipliers)
-        assertNull(assertNotNull(solveAndCertify(source).bound?.support).conflictMultipliers)
-        assertEquals(0, state.assertionCount)
     }
 
     @Test

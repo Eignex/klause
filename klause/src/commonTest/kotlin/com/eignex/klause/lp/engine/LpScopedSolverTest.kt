@@ -403,7 +403,10 @@ class LpScopedSolverTest {
                 ),
             )
             val strict = assertNotNull(solver.solve())
-            assertNull(strict.witness)
+            val point = assertNotNull(strict.witness)
+            assertTrue(point.primal.single() > BigFraction.ZERO && point.primal.single() <= BigFraction.ONE)
+            assertEquals(point.primal.single(), point.objective)
+            assertEquals(LpVerdict.FEASIBLE, strict.verdict)
             assertEquals(BigFraction.ZERO, strict.lowerBound)
 
             assertTrue(solver.deactivate(4))

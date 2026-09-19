@@ -202,7 +202,7 @@ private class ReconstructionAuthority(val model: LpModel, val meter: Reconstruct
         for (bound in premises.boundEntries()) meter.fraction(bound.threshold.value)
     }
 
-    fun support(y: List<BigFraction>, selected: List<ExactSimplexBound>, ray: Boolean): LpExactSupport? {
+    fun support(y: List<BigFraction>, selected: List<ExactSimplexBound>): LpExactSupport? {
         meter.phase = ReconstructionPhase.SUPPORT
         val state = model.exactState ?: return null
         meter.storage((m.toLong() + selected.size) * 32L)
@@ -218,14 +218,7 @@ private class ReconstructionAuthority(val model: LpModel, val meter: Reconstruct
             val witness = state.activeSide(cited.column, cited.upper)?.takeIf { it.side == side }?.witness
             LpExactCitedSide(cited.column, cited.upper, side, witness)
         }
-        if (ray) {
-            meter.step(y.size.toLong())
-            meter.storage(y.size * 8L)
-        }
-        return LpExactSupport(
-            state, rows.indices.filter { rows[it] }.map { it to state.model.row(it) }, sides,
-            y.takeIf { ray },
-        )
+        return LpExactSupport(state, rows.indices.filter { rows[it] }.map { it to state.model.row(it) }, sides)
     }
 }
 
@@ -439,7 +432,7 @@ private class ReconstructionRun(private val a: ReconstructionAuthority, private 
             BigReconstructionVerifier(a, meter).dual(candidate, ray)
         } ?: return
         if (ray && !(checked.value.signum() > 0 || (checked.value.isZero && checked.strict))) return
-        val support = a.support(candidate, checked.selected, ray)
+        val support = a.support(candidate, checked.selected)
         meter.storage((candidate.size.toLong() + checked.selected.size) * 32L)
         if (ray) {
             val rows = candidate.indices.filter { !candidate[it].isZero }

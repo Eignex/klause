@@ -33,14 +33,7 @@ internal class LpExactSupport(
     val state: LpExactState,
     val rows: List<Pair<Int, ExactLpRow>>,
     val sides: List<LpExactCitedSide>,
-    conflictMultipliers: List<BigFraction>? = null,
-) {
-    private val sourceMultipliers = conflictMultipliers?.toList()
-
-    // rho * b exceeds the upper box support of rho * M, with strict equality also contradictory.
-    val conflictMultiplierCount: Int? get() = sourceMultipliers?.size
-    val conflictMultipliers: List<BigFraction>? get() = sourceMultipliers?.toList()
-}
+)
 
 // Exact evidence uses original coordinates and minimized objective units.
 internal class CertifiedLpResult(
@@ -692,7 +685,7 @@ private fun LpModel.exactSupport(multipliers: List<BigFraction>, objective: Bool
             !y[it].isZero
         } + sides.filter { it.column >= n }.map { it.column - n }
         ).distinct().sorted()
-    return LpExactSupport(state, rows.map { it to state.model.row(it) }, sides, y.takeUnless { objective })
+    return LpExactSupport(state, rows.map { it to state.model.row(it) }, sides)
 }
 
 internal fun exactLagrangian(
