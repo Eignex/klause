@@ -38,6 +38,7 @@ internal class LpExactSupport(
     private val sourceMultipliers = conflictMultipliers?.toList()
 
     // rho * b exceeds the upper box support of rho * M, with strict equality also contradictory.
+    val conflictMultiplierCount: Int? get() = sourceMultipliers?.size
     val conflictMultipliers: List<BigFraction>? get() = sourceMultipliers?.toList()
 }
 
