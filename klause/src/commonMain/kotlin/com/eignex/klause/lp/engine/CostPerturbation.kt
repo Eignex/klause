@@ -28,11 +28,7 @@ internal enum class NumericalRecoveryStep {
 
 internal data class NumericalRecoveryOptions(val enabled: Boolean = false)
 
-internal data class NumericalRecoveryCount(
-    val attempts: Int = 0,
-    val successes: Int = 0,
-    val skips: Int = 0,
-) {
+internal data class NumericalRecoveryCount(val attempts: Int = 0, val successes: Int = 0, val skips: Int = 0) {
     val declines: Int get() = attempts - successes
 }
 

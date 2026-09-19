@@ -353,7 +353,12 @@ internal class RevisedSimplex(
         val stopped = stoppedContinuationBasis
         val headings = stopped?.basicVars ?: basicVar
         val seats = stopped?.status ?: status
-        if (rejectedExactBasis?.contentEquals(headings) == true || !basisStatusConsistent(model, headings, seats)) return null
+        if (rejectedExactBasis?.contentEquals(
+                headings,
+            ) == true || !basisStatusConsistent(model, headings, seats)
+        ) {
+                return null
+            }
         return Basis(headings.copyOf(), seats.copyOf(), captureEligible = false)
     }
 
@@ -958,7 +963,9 @@ internal class RevisedSimplex(
      */
     override fun solve(warm: Basis?): FloatLpResult? {
         val progress = SolveProgress()
-        return runNumericalSolve(progress) { reset -> solveCore(warm, reuse = false, reset = reset, progress = progress) }
+        return runNumericalSolve(
+            progress,
+        ) { reset -> solveCore(warm, reuse = false, reset = reset, progress = progress) }
     }
 
     /**
@@ -1120,7 +1127,9 @@ internal class RevisedSimplex(
         val current = basisSolver ?: return null
         if (rejectedExactBasis?.contentEquals(basicVar) == true ||
             !basisFactorized || current.singular || !trackedHeadingsConsistent() || token()
-        ) return null
+        ) {
+            return null
+        }
         val snapshot = EngineBasisRestartSnapshot.capture(
             current,
             basisMatrixIdentity() ?: return null,
@@ -1465,13 +1474,20 @@ internal class RevisedSimplex(
     private fun applyRootPerturbation(progress: SolveProgress) {
         if (progress.rootConsidered) return
         progress.rootConsidered = true
-        if (!warmStarted && perturbationAllowed && perturbationOptions.root && resourcesRemain(progress)) applyCostShift(root = true)
+        if (!warmStarted && perturbationAllowed && perturbationOptions.root && resourcesRemain(
+                progress,
+            )
+        ) {
+                applyCostShift(root = true)
+            }
     }
 
     private fun applyStallPerturbation(progress: SolveProgress) {
         if (!perturbationAllowed || !perturbationOptions.stall || progress.stallConsidered ||
             maxOf(progress.primalDegenerate, progress.dualDegenerate) < perturbationOptions.stallIterations
-        ) return
+        ) {
+            return
+        }
         progress.stallConsidered = true
         if (resourcesRemain(progress)) applyCostShift(root = false)
     }
@@ -1503,7 +1519,9 @@ internal class RevisedSimplex(
                 clearNumericalPublication()
                 result = recoverNumerically(progress, enforced)
             }
-            val cleanup = costPerturbation != null || tolerance != TOL || textbookRatio
+            val shifted = lastNumericalMetrics.rootShifts > 0 || lastNumericalMetrics.stallShifts > 0
+            val originalReady = costPerturbation == null && (result?.optimal == true || infeasibleRay != null)
+            val cleanup = (shifted && !originalReady) || tolerance != TOL || textbookRatio
             removeCostShifts()
             tolerance = TOL
             feasibilityTolerance = FEAS_TOL
@@ -1511,8 +1529,10 @@ internal class RevisedSimplex(
             perturbationAllowed = false
             if (cleanup) result = cleanupOriginal(progress, enforced)
             if (result?.optimal != true &&
-                (progress.iterations >= maxIterations || effectiveWorkLimit > 0L && work.ops >= effectiveWorkLimit)
-            ) lastNumericalMetrics.capExits++
+                (progress.iterations >= maxIterations || (effectiveWorkLimit > 0L && work.ops >= effectiveWorkLimit))
+            ) {
+                lastNumericalMetrics.capExits++
+            }
             if (rejectedExactBasis?.contentEquals(result?.basis?.basicVars ?: basicVar) == true) {
                 clearNumericalPublication()
                 basisKept = false
@@ -1550,7 +1570,10 @@ internal class RevisedSimplex(
             if (!resourcesRemain(progress)) break
             lastNumericalMetrics.cleanupAttempts++
             val result = numericalSolve(
-                progress, { resumeOriginal(progress, enforced) }, allowUnscaledFallback = false, reset = false,
+                progress,
+                { resumeOriginal(progress, enforced) },
+                allowUnscaledFallback = false,
+                reset = false,
             )
             if ((result?.optimal == true || infeasibleRay != null) && repairStop == null && !cancellation()) {
                 lastNumericalMetrics.cleanupSuccesses++
@@ -1564,7 +1587,9 @@ internal class RevisedSimplex(
                     {
                         refactorize(LpRefactorReason.NUMERICAL_RECOVERY)
                         null
-                    }, allowUnscaledFallback = false, reset = false,
+                    },
+                    allowUnscaledFallback = false,
+                    reset = false,
                 )
                 if (!basisFactorized || repairStop != null) break
             }
@@ -1574,7 +1599,15 @@ internal class RevisedSimplex(
 
     private fun resumeOriginal(progress: SolveProgress, enforced: BooleanArray?): FloatLpResult? {
         if (!resourcesRemain(progress)) return null
-        if (!basisFactorized) return solveCore(null, reuse = false, enforced = enforced, reset = false, progress = progress)
+        if (!basisFactorized) {
+            return solveCore(
+            null,
+            reuse = false,
+            enforced = enforced,
+            reset = false,
+            progress = progress,
+        )
+        }
         basisKept = true
         return if (enforced == null && !dualFeasible()) {
             solvePrimalCore(null, reuse = true, reset = false, progress = progress)
@@ -1587,8 +1620,11 @@ internal class RevisedSimplex(
         for (step in NumericalRecoveryStep.entries) {
             if (!resourcesRemain(progress)) return null
             val supported = when (step) {
-                NumericalRecoveryStep.TIGHTER_PIVOT -> false // No threshold capability on BasisSolver.
+                NumericalRecoveryStep.TIGHTER_PIVOT -> false
+
+                // No threshold capability on BasisSolver.
                 NumericalRecoveryStep.UNSCALED -> numerical.applied
+
                 else -> true
             }
             if (!supported) {
@@ -1604,34 +1640,42 @@ internal class RevisedSimplex(
                     val ready = when (step) {
                         NumericalRecoveryStep.RESIDUAL_REBUILD ->
                             refactorize(LpRefactorReason.NUMERICAL_RECOVERY) != RefactorResult.FAILED
+
                         NumericalRecoveryStep.UNSCALED -> {
                             installUnscaledFallback(model)
                             true
                         }
+
                         NumericalRecoveryStep.LOGICALS -> {
                             coldStart()
                             refactorize(LpRefactorReason.NUMERICAL_RECOVERY) != RefactorResult.FAILED
                         }
+
                         NumericalRecoveryStep.RELAX_TOLERANCE -> {
                             tolerance = TOL * 10.0
                             feasibilityTolerance = FEAS_TOL * 10.0
                             true
                         }
+
                         NumericalRecoveryStep.TIGHTEN_TOLERANCE -> {
                             tolerance = TOL * 0.1
                             feasibilityTolerance = FEAS_TOL * 0.1
                             true
                         }
+
                         NumericalRecoveryStep.TEXTBOOK_RATIO -> {
                             tolerance = TOL
                             feasibilityTolerance = FEAS_TOL
                             textbookRatio = true
                             true
                         }
+
                         NumericalRecoveryStep.TIGHTER_PIVOT -> false
                     }
                     if (ready) resumeOriginal(progress, enforced) else null
-                }, allowUnscaledFallback = false, reset = false,
+                },
+                allowUnscaledFallback = false,
+                reset = false,
             )
             if (result != null || infeasibleRay != null) {
                 lastNumericalMetrics.recovery[step] = NumericalRecoveryCount(attempts = 1, successes = 1)
@@ -2370,7 +2414,8 @@ internal class RevisedSimplex(
                 }
                 if (best != -1) {
                     val minimizeBoundSupport =
-                        pricing.zeroObjective == LpZeroObjectivePricing.MIN_BOUND_SUPPORT && originalZeroCost && costPerturbation == null
+                        pricing.zeroObjective == LpZeroObjectivePricing.MIN_BOUND_SUPPORT && originalZeroCost &&
+                            costPerturbation == null
                     val selected = if (minimizeBoundSupport) {
                         when (val theory = chooseTheoryEntering(theoryCandidates, leavingRow, enforced)) {
                             EnteringChoice.ResourceStopped -> return theory
@@ -3007,7 +3052,9 @@ internal class RevisedSimplex(
                 }
                 if (t == Double.MAX_VALUE) continue
                 // Strictly shorter step, or — under Bland's — an equal step leaving a lower-indexed variable.
-                val accept = t < tMax - tolerance || (bland && leaving != -1 && t <= tMax + tolerance && basicVar[i] < leavingVar)
+                val accept =
+                    t < tMax - tolerance ||
+                        (bland && leaving != -1 && t <= tMax + tolerance && basicVar[i] < leavingVar)
                 if (accept) {
                     if (t < tMax) tMax = t
                     leaving = i
