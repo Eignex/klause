@@ -58,6 +58,7 @@ internal interface LpSearchPolicy {
     fun fractionalBranch(context: SearchContext): LpFractionalBranch? = null
     fun retract(decisionLevel: Int) = Unit
     fun restart(context: SearchContext) = Unit
+    fun rowAssertionAllowed(context: SearchContext): Boolean = true
     fun rowDecision(
         state: LpExactState,
         column: Int,
