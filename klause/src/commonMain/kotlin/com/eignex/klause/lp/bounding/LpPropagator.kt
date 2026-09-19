@@ -133,7 +133,9 @@ internal class LpPropagator(
     ): SearchDecision? = policy.rowDecision(captured, column, upper, side, context)
 
     fun rowBoundPremise(captured: LpExactState, assertion: LpBoundAssertion): SearchAtomPremise {
-        if (state !== captured) return SearchAtomPremise.Unavailable
+        if (state !== captured || assertion.column !in 0 until captured.model.numVars ||
+            captured.activeSide(assertion.column, assertion.upper) != assertion
+        ) return SearchAtomPremise.Unavailable
         val declared = rootState?.takeIf { assertion.column < it.model.numVars }
             ?.activeSide(assertion.column, assertion.upper)
         return if (declared == assertion) {
@@ -573,6 +575,7 @@ internal class LpPropagator(
     }
 
     fun releaseSolver() {
+        rowReasonEpoch = Any()
         if (pendingRootAdmission) {
             invalidate()
             return
