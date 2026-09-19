@@ -148,13 +148,22 @@ internal fun LinearRow.booleanVariables(): Set<Int> = buildSet {
 
 internal class LiveQfLraSystem(private val source: Problem, private val lp: LpPropagator) {
     private val columns = source.numRealVars + source.numIntVars
-    private val terms = source.factors.flatMap { it.linearRows }.map { row ->
+    private val sourceColumns = source.exactLpSourceColumns()
+    private val declaredFixed = sourceColumns.mapIndexedNotNull { index, column ->
+        val lower = column.lower ?: return@mapIndexedNotNull null
+        val upper = column.upper ?: return@mapIndexedNotNull null
+        if (lower.value != upper.value) return@mapIndexedNotNull null
+        index to FixedSmtColumn(lower.value + column.origin.value, SearchAtomPremise.All(emptyList()))
+    }.toMap()
+    private val canonicalTerms = HashMap<Map<Int, BigFraction>, Map<Int, BigFraction>>()
+    private val normalized = source.factors.flatMap { it.linearRows }.map { row ->
         row.exactComparison(source.numRealVars, true) { false }.terms
-    }.flatMap { listOf(it, it.mapValues { (_, value) -> value.negated() }) }.distinct()
+    }.associateWith { intern(it, declaredFixed) }.toMutableMap()
+    private val terms = normalized.values.map { it.coefficients }.filter { it.size != 1 }.distinct()
     private val definitions = terms.withIndex().associate { (index, term) -> term to columns + index }.toMutableMap()
 
     fun install(): Boolean {
-        val structural = source.exactLpSourceColumns().map { column ->
+        val structural = sourceColumns.map { column ->
             ExactLpColumn(
                 ExactLpBounds(
                     column.lower?.let { ExactLpSide(ExactLpNumber.of(it.value + column.origin.value)) },
@@ -229,15 +238,21 @@ internal class LiveQfLraSystem(private val source: Problem, private val lp: LpPr
         strict: Boolean,
         premise: SearchAtomPremise,
     ): Boolean {
-        val direct = expression.entries.singleOrNull()?.takeIf { it.value == BigFraction.ONE }
-        val column = direct?.key ?: definitions[expression] ?: run {
+        val fixed = rootFixedColumns(expression)
+        val term = if (fixed.isEmpty()) {
+            normalized.getOrPut(expression.toMap()) { intern(expression, declaredFixed) }
+        } else {
+            intern(expression, declaredFixed + fixed)
+        }
+        val coefficients = term.coefficients
+        val column = coefficients.keys.singleOrNull() ?: definitions[coefficients] ?: run {
             val state = lp.state ?: return false
             val id = state.rows.lastId + 1L
             val next = state.model.numVars
             if (!lp.append(
                     LpScopedRow(
                         id,
-                        expression.entries.sortedBy { it.key }.map { it.key to ExactLpNumber.of(it.value.negated()) },
+                        coefficients.map { it.key to ExactLpNumber.of(it.value.negated()) },
                         ExactLpNumber.of(0L),
                         ExactLpColumn(ExactLpBounds(), integral = false),
                     ),
@@ -246,9 +261,45 @@ internal class LiveQfLraSystem(private val source: Problem, private val lp: LpPr
             ) {
                 return false
             }
-            definitions[expression.toMap()] = next
+            definitions[coefficients] = next
             next
         }
-        return lp.assertBound(column, upper, ExactLpSide(ExactLpNumber.of(threshold), strict), premise)
+        return lp.assertBound(
+            column,
+            if (term.scale.signum() < 0) !upper else upper,
+            ExactLpSide(ExactLpNumber.of(term.bound(threshold)), strict),
+            term.premise(premise),
+        )
+    }
+
+    private fun intern(expression: Map<Int, BigFraction>, fixed: Map<Int, FixedSmtColumn>): NormalizedSmtTerm {
+        val term = normalizeSmtTerm(expression, fixed)
+        return term.copy(coefficients = canonicalTerms.getOrPut(term.coefficients) { term.coefficients })
+    }
+
+    private fun rootFixedColumns(expression: Map<Int, BigFraction>): Map<Int, FixedSmtColumn> {
+        val state = lp.state ?: return emptyMap()
+        if (state.depth != 0) return emptyMap()
+        val fixed = expression.keys.filter { column ->
+            if (column in declaredFixed) return@filter false
+            val lower = state.activeSide(column, false)?.side ?: return@filter false
+            val upper = state.activeSide(column, true)?.side ?: return@filter false
+            !lower.strict && !upper.strict && lower.number.value == upper.number.value &&
+                lower.premises == null && upper.premises == null
+        }
+        if (fixed.isEmpty()) return emptyMap()
+        // Capture both immutable witnesses before asserting a bound that can depend on them.
+        val premises = lp.epochBasePremises() ?: return emptyMap()
+        return fixed.associateWith { column ->
+            FixedSmtColumn(
+                checkNotNull(state.activeSide(column, false)).side.number.value,
+                SearchAtomPremise.All(
+                    listOf(
+                        premises[column to false] ?: SearchAtomPremise.Unavailable,
+                        premises[column to true] ?: SearchAtomPremise.Unavailable,
+                    ),
+                ),
+            )
+        }
     }
 }
