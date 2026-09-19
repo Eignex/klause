@@ -25,7 +25,14 @@ class RevisedSimplexPerturbationTest {
         assertNull(solver.solve())
 
         assertEquals(1, solver.lastNumericalMetrics.cleanupSuccesses)
-        assertNotNull(integerFarkasRay(model, assertNotNull(solver.infeasibleRay), basis = solver.infeasibleBasis, basisRow = solver.infeasibleRow))
+        assertNotNull(
+            integerFarkasRay(
+                model,
+                assertNotNull(solver.infeasibleRay),
+                basis = solver.infeasibleBasis,
+                basisRow = solver.infeasibleRow,
+            ),
+        )
         solver.close()
     }
 
@@ -46,19 +53,23 @@ class RevisedSimplexPerturbationTest {
         solver.close()
     }
 
-
     @Test
     fun `working scopes and bound pops do not retain perturbed objectives`() {
         val x = 0
         val zero = ExactLpNumber.of(0L)
         val one = ExactLpNumber.of(1L)
-        val state = LpExactState(ExactLpModel(
-            listOf(listOf(ExactLpEntry(0, one))), listOf(ExactLpNumber.of(2L)),
-            listOf(
-                ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(ExactLpNumber.of(3L)))),
-                ExactLpColumn(ExactLpBounds(ExactLpSide(zero))),
-            ), listOf(ExactLpRow()), ExactLpObjective(listOf(one, zero)),
-        ))
+        val state = LpExactState(
+            ExactLpModel(
+                listOf(listOf(ExactLpEntry(0, one))),
+                listOf(ExactLpNumber.of(2L)),
+                listOf(
+                    ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(ExactLpNumber.of(3L)))),
+                    ExactLpColumn(ExactLpBounds(ExactLpSide(zero))),
+                ),
+                listOf(ExactLpRow()),
+                ExactLpObjective(listOf(one, zero)),
+            ),
+        )
         val factory = object : LpEngineFactory by ProductionLpEngineFactory {
             override fun newPersistentSolver(
                 model: LpModel,
@@ -69,8 +80,14 @@ class RevisedSimplexPerturbationTest {
                 trackDegeneracy: Boolean,
                 pricing: LpPricingOptions,
             ): PersistentLpSolver = RevisedSimplex(
-                model, cancellation, refactorUpdateLimit, iterationLimit, workLimit, trackDegeneracy,
-                pricing = pricing, perturbationOptions = CostPerturbationOptions(root = true, stall = true),
+                model,
+                cancellation,
+                refactorUpdateLimit,
+                iterationLimit,
+                workLimit,
+                trackDegeneracy,
+                pricing = pricing,
+                perturbationOptions = CostPerturbationOptions(root = true, stall = true),
             )
         }
         LpScopedSolver(state, context = LpSolveContext(engineFactory = factory)).use { owner ->
@@ -80,7 +97,8 @@ class RevisedSimplexPerturbationTest {
                 assertTrue(owner.assertBound(x, false, ExactLpSide(one), 42L))
                 assertEquals(BigFraction.ONE, assertNotNull(owner.solve()).lowerBound)
                 val temporary = LpWorkingModel.overrides(
-                    owner.state, ExactLpObjective(listOf(ExactLpNumber.of(-1L), zero)),
+                    owner.state,
+                    ExactLpObjective(listOf(ExactLpNumber.of(-1L), zero)),
                 )
                 owner.withWorkingModel(temporary) { scope ->
                     val result = assertNotNull(scope.solve())
@@ -94,7 +112,6 @@ class RevisedSimplexPerturbationTest {
         }
     }
 
-
     @Test
     fun `root cleanup reverses a perturbed choice and certifies the original objective`() {
         for (primal in listOf(false, true)) {
@@ -104,7 +121,10 @@ class RevisedSimplexPerturbationTest {
             b.addRealRow(intArrayOf(x, y), doubleArrayOf(1.0, 1.0), Relation.GE, 1.0)
             val model = b.build(Sense.MINIMIZE)
             val costs = model.cost.copyOf()
-            val solver = RevisedSimplex(model, perturbationOptions = CostPerturbationOptions(root = true, relativeMagnitude = 0.01))
+            val solver = RevisedSimplex(
+                model,
+                perturbationOptions = CostPerturbationOptions(root = true, relativeMagnitude = 0.01),
+            )
 
             val result = assertNotNull(if (primal) solver.solvePrimal() else solver.solve())
 
@@ -129,7 +149,9 @@ class RevisedSimplexPerturbationTest {
         b.addRealRow(intArrayOf(0), doubleArrayOf(1.0), Relation.LE, 1.0)
         val model = b.build(Sense.MINIMIZE)
         val solver = RevisedSimplex(
-            model, iterationLimit = 128, scalingOptions = LpScalingOptions(enabled = false),
+            model,
+            iterationLimit = 128,
+            scalingOptions = LpScalingOptions(enabled = false),
             perturbationOptions = CostPerturbationOptions(stall = true, stallIterations = 2),
         )
 
@@ -154,19 +176,24 @@ class RevisedSimplexPerturbationTest {
         val one = ExactLpNumber.of(1L)
         val three = ExactLpNumber.of(3L)
         val exact = ExactLpModel(
-            List(4) { listOf(ExactLpEntry(0, one)) }, listOf(ExactLpNumber.of(10L)),
+            List(4) { listOf(ExactLpEntry(0, one)) },
+            listOf(ExactLpNumber.of(10L)),
             listOf(
                 ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(three))),
                 ExactLpColumn(ExactLpBounds(upper = ExactLpSide(ExactLpNumber.of(-1L)))),
                 ExactLpColumn(ExactLpBounds()),
                 ExactLpColumn(ExactLpBounds(ExactLpSide(three), ExactLpSide(three))),
                 ExactLpColumn(ExactLpBounds()),
-            ), listOf(ExactLpRow()),
+            ),
+            listOf(ExactLpRow()),
             ExactLpObjective(listOf(one, ExactLpNumber.of(-1L), zero, one, zero)),
         )
         val state = LpExactState(exact)
         val trail = LpBoundTrail(state)
-        val solver = RevisedSimplex(assertNotNull(state.toWorkingModel()), perturbationOptions = CostPerturbationOptions(root = true))
+        val solver = RevisedSimplex(
+            assertNotNull(state.toWorkingModel()),
+            perturbationOptions = CostPerturbationOptions(root = true),
+        )
         repeat(4) { index ->
             val cost = if (index % 2 == 0) one else ExactLpNumber.of(-1L)
             assertTrue(trail.replaceObjective(ExactLpObjective(listOf(cost, ExactLpNumber.of(-1L), zero, one, zero))))
@@ -194,7 +221,11 @@ class RevisedSimplexPerturbationTest {
         val x = b.addVar(0L, 2L, cost = 1L)
         b.addRow(mapOf(x to 1L), Relation.GE, 1L)
         val model = b.build(Sense.MINIMIZE)
-        val solver = RevisedSimplex(model, iterationLimit = 2, perturbationOptions = CostPerturbationOptions(root = true))
+        val solver = RevisedSimplex(
+            model,
+            iterationLimit = 2,
+            perturbationOptions = CostPerturbationOptions(root = true),
+        )
 
         assertNull(solver.solve())
 
@@ -216,7 +247,8 @@ class RevisedSimplexPerturbationTest {
         var fail = true
         lateinit var solver: RevisedSimplex
         solver = RevisedSimplex(
-            model, perturbationOptions = CostPerturbationOptions(root = true),
+            model,
+            perturbationOptions = CostPerturbationOptions(root = true),
             basisSolverFactory = { matrix ->
                 val delegate = KotlinBasisSolver(matrix)
                 object : BasisSolver by delegate {
@@ -245,7 +277,8 @@ class RevisedSimplexPerturbationTest {
         var cancelled = false
         lateinit var solver: RevisedSimplex
         solver = RevisedSimplex(
-            b.build(Sense.MINIMIZE), cancellation = Cancellation { cancelled },
+            b.build(Sense.MINIMIZE),
+            cancellation = Cancellation { cancelled },
             perturbationOptions = CostPerturbationOptions(root = true),
             basisSolverFactory = { matrix ->
                 val delegate = KotlinBasisSolver(matrix)

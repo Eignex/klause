@@ -15,6 +15,54 @@ import kotlin.test.assertTrue
 
 class RevisedSimplexRecoveryTest {
     @Test
+    fun `late cancellation of recovered original costs withholds all publication`() {
+        for (root in listOf(false, true)) {
+            val b = LpBuilder()
+            val x = b.addVar(0L, 2L, cost = 1L)
+            b.addRow(mapOf(x to 1L), Relation.GE, 1L)
+            val model = b.build(Sense.MINIMIZE)
+            var fail = true
+            var cancelled = false
+            lateinit var solver: RevisedSimplex
+            solver = RevisedSimplex(
+                model,
+                cancellation = Cancellation { cancelled },
+                perturbationOptions = CostPerturbationOptions(root = root),
+                recoveryOptions = NumericalRecoveryOptions(enabled = true),
+                basisSolverFactory = { matrix ->
+                    val delegate = KotlinBasisSolver(matrix)
+                    object : BasisSolver by delegate {
+                        override fun ftran(x: IndexedVector, expectedDensity: Double) {
+                            if (fail) {
+                                fail = false
+                                throw BasisArithmeticException("initial solve")
+                            }
+                            delegate.ftran(x, expectedDensity)
+                        }
+                        override fun btran(x: IndexedVector, expectedDensity: Double) {
+                            delegate.btran(x, expectedDensity)
+                            if (solver.lastPivots > 0) cancelled = true
+                        }
+                    }
+                },
+            )
+
+            assertNull(solver.solve())
+
+            assertTrue(cancelled)
+            assertEquals(1, solver.lastPivots)
+            assertEquals(0, solver.lastNumericalMetrics.cleanupSuccesses)
+            assertEquals(setOf(NumericalRecoveryStep.RESIDUAL_REBUILD), solver.lastNumericalMetrics.recovery.keys)
+            assertTrue(solver.lastNumericalMetrics.recovery.values.all { it.successes == 0 })
+            assertNull(solver.infeasibleRay)
+            assertNull(solver.solvedExactState)
+            assertTrue(solver.gomoryCuts(1).isEmpty())
+            assertEquals(1L, model.cost[x])
+            solver.close()
+        }
+    }
+
+    @Test
     fun `shift removal during fallback retains the cleanup obligation at an iteration stop`() {
         for (recovery in listOf(false, true)) {
             val b = LpBuilder()
@@ -23,8 +71,11 @@ class RevisedSimplexRecoveryTest {
             val model = b.build(Sense.MINIMIZE)
             var fail = true
             val solver = RevisedSimplex(
-                model, iterationLimit = 2, perturbationOptions = CostPerturbationOptions(root = true),
-                recoveryOptions = NumericalRecoveryOptions(enabled = recovery), basisSolverFactory = { matrix ->
+                model,
+                iterationLimit = 2,
+                perturbationOptions = CostPerturbationOptions(root = true),
+                recoveryOptions = NumericalRecoveryOptions(enabled = recovery),
+                basisSolverFactory = { matrix ->
                     val delegate = KotlinBasisSolver(matrix)
                     object : BasisSolver by delegate {
                         override fun ftran(x: IndexedVector, expectedDensity: Double) {
@@ -65,9 +116,14 @@ class RevisedSimplexRecoveryTest {
                     delegate.refactorize(if (basicIndex.contentEquals(heading)) intArrayOf(2, 3) else basicIndex)
             }
         })
-        val proposal = assertNotNull(solver.solve(Basis(
-            heading, arrayOf(VarStatus.BASIC, VarStatus.BASIC, VarStatus.FIXED, VarStatus.FIXED),
-        )))
+        val proposal = assertNotNull(
+            solver.solve(
+                Basis(
+                    heading,
+                    arrayOf(VarStatus.BASIC, VarStatus.BASIC, VarStatus.FIXED, VarStatus.FIXED),
+                ),
+            ),
+        )
         val rejected = verifyExactBasis(model, proposal.basis)
         assertEquals(ExactBasisDecline.SINGULAR, rejected.metrics.decline)
         assertEquals(1, rejected.singularRank)
@@ -82,18 +138,22 @@ class RevisedSimplexRecoveryTest {
         solver.close()
     }
 
-
     @Test
     fun `appended owner retains recovery selection and restores original costs`() {
         val zero = ExactLpNumber.of(0L)
         val one = ExactLpNumber.of(1L)
-        val source = LpExactState(ExactLpModel(
-            listOf(listOf(ExactLpEntry(0, one))), listOf(ExactLpNumber.of(2L)),
-            listOf(
-                ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(ExactLpNumber.of(3L)))),
-                ExactLpColumn(ExactLpBounds(ExactLpSide(zero))),
-            ), listOf(ExactLpRow()), ExactLpObjective(listOf(one, zero)),
-        ))
+        val source = LpExactState(
+            ExactLpModel(
+                listOf(listOf(ExactLpEntry(0, one))),
+                listOf(ExactLpNumber.of(2L)),
+                listOf(
+                    ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(ExactLpNumber.of(3L)))),
+                    ExactLpColumn(ExactLpBounds(ExactLpSide(zero))),
+                ),
+                listOf(ExactLpRow()),
+                ExactLpObjective(listOf(one, zero)),
+            ),
+        )
         var failNext = false
         val factory = object : LpEngineFactory by ProductionLpEngineFactory {
             override fun newPersistentSolver(
@@ -123,24 +183,37 @@ class RevisedSimplexRecoveryTest {
             )
         }
         LpScopedSolver(
-            source, context = LpSolveContext(engineFactory = factory), appendSelection = LpAppendSelection.FRESH_INTENDED,
+            source,
+            context = LpSolveContext(engineFactory = factory),
+            appendSelection = LpAppendSelection.FRESH_INTENDED,
         ).use { owner ->
             assertNotNull(owner.solve())
-            assertTrue(owner.append(LpScopedRow(
-                1L, listOf(0 to ExactLpNumber.of(-1L)), ExactLpNumber.of(-1L),
-                ExactLpColumn(ExactLpBounds(ExactLpSide(zero))),
-            ), scoped = false))
+            assertTrue(
+                owner.append(
+                    LpScopedRow(
+                        1L,
+                        listOf(0 to ExactLpNumber.of(-1L)),
+                        ExactLpNumber.of(-1L),
+                        ExactLpColumn(ExactLpBounds(ExactLpSide(zero))),
+                    ),
+                    scoped = false,
+                ),
+            )
             failNext = true
 
             val (engine, result) = assertNotNull(owner.solveFloat())
 
             assertEquals(1.0, assertNotNull(result).objective)
-            assertEquals(1, (engine as RevisedSimplex).lastNumericalMetrics.recovery.getValue(NumericalRecoveryStep.RESIDUAL_REBUILD).successes)
+            assertEquals(
+                1,
+                (engine as RevisedSimplex).lastNumericalMetrics.recovery.getValue(
+                    NumericalRecoveryStep.RESIDUAL_REBUILD,
+                ).successes,
+            )
             assertFalse(failNext)
             assertEquals(1, owner.metrics.appendIntendedFreshBuilds)
         }
     }
-
 
     @Test
     fun `recovery rebuild spends the remaining work without admitting another solve`() {
@@ -149,7 +222,9 @@ class RevisedSimplexRecoveryTest {
         b.addRow(mapOf(x to 1L), Relation.GE, 1L)
         var solves = 0
         val solver = RevisedSimplex(
-            b.build(Sense.MINIMIZE), workLimit = 4L, recoveryOptions = NumericalRecoveryOptions(enabled = true),
+            b.build(Sense.MINIMIZE),
+            workLimit = 4L,
+            recoveryOptions = NumericalRecoveryOptions(enabled = true),
             basisSolverFactory = { matrix ->
                 val delegate = KotlinBasisSolver(matrix)
                 object : BasisSolver by delegate {
@@ -175,23 +250,32 @@ class RevisedSimplexRecoveryTest {
         val zero = ExactLpNumber.of(0L)
         val one = ExactLpNumber.of(1L)
         val coefficient = ExactLpNumber.of(-1024L)
-        val state = LpExactState(ExactLpModel(
-            listOf(listOf(ExactLpEntry(0, coefficient))), listOf(coefficient),
-            listOf(
-                ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(ExactLpNumber.of(2L)))),
-                ExactLpColumn(ExactLpBounds(ExactLpSide(zero))),
-            ), listOf(ExactLpRow()), ExactLpObjective(listOf(one, zero)),
-        ))
+        val state = LpExactState(
+            ExactLpModel(
+                listOf(listOf(ExactLpEntry(0, coefficient))),
+                listOf(coefficient),
+                listOf(
+                    ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(ExactLpNumber.of(2L)))),
+                    ExactLpColumn(ExactLpBounds(ExactLpSide(zero))),
+                ),
+                listOf(ExactLpRow()),
+                ExactLpObjective(listOf(one, zero)),
+            ),
+        )
         val model = assertNotNull(state.toWorkingModel())
         var failScaled = false
         lateinit var solver: RevisedSimplex
         solver = RevisedSimplex(
-            model, perturbationOptions = CostPerturbationOptions(root = true),
-            recoveryOptions = NumericalRecoveryOptions(enabled = true), basisSolverFactory = { matrix ->
+            model,
+            perturbationOptions = CostPerturbationOptions(root = true),
+            recoveryOptions = NumericalRecoveryOptions(enabled = true),
+            basisSolverFactory = { matrix ->
                 val delegate = KotlinBasisSolver(matrix)
                 object : BasisSolver by delegate {
                     override fun ftran(x: IndexedVector, expectedDensity: Double) {
-                        if (failScaled && solver.scalingMetrics.applied) throw BasisArithmeticException("scaled failure")
+                        if (failScaled && solver.scalingMetrics.applied) {
+                            throw BasisArithmeticException("scaled failure")
+                        }
                         delegate.ftran(x, expectedDensity)
                     }
                 }
@@ -211,7 +295,6 @@ class RevisedSimplexRecoveryTest {
         solver.close()
     }
 
-
     @Test
     fun `a repaired factorization does not turn later unboundedness into a numerical retry`() {
         for (recovery in listOf(false, true)) {
@@ -220,7 +303,8 @@ class RevisedSimplexRecoveryTest {
             b.addRealRow(intArrayOf(x), doubleArrayOf(1024.0), Relation.GE, 0.0)
             var first = true
             val solver = RevisedSimplex(
-                b.build(Sense.MINIMIZE), recoveryOptions = NumericalRecoveryOptions(enabled = recovery),
+                b.build(Sense.MINIMIZE),
+                recoveryOptions = NumericalRecoveryOptions(enabled = recovery),
                 basisSolverFactory = { matrix ->
                     val delegate = KotlinBasisSolver(matrix)
                     object : BasisSolver by delegate {
@@ -252,8 +336,10 @@ class RevisedSimplexRecoveryTest {
         val model = b.build(Sense.MINIMIZE)
         lateinit var solver: RevisedSimplex
         solver = RevisedSimplex(
-            model, perturbationOptions = CostPerturbationOptions(root = true),
-            recoveryOptions = NumericalRecoveryOptions(enabled = true), basisSolverFactory = { matrix ->
+            model,
+            perturbationOptions = CostPerturbationOptions(root = true),
+            recoveryOptions = NumericalRecoveryOptions(enabled = true),
+            basisSolverFactory = { matrix ->
                 val delegate = KotlinBasisSolver(matrix)
                 object : BasisSolver by delegate {
                     override fun ftran(x: IndexedVector, expectedDensity: Double) {
@@ -273,7 +359,6 @@ class RevisedSimplexRecoveryTest {
         solver.close()
     }
 
-
     @Test
     fun `each supported recovery step can produce an original source optimum`() {
         for (target in NumericalRecoveryStep.entries.filter { it != NumericalRecoveryStep.TIGHTER_PIVOT }) {
@@ -282,17 +367,21 @@ class RevisedSimplexRecoveryTest {
             b.addRow(mapOf(x to 1024L), Relation.GE, 1024L)
             val model = b.build(Sense.MINIMIZE)
             lateinit var solver: RevisedSimplex
-            solver = RevisedSimplex(model, recoveryOptions = NumericalRecoveryOptions(enabled = true), basisSolverFactory = { matrix ->
-                val delegate = KotlinBasisSolver(matrix)
-                object : BasisSolver by delegate {
-                    override fun ftran(x: IndexedVector, expectedDensity: Double) {
-                        if (solver.lastNumericalMetrics.recovery[target]?.attempts != 1) {
-                            throw BasisArithmeticException("injected until $target")
+            solver = RevisedSimplex(
+                model,
+                recoveryOptions = NumericalRecoveryOptions(enabled = true),
+                basisSolverFactory = { matrix ->
+                    val delegate = KotlinBasisSolver(matrix)
+                    object : BasisSolver by delegate {
+                        override fun ftran(x: IndexedVector, expectedDensity: Double) {
+                            if (solver.lastNumericalMetrics.recovery[target]?.attempts != 1) {
+                                throw BasisArithmeticException("injected until $target")
+                            }
+                            delegate.ftran(x, expectedDensity)
                         }
-                        delegate.ftran(x, expectedDensity)
                     }
-                }
-            })
+                },
+            )
 
             val result = assertNotNull(solver.solve(), target.name)
 
@@ -302,7 +391,10 @@ class RevisedSimplexRecoveryTest {
             assertEquals(1, solver.lastNumericalMetrics.recovery.getValue(target).successes)
             assertTrue(solver.lastNumericalMetrics.recovery.values.all { it.attempts <= 1 })
             if (target != NumericalRecoveryStep.RESIDUAL_REBUILD) {
-                assertEquals(1, solver.lastNumericalMetrics.recovery.getValue(NumericalRecoveryStep.TIGHTER_PIVOT).skips)
+                assertEquals(
+                    1,
+                    solver.lastNumericalMetrics.recovery.getValue(NumericalRecoveryStep.TIGHTER_PIVOT).skips,
+                )
             }
             solver.close()
         }
@@ -314,11 +406,15 @@ class RevisedSimplexRecoveryTest {
         val x = b.addVar(0L, 2L, cost = 1L)
         b.addRow(mapOf(x to 1L), Relation.GE, 1L)
         val solver = RevisedSimplex(
-            b.build(Sense.MINIMIZE), recoveryOptions = NumericalRecoveryOptions(enabled = true),
+            b.build(Sense.MINIMIZE),
+            recoveryOptions = NumericalRecoveryOptions(enabled = true),
             basisSolverFactory = { matrix ->
                 val delegate = KotlinBasisSolver(matrix)
                 object : BasisSolver by delegate {
-                    override fun ftran(x: IndexedVector, expectedDensity: Double): Unit = throw BasisArithmeticException("injected")
+                    override fun ftran(x: IndexedVector, expectedDensity: Double): Unit =
+                        throw BasisArithmeticException(
+                            "injected",
+                        )
                 }
             },
         )
@@ -341,7 +437,9 @@ class RevisedSimplexRecoveryTest {
         b.addRow(mapOf(x to 1L), Relation.GE, 1L)
         var builds = 0
         val solver = RevisedSimplex(
-            b.build(Sense.MINIMIZE), workLimit = 100L, recoveryOptions = NumericalRecoveryOptions(enabled = true),
+            b.build(Sense.MINIMIZE),
+            workLimit = 100L,
+            recoveryOptions = NumericalRecoveryOptions(enabled = true),
             basisSolverFactory = { matrix ->
                 val delegate = KotlinBasisSolver(matrix)
                 object : BasisSolver by delegate {
@@ -375,8 +473,10 @@ class RevisedSimplexRecoveryTest {
         var cancelled = false
         var builds = 0
         val solver = RevisedSimplex(
-            b.build(Sense.MINIMIZE), cancellation = Cancellation { cancelled },
-            recoveryOptions = NumericalRecoveryOptions(enabled = true), basisSolverFactory = { matrix ->
+            b.build(Sense.MINIMIZE),
+            cancellation = Cancellation { cancelled },
+            recoveryOptions = NumericalRecoveryOptions(enabled = true),
+            basisSolverFactory = { matrix ->
                 val delegate = KotlinBasisSolver(matrix)
                 object : BasisSolver by delegate {
                     override fun refactorize(basicIndex: IntArray): Boolean {
@@ -404,13 +504,18 @@ class RevisedSimplexRecoveryTest {
         val zero = ExactLpNumber.of(0L)
         val one = ExactLpNumber.of(1L)
         val negative = ExactLpNumber.of(-1L)
-        val state = LpExactState(ExactLpModel(
-            listOf(listOf(ExactLpEntry(0, negative))), listOf(negative),
-            listOf(
-                ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(ExactLpNumber.of(2L)))),
-                ExactLpColumn(ExactLpBounds(ExactLpSide(zero))),
-            ), listOf(ExactLpRow()), ExactLpObjective(listOf(one, zero)),
-        ))
+        val state = LpExactState(
+            ExactLpModel(
+                listOf(listOf(ExactLpEntry(0, negative))),
+                listOf(negative),
+                listOf(
+                    ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(ExactLpNumber.of(2L)))),
+                    ExactLpColumn(ExactLpBounds(ExactLpSide(zero))),
+                ),
+                listOf(ExactLpRow()),
+                ExactLpObjective(listOf(one, zero)),
+            ),
+        )
         val model = assertNotNull(state.toWorkingModel())
         val solver = RevisedSimplex(model, recoveryOptions = NumericalRecoveryOptions(enabled = true))
         val first = assertNotNull(solver.solve())
