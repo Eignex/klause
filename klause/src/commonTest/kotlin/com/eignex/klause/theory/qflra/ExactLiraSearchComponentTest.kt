@@ -57,15 +57,15 @@ class ExactLiraSearchComponentTest {
             realUpper = doubleArrayOf(1.0),
             factors = arrayOf(
                 ReifiedRealLinear(
-                0,
-                intArrayOf(),
-                doubleArrayOf(),
-                intArrayOf(0),
-                doubleArrayOf(1.0),
-                LinearOp.GE,
-                1.0,
-                strict = true,
-            )
+                    0,
+                    intArrayOf(),
+                    doubleArrayOf(),
+                    intArrayOf(0),
+                    doubleArrayOf(1.0),
+                    LinearOp.GE,
+                    1.0,
+                    strict = true,
+                ),
             ),
         )
         ExactLiraSearchComponent(model).use { component ->
@@ -136,14 +136,14 @@ class ExactLiraSearchComponentTest {
             realUpper = doubleArrayOf(1.0),
             factors = arrayOf(
                 Linear(
-                intArrayOf(),
-                doubleArrayOf(),
-                intArrayOf(0),
-                doubleArrayOf(1.0),
-                LinearOp.GE,
-                0.0,
-                strict = true,
-            )
+                    intArrayOf(),
+                    doubleArrayOf(),
+                    intArrayOf(0),
+                    doubleArrayOf(1.0),
+                    LinearOp.GE,
+                    0.0,
+                    strict = true,
+                ),
             ),
         )
         val stats = SmtStatsSink()

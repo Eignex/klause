@@ -2,10 +2,15 @@ package com.eignex.klause.lp.engine
 
 import com.eignex.klause.simplex.exact.BigFraction
 
-internal fun LpModel.hasStrictSides(): Boolean = (0 until numVars).any { column ->
-    val bounds = exactBounds(column)
-    bounds.lower?.strict == true || bounds.upper?.strict == true
-} || (0 until m).any { exactState?.model?.row(it)?.strict ?: rowStrict[it] }
+internal fun LpModel.hasStrictSides(meter: RefinementMeter): Boolean {
+    if (numVars > meter.limits.maxCoordinates) meter.stop(LpRefinementDecline.DIMENSION)
+    meter.charge(numVars.toLong() + m)
+    val source = requireNotNull(exactState).model
+    return (0 until numVars).any { column ->
+        val bounds = source.column(column).bounds
+        bounds.lower?.strict == true || bounds.upper?.strict == true
+    } || (0 until m).any { source.row(it).strict }
+}
 
 // Auxiliary structural coordinates include source logicals; source origins are restored only on export.
 internal class StrictFeasibility(private val source: RefinementAuthority) {
