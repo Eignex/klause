@@ -554,8 +554,8 @@ class ExactBasisVerifyTest {
             assertEquals(1, verifyExactBasis(model, result.basis, cache = solver.exactBasisCache).metrics.reuse)
 
             assertTrue(solver.rejectSingularBasis(model, result.basis))
-            val repaired = assertNotNull(solver.resolveBounds())
-            val verified = verifyExactBasis(model, repaired.basis, cache = solver.exactBasisCache)
+            assertNull(solver.resolveBounds())
+            val verified = verifyExactBasis(model, result.basis, cache = solver.exactBasisCache)
 
             assertFalse(solver.lastWarmStarted)
             assertEquals(1, verified.metrics.factoryCalls)

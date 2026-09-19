@@ -8,11 +8,81 @@ import com.eignex.klause.simplex.basis.KotlinBasisSolver
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class RevisedSimplexRecoveryTest {
+    @Test
+    fun `shift removal during fallback retains the cleanup obligation at an iteration stop`() {
+        for (recovery in listOf(false, true)) {
+            val b = LpBuilder()
+            val x = b.addVar(0L, 2L, cost = 1L)
+            b.addRow(mapOf(x to 1024L), Relation.GE, 1024L)
+            val model = b.build(Sense.MINIMIZE)
+            var fail = true
+            val solver = RevisedSimplex(
+                model, iterationLimit = 2, perturbationOptions = CostPerturbationOptions(root = true),
+                recoveryOptions = NumericalRecoveryOptions(enabled = recovery), basisSolverFactory = { matrix ->
+                    val delegate = KotlinBasisSolver(matrix)
+                    object : BasisSolver by delegate {
+                        override fun ftran(x: IndexedVector, expectedDensity: Double) {
+                            if (fail) {
+                                fail = false
+                                throw BasisArithmeticException("first iteration")
+                            }
+                            delegate.ftran(x, expectedDensity)
+                        }
+                    }
+                },
+            )
+
+            assertNull(solver.solve())
+
+            assertEquals(1, solver.lastPivots)
+            assertEquals(1, solver.lastNumericalMetrics.rootAttempts)
+            assertEquals(1, solver.lastNumericalMetrics.capExits)
+            assertNull(solver.infeasibleRay)
+            assertNull(solver.solvedExactState)
+            assertTrue(solver.gomoryCuts(1).isEmpty())
+            assertEquals(1L, model.cost[x])
+            solver.close()
+        }
+    }
+
+    @Test
+    fun `exact singularity rejects the numerical heading and permits a different source basis`() {
+        val b = LpBuilder()
+        repeat(2) { b.addVar(0L, 2L) }
+        repeat(2) { b.addRow(mapOf(0 to 1L, 1 to 1L), Relation.EQ, 1L) }
+        val model = b.build(Sense.MINIMIZE)
+        val heading = intArrayOf(0, 1)
+        val solver = RevisedSimplex(model, basisSolverFactory = { matrix ->
+            val delegate = KotlinBasisSolver(matrix)
+            object : BasisSolver by delegate {
+                override fun refactorize(basicIndex: IntArray): Boolean =
+                    delegate.refactorize(if (basicIndex.contentEquals(heading)) intArrayOf(2, 3) else basicIndex)
+            }
+        })
+        val proposal = assertNotNull(solver.solve(Basis(
+            heading, arrayOf(VarStatus.BASIC, VarStatus.BASIC, VarStatus.FIXED, VarStatus.FIXED),
+        )))
+        val rejected = verifyExactBasis(model, proposal.basis)
+        assertEquals(ExactBasisDecline.SINGULAR, rejected.metrics.decline)
+        assertEquals(1, rejected.singularRank)
+        assertTrue(solver.rejectSingularBasis(model, proposal.basis))
+
+        val recovered = assertNotNull(solver.resolveBounds())
+
+        assertTrue(!recovered.basis.basicVars.contentEquals(heading))
+        assertEquals(1.0, recovered.primal.sum(), 1e-9)
+        assertTrue(recovered.primal.all { it in 0.0..2.0 })
+        assertNotNull(verifyExactBasis(model, recovered.basis).witness)
+        solver.close()
+    }
+
+
     @Test
     fun `appended owner retains recovery selection and restores original costs`() {
         val zero = ExactLpNumber.of(0L)
@@ -41,19 +111,19 @@ class RevisedSimplexRecoveryTest {
                 basisSolverFactory = { matrix ->
                     val delegate = KotlinBasisSolver(matrix)
                     object : BasisSolver by delegate {
-                        override fun ftran(x: IndexedVector, expectedDensity: Double) {
+                        override fun btran(x: IndexedVector, expectedDensity: Double) {
                             if (failNext) {
                                 failNext = false
                                 throw BasisArithmeticException("appended solve")
                             }
-                            delegate.ftran(x, expectedDensity)
+                            delegate.btran(x, expectedDensity)
                         }
                     }
                 },
             )
         }
         LpScopedSolver(
-            source, context = LpSolveContext(engineFactory = factory), appendSelection = LpAppendSelection.FORCE_TRANSFER,
+            source, context = LpSolveContext(engineFactory = factory), appendSelection = LpAppendSelection.FRESH_INTENDED,
         ).use { owner ->
             assertNotNull(owner.solve())
             assertTrue(owner.append(LpScopedRow(
@@ -66,7 +136,8 @@ class RevisedSimplexRecoveryTest {
 
             assertEquals(1.0, assertNotNull(result).objective)
             assertEquals(1, (engine as RevisedSimplex).lastNumericalMetrics.recovery.getValue(NumericalRecoveryStep.RESIDUAL_REBUILD).successes)
-            assertEquals(1, owner.metrics.appendTransfers)
+            assertFalse(failNext)
+            assertEquals(1, owner.metrics.appendIntendedFreshBuilds)
         }
     }
 
