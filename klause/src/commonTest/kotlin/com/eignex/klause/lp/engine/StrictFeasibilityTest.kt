@@ -15,9 +15,11 @@ class StrictFeasibilityTest {
     fun `strict eligibility declines before scanning an unadmitted source`() {
         val zero = ExactLpNumber.of(0L)
         val source = ExactLpModel(
-            List(3) { emptyList() }, emptyList(),
+            List(3) { emptyList() },
+            emptyList(),
             List(3) { ExactLpColumn(ExactLpBounds(ExactLpSide(zero, strict = true)), integral = false) },
-            emptyList(), ExactLpObjective(List(3) { zero }),
+            emptyList(),
+            ExactLpObjective(List(3) { zero }),
         )
         val cases = listOf(
             LpRefinementLimits(maxCoordinates = 2) to LpRefinementDecline.DIMENSION,
@@ -43,15 +45,20 @@ class StrictFeasibilityTest {
     fun `disabled auxiliaries skip strict eligibility admission`() {
         val zero = ExactLpNumber.of(0L)
         val source = ExactLpModel(
-            listOf(emptyList()), emptyList(),
+            listOf(emptyList()),
+            emptyList(),
             listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero, strict = true)), integral = false)),
-            emptyList(), ExactLpObjective(listOf(zero)),
+            emptyList(),
+            ExactLpObjective(listOf(zero)),
         )
         LpScopedSolver(LpExactState(source)).use { owner ->
             val result = refineLp(
                 assertNotNull(owner.state.toWorkingModel()),
-                LpRefinementRequest(owner, owner.refinementCache,
-                    LpRefinementLimits(maxAuxiliaries = 0, maxCoordinates = 0, maxWork = 1)),
+                LpRefinementRequest(
+                    owner,
+                    owner.refinementCache,
+                    LpRefinementLimits(maxAuxiliaries = 0, maxCoordinates = 0, maxWork = 1),
+                ),
             )
 
             assertEquals(LpRefinementDecline.CANDIDATE, result.metrics.decline)
