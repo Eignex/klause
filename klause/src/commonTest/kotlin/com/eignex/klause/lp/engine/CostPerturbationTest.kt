@@ -10,7 +10,12 @@ class CostPerturbationTest {
     fun `removal restores tiny authoritative costs without reverse subtraction`() {
         val original = doubleArrayOf(1e-30, -1e-30, -0.0)
         val shifts = CostPerturbation(original)
-        shifts.apply(arrayOf(VarStatus.AT_LOWER, VarStatus.AT_UPPER, VarStatus.FREE), true, CostPerturbationOptions(), { false })
+        shifts.apply(
+            arrayOf(VarStatus.AT_LOWER, VarStatus.AT_UPPER, VarStatus.FREE),
+            true,
+            CostPerturbationOptions(),
+            { false },
+        )
         assertNotEquals(original[0], shifts.cost(0))
 
         shifts.restore()
@@ -23,14 +28,18 @@ class CostPerturbationTest {
         val shifts = CostPerturbation(doubleArrayOf(1.0, 2.0, 3.0, 4.0))
         shifts.apply(
             arrayOf(VarStatus.AT_LOWER, VarStatus.AT_UPPER, VarStatus.FREE, VarStatus.FIXED),
-            true, CostPerturbationOptions(), { false },
+            true,
+            CostPerturbationOptions(),
+            { false },
         )
         val rootBasic = shifts.cost(0)
         val rootUpper = shifts.cost(1)
 
         shifts.apply(
             arrayOf(VarStatus.BASIC, VarStatus.AT_UPPER, VarStatus.FREE, VarStatus.FIXED),
-            false, CostPerturbationOptions(), { false },
+            false,
+            CostPerturbationOptions(),
+            { false },
         )
 
         assertTrue(rootBasic > 1.0)

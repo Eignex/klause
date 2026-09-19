@@ -357,8 +357,8 @@ internal class RevisedSimplex(
                 headings,
             ) == true || !basisStatusConsistent(model, headings, seats)
         ) {
-                return null
-            }
+            return null
+        }
         return Basis(headings.copyOf(), seats.copyOf(), captureEligible = false)
     }
 
@@ -1478,8 +1478,8 @@ internal class RevisedSimplex(
                 progress,
             )
         ) {
-                applyCostShift(root = true)
-            }
+            applyCostShift(root = true)
+        }
     }
 
     private fun applyStallPerturbation(progress: SolveProgress) {
@@ -1528,6 +1528,11 @@ internal class RevisedSimplex(
             textbookRatio = false
             perturbationAllowed = false
             if (cleanup) result = cleanupOriginal(progress, enforced)
+            if ((shifted || recoveryOptions.enabled) && (repairStop != null || cancellation())) {
+                clearNumericalPublication()
+                lastNumericalMetrics.cleanupSuccesses = 0
+                result = null
+            }
             if (result?.optimal != true &&
                 (progress.iterations >= maxIterations || (effectiveWorkLimit > 0L && work.ops >= effectiveWorkLimit))
             ) {
@@ -1575,7 +1580,11 @@ internal class RevisedSimplex(
                 allowUnscaledFallback = false,
                 reset = false,
             )
-            if ((result?.optimal == true || infeasibleRay != null) && repairStop == null && !cancellation()) {
+            if (repairStop != null || cancellation()) {
+                clearNumericalPublication()
+                return null
+            }
+            if (result?.optimal == true || infeasibleRay != null) {
                 lastNumericalMetrics.cleanupSuccesses++
                 return result
             }
@@ -1601,12 +1610,12 @@ internal class RevisedSimplex(
         if (!resourcesRemain(progress)) return null
         if (!basisFactorized) {
             return solveCore(
-            null,
-            reuse = false,
-            enforced = enforced,
-            reset = false,
-            progress = progress,
-        )
+                null,
+                reuse = false,
+                enforced = enforced,
+                reset = false,
+                progress = progress,
+            )
         }
         basisKept = true
         return if (enforced == null && !dualFeasible()) {
