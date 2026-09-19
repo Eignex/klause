@@ -12,13 +12,10 @@ import com.eignex.klause.lp.ExactMixedBoundedRow
 import com.eignex.klause.lp.ExactMixedEchelonHermite
 import com.eignex.klause.lp.ExactMixedTriangularBounds
 import com.eignex.klause.lp.asFraction
-import com.eignex.klause.lp.bounding.RowPropagation
-import com.eignex.klause.lp.bounding.RowPropagationResult
 import com.eignex.klause.lp.bounding.LpPropagator
 import com.eignex.klause.lp.bounding.LpSearchPolicy
 import com.eignex.klause.lp.engine.LpCertificationObserver
 import com.eignex.klause.lp.engine.LpCertifier
-import com.eignex.klause.lp.engine.ExactLpSide
 import com.eignex.klause.lp.engine.LpExactState
 import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.lp.engine.LpSolveMetrics
@@ -152,8 +149,7 @@ class ExactLiraSearchComponent(
     private val arithmeticVariables = arithmeticRows.flatMap { it.booleanVariables() }.toSet()
     private val branchNames = HashMap<SourceBoundAtom, SearchDecision>()
     private var context: SearchContext? = null
-    private var rowPropagation: RowPropagation? = null
-    private val lpDelegate: Lazy<LpPropagator> = lazy {
+    private val lp by lazy {
         LpPropagator(
             object : LpSearchPolicy {
                 override fun assert(decision: SearchDecision, context: SearchContext): ComponentResult =
@@ -162,21 +158,6 @@ class ExactLiraSearchComponent(
                 override fun check(context: SearchContext): ComponentCheck = outcome ?: ComponentCheck.Indeterminate
                 override fun nextBranch(context: SearchContext): List<SearchDecision>? = branch(context)
                 override fun retract(decisionLevel: Int) = retractSource(decisionLevel)
-                override fun rowAssertionAllowed(context: SearchContext): Boolean =
-                    this@ExactLiraSearchComponent.context === context && node.sourceBranches.size <= 128 &&
-                        node.retainedReduction == null
-
-                override fun rowDecision(
-                    state: LpExactState,
-                    column: Int,
-                    upper: Boolean,
-                    side: ExactLpSide,
-                    context: SearchContext,
-                ): SearchDecision? = if (rowAssertionAllowed(context)) {
-                    system.rowDecision(state, column, upper, side, context)
-                } else {
-                    null
-                }
                 override fun restart(context: SearchContext) {
                     if (lpEpochs) {
                         epochObserver?.invoke("shared_restart_opportunities", 1L)
@@ -185,7 +166,6 @@ class ExactLiraSearchComponent(
                     }
                 }
             },
-            rowPropagation = rowPropagation,
             solveContext = solveContext,
             cancellation = Cancellation { context?.cancelled() == true },
             certificationObserver = object : LpCertificationObserver {
@@ -198,13 +178,7 @@ class ExactLiraSearchComponent(
             },
         )
     }
-    private val lp: LpPropagator by lpDelegate
     private val system by lazy { LiveQfLraSystem(model, lp) }
-
-    internal fun propagateRowsWith(propagation: RowPropagation) {
-        check(context == null && !lpDelegate.isInitialized())
-        rowPropagation = propagation
-    }
 
     internal fun solveWith(context: LpSolveContext) {
         check(this.context == null)
@@ -369,16 +343,6 @@ class ExactLiraSearchComponent(
             return ComponentResult.Indeterminate
         }
         refreshEpoch(context)
-        when (val propagated = lp.propagateRows(context)) {
-            RowPropagationResult.Published -> return ComponentResult.Consistent
-            is RowPropagationResult.Conflict -> {
-                outcome = ComponentCheck.Infeasible(propagated.explanation)
-                smtStats?.observeConflict(propagated.explanation)
-                return ComponentResult.Conflict(propagated.explanation)
-            }
-            RowPropagationResult.Indeterminate -> return ComponentResult.Indeterminate
-            RowPropagationResult.Skipped -> Unit
-        }
         if (!context.consumeCheck()) return ComponentResult.Indeterminate
         val result = lp.solve() ?: return ComponentResult.Indeterminate
         if (context.cancelled()) return ComponentResult.Indeterminate

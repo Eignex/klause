@@ -58,14 +58,6 @@ internal interface LpSearchPolicy {
     fun fractionalBranch(context: SearchContext): LpFractionalBranch? = null
     fun retract(decisionLevel: Int) = Unit
     fun restart(context: SearchContext) = Unit
-    fun rowAssertionAllowed(context: SearchContext): Boolean = true
-    fun rowDecision(
-        state: LpExactState,
-        column: Int,
-        upper: Boolean,
-        side: ExactLpSide,
-        context: SearchContext,
-    ): SearchDecision? = null
 }
 
 internal data class LpFractionalBranch(
@@ -81,7 +73,6 @@ internal class LpPropagator(
     private val solveContext: LpSolveContext = LpSolveContext.Production,
     private val cancellation: Cancellation = Cancellation.Never,
     private val certificationObserver: LpCertificationObserver? = null,
-    private val rowPropagation: RowPropagation? = null,
 ) : SearchComponent,
     SearchBrancher,
     AutoCloseable {
@@ -89,9 +80,6 @@ internal class LpPropagator(
     private var epochWarm: Basis? = null
     private var proofContext: SearchContext? = null
     private var modelKey: Any? = null
-    private var rowSourceIdentity: Any? = null
-    var rowReasonEpoch: Any = Any()
-        private set
     private var rootState: LpExactState? = null
 
     // Local cut models may reinstall after an epoch; their initial bounds still need source premises.
@@ -100,9 +88,6 @@ internal class LpPropagator(
     private var closed = false
     private var invalidated = false
     private var nextWitness = 0L
-    private var rowHistoryBits = 0
-    private var rowHistoryAdmitted = false
-    private var rowNumericalPrepared = false
     private var preparedWork = 0L
     private var preparedRefactors = 0L
     private var solved = false
@@ -118,59 +103,6 @@ internal class LpPropagator(
     val metrics: LpScopedMetrics? get() = owner?.metrics
 
     fun boundPremise(witness: Long): SearchAtomPremise = witnesses[witness] ?: SearchAtomPremise.Unavailable
-
-    fun rowNativeCost(captured: LpExactState, inputBits: Int): Pair<Long, Long>? {
-        if (state !== captured || !rowHistoryAdmitted || rowNumericalPrepared || nextWitness > 1024 ||
-            captured.depth > 128 || captured.model.numVars > 128 || captured.model.m > 64
-        ) return null
-        val cells = captured.model.n.toLong() * captured.model.m
-        val bits = maxOf(inputBits, rowHistoryBits)
-        if (bits !in 0..128) return null
-        val productBits = 2L * bits + 1
-        val work = (nextWitness + captured.model.numVars + 1) * (captured.depth + 4 * (productBits * productBits + 2)) +
-            (cells + captured.model.numVars + captured.depth + 1) * 8 * (bits + 1)
-        val allocation = 32 * (nextWitness + cells + captured.model.numVars + captured.depth + 1)
-        return work to allocation
-    }
-
-    private fun admitRowHistory(side: ExactLpSide) {
-        rowHistoryBits = maxOf(rowHistoryBits, side.number.value.num.bitLength(), side.number.value.den.bitLength())
-        rowHistoryAdmitted = rowHistoryAdmitted && rowHistoryBits <= 128 && (side.premises?.size ?: 0L) <= 128
-    }
-
-    fun rowSource(key: Any): Any? = rowSourceIdentity.takeIf { modelKey === key }
-
-    fun ownsRowSource(key: Any, captured: LpExactState, token: Any): Boolean =
-        modelKey === key && state === captured && rowSourceIdentity === token
-
-    fun rowPublicationCurrent(captured: LpExactState, context: SearchContext, epoch: Any): Boolean =
-        !closed && !invalidated && state === captured && proofContext === context && rowReasonEpoch === epoch &&
-            captured.depth == context.decisionLevel && !context.cancelled() && !cancellation()
-
-    fun rowDecision(
-        captured: LpExactState,
-        column: Int,
-        upper: Boolean,
-        side: ExactLpSide,
-        context: SearchContext,
-    ): SearchDecision? = policy.rowDecision(captured, column, upper, side, context)
-
-    fun rowBoundPremise(captured: LpExactState, assertion: LpBoundAssertion): SearchAtomPremise {
-        if (state !== captured || assertion.column !in 0 until captured.model.numVars ||
-            captured.activeSide(assertion.column, assertion.upper) != assertion
-        ) return SearchAtomPremise.Unavailable
-        val declared = rootState?.takeIf { assertion.column < it.model.numVars }
-            ?.activeSide(assertion.column, assertion.upper)
-        return if (declared == assertion) {
-            if (sourceRootBounds) SearchAtomPremise.All(emptyList()) else
-                baseSidePremises[assertion.column to assertion.upper] ?: SearchAtomPremise.Unavailable
-        } else {
-            boundPremise(assertion.witness)
-        }
-    }
-
-    fun propagateRows(context: SearchContext): RowPropagationResult =
-        rowPropagation?.propagate(this, context) ?: RowPropagationResult.Skipped
 
     fun explainConflict(support: LpExactSupport?, context: SearchContext): SearchExplanation? {
         val current = state ?: return null
@@ -225,10 +157,6 @@ internal class LpPropagator(
         pendingRootAdmission = rootAdmission != null
         rootState = initial
         modelKey = key
-        rowSourceIdentity = Any()
-        rowHistoryBits = 0
-        rowHistoryAdmitted = rootAdmission == null
-        rowNumericalPrepared = rootAdmission != null
         sourcePremises = LpSourcePremises(key)
         return true
     }
@@ -285,10 +213,6 @@ internal class LpPropagator(
                 sourceRootBounds = false
                 baseSidePremises = premises.toMap()
                 modelKey = key
-                rowSourceIdentity = null
-                rowHistoryAdmitted = true
-                rowNumericalPrepared = true
-                rowReasonEpoch = Any()
                 sourcePremises = savedPremises ?: LpSourcePremises(key)
                 witnesses.clear()
                 nextWitness = 0L
@@ -377,10 +301,7 @@ internal class LpPropagator(
 
     fun atLevel(depth: Int, token: Cancellation = cancellation): Boolean {
         val current = owner ?: return false
-        if (depth < current.state.depth) {
-            rowReasonEpoch = Any()
-            if (!current.pop(depth, token)) return invalidate()
-        }
+        if (depth < current.state.depth && !current.pop(depth, token)) return invalidate()
         while (current.state.depth < depth) if (!current.push(token)) return invalidate()
         return true
     }
@@ -399,7 +320,6 @@ internal class LpPropagator(
         if (witness == Long.MAX_VALUE || !current.assertBound(column, upper, side, witness)) {
             return invalidate()
         }
-        admitRowHistory(side)
         witnesses[witness] = premise
         lastMetrics = LpSolveMetrics()
         return true
@@ -438,7 +358,6 @@ internal class LpPropagator(
         val result = current.assertBounds(assertions)
         if (result !is LpBoundBatchResult.Declined) {
             for (index in 0 until result.count) {
-                admitRowHistory(assertions[index].side)
                 witnesses[assertions[index].witness] = SearchAtomPremise.Unavailable
             }
             nextWitness += result.count
@@ -447,17 +366,10 @@ internal class LpPropagator(
         return result
     }
 
-    fun append(row: LpScopedRow, scoped: Boolean): Boolean {
-        rowNumericalPrepared = true
-        return owner?.append(row, scoped) == true
-    }
-    fun deactivate(row: Long): Boolean {
-        rowReasonEpoch = Any()
-        return owner?.deactivate(row) == true
-    }
+    fun append(row: LpScopedRow, scoped: Boolean): Boolean = owner?.append(row, scoped) == true
+    fun deactivate(row: Long): Boolean = owner?.deactivate(row) == true
 
     fun solveFloat(warm: Basis? = null, token: Cancellation = cancellation): Pair<LpSolver, FloatLpResult?>? {
-        rowNumericalPrepared = true
         val admitted = pendingRootAdmission
         val result = solveOwned { current ->
             val allowance = if (solved && !admitted) effort().let { LpFloatAllowance(it.work, it.iterations) } else null
@@ -478,7 +390,6 @@ internal class LpPropagator(
     }
 
     fun solve(): CertifiedLpResult? = solveOwned {
-        rowNumericalPrepared = true
         val profile = effort()
         it.solve(
             continuationLimits = profile.continuation,
@@ -518,7 +429,6 @@ internal class LpPropagator(
     }
 
     fun resetRoot(): Boolean {
-        rowReasonEpoch = Any()
         lastMetrics = LpSolveMetrics()
         val initial = rootState ?: return false
         if (withOwner { it.resetRoot(initial, cancellation) } != true) return invalidate()
@@ -548,22 +458,9 @@ internal class LpPropagator(
     override fun assert(decision: SearchDecision, context: SearchContext): ComponentResult {
         if (proofContext != null && proofContext !== context) return ComponentResult.Indeterminate
         proofContext = context
-        if (rowPropagation?.isPublished(decision, context) == true &&
-            (state?.depth != context.decisionLevel || !policy.rowAssertionAllowed(context) ||
-                !rowPropagation.prepareAssertion(this, decision, context))
-        ) return ComponentResult.Indeterminate
         if (owner != null && !atLevel(context.decisionLevel, Cancellation.Never)) return ComponentResult.Indeterminate
         sourcePremises?.record(decision, context)
-        if (rowPropagation?.isPublished(decision, context) != true) return policy.assert(decision, context)
-        val key = modelKey
-        val token = rowSourceIdentity
-        val epoch = rowReasonEpoch
-        if (context.cancelled() || cancellation()) return ComponentResult.Indeterminate
-        val result = policy.assert(decision, context)
-        if (result is ComponentResult.Conflict) return result
-        return if (proofContext !== context || modelKey !== key || rowSourceIdentity !== token ||
-            rowReasonEpoch !== epoch || context.cancelled() || cancellation()
-        ) ComponentResult.Indeterminate else result
+        return policy.assert(decision, context)
     }
 
     override fun propagate(context: SearchContext): ComponentResult {
@@ -604,7 +501,6 @@ internal class LpPropagator(
     }
 
     override fun retract(decisionLevel: Int) {
-        rowReasonEpoch = Any()
         val current = owner
         if (current != null && current.state.depth > decisionLevel &&
             !current.pop(decisionLevel, Cancellation.Never)
@@ -617,13 +513,9 @@ internal class LpPropagator(
         policy.retract(decisionLevel)
     }
 
-    override fun onRestart(context: SearchContext) {
-        rowReasonEpoch = Any()
-        policy.restart(context)
-    }
+    override fun onRestart(context: SearchContext) = policy.restart(context)
 
     fun releaseSolver() {
-        rowReasonEpoch = Any()
         if (pendingRootAdmission) {
             invalidate()
             return
@@ -636,7 +528,6 @@ internal class LpPropagator(
         preparedWork = 0L
         preparedRefactors = 0L
         owner = newOwner(retained)
-        rowNumericalPrepared = false
     }
 
     fun reset() {
@@ -644,8 +535,6 @@ internal class LpPropagator(
         owner = null
         invalidated = false
         modelKey = null
-        rowSourceIdentity = null
-        rowReasonEpoch = Any()
         rootState = null
         baseSidePremises = emptyMap()
         epochWarm = null
@@ -655,8 +544,6 @@ internal class LpPropagator(
         solved = false
         pendingRootAdmission = false
         nextWitness = 0L
-        rowHistoryAdmitted = false
-        rowNumericalPrepared = false
         preparedWork = 0L
         preparedRefactors = 0L
         lastMetrics = LpSolveMetrics()
