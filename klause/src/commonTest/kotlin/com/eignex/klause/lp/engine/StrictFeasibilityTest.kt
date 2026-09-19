@@ -99,7 +99,10 @@ class StrictFeasibilityTest {
             emptyList(),
             listOf(
                 ExactLpColumn(
-                    ExactLpBounds(ExactLpSide(zero, strict = true), ExactLpSide(ExactLpNumber.of(1L))),
+                    ExactLpBounds(
+                        ExactLpSide(zero, strict = true),
+                        ExactLpSide(ExactLpNumber.of(1L), strict = true),
+                    ),
                     integral = false,
                 ),
             ),
@@ -146,7 +149,7 @@ class StrictFeasibilityTest {
                 LpRefinementRequest(owner, owner.refinementCache, LpRefinementLimits(maxRounds = 0)),
             )
 
-            assertTrue(assertNotNull(result.witness).primal.single() > BigFraction.ZERO)
+            assertEquals(BigFraction.ONE, assertNotNull(result.witness).primal.single() * BigFraction.ofLong(2L))
             assertEquals(1, result.metrics.strictWitnesses)
             assertEquals(0, result.metrics.luFactories)
             assertEquals(0, result.metrics.rounds)
