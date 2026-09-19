@@ -1,6 +1,6 @@
 package com.eignex.klause.lp.engine
 
-import com.eignex.klause.lp.bounding.trailModel
+import com.eignex.klause.lp.engine.authoritativeModel
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.BigRationalConflict
 import com.eignex.klause.simplex.exact.ExactSimplexBound
@@ -63,7 +63,7 @@ class LpDualizationProofTest {
         val builder = LpBuilder()
         val x = builder.addVar(0L, 10L)
         builder.addRow(intArrayOf(x), longArrayOf(1L), Relation.LE, -1L)
-        val source = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).trailModel()))
+        val source = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
         val transform = LpDualization.create(
             source,
             LpDualizationOptions(),
@@ -87,7 +87,7 @@ class LpDualizationProofTest {
         val builder = LpBuilder()
         val x = builder.addVar(0L, 10L)
         builder.addRow(intArrayOf(x), longArrayOf(1L), Relation.LE, -1L)
-        val source = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).trailModel()))
+        val source = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
         val transform = LpDualization.create(
             source,
             LpDualizationOptions(),
@@ -183,7 +183,7 @@ class LpDualizationProofTest {
         val builder = LpBuilder()
         val x = builder.addVar(0L, 8L, cost = 2L)
         repeat(10) { builder.addRow(intArrayOf(x), longArrayOf(1L), Relation.GE, 3L) }
-        val source = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).trailModel()))
+        val source = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
         val attempt = LpRootDualizationAttempt(LpDualizationOptions(enabled = true))
         assertNotNull(attempt.solve(source))
 

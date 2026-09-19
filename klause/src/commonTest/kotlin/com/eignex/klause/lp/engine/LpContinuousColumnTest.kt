@@ -36,14 +36,15 @@ class LpContinuousColumnTest {
     }
 
     @Test
-    fun `certifies an infeasible continuous LP via the rationalized 128-bit Farkas`() {
+    fun `certifies an infeasible continuous LP on the original source`() {
         // 0 <= x <= 1 with 2x >= 3 (x >= 1.5) has no feasible point; coefficients rationalize exactly.
         val b = LpBuilder()
         val x = b.addRealVar(0.0, 1.0, cost = 1.0)
         b.addRealRow(intArrayOf(x), doubleArrayOf(2.0), Relation.GE, 3.0)
-        val result = solveAndCertify(b.build(Sense.MINIMIZE))
+        val model = b.build(Sense.MINIMIZE)
+        val result = solveAndCertify(model)
         assertEquals(LpVerdict.INFEASIBLE, result.verdict)
-        assertNotNull(result.farkasRay)
+        assertTrue(checkedLpConflict(model, assertNotNull(result.rationalConflict)))
     }
 
     @Test

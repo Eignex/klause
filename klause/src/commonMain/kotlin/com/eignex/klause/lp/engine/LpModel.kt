@@ -923,6 +923,7 @@ internal class ExactLpModel private constructor(
     fun entries(j: Int): List<ExactLpEntry> = matrix[j].toList()
 
     fun copy(
+        rhs: List<ExactLpNumber> = this.rightHandSide,
         columns: List<ExactLpColumn> = this.columns,
         rows: List<ExactLpRow> = this.rows,
         objective: ExactLpObjective = this.objective,
@@ -930,7 +931,8 @@ internal class ExactLpModel private constructor(
         require(columns.size == numVars && columns.indices.all { columns[it].origin == this.columns[it].origin }) {
             "coordinate changes require recentered"
         }
-        return ExactLpModel(matrix, rightHandSide, columns.toList(), rows.toList(), objective, false)
+        require(rhs.size == m)
+        return ExactLpModel(matrix, rhs.toList(), columns.toList(), rows.toList(), objective, false)
     }
 
     fun recentered(origins: List<ExactLpNumber>): ExactLpModel {

@@ -389,9 +389,10 @@ internal class LpPropagator(
         return result
     }
 
-    fun solve(): CertifiedLpResult? = solveOwned {
+    fun solve(token: Cancellation = cancellation): CertifiedLpResult? = solveOwned {
         val profile = effort()
         it.solve(
+            token = Cancellation { cancellation() || token() },
             continuationLimits = profile.continuation,
             fullContinuation = profile.fullContinuation,
             observer = certificationObserver,

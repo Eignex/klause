@@ -9,7 +9,6 @@ import com.eignex.klause.lp.engine.integerDualLowerBoundCeil
 import com.eignex.klause.lp.engine.integerFarkasRay
 import com.eignex.klause.lp.engine.newLpSolver
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.solver.result.LpStatsSink
 import kotlin.math.abs
 import kotlin.random.Random
 import kotlin.test.Test
@@ -48,12 +47,15 @@ class LpComponentsTest {
         val y = b.addVar(0L, 10L, cost = 2L)
         b.addRow(intArrayOf(x), longArrayOf(1L), Relation.GE, 4L)
         b.addRow(intArrayOf(y), longArrayOf(1L), Relation.GE, 5L)
-        val sink = LpStatsSink()
+        val model = b.build(Sense.MINIMIZE)
+        assertIs<ComponentLpSolver>(newLpSolver(model)).use { solver ->
+            val raw = assertNotNull(solver.solve())
+            val result = certifyLpResult(model, solver, raw)
 
-        val result = solveAndCertify(b.build(Sense.MINIMIZE), observer = sink.certificationObserver())
-
-        assertEquals(LpVerdict.ATTAINED_OPTIMUM, result.verdict)
-        assertEquals(1.0, sink.snapshot().componentPasses.sum)
+            assertEquals(LpVerdict.ATTAINED_OPTIMUM, result.verdict)
+            assertEquals(2, raw.blocks)
+            assertTrue(solver.lastMetrics.workOps > 0L)
+        }
     }
 
     @Test

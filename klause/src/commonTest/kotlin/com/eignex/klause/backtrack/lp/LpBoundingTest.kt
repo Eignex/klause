@@ -15,12 +15,20 @@ import com.eignex.klause.lp.bounding.rootLpRelaxationBound
 import com.eignex.klause.lp.bounding.roundUpToResidue
 import com.eignex.klause.lp.bounding.sparseCertifiedPrune
 import com.eignex.klause.lp.bounding.sparseSafePrune
+import com.eignex.klause.lp.engine.Basis
+import com.eignex.klause.lp.engine.LpEngineFactory
+import com.eignex.klause.lp.engine.LpModel
+import com.eignex.klause.lp.engine.LpPricingOptions
+import com.eignex.klause.lp.engine.LpSolveContext
+import com.eignex.klause.lp.engine.PersistentLpSolver
+import com.eignex.klause.lp.engine.ProductionLpEngineFactory
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SolveStatsSink
+import com.eignex.klause.solver.search.VarRef
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -29,6 +37,175 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class LpBoundingTest {
+    @Test
+    fun `a feasible strict precheck preserves objective variable propagation`() {
+        val problem = Problem(
+            0,
+            1,
+            arrayOf(IntDomain(0, 5)),
+            arrayOf(
+                Linear(
+                    intArrayOf(0),
+                    doubleArrayOf(1.0),
+                    intArrayOf(0),
+                    doubleArrayOf(1.0),
+                    LinearOp.GE,
+                    2.5,
+                    strict = true,
+                ),
+            ),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(1.0),
+        )
+        val objective = LinearObjective(intCoefficients = longArrayOf(1L))
+        val sink = SolveStatsSink(backend = "strict-precheck")
+        val session = PropagationSession(problem)
+        LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true)), sink).use { engine ->
+            val result = engine.sparseSafePrune(
+                assertNotNull(engine.lpRelaxer),
+                session,
+                Double.POSITIVE_INFINITY,
+                sink,
+                Cancellation.Never,
+                0,
+                true,
+            )
+
+            assertFalse(result.prune)
+            assertEquals(2L, session.intDomain(0).min)
+        }
+    }
+
+    @Test
+    fun `a feasible strict precheck preserves fractional branching hints`() {
+        val problem = Problem(
+            0,
+            1,
+            arrayOf(IntDomain(0, 5)),
+            arrayOf(
+                Linear(
+                    intArrayOf(0),
+                    doubleArrayOf(1.0),
+                    intArrayOf(0),
+                    doubleArrayOf(1.0),
+                    LinearOp.GE,
+                    2.5,
+                    strict = true,
+                ),
+            ),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(1.0),
+        )
+        val objective = LinearObjective(intCoefficients = longArrayOf(1L))
+        val sink = SolveStatsSink(backend = "strict-precheck")
+        val session = PropagationSession(problem)
+        val hints = LpHints(1, 0)
+        LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true)), sink).use { engine ->
+            val result = engine.sparseSafePrune(
+                assertNotNull(engine.lpRelaxer),
+                session,
+                Double.POSITIVE_INFINITY,
+                sink,
+                Cancellation.Never,
+                0,
+                true,
+                hints = hints,
+            )
+
+            assertFalse(result.prune)
+            assertTrue(hints.branchScore(VarRef.IntVar(0)).isFinite())
+        }
+    }
+
+    @Test
+    fun `cancellation during strict auxiliary preparation withholds deductions and closes owners`() {
+        val problem = Problem(
+            0,
+            1,
+            arrayOf(IntDomain(0, 5)),
+            arrayOf(
+                Linear(
+                    intArrayOf(0),
+                    doubleArrayOf(1.0),
+                    intArrayOf(0),
+                    doubleArrayOf(1.0),
+                    LinearOp.GE,
+                    2.5,
+                    strict = true,
+                ),
+            ),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(1.0),
+        )
+        val objective = LinearObjective(intCoefficients = longArrayOf(1L))
+        val sink = SolveStatsSink(backend = "strict-precheck")
+        val session = PropagationSession(problem)
+        var cancelled = false
+        var created = 0
+        var closed = 0
+        var auxiliaryPrepared = false
+        val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+            override fun newPersistentSolver(
+                model: LpModel,
+                cancellation: Cancellation,
+                refactorUpdateLimit: Int,
+                iterationLimit: Int,
+                workLimit: Long,
+                trackDegeneracy: Boolean,
+                pricing: LpPricingOptions,
+            ): PersistentLpSolver {
+                created++
+                val auxiliary = created > 1
+                val delegate = ProductionLpEngineFactory.newPersistentSolver(
+                    model,
+                    cancellation,
+                    refactorUpdateLimit,
+                    iterationLimit,
+                    workLimit,
+                    trackDegeneracy,
+                    pricing,
+                )
+                return object : PersistentLpSolver by delegate {
+                    override fun prepareLogicals(token: Cancellation): Basis? = delegate.prepareLogicals(token).also {
+                        if (auxiliary) {
+                            auxiliaryPrepared = true
+                            cancelled = true
+                        }
+                    }
+                    override fun close() {
+                        closed++
+                        delegate.close()
+                    }
+                }
+            }
+        }
+        LpEngine(
+            problem,
+            objective,
+            LpParams(lpPlan = LpPlan(bounding = true)),
+            sink,
+            LpSolveContext(factory),
+        ).use { engine ->
+            val result = engine.sparseSafePrune(
+                assertNotNull(engine.lpRelaxer),
+                session,
+                Double.POSITIVE_INFINITY,
+                sink,
+                Cancellation { cancelled },
+                0,
+                true,
+            )
+
+            assertTrue(auxiliaryPrepared)
+            assertFalse(result.prune)
+            assertEquals(0L, session.intDomain(0).min)
+            assertTrue(assertNotNull(engine.propagator.metrics).preparationWork > 0L)
+        }
+        assertEquals(created, closed)
+    }
 
     /**
      * Triangle covering: minimize x0+x1+x2 with x0+x1≥2, x1+x2≥2, x0+x2≥2 over [0,5]. Summing the

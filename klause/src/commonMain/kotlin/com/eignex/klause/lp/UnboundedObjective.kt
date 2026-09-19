@@ -1,15 +1,16 @@
 package com.eignex.klause.lp
 
 import com.eignex.klause.ir.Factor
+import com.eignex.klause.ir.IntegralConstants
 import com.eignex.klause.ir.LinearForm
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.LinearRow
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.RealConstants
 import com.eignex.klause.ir.linearRows
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ExactRationalInequality
-import com.eignex.klause.simplex.exact.RationalSimplexObserver
-import com.eignex.klause.simplex.exact.exactDescendingDirection
+import com.eignex.klause.solver.result.SourceLpWorkStats
 import com.eignex.klause.util.Cancellation
 
 /**
@@ -34,22 +35,94 @@ internal fun Problem.objectiveUnboundedBelow(
     coefficients: LongArray,
     witness: ExactWitness,
     cancellation: Cancellation = Cancellation.Never,
-    observer: RationalSimplexObserver? = null,
+    onWork: (SourceLpWorkStats) -> Unit,
 ): Boolean? {
-    // A constant objective has no direction to descend along, and one whose every column is bounded on
-    // its own descent side is already bounded below by the declared box — the cheap half of the question,
-    // answered before a cone system over every row of the model is built.
-    if (terms.isEmpty() || descentSidesClosed(terms, coefficients)) return false
-    val rows = branchRowsAt(witness) ?: return null
-    val activity = HashMap<Int, BigFraction>()
-    for (index in terms.indices) activity.add(numRealVars + terms[index], BigFraction.ofLong(coefficients[index]))
-    return exactDescendingDirection(
-        rows,
-        exactRow(activity, BigFraction.ZERO),
-        numRealVars + numIntVars,
-        cancellation,
-        observer,
-    )
+    val budget = SourceLpBudget(onWork = onWork)
+    return budget.run(emptyList(), numRealVars + numIntVars, cancellation) { token ->
+        if (terms.size > 128 || !admitsDirectionPreparation(token)) return@run null
+        if (terms.isEmpty() || descentSidesClosed(terms, coefficients)) return@run false
+        val point = List(numRealVars + numIntVars, witness::at)
+        if (!point.admittedSourcePoint() ||
+            (numRealVars until point.size).any { point[it].den != com.ionspin.kotlin.bignum.integer.BigInteger.ONE }
+        ) {
+            return@run null
+        }
+        val rows = branchRowsAt(witness, token) ?: return@run null
+        budget.run(rows, point.size, token) checked@{ checkedToken ->
+            if (!point.satisfiesSourceRows(rows, checkedToken)) return@checked null
+            val activity = HashMap<Int, BigFraction>()
+            for (index in terms.indices) {
+                if (checkedToken()) return@checked null
+                activity.add(numRealVars + terms[index], BigFraction.ofLong(coefficients[index]))
+            }
+            sourceDescendingDirection(
+                rows,
+                exactRow(activity, BigFraction.ZERO),
+                point.size,
+                checkedToken,
+                budget,
+            )
+        }
+    }
+}
+
+private fun Problem.admitsDirectionPreparation(token: Cancellation): Boolean {
+    if (numBoolVars > 512 || factors.size > 128) return false
+    var terms = 0L
+    var rows = 0L
+    var bits = 0L
+    fun admit(value: BigFraction): Boolean {
+        if (token() || value.num.bitLength() > 4096 || value.den.bitLength() > 4096) return false
+        bits += value.num.bitLength().toLong() + value.den.bitLength()
+        return bits <= 8192L
+    }
+    for (integer in 0 until numIntVars) {
+        val lower = intBounds.lowerAsBigInteger(integer)
+        val upper = intBounds.upperAsBigInteger(integer)
+        if (lower != null && (lower.bitLength() > 4096 || !admit(lower.asFraction()))) return false
+        if (upper != null && (upper.bitLength() > 4096 || !admit(upper.asFraction()))) return false
+    }
+    for (real in 0 until numRealVars) {
+        if (realLower[real].isFinite() && !admit(realLower[real].asFraction())) return false
+        if (realUpper[real].isFinite() && !admit(realUpper[real].asFraction())) return false
+    }
+    for (factor in factors) {
+        if (token() || factor.intVars.size > 512 || factor.variables.reals.size > 512) return false
+        val linear = factor.linearRows
+        if (linear.size > 128) return false
+        for (row in linear) {
+            rows++
+            terms += row.size
+            if (rows > 128L || terms > 512L) return false
+            when (val constants = row.constants) {
+                is IntegralConstants -> {
+                    if (constants.exactBound.bitLength() > 4096 || !admit(
+                            constants.exactBound.asFraction(),
+                        )
+                    ) {
+                        return false
+                    }
+                    for (index in 0 until row.size) {
+                        val coefficient = constants.exactCoeff(index)
+                        if (coefficient.bitLength() > 4096 || !admit(coefficient.asFraction())) return false
+                    }
+                }
+
+                is RealConstants -> {
+                    if (!constants.bound.isFinite() || !admit(constants.bound.asFraction())) return false
+                    for (index in 0 until row.size) {
+                        val coefficient = if (index < constants.intCoefficients.size) {
+                            constants.intCoefficients.at(index)
+                        } else {
+                            constants.realCoefficients.at(index - constants.intCoefficients.size)
+                        }
+                        if (!coefficient.isFinite() || !admit(coefficient.asFraction())) return false
+                    }
+                }
+            }
+        }
+    }
+    return !token()
 }
 
 /**
@@ -82,7 +155,7 @@ private fun Problem.descentSidesClosed(terms: IntArray, coefficients: LongArray)
  * itself — which is also why a declared value set needs no reading here: a column declaring one is closed
  * on both sides, and no direction of the cone moves it.
  */
-private fun Problem.branchRowsAt(witness: ExactWitness): List<ExactRationalInequality>? {
+private fun Problem.branchRowsAt(witness: ExactWitness, token: Cancellation): List<ExactRationalInequality>? {
     val rows = ArrayList<ExactRationalInequality>()
     for (integer in 0 until numIntVars) {
         val column = numRealVars + integer
@@ -94,9 +167,11 @@ private fun Problem.branchRowsAt(witness: ExactWitness): List<ExactRationalInequ
         realUpper[real].takeIf(Double::isFinite)?.let { rows += exactColumnUpper(real, it.asFraction()) }
     }
     for (factor in factors) {
+        if (token()) return null
         if (movesNoRay(factor)) continue
         if (factor.linearForm is LinearForm.Relaxation || factor.linearForm == null) return null
         val comparisons = factor.linearRows.map { row ->
+            if (token()) return null
             row.exactComparison(
                 numRealVars,
                 row.activator == LinearRow.ALWAYS || witness.truth(row.activator),

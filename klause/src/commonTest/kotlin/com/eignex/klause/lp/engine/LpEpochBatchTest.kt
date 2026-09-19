@@ -2,7 +2,7 @@ package com.eignex.klause.lp.engine
 
 import com.eignex.klause.lp.bounding.LpPropagator
 import com.eignex.klause.lp.bounding.LpSearchPolicy
-import com.eignex.klause.lp.bounding.trailModel
+import com.eignex.klause.lp.engine.authoritativeModel
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.Cancellation
 import com.ionspin.kotlin.bignum.integer.BigInteger
@@ -20,7 +20,9 @@ import kotlin.test.assertTrue
 class LpEpochBatchTest {
     @Test
     fun `rejected batch adoption leaves staged witnesses available for retry`() {
-        val source = assertNotNull(LpBuilder().apply { addVar(0, 10, cost = 1) }.build(Sense.MINIMIZE).trailModel())
+        val source = assertNotNull(
+            LpBuilder().apply { addVar(0, 10, cost = 1) }.build(Sense.MINIMIZE).authoritativeModel(),
+        )
         var reject = false
         val factory = object : LpEngineFactory by ProductionLpEngineFactory {
             override fun newPersistentSolver(
@@ -91,7 +93,9 @@ class LpEpochBatchTest {
 
     @Test
     fun `unprojectable adoption preserves an exact continuation retry`() {
-        val source = assertNotNull(LpBuilder().apply { addVar(0, 10, cost = 1) }.build(Sense.MINIMIZE).trailModel())
+        val source = assertNotNull(
+            LpBuilder().apply { addVar(0, 10, cost = 1) }.build(Sense.MINIMIZE).authoritativeModel(),
+        )
         val model = assertNotNull(LpExactState(source).toWorkingModel())
         val huge = ExactLpNumber.of(BigFraction.of(BigInteger.ONE shl 2048, BigInteger.ONE))
         val invalid = LpExactState(
@@ -114,7 +118,7 @@ class LpEpochBatchTest {
 
     @Test
     fun `ordered batches retain equal and weaker witnesses through backjump`() {
-        val source = assertNotNull(LpBuilder().apply { addVar(0, 10) }.build(Sense.MINIMIZE).trailModel())
+        val source = assertNotNull(LpBuilder().apply { addVar(0, 10) }.build(Sense.MINIMIZE).authoritativeModel())
         val batch = LpBoundTrail(source)
         val sequential = LpBoundTrail(source)
         assertTrue(batch.push())
@@ -142,7 +146,7 @@ class LpEpochBatchTest {
 
     @Test
     fun `first conflicting prefix retains exact strict witnesses and ignores malformed tail`() {
-        val source = assertNotNull(LpBuilder().apply { addVar(0, 10) }.build(Sense.MINIMIZE).trailModel())
+        val source = assertNotNull(LpBuilder().apply { addVar(0, 10) }.build(Sense.MINIMIZE).authoritativeModel())
         val trail = LpBoundTrail(source)
         assertTrue(trail.push())
         val premise = ExactLpPremises(emptyList(), listOf(7))
@@ -202,7 +206,7 @@ class LpEpochBatchTest {
 
     @Test
     fun `cancelled preparation leaves every ordered assertion unpublished`() {
-        val source = assertNotNull(LpBuilder().apply { addVar(0, 10) }.build(Sense.MINIMIZE).trailModel())
+        val source = assertNotNull(LpBuilder().apply { addVar(0, 10) }.build(Sense.MINIMIZE).authoritativeModel())
         val updates = listOf(
             LpBoundAssertion(0, false, ExactLpSide(ExactLpNumber.of(2L)), 0, 0),
             LpBoundAssertion(0, true, ExactLpSide(ExactLpNumber.of(8L)), 1, 0),
@@ -220,7 +224,7 @@ class LpEpochBatchTest {
 
     @Test
     fun `duplicate witnesses and revision overflow reject the entire batch`() {
-        val source = assertNotNull(LpBuilder().apply { addVar(0, 10) }.build(Sense.MINIMIZE).trailModel())
+        val source = assertNotNull(LpBuilder().apply { addVar(0, 10) }.build(Sense.MINIMIZE).authoritativeModel())
         val update = LpBoundAssertion(0, false, ExactLpSide(ExactLpNumber.of(2L)), 0, 0)
         for (overflow in listOf(false, true)) {
             val initial = LpExactState(source, boundRevision = if (overflow) Long.MAX_VALUE - 1 else 0L)
@@ -239,7 +243,7 @@ class LpEpochBatchTest {
 
     @Test
     fun `propagator skips equal active bounds without spending witness identities`() {
-        val source = assertNotNull(LpBuilder().apply { addVar(0, 10) }.build(Sense.MINIMIZE).trailModel())
+        val source = assertNotNull(LpBuilder().apply { addVar(0, 10) }.build(Sense.MINIMIZE).authoritativeModel())
         LpPropagator(object : LpSearchPolicy {}).use { core ->
             assertTrue(core.install(Any(), source))
             val lower = listOf(ExactLpSide(ExactLpNumber.of(0L)))
@@ -262,7 +266,7 @@ class LpEpochBatchTest {
             LpBuilder().apply {
                 addVar(0, 10, cost = 1)
                 addRow(intArrayOf(0), longArrayOf(1), Relation.EQ, 1)
-            }.build(Sense.MINIMIZE).trailModel(),
+            }.build(Sense.MINIMIZE).authoritativeModel(),
         )
         for (stop in listOf(1, 2)) {
             val initial = LpExactState(source)
@@ -286,7 +290,9 @@ class LpEpochBatchTest {
 
     @Test
     fun `failed numerical refresh closes the owner without publishing exact bounds`() {
-        val source = assertNotNull(LpBuilder().apply { addVar(0, 10, cost = 1) }.build(Sense.MINIMIZE).trailModel())
+        val source = assertNotNull(
+            LpBuilder().apply { addVar(0, 10, cost = 1) }.build(Sense.MINIMIZE).authoritativeModel(),
+        )
         val primary = IllegalStateException("refresh failure")
         val cleanup = IllegalStateException("cleanup failure")
         var fail = false

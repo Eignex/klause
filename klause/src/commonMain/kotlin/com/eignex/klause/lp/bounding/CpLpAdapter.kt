@@ -3,19 +3,11 @@ package com.eignex.klause.lp.bounding
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.lp.engine.Basis
 import com.eignex.klause.lp.engine.CutPremise
-import com.eignex.klause.lp.engine.ExactLpColumn
-import com.eignex.klause.lp.engine.ExactLpEntry
-import com.eignex.klause.lp.engine.ExactLpModel
 import com.eignex.klause.lp.engine.ExactLpNumber
-import com.eignex.klause.lp.engine.ExactLpObjective
-import com.eignex.klause.lp.engine.ExactLpPremise
-import com.eignex.klause.lp.engine.ExactLpPremises
-import com.eignex.klause.lp.engine.ExactLpRow
 import com.eignex.klause.lp.engine.ExactLpSide
 import com.eignex.klause.lp.engine.LpBoundBatchResult
 import com.eignex.klause.lp.engine.LpModel
-import com.eignex.klause.lp.engine.exactBounds
-import com.eignex.klause.lp.engine.finiteExactInput
+import com.eignex.klause.lp.engine.authoritativeModel
 import com.eignex.klause.lp.relaxation.LpRelaxation
 import com.eignex.klause.lp.relaxation.columnBounds
 import com.eignex.klause.lp.relaxation.withCpBounds
@@ -94,7 +86,7 @@ internal class CpLpAdapter(private val engine: LpEngine) : LpSearchPolicy {
         publish: () -> Unit,
     ): Boolean {
         if (session.decisionLevel != 0 || (shared?.decisionLevel ?: 0) != 0) return false
-        val model = base.model.trailModel() ?: return false
+        val model = base.model.authoritativeModel() ?: return false
         val premises = buildMap<Pair<Int, Boolean>, SearchAtomPremise> {
             for (column in 0 until model.n) {
                 for (upper in listOf(false, true)) {
@@ -138,7 +130,7 @@ internal class CpLpAdapter(private val engine: LpEngine) : LpSearchPolicy {
         }
         val core = engine.propagator
         if (!persistentState) core.reset()
-        if (core.state == null && !core.install(base, base.model.trailModel() ?: return null)) return null
+        if (core.state == null && !core.install(base, base.model.authoritativeModel() ?: return null)) return null
         val depth = if (session ===
             sharedNative
         ) {
@@ -158,7 +150,7 @@ internal class CpLpAdapter(private val engine: LpEngine) : LpSearchPolicy {
         }
         // Standalone callers may replace a root or sibling without delivering shared retract events.
         if (weakens) {
-            if (!core.resetRoot() && !core.install(base, base.model.trailModel() ?: return null)) return null
+            if (!core.resetRoot() && !core.install(base, base.model.authoritativeModel() ?: return null)) return null
             if (!core.atLevel(depth)) return null
         }
         val initial = requireNotNull(core.state).model
@@ -190,57 +182,4 @@ internal class CpLpAdapter(private val engine: LpEngine) : LpSearchPolicy {
         persistentState = true
         return rebound
     }
-}
-
-internal fun LpModel.trailModel(): ExactLpModel? {
-    exactState?.let { return it.model }
-    if (!finiteExactInput() || rowStrict.any { it }) return null
-    val dv = doubleView
-    return ExactLpModel(
-        List(n) { column ->
-            buildList {
-                if (dv == null) {
-                    forEachInColumn(column) { row, value -> add(ExactLpEntry(row, ExactLpNumber.of(value))) }
-                } else {
-                    forEachInColumnD(column) { row, value -> add(ExactLpEntry(row, ExactLpNumber.ofIeee(value))) }
-                }
-            }
-        },
-        dv?.rhs?.map(ExactLpNumber::ofIeee) ?: rhs.map(ExactLpNumber::of),
-        List(numVars) { column ->
-            ExactLpColumn(
-                exactBounds(column),
-                origin = if (column >= n) {
-                    ExactLpNumber.of(0L)
-                } else {
-                    dv?.let { ExactLpNumber.ofIeee(it.loShift[column]) } ?: ExactLpNumber.of(loShift[column])
-                },
-                integral = column >= n || !colContinuous[column],
-                tag = if (column < n) tag[column] else -1,
-            )
-        },
-        List(m) { row ->
-            ExactLpRow(
-                rowGlobal[row],
-                rowStrict[row],
-                rowPremises[row]?.let { premise ->
-                    ExactLpPremises(
-                        premise.vars.indices.map {
-                            ExactLpPremise(
-                                premise.vars[it],
-                                premise.isUpper[it],
-                                ExactLpNumber.of(premise.thresholds[it]),
-                            )
-                        },
-                        premise.boolLits.toList(),
-                    )
-                },
-            )
-        },
-        ExactLpObjective(
-            dv?.cost?.map(ExactLpNumber::ofIeee) ?: cost.map(ExactLpNumber::of),
-            dv?.let { ExactLpNumber.ofIeee(it.objConstant) } ?: ExactLpNumber.of(objConstant),
-            sense = sense,
-        ),
-    )
 }

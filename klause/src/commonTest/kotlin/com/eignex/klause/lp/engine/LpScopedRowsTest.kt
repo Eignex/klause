@@ -220,7 +220,6 @@ class LpScopedRowsTest {
             LpScopedRow(-1, emptyList(), zero, logical),
             LpScopedRow(0, listOf(1 to one), zero, logical),
             LpScopedRow(0, listOf(0 to one, 0 to one), zero, logical),
-            LpScopedRow(0, listOf(0 to tiny), zero, logical),
             LpScopedRow(0, listOf(0 to one), huge, logical),
             LpScopedRow(0, emptyList(), zero, logical, ExactLpRow(strict = true)),
             LpScopedRow(0, emptyList(), zero, logical.copy(origin = one)),
@@ -231,6 +230,12 @@ class LpScopedRowsTest {
             assertFalse(trail.append(row, scoped = false))
             assertSame(before, trail.state)
         }
+        val underflow = LpBoundTrail(source)
+        assertTrue(underflow.append(LpScopedRow(0, listOf(0 to tiny), zero, logical), scoped = false))
+        val projected = assertNotNull(underflow.state.toWorkingModel())
+        assertEquals(tiny, underflow.state.model.entries(0).single().number)
+        assertEquals(0.0, assertNotNull(projected.doubleView).colVal.single())
+        assertEquals(LpMatrixProjectionStatus(1, 0), underflow.state.matrixProjectionStatus)
         val row = LpScopedRow(Long.MAX_VALUE, listOf(0 to one), zero, logical)
         val trail = LpBoundTrail(source)
         val before = trail.state

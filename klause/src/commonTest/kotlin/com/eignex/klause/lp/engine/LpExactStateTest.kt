@@ -48,7 +48,7 @@ class LpExactStateTest {
     }
 
     @Test
-    fun `nonzero matrix and cost underflow decline instead of changing the problem`() {
+    fun `matrix underflow preserves source authority while cost underflow declines`() {
         val zero = ExactLpNumber.of(0L)
         val tiny = ExactLpNumber.of(BigFraction.of(BigInteger.ONE, BigInteger.ONE shl 2048))
         for (matrixUnderflow in listOf(false, true)) {
@@ -60,7 +60,17 @@ class LpExactStateTest {
                 ExactLpObjective(listOf(if (matrixUnderflow) zero else tiny, zero)),
             )
 
-            assertNull(LpExactState(model).toWorkingModel())
+            val state = LpExactState(model)
+            val working = state.toWorkingModel()
+            if (matrixUnderflow) {
+                assertNotNull(working)
+                assertSame(state, working.exactState)
+                assertEquals(tiny, state.model.entries(0).single().number)
+                assertEquals(0.0, assertNotNull(working.doubleView).colVal.single())
+                assertEquals(LpMatrixProjectionStatus(1, 0), state.matrixProjectionStatus)
+            } else {
+                assertNull(working)
+            }
         }
     }
 
@@ -160,7 +170,7 @@ class LpExactStateTest {
     }
 
     @Test
-    fun `an underflowed bound cannot authorize a nonzero matrix cost or scale`() {
+    fun `an underflowed bound cannot authorize cost or scale underflow`() {
         val zero = ExactLpNumber.of(0L)
         val one = ExactLpNumber.of(1L)
         val tiny = ExactLpNumber.of(BigFraction.of(BigInteger.ONE, BigInteger.ONE shl 2048))
@@ -184,7 +194,17 @@ class LpExactStateTest {
                 ),
             )
 
-            assertNull(LpExactState(model).toWorkingModel())
+            val state = LpExactState(model)
+            val working = state.toWorkingModel()
+            if (role == "matrix") {
+                assertNotNull(working)
+                assertSame(state, working.exactState)
+                assertEquals(tiny, state.model.entries(0).single().number)
+                assertEquals(0.0, assertNotNull(working.doubleView).colVal.single())
+                assertEquals(LpMatrixProjectionStatus(1, 0), state.matrixProjectionStatus)
+            } else {
+                assertNull(working)
+            }
         }
     }
 

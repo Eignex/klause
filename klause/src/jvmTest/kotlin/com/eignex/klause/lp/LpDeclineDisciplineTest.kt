@@ -29,6 +29,7 @@ import com.eignex.klause.lp.engine.Cut
 import com.eignex.klause.lp.engine.ExactLpWitness
 import com.eignex.klause.lp.engine.FloatLpResult
 import com.eignex.klause.lp.engine.LpBuilder
+import com.eignex.klause.lp.engine.LpCapture
 import com.eignex.klause.lp.engine.LpCertificationObserver
 import com.eignex.klause.lp.engine.LpCertificationPolicy
 import com.eignex.klause.lp.engine.LpCertifier
@@ -38,6 +39,9 @@ import com.eignex.klause.lp.engine.LpFloatAllowance
 import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.LpNeighborhood
 import com.eignex.klause.lp.engine.LpPricingOptions
+import com.eignex.klause.lp.engine.LpReplay
+import com.eignex.klause.lp.engine.LpReplayEvent
+import com.eignex.klause.lp.engine.LpReplaySettings
 import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.lp.engine.LpSolver
 import com.eignex.klause.lp.engine.LpVerdict
@@ -370,12 +374,17 @@ class LpDeclineDisciplineTest {
         val model = builder.build(Sense.MINIMIZE)
         val harness = harness()
 
-        val declined = solveAndCertify(model, context = harness.context)
+        val capture = LpCapture.capture(
+            model,
+            LpReplaySettings("component-decline", 570L),
+            listOf(LpReplayEvent.Solve()),
+        )
+        val declined = LpReplay.replay(capture, context = harness.context).steps.single()
 
-        val accepted = solveAndCertify(model)
-        assertEquals(LpVerdict.ATTAINED_OPTIMUM, accepted.verdict)
+        val accepted = LpReplay.replay(capture).steps.single()
+        assertEquals(LpVerdict.ATTAINED_OPTIMUM, accepted.productionVerdict)
         assertEquals(3L, accepted.integerObjectiveLowerBound)
-        assertEquals(LpVerdict.INDETERMINATE, declined.verdict)
+        assertEquals(LpVerdict.INDETERMINATE, declined.productionVerdict)
         assertNull(declined.integerObjectiveLowerBound)
         assertEquals(2, harness.factory.calls.count { it == DeclineCall.GENERAL })
         assertEquals(1, harness.factory.calls.count { it == DeclineCall.COMPONENT })
@@ -650,7 +659,7 @@ class LpDeclineDisciplineTest {
     }
 
     @Test
-    fun `cancellation leaves the final rational fallback unknown`() {
+    fun `pre cancelled common solving publishes no proof`() {
         val builder = LpBuilder()
         val x = builder.addRealVar(0.0, 1.0)
         builder.addRealRow(intArrayOf(x), doubleArrayOf(1.0), Relation.GE, 2.0)
@@ -666,7 +675,12 @@ class LpDeclineDisciplineTest {
 
         assertEquals(LpVerdict.INDETERMINATE, result.verdict)
         assertTrue(harness.factory.cancellations.all { it === token })
-        assertTrue(LpCertifier.RATIONAL to false in harness.policy.attempts)
+        assertNull(result.witness)
+        assertNull(result.bound)
+        assertNull(result.rationalConflict)
+        assertNull(result.farkasRay)
+        assertNull(result.boundConflict)
+        assertTrue(harness.policy.attempts.none { it.second })
         assertFalse(harness.policy.observedSuccess(LpCertifier.RATIONAL))
         assertEquals(
             harness.factory.calls.count { it == DeclineCall.GENERAL },
@@ -703,7 +717,7 @@ class LpDeclineDisciplineTest {
             )
         val exactPaths = exactSources.map { root.relativize(it).toString().replace('\\', '/') }
 
-        for (required in listOf("ExactLraSolver.kt", "QfLraSystem.kt", "QfLiraSolver.kt")) {
+        for (required in listOf("ExactLraAssignment.kt", "QfLraSystem.kt", "QfLiraSolver.kt")) {
             assertTrue(exactPaths.any { it.endsWith(required) }, "exact source discovery missed $required")
         }
         for (path in exactSources) {
@@ -733,8 +747,16 @@ class LpDeclineDisciplineTest {
             assertFalse("newLpSolver" in code, relative)
             assertFalse("newPersistentSolver" in code, relative)
         }
-        assertTrue("bigRationalOutcome" in source(root, exactPaths.single { it.endsWith("ExactLraSolver.kt") }))
-        assertTrue("ExactIntegerSearch" in source(root, exactPaths.single { it.endsWith("QfLiraSolver.kt") }))
+        val coldEntry = Regex(
+            "\\b(?:rationalFeasible|rationalOutcome|bigRationalOutcome|bigRationalMinimum|" +
+                "exactDoubleBoundedSplit|exactDescendingDirection|exactMixedUnitCubeSolution)\\s*\\(",
+        )
+        for (path in kotlinSources(root.resolve("klause/src/commonMain/kotlin"))) {
+            val code = path.readText()
+            assertFalse(coldEntry.containsMatchIn(code), path.toString())
+            assertFalse("ExactIntegerSearch" in code, path.toString())
+        }
+        assertTrue("sourceDoubleBoundedSplit(" in source(root, exactPaths.single { it.endsWith("QfLiraSolver.kt") }))
         assertTrue("LpPropagator(" in source(root, exactPaths.single { it.endsWith("QfLiraSolver.kt") }))
     }
 

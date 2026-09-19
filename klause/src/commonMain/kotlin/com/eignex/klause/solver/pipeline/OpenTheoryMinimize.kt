@@ -264,7 +264,6 @@ class OpenTheoryMinimizer internal constructor(
                                     installed.assignment,
                                     params,
                                     state,
-                                    boundedPlan.theoryPipeline,
                                 ) ->
                                     return OpenTheoryOptimum.Unbounded(
                                         installed.assignment,
@@ -327,7 +326,6 @@ class OpenTheoryMinimizer internal constructor(
         witness: OpenTheoryAssignment,
         params: TheoryParams,
         state: OpenTheorySolveState,
-        pipeline: ProblemPipeline,
     ): Boolean {
         if (rayRefusedForEveryWitness) return false
         val ray = model.objectiveUnboundedBelow(
@@ -335,7 +333,7 @@ class OpenTheoryMinimizer internal constructor(
             coefficients,
             witness.exactWitness(model.numRealVars),
             Cancellation { presolveCancellation() || params.cancellation() || params.timeout() },
-            state.smt.takeIf { pipeline == ProblemPipeline.EXACT_LRA || pipeline == ProblemPipeline.EXACT_LIRA },
+            state.smt::observeSourceLp,
         )
         rayRefusedForEveryWitness = ray == false && model.statesOneBranch()
         return ray == true

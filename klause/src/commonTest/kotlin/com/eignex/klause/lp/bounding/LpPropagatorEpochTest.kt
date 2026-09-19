@@ -14,6 +14,7 @@ import com.eignex.klause.lp.engine.ProductionLpEngineFactory
 import com.eignex.klause.lp.engine.Relation
 import com.eignex.klause.lp.engine.Sense
 import com.eignex.klause.lp.engine.VarStatus
+import com.eignex.klause.lp.engine.authoritativeModel
 import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
@@ -66,7 +67,7 @@ class LpPropagatorEpochTest {
         val builder = LpBuilder()
         val x = builder.addRealVar(0.0, 2.0, cost = 1.0)
         builder.addRealRow(intArrayOf(x), doubleArrayOf(3.0), Relation.EQ, 1.0)
-        val source = assertNotNull(builder.build(Sense.MINIMIZE).trailModel())
+        val source = assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel())
 
         for (outcome in listOf("published", "rejected", "cancelled")) {
             LpPropagator(object : LpSearchPolicy {}, solveContext = LpSolveContext(factory)).use { lp ->
@@ -140,7 +141,7 @@ class LpPropagatorEpochTest {
         val builder = LpBuilder()
         val x = builder.addRealVar(0.0, 2.0, cost = 1.0)
         builder.addRealRow(intArrayOf(x), doubleArrayOf(3.0), Relation.EQ, 1.0)
-        val source = assertNotNull(builder.build(Sense.MINIMIZE).trailModel())
+        val source = assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel())
 
         LpPropagator(object : LpSearchPolicy {}, solveContext = LpSolveContext(factory)).use { lp ->
             val key = Any()
@@ -177,7 +178,7 @@ class LpPropagatorEpochTest {
         val builder = LpBuilder()
         builder.addVar(0, 0)
         builder.addRow(intArrayOf(0), longArrayOf(1), Relation.GE, 1)
-        val source = assertNotNull(builder.build(Sense.MINIMIZE).trailModel())
+        val source = assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel())
         LpPropagator(object : LpSearchPolicy {}).use { lp ->
             assertTrue(lp.install(Any(), source))
             val session = SearchSession(listOf(lp))
@@ -240,7 +241,7 @@ class LpPropagatorEpochTest {
         val builder = LpBuilder()
         builder.addVar(0, 4, cost = 1)
         builder.addRow(intArrayOf(0), longArrayOf(1), Relation.GE, 1)
-        val source = assertNotNull(builder.build(Sense.MINIMIZE).trailModel())
+        val source = assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel())
         LpPropagator(object : LpSearchPolicy {}, solveContext = LpSolveContext(factory)).use { lp ->
             assertTrue(lp.install(Any(), source))
             assertNotNull(lp.solve())
@@ -295,7 +296,7 @@ class LpPropagatorEpochTest {
         val builder = LpBuilder()
         builder.addVar(0, 4, cost = 1)
         builder.addRow(intArrayOf(0), longArrayOf(1), Relation.GE, 1)
-        val source = assertNotNull(builder.build(Sense.MINIMIZE).trailModel())
+        val source = assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel())
         LpPropagator(object : LpSearchPolicy {}, solveContext = LpSolveContext(factory)).use { lp ->
             assertTrue(lp.install(Any(), source))
             assertNotNull(lp.solve())
@@ -313,7 +314,7 @@ class LpPropagatorEpochTest {
         val builder = LpBuilder()
         builder.addVar(0, 4, cost = 1)
         builder.addRow(intArrayOf(0), longArrayOf(1), Relation.GE, 1)
-        val source = assertNotNull(builder.build(Sense.MINIMIZE).trailModel())
+        val source = assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel())
         LpPropagator(object : LpSearchPolicy {}).use { lp ->
             assertTrue(lp.install(Any(), source))
             assertNotNull(lp.solve())
@@ -337,7 +338,7 @@ class LpPropagatorEpochTest {
         val builder = LpBuilder()
         builder.addVar(0, 4, cost = 1)
         builder.addRow(intArrayOf(0), longArrayOf(1), Relation.GE, 1)
-        val source = assertNotNull(builder.build(Sense.MINIMIZE).trailModel())
+        val source = assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel())
         LpPropagator(object : LpSearchPolicy {}).use { lp ->
             var expired = false
             assertTrue(lp.replaceEpoch(Any(), source, null, Cancellation { expired }, { true }) {})
@@ -352,7 +353,7 @@ class LpPropagatorEpochTest {
         repeat(2) { builder.addVar(0, 4, cost = 1) }
         builder.addRow(intArrayOf(0, 1), longArrayOf(1, 1), Relation.GE, 1)
         builder.addRow(intArrayOf(0, 1), longArrayOf(2, 2), Relation.LE, 6)
-        val source = assertNotNull(builder.build(Sense.MINIMIZE).trailModel())
+        val source = assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel())
         val warm = Basis(
             intArrayOf(0, 1),
             arrayOf(VarStatus.BASIC, VarStatus.BASIC, VarStatus.AT_LOWER, VarStatus.AT_LOWER),
@@ -370,7 +371,7 @@ class LpPropagatorEpochTest {
         val builder = LpBuilder()
         val x = builder.addVar(0, 4, cost = 1)
         builder.addRow(intArrayOf(x), longArrayOf(1), Relation.GE, 1)
-        val source = assertNotNull(builder.build(Sense.MINIMIZE).trailModel())
+        val source = assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel())
         val seen = ArrayList<LpFloatAllowance?>()
         val factory = object : LpEngineFactory by ProductionLpEngineFactory {
             override fun newPersistentSolver(

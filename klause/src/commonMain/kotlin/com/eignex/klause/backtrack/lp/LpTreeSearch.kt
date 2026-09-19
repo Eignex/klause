@@ -3,7 +3,6 @@ package com.eignex.klause.backtrack.lp
 import com.eignex.klause.lp.bounding.LpEngine
 import com.eignex.klause.lp.bounding.LpFractionalBranch
 import com.eignex.klause.lp.bounding.solveNode
-import com.eignex.klause.lp.bounding.trailModel
 import com.eignex.klause.lp.engine.Basis
 import com.eignex.klause.lp.engine.CertifiedLpResult
 import com.eignex.klause.lp.engine.CrashBasisAttempt
@@ -21,6 +20,7 @@ import com.eignex.klause.lp.engine.LpSolveMetrics
 import com.eignex.klause.lp.engine.LpSolver
 import com.eignex.klause.lp.engine.LpVerdict
 import com.eignex.klause.lp.engine.acceptNullable
+import com.eignex.klause.lp.engine.authoritativeModel
 import com.eignex.klause.lp.engine.certifiedTightObjectiveLowerBound
 import com.eignex.klause.lp.engine.certifyDualizedSource
 import com.eignex.klause.lp.engine.exactPointWitness
@@ -211,7 +211,7 @@ internal fun LpEngine.solveRootNode(
                         dualization.decline(decline)
                     } else {
                         preparationWork = estimate
-                        source = original.exactState ?: original.trailModel()?.let(::LpExactState)
+                        source = original.exactState ?: original.authoritativeModel()?.let(::LpExactState)
                         val projection = source?.toWorkingModel()
                         if (projection == null) {
                             dualization.decline(LpDualizationDecline.PROJECTION)

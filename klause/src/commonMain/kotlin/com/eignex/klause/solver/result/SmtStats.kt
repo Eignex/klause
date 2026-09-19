@@ -1,18 +1,44 @@
 package com.eignex.klause.solver.result
 
 import com.eignex.klause.simplex.exact.ExactContinuationMetrics
-import com.eignex.klause.simplex.exact.ExactSimplexRunResult
-import com.eignex.klause.simplex.exact.ExactSimplexStage
-import com.eignex.klause.simplex.exact.Frac128Escalation
-import com.eignex.klause.simplex.exact.RationalSimplexObserver
 import com.eignex.klause.solver.search.SearchExplanation
 import kotlin.time.TimeMark
 import kotlin.time.TimeSource.Monotonic
 
+/** Source-adapter accounting. Phase counters have distinct units/scopes and must not be summed. */
+data class SourceLpWorkStats(
+    /** Nonrefundable admitted source-adapter operations. */
+    val operations: Long = 0L,
+    /** Conservative work reservations, not measured execution. */
+    val modeledWork: Long = 0L,
+    /** Conservative allocation reservations, not measured bytes or RSS. */
+    val modeledAllocation: Long = 0L,
+    /** Active adapter time, including nested solves and owner cleanup once. */
+    val activeNs: Long = 0L,
+    /** Measured source-owner preparation work. */
+    val preparationWork: Long = 0L,
+    /** Measured source float solve work, excluding preparation. */
+    val floatWork: Long = 0L,
+    /** Measured continuation invocation work. */
+    val continuationWork: Long = 0L,
+    /** Charged refinement work, including its preceding direct-stage charges; overlaps other counters. */
+    val refinementWork: Long = 0L,
+) {
+    /** Merge independent nonnegative deltas with saturating arithmetic. */
+    fun mergedWith(other: SourceLpWorkStats): SourceLpWorkStats = SourceLpWorkStats(
+        operations + minOf(other.operations, Long.MAX_VALUE - operations),
+        modeledWork + minOf(other.modeledWork, Long.MAX_VALUE - modeledWork),
+        modeledAllocation + minOf(other.modeledAllocation, Long.MAX_VALUE - modeledAllocation),
+        activeNs + minOf(other.activeNs, Long.MAX_VALUE - activeNs),
+        preparationWork + minOf(other.preparationWork, Long.MAX_VALUE - preparationWork),
+        floatWork + minOf(other.floatWork, Long.MAX_VALUE - floatWork),
+        continuationWork + minOf(other.continuationWork, Long.MAX_VALUE - continuationWork),
+        refinementWork + minOf(other.refinementWork, Long.MAX_VALUE - refinementWork),
+    )
+}
+
 /** Exact-arithmetic telemetry for complete SMT theory routes. */
 data class SmtStats(
-    /** Accepted exact checks spent by the private exact-integer DFS. */
-    val privateChecks: Long = 0,
     /** Exact-theory conflicts returned to the shared search. */
     val conflicts: Long = 0,
     /** Returned conflicts with a clause-form explanation. */
@@ -29,30 +55,8 @@ data class SmtStats(
     val reductionAccepted: Long = 0,
     /** Reduction requests interrupted before a decisive result. */
     val reductionDeclined: Long = 0,
-    /** Reduction time excluding nested simplex and escalation time. */
+    /** Reduction time including nested common-engine work. */
     val reductionNs: Long = 0,
-    /** Exact-simplex invocations on nonempty models. */
-    val simplexAttempts: Long = 0,
-    /** Exact-simplex invocations with a feasible or infeasible verdict. */
-    val simplexAccepted: Long = 0,
-    /** Exact-simplex invocations that returned unknown. */
-    val simplexDeclined: Long = 0,
-    /** Simplex time excluding escalated BigFraction reruns. */
-    val simplexNs: Long = 0,
-    /** Frac128 calls made by the exact rational outcome path. */
-    val frac128Attempts: Long = 0,
-    /** Frac128 calls whose initial tableau was representable. */
-    val frac128Eligible: Long = 0,
-    /** Eligible Frac128 calls that returned a decisive verdict without escalation. */
-    val frac128Accepted: Long = 0,
-    /** Frac128 calls that restarted at BigFraction. */
-    val frac128Escalations: Long = 0,
-    /** Escalations after a latched Frac128 overflow. */
-    val frac128OverflowEscalations: Long = 0,
-    /** Escalations because the initial Frac128 tableau was not representable. */
-    val frac128InputEscalations: Long = 0,
-    /** BigFraction rerun time after a Frac128 escalation. */
-    val escalationNs: Long = 0,
     /** Exact source-witness candidates made available by an exact theory check. */
     val witnessCandidates: Long = 0,
     /** Existing consumer paths that accepted an exact source witness. */
@@ -67,10 +71,11 @@ data class SmtStats(
     val wideWitnessAccepted: Long = 0,
     /** Shared LP exact continuation invocation deltas. */
     val continuation: LpContinuationStats = LpContinuationStats(),
+    /** Common-engine source adapters, separate from retired cold-simplex counters. */
+    val sourceLp: SourceLpWorkStats = SourceLpWorkStats(),
 ) {
     /** Combine independent solve slices. */
     fun mergedWith(other: SmtStats): SmtStats = SmtStats(
-        privateChecks + other.privateChecks,
         conflicts + other.conflicts,
         explainedConflicts + other.explainedConflicts,
         unexplainedConflicts + other.unexplainedConflicts,
@@ -80,17 +85,6 @@ data class SmtStats(
         reductionAccepted + other.reductionAccepted,
         reductionDeclined + other.reductionDeclined,
         reductionNs + other.reductionNs,
-        simplexAttempts + other.simplexAttempts,
-        simplexAccepted + other.simplexAccepted,
-        simplexDeclined + other.simplexDeclined,
-        simplexNs + other.simplexNs,
-        frac128Attempts + other.frac128Attempts,
-        frac128Eligible + other.frac128Eligible,
-        frac128Accepted + other.frac128Accepted,
-        frac128Escalations + other.frac128Escalations,
-        frac128OverflowEscalations + other.frac128OverflowEscalations,
-        frac128InputEscalations + other.frac128InputEscalations,
-        escalationNs + other.escalationNs,
         witnessCandidates + other.witnessCandidates,
         witnessAccepted + other.witnessAccepted,
         strictWitnessCandidates + other.strictWitnessCandidates,
@@ -98,18 +92,24 @@ data class SmtStats(
         wideWitnessCandidates + other.wideWitnessCandidates,
         wideWitnessAccepted + other.wideWitnessAccepted,
         continuation.mergedWith(other.continuation),
+        sourceLp.mergedWith(other.sourceLp),
     )
 }
 
 /** Mutable exact-SMT telemetry for one top-level open-theory request. */
-internal class SmtStatsSink : RationalSimplexObserver {
+internal class SmtStatsSink {
+    private var sourceLp = SourceLpWorkStats()
+
+    fun observeSourceLp(delta: SourceLpWorkStats) {
+        sourceLp = sourceLp.mergedWith(delta)
+    }
+
     private var continuation = LpContinuationStats()
 
     fun observeContinuation(metrics: ExactContinuationMetrics) {
         continuation = continuation.mergedWith(metrics.toStats())
     }
 
-    private var privateChecks = 0L
     private var conflicts = 0L
     private var explainedConflicts = 0L
     private var unexplainedConflicts = 0L
@@ -119,27 +119,12 @@ internal class SmtStatsSink : RationalSimplexObserver {
     private var reductionAccepted = 0L
     private var reductionDeclined = 0L
     private var reductionNs = 0L
-    private var simplexAttempts = 0L
-    private var simplexAccepted = 0L
-    private var simplexDeclined = 0L
-    private var simplexNs = 0L
-    private var frac128Attempts = 0L
-    private var frac128Eligible = 0L
-    private var frac128Accepted = 0L
-    private var frac128Escalations = 0L
-    private var frac128OverflowEscalations = 0L
-    private var frac128InputEscalations = 0L
-    private var escalationNs = 0L
     private var witnessCandidates = 0L
     private var witnessAccepted = 0L
     private var strictWitnessCandidates = 0L
     private var strictWitnessAccepted = 0L
     private var wideWitnessCandidates = 0L
     private var wideWitnessAccepted = 0L
-
-    fun observePrivateCheck() {
-        privateChecks++
-    }
 
     fun observeConflict(explanation: SearchExplanation?) {
         conflicts++
@@ -151,16 +136,13 @@ internal class SmtStatsSink : RationalSimplexObserver {
         }
     }
 
-    fun beginReduction(): ReductionMark = ReductionMark(Monotonic.markNow(), simplexNs, escalationNs)
+    fun beginReduction(): TimeMark = Monotonic.markNow()
 
-    fun endReduction(mark: ReductionMark, cacheHit: Boolean, accepted: Boolean) {
+    fun endReduction(mark: TimeMark, cacheHit: Boolean, accepted: Boolean) {
         reductionRequests++
         if (cacheHit) reductionCacheHits++
         if (accepted) reductionAccepted++ else reductionDeclined++
-        val nested = (simplexNs - mark.simplexNs) + (escalationNs - mark.escalationNs)
-        val elapsed = mark.mark.elapsedNow().inWholeNanoseconds
-        check(elapsed >= nested) { "nested exact-simplex timing exceeded enclosing reduction timing" }
-        reductionNs += elapsed - nested
+        reductionNs += mark.elapsedNow().inWholeNanoseconds
     }
 
     fun observeWitnessCandidate(strict: Boolean, wide: Boolean) {
@@ -175,43 +157,10 @@ internal class SmtStatsSink : RationalSimplexObserver {
         if (wide) wideWitnessAccepted++
     }
 
-    override fun observeFrac128Attempt(eligible: Boolean) {
-        frac128Attempts++
-        if (eligible) frac128Eligible++
-    }
-
-    override fun observeEscalation(reason: Frac128Escalation) {
-        frac128Escalations++
-        when (reason) {
-            Frac128Escalation.OVERFLOW -> frac128OverflowEscalations++
-            Frac128Escalation.INPUT -> frac128InputEscalations++
-        }
-    }
-
-    override fun observeSimplex(stage: ExactSimplexStage, result: ExactSimplexRunResult, elapsedNs: Long) {
-        simplexAttempts++
-        when (result) {
-            ExactSimplexRunResult.FEASIBLE, ExactSimplexRunResult.INFEASIBLE -> simplexAccepted++
-            ExactSimplexRunResult.UNKNOWN -> simplexDeclined++
-        }
-        if (stage == ExactSimplexStage.ESCALATED_BIG) {
-            escalationNs += elapsedNs
-        } else {
-            simplexNs += elapsedNs
-        }
-        if (stage == ExactSimplexStage.FRAC128 && result != ExactSimplexRunResult.UNKNOWN) frac128Accepted++
-    }
-
     fun snapshot(): SmtStats = SmtStats(
-        privateChecks, conflicts, explainedConflicts, unexplainedConflicts, conflictLiterals,
+        conflicts, explainedConflicts, unexplainedConflicts, conflictLiterals,
         reductionRequests, reductionCacheHits, reductionAccepted, reductionDeclined, reductionNs,
-        simplexAttempts, simplexAccepted, simplexDeclined, simplexNs,
-        frac128Attempts, frac128Eligible, frac128Accepted, frac128Escalations,
-        frac128OverflowEscalations, frac128InputEscalations, escalationNs,
         witnessCandidates, witnessAccepted, strictWitnessCandidates, strictWitnessAccepted,
-        wideWitnessCandidates, wideWitnessAccepted, continuation,
+        wideWitnessCandidates, wideWitnessAccepted, continuation, sourceLp,
     )
 }
-
-/** One reduction timing interval and the nested simplex totals it started with. */
-internal class ReductionMark(val mark: TimeMark, val simplexNs: Long, val escalationNs: Long)

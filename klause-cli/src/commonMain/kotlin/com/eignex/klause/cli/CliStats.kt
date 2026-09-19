@@ -325,11 +325,8 @@ internal fun openTheoryStatPairs(stats: SolveStats, solveTimeMs: Long): List<Pai
 /** Exact SMT-theory lane counters, with rates only when their denominator is meaningful. */
 private fun smtStatPairs(stats: SolveStats, solveTimeMs: Long): List<Pair<String, String>> = with(stats.smt) {
     if (this == SmtStats()) return emptyList()
-    val sharedChecks = stats.openTheory.openTheoryChecks - privateChecks
     val out = ArrayList<Pair<String, String>>()
     out += continuationStatPairs("smt", continuation)
-    out += "smtPrivateChecks" to "$privateChecks"
-    out += "smtSharedChecks" to "$sharedChecks"
     out += "smtTheoryChecks" to "${stats.openTheory.openTheoryChecks}"
     if (solveTimeMs > 0L) {
         out += "smtTheoryChecksPerSec" to round4(stats.openTheory.openTheoryChecks / (solveTimeMs / 1000.0))
@@ -348,19 +345,14 @@ private fun smtStatPairs(stats: SolveStats, solveTimeMs: Long): List<Pair<String
     out += "smtReductionAccepted" to "$reductionAccepted"
     out += "smtReductionDeclined" to "$reductionDeclined"
     out += "smtReductionMs" to round4(reductionNs / 1_000_000.0)
-    out += "smtSimplexAttempts" to "$simplexAttempts"
-    out += "smtSimplexAccepted" to "$simplexAccepted"
-    out += "smtSimplexDeclined" to "$simplexDeclined"
-    out += "smtSimplexMs" to round4(simplexNs / 1_000_000.0)
-    out += "smtFrac128Attempts" to "$frac128Attempts"
-    out += "smtFrac128Eligible" to "$frac128Eligible"
-    out += "smtFrac128Accepted" to "$frac128Accepted"
-    out += "smtFrac128Escalations" to "$frac128Escalations"
-    out += "smtFrac128OverflowEscalations" to "$frac128OverflowEscalations"
-    out += "smtFrac128InputEscalations" to "$frac128InputEscalations"
-    out += "smtEscalationMs" to round4(
-        escalationNs / 1_000_000.0,
-    )
+    out += "smtSourceLpOperations" to "${sourceLp.operations}"
+    out += "smtSourceLpModeledWork" to "${sourceLp.modeledWork}"
+    out += "smtSourceLpModeledAllocation" to "${sourceLp.modeledAllocation}"
+    out += "smtSourceLpActiveNs" to "${sourceLp.activeNs}"
+    out += "smtSourceLpPreparationWork" to "${sourceLp.preparationWork}"
+    out += "smtSourceLpFloatWork" to "${sourceLp.floatWork}"
+    out += "smtSourceLpContinuationWork" to "${sourceLp.continuationWork}"
+    out += "smtSourceLpRefinementWork" to "${sourceLp.refinementWork}"
     out += "smtWitnessCandidates" to "$witnessCandidates"
     out += "smtWitnessAccepted" to "$witnessAccepted"
     out += "smtStrictWitnessCandidates" to "$strictWitnessCandidates"

@@ -1,5 +1,47 @@
 package com.eignex.klause.lp.engine
 
+import com.eignex.klause.util.Cancellation
+
+internal data class LpMatrixProjectionStatus(val underflows: Int, val overflows: Int)
+
+internal class LpProjectionStop : RuntimeException()
+
+internal class LpProjectionMeter(
+    private val workLimit: Long = Long.MAX_VALUE,
+    private val allocationLimit: Long = Long.MAX_VALUE,
+    private val cancellation: Cancellation = Cancellation.Never,
+) {
+    var matrixWork: Long = 0L
+        private set
+    var vectorWork: Long = 0L
+        private set
+    var allocation: Long = 0L
+        private set
+    val work: Long get() = matrixWork + vectorWork
+
+    init {
+        require(workLimit >= 0L && allocationLimit >= 0L)
+    }
+
+    fun poll() {
+        if (cancellation()) throw LpProjectionStop()
+    }
+
+    fun reserveVectors(model: ExactLpModel) {
+        val vectors = model.m.toLong() + model.numVars + model.n
+        reserve(vectors * 4L + 1L, vectors * 64L + 512L, matrix = false)
+    }
+
+    fun reserve(work: Long, bytes: Long, matrix: Boolean) {
+        poll()
+        if (work < 0L || bytes < 0L || work > workLimit - this.work || bytes > allocationLimit - allocation) {
+            throw LpProjectionStop()
+        }
+        if (matrix) matrixWork += work else vectorWork += work
+        allocation += bytes
+    }
+}
+
 internal data class LpBoundAssertion(
     val column: Int,
     val upper: Boolean,
@@ -108,19 +150,36 @@ internal class LpExactState internal constructor(
         projectionAttempted = previous.projectionAttempted
     }
 
-    fun toWorkingModel(): LpModel? {
+    val matrixProjectionStatus: LpMatrixProjectionStatus? get() = projection?.status
+    val matrixProjectionDeclined: Boolean get() = projectionAttempted && projection == null
+
+    fun toWorkingModel(meter: LpProjectionMeter = LpProjectionMeter()): LpModel? = try {
+        projectWorkingModel(meter)
+    } catch (_: LpProjectionStop) {
+        null
+    }
+
+    private fun projectWorkingModel(meter: LpProjectionMeter): LpModel? {
+        meter.poll()
         if (!projectionAttempted) {
-            projection = LpMatrixProjection.create(model)
+            val completed = LpMatrixProjection.create(model, meter)
+            meter.poll()
+            projection = completed
             projectionAttempted = true
         }
         val matrix = projection ?: return null
+        meter.reserveVectors(model)
         val rhs = DoubleArray(model.m)
         val costs = DoubleArray(model.numVars)
         val uppers = DoubleArray(model.numVars)
         val hasUpper = BooleanArray(model.numVars)
         val origins = DoubleArray(model.n)
-        for (i in rhs.indices) rhs[i] = model.rhs(i).project() ?: return null
+        for (i in rhs.indices) {
+            meter.poll()
+            rhs[i] = model.rhs(i).project() ?: return null
+        }
         for (j in 0 until model.numVars) {
+            meter.poll()
             costs[j] = model.objective.cost(j).project(nonzeroRequired = true) ?: return null
             model.column(j).bounds.lower?.let { if (it.number.project() == null) return null }
             model.column(j).bounds.upper?.let {
@@ -135,6 +194,7 @@ internal class LpExactState internal constructor(
         ) {
             return null
         }
+        meter.poll()
         return LpModel(
             n = model.n,
             m = model.m,
@@ -169,13 +229,25 @@ private fun ExactLpNumber.project(nonzeroRequired: Boolean = false): Double? {
     return result.takeIf { it.isFinite() && (!nonzeroRequired || it != 0.0 || value.isZero) }
 }
 
-private class LpMatrixProjection(val colPtr: IntArray, val rowIdx: IntArray, val values: DoubleArray) {
+private class LpMatrixProjection(
+    val colPtr: IntArray,
+    val rowIdx: IntArray,
+    val values: DoubleArray,
+    val status: LpMatrixProjectionStatus,
+) {
     val csc = Csc(colPtr, rowIdx, LongArray(values.size))
 
     companion object {
-        fun create(model: ExactLpModel): LpMatrixProjection? {
+        fun create(model: ExactLpModel, meter: LpProjectionMeter): LpMatrixProjection? {
+            meter.reserve(model.n.toLong() + model.m + 1L, 0L, matrix = true)
+            val size = model.keySize
+            if (size < 0L || size > (Long.MAX_VALUE - 64L) / 32L) return null
+            meter.reserve(size, size * 32L + 64L, matrix = true)
+            var underflows = 0
+            var overflows = 0
             val pointers = IntArray(model.n + 1)
             for (j in 0 until model.n) {
+                meter.poll()
                 val count = pointers[j].toLong() + model.entries(j).size
                 if (count > Int.MAX_VALUE) return null
                 pointers[j + 1] = count.toInt()
@@ -185,10 +257,26 @@ private class LpMatrixProjection(val colPtr: IntArray, val rowIdx: IntArray, val
             for (j in 0 until model.n) {
                 for ((k, entry) in model.entries(j).withIndex()) {
                     indices[pointers[j] + k] = entry.row
-                    values[pointers[j] + k] = entry.number.project(nonzeroRequired = true) ?: return null
+                    meter.poll()
+                    val approximation = entry.number.approximation
+                    if (approximation.isNaN()) return null
+                    values[pointers[j] + k] = when {
+                        !approximation.isFinite() -> {
+                            overflows++
+                            if (entry.number.value.signum() < 0) -Double.MAX_VALUE else Double.MAX_VALUE
+                        }
+
+                        approximation == 0.0 && !entry.number.value.isZero -> {
+                            underflows++
+                            if (entry.number.value.signum() < 0) -0.0 else 0.0
+                        }
+
+                        else -> approximation
+                    }
                 }
             }
-            return LpMatrixProjection(pointers, indices, values)
+            meter.poll()
+            return LpMatrixProjection(pointers, indices, values, LpMatrixProjectionStatus(underflows, overflows))
         }
     }
 }

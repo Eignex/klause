@@ -1,5 +1,6 @@
 package com.eignex.klause.theory.qflra
 
+import com.eignex.klause.ir.IntegralConstants
 import com.eignex.klause.ir.LinearForm
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.LinearRow
@@ -11,9 +12,13 @@ import com.eignex.klause.ir.linearRows
 import com.eignex.klause.lp.ExactMixedBoundedRow
 import com.eignex.klause.lp.ExactMixedEchelonHermite
 import com.eignex.klause.lp.ExactMixedTriangularBounds
+import com.eignex.klause.lp.SourceLp
+import com.eignex.klause.lp.SourceLpBudget
+import com.eignex.klause.lp.admittedSourcePoint
 import com.eignex.klause.lp.asFraction
 import com.eignex.klause.lp.bounding.LpPropagator
 import com.eignex.klause.lp.bounding.LpSearchPolicy
+import com.eignex.klause.lp.closeSourceLpOwners
 import com.eignex.klause.lp.engine.LpCertificationObserver
 import com.eignex.klause.lp.engine.LpCertifier
 import com.eignex.klause.lp.engine.LpExactState
@@ -25,17 +30,15 @@ import com.eignex.klause.lp.exactColumnUpper
 import com.eignex.klause.lp.exactComparison
 import com.eignex.klause.lp.exactMixedEchelonHermite
 import com.eignex.klause.lp.exactMixedTriangularBounds
+import com.eignex.klause.lp.satisfiesSourceRows
+import com.eignex.klause.lp.sourceDoubleBoundedSplit
+import com.eignex.klause.lp.sourceEqualityRows
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ExactContinuationMetrics
 import com.eignex.klause.simplex.exact.ExactDoubleBoundedSplit
-import com.eignex.klause.simplex.exact.ExactRationalFeasibilityModel
 import com.eignex.klause.simplex.exact.ExactRationalInequality
-import com.eignex.klause.simplex.exact.RationalFeasibility
-import com.eignex.klause.simplex.exact.RationalSimplexObserver
-import com.eignex.klause.simplex.exact.bigRationalOutcome
-import com.eignex.klause.simplex.exact.exactDoubleBoundedSplit
-import com.eignex.klause.simplex.exact.exactMixedUnitCubeSolution
 import com.eignex.klause.solver.result.SmtStatsSink
+import com.eignex.klause.solver.result.SourceLpWorkStats
 import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.RegisteredTheoryDecision
@@ -43,15 +46,11 @@ import com.eignex.klause.solver.search.SearchAtomPremise
 import com.eignex.klause.solver.search.SearchBrancher
 import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchDecision
-import com.eignex.klause.solver.search.SearchExplanation
 import com.eignex.klause.solver.search.SearchIntValue
 import com.eignex.klause.solver.search.SearchModel
 import com.eignex.klause.solver.search.SearchRealValue
 import com.eignex.klause.solver.search.SearchTheoryDecision
 import com.eignex.klause.solver.search.TheoryComponent
-import com.eignex.klause.theory.Theory
-import com.eignex.klause.theory.TheoryCheck
-import com.eignex.klause.theory.TheoryContext
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.MutableIntObjectMap
 import com.ionspin.kotlin.bignum.integer.BigInteger
@@ -67,59 +66,6 @@ data class ExactLiraAssignment(
     val reals: List<BigFraction>,
 )
 
-/**
- * Exact feasibility for the supported open QF_LIRA and QF_LIA fragments.
- *
- * The Boolean skeleton is fixed first. At a Boolean leaf the rational simplex sees both integer and
- * real columns. A fractional integer witness is split at its exact [BigInteger] floor, so the child
- * boxes are disjoint and cover every integer value. This deliberately lives beside QF_LRA rather than
- * entering finite CP: the only branching here is theory-local integrality branching.
- */
-class ExactLiraSolver(override val model: Problem) : Theory<ExactLiraAssignment> {
-    private var smtStats: SmtStatsSink? = null
-    init {
-        require(model.supportsExactLira()) { "exact LIRA search requires a supported integer-containing linear model" }
-    }
-
-    override fun check(bools: BooleanArray, context: TheoryContext): TheoryCheck<ExactLiraAssignment> =
-        checkExactLinear(model, bools, context, smtStats)
-
-    internal fun observeWith(stats: SmtStatsSink) {
-        smtStats = stats
-    }
-}
-
-internal fun checkExactLinear(
-    model: Problem,
-    bools: BooleanArray,
-    context: TheoryContext,
-    stats: SmtStatsSink? = null,
-): TheoryCheck<ExactLiraAssignment> {
-    val cancellation = Cancellation(context::cancelled)
-    return when (
-        val result = ExactIntegerSearch(
-            model = model,
-            bools = bools.toStates(),
-            cancellation = cancellation,
-            consumeLeaf = {
-                context.consumeCheck().also { accepted -> if (accepted) stats?.observePrivateCheck() }
-            },
-            lowerBound = context::intLowerBound,
-            upperBound = context::intUpperBound,
-            emitAssignment = true,
-            observer = stats,
-        ).run()
-    ) {
-        is IntegerSearchResult.Found -> TheoryCheck.Sat(checkNotNull(result.assignment))
-
-        IntegerSearchResult.Infeasible -> TheoryCheck.Infeasible(
-            sourceExplanation(model, bools.toStates(), cancellation, stats),
-        )
-
-        IntegerSearchResult.Cancelled, IntegerSearchResult.Budget -> TheoryCheck.Cancelled
-    }
-}
-
 /** Incremental source arithmetic on the shared LP and search lifecycles. */
 class ExactLiraSearchComponent(
     private val model: Problem,
@@ -132,7 +78,7 @@ class ExactLiraSearchComponent(
     private val bools = IntArray(model.numBoolVars) { UNASSIGNED }
     private val boolLevels = IntArray(model.numBoolVars) { -1 }
     private val root = SearchNode()
-    private val reduction = ExactLiraReductionCache(model)
+    private val reduction = ExactLiraReductionCache(model, { solveContext }) { smtStats?.observeSourceLp(it) }
     private val nodesByLevel = MutableIntObjectMap<SearchNode>()
     private var node = root
     private var assignment: ExactLiraAssignment? = null
@@ -149,7 +95,7 @@ class ExactLiraSearchComponent(
     private val arithmeticVariables = arithmeticRows.flatMap { it.booleanVariables() }.toSet()
     private val branchNames = HashMap<SourceBoundAtom, SearchDecision>()
     private var context: SearchContext? = null
-    private val lp by lazy {
+    private val lpDelegate: Lazy<LpPropagator> = lazy {
         LpPropagator(
             object : LpSearchPolicy {
                 override fun assert(decision: SearchDecision, context: SearchContext): ComponentResult =
@@ -178,6 +124,7 @@ class ExactLiraSearchComponent(
             },
         )
     }
+    private val lp: LpPropagator by lpDelegate
     private val system by lazy { LiveQfLraSystem(model, lp) }
 
     internal fun solveWith(context: LpSolveContext) {
@@ -216,7 +163,9 @@ class ExactLiraSearchComponent(
     override fun nextBranch(context: SearchContext): List<SearchDecision>? = lp.nextBranch(context)
     override fun retract(decisionLevel: Int) = lp.retract(decisionLevel)
     override fun onRestart(context: SearchContext) = lp.onRestart(context)
-    override fun close() = lp.close()
+    override fun close() {
+        closeSourceLpOwners(listOfNotNull(if (lpDelegate.isInitialized()) lp else null, reduction))
+    }
 
     private fun accept(decision: SearchDecision, context: SearchContext): ComponentResult {
         if (decision is SearchDecision.Bool && decision.literal ushr 1 !in bools.indices) {
@@ -248,9 +197,15 @@ class ExactLiraSearchComponent(
                     branchNames[atom] = decision
                     val branchRows = atom.sourceRows(model.numRealVars)
                     val retained = node.retainedReduction?.takeIf { reduced ->
-                        branchRows.all { row ->
-                            reduced.system.transform(row).columns.all(reduced.system::boundedColumn)
-                        }
+                        reduced.budget.run(
+                            branchRows,
+                            model.numRealVars + model.numIntVars,
+                            Cancellation(context::cancelled),
+                        ) {
+                            branchRows.all { row ->
+                                reduced.system.transform(row).columns.all(reduced.system::boundedColumn)
+                            }
+                        } == true
                     }
                     node = node.copy(sourceBranches = node.sourceBranches + atom, retainedReduction = retained)
                     if (!system.assertAtom(atom, SearchAtomPremise.Asserted(decision))) {
@@ -474,8 +429,7 @@ class ExactLiraSearchComponent(
             outcome = ComponentCheck.Indeterminate
             return null
         }
-        smtStats?.observePrivateCheck()
-        when (val bounded = ExactReducedLiraSystem(reduced).solve(node, Cancellation(context::cancelled), smtStats)) {
+        when (val bounded = reduced.solver.solve(node, Cancellation(context::cancelled))) {
             is ExactReducedSearchResult.Split -> {
                 return registeredSplit(reduced, bounded.integer, bounded.floor.asFraction(), context)
             }
@@ -520,8 +474,8 @@ class ExactLiraSearchComponent(
         ) {
             return null
         }
-        val rows = reduction.sourceRows(bools, node) ?: return null
-        if (!point.satisfiesExactRows(rows)) return null
+        val rows = reduction.sourceRows(bools, node, Cancellation { context?.cancelled() == true }) ?: return null
+        if (!point.satisfiesSourceRows(rows, Cancellation { context?.cancelled() == true })) return null
         val strict = rows.any { it.strict }
         val wide = rows.hasWideIntegerData() || point.any { it.num.abs() > WIDE_INTEGER_LIMIT }
         smtStats?.observeWitnessCandidate(strict, wide)
@@ -556,122 +510,6 @@ class ExactLiraSearchComponent(
             modelContribution?.invoke(value, model)
         }
     }
-}
-
-private fun sourceExplanation(
-    model: Problem,
-    bools: IntArray,
-    cancellation: Cancellation,
-    observer: RationalSimplexObserver?,
-): SearchExplanation? {
-    if (cancellation()) return null
-    // Refute the original active rows independently of private splits, reductions and shared bounds.
-    val relaxation = QfLraSystem(model).build { variable ->
-        when (bools[variable]) {
-            TRUE -> true
-            FALSE -> false
-            else -> null
-        }
-    }
-    val outcome = bigRationalOutcome(relaxation.model, cancellation, observer = observer)
-    return relaxation.explanation(outcome.conflict)
-}
-
-private class ExactIntegerSearch(
-    private val model: Problem,
-    private val bools: IntArray,
-    private val cancellation: Cancellation,
-    private val consumeLeaf: () -> Boolean,
-    private val lowerBound: (Int) -> Long?,
-    private val upperBound: (Int) -> Long?,
-    private val emitAssignment: Boolean,
-    private val observer: SmtStatsSink? = null,
-) {
-    private val reduction = ExactLiraReductionCache(model)
-
-    fun run(): IntegerSearchResult {
-        val stack = ArrayDeque<SearchNode>()
-        stack.addLast(
-            SearchNode().withPublishedBounds(model.numIntVars, lowerBound, upperBound),
-        )
-        while (stack.isNotEmpty()) {
-            if (!consumeLeaf()) return IntegerSearchResult.Budget
-            if (cancellation()) return IntegerSearchResult.Cancelled
-            val node = stack.removeLast()
-            val comparison = node.nextComparison(model)
-            if (comparison != null) {
-                val rows = model.factors[comparison.factor].linearRows
-                for (literal in rows.indices.reversed()) {
-                    stack.addLast(node.withComparison(comparison, literal))
-                }
-                continue
-            }
-            val disequality = node.nextDisequality(model, bools)
-            if (disequality != null) {
-                stack.addLast(node.withDirection(disequality, LinearOp.GE))
-                stack.addLast(node.withDirection(disequality, LinearOp.LE))
-                continue
-            }
-            val reduced = reduction.reduce(bools, node, cancellation, observer)
-            if (reduced == ExactLiraReduction.Infeasible) continue
-            if (reduced == ExactLiraReduction.Interrupted) return IntegerSearchResult.Cancelled
-            reduced as ExactLiraReduction.Bounded
-            when (val bounded = ExactReducedLiraSystem(reduced).solve(node, cancellation, observer)) {
-                is ExactReducedSearchResult.Split -> {
-                    stack.addLast(
-                        bounded.node.withReducedBranch(
-                            IntegerBranch(bounded.integer, lower = bounded.floor + BigInteger.ONE),
-                        ),
-                    )
-                    stack.addLast(bounded.node.withReducedBranch(IntegerBranch(bounded.integer, upper = bounded.floor)))
-                }
-
-                ExactReducedSearchResult.Infeasible -> Unit
-
-                ExactReducedSearchResult.Interrupted -> return IntegerSearchResult.Cancelled
-
-                is ExactReducedSearchResult.Found -> {
-                    val source = bounded.sourceValues
-                    if ((0 until model.numIntVars).any { integer ->
-                            !source[model.numRealVars + integer].isInteger()
-                        }
-                    ) {
-                        return IntegerSearchResult.Cancelled
-                    }
-                    return IntegerSearchResult.Found(
-                        if (emitAssignment) {
-                            val telemetry = observer?.let { stats ->
-                                val strict = reduced.sourceRows.any(ExactRationalInequality::strict)
-                                val wide = reduced.sourceRows.hasWideIntegerData() ||
-                                    (0 until model.numIntVars).any { integer ->
-                                        source[model.numRealVars + integer].num.abs() > WIDE_INTEGER_LIMIT
-                                    }
-                                stats.observeWitnessCandidate(strict, wide)
-                                strict to wide
-                            }
-                            ExactLiraAssignment(
-                                bools.toCompleteValues(),
-                                Array(model.numIntVars) { integer -> source[model.numRealVars + integer].num },
-                                List(model.numRealVars) { real -> source[real] },
-                            ).also {
-                                telemetry?.let { (strict, wide) -> observer.observeWitnessAccepted(strict, wide) }
-                            }
-                        } else {
-                            null
-                        },
-                    )
-                }
-            }
-        }
-        return IntegerSearchResult.Infeasible
-    }
-}
-
-private sealed interface IntegerSearchResult {
-    data class Found(val assignment: ExactLiraAssignment?) : IntegerSearchResult
-    data object Infeasible : IntegerSearchResult
-    data object Cancelled : IntegerSearchResult
-    data object Budget : IntegerSearchResult
 }
 
 private const val UNASSIGNED = -1
@@ -710,7 +548,16 @@ private sealed interface ExactLiraReduction {
         val bounds: ExactMixedTriangularBounds,
         val unboundedRows: List<ExactRationalInequality>,
         val sourceRows: List<ExactRationalInequality>,
-    ) : ExactLiraReduction
+        val budget: SourceLpBudget,
+    ) : ExactLiraReduction,
+        AutoCloseable {
+        val solver = ExactReducedLiraSystem(this)
+        var extension: SourceLp? = null
+
+        override fun close() {
+            closeSourceLpOwners(listOfNotNull(solver, extension))
+        }
+    }
 
     data object Interrupted : ExactLiraReduction
 }
@@ -721,7 +568,18 @@ private sealed interface ExactLiraReduction {
  * Reduced-coordinate branches are deliberately not part of this key: they search the fixed
  * double-bounded artefact, while source bounds and Boolean/disjunction choices select that artefact.
  */
-private class ExactLiraReductionCache(private val model: Problem) {
+private class ExactLiraReductionCache(
+    private val model: Problem,
+    solveContext: () -> LpSolveContext,
+    onWork: (SourceLpWorkStats) -> Unit,
+) : AutoCloseable {
+    private val budget = SourceLpBudget(solveContext = solveContext, onWork = onWork)
+
+    override fun close() {
+        val owners = results.values.filterIsInstance<ExactLiraReduction.Bounded>()
+        results.clear()
+        closeSourceLpOwners(owners)
+    }
     private val results = HashMap<ExactLiraReductionKey, ExactLiraReduction>()
 
     fun reduce(
@@ -729,6 +587,64 @@ private class ExactLiraReductionCache(private val model: Problem) {
         node: SearchNode,
         cancellation: Cancellation,
         observer: SmtStatsSink? = null,
+    ): ExactLiraReduction {
+        return budget.run(emptyList(), model.numRealVars + model.numIntVars, cancellation) { token ->
+            if (!admitsSourcePreparation(node)) return@run ExactLiraReduction.Interrupted
+            reduceAdmitted(bools, node, token, observer)
+        } ?: ExactLiraReduction.Interrupted
+    }
+
+    private fun admitsSourcePreparation(node: SearchNode): Boolean {
+        if (model.numBoolVars > 512 || model.factors.size > 128 || node.branches.size > 128 ||
+            node.sourceBranches.size > 128 || node.sourceBranches.sumOf { it.terms.size.toLong() } > 512L
+        ) {
+            return false
+        }
+        var terms = 0L
+        var rows = 0L
+        for (factor in model.factors) {
+            if (factor.linearRows.size > 128) return false
+            for (row in factor.linearRows) {
+                rows++
+                terms += row.size
+                if (rows > 128L || terms > 512L) return false
+                val constants = row.constants
+                if (constants is IntegralConstants && (
+                        constants.exactBound.bitLength() > 4096 ||
+                            (0 until row.size).any { constants.exactCoeff(it).bitLength() > 4096 }
+                        )
+                ) {
+                    return false
+                }
+            }
+        }
+        for (integer in 0 until model.numIntVars) {
+            if (model.intBounds.lowerAsBigInteger(integer)?.bitLength()?.let { it > 4096 } == true ||
+                model.intBounds.upperAsBigInteger(integer)?.bitLength()?.let { it > 4096 } == true
+            ) {
+                return false
+            }
+        }
+        if (node.branches.any { branch ->
+                branch.variable !in 0 until model.numIntVars ||
+                    branch.lower?.bitLength()?.let { it > 4096 } == true ||
+                    branch.upper?.bitLength()?.let { it > 4096 } == true
+            }
+        ) {
+            return false
+        }
+        return node.sourceBranches.all { atom ->
+            listOf(
+                atom.threshold,
+            ).admittedSourcePoint() && atom.terms.all { listOf(it.coefficient).admittedSourcePoint() }
+        }
+    }
+
+    private fun reduceAdmitted(
+        bools: IntArray,
+        node: SearchNode,
+        cancellation: Cancellation,
+        observer: SmtStatsSink?,
     ): ExactLiraReduction {
         val mark = observer?.beginReduction()
         val key = ExactLiraReductionKey(
@@ -748,15 +664,36 @@ private class ExactLiraReductionCache(private val model: Problem) {
             }
             return cached
         }
-        val rows = sourceRows(bools, node) ?: return ExactLiraReduction.Interrupted.also {
+        val rows = sourceRows(bools, node, cancellation) ?: return ExactLiraReduction.Interrupted.also {
             mark?.let { observer.endReduction(it, cacheHit = false, accepted = false) }
         }
-        val result = when (
-            val split = exactDoubleBoundedSplit(
+        var admitted = false
+        var result = reduceRows(rows, cancellation) { admitted = true }
+        if (!admitted) {
+            val equalities = sourceEqualityRows(rows, model.numRealVars + model.numIntVars, budget, cancellation)
+            if (equalities != null && equalities.isNotEmpty() && equalities.size < rows.size) {
+                val subset = reduceRows(equalities, cancellation)
+                if (subset == ExactLiraReduction.Infeasible && !cancellation()) result = subset
+                (subset as? ExactLiraReduction.Bounded)?.close()
+            }
+        }
+        results[key] = result
+        mark?.let { observer.endReduction(it, cacheHit = false, accepted = result != ExactLiraReduction.Interrupted) }
+        return result
+    }
+
+    private fun reduceRows(
+        rows: List<ExactRationalInequality>,
+        cancellation: Cancellation,
+        onAdmitted: () -> Unit = {},
+    ): ExactLiraReduction = budget.run(rows, model.numRealVars + model.numIntVars, cancellation) { token ->
+        onAdmitted()
+        when (
+            val split = sourceDoubleBoundedSplit(
                 rows,
                 model.numRealVars + model.numIntVars,
-                cancellation,
-                observer,
+                budget,
+                token,
             )
         ) {
             ExactDoubleBoundedSplit.Infeasible -> ExactLiraReduction.Infeasible
@@ -778,7 +715,7 @@ private class ExactLiraReductionCache(private val model: Problem) {
                     bounded,
                     realColumns = model.numRealVars,
                     integerColumns = model.numIntVars,
-                    cancellation = cancellation,
+                    cancellation = token,
                 )
                 if (transformed == null) {
                     ExactLiraReduction.Interrupted
@@ -792,33 +729,35 @@ private class ExactLiraReductionCache(private val model: Problem) {
                             bounds,
                             split.unbounded.map(rows::get),
                             rows,
+                            budget,
                         )
                     }
                 }
             }
         }
-        if (!cancellation()) results[key] = result
-        mark?.let { observer.endReduction(it, cacheHit = false, accepted = result != ExactLiraReduction.Interrupted) }
-        return result
-    }
+    } ?: ExactLiraReduction.Interrupted
 
-    fun sourceRows(bools: IntArray, node: SearchNode): List<ExactRationalInequality>? {
+    fun sourceRows(bools: IntArray, node: SearchNode, cancellation: Cancellation): List<ExactRationalInequality>? {
         val rows = ArrayList<ExactRationalInequality>()
+        val published = node.branches.associateBy { it.variable }
         for (integer in 0 until model.numIntVars) {
+            if (cancellation()) return null
             val column = model.numRealVars + integer
-            model.intBounds.lowerAsBigInteger(integer)?.let { rows += exactColumnLower(column, it.asFraction()) }
-            model.intBounds.upperAsBigInteger(integer)?.let { rows += exactColumnUpper(column, it.asFraction()) }
-        }
-        for (branch in node.branches) {
-            val column = model.numRealVars + branch.variable
-            branch.lower?.let { rows += exactColumnLower(column, it.asFraction()) }
-            branch.upper?.let { rows += exactColumnUpper(column, it.asFraction()) }
+            val branch = published[integer]
+            listOfNotNull(model.intBounds.lowerAsBigInteger(integer), branch?.lower).maxOrNull()?.let {
+                rows += exactColumnLower(column, it.asFraction())
+            }
+            listOfNotNull(model.intBounds.upperAsBigInteger(integer), branch?.upper).minOrNull()?.let {
+                rows += exactColumnUpper(column, it.asFraction())
+            }
         }
         for (real in 0 until model.numRealVars) {
+            if (cancellation()) return null
             model.realLower[real].takeIf(Double::isFinite)?.let { rows += exactColumnLower(real, it.asFraction()) }
             model.realUpper[real].takeIf(Double::isFinite)?.let { rows += exactColumnUpper(real, it.asFraction()) }
         }
         val complete = node.forEachSelectedRow(model) { factor, index, row ->
+            if (cancellation()) return null
             val truth = row.truthUnder(bools) ?: return@forEachSelectedRow
             val comparison = row.exactComparison(model.numRealVars, truth) { bools[it] == TRUE }
             val direction = if (comparison.op == LinearOp.NE) {
@@ -828,7 +767,10 @@ private class ExactLiraReductionCache(private val model: Problem) {
             }
             comparison.rowsInto(rows, direction)
         }
-        for (atom in node.sourceBranches) rows += atom.sourceRows(model.numRealVars)
+        for (atom in node.sourceBranches) {
+            if (cancellation()) return null
+            rows += atom.sourceRows(model.numRealVars)
+        }
         return rows.takeIf { complete }
     }
 }
@@ -848,7 +790,7 @@ private data class ExactLiraReductionKey(
  * makes each of those coordinates finite; zero columns are deliberately absent from this search and
  * are filled by [ExactLiraReduction.Bounded.extend] after the bounded witness is found.
  */
-private class ExactReducedLiraSystem(private val reduction: ExactLiraReduction.Bounded) {
+private class ExactReducedLiraSystem(private val reduction: ExactLiraReduction.Bounded) : AutoCloseable {
     private val realColumns = reduction.system.realColumns
     private val integerColumns = reduction.system.integerColumns
     private val columns = realColumns + integerColumns
@@ -876,7 +818,7 @@ private class ExactReducedLiraSystem(private val reduction: ExactLiraReduction.B
         return result
     }
 
-    fun model(node: SearchNode): ExactRationalFeasibilityModel {
+    fun model(node: SearchNode): List<ExactRationalInequality> {
         val rows = ArrayList<ExactRationalInequality>(reduction.system.rows.size * 2 + node.reducedBranches.size * 2)
         for (row in reduction.system.rows) {
             rows.add(row.asUpper())
@@ -906,39 +848,49 @@ private class ExactReducedLiraSystem(private val reduction: ExactLiraReduction.B
         for (atom in node.sourceBranches) {
             rows += atom.sourceRows(realColumns).map(reduction.system::transform)
         }
-        return ExactRationalFeasibilityModel(2 * columns, rows.map { it.overFreeColumns(columns) })
+        return rows
     }
 
-    fun values(witness: List<BigFraction>): List<BigFraction> =
-        List(columns) { column -> witness[column] - witness[columns + column] }
+    private val owner = SourceLp(model(root(SearchNode())), columns, reduction.budget)
+
+    override fun close() = owner.close()
 
     fun fractionalInteger(values: List<BigFraction>): Int? = (0 until integerColumns).firstOrNull { integer ->
         reduction.system.boundedColumn(realColumns + integer) && !values[realColumns + integer].isInteger()
     }
 
-    fun solve(
-        node: SearchNode,
-        cancellation: Cancellation,
-        observer: RationalSimplexObserver? = null,
-    ): ExactReducedSearchResult {
-        if (!isBounded()) return ExactReducedSearchResult.Interrupted
-        val rooted = root(node)
-        val outcome = bigRationalOutcome(model(rooted), cancellation, Int.MAX_VALUE, observer)
-        if (outcome.feasibility == RationalFeasibility.INFEASIBLE) return ExactReducedSearchResult.Infeasible
-        if (outcome.feasibility != RationalFeasibility.FEASIBLE) return ExactReducedSearchResult.Interrupted
-        val values = values(checkNotNull(outcome.witness))
-        val integer = fractionalInteger(values)
-        if (integer != null) {
-            return ExactReducedSearchResult.Split(
-                rooted,
-                integer,
-                values[realColumns + integer].floor(),
-            )
-        }
-        return reduction.extend(values, cancellation, observer)?.takeIf { source ->
-            source.satisfiesExactRows(node.sourceBranches.flatMap { it.sourceRows(realColumns) })
-        }?.let(ExactReducedSearchResult::Found)
-            ?: ExactReducedSearchResult.Interrupted
+    fun solve(node: SearchNode, cancellation: Cancellation): ExactReducedSearchResult {
+        return reduction.budget.run(reduction.sourceRows, columns, cancellation) { token ->
+            if (node.sourceBranches.size > 128 || node.sourceBranches.sumOf { it.terms.size.toLong() } > 512L ||
+                node.sourceBranches.any { atom ->
+                    !listOf(
+                        atom.threshold,
+                    ).admittedSourcePoint() || atom.terms.any { !listOf(it.coefficient).admittedSourcePoint() }
+                }
+            ) {
+                return@run ExactReducedSearchResult.Interrupted
+            }
+            if (!isBounded()) return@run ExactReducedSearchResult.Interrupted
+            val rooted = root(node)
+            val outcome = owner.solve(
+                token,
+                branches = node.sourceBranches.flatMap { it.sourceRows(realColumns).map(reduction.system::transform) },
+            ) ?: return@run ExactReducedSearchResult.Interrupted
+            if (outcome.verdict == LpVerdict.INFEASIBLE) return@run ExactReducedSearchResult.Infeasible
+            val values = outcome.exactPrimal?.take(columns) ?: return@run ExactReducedSearchResult.Interrupted
+            val integer = fractionalInteger(values)
+            if (integer != null) {
+                return@run ExactReducedSearchResult.Split(
+                    rooted,
+                    integer,
+                    values[realColumns + integer].floor(),
+                )
+            }
+            reduction.extend(values, token)?.takeIf { source ->
+                source.satisfiesSourceRows(node.sourceBranches.flatMap { it.sourceRows(realColumns) }, token)
+            }?.let(ExactReducedSearchResult::Found)
+                ?: ExactReducedSearchResult.Interrupted
+        } ?: ExactReducedSearchResult.Interrupted
     }
 }
 
@@ -952,47 +904,69 @@ private sealed interface ExactReducedSearchResult {
 private fun ExactLiraReduction.Bounded.extend(
     transformed: List<BigFraction>,
     cancellation: Cancellation,
-    observer: RationalSimplexObserver? = null,
 ): List<BigFraction>? {
-    val realFree = (0 until system.realColumns).filterNot(system::boundedColumn)
-    val integerFree = (0 until system.integerColumns).filterNot { integer ->
-        system.boundedColumn(system.realColumns + integer)
-    }.map { integer -> system.realColumns + integer }
-    val free = realFree + integerFree
-    val compact = free.withIndex().associate { (index, column) -> column to index }
-    val extensionRows = unboundedRows.map { source ->
-        val transformedRow = system.transform(source)
-        var rhs = transformedRow.rhs
-        val coefficients = HashMap<Int, BigFraction>()
-        for (entry in transformedRow.columns.indices) {
-            val column = transformedRow.columns[entry]
-            val coefficient = transformedRow.coefficients[entry]
-            val target = compact[column]
-            if (target == null) {
-                rhs -= coefficient * transformed[column]
-            } else {
-                coefficients[target] = coefficient
-            }
-        }
-        val ordered = coefficients.entries.sortedBy { it.key }
-        ExactRationalInequality(
-            ordered.map { it.key }.toIntArray(),
-            ordered.map { it.value },
-            rhs,
-            transformedRow.strict,
-        )
-    }
-    val extension = exactMixedUnitCubeSolution(
-        extensionRows,
-        realColumns = realFree.size,
-        integerColumns = integerFree.size,
+    return budget.run(
+        unboundedRows,
+        system.realColumns + system.integerColumns,
         cancellation,
-        observer,
-    ) ?: return null
-    val completed = transformed.toMutableList()
-    for ((index, column) in free.withIndex()) completed[column] = extension[index]
-    val recovered = system.recover(completed)
-    return recovered.takeIf { values -> values.satisfiesExactRows(sourceRows) }
+        rhs = transformed,
+    ) { token ->
+        val realFree = (0 until system.realColumns).filterNot(system::boundedColumn)
+        val integerFree = (0 until system.integerColumns).filterNot { integer ->
+            system.boundedColumn(system.realColumns + integer)
+        }.map { integer -> system.realColumns + integer }
+        val free = realFree + integerFree
+        val compact = free.withIndex().associate { (index, column) -> column to index }
+        val extensionRows = unboundedRows.map { source ->
+            if (token()) return@run null
+            val transformedRow = system.transform(source)
+            var rhs = transformedRow.rhs
+            val coefficients = HashMap<Int, BigFraction>()
+            for (entry in transformedRow.columns.indices) {
+                if (token()) return@run null
+                val column = transformedRow.columns[entry]
+                val coefficient = transformedRow.coefficients[entry]
+                val target = compact[column]
+                if (target == null) {
+                    rhs -= coefficient * transformed[column]
+                } else {
+                    coefficients[target] = coefficient
+                }
+            }
+            val ordered = coefficients.entries.sortedBy { it.key }
+            ExactRationalInequality(
+                ordered.map { it.key }.toIntArray(),
+                ordered.map { it.value },
+                rhs,
+                transformedRow.strict,
+            )
+        }
+        val half = BigFraction.of(BigInteger.ONE, BigInteger.TWO)
+        val shifted = extensionRows.map { row ->
+            if (token()) return@run null
+            var norm = BigFraction.ZERO
+            for (i in row.columns.indices) {
+                if (token()) return@run null
+                if (row.columns[i] >= realFree.size) {
+                    val value = row.coefficients[i]
+                    norm += if (value < BigFraction.ZERO) value.negated() else value
+                }
+            }
+            ExactRationalInequality(row.columns, row.coefficients, row.rhs - half * norm, row.strict)
+        }
+        val owner = extension ?: SourceLp(shifted, free.size, budget).also { extension = it }
+        val point = owner.solve(token, rhs = shifted.map { it.rhs })?.exactPrimal?.take(free.size) ?: return@run null
+        val extension = point.mapIndexed { index, value ->
+            if (token()) return@run null
+            if (index < realFree.size) value else (value + half).floor().asFraction()
+        }
+        if (!extension.satisfiesSourceRows(extensionRows, token)) return@run null
+        val completed = transformed.toMutableList()
+        for ((index, column) in free.withIndex()) completed[column] = extension[index]
+        if (token()) return@run null
+        val recovered = system.recover(completed)
+        recovered.takeIf { values -> values.satisfiesSourceRows(sourceRows, token) }
+    }
 }
 
 private fun ExactMixedBoundedRow.asUpper(): ExactRationalInequality {
@@ -1007,22 +981,6 @@ private fun ExactMixedBoundedRow.asLower(): ExactRationalInequality {
         ordered.map { it.value.negated() },
         lower.negated(),
     )
-}
-
-internal fun ExactRationalInequality.overFreeColumns(variables: Int): ExactRationalInequality {
-    val terms = ArrayList<Pair<Int, BigFraction>>(columns.size * 2)
-    for (entry in columns.indices) {
-        terms.add(columns[entry] to coefficients[entry])
-        terms.add(variables + columns[entry] to coefficients[entry].negated())
-    }
-    terms.sortBy { it.first }
-    return ExactRationalInequality(terms.map { it.first }.toIntArray(), terms.map { it.second }, rhs, strict)
-}
-
-private fun List<BigFraction>.satisfiesExactRows(rows: List<ExactRationalInequality>): Boolean = rows.all { row ->
-    var activity = BigFraction.ZERO
-    for (entry in row.columns.indices) activity += this[row.columns[entry]] * row.coefficients[entry]
-    if (row.strict) activity < row.rhs else activity <= row.rhs
 }
 
 // Source integer values beyond the largest exactly representable double are a useful diagnostic for

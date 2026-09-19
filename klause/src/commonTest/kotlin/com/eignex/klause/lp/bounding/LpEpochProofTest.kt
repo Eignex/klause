@@ -22,6 +22,7 @@ import com.eignex.klause.lp.engine.Relation
 import com.eignex.klause.lp.engine.Sense
 import com.eignex.klause.lp.engine.TableauCutProvenance
 import com.eignex.klause.lp.engine.VarStatus
+import com.eignex.klause.lp.engine.authoritativeModel
 import com.eignex.klause.lp.engine.integerCertify
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.lp.relaxation.CutSourceMap
@@ -333,7 +334,7 @@ class LpEpochProofTest {
                 flippedRhs = model.flippedRhs, probeClampedLo = model.probeClampedLo,
                 probeClampedHi = model.probeClampedHi, colContinuous = model.colContinuous,
                 exactState = if (changed == "exact state") {
-                    LpExactState(assertNotNull(model.trailModel()))
+                    LpExactState(assertNotNull(model.authoritativeModel()))
                 } else {
                     null
                 },

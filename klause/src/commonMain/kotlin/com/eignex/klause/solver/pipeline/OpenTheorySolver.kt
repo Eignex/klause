@@ -170,6 +170,16 @@ class OpenTheoryEngine internal constructor(
 
     /** Execute one feasibility round against the caller's solve-wide [state]. */
     internal fun solve(params: TheoryParams, state: OpenTheorySolveState): OpenTheoryResult {
+        val result = solvePrepared(params, state)
+        val stats = result.stats.copy(smt = state.smt.snapshot())
+        return when (result) {
+            is OpenTheoryResult.Sat -> result.copy(stats = stats)
+            is OpenTheoryResult.Unsat -> result.copy(stats = stats)
+            is OpenTheoryResult.Unknown -> result.copy(stats = stats)
+        }
+    }
+
+    private fun solvePrepared(params: TheoryParams, state: OpenTheorySolveState): OpenTheoryResult {
         val work = state.work
         val cancellation = Cancellation { params.timeout() || params.cancellation() }
         val stats = SolveStatsSink(backend = declaredRoute.backendName())
@@ -303,9 +313,6 @@ class OpenTheoryEngine internal constructor(
         state.capture(session)
         openTheory = state.work.snapshot()
         smt = state.smt.snapshot()
-        check(openTheory.openTheoryChecks >= smt.privateChecks) {
-            "private exact checks exceeded accepted open-theory checks"
-        }
         openTheoryClauses = state.clauses
         openHints = state.hints
         stop()

@@ -1,6 +1,6 @@
 package com.eignex.klause.lp.engine
 
-import com.eignex.klause.lp.bounding.trailModel
+import com.eignex.klause.lp.engine.authoritativeModel
 import com.eignex.klause.simplex.exact.ContinuationDecline
 import com.eignex.klause.simplex.exact.ExactContinuationLimits
 import com.eignex.klause.util.Cancellation
@@ -42,7 +42,7 @@ class LpFloatAllowanceTest {
             val x = builder.addVar(0, 4, cost = 1)
             builder.addRow(intArrayOf(x), longArrayOf(1), Relation.GE, 1)
         }
-        val source = assertNotNull(builder.build(Sense.MINIMIZE).trailModel())
+        val source = assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel())
         val state = LpExactState(source)
         RevisedSimplex(assertNotNull(state.toWorkingModel())).use { solver ->
             assertFalse(solver.resolveBounds(LpFloatAllowance(0L, 1))?.optimal == true)
@@ -98,7 +98,7 @@ class LpFloatAllowanceTest {
     fun `a warm hint and explicit allowance are rejected before preparation`() {
         val builder = LpBuilder()
         builder.addVar(0, 1)
-        val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).trailModel()))
+        val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
         LpScopedSolver(state).use { owner ->
             assertFailsWith<IllegalArgumentException> {
                 owner.solveFloat(Basis(intArrayOf(), arrayOf(VarStatus.AT_LOWER)), allowance = LpFloatAllowance(1L, 1))
@@ -117,7 +117,7 @@ class LpFloatAllowanceTest {
             val x = builder.addVar(0, 4, cost = 1)
             builder.addRow(intArrayOf(x), longArrayOf(1), Relation.GE, 0)
         }
-        val source = assertNotNull(builder.build(Sense.MINIMIZE).trailModel())
+        val source = assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel())
         val initial = LpExactState(source)
         val changed = ExactLpModel(
             List(4) { source.entries(it) },
@@ -144,7 +144,7 @@ class LpFloatAllowanceTest {
     fun `float allowances and owner replacement preserve exhausted exact consumption`() {
         val builder = LpBuilder()
         builder.addVar(0, 2)
-        val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).trailModel()))
+        val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
         val factory = object : LpEngineFactory by ProductionLpEngineFactory {
             override fun newPersistentSolver(
                 model: LpModel,

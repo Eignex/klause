@@ -7,7 +7,7 @@ import com.eignex.klause.lp.bounding.LpParams
 import com.eignex.klause.lp.bounding.LpPropagator
 import com.eignex.klause.lp.bounding.LpSearchPolicy
 import com.eignex.klause.lp.bounding.solveNode
-import com.eignex.klause.lp.bounding.trailModel
+import com.eignex.klause.lp.engine.authoritativeModel
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.util.Cancellation
@@ -37,6 +37,7 @@ class LpRootAdmissionTest {
         val model = assertNotNull(source.toWorkingModel())
         val pricing = LpPricingOptions(LpZeroObjectivePricing.LARGEST_PIVOT, 19L)
         var created = 0
+        var numericalAllowance = 0L
         val factory = object : LpEngineFactory by ProductionLpEngineFactory {
             override fun newPersistentSolver(
                 model: LpModel,
@@ -51,7 +52,8 @@ class LpRootAdmissionTest {
                 assertSame(source, model.exactState)
                 assertEquals(17, refactorUpdateLimit)
                 assertEquals(7, iterationLimit)
-                assertEquals(500L, workLimit)
+                assertTrue(workLimit in 1L until 500L)
+                numericalAllowance = workLimit
                 assertTrue(trackDegeneracy)
                 assertEquals(LpPricingOptions(LpZeroObjectivePricing.LARGEST_PIVOT, 19L), pricing)
                 return object : PersistentLpSolver {
@@ -100,6 +102,7 @@ class LpRootAdmissionTest {
             assertSame(source, owner.state)
             val result = assertNotNull(owner.solveFloat())
             assertSame(source, assertNotNull(result.second).exactState)
+            assertEquals(500L, numericalAllowance + assertNotNull(owner.metrics).preparationWork)
             assertFalse(owner.install(model, source.model, receipt))
             assertSame(source, owner.state)
         }
@@ -110,7 +113,7 @@ class LpRootAdmissionTest {
     fun `a foreign equal valued authority consumes admission and leaves current state intact`() {
         val builder = LpBuilder()
         builder.addVar(0L, 3L)
-        val source = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).trailModel()))
+        val source = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
         val model = assertNotNull(source.toWorkingModel())
         val foreign = LpExactState(source.model)
         val foreignModel = assertNotNull(foreign.toWorkingModel())
@@ -130,7 +133,7 @@ class LpRootAdmissionTest {
     fun `zero and exhausted finite limits cannot become unlimited admission`() {
         val builder = LpBuilder()
         builder.addVar(0L, 3L)
-        val source = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).trailModel()))
+        val source = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
         val model = assertNotNull(source.toWorkingModel())
 
         assertFailsWith<IllegalArgumentException> { LpRootAdmission(model, 0L, null) }
@@ -143,7 +146,7 @@ class LpRootAdmissionTest {
     fun `a missing exact model consumes the receipt`() {
         val builder = LpBuilder()
         builder.addVar(0L, 3L)
-        val source = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).trailModel()))
+        val source = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
         val model = assertNotNull(source.toWorkingModel())
         val receipt = LpRootAdmission(model, 10L, null)
 
@@ -155,7 +158,7 @@ class LpRootAdmissionTest {
     fun `per call cancellation preserves installed state and consumes the root receipt`() {
         val builder = LpBuilder()
         builder.addVar(0L, 3L)
-        val source = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).trailModel()))
+        val source = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
         val model = assertNotNull(source.toWorkingModel())
         val receipt = LpRootAdmission(model, 10L, null)
         LpEngine(
@@ -182,15 +185,49 @@ class LpRootAdmissionTest {
         val builder = LpBuilder()
         val x = builder.addVar(0L, 3L)
         repeat(4) { builder.addRow(intArrayOf(x), longArrayOf(1L), Relation.GE, 1L) }
-        val source = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).trailModel()))
+        val source = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
         val model = assertNotNull(source.toWorkingModel())
-        val receipt = LpRootAdmission(model, 2L, null)
-        LpPropagator(object : LpSearchPolicy {}).use { owner ->
+        val receipt = LpRootAdmission(model, 1001L, null)
+        var logicalWork = 0L
+        var numericalAllowance = 0L
+        val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+            override fun newPersistentSolver(
+                model: LpModel,
+                cancellation: Cancellation,
+                refactorUpdateLimit: Int,
+                iterationLimit: Int,
+                workLimit: Long,
+                trackDegeneracy: Boolean,
+                pricing: LpPricingOptions,
+            ): PersistentLpSolver {
+                numericalAllowance = workLimit
+                val delegate = ProductionLpEngineFactory.newPersistentSolver(
+                    model,
+                    cancellation,
+                    refactorUpdateLimit,
+                    iterationLimit,
+                    workLimit,
+                    trackDegeneracy,
+                    pricing,
+                )
+                return object : PersistentLpSolver by delegate {
+                    override fun prepareLogicals(token: Cancellation): Basis? {
+                        assertNotNull(delegate.prepareLogicals(token))
+                        logicalWork = delegate.lastMetrics.workOps
+                        return null
+                    }
+                }
+            }
+        }
+        LpPropagator(object : LpSearchPolicy {}, solveContext = LpSolveContext(factory)).use { owner ->
             assertTrue(owner.install(model, source.model, receipt))
 
             assertNull(owner.solveFloat())
 
-            assertTrue(owner.lastMetrics.workOps > 0L)
+            assertTrue(logicalWork > 0L)
+            assertTrue(numericalAllowance in 1L until 500L)
+            assertEquals(500L - numericalAllowance + logicalWork, owner.lastMetrics.workOps)
+            assertTrue(owner.lastMetrics.workOps <= 500L)
             assertNull(owner.state)
             assertNull(owner.solveFloat())
             assertFalse(owner.install(model, source.model, receipt))
@@ -202,10 +239,12 @@ class LpRootAdmissionTest {
         val builder = LpBuilder()
         val x = builder.addVar(0, 4, cost = 1)
         builder.addRow(intArrayOf(x), longArrayOf(1), Relation.GE, 1)
-        val source = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).trailModel()))
+        val source = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
         val model = assertNotNull(source.toWorkingModel())
         val seen = ArrayList<LpFloatAllowance?>()
         var constructions = 0
+        var numericalAllowance = 0L
+        var logicalWork = 0L
         val factory = object : LpEngineFactory by ProductionLpEngineFactory {
             override fun newPersistentSolver(
                 model: LpModel,
@@ -217,7 +256,8 @@ class LpRootAdmissionTest {
                 pricing: LpPricingOptions,
             ): PersistentLpSolver {
                 constructions++
-                assertEquals(500L, workLimit)
+                assertTrue(workLimit in 1L until 500L)
+                numericalAllowance = workLimit
                 assertEquals(7, iterationLimit)
                 val delegate = ProductionLpEngineFactory.newPersistentSolver(
                     model,
@@ -229,6 +269,8 @@ class LpRootAdmissionTest {
                     pricing,
                 )
                 return object : PersistentLpSolver by delegate {
+                    override fun prepareLogicals(token: Cancellation): Basis? =
+                        delegate.prepareLogicals(token).also { logicalWork = delegate.lastMetrics.workOps }
                     override fun resolveBounds(allowance: LpFloatAllowance?): FloatLpResult? {
                         seen.add(allowance)
                         delegate.resolveBounds(allowance)
@@ -241,6 +283,7 @@ class LpRootAdmissionTest {
         LpPropagator(object : LpSearchPolicy {}, { profile }, LpSolveContext(factory)).use { owner ->
             assertTrue(owner.install(model, source.model, LpRootAdmission(model, 1001L, 7)))
             assertNull(assertNotNull(owner.solveFloat()).second)
+            assertEquals(500L - numericalAllowance + logicalWork, assertNotNull(owner.metrics).preparationWork)
             profile = LpEffortProfile(work = 100L, iterations = 2)
 
             assertNull(assertNotNull(owner.solveFloat()).second)
@@ -257,13 +300,14 @@ class LpRootAdmissionTest {
             val builder = LpBuilder()
             val x = builder.addVar(0, 4, cost = 1)
             builder.addRow(intArrayOf(x), longArrayOf(1), Relation.GE, 1)
-            val source = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).trailModel()))
+            val source = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
             val model = assertNotNull(source.toWorkingModel())
             val cleanup = IllegalStateException("root cleanup failed")
             var cancelled = false
             var calls = 0
             var numericalWork = 0L
             var preparationWork = 0L
+            var numericalAllowance = 0L
             val factory = object : LpEngineFactory by ProductionLpEngineFactory {
                 override fun newPersistentSolver(
                     model: LpModel,
@@ -274,6 +318,7 @@ class LpRootAdmissionTest {
                     trackDegeneracy: Boolean,
                     pricing: LpPricingOptions,
                 ): PersistentLpSolver {
+                    numericalAllowance = workLimit
                     val delegate = ProductionLpEngineFactory.newPersistentSolver(
                         model,
                         cancellation,
@@ -314,7 +359,9 @@ class LpRootAdmissionTest {
                     assertNull(owner.solveFloat(token = Cancellation { cancelled }))
                 }
 
-                assertEquals(preparationWork + numericalWork, owner.lastMetrics.workOps)
+                assertTrue(numericalAllowance in 1L until 500L)
+                assertEquals(500L - numericalAllowance + preparationWork + numericalWork, owner.lastMetrics.workOps)
+                assertTrue(owner.lastMetrics.workOps <= 1001L)
                 assertTrue(owner.lastMetrics.workOps > 0L)
                 assertNull(owner.state)
                 cancelled = false
@@ -330,7 +377,7 @@ class LpRootAdmissionTest {
     fun `releasing an unattempted root owner cannot bypass admission`() {
         val builder = LpBuilder()
         builder.addVar(0, 1)
-        val source = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).trailModel()))
+        val source = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
         val model = assertNotNull(source.toWorkingModel())
         val receipt = LpRootAdmission(model, 10L, 1)
         LpPropagator(object : LpSearchPolicy {}).use { owner ->
@@ -348,7 +395,7 @@ class LpRootAdmissionTest {
     fun `epoch publication cannot replace an unattempted admitted root`() {
         val builder = LpBuilder()
         builder.addVar(0, 1)
-        val source = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).trailModel()))
+        val source = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
         val model = assertNotNull(source.toWorkingModel())
         LpPropagator(object : LpSearchPolicy {}).use { owner ->
             assertTrue(owner.install(model, source.model, LpRootAdmission(model, 10L, 1)))
