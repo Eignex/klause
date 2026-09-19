@@ -1,5 +1,9 @@
 package com.eignex.klause.lp
 
+import com.eignex.klause.lp.engine.ExactBasisMetrics
+import com.eignex.klause.lp.engine.LpCertificationPolicy
+import com.eignex.klause.lp.engine.LpCertifier
+import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.lp.engine.LpVerdict
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ExactDoubleBoundedSplit
@@ -16,6 +20,31 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class SourceLpTest {
+    @Test
+    fun `basis observations retain the source witness and cancellation spending`() {
+        val observations = ArrayList<ExactBasisMetrics>()
+        val rows = listOf(
+            ExactRationalInequality(intArrayOf(0), listOf(BigFraction.ofLong(3L)), BigFraction.ONE),
+            ExactRationalInequality(intArrayOf(0), listOf(BigFraction.ofLong(-3L)), BigFraction.MINUS_ONE),
+        )
+        val context = LpSolveContext(
+            certificationPolicy = LpCertificationPolicy { certifier, success ->
+            success && certifier == LpCertifier.EXACT_BASIS
+        }
+        )
+        val budget = SourceLpBudget(solveContext = { context }, onBasisVerification = observations::add)
+        SourceLp(rows, 1, budget).use { source ->
+            val result = assertNotNull(source.solve(Cancellation.Never))
+            assertEquals(BigFraction.ofLong(3L).reciprocal(), result.exactPrimal?.first())
+            assertTrue(observations.isNotEmpty())
+            val calls = observations.size
+            val spent = budget.reservedWork
+            assertNull(source.solve(Cancellation { true }))
+            assertEquals(calls, observations.size)
+            assertEquals(spent, budget.reservedWork)
+        }
+    }
+
     @Test
     fun `equality subset retains both source rows and omits unequal and unpaired bounds`() {
         for (strict in listOf(false, true)) {
