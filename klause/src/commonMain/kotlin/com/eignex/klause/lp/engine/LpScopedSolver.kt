@@ -258,6 +258,7 @@ internal class LpScopedSolver(
                 iterationLimit,
                 preparationWork,
                 lastMetrics,
+                onBasisVerification = context.onRefinementBasisVerification,
             ),
         )
         if (token()) return null

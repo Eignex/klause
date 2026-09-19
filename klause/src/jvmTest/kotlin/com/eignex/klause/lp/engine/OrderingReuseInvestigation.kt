@@ -56,7 +56,8 @@ internal object OrderingReuseInvestigation {
         override fun observe(certifier: LpCertifier, success: Boolean) = Unit
         override fun observeExactInput(accepted: Boolean) = Unit
         override fun observeSolve(metrics: LpSolveMetrics, component: Boolean) = Unit
-        override fun observeBasisVerification(metrics: ExactBasisMetrics) {
+        override fun observeBasisVerification(metrics: ExactBasisMetrics) = recordBasis(metrics, "direct")
+        private fun recordBasis(metrics: ExactBasisMetrics, via: String) {
             basis += metric(metrics) + mapOf(
                 "role" to role,
                 "ownerUpdatesAtObservation" to owners.map { it.updateCount },
@@ -103,7 +104,10 @@ internal object OrderingReuseInvestigation {
                 }
             }
         }
-        val context = LpSolveContext(engineFactory = factory)
+        val context = LpSolveContext(
+            engineFactory = factory,
+            onRefinementBasisVerification = { recordBasis(it, "refinement") },
+        )
     }
 
     private fun scoped(id: String, path: Path, kind: String, enabled: Boolean) {
