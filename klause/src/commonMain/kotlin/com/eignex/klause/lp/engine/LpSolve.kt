@@ -33,7 +33,13 @@ internal class LpExactSupport(
     val state: LpExactState,
     val rows: List<Pair<Int, ExactLpRow>>,
     val sides: List<LpExactCitedSide>,
-)
+    conflictMultipliers: List<BigFraction>? = null,
+) {
+    private val sourceMultipliers = conflictMultipliers?.toList()
+
+    // rho * b exceeds the upper box support of rho * M, with strict equality also contradictory.
+    val conflictMultipliers: List<BigFraction>? get() = sourceMultipliers?.toList()
+}
 
 // Exact evidence uses original coordinates and minimized objective units.
 internal class CertifiedLpResult(
@@ -610,11 +616,7 @@ internal fun certifyLpResult(
             ?: continued?.support?.takeIf { conflict === continued.conflict }
             ?: exactBasis?.conflictSupport?.takeIf { conflict === exactBasis.conflict }
             ?: reconstruction?.conflictSupport?.takeIf { conflict === reconstruction.conflict }
-            ?: conflict?.let { proof ->
-                val y = MutableList(model.m) { BigFraction.ZERO }
-                for (i in proof.rows.indices) y[proof.rows[i]] = proof.multipliers[i].negated()
-                model.exactSupport(y, objective = false)
-            },
+            ?: conflict?.let(model::exactConflictSupport),
     )
 }
 
@@ -652,6 +654,12 @@ private fun rationalLpBound(model: LpModel, duals: DoubleArray): CertifiedLpBoun
     return CertifiedLpBound(value, support = model.exactSupport(y, objective = true))
 }
 
+internal fun LpModel.exactConflictSupport(conflict: BigRationalConflict): LpExactSupport? {
+    val y = MutableList(m) { BigFraction.ZERO }
+    for (i in conflict.rows.indices) y[conflict.rows[i]] -= conflict.multipliers[i]
+    return exactSupport(y, objective = false)
+}
+
 private fun LpModel.exactSupport(multipliers: List<BigFraction>, objective: Boolean): LpExactSupport? {
     val state = exactState ?: return null
     val y = multipliers.mapIndexed { row, value ->
@@ -679,7 +687,7 @@ private fun LpModel.exactSupport(multipliers: List<BigFraction>, objective: Bool
             !y[it].isZero
         } + sides.filter { it.column >= n }.map { it.column - n }
         ).distinct().sorted()
-    return LpExactSupport(state, rows.map { it to state.model.row(it) }, sides)
+    return LpExactSupport(state, rows.map { it to state.model.row(it) }, sides, y.takeUnless { objective })
 }
 
 internal fun exactLagrangian(
