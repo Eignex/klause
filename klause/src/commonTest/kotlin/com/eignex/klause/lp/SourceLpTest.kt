@@ -1,5 +1,9 @@
 package com.eignex.klause.lp
 
+import com.eignex.klause.lp.engine.ExactBasisMetrics
+import com.eignex.klause.lp.engine.LpCertificationPolicy
+import com.eignex.klause.lp.engine.LpCertifier
+import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.lp.engine.LpVerdict
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ExactDoubleBoundedSplit
@@ -16,6 +20,72 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class SourceLpTest {
+    @Test
+    fun `scoped refinement observations reconcile with completed source work`() {
+        val observations = ArrayList<ExactBasisMetrics>()
+        val a = BigFraction.ofLong(1_000_000_007L)
+        val b = BigFraction.ofLong(1_000_000_009L)
+        val rows = listOf(
+            ExactRationalInequality(intArrayOf(0, 1), listOf(a, BigFraction.ONE), BigFraction.ONE),
+            ExactRationalInequality(
+                intArrayOf(0, 1),
+                listOf(a.negated(), BigFraction.MINUS_ONE),
+                BigFraction.MINUS_ONE,
+            ),
+            ExactRationalInequality(intArrayOf(0, 1), listOf(BigFraction.ONE, b), BigFraction.ONE),
+            ExactRationalInequality(
+                intArrayOf(0, 1),
+                listOf(BigFraction.MINUS_ONE, b.negated()),
+                BigFraction.MINUS_ONE,
+            ),
+        )
+        val context = LpSolveContext(onRefinementBasisVerification = observations::add)
+        val budget = SourceLpBudget(solveContext = { context })
+        SourceLp(rows, 2, budget).use { source ->
+            val result = assertNotNull(source.solve(Cancellation.Never))
+            val refinement = assertNotNull(result.refinement)
+
+            assertTrue(observations.isNotEmpty())
+            assertTrue(refinement.luFactories > 0)
+            assertEquals(refinement.luFactories, observations.sumOf { it.factoryCalls })
+            assertEquals(refinement.luBuilds, observations.sumOf { it.builds })
+            assertEquals(refinement.luReuse, observations.sumOf { it.reuse })
+            assertEquals(refinement.luSolves, observations.sumOf { it.solves })
+            assertEquals(refinement.luWork, observations.sumOf { it.work })
+            assertTrue(assertNotNull(result.exactPrimal).satisfiesSourceRows(rows))
+            val calls = observations.size
+            val spent = budget.reservedWork
+            assertNull(source.solve(Cancellation { true }))
+            assertEquals(calls, observations.size)
+            assertEquals(spent, budget.reservedWork)
+        }
+    }
+
+    @Test
+    fun `basis observations retain the source witness and cancellation spending`() {
+        val observations = ArrayList<ExactBasisMetrics>()
+        val rows = listOf(
+            ExactRationalInequality(intArrayOf(0), listOf(BigFraction.ofLong(3L)), BigFraction.ONE),
+            ExactRationalInequality(intArrayOf(0), listOf(BigFraction.ofLong(-3L)), BigFraction.MINUS_ONE),
+        )
+        val context = LpSolveContext(
+            certificationPolicy = LpCertificationPolicy { certifier, success ->
+                success && certifier == LpCertifier.EXACT_BASIS
+            },
+        )
+        val budget = SourceLpBudget(solveContext = { context }, onBasisVerification = observations::add)
+        SourceLp(rows, 1, budget).use { source ->
+            val result = assertNotNull(source.solve(Cancellation.Never))
+            assertEquals(BigFraction.ofLong(3L).reciprocal(), result.exactPrimal?.first())
+            assertTrue(observations.isNotEmpty())
+            val calls = observations.size
+            val spent = budget.reservedWork
+            assertNull(source.solve(Cancellation { true }))
+            assertEquals(calls, observations.size)
+            assertEquals(spent, budget.reservedWork)
+        }
+    }
+
     @Test
     fun `equality subset retains both source rows and omits unequal and unpaired bounds`() {
         for (strict in listOf(false, true)) {

@@ -99,6 +99,7 @@ internal data class LpSolveContext(
     val engineFactory: LpEngineFactory = ProductionLpEngineFactory,
     val certificationPolicy: LpCertificationPolicy = ProductionLpCertificationPolicy,
     val rootDualization: LpDualizationOptions = LpDualizationOptions(),
+    val onRefinementBasisVerification: ((ExactBasisMetrics) -> Unit)? = null,
 ) {
     companion object {
         val Production = LpSolveContext()

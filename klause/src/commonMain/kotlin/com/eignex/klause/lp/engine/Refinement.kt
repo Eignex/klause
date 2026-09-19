@@ -101,6 +101,7 @@ internal class LpRefinementRequest(
     private val sourceIterationLimit: Int = 0,
     private val preparationWork: Long = 0L,
     private val sourceSolve: LpSolveMetrics = LpSolveMetrics(),
+    val onBasisVerification: ((ExactBasisMetrics) -> Unit)? = null,
 ) {
     fun effectiveLimits(): LpRefinementLimits = limits.copy(
         maxWork = if (sourceWorkLimit > 0L) {
@@ -138,6 +139,7 @@ internal class RefinementMeter(
     val limits: LpRefinementLimits,
     private val cache: LpRefinementCache,
     private val cancellation: Cancellation,
+    private val onBasisVerification: ((ExactBasisMetrics) -> Unit)? = null,
 ) {
     private val started = TimeSource.Monotonic.markNow()
     private val initialWork = cache.work
@@ -262,6 +264,7 @@ internal class RefinementMeter(
             luReuse = metrics.luReuse + checked.reuse,
             luSolves = metrics.luSolves + checked.solves,
         )
+        onBasisVerification?.invoke(checked)
     }
 
     fun finish(reason: LpRefinementDecline?): LpRefinementMetrics {
@@ -1159,7 +1162,7 @@ internal fun refineLp(
     val state = model.exactState
     val limits = request.effectiveLimits()
     val cache = request.cache
-    val meter = RefinementMeter(limits, cache, cancellation)
+    val meter = RefinementMeter(limits, cache, cancellation, request.onBasisVerification)
     var run: RefinementRun? = null
     var reason: LpRefinementDecline? = LpRefinementDecline.FAILURE
     var metrics: LpRefinementMetrics

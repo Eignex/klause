@@ -294,6 +294,7 @@ internal class RevisedSimplex(
         val state = model.exactState
         val original = constructionState
         if (state == null || original == null) return null
+        meter.phase = ExactBasisPhase.ORDER_IDENTITY
         meter.charge(2L * state.model.keySize + numVars + 8L * m, 256L + 8L * numVars + 8L * m)
         if (authority.model.exactState !== state || !original.sameMatrix(state) ||
             !authority.headings.contentEquals(basicVar) || !basisFactorized || !trackedHeadingsConsistent()
@@ -307,6 +308,7 @@ internal class RevisedSimplex(
             return null
         }
         // Reserve the owner's snapshot, all four copy getters, translation and validation scratch.
+        meter.phase = ExactBasisPhase.ORDER_EXPORT
         meter.charge(16L * m + numVars, 768L + 48L * m + 4L * numVars)
         val order = current.ordering() ?: return null
         meter.poll()

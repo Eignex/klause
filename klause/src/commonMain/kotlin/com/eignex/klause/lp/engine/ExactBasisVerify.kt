@@ -15,7 +15,18 @@ internal data class ExactBasisLimits(
     val verification: ReconstructionLimits = ReconstructionLimits(),
 )
 
-internal enum class ExactBasisPhase { ASSEMBLY, FACTOR, PRIMAL, DUAL, RAY, VERIFICATION, PROJECTION }
+internal enum class ExactBasisPhase {
+    ASSEMBLY,
+    ORDER_IDENTITY,
+    ORDER_EXPORT,
+    ORDER_VALIDATION,
+    FACTOR,
+    PRIMAL,
+    DUAL,
+    RAY,
+    VERIFICATION,
+    PROJECTION,
+}
 internal enum class ExactBasisDecline {
     INVALID_INPUT,
     INVALID_BASIS,
@@ -85,6 +96,13 @@ internal class ExactBasisCache(private val propose: ((ExactBasisAuthority) -> Ra
     }
 
     fun proposedOrder(current: ExactBasisAuthority): RationalBasisOrder? {
+        val previousPhase = current.meter.phase
+        val order = readProposedOrder(current)
+        current.meter.phase = previousPhase
+        return order
+    }
+
+    private fun readProposedOrder(current: ExactBasisAuthority): RationalBasisOrder? {
         val provider = propose ?: return null
         val meter = current.meter
         meter.poll()
@@ -95,6 +113,7 @@ internal class ExactBasisCache(private val propose: ((ExactBasisAuthority) -> Ra
             if (meter.orderDecline == null) meter.orderDecline = ExactBasisOrderDecline.UNSUPPORTED
             return null
         }
+        meter.phase = ExactBasisPhase.ORDER_VALIDATION
         val n = current.model.m
         if (proposed.rows.size != n || proposed.columns.size != n) {
             meter.orderDecline = ExactBasisOrderDecline.INVALID

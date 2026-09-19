@@ -1,6 +1,7 @@
 package com.eignex.klause.lp
 
 import com.eignex.klause.lp.engine.CertifiedLpResult
+import com.eignex.klause.lp.engine.ExactBasisMetrics
 import com.eignex.klause.lp.engine.ExactLpBounds
 import com.eignex.klause.lp.engine.ExactLpColumn
 import com.eignex.klause.lp.engine.ExactLpEntry
@@ -34,6 +35,7 @@ internal class SourceLpBudget(
     private val maxActiveNanos: Long = 5_000_000_000L,
     private val solveContext: () -> LpSolveContext = { LpSolveContext.Production },
     private val onWork: (SourceLpWorkStats) -> Unit = {},
+    val onBasisVerification: ((ExactBasisMetrics) -> Unit)? = null,
 ) {
     val context: LpSolveContext get() = solveContext()
 
@@ -207,6 +209,9 @@ internal class SourceLp(
         override fun observe(certifier: LpCertifier, success: Boolean) = Unit
         override fun observeExactInput(accepted: Boolean) = Unit
         override fun observeSolve(metrics: LpSolveMetrics, component: Boolean) = Unit
+        override fun observeBasisVerification(metrics: ExactBasisMetrics) {
+            budget.onBasisVerification?.invoke(metrics)
+        }
         override fun observeContinuation(metrics: ExactContinuationMetrics) {
             budget.observe(continuation = metrics.work)
         }

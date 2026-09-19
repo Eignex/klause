@@ -37,6 +37,26 @@ class ExactBasisOrderingTest {
             val checked = verifyExactBasis(model, candidate.basis, cache = solver.exactBasisCache)
             val standalone = verifyExactBasis(model, candidate.basis)
 
+            val orderPhases = setOf(
+                ExactBasisPhase.ORDER_IDENTITY,
+                ExactBasisPhase.ORDER_EXPORT,
+                ExactBasisPhase.ORDER_VALIDATION,
+            )
+            for (phase in orderPhases) assertTrue(checked.metrics.operations.single { it.phase == phase }.work > 0L)
+            val cached = verifyExactBasis(model, candidate.basis, cache = solver.exactBasisCache)
+            assertEquals(1, cached.metrics.reuse)
+            assertEquals(0, cached.metrics.orderOffers)
+            assertTrue(
+                cached.metrics.operations.filter {
+                    it.phase in orderPhases
+                }.all { it.work == 0L && it.allocation == 0L },
+            )
+            assertTrue(
+                standalone.metrics.operations.filter { it.phase in orderPhases }.all {
+                    it.work == 0L &&
+                        it.allocation == 0L
+                },
+            )
             assertEquals(1, checked.metrics.orderProposals)
             assertEquals(1, checked.metrics.orderAttempts)
             assertEquals(0, checked.metrics.orderFallbacks)
