@@ -100,6 +100,7 @@ internal class LpPropagator(
     private var closed = false
     private var invalidated = false
     private var nextWitness = 0L
+    private var rowHistoryBits = 0
     private var rowHistoryAdmitted = false
     private var rowNumericalPrepared = false
     private var preparedWork = 0L
@@ -118,19 +119,23 @@ internal class LpPropagator(
 
     fun boundPremise(witness: Long): SearchAtomPremise = witnesses[witness] ?: SearchAtomPremise.Unavailable
 
-    fun rowNativeCost(captured: LpExactState): Pair<Long, Long>? {
+    fun rowNativeCost(captured: LpExactState, inputBits: Int): Pair<Long, Long>? {
         if (state !== captured || !rowHistoryAdmitted || rowNumericalPrepared || nextWitness > 1024 ||
             captured.depth > 128 || captured.model.numVars > 128 || captured.model.m > 64
         ) return null
         val cells = captured.model.n.toLong() * captured.model.m
-        val work = (nextWitness + 1) * (captured.depth + 16_641L) + cells * 32 + captured.model.numVars * 32L
+        val bits = maxOf(inputBits, rowHistoryBits)
+        if (bits !in 0..128) return null
+        val productBits = 2L * bits + 1
+        val work = (nextWitness + 1) * (captured.depth + 4 * (productBits * productBits + 2)) +
+            (cells + captured.model.numVars + captured.depth + 1) * 8 * (bits + 1)
         val allocation = 32 * (nextWitness + cells + captured.model.numVars + captured.depth + 1)
         return work to allocation
     }
 
     private fun admitRowHistory(side: ExactLpSide) {
-        rowHistoryAdmitted = rowHistoryAdmitted && side.number.value.num.bitLength() <= 128 &&
-            side.number.value.den.bitLength() <= 128 && (side.premises?.size ?: 0L) <= 128
+        rowHistoryBits = maxOf(rowHistoryBits, side.number.value.num.bitLength(), side.number.value.den.bitLength())
+        rowHistoryAdmitted = rowHistoryAdmitted && rowHistoryBits <= 128 && (side.premises?.size ?: 0L) <= 128
     }
 
     fun rowSource(key: Any): Any? = rowSourceIdentity.takeIf { modelKey === key }
@@ -221,6 +226,7 @@ internal class LpPropagator(
         rootState = initial
         modelKey = key
         rowSourceIdentity = Any()
+        rowHistoryBits = 0
         rowHistoryAdmitted = rootAdmission == null
         rowNumericalPrepared = rootAdmission != null
         sourcePremises = LpSourcePremises(key)

@@ -40,7 +40,16 @@ internal class ExactRowPropagation(limits: RowPropagationLimits = RowPropagation
     private var owner: LpPropagator? = null
     private var seen: LpExactState? = null
     private var seenEpoch: Any? = null
-    private var reservedNativeCost: Pair<Long, Long>? = null
+    private data class NativeReservation(
+        val state: LpExactState,
+        val epoch: Any,
+        val context: SearchContext,
+        val decision: SearchDecision,
+        val cost: Pair<Long, Long>,
+        val bits: Int,
+    )
+    private var reservation: NativeReservation? = null
+    private var nativeBits = 0
     var passes = 0L
         private set
     var published = 0L
@@ -57,12 +66,13 @@ internal class ExactRowPropagation(limits: RowPropagationLimits = RowPropagation
     override fun isPublished(decision: SearchDecision, context: SearchContext): Boolean = reasons.known(decision, context)
 
     override fun prepareAssertion(lp: LpPropagator, decision: SearchDecision, context: SearchContext): Boolean {
-        val current = lp.state ?: return false
-        val cost = lp.rowNativeCost(current) ?: return false
-        val reserved = reservedNativeCost ?: return false
-        reservedNativeCost = null
-        return owner === lp && isPublished(decision, context) && !context.cancelled() &&
-            cost.first <= reserved.first && cost.second <= reserved.second
+        val reserved = reservation ?: return false
+        reservation = null
+        if (owner !== lp || reserved.context !== context || reserved.decision != decision ||
+            !lp.rowPublicationCurrent(reserved.state, context, reserved.epoch)
+        ) return false
+        val cost = lp.rowNativeCost(reserved.state, reserved.bits) ?: return false
+        return cost.first <= reserved.cost.first && cost.second <= reserved.cost.second
     }
 
     override fun propagate(lp: LpPropagator, context: SearchContext): RowPropagationResult {
@@ -89,9 +99,15 @@ internal class ExactRowPropagation(limits: RowPropagationLimits = RowPropagation
             }
             reasonDeclines++
         }
+        if (pass.implications.isNotEmpty() && !admitNativeModel(state)) {
+            mappingDeclines += pass.implications.size
+            return stopped(context)
+        }
         for (candidate in pass.implications) {
             if (!budget.input(candidate.side.number.value) || !budget.charge(2048, 2048)) break
-            val nativeCost = lp.rowNativeCost(state)
+            val candidateBits = maxOf(nativeBits, candidate.side.number.value.num.bitLength(),
+                candidate.side.number.value.den.bitLength())
+            val nativeCost = lp.rowNativeCost(state, candidateBits)
             if (nativeCost == null) {
                 mappingDeclines++
                 continue
@@ -117,7 +133,7 @@ internal class ExactRowPropagation(limits: RowPropagationLimits = RowPropagation
                 continue
             }
             if (!budget.charge(nativeCost.first, nativeCost.second)) break
-            reservedNativeCost = nativeCost
+            reservation = NativeReservation(state, epoch, context, decision, nativeCost, candidateBits)
             if (!lp.rowPublicationCurrent(state, context, epoch)) return RowPropagationResult.Indeterminate
             val result = context.imply(literal, explanation)
             if (result is ComponentResult.Conflict) {
@@ -130,6 +146,28 @@ internal class ExactRowPropagation(limits: RowPropagationLimits = RowPropagation
             return RowPropagationResult.Published
         }
         return stopped(context)
+    }
+
+    private fun admitNativeModel(state: LpExactState): Boolean {
+        val model = state.baseModel
+        nativeBits = 0
+        fun admit(value: BigFraction): Boolean {
+            nativeBits = maxOf(nativeBits, value.num.bitLength(), value.den.bitLength())
+            return budget.input(value)
+        }
+        if (!budget.charge(model.n.toLong() * model.m + model.numVars, model.n.toLong() * model.m)) return false
+        for (column in 0 until model.numVars) {
+            val value = model.column(column)
+            if (!admit(value.origin.value) || !admit(model.objective.cost(column).value)) return false
+            value.bounds.lower?.let { if ((it.premises?.size ?: 0L) > 128 || !admit(it.number.value)) return false }
+            value.bounds.upper?.let { if ((it.premises?.size ?: 0L) > 128 || !admit(it.number.value)) return false }
+            if (column < model.n && model.entries(column).any { !admit(it.number.value) }) return false
+        }
+        for (row in 0 until model.m) {
+            if ((model.row(row).premises?.size ?: 0L) > 128 || !admit(model.rhs(row).value)) return false
+        }
+        return admit(model.objective.constant.value) && admit(model.objective.scale.value) &&
+            admit(model.objective.externalConstant.value)
     }
 
     private fun stopped(context: SearchContext): RowPropagationResult = if (context.cancelled() || budget.cancellation()) {
@@ -185,22 +223,27 @@ internal class ExactRowPropagation(limits: RowPropagationLimits = RowPropagation
         val upper = MutableList(model.numVars) { bound(it, true) }
         for (column in lower.indices) {
             if (!budget.input(model.column(column).origin.value)) return null
-            for (side in listOfNotNull(lower[column], upper[column])) {
-                if (!budget.input(side.side.number.value)) return null
-            }
+            lower[column]?.let { if (!budget.input(it.side.number.value)) return null }
+            upper[column]?.let { if (!budget.input(it.side.number.value)) return null }
         }
         var changed: Boolean
         do {
             changed = false
             for (row in equations) {
-                for (minimum in listOf(true, false)) {
+                for (direction in 0..1) {
+                    val minimum = direction == 0
                     if (!budget.charge(row.terms.size.toLong())) return finish(lower, upper)
-                    val missing = row.terms.filter {
-                        selected(it, minimum, lower, upper) == null
+                    var missing = -1
+                    var missingCount = 0
+                    for (term in row.terms) {
+                        if (selected(term, minimum, lower, upper) == null) {
+                            missing = term.column
+                            missingCount++
+                        }
                     }
-                    if (missing.size > 1) continue
+                    if (missingCount > 1) continue
                     for (target in row.terms) {
-                        if (missing.size == 1 && target.column != missing.single().column) continue
+                        if (missingCount == 1 && target.column != missing) continue
                         val candidate = derive(row, target, minimum, lower, upper) ?: continue
                         val isUpper = minimum == (target.coefficient.signum() > 0)
                         var side = candidate.side
