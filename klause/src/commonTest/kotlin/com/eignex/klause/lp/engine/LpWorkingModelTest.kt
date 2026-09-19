@@ -178,6 +178,8 @@ class LpWorkingModelTest {
         val primary = IllegalStateException("body")
         val cleanup = IllegalStateException("close")
         var created = 0
+        val allowances = ArrayList<Long>()
+        val logicalWork = ArrayList<Long>()
         val factory = object : LpEngineFactory by ProductionLpEngineFactory {
             override fun newPersistentSolver(
                 model: LpModel,
@@ -191,9 +193,12 @@ class LpWorkingModelTest {
                 val working = ++created == 2
                 assertEquals(17L, pricing.tieSeed)
                 assertEquals(LpZeroObjectivePricing.LARGEST_PIVOT, pricing.zeroObjective)
-                assertEquals(1_000_000L, workLimit)
+                assertTrue(workLimit in 1L until 1_000_000L)
+                allowances += workLimit
                 val delegate = RevisedSimplex(model, cancellation, pricing = pricing, reuseRationalOrder = false)
                 return object : PersistentLpSolver by delegate {
+                    override fun prepareLogicals(token: Cancellation): Basis? =
+                        delegate.prepareLogicals(token).also { logicalWork += delegate.lastMetrics.workOps }
                     override fun close() {
                         delegate.close()
                         if (working) throw cleanup
@@ -208,6 +213,7 @@ class LpWorkingModelTest {
             pricing = LpPricingOptions(LpZeroObjectivePricing.LARGEST_PIVOT, 17L),
         ).use { owner ->
             assertNotNull(owner.solve())
+            assertEquals(1_000_000L - allowances[0] + logicalWork[0], owner.metrics.preparationWork)
             val failure = assertFailsWith<IllegalStateException> {
                 owner.withWorkingModel(LpWorkingModel.overrides(source)) { scope ->
                     assertNotNull(scope.solve())
@@ -216,7 +222,9 @@ class LpWorkingModelTest {
             }
             assertSame(primary, failure)
             assertSame(cleanup, failure.suppressedExceptions.single())
-            assertEquals(1L, assertNotNull(owner.lastWorkingMetrics).owners.closedOwners)
+            val metrics = assertNotNull(owner.lastWorkingMetrics).owners
+            assertEquals(1_000_000L - allowances[1] + logicalWork[1], metrics.preparationWork)
+            assertEquals(1L, metrics.closedOwners)
             assertEquals(1L, owner.lastWorkingMetrics?.attempts)
             assertEquals(BigFraction.ZERO, assertNotNull(owner.solve()).lowerBound)
         }

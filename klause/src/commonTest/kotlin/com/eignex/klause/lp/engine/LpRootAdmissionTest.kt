@@ -37,6 +37,7 @@ class LpRootAdmissionTest {
         val model = assertNotNull(source.toWorkingModel())
         val pricing = LpPricingOptions(LpZeroObjectivePricing.LARGEST_PIVOT, 19L)
         var created = 0
+        var numericalAllowance = 0L
         val factory = object : LpEngineFactory by ProductionLpEngineFactory {
             override fun newPersistentSolver(
                 model: LpModel,
@@ -51,7 +52,8 @@ class LpRootAdmissionTest {
                 assertSame(source, model.exactState)
                 assertEquals(17, refactorUpdateLimit)
                 assertEquals(7, iterationLimit)
-                assertEquals(500L, workLimit)
+                assertTrue(workLimit in 1L until 500L)
+                numericalAllowance = workLimit
                 assertTrue(trackDegeneracy)
                 assertEquals(LpPricingOptions(LpZeroObjectivePricing.LARGEST_PIVOT, 19L), pricing)
                 return object : PersistentLpSolver {
@@ -100,6 +102,7 @@ class LpRootAdmissionTest {
             assertSame(source, owner.state)
             val result = assertNotNull(owner.solveFloat())
             assertSame(source, assertNotNull(result.second).exactState)
+            assertEquals(500L, numericalAllowance + assertNotNull(owner.metrics).preparationWork)
             assertFalse(owner.install(model, source.model, receipt))
             assertSame(source, owner.state)
         }
@@ -184,13 +187,47 @@ class LpRootAdmissionTest {
         repeat(4) { builder.addRow(intArrayOf(x), longArrayOf(1L), Relation.GE, 1L) }
         val source = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
         val model = assertNotNull(source.toWorkingModel())
-        val receipt = LpRootAdmission(model, 2L, null)
-        LpPropagator(object : LpSearchPolicy {}).use { owner ->
+        val receipt = LpRootAdmission(model, 1001L, null)
+        var logicalWork = 0L
+        var numericalAllowance = 0L
+        val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+            override fun newPersistentSolver(
+                model: LpModel,
+                cancellation: Cancellation,
+                refactorUpdateLimit: Int,
+                iterationLimit: Int,
+                workLimit: Long,
+                trackDegeneracy: Boolean,
+                pricing: LpPricingOptions,
+            ): PersistentLpSolver {
+                numericalAllowance = workLimit
+                val delegate = ProductionLpEngineFactory.newPersistentSolver(
+                    model,
+                    cancellation,
+                    refactorUpdateLimit,
+                    iterationLimit,
+                    workLimit,
+                    trackDegeneracy,
+                    pricing,
+                )
+                return object : PersistentLpSolver by delegate {
+                    override fun prepareLogicals(token: Cancellation): Basis? {
+                        assertNotNull(delegate.prepareLogicals(token))
+                        logicalWork = delegate.lastMetrics.workOps
+                        return null
+                    }
+                }
+            }
+        }
+        LpPropagator(object : LpSearchPolicy {}, solveContext = LpSolveContext(factory)).use { owner ->
             assertTrue(owner.install(model, source.model, receipt))
 
             assertNull(owner.solveFloat())
 
-            assertTrue(owner.lastMetrics.workOps > 0L)
+            assertTrue(logicalWork > 0L)
+            assertTrue(numericalAllowance in 1L until 500L)
+            assertEquals(500L - numericalAllowance + logicalWork, owner.lastMetrics.workOps)
+            assertTrue(owner.lastMetrics.workOps <= 500L)
             assertNull(owner.state)
             assertNull(owner.solveFloat())
             assertFalse(owner.install(model, source.model, receipt))
@@ -206,6 +243,8 @@ class LpRootAdmissionTest {
         val model = assertNotNull(source.toWorkingModel())
         val seen = ArrayList<LpFloatAllowance?>()
         var constructions = 0
+        var numericalAllowance = 0L
+        var logicalWork = 0L
         val factory = object : LpEngineFactory by ProductionLpEngineFactory {
             override fun newPersistentSolver(
                 model: LpModel,
@@ -217,7 +256,8 @@ class LpRootAdmissionTest {
                 pricing: LpPricingOptions,
             ): PersistentLpSolver {
                 constructions++
-                assertEquals(500L, workLimit)
+                assertTrue(workLimit in 1L until 500L)
+                numericalAllowance = workLimit
                 assertEquals(7, iterationLimit)
                 val delegate = ProductionLpEngineFactory.newPersistentSolver(
                     model,
@@ -229,6 +269,8 @@ class LpRootAdmissionTest {
                     pricing,
                 )
                 return object : PersistentLpSolver by delegate {
+                    override fun prepareLogicals(token: Cancellation): Basis? =
+                        delegate.prepareLogicals(token).also { logicalWork = delegate.lastMetrics.workOps }
                     override fun resolveBounds(allowance: LpFloatAllowance?): FloatLpResult? {
                         seen.add(allowance)
                         delegate.resolveBounds(allowance)
@@ -241,6 +283,7 @@ class LpRootAdmissionTest {
         LpPropagator(object : LpSearchPolicy {}, { profile }, LpSolveContext(factory)).use { owner ->
             assertTrue(owner.install(model, source.model, LpRootAdmission(model, 1001L, 7)))
             assertNull(assertNotNull(owner.solveFloat()).second)
+            assertEquals(500L - numericalAllowance + logicalWork, assertNotNull(owner.metrics).preparationWork)
             profile = LpEffortProfile(work = 100L, iterations = 2)
 
             assertNull(assertNotNull(owner.solveFloat()).second)
@@ -264,6 +307,7 @@ class LpRootAdmissionTest {
             var calls = 0
             var numericalWork = 0L
             var preparationWork = 0L
+            var numericalAllowance = 0L
             val factory = object : LpEngineFactory by ProductionLpEngineFactory {
                 override fun newPersistentSolver(
                     model: LpModel,
@@ -274,6 +318,7 @@ class LpRootAdmissionTest {
                     trackDegeneracy: Boolean,
                     pricing: LpPricingOptions,
                 ): PersistentLpSolver {
+                    numericalAllowance = workLimit
                     val delegate = ProductionLpEngineFactory.newPersistentSolver(
                         model,
                         cancellation,
@@ -314,7 +359,9 @@ class LpRootAdmissionTest {
                     assertNull(owner.solveFloat(token = Cancellation { cancelled }))
                 }
 
-                assertEquals(preparationWork + numericalWork, owner.lastMetrics.workOps)
+                assertTrue(numericalAllowance in 1L until 500L)
+                assertEquals(500L - numericalAllowance + preparationWork + numericalWork, owner.lastMetrics.workOps)
+                assertTrue(owner.lastMetrics.workOps <= 1001L)
                 assertTrue(owner.lastMetrics.workOps > 0L)
                 assertNull(owner.state)
                 cancelled = false

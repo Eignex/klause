@@ -10095,8 +10095,8 @@ public final class com/eignex/klause/solver/result/SearchStats {
 
 public final class com/eignex/klause/solver/result/SmtStats {
 	public fun <init> ()V
-	public fun <init> (JJJJJJJJJJJJJJJJJJJJJJJJJJJLcom/eignex/klause/solver/result/LpContinuationStats;)V
-	public synthetic fun <init> (JJJJJJJJJJJJJJJJJJJJJJJJJJJLcom/eignex/klause/solver/result/LpContinuationStats;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (JJJJJJJJJJJJJJJLcom/eignex/klause/solver/result/LpContinuationStats;Lcom/eignex/klause/solver/result/SourceLpWorkStats;)V
+	public synthetic fun <init> (JJJJJJJJJJJJJJJLcom/eignex/klause/solver/result/LpContinuationStats;Lcom/eignex/klause/solver/result/SourceLpWorkStats;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()J
 	public final fun component10 ()J
 	public final fun component11 ()J
@@ -10104,20 +10104,9 @@ public final class com/eignex/klause/solver/result/SmtStats {
 	public final fun component13 ()J
 	public final fun component14 ()J
 	public final fun component15 ()J
-	public final fun component16 ()J
-	public final fun component17 ()J
-	public final fun component18 ()J
-	public final fun component19 ()J
+	public final fun component16 ()Lcom/eignex/klause/solver/result/LpContinuationStats;
+	public final fun component17 ()Lcom/eignex/klause/solver/result/SourceLpWorkStats;
 	public final fun component2 ()J
-	public final fun component20 ()J
-	public final fun component21 ()J
-	public final fun component22 ()J
-	public final fun component23 ()J
-	public final fun component24 ()J
-	public final fun component25 ()J
-	public final fun component26 ()J
-	public final fun component27 ()J
-	public final fun component28 ()Lcom/eignex/klause/solver/result/LpContinuationStats;
 	public final fun component3 ()J
 	public final fun component4 ()J
 	public final fun component5 ()J
@@ -10125,30 +10114,19 @@ public final class com/eignex/klause/solver/result/SmtStats {
 	public final fun component7 ()J
 	public final fun component8 ()J
 	public final fun component9 ()J
-	public final fun copy (JJJJJJJJJJJJJJJJJJJJJJJJJJJLcom/eignex/klause/solver/result/LpContinuationStats;)Lcom/eignex/klause/solver/result/SmtStats;
-	public static synthetic fun copy$default (Lcom/eignex/klause/solver/result/SmtStats;JJJJJJJJJJJJJJJJJJJJJJJJJJJLcom/eignex/klause/solver/result/LpContinuationStats;ILjava/lang/Object;)Lcom/eignex/klause/solver/result/SmtStats;
+	public final fun copy (JJJJJJJJJJJJJJJLcom/eignex/klause/solver/result/LpContinuationStats;Lcom/eignex/klause/solver/result/SourceLpWorkStats;)Lcom/eignex/klause/solver/result/SmtStats;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/result/SmtStats;JJJJJJJJJJJJJJJLcom/eignex/klause/solver/result/LpContinuationStats;Lcom/eignex/klause/solver/result/SourceLpWorkStats;ILjava/lang/Object;)Lcom/eignex/klause/solver/result/SmtStats;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getConflictLiterals ()J
 	public final fun getConflicts ()J
 	public final fun getContinuation ()Lcom/eignex/klause/solver/result/LpContinuationStats;
-	public final fun getEscalationNs ()J
 	public final fun getExplainedConflicts ()J
-	public final fun getFrac128Accepted ()J
-	public final fun getFrac128Attempts ()J
-	public final fun getFrac128Eligible ()J
-	public final fun getFrac128Escalations ()J
-	public final fun getFrac128InputEscalations ()J
-	public final fun getFrac128OverflowEscalations ()J
-	public final fun getPrivateChecks ()J
 	public final fun getReductionAccepted ()J
 	public final fun getReductionCacheHits ()J
 	public final fun getReductionDeclined ()J
 	public final fun getReductionNs ()J
 	public final fun getReductionRequests ()J
-	public final fun getSimplexAccepted ()J
-	public final fun getSimplexAttempts ()J
-	public final fun getSimplexDeclined ()J
-	public final fun getSimplexNs ()J
+	public final fun getSourceLp ()Lcom/eignex/klause/solver/result/SourceLpWorkStats;
 	public final fun getStrictWitnessAccepted ()J
 	public final fun getStrictWitnessCandidates ()J
 	public final fun getUnexplainedConflicts ()J
@@ -10198,6 +10176,34 @@ public final class com/eignex/klause/solver/result/SolveStats {
 
 public final class com/eignex/klause/solver/result/SolveStats$Companion {
 	public final fun getEMPTY ()Lcom/eignex/klause/solver/result/SolveStats;
+}
+
+public final class com/eignex/klause/solver/result/SourceLpWorkStats {
+	public fun <init> ()V
+	public fun <init> (JJJJJJJJ)V
+	public synthetic fun <init> (JJJJJJJJILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()J
+	public final fun component2 ()J
+	public final fun component3 ()J
+	public final fun component4 ()J
+	public final fun component5 ()J
+	public final fun component6 ()J
+	public final fun component7 ()J
+	public final fun component8 ()J
+	public final fun copy (JJJJJJJJ)Lcom/eignex/klause/solver/result/SourceLpWorkStats;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/result/SourceLpWorkStats;JJJJJJJJILjava/lang/Object;)Lcom/eignex/klause/solver/result/SourceLpWorkStats;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getActiveNs ()J
+	public final fun getContinuationWork ()J
+	public final fun getFloatWork ()J
+	public final fun getModeledAllocation ()J
+	public final fun getModeledWork ()J
+	public final fun getOperations ()J
+	public final fun getPreparationWork ()J
+	public final fun getRefinementWork ()J
+	public fun hashCode ()I
+	public final fun mergedWith (Lcom/eignex/klause/solver/result/SourceLpWorkStats;)Lcom/eignex/klause/solver/result/SourceLpWorkStats;
+	public fun toString ()Ljava/lang/String;
 }
 
 public final class com/eignex/klause/solver/result/TerminationReason : java/lang/Enum {
@@ -11384,12 +11390,6 @@ public final class com/eignex/klause/theory/qflra/ExactLiraSearchComponent : com
 	public fun retract (I)V
 }
 
-public final class com/eignex/klause/theory/qflra/ExactLiraSolver : com/eignex/klause/theory/Theory {
-	public fun <init> (Lcom/eignex/klause/ir/Problem;)V
-	public fun check ([ZLcom/eignex/klause/theory/TheoryContext;)Lcom/eignex/klause/theory/TheoryCheck;
-	public fun getModel ()Lcom/eignex/klause/ir/Problem;
-}
-
 public final class com/eignex/klause/theory/qflra/ExactLraAssignment {
 	public fun <init> ([ZLjava/util/List;)V
 	public final fun component1 ()[Z
@@ -11401,12 +11401,6 @@ public final class com/eignex/klause/theory/qflra/ExactLraAssignment {
 	public final fun getReals ()Ljava/util/List;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
-}
-
-public final class com/eignex/klause/theory/qflra/ExactLraSolver : com/eignex/klause/theory/Theory {
-	public fun <init> (Lcom/eignex/klause/ir/Problem;)V
-	public fun check ([ZLcom/eignex/klause/theory/TheoryContext;)Lcom/eignex/klause/theory/TheoryCheck;
-	public fun getModel ()Lcom/eignex/klause/ir/Problem;
 }
 
 public final class com/eignex/klause/theory/qflra/SourceBoundAtom : com/eignex/klause/solver/search/SearchTheoryDecision {

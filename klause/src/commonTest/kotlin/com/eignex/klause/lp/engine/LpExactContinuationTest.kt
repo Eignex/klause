@@ -129,7 +129,32 @@ class LpExactContinuationTest {
             ExactLpObjective(listOf(zero, zero)),
         )
         val state = LpExactState(source)
-        LpScopedSolver(state, workLimit = 1L).use { owner ->
+        val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+            override fun newPersistentSolver(
+                model: LpModel,
+                cancellation: Cancellation,
+                refactorUpdateLimit: Int,
+                iterationLimit: Int,
+                workLimit: Long,
+                trackDegeneracy: Boolean,
+                pricing: LpPricingOptions,
+            ): PersistentLpSolver {
+                val delegate = ProductionLpEngineFactory.newPersistentSolver(
+                    model,
+                    cancellation,
+                    refactorUpdateLimit,
+                    iterationLimit,
+                    workLimit,
+                    trackDegeneracy,
+                    pricing,
+                )
+                return object : PersistentLpSolver by delegate {
+                    override fun resolveBounds(allowance: LpFloatAllowance?): FloatLpResult? =
+                        delegate.resolveBounds(LpFloatAllowance(1L, 1024))
+                }
+            }
+        }
+        LpScopedSolver(state, context = LpSolveContext(factory), workLimit = 10_000L).use { owner ->
             val result = assertNotNull(owner.solve())
 
             assertEquals(BigFraction.ONE, assertNotNull(result.witness).primal[0])

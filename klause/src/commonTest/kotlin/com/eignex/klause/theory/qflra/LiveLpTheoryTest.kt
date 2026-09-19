@@ -79,8 +79,8 @@ class LiveLpTheoryTest {
             lateinit var state: OpenTheorySolveState
             val params = TheoryParams(
                 cancellation = Cancellation {
-                cancelAfterWork && state.smt.snapshot().sourceLp.operations > 0L
-            }
+                    cancelAfterWork && state.smt.snapshot().sourceLp.operations > 0L
+                },
             )
             state = OpenTheorySolveState(params)
             val engine = OpenTheoryEngine(model, ProblemPipeline.EXACT_LIRA)

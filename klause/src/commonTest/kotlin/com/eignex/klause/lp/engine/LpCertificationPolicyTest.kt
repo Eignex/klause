@@ -10,6 +10,8 @@ import com.eignex.klause.lp.relaxation.leafRealFeasibility
 import com.eignex.klause.solver.Sample
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertIs
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -75,12 +77,17 @@ class LpCertificationPolicyTest {
         builder.addRow(intArrayOf(y), longArrayOf(1L), Relation.GE, 2L)
         val policy = RecordingCertificationPolicy(accept = false)
 
-        val result = solveAndCertify(
-            builder.build(Sense.MINIMIZE),
-            context = LpSolveContext(certificationPolicy = policy),
-        )
+        val model = builder.build(Sense.MINIMIZE)
+        val result = assertIs<ComponentLpSolver>(newLpSolver(model)).use { solver ->
+            val raw = assertNotNull(solver.solve())
+            val accepted = certifyLpResult(model, solver, raw)
+            assertEquals(LpVerdict.ATTAINED_OPTIMUM, accepted.verdict)
+            certifyLpResult(model, solver, raw, policy = policy)
+        }
 
         assertEquals(LpVerdict.INDETERMINATE, result.verdict)
+        assertNull(result.bound)
+        assertNull(result.witness)
         assertTrue(policy.attempts.count { it.first == LpCertifier.INTEGER } >= 2)
     }
 

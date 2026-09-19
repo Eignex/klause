@@ -115,6 +115,23 @@ internal class SourceLpBudget(
         additional: List<List<ExactRationalInequality>> = emptyList(),
         rhs: List<BigFraction> = emptyList(),
         block: (Cancellation) -> T?,
+    ): T? = runAdmitted(rows, variables, cancellation, additional, rhs, false, block)
+
+    fun <T> runPairing(
+        rows: List<ExactRationalInequality>,
+        variables: Int,
+        cancellation: Cancellation,
+        block: (Cancellation) -> T?,
+    ): T? = runAdmitted(rows, variables, cancellation, emptyList(), emptyList(), true, block)
+
+    private fun <T> runAdmitted(
+        rows: List<ExactRationalInequality>,
+        variables: Int,
+        cancellation: Cancellation,
+        additional: List<List<ExactRationalInequality>>,
+        rhs: List<BigFraction>,
+        pairing: Boolean,
+        block: (Cancellation) -> T?,
     ): T? {
         if (cancellation() || activeNanos >= maxActiveNanos || operations >= maxOperations) return null
         operations++
@@ -148,11 +165,15 @@ internal class SourceLpBudget(
                 }
             }
             if (rhs.any { !admit(it) }) return null
-            val width = bits + 4096L * (variables + rowCount) + 64L
-            val visits = 32L * (entries + variables + rowCount * 2L + 1L)
+            val width = if (pairing) 4L * bits + 64L else bits + 4096L * (variables + rowCount) + 64L
+            val visits = 32L * if (pairing) {
+                entries + rowCount * entries + rowCount * rowCount + variables + 1L
+            } else {
+                entries + variables + rowCount * 2L + 1L
+            }
             val words = (width + 63L) / 64L
-            val work = 400_000_000L + visits * words * words
-            val allocation = 1_073_741_824L + visits * (64L + 16L * width)
+            val work = (if (pairing) 0L else 400_000_000L) + visits * words * words
+            val allocation = (if (pairing) 0L else 1_073_741_824L) + visits * (64L + 16L * width)
             if (work > 1_000_000_000_000L || allocation > 2_147_483_648L) return null
             reservedWork += work
             reservedAllocation += allocation
@@ -410,6 +431,61 @@ internal fun List<BigFraction>.satisfiesSourceRows(
     if (row.strict) value < row.rhs else value <= row.rhs
 }
 
+internal fun sourceEqualityRows(
+    rows: List<ExactRationalInequality>,
+    variables: Int,
+    budget: SourceLpBudget,
+    cancellation: Cancellation,
+): List<ExactRationalInequality>? = budget.runPairing(rows, variables, cancellation) { token ->
+    val paired = pairedSourceLowerBounds(rows, token) ?: return@runPairing null
+    val selected = BooleanArray(rows.size)
+    for (index in rows.indices) {
+        if (token()) return@runPairing null
+        if (paired.lower[index] != rows[index].rhs) continue
+        selected[index] = true
+        paired.opposite[index].takeIf { it >= 0 }?.let { selected[it] = true }
+    }
+    rows.filterIndexed { index, _ -> selected[index] }
+}
+
+private class SourcePairedBounds(val lower: List<BigFraction?>, val opposite: IntArray)
+
+private fun pairedSourceLowerBounds(rows: List<ExactRationalInequality>, token: Cancellation): SourcePairedBounds? {
+    val scales = rows.map { row ->
+        if (token()) return null
+        row.coefficients.firstOrNull { !it.isZero }?.let { if (it < BigFraction.ZERO) it.negated() else it }
+    }
+    val directions = rows.mapIndexed { index, row ->
+        if (token()) return null
+        val inverse = scales[index]?.reciprocal() ?: BigFraction.ONE
+        row.columns.indices.filter { !row.coefficients[it].isZero }.map {
+            row.columns[it] to row.coefficients[it] * inverse
+        }
+    }
+    val upperByDirection = HashMap<List<Pair<Int, BigFraction>>, Pair<BigFraction, Int>>()
+    for (index in rows.indices) {
+        if (token()) return null
+        val upper = rows[index].rhs * (scales[index]?.reciprocal() ?: BigFraction.ONE)
+        val key = directions[index]
+        val previous = upperByDirection[key]
+        if (previous == null || upper < previous.first) upperByDirection[key] = upper to index
+    }
+    val oppositeRows = IntArray(rows.size) { -1 }
+    val lower = rows.indices.map { index ->
+        if (token()) return null
+        if (scales[index] == null) {
+            BigFraction.ZERO
+        } else {
+            val opposite = directions[index].map { it.first to it.second.negated() }
+            upperByDirection[opposite]?.let {
+                oppositeRows[index] = it.second
+                it.first.negated() * checkNotNull(scales[index])
+            }
+        }
+    }
+    return SourcePairedBounds(lower, oppositeRows)
+}
+
 internal fun sourceDoubleBoundedSplit(
     rows: List<ExactRationalInequality>,
     variables: Int,
@@ -417,12 +493,20 @@ internal fun sourceDoubleBoundedSplit(
     cancellation: Cancellation,
 ): ExactDoubleBoundedSplit {
     return budget.run(rows, variables, cancellation) { token ->
+        val pairedLower = pairedSourceLowerBounds(rows, token) ?: return@run ExactDoubleBoundedSplit.Unknown
         val homogeneous = rows.map { ExactRationalInequality(it.columns, it.coefficients, BigFraction.ZERO) }
         SourceLp(homogeneous, variables, budget, cone = true).use { cone ->
             SourceLp(rows, variables, budget).use { source ->
                 val bounded = ArrayList<ExactDoubleBoundedRow>()
                 val unbounded = ArrayList<Int>()
                 for (index in rows.indices) {
+                    if (token()) return@run ExactDoubleBoundedSplit.Unknown
+                    val impliedLower = pairedLower.lower[index]
+                    if (impliedLower != null) {
+                        if (impliedLower > rows[index].rhs) return@run ExactDoubleBoundedSplit.Unknown
+                        bounded += ExactDoubleBoundedRow(index, rows[index], impliedLower)
+                        continue
+                    }
                     val direction = cone.solve(token, activity = index) ?: return@run ExactDoubleBoundedSplit.Unknown
                     val activity = direction.witness?.objective
                     if (activity != null && activity < BigFraction.ZERO) {

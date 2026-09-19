@@ -36,7 +36,7 @@ class LpReplayTest {
                         Basis(intArrayOf(1), arrayOf(VarStatus.AT_LOWER, VarStatus.BASIC))
                     }
                     override fun solve(warm: Basis?): FloatLpResult? {
-                        event++;
+                        event++
                         return null
                     }
                     override fun solvePrimal(warm: Basis?): FloatLpResult? = solve(warm)
@@ -117,7 +117,7 @@ class LpReplayTest {
                         return result
                     }
                     override fun close() {
-                        closed++;
+                        closed++
                         delegate.close()
                     }
                 }

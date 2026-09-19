@@ -100,8 +100,8 @@ private fun Problem.admitsDirectionPreparation(token: Cancellation): Boolean {
                             constants.exactBound.asFraction(),
                         )
                     ) {
-                            return false
-                        }
+                        return false
+                    }
                     for (index in 0 until row.size) {
                         val coefficient = constants.exactCoeff(index)
                         if (coefficient.bitLength() > 4096 || !admit(coefficient.asFraction())) return false

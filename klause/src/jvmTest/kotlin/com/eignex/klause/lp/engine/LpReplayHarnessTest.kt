@@ -87,7 +87,7 @@ class LpReplayHarnessTest {
     }
 
     @Test
-    fun `unattained strict infimum validates only the feasible witness`() {
+    fun `unattained strict infimum keeps the persistent bound and general witness separate`() {
         val model = LpBuilder().apply {
             val x = addRealVar(0.0, 1.0, cost = 1.0)
             addRealRow(intArrayOf(x), doubleArrayOf(1.0), Relation.GE, 0.0, strict = true)
@@ -99,13 +99,31 @@ class LpReplayHarnessTest {
             componentSplit = false,
         )
 
-        val step = LpReplay.replay(
-            LpCapture.capture(model, settings, listOf(LpReplayEvent.Solve())),
-            IndependentExactValidator,
-        ).steps.single()
+        for (kind in listOf(LpReplaySolverKind.PERSISTENT, LpReplaySolverKind.GENERAL)) {
+            val step = LpReplay.replay(
+                LpCapture.capture(
+                    model,
+                    LpReplaySettings(settings.label, settings.seed, solverKind = kind, componentSplit = false),
+                    listOf(LpReplayEvent.Solve()),
+                ),
+                IndependentExactValidator,
+            ).steps.single()
 
-        assertEquals(LpIndependentValidation.VALIDATED, step.independentCheck.validation)
-        assertEquals(LpIndependentClaim.FEASIBLE_WITNESS, step.independentCheck.claim)
+            assertEquals(LpIndependentValidation.VALIDATED, step.independentCheck.validation)
+            assertEquals(BigFraction.ZERO, step.rationalLowerBound)
+            assertEquals(
+                if (kind == LpReplaySolverKind.PERSISTENT) LpVerdict.CERTIFIED_BOUND else LpVerdict.FEASIBLE,
+                step.productionVerdict,
+            )
+            assertEquals(
+                if (kind == LpReplaySolverKind.PERSISTENT) {
+                    LpIndependentClaim.CERTIFIED_BOUND
+                } else {
+                    LpIndependentClaim.FEASIBLE_WITNESS
+                },
+                step.independentCheck.claim,
+            )
+        }
     }
 
     @Test

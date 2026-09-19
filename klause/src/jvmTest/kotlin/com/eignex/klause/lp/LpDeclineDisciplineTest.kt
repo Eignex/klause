@@ -22,10 +22,6 @@ import com.eignex.klause.lp.bounding.rootLpBoundsNoBake
 import com.eignex.klause.lp.bounding.rootLpInfeasibleNoBake
 import com.eignex.klause.lp.bounding.rootLpRelaxationBound
 import com.eignex.klause.lp.bounding.sparseCertifiedPrune
-import com.eignex.klause.lp.engine.LpReplay
-import com.eignex.klause.lp.engine.LpCapture
-import com.eignex.klause.lp.engine.LpReplayEvent
-import com.eignex.klause.lp.engine.LpReplaySettings
 import com.eignex.klause.lp.engine.Basis
 import com.eignex.klause.lp.engine.CertifiedLpBound
 import com.eignex.klause.lp.engine.ComponentLpSolverCapability
@@ -33,6 +29,7 @@ import com.eignex.klause.lp.engine.Cut
 import com.eignex.klause.lp.engine.ExactLpWitness
 import com.eignex.klause.lp.engine.FloatLpResult
 import com.eignex.klause.lp.engine.LpBuilder
+import com.eignex.klause.lp.engine.LpCapture
 import com.eignex.klause.lp.engine.LpCertificationObserver
 import com.eignex.klause.lp.engine.LpCertificationPolicy
 import com.eignex.klause.lp.engine.LpCertifier
@@ -42,6 +39,9 @@ import com.eignex.klause.lp.engine.LpFloatAllowance
 import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.LpNeighborhood
 import com.eignex.klause.lp.engine.LpPricingOptions
+import com.eignex.klause.lp.engine.LpReplay
+import com.eignex.klause.lp.engine.LpReplayEvent
+import com.eignex.klause.lp.engine.LpReplaySettings
 import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.lp.engine.LpSolver
 import com.eignex.klause.lp.engine.LpVerdict
@@ -375,7 +375,9 @@ class LpDeclineDisciplineTest {
         val harness = harness()
 
         val capture = LpCapture.capture(
-            model, LpReplaySettings("component-decline", 570L), listOf(LpReplayEvent.Solve()),
+            model,
+            LpReplaySettings("component-decline", 570L),
+            listOf(LpReplayEvent.Solve()),
         )
         val declined = LpReplay.replay(capture, context = harness.context).steps.single()
 
