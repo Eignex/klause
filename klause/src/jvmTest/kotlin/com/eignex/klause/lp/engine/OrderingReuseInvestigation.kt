@@ -60,6 +60,7 @@ internal object OrderingReuseInvestigation {
         private fun recordBasis(metrics: ExactBasisMetrics, via: String) {
             basis += metric(metrics) + mapOf(
                 "role" to role,
+                "via" to via,
                 "ownerUpdatesAtObservation" to owners.map { it.updateCount },
             )
         }
