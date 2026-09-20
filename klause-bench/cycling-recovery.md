@@ -1,10 +1,12 @@
 # Cycling recovery decision
 
-Defer repeated-state detection. The experiment fails its frozen overhead gate and finds no source
-activation. Production simplex, pricing, defaults, certification and accounting remain unchanged;
-no disabled mechanism is retained. New tests cover existing primal stall recovery from cold/objective
-warm starts, exact basis certification, iteration/work limits and cancellation.
+Wave 8 final decision at `17671663b`: retire the always-on repeated-state detector proposal;
+keep selective recovery deferred. The experiment failed its overhead gate and found no source
+activation. Current production retains ordinary stall Bland and numerical safeguards, with no
+optional detector. Existing tests cover cold/objective-warm stall recovery, exact basis certification,
+iteration/work limits and cancellation. See the [final retention contract](lp-retention.md).
 
+The measurements below describe the original 7.3 experiment; no new run or performance claim is made.
 Base: `d39c302c65572dd2da7952d579ef77bd9676635f` (#2017, including #2015).
 Evidence: `/home/rasmus/Workspaces/lp-evidence/session-7.3/`. `contract.md`, `contract-review.md` and
 `observer-review.md` retain independent Astra/high review. `observer.patch`,
@@ -71,7 +73,16 @@ FIFO history is bounded by 32 snapshots/65,536 Int cells, with charged scans/cop
 eviction, capacity, work and scan/copy cancellation. Tiny trace logging is separate evidence overhead.
 Generic saturation and actual numerical-retry integration remain unestablished.
 
-No revisit-triggered recovery policy was implemented. Revival requires reviewed numerical eligibility,
-revision/lifecycle and resource contracts, plus representative benefit or verified primal and dual
-cycle recovery while passing the unchanged cost/proof gates. Minimum-index dual entering must stay
-inside ratio-test admissibility. Floating tolerances do not inherit Bland's exact termination theorem.
+No revisit-triggered recovery policy was implemented. Revival requires a representative expensive
+stall/cycle that existing recovery does not handle economically and a selective activation hypothesis;
+a cheaper observer alone is insufficient. Freeze numerical eligibility, complete basis/status/revision
+identity, bounded history and charged scan/copy/poll costs. Demonstrate benefit against existing stall
+behavior or verified uncovered primal/dual recovery while preserving the original cost/proof gates,
+including the separate cancellation-bound loss. Minimum-index dual entering must remain ratio-test
+admissible. Floating tolerances do not inherit Bland's exact termination theorem.
+
+The live [RevisedSimplexCyclingTest](../klause/src/commonTest/kotlin/com/eignex/klause/lp/engine/RevisedSimplexCyclingTest.kt)
+retains `stall recovery reaches the source optimum from cold and objective warm starts`,
+`cyclic primal pivots cannot replenish the iteration allowance`, `cyclic primal refactors share the
+work allowance`, and `cancellation during a primal cycle withholds the exact state`. These establish
+existing recovery contracts, not benefit for an unimplemented selective policy.

@@ -1,9 +1,10 @@
 # Rational ordering reuse: B6c investigation
 
-Retain the explicitly enabled default pending Wave 8's reviewed decision. The measured priority is to
-reduce the cost of declining updated bases; this session makes no tuning or default change. Natural
-eligible calls are scarce, ordering overhead exceeds factor savings in this cohort, and representative
-full-search performance acceptance remains inconclusive.
+Wave 8 final decision: keep rational ordering reuse ON. Early updated-owner rejection is implemented
+in [B #2024](https://github.com/Eignex/klause/pull/2024), included in audited base `17671663b`.
+The B6c measurements below retain their historical implementation and costs. Natural eligible calls
+were scarce and ordering overhead exceeded factor savings; broader full-search acceptance remains
+unestablished. See the [final retention contract](lp-retention.md).
 
 ## Reproduction and scope
 
@@ -148,15 +149,31 @@ reconciled smoke probe justified one corrected campaign on the unchanged workloa
 not a repeat to improve timing. The inherited 5.7 decimal SMT rendering issue and the disputed 6.2 raw
 internal rebind diagnostic remain separate; neither is repaired or used as passing evidence here.
 
-## Wave 8 disposition
+## Implemented Wave 8 disposition
 
-Keep ON under the user's existing policy; do not treat these timings as adoption evidence. The
-specific measured tuning candidate is checking cheap updated-owner ineligibility before reserving
-full identity validation, under a separate mathematical/lifecycle contract. Do not weaken exact
-identity/permutation validation for eligible orders. Duplicate export copies and cache permutation
-checks are measurable but small here; removing their ownership checks is unsupported. Exporting an
-order from an FT-updated basis would require a new soundness contract and representative evidence.
+Keep ON under the user's existing policy. B moved the scalar updated-owner availability check ahead
+of full identity traversal/reservation in `RevisedSimplex.proposedRationalOrder`. An updated owner
+returns an unavailable hint with no proposals/attempts; UPDATED can precede STALE without granting
+identity or proof authority. Eligible hints retain full matrix/headings/permutation validation and
+modeled charges; empty models never refund work. Standalone exact ordering, overflow/fallback,
+source verification and cumulative budgets remain. Poll positions are not instruction-identical.
 
-Wave 8 should consume this attribution and its unresolved frontend/source-validation coverage,
-not repeat this matrix. Any restriction/default change needs its own reviewed decision. No blanket
-throughput, final basis-performance, full-search adoption or physical-allocation claim is established.
+The [B handoff](/home/rasmus/Workspaces/lp-evidence/session-8.2-b/handoff.md) records one bounded
+existing-fixture comparison: updated provider identity 80 work/280 modeled bytes → 1/0; complete
+verification 682→603 work and 24,037→23,757 modeled bytes. The fresh eligible fixture remains
+1,362 work/81,528 modeled bytes, with exact source witness/bound preserved. These are modeled
+reservations for unit-fixture verification, not physical memory, full-ladder or consumer speed gains.
+No B6c campaign was repeated and its adverse/unsupported/inactive records remain unchanged.
+
+Live [ExactBasisOrderingTest](../klause/src/commonTest/kotlin/com/eignex/klause/lp/engine/ExactBasisOrderingTest.kt)
+checks `accepted live updates decline ordering while exact witnesses remain available`,
+`updated owner unavailability precedes foreign authority and heading diagnostics`,
+`rebuilding an updated owner restores fully checked ordering eligibility`,
+`updated rejection spends the same finite budget as later exact factorization`,
+`cancellation during updated availability prevents exact result publication`, and
+`zero row ordering admission never refunds work`.
+
+Eligible overhead remains, as do B6c's frontend/source-validation limits. Duplicate export copies and
+permutation checks were small in that cohort; deleting ownership checks is unsupported. Export from
+an updated basis needs a separate soundness contract and representative evidence. No blanket
+throughput, basis-performance, full-search or physical-allocation claim follows from this decision.
