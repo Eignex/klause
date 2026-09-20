@@ -2,6 +2,7 @@ package com.eignex.klause.portfolio
 
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
+import com.eignex.klause.backtrack.UnresolvedRealLeafFixture
 import com.eignex.klause.backtrack.selector.IndomainMax
 import com.eignex.klause.backtrack.selector.IndomainMiddle
 import com.eignex.klause.backtrack.selector.InputOrder
@@ -18,6 +19,7 @@ import com.eignex.klause.localsearch.LocalSearchSolver
 import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.lp.bounding.LpEmphasis
 import com.eignex.klause.lp.bounding.LpTechnique
+import com.eignex.klause.lp.engine.LpCertifier
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.objective.LinearObjective
@@ -37,6 +39,48 @@ import kotlin.time.TimeSource
 
 @OptIn(ExperimentalAtomicApi::class)
 class PortfolioTest {
+    @Test
+    fun `parallel real unresolved arms cannot prove infeasibility or optimality`() {
+        for (withIncumbent in listOf(false, true)) {
+            val fixtures = List(2) { UnresolvedRealLeafFixture(withIncumbent) }
+            val workers = fixtures.mapIndexed { index, fixture ->
+                PortfolioWorker.of(
+                    "real#$index", index, fixture.solver.session(), fixture.params, objective = fixture.objective,
+                    withBound = { p, bound -> p.copy(objectiveBoundSupplier = bound) },
+                )
+            }
+            Portfolio(workers).use { portfolio ->
+                var offers = 0
+                val result = portfolio.minimize { offers++ }
+                if (withIncumbent) {
+                    fixtures.first().assertIncumbent(assertIs<MinimizeResult.BestFound>(result).sample)
+                    assertEquals(1, offers)
+                } else {
+                    assertIs<MinimizeResult.Unknown>(result)
+                    assertEquals(0, offers)
+                }
+                fixtures.forEach { it.assertVisitedLeaves() }
+            }
+        }
+    }
+
+    @Test
+    fun `verified nonoptimal real point reaches the parallel incumbent once`() {
+        val fixture = UnresolvedRealLeafFixture(false)
+        fixture.acceptProof = { _, certifier -> certifier == LpCertifier.EXACT_POINT }
+        val worker = PortfolioWorker.of(
+            "point", 0, fixture.solver.session(), fixture.params, objective = fixture.objective,
+            withBound = { p, bound -> p.copy(objectiveBoundSupplier = bound) },
+        )
+        Portfolio(listOf(worker)).use { portfolio ->
+            var offers = 0
+            val result = assertIs<MinimizeResult.BestFound>(portfolio.minimize { offers++ })
+            assertEquals(0.5, result.sample.reals.single())
+            assertEquals(1, offers)
+            fixture.assertVisitedLeaves()
+        }
+    }
+
 
     @Test
     fun `both backtrack palettes spread lp-intensity arms`() {

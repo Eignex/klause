@@ -260,6 +260,9 @@ sealed interface SearchModelDisposition {
 
     /** Exclude this model according to [SearchModelContinuation] and keep traversing. */
     data object Continue : SearchModelDisposition
+
+    /** Stop without excluding a model whose feasibility or required proof remains unresolved. */
+    data object Indeterminate : SearchModelDisposition
 }
 
 /** Selects whether a shared run expands the current node. */

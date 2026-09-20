@@ -2,6 +2,8 @@ package com.eignex.klause.portfolio
 
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
+import com.eignex.klause.backtrack.UnresolvedRealLeafFixture
+import com.eignex.klause.backtrack.selector.IndomainMax
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.bool.Clause
@@ -12,6 +14,9 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.localsearch.LocalSearchSolver
+import com.eignex.klause.lp.engine.LpCertificationPolicy
+import com.eignex.klause.lp.engine.LpCertifier
+import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.ResumableOptimizer
 import com.eignex.klause.solver.ResumableSearch
@@ -22,10 +27,13 @@ import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.Cancellation
+import com.eignex.kumulant.bandit.UnivariateBandit
+import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
+import kotlin.test.assertTrue
 
 private class TrackingResumableSearch(
     private val result: MinimizeResult?,
@@ -85,6 +93,160 @@ private fun trackingWorker(label: String, armId: Int, handle: ResumableSearch): 
 )
 
 class SequentialPortfolioTest {
+    @Test
+    fun `real unresolved arms terminate without claiming complete coverage`() {
+        for (withIncumbent in listOf(false, true)) {
+            val fixtures = List(2) { UnresolvedRealLeafFixture(withIncumbent) }
+            val workers = fixtures.mapIndexed { index, fixture ->
+                PortfolioWorker.of(
+                    "real#$index", index, fixture.solver.session(), fixture.params, objective = fixture.objective,
+                    withBound = { p, bound -> p.copy(objectiveBoundSupplier = bound) },
+                )
+            }
+            var polls = 0
+            SequentialPortfolio.exp3(workers).use { portfolio ->
+                val offered = ArrayList<Double>()
+                val result = portfolio.minimize(Cancellation { ++polls > 100_000 }) { offered += requireNotNull(it.result.objectiveValue) }
+                assertTrue(polls < 100_000, "completed arms must terminate without cancellation")
+                if (withIncumbent) {
+                    fixtures.first().assertIncumbent(assertIs<MinimizeResult.BestFound>(result).sample)
+                    assertEquals(listOf(1.0), offered)
+                } else {
+                    assertIs<MinimizeResult.Unknown>(result)
+                    assertTrue(offered.isEmpty())
+                }
+                fixtures.forEach { it.assertVisitedLeaves() }
+            }
+        }
+    }
+
+    @Test
+    fun `an exact real arm can prove the optimum after an unresolved arm retires`() {
+        val fixtures = List(2) { UnresolvedRealLeafFixture(false) }
+        fixtures.last().acceptProof = { _, _ -> true }
+        val workers = fixtures.mapIndexed { index, fixture ->
+            PortfolioWorker.of(
+                "real#$index", index, fixture.solver.session(), fixture.params, objective = fixture.objective,
+                withBound = { p, bound -> p.copy(objectiveBoundSupplier = bound) },
+            )
+        }
+        SequentialPortfolio.exp3(workers).use { portfolio ->
+            val result = assertIs<MinimizeResult.Optimal>(portfolio.minimize())
+            assertEquals(0.5, result.sample.reals.single())
+            fixtures.forEach { it.assertVisitedLeaves() }
+        }
+    }
+
+    @Test
+    fun `a verified nonoptimal real point reaches the sequential incumbent`() {
+        val fixture = UnresolvedRealLeafFixture(false)
+        fixture.acceptProof = { _, certifier -> certifier == LpCertifier.EXACT_POINT }
+        val worker = PortfolioWorker.of(
+            "point", 0, fixture.solver.session(), fixture.params, objective = fixture.objective,
+            withBound = { p, bound -> p.copy(objectiveBoundSupplier = bound) },
+        )
+        SequentialPortfolio.exp3(listOf(worker)).use { portfolio ->
+            var offers = 0
+            val result = assertIs<MinimizeResult.BestFound>(portfolio.minimize { offers++ })
+            assertEquals(0.5, result.sample.reals.single())
+            assertEquals(1, offers)
+            fixture.assertVisitedLeaves()
+        }
+    }
+
+    @Test
+    fun `retired arm is not reopened when bandit keeps selecting it`() {
+        var dirtyRuns = 0
+        var activeRuns = 0
+        val dirty = TrackingResumableSearch(MinimizeResult.Unknown(TerminationReason.Unsupported), onRun = { dirtyRuns++ })
+        val sample = Sample(BooleanArray(0), LongArray(0))
+        val active = object : ResumableSearch {
+            var closed = 0
+            override val stats: SolveStats get() = SolveStats.EMPTY
+            override val isDone: Boolean get() = activeRuns == 2
+            override fun runSlice(global: Cancellation, sliceMillis: Long, sliceNodes: Long,
+                onIncumbent: (MinimizeResult.WithSample) -> Unit): MinimizeResult? {
+                activeRuns++
+                return if (activeRuns == 1) null else MinimizeResult.Optimal(sample, 0.0)
+            }
+            override fun close() { closed++ }
+        }
+        val bandit = object : UnivariateBandit {
+            override val nbrArms = 2
+            override val random = Random(0)
+            override fun choose() = 0
+            override fun update(armIndex: Int, value: Double, weight: Double) = Unit
+            override fun reset() = Unit
+        }
+        val portfolio = SequentialPortfolio(
+            listOf(trackingWorker("dirty", 0, dirty), trackingWorker("active", 1, active)), bandit,
+        )
+        var polls = 0
+        assertIs<MinimizeResult.Optimal>(portfolio.minimize(Cancellation { ++polls > 20 }))
+        assertEquals(1, dirtyRuns)
+        assertEquals(2, activeRuns)
+        assertEquals(1, dirty.closes)
+        assertEquals(1, active.closed)
+    }
+
+    @Test
+    fun `failed resumable arm is closed without rescheduling`() {
+        var runs = 0
+        val failed = TrackingResumableSearch(null, onRun = { runs++; error("run failure") })
+        var polls = 0
+        val portfolio = SequentialPortfolio.exp3(listOf(trackingWorker("failed", 0, failed)))
+        assertIs<MinimizeResult.Unknown>(portfolio.minimize(Cancellation { ++polls > 20 }))
+        assertEquals(1, runs)
+        assertEquals(1, failed.closes)
+    }
+
+    @Test
+    fun `unresolved leaf is not shared as a conflict with a fresh arm`() {
+        val fixture = UnresolvedRealLeafFixture(true)
+        val problem = Problem(
+            0, 1, arrayOf(IntDomain(0L, 2L)),
+            arrayOf(Linear(longArrayOf(1L), intArrayOf(0), doubleArrayOf(2.0), intArrayOf(0), LinearOp.EQ, 3L)),
+            numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.5),
+        ).bake()
+        val pool = SharedClausePool()
+        var declined = false
+        val donor = BacktrackSolver(problem, LpSolveContext(
+            fixture.factory,
+            object : LpCertificationPolicy {
+                override fun accepts(certifier: LpCertifier, successful: Boolean): Boolean {
+                    declined = true
+                    return false
+                }
+            },
+        ))
+        donor.resumable(fixture.objective, fixture.params.copy(
+            valueSelector = IndomainMax,
+            lubyRestartBase = 1L,
+            clauseExchange = PoolClauseExchange(pool),
+            objectiveBoundSupplier = { Double.POSITIVE_INFINITY },
+        )).use { search ->
+            val result = assertIs<MinimizeResult.Unknown>(search.runSlice(Cancellation { declined }, 1000L, 256L) {})
+            assertEquals(TerminationReason.Unsupported, result.reason)
+            assertTrue(search.isDone)
+        }
+        assertTrue(declined)
+        assertEquals(1, fixture.opened)
+        assertEquals(fixture.opened, fixture.closed)
+        assertTrue(pool.drainSince(0L).clauses.isEmpty())
+        val worker = PortfolioWorker.of(
+            "fresh", 0, BacktrackSolver(problem).session(),
+            fixture.params.copy(clauseExchange = PoolClauseExchange(pool)),
+            objective = fixture.objective,
+            withBound = { p, bound -> p.copy(objectiveBoundSupplier = bound) },
+        )
+        SequentialPortfolio.exp3(listOf(worker)).use { portfolio ->
+            val result = assertIs<MinimizeResult.Optimal>(portfolio.minimize())
+            assertEquals(0.5, result.objectiveValue)
+            assertEquals(2L, result.sample.ints.single())
+            assertEquals(3.0, result.sample.ints.single() + 2.0 * result.sample.reals.single())
+        }
+    }
+
 
     @Test
     fun `terminal arm closes a paused sibling handle`() {
