@@ -1088,4 +1088,75 @@ class LpSolveTest {
         assertNull(result.witness)
         assertEquals(listOf(LpCertifier.RATIONAL to false), attempts)
     }
+
+    @Test
+    fun `upper only structural and ranged logical costs retain objective units and origin`() {
+        val one = ExactLpNumber.of(1L)
+        val source = LpExactState(
+            ExactLpModel(
+                listOf(listOf(ExactLpEntry(0, one))),
+                listOf(ExactLpNumber.of(5L)),
+                listOf(
+                    ExactLpColumn(
+                        ExactLpBounds(upper = ExactLpSide(ExactLpNumber.of(4L))),
+                        origin = ExactLpNumber.of(10L),
+                        integral = false,
+                    ),
+                    ExactLpColumn(ExactLpBounds(ExactLpSide(one), ExactLpSide(ExactLpNumber.of(3L))), integral = false),
+                ),
+                listOf(ExactLpRow()),
+                ExactLpObjective(
+                    listOf(ExactLpNumber.of(-3L), ExactLpNumber.of(2L)),
+                    ExactLpNumber.of(7L),
+                    ExactLpNumber.of(2L),
+                    ExactLpNumber.of(5L),
+                    Sense.MAXIMIZE,
+                ),
+            ),
+        )
+        val result = solveAndCertify(source.model)
+
+        assertEquals(LpVerdict.ATTAINED_OPTIMUM, result.verdict)
+        assertEquals(listOf(BigFraction.ofLong(14L)), result.exactPrimal)
+        val x = assertNotNull(result.exactPrimal).single() - BigFraction.ofLong(10L)
+        val slack = BigFraction.ofLong(5L) - x
+        assertTrue(x <= BigFraction.ofLong(4L))
+        assertTrue(slack >= BigFraction.ONE && slack <= BigFraction.ofLong(3L))
+        val value = (
+            BigFraction.ofLong(
+                -3L,
+            ) * x + BigFraction.ofLong(
+                2L,
+            ) * slack + BigFraction.ofLong(7L)
+            ) * BigFraction.ofLong(2L).reciprocal() + BigFraction.ofLong(5L)
+        assertEquals(value, result.lowerBound)
+        assertEquals(BigFraction.ofLong(7L) * BigFraction.ofLong(2L).reciprocal(), value)
+    }
+
+    @Test
+    fun `tall source roots certify the exact optimum with cold and explicit warm starts`() {
+        for (warmStart in listOf(false, true)) {
+            val builder = LpBuilder()
+            val x = builder.addVar(0L, 8L, cost = 2L)
+            repeat(10) { builder.addRow(intArrayOf(x), longArrayOf(1L), Relation.GE, 3L) }
+            val model = assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel())
+            val warm = if (warmStart) {
+                ExactLpBasis(listOf(0) + (2..10).toList(), List(11) {
+                    if (it == 1) ExactLpStatus.AT_LOWER else ExactLpStatus.BASIC
+                })
+            } else {
+                null
+            }
+
+            val result = solveAndCertify(model, warm)
+
+            assertEquals(LpVerdict.ATTAINED_OPTIMUM, result.verdict)
+            val point = assertNotNull(result.exactPrimal).single()
+            assertTrue(point >= BigFraction.ofLong(3L) && point <= BigFraction.ofLong(8L))
+            assertEquals(BigFraction.ofLong(3L), point)
+            assertEquals(BigFraction.ofLong(2L) * point, result.witness?.objective)
+            assertEquals(BigFraction.ofLong(6L), result.lowerBound)
+            assertEquals(warmStart, assertNotNull(result.float).warmStarted)
+        }
+    }
 }

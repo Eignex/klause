@@ -16,7 +16,6 @@ import com.eignex.klause.lp.engine.LpExactState
 import com.eignex.klause.lp.engine.LpExactSupport
 import com.eignex.klause.lp.engine.LpFloatAllowance
 import com.eignex.klause.lp.engine.LpPricingOptions
-import com.eignex.klause.lp.engine.LpRootAdmission
 import com.eignex.klause.lp.engine.LpScopedMetrics
 import com.eignex.klause.lp.engine.LpScopedRow
 import com.eignex.klause.lp.engine.LpScopedRows
@@ -91,7 +90,6 @@ internal class LpPropagator(
     private var preparedWork = 0L
     private var preparedRefactors = 0L
     private var solved = false
-    private var pendingRootAdmission = false
     private val witnesses = HashMap<Long, SearchAtomPremise>()
     var sourcePremises: LpSourcePremises? = null
         private set
@@ -147,14 +145,12 @@ internal class LpPropagator(
         )
     }
 
-    fun install(key: Any, model: ExactLpModel, rootAdmission: LpRootAdmission? = null): Boolean {
-        val admitted = if (rootAdmission != null) rootAdmission.claim(key, model) ?: return false else null
+    fun install(key: Any, model: ExactLpModel): Boolean {
         if (closed || cancellation()) return false
-        if (modelKey === key && owner != null) return rootAdmission == null
+        if (modelKey === key && owner != null) return true
         reset()
-        val initial = admitted ?: LpExactState(model)
-        owner = newOwner(initial, rootAdmission)
-        pendingRootAdmission = rootAdmission != null
+        val initial = LpExactState(model)
+        owner = newOwner(initial)
         rootState = initial
         modelKey = key
         sourcePremises = LpSourcePremises(key)
@@ -173,7 +169,7 @@ internal class LpPropagator(
         publish: () -> Unit,
     ): Boolean {
         lastEpochMetrics = LpSolveMetrics()
-        if (closed || pendingRootAdmission || token() || (owner?.state?.depth ?: 0) != 0 ||
+        if (closed || token() || (owner?.state?.depth ?: 0) != 0 ||
             (preserveSourcePremises && modelKey !== key)
         ) {
             return false
@@ -217,7 +213,6 @@ internal class LpPropagator(
                 witnesses.clear()
                 nextWitness = 0L
                 solved = true
-                pendingRootAdmission = false
                 invalidated = false
                 preparedWork = candidate.metrics.preparationWork
                 preparedRefactors = candidate.metrics.preparationRefactorizations
@@ -275,17 +270,8 @@ internal class LpPropagator(
         return result.toMap()
     }
 
-    private fun newOwner(initial: LpExactState, rootAdmission: LpRootAdmission? = null): LpScopedSolver {
-        val ordinary = effort()
-        // Initial admission prepares logicals and solves in two separately metered invocations.
-        val profile = if (rootAdmission == null) {
-            ordinary
-        } else {
-            ordinary.copy(
-                work = rootAdmission.workLimit?.div(2L) ?: 0L,
-                iterations = rootAdmission.iterationLimit ?: 0,
-            )
-        }
+    private fun newOwner(initial: LpExactState): LpScopedSolver {
+        val profile = effort()
         return LpScopedSolver(
             initial,
             cancellation,
@@ -370,23 +356,10 @@ internal class LpPropagator(
     fun deactivate(row: Long): Boolean = owner?.deactivate(row) == true
 
     fun solveFloat(warm: Basis? = null, token: Cancellation = cancellation): Pair<LpSolver, FloatLpResult?>? {
-        val admitted = pendingRootAdmission
-        val result = solveOwned { current ->
-            val allowance = if (solved && !admitted) effort().let { LpFloatAllowance(it.work, it.iterations) } else null
+        return solveOwned { current ->
+            val allowance = if (solved) effort().let { LpFloatAllowance(it.work, it.iterations) } else null
             current.solveFloat(if (solved) null else warm, token, allowance).also { solved = true }
         }
-        if (admitted) {
-            pendingRootAdmission = false
-            if (result == null) {
-                val recorded = lastMetrics
-                try {
-                    invalidate()
-                } finally {
-                    lastMetrics = recorded
-                }
-            }
-        }
-        return result
     }
 
     fun solve(token: Cancellation = cancellation): CertifiedLpResult? = solveOwned {
@@ -517,10 +490,6 @@ internal class LpPropagator(
     override fun onRestart(context: SearchContext) = policy.restart(context)
 
     fun releaseSolver() {
-        if (pendingRootAdmission) {
-            invalidate()
-            return
-        }
         val current = owner ?: return
         val retained = current.state
         owner = null
@@ -543,7 +512,6 @@ internal class LpPropagator(
         sourcePremises = null
         witnesses.clear()
         solved = false
-        pendingRootAdmission = false
         nextWitness = 0L
         preparedWork = 0L
         preparedRefactors = 0L
