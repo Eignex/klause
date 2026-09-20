@@ -929,7 +929,9 @@ internal class ResumableMinimize(
             return when {
                 // Blocking an unresolved leaf would let its nogood escape as a proved shared conflict.
                 sawIndeterminateLeaf -> SearchModelDisposition.Indeterminate
+
                 incumbent == null -> SearchModelDisposition.Continue
+
                 else -> SearchModelDisposition.Surface
             }
         }
