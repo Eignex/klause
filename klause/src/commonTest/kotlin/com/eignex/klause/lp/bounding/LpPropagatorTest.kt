@@ -1,5 +1,9 @@
 package com.eignex.klause.lp.bounding
 
+import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.engine.Basis
 import com.eignex.klause.lp.engine.ExactLpBounds
 import com.eignex.klause.lp.engine.ExactLpColumn
@@ -26,13 +30,18 @@ import com.eignex.klause.lp.engine.Relation
 import com.eignex.klause.lp.engine.RevisedSimplex
 import com.eignex.klause.lp.engine.Sense
 import com.eignex.klause.lp.engine.authoritativeModel
+import com.eignex.klause.lp.relaxation.CpToLpRelaxation
+import com.eignex.klause.lp.relaxation.RootDomains
+import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.simplex.basis.BasisArithmeticException
 import com.eignex.klause.simplex.basis.BasisSolver
 import com.eignex.klause.simplex.basis.IndexedVector
 import com.eignex.klause.simplex.basis.KotlinBasisSolver
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ExactContinuationLimits
+import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.LpStatsSink
+import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.solver.search.SearchAtomRegistry
 import com.eignex.klause.solver.search.SearchContext
@@ -49,6 +58,79 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class LpPropagatorTest {
+    @Test
+    fun `continuous CP rows decline the legacy bound adapter without changing domains`() {
+        val problem = Problem(
+            0,
+            1,
+            arrayOf(IntDomain(0, 4)),
+            arrayOf(
+                Linear(intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0), doubleArrayOf(0.5), LinearOp.GE, 1.0),
+            ),
+            numRealVars = 1,
+            realLower = doubleArrayOf(-2.0),
+            realUpper = doubleArrayOf(2.0),
+        )
+        val objective = LinearObjective(intCoefficients = longArrayOf(1))
+        val relaxation = CpToLpRelaxation(problem, objective).build(RootDomains(problem))
+        val session = PropagationSession(problem)
+        val domain = session.intDomain(0)
+        val stats = SolveStatsSink(backend = "mixed-adapter")
+        LpEngine(problem, objective, LpParams(), stats).use { engine ->
+            assertNull(engine.cpAdapter.relaxation(relaxation, session))
+            assertEquals(domain, session.intDomain(0))
+            assertTrue(relaxation.colRealId.any { it == 0 })
+        }
+    }
+
+    @Test
+    fun `ordinary owners use the current retained invocation allowance`() {
+        val builder = LpBuilder()
+        val x = builder.addVar(0, 4, cost = 1)
+        builder.addRow(intArrayOf(x), longArrayOf(1), Relation.GE, 1)
+        val source = assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel())
+        val seen = ArrayList<LpFloatAllowance?>()
+        val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+            override fun newPersistentSolver(
+                model: LpModel,
+                cancellation: Cancellation,
+                refactorUpdateLimit: Int,
+                iterationLimit: Int,
+                workLimit: Long,
+                trackDegeneracy: Boolean,
+                pricing: LpPricingOptions,
+            ): PersistentLpSolver {
+                val delegate = ProductionLpEngineFactory.newPersistentSolver(
+                    model,
+                    cancellation,
+                    refactorUpdateLimit,
+                    iterationLimit,
+                    workLimit,
+                    trackDegeneracy,
+                    pricing,
+                )
+                return object : PersistentLpSolver by delegate {
+                    override fun resolveBounds(allowance: LpFloatAllowance?): FloatLpResult? {
+                        seen.add(allowance)
+                        return delegate.resolveBounds(allowance)
+                    }
+                }
+            }
+        }
+        var effort = LpEffortProfile(work = 10_000L, iterations = 100)
+        LpPropagator(object : LpSearchPolicy {}, { effort }, LpSolveContext(factory)).use { lp ->
+            assertTrue(lp.install(Any(), source))
+            assertNotNull(lp.solveFloat())
+            effort = LpEffortProfile(work = 5000L, iterations = 30)
+            assertNotNull(lp.solveFloat())
+            effort = LpEffortProfile(work = 100L, iterations = 2)
+
+            assertNotNull(lp.solveFloat())
+
+            assertEquals(listOf(null, LpFloatAllowance(5000L, 30), LpFloatAllowance(100L, 2)), seen)
+        }
+    }
+
     @Test
     fun `raising live effort resumes exact state and records only new work`() {
         val zero = ExactLpNumber.of(0L)

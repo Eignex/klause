@@ -1,15 +1,12 @@
 package com.eignex.klause.lp.cut
 
-import com.eignex.klause.lp.bounding.LpEpochProof
 import com.eignex.klause.lp.engine.Cut
 import com.eignex.klause.lp.engine.CutAuxiliaryDefinition
 import com.eignex.klause.lp.engine.CutExpression
-import com.eignex.klause.lp.engine.CutLatticeResult
 import com.eignex.klause.lp.engine.CutPremise
 import com.eignex.klause.lp.engine.CutProofFact
 import com.eignex.klause.lp.engine.CutProvenance
 import com.eignex.klause.lp.engine.CutRoundingRule
-import com.eignex.klause.lp.engine.CutRowTransform
 import com.eignex.klause.lp.engine.CutSource
 import com.eignex.klause.lp.engine.CutSourceKind
 import com.eignex.klause.lp.engine.CutWeightedRow
@@ -56,18 +53,6 @@ internal fun CutProvenance.retainReferencedDefinitions(additional: CutExpression
         }
     }
     for (rule in rules) for (row in rule.rows) expression(row.row.expression)
-    for (transform in transformations) {
-        expression(transform.input.expression)
-        expression(transform.conclusion.expression)
-        when (transform) {
-            is CutRowTransform.Algebraic -> for (fixing in transform.fixings) {
-                expression(fixing.lower.expression)
-                expression(fixing.upper.expression)
-            }
-
-            is CutRowTransform.Lattice -> expression(transform.integral.expression)
-        }
-    }
     val definitions = auxiliaryDefinitions
     if (referenced.any { it !in definitions }) return null
     return CutProvenance(
@@ -77,7 +62,6 @@ internal fun CutProvenance.retainReferencedDefinitions(additional: CutExpression
         assumptions,
         rules,
         conclusion,
-        transformations,
         definitions.filterKeys { it in referenced },
     )
 }
@@ -131,39 +115,6 @@ internal class CutMappingLimits(val terms: Int = 4096, val bits: Int = 4096) {
             if (--remaining < 0) return false
             for (row in rule.rows) {
                 if (!expression(row.row.expression) || !accepts(row.row.rhs)) return false
-            }
-        }
-        for (transform in proof.transformations) {
-            if (--remaining < 0 || !expression(transform.input.expression) || !accepts(transform.input.rhs) ||
-                !expression(transform.conclusion.expression) || !accepts(transform.conclusion.rhs)
-            ) {
-                return false
-            }
-            when (transform) {
-                is CutRowTransform.Algebraic -> {
-                    if (!accepts(transform.multiplier)) return false
-                    for (fixing in transform.fixings) {
-                        if (--remaining < 0 || !expression(fixing.lower.expression) || !accepts(fixing.lower.value) ||
-                            !expression(fixing.upper.expression) || !accepts(fixing.upper.value)
-                        ) {
-                            return false
-                        }
-                    }
-                }
-
-                is CutRowTransform.Lattice -> {
-                    if (!expression(transform.integral.expression)) return false
-                    when (val result = transform.result) {
-                        is CutLatticeResult.RoundedBound -> if (!accepts(
-                                result.threshold,
-                            ) || !accepts(result.roundedThreshold)
-                        ) {
-                            return false
-                        }
-
-                        is CutLatticeResult.InfeasibleEquality -> if (!accepts(result.threshold)) return false
-                    }
-                }
             }
         }
         return true
@@ -258,7 +209,6 @@ internal class SourceCut(
             provenance.assumptions,
             provenance.rules,
             CutPremise.Row(expression, relation, rhs),
-            provenance.transformations,
             provenance.auxiliaryDefinitions,
         )
         if (!limits.accepts(proof)) return CutMapping.Declined(CutMappingDecline.ARITHMETIC_LIMIT)
@@ -282,7 +232,7 @@ internal class SourceCut(
         ): CutMapping<SourceCut> {
             val map = relaxation.sourceMap ?: return CutMapping.Declined(CutMappingDecline.MISSING_SOURCE)
             return try {
-                SourceCutMapper(relaxation.model, map, limits, relaxation.tidyProof).map(cut)
+                SourceCutMapper(relaxation.model, map, limits).map(cut)
             } catch (decline: CutMappingFailure) {
                 CutMapping.Declined(decline.reason)
             }
@@ -296,7 +246,6 @@ private class SourceCutMapper(
     private val model: LpModel,
     private val sources: CutSourceMap,
     private val limits: CutMappingLimits,
-    private val tidy: LpEpochProof?,
 ) {
     private val definitions = sources.columns
     private var remaining = limits.terms
@@ -380,7 +329,6 @@ private class SourceCutMapper(
         val inequality = expression(columns.keys.toList(), columns.values.toList(), constant)
         val facts = ArrayList<CutProofFact>()
         val rules = ArrayList<CutRoundingRule>()
-        val transformations = ArrayList<CutRowTransform>()
         val auxiliary = sources.auxiliaryDefinitions.toMutableMap()
         fun inheritDefinitions(definitions: Map<CutSource, CutAuxiliaryDefinition>) {
             for ((source, definition) in definitions) {
@@ -395,7 +343,6 @@ private class SourceCutMapper(
             if (!cut.global && inherited.global) decline(CutMappingDecline.MISSING_PROVENANCE)
             facts.addAll(inherited.facts)
             rules.addAll(inherited.rules)
-            transformations.addAll(inherited.transformations)
             inheritDefinitions(inherited.auxiliaryDefinitions)
         } else if (tableau != null) {
             if (tableau.model !== model) decline(CutMappingDecline.MODEL_SCOPE)
@@ -419,12 +366,7 @@ private class SourceCutMapper(
             for (row in tableau.rows) {
                 val rowExpression = expression(row.columns.toList(), row.coefficients.map { BigFraction.ofLong(it) })
                 val rowFact = CutPremise.Row(rowExpression, row.relation, row.rhs)
-                val parent = if (tidy != null) {
-                    if (tidy.model !== model) decline(CutMappingDecline.MODEL_SCOPE)
-                    tidy.rowProof(row.index) ?: decline(CutMappingDecline.MISSING_PROVENANCE)
-                } else {
-                    sources.parent(row.index)
-                }
+                val parent = sources.parent(row.index)
                 if (parent != null) {
                     if (!row.global && parent.global) decline(CutMappingDecline.MISSING_PROVENANCE)
                     if (parent.model !== sources.model || !sources.assumptions.containsAll(
@@ -437,7 +379,6 @@ private class SourceCutMapper(
                     facts.addAll(parent.facts)
                     if (rules.size + parent.rules.size > limits.terms) decline(CutMappingDecline.ARITHMETIC_LIMIT)
                     rules.addAll(parent.rules)
-                    transformations.addAll(parent.transformations)
                     inheritDefinitions(parent.auxiliaryDefinitions)
                 } else if (row.global) {
                     facts.add(CutProofFact(rowFact, true))
@@ -483,7 +424,6 @@ private class SourceCutMapper(
             assumptions,
             rules,
             CutPremise.Row(inequality, cut.rel, BigFraction.ofLong(cut.rhs)),
-            transformations,
             auxiliary,
         ).retainReferencedDefinitions(inequality) ?: decline(CutMappingDecline.MISSING_SOURCE)
         if (!limits.accepts(proof)) decline(CutMappingDecline.ARITHMETIC_LIMIT)

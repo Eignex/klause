@@ -89,13 +89,10 @@ internal object LpExplanation {
         session: PropagationSession,
         column: Int,
         lowerSide: Boolean,
-    ): IntArray? {
-        if (relaxation.tidyProof?.active(session) == false) return null
-        return when (val literal = premiseLit(relaxation, session, column, lowerSide)) {
-            PREMISE_AUX -> null
-            PREMISE_NONE -> intArrayOf()
-            else -> intArrayOf(literal)
-        }
+    ): IntArray? = when (val literal = premiseLit(relaxation, session, column, lowerSide)) {
+        PREMISE_AUX -> null
+        PREMISE_NONE -> intArrayOf()
+        else -> intArrayOf(literal)
     }
 
     private fun presencePremise(
@@ -223,16 +220,7 @@ internal object LpExplanation {
         session: PropagationSession,
     ): Boolean {
         val model = relaxation.model
-        val tidy = relaxation.tidyProof
-        if (relaxation.tidyDerivation != null && (tidy == null || !tidy.active(session))) return false
         for (r in rows) {
-            if (tidy != null) {
-                val proof = tidy.rowProof(r) ?: return false
-                for (fact in proof.facts) {
-                    if (!fact.global && !addSourcePremise(lits, seen, fact.premise, session)) return false
-                }
-                continue
-            }
             if (model.rowGlobal[r]) continue
             val source = relaxation.sourceMap?.parent(r)
             if (source != null) {

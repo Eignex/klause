@@ -22,12 +22,16 @@ import com.eignex.klause.ir.linearRows
 import com.eignex.klause.lp.engine.LpCertificationPolicy
 import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.solver.pipeline.componentPlan
+import com.eignex.klause.solver.pipeline.search
 import com.eignex.klause.solver.result.SmtStatsSink
 import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchAtomRegistry
 import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchDecision
+import com.eignex.klause.solver.search.SearchLearnedDbParams
+import com.eignex.klause.solver.search.SearchRealValue
 import com.eignex.klause.solver.search.SearchResult
 import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.solver.search.SearchSolveParams
@@ -45,6 +49,65 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class ExactLiraSearchComponentTest {
+
+    @Test
+    fun `root restart retains conditional reasons and registered atom names`() {
+        val source = Problem(
+            numBoolVars = 1,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(), longArrayOf(), null, null),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(2.0),
+            factors = arrayOf(
+                Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(2.0), LinearOp.GE, 0.0),
+                ReifiedRealLinear(
+                    0,
+                    intArrayOf(),
+                    doubleArrayOf(),
+                    intArrayOf(0),
+                    doubleArrayOf(2.0),
+                    LinearOp.GE,
+                    1.0,
+                ),
+            ),
+        )
+        source.componentPlan().search(
+            source,
+            emptyMap(),
+            Long.MAX_VALUE,
+            Cancellation.Never,
+            SearchLearnedDbParams(),
+            null,
+        ).use { planned ->
+            val session = planned.session
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            val split = assertNotNull(
+                SourceBoundAtom.rationalSplit(
+                    session,
+                    listOf(SourceBoundTerm(SearchRealValue(0), BigFraction.ONE)),
+                    BigFraction.ZERO,
+                ),
+            )
+            assertIs<ComponentResult.Consistent>(session.publish(SearchDecision.Bool(Lit.make(0, true))))
+            assertIs<ComponentResult.Consistent>(session.propagate())
+
+            assertIs<ComponentResult.Consistent>(session.restart())
+            val conflict = assertIs<ComponentResult.Conflict>(session.push(SearchDecision.Theory(split.positive)))
+
+            assertContentEquals(
+                intArrayOf(Lit.make(0, false), split.negative.literal).sortedArray(),
+                assertNotNull(conflict.explanation).literals.sortedArray(),
+            )
+            val registered = assertNotNull(
+                SourceBoundAtom.rationalSplit(
+                    session,
+                    listOf(SourceBoundTerm(SearchRealValue(0), BigFraction.ONE)),
+                    BigFraction.ZERO,
+                ),
+            )
+            assertEquals(split.positive.literal, registered.positive.literal)
+        }
+    }
 
     @Test
     fun `a satisfiable equality subset cannot publish a full source witness`() {
@@ -305,7 +368,7 @@ class ExactLiraSearchComponentTest {
                 ),
             ),
         )
-        ExactLiraSearchComponent(model, lpEpochs = true).use { component ->
+        ExactLiraSearchComponent(model).use { component ->
             val session = SearchSession(listOf(component))
             assertIs<ComponentResult.Consistent>(session.initialize())
             session.publish(SearchDecision.Bool(Lit.make(0, true)))

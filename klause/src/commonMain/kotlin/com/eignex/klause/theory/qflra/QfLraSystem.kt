@@ -26,7 +26,6 @@ import com.eignex.klause.simplex.exact.ExactRationalInequality
 import com.eignex.klause.solver.search.SearchAtomPremise
 import com.eignex.klause.solver.search.SearchIntValue
 import com.eignex.klause.solver.search.SearchRealValue
-import com.eignex.klause.util.Cancellation
 
 internal class QfLraSystem(private val model: Problem) {
     fun build(booleanValue: (Int) -> Boolean?): QfLraRelaxation {
@@ -169,13 +168,6 @@ internal class LiveQfLraSystem(private val source: Problem, private val lp: LpPr
         )
     }
 
-    fun refreshEpoch(token: Cancellation, validatePublication: () -> Boolean): Boolean {
-        val retainedDefinitions = definitions.toMap()
-        return lp.refreshSourceEpoch(token) {
-            definitions == retainedDefinitions && validatePublication()
-        }
-    }
-
     fun assertRow(row: ExactRationalInequality, premise: SearchAtomPremise): Boolean = assertTerms(
         row.columns.indices.associate { row.columns[it] to row.coefficients[it] },
         true,
@@ -266,7 +258,7 @@ internal class LiveQfLraSystem(private val source: Problem, private val lp: LpPr
         }
         if (fixed.isEmpty()) return emptyMap()
         // Capture both immutable witnesses before asserting a bound that can depend on them.
-        val premises = lp.epochBasePremises() ?: return emptyMap()
+        val premises = lp.rootBoundPremises() ?: return emptyMap()
         return fixed.associateWith { column ->
             FixedSmtColumn(
                 checkNotNull(state.activeSide(column, false)).side.number.value,

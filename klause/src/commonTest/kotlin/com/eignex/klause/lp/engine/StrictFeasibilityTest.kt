@@ -216,7 +216,7 @@ class StrictFeasibilityTest {
     }
 
     @Test
-    fun `equivalent source replacement retains strict attempt spending`() {
+    fun `repeated strict source attempts retain spending`() {
         val zero = ExactLpNumber.of(0L)
         val source = ExactLpModel(
             listOf(emptyList()),
@@ -237,21 +237,16 @@ class StrictFeasibilityTest {
                 LpRefinementRequest(donor, donor.refinementCache, limits),
             )
             assertNull(first.witness)
-            val receipt = assertNotNull(donor.exportEpochReceipt())
-            LpScopedSolver(LpExactState(source)).use { recipient ->
-                assertTrue(recipient.importEpochReceipt(receipt))
-                val spent = recipient.refinementCache.work
+            val spent = donor.refinementCache.work
 
-                val repeated = refineLp(
-                    assertNotNull(recipient.state.toWorkingModel()),
-                    LpRefinementRequest(recipient, recipient.refinementCache, limits),
-                )
+            val repeated = refineLp(
+                assertNotNull(donor.state.toWorkingModel()),
+                LpRefinementRequest(donor, donor.refinementCache, limits),
+            )
 
-                assertEquals(LpRefinementDecline.REPEATED, repeated.metrics.decline)
-                assertNull(repeated.witness)
-                assertEquals(spent, recipient.refinementCache.work)
-                assertEquals(donor.refinementCache.work, spent)
-            }
+            assertEquals(LpRefinementDecline.REPEATED, repeated.metrics.decline)
+            assertNull(repeated.witness)
+            assertEquals(spent, donor.refinementCache.work)
         }
     }
 

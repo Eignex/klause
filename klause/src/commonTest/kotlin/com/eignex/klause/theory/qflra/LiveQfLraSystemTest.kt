@@ -21,14 +21,12 @@ import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchRealValue
 import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.solver.search.explainAtoms
-import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
-import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class LiveQfLraSystemTest {
@@ -107,7 +105,7 @@ class LiveQfLraSystemTest {
     }
 
     @Test
-    fun `root substitution keeps both conditional fixing premises through refresh`() {
+    fun `root substitution keeps both conditional fixing premises`() {
         LpPropagator(object : LpSearchPolicy {}).use { lp ->
             val system = LiveQfLraSystem(source(), lp)
             assertTrue(system.install())
@@ -119,7 +117,6 @@ class LiveQfLraSystemTest {
             assertTrue(system.assertRow(row(listOf(1, 1), 3), premise(2)))
             assertEquals(0, assertNotNull(lp.state).model.m)
             assertEquals(BigFraction.ONE, assertNotNull(lp.state?.activeSide(1, true)).side.number.value)
-            assertTrue(system.refreshEpoch(Cancellation.Never) { true })
             assertTrue(
                 system.assertRow(
                     ExactRationalInequality(intArrayOf(1), listOf(BigFraction.MINUS_ONE), BigFraction.ofLong(-2)),
@@ -240,22 +237,6 @@ class LiveQfLraSystemTest {
             assertEquals(0, assertNotNull(lp.state).model.m)
             assertTrue(assertNotNull(lp.state).model.column(1).integral)
             assertFalse(assertNotNull(lp.state).model.column(0).integral)
-        }
-    }
-
-    @Test
-    fun `cancelled refresh preserves the donor and its active term bound`() {
-        LpPropagator(object : LpSearchPolicy {}).use { lp ->
-            val system = LiveQfLraSystem(source(), lp)
-            assertTrue(system.install())
-            assertTrue(system.assertRow(row(listOf(1, 1), 1), axiom))
-            val before = lp.state
-
-            assertFalse(system.refreshEpoch(Cancellation { true }) { true })
-
-            assertSame(before, lp.state)
-            assertTrue(system.assertRow(row(listOf(-2, -2), -4), axiom))
-            assertEquals(LpVerdict.INFEASIBLE, assertNotNull(lp.solve()).verdict)
         }
     }
 

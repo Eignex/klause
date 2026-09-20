@@ -24,14 +24,6 @@ import com.eignex.klause.lp.HullFlags
 import com.eignex.klause.lp.LinearLpProjection
 import com.eignex.klause.lp.LpAuxiliaryColumn
 import com.eignex.klause.lp.RelaxationBuilder
-import com.eignex.klause.lp.bounding.LpEpochProof
-import com.eignex.klause.lp.bounding.RelaxationTidy
-import com.eignex.klause.lp.bounding.RelaxationTidyConfig
-import com.eignex.klause.lp.bounding.RelaxationTidyDecline
-import com.eignex.klause.lp.bounding.RelaxationTidyDerivation
-import com.eignex.klause.lp.bounding.RelaxationTidyResult
-import com.eignex.klause.lp.bounding.RelaxationTidyScope
-import com.eignex.klause.lp.bounding.RelaxationTidyStats
 import com.eignex.klause.lp.cut.CircuitArcModel
 import com.eignex.klause.lp.cut.CircuitSeparator
 import com.eignex.klause.lp.emitLpRelaxation
@@ -134,11 +126,6 @@ internal class LpRelaxation(
     /** The pin value activating gated entry k (`true` = the atom row, `false` = its complement). */
     val gatedWhenTrue: BooleanArray = BooleanArray(0),
     val sourceMap: CutSourceMap? = null,
-    /** Root-tidy proof map, present only when the explicit root construction hook applied. */
-    val tidyDerivation: RelaxationTidyDerivation? = null,
-    /** Rule/decline accounting for an enabled tidy attempt. */
-    val tidyStats: RelaxationTidyStats? = null,
-    val tidyProof: LpEpochProof? = null,
     val colPresence: List<CutAuxiliaryDefinition?> = List(model.n) { null },
 )
 
@@ -249,64 +236,6 @@ internal fun LpRelaxation.withModel(
     gatedAux = gatedAux,
     gatedWhenTrue = gatedWhenTrue,
     sourceMap = sources,
-    tidyDerivation = tidyDerivation,
-    tidyStats = tidyStats,
-    tidyProof = tidyDerivation?.let {
-        requireNotNull(
-            tidyProof?.bind(reboundModel, sources),
-        ) { "LP tidy proof does not bind to the replacement model" }
-    },
-)
-
-internal fun LpRelaxation.withTidy(
-    tidyModel: LpModel,
-    sources: CutSourceMap,
-    derivation: RelaxationTidyDerivation,
-    proof: LpEpochProof,
-): LpRelaxation = LpRelaxation(
-    model = tidyModel,
-    colVarId = colVarId,
-    colIsBool = colIsBool,
-    objectiveConstant = objectiveConstant,
-    intColOf = intColOf,
-    boolColOf = boolColOf,
-    circuitArcs = circuitArcs,
-    persistentEligible = false,
-    colReq = colReq,
-    colPresentUpper = colPresentUpper,
-    colPresence = colPresence,
-    hullFactorIds = hullFactorIds,
-    colRealId = colRealId,
-    colRealSign = colRealSign,
-    sourceMap = sources,
-    tidyDerivation = derivation,
-    tidyStats = derivation.stats,
-    tidyProof = proof,
-)
-
-private fun LpRelaxation.withTidyDecline(
-    reason: RelaxationTidyDecline,
-    stats: RelaxationTidyStats = RelaxationTidyStats(declined = mapOf(reason to 1)),
-): LpRelaxation = LpRelaxation(
-    model = model,
-    colVarId = colVarId,
-    colIsBool = colIsBool,
-    objectiveConstant = objectiveConstant,
-    intColOf = intColOf,
-    boolColOf = boolColOf,
-    circuitArcs = circuitArcs,
-    persistentEligible = persistentEligible,
-    colReq = colReq,
-    colPresentUpper = colPresentUpper,
-    colPresence = colPresence,
-    hullFactorIds = hullFactorIds,
-    colRealId = colRealId,
-    colRealSign = colRealSign,
-    gatedRows = gatedRows,
-    gatedAux = gatedAux,
-    gatedWhenTrue = gatedWhenTrue,
-    sourceMap = sourceMap,
-    tidyStats = stats,
 )
 
 /**
@@ -329,9 +258,6 @@ internal interface RelaxationDomains {
      * relaxing it there would drop the branch's own constraint.
      */
     val honorsOpenSides: Boolean get() = false
-
-    /** Explicit admission for the root-only relaxation tidy pass. */
-    val admitsRootTidy: Boolean get() = false
 }
 
 /** [RelaxationDomains] over a `Problem`'s root boxes: every integer variable at its full box and every
@@ -341,7 +267,6 @@ internal class RootDomains(private val problem: Problem) : RelaxationDomains {
     override fun intDomain(varId: Int): IntDomain = problem.rootDomainOf(varId)
     override fun boolValue(varId: Int): Boolean? = null
     override val honorsOpenSides: Boolean get() = true
-    override val admitsRootTidy: Boolean get() = true
 }
 
 /** [RelaxationDomains] backed by a live [PropagationSession]'s search state. */
@@ -523,8 +448,6 @@ internal class CpToLpRelaxation(
      *  (`LpEngine.pruneIneffectiveHulls`) fills this with the per-factor hulls it found add no root
      *  strength, so they contribute only their CORE rows (if any). */
     private val suppressedHullFactors: Set<Int> = emptySet(),
-    /** Explicit, off-by-default root tidy policy. */
-    private val tidy: RelaxationTidyConfig = RelaxationTidyConfig(),
     private val auxiliarySources: LpAuxiliarySources = LpAuxiliarySources(),
 ) {
     private val linearProjection = LinearLpProjection()
@@ -644,28 +567,7 @@ internal class CpToLpRelaxation(
         domains: RelaxationDomains,
         extraCuts: List<Cut> = emptyList(),
         cancellation: Cancellation = Cancellation.Never,
-    ): LpRelaxation {
-        val assembled = Assembler(domains, cancellation = cancellation).assemble(extraCuts)
-        if (!tidy.enabled) return assembled
-        if (!domains.admitsRootTidy) return assembled.withTidyDecline(RelaxationTidyDecline.NOT_ROOT)
-        return when (
-            val result = RelaxationTidy.apply(
-                assembled,
-                RelaxationTidyScope(
-                    problem,
-                    requireNotNull(assembled.sourceMap).epoch,
-                    objective,
-                    true,
-                    tidy.assumptions,
-                    tidy.cutoff,
-                ),
-                tidy,
-            )
-        ) {
-            is RelaxationTidyResult.Applied -> result.relaxation
-            is RelaxationTidyResult.Declined -> assembled.withTidyDecline(result.reason, result.stats)
-        }
-    }
+    ): LpRelaxation = Assembler(domains, cancellation = cancellation).assemble(extraCuts)
 
     /**
      * The **gated** residual relaxation ([LpRelaxation.gatedRows]), or null when the model does not
