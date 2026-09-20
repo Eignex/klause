@@ -1,10 +1,6 @@
 package com.eignex.klause.lp.bounding
 
 import com.eignex.klause.lp.engine.Basis
-import com.eignex.klause.lp.engine.LpBuilder
-import com.eignex.klause.lp.engine.Relation
-import com.eignex.klause.lp.engine.Sense
-import com.eignex.klause.lp.engine.authoritativeModel
 import com.eignex.klause.lp.engine.ExactLpBounds
 import com.eignex.klause.lp.engine.ExactLpColumn
 import com.eignex.klause.lp.engine.ExactLpEntry
@@ -15,6 +11,7 @@ import com.eignex.klause.lp.engine.ExactLpPremises
 import com.eignex.klause.lp.engine.ExactLpRow
 import com.eignex.klause.lp.engine.ExactLpSide
 import com.eignex.klause.lp.engine.FloatLpResult
+import com.eignex.klause.lp.engine.LpBuilder
 import com.eignex.klause.lp.engine.LpEngineFactory
 import com.eignex.klause.lp.engine.LpExactState
 import com.eignex.klause.lp.engine.LpFloatAllowance
@@ -25,7 +22,10 @@ import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.lp.engine.LpVerdict
 import com.eignex.klause.lp.engine.PersistentLpSolver
 import com.eignex.klause.lp.engine.ProductionLpEngineFactory
+import com.eignex.klause.lp.engine.Relation
 import com.eignex.klause.lp.engine.RevisedSimplex
+import com.eignex.klause.lp.engine.Sense
+import com.eignex.klause.lp.engine.authoritativeModel
 import com.eignex.klause.simplex.basis.BasisArithmeticException
 import com.eignex.klause.simplex.basis.BasisSolver
 import com.eignex.klause.simplex.basis.IndexedVector
@@ -523,7 +523,11 @@ class LpPropagatorTest {
                 }
             }
         }
-        LpPropagator(object : LpSearchPolicy {}, { LpEffortProfile(work = 1000L) }, LpSolveContext(factory)).use { owner ->
+        LpPropagator(
+            object : LpSearchPolicy {},
+            { LpEffortProfile(work = 1000L) },
+            LpSolveContext(factory),
+        ).use { owner ->
             assertTrue(owner.install(model, source.model))
 
             assertNull(owner.solveFloat())

@@ -1141,9 +1141,12 @@ class LpSolveTest {
             repeat(10) { builder.addRow(intArrayOf(x), longArrayOf(1L), Relation.GE, 3L) }
             val model = assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel())
             val warm = if (warmStart) {
-                ExactLpBasis(listOf(0) + (2..10).toList(), List(11) {
+                ExactLpBasis(
+                    listOf(0) + (2..10).toList(),
+                    List(11) {
                     if (it == 1) ExactLpStatus.AT_LOWER else ExactLpStatus.BASIC
-                })
+                }
+                )
             } else {
                 null
             }

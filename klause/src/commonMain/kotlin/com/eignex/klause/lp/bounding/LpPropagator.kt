@@ -355,12 +355,13 @@ internal class LpPropagator(
     fun append(row: LpScopedRow, scoped: Boolean): Boolean = owner?.append(row, scoped) == true
     fun deactivate(row: Long): Boolean = owner?.deactivate(row) == true
 
-    fun solveFloat(warm: Basis? = null, token: Cancellation = cancellation): Pair<LpSolver, FloatLpResult?>? {
-        return solveOwned { current ->
+    fun solveFloat(warm: Basis? = null, token: Cancellation = cancellation): Pair<LpSolver, FloatLpResult?>? =
+        solveOwned {
+                current,
+            ->
             val allowance = if (solved) effort().let { LpFloatAllowance(it.work, it.iterations) } else null
             current.solveFloat(if (solved) null else warm, token, allowance).also { solved = true }
         }
-    }
 
     fun solve(token: Cancellation = cancellation): CertifiedLpResult? = solveOwned {
         val profile = effort()
