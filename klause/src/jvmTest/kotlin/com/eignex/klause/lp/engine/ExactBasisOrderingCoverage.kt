@@ -6,7 +6,6 @@ import com.eignex.klause.formats.smtlib.SmtLib
 import com.eignex.klause.formats.smtlib.toExactLpModel
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.propagation.PropagationSession
-import com.eignex.klause.simplex.basis.BasisExtension
 import com.eignex.klause.simplex.basis.BasisTraceCodec
 import com.eignex.klause.simplex.basis.BasisTraceOperation
 import com.eignex.klause.simplex.basis.BasisUpdate
@@ -43,7 +42,6 @@ internal object ExactBasisOrderingCoverage {
     @JvmStatic
     fun main(args: Array<String>) {
         verifyNonsymmetricOrder()
-        verifyExtensionOrder()
         if (args.contentEquals(arrayOf("--probes-only"))) return
         val root = Path.of(args.single())
         val inputs = listOf(
@@ -291,55 +289,6 @@ internal object ExactBasisOrderingCoverage {
                     }
                 }
             }
-        }
-    }
-
-    private fun verifyExtensionOrder() {
-        val source = SparseMatrix.ofColumns(
-            2,
-            3,
-            listOf(listOf(1 to 2.0), listOf(0 to 3.0), listOf(0 to 1.0, 1 to 1.0)),
-        )
-        val target = SparseMatrix.ofColumns(
-            3,
-            4,
-            listOf(
-                listOf(0 to 1.0, 1 to 2.0, 2 to 1.0),
-                listOf(0 to 2.0, 1 to 1.0),
-                listOf(1 to 4.0, 2 to 3.0),
-                listOf(1 to 1.0),
-            ),
-        )
-        KotlinBasisSolver(source).use { solver ->
-            assertTrue(solver.refactorize(intArrayOf(0, 1)))
-            val extension = BasisExtension(intArrayOf(0, 1), intArrayOf(-1, -1), intArrayOf(2, 0), intArrayOf(1, 2, 0))
-            val fresh = assertNotNull(solver.extend(target, extension))
-            fresh.solver.use { owner ->
-                val order = assertNotNull(owner.ordering())
-                assertContentEquals(intArrayOf(1, 2, -1), order.columns)
-                assertContentEquals(intArrayOf(-1, -1, 1), order.unitRows)
-                val b = listOf(listOf(2L, 0L, 0L), listOf(1L, 4L, 1L), listOf(0L, 3L, 0L))
-                    .map { it.map(BigFraction::ofLong) }
-                val factors = assertIs<RationalBasisBuild.Ready>(
-                    RationalBasisFactors.factor(b, RationalBasisOrder(order.rows, order.slots)),
-                )
-                assertEquals(0, factors.stats.fallbacks)
-            }
-            val spike = IndexedVector(2).also { it.scatterColumn(source, 2) }
-            solver.ftran(spike)
-            assertEquals(BasisUpdate.APPLIED, solver.update(0, 2, spike))
-            val updated = assertNotNull(
-                solver.extend(
-                    target,
-                    BasisExtension(
-                        intArrayOf(2, 1),
-                        intArrayOf(-1, -1),
-                        intArrayOf(2, 0),
-                        intArrayOf(1, 2, 0),
-                    ),
-                ),
-            )
-            updated.solver.use { assertNull(it.ordering()) }
         }
     }
 

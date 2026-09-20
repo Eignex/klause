@@ -1,7 +1,6 @@
 package com.eignex.klause.lp.engine
 
 import com.eignex.klause.simplex.basis.BasisArithmeticException
-import com.eignex.klause.simplex.basis.BasisSnapshot
 import com.eignex.klause.simplex.basis.BasisSolver
 import com.eignex.klause.simplex.basis.IndexedVector
 import com.eignex.klause.simplex.basis.KotlinBasisSolver
@@ -226,12 +225,10 @@ class RevisedSimplexScalingTest {
         assertNotNull(solver.solve())
         assertTrue(solver.scalingMetrics.applied)
         val scaledVersion = solver.scaleVersion
-        val snapshot = assertNotNull(solver.captureBasisRestart())
         val changed = ExactLpObjective(listOf(ExactLpNumber.ofIeee(1e300), zero, zero))
         assertTrue(trail.replaceObjective(changed))
 
         assertTrue(solver.adopt(trail.state, Cancellation.Never))
-        assertFalse(solver.restoreBasisRestart(snapshot, Cancellation.Never))
         val result = assertNotNull(solver.resolveBounds())
 
         assertFalse(solver.scalingMetrics.applied)
@@ -262,7 +259,7 @@ class RevisedSimplexScalingTest {
     }
 
     @Test
-    fun `fallback cleanup retires every snapshot and owner after failures`() {
+    fun `fallback cleanup retires the owner after failure`() {
         val trail = LpBoundTrail(exactScaledModel())
         val tracker = FallbackCleanupTracker()
         val solver = RevisedSimplex(
@@ -270,7 +267,6 @@ class RevisedSimplexScalingTest {
             basisSolverFactory = { matrix -> FallbackCleanupSolver(KotlinBasisSolver(matrix), tracker) },
         )
         assertNotNull(solver.solve())
-        repeat(3) { assertNotNull(solver.captureBasisRestart()) }
         val tiny = ExactLpNumber.of(BigFraction.of(BigInteger.ONE, BigInteger.ONE shl 2000))
         assertTrue(trail.assertBound(0, false, ExactLpSide(tiny), 7L))
 
@@ -278,11 +274,9 @@ class RevisedSimplexScalingTest {
             solver.adopt(trail.state, Cancellation.Never)
         }
 
-        assertEquals("snapshot 2", failure.message)
-        assertEquals(listOf("snapshot 3", "owner"), failure.suppressedExceptions.map { it.message })
-        assertEquals(3, tracker.snapshotCloses)
+        assertEquals("owner", failure.message)
+        assertTrue(failure.suppressedExceptions.isEmpty())
         assertEquals(1, tracker.ownerCloses)
-        assertEquals(0, solver.liveBasisRestartSnapshots)
         assertFalse(solver.scalingMetrics.applied)
         assertEquals(1, solver.scalingMetrics.fallbacks)
         solver.close()
@@ -323,20 +317,17 @@ class RevisedSimplexScalingTest {
     }
 
     @Test
-    fun `basis restart snapshot stays usable across safe scaled bound updates`() {
+    fun `current basis stays usable across safe scaled bound updates`() {
         val source = exactScaledModel()
         val trail = LpBoundTrail(source)
         val solver = RevisedSimplex(assertNotNull(trail.state.toWorkingModel()))
         assertNotNull(solver.solve())
         assertTrue(solver.scalingMetrics.applied)
-        val snapshot = assertNotNull(solver.captureBasisRestart())
         assertTrue(trail.assertBound(0, false, ExactLpSide(ExactLpNumber.of(1L)), 7L))
         assertTrue(solver.adopt(trail.state, Cancellation.Never))
 
-        assertTrue(solver.restoreBasisRestart(snapshot, Cancellation.Never))
         assertNotNull(solver.resolveBounds())
         assertTrue(solver.scalingMetrics.applied)
-        snapshot.close()
         solver.close()
     }
 
@@ -384,23 +375,11 @@ class RevisedSimplexScalingTest {
 }
 
 private class FallbackCleanupTracker {
-    var snapshots = 0
-    var snapshotCloses = 0
     var ownerCloses = 0
 }
 
 private class FallbackCleanupSolver(private val delegate: BasisSolver, private val tracker: FallbackCleanupTracker) :
     BasisSolver by delegate {
-    override fun snapshot(): BasisSnapshot {
-        val id = ++tracker.snapshots
-        return object : BasisSnapshot {
-            override fun close() {
-                tracker.snapshotCloses++
-                if (id > 1) throw IllegalStateException("snapshot $id")
-            }
-        }
-    }
-
     override fun close() {
         tracker.ownerCloses++
         delegate.close()

@@ -15,7 +15,7 @@ internal data class BasisSolveWork(
 
 // Single-threaded owner of source, factors, row transforms and scratch. Caller vectors never become retained buffers.
 // Mandatory operations/reports reject close; n and the last refactorization's singular flag remain readable.
-// Repair and snapshots stay within this fixed source identity; partial repair factors remain private.
+// Repair stays within this fixed source identity; partial repair factors remain private.
 internal class KotlinBasisSolver(
     matrix: SparseMatrix,
     private val policy: LuPivotPolicy = LuPivotPolicy(),
@@ -39,8 +39,6 @@ internal class KotlinBasisSolver(
     private val solveWorkspace = BasisWorkspace(n)
     private val mapped = BasisWorkspace(n)
     private val qualityProduct = DoubleArray(n)
-    private val identity = Any()
-    private val liveSnapshots = mutableSetOf<KotlinBasisSnapshot>()
     private var cache: BasisSolveCache? = null
     private var columns = IntArray(0)
     private var unitRows = IntArray(0)
@@ -534,36 +532,6 @@ internal class KotlinBasisSolver(
         return BasisSolveQuality(residual, residual / scale)
     }
 
-    override fun snapshot(): BasisSnapshot? {
-        requireOpen()
-        operationMeter.attempt(BasisOperationKind.SNAPSHOT)
-        val current = cache
-        if (current == null || singular) {
-            operationMeter.decline(BasisOperationKind.SNAPSHOT, 0)
-            return null
-        }
-        val copied = current.snapshot()
-        val units = snapshotCopyUnits(copied)
-        return KotlinBasisSnapshot(
-            identity,
-            n,
-            source.cols,
-            policy,
-            updateLimit,
-            fillFactor,
-            densityThreshold,
-            reusePivotOrder,
-            copied,
-            columns.copyOf(),
-            unitRows.copyOf(),
-            lastSolveWork,
-            workMeter.snapshot(),
-        ).also {
-            liveSnapshots.add(it)
-            operationMeter.success(BasisOperationKind.SNAPSHOT, units)
-        }
-    }
-
     override fun ordering(): BasisOrdering? {
         check(!repairActive) { "basis repair is active" }
         if (closed || singular) return null
@@ -582,87 +550,9 @@ internal class KotlinBasisSolver(
         )
     }
 
-    override fun restore(snapshot: BasisSnapshot): Boolean {
-        requireOpen()
-        operationMeter.attempt(BasisOperationKind.RESTORE)
-        val own = snapshot as? KotlinBasisSnapshot
-        val state = own?.state
-        if (own == null || state == null) {
-            operationMeter.decline(BasisOperationKind.RESTORE, 1)
-            return false
-        }
-        if (
-            own.owner !== identity || own !in liveSnapshots || own.dimension != n ||
-            own.sourceColumns != source.cols || own.policy != policy || own.updateLimit != updateLimit ||
-            own.fillFactor != fillFactor || own.densityThreshold != densityThreshold ||
-            own.reusePivotOrder != reusePivotOrder
-        ) {
-            operationMeter.decline(BasisOperationKind.RESTORE, 8)
-            return false
-        }
-        val units = own.restoreCopyUnits
-        val restored = try {
-            BasisSolveCache.restore(state, densityThreshold)
-        } catch (failure: BasisArithmeticException) {
-            operationMeter.declineUnknown(BasisOperationKind.RESTORE, units)
-            throw failure
-        }
-        cache = restored
-        columns = own.columns.copyOf()
-        unitRows = own.unitRows.copyOf()
-        singular = false
-        lastSolveWork = own.lastSolveWork
-        workMeter.restore(own.work)
-        retainedOrder = SymbolicLu(
-            restored.factors.symbolic.rowOrder.copyOf(),
-            restored.factors.symbolic.columnOrder.copyOf(),
-        )
-        solveWorkspace.clear()
-        mapped.clear()
-        operationMeter.success(BasisOperationKind.RESTORE, units)
-        return true
-    }
-
-    override fun extend(matrix: SparseMatrix, extension: BasisExtension): BasisExtensionResult? {
-        requireOpen()
-        operationMeter.attempt(BasisOperationKind.EXTENSION)
-        val verification = inspectBasisExtension(source, matrix, columns, unitRows, extension)
-        val state = verification.state
-        val current = cache
-        if (state == null || current == null) {
-            operationMeter.decline(BasisOperationKind.EXTENSION, verification.units)
-            return null
-        }
-        val target = KotlinBasisSolver(
-            matrix,
-            policy,
-            updateLimit,
-            fillFactor,
-            densityThreshold,
-            reusePivotOrder,
-        )
-        var transferred = false
-        try {
-            val (extended, units) = buildExtendedCache(current, source, state, densityThreshold)
-            target.installExtension(extended, state.basisColumns, state.basisUnitRows, units)
-            operationMeter.success(
-                BasisOperationKind.EXTENSION,
-                units,
-            )
-            transferred = true
-            return BasisExtensionResult(target, state.basisColumns, state.basisUnitRows)
-        } catch (failure: BasisArithmeticException) {
-            operationMeter.declineUnknown(BasisOperationKind.EXTENSION, verification.units)
-            throw failure
-        } finally {
-            if (!transferred) target.close()
-        }
-    }
-
     override fun close() {
         check(!repairActive) { "basis repair is active" }
         if (closed) return
-        for (snapshot in liveSnapshots.toList()) snapshot.close()
         closed = true
         cache = null
         columns = IntArray(0)
@@ -697,29 +587,6 @@ internal class KotlinBasisSolver(
         singular = false
     }
 
-    private fun installExtension(extended: BasisSolveCache, columns: IntArray, unitRows: IntArray, units: Long) {
-        cache = extended
-        this.columns = columns.copyOf()
-        this.unitRows = unitRows.copyOf()
-        retainedOrder = SymbolicLu(
-            extended.factors.symbolic.rowOrder.copyOf(),
-            extended.factors.symbolic.columnOrder.copyOf(),
-        )
-        workMeter.reset(
-            BasisBuildWork(
-                BasisBuildKind.EXTENSION,
-                successful = true,
-                builds = 0,
-                orderingAttempts = 0,
-                reusedOrders = 0,
-                fallbacks = 0,
-                units = units,
-                installedBuildUnits = null,
-            ),
-        )
-        singular = false
-    }
-
     private fun recordSolveAttempt(transpose: Boolean) {
         workMeter.solveAttempt(transpose)
         operationMeter.attempt(if (transpose) BasisOperationKind.BTRAN else BasisOperationKind.FTRAN)
@@ -736,94 +603,17 @@ internal class KotlinBasisSolver(
         return BasisUpdate.SINGULAR
     }
 
-    private fun snapshotCopyUnits(state: BasisCacheState): Long {
-        val factors = state.factors
-        val matrices = listOf(factors.lower, factors.upper, factors.lowerTranspose, factors.upperTranspose)
-        val factorEntries = matrices.fold(0L) { total, matrix ->
-            saturatedAdd(total, matrix.cols + 1L + matrix.nnz.toLong() * 2L)
-        }
-        val triangularEntries = (state.ft.upper.asSequence() + state.ft.transpose.asSequence()).fold(0L) {
-                total,
-                slice,
-            ->
-            saturatedAdd(total, slice.count.toLong() * 2L)
-        }
-        val ftEntries = saturatedAdd(
-            triangularEntries,
-            saturatedAdd(state.ft.order.size.toLong(), state.ft.transformEntries.toLong() * 2L),
-        )
-        return saturatedAdd(
-            factorEntries,
-            saturatedAdd(ftEntries, n.toLong() * 6L),
-        )
-    }
-
     private fun requireOpen() {
         check(!closed) { "basis solver is closed" }
         check(!repairActive) { "basis repair is active" }
     }
-
-    private inner class KotlinBasisSnapshot(
-        val owner: Any,
-        val dimension: Int,
-        val sourceColumns: Int,
-        val policy: LuPivotPolicy,
-        val updateLimit: Int,
-        val fillFactor: Double,
-        val densityThreshold: Double,
-        val reusePivotOrder: Boolean,
-        state: BasisCacheState,
-        columns: IntArray,
-        unitRows: IntArray,
-        val lastSolveWork: BasisSolveWork?,
-        val work: BasisWork,
-        val restoreCopyUnits: Long = saturatedAdd(snapshotCopyUnits(state), dimension.toLong() * 4L),
-    ) : BasisSnapshot {
-        var state: BasisCacheState? = state
-            private set
-        var columns = columns
-            private set
-        var unitRows = unitRows
-            private set
-
-        override fun close() {
-            if (state == null) return
-            state = null
-            columns = IntArray(0)
-            unitRows = IntArray(0)
-            liveSnapshots.remove(this)
-        }
-    }
 }
 
-internal class BasisSolveCache private constructor(
-    val factors: LuFactors,
-    val ft: ForrestTomlinFactors,
-    threshold: Double,
-) {
-    constructor(factors: LuFactors, threshold: Double) :
-        this(factors, ForrestTomlinFactors(factors), threshold)
+internal class BasisSolveCache(val factors: LuFactors, threshold: Double) {
+    val ft = ForrestTomlinFactors(factors)
 
     val lower = HyperSparseSolve(factors.lower, lower = true, unitDiagonal = true, threshold)
     val upper = HyperSparseSolve(ft.upper, lower = false, unitDiagonal = false, threshold)
     val lowerTranspose = HyperSparseSolve(factors.lowerTranspose, lower = false, unitDiagonal = true, threshold)
     val upperTranspose = HyperSparseSolve(ft.transpose, lower = true, unitDiagonal = false, threshold)
-
-    fun snapshot() = BasisCacheState(factors.copyOwned(), ft.snapshot())
-
-    companion object {
-        fun transfer(factors: LuFactors, state: ForrestTomlinState, threshold: Double): BasisSolveCache =
-            BasisSolveCache(
-                factors,
-                ForrestTomlinFactors.transfer(factors, state),
-                threshold,
-            )
-
-        fun restore(state: BasisCacheState, threshold: Double): BasisSolveCache {
-            val factors = state.factors.copyOwned()
-            return BasisSolveCache(factors, ForrestTomlinFactors.restore(factors, state.ft), threshold)
-        }
-    }
 }
-
-internal class BasisCacheState(val factors: LuFactors, val ft: ForrestTomlinState)

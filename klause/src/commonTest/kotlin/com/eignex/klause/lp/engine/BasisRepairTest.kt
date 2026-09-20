@@ -6,7 +6,6 @@ import com.eignex.klause.simplex.basis.BasisPhaseWork
 import com.eignex.klause.simplex.basis.BasisRepair
 import com.eignex.klause.simplex.basis.BasisRepairControl
 import com.eignex.klause.simplex.basis.BasisRepairStop
-import com.eignex.klause.simplex.basis.BasisSnapshot
 import com.eignex.klause.simplex.basis.BasisSolver
 import com.eignex.klause.simplex.basis.KotlinBasisSolver
 import com.eignex.klause.util.Cancellation
@@ -17,7 +16,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
-import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class BasisRepairTest {
@@ -327,119 +325,6 @@ class BasisRepairTest {
             ExactBasisRankEvidence.CANCELLED,
             exactBasisRankEvidence(model, intArrayOf(0, 1), cancellation = Cancellation { true }),
         )
-    }
-
-    @Test
-    fun `snapshot restores an earlier basis on the same owner and current bounds`() {
-        val matrix = repairMatrix()
-        val solver = KotlinBasisSolver(matrix)
-        assertTrue(solver.refactorize(intArrayOf(0, 1)))
-        val identity = BasisMatrixIdentity(3L, 2, listOf(10L, 11L))
-        val captured = EngineBasisState(
-            intArrayOf(0, 1),
-            arrayOf(VarStatus.BASIC, VarStatus.BASIC, VarStatus.AT_UPPER, VarStatus.AT_LOWER),
-        )
-        val snapshot = assertNotNull(EngineBasisRestartSnapshot.capture(solver, identity, captured))
-        assertTrue(solver.refactorize(intArrayOf(2, 3)))
-        val currentBounds = arrayOf(
-            BasisBoundState(true, false, false),
-            BasisBoundState(true, false, false),
-            BasisBoundState(true, false, false),
-            BasisBoundState(true, false, false),
-        )
-
-        val restored = assertNotNull(snapshot.restore(solver, identity, currentBounds)) as BasisRestartResult.Restored
-
-        assertTrue(restored.factorsRestored)
-        assertFalse(restored.factorRestoreDeclined)
-        assertContentEquals(intArrayOf(0, 1), restored.state.headings)
-        assertEquals(VarStatus.AT_LOWER, restored.state.statuses[2])
-        snapshot.close()
-        snapshot.close()
-        assertNull(snapshot.restore(solver, identity, currentBounds))
-        solver.close()
-    }
-
-    @Test
-    fun `status-only snapshot rejects foreign owners and cancellation`() {
-        val first = statusOnlySolver(2)
-        val second = statusOnlySolver(2)
-        val identity = BasisMatrixIdentity(0L, 0, listOf(0L, 1L))
-        val state = EngineBasisState(intArrayOf(0, 1), arrayOf(VarStatus.BASIC, VarStatus.BASIC))
-        val bounds = Array(2) { BasisBoundState(true, false, false) }
-        val snapshot = assertNotNull(EngineBasisRestartSnapshot.capture(first, identity, state))
-
-        assertNull(snapshot.restore(second, identity, bounds))
-        val restored = assertNotNull(snapshot.restore(first, identity, bounds)) as BasisRestartResult.Restored
-        assertFalse(restored.factorsRestored)
-        assertFalse(restored.factorRestoreDeclined)
-        snapshot.close()
-        val cancelledSnapshot = assertNotNull(EngineBasisRestartSnapshot.capture(first, identity, state))
-        val cancelled = assertNotNull(
-            cancelledSnapshot.restore(first, identity, bounds, Cancellation { true }),
-        ) as BasisRestartResult.Cancelled
-        assertFalse(cancelled.factorsMayHaveChanged)
-    }
-
-    @Test
-    fun `restore false preserves a compatible discrete restart`() {
-        var closes = 0
-        val factor = object : BasisSnapshot {
-            override fun close() {
-                closes++
-            }
-        }
-        val solver = object : BasisSolver by statusOnlySolver(1) {
-            override fun snapshot(): BasisSnapshot = factor
-            override fun restore(snapshot: BasisSnapshot): Boolean = false
-        }
-        val identity = BasisMatrixIdentity(0L, 0, listOf(0L))
-        val snapshot = assertNotNull(
-            EngineBasisRestartSnapshot.capture(
-                solver,
-                identity,
-                EngineBasisState(intArrayOf(0), arrayOf(VarStatus.BASIC)),
-            ),
-        )
-
-        val restored = assertNotNull(
-            snapshot.restore(solver, identity, arrayOf(BasisBoundState(true, false, false))),
-        ) as BasisRestartResult.Restored
-
-        assertFalse(restored.factorsRestored)
-        assertTrue(restored.factorRestoreDeclined)
-        snapshot.close()
-        snapshot.close()
-        assertEquals(1, closes)
-    }
-
-    @Test
-    fun `invalid snapshot shape does not create a factor handle`() {
-        var snapshots = 0
-        val delegate = statusOnlySolver(2)
-        val solver = object : BasisSolver by delegate {
-            override fun snapshot(): BasisSnapshot? {
-                snapshots++
-                return null
-            }
-        }
-        val invalid = EngineBasisState(intArrayOf(0), arrayOf(VarStatus.BASIC, VarStatus.AT_LOWER))
-        val missingColumns = EngineBasisState(
-            intArrayOf(0, 1),
-            arrayOf(VarStatus.BASIC, VarStatus.BASIC),
-            ownerColumns = intArrayOf(),
-        )
-        val missingUnits = EngineBasisState(
-            intArrayOf(0, 1),
-            arrayOf(VarStatus.BASIC, VarStatus.BASIC),
-            ownerUnitRows = intArrayOf(),
-        )
-
-        val identity = BasisMatrixIdentity(0L, 0, listOf(0L, 1L))
-        assertNull(EngineBasisRestartSnapshot.capture(solver, identity, invalid))
-        assertNull(EngineBasisRestartSnapshot.capture(solver, identity, missingColumns))
-        assertNull(EngineBasisRestartSnapshot.capture(solver, identity, missingUnits))
-        assertEquals(0, snapshots)
     }
 
     private fun repairMatrix(): SparseMatrix = SparseMatrix.ofColumns(

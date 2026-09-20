@@ -17,24 +17,12 @@ internal data class LpScopedMetrics(
     val peakOwners: Long,
     val retainedRows: Int,
     val activeRows: Int,
-    val appendReplacementAttempts: Long,
-    val appendTransfers: Long,
-    val appendIntendedFreshBuilds: Long,
-    val appendFallbacks: Long,
     val appendBasisWork: Long,
     val appendUnknownWork: Long,
-    val lastAppendDecline: LpAppendTransferDecline?,
 ) {
     val editDeclines: Long get() = editAttempts - editSuccesses
     val preparationDeclines: Long get() = preparationAttempts - preparationSuccesses
     val currentOwners: Long get() = createdOwners - closedOwners
-}
-
-internal enum class LpAppendSelection {
-    PRODUCTION_FRESH,
-    CANDIDATE,
-    FORCE_TRANSFER,
-    FRESH_INTENDED,
 }
 
 @Suppress("TooGenericExceptionCaught") // Ownership boundaries preserve arbitrary primary and cleanup failures.
@@ -47,7 +35,6 @@ internal class LpScopedSolver(
     private val workLimit: Long = 0L,
     private val trackDegeneracy: Boolean = false,
     private val maxRetainedRows: Int = Int.MAX_VALUE,
-    private val appendSelection: LpAppendSelection = LpAppendSelection.PRODUCTION_FRESH,
     private val pricing: LpPricingOptions = LpPricingOptions(),
 ) : AutoCloseable {
     private val continuationCache = LpExactContinuationCache()
@@ -70,13 +57,8 @@ internal class LpScopedSolver(
     private var createdOwners = 0L
     private var closedOwners = 0L
     private var peakOwners = 0L
-    private var appendReplacementAttempts = 0L
-    private var appendTransfers = 0L
-    private var appendIntendedFreshBuilds = 0L
-    private var appendFallbacks = 0L
     private var appendBasisWork = 0L
     private var appendUnknownWork = 0L
-    private var lastAppendDecline: LpAppendTransferDecline? = null
     private var pendingAppendSolveWork: Long? = null
     private var pendingAppendSolveWorkComplete = false
     private var pendingAppendSolve = false
@@ -91,8 +73,7 @@ internal class LpScopedSolver(
         editAttempts, editSuccesses, preparationAttempts, preparationSuccesses,
         preparationWork, preparationRefactorizations, createdOwners, closedOwners, peakOwners,
         state.rows.size, state.rows.activeCount,
-        appendReplacementAttempts, appendTransfers, appendIntendedFreshBuilds, appendFallbacks,
-        appendBasisWork, appendUnknownWork, lastAppendDecline,
+        appendBasisWork, appendUnknownWork,
     )
 
     init {
@@ -214,17 +195,6 @@ internal class LpScopedSolver(
 
     fun compact(token: Cancellation = cancellation): Boolean = edit(token) { it.compact(token) }
 
-    fun captureBasisRestart(token: Cancellation = cancellation): EngineBasisRestartSnapshot? {
-        requireAvailable()
-        return if (closed || token()) null else solver?.captureBasisRestart(token)
-    }
-
-    fun restoreBasisRestart(snapshot: EngineBasisRestartSnapshot, token: Cancellation = cancellation): Boolean {
-        requireAvailable()
-        lastResult = null
-        return !closed && !token() && solver?.restoreBasisRestart(snapshot, token) == true
-    }
-
     val basisLifecycleWork: BasisOperationWork? get() = solver?.basisLifecycleWork
 
     @Suppress("TooGenericExceptionCaught")
@@ -332,7 +302,7 @@ internal class LpScopedSolver(
         val scopeToken = Cancellation { cancellation() || token() }
         val child = LpScopedSolver(
             working.state, scopeToken, context, refactorUpdateLimit, childIterations, childWork,
-            trackDegeneracy, maxRetainedRows, appendSelection, pricing,
+            trackDegeneracy, maxRetainedRows, pricing,
         )
         val scope = LpWorkingScope(working, child, scopeToken)
         workingActive = true
@@ -397,8 +367,7 @@ internal class LpScopedSolver(
 
     private fun replace(next: LpBoundTrail, token: Cancellation, append: Boolean): Boolean {
         if (append) solver?.let { recordPendingAppendSolve(it) }
-        val selected = if (append) appendReplacement(next.state, token) else null
-        val expected = selected?.second?.basicVars ?: if (next.state.model.m < state.model.m) {
+        val expected = if (next.state.model.m < state.model.m) {
             // Seat the disappearing logicals in an isolated old-size owner before deleting their slots.
             val staging = prepared(state, token) ?: return false
             var failure: Throwable? = null
@@ -414,12 +383,12 @@ internal class LpScopedSolver(
         } else {
             IntArray(next.state.model.m) { next.state.model.n + it }
         }
-        val replacement = selected ?: prepared(next.state, token, append) ?: return false
+        val replacement = prepared(next.state, token, append) ?: return false
         var published = false
         var failure: Throwable? = null
         try {
             val replacementWork = if (append) appendBasisLifecycleWork(replacement.first) else null
-            if (append && selected == null) recordAppendWork(replacementWork)
+            if (append) recordAppendWork(replacementWork)
             val pendingWork = basisWorkUnits(replacementWork)
             if (!replacement.second.basicVars.contentEquals(expected) || token()) return false
             val old = solver
@@ -445,71 +414,6 @@ internal class LpScopedSolver(
         }
     }
 
-    private fun appendReplacement(next: LpExactState, token: Cancellation): Pair<PersistentLpSolver, Basis>? {
-        val current = solver ?: return null
-        val mode = when (appendSelection) {
-            LpAppendSelection.PRODUCTION_FRESH -> return null
-
-            LpAppendSelection.CANDIDATE -> {
-                if (!appendCandidate(state, next, current)) return null
-                LpAppendReplacementMode.TRANSFER
-            }
-
-            LpAppendSelection.FORCE_TRANSFER -> LpAppendReplacementMode.TRANSFER
-
-            LpAppendSelection.FRESH_INTENDED -> LpAppendReplacementMode.FRESH_INTENDED
-        }
-        appendReplacementAttempts++
-        lastAppendDecline = null
-        val rowMap = IntArray(state.rows.size) { old -> next.rows.index(state.rows.row(old).id) }
-        val columnMap = IntArray(state.model.numVars) { old ->
-            if (old < state.model.n) old else next.model.n + rowMap[old - state.model.n]
-        }
-        val attempt = try {
-            current.appendReplacement(next, rowMap, columnMap, mode, token)
-        } catch (primary: Throwable) {
-            recordExceptionalAppendWork(current, primary)
-            throw primary
-        }
-        recordAppendWork(attempt.basisWork, attempt.basisWorkComplete)
-        val accepted = attempt.replacement
-        if (accepted == null) {
-            lastAppendDecline = attempt.decline ?: LpAppendTransferDecline.UNSUPPORTED
-            appendFallbacks++
-            return null
-        }
-        createdOwners++
-        peakOwners = maxOf(peakOwners, createdOwners - closedOwners)
-        if (accepted.transferred) appendTransfers++ else appendIntendedFreshBuilds++
-        return accepted.solver to accepted.basis
-    }
-
-    private fun appendCandidate(current: LpExactState, next: LpExactState, owner: PersistentLpSolver): Boolean {
-        val appendedRows = next.model.m - current.model.m
-        if (
-            appendedRows < 1 || current.model.m < 16 || current.model.n <= 0 || !owner.appendTransferReady ||
-            knownBasisWork(owner.basisLifecycleWork) == null
-        ) {
-            return false
-        }
-        if (current.rows.entries().any { next.rows.index(it.id) < 0 }) return false
-        var oldNonzeros = 0L
-        var appendedNonzeros = 0L
-        val oldIds = current.rows.entries().map { it.id }.toSet()
-        for (column in 0 until next.model.n) {
-            for (entry in next.model.entries(column)) {
-                if (!projectedNonzero(entry.number)) continue
-                if (next.rows.row(entry.row).id in oldIds) oldNonzeros++ else appendedNonzeros++
-            }
-        }
-        val oldArea = current.model.m.toLong() * current.model.n
-        val appendedArea = appendedRows.toLong() * current.model.n
-        return oldNonzeros >= oldArea - oldArea / 4L && appendedNonzeros >= (appendedArea + 3L) / 4L
-    }
-
-    private fun projectedNonzero(number: ExactLpNumber): Boolean =
-        (number.ieeeBits?.let { Double.fromBits(it) } ?: number.value.toDouble()) != 0.0
-
     private fun saturatingAdd(left: Long, right: Long): Long =
         if (left > Long.MAX_VALUE - right) Long.MAX_VALUE else left + right
 
@@ -524,16 +428,6 @@ internal class LpScopedSolver(
         }
     }
 
-    private fun recordExceptionalAppendWork(current: PersistentLpSolver, primary: Throwable) {
-        try {
-            val work = current.lastAppendReplacementWork
-            recordAppendWork(work?.units, work?.complete == true)
-        } catch (telemetry: Throwable) {
-            appendUnknownWork = saturatingAdd(appendUnknownWork, 1)
-            primary.addSuppressed(telemetry)
-        }
-    }
-
     private fun appendBasisLifecycleWork(owner: PersistentLpSolver) = try {
         owner.basisLifecycleWork
     } catch (telemetry: Throwable) {
@@ -544,9 +438,6 @@ internal class LpScopedSolver(
     private fun recordAppendWork(work: com.eignex.klause.simplex.basis.BasisOperationWork?) {
         recordAppendWork(basisWorkUnits(work), basisWorkComplete(work))
     }
-
-    private fun knownBasisWork(work: com.eignex.klause.simplex.basis.BasisOperationWork?): Long? =
-        work?.takeIf { it.complete && !it.saturated }?.units
 
     private fun basisWorkUnits(work: com.eignex.klause.simplex.basis.BasisOperationWork?): Long? =
         work?.takeUnless { it.saturated }?.units

@@ -2,7 +2,6 @@ package com.eignex.klause.lp.engine
 
 import com.eignex.klause.lp.engine.Cut
 import com.eignex.klause.simplex.basis.BasisArithmeticException
-import com.eignex.klause.simplex.basis.BasisExtension
 import com.eignex.klause.simplex.basis.BasisOperationWork
 import com.eignex.klause.simplex.basis.BasisPhaseWork
 import com.eignex.klause.simplex.basis.BasisRepairControl
@@ -111,21 +110,16 @@ internal class RevisedSimplex(
     private val pricing: LpPricingOptions = LpPricingOptions(),
     private val reuseRationalOrder: Boolean = true,
     private val scalingOptions: LpScalingOptions = LpScalingOptions(),
-    private val perturbationOptions: CostPerturbationOptions = CostPerturbationOptions(),
-    private val recoveryOptions: NumericalRecoveryOptions = NumericalRecoveryOptions(),
 ) : TableauCutSolver,
     PersistentLpSolver {
     internal var lastNumericalMetrics = SimplexNumericalMetrics()
         private set
-    private var costPerturbation: CostPerturbation? = null
-    private var perturbationAllowed = false
     private var numericalFailure = false
-    private var tolerance = TOL
-    private var feasibilityTolerance = FEAS_TOL
-    private var textbookRatio = false
-    private val harrisTolerance: Double get() = if (textbookRatio) 0.0 else 0.5 * tolerance
-    private val minimumDelta: Double get() = if (textbookRatio) 0.0 else 0.01 * tolerance
-    private fun cost(column: Int): Double = costPerturbation?.cost(column) ?: numerical.costD(column)
+    private val tolerance = TOL
+    private val feasibilityTolerance = FEAS_TOL
+    private val harrisTolerance: Double get() = 0.5 * tolerance
+    private val minimumDelta: Double get() = 0.01 * tolerance
+    private fun cost(column: Int): Double = numerical.costD(column)
     private val maxIterations: Int
         get() = if (effectiveIterationLimit > 0) effectiveIterationLimit else 50 * (m + numVars) + 200
 
@@ -275,13 +269,11 @@ internal class RevisedSimplex(
     private var basisSolver: BasisSolver? = null
     private var retiredBasisWork: BasisOperationWork? = null
     private val basisRepairer = EngineBasisRepairer()
-    private val restartSnapshots = mutableListOf<EngineBasisRestartSnapshot>()
     private var refactorPolicy = RefactorPolicy(RefactorPolicyConfig(hardUpdateCap = refactorUpdateLimit))
     private var pendingSolveQuality: BasisSolveQuality? = null
 
     internal val lastBasisRepairMetrics: BasisRepairMetrics get() = basisRepairer.metrics
     internal val lastRefactorPolicyMetrics: RefactorPolicyMetrics get() = refactorPolicy.metrics
-    internal val liveBasisRestartSnapshots: Int get() = restartSnapshots.size
 
     /** Whether [basisSolver] currently factorizes the seated [basicVar]. False before the first
      *  factorization and after one came back singular. */
@@ -522,7 +514,6 @@ internal class RevisedSimplex(
 
     @Suppress("TooGenericExceptionCaught")
     override fun close() {
-        removeCostShifts()
         continuationAvailable = false
         stoppedContinuationBasis = null
         exactBasisCache.clear()
@@ -532,16 +523,7 @@ internal class RevisedSimplex(
         infeasibleBasis = null
         infeasibleRow = -1
         infeasibleRay = null
-        val snapshots = restartSnapshots.toList()
-        restartSnapshots.clear()
         var failure: Throwable? = null
-        for (snapshot in snapshots) {
-            try {
-                snapshot.close()
-            } catch (cleanup: Throwable) {
-                if (failure == null) failure = cleanup else failure.addSuppressed(cleanup)
-            }
-        }
         val current = basisSolver
         if (current != null) {
             try {
@@ -986,7 +968,7 @@ internal class RevisedSimplex(
      */
     override fun resolveGated(enforced: BooleanArray): FloatLpResult? {
         val progress = SolveProgress()
-        return runNumericalSolve(progress, enforced) { reset ->
+        return runNumericalSolve(progress) { reset ->
             solveCore(null, reuse = true, enforced = enforced, reset = reset, progress = progress)
         }
     }
@@ -1083,18 +1065,8 @@ internal class RevisedSimplex(
 
     @Suppress("TooGenericExceptionCaught")
     private fun installUnscaledFallback(next: LpModel) {
-        removeCostShifts()
         val fallback = LpScalingView.identityAfterFallback(next, numerical.metrics)
-        val snapshots = restartSnapshots.toList()
-        restartSnapshots.clear()
         var failure: Throwable? = null
-        for (snapshot in snapshots) {
-            try {
-                snapshot.close()
-            } catch (cleanup: Throwable) {
-                if (failure == null) failure = cleanup else failure.addSuppressed(cleanup)
-            }
-        }
         basisSolver?.let { current ->
             val operationWork = try {
                 current.basisOperationWork ?: BasisOperationWork(complete = false)
@@ -1125,62 +1097,6 @@ internal class RevisedSimplex(
         if (failure != null) throw failure
     }
 
-    override fun captureBasisRestart(token: Cancellation): EngineBasisRestartSnapshot? {
-        val current = basisSolver ?: return null
-        if (rejectedExactBasis?.contentEquals(basicVar) == true ||
-            !basisFactorized || current.singular || !trackedHeadingsConsistent() || token()
-        ) {
-            return null
-        }
-        val snapshot = EngineBasisRestartSnapshot.capture(
-            current,
-            basisMatrixIdentity() ?: return null,
-            EngineBasisState(basicVar, status, ownerColumns, ownerUnitRows),
-            token,
-            onClose = { restartSnapshots.remove(it) },
-        ) ?: return null
-        restartSnapshots.add(snapshot)
-        return snapshot
-    }
-
-    @Suppress("TooGenericExceptionCaught")
-    override fun restoreBasisRestart(snapshot: EngineBasisRestartSnapshot, token: Cancellation): Boolean {
-        continuationAvailable = false
-        stoppedContinuationBasis = null
-        val current = basisSolver ?: return false
-        val restored = try {
-            snapshot.restore(
-                current,
-                basisMatrixIdentity() ?: return false,
-                model.basisBoundStates(),
-                token,
-            ) ?: return false
-        } catch (primary: Throwable) {
-            invalidateUncertainBasisState()
-            throw primary
-        }
-        return when (restored) {
-            is BasisRestartResult.Cancelled -> {
-                if (restored.factorsMayHaveChanged) invalidateUncertainBasisState()
-                false
-            }
-
-            is BasisRestartResult.Restored -> {
-                if (rejectedExactBasis?.contentEquals(restored.state.headings) == true) {
-                    invalidateUncertainBasisState()
-                    return false
-                }
-                installRecoveredBasis(restored.state)
-                if (restored.factorsRestored) {
-                    recordFactorization(current, basisChanged = true)
-                    true
-                } else {
-                    refactorize(LpRefactorReason.NUMERICAL_RECOVERY) != RefactorResult.FAILED
-                }
-            }
-        }
-    }
-
     private fun invalidateUncertainBasisState() {
         continuationAvailable = false
         stoppedContinuationBasis = null
@@ -1191,168 +1107,12 @@ internal class RevisedSimplex(
         invalidateBasisDependentState()
     }
 
-    private fun basisMatrixIdentity(): BasisMatrixIdentity? {
-        val exact = model.exactState ?: return null
-        return BasisMatrixIdentity(exact.matrixRevision, n, exact.rows.entries().map { it.id })
-    }
-
-    override val appendTransferReady: Boolean
-        get() = basisKept && basisFactorized && basisSolver?.singular == false && trackedHeadingsConsistent()
     override val basisLifecycleWork: BasisOperationWork?
         get() {
             val current = basisSolver ?: return retiredBasisWork
             val active = current.basisOperationWork ?: BasisOperationWork(complete = false)
             return retiredBasisWork?.mergedWith(active) ?: active
         }
-    override var lastAppendReplacementWork: LpAppendBasisWork? = null
-        private set
-
-    @Suppress("ReturnCount", "TooGenericExceptionCaught")
-    override fun appendReplacement(
-        next: LpExactState,
-        oldRowsInNew: IntArray,
-        oldColumnsInNew: IntArray,
-        mode: LpAppendReplacementMode,
-        token: Cancellation,
-    ): LpAppendReplacementAttempt {
-        lastAppendReplacementWork = null
-        val current = model.exactState
-            ?: return LpAppendReplacementAttempt(decline = LpAppendTransferDecline.INCOMPATIBLE_STATE)
-        if (token()) return LpAppendReplacementAttempt(decline = LpAppendTransferDecline.CANCELLED)
-        if (!appendCompatible(current, next, oldRowsInNew, oldColumnsInNew)) {
-            return LpAppendReplacementAttempt(decline = LpAppendTransferDecline.INCOMPATIBLE_STATE)
-        }
-        val oldSolver = basisSolver
-        if (!basisKept || !basisFactorized || oldSolver == null || oldSolver.singular) {
-            return LpAppendReplacementAttempt(decline = LpAppendTransferDecline.NOT_READY)
-        }
-        if (!trackedHeadingsConsistent()) {
-            return LpAppendReplacementAttempt(decline = LpAppendTransferDecline.INCONSISTENT_HEADINGS)
-        }
-        val nextModel = next.toWorkingModel()
-            ?: return LpAppendReplacementAttempt(decline = LpAppendTransferDecline.INCOMPATIBLE_STATE)
-        val intended = mappedAppendBasis(nextModel, oldRowsInNew, oldColumnsInNew)
-            ?: return LpAppendReplacementAttempt(decline = LpAppendTransferDecline.INCONSISTENT_HEADINGS)
-        val intendedStatus = mappedAppendStatus(nextModel, oldColumnsInNew, intended)
-            ?: return LpAppendReplacementAttempt(decline = LpAppendTransferDecline.INCONSISTENT_HEADINGS)
-        val candidate = RevisedSimplex(
-            nextModel,
-            token,
-            refactorUpdateLimit,
-            iterationLimit,
-            workLimit,
-            trackDegeneracy,
-            basisSolverFactory,
-            pricing,
-            reuseRationalOrder,
-            scalingOptions,
-            perturbationOptions,
-            recoveryOptions,
-        )
-        val logicalColumns = IntArray(nextModel.m) { nextModel.n + it }
-        val adapter = BasisExtensionAdapter { candidate.createBasisSolver() }
-        val replacement: BasisReplacement
-        var basisWork: Long? = null
-        var basisWorkComplete = false
-        if (mode == LpAppendReplacementMode.TRANSFER) {
-            if (numerical.applied || candidate.numerical.applied) {
-                candidate.close()
-                return LpAppendReplacementAttempt(decline = LpAppendTransferDecline.STRUCTURAL)
-            }
-            val transfer = observeAdapterAttempt(adapter) {
-                adapter.transfer(
-                    oldSolver,
-                    candidate.columns,
-                    intended,
-                    logicalColumns,
-                    BasisExtension(ownerColumns, ownerUnitRows, oldRowsInNew, oldColumnsInNew),
-                )
-            }
-            basisWork = transfer.workUnits
-            basisWorkComplete = transfer.workComplete
-            lastAppendReplacementWork = LpAppendBasisWork(basisWork, basisWorkComplete)
-            replacement = transfer.replacement ?: return LpAppendReplacementAttempt(
-                decline = if (transfer.arithmeticDeclined) {
-                    LpAppendTransferDecline.ARITHMETIC
-                } else {
-                    LpAppendTransferDecline.STRUCTURAL
-                },
-                basisWork = transfer.workUnits,
-                basisWorkComplete = transfer.workComplete,
-            )
-        } else {
-            val fresh = observeAdapterAttempt(adapter) {
-                adapter.replacementAttempt(oldSolver, candidate.columns, intended, logicalColumns)
-            }
-            basisWork = fresh.workUnits
-            basisWorkComplete = fresh.workComplete
-            lastAppendReplacementWork = LpAppendBasisWork(basisWork, basisWorkComplete)
-            replacement = fresh.replacement ?: return LpAppendReplacementAttempt(
-                decline = LpAppendTransferDecline.FRESH_FAILED,
-                basisWork = fresh.workUnits,
-                basisWorkComplete = fresh.workComplete,
-            )
-        }
-        var installed = false
-        var failure: Throwable? = null
-        try {
-            if (token()) {
-                return LpAppendReplacementAttempt(
-                    decline = LpAppendTransferDecline.CANCELLED,
-                    basisWork = basisWork,
-                    basisWorkComplete = basisWorkComplete,
-                )
-            }
-            val basis = candidate.installAppendReplacement(
-                replacement,
-                intendedStatus,
-            ) ?: return LpAppendReplacementAttempt(
-                decline = LpAppendTransferDecline.INCONSISTENT_HEADINGS,
-                basisWork = basisWork,
-                basisWorkComplete = basisWorkComplete,
-            )
-            installed = true
-            return LpAppendReplacementAttempt(
-                LpAppendReplacement(candidate, basis, replacement.transferred),
-                basisWork = basisWork,
-                basisWorkComplete = basisWorkComplete,
-            )
-        } catch (primary: Throwable) {
-            failure = primary
-            throw primary
-        } finally {
-            if (!installed) closeRejectedReplacement(replacement.solver, failure)
-        }
-    }
-
-    @Suppress("TooGenericExceptionCaught")
-    private inline fun <T> observeAdapterAttempt(adapter: BasisExtensionAdapter, operation: () -> T): T = try {
-        operation()
-    } catch (primary: Throwable) {
-        lastAppendReplacementWork = adapter.lastAttemptWork?.let { LpAppendBasisWork(it.units, it.complete) }
-        throw primary
-    }
-
-    private fun appendCompatible(
-        current: LpExactState,
-        next: LpExactState,
-        oldRowsInNew: IntArray,
-        oldColumnsInNew: IntArray,
-    ): Boolean {
-        if (next.model.n != n || next.model.m <= m || oldRowsInNew.size != m || oldColumnsInNew.size != numVars) {
-            return false
-        }
-        if (oldRowsInNew.toSet().size != m || oldRowsInNew.any { it !in 0 until next.model.m }) return false
-        if (oldColumnsInNew.toSet().size != numVars || oldColumnsInNew.any { it !in 0 until next.model.numVars }) {
-            return false
-        }
-        if ((0 until n).any { oldColumnsInNew[it] != it }) return false
-        return oldRowsInNew.indices.all { oldRow ->
-            current.rows.row(oldRow).id == next.rows.row(oldRowsInNew[oldRow]).id &&
-                oldColumnsInNew[n + oldRow] == next.model.n + oldRowsInNew[oldRow]
-        }
-    }
-
     private fun trackedHeadingsConsistent(): Boolean {
         if (ownerColumns.size != m || ownerUnitRows.size != m || basicVar.distinct().size != m) return false
         if (!basisStatusConsistent(model, basicVar, status)) return false
@@ -1362,49 +1122,6 @@ internal class RevisedSimplex(
             (column >= 0) != (unit >= 0) &&
                 (if (column >= 0) column else n + unit) == basicVar[slot]
         }
-    }
-
-    private fun mappedAppendBasis(next: LpModel, oldRowsInNew: IntArray, oldColumnsInNew: IntArray): IntArray? {
-        val mapped = IntArray(next.m)
-        for (slot in basicVar.indices) mapped[slot] = oldColumnsInNew[basicVar[slot]]
-        val oldAtNew = BooleanArray(next.m)
-        for (row in oldRowsInNew) oldAtNew[row] = true
-        var slot = m
-        for (row in 0 until next.m) {
-            if (!oldAtNew[row]) mapped[slot++] = next.n + row
-        }
-        return mapped.takeIf { slot == next.m && it.distinct().size == next.m }
-    }
-
-    private fun mappedAppendStatus(next: LpModel, oldColumnsInNew: IntArray, headings: IntArray): Array<VarStatus>? {
-        val mapped = Array(next.numVars) { VarStatus.BASIC }
-        for (column in oldColumnsInNew.indices) mapped[oldColumnsInNew[column]] = status[column]
-        val oldColumns = oldColumnsInNew.toSet()
-        for (column in mapped.indices) if (column !in oldColumns) mapped[column] = VarStatus.BASIC
-        for (heading in headings) mapped[heading] = VarStatus.BASIC
-        return mapped.takeIf { basisStatusConsistent(next, headings, it) }
-    }
-
-    private fun installAppendReplacement(replacement: BasisReplacement, nextStatus: Array<VarStatus>): Basis? {
-        if (basisSolver != null || replacement.sourceHeadings.size != m || replacement.ownerBasis.columns.size != m) {
-            return null
-        }
-        if (!basisStatusConsistent(model, replacement.sourceHeadings, nextStatus)) return null
-        replacement.sourceHeadings.copyInto(basicVar)
-        nextStatus.copyInto(status)
-        ownerColumns = replacement.ownerBasis.columns.copyOf()
-        ownerUnitRows = replacement.ownerBasis.unitRows.copyOf()
-        if (!trackedHeadingsConsistent()) {
-            ownerColumns = IntArray(0)
-            ownerUnitRows = IntArray(0)
-            return null
-        }
-        basisSolver = replacement.solver
-        basisFactorized = true
-        basisKept = true
-        nnzB = basicVar.sumOf { columnNnz(it) }
-        recordFactorization(replacement.solver, basisChanged = true)
-        return Basis(basicVar.copyOf(), status.copyOf(), captureEligible = false)
     }
 
     private fun basisStatusConsistent(source: LpModel, headings: IntArray, seats: Array<VarStatus>): Boolean {
@@ -1421,16 +1138,6 @@ internal class RevisedSimplex(
                 VarStatus.FIXED -> source.fixed(column)
                 VarStatus.FREE -> !source.hasFiniteLower(column) && !source.hasFiniteUpper(column)
             }
-        }
-    }
-
-    @Suppress("TooGenericExceptionCaught")
-    private fun closeRejectedReplacement(owner: BasisSolver, primary: Throwable?) {
-        try {
-            owner.close()
-        } catch (cleanup: Throwable) {
-            if (primary == null) throw cleanup
-            primary.addSuppressed(cleanup)
         }
     }
 
@@ -1451,11 +1158,6 @@ internal class RevisedSimplex(
      *  after a bailed solve. */
     private var basisKept = false
 
-    private fun removeCostShifts() {
-        costPerturbation?.restore()
-        costPerturbation = null
-    }
-
     private fun clearNumericalPublication() {
         solvedExactState = null
         optimalBasis = null
@@ -1473,68 +1175,12 @@ internal class RevisedSimplex(
         progress.iterations < maxIterations &&
         (effectiveWorkLimit == 0L || work.ops < effectiveWorkLimit) && !cancellation()
 
-    private fun applyRootPerturbation(progress: SolveProgress) {
-        if (progress.rootConsidered) return
-        progress.rootConsidered = true
-        if (!warmStarted && perturbationAllowed && perturbationOptions.root && resourcesRemain(
-                progress,
-            )
-        ) {
-            applyCostShift(root = true)
-        }
-    }
-
-    private fun applyStallPerturbation(progress: SolveProgress) {
-        if (!perturbationAllowed || !perturbationOptions.stall || progress.stallConsidered ||
-            maxOf(progress.primalDegenerate, progress.dualDegenerate) < perturbationOptions.stallIterations
-        ) {
-            return
-        }
-        progress.stallConsidered = true
-        if (resourcesRemain(progress)) applyCostShift(root = false)
-    }
-
-    private fun applyCostShift(root: Boolean) {
-        if (!perturbationOptions.zeroObjective && originalZeroCost) return
-        if (root) lastNumericalMetrics.rootAttempts++ else lastNumericalMetrics.stallAttempts++
-        val shifts = costPerturbation ?: CostPerturbation(DoubleArray(numVars) { numerical.costD(it) })
-        val changed = shifts.apply(status, root, perturbationOptions, model::fixed)
-        work.add(3L * numVars)
-        if (changed > 0) costPerturbation = shifts
-        if (root) lastNumericalMetrics.rootShifts += changed else lastNumericalMetrics.stallShifts += changed
-    }
-
     @Suppress("TooGenericExceptionCaught")
-    private fun runNumericalSolve(
-        progress: SolveProgress,
-        enforced: BooleanArray? = null,
-        block: (reset: Boolean) -> FloatLpResult?,
-    ): FloatLpResult? {
+    private fun runNumericalSolve(progress: SolveProgress, block: (reset: Boolean) -> FloatLpResult?): FloatLpResult? {
         lastNumericalMetrics = SimplexNumericalMetrics()
         numericalFailure = false
-        perturbationAllowed = enforced == null && (perturbationOptions.root || perturbationOptions.stall)
         return try {
-            var result = numericalSolve(progress, block, allowUnscaledFallback = !recoveryOptions.enabled)
-            if (recoveryOptions.enabled && result == null && infeasibleRay == null && numericalFailure) {
-                removeCostShifts()
-                perturbationAllowed = false
-                clearNumericalPublication()
-                result = recoverNumerically(progress, enforced)
-            }
-            val shifted = lastNumericalMetrics.rootShifts > 0 || lastNumericalMetrics.stallShifts > 0
-            val originalReady = costPerturbation == null && (result?.optimal == true || infeasibleRay != null)
-            val cleanup = (shifted && !originalReady) || tolerance != TOL || textbookRatio
-            removeCostShifts()
-            tolerance = TOL
-            feasibilityTolerance = FEAS_TOL
-            textbookRatio = false
-            perturbationAllowed = false
-            if (cleanup) result = cleanupOriginal(progress, enforced)
-            if ((shifted || recoveryOptions.enabled) && (repairStop != null || cancellation())) {
-                clearNumericalPublication()
-                lastNumericalMetrics.cleanupSuccesses = 0
-                result = null
-            }
+            var result = numericalSolve(progress, block, allowUnscaledFallback = true)
             if (result?.optimal != true &&
                 (progress.iterations >= maxIterations || (effectiveWorkLimit > 0L && work.ops >= effectiveWorkLimit))
             ) {
@@ -1545,14 +1191,9 @@ internal class RevisedSimplex(
                 basisKept = false
                 result = null
             }
-            if (result == null && infeasibleRay == null) {
-                for ((step, count) in lastNumericalMetrics.recovery.toMap()) {
-                    if (count.successes > 0) lastNumericalMetrics.recovery[step] = count.copy(successes = 0)
-                }
-                if (numericalFailure) {
-                    basisFactorized = false
-                    basisKept = false
-                }
+            if (result == null && infeasibleRay == null && numericalFailure) {
+                basisFactorized = false
+                basisKept = false
             }
             result
         } catch (primary: Throwable) {
@@ -1562,139 +1203,7 @@ internal class RevisedSimplex(
                 primary.addSuppressed(cleanup)
             }
             throw primary
-        } finally {
-            removeCostShifts()
-            perturbationAllowed = false
-            tolerance = TOL
-            feasibilityTolerance = FEAS_TOL
-            textbookRatio = false
         }
-    }
-
-    private fun cleanupOriginal(progress: SolveProgress, enforced: BooleanArray?): FloatLpResult? {
-        clearNumericalPublication()
-        for (attempt in 0 until 2) {
-            if (!resourcesRemain(progress)) break
-            lastNumericalMetrics.cleanupAttempts++
-            val result = numericalSolve(
-                progress,
-                { resumeOriginal(progress, enforced) },
-                allowUnscaledFallback = false,
-                reset = false,
-            )
-            if (repairStop != null || cancellation()) {
-                clearNumericalPublication()
-                return null
-            }
-            if (result?.optimal == true || infeasibleRay != null) {
-                lastNumericalMetrics.cleanupSuccesses++
-                return result
-            }
-            clearNumericalPublication()
-            // A fresh rebuild is the only additional attempt; neither phase replenishes work.
-            if (attempt == 0 && resourcesRemain(progress)) {
-                numericalSolve(
-                    progress,
-                    {
-                        refactorize(LpRefactorReason.NUMERICAL_RECOVERY)
-                        null
-                    },
-                    allowUnscaledFallback = false,
-                    reset = false,
-                )
-                if (!basisFactorized || repairStop != null) break
-            }
-        }
-        return null
-    }
-
-    private fun resumeOriginal(progress: SolveProgress, enforced: BooleanArray?): FloatLpResult? {
-        if (!resourcesRemain(progress)) return null
-        if (!basisFactorized) {
-            return solveCore(
-                null,
-                reuse = false,
-                enforced = enforced,
-                reset = false,
-                progress = progress,
-            )
-        }
-        basisKept = true
-        return if (enforced == null && !dualFeasible()) {
-            solvePrimalCore(null, reuse = true, reset = false, progress = progress)
-        } else {
-            solveCore(null, reuse = true, enforced = enforced, reset = false, progress = progress)
-        }
-    }
-
-    private fun recoverNumerically(progress: SolveProgress, enforced: BooleanArray?): FloatLpResult? {
-        for (step in NumericalRecoveryStep.entries) {
-            if (!resourcesRemain(progress)) return null
-            val supported = when (step) {
-                NumericalRecoveryStep.TIGHTER_PIVOT -> false
-
-                // No threshold capability on BasisSolver.
-                NumericalRecoveryStep.UNSCALED -> numerical.applied
-
-                else -> true
-            }
-            if (!supported) {
-                lastNumericalMetrics.recovery[step] = NumericalRecoveryCount(skips = 1)
-                continue
-            }
-            lastNumericalMetrics.recovery[step] = NumericalRecoveryCount(attempts = 1)
-            clearNumericalPublication()
-            numericalFailure = false
-            val result = numericalSolve(
-                progress,
-                {
-                    val ready = when (step) {
-                        NumericalRecoveryStep.RESIDUAL_REBUILD ->
-                            refactorize(LpRefactorReason.NUMERICAL_RECOVERY) != RefactorResult.FAILED
-
-                        NumericalRecoveryStep.UNSCALED -> {
-                            installUnscaledFallback(model)
-                            true
-                        }
-
-                        NumericalRecoveryStep.LOGICALS -> {
-                            coldStart()
-                            refactorize(LpRefactorReason.NUMERICAL_RECOVERY) != RefactorResult.FAILED
-                        }
-
-                        NumericalRecoveryStep.RELAX_TOLERANCE -> {
-                            tolerance = TOL * 10.0
-                            feasibilityTolerance = FEAS_TOL * 10.0
-                            true
-                        }
-
-                        NumericalRecoveryStep.TIGHTEN_TOLERANCE -> {
-                            tolerance = TOL * 0.1
-                            feasibilityTolerance = FEAS_TOL * 0.1
-                            true
-                        }
-
-                        NumericalRecoveryStep.TEXTBOOK_RATIO -> {
-                            tolerance = TOL
-                            feasibilityTolerance = FEAS_TOL
-                            textbookRatio = true
-                            true
-                        }
-
-                        NumericalRecoveryStep.TIGHTER_PIVOT -> false
-                    }
-                    if (ready) resumeOriginal(progress, enforced) else null
-                },
-                allowUnscaledFallback = false,
-                reset = false,
-            )
-            if (result != null || infeasibleRay != null) {
-                lastNumericalMetrics.recovery[step] = NumericalRecoveryCount(attempts = 1, successes = 1)
-                return result
-            }
-            if (!numericalFailure) return null
-        }
-        return null
     }
 
     // A checked basis failure cannot supply a terminal claim or a factorization safe to keep.
@@ -1740,10 +1249,6 @@ internal class RevisedSimplex(
         if (allowUnscaledFallback && numerical.applied && resourcesRemain(progress)) {
             installUnscaledFallback(model)
             numericalSolve(progress, block, false, reset = false)
-        } else if (recoveryOptions.enabled && repairStop == null) {
-            numericalFailure = true
-            clearNumericalPublication()
-            null
         } else {
             retireAfterArithmeticFailure(primary)
         }
@@ -1752,10 +1257,6 @@ internal class RevisedSimplex(
         if (allowUnscaledFallback && numerical.applied && resourcesRemain(progress)) {
             installUnscaledFallback(model)
             numericalSolve(progress, block, false, reset = false)
-        } else if (recoveryOptions.enabled && repairStop == null) {
-            numericalFailure = true
-            clearNumericalPublication()
-            null
         } else {
             retireAfterArithmeticFailure(primary)
         }
@@ -1913,11 +1414,10 @@ internal class RevisedSimplex(
             objectiveWarmHits++
             return solvePrimalCore(null, reuse = true, reset = false, progress = progress)
         }
-        applyRootPerturbation(progress)
         val sameObjective = before?.model?.objective == after?.model?.objective
         val sameSeats = cachedStatus?.contentEquals(status) == true
-        if ((warmStarted || after != null || costPerturbation != null) &&
-            (!kept || !sameObjective || !sameSeats || costPerturbation != null) && !dualFeasible()
+        if ((warmStarted || after != null) &&
+            (!kept || !sameObjective || !sameSeats) && !dualFeasible()
         ) {
             if (kept && before != null && after != null && before.model.objective != after.model.objective) {
                 objectiveWarmAttempts++
@@ -2028,7 +1528,6 @@ internal class RevisedSimplex(
                 if (effectiveWorkLimit > 0L && work.ops >= effectiveWorkLimit) return truncated(beta)
             }
 
-            applyStallPerturbation(progress)
             val y = duals()
             when (refactorAtQualitySafePoint()) {
                 null -> Unit
@@ -2130,7 +1629,6 @@ internal class RevisedSimplex(
                 return null
             }
 
-            progress.dualDegenerate = if (ratioBuf[q] <= tolerance) progress.dualDegenerate + 1 else 0
             spike(q) // spike η = B⁻¹ A_q in the pre-pivot factorization
             if (abs(spikeVec[r]) < tolerance) {
                 // Numerically singular pivot. Counted before giving up: a solve lost here leaves no
@@ -2425,8 +1923,7 @@ internal class RevisedSimplex(
                 }
                 if (best != -1) {
                     val minimizeBoundSupport =
-                        pricing.zeroObjective == LpZeroObjectivePricing.MIN_BOUND_SUPPORT && originalZeroCost &&
-                            costPerturbation == null
+                        pricing.zeroObjective == LpZeroObjectivePricing.MIN_BOUND_SUPPORT && originalZeroCost
                     val selected = if (minimizeBoundSupport) {
                         when (val theory = chooseTheoryEntering(theoryCandidates, leavingRow, enforced)) {
                             EnteringChoice.ResourceStopped -> return theory
@@ -2983,7 +2480,6 @@ internal class RevisedSimplex(
             }
         }
         if (model.exactState != null) repairNonbasicStatuses()
-        applyRootPerturbation(progress)
         val beta = basicValues(primalBeta)
         if (effectiveWorkLimit > 0L && work.ops >= effectiveWorkLimit) return null
         when (refactorAtQualitySafePoint()) {
@@ -3010,10 +2506,9 @@ internal class RevisedSimplex(
             if (effectiveWorkLimit > 0L && work.ops >= effectiveWorkLimit) return null
             if (iteration % CANCEL_POLL == 0 && cancellation()) return null
             // Floating Bland ordering is a bounded anti-cycling heuristic, not a termination proof.
-            val bland = progress.primalDegenerate >= blandStall || textbookRatio
+            val bland = progress.primalDegenerate >= blandStall
             if (bland && !progress.primalBlandActive) lastNumericalMetrics.primalBlandEntries++
             progress.primalBlandActive = bland
-            applyStallPerturbation(progress)
             val y = duals()
             when (refactorAtQualitySafePoint()) {
                 null -> Unit
@@ -3166,9 +2661,6 @@ private class SolveProgress(
     var primalDegenerate: Int = 0,
     var restarts: Int = 0,
     var dualNumericalRecoveryTried: Boolean = false,
-    var rootConsidered: Boolean = false,
-    var stallConsidered: Boolean = false,
-    var dualDegenerate: Int = 0,
     var primalBlandActive: Boolean = false,
 ) {
     val iterations: Long get() = dualIterations.toLong() + primalIterations
@@ -3249,4 +2741,9 @@ private fun lpColumns(model: LpScalingView): SparseMatrix {
         k++
     }
     return SparseMatrix.ofTriplets(m, n + m, rows, cols, vals)
+}
+
+internal class SimplexNumericalMetrics {
+    var primalBlandEntries = 0
+    var capExits = 0
 }

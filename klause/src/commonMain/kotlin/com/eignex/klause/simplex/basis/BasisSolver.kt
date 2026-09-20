@@ -1,7 +1,6 @@
 package com.eignex.klause.simplex.basis
 
 import com.eignex.klause.util.Cancellation
-import com.eignex.koblas.SparseMatrix
 
 internal enum class BasisRepairStop {
     CANCELLED,
@@ -118,8 +117,6 @@ internal class BasisRepair(columns: IntArray, unitRows: IntArray) {
     }
 }
 
-internal interface BasisSnapshot : AutoCloseable
-
 // Pivot positions map to source rows and slots of the accepted ordered basis, never inverse headings.
 internal class BasisOrdering(columns: IntArray, unitRows: IntArray, rows: IntArray, slots: IntArray) {
     private val sourceColumns = columns.copyOf()
@@ -163,9 +160,6 @@ internal interface BasisSolver : AutoCloseable {
         return result.takeIf { control.check() }
     }
 
-    fun snapshot(): BasisSnapshot? = null
     fun ordering(): BasisOrdering? = null
-    fun restore(snapshot: BasisSnapshot): Boolean = false
-    fun extend(matrix: SparseMatrix, extension: BasisExtension): BasisExtensionResult? = null
     override fun close() {}
 }

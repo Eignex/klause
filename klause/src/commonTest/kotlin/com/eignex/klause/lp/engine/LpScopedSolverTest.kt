@@ -1,9 +1,12 @@
 package com.eignex.klause.lp.engine
 
 import com.eignex.klause.simplex.basis.BasisArithmeticException
+import com.eignex.klause.simplex.basis.BasisOperationWork
+import com.eignex.klause.simplex.basis.BasisPhaseWork
 import com.eignex.klause.simplex.basis.BasisRepair
 import com.eignex.klause.simplex.basis.BasisRepairControl
 import com.eignex.klause.simplex.basis.BasisSolver
+import com.eignex.klause.simplex.basis.IndexedVector
 import com.eignex.klause.simplex.basis.KotlinBasisSolver
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ExactContinuationMetrics
@@ -18,6 +21,673 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class LpScopedSolverTest {
+    @Test
+    fun `fresh replacement keeps partial units and records unknown work`() {
+        val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+            override fun newPersistentSolver(
+                model: LpModel,
+                cancellation: Cancellation,
+                refactorUpdateLimit: Int,
+                iterationLimit: Int,
+                workLimit: Long,
+                trackDegeneracy: Boolean,
+                pricing: LpPricingOptions,
+            ): PersistentLpSolver {
+                val delegate = RevisedSimplex(model, cancellation, pricing = pricing)
+                return object : PersistentLpSolver by delegate {
+                    override val basisLifecycleWork = BasisOperationWork(
+                        refactorization = BasisPhaseWork(units = 7),
+                        complete = false,
+                    )
+                }
+            }
+        }
+        LpScopedSolver(
+            LpExactState(lowerBoundModel()),
+            context = LpSolveContext(engineFactory = factory),
+        ).use { solver ->
+            assertNotNull(solver.solve())
+
+            assertTrue(solver.append(lowerRow(1, 2), scoped = false))
+
+            assertTrue(solver.metrics.appendBasisWork >= 7)
+            assertEquals(1, solver.metrics.appendUnknownWork)
+        }
+    }
+
+    @Test
+    fun `scoped aggregate saturation records unknown work`() {
+        val contribution = Long.MAX_VALUE / 2 + 1
+        val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+            override fun newPersistentSolver(
+                model: LpModel,
+                cancellation: Cancellation,
+                refactorUpdateLimit: Int,
+                iterationLimit: Int,
+                workLimit: Long,
+                trackDegeneracy: Boolean,
+                pricing: LpPricingOptions,
+            ): PersistentLpSolver {
+                val delegate = RevisedSimplex(model, cancellation, pricing = pricing)
+                return object : PersistentLpSolver by delegate {
+                    override val basisLifecycleWork = BasisOperationWork(
+                        refactorization = BasisPhaseWork(units = contribution),
+                        complete = true,
+                    )
+                }
+            }
+        }
+        LpScopedSolver(
+            LpExactState(lowerBoundModel()),
+            context = LpSolveContext(engineFactory = factory),
+        ).use { solver ->
+            assertNotNull(solver.solve())
+
+            assertTrue(solver.append(lowerRow(1, 2), scoped = false))
+            assertTrue(solver.append(lowerRow(2, 3), scoped = false))
+
+            assertEquals(Long.MAX_VALUE, solver.metrics.appendBasisWork)
+            assertTrue(solver.metrics.appendUnknownWork > 0)
+        }
+    }
+
+    @Test
+    fun `working scopes and bound pops restore the source objective`() {
+        val x = 0
+        val zero = ExactLpNumber.of(0L)
+        val one = ExactLpNumber.of(1L)
+        val state = LpExactState(
+            ExactLpModel(
+                listOf(listOf(ExactLpEntry(0, one))),
+                listOf(ExactLpNumber.of(2L)),
+                listOf(
+                    ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(ExactLpNumber.of(3L)))),
+                    ExactLpColumn(ExactLpBounds(ExactLpSide(zero))),
+                ),
+                listOf(ExactLpRow()),
+                ExactLpObjective(listOf(one, zero)),
+            ),
+        )
+        LpScopedSolver(state).use { owner ->
+            repeat(3) {
+                assertEquals(BigFraction.ZERO, assertNotNull(owner.solve()).lowerBound)
+                assertTrue(owner.push())
+                assertTrue(owner.assertBound(x, false, ExactLpSide(one), 42L))
+                assertEquals(BigFraction.ONE, assertNotNull(owner.solve()).lowerBound)
+                val temporary = LpWorkingModel.overrides(
+                    owner.state,
+                    ExactLpObjective(listOf(ExactLpNumber.of(-1L), zero)),
+                )
+                owner.withWorkingModel(temporary) { scope ->
+                    val result = assertNotNull(scope.solve())
+                    assertEquals(BigFraction.ofLong(-2L), result.lowerBound)
+                    assertEquals(listOf(BigFraction.ofLong(2L)), result.exactPrimal)
+                }
+                assertEquals(BigFraction.ONE, assertNotNull(owner.solve()).lowerBound)
+                assertTrue(owner.pop(0))
+            }
+            assertEquals(BigFraction.ZERO, assertNotNull(owner.solve()).lowerBound)
+        }
+    }
+
+    @Test
+    fun `production default and compaction retain fresh replacement behavior`() {
+        val source = lowerBoundModel()
+        LpScopedSolver(LpExactState(source)).use { solver ->
+            assertNotNull(solver.solve())
+            assertTrue(solver.push())
+            assertTrue(solver.append(lowerRow(1, 2), scoped = true))
+            assertTrue(solver.pop(0))
+
+            assertTrue(solver.compact())
+            val settledWork = solver.metrics.appendBasisWork
+
+            assertEquals(1, solver.state.model.m)
+            B5bIndependentExactSourceValidator.validate(solver.state, assertNotNull(solver.solve()))
+            assertEquals(settledWork, solver.metrics.appendBasisWork)
+            assertEquals(0, solver.metrics.appendUnknownWork)
+        }
+    }
+
+    @Test
+    fun `cancellation after fresh preparation retains rejected owner work`() {
+        var owners = 0
+        var cancelled = false
+        val token = Cancellation { cancelled }
+        val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+            override fun newPersistentSolver(
+                model: LpModel,
+                cancellation: Cancellation,
+                refactorUpdateLimit: Int,
+                iterationLimit: Int,
+                workLimit: Long,
+                trackDegeneracy: Boolean,
+                pricing: LpPricingOptions,
+            ): PersistentLpSolver {
+                owners++
+                val replacement = owners > 1
+                val delegate = RevisedSimplex(model, cancellation, pricing = pricing)
+                return object : PersistentLpSolver by delegate {
+                    override val basisLifecycleWork: BasisOperationWork
+                        get() {
+                            if (replacement) cancelled = true
+                            return checkNotNull(delegate.basisLifecycleWork)
+                        }
+                }
+            }
+        }
+        val solver = LpScopedSolver(
+            LpExactState(lowerBoundModel()),
+            cancellation = token,
+            context = LpSolveContext(engineFactory = factory),
+        )
+        val initial = assertNotNull(solver.solve())
+        val state = solver.state
+
+        assertTrue(!solver.append(lowerRow(1, 2), scoped = false))
+
+        assertTrue(cancelled)
+        assertTrue(solver.metrics.appendBasisWork > 0)
+        assertEquals(0, solver.metrics.appendUnknownWork)
+        assertTrue(solver.state === state)
+        assertTrue(solver.lastResult === initial)
+        assertEquals(1, solver.metrics.currentOwners)
+        assertEquals(1, solver.metrics.closedOwners)
+        cancelled = false
+        B5bIndependentExactSourceValidator.validate(solver.state, assertNotNull(solver.solve()))
+        solver.close()
+    }
+
+    @Test
+    fun `replacement cleanup is suppressed behind the primary cancellation failure`() {
+        val primary = IllegalStateException("primary")
+        val cleanup = IllegalArgumentException("cleanup")
+        var basisFactoryCalls = 0
+        var targetConstructed = false
+        val token = Cancellation {
+            if (targetConstructed) throw primary
+            false
+        }
+        val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+            override fun newPersistentSolver(
+                model: LpModel,
+                cancellation: Cancellation,
+                refactorUpdateLimit: Int,
+                iterationLimit: Int,
+                workLimit: Long,
+                trackDegeneracy: Boolean,
+                pricing: LpPricingOptions,
+            ): PersistentLpSolver = RevisedSimplex(
+                model,
+                cancellation,
+                pricing = pricing,
+                basisSolverFactory = { matrix ->
+                    basisFactoryCalls++
+                    val target = basisFactoryCalls > 1
+                    val delegate = KotlinBasisSolver(matrix)
+                    if (target) targetConstructed = true
+                    object : BasisSolver by delegate {
+                        override fun close() {
+                            delegate.close()
+                            if (target) throw cleanup
+                        }
+                    }
+                },
+            )
+        }
+        val solver = LpScopedSolver(
+            LpExactState(lowerBoundModel()),
+            cancellation = token,
+            context = LpSolveContext(engineFactory = factory),
+        )
+        assertNotNull(solver.solve())
+
+        val thrown = assertFailsWith<IllegalStateException> {
+            solver.append(lowerRow(1, 2), scoped = false)
+        }
+
+        assertTrue(thrown === primary)
+        assertEquals(listOf(cleanup), thrown.suppressedExceptions.toList())
+        assertTrue(solver.metrics.appendBasisWork > 0)
+        assertEquals(0, solver.metrics.appendUnknownWork)
+        targetConstructed = false
+        solver.close()
+    }
+
+    @Test
+    fun `fresh construction cleanup is suppressed behind its primary failure`() {
+        val primary = IllegalStateException("primary")
+        val cleanup = IllegalArgumentException("cleanup")
+        var basisFactoryCalls = 0
+        val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+            override fun newPersistentSolver(
+                model: LpModel,
+                cancellation: Cancellation,
+                refactorUpdateLimit: Int,
+                iterationLimit: Int,
+                workLimit: Long,
+                trackDegeneracy: Boolean,
+                pricing: LpPricingOptions,
+            ): PersistentLpSolver = RevisedSimplex(
+                model,
+                cancellation,
+                pricing = pricing,
+                basisSolverFactory = { matrix ->
+                    basisFactoryCalls++
+                    val target = basisFactoryCalls > 1
+                    val delegate = KotlinBasisSolver(matrix)
+                    object : BasisSolver by delegate {
+                        override val basisOperationWork: BasisOperationWork
+                            get() = if (target) {
+                                BasisOperationWork(
+                                    refactorization = BasisPhaseWork(attempts = 1, units = 7, declines = 1),
+                                    complete = false,
+                                )
+                            } else {
+                                delegate.basisOperationWork
+                            }
+
+                        override fun refactorize(basicIndex: IntArray): Boolean {
+                            if (target) throw primary
+                            return delegate.refactorize(basicIndex)
+                        }
+
+                        override fun close() {
+                            delegate.close()
+                            if (target) throw cleanup
+                        }
+                    }
+                },
+            )
+        }
+        val solver = LpScopedSolver(
+            LpExactState(lowerBoundModel()),
+            context = LpSolveContext(engineFactory = factory),
+        )
+        assertNotNull(solver.solve())
+
+        val thrown = assertFailsWith<IllegalStateException> {
+            solver.append(lowerRow(1, 2), scoped = false)
+        }
+
+        assertTrue(thrown === primary)
+        assertEquals(listOf(cleanup), thrown.suppressedExceptions.toList())
+        assertEquals(7, solver.metrics.appendBasisWork)
+        assertEquals(1, solver.metrics.appendUnknownWork)
+        solver.close()
+    }
+
+    @Test
+    fun `disposed basis owner retains completed and failed solve work`() {
+        var inject = false
+        var unitsAtClose = 0L
+        var owners = 0
+        val working = assertNotNull(LpExactState(lowerBoundModel()).toWorkingModel())
+        val engine = RevisedSimplex(working, basisSolverFactory = { matrix ->
+            owners++
+            val unmetered = owners > 1
+            val delegate = KotlinBasisSolver(matrix)
+            object : BasisSolver by delegate {
+                override val basisOperationWork: BasisOperationWork?
+                    get() = if (unmetered) null else delegate.basisOperationWork
+
+                override fun ftran(x: IndexedVector, expectedDensity: Double) {
+                    delegate.ftran(x, expectedDensity)
+                    if (inject) throw BasisArithmeticException("after known work")
+                }
+
+                override fun close() {
+                    unitsAtClose = delegate.basisOperationWork.units
+                    delegate.close()
+                }
+            }
+        })
+        assertNotNull(engine.prepareLogicals(Cancellation.Never))
+        val before = assertNotNull(engine.basisLifecycleWork).units
+        inject = true
+
+        assertEquals(null, engine.resolveBounds())
+
+        val retained = assertNotNull(engine.basisLifecycleWork)
+        assertTrue(retained.units > before)
+        assertEquals(unitsAtClose, retained.units)
+        assertTrue(retained.complete)
+        inject = false
+        assertNotNull(engine.resolveBounds())
+        val recreated = assertNotNull(engine.basisLifecycleWork)
+        assertTrue(recreated.units >= retained.units)
+        assertTrue(!recreated.complete)
+        engine.close()
+    }
+
+    @Test
+    fun `fresh arithmetic decline propagates cleanup failure`() {
+        val cleanup = IllegalStateException("cleanup")
+        var basisFactoryCalls = 0
+        val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+            override fun newPersistentSolver(
+                model: LpModel,
+                cancellation: Cancellation,
+                refactorUpdateLimit: Int,
+                iterationLimit: Int,
+                workLimit: Long,
+                trackDegeneracy: Boolean,
+                pricing: LpPricingOptions,
+            ): PersistentLpSolver = RevisedSimplex(
+                model,
+                cancellation,
+                pricing = pricing,
+                basisSolverFactory = { matrix ->
+                    basisFactoryCalls++
+                    val target = basisFactoryCalls > 1
+                    val delegate = KotlinBasisSolver(matrix)
+                    object : BasisSolver by delegate {
+                        override val basisOperationWork: BasisOperationWork
+                            get() = if (target) {
+                                BasisOperationWork(
+                                    refactorization = BasisPhaseWork(attempts = 1, units = 7, declines = 1),
+                                )
+                            } else {
+                                delegate.basisOperationWork
+                            }
+
+                        override fun refactorize(basicIndex: IntArray): Boolean {
+                            if (target) throw BasisArithmeticException("arithmetic")
+                            return delegate.refactorize(basicIndex)
+                        }
+
+                        override fun refactorizeRepairing(
+                            basicIndex: IntArray,
+                            control: BasisRepairControl,
+                        ): BasisRepair? = if (target) null else delegate.refactorizeRepairing(basicIndex, control)
+
+                        override fun close() {
+                            delegate.close()
+                            if (target) throw cleanup
+                        }
+                    }
+                },
+            )
+        }
+        val solver = LpScopedSolver(
+            LpExactState(lowerBoundModel()),
+            context = LpSolveContext(engineFactory = factory),
+        )
+        assertNotNull(solver.solve())
+
+        val thrown = assertFailsWith<IllegalStateException> {
+            solver.append(lowerRow(1, 2), scoped = false)
+        }
+
+        assertTrue(thrown === cleanup)
+        assertEquals(7, solver.metrics.appendBasisWork)
+        assertEquals(0, solver.metrics.appendUnknownWork)
+        solver.close()
+    }
+
+    @Test
+    fun `fresh telemetry failure closes the constructed basis owner`() {
+        val telemetry = IllegalStateException("telemetry")
+        val cleanup = IllegalArgumentException("cleanup")
+        var basisFactoryCalls = 0
+        var targetCloses = 0
+        val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+            override fun newPersistentSolver(
+                model: LpModel,
+                cancellation: Cancellation,
+                refactorUpdateLimit: Int,
+                iterationLimit: Int,
+                workLimit: Long,
+                trackDegeneracy: Boolean,
+                pricing: LpPricingOptions,
+            ): PersistentLpSolver = RevisedSimplex(
+                model,
+                cancellation,
+                pricing = pricing,
+                basisSolverFactory = { matrix ->
+                    basisFactoryCalls++
+                    val target = basisFactoryCalls > 1
+                    val delegate = KotlinBasisSolver(matrix)
+                    object : BasisSolver by delegate {
+                        override val basisOperationWork: BasisOperationWork
+                            get() = if (target) throw telemetry else delegate.basisOperationWork
+
+                        override fun close() {
+                            if (target) targetCloses++
+                            delegate.close()
+                            if (target) throw cleanup
+                        }
+                    }
+                },
+            )
+        }
+        val solver = LpScopedSolver(
+            LpExactState(lowerBoundModel()),
+            context = LpSolveContext(engineFactory = factory),
+        )
+        val initial = assertNotNull(solver.solve())
+        val state = solver.state
+
+        val thrown = assertFailsWith<IllegalStateException> {
+            solver.append(lowerRow(1, 2), scoped = false)
+        }
+
+        assertTrue(thrown === telemetry)
+        assertEquals(listOf(cleanup), thrown.suppressedExceptions.toList())
+        assertEquals(1, targetCloses)
+        assertTrue(solver.state === state)
+        assertTrue(solver.lastResult === initial)
+        B5bIndependentExactSourceValidator.validate(solver.state, assertNotNull(solver.solve()))
+        solver.close()
+    }
+
+    @Test
+    fun `telemetry failure before publication closes replacement and preserves old owner`() {
+        val telemetry = IllegalStateException("telemetry")
+        var owners = 0
+        var closes = 0
+        val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+            override fun newPersistentSolver(
+                model: LpModel,
+                cancellation: Cancellation,
+                refactorUpdateLimit: Int,
+                iterationLimit: Int,
+                workLimit: Long,
+                trackDegeneracy: Boolean,
+                pricing: LpPricingOptions,
+            ): PersistentLpSolver {
+                owners++
+                val replacement = owners > 1
+                val delegate = RevisedSimplex(model, cancellation, pricing = pricing)
+                return object : PersistentLpSolver by delegate {
+                    override val basisLifecycleWork: BasisOperationWork
+                        get() = if (replacement) throw telemetry else checkNotNull(delegate.basisLifecycleWork)
+
+                    override fun close() {
+                        closes++
+                        delegate.close()
+                    }
+                }
+            }
+        }
+        val solver = LpScopedSolver(
+            LpExactState(lowerBoundModel()),
+            context = LpSolveContext(engineFactory = factory),
+        )
+        val initial = assertNotNull(solver.solve())
+        val state = solver.state
+
+        val thrown = assertFailsWith<IllegalStateException> {
+            solver.append(lowerRow(1, 2), scoped = false)
+        }
+
+        assertTrue(thrown === telemetry)
+        assertTrue(solver.state === state)
+        assertTrue(solver.lastResult === initial)
+        assertEquals(1, closes)
+        assertEquals(1, solver.metrics.appendUnknownWork)
+        B5bIndependentExactSourceValidator.validate(solver.state, assertNotNull(solver.solve()))
+        solver.close()
+        assertEquals(2, closes)
+    }
+
+    @Test
+    fun `pending telemetry is suppressed behind a post append solve failure`() {
+        val primary = IllegalStateException("primary")
+        val telemetry = IllegalArgumentException("telemetry")
+        var owners = 0
+        var replacementLedgerReads = 0
+        val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+            override fun newPersistentSolver(
+                model: LpModel,
+                cancellation: Cancellation,
+                refactorUpdateLimit: Int,
+                iterationLimit: Int,
+                workLimit: Long,
+                trackDegeneracy: Boolean,
+                pricing: LpPricingOptions,
+            ): PersistentLpSolver {
+                owners++
+                val replacement = owners > 1
+                val delegate = RevisedSimplex(model, cancellation, pricing = pricing)
+                return object : PersistentLpSolver by delegate {
+                    override val basisLifecycleWork: BasisOperationWork
+                        get() {
+                            if (replacement && replacementLedgerReads++ > 0) throw telemetry
+                            return checkNotNull(delegate.basisLifecycleWork)
+                        }
+
+                    override fun resolveBounds(allowance: LpFloatAllowance?): FloatLpResult? {
+                        if (replacement) throw primary
+                        return delegate.resolveBounds(allowance)
+                    }
+                }
+            }
+        }
+        val solver = LpScopedSolver(
+            LpExactState(lowerBoundModel()),
+            context = LpSolveContext(engineFactory = factory),
+        )
+        assertNotNull(solver.solve())
+        assertTrue(solver.append(lowerRow(1, 2), scoped = false))
+
+        val thrown = assertFailsWith<IllegalStateException> { solver.solve() }
+
+        assertTrue(thrown === primary)
+        assertEquals(listOf(telemetry), thrown.suppressedExceptions.toList())
+        assertEquals(1, solver.metrics.appendUnknownWork)
+        solver.close()
+    }
+
+    @Test
+    fun `rejected candidate preserves primary failure over telemetry and cleanup`() {
+        val primary = IllegalStateException("primary")
+        val telemetry = IllegalArgumentException("telemetry")
+        val cleanup = UnsupportedOperationException("cleanup")
+        var owners = 0
+        val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+            override fun newPersistentSolver(
+                model: LpModel,
+                cancellation: Cancellation,
+                refactorUpdateLimit: Int,
+                iterationLimit: Int,
+                workLimit: Long,
+                trackDegeneracy: Boolean,
+                pricing: LpPricingOptions,
+            ): PersistentLpSolver {
+                owners++
+                val replacement = owners > 1
+                val delegate = RevisedSimplex(model, cancellation, pricing = pricing)
+                return object : PersistentLpSolver by delegate {
+                    override val basisLifecycleWork: BasisOperationWork
+                        get() = if (replacement) throw telemetry else checkNotNull(delegate.basisLifecycleWork)
+
+                    override fun adopt(state: LpExactState, token: Cancellation): Boolean {
+                        if (replacement) throw primary
+                        return delegate.adopt(state, token)
+                    }
+
+                    override fun close() {
+                        delegate.close()
+                        if (replacement) throw cleanup
+                    }
+                }
+            }
+        }
+        val solver = LpScopedSolver(
+            LpExactState(lowerBoundModel()),
+            context = LpSolveContext(engineFactory = factory),
+        )
+        val initial = assertNotNull(solver.solve())
+        val state = solver.state
+
+        val thrown = assertFailsWith<IllegalStateException> {
+            solver.append(lowerRow(1, 2), scoped = false)
+        }
+
+        assertTrue(thrown === primary)
+        assertEquals(listOf(telemetry, cleanup), thrown.suppressedExceptions.toList())
+        assertEquals(1, solver.metrics.appendUnknownWork)
+        assertTrue(solver.state === state)
+        assertTrue(solver.lastResult === initial)
+        B5bIndependentExactSourceValidator.validate(solver.state, assertNotNull(solver.solve()))
+        solver.close()
+    }
+
+    @Test
+    fun `exact source validation uses shifted coordinates logical costs and minimized scale`() {
+        val zero = ExactLpNumber.of(0L)
+        val model = ExactLpModel(
+            listOf(listOf(ExactLpEntry(0, ExactLpNumber.of(-1L)))),
+            listOf(ExactLpNumber.of(-1L)),
+            listOf(
+                ExactLpColumn(
+                    ExactLpBounds(ExactLpSide(zero), ExactLpSide(ExactLpNumber.of(10L))),
+                    origin = ExactLpNumber.of(1L),
+                ),
+                ExactLpColumn(ExactLpBounds(ExactLpSide(zero))),
+            ),
+            listOf(ExactLpRow()),
+            ExactLpObjective(
+                listOf(ExactLpNumber.of(2L), ExactLpNumber.of(3L)),
+                constant = ExactLpNumber.of(4L),
+                scale = ExactLpNumber.of(2L),
+                externalConstant = ExactLpNumber.of(5L),
+            ),
+        )
+        LpScopedSolver(LpExactState(model)).use { solver ->
+            val result = assertNotNull(solver.solve())
+
+            B5bIndependentExactSourceValidator.validate(solver.state, result)
+
+            assertEquals(listOf(BigFraction.ofLong(2L)), result.exactPrimal)
+            assertEquals(BigFraction.ofLong(8L), assertNotNull(result.witness).objective)
+        }
+    }
+
+    private fun lowerBoundModel(): ExactLpModel {
+        val zero = ExactLpNumber.of(0L)
+        val one = ExactLpNumber.of(1L)
+        val minusOne = ExactLpNumber.of(-1L)
+        return ExactLpModel(
+            listOf(listOf(ExactLpEntry(0, minusOne))),
+            listOf(minusOne),
+            listOf(
+                ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(ExactLpNumber.of(10L)))),
+                ExactLpColumn(ExactLpBounds(ExactLpSide(zero))),
+            ),
+            listOf(ExactLpRow()),
+            ExactLpObjective(listOf(one, zero)),
+        )
+    }
+
+    private fun lowerRow(id: Long, lower: Long): LpScopedRow = LpScopedRow(
+        id,
+        listOf(0 to ExactLpNumber.of(-1L)),
+        ExactLpNumber.of(-lower),
+        ExactLpColumn(ExactLpBounds(ExactLpSide(ExactLpNumber.of(0L)))),
+    )
+
     @Test
     fun `cancelled publication retains continuation cost without exposing its witness`() {
         val zero = ExactLpNumber.of(0L)
@@ -809,6 +1479,45 @@ class LpScopedSolverTest {
             assertEquals(1L, solver.state.assertions.single().witness)
             assertEquals(listOf(BigFraction.ONE), assertNotNull(solver.solve()).exactPrimal)
             assertEquals(2L, solver.metrics.editDeclines)
+        }
+    }
+}
+
+internal object B5bIndependentExactSourceValidator {
+    fun validate(state: LpExactState, result: CertifiedLpResult) {
+        val primal = assertNotNull(result.exactPrimal)
+        assertEquals(state.model.n, primal.size)
+        val shifted = List(state.model.n) { column ->
+            primal[column] - state.model.column(column).origin.value
+        }
+        for (column in shifted.indices) validateBounds(shifted[column], state.model.column(column).bounds)
+        val logicals = MutableList(state.model.m) { BigFraction.ZERO }
+        for (row in 0 until state.model.m) {
+            var logical = state.model.rhs(row).value
+            for (column in 0 until state.model.n) {
+                val coefficient = state.model.entries(column).firstOrNull { it.row == row }?.number?.value
+                    ?: BigFraction.ZERO
+                logical -= coefficient * shifted[column]
+            }
+            validateBounds(logical, state.model.column(state.model.n + row).bounds)
+            logicals[row] = logical
+        }
+        val coordinates = shifted + logicals
+        var objective = state.model.objective.constant.value
+        for (column in coordinates.indices) {
+            objective += state.model.objective.cost(column).value * coordinates[column]
+        }
+        objective = objective * state.model.objective.scale.value.reciprocal() +
+            state.model.objective.externalConstant.value
+        assertEquals(objective, assertNotNull(result.witness).objective)
+    }
+
+    private fun validateBounds(value: BigFraction, bounds: ExactLpBounds) {
+        bounds.lower?.let { side ->
+            if (side.strict) assertTrue(value > side.number.value) else assertTrue(value >= side.number.value)
+        }
+        bounds.upper?.let { side ->
+            if (side.strict) assertTrue(value < side.number.value) else assertTrue(value <= side.number.value)
         }
     }
 }

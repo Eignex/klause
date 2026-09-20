@@ -15,6 +15,56 @@ import kotlin.test.assertTrue
 
 class KotlinBasisSolverTest {
     @Test
+    fun `declined solve work is retained until the next build`() {
+        val source = SparseMatrix.ofColumns(1, 1, listOf(listOf(0 to 1e-200)))
+        val solver = KotlinBasisSolver(source, LuPivotPolicy(absoluteTolerance = 0.0))
+        assertTrue(solver.refactorize(intArrayOf(0)))
+        val vector = IndexedVector(1).also { it.store(0, 1e200) }
+        assertFailsWith<BasisArithmeticException> { solver.ftran(vector) }
+        val declined = solver.basisWork
+        assertEquals(1, declined.ftran.declines)
+        assertTrue(declined.ftran.units > 0)
+        assertFalse(solver.basisOperationWork.complete)
+        assertTrue(solver.basisOperationWork.ftran.units > 0)
+        vector.scatter(doubleArrayOf(1e-200))
+        solver.ftran(vector)
+
+        assertTrue(solver.refactorize(intArrayOf(0)))
+        assertEquals(BasisPhaseWork(), solver.basisWork.ftran)
+        assertTrue(solver.basisOperationWork.ftran.units >= declined.ftran.units)
+        solver.close()
+    }
+
+    @Test
+    fun `declined update work is retained until the next build`() {
+        val source = SparseMatrix.ofColumns(
+            2,
+            3,
+            listOf(
+                listOf(0 to 1.0),
+                listOf(0 to 1e200, 1 to 1e-200),
+                emptyList(),
+            ),
+        )
+        val solver = KotlinBasisSolver(source, LuPivotPolicy(absoluteTolerance = 0.0))
+        assertTrue(solver.refactorize(intArrayOf(0, 1)))
+        val spike = IndexedVector(2).also { it.scatter(doubleArrayOf(1.0, 1.0)) }
+        assertEquals(BasisUpdate.SINGULAR, solver.update(0, 2, spike))
+        val declined = solver.basisWork
+        assertEquals(1, declined.update.declines)
+        assertTrue(declined.update.units > 1 + spike.count)
+        assertTrue(assertNotNull(solver.lastUpdateWork).units > 0)
+        assertEquals(BasisUpdate.SINGULAR, solver.update(0, 2, spike))
+        assertTrue(solver.basisWork.update.attempts > declined.update.attempts)
+
+        assertTrue(assertNotNull(solver.lastUpdateWork).units > 0)
+        assertTrue(solver.refactorize(intArrayOf(0, 1)))
+        assertEquals(BasisPhaseWork(), solver.basisWork.update)
+        assertTrue(solver.basisOperationWork.update.units >= declined.update.units)
+        solver.close()
+    }
+
+    @Test
     fun `seeded updates solve permuted unit bases in both directions`() {
         assertSeededUpdatesSolve("unit", 8)
     }
@@ -139,15 +189,11 @@ class KotlinBasisSolverTest {
     }
 
     @Test
-    fun `empty repair and snapshot retain a usable empty basis`() {
+    fun `empty repair retains a usable empty basis`() {
         val solver: BasisSolver = KotlinBasisSolver(SparseMatrix.ofColumns(0, 0, emptyList()))
         assertTrue(solver.refactorize(intArrayOf()))
         assertNull(solver.kernel)
         assertFalse(assertNotNull(solver.refactorizeRepairing(intArrayOf())).repaired)
-        val snapshot = assertNotNull(solver.snapshot())
-        assertTrue(solver.restore(snapshot))
-        snapshot.close()
-        assertFalse(solver.restore(snapshot))
         solver.close()
     }
 

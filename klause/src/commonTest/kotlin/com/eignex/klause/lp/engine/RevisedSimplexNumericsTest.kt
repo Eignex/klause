@@ -2,6 +2,7 @@ package com.eignex.klause.lp.engine
 
 import com.eignex.klause.simplex.basis.BasisArithmeticException
 import com.eignex.klause.simplex.basis.BasisRepairControl
+import com.eignex.klause.simplex.basis.BasisSolveQuality
 import com.eignex.klause.simplex.basis.BasisSolver
 import com.eignex.klause.simplex.basis.IndexedVector
 import com.eignex.klause.simplex.basis.KotlinBasisSolver
@@ -17,6 +18,134 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class RevisedSimplexNumericsTest {
+    @Test
+    fun `infeasible true costs retain a source checked ray`() {
+        val b = LpBuilder()
+        val x = b.addVar(0L, 1L, cost = 1L)
+        b.addRow(mapOf(x to 1L), Relation.GE, 2L)
+        val model = b.build(Sense.MINIMIZE)
+        val solver = RevisedSimplex(model)
+
+        assertNull(solver.solve())
+
+        assertNotNull(
+            integerFarkasRay(
+                model,
+                assertNotNull(solver.infeasibleRay),
+                basis = solver.infeasibleBasis,
+                basisRow = solver.infeasibleRow,
+            ),
+        )
+        solver.close()
+    }
+
+    @Test
+    fun `fixed columns contribute to the source objective`() {
+        val b = LpBuilder()
+        b.addVar(1L, 1L, cost = 1L)
+        val x = b.addVar(0L, 2L, cost = 1L)
+        b.addRow(mapOf(x to 1L), Relation.GE, 1L)
+        val model = b.build(Sense.MINIMIZE)
+        val solver = RevisedSimplex(model)
+
+        val result = assertNotNull(solver.solve())
+
+        assertEquals(2.0, result.objective)
+        assertEquals(2L, integerDualLowerBoundCeil(model, result.duals))
+        solver.close()
+    }
+
+    @Test
+    fun `close numerical costs select the exact source optimum`() {
+        for (primal in listOf(false, true)) {
+            val b = LpBuilder()
+            val x = b.addRealVar(0.0, 1.0, cost = 1.0)
+            val y = b.addRealVar(0.0, 1.0, cost = 1.0001)
+            b.addRealRow(intArrayOf(x, y), doubleArrayOf(1.0, 1.0), Relation.GE, 1.0)
+            val model = b.build(Sense.MINIMIZE)
+            val costs = model.cost.copyOf()
+            val solver = RevisedSimplex(
+                model,
+            )
+
+            val result = assertNotNull(if (primal) solver.solvePrimal() else solver.solve())
+
+            assertEquals(1.0, result.primal[x], 1e-9)
+            assertEquals(0.0, result.primal[y], 1e-9)
+            assertEquals(1.0, result.objective, 1e-9)
+            assertEquals(BigFraction.ONE, certifyLpResult(model, solver, result).lowerBound)
+            assertTrue(costs.contentEquals(model.cost))
+            solver.close()
+        }
+    }
+
+    @Test
+    fun `numerical callback exception preserves true costs before reuse`() {
+        val b = LpBuilder()
+        val x = b.addVar(0L, 2L, cost = 1L)
+        b.addRow(mapOf(x to 1L), Relation.GE, 1L)
+        val model = b.build(Sense.MINIMIZE)
+        var fail = true
+        val solver = RevisedSimplex(
+            model,
+            basisSolverFactory = { matrix ->
+                val delegate = KotlinBasisSolver(matrix)
+                object : BasisSolver by delegate {
+                    override fun btran(x: IndexedVector, expectedDensity: Double) {
+                        if (fail) error("cleanup injected")
+                        delegate.btran(x, expectedDensity)
+                    }
+                }
+            },
+        )
+
+        assertFailsWith<IllegalStateException> { solver.solve() }
+        fail = false
+        val result = assertNotNull(solver.solve())
+
+        assertEquals(1.0, result.objective)
+        assertEquals(1L, integerDualLowerBoundCeil(model, result.duals))
+        solver.close()
+    }
+
+    @Test
+    fun `persistent bad residual requests one rebuild per unchanged basis`() {
+        val trail = LpBoundTrail(model(ExactLpNumber.of(1L)))
+        RevisedSimplex(
+            assertNotNull(trail.state.toWorkingModel()),
+            basisSolverFactory = { matrix -> BadQualitySolver(KotlinBasisSolver(matrix)) },
+        ).use { solver ->
+            repeat(24) { assertEquals(BigFraction.ofLong(3L), solveCurrent(solver, trail)) }
+
+            val metrics = solver.lastRefactorPolicyMetrics
+            assertTrue(metrics.qualitySamples >= 2L)
+            assertEquals(1L, metrics.residualTriggers)
+            assertTrue(metrics.cooldownDeclines >= 1L)
+        }
+    }
+
+    private fun model(cost: ExactLpNumber): ExactLpModel {
+        val zero = ExactLpNumber.of(0L)
+        val minusOne = ExactLpNumber.of(-1L)
+        return ExactLpModel(
+            listOf(listOf(ExactLpEntry(0, minusOne))),
+            listOf(ExactLpNumber.of(-3L)),
+            listOf(
+                ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(ExactLpNumber.of(10L)))),
+                ExactLpColumn(ExactLpBounds(ExactLpSide(zero))),
+            ),
+            listOf(ExactLpRow()),
+            ExactLpObjective(listOf(cost, zero)),
+        )
+    }
+
+    private fun solveCurrent(solver: RevisedSimplex, trail: LpBoundTrail): BigFraction {
+        assertTrue(solver.adopt(trail.state, Cancellation.Never))
+        val result = assertNotNull(solver.resolveBounds())
+        val certified = certifyLpResult(assertNotNull(trail.state.toWorkingModel()), solver, result)
+        assertEquals(LpVerdict.ATTAINED_OPTIMUM, certified.verdict)
+        return assertNotNull(certified.lowerBound)
+    }
 
     @Test
     fun `an underestimated Devex weight is corrected before the solve continues`() {
@@ -421,4 +550,9 @@ private class FailingRefactorBasisSolver(private val delegate: BasisSolver, priv
         closed = true
         delegate.close()
     }
+}
+
+private class BadQualitySolver(private val delegate: BasisSolver) : BasisSolver by delegate {
+    override fun solveQuality(rhs: DoubleArray, solution: IndexedVector, transpose: Boolean): BasisSolveQuality =
+        BasisSolveQuality(1e-4, 1e-4)
 }

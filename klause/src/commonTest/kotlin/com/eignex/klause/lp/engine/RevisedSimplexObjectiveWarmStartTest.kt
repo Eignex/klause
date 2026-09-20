@@ -6,9 +6,89 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class RevisedSimplexObjectiveWarmStartTest {
+    @Test
+    fun `mixed seats retain exact bounds and costs through repeated objective changes`() {
+        val zero = ExactLpNumber.of(0L)
+        val one = ExactLpNumber.of(1L)
+        val three = ExactLpNumber.of(3L)
+        val exact = ExactLpModel(
+            List(4) { listOf(ExactLpEntry(0, one)) },
+            listOf(ExactLpNumber.of(10L)),
+            listOf(
+                ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(three))),
+                ExactLpColumn(ExactLpBounds(upper = ExactLpSide(ExactLpNumber.of(-1L)))),
+                ExactLpColumn(ExactLpBounds()),
+                ExactLpColumn(ExactLpBounds(ExactLpSide(three), ExactLpSide(three))),
+                ExactLpColumn(ExactLpBounds()),
+            ),
+            listOf(ExactLpRow()),
+            ExactLpObjective(listOf(one, ExactLpNumber.of(-1L), zero, one, zero)),
+        )
+        val state = LpExactState(exact)
+        val trail = LpBoundTrail(state)
+        val solver = RevisedSimplex(
+            assertNotNull(state.toWorkingModel()),
+        )
+        repeat(4) { index ->
+            val cost = if (index % 2 == 0) one else ExactLpNumber.of(-1L)
+            assertTrue(trail.replaceObjective(ExactLpObjective(listOf(cost, ExactLpNumber.of(-1L), zero, one, zero))))
+            assertTrue(solver.adopt(trail.state, Cancellation.Never))
+
+            val result = assertNotNull(solver.resolveBounds())
+
+            assertEquals(if (index % 2 == 0) 4.0 else 1.0, result.objective, 1e-9)
+            assertEquals(-1.0, result.primal[1])
+            assertEquals(0.0, result.primal[2])
+            assertEquals(3.0, result.primal[3])
+            assertEquals(if (index % 2 == 0) 0.0 else 3.0, result.primal[0])
+            assertSame(trail.state, result.exactState)
+            assertEquals(
+                BigFraction.ofLong(if (index % 2 == 0) 4L else 1L),
+                certifyLpResult(assertNotNull(trail.state.toWorkingModel()), solver, result).lowerBound,
+            )
+        }
+        solver.close()
+    }
+
+    @Test
+    fun `objective adoption follows zero nonzero zero revisions`() {
+        val zero = ExactLpNumber.of(0L)
+        val one = ExactLpNumber.of(1L)
+        val minusOne = ExactLpNumber.of(-1L)
+        val source = ExactLpModel(
+            listOf(listOf(ExactLpEntry(0, minusOne))),
+            listOf(ExactLpNumber.of(-3L)),
+            listOf(
+                ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(ExactLpNumber.of(10L)))),
+                ExactLpColumn(ExactLpBounds(ExactLpSide(zero))),
+            ),
+            listOf(ExactLpRow()),
+            ExactLpObjective(listOf(zero, zero)),
+        )
+        val trail = LpBoundTrail(source)
+        RevisedSimplex(assertNotNull(trail.state.toWorkingModel())).use { solver ->
+            assertEquals(BigFraction.ZERO, solveCurrent(solver, trail))
+
+            assertTrue(trail.replaceObjective(ExactLpObjective(listOf(minusOne, zero))))
+            assertEquals(BigFraction.ofLong(-10L), solveCurrent(solver, trail))
+
+            assertTrue(trail.replaceObjective(ExactLpObjective(listOf(zero, zero))))
+            assertEquals(BigFraction.ZERO, solveCurrent(solver, trail))
+        }
+    }
+
+    private fun solveCurrent(solver: RevisedSimplex, trail: LpBoundTrail): BigFraction {
+        assertTrue(solver.adopt(trail.state, Cancellation.Never))
+        val result = assertNotNull(solver.resolveBounds())
+        val certified = certifyLpResult(assertNotNull(trail.state.toWorkingModel()), solver, result)
+        assertEquals(LpVerdict.ATTAINED_OPTIMUM, certified.verdict)
+        return assertNotNull(certified.lowerBound)
+    }
+
     private val zero = ExactLpNumber.of(0L)
     private val one = ExactLpNumber.of(1L)
     private val four = ExactLpNumber.of(4L)
