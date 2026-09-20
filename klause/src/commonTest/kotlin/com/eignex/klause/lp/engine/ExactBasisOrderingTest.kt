@@ -517,9 +517,11 @@ class ExactBasisOrderingTest {
                 ExactBasisWork(ExactBasisPhase.ORDER_IDENTITY, 1L, 0L),
                 checked.metrics.operations.single { it.phase == ExactBasisPhase.ORDER_IDENTITY },
             )
-            assertTrue(checked.metrics.operations.filter {
-                it.phase == ExactBasisPhase.ORDER_EXPORT || it.phase == ExactBasisPhase.ORDER_VALIDATION
-            }.all { it.work == 0L && it.allocation == 0L })
+            assertTrue(
+                checked.metrics.operations.filter {
+                    it.phase == ExactBasisPhase.ORDER_EXPORT || it.phase == ExactBasisPhase.ORDER_VALIDATION
+                }.all { it.work == 0L && it.allocation == 0L },
+            )
             val cached = verifyExactBasis(model, candidate.basis, cache = solver.exactBasisCache)
             assertEquals(1, cached.metrics.reuse)
             assertEquals(0, cached.metrics.orderOffers)
@@ -557,7 +559,11 @@ class ExactBasisOrderingTest {
                 ).toWorkingModel(),
             )
             val alternate = Basis(intArrayOf(1), arrayOf(VarStatus.AT_LOWER, VarStatus.BASIC))
-            for ((requested, basis) in listOf(foreign to candidate.basis, changed to candidate.basis, model to alternate)) {
+            for ((requested, basis) in listOf(
+                foreign to candidate.basis,
+                changed to candidate.basis,
+                model to alternate,
+            )) {
                 solver.exactBasisCache.clear()
                 val checked = verifyExactBasis(requested, basis, cache = solver.exactBasisCache)
                 val standalone = verifyExactBasis(requested, basis)
@@ -603,7 +609,10 @@ class ExactBasisOrderingTest {
 
                 assertEquals(BigFraction.ONE, checked.witness?.primal?.single())
                 assertEquals(if (updateLimit == 1) 1 else 0, checked.metrics.orderProposals)
-                assertEquals(if (updateLimit == 1) null else ExactBasisOrderDecline.UPDATED, checked.metrics.orderDecline)
+                assertEquals(
+                    if (updateLimit == 1) null else ExactBasisOrderDecline.UPDATED,
+                    checked.metrics.orderDecline,
+                )
                 assertEquals(
                     if (updateLimit == 1) 80L else 1L,
                     checked.metrics.operations.single { it.phase == ExactBasisPhase.ORDER_IDENTITY }.work,
