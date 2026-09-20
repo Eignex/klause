@@ -43,7 +43,10 @@ internal class UnresolvedRealLeafFixture(val withIncumbent: Boolean) {
             Linear(
                 if (withIncumbent) longArrayOf(1L) else longArrayOf(),
                 if (withIncumbent) intArrayOf(0) else intArrayOf(),
-                doubleArrayOf(2.0), intArrayOf(0), LinearOp.EQ, if (withIncumbent) 2L else 1L,
+                doubleArrayOf(2.0),
+                intArrayOf(0),
+                LinearOp.EQ,
+                if (withIncumbent) 2L else 1L,
             ),
         ),
         numRealVars = 1,
@@ -67,13 +70,16 @@ internal class UnresolvedRealLeafFixture(val withIncumbent: Boolean) {
     })
     var acceptProof: (Int, LpCertifier) -> Boolean = { leaf, _ -> withIncumbent && leaf == 1 }
     val attempts = ArrayList<Pair<Int, Boolean>>()
-    val context = LpSolveContext(factory, object : LpCertificationPolicy {
-        override fun accepts(certifier: LpCertifier, successful: Boolean): Boolean {
-            val leaf = factory.calls.count { it.kind == EngineConstruction.GENERAL }
-            attempts += leaf to successful
-            return successful && acceptProof(leaf, certifier)
-        }
-    })
+    val context = LpSolveContext(
+        factory,
+        object : LpCertificationPolicy {
+            override fun accepts(certifier: LpCertifier, successful: Boolean): Boolean {
+                val leaf = factory.calls.count { it.kind == EngineConstruction.GENERAL }
+                attempts += leaf to successful
+                return successful && acceptProof(leaf, certifier)
+            }
+        },
+    )
     val solver = BacktrackSolver(problem, context)
     val params = BacktrackParams(
         randomSeed = 0L,
@@ -117,9 +123,11 @@ class ResumableMinimizeTest {
         fixture.acceptProof = { _, certifier -> certifier == LpCertifier.EXACT_POINT }
         ResumableMinimize(fixture.solver, fixture.objective, fixture.params, rebindable = true).use { search ->
             val offered = ArrayList<Double>()
-            val result = assertIs<MinimizeResult.BestFound>(search.runSlice(Cancellation.Never, 1000L, 256L) {
-                offered += it.objectiveValue
-            })
+            val result = assertIs<MinimizeResult.BestFound>(
+                search.runSlice(Cancellation.Never, 1000L, 256L) {
+                    offered += it.objectiveValue
+                },
+            )
             assertEquals(TerminationReason.Unsupported, result.reason)
             assertEquals(listOf(0.5), offered)
             assertEquals(0.5, result.sample.reals.single())
@@ -127,7 +135,9 @@ class ResumableMinimizeTest {
             assertSame(result, search.runSlice(Cancellation.Never, 1000L, 256L) { error("duplicate incumbent") })
             search.rebind(Assumptions.None, 256L)
             fixture.acceptProof = { _, _ -> false }
-            assertIs<MinimizeResult.Unknown>(search.runSlice(Cancellation.Never, 1000L, 256L) { error("stale incumbent") })
+            assertIs<MinimizeResult.Unknown>(
+                search.runSlice(Cancellation.Never, 1000L, 256L) { error("stale incumbent") },
+            )
             assertEquals(2, fixture.opened)
             assertEquals(fixture.opened, fixture.closed)
         }
@@ -142,9 +152,11 @@ class ResumableMinimizeTest {
             search.rebind(Assumptions.None.withInt(0, 1L), 256L)
             fixture.acceptProof = { _, _ -> true }
             val offered = ArrayList<Double>()
-            val result = assertIs<MinimizeResult.BestFound>(search.runSlice(Cancellation.Never, 1000L, 256L) {
-                offered += it.objectiveValue
-            })
+            val result = assertIs<MinimizeResult.BestFound>(
+                search.runSlice(Cancellation.Never, 1000L, 256L) {
+                    offered += it.objectiveValue
+                },
+            )
             assertEquals(TerminationReason.Unsupported, result.reason)
             assertEquals(listOf(0.5), offered)
             assertEquals(1L, result.sample.ints.single())
@@ -176,22 +188,46 @@ class ResumableMinimizeTest {
 
     @Test
     fun `exact real exhaustion retains complete shared coverage`() {
-        for (shared in listOf(false, true)) for (feasible in listOf(false, true)) {
-            val problem = Problem(
-                0, 0, emptyArray(),
-                arrayOf(Linear(longArrayOf(), intArrayOf(), doubleArrayOf(2.0), intArrayOf(0), LinearOp.EQ,
-                    if (feasible) 1L else 3L)),
-                numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0),
-            ).bake()
-            val objective = LinearObjective(realCoefficients = doubleArrayOf(1.0))
-            val params = BacktrackParams(objectiveBoundSupplier = if (shared) ({ Double.POSITIVE_INFINITY }) else null)
-            val result = BacktrackSolver(problem).minimize(objective, params)
-            when {
-                shared && feasible -> assertEquals(TerminationReason.SearchExhausted,
-                    assertIs<MinimizeResult.BestFound>(result).reason)
-                shared -> assertEquals(TerminationReason.SearchExhausted, assertIs<MinimizeResult.Unknown>(result).reason)
-                feasible -> assertEquals(0.5, assertIs<MinimizeResult.Optimal>(result).sample.reals.single())
-                else -> assertIs<MinimizeResult.Infeasible>(result)
+        for (shared in listOf(false, true)) {
+            for (feasible in listOf(false, true)) {
+                val problem = Problem(
+                    0,
+                    0,
+                    emptyArray(),
+                    arrayOf(
+                        Linear(
+                            longArrayOf(),
+                            intArrayOf(),
+                            doubleArrayOf(2.0),
+                            intArrayOf(0),
+                            LinearOp.EQ,
+                            if (feasible) 1L else 3L,
+                        ),
+                    ),
+                    numRealVars = 1,
+                    realLower = doubleArrayOf(0.0),
+                    realUpper = doubleArrayOf(1.0),
+                ).bake()
+                val objective = LinearObjective(realCoefficients = doubleArrayOf(1.0))
+                val params = BacktrackParams(
+                    objectiveBoundSupplier = if (shared) ({ Double.POSITIVE_INFINITY }) else null,
+                )
+                val result = BacktrackSolver(problem).minimize(objective, params)
+                when {
+                    shared && feasible -> assertEquals(
+                        TerminationReason.SearchExhausted,
+                        assertIs<MinimizeResult.BestFound>(result).reason,
+                    )
+
+                    shared -> assertEquals(
+                        TerminationReason.SearchExhausted,
+                        assertIs<MinimizeResult.Unknown>(result).reason,
+                    )
+
+                    feasible -> assertEquals(0.5, assertIs<MinimizeResult.Optimal>(result).sample.reals.single())
+
+                    else -> assertIs<MinimizeResult.Infeasible>(result)
+                }
             }
         }
     }
@@ -200,7 +236,9 @@ class ResumableMinimizeTest {
     fun `unresolved real leaf cannot prove infeasibility under shared bounds`() {
         for (shared in listOf(false, true)) {
             val fixture = UnresolvedRealLeafFixture(false)
-            val params = fixture.params.copy(objectiveBoundSupplier = if (shared) ({ Double.POSITIVE_INFINITY }) else null)
+            val params = fixture.params.copy(
+                objectiveBoundSupplier = if (shared) ({ Double.POSITIVE_INFINITY }) else null,
+            )
             fixture.solver.resumable(fixture.objective, params).use { search ->
                 val result = assertIs<MinimizeResult.Unknown>(search.runSlice(Cancellation.Never, 1000L, 256L) {})
                 assertEquals(TerminationReason.Unsupported, result.reason)
@@ -218,10 +256,12 @@ class ResumableMinimizeTest {
             var bound = Double.POSITIVE_INFINITY
             val params = fixture.params.copy(objectiveBoundSupplier = if (shared) ({ bound }) else null)
             fixture.solver.resumable(fixture.objective, params).use { search ->
-                val result = assertIs<MinimizeResult.BestFound>(search.runSlice(Cancellation.Never, 1000L, 256L) {
-                    fixture.assertIncumbent(it.sample)
-                    bound = it.objectiveValue
-                })
+                val result = assertIs<MinimizeResult.BestFound>(
+                    search.runSlice(Cancellation.Never, 1000L, 256L) {
+                        fixture.assertIncumbent(it.sample)
+                        bound = it.objectiveValue
+                    },
+                )
                 assertEquals(TerminationReason.Unsupported, result.reason)
                 fixture.assertIncumbent(result.sample)
                 fixture.assertVisitedLeaves()

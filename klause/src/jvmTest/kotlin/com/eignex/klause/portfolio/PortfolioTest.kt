@@ -45,7 +45,11 @@ class PortfolioTest {
             val fixtures = List(2) { UnresolvedRealLeafFixture(withIncumbent) }
             val workers = fixtures.mapIndexed { index, fixture ->
                 PortfolioWorker.of(
-                    "real#$index", index, fixture.solver.session(), fixture.params, objective = fixture.objective,
+                    "real#$index",
+                    index,
+                    fixture.solver.session(),
+                    fixture.params,
+                    objective = fixture.objective,
                     withBound = { p, bound -> p.copy(objectiveBoundSupplier = bound) },
                 )
             }
@@ -69,7 +73,11 @@ class PortfolioTest {
         val fixture = UnresolvedRealLeafFixture(false)
         fixture.acceptProof = { _, certifier -> certifier == LpCertifier.EXACT_POINT }
         val worker = PortfolioWorker.of(
-            "point", 0, fixture.solver.session(), fixture.params, objective = fixture.objective,
+            "point",
+            0,
+            fixture.solver.session(),
+            fixture.params,
+            objective = fixture.objective,
             withBound = { p, bound -> p.copy(objectiveBoundSupplier = bound) },
         )
         Portfolio(listOf(worker)).use { portfolio ->
@@ -80,7 +88,6 @@ class PortfolioTest {
             fixture.assertVisitedLeaves()
         }
     }
-
 
     @Test
     fun `both backtrack palettes spread lp-intensity arms`() {
