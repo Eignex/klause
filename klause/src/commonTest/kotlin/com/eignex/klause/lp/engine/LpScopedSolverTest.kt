@@ -1481,6 +1481,35 @@ class LpScopedSolverTest {
             assertEquals(2L, solver.metrics.editDeclines)
         }
     }
+
+    @Test
+    fun `ordinary source basis remains usable after a cut append`() {
+        val builder = LpBuilder()
+        val x = builder.addVar(0L, 8L, cost = 2L)
+        repeat(10) { builder.addRow(intArrayOf(x), longArrayOf(1L), Relation.GE, 3L) }
+        val source = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+        val solved = solveAndCertify(source.model)
+        val basis = assertNotNull(solved.float).basis
+        assertEquals(listOf(BigFraction.ofLong(3L)), solved.exactPrimal)
+
+        LpScopedSolver(source).use { owner ->
+            assertEquals(BigFraction.ofLong(6L), owner.solve(basis)?.lowerBound)
+            assertTrue(
+                owner.append(
+                    LpScopedRow(
+                        id = 100L,
+                        coefficients = listOf(0 to ExactLpNumber.of(1L)),
+                        rhs = ExactLpNumber.of(4L),
+                        logical = ExactLpColumn(ExactLpBounds(upper = ExactLpSide(ExactLpNumber.of(0L)))),
+                    ),
+                    scoped = false,
+                ),
+            )
+            val after = assertNotNull(owner.solve())
+            assertEquals(BigFraction.ofLong(8L), after.lowerBound)
+            assertEquals(listOf(BigFraction.ofLong(4L)), after.exactPrimal)
+        }
+    }
 }
 
 internal object B5bIndependentExactSourceValidator {
@@ -1518,35 +1547,6 @@ internal object B5bIndependentExactSourceValidator {
         }
         bounds.upper?.let { side ->
             if (side.strict) assertTrue(value < side.number.value) else assertTrue(value <= side.number.value)
-        }
-    }
-
-    @Test
-    fun `ordinary source basis remains usable after a cut append`() {
-        val builder = LpBuilder()
-        val x = builder.addVar(0L, 8L, cost = 2L)
-        repeat(10) { builder.addRow(intArrayOf(x), longArrayOf(1L), Relation.GE, 3L) }
-        val source = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
-        val solved = solveAndCertify(source.model)
-        val basis = assertNotNull(solved.float).basis
-        assertEquals(listOf(BigFraction.ofLong(3L)), solved.exactPrimal)
-
-        LpScopedSolver(source).use { owner ->
-            assertEquals(BigFraction.ofLong(6L), owner.solve(basis)?.lowerBound)
-            assertTrue(
-                owner.append(
-                    LpScopedRow(
-                        id = 100L,
-                        coefficients = listOf(0 to ExactLpNumber.of(1L)),
-                        rhs = ExactLpNumber.of(4L),
-                        logical = ExactLpColumn(ExactLpBounds(upper = ExactLpSide(ExactLpNumber.of(0L)))),
-                    ),
-                    scoped = false,
-                ),
-            )
-            val after = assertNotNull(owner.solve())
-            assertEquals(BigFraction.ofLong(8L), after.lowerBound)
-            assertEquals(listOf(BigFraction.ofLong(4L)), after.exactPrimal)
         }
     }
 }

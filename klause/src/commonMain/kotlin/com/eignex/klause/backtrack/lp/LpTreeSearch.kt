@@ -150,10 +150,7 @@ internal fun LpEngine.lbTreeSearch(objective: LinearObjective, cancellation: Can
     }
 }
 
-internal class LpRootNodeResult(
-    val model: LpModel,
-    val float: FloatLpResult?,
-)
+internal class LpRootNodeResult(val model: LpModel, val float: FloatLpResult?)
 
 @Suppress("TooGenericExceptionCaught", "ThrowingExceptionFromFinally")
 internal fun LpEngine.solveRootNode(
