@@ -21,7 +21,6 @@ import com.eignex.klause.lp.bounding.LpSearchPolicy
 import com.eignex.klause.lp.closeSourceLpOwners
 import com.eignex.klause.lp.engine.LpCertificationObserver
 import com.eignex.klause.lp.engine.LpCertifier
-import com.eignex.klause.lp.engine.LpExactState
 import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.lp.engine.LpSolveMetrics
 import com.eignex.klause.lp.engine.LpVerdict
@@ -54,7 +53,6 @@ import com.eignex.klause.solver.search.TheoryComponent
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.MutableIntObjectMap
 import com.ionspin.kotlin.bignum.integer.BigInteger
-import kotlin.time.TimeSource.Monotonic
 
 /** An exact integer/rational witness for an open QF_LIRA or QF_LIA model. */
 data class ExactLiraAssignment(
@@ -69,7 +67,6 @@ data class ExactLiraAssignment(
 /** Incremental source arithmetic on the shared LP and search lifecycles. */
 class ExactLiraSearchComponent(
     private val model: Problem,
-    private val lpEpochs: Boolean = false,
     private val modelContribution: ((ExactLiraAssignment, SearchModel) -> Unit)? = null,
 ) : TheoryComponent,
     SearchBrancher,
@@ -85,9 +82,6 @@ class ExactLiraSearchComponent(
     private var outcome: ComponentCheck? = null
     private var candidate: List<BigFraction>? = null
     private var dirty = true
-    private var epochObserver: ((String, Long) -> Unit)? = null
-    private var epochPending = false
-    private var epochRoot: LpExactState? = null
     private var solveContext = LpSolveContext.Production
     private val arithmeticRows = model.factors.flatMap { it.linearRows }.filter { row ->
         (0 until row.size).any { !Term.isBool(row.ref(it)) }
@@ -104,13 +98,6 @@ class ExactLiraSearchComponent(
                 override fun check(context: SearchContext): ComponentCheck = outcome ?: ComponentCheck.Indeterminate
                 override fun nextBranch(context: SearchContext): List<SearchDecision>? = branch(context)
                 override fun retract(decisionLevel: Int) = retractSource(decisionLevel)
-                override fun restart(context: SearchContext) {
-                    if (lpEpochs) {
-                        epochObserver?.invoke("shared_restart_opportunities", 1L)
-                        epochPending = true
-                        dirty = true
-                    }
-                }
             },
             solveContext = solveContext,
             cancellation = Cancellation { context?.cancelled() == true },
@@ -133,10 +120,6 @@ class ExactLiraSearchComponent(
     }
 
     internal val lpMetrics get() = lp.metrics
-
-    internal fun observeEpochWith(observer: (String, Long) -> Unit) {
-        epochObserver = observer
-    }
 
     internal fun observeWith(stats: SmtStatsSink) {
         smtStats = stats
@@ -290,14 +273,10 @@ class ExactLiraSearchComponent(
         ) {
             return ComponentResult.Consistent
         }
-        val sourceStarted = if (lpEpochs && epochPending && context.decisionLevel == 0) Monotonic.markNow() else null
         val asserted = assertSource(context)
-        sourceStarted?.let { epochObserver?.invoke("shared_source_ns", it.elapsedNow().inWholeNanoseconds) }
         if (!asserted || context.cancelled()) {
-            if (sourceStarted != null) epochObserver?.invoke("shared_source_declines", 1L)
             return ComponentResult.Indeterminate
         }
-        refreshEpoch(context)
         if (!context.consumeCheck()) return ComponentResult.Indeterminate
         val result = lp.solve() ?: return ComponentResult.Indeterminate
         if (context.cancelled()) return ComponentResult.Indeterminate
@@ -321,57 +300,6 @@ class ExactLiraSearchComponent(
         }
         // Source integer branching requires an independently checked continuous witness.
         return ComponentResult.Consistent
-    }
-
-    private fun refreshEpoch(context: SearchContext) {
-        if (!lpEpochs || context.decisionLevel != 0) return
-        val current = lp.state ?: return
-        val baseline = epochRoot
-        if (baseline == null) {
-            epochRoot = current
-            epochPending = false
-            epochObserver?.invoke("shared_root_baselines", 1L)
-            return
-        }
-        if (!epochPending) return
-        epochPending = false
-        val started = Monotonic.markNow()
-        try {
-            if (baseline.model.sameAuthority(current.model) && baseline.rows.sameAuthority(current.rows)) {
-                epochObserver?.invoke("shared_unchanged", 1L)
-                return
-            }
-            epochObserver?.invoke("shared_attempts", 1L)
-            val token = Cancellation {
-                context.cancelled() || started.elapsedNow().inWholeNanoseconds >= SOURCE_EPOCH_MAX_NS
-            }
-            val published = try {
-                system.refreshEpoch(token) { this.context === context && context.decisionLevel == 0 }
-            } finally {
-                val metrics = lp.lastEpochMetrics
-                epochObserver?.invoke("shared_repair_work_ops", metrics.workOps)
-                epochObserver?.invoke("shared_repair_pivots", metrics.pivots.toLong())
-                epochObserver?.invoke("shared_repair_refactors", metrics.initialRefactorizations.toLong())
-            }
-            if (published) {
-                epochRoot = lp.state
-                candidate = null
-                assignment = null
-                outcome = null
-                epochObserver?.invoke("shared_replacements", 1L)
-                epochObserver?.invoke("shared_rows", current.model.m.toLong())
-                epochObserver?.invoke("shared_columns", current.model.numVars.toLong())
-            } else {
-                val decline = when {
-                    context.cancelled() -> "shared_cancelled"
-                    started.elapsedNow().inWholeNanoseconds >= SOURCE_EPOCH_MAX_NS -> "shared_budget_declines"
-                    else -> "shared_declines"
-                }
-                epochObserver?.invoke(decline, 1L)
-            }
-        } finally {
-            epochObserver?.invoke("shared_total_ns", started.elapsedNow().inWholeNanoseconds)
-        }
     }
 
     private fun branch(context: SearchContext): List<SearchDecision>? {
@@ -1151,5 +1079,3 @@ private fun BigFraction.floor(): BigInteger {
     val quotient = num / den
     return if (num < BigInteger.ZERO && num % den != BigInteger.ZERO) quotient - BigInteger.ONE else quotient
 }
-
-private const val SOURCE_EPOCH_MAX_NS = 100_000_000L

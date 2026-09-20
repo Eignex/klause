@@ -1,4 +1,4 @@
-package com.eignex.klause.lp.bounding
+package com.eignex.klause.lp.cut
 
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.global.AllDifferent
@@ -7,15 +7,11 @@ import com.eignex.klause.factor.table.Table
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.lp.cut.SourceCut
-import com.eignex.klause.lp.cut.orNull
 import com.eignex.klause.lp.engine.CutAuxiliaryDefinition
 import com.eignex.klause.lp.engine.CutExpression
-import com.eignex.klause.lp.engine.CutFixing
 import com.eignex.klause.lp.engine.CutPremise
 import com.eignex.klause.lp.engine.CutProofFact
 import com.eignex.klause.lp.engine.CutProvenance
-import com.eignex.klause.lp.engine.CutRowTransform
 import com.eignex.klause.lp.engine.CutSource
 import com.eignex.klause.lp.engine.CutSourceKind
 import com.eignex.klause.lp.engine.Relation
@@ -34,7 +30,7 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-class LpEpochPresenceTest {
+class SourceCutPresenceTest {
     @Test
     fun `integer affine expressions have an intrinsic source lattice`() {
         val integer = CutSource(CutSourceKind.INTEGER, 0)
@@ -141,56 +137,6 @@ class LpEpochPresenceTest {
         )
 
         assertNull(cut.toCut(map).orNull())
-    }
-
-    @Test
-    fun `transformation dependencies retain auxiliary definitions absent from the cut expression`() {
-        val root = Any()
-        val term = CutSource(CutSourceKind.TERM, 0)
-        val auxiliary = CutSource(CutSourceKind.AUXILIARY, 0)
-        val definition = CutAuxiliaryDefinition(listOf(1L), emptyList(), 0L, false)
-        val expression = CutExpression(mapOf(term to BigFraction.ONE))
-        val original = CutPremise.Row(
-            CutExpression(mapOf(term to BigFraction.ONE, auxiliary to BigFraction.ONE)),
-            Relation.LE,
-            BigFraction.ofLong(2),
-        )
-        val conclusion = CutPremise.Row(expression, Relation.LE, BigFraction.ofLong(2))
-        val lower = CutPremise.Bound(CutExpression(mapOf(auxiliary to BigFraction.ONE)), false, BigFraction.ZERO)
-        val upper = lower.copy(upper = true)
-        val cut = SourceCut(
-            expression,
-            Relation.LE,
-            BigFraction.ofLong(2),
-            CutProvenance(
-                root,
-                0L,
-                listOf(CutProofFact(original, true), CutProofFact(lower, true), CutProofFact(upper, true)),
-                conclusion = conclusion,
-                transformations = listOf(
-                    CutRowTransform.Algebraic(
-                        original,
-                        conclusion,
-                        BigFraction.ONE,
-                        false,
-                        false,
-                        listOf(CutFixing(lower, upper)),
-                    ),
-                ),
-                auxiliaryDefinitions = mapOf(auxiliary to definition),
-            ),
-        )
-        val map = CutSourceMap(
-            root,
-            0L,
-            listOf(CutColumnSource(term)),
-            auxiliaryDefinitions = mapOf(auxiliary to definition),
-        )
-
-        val mapped = assertNotNull(cut.toCut(map).orNull())
-
-        assertEquals(mapOf(auxiliary to definition), assertNotNull(mapped.provenance).auxiliaryDefinitions)
-        assertNull(cut.toCut(CutSourceMap(root, 0L, map.columns)).orNull())
     }
 
     @Test

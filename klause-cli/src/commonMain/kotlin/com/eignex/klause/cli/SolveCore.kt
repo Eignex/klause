@@ -86,7 +86,6 @@ internal object SolveCore {
                     openWorkLimit = nodeLimit ?: Long.MAX_VALUE,
                     maxDecisions = takeOpenLongParam(common, "max-decisions", nonNegative = true) ?: Long.MAX_VALUE,
                     sharedRestart = takeOpenLongParam(common, "shared-restart", nonNegative = false),
-                    lpEpochs = EngineParams(common.engineParams).bool("lp-epochs") ?: false,
                     maxLearnedClauses = takeOpenIntParam(common, "max-learned", nonNegative = true),
                     lbdGlue = takeOpenIntParam(common, "lbd-glue", nonNegative = true) ?: 2,
                     openHintFlips = takeOpenLongParam(common, "open-hint-flips", nonNegative = true),
@@ -96,7 +95,6 @@ internal object SolveCore {
                     cancellation = deadlineCancel,
                     timeout = deadlineCancel,
                 )
-                common.engineParams.removeAll { it.startsWith("lp-epochs=") }
                 val request = pipeline.request.withPresolve(
                     config,
                     cancellation = presolveCancel,

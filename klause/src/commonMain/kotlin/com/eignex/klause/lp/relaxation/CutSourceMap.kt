@@ -113,37 +113,6 @@ internal class CutSourceMap(
         parentSnapshot,
         auxiliarySnapshot,
     )
-
-    fun atEpoch(next: Long): CutSourceMap = CutSourceMap(
-        model,
-        next,
-        columnSnapshot,
-        globalSnapshot,
-        activeSnapshot,
-        fixedSnapshot,
-        assumptionSnapshot,
-        parentSnapshot,
-        auxiliarySnapshot,
-    )
-
-    /** Compact row-indexed cut provenance through a proof-mapped relaxation transform. */
-    fun remapRows(sourceRows: IntArray): CutSourceMap {
-        val remapped = HashMap<Int, CutProvenance>()
-        for (outputRow in sourceRows.indices) {
-            parentSnapshot[sourceRows[outputRow]]?.let { remapped[outputRow] = it }
-        }
-        return CutSourceMap(
-            model,
-            epoch,
-            columnSnapshot,
-            globalSnapshot,
-            activeSnapshot,
-            fixedSnapshot,
-            assumptionSnapshot,
-            remapped,
-            auxiliarySnapshot,
-        )
-    }
 }
 
 internal fun CutSourceMap.withCpBounds(

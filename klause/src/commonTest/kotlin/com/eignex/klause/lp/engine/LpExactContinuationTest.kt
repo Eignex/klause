@@ -3,15 +3,167 @@ package com.eignex.klause.lp.engine
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ContinuationDecline
 import com.eignex.klause.simplex.exact.ContinuationPhase
+import com.eignex.klause.simplex.exact.ContinuationStatus
+import com.eignex.klause.simplex.exact.ExactContinuation
+import com.eignex.klause.simplex.exact.ExactContinuationInput
 import com.eignex.klause.simplex.exact.ExactContinuationLimits
 import com.eignex.klause.util.Cancellation
+import com.ionspin.kotlin.bignum.integer.BigInteger
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class LpExactContinuationTest {
+    @Test
+    fun `repeated continuation cannot replenish exhausted feasibility pivots`() {
+        val source = assertNotNull(
+            LpBuilder().apply {
+                repeat(4) { j ->
+                    addVar(0L, 10L)
+                    addRow(intArrayOf(j), longArrayOf(3L), Relation.GE, 1L)
+                }
+            }.build(Sense.MINIMIZE).authoritativeModel(),
+        )
+        val state = LpExactState(source)
+        val basis = Basis(IntArray(4) { 4 + it }, Array(8) { if (it < 4) VarStatus.AT_LOWER else VarStatus.BASIC })
+        val cache = LpExactContinuationCache()
+        val limited = continueExactLp(
+            assertNotNull(state.toWorkingModel()),
+            basis,
+            cache,
+            limits = ExactContinuationLimits(maxPivots = 2),
+        )
+        val spent = cache.usedWork
+
+        val resumed = continueExactLp(
+            assertNotNull(state.toWorkingModel()),
+            basis,
+            cache,
+            limits = ExactContinuationLimits(maxPivots = 2),
+        )
+
+        assertEquals(ContinuationDecline.PIVOTS, limited.metrics.decline)
+        assertEquals(2, limited.metrics.pivots)
+        assertEquals(ContinuationDecline.PIVOTS, resumed.metrics.decline)
+        assertEquals(0, resumed.metrics.pivots)
+        assertNull(resumed.witness)
+        assertTrue(cache.usedWork > spent)
+    }
+
+    @Test
+    fun `cancellation before lane publication retains admitted input peak`() {
+        val large = BigFraction.of(BigInteger.ONE shl 40, BigInteger.ONE)
+        val session = ExactContinuation(
+            ExactContinuationInput(
+                listOf(emptyList()),
+                emptyList(),
+                listOf(large),
+                listOf(null),
+                emptyList(),
+                listOf(ContinuationStatus.LOWER),
+            ),
+        )
+
+        val cancelled = session.resume(cancellation = Cancellation { session.normalizedScalarPeak >= 41 })
+        val lowered = session.resume(ExactContinuationLimits(maxBits = 24))
+
+        assertEquals(ContinuationDecline.CANCELLED, cancelled.metrics.decline)
+        assertEquals(1, cancelled.metrics.builds)
+        assertEquals(41, session.normalizedScalarPeak)
+        assertEquals(ContinuationDecline.BITS, lowered.metrics.decline)
+        assertNull(lowered.values)
+    }
+
+    @Test
+    fun `precision restart peak survives a lower scalar ceiling`() {
+        val huge = ExactLpNumber.of(BigFraction.of(BigInteger.ONE shl 100, BigInteger.ONE))
+        val zero = ExactLpNumber.of(0L)
+        val one = ExactLpNumber.of(1L)
+        val source = ExactLpModel(
+            listOf(
+                listOf(ExactLpEntry(0, huge), ExactLpEntry(1, one)),
+                listOf(ExactLpEntry(0, one), ExactLpEntry(1, huge)),
+            ),
+            listOf(one, one),
+            List(4) { ExactLpColumn(ExactLpBounds(ExactLpSide(zero), if (it < 2) null else ExactLpSide(zero))) },
+            List(2) { ExactLpRow() },
+            ExactLpObjective(List(4) { zero }),
+        )
+        val state = LpExactState(source)
+        val basis = Basis(intArrayOf(0, 1), arrayOf(VarStatus.BASIC, VarStatus.BASIC, VarStatus.FIXED, VarStatus.FIXED))
+        val cache = LpExactContinuationCache()
+        val first = continueExactLp(assertNotNull(state.toWorkingModel()), basis, cache)
+        val peak = cache.scalarPeak
+
+        val lowered = continueExactLp(
+            assertNotNull(state.toWorkingModel()),
+            basis,
+            cache,
+            limits = ExactContinuationLimits(maxBits = peak - 1),
+        )
+        val equal = continueExactLp(
+            assertNotNull(state.toWorkingModel()),
+            basis,
+            cache,
+            limits = ExactContinuationLimits(maxBits = peak),
+        )
+
+        assertNotNull(first.witness)
+        assertTrue(first.metrics.restarts > 0)
+        assertTrue(peak > 101)
+        assertEquals(ContinuationDecline.BITS, lowered.metrics.decline)
+        assertNull(lowered.witness)
+        assertNotNull(equal.witness)
+    }
+
+    @Test
+    fun `near maximum costs remain exhausted through repeated continuation`() {
+        val source = assertNotNull(LpBuilder().apply { addVar(0L, 10L) }.build(Sense.MINIMIZE).authoritativeModel())
+        val state = LpExactState(source)
+        val cache = LpExactContinuationCache()
+        val basis = Basis(intArrayOf(), arrayOf(VarStatus.AT_LOWER))
+        val working = assertNotNull(state.toWorkingModel())
+        assertNotNull(continueExactLp(working, basis, cache).witness)
+        cache.accountInput(Long.MAX_VALUE - 2L, Long.MAX_VALUE - 2L, Long.MAX_VALUE - 2L)
+        cache.accountInput(10L, 10L, 10L)
+
+        val declined = continueExactLp(working, basis, cache)
+
+        assertNull(declined.witness)
+        assertEquals(Long.MAX_VALUE, cache.usedWork)
+        assertEquals(Long.MAX_VALUE, cache.usedAllocation)
+        assertEquals(Long.MAX_VALUE, cache.usedTimeNs)
+        assertFailsWith<IllegalArgumentException> { cache.accountInput(-1L, 0L, 0L) }
+    }
+
+    @Test
+    fun `initialized continuation totals saturate without accepting negative cost`() {
+        val continuation = ExactContinuation(
+            ExactContinuationInput(
+                listOf(emptyList()),
+                emptyList(),
+                listOf(BigFraction.ZERO),
+                listOf(null),
+                emptyList(),
+                listOf(ContinuationStatus.LOWER),
+            ),
+        )
+        continuation.account(Long.MAX_VALUE - 2L, Long.MAX_VALUE - 2L, Long.MAX_VALUE - 2L)
+
+        continuation.account(10L, 10L, 10L)
+        continuation.account(0L, 0L, 0L)
+        val declined = continuation.resume()
+
+        assertNull(declined.values)
+        assertEquals(Long.MAX_VALUE, continuation.usedWork)
+        assertEquals(Long.MAX_VALUE, continuation.usedAllocation)
+        assertEquals(Long.MAX_VALUE, continuation.usedTimeNs)
+        assertFailsWith<IllegalArgumentException> { continuation.account(-1L, 0L, 0L) }
+    }
+
     @Test
     fun `source verification resumes a previously limited import`() {
         val model = LpBuilder().apply {

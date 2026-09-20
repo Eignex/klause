@@ -131,7 +131,7 @@ private class CpSatisfactionTraversal(
         try {
             val completion = BacktrackCompletion.of(problem, cp, params, sink, solveContext)
             completion.lpResource?.let(lpResources::add)
-            val lp = if (params.lpConfig != null || params.lpRootTidy || params.lpEpochs) {
+            val lp = if (params.lpConfig != null) {
                 LpFeasibilityComponent(problem, cp, params, sink, solveContext).also(lpResources::add)
             } else {
                 null
@@ -141,7 +141,6 @@ private class CpSatisfactionTraversal(
                 params,
                 sink,
                 seedDecisionLevels = params.assumptions.boolKeys.size + params.assumptions.intKeys.size,
-                lpEngine = lp?.engine,
             )
             val components = ArrayList<SearchComponent>()
             components += cp
@@ -178,7 +177,6 @@ private class CpSatisfactionTraversal(
                     return@sequence
                 }
             }
-            traversal.onRoot()
             val run = session.openRun(problem.numBoolVars, traversal)
             while (true) {
                 when (val event = run.next()) {
@@ -262,7 +260,6 @@ private class CpSatisfactionTraversalPolicy(
     private val params: BacktrackParams,
     sink: SolveStatsSink?,
     seedDecisionLevels: Int,
-    lpEngine: LpEngine?,
 ) : SearchTraversalPolicy,
     SearchRunLifecycle {
     private val restart = RestartSchedule.from(params)
@@ -286,11 +283,8 @@ private class CpSatisfactionTraversalPolicy(
     override val nodePolicy: SearchNodePolicy = SearchNodePolicy.ExpandAll
     override val lifecycle: SearchRunLifecycle get() = this
 
-    private val inprocessing = Inprocessing.from(params, lpEngine)
+    private val inprocessing = Inprocessing.from(params)
 
-    fun onRoot() {
-        inprocessing?.onRoot(session, params)
-    }
     private val pooledIncumbents = params.pooledIncumbents?.let { IncumbentSubscription(it) }
 
     override fun onRestart(context: SearchContext): SearchRunDisposition {

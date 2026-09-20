@@ -141,7 +141,7 @@ class LpFloatAllowanceTest {
     }
 
     @Test
-    fun `float allowances and owner replacement preserve exhausted exact consumption`() {
+    fun `float allowances preserve exhausted exact consumption`() {
         val builder = LpBuilder()
         builder.addVar(0, 2)
         val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
@@ -175,11 +175,10 @@ class LpFloatAllowanceTest {
         }
         val context = LpSolveContext(factory)
         val limits = ExactContinuationLimits(maxWork = 100L)
-        val spent = LpScopedSolver(state, context = context).use { owner ->
-            assertTrue(owner.importEpochBudget(LpEpochBudget(state.model, 100L, 0L, 0L, 0, 0, 0)))
+        LpScopedSolver(state, context = context).use { owner ->
             val exhausted = assertNotNull(owner.solve(continuationLimits = limits))
             assertEquals(ContinuationDecline.WORK, exhausted.continuation?.decline)
-            val consumed = assertNotNull(owner.exportEpochBudget())
+            assertTrue(assertNotNull(exhausted.continuation).builds > 0)
 
             for (allowance in listOf(
                 LpFloatAllowance(1L, 1),
@@ -187,19 +186,11 @@ class LpFloatAllowanceTest {
                 LpFloatAllowance(0L, 0),
             )) {
                 assertNotNull(owner.solveFloat(allowance = allowance))
-                assertEquals(consumed, owner.exportEpochBudget())
+                val repeated = assertNotNull(owner.solve(continuationLimits = limits))
+                assertEquals(ContinuationDecline.WORK, repeated.continuation?.decline)
+                assertEquals(0, repeated.continuation?.builds)
+                assertNull(repeated.witness)
             }
-            consumed
-        }
-        LpScopedSolver(state, context = context).use { replacement ->
-            assertTrue(replacement.importEpochBudget(spent))
-
-            val exhausted = assertNotNull(replacement.solve(continuationLimits = limits))
-
-            assertEquals(ContinuationDecline.WORK, exhausted.continuation?.decline)
-            assertEquals(0, exhausted.continuation?.builds)
-            assertNull(exhausted.witness)
-            assertTrue(assertNotNull(replacement.exportEpochBudget()).work >= spent.work)
         }
     }
 }

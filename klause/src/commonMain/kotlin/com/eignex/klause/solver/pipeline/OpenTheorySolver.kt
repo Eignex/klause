@@ -218,8 +218,6 @@ class OpenTheoryEngine internal constructor(
             cancellation = cancellation,
             learnedDb = SearchLearnedDbParams(params.maxLearnedClauses, params.lbdGlue),
             smtStats = state.smt,
-            lpEpochs = params.lpEpochs,
-            lpStats = stats.lp,
         )
         planned.use {
             planned.session.attachOpenTheoryWork(work)

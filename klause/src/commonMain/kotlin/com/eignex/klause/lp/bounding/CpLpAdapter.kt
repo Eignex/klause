@@ -1,8 +1,5 @@
 package com.eignex.klause.lp.bounding
 
-import com.eignex.klause.ir.Lit
-import com.eignex.klause.lp.engine.Basis
-import com.eignex.klause.lp.engine.CutPremise
 import com.eignex.klause.lp.engine.ExactLpNumber
 import com.eignex.klause.lp.engine.ExactLpSide
 import com.eignex.klause.lp.engine.LpBoundBatchResult
@@ -16,11 +13,8 @@ import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.solver.search.ComponentResult
-import com.eignex.klause.solver.search.SearchAtomPremise
 import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchDecision
-import com.eignex.klause.util.Cancellation
-import kotlin.time.TimeSource.Monotonic
 
 internal class CpLpAdapter(private val engine: LpEngine) : LpSearchPolicy {
     private var native: PropagationSession? = null
@@ -77,50 +71,6 @@ internal class CpLpAdapter(private val engine: LpEngine) : LpSearchPolicy {
         engine.propagator.reset()
     }
 
-    fun installEpoch(
-        base: LpRelaxation,
-        session: PropagationSession,
-        warm: Basis?,
-        token: Cancellation,
-        validatePublication: () -> Boolean,
-        publish: () -> Unit,
-    ): Boolean {
-        if (session.decisionLevel != 0 || (shared?.decisionLevel ?: 0) != 0) return false
-        val model = base.model.authoritativeModel() ?: return false
-        val premises = buildMap<Pair<Int, Boolean>, SearchAtomPremise> {
-            for (column in 0 until model.n) {
-                for (upper in listOf(false, true)) {
-                    val side = if (upper) model.column(column).bounds.upper else model.column(column).bounds.lower
-                    if (side == null) continue
-                    val source = base.sourceMap?.column(column)
-                    val fact = source?.let {
-                        CutPremise.Bound(
-                            it.expression(),
-                            upper,
-                            side.number.value + model.column(column).origin.value,
-                        )
-                    }
-                    val premise = when {
-                        fact != null && base.sourceMap.isGlobal(fact) -> SearchAtomPremise.All(emptyList())
-
-                        base.colIsBool[column] -> SearchAtomPremise.Asserted(
-                            SearchDecision.Bool(Lit.make(base.colVarId[column], !upper)),
-                        )
-
-                        else -> SearchAtomPremise.Unavailable
-                    }
-                    put(column to upper, premise)
-                }
-            }
-        }
-        return engine.propagator.replaceEpoch(base, model, warm, token, validatePublication, premises) {
-            native = session
-            persistentState = true
-            currentModel = null
-            publish()
-        }
-    }
-
     fun relaxation(base: LpRelaxation, session: PropagationSession): LpRelaxation? {
         currentModel = null
         if (base.model.hasContinuous || base.model.doubleView != null || base.model.exactState != null) return null
@@ -167,17 +117,7 @@ internal class CpLpAdapter(private val engine: LpEngine) : LpSearchPolicy {
         val authority = requireNotNull(core.state).model
         val proof = authority.recentered(lower.map(ExactLpNumber::of)).toLegacy() ?: return null
         val sources = base.sourceMap?.withCpBounds(proof, session)
-        val bindingStarted = if (base.tidyProof != null) Monotonic.markNow() else null
-        val rebound = try {
-            base.withModel(proof, sources)
-        } catch (_: IllegalArgumentException) {
-            engine.observeEpoch("map_declines")
-            reset()
-            return null
-        } finally {
-            bindingStarted?.let { engine.observeEpoch("map_binding_ns", it.elapsedNow().inWholeNanoseconds) }
-        }
-        if (base.tidyProof != null) engine.observeEpoch("map_retained")
+        val rebound = base.withModel(proof, sources)
         currentModel = proof
         persistentState = true
         return rebound

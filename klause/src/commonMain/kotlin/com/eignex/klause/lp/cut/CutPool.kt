@@ -105,10 +105,6 @@ internal class CutPool(
         return declines.toMap()
     }
 
-    fun mappedCuts(map: CutSourceMap): List<CutMapping<Cut>> = entries.map { entry ->
-        entry.source?.toCut(map) ?: CutMapping.Declined(CutMappingDecline.MISSING_PROVENANCE)
-    }
-
     fun exportGlobalCuts(): List<SharedCut> = entries.mapNotNull { entry ->
         entry.source?.takeIf { it.provenance.global }?.let { SharedCut(it) }
     }

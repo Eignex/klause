@@ -385,8 +385,6 @@ data class LpStats(
     val componentRoute: LpRouteSolveStats = LpRouteSolveStats(),
     /** Complete root and presolve engine telemetry. */
     val rootRoute: LpRouteSolveStats = LpRouteSolveStats(),
-    /** Root/restart epoch counts and cumulative phase costs; nanoseconds use the `_ns` suffix. */
-    val epochs: Map<String, Long> = emptyMap(),
 ) {
     /** Combine two workers' LP stats: counts add, LU maxes take the larger, wall time sums, and the
      *  root bound (same root across workers) keeps the tightest finite reading (NaN defers). */
@@ -464,7 +462,6 @@ data class LpStats(
         exactBasisFeasible = exactBasisFeasible.mergedWith(o.exactBasisFeasible),
         basisVerification = basisVerification.mergedWith(o.basisVerification),
         continuation = continuation.mergedWith(o.continuation),
-        epochs = mergeBasisCounts(epochs, o.epochs),
         exactFarkasRay = exactFarkasRay.mergedWith(o.exactFarkasRay),
         exactPointFeasible = exactPointFeasible.mergedWith(o.exactPointFeasible),
         rationalOutcome = rationalOutcome.mergedWith(o.rationalOutcome),
@@ -592,11 +589,6 @@ internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
 
     private var basisVerification = LpBasisVerificationStats()
     private var continuation = LpContinuationStats()
-    private val epochs = HashMap<String, Long>()
-
-    fun observeEpoch(name: String, value: Long = 1L) {
-        epochs[name] = (epochs[name] ?: 0L) + value
-    }
 
     private val certificationObservers: Array<LpCertificationObserver> by lazy {
         Array(LpRoute.entries.size) { index ->
@@ -898,7 +890,6 @@ internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
         exactBasisFeasible = certifierStats(LpCertifier.EXACT_BASIS),
         basisVerification = basisVerification,
         continuation = continuation,
-        epochs = epochs.toMap(),
         exactFarkasRay = certifierStats(LpCertifier.EXACT_FARKAS),
         exactPointFeasible = certifierStats(LpCertifier.EXACT_POINT),
         rationalOutcome = certifierStats(LpCertifier.RATIONAL),
