@@ -287,18 +287,22 @@ internal class RevisedSimplex(
         val original = constructionState
         if (state == null || original == null) return null
         meter.phase = ExactBasisPhase.ORDER_IDENTITY
-        meter.charge(2L * state.model.keySize + numVars + 8L * m, 256L + 8L * numVars + 8L * m)
+        val availabilityWork = if (m == 0) 0L else 1L
+        meter.charge(availabilityWork)
+        val current = basisSolver
+        // Updated factors cannot offer LU pivots, independently of the requested identity.
+        if (basisFactorized && current != null && current.updateCount != 0) {
+            meter.orderDecline = ExactBasisOrderDecline.UPDATED
+            return null
+        }
+        meter.charge(2L * state.model.keySize + numVars + 8L * m - availabilityWork, 256L + 8L * numVars + 8L * m)
         if (authority.model.exactState !== state || !original.sameMatrix(state) ||
             !authority.headings.contentEquals(basicVar) || !basisFactorized || !trackedHeadingsConsistent()
         ) {
             meter.orderDecline = ExactBasisOrderDecline.STALE
             return null
         }
-        val current = basisSolver ?: return null
-        if (current.updateCount != 0) {
-            meter.orderDecline = ExactBasisOrderDecline.UPDATED
-            return null
-        }
+        if (current == null) return null
         // Reserve the owner's snapshot, all four copy getters, translation and validation scratch.
         meter.phase = ExactBasisPhase.ORDER_EXPORT
         meter.charge(16L * m + numVars, 768L + 48L * m + 4L * numVars)
