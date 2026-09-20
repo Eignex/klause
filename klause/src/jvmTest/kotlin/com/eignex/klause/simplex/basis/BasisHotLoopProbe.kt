@@ -10,6 +10,7 @@ import kotlin.math.max
 
 /** Explicit operation probe; excluded from ordinary test discovery. */
 fun main(args: Array<String>) {
+    println("protocol\tfresh-refactor-reset-v2\treset-outside-measurement")
     println("kernels\t${koblas.vectorKernels.name}\t${koblas.sparseKernels.name}")
     for (id in listOf("mps-adlittle", "mps-afiro", "mzn-timetabling")) {
         val trace = BasisTraceCodec.read(Path.of(args[0], "$id.kbtrace"))
@@ -90,35 +91,30 @@ private class HotLoopProbe(private val trace: BasisTrace) : AutoCloseable {
     }
 
     private fun probeUpdate(slot: Int, entering: Int) {
-        val snapshot = checkNotNull(solver.snapshot())
-        try {
-            for (composed in listOf(false, true)) {
-                repeat(100) {
-                    check(solver.restore(snapshot))
-                    prepare(slot, entering)
-                    check(solver.update(slot, entering, spike, row) != BasisUpdate.SINGULAR)
-                }
-                measure(if (composed) "prepared-update" else "update", 100, {
-                    check(solver.restore(snapshot))
-                    if (!composed) prepare(slot, entering)
-                }) {
-                    if (composed) prepare(slot, entering)
-                    check(solver.update(slot, entering, spike, row) != BasisUpdate.SINGULAR)
-                }
-                val old = headings[slot]
-                headings[slot] = entering
-                val rhs = DoubleArray(matrix.rows) { if (it % 5 == 0) 1.0 else 0.0 }
-                solve(rhs, false)
-                checkResidual(rhs, input, false)
-                solve(rhs, true)
-                checkResidual(rhs, input, true)
-                headings[slot] = old
+        for (composed in listOf(false, true)) {
+            repeat(100) {
+                check(solver.refactorize(headings))
+                prepare(slot, entering)
+                check(solver.update(slot, entering, spike, row) != BasisUpdate.SINGULAR)
             }
-            check(solver.restore(snapshot))
-            prepare(slot, entering)
-        } finally {
-            snapshot.close()
+            measure(if (composed) "prepared-update" else "update", 100, {
+                check(solver.refactorize(headings))
+                if (!composed) prepare(slot, entering)
+            }) {
+                if (composed) prepare(slot, entering)
+                check(solver.update(slot, entering, spike, row) != BasisUpdate.SINGULAR)
+            }
+            val old = headings[slot]
+            headings[slot] = entering
+            val rhs = DoubleArray(matrix.rows) { if (it % 5 == 0) 1.0 else 0.0 }
+            solve(rhs, false)
+            checkResidual(rhs, input, false)
+            solve(rhs, true)
+            checkResidual(rhs, input, true)
+            headings[slot] = old
         }
+        check(solver.refactorize(headings))
+        prepare(slot, entering)
     }
 
     private fun prepare(slot: Int, entering: Int) {

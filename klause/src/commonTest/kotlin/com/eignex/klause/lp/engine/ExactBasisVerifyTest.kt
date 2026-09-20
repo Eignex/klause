@@ -395,7 +395,7 @@ class ExactBasisVerifyTest {
     }
 
     @Test
-    fun `restored and replacement owners do not inherit rational factors`() {
+    fun `replacement owners do not inherit rational factors`() {
         val zero = ExactLpNumber.of(0L)
         val source = ExactLpModel(
             listOf(listOf(ExactLpEntry(0, ExactLpNumber.of(1L)))),
@@ -411,14 +411,6 @@ class ExactBasisVerifyTest {
         RevisedSimplex(model).use { solver ->
             val first = assertNotNull(solver.solve())
             assertEquals(1, verifyExactBasis(model, first.basis, cache = solver.exactBasisCache).metrics.factoryCalls)
-            val snapshot = assertNotNull(solver.captureBasisRestart())
-            assertTrue(solver.restoreBasisRestart(snapshot))
-            val restored = assertNotNull(solver.resolveBounds())
-            assertEquals(
-                1,
-                verifyExactBasis(model, restored.basis, cache = solver.exactBasisCache).metrics.factoryCalls,
-            )
-            snapshot.close()
             RevisedSimplex(model).use { replacement ->
                 val result = assertNotNull(replacement.solve())
                 assertEquals(

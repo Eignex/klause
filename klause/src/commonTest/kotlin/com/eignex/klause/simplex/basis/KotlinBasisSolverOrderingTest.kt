@@ -59,31 +59,6 @@ class KotlinBasisSolverOrderingTest {
     }
 
     @Test
-    fun `restores recover the saved order eligibility and reject foreign snapshots`() {
-        val source = ftSource("dense", 3)
-        KotlinBasisSolver(source).use { solver ->
-            assertTrue(solver.refactorize(intArrayOf(2, 0, 1)))
-            val initial = assertNotNull(solver.snapshot())
-            val spike = IndexedVector(3).also { it.scatterColumn(source, 4) }
-            solver.ftran(spike)
-            assertEquals(BasisUpdate.APPLIED, solver.update(1, 4, spike))
-            val updated = assertNotNull(solver.snapshot())
-            assertTrue(solver.restore(initial))
-            assertContentEquals(intArrayOf(2, 0, 1), assertNotNull(solver.ordering()).columns)
-            assertTrue(solver.restore(updated))
-            assertNull(solver.ordering())
-            KotlinBasisSolver(source).use { foreign ->
-                assertFalse(foreign.restore(initial))
-                assertNull(foreign.ordering())
-            }
-            assertTrue(solver.restore(initial))
-            initial.close()
-            assertFalse(solver.restore(initial))
-            assertNotNull(solver.ordering())
-        }
-    }
-
-    @Test
     fun `repair exports accepted logical columns and failed rebuild retires the order`() {
         val source = SparseMatrix.ofColumns(3, 3, listOf(listOf(1 to 1.0), listOf(1 to 1.0), emptyList()))
         KotlinBasisSolver(source).use { solver ->

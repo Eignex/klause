@@ -25,13 +25,6 @@ class BasisWorkTest {
             assertTrue(lifetime.update.successes > 0)
             assertTrue(assertNotNull(active.build).builds > 2)
             assertEquals(control.spentWork, lifetime.units)
-            val snapshot = assertNotNull(solver.snapshot())
-            val beforeRestore = solver.basisOperationWork
-            assertTrue(solver.restore(snapshot))
-            assertEquals(beforeRestore.ftran, solver.basisOperationWork.ftran)
-            assertEquals(beforeRestore.update, solver.basisOperationWork.update)
-            assertEquals(active, solver.basisWork)
-            snapshot.close()
         }
     }
 
@@ -138,7 +131,7 @@ class BasisWorkTest {
     }
 
     @Test
-    fun `repair snapshot restore and close preserve work lifetimes`() {
+    fun `repair and close preserve work lifetimes`() {
         val source = ftSource("sparse", 5)
         val solver = KotlinBasisSolver(source)
         assertTrue(solver.refactorize(IntArray(5) { it }))
@@ -149,13 +142,6 @@ class BasisWorkTest {
         assertEquals(BasisBuildKind.REPAIR, repairedBuild.kind)
         assertTrue(repairedBuild.builds > 1)
         assertTrue(repairedBuild.units >= assertNotNull(repairedBuild.installedBuildUnits))
-        val snapshot = assertNotNull(solver.snapshot())
-        assertTrue(solver.refactorize(IntArray(5) { 4 - it }))
-
-        assertTrue(solver.restore(snapshot))
-
-        assertEquals(repaired, solver.basisWork)
-        snapshot.close()
         solver.close()
         assertFailsWith<IllegalStateException> { solver.basisWork }
     }
@@ -174,23 +160,10 @@ class BasisWorkTest {
 
     @Test
     fun `saturated phase counters preserve recorded declines`() {
-        val meter = BasisWorkMeter()
-        meter.restore(
-            BasisWork(
-                ftran = BasisPhaseWork(
-                    attempts = Long.MAX_VALUE,
-                    successes = Long.MAX_VALUE - 1,
-                    declines = 1,
-                ),
-            ),
-        )
+        val full = BasisPhaseWork(attempts = Long.MAX_VALUE, successes = Long.MAX_VALUE - 1, declines = 1)
 
-        meter.solveAttempt(transpose = false)
-        meter.solveSuccess(transpose = false, units = 1)
-        meter.solveAttempt(transpose = false)
-        meter.solveDecline(transpose = false)
+        val phase = full.mergedWith(BasisPhaseWork(attempts = 2, successes = 1, declines = 1))
 
-        val phase = meter.snapshot().ftran
         assertEquals(Long.MAX_VALUE, phase.attempts)
         assertEquals(Long.MAX_VALUE, phase.successes)
         assertEquals(2, phase.declines)
@@ -224,100 +197,21 @@ class BasisWorkTest {
     }
 
     @Test
-    fun `extension records transfer work without inheriting a reinversion epoch`() {
-        val oldSource = SparseMatrix.ofColumns(
-            2,
-            2,
-            listOf(listOf(0 to 2.0, 1 to 1.0), listOf(0 to 1.0, 1 to 3.0)),
-        )
-        val old = KotlinBasisSolver(oldSource)
-        assertTrue(old.refactorize(intArrayOf(0, 1)))
-        val vector = IndexedVector(2).also { it.unit(0) }
-        old.ftran(vector, 0.0)
-        assertTrue(old.basisWork.workSinceBuild > 0)
-        val newSource = SparseMatrix.ofColumns(
-            3,
-            3,
-            listOf(
-                listOf(1 to 2.0, 2 to 1.0, 0 to 0.5),
-                listOf(1 to 1.0, 2 to 3.0, 0 to 0.25),
-                listOf(0 to 1.0),
-            ),
-        )
-
-        val result = assertNotNull(
-            old.extend(
-                newSource,
-                BasisExtension(intArrayOf(0, 1), intArrayOf(-1, -1), intArrayOf(1, 2), intArrayOf(0, 1)),
-            ),
-        )
-
-        val extension = assertNotNull(result.solver.basisWork?.build)
-        val operation = old.basisOperationWork.extension
-        assertEquals(1, operation.attempts)
-        assertEquals(1, operation.successes)
-        assertEquals(0, operation.declines)
-        assertTrue(operation.units > 0)
-        assertEquals(BasisBuildKind.EXTENSION, extension.kind)
-        assertEquals(0, extension.builds)
-        assertEquals(null, extension.installedBuildUnits)
-        assertEquals(54, extension.units)
-        assertEquals(0, result.solver.basisWork?.workSinceBuild)
-        val snapshot = assertNotNull(result.solver.snapshot())
-        result.solver.ftran(IndexedVector(3).also { it.unit(0) }, 0.0)
-        assertTrue(result.solver.basisWork!!.workSinceBuild > 0)
-        assertTrue(result.solver.restore(snapshot))
-        assertEquals(0, result.solver.basisWork?.workSinceBuild)
-    }
-
-    @Test
-    fun `operation work retains failed extension and survives snapshot restore`() {
+    fun `operation work retains prior solves after a fresh factorization`() {
         val source = ftSource("dense", 5)
-        val solver = KotlinBasisSolver(source)
-        assertTrue(solver.refactorize(IntArray(5) { it }))
-        val snapshot = assertNotNull(solver.snapshot())
-        solver.ftran(IndexedVector(5).also { it.unit(0) }, 0.0)
-        val beforeRestore = solver.basisOperationWork
+        KotlinBasisSolver(source).use { solver ->
+            assertTrue(solver.refactorize(IntArray(5) { it }))
+            solver.ftran(IndexedVector(5).also { it.unit(0) }, 0.0)
+            val before = solver.basisOperationWork
 
-        assertTrue(solver.restore(snapshot))
+            assertTrue(solver.refactorize(IntArray(5) { it }))
 
-        val afterRestore = solver.basisOperationWork
-        assertTrue(afterRestore.units > beforeRestore.units)
-        assertEquals(1, afterRestore.refactorization.successes)
-        assertEquals(1, afterRestore.snapshot.successes)
-        assertEquals(1, afterRestore.restore.successes)
-        assertEquals(1, afterRestore.ftran.successes)
-        val incompatible = SparseMatrix.ofColumns(
-            6,
-            source.cols,
-            List(source.cols) { column ->
-                buildList {
-                    source.forEachInColumn(column) { row, value ->
-                        add(row to if (column == 0) value + 1.0 else value)
-                    }
-                    if (column == 0) add(5 to 1.0)
-                }
-            },
-        )
-
-        assertEquals(
-            null,
-            solver.extend(
-                incompatible,
-                BasisExtension(
-                    IntArray(5) { it },
-                    IntArray(5) { -1 },
-                    IntArray(5) { it },
-                    IntArray(source.cols) { it },
-                ),
-            ),
-        )
-
-        val declined = solver.basisOperationWork.extension
-        assertEquals(1, declined.attempts)
-        assertEquals(0, declined.successes)
-        assertEquals(1, declined.declines)
-        assertTrue(declined.units > 0)
+            val after = solver.basisOperationWork
+            assertTrue(after.units > before.units)
+            assertEquals(2, after.refactorization.successes)
+            assertEquals(before.ftran, after.ftran)
+            assertEquals(0, solver.basisWork.workSinceBuild)
+        }
     }
 
     private fun measuredTrace(source: SparseMatrix): BasisWork {

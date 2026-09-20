@@ -249,22 +249,7 @@ internal interface PersistentLpSolver : LpSolver {
 
     fun adopt(state: LpExactState, token: Cancellation = Cancellation.Never): Boolean = false
 
-    val appendTransferReady: Boolean get() = false
     val basisLifecycleWork: BasisOperationWork? get() = null
-    val lastAppendReplacementWork: LpAppendBasisWork? get() = null
-
-    fun captureBasisRestart(token: Cancellation = Cancellation.Never): EngineBasisRestartSnapshot? = null
-
-    fun restoreBasisRestart(snapshot: EngineBasisRestartSnapshot, token: Cancellation = Cancellation.Never): Boolean =
-        false
-
-    fun appendReplacement(
-        next: LpExactState,
-        oldRowsInNew: IntArray,
-        oldColumnsInNew: IntArray,
-        mode: LpAppendReplacementMode,
-        token: Cancellation = Cancellation.Never,
-    ): LpAppendReplacementAttempt = LpAppendReplacementAttempt(decline = LpAppendTransferDecline.UNSUPPORTED)
 
     /**
      * Re-point this engine at [next] and [token], keeping the seated basis and its factorization; false
@@ -286,30 +271,6 @@ internal interface PersistentLpSolver : LpSolver {
      */
     fun resolveGated(enforced: BooleanArray): FloatLpResult?
 }
-
-internal enum class LpAppendReplacementMode { TRANSFER, FRESH_INTENDED }
-
-internal enum class LpAppendTransferDecline {
-    UNSUPPORTED,
-    NOT_READY,
-    INCOMPATIBLE_STATE,
-    INCONSISTENT_HEADINGS,
-    STRUCTURAL,
-    ARITHMETIC,
-    CANCELLED,
-    FRESH_FAILED,
-}
-
-internal class LpAppendReplacement(val solver: PersistentLpSolver, val basis: Basis, val transferred: Boolean)
-
-internal data class LpAppendBasisWork(val units: Long?, val complete: Boolean)
-
-internal class LpAppendReplacementAttempt(
-    val replacement: LpAppendReplacement? = null,
-    val decline: LpAppendTransferDecline? = null,
-    val basisWork: Long? = null,
-    val basisWorkComplete: Boolean = basisWork != null,
-)
 
 /**
  * Construct the LP engine for the general solve/certify path — the swap point for an alternative engine

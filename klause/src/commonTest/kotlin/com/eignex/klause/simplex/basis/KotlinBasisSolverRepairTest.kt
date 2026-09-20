@@ -56,7 +56,6 @@ class KotlinBasisSolverRepairTest {
                 assertEquals(BasisRepairStop.CANCELLED, control.stop)
                 assertTrue(solver.singular)
                 assertNull(solver.ordering())
-                assertNull(solver.snapshot())
                 assertFailsWith<IllegalStateException> { solver.ftran(IndexedVector(2)) }
                 assertTrue(solver.refactorize(intArrayOf(0, 1)))
             }
@@ -72,7 +71,6 @@ class KotlinBasisSolverRepairTest {
                 Cancellation {
                     requested.fill(-1)
                     assertFailsWith<IllegalStateException> { solver.ordering() }
-                    assertFailsWith<IllegalStateException> { solver.snapshot() }
                     assertFailsWith<IllegalStateException> { solver.refactorize(intArrayOf(0, 1)) }
                     assertFailsWith<IllegalStateException> { solver.ftran(IndexedVector(2)) }
                     assertFailsWith<IllegalStateException> { solver.close() }

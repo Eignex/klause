@@ -3,7 +3,6 @@ package com.eignex.klause.simplex.basis
 internal enum class BasisBuildKind {
     REFACTORIZATION,
     REPAIR,
-    EXTENSION,
 }
 
 // A unit is one reported entry visit, pivot visit, candidate test, Schur update, or copied entry.
@@ -34,7 +33,7 @@ internal data class BasisBuildWork(
 )
 
 // Solve and update phases accumulate from the latest numerical build attempt. A build attempt resets the
-// epoch even when it fails. Snapshot restore reinstates the captured epoch for reinversion calibration.
+// epoch even when it fails.
 internal data class BasisWork(
     val build: BasisBuildWork? = null,
     val ftran: BasisPhaseWork = BasisPhaseWork(),
@@ -44,14 +43,10 @@ internal data class BasisWork(
     val workSinceBuild: Long get() = saturatedAdd(saturatedAdd(ftran.units, btran.units), update.units)
 }
 
-// Monotonic owner-lifetime work. Unlike [BasisWork], this is neither reset by a build nor rewound by
-// snapshot restore, so a caller can account for rejected operations and their fallbacks.
+// Monotonic owner-lifetime work is not reset by builds, retaining rejected operations and fallbacks.
 internal data class BasisOperationWork(
     val refactorization: BasisPhaseWork = BasisPhaseWork(),
     val repair: BasisPhaseWork = BasisPhaseWork(),
-    val extension: BasisPhaseWork = BasisPhaseWork(),
-    val snapshot: BasisPhaseWork = BasisPhaseWork(),
-    val restore: BasisPhaseWork = BasisPhaseWork(),
     val ftran: BasisPhaseWork = BasisPhaseWork(),
     val btran: BasisPhaseWork = BasisPhaseWork(),
     val update: BasisPhaseWork = BasisPhaseWork(),
@@ -60,9 +55,6 @@ internal data class BasisOperationWork(
     fun mergedWith(other: BasisOperationWork) = BasisOperationWork(
         refactorization.mergedWith(other.refactorization),
         repair.mergedWith(other.repair),
-        extension.mergedWith(other.extension),
-        snapshot.mergedWith(other.snapshot),
-        restore.mergedWith(other.restore),
         ftran.mergedWith(other.ftran),
         btran.mergedWith(other.btran),
         update.mergedWith(other.update),
@@ -74,17 +66,13 @@ internal data class BasisOperationWork(
             var total = 0L
             total = saturatedAdd(total, refactorization.units)
             total = saturatedAdd(total, repair.units)
-            total = saturatedAdd(total, extension.units)
-            total = saturatedAdd(total, snapshot.units)
-            total = saturatedAdd(total, restore.units)
             total = saturatedAdd(total, ftran.units)
             total = saturatedAdd(total, btran.units)
             return saturatedAdd(total, update.units)
         }
     val saturated: Boolean
         get() = units == Long.MAX_VALUE ||
-            refactorization.saturated || repair.saturated || extension.saturated || snapshot.saturated ||
-            restore.saturated || ftran.saturated || btran.saturated || update.saturated
+            refactorization.saturated || repair.saturated || ftran.saturated || btran.saturated || update.saturated
 }
 
 private val BasisPhaseWork.saturated: Boolean
@@ -119,9 +107,6 @@ internal class BasisOperationMeter {
     fun snapshot(): BasisOperationWork = BasisOperationWork(
         phase(BasisOperationKind.REFACTORIZATION),
         phase(BasisOperationKind.REPAIR),
-        phase(BasisOperationKind.EXTENSION),
-        phase(BasisOperationKind.SNAPSHOT),
-        phase(BasisOperationKind.RESTORE),
         phase(BasisOperationKind.FTRAN),
         phase(BasisOperationKind.BTRAN),
         phase(BasisOperationKind.UPDATE),
@@ -136,9 +121,6 @@ internal class BasisOperationMeter {
 internal enum class BasisOperationKind {
     REFACTORIZATION,
     REPAIR,
-    EXTENSION,
-    SNAPSHOT,
-    RESTORE,
     FTRAN,
     BTRAN,
     UPDATE,
@@ -180,22 +162,6 @@ internal class BasisWorkMeter {
         updateSuccesses = 0
         updateDeclines = 0
         updateUnits = 0
-    }
-
-    fun restore(work: BasisWork) {
-        build = work.build
-        ftranAttempts = work.ftran.attempts
-        ftranSuccesses = work.ftran.successes
-        ftranDeclines = work.ftran.declines
-        ftranUnits = work.ftran.units
-        btranAttempts = work.btran.attempts
-        btranSuccesses = work.btran.successes
-        btranDeclines = work.btran.declines
-        btranUnits = work.btran.units
-        updateAttempts = work.update.attempts
-        updateSuccesses = work.update.successes
-        updateDeclines = work.update.declines
-        updateUnits = work.update.units
     }
 
     fun solveAttempt(transpose: Boolean) {
