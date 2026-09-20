@@ -1,0 +1,164 @@
+# LP mechanism retention: Wave 8.1
+
+Decision inventory at `84dd300ec5205129774edcb8ed6b3dde9b9f1856` (merged #2019).
+This report proposes the executable Wave 8.2 split; it changes no production code or defaults.
+Root tidy/epochs and dualization remain OFF; rational ordering reuse remains ON by user decision.
+Static caller inspection is current at that base. Measurements retain their original implementation,
+consumer, budgets and exclusions; none was repeated for this inventory.
+
+Evidence root: `/home/rasmus/Workspaces/lp-evidence/` (abbreviated `E/` below).
+The [static contract](/home/rasmus/Workspaces/lp-evidence/session-8.1/contract.md) is external;
+`E/session-8.1/{caller-audit,correctness-route,review-*}.md` holds detailed attribution/review.
+The central `lp-plan.md` and `lp-waves.md` remain coordinator-owned. Historical solver notes are
+comparisons, not current authority: there is no COMBO, HFactor, generic Workspace or cold exact
+production solver to restore, and no dependency upgrade or compatibility shim is proposed.
+
+## Protected behavior and decision rules
+
+One production float engine, exact certification/source proofs, the bound trail, klause basis on
+current koblas kernels, presolve reuse and live incremental consumer behavior are requirements.
+Retain objective/bound warm starts, row lifecycle, source provenance, repair, cancellation and
+cumulative resource invariants even when retiring an optional caller. A missed benchmark event
+cannot justify removing correctness or recovery obligations. A cache containing spent allowances is
+not an optional performance cache.
+
+`Remove` below means retire the present optional implementation in 8.2, with shared machinery
+preserved and caller/flag deletion checked. It does not prove the mathematical idea has no useful
+workload. `Deferred` proposals already have no production implementation; their no-code disposition
+can close in 8.2 without restoring scaffolding. No row below authorizes a new benchmark. Any changed
+hypothesis needs frozen ownership, eligible consumers, size classes, oracle, budgets and independent
+contract review before code or measurement. Busy-host timings remain descriptive.
+
+## Retained implementation inventory
+
+Paths in this section are below `klause/src/commonMain/kotlin/com/eignex/klause/` unless qualified.
+Function names identify the actual call sites; an internal constructor option is not a CLI opt-in.
+Every recommendation separates saved value from unmeasured cost and preserves a simpler fallback.
+
+| ID / current mechanism and callers | Evidence, benefit and costs | Proposed 8.2 disposition and obligations |
+|---|---|---|
+| E1 Root tidy: `backtrack/Inprocessing.from` registers `lp/bounding/LpEpochPass`; `onRoot -> LpEngine.rebuildEpoch -> RelaxationTidy.apply -> CpLpAdapter.installEpoch`. `BacktrackParams.lpRootTidy=false`; `EngineParams` exposes `lp-root-tidy`. | Intended smaller generated relaxation. 6.1 root microfixture cost more than off; no corpus benefit. 6.2 root-only is the stronger comparator, not synonymous with successful tidy. Regeneration, exact proof binding, remapping, owner preparation and retained derivations are real costs. | **Remove current optional policy and exclusive tidy implementation**, after E2's joint caller cleanup. Ordinary problem presolve stays. High maintenance: conditional fixings, integer singleton rounding, auxiliary presence, proof lifting and source-cut maps. Preserve any shared maps/guards still used by surviving source cuts; no blanket deletion by `Epoch` name. |
+| E2 Automatic finite epochs and SOURCE refresh: E1's `LpEpochPass.run`; `theory/qflra/QfLiraSolver.refreshEpoch`, routed by `OpenTheorySolver -> PlannedSearch -> TheoryComponentFactory`. `lpEpochs=false` in finite/theory params, CLI `lp-epochs`. | 6.2 repaired expensive basis preparation, but seven-case/63-run total epoch/root wall ratio 1.00036 supplies no qualifying larger win. Composed 15-case traces: 158 attempts, 86 tidy CANCELLED of unknown cause, two consumed first publications, no reduction against a prior published generation; all first-root size coverage unknown. 22 lot witnesses pass; four workforce outputs have unsupported validator syntax. | **Remove automatic scheduling and its exclusive bookkeeping**, preserving ordinary SOURCE owner refresh and shared replacement/receipt semantics. This is an implementation/coverage failure, not absent opportunity. Off avoids preparation; root-only remains the stronger historical alternative. No additional timing matrix is justified by these traces. Exact authority, narrowing root scope, donor preservation, publish-before-close, source cuts and cumulative continuation/refinement spending remain required. |
+| D Root dualization: `lp/engine/LpSolve.solveAndCertify` when no explicit warm basis; `backtrack/lp/LpTreeSearch.solveRootNode` at first root. `LpSolveContext.rootDualization` defaults disabled; no production enabled context or CLI switch. | 5.4b tall ratio 10:1 gate did not repay transform/auxiliary/source recovery. CP root work 1,328→7,663; tree 6,070→9,587. Tall MPS BASIS declines occurred before source basis mapping because no exact source witness; 2173 exhausted proof work. 5.2 later gained source certification/refinement (23588 attained 3/3; rejected 2171 seeds recovered), with aggregate standalone work +24.79%. Those are valuable general refinement gains, not a paired post-5.2 dualization benefit. | **Remove current root strategy and exclusive map/options/metrics**, retain refinement and first-root resource admission where used. Simpler crash/source solve already exists; no activated production caller or full-consumer advantage justifies this disabled surface. Preserve exact source witness/bound policy, objective maps, source point plus ray and one-shot finite allowance in any future strategy. Do not treat auxiliary infeasibility as source infeasibility. |
+| O Rational ordering reuse: `RevisedSimplex.exactBasisCache -> proposedRationalOrder -> BasisSolver.ordering`; `ExactBasisVerify.verifyExactBasis` requests the hint. `reuseRationalOrder=true`; no production override. | B6c three pairs: total rational work 1,320,720→1,358,178 (+2.84%); savings 177 versus 37,635 order units; 95.6% order cost before updated-owner declines. 30 offers/6 accepted/24 updated declines, no fallback; 42 factories/45 builds/36 cache hits/138 solves per arm. First-call eligible verification +19.7%. 141 paired packages match; natural LU only in two MPS/four SMT cases. No full-consumer benefit. | **Keep ON; simplify rejection**, honoring explicit user decision. Move only the cheap updated-owner unavailability check ahead of full identity reservation; preserve charged admission for eligible hints, exact matrix/headings/permutation validation, standalone rational reorder and overflow fallback. Tests must distinguish skipped hint from verification decline, cap/cancellation and stale authority. No duplicate B6c campaign; compare bounded current traces/work after a reviewed contract. |
+| T Optional append factor transfer: `LpScopedSolver.append -> appendReplacement -> RevisedSimplex.appendReplacement -> BasisExtensionAdapter.transfer`; selection defaults `PRODUCTION_FRESH`, with no production override. | B5b append traces save 50.44% basis work versus identical intended-basis rebuild, not live consumer savings; all-logical comparisons also change the starting basis. Current production already constructs fresh factors. Optional transfer retains embeddings, copied update state, arithmetic fallback and ownership branches; current-consumer saved work/memory is unmeasured. | **Remove dormant transfer selection and exclusive engine hooks**; keep fresh transactional append/compaction, discrete warm headings, basis repair and accounting. Basis-kernel extension requires its own caller check before deletion. Donor stays usable on failure; complete returned headings must be adopted; publication precedes donor close. |
+| S Restart factor snapshots: `LpScopedSolver.captureBasisRestart/restoreBasisRestart`, `PersistentLpSolver` and `RevisedSimplex` wrappers; no production consuming caller. | Designed basis tests establish owned copies/restore, not actual restart savings. Each handle retains factors/statuses and adds invalidation, identity and close obligations. Ordinary bound pop already retains basis; objective warm start does not need snapshots. | **Remove unused engine restart snapshot API/registry and exclusive wrappers/tests**. Preserve any basis-kernel snapshot caller used by surviving transactions, verified separately. Simpler current-basis continuation/fresh repair remains. Never remove required bound-pop or working-scope state restoration under the snapshot label. |
+| C1 Exact factor cache: `RevisedSimplex.exactBasisCache`, consumed by `verifyExactBasis` through `LpSolve` and `Refinement`; owner-local ON. | B6c has 36 cache hits per arm, avoiding repeated rational builds, with 138 solves still charged. Retained factors consume memory; build/cache accounting is partial on null/cancelled/exception paths. No isolated full-consumer cache speedup claim. | **Keep**, bounded to one current matrix/ordered basis. Fresh factorization is simpler but discards observed reuse. Recompute current RHS/seats/costs/proofs; failed build is not a permanent memoized decline. Clear on incompatible replacement; charge all attempts. Maintenance is justified by live repeated verification and covered identity tests. |
+| C2 Refinement source factor/point/child reuse and continuation ledgers: `LpSolve.runRefinement`, `Refinement`, `LpScopedSolver`; exact continuation through `LpExactContinuation`. | 5.2 scheduled source LU first, retained source factors, delayed residual construction and reused checked points; declared paired gates pass while aggregate time +50.32% and work +24.79% remain. Capability includes source attainment and rejected-seed recovery. Broader consumer/cleanup accounting remains incomplete. | **Keep** current bounded reuse. Fresh correction children/point checks repeat measured setup; deleting ledgers would replenish resources. Preserve matrix/objective/bound/authority identity, source restoration, one equivalent-attempt budget across child/epoch replacement, close on every exit and cancellation before publication. Do not sum overlapping meters as total work. |
+| W Required warm behavior and optional per-depth hints: `LpEngine.lpBasisByDepth`, `CpLpAdapter`, `LpScopedSolver`, `RevisedSimplex.resolveBounds` and objective adoption. | Live finite search and exact theory require retained bound/status and objective reoptimization. Historical wave checks establish capability, not Wave 2/3 broad acceptance. Per-depth hints add copies/storage and stale-hint rejection; saved full-search work is not isolated. | **Keep required incrementality and restrict existing hints to the current finite fallback** (`LpPlan.warmStart=true`). Fresh construction is an optional-hint fallback, not a replacement for required trail behavior. Preserve source IDs, active rows, status-side repair, objective-dependent cutoff retraction and failure semantics. No blanket cache removal. |
+| N1 Root/stall cost perturbation: `RevisedSimplex` constructor `CostPerturbationOptions` OFF; production factory does not forward a nondefault option. | 5.5 120 records/105 supported outcomes source-check; 23588 total work −8.93%, afiro +14.54%, small CP/zero-objective SMT +6–7%. Root+stall equals root; no stall activation on source slice. Unscaled designed Beale is capability, not consumer performance. Cost shifts and true-cost cleanup enlarge every exit contract. | **Remove dormant optional perturbation**, retain true-cost authority and existing recovery. Ordinary unperturbed solve is simpler and already production. No evidence supports a generally enabled choice or a routed special-purpose consumer. A future conditional perturbation must first name an actual expensive stall class, not repeat the same inactive matrix. |
+| N2 Additional numerical recovery ladder: `RevisedSimplex`, `NumericalRecoveryOptions.enabled=false`; no enabling production factory. | 5.5 validates directed residual rebuild/unscaled/logical repair behavior; tighter pivot is unsupported/skipped, but no source-slice recovery event or independent consumer benefit. Extra state transitions, repeated cleanup and source publication checks are substantial maintenance. | **Remove unused selectable ladder branches**, while preserving ordinary numerical refactors, small-pivot/fresh-recompute safeguards, logical repair, scaling fallback and existing primal stall Bland. A rare obligation survives even if the optional implementation does not. Test budget/cancellation stops cannot become fresh allowance or false proofs. |
+| P Zero-objective entering pricing: `LpPricingOptions.MIN_BOUND_SUPPORT`, `ProductionLpEngineFactory`, forwarded by finite/theory consumers; explicit `LARGEST_PIVOT` alternative. Nonzero objectives use Harris. | Wave 2.3 CP work −20.74%; synthetic exact-state engine/basis work +2.33%/+14.94%; user accepted default. Sampling tableau support costs work; original CSC sparsity is only a proxy. Broad throughput is open. | **Keep both policy choices and current default**. Live configurable rollback and explicit user decision justify small policy surface. Preserve Devex leaving selection, Harris admissibility/magnitude floor, seeded ties and sampling budget. Do not conflate this with deferred primal maximum caching. |
+| H SMT normalized term sharing: `QfLraSystem.LiveQfLraSystem` through `QfLiraSolver`; always active, no off switch. | 6.3 eight source cases agree with Z3, six SAT witnesses checked; shared rows 48→1, repeated checks −30–39%; unique case +49.3%. Definitions live for owner lifetime. Exact canonicalization/maps cost construction and retained storage; broad no-regression unestablished. | **Keep exact sharing and fixed substitution** for demonstrated repeated-term capability; no speculative off framework. Maintenance preserves signed scale, strictness, integrality, immutable source identity and reconstruction. A permanent true bound still constrains its definition. The unique-term regression is a tuning gap, not a license to erase active definitions. |
+| R Bounded triangular root crash: `LpTreeSearch.solveRootNode -> rootCrashBasis -> CrashBasis.triangularCrashBasis`, active when no mapped dualization basis. | 5.4a directed construction+solve work 4,608 versus 83,072 cold; real tree-root probe 5,679 versus 7,015. Crash-only comparison lacks independent exact objective certification; broad throughput unknown. Sorting/selection and failed construction cost are charged. | **Keep root-only** for demonstrated work reduction and live caller. All-logical fallback stays; proposal is never a certificate. Maintain cost-sign/status-side eligibility, cancellation and once-only work charging on success/null/throw. No scope expansion. |
+
+
+| C3 Remembered exact counter-results: `LpEngine` passes `LpCounterResults` into `LpSolve`; current source witness suppresses a repeated infeasibility candidate. | This positive witness is a counterexample to a false infeasibility claim, not just cached speed. `LpSolveTest` verifies no ray read even under cancellation. Bounded value-key traversal/encoding and retained bound/witness storage cost are unmeasured. | **Keep the exact feasible-counter guard; simplify optional bound memoization** only with equivalent current-authority/provenance tests. No unverified boolean replacement. Preserve policy identity, premise/strictness/objective/bound invalidation and storage decline. Removing all of this “cache” would violate remembered-refuted-claim requirements. |
+| G Component splitting: `LpSolver.newLpSolver -> componentLpSolverOrNull`; `LpPlan.componentSplit=true`, `EngineParams` exposes `lp-component-split`. Live activation in `lp/OpenIntBounds.tightenOpenIntBounds/tightenByNeighborhoodProbes`. | Legacy OBBT builds split owners; native `exactState` immediately declines splitting, so ordinary exact-imported `solveAndCertify` does not activate it. `LpComponentsTest` covers stitched bounds, isolated columns, sum-before-rounding and interrupted-block non-attainment. Submodel construction/memory, loss of warm handles and complete throughput are unmeasured. | **Keep restricted to existing legacy OBBT consumers**, with monolithic same-engine fallback; no native expansion. Preserve complete partition/source witness validation, global bound stitching and resource exits. Maintenance supports a real separable-model capability, not a claim that every ON flag activates it. |
+
+## Removed proposals: explicit reconsideration
+
+These four mechanisms have no live production caller, flag, disabled implementation or retained
+experimental resource owner. Their historical integration routes below describe removed code.
+The simpler baseline is current production, including its existing source explanations and recovery.
+
+| Proposal | Failure classification and retained evidence | Reviewed recommendation for 8.2 |
+|---|---|---|
+| 7.1 weakening | Removed `LpPropagator` source Farkas/crossed-bound weakening. 800 attempts: 700 eligible, 500 weakened; destination-level sum 2,000→1,300, but 800 propagations and 7,800 LP work unchanged. Lifecycle +45.59%, failing its 10% gate. Source correctness passed; CP coverage unsupported. This is construction-cost/no-observed-consumer-gain failure, not proof that weaker antecedents are useless. | **Remain deferred; no code.** Cheaper candidate selection is plausible but no source-supported workload currently shows avoided future work. Do not rerun smaller explanations as the success metric. A future experiment must freeze a real repeated-conflict consumer and measure avoided propagation/LP work against current explanations, including shared exact surplus, strict contradictions, premise expansion, resource admission and publication. |
+| 7.2 row propagation | Removed pre-engine exact-theory scan/publication. Six-source normal budget: engine checks 7→6, shared checks 7→15; one-check budget loses four SAT to UNKNOWN. Publication-induced full source replay was uncharged; real queued branch/reduction mutation coverage missing. Routing follow-up: 13 exact SMT components, two finite SMT, one frontend refutation, all eight MPS finite; OBBT closes the disjunction control, MPS sides already closed. External SMT yields no facts; shared checks 61→98 on 22 non-wall-limited cases. | **Remain deferred; no restoration.** Scheduling/replay accounting must change before benefit evaluation. A changed hypothesis would reserve complete source replay before publication and run within a budget that leaves the baseline engine check available. It must cover registered-atom producer delivery exactly once, queued branch/reduction changes, recursively expandable strict/source reasons and a missed-propagation sweep. Neither extra budgets nor a scanner-only speedup can rescue quality loss. |
+| 7.2 separate CP opportunity | Archived formats follow-up: 24 sources, 15 complete post-CP scans (one empty), two partial and seven capped; returned scans find zero tighter CP bounds but 109 logical/slack tightenings. Before CP, 24 named-source bounds validate; 16 compiler auxiliaries unmapped. 17 witnesses/nine optima validate separately. No CP publication integration or on/off benefit. | **Remain deferred as a distinct consumer proposal.** Capped, nonroot and logical/slack opportunities are unknown. A revised CP experiment needs a source mapping/implication contract and an actual post-CP deduction reaching a later solve before timing; a forced exact-SMT route cannot establish this. Preserve both `session-7.2-formats/report.md` and `session-7.2-routing/report.md`, not just the original six-source cohort. |
+| 7.3 cycle detector | Removed observation only: 117 supported calls/21 unsupported per arm; work +38.38%, no source revisit or pivot/refactor change. Canonical fractional Beale has 66 checked revisits/73 pivots, but existing `stallBland` attains optimum. Dual counterpart does not cycle. Cancellation-poll diagnostic loses a baseline bound. No new recovery policy was tested. | **Retire the always-on detector proposal; defer selective detection.** Existing stall recovery covers the designed need at lower cost. A revival requires a captured source failure escaping that recovery, then bounded selective observation and a tested admissible recovery policy. Preserve full heading/status collision confirmation, revision/phase invalidation, charged history/eviction and cancellation; floating Bland has no exact termination guarantee. No dual-cycle benefit or universal absence of cycles is claimed. |
+| 7.4 primal pricing structure | No selection-only 10% gate pass. 26 strata: five descriptive below-gate, thirteen undersampled, two unsupported, six correctness-blocked; only two below-gate strata pass recording-overhead guard. 36 larger scheduled records stay blocked. Adlittle objective mode is mainly cold repair (19,572 samples); actual warm continuation has 227, afiro 427. Both phases densely recompute scores; GLOP's maximum uses separately maintained sparse reduced costs. | **Defer maximum caching; retire a heap-only port.** Sparse incremental score maintenance is the causally different hypothesis, after source correctness and actual warm/wider routing are established. First freeze update-density/computation versus selection attribution; only then decide whether any cache can repay invalidation and drift control. Preserve eligibility, ascending ties/stall Bland, phase-I gradient changes, all objective/status/bound/pivot/rebuild invalidations and shared limits. Do not repeat the same selection matrix or infer absent larger opportunity. |
+
+## Separate mandatory correctness handoff
+
+At untouched 7.4 base `549d12965`, the rebuilt CLI falsely reports UNSAT for `80bau3b`.
+An independently rechecked exact source witness satisfies all 2,262 rows and 9,799 bounds.
+`perold` and `25fv47` disagree with HiGHS but their bounded exact checks timed out: status unresolved.
+All three parse as continuous minimization and route Finite; saved root propagation, source presolve
+and finite presolve do not refute them. These are correctness blockers, not optional retention votes.
+
+Static review at this report's base identifies a concrete loss of unresolved-proof state:
+`backtrack/ResumableMinimize.terminalExhausted` checks `externalShared` before
+`sawIndeterminateLeaf`, producing `Unknown(SearchExhausted)` or `BestFound(SearchExhausted)`.
+`portfolio/PortfolioReduction.isExhausted` treats either as proof of exhaustion; sequential and
+parallel executors can then produce false Infeasible or Optimal. `BacktrackWorkerConfig` installs
+the objective-bound supplier that sets `externalShared`. The unshared path preserves Unsupported.
+This conditional code defect is established by inspection; its causal connection to `80bau3b`
+remains unproven. `lpSolves=0` is not localization: saved `80bau3b` output has one standalone LP pass,
+493 pivots, 29,331,990 work and 61 numerical refactors. Zero displayed certification attempts do
+not identify the leaf result.
+
+Fix task F must exercise the actual producer with existing
+`BacktrackSolver(BakedProblem, LpSolveContext)` and a deterministic withholding certification policy,
+adapting the tiny forced-decline continuous equality in
+`LpCertificationPolicyTest` to `x=1/2`, `0<=x<=1`. Cover shared supplier on/off, incumbent present/absent, unresolved
+leaf and genuinely exhausted controls; carry actual arm results through production
+`PortfolioReduction` and `SequentialPortfolio`, and inspect parallel/restart consumers. A fabricated
+`Unknown(SearchExhausted)` alone misses the producer defect. Preserve valid shared-cutoff exhaustion;
+simply demoting every SearchExhausted is insufficient. Ensure finished dirty arms close/stop under a
+bounded cancellation/count control, rather than repeatedly scheduling them. Identify the accepted/declined
+leaf by model or recording-factory construction boundary, not certification callback count (one leaf
+tries multiple certifiers); freeze and verify that two-region incumbent fixture before implementation. New JVM tests must be
+under 300 ms. No production fix or new diagnostic was run in 8.1.
+
+After independent contract review, one isolated original-source run may capture leaf verdict,
+admission/cancellation, unresolved-leaf state, supplier presence, arm terminal and portfolio terminal.
+Rebuild `:klause-cli:installJvmDist`; use saved `-t 2000 -r 606 -s -p 1 -e cp --lp default`, with a
+20-second external bound. Causality requires baseline decline→shared SearchExhausted→UNSAT and
+prevention by the isolated correction. UNKNOWN is a valid soundness repair, not recovered source
+feasibility/optimality. Do not reopen the 7.4 blocked timing records or increase proof budgets.
+
+Exact oracle: `E/session-7.4/{inputs/80bau3b.mps,80bau3b-source-witness.json,
+verify_large_witness.py,large-witness-verification.json,correctness-amendment.md,amendment-review.md}`.
+Source SHA-256 `abfd9c578df785018be663840ff798199c9a0991e0ea7a809794bf12d581fd56`;
+witness `16d65ab9dd865d2a836ad3b6ba125b4efc01bf75c976b485c82390116ea494cb`.
+No float-label equality, same-solver fresh build or witness-only optimality claim is an oracle.
+
+Other mandatory gaps remain independent: 6.2 restricted raw rebind gives −37 versus enumerated/fresh
+−38 (supported-caller contract versus retained-state cause unresolved); 5.7 emitted decimal/SMT
+rendering; afiro/adlittle exact original-decimal equalities and objective units; Wave 2 captured
+bound-update/exact-check failures, Wave 3 consumer/source integration acceptance, and Wave 4 bounded
+certification-rate/time acceptance. No general soundness, completeness or whole-plan acceptance
+follows from this report or a passing build.
+
+## Ordered Wave 8.2 work
+
+All paths below use the source prefix above, with corresponding `commonTest` packages where named.
+These are proposed allocations, to be frozen by the coordinator at the actual implementation base.
+A task may not extend its file set implicitly. Update generated dumps only for actual API deletion;
+no compatibility aliases. Final gate for each composed delivery is `./gradlew check lintDocs
+--max-workers=2`, without `--rerun-tasks`; no edits during it. Independent contract review precedes
+proof/resource/lifecycle changes; fresh final review records exact head/model and resolved findings.
+
+| Order / owner-sized task | Exact initial production paths and test boundaries | Dependencies and exit |
+|---|---|---|
+| F Separate verdict fix | `backtrack/ResumableMinimize.kt`; proposed tests `backtrack/ResumableMinimizeTest.kt`, `portfolio/SequentialPortfolioTest.kt`, JVM `portfolio/PortfolioTest.kt`. Read-only dependencies `portfolio/{PortfolioReduction,Portfolio,PortfolioWorker,BacktrackWorkerConfig,SequentialPortfolio}.kt`, `lp/relaxation/CpToLpRelaxation.kt`, `lp/engine/LpSolve.kt`. | Highest priority; independent of optional removals, but sequence any epoch edits to minimizer. Execute producer/composition matrix above; exact original-source attribution is a separate bounded diagnostic. Audit all SearchExhausted consumers and rebind/root restart state. Expand fixes only after attribution review. |
+| A Optional engine cleanup | `lp/engine/{LpSolver,LpScopedSolver,RevisedSimplex,BasisExtensionAdapter,CostPerturbation}.kt`; `lp/engine/BasisRepair.kt:EngineBasisRestartSnapshot`; tests `LpScopedBasisTransferTest`, `RevisedSimplexSnapshotTest`, `RevisedSimplexPerturbationTest`, `CostPerturbationTest`, `BasisExtensionAdapterTest`. | T/S/N1/N2 together under one owner; no concurrent edits with O/C2. Keep fresh append, current-basis warmth, ordinary repair/unscaled recovery and all resource guards. Resolve independent basis snapshot/extension callers before leaf deletions. Zero dormant selection/registry references; surviving append/pop/objective/cancellation tests pass. |
+| B Rational hint simplification | `lp/engine/RevisedSimplex.kt:proposedRationalOrder`; `lp/engine/ExactBasisOrderingTest.kt`. | After A hands off shared file. O stays ON. Freeze charge/decline contract, verify eligible hints unchanged and cheap updated rejection avoids identity overhead without granting verification extra authority. Existing B6c is baseline; bounded diagnostic only if needed, no full campaign. |
+| C Epoch/tidy policy retirement | `lp/bounding/{LpEpochPass,LpEpochState,LpEpochProof,RelaxationTidy,RelaxationTidyDerivation,LpEngine}.kt`; `backtrack/{BacktrackParams,Inprocessing,Search}.kt`; `solver/pipeline/{EngineParams,TheoryParams,OpenTheorySolver,PlannedSearch,TheoryComponentFactory}.kt`; `theory/qflra/QfLiraSolver.kt`; CLI `SolveCore.kt`. | E1/E2; sequence with F and theory sharing work. First enumerate exclusive versus shared references in `CpLpAdapter`, `LpPropagator`, `LpScopedSolver`, `LpEpochReceipt`, `LpHarvest`, `LpRelaxation` and `LpExplanation`; these are preservation boundaries, not blanket deletion grants. Migrate shared lifecycle regressions before removing exclusive epoch/tidy tests/CLI stats. Ordinary replacement, source cuts, root harvesting and presolve must retain callers/tests. |
+| D Root dualization retirement | `lp/engine/{LpDualization,LpSolve,LpEngineFactory,LpSolver}.kt`; `backtrack/lp/LpTreeSearch.kt`; tests `LpDualizationTest`, `LpDualizationBasisTest`, `LpDualizationProofTest`, `LpTreeSearchDualizationTest`. | Sequence with certification/cache work. Remove exclusive options/observer/statistics only after reference audit. Preserve root crash, source certification/refinement and shared admission/allowance. Reuse source-proof and warm/cancellation controls; no performance test needed for dormant-branch deletion. |
+| C3 Counter-result simplification | `lp/engine/LpSolve.kt`, `lp/bounding/LpEngine.kt`, `lp/engine/LpScopedSolver.kt`; `lp/engine/LpSolveTest.kt`. | After A/D shared-file handoff. Retain exact witness as refutation guard; remove only optional cached bound reuse without weakening cancellation/policy/current-state protection. Independent proof contract and positive/decline tests required. |
+| E No-code dispositions and retained contracts | This report, `lp-weakening.md`, `lp-row-propagation.md`, `klause-bench/{cycling-recovery,primal-pricing,ordering-reuse}.md`; central plans coordinator-only. | Can proceed independently. Record final decisions for 7.1–7.4, C1/C2/W/P/H/R/G; link live tests and evidence. Larger/warm pricing experiments remain blocked by F and independent source correctness/coverage. No new scanner/detector/cache framework. |
+
+For E1/E2, a future replacement experiment must first distinguish deadline/work/parent cancellation,
+resolved LP plan and first-root eligible size, then prove a consumed reduction from a prior published
+generation. Any performance revival retains the central epoch gate against both root-only and off:
+at least two application groups including a predeclared larger case, ≥20% paired median wall gain
+where both prove all three repetitions or extra proofs in at least two of three, no quality loss,
+and the plan's small-case checks. That threshold does not apply to other mechanisms. Other optional
+performance changes use their frozen gates or plan rule 8 (≥5% target gain, no lost solves, ≤5%
+common-solved median regression). No indefinite disabled scaffolding is an accepted 8.2 endpoint.
+
+Evidence entry points: `E/session-6.2/{full-api-handoff.md,rebind-attribution.md,
+epoch-composed-diagnostics/diagnostic-report.md,epoch-composed-diagnostics/final-review.md,
+larger-activation/repair-larger/}`; `E/session-5.4b/{api-handoff,measurements}.md`;
+`E/session-5.2/{handoff,measurements,source-cache-review}.md`;
+`E/session-5.5/{handoff,measurements,final-review}.md`;
+`E/session-6.3/{delivery,measurements,final-review}.md`;
+`E/session-7.1/{experiment-review,contract-review}.md`;
+`E/session-7.2/composition-review.md`; both 7.2 follow-up reports above;
+`E/session-7.3/`; `E/session-7.4/{handoff,amendment-review,measurement-review}.md`;
+`E/session-b6c/{handoff,final-validation.json}`. Raw artifacts and adverse/unsupported outcomes
+remain there; this report neither supersedes those records nor imports their historical approvals
+as approval of a new implementation.
