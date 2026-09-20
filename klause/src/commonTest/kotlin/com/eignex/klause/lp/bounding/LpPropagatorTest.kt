@@ -1,5 +1,10 @@
 package com.eignex.klause.lp.bounding
 
+import com.eignex.klause.lp.engine.Basis
+import com.eignex.klause.lp.engine.LpBuilder
+import com.eignex.klause.lp.engine.Relation
+import com.eignex.klause.lp.engine.Sense
+import com.eignex.klause.lp.engine.authoritativeModel
 import com.eignex.klause.lp.engine.ExactLpBounds
 import com.eignex.klause.lp.engine.ExactLpColumn
 import com.eignex.klause.lp.engine.ExactLpEntry
@@ -472,6 +477,127 @@ class LpPropagatorTest {
                 assertNull(lp.solve())
                 assertEquals(1, closes)
             }
+        }
+    }
+
+    @Test
+    fun `failed ordinary logical preparation remains charged and closes its numerical owner`() {
+        val builder = LpBuilder()
+        val x = builder.addVar(0L, 3L)
+        repeat(4) { builder.addRow(intArrayOf(x), longArrayOf(1L), Relation.GE, 1L) }
+        val source = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+        val model = assertNotNull(source.toWorkingModel())
+        var closes = 0
+        var logicalWork = 0L
+        var numericalAllowance = 0L
+        val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+            override fun newPersistentSolver(
+                model: LpModel,
+                cancellation: Cancellation,
+                refactorUpdateLimit: Int,
+                iterationLimit: Int,
+                workLimit: Long,
+                trackDegeneracy: Boolean,
+                pricing: LpPricingOptions,
+            ): PersistentLpSolver {
+                numericalAllowance = workLimit
+                val delegate = ProductionLpEngineFactory.newPersistentSolver(
+                    model,
+                    cancellation,
+                    refactorUpdateLimit,
+                    iterationLimit,
+                    workLimit,
+                    trackDegeneracy,
+                    pricing,
+                )
+                return object : PersistentLpSolver by delegate {
+                    override fun close() {
+                        closes++
+                        delegate.close()
+                    }
+                    override fun prepareLogicals(token: Cancellation): Basis? {
+                        assertNotNull(delegate.prepareLogicals(token))
+                        logicalWork = delegate.lastMetrics.workOps
+                        return null
+                    }
+                }
+            }
+        }
+        LpPropagator(object : LpSearchPolicy {}, { LpEffortProfile(work = 1000L) }, LpSolveContext(factory)).use { owner ->
+            assertTrue(owner.install(model, source.model))
+
+            assertNull(owner.solveFloat())
+
+            assertTrue(logicalWork > 0L)
+            assertTrue(numericalAllowance in 1L until 1000L)
+            assertEquals(1000L - numericalAllowance + logicalWork, owner.lastMetrics.workOps)
+            assertTrue(owner.lastMetrics.workOps <= 1000L)
+            assertNotNull(owner.state)
+            assertEquals(1, closes)
+            assertTrue(owner.install(model, source.model))
+        }
+    }
+
+    @Test
+    fun `a null first float result retains its owner and uses the next effort allowance`() {
+        val builder = LpBuilder()
+        val x = builder.addVar(0, 4, cost = 1)
+        builder.addRow(intArrayOf(x), longArrayOf(1), Relation.GE, 1)
+        val source = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+        val model = assertNotNull(source.toWorkingModel())
+        val seen = ArrayList<LpFloatAllowance?>()
+        var constructions = 0
+        var numericalAllowance = 0L
+        var logicalWork = 0L
+        val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+            override fun newPersistentSolver(
+                model: LpModel,
+                cancellation: Cancellation,
+                refactorUpdateLimit: Int,
+                iterationLimit: Int,
+                workLimit: Long,
+                trackDegeneracy: Boolean,
+                pricing: LpPricingOptions,
+            ): PersistentLpSolver {
+                constructions++
+                assertTrue(workLimit in 1L until 1000L)
+                numericalAllowance = workLimit
+                assertEquals(30, iterationLimit)
+                val delegate = ProductionLpEngineFactory.newPersistentSolver(
+                    model,
+                    cancellation,
+                    refactorUpdateLimit,
+                    iterationLimit,
+                    workLimit,
+                    trackDegeneracy,
+                    pricing,
+                )
+                return object : PersistentLpSolver by delegate {
+                    override fun prepareLogicals(token: Cancellation): Basis? =
+                        delegate.prepareLogicals(token).also { logicalWork = delegate.lastMetrics.workOps }
+                    override fun resolveBounds(allowance: LpFloatAllowance?): FloatLpResult? {
+                        seen.add(allowance)
+                        delegate.resolveBounds(allowance)
+                        return null
+                    }
+                }
+            }
+        }
+        var profile = LpEffortProfile(work = 1000L, iterations = 30)
+        LpPropagator(object : LpSearchPolicy {}, { profile }, LpSolveContext(factory)).use { owner ->
+            assertTrue(owner.install(model, source.model))
+            val installed = owner.state
+            assertNull(assertNotNull(owner.solveFloat()).second)
+            assertEquals(1000L - numericalAllowance + logicalWork, assertNotNull(owner.metrics).preparationWork)
+            assertTrue(owner.install(model, source.model))
+            assertSame(installed, owner.state)
+            profile = LpEffortProfile(work = 100L, iterations = 2)
+
+            assertNull(assertNotNull(owner.solveFloat()).second)
+
+            assertEquals(listOf(null, LpFloatAllowance(100L, 2)), seen)
+            assertEquals(1, constructions)
+            assertSame(installed, owner.state)
         }
     }
 }

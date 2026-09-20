@@ -118,4 +118,63 @@ class LpTreeSearchWarmStartTest {
         assertEquals(0L, engine.pendingNodeSolveWork())
         assertEquals(43.0, sink.snapshot().lp.rootWorkOps.sum)
     }
+
+    @Test
+    fun `a failed root charges completed source preparation once to its parent`() {
+        val sink = SolveStatsSink(backend = "source-parent")
+        val engine = LpEngine(Problem(0, 0, emptyArray(), emptyArray()), LinearObjective(), LpParams(), sink)
+
+        engine.use {
+            assertNull(
+                it.solveRootNodeWithCrash(
+                    null,
+                    { null },
+                    { error("no solve owner") },
+                    { LpSolveMetrics(workOps = 41L) },
+                ),
+            )
+        }
+
+        assertEquals(41L, engine.totalSolveWork())
+        assertEquals(0L, engine.pendingNodeSolveWork())
+        assertEquals(41.0, sink.snapshot().lp.rootWorkOps.sum)
+    }
+
+    @Test
+    fun `throwing source work is accounted without masking the failure`() {
+        val observed = ArrayList<Long>()
+
+        val failure = assertFailsWith<IllegalStateException> {
+            solveRootNodeWithCrash(
+                null,
+                { error("source failure") },
+                { error("no owner") },
+                { _, metrics -> observed += metrics.workOps },
+                { LpSolveMetrics(workOps = 23L) },
+            )
+        }
+
+        assertEquals("source failure", failure.message)
+        assertEquals(listOf(23L), observed)
+    }
+
+    @Test
+    fun `successful root combines preparation and source work once`() {
+        val observed = ArrayList<Long>()
+        val solver = object : LpSolver {
+            override val infeasibleRay: DoubleArray? = null
+            override fun solve(warm: Basis?) = null
+            override fun solvePrimal(warm: Basis?) = null
+        }
+
+        solveRootNodeWithCrash(
+            null,
+            { solver to null },
+            { LpSolveMetrics(workOps = 17L) },
+            { _, metrics -> observed += metrics.workOps },
+            { LpSolveMetrics(workOps = 23L) },
+        )
+
+        assertEquals(listOf(40L), observed)
+    }
 }
