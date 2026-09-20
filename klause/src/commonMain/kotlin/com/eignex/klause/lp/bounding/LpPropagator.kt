@@ -356,9 +356,7 @@ internal class LpPropagator(
     fun deactivate(row: Long): Boolean = owner?.deactivate(row) == true
 
     fun solveFloat(warm: Basis? = null, token: Cancellation = cancellation): Pair<LpSolver, FloatLpResult?>? =
-        solveOwned {
-                current,
-            ->
+        solveOwned { current ->
             val allowance = if (solved) effort().let { LpFloatAllowance(it.work, it.iterations) } else null
             current.solveFloat(if (solved) null else warm, token, allowance).also { solved = true }
         }

@@ -1144,8 +1144,8 @@ class LpSolveTest {
                 ExactLpBasis(
                     listOf(0) + (2..10).toList(),
                     List(11) {
-                    if (it == 1) ExactLpStatus.AT_LOWER else ExactLpStatus.BASIC
-                }
+                        if (it == 1) ExactLpStatus.AT_LOWER else ExactLpStatus.BASIC
+                    },
                 )
             } else {
                 null
