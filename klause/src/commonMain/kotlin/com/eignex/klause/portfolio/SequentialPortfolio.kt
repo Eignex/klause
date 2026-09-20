@@ -210,6 +210,8 @@ class SequentialPortfolio(
         // One resumable handle per backtrack arm, opened lazily on the arm's first segment and resumed
         // on every later one. LS arms stay null and run a fresh warm-started slice each time.
         val handles = arrayOfNulls<ResumableSearch>(workers.size)
+        val retired = BooleanArray(workers.size)
+        var remaining = workers.size
         // Per-arm counters. A resumable arm's handle carries them cumulatively, so its entry is replaced
         // each segment rather than accumulated; a non-resumable arm runs a fresh search per segment, so
         // its terminal verdicts are merged. Folding only terminal verdicts loses every arm the deadline
@@ -232,7 +234,13 @@ class SequentialPortfolio(
                 // Round-robin warmup: force every arm once (at the short warmup slice) before the
                 // bandit free-selects, so a backtrack arm a COP needs can't be starved to zero budget.
                 val warming = segment < workers.size
-                val arm = if (warming) segment else bandit.choose()
+                val selected = if (warming) segment else bandit.choose()
+                val arm = if (retired[selected]) {
+                    bandit.update(selected, 0.0)
+                    retired.indexOfFirst { !it }
+                } else {
+                    selected
+                }
                 val sliceMs = if (warming) warmupSliceMillis else slice
                 val hadIncumbent = incumbent.current() != null
                 val before = readBound()
@@ -241,12 +249,15 @@ class SequentialPortfolio(
                 armId = worker.armId
                 val handle = handles[arm] ?: worker.newResumableSearch(readBound)?.also { handles[arm] = it }
                 var terminal: MinimizeResult? = null
+                var failed = false
                 if (handle != null) {
                     // Resume the arm's search for this slice; a terminal verdict means it finished, null
                     // means the slice elapsed (search paused, state retained for the next reschedule).
-                    terminal = runCatching {
+                    val outcome = runCatching {
                         handle.runSlice(cancellation, Long.MAX_VALUE, sliceNodes) { accept(it) }
-                    }.getOrNull()
+                    }
+                    terminal = outcome.getOrNull()
+                    failed = outcome.isFailure
                 } else {
                     // Local-search segments restart from the shared incumbent but are bounded by their own
                     // counted work post-warmup; the whole-solve deadline remains the outer cancellation
@@ -264,6 +275,7 @@ class SequentialPortfolio(
                         }
                     }
                 }
+                if (terminal is MinimizeResult.WithSample) accept(terminal)
                 if (handle != null) {
                     perArm[arm] = handle.stats
                 } else {
@@ -285,7 +297,7 @@ class SequentialPortfolio(
                 // Guards keep it from disrupting productive search: only once an incumbent exists (the
                 // feasibility hunt is never reset), and never on a segment that already returned a terminal
                 // verdict (a completed optimality / infeasibility proof short-circuits to the return below).
-                if (handle != null && terminal == null && incumbent.current() != null) {
+                if (handle != null && terminal == null && !failed && incumbent.current() != null) {
                     if (improvement > 0.0) {
                         staleSegments[arm] = 0
                     } else if (reseedStaleThreshold > 0 && ++staleSegments[arm] >= reseedStaleThreshold) {
@@ -298,6 +310,15 @@ class SequentialPortfolio(
                 // A clean segment exhaustion ends the run: any incumbent is optimal, else infeasible.
                 if (PortfolioReduction.isExhausted(terminal)) {
                     return PortfolioReduction.terminal(incumbent.current(), dirty = false, foldArms(perArm))
+                }
+                if (handle != null && (terminal != null || failed)) {
+                    retired[arm] = true
+                    remaining--
+                    handles[arm] = null
+                    handle.close()
+                    if (remaining == 0) {
+                        return PortfolioReduction.terminal(incumbent.current(), dirty = true, foldArms(perArm))
+                    }
                 }
                 if (!warming) {
                     slice = grow(slice, maxSliceMillis)

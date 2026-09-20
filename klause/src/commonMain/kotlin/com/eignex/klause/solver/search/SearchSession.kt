@@ -1014,6 +1014,12 @@ class SearchRun internal constructor(
                         when (modelPolicy.onModel(model, session)) {
                             SearchModelDisposition.Surface -> return SearchRunEvent.Satisfied(model)
 
+                            SearchModelDisposition.Indeterminate -> {
+                                resumeAfterSolution = false
+                                lastModel = null
+                                return finish(SearchRunEvent.Indeterminate.Component)
+                            }
+
                             SearchModelDisposition.Continue -> {
                                 resumeAfterSolution = false
                                 when (modelContinuation) {

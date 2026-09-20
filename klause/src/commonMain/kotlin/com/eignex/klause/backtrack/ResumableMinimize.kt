@@ -113,8 +113,7 @@ internal class ResumableMinimize(
     private var initialCandidate = initialCandidate
     private var replaced = false
 
-    /** Set when a leaf's residual continuous LP was neither certified feasible nor infeasible, so an
-     *  exhausted search with no incumbent must report `unknown` rather than Infeasible. */
+    // Unproved leaf coverage cannot become infeasibility or optimality, including under shared cutoffs.
     private var sawIndeterminateLeaf = false
 
     // The LP-relaxation family is resolved from [BacktrackParams.lpConfig] inside [LpEngine]
@@ -409,6 +408,7 @@ internal class ResumableMinimize(
         lastBoolCutoffRhs = null
         lastOpenCutoff = null
         done = null
+        pendingIncumbent = null
     }
 
     /** Advance the search to the next reportable [StepEvent].
@@ -425,16 +425,26 @@ internal class ResumableMinimize(
                 firstRunWork()?.let { return StepEvent.Incumbent(it) }
             }
             return when (val e = run.next()) {
-                is SearchRunEvent.Satisfied -> StepEvent.Incumbent(checkNotNull(pendingIncumbent))
+                is SearchRunEvent.Satisfied -> {
+                    val incumbent = checkNotNull(pendingIncumbent)
+                    pendingIncumbent = null
+                    StepEvent.Incumbent(incumbent)
+                }
 
                 SearchRunEvent.Exhausted -> terminal(terminalExhausted(null))
 
                 SearchRunEvent.Paused -> StepEvent.Paused
 
-                is SearchRunEvent.Indeterminate -> if (pausable && sliceCancelled()) {
-                    StepEvent.Paused
-                } else {
-                    terminal(terminalBudget())
+                is SearchRunEvent.Indeterminate -> when {
+                    sawIndeterminateLeaf -> {
+                        val incumbent = pendingIncumbent
+                        pendingIncumbent = null
+                        if (incumbent != null) StepEvent.Incumbent(incumbent) else terminal(terminalExhausted(null))
+                    }
+
+                    pausable && sliceCancelled() -> StepEvent.Paused
+
+                    else -> terminal(terminalBudget())
                 }
             }
         } catch (failure: Throwable) {
@@ -454,19 +464,17 @@ internal class ResumableMinimize(
         val stats = sink.snapshot()
         val b = incumbents.current()
         return when {
+            b != null && sawIndeterminateLeaf ->
+                MinimizeResult.BestFound(b.assignment, b.objective, TerminationReason.Unsupported, stats)
+
+            sawIndeterminateLeaf -> MinimizeResult.Unknown(TerminationReason.Unsupported, stats)
+
             externalShared && b != null ->
                 MinimizeResult.BestFound(b.assignment, b.objective, TerminationReason.SearchExhausted, stats)
 
             externalShared -> MinimizeResult.Unknown(TerminationReason.SearchExhausted, stats)
 
-            b != null && sawIndeterminateLeaf ->
-                MinimizeResult.BestFound(b.assignment, b.objective, TerminationReason.Unsupported, stats)
-
             b != null -> MinimizeResult.Optimal(b.assignment, b.objective, stats)
-
-            // No incumbent, but a leaf's continuous LP was uncertifiable — the tree is not provably
-            // all-infeasible, so report `unknown` rather than an unsound Infeasible.
-            sawIndeterminateLeaf -> MinimizeResult.Unknown(TerminationReason.Unsupported, stats)
 
             else -> MinimizeResult.Infeasible(core, stats)
         }
@@ -917,11 +925,12 @@ internal class ResumableMinimize(
                     }
                 }
             }
-            return if (incumbent == null) {
-                SearchModelDisposition.Continue
-            } else {
-                pendingIncumbent = incumbent
-                SearchModelDisposition.Surface
+            pendingIncumbent = incumbent
+            return when {
+                // Blocking an unresolved leaf would let its nogood escape as a proved shared conflict.
+                sawIndeterminateLeaf -> SearchModelDisposition.Indeterminate
+                incumbent == null -> SearchModelDisposition.Continue
+                else -> SearchModelDisposition.Surface
             }
         }
     }

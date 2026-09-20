@@ -10818,6 +10818,13 @@ public final class com/eignex/klause/solver/search/SearchModelDisposition$Contin
 	public fun toString ()Ljava/lang/String;
 }
 
+public final class com/eignex/klause/solver/search/SearchModelDisposition$Indeterminate : com/eignex/klause/solver/search/SearchModelDisposition {
+	public static final field INSTANCE Lcom/eignex/klause/solver/search/SearchModelDisposition$Indeterminate;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
 public final class com/eignex/klause/solver/search/SearchModelDisposition$Surface : com/eignex/klause/solver/search/SearchModelDisposition {
 	public static final field INSTANCE Lcom/eignex/klause/solver/search/SearchModelDisposition$Surface;
 	public fun equals (Ljava/lang/Object;)Z
