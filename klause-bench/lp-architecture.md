@@ -43,8 +43,12 @@ The two legacy persistent bound-update callers have distinct replacements:
 
 Replay bound replacements carry independent source authority and increasing revisions, including
 coordinate shifts that change the objective constant. Certification receives the exact state instance
-adopted by the solver; the independent validator receives the original source model. A mixed gated
-event temporarily deactivates logical-row bounds. Its float hint remains uncertified; an ordinary
+adopted by the solver; the independent validator receives the original source model. Probe flags
+preserve each flagged side's absence even when a raw bound event writes finite coordinates there;
+they do not remove the opposite unflagged side. Legacy wire warm statuses can be rejected by the
+native solver when they refer to an absent side, causing cold repair rather than guaranteed warmth.
+A mixed gated event temporarily deactivates logical-row bounds and calls `resolveBounds`;
+`resolveGated` remains a separate live legacy seam. Its float hint remains uncertified; an ordinary
 event restores full source rows before certification. A failed adoption poisons subsequent solves
 until a successful explicit replacement: no donor result, ray, metrics or exact continuation claim
 may escape under the requested state. Explicit cancellation reset events retain their meaning.
@@ -52,14 +56,16 @@ may escape under the requested state. Explicit cancellation reset events retain 
 The capture owns one cumulative exact-continuation allowance across replacements. Adoption can
 change float paths, cancellation polling and work; one owner does not mean identical pivots or
 absence of exact continuation factors. Generated native basis statuses are not promised as portable
-legacy recaptures. Input discrete warm bases remain supported.
+legacy recaptures. Input discrete warm bases remain supported. Adoption projects working vectors
+inside the solver and again for replay certification; matrix projection is shared, but the repeated
+vector allocation and source-import preparation are not included in float work counters.
 
 `LpModel.rebind` remains a model-copy operation. `ResumableMinimize.rebind` remains a separate search
 repair lifecycle, outside this migration. Neither is an obsolete persistent engine adapter.
 
 ## Evidence and retained obligations
 
-The [frozen contract and evidence][evidence] identify base
+The coordinator's local `session-7.6` evidence bundle records the frozen contract, including base
 `20b12fd227fe5160f5d69e600a2a2d12d9a4813a`, allocated files, assertion migrations and independent
 Opus review. The small deterministic source traces compare source proofs, owner closure, work and
 factor counts under fixed limits. They do not establish whole-plan acceptance or total performance.
@@ -79,7 +85,15 @@ steps never enter certification. The fixed-cap comparison preserves all measured
 the 25 repaired records carry both bound and witness. Low-limit float work increases on some traces.
 
 The shared certification branch also applies to constant-objective scoped production relaxations,
-in their own minimized objective units. Its two matrix-list-copy passes and exact arithmetic follow
+in their own minimized objective units. `ResumableMinimize.IncumbentPolicy` treats attained real
+leaves as resolved: a newly complete witness-and-bound package can therefore permit ordinary leaf
+blocking where a witness alone kept the search indeterminate. The residual LP rechecks its exact
+witness against the assembled relaxation; incumbent admission checks finite objective and real-value
+coverage, not arbitrary full-factor source reconstruction. F's unresolved-leaf stop-before-block
+protection and the broader source/consumer acceptance obligations remain required. A directed
+[producer regression][consumer-test] checks the fully covered source `2r = 1`, `r in [0, 1]`, objective
+zero: real resource exit and exact continuation resolve the leaf only when the independent bound is
+accepted; withholding it preserves `Unsupported`, terminal idempotence and no shared clauses. Its two matrix-list-copy passes and exact arithmetic follow
 the existing direct-certification policy outside float counters and continuation allowances. The
 certificate computation is not internally cancellation-polled; boundary checks prevent publication
 after cancellation. This does not establish parity for general nonconstant truncated candidates or
@@ -117,5 +131,5 @@ The following obligations remain separate from migration, a passing gate and the
 [bounding]: ../klause/src/commonMain/kotlin/com/eignex/klause/lp/bounding/LpBounding.kt
 [replay]: ../klause/src/commonMain/kotlin/com/eignex/klause/lp/engine/LpReplay.kt
 [retention]: lp-retention.md
-[evidence]: /home/rasmus/Workspaces/lp-evidence/session-7.6/contract-v2.md
 [certification]: ../klause/src/commonMain/kotlin/com/eignex/klause/lp/engine/LpSolve.kt
+[consumer-test]: ../klause/src/commonTest/kotlin/com/eignex/klause/backtrack/ResumableMinimizeTest.kt
