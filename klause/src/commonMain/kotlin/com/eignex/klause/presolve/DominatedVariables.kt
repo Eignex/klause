@@ -95,6 +95,10 @@ internal object DominatedVariables {
      *
      * A column open on the side its safe direction points at is skipped. Pinning needs a bound to sit
      * at, and the reduction proves only that moving that way never costs — not where the movement stops.
+     *
+     * The endpoint comes from the column's declared value set where it states one, and from its range
+     * otherwise: a declaration may sit strictly inside the model-level range, and a pin at the range's
+     * endpoint would then name a value the model excludes — which the rebuild reads as a refutation.
      */
     fun fixDominatedSourceVariables(
         problem: Problem,
@@ -103,28 +107,40 @@ internal object DominatedVariables {
     ): SourceDelta {
         val safety = scanSafety(problem)
         val bounds = problem.intBounds
-        val tightening = bounds.tightening()
+        // Allocated on the first pin: the copy is two arrays over every column, and a round on a wide
+        // model far more often finds nothing to pin than something.
+        var tightening: IntBounds.Tightening? = null
+        fun pin(v: Int, value: Long) {
+            val target = tightening ?: bounds.tightening().also { tightening = it }
+            target.atLeast(v, value)
+            target.atMost(v, value)
+        }
         for (v in 0 until problem.numIntVars) {
-            if (!safety.pinnable(v) || fixedColumn(bounds, v)) continue
+            if (!safety.pinnable(v)) continue
+            val declared = problem.intDomainOrNull(v)
+            if (fixedColumn(bounds, declared, v)) continue
             val c = objectiveIntCoeffs[v] ?: 0L
             // Each arm carries its own justification, so falling past an arm whose bound is open and
             // pinning on the other is sound rather than a second-choice guess: reaching the lower arm
             // needs `downSafe`, the upper one `upSafe`, and only `c == 0` satisfies both coefficient
             // tests at once.
             when {
-                safety.downSafe[v] && c >= 0L && bounds.hasLower(v) -> tightening.atMost(v, bounds.lower(v))
-                safety.upSafe[v] && c <= 0L && bounds.hasUpper(v) -> tightening.atLeast(v, bounds.upper(v))
+                safety.downSafe[v] && c >= 0L && bounds.hasLower(v) -> pin(v, declared?.min ?: bounds.lower(v))
+                safety.upSafe[v] && c <= 0L && bounds.hasUpper(v) -> pin(v, declared?.max ?: bounds.upper(v))
             }
         }
         val extra = safety.boolPins(objectiveBoolCoeffs)
-        val proved = tightening.build()
+        val proved = tightening?.build()
         if (proved == null && extra.isEmpty()) return SourceDelta()
         return SourceDelta(addedFactors = extra, bounds = proved)
     }
 
-    /** Whether [v] is already pinned by its declared range, so a dual-fixing pin would restate it. */
-    private fun fixedColumn(bounds: IntBounds, v: Int): Boolean =
+    /** Whether [v] admits one value already, so a dual-fixing pin would restate what it declares. */
+    private fun fixedColumn(bounds: IntBounds, declared: IntDomain?, v: Int): Boolean = if (declared != null) {
+        declared.min == declared.max
+    } else {
         bounds.hasLower(v) && bounds.hasUpper(v) && bounds.lower(v) == bounds.upper(v)
+    }
 
     /**
      * What the monotone-occurrence scan proved about each column and each literal.
