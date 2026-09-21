@@ -570,7 +570,7 @@ internal class LpBuilder {
         val m = rows.size
         val rhs = LongArray(m)
         // Base rhs after the >=-to-<= flip but before the lower-bound shift; retained on the model so a
-        // persistent relaxation can re-derive `rhs` for fresh bounds (see LpModel.rebind / flippedRhs).
+        // model copy can re-derive `rhs` for replay bounds (see LpModel.rebind / flippedRhs).
         val flippedRhs = LongArray(m)
         val loShift = LongArray(n) { lo[it] }
 

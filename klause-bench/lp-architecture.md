@@ -78,7 +78,8 @@ factor counts under fixed limits. They do not establish whole-plan acceptance or
 
 On the noncanonical CSC fallback control, exact import deliberately declines while the float hint
 matches the analytic source objective. Four bound calls change one retained owner into four fresh
-owners, all closed; factor warmth is lost. No natural producer or certified capability is claimed
+owners, all closed; factor warmth is lost. Constructing the replacement before closing the displaced
+owner temporarily retains two owners instead of one. No natural producer or certified capability is claimed
 for this malformed-input fixture. Constructor/projection and direct-certification setup are not
 fully represented by float work counters, so their omission cannot support a speedup claim.
 
@@ -86,6 +87,11 @@ The repository's W0 replay manifest does not contain `REBIND`; its no-refutation
 cannot detect partial package losses classified as `DECLINED`. The frozen migrated-route traces
 therefore compare each ordered source package, including declined outcomes. Directed tests check
 exact source equations and inequalities; they do not establish a universal replay parity gate.
+The no-claim decline also removes the old feasible-reference gated alarm; partial capability losses
+must remain visible in ordered package comparisons. The probe witness checker omits only artificial
+bound sides, retaining source rows and real sides. Its boxed reference optimizer still declines
+probe objectives: accepting a source witness can refute a contradictory bound but cannot validate
+an otherwise consistent bound or optimum.
 
 A separate fixed-cap probe control covers genuinely clamped upper, lower and both-sided columns,
 and an unbounded source. All measured source bounds and witnesses survive. Removing an artificial
@@ -114,7 +120,10 @@ The bound can also reach `strictSourcePrune`; broader pruning and consumer-corpu
 unmeasured. Its two matrix-list-copy passes and exact arithmetic follow
 the existing direct-certification policy outside float counters and continuation allowances. The
 certificate computation is not internally cancellation-polled; boundary checks prevent publication
-after cancellation. This does not establish parity for general nonconstant truncated candidates or
+after cancellation. No size-scaled measurement covers these O(m + nnz) passes on the production
+zero-objective path. With no continuation conflict, even nonconstant costs consume the poll before
+the cost scan; an attempted constant certificate consumes a second boundary poll. A conflict skips
+both polls. This does not establish parity for general nonconstant truncated candidates or
 cancellation poll schedules. A valid witness alone never substitutes for a lost bound.
 
 [Retention decisions][retention] govern the mechanisms that remain: owner-local exact factors,

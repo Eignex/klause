@@ -113,7 +113,7 @@ internal class LpReferenceAdapter(
             val value = BigFraction.ofDouble(Double.fromBits(primalBits[column])) ?: return null
             value - data.shifts[column]
         }
-        return data.accepts(shifted)
+        return data.accepts(shifted, model.probeClampedLo, model.probeClampedHi)
     }
 
     fun objective(model: LpModel, primalBits: LongArray?, enforcedRows: BooleanArray? = null): BigFraction? {
@@ -129,7 +129,11 @@ internal class LpReferenceAdapter(
     fun acceptsExact(model: LpModel, witness: List<BigFraction>, enforcedRows: BooleanArray? = null): Boolean? {
         if (witness.size != model.n) return false
         val data = exactData(model, enforcedRows) ?: return null
-        return data.accepts(witness.mapIndexed { column, value -> value - data.shifts[column] })
+        return data.accepts(
+            witness.mapIndexed { column, value -> value - data.shifts[column] },
+            model.probeClampedLo,
+            model.probeClampedHi,
+        )
     }
 
     fun exactObjective(model: LpModel, witness: List<BigFraction>, enforcedRows: BooleanArray? = null): BigFraction? {
@@ -154,11 +158,17 @@ private class ExactModelData(
     fun unshift(witness: List<BigFraction>): List<BigFraction> =
         witness.mapIndexed { column, value -> value + shifts[column] }
 
-    fun accepts(witness: List<BigFraction>): Boolean {
+    fun accepts(
+        witness: List<BigFraction>,
+        probeClampedLo: BooleanArray? = null,
+        probeClampedHi: BooleanArray? = null,
+    ): Boolean {
         if (witness.size != costs.size) return false
         for (column in witness.indices) {
-            if (witness[column] < BigFraction.ZERO) return false
-            if (upper[column]?.let { witness[column] > it } == true) return false
+            if (probeClampedLo?.get(column) != true && witness[column] < BigFraction.ZERO) return false
+            if (probeClampedHi?.get(column) != true && upper[column]?.let { witness[column] > it } == true) {
+                return false
+            }
         }
         return rows.all { row ->
             var activity = BigFraction.ZERO

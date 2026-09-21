@@ -150,6 +150,49 @@ class LpReferenceAdapterTest {
     }
 
     @Test
+    fun `source witness checks omit probe sides but retain real sides and rows`() {
+        for (lowerClamped in listOf(false, true)) {
+            val model = LpBuilder().apply {
+                val x = addFreeVar(if (lowerClamped) null else 0L, if (lowerClamped) 0L else null)
+                addRow(
+                    intArrayOf(x),
+                    longArrayOf(1L),
+                    if (lowerClamped) Relation.GE else Relation.LE,
+                    if (lowerClamped) -5L else 5L,
+                )
+            }.build(Sense.MINIMIZE).rebind(
+                longArrayOf(if (lowerClamped) -3L else 0L),
+                longArrayOf(if (lowerClamped) 0L else 3L),
+            )
+            val adapter = LpReferenceAdapter()
+            val direction = if (lowerClamped) -1L else 1L
+
+            for ((point, expected) in listOf(5L to true, -1L to false, 6L to false)) {
+                val value = point * direction
+                assertEquals(expected, adapter.accepts(model, longArrayOf(value.toDouble().toRawBits())))
+                assertEquals(expected, adapter.acceptsExact(model, listOf(BigFraction.ofLong(value))))
+            }
+        }
+    }
+
+    @Test
+    fun `source probe witness checks retain strict rows and dimensions`() {
+        val model = LpBuilder().apply {
+            val x = addRealVar(0.0, null)
+            addRealRow(intArrayOf(x), doubleArrayOf(1.0), Relation.LE, 5.0, strict = true)
+        }.build(Sense.MINIMIZE)
+        val adapter = LpReferenceAdapter()
+
+        for ((point, expected) in listOf(4L to true, 5L to false)) {
+            assertEquals(expected, adapter.accepts(model, longArrayOf(point.toDouble().toRawBits())))
+            assertEquals(expected, adapter.acceptsExact(model, listOf(BigFraction.ofLong(point))))
+        }
+        assertEquals(false, adapter.accepts(model, longArrayOf()))
+        assertEquals(false, adapter.acceptsExact(model, emptyList()))
+        assertEquals(false, adapter.acceptsExact(model, listOf(BigFraction.ZERO, BigFraction.ZERO)))
+    }
+
+    @Test
     fun `zero cost probe support still declines objective comparison`() {
         val model = LpBuilder().apply {
             val x = addVar(0L, 10L, cost = 1L)
