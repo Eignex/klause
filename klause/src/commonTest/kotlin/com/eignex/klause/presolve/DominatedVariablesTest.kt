@@ -471,4 +471,23 @@ class DominatedVariablesTest {
         val pinned = assertNotNull(finite.domains, "the finite lane pins the same column")
         assertEquals(0L, pinned[0].max)
     }
+
+    @Test
+    fun `a pin lands on the declared value set rather than the wider model range`() {
+        // A column declaring `0..1000` inside a model range of `0..1000000`: the range's endpoint is a
+        // value the declaration excludes, so pinning there refutes a model `x = 1000` satisfies.
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 1,
+            intDomains = arrayOf(IntDomain(0, 1000)),
+            factors = listOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 5)),
+            modelBounds = IntBounds.fromModelBounds(longArrayOf(0L), longArrayOf(1_000_000L), null, null),
+        )
+
+        val delta = Presolve.fixDominatedSourceVariables(problem, emptyMap())
+
+        val out = assertNotNull(problem.withSourcePassDelta(delta), "the pin must not refute the model")
+        assertEquals(1000L, out.intBounds.lower(0))
+        assertEquals(1000L, out.intBounds.upper(0))
+    }
 }
