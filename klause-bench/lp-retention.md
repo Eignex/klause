@@ -67,11 +67,12 @@ that they prove all consumer acceptance. No isolated full-search speedup is clai
 The [7.6 architecture and migration boundary](lp-architecture.md) records the caller replacements
 and validation limits; the handoff below preserves the obligations assigned before that migration.
 
-**Actual remaining migration/audit surface.** [LpBounding.solveNode][bounding] still uses
-`PersistentLpSolver.rebind` only after exact projection is unavailable; eligible finite/theory paths
-use the scoped trail. [LpReplay][replay] retains legacy capture rebind events. 7.6 must enumerate the
-unsupported legacy shapes and their real callers, cover a replacement, then retire those adapters
-without losing fallback behavior or supported replay. Do not infer retirement from a symbol count.
+**Migrated caller surface.** [LpBounding.solveNode][bounding] uses the scoped trail when exact
+source authority imports; unsupported legacy input retains bounded fresh solves and warm hints,
+with factor reuse lost. [LpReplay][replay] imports legacy capture rebind events into exact-state
+adoption on one persistent owner. `PersistentLpSolver.rebind` is retired; `LpModel.rebind` remains
+a source-coordinate copy operation. The architecture note records unsupported shapes, measured
+proof packages, owner closure and costs without closing the acceptance obligations below.
 `ResumableMinimize.rebind` is a separate live search-repair lifecycle used by `BacktrackSolver.openRepair`,
 not the LP migration method; its historical discrepancy requires its own contract investigation.
 
@@ -80,10 +81,11 @@ already removed; old `LpStats` field names do not indicate live old certifiers. 
 checking, rational basis/continuation, source minimum/direction/split helpers and test-only references.
 Recheck the [existing structural/decline test][boundary-test] (`open theory uses the shared LP owner
 while exact arithmetic stays independent`) and [reference boundary test][reference-test]
-(`reference adapter reaches no float engine implementation or certifier`). Audit the entire engine
-outbound boundary as well: these tests do not prove a full kernel import fence. Current engine uses
-`util`, `simplex.exact`, `lp.lattice` and `simplex.basis`; repository AGENTS' older closed list omits
-`simplex.basis` and needs coordinator reconciliation, not permission to widen dependencies.
+(`reference adapter reaches no float engine implementation or certifier`). The structural fence also
+checks qualified engine and arithmetic-kernel references in imports,
+code and KDoc. The engine closed list is `util`, `simplex.exact`, `lp.lattice` and `simplex.basis`;
+repository rules include the existing basis dependency. This reconciles the documented boundary
+without widening runtime dependencies.
 
 **F is completed soundness repair.** [F #2021][pr-f] and its [source attribution][f] establish
 `80bau3b`'s INDETERMINATE → shared SearchExhausted → UNSAT promotion and the correction to
