@@ -173,6 +173,7 @@ class CliModeTest {
                 (declare-const q Bool)
                 (assert (>= x 5))
                 (assert (or p q))
+                (assert (or (not p) (not q)))
                 (check-sat)
                 """.trimIndent(),
             )
@@ -1004,6 +1005,8 @@ class CliModeTest {
     fun `the lp-harvest presolve pass reports its contribution when enabled`() {
         // x+y<=3, y+z<=3, x+z<=3 imply x+y+z<=5 (LP max 4.5), so the lp-harvest pass drops it. The pass is
         // opt-in, so it fires only with the +lp-harvest delta; the dry-run must then report the removal.
+        // The `x+y+z >= 1` row puts every column in a `>=` row as well as a `<=` one, so no column has a
+        // globally safe direction and dual fixing leaves the harvest a model to reason over.
         val fzn = File.createTempFile("cli", ".fzn").apply {
             writeText(
                 "array[1..3] of var 0..10: x;\n" +
@@ -1011,6 +1014,7 @@ class CliModeTest {
                     "constraint int_lin_le([1,1],[x[2],x[3]],3);\n" +
                     "constraint int_lin_le([1,1],[x[1],x[3]],3);\n" +
                     "constraint int_lin_le([1,1,1],[x[1],x[2],x[3]],5);\n" +
+                    "constraint int_lin_le([-1,-1,-1],[x[1],x[2],x[3]],-1);\n" +
                     "solve satisfy;\n",
             )
             deleteOnExit()
