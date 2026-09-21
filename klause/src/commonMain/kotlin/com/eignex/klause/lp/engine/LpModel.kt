@@ -119,9 +119,9 @@ internal class LpModel(
     val rowPremises: Array<LpRowPremises?> = arrayOfNulls(m),
     /**
      * Right-hand side per row after the `>=`-to-`<=` flip but **before** the lower-bound shift — i.e.
-     * `rhs[i] = flippedRhs[i] − Σ_j csc(i,j)·loShift[j]`. Retained so a persistent relaxation can
-     * [rebind] new column bounds over the fixed [csc] without re-running [LpBuilder]: the structure
-     * (matrix, costs, tags, row relations) is node-invariant, only the bound-derived vectors change.
+     * `rhs[i] = flippedRhs[i] − Σ_j csc(i,j)·loShift[j]`. Retained so [rebind] can copy column bounds
+     * over the fixed [csc] for legacy capture replay without re-running [LpBuilder]: the structure
+     * (matrix, costs, tags, row relations) stays fixed while the bound-derived vectors change.
      * Defaults to the post-shift [rhs] for models that never rebind.
      */
     val flippedRhs: LongArray = rhs,
@@ -201,9 +201,8 @@ internal class LpModel(
      * A model identical in structure ([csc], [cost], [tag], [rowGlobal], [rowPremises], slack
      * relations) but with fresh structural-column bounds `[lo[j], hi[j]]`. Recomputes only the
      * bound-derived vectors — [rhs] (via the lower-bound shift over the fixed matrix), [upper],
-     * [loShift] and [objConstant] — in `O(nnz)`. For a relaxation whose layout is node-invariant
-     * (no auxiliary columns, no live-M rows) this yields the same model a per-node rebuild would,
-     * so a search node can re-bind the persistent relaxation instead of rebuilding it.
+     * [loShift] and [objConstant] — in `O(nnz)`. Legacy capture replay uses this copy to import
+     * updated source authority; it does not mutate a persistent solver.
      */
     fun rebind(lo: LongArray, hi: LongArray): LpModel {
         require(exactState == null) { "exact state bounds require the bound trail" }
