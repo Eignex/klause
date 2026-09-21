@@ -6,7 +6,10 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.bounding.LpPlan
+import com.eignex.klause.lp.engine.Basis
+import com.eignex.klause.lp.engine.DEFAULT_REFACTOR_UPDATE_LIMIT
 import com.eignex.klause.lp.engine.EngineConstruction
+import com.eignex.klause.lp.engine.FloatLpResult
 import com.eignex.klause.lp.engine.LpCertificationPolicy
 import com.eignex.klause.lp.engine.LpCertifier
 import com.eignex.klause.lp.engine.LpEngineFactory
@@ -14,12 +17,15 @@ import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.LpPricingOptions
 import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.lp.engine.LpSolver
+import com.eignex.klause.lp.engine.PersistentLpSolver
 import com.eignex.klause.lp.engine.ProductionLpEngineFactory
 import com.eignex.klause.lp.engine.RecordingLpEngineFactory
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.ClauseExchange
 import com.eignex.klause.propagation.PropagationSession
+import com.eignex.klause.propagation.SharedClause
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
@@ -30,6 +36,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
@@ -105,6 +112,125 @@ internal class UnresolvedRealLeafFixture(val withIncumbent: Boolean) {
 }
 
 class ResumableMinimizeTest {
+    @Test
+    fun `constant real leaf completion requires its independently accepted bound`() {
+        for (acceptBound in listOf(false, true)) {
+            val fixture = UnresolvedRealLeafFixture(false)
+            val objective = LinearObjective()
+            var opened = 0
+            var closed = 0
+            var cappedSolves = 0
+            var continuationExports = 0
+            var boundChecked = false
+            var sharedClauses = 0
+            var observedSession: PropagationSession? = null
+            val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+                override fun newGeneralSolver(
+                    model: LpModel,
+                    cancellation: Cancellation,
+                    pricing: LpPricingOptions,
+                ): LpSolver = newPersistentSolver(
+                    model,
+                    cancellation,
+                    DEFAULT_REFACTOR_UPDATE_LIMIT,
+                    1,
+                    1L,
+                    false,
+                    pricing,
+                )
+
+                override fun newPersistentSolver(
+                    model: LpModel,
+                    cancellation: Cancellation,
+                    refactorUpdateLimit: Int,
+                    iterationLimit: Int,
+                    workLimit: Long,
+                    trackDegeneracy: Boolean,
+                    pricing: LpPricingOptions,
+                ): PersistentLpSolver {
+                    val delegate = ProductionLpEngineFactory.newPersistentSolver(
+                        model,
+                        cancellation,
+                        refactorUpdateLimit,
+                        iterationLimit,
+                        workLimit,
+                        trackDegeneracy,
+                        pricing,
+                    )
+                    opened++
+                    return object : PersistentLpSolver by delegate {
+                        override fun solve(warm: Basis?): FloatLpResult? = delegate.solve(warm).also {
+                            if (workLimit == 1L) {
+                                cappedSolves++
+                                assertNull(it)
+                                assertTrue(delegate.lastWorkOps >= workLimit)
+                            }
+                        }
+
+                        override fun continuationBasis(model: LpModel): Basis? =
+                            delegate.continuationBasis(model).also {
+                                if (workLimit == 1L && it != null) continuationExports++
+                            }
+
+                        override fun close() {
+                            closed++
+                            delegate.close()
+                        }
+                    }
+                }
+            }
+            val policy = LpCertificationPolicy { certifier, success ->
+                if (certifier == LpCertifier.INTEGER) boundChecked = success
+                success && (acceptBound || certifier != LpCertifier.INTEGER)
+            }
+            val context = LpSolveContext(factory, policy)
+            val exchange = object : ClauseExchange {
+                override fun onRestart(session: PropagationSession) = Unit
+
+                override fun onSearchStart(session: PropagationSession) {
+                    observedSession = session
+                }
+
+                override fun publishGlobal(clause: SharedClause) {
+                    sharedClauses++
+                }
+            }
+            val params = fixture.params.copy(clauseExchange = exchange)
+            BacktrackSolver(fixture.problem, context).resumable(objective, params).use { search ->
+                val offered = ArrayList<Double>()
+
+                val result = assertNotNull(
+                    search.runSlice(Cancellation.Never, 1000L, 256L) {
+                        offered += it.objectiveValue
+                    },
+                )
+
+                val sample = if (acceptBound) {
+                    assertIs<MinimizeResult.Optimal>(result).sample
+                } else {
+                    val incomplete = assertIs<MinimizeResult.BestFound>(result)
+                    assertEquals(TerminationReason.Unsupported, incomplete.reason)
+                    incomplete.sample
+                }
+                assertEquals(
+                    BigFraction.ONE,
+                    assertNotNull(BigFraction.ofDouble(sample.reals.single())) * BigFraction.ofLong(2L),
+                )
+                assertEquals(0.0, objective.evaluate(sample))
+                assertEquals(listOf(0.0), offered)
+                assertTrue(search.isDone)
+                assertSame(result, search.runSlice(Cancellation.Never, 1000L, 256L) { error("duplicate incumbent") })
+                assertEquals(0, assertNotNull(observedSession).learnedClauseCount)
+                assertEquals(0, sharedClauses)
+            }
+            assertEquals(0, sharedClauses)
+            assertEquals(1, cappedSolves)
+            assertTrue(continuationExports > 0)
+            assertTrue(boundChecked)
+            assertEquals(opened, closed)
+        }
+    }
+
     @Test
     fun `a genuine shared cutoff retains exhaustive coverage without a local incumbent`() {
         val problem = Problem(0, 1, arrayOf(IntDomain(0L, 3L)), emptyArray()).bake()

@@ -193,7 +193,7 @@ class LpReplayHarnessTest {
             val step = fabricatedStep(
                 LpCandidateKind.NONE,
                 objective = null,
-                primal = 0.0,
+                primal = null,
                 verdict = LpVerdict.INDETERMINATE,
                 hasWitness = false,
                 capability = capability,
@@ -250,7 +250,7 @@ class LpReplayHarnessTest {
     private fun fabricatedStep(
         candidate: LpCandidateKind,
         objective: Double?,
-        primal: Double,
+        primal: Double?,
         verdict: LpVerdict = LpVerdict.FEASIBLE,
         lowerBound: BigFraction? = null,
         hasWitness: Boolean = true,
@@ -261,7 +261,7 @@ class LpReplayHarnessTest {
         candidate = candidate,
         productionVerdict = verdict,
         objectiveBits = objective?.toRawBits(),
-        primalBits = longArrayOf(primal.toRawBits()),
+        primalBits = primal?.let { longArrayOf(it.toRawBits()) },
         integerObjectiveLowerBound = null,
         hasFeasibleWitness = hasWitness,
         hasCertifiedBound = lowerBound != null,
@@ -282,7 +282,8 @@ class LpReplayHarnessTest {
             if (step.productionVerdict == LpVerdict.INDETERMINATE &&
                 step.candidate == LpCandidateKind.NONE && !step.hasFeasibleWitness &&
                 !step.hasCertifiedBound && !step.hasInfeasibilityProof && step.exactWitness == null &&
-                step.rationalLowerBound == null && step.integerObjectiveLowerBound == null
+                step.rationalLowerBound == null && step.integerObjectiveLowerBound == null &&
+                step.objectiveBits == null && step.primalBits == null
             ) {
                 return LpIndependentCheck(LpIndependentValidation.DECLINED, LpIndependentClaim.NONE)
             }
