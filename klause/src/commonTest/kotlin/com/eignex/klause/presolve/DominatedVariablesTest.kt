@@ -6,20 +6,25 @@ import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.bool.PseudoBoolean
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.ir.Factor
+import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.presolve.PresolveShared.withPassDelta
+import com.eignex.klause.presolve.PresolveShared.withSourcePassDelta
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.propagation.propagate
 import com.eignex.klause.propagation.propagatorProjection
+import com.eignex.klause.util.Bits
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 /**
@@ -344,5 +349,126 @@ class DominatedVariablesTest {
             Presolve.fixDominatedVariables(problem.bake(), emptyMap(), emptyMap()).isEmpty,
             "expected no fixing",
         )
+    }
+
+    // ---- the source lane: the same reduction before any finite projection exists ----
+
+    /** One column, lower bound [lo], open above — the shape a finite domain cannot state. */
+    private fun openAbove(lo: Long, vararg factors: Factor): Problem = Problem(
+        numBoolVars = 0,
+        intBounds = IntBounds.fromModelBounds(
+            longArrayOf(lo),
+            longArrayOf(0L),
+            null,
+            Bits(1).also { it.set(0) },
+        ),
+        factors = arrayOf(*factors),
+    )
+
+    /** One column open below, upper bound [hi]. */
+    private fun openBelow(hi: Long, vararg factors: Factor): Problem = Problem(
+        numBoolVars = 0,
+        intBounds = IntBounds.fromModelBounds(
+            longArrayOf(0L),
+            longArrayOf(hi),
+            Bits(1).also { it.set(0) },
+            null,
+        ),
+        factors = arrayOf(*factors),
+    )
+
+    @Test
+    fun `a down-safe column open above is pinned to its lower bound`() {
+        // x >= 0, open above, occurring only as `+x <= 7`: lowering is always safe, so an optimum sits
+        // at 0. The open upper side is irrelevant to that argument — which is the whole point.
+        val problem = openAbove(0L, Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 7))
+
+        val delta = Presolve.fixDominatedSourceVariables(problem, emptyMap())
+
+        val out = assertNotNull(problem.withSourcePassDelta(delta), "the pin must not refute the model")
+        assertEquals(0L, out.intBounds.lower(0))
+        assertEquals(0L, out.intBounds.upper(0))
+    }
+
+    @Test
+    fun `a down-safe column open below is left free`() {
+        // Same safe direction, but nothing to pin to: the reduction proves that lowering never costs,
+        // never where the lowering stops. Pinning to the invented endpoint would assert a bound the
+        // model does not state.
+        val problem = openBelow(7L, Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 7))
+
+        val delta = Presolve.fixDominatedSourceVariables(problem, emptyMap())
+
+        assertTrue(delta.isEmpty, "a column open on its safe side admits no pin")
+    }
+
+    @Test
+    fun `an up-safe column open above is left free while its bounded partner pins`() {
+        // -x0 + x1 <= 4 makes raising x0 safe and lowering x1 safe. x0 is open above, so its pin has no
+        // endpoint; x1 is closed below and pins. One open column must not cost the other its reduction.
+        val problem = Problem(
+            numBoolVars = 0,
+            intBounds = IntBounds.fromModelBounds(
+                longArrayOf(0L, 0L),
+                longArrayOf(0L, 5L),
+                null,
+                Bits(2).also { it.set(0) },
+            ),
+            factors = arrayOf(Linear(intArrayOf(-1, 1), intArrayOf(0, 1), LinearOp.LE, 4)),
+        )
+
+        val delta = Presolve.fixDominatedSourceVariables(problem, mapOf(0 to -1L))
+
+        val out = assertNotNull(problem.withSourcePassDelta(delta))
+        assertFalse(out.intBounds.hasUpper(0), "x0 stays open above")
+        assertEquals(0L, out.intBounds.lower(1))
+        assertEquals(0L, out.intBounds.upper(1))
+    }
+
+    @Test
+    fun `a safe-direction boolean is pinned on a model with an open column`() {
+        // The Boolean half reads no range at all, so an open integer column beside it changes nothing.
+        // The clause needs two literals: a unit clause is already a pin, and re-emitting it is what the
+        // idempotence rule suppresses.
+        val problem = Problem(
+            numBoolVars = 2,
+            intBounds = IntBounds.fromModelBounds(
+                longArrayOf(0L),
+                longArrayOf(0L),
+                null,
+                Bits(1).also { it.set(0) },
+            ),
+            factors = arrayOf(
+                Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 7),
+                Clause(intArrayOf(pos(0), pos(1))),
+            ),
+        )
+
+        val delta = Presolve.fixDominatedSourceVariables(problem, emptyMap())
+
+        assertTrue(
+            delta.addedFactors.any { it is Clause && it.literals.contentEquals(intArrayOf(Lit.make(0, true))) },
+            "the pure-positive boolean is pinned true",
+        )
+    }
+
+    @Test
+    fun `both lanes pin the same columns on a closed model`() {
+        // The source form is the finite one minus the domains it cannot read, so on a model that states
+        // every bound the two must agree — the property that keeps the port from being a second pass.
+        val problem = Problem(
+            0,
+            2,
+            Array(2) { IntDomain(0, 5) },
+            listOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 4)),
+        )
+
+        val source = Presolve.fixDominatedSourceVariables(problem, mapOf(0 to 2L))
+        val finite = Presolve.fixDominatedVariables(problem.bake(), mapOf(0 to 2L))
+
+        val fromSource = assertNotNull(problem.withSourcePassDelta(source))
+        assertEquals(0L, fromSource.intBounds.upper(0))
+        val pinned = assertNotNull(finite.domains, "the finite lane pins the same column")
+        assertEquals(0L, pinned[0].max)
     }
 }

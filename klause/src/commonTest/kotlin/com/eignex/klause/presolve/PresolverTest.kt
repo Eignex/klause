@@ -92,6 +92,26 @@ class PresolverTest {
     }
 
     @Test
+    fun `the source lane drops a solution-set-altering pass for a sensitive query`() {
+        // Model counting runs through the shared source phase, so the gate that keeps it exact has to
+        // hold on the SOURCE overload too — and until dual fixing was ported, no SOURCE pass altered
+        // the solution set, so nothing exercised it. Every pass the source lane offers a sensitive
+        // query must preserve the set.
+        val auto = PresolveConfig.AUTO
+        val sensitive = PresolveContext(solutionSetSensitive = true)
+        val sourcePasses = auto.problemPasses(sensitive, PresolvePass.Capability.SOURCE)
+
+        assertTrue(
+            PresolvePass.DUAL_FIX in auto.problemPasses(PresolveContext.EMPTY, PresolvePass.Capability.SOURCE),
+            "dual fixing is a source pass for an ordinary solve",
+        )
+        assertTrue(PresolvePass.DUAL_FIX !in sourcePasses, "dual fixing discards optimum-equivalent solutions")
+        assertTrue(sourcePasses.all { it.preservesSolutionSet }, "a sensitive query gets only exact source passes")
+        // The cheap exact reductions stay, so the gate narrows the lane rather than closing it.
+        assertTrue(PresolvePass.STRENGTHEN_COEFFICIENTS in sourcePasses)
+    }
+
+    @Test
     fun `auto resolution is intent-aware and SAC is opt-in`() {
         val auto = PresolveConfig.AUTO
         // Symmetry breaking is solution-set-altering: auto-on for solve, auto-off when the query

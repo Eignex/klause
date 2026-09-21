@@ -103,10 +103,13 @@ class PresolvePipelineTest {
             numBoolVars = 0,
             numIntVars = 3,
             intDomains = arrayOf(IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 1)),
+            // The at-most-two row puts every column in an LE row as well as a GE one, so no column has a
+            // globally safe direction and dual fixing leaves the substitution something to do.
             factors = listOf(
                 Linear(longArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),
                 Linear(longArrayOf(1, 1), intArrayOf(1, 2), LinearOp.GE, 1),
                 Linear(longArrayOf(1, 1), intArrayOf(0, 2), LinearOp.GE, 1),
+                Linear(longArrayOf(1, 1, 1), intArrayOf(0, 1, 2), LinearOp.LE, 2),
             ),
         )
         val outcome = PresolvePipeline.run(binary, null, PresolveConfig.AUTO, solutionSetSensitive = false)

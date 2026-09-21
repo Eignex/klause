@@ -157,6 +157,13 @@ object Presolve {
         objectiveBoolCoeffs: Map<Int, Long> = emptyMap(),
     ): PassDelta = DominatedVariables.fixDominatedVariables(problem, objectiveIntCoeffs, objectiveBoolCoeffs)
 
+    /** Dual fixing over a canonical source model. See [DominatedVariables.fixDominatedSourceVariables]. */
+    internal fun fixDominatedSourceVariables(
+        problem: Problem,
+        objectiveIntCoeffs: Map<Int, Long>,
+        objectiveBoolCoeffs: Map<Int, Long> = emptyMap(),
+    ): SourceDelta = DominatedVariables.fixDominatedSourceVariables(problem, objectiveIntCoeffs, objectiveBoolCoeffs)
+
     /** Failed-literal and common-bound probing to fixpoint. See [Probing]. */
     fun probe(problem: BakedProblem, maxCandidates: Int, cancellation: Cancellation = Cancellation.Never): PassDelta =
         Probing.probe(problem, maxCandidates, cancellation)

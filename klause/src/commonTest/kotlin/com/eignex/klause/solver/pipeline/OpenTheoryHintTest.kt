@@ -251,6 +251,7 @@ class OpenTheoryHintTest {
                 (declare-const p Bool) (declare-const q Bool)
                 (declare-const x Int)
                 (assert (or p q))
+                (assert (or (not p) (not q)))
                 (assert (>= x 3))
             """.trimIndent(),
         )

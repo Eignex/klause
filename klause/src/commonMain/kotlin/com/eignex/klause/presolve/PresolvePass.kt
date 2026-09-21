@@ -258,15 +258,24 @@ enum class PresolvePass(
 
     /** Dual fixing / dominated-variable reductions — pins a variable to a bound when the
      *  objective and constraint structure guarantee an optimum there. Solution-set altering, so
-     *  auto-disabled for solution-set-sensitive queries. */
+     *  auto-disabled for solution-set-sensitive queries.
+     *
+     *  The safety argument reads the rows a factor declares and no domain at all, so it holds on a
+     *  source model; only the pin needs a value, and only the one bound it pins to. A column open on
+     *  the side its safe direction points at is left alone. */
     DUAL_FIX(
         "dual-fix",
         Stage.PROBLEM,
-        Capability.FINITE,
+        Capability.SOURCE,
         PresolveTiming.MEDIUM,
         preservesSolutionSet = false,
         autoEligible = true,
     ) {
+        override fun applySource(problem: Problem, ctx: PresolveContext) =
+            Presolve.fixDominatedSourceVariables(problem, ctx.objectiveIntCoeffs, ctx.objectiveBoolCoeffs)
+
+        // The finite lane pins into root-propagated domains, which are narrower than the model states,
+        // so it fixes columns the declaration alone leaves too wide.
         override fun applyFinite(problem: BakedProblem, ctx: PresolveContext) =
             Presolve.fixDominatedVariables(problem, ctx.objectiveIntCoeffs, ctx.objectiveBoolCoeffs)
     },
