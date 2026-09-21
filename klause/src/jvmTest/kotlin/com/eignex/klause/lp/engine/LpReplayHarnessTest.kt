@@ -181,28 +181,30 @@ class LpReplayHarnessTest {
     }
 
     @Test
-    fun `an infeasible reference leaves an evidence free indeterminate result unresolved`() {
-        val model = LpBuilder().apply {
-            val x = addVar(0L, 1L)
-            addRow(intArrayOf(x), longArrayOf(1L), Relation.GE, 2L)
-        }.build(Sense.MINIMIZE)
-        for (capability in listOf(
-            LpCertificationCapability.ELIGIBLE,
-            LpCertificationCapability.GATED_ACTIVE_STATE_UNAVAILABLE,
-        )) {
-            val step = fabricatedStep(
-                LpCandidateKind.NONE,
-                objective = null,
-                primal = null,
-                verdict = LpVerdict.INDETERMINATE,
-                hasWitness = false,
-                capability = capability,
-            )
+    fun `an evidence free indeterminate result remains unresolved for either reference verdict`() {
+        for (rhs in listOf(0L, 2L)) {
+            val model = LpBuilder().apply {
+                val x = addVar(0L, 1L)
+                addRow(intArrayOf(x), longArrayOf(1L), Relation.GE, rhs)
+            }.build(Sense.MINIMIZE)
+            for (capability in listOf(
+                LpCertificationCapability.ELIGIBLE,
+                LpCertificationCapability.GATED_ACTIVE_STATE_UNAVAILABLE,
+            )) {
+                val step = fabricatedStep(
+                    LpCandidateKind.NONE,
+                    objective = null,
+                    primal = null,
+                    verdict = LpVerdict.INDETERMINATE,
+                    hasWitness = false,
+                    capability = capability,
+                )
 
-            val check = IndependentExactValidator.validate(model, step)
+                val check = IndependentExactValidator.validate(model, step)
 
-            assertEquals(LpIndependentValidation.DECLINED, check.validation)
-            assertEquals(LpIndependentClaim.NONE, check.claim)
+                assertEquals(LpIndependentValidation.DECLINED, check.validation)
+                assertEquals(LpIndependentClaim.NONE, check.claim)
+            }
         }
     }
 
@@ -245,6 +247,90 @@ class LpReplayHarnessTest {
         val check = IndependentExactValidator.validate(model, step)
 
         assertEquals(LpIndependentValidation.DECLINED, check.validation)
+    }
+
+    @Test
+    fun `rebound probe source optima outside the box decline unsupported objective comparison`() {
+        for (lowerClamped in listOf(false, true)) {
+            val point = if (lowerClamped) -5L else 5L
+            val model = LpBuilder().apply {
+                val x = addFreeVar(
+                    if (lowerClamped) null else 0L,
+                    if (lowerClamped) 0L else null,
+                    cost = if (lowerClamped) 1L else -1L,
+                )
+                addRow(intArrayOf(x), longArrayOf(1L), if (lowerClamped) Relation.GE else Relation.LE, point)
+            }.build(Sense.MINIMIZE)
+            val capture = LpCapture.capture(
+                model,
+                LpReplaySettings(
+                    "probe-source-witness",
+                    76L,
+                    LpReplaySolverKind.PERSISTENT,
+                    componentSplit = false,
+                    pivotLimit = 100,
+                    workLimit = 1_000_000L,
+                    refactorUpdateLimit = 50,
+                ),
+                listOf(
+                    LpReplayEvent.Rebind(
+                        longArrayOf(if (lowerClamped) -3L else 0L),
+                        longArrayOf(if (lowerClamped) 0L else 3L),
+                    ),
+                    LpReplayEvent.ResolveBounds(),
+                ),
+            )
+
+            val step = LpReplay.replay(capture, IndependentExactValidator).steps.last()
+
+            assertEquals(LpVerdict.ATTAINED_OPTIMUM, step.productionVerdict)
+            assertEquals(listOf(BigFraction.ofLong(point)), step.exactWitness)
+            assertEquals(BigFraction.ofLong(-5L), step.rationalLowerBound)
+            assertEquals(LpIndependentValidation.DECLINED, step.independentCheck.validation)
+        }
+    }
+
+    @Test
+    fun `an accepted probe witness refutes a contradictory certified bound`() {
+        val model = LpBuilder().apply {
+            val x = addFreeVar(0L, null, cost = -1L)
+            addRow(intArrayOf(x), longArrayOf(1L), Relation.LE, 5L)
+        }.build(Sense.MINIMIZE).rebind(longArrayOf(0L), longArrayOf(3L))
+        val step = fabricatedStep(
+            LpCandidateKind.NONE,
+            null,
+            5.0,
+            verdict = LpVerdict.CERTIFIED_BOUND,
+            lowerBound = BigFraction.ofLong(-4L),
+        )
+
+        val check = IndependentExactValidator.validate(model, step)
+
+        assertEquals(LpIndependentValidation.REFUTED, check.validation)
+        assertEquals(LpIndependentClaim.CERTIFIED_BOUND, check.claim)
+    }
+
+    @Test
+    fun `probe optimum claims require a present witness and equal certified bound`() {
+        val model = LpBuilder().apply {
+            val x = addFreeVar(0L, null, cost = -1L)
+            addRow(intArrayOf(x), longArrayOf(1L), Relation.LE, 5L)
+        }.build(Sense.MINIMIZE).rebind(longArrayOf(0L), longArrayOf(3L))
+        for ((point, bound) in listOf(5.0 to -6L, 5.0 to null, null to -5L, null to null)) {
+            val step = fabricatedStep(
+                LpCandidateKind.NONE,
+                null,
+                point,
+                verdict = LpVerdict.ATTAINED_OPTIMUM,
+                lowerBound = bound?.let(BigFraction::ofLong),
+                hasWitness = point != null,
+            )
+
+            val check = IndependentExactValidator.validate(model, step)
+
+            assertEquals(LpIndependentValidation.REFUTED, check.validation)
+            assertEquals(LpIndependentClaim.PROVED_OPTIMUM, check.claim)
+        }
     }
 
     private fun fabricatedStep(
@@ -355,6 +441,15 @@ class LpReplayHarnessTest {
             } else {
                 null
             }
+            val lower = step.rationalLowerBound
+            if (step.hasCertifiedBound && lower != null && witnessObjective != null && lower > witnessObjective) {
+                return LpIndependentCheck(LpIndependentValidation.REFUTED, LpIndependentClaim.CERTIFIED_BOUND)
+            }
+            if (step.productionVerdict == LpVerdict.ATTAINED_OPTIMUM &&
+                (!step.hasCertifiedBound || lower == null || witnessObjective == null || lower != witnessObjective)
+            ) {
+                return LpIndependentCheck(LpIndependentValidation.REFUTED, LpIndependentClaim.PROVED_OPTIMUM)
+            }
             val expected = reference.objective as? LpReferenceObjective.Bound ?: return when (reference.objective) {
                 LpReferenceObjective.Unbounded -> when {
                     step.hasCertifiedBound -> LpIndependentCheck(
@@ -380,7 +475,6 @@ class LpReplayHarnessTest {
 
                 is LpReferenceObjective.Bound -> error("bound handled above")
             }
-            val lower = step.rationalLowerBound
             if (lower != null && lower > expected.lower) {
                 return LpIndependentCheck(LpIndependentValidation.REFUTED, LpIndependentClaim.CERTIFIED_BOUND)
             }
