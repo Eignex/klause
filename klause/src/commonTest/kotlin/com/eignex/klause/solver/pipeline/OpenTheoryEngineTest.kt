@@ -308,10 +308,15 @@ class OpenTheoryEngineTest {
             it.set(0)
             it.set(1)
         }
+        // The `>= 1` row leaves both columns neither up- nor down-safe, so dual fixing declines and the
+        // theory is what produces the witness.
         val model = Problem(
             numBoolVars = 0,
             intBounds = IntBounds.fromModelBounds(longArrayOf(0, 0), longArrayOf(0, 0), null, openUpper),
-            factors = arrayOf(Linear(intArrayOf(2, 1), intArrayOf(0, 1), LinearOp.LE, 3)),
+            factors = arrayOf(
+                Linear(intArrayOf(2, 1), intArrayOf(0, 1), LinearOp.LE, 3),
+                Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),
+            ),
         )
 
         val result = OpenTheoryEngine(model, ProblemPipeline.EXACT_LIRA).solve()

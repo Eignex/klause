@@ -17,11 +17,16 @@ class OpenTheoryPipelineTest {
     @Test
     fun `preparation reports LP work used to close an open side`() {
         val openUpper = Bits(1).also { it.set(0) }
+        // The `>= 2` row is what keeps dual fixing off this column: with only the `<= 7` row, lowering
+        // would be safe everywhere and the pin would close the side before any LP ran.
         val request = OpenTheoryRequest(
             model = Problem(
                 numBoolVars = 0,
                 intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(0), null, openUpper),
-                factors = arrayOf<Factor>(Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 7)),
+                factors = arrayOf<Factor>(
+                    Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 7),
+                    Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 2),
+                ),
             ),
         )
 

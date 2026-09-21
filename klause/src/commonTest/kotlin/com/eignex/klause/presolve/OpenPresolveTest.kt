@@ -60,10 +60,12 @@ class OpenPresolveTest {
 
     @Test
     fun `an open side a row already implies is closed`() {
-        // 0 <= x and x <= 7 leaves nothing open, and the bound is the row's.
+        // 0 <= x and x <= 7 leaves nothing open, and the bound is the row's. Source passes are off so
+        // the bound is the tightening's: dual fixing would otherwise pin this column first, which the
+        // pair of tests below covers.
         val spec = openAbove(1, row(0 to 1L, op = LinearOp.LE, bound = 7L))
 
-        val result = assertIs<OpenPresolveResult.Tightened>(spec.presolveOpen())
+        val result = assertIs<OpenPresolveResult.Tightened>(spec.presolveOpen(PresolveConfig.NONE))
 
         assertEquals(1, result.closedSides)
         assertTrue(result.spec.intBounds.hasUpper(0), "the open side was proved")
@@ -78,10 +80,38 @@ class OpenPresolveTest {
             factors = arrayOf<Factor>(row(0 to 1L, op = LinearOp.LE, bound = 5L)),
         )
 
-        val result = assertIs<OpenPresolveResult.Tightened>(spec.presolveOpen())
+        val result = assertIs<OpenPresolveResult.Tightened>(spec.presolveOpen(PresolveConfig.NONE))
 
         assertEquals(0, result.closedSides)
         assertTrue(result.spec === spec, "nothing to prove, so nothing is rebuilt")
+    }
+
+    @Test
+    fun `a source pin closes an open side before the tightening runs`() {
+        // Dual fixing reaches this column without solving anything: it occurs only as `+x` in a `<=`
+        // row, so lowering never violates, and with no objective an optimum sits at its lower bound.
+        // The pin closes the open side, which is the cheaper of the two ways off the open route.
+        val spec = openAbove(1, row(0 to 1L, op = LinearOp.LE, bound = 7L))
+
+        val result = assertIs<OpenPresolveResult.Tightened>(spec.presolveOpen())
+
+        assertTrue(result.spec.intBounds.hasUpper(0), "the source pin closed the side")
+        assertEquals(0L, result.spec.intBounds.lower(0))
+        assertEquals(0L, result.spec.intBounds.upper(0))
+    }
+
+    @Test
+    fun `a model a source pin makes contradictory is still refuted`() {
+        // The pin closes every open side, so the bound phase has nothing left to close. It must still
+        // refute: `x >= 3` and `x <= 1` have no point between them, and on this route no bake follows
+        // to catch what a bare `Tightened` would wave through.
+        val spec = openAbove(
+            1,
+            row(0 to 1L, op = LinearOp.LE, bound = 1L),
+            row(0 to 1L, op = LinearOp.GE, bound = 3L),
+        )
+
+        assertIs<OpenPresolveResult.Refuted>(spec.presolveOpen())
     }
 
     @Test
