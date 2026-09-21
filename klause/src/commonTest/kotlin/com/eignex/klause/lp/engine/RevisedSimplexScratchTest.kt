@@ -15,16 +15,21 @@ import kotlin.test.assertTrue
 
 class RevisedSimplexScratchTest {
     @Test
-    fun `legacy rebind retires an old ray before the next solve`() {
+    fun `exact adoption retires an old ray before the next solve`() {
         val model = LpBuilder().apply {
             addVar(0L, 1L, cost = 1L)
             addRow(intArrayOf(0), longArrayOf(1L), Relation.GE, 2L)
         }.build(Sense.MINIMIZE)
-        RevisedSimplex(model).use { solver ->
+        val initial = LpExactState(assertNotNull(model.authoritativeModel()))
+        RevisedSimplex(assertNotNull(initial.toWorkingModel())).use { solver ->
             assertNull(solver.solve())
             assertNotNull(solver.infeasibleRay)
 
-            assertTrue(solver.rebind(model.rebind(longArrayOf(0L), longArrayOf(3L)), Cancellation.Never))
+            val next = LpExactState(
+                assertNotNull(model.rebind(longArrayOf(0L), longArrayOf(3L)).authoritativeModel()),
+                boundRevision = 1L,
+            )
+            assertTrue(solver.adopt(next, Cancellation.Never))
 
             assertNull(solver.infeasibleRay)
             assertNull(solver.infeasibleBasis)

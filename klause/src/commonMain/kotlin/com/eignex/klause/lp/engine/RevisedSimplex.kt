@@ -977,38 +977,6 @@ internal class RevisedSimplex(
         }
     }
 
-    /**
-     * Re-point this engine at [next] and [token], keeping the seated basis and its factorization, then
-     * re-solve. Null when [next] is not a bound-only revision of the current model, which is the caller's
-     * signal to build a fresh engine.
-     *
-     * The basis matrix is `csc`'s columns at [basicVar], and dual feasibility is a function of `cost` and
-     * the basis — neither reads a bound. So when both arrays are the *same objects*, a child node's
-     * tightened bounds leave the parent's factorization valid and its basis dual-feasible, and the dual
-     * simplex repairs the primal infeasibility in a few pivots instead of refactorizing. `LpModel.rebind`
-     * shares exactly those two and replaces the rest, so identity is the honest test: it cannot pass for
-     * a model whose matrix or objective was rebuilt.
-     *
-     * The bounds and right-hand side are re-read every iteration of the solve loop, so nothing stale
-     * survives the swap; only the basis and its factorization do.
-     */
-    override fun rebind(next: LpModel, token: Cancellation): Boolean {
-        if (model.exactState != null || next.exactState != null) return false
-        if (next.csc !== model.csc || next.cost !== model.cost) return false
-        if (next.n != n || next.m != m) return false
-        refreshNumerical(next)
-        cancellation = token
-        continuationAvailable = false
-        stoppedContinuationBasis = null
-        solvedExactState = null
-        optimalBasis = null
-        optimalPrimal = null
-        infeasibleBasis = null
-        infeasibleRow = -1
-        infeasibleRay = null
-        return true
-    }
-
     override fun prepareLogicals(token: Cancellation): Basis? {
         continuationAvailable = false
         stoppedContinuationBasis = null
@@ -1145,7 +1113,7 @@ internal class RevisedSimplex(
         }
     }
 
-    /** Re-solve after a [rebind], continuing from the kept basis and factorization. */
+    /** Re-solve after [adopt], continuing from the kept basis and factorization. */
     override fun resolveBounds(allowance: LpFloatAllowance?): FloatLpResult? {
         val previous = floatAllowance
         floatAllowance = allowance
@@ -2718,7 +2686,7 @@ private enum class PivotFold {
  *
  * The slacks are materialized rather than left implicit because the basis seam names its columns by
  * index into this matrix, so a basis slot holding a slack has to be an ordinary column for the solver
- * to factor it where it lies. Built once per engine, and never rebuilt: a bound-only rebind shares the
+ * to factor it where it lies. Built once per engine, and never rebuilt: bound-only adoption preserves the
  * model's matrix, and anything that replaces it builds a fresh engine.
  */
 private fun lpColumns(model: LpScalingView): SparseMatrix {

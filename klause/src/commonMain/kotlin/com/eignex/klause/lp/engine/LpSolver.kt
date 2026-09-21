@@ -232,15 +232,8 @@ internal data class LpFloatAllowance(val work: Long, val iterations: Int) {
 }
 
 /**
- * An [LpSolver] a caller keeps across many solves, re-pointing one instance at a successor model rather
- * than building a fresh engine for it. The basis and its factorization — the expensive half of a solve —
- * carry over, so a model differing from its predecessor only in column bounds or in which rows are
- * enforced is repaired in a few pivots.
- *
- * Kept off [LpSolver] because not every engine can honour it: [ComponentLpSolver] holds one sub-solver
- * per column component, and neither the identity test [rebind] rests on nor a per-row enforcement toggle
- * survives that split. Stating the limitation in the type is better than a no-op implementation that a
- * caller would silently pay a full rebuild for.
+ * An [LpSolver] retaining its basis and factorization across exact bound and objective adoption.
+ * Monolithic ownership is required: a component solve has no single basis to retain.
  */
 internal interface PersistentLpSolver : LpSolver {
     // Builds an all-logical basis without claiming feasibility; null means unsupported or declined.
@@ -249,13 +242,6 @@ internal interface PersistentLpSolver : LpSolver {
     fun adopt(state: LpExactState, token: Cancellation = Cancellation.Never): Boolean = false
 
     val basisLifecycleWork: BasisOperationWork? get() = null
-
-    /**
-     * Re-point this engine at [next] and [token], keeping the seated basis and its factorization; false
-     * when [next] is not a bound-only revision of the current model, which is the caller's signal to
-     * build a fresh engine.
-     */
-    fun rebind(next: LpModel, token: Cancellation): Boolean
 
     /**
      * Re-solve with retained factors. Null [allowance] uses construction limits; explicit zero work

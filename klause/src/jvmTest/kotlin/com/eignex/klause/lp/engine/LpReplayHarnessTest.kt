@@ -186,18 +186,45 @@ class LpReplayHarnessTest {
             val x = addVar(0L, 1L)
             addRow(intArrayOf(x), longArrayOf(1L), Relation.GE, 2L)
         }.build(Sense.MINIMIZE)
+        for (capability in listOf(
+            LpCertificationCapability.ELIGIBLE,
+            LpCertificationCapability.GATED_ACTIVE_STATE_UNAVAILABLE,
+        )) {
+            val step = fabricatedStep(
+                LpCandidateKind.NONE,
+                objective = null,
+                primal = 0.0,
+                verdict = LpVerdict.INDETERMINATE,
+                hasWitness = false,
+                capability = capability,
+            )
+
+            val check = IndependentExactValidator.validate(model, step)
+
+            assertEquals(LpIndependentValidation.DECLINED, check.validation)
+            assertEquals(LpIndependentClaim.NONE, check.claim)
+        }
+    }
+
+    @Test
+    fun `an infeasible gated reference refutes a claimed float optimum`() {
+        val model = LpBuilder().apply {
+            val x = addVar(0L, 1L)
+            addRow(intArrayOf(x), longArrayOf(1L), Relation.GE, 2L)
+        }.build(Sense.MINIMIZE)
         val step = fabricatedStep(
-            LpCandidateKind.NONE,
-            objective = null,
+            LpCandidateKind.FLOAT_OPTIMUM,
+            objective = 0.0,
             primal = 0.0,
             verdict = LpVerdict.INDETERMINATE,
             hasWitness = false,
+            capability = LpCertificationCapability.GATED_ACTIVE_STATE_UNAVAILABLE,
         )
 
         val check = IndependentExactValidator.validate(model, step)
 
-        assertEquals(LpIndependentValidation.DECLINED, check.validation)
-        assertEquals(LpIndependentClaim.NONE, check.claim)
+        assertEquals(LpIndependentValidation.REFUTED, check.validation)
+        assertEquals(LpIndependentClaim.CANDIDATE_HINT, check.claim)
     }
 
     @Test
@@ -227,6 +254,7 @@ class LpReplayHarnessTest {
         verdict: LpVerdict = LpVerdict.FEASIBLE,
         lowerBound: BigFraction? = null,
         hasWitness: Boolean = true,
+        capability: LpCertificationCapability = LpCertificationCapability.ELIGIBLE,
     ): LpReplayStep = LpReplayStep(
         eventIndex = 0,
         operation = LpReplayOperation.SOLVE,
@@ -243,11 +271,19 @@ class LpReplayHarnessTest {
         exactInputAttempts = 0,
         exactInputAccepted = 0,
         rationalLowerBound = lowerBound,
+        certificationCapability = capability,
     )
 
     internal object IndependentExactValidator : LpReplayValidator {
         override fun validate(model: LpModel, step: LpReplayStep): LpIndependentCheck {
             if (step.productionVerdict == null || step.certificationCapability == LpCertificationCapability.NO_CLAIM) {
+                return LpIndependentCheck(LpIndependentValidation.DECLINED, LpIndependentClaim.NONE)
+            }
+            if (step.productionVerdict == LpVerdict.INDETERMINATE &&
+                step.candidate == LpCandidateKind.NONE && !step.hasFeasibleWitness &&
+                !step.hasCertifiedBound && !step.hasInfeasibilityProof && step.exactWitness == null &&
+                step.rationalLowerBound == null && step.integerObjectiveLowerBound == null
+            ) {
                 return LpIndependentCheck(LpIndependentValidation.DECLINED, LpIndependentClaim.NONE)
             }
             val adapter = LpReferenceAdapter()
@@ -271,12 +307,6 @@ class LpReplayHarnessTest {
                     },
                     LpIndependentClaim.CANDIDATE_HINT,
                 )
-            }
-            if (step.productionVerdict == LpVerdict.INDETERMINATE &&
-                step.candidate == LpCandidateKind.NONE && !step.hasFeasibleWitness &&
-                !step.hasCertifiedBound && !step.hasInfeasibilityProof
-            ) {
-                return LpIndependentCheck(LpIndependentValidation.DECLINED, LpIndependentClaim.NONE)
             }
             if (step.productionVerdict == LpVerdict.CERTIFIED_BOUND &&
                 step.hasCertifiedBound && step.rationalLowerBound != null && !step.hasFeasibleWitness

@@ -281,8 +281,15 @@ internal fun certifyLpResult(
             if ((continued.metrics.success && (point == null || boxedObjective)) ||
                 refinement?.source?.state !== state
             ) {
+                val constantBound = if (continued.conflict == null && !cancellation() &&
+                    (0 until model.numVars).all { model.exactCost(it).isZero }
+                ) {
+                    certifyLpBound(model, DoubleArray(model.m), observer, policy).takeUnless { cancellation() }
+                } else {
+                    null
+                }
                 return CertifiedLpResult(
-                    null, null, point, null, refutation, model.hasIntegralObjective(), { null },
+                    null, constantBound, point, null, refutation, model.hasIntegralObjective(), { null },
                     conflictSupport = continued.support.takeIf { refutation != null }, continuation = continued.metrics,
                 )
             }

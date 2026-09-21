@@ -345,7 +345,9 @@ class LpExactContinuationTest {
                 },
             )
 
-            assertEquals(LpVerdict.INDETERMINATE, result.verdict)
+            assertEquals(LpVerdict.CERTIFIED_BOUND, result.verdict)
+            assertEquals(BigFraction.ZERO, result.lowerBound)
+            assertTrue(assertNotNull(assertNotNull(result.bound).support).state === state)
             assertNull(result.witness)
             assertTrue(assertNotNull(result.continuation).success)
         }

@@ -558,6 +558,222 @@ class LpReplayTest {
     }
 
     @Test
+    fun `resource stopped native replay retains its constant bound across gated restoration`() {
+        val model = LpBuilder().apply {
+            addVar(0L, 10L)
+            addVar(0L, 10L)
+            addRow(intArrayOf(0, 1), longArrayOf(1L, 1L), Relation.GE, 3L)
+        }.build(Sense.MINIMIZE)
+        val capture = LpCapture.capture(
+            model,
+            LpReplaySettings(
+                "constant-bound", 76L, LpReplaySolverKind.PERSISTENT,
+                componentSplit = false, pivotLimit = 1, workLimit = 10L,
+            ),
+            listOf(
+                LpReplayEvent.Solve(),
+                LpReplayEvent.Rebind(longArrayOf(0L, 0L), longArrayOf(1L, 10L)),
+                LpReplayEvent.ResolveBounds(),
+                LpReplayEvent.ResolveGated(booleanArrayOf(false)),
+                LpReplayEvent.Solve(),
+            ),
+        )
+
+        val steps = LpReplay.replay(capture).steps
+
+        for (index in listOf(0, 2, 4)) {
+            val step = steps[index]
+            assertEquals(LpVerdict.ATTAINED_OPTIMUM, step.productionVerdict)
+            assertEquals(BigFraction.ZERO, step.rationalLowerBound)
+            val point = assertNotNull(step.exactWitness)
+            assertTrue(point[0] + point[1] >= BigFraction.ofLong(3L))
+            assertTrue(point.all { it >= BigFraction.ZERO && it <= BigFraction.ofLong(10L) })
+            if (index > 0) assertTrue(point[0] <= BigFraction.ONE)
+        }
+        assertEquals(LpCertificationCapability.GATED_ACTIVE_STATE_UNAVAILABLE, steps[3].certificationCapability)
+        assertFalse(steps[3].hasCertifiedBound)
+        assertFalse(steps[3].hasFeasibleWitness)
+        assertNull(steps[3].rationalLowerBound)
+        assertNull(steps[3].integerObjectiveLowerBound)
+        assertNull(steps[3].exactWitness)
+    }
+
+    @Test
+    fun `rebound probe sides preserve source absence and row premises`() {
+        val premises = LpRowPremises(intArrayOf(7), booleanArrayOf(false), longArrayOf(5L), intArrayOf(19))
+        val model = LpBuilder().apply {
+            addOpenAboveVar(0L, cost = 1L)
+            addRow(intArrayOf(0), longArrayOf(1L), Relation.GE, 5L, global = false, premises = premises)
+        }.build(Sense.MINIMIZE)
+        var adopted: LpExactState? = null
+        val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+            override fun newPersistentSolver(
+                model: LpModel,
+                cancellation: Cancellation,
+                refactorUpdateLimit: Int,
+                iterationLimit: Int,
+                workLimit: Long,
+                trackDegeneracy: Boolean,
+                pricing: LpPricingOptions,
+            ): PersistentLpSolver {
+                val delegate = ProductionLpEngineFactory.newPersistentSolver(
+                    model, cancellation, refactorUpdateLimit, iterationLimit, workLimit, trackDegeneracy, pricing,
+                )
+                return object : PersistentLpSolver by delegate {
+                    override fun adopt(state: LpExactState, token: Cancellation): Boolean =
+                        delegate.adopt(state, token).also { if (it) adopted = state }
+                }
+            }
+        }
+        val capture = LpCapture.capture(
+            model,
+            persistentSettings("probe-premises"),
+            listOf(
+                LpReplayEvent.Rebind(longArrayOf(2L), longArrayOf(3L)),
+                LpReplayEvent.ResolveBounds(),
+            ),
+        )
+
+        val step = LpReplay.replay(LpCapture.decode(capture.encode()), context = LpSolveContext(factory)).steps.last()
+
+        assertEquals(LpVerdict.ATTAINED_OPTIMUM, step.productionVerdict)
+        assertEquals(listOf(BigFraction.ofLong(5L)), step.exactWitness)
+        assertEquals(BigFraction.ofLong(5L), step.rationalLowerBound)
+        val authority = assertNotNull(adopted).model
+        assertNull(authority.column(0).bounds.upper)
+        assertFalse(authority.row(0).global)
+        assertEquals(listOf(19), assertNotNull(authority.row(0).premises).literalEntries())
+        assertEquals(listOf(ExactLpPremise(7, false, ExactLpNumber.of(5L))), authority.row(0).premises?.boundEntries())
+    }
+
+    @Test
+    fun `mixed gated replay restores full source rows before certification`() {
+        val model = LpBuilder().apply {
+            addVar(0L, 1L)
+            addRow(intArrayOf(0), longArrayOf(1L), Relation.GE, 2L)
+        }.build(Sense.MINIMIZE)
+        val capture = LpCapture.capture(
+            model,
+            persistentSettings("mixed-gated"),
+            listOf(
+                LpReplayEvent.Rebind(longArrayOf(0L), longArrayOf(1L)),
+                LpReplayEvent.ResolveGated(booleanArrayOf(false)),
+                LpReplayEvent.ResolveBounds(),
+                LpReplayEvent.Rebind(longArrayOf(0L), longArrayOf(3L)),
+                LpReplayEvent.ResolveBounds(),
+            ),
+        )
+
+        val steps = LpReplay.replay(LpCapture.decode(capture.encode())).steps
+
+        assertEquals(LpCandidateKind.FLOAT_OPTIMUM, steps[1].candidate)
+        assertEquals(LpVerdict.INDETERMINATE, steps[1].productionVerdict)
+        assertFalse(steps[1].hasFeasibleWitness)
+        assertFalse(steps[1].hasCertifiedBound)
+        assertEquals(LpVerdict.INFEASIBLE, steps[2].productionVerdict)
+        assertTrue(steps[2].hasInfeasibilityProof)
+        assertEquals(LpVerdict.ATTAINED_OPTIMUM, steps[4].productionVerdict)
+        val point = assertNotNull(steps[4].exactWitness).single()
+        assertTrue(point >= BigFraction.ofLong(2L) && point <= BigFraction.ofLong(3L))
+    }
+
+    @Test
+    fun `declined replay adoption withholds earlier artifacts until an explicit replacement`() {
+        for (rhs in listOf(0L, 2L)) {
+            val model = LpBuilder().apply {
+                addVar(0L, 1L)
+                addRow(intArrayOf(0), longArrayOf(1L), Relation.GE, rhs)
+            }.build(Sense.MINIMIZE)
+            var attempts = 0
+            var closes = 0
+            val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+                override fun newPersistentSolver(
+                    model: LpModel,
+                    cancellation: Cancellation,
+                    refactorUpdateLimit: Int,
+                    iterationLimit: Int,
+                    workLimit: Long,
+                    trackDegeneracy: Boolean,
+                    pricing: LpPricingOptions,
+                ): PersistentLpSolver {
+                    val delegate = ProductionLpEngineFactory.newPersistentSolver(
+                        model, cancellation, refactorUpdateLimit, iterationLimit, workLimit, trackDegeneracy, pricing,
+                    )
+                    return object : PersistentLpSolver by delegate {
+                        override fun adopt(state: LpExactState, token: Cancellation): Boolean {
+                            attempts++
+                            return attempts > 1 && delegate.adopt(state, token)
+                        }
+
+                        override fun close() {
+                            closes++
+                            delegate.close()
+                        }
+                    }
+                }
+            }
+            val capture = LpCapture.capture(
+                model,
+                persistentSettings("failed-adoption"),
+                listOf(
+                    LpReplayEvent.Solve(),
+                    LpReplayEvent.Rebind(longArrayOf(2L), longArrayOf(3L)),
+                    LpReplayEvent.ResolveBounds(),
+                    LpReplayEvent.Solve(),
+                    LpReplayEvent.SolvePrimal(),
+                    LpReplayEvent.ResolveGated(booleanArrayOf(false)),
+                    LpReplayEvent.Rebind(longArrayOf(2L), longArrayOf(3L)),
+                    LpReplayEvent.ResolveBounds(),
+                ),
+            )
+
+            val steps = LpReplay.replay(capture, context = LpSolveContext(factory)).steps
+
+            assertEquals(if (rhs == 0L) LpVerdict.ATTAINED_OPTIMUM else LpVerdict.INFEASIBLE, steps[0].productionVerdict)
+            for (step in steps.subList(2, 6)) {
+                assertEquals(LpVerdict.INDETERMINATE, step.productionVerdict)
+                assertEquals(LpCandidateKind.NONE, step.candidate)
+                assertFalse(step.hasFeasibleWitness)
+                assertFalse(step.hasCertifiedBound)
+                assertFalse(step.hasInfeasibilityProof)
+                assertNull(step.rationalLowerBound)
+                assertNull(step.integerObjectiveLowerBound)
+                assertNull(step.exactWitness)
+                assertEquals(0L, step.metrics.workOps)
+            }
+            assertEquals(LpCertificationCapability.GATED_ACTIVE_STATE_UNAVAILABLE, steps[5].certificationCapability)
+            assertEquals(LpVerdict.ATTAINED_OPTIMUM, steps[7].productionVerdict)
+            val point = assertNotNull(steps[7].exactWitness).single()
+            assertTrue(point >= BigFraction.ofLong(2L) && point <= BigFraction.ofLong(3L))
+            assertEquals(2, attempts)
+            assertEquals(1, closes)
+        }
+    }
+
+    @Test
+    fun `explicit replay cancellation reset can recover a declined bound replacement`() {
+        val model = LpBuilder().apply { addVar(0L, 10L, cost = 1L) }.build(Sense.MINIMIZE)
+        val capture = LpCapture.capture(
+            model,
+            LpReplaySettings("reset", 76L, LpReplaySolverKind.PERSISTENT, componentSplit = false, cancellationPollLimit = 1),
+            listOf(
+                LpReplayEvent.Rebind(longArrayOf(5L), longArrayOf(10L)),
+                LpReplayEvent.ResolveBounds(),
+                LpReplayEvent.Rebind(longArrayOf(6L), longArrayOf(10L), cancellationPollLimit = 0),
+                LpReplayEvent.ResolveBounds(),
+            ),
+        )
+
+        val steps = LpReplay.replay(capture).steps
+
+        assertEquals(LpVerdict.INDETERMINATE, steps[1].productionVerdict)
+        assertFalse(steps[1].hasCertifiedBound)
+        assertEquals(LpVerdict.ATTAINED_OPTIMUM, steps[3].productionVerdict)
+        assertEquals(listOf(BigFraction.ofLong(6L)), steps[3].exactWitness)
+        assertEquals(BigFraction.ofLong(6L), steps[3].rationalLowerBound)
+    }
+
+    @Test
     fun `persistent replay executes solve rebind and resolve through the seam`() {
         val builder = LpBuilder()
         val x = builder.addVar(0L, 10L, cost = 1L)

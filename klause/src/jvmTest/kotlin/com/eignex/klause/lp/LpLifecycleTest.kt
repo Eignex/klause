@@ -214,10 +214,6 @@ private class LifecycleFactory : LpEngineFactory {
 
             override fun solve(warm: Basis?): FloatLpResult? = record.solve(delegate) { delegate.solve(warm) }
 
-            override fun rebind(next: LpModel, token: Cancellation): Boolean {
-                record.use()
-                return delegate.rebind(next, token)
-            }
 
             override fun resolveBounds(allowance: LpFloatAllowance?): FloatLpResult? =
                 record.solve(delegate) { delegate.resolveBounds(allowance) }
