@@ -20,53 +20,64 @@ import kotlin.test.assertTrue
 class LpSolveTest {
     @Test
     fun `native continuation preserves constant objective bounds in minimized source units`() {
-        for (sense in Sense.entries) for (fractional in listOf(false, true)) {
-            val zero = ExactLpNumber.of(0L)
-            val one = ExactLpNumber.of(1L)
-            val constant = if (fractional) {
-                BigFraction.ofLong(7L) * BigFraction.ofLong(3L).reciprocal()
-            } else {
-                BigFraction.ofLong(4L)
-            }
-            val external = if (fractional) {
-                BigFraction.ofLong(5L) * BigFraction.ofLong(4L).reciprocal()
-            } else {
-                BigFraction.ZERO
-            }
-            val scale = if (fractional) 2L else 1L
-            val source = ExactLpModel(
-                listOf(emptyList()), emptyList(),
-                listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(one)), origin = ExactLpNumber.of(7L))),
-                emptyList(),
-                ExactLpObjective(
-                    listOf(zero), ExactLpNumber.of(constant), ExactLpNumber.of(scale),
-                    ExactLpNumber.of(external), sense,
-                ),
-            )
-            val state = LpExactState(source)
-            val model = assertNotNull(state.toWorkingModel())
-            val solver = object : LpSolver {
-                override val infeasibleRay: DoubleArray? = null
-                override fun solve(warm: Basis?): FloatLpResult? = null
-                override fun solvePrimal(warm: Basis?): FloatLpResult? = null
-                override fun continuationBasis(model: LpModel) = Basis(intArrayOf(), arrayOf(VarStatus.AT_LOWER))
-            }
+        for (sense in Sense.entries) {
+            for (fractional in listOf(false, true)) {
+                val zero = ExactLpNumber.of(0L)
+                val one = ExactLpNumber.of(1L)
+                val constant = if (fractional) {
+                    BigFraction.ofLong(7L) * BigFraction.ofLong(3L).reciprocal()
+                } else {
+                    BigFraction.ofLong(4L)
+                }
+                val external = if (fractional) {
+                    BigFraction.ofLong(5L) * BigFraction.ofLong(4L).reciprocal()
+                } else {
+                    BigFraction.ZERO
+                }
+                val scale = if (fractional) 2L else 1L
+                val source = ExactLpModel(
+                    listOf(emptyList()),
+                    emptyList(),
+                    listOf(
+                        ExactLpColumn(
+                            ExactLpBounds(ExactLpSide(zero), ExactLpSide(one)),
+                            origin = ExactLpNumber.of(7L),
+                        ),
+                    ),
+                    emptyList(),
+                    ExactLpObjective(
+                        listOf(zero),
+                        ExactLpNumber.of(constant),
+                        ExactLpNumber.of(scale),
+                        ExactLpNumber.of(external),
+                        sense,
+                    ),
+                )
+                val state = LpExactState(source)
+                val model = assertNotNull(state.toWorkingModel())
+                val solver = object : LpSolver {
+                    override val infeasibleRay: DoubleArray? = null
+                    override fun solve(warm: Basis?): FloatLpResult? = null
+                    override fun solvePrimal(warm: Basis?): FloatLpResult? = null
+                    override fun continuationBasis(model: LpModel) = Basis(intArrayOf(), arrayOf(VarStatus.AT_LOWER))
+                }
 
-            val result = certifyLpResult(model, solver, null)
+                val result = certifyLpResult(model, solver, null)
 
-            val expected = constant * BigFraction.ofLong(scale).reciprocal() + external
-            assertEquals(LpVerdict.ATTAINED_OPTIMUM, result.verdict)
-            assertEquals(expected, result.lowerBound)
-            assertEquals(expected, assertNotNull(result.witness).objective)
-            assertEquals(
-                if (sense == Sense.MINIMIZE) expected else expected.negated(),
-                source.objective.sourceValue(listOf(BigFraction.ZERO)),
-            )
-            assertEquals(if (fractional) null else 4L, result.integerObjectiveLowerBound)
-            val support = assertNotNull(assertNotNull(result.bound).support)
-            assertSame(state, support.state)
-            assertTrue(support.rows.isEmpty())
-            assertTrue(support.sides.isEmpty())
+                val expected = constant * BigFraction.ofLong(scale).reciprocal() + external
+                assertEquals(LpVerdict.ATTAINED_OPTIMUM, result.verdict)
+                assertEquals(expected, result.lowerBound)
+                assertEquals(expected, assertNotNull(result.witness).objective)
+                assertEquals(
+                    if (sense == Sense.MINIMIZE) expected else expected.negated(),
+                    source.objective.sourceValue(listOf(BigFraction.ZERO)),
+                )
+                assertEquals(if (fractional) null else 4L, result.integerObjectiveLowerBound)
+                val support = assertNotNull(assertNotNull(result.bound).support)
+                assertSame(state, support.state)
+                assertTrue(support.rows.isEmpty())
+                assertTrue(support.sides.isEmpty())
+            }
         }
     }
 
@@ -76,9 +87,11 @@ class LpSolveTest {
             val zero = ExactLpNumber.of(0L)
             val one = ExactLpNumber.of(1L)
             val source = ExactLpModel(
-                listOf(listOf(ExactLpEntry(0, one))), listOf(one),
+                listOf(listOf(ExactLpEntry(0, one))),
+                listOf(one),
                 List(2) { ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(one))) },
-                listOf(ExactLpRow()), ExactLpObjective(List(2) { if (it == costColumn) one else zero }),
+                listOf(ExactLpRow()),
+                ExactLpObjective(List(2) { if (it == costColumn) one else zero }),
             )
             val model = assertNotNull(LpExactState(source).toWorkingModel())
             val solver = object : LpSolver {
@@ -164,10 +177,12 @@ class LpSolveTest {
 
     @Test
     fun `native continuation conflict excludes a constant objective bound`() {
-        val source = assertNotNull(LpBuilder().apply {
-            addVar(0L, 1L)
-            addRow(intArrayOf(0), longArrayOf(1L), Relation.GE, 2L)
-        }.build(Sense.MINIMIZE).authoritativeModel())
+        val source = assertNotNull(
+            LpBuilder().apply {
+                addVar(0L, 1L)
+                addRow(intArrayOf(0), longArrayOf(1L), Relation.GE, 2L)
+            }.build(Sense.MINIMIZE).authoritativeModel(),
+        )
         val model = assertNotNull(LpExactState(source).toWorkingModel())
         val solver = object : LpSolver {
             override val infeasibleRay: DoubleArray? = null

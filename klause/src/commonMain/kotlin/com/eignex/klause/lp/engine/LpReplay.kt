@@ -114,30 +114,30 @@ internal object LpReplay {
                             declinedStep(index, LpReplayOperation.SOLVE)
                         } else {
                             replaySolve(
-                            index,
-                            LpReplayOperation.SOLVE,
-                            boundUpdates?.working ?: model,
-                            solver,
-                            cancellation,
-                            context,
-                            strict,
-                            continuationBudget,
-                        ) { solver.solve(event.warm?.toBasis(model.hasUpper, model.m)) }
+                                index,
+                                LpReplayOperation.SOLVE,
+                                boundUpdates?.working ?: model,
+                                solver,
+                                cancellation,
+                                context,
+                                strict,
+                                continuationBudget,
+                            ) { solver.solve(event.warm?.toBasis(model.hasUpper, model.m)) }
                         }
 
                         is LpReplayEvent.SolvePrimal -> if (boundUpdates?.restore(solver, cancellation) == false) {
                             declinedStep(index, LpReplayOperation.SOLVE_PRIMAL)
                         } else {
                             replaySolve(
-                            index,
-                            LpReplayOperation.SOLVE_PRIMAL,
-                            boundUpdates?.working ?: model,
-                            solver,
-                            cancellation,
-                            context,
-                            strict,
-                            continuationBudget,
-                        ) { solver.solvePrimal(event.warm?.toBasis(model.hasUpper, model.m)) }
+                                index,
+                                LpReplayOperation.SOLVE_PRIMAL,
+                                boundUpdates?.working ?: model,
+                                solver,
+                                cancellation,
+                                context,
+                                strict,
+                                continuationBudget,
+                            ) { solver.solvePrimal(event.warm?.toBasis(model.hasUpper, model.m)) }
                         }
 
                         is LpReplayEvent.Rebind -> {
@@ -154,15 +154,15 @@ internal object LpReplay {
                             declinedStep(index, LpReplayOperation.RESOLVE_BOUNDS)
                         } else {
                             replaySolve(
-                            index,
-                            LpReplayOperation.RESOLVE_BOUNDS,
-                            boundUpdates?.working ?: model,
-                            solver,
-                            cancellation,
-                            context,
-                            strict,
-                            continuationBudget,
-                        ) { (solver as PersistentLpSolver).resolveBounds() }
+                                index,
+                                LpReplayOperation.RESOLVE_BOUNDS,
+                                boundUpdates?.working ?: model,
+                                solver,
+                                cancellation,
+                                context,
+                                strict,
+                                continuationBudget,
+                            ) { (solver as PersistentLpSolver).resolveBounds() }
                         }
 
                         is LpReplayEvent.ResolveGated -> if (
@@ -171,17 +171,17 @@ internal object LpReplay {
                             declinedStep(index, LpReplayOperation.RESOLVE_GATED, event.enforced)
                         } else {
                             replayUncertified(
-                            index,
-                            LpReplayOperation.RESOLVE_GATED,
-                            solver,
-                            event.enforced,
-                        ) {
-                            if (boundUpdates == null) {
-                                (solver as PersistentLpSolver).resolveGated(event.enforced.copyOf())
-                            } else {
-                                (solver as PersistentLpSolver).resolveBounds()
+                                index,
+                                LpReplayOperation.RESOLVE_GATED,
+                                solver,
+                                event.enforced,
+                            ) {
+                                if (boundUpdates == null) {
+                                    (solver as PersistentLpSolver).resolveGated(event.enforced.copyOf())
+                                } else {
+                                    (solver as PersistentLpSolver).resolveBounds()
+                                }
                             }
-                        }
                         }
 
                         else -> error("unsupported event passed replay preflight: ${event::class.simpleName}")
