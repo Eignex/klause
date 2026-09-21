@@ -688,6 +688,57 @@ class LpReplayTest {
     }
 
     @Test
+    fun `partial row masks survive bound replacement and restore both source rows`() {
+        val model = LpBuilder().apply {
+            addVar(0L, 3L)
+            addVar(0L, 3L)
+            addRow(intArrayOf(0), longArrayOf(1L), Relation.GE, 2L)
+            addRow(intArrayOf(1), longArrayOf(1L), Relation.GE, 4L)
+        }.build(Sense.MINIMIZE)
+        val capture = LpCapture.capture(
+            model,
+            persistentSettings("partial-mask"),
+            listOf(
+                LpReplayEvent.Rebind(longArrayOf(0L, 0L), longArrayOf(3L, 3L)),
+                LpReplayEvent.ResolveGated(booleanArrayOf(true, false)),
+                LpReplayEvent.Rebind(longArrayOf(0L, 1L), longArrayOf(1L, 5L)),
+                LpReplayEvent.ResolveGated(booleanArrayOf(false, true)),
+                LpReplayEvent.ResolveBounds(),
+                LpReplayEvent.Rebind(longArrayOf(0L, 1L), longArrayOf(3L, 5L)),
+                LpReplayEvent.ResolveBounds(),
+            ),
+        )
+
+        val steps = LpReplay.replay(LpCapture.decode(capture.encode())).steps
+
+        for (index in listOf(1, 3)) {
+            val step = steps[index]
+            val point = assertNotNull(step.primalBits).map { assertNotNull(BigFraction.ofDouble(Double.fromBits(it))) }
+            assertEquals(BigFraction.ZERO, BigFraction.ofDouble(Double.fromBits(assertNotNull(step.objectiveBits))))
+            assertTrue(point.all { it >= BigFraction.ZERO && it <= BigFraction.ofLong(5L) })
+            if (index == 1) {
+                assertTrue(point[0] >= BigFraction.ofLong(2L) && point[0] <= BigFraction.ofLong(3L))
+                assertTrue(point[1] <= BigFraction.ofLong(3L))
+            } else {
+                assertTrue(point[0] >= BigFraction.ZERO && point[0] <= BigFraction.ONE)
+                assertTrue(point[1] >= BigFraction.ofLong(4L))
+            }
+            assertEquals(LpVerdict.INDETERMINATE, step.productionVerdict)
+            assertFalse(step.hasCertifiedBound)
+            assertFalse(step.hasFeasibleWitness)
+            assertNull(step.exactWitness)
+        }
+        assertEquals(LpVerdict.INFEASIBLE, steps[4].productionVerdict)
+        assertTrue(steps[4].hasInfeasibilityProof)
+        val restored = steps[6]
+        assertEquals(LpVerdict.ATTAINED_OPTIMUM, restored.productionVerdict)
+        val point = assertNotNull(restored.exactWitness)
+        assertTrue(point[0] >= BigFraction.ofLong(2L) && point[1] >= BigFraction.ofLong(4L))
+        assertTrue(point[0] <= BigFraction.ofLong(3L) && point[1] <= BigFraction.ofLong(5L))
+        assertEquals(BigFraction.ZERO, restored.rationalLowerBound)
+    }
+
+    @Test
     fun `declined replay adoption withholds earlier artifacts until an explicit replacement`() {
         for (rhs in listOf(0L, 2L)) {
             val model = LpBuilder().apply {

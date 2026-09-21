@@ -40,6 +40,9 @@ The two legacy persistent bound-update callers have distinct replacements:
 - [LpReplay][replay] interprets legacy capture `REBIND` events using `LpModel.rebind` for checked
   source-coordinate copies and exact-state adoption on one persistent float owner. Captures without
   `REBIND` retain their existing route. The wire format and ordered events remain unchanged.
+  A parseable capture with a negative logical upper width is not valid exact authority: a capture
+  containing `REBIND` rejects it before owner allocation. This invalid-authority compatibility
+  change does not broaden the wire parser's rejection rules.
 
 Replay bound replacements carry independent source authority and increasing revisions, including
 coordinate shifts that change the objective constant. Certification receives the exact state instance
@@ -59,6 +62,8 @@ absence of exact continuation factors. Generated native basis statuses are not p
 legacy recaptures. Input discrete warm bases remain supported. Adoption projects working vectors
 inside the solver and again for replay certification; matrix projection is shared, but the repeated
 vector allocation and source-import preparation are not included in float work counters.
+Conservative pop revisions on replacements invalidate cached basic values; retaining factors does
+not preserve that restoration shortcut and can require a full forward solve.
 
 `LpModel.rebind` remains a model-copy operation. `ResumableMinimize.rebind` remains a separate search
 repair lifecycle, outside this migration. Neither is an obsolete persistent engine adapter.
@@ -93,7 +98,9 @@ coverage, not arbitrary full-factor source reconstruction. F's unresolved-leaf s
 protection and the broader source/consumer acceptance obligations remain required. A directed
 [producer regression][consumer-test] checks the fully covered source `2r = 1`, `r in [0, 1]`, objective
 zero: real resource exit and exact continuation resolve the leaf only when the independent bound is
-accepted; withholding it preserves `Unsupported`, terminal idempotence and no shared clauses. Its two matrix-list-copy passes and exact arithmetic follow
+accepted; withholding it preserves `Unsupported`, terminal idempotence and no shared clauses.
+The bound can also reach `strictSourcePrune`; broader pruning and consumer-corpus acceptance remain
+unmeasured. Its two matrix-list-copy passes and exact arithmetic follow
 the existing direct-certification policy outside float counters and continuation allowances. The
 certificate computation is not internally cancellation-polled; boundary checks prevent publication
 after cancellation. This does not establish parity for general nonconstant truncated candidates or
