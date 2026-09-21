@@ -61,7 +61,8 @@ change float paths, cancellation polling and work; one owner does not mean ident
 absence of exact continuation factors. Generated native basis statuses are not promised as portable
 legacy recaptures. Input discrete warm bases remain supported. Adoption projects working vectors
 inside the solver and again for replay certification; matrix projection is shared, but the repeated
-vector allocation and source-import preparation are not included in float work counters.
+vector allocation, source import and two value-based matrix comparisons per replacement are not
+included in float work counters.
 Conservative pop revisions on replacements invalidate cached basic values; retaining factors does
 not preserve that restoration shortcut and can require a full forward solve.
 
@@ -80,6 +81,16 @@ matches the analytic source objective. Four bound calls change one retained owne
 owners, all closed; factor warmth is lost. No natural producer or certified capability is claimed
 for this malformed-input fixture. Constructor/projection and direct-certification setup are not
 fully represented by float work counters, so their omission cannot support a speedup claim.
+
+The repository's W0 replay manifest does not contain `REBIND`; its no-refutation assertion alone
+cannot detect partial package losses classified as `DECLINED`. The frozen migrated-route traces
+therefore compare each ordered source package, including declined outcomes. Directed tests check
+exact source equations and inequalities; they do not establish a universal replay parity gate.
+
+A separate fixed-cap probe control covers genuinely clamped upper, lower and both-sided columns,
+and an unbounded source. All measured source bounds and witnesses survive. Removing an artificial
+probe box can remove a float optimum hint; the unbounded control retains a feasible witness without
+proving unboundedness. This is a source-relaxation change, not method or capability parity.
 
 Normal replay controls preserve source packages. At work limit 10, 25 ordinary steps require an
 independent constant-objective certificate to preserve the legacy bound alongside the exact native

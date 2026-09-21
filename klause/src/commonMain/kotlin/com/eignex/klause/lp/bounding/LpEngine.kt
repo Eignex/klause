@@ -464,7 +464,7 @@ internal class LpEngine(
     private var persistentResolved = false
     private var persistentRelaxation: LpRelaxation? = null
 
-    // Strict residual filtering retains its dedicated floating owner until its exact-state migration.
+    // The current legacy fallback owner remains live for metrics until replacement or engine close.
     internal var nodeSimplex: PersistentLpSolver? = null
     internal var nodeUsesTrail: Boolean = false
 

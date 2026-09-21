@@ -603,57 +603,70 @@ class LpReplayTest {
     }
 
     @Test
-    fun `rebound probe sides preserve source absence and row premises`() {
-        val premises = LpRowPremises(intArrayOf(7), booleanArrayOf(false), longArrayOf(5L), intArrayOf(19))
-        val model = LpBuilder().apply {
-            addOpenAboveVar(0L, cost = 1L)
-            addRow(intArrayOf(0), longArrayOf(1L), Relation.GE, 5L, global = false, premises = premises)
-        }.build(Sense.MINIMIZE)
-        var adopted: LpExactState? = null
-        val factory = object : LpEngineFactory by ProductionLpEngineFactory {
-            override fun newPersistentSolver(
-                model: LpModel,
-                cancellation: Cancellation,
-                refactorUpdateLimit: Int,
-                iterationLimit: Int,
-                workLimit: Long,
-                trackDegeneracy: Boolean,
-                pricing: LpPricingOptions,
-            ): PersistentLpSolver {
-                val delegate = ProductionLpEngineFactory.newPersistentSolver(
-                    model,
-                    cancellation,
-                    refactorUpdateLimit,
-                    iterationLimit,
-                    workLimit,
-                    trackDegeneracy,
-                    pricing,
-                )
-                return object : PersistentLpSolver by delegate {
-                    override fun adopt(state: LpExactState, token: Cancellation): Boolean =
-                        delegate.adopt(state, token).also { if (it) adopted = state }
+    fun `rebound absent upper sides preserve source authority and row premises`() {
+        for (probeClamped in listOf(false, true)) {
+            val premises = LpRowPremises(intArrayOf(7), booleanArrayOf(false), longArrayOf(5L), intArrayOf(19))
+            val model = LpBuilder().apply {
+                if (probeClamped) addFreeVar(0L, null, cost = 1L) else addOpenAboveVar(0L, cost = 1L)
+                addRow(intArrayOf(0), longArrayOf(1L), Relation.GE, 5L, global = false, premises = premises)
+            }.build(Sense.MINIMIZE)
+            assertEquals(probeClamped, model.probeClampedHi[0])
+            assertEquals(probeClamped, model.hasUpper[0])
+            assertFalse(model.probeClampedLo[0])
+            var adopted: LpExactState? = null
+            val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+                override fun newPersistentSolver(
+                    model: LpModel,
+                    cancellation: Cancellation,
+                    refactorUpdateLimit: Int,
+                    iterationLimit: Int,
+                    workLimit: Long,
+                    trackDegeneracy: Boolean,
+                    pricing: LpPricingOptions,
+                ): PersistentLpSolver {
+                    val delegate = ProductionLpEngineFactory.newPersistentSolver(
+                        model,
+                        cancellation,
+                        refactorUpdateLimit,
+                        iterationLimit,
+                        workLimit,
+                        trackDegeneracy,
+                        pricing,
+                    )
+                    return object : PersistentLpSolver by delegate {
+                        override fun adopt(state: LpExactState, token: Cancellation): Boolean =
+                            delegate.adopt(state, token).also { if (it) adopted = state }
+                    }
                 }
             }
+            val capture = LpCapture.capture(
+                model,
+                persistentSettings("probe-premises"),
+                listOf(
+                    LpReplayEvent.Rebind(longArrayOf(2L), longArrayOf(3L)),
+                    LpReplayEvent.ResolveBounds(),
+                ),
+            )
+
+            val step = LpReplay.replay(
+                LpCapture.decode(capture.encode()),
+                context = LpSolveContext(factory),
+            ).steps.last()
+
+            assertEquals(LpVerdict.ATTAINED_OPTIMUM, step.productionVerdict)
+            assertEquals(listOf(BigFraction.ofLong(5L)), step.exactWitness)
+            assertEquals(BigFraction.ofLong(5L), step.rationalLowerBound)
+            val authority = assertNotNull(adopted).model
+            assertNull(authority.column(0).bounds.upper)
+            assertEquals(BigFraction.ZERO, assertNotNull(authority.column(0).bounds.lower).number.value)
+            assertEquals(BigFraction.ofLong(2L), authority.column(0).origin.value)
+            assertFalse(authority.row(0).global)
+            assertEquals(listOf(19), assertNotNull(authority.row(0).premises).literalEntries())
+            assertEquals(
+                listOf(ExactLpPremise(7, false, ExactLpNumber.of(5L))),
+                authority.row(0).premises?.boundEntries(),
+            )
         }
-        val capture = LpCapture.capture(
-            model,
-            persistentSettings("probe-premises"),
-            listOf(
-                LpReplayEvent.Rebind(longArrayOf(2L), longArrayOf(3L)),
-                LpReplayEvent.ResolveBounds(),
-            ),
-        )
-
-        val step = LpReplay.replay(LpCapture.decode(capture.encode()), context = LpSolveContext(factory)).steps.last()
-
-        assertEquals(LpVerdict.ATTAINED_OPTIMUM, step.productionVerdict)
-        assertEquals(listOf(BigFraction.ofLong(5L)), step.exactWitness)
-        assertEquals(BigFraction.ofLong(5L), step.rationalLowerBound)
-        val authority = assertNotNull(adopted).model
-        assertNull(authority.column(0).bounds.upper)
-        assertFalse(authority.row(0).global)
-        assertEquals(listOf(19), assertNotNull(authority.row(0).premises).literalEntries())
-        assertEquals(listOf(ExactLpPremise(7, false, ExactLpNumber.of(5L))), authority.row(0).premises?.boundEntries())
     }
 
     @Test
@@ -1069,6 +1082,42 @@ class LpReplayTest {
             }
             assertEquals(0, validations, "${future::class.simpleName} executed a prefix before rejection")
         }
+    }
+
+    @Test
+    fun `negative logical width rejects rebound replay before allocating an owner`() {
+        val model = LpBuilder().apply {
+            addVar(0L, 10L)
+            addRow(intArrayOf(0), longArrayOf(1L), Relation.LE, 5L)
+        }.build(Sense.MINIMIZE)
+        val capture = LpCapture.capture(
+            model,
+            persistentSettings("negative-logical-width"),
+            listOf(LpReplayEvent.Solve(), LpReplayEvent.Rebind(longArrayOf(0L), longArrayOf(10L))),
+        )
+        capture.model.hasUpper[model.n] = true
+        capture.model.upper[model.n] = -1L
+        val decoded = LpCapture.decode(capture.encode())
+        var owners = 0
+        val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+            override fun newPersistentSolver(
+                model: LpModel,
+                cancellation: Cancellation,
+                refactorUpdateLimit: Int,
+                iterationLimit: Int,
+                workLimit: Long,
+                trackDegeneracy: Boolean,
+                pricing: LpPricingOptions,
+            ): PersistentLpSolver {
+                owners++
+                error("unexpected owner allocation")
+            }
+        }
+
+        val failure = assertFails { LpReplay.replay(decoded, context = LpSolveContext(factory)) }
+
+        assertEquals("replay bound updates require valid exact source authority", failure.message)
+        assertEquals(0, owners)
     }
 
     @Test

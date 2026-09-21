@@ -321,7 +321,9 @@ internal object LpReplay {
 }
 
 private class ReplayBoundUpdates(model: LpModel) {
-    private var full = LpExactState(requireNotNull(model.authoritativeModel()))
+    private var full = LpExactState(requireNotNull(model.authoritativeModel()) {
+        "replay bound updates require valid exact source authority"
+    })
     private var revision = 0L
     private var available = true
     private var masked = false
@@ -329,7 +331,9 @@ private class ReplayBoundUpdates(model: LpModel) {
         private set
 
     fun replace(model: LpModel, solver: LpSolver, token: Cancellation) {
-        val next = state(requireNotNull(model.authoritativeModel()))
+        val next = state(requireNotNull(model.authoritativeModel()) {
+            "replay bound updates require valid exact source authority"
+        })
         if (full.sameMatrix(next)) next.inheritProjection(full)
         full = next
         masked = false
