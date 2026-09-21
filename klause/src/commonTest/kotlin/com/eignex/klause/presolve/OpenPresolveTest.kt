@@ -101,10 +101,11 @@ class OpenPresolveTest {
     }
 
     @Test
-    fun `a model a source pin makes contradictory is still refuted`() {
-        // The pin closes every open side, so the bound phase has nothing left to close. It must still
-        // refute: `x >= 3` and `x <= 1` have no point between them, and on this route no bake follows
-        // to catch what a bare `Tightened` would wave through.
+    fun `a model the source phase declines to pin is still refuted`() {
+        // The two rows constrain x in opposite directions, so neither direction is safe and dual fixing
+        // declines. The source phase has to hand the model on rather than report the fixpoint it reached:
+        // `x >= 3` and `x <= 1` have no point between them, and on this route no bake follows to catch
+        // what a bare `Tightened` would wave through.
         val spec = openAbove(
             1,
             row(0 to 1L, op = LinearOp.LE, bound = 1L),
