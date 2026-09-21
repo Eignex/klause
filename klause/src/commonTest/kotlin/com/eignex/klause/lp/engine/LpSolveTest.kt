@@ -14,9 +14,177 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class LpSolveTest {
+    @Test
+    fun `native continuation preserves constant objective bounds in minimized source units`() {
+        for (sense in Sense.entries) for (fractional in listOf(false, true)) {
+            val zero = ExactLpNumber.of(0L)
+            val one = ExactLpNumber.of(1L)
+            val constant = if (fractional) {
+                BigFraction.ofLong(7L) * BigFraction.ofLong(3L).reciprocal()
+            } else {
+                BigFraction.ofLong(4L)
+            }
+            val external = if (fractional) {
+                BigFraction.ofLong(5L) * BigFraction.ofLong(4L).reciprocal()
+            } else {
+                BigFraction.ZERO
+            }
+            val scale = if (fractional) 2L else 1L
+            val source = ExactLpModel(
+                listOf(emptyList()), emptyList(),
+                listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(one)), origin = ExactLpNumber.of(7L))),
+                emptyList(),
+                ExactLpObjective(
+                    listOf(zero), ExactLpNumber.of(constant), ExactLpNumber.of(scale),
+                    ExactLpNumber.of(external), sense,
+                ),
+            )
+            val state = LpExactState(source)
+            val model = assertNotNull(state.toWorkingModel())
+            val solver = object : LpSolver {
+                override val infeasibleRay: DoubleArray? = null
+                override fun solve(warm: Basis?): FloatLpResult? = null
+                override fun solvePrimal(warm: Basis?): FloatLpResult? = null
+                override fun continuationBasis(model: LpModel) = Basis(intArrayOf(), arrayOf(VarStatus.AT_LOWER))
+            }
+
+            val result = certifyLpResult(model, solver, null)
+
+            val expected = constant * BigFraction.ofLong(scale).reciprocal() + external
+            assertEquals(LpVerdict.ATTAINED_OPTIMUM, result.verdict)
+            assertEquals(expected, result.lowerBound)
+            assertEquals(expected, assertNotNull(result.witness).objective)
+            assertEquals(
+                if (sense == Sense.MINIMIZE) expected else expected.negated(),
+                source.objective.sourceValue(listOf(BigFraction.ZERO)),
+            )
+            assertEquals(if (fractional) null else 4L, result.integerObjectiveLowerBound)
+            val support = assertNotNull(assertNotNull(result.bound).support)
+            assertSame(state, support.state)
+            assertTrue(support.rows.isEmpty())
+            assertTrue(support.sides.isEmpty())
+        }
+    }
+
+    @Test
+    fun `native continuation does not invent bounds for nonconstant structural or logical costs`() {
+        for (costColumn in listOf(0, 1)) {
+            val zero = ExactLpNumber.of(0L)
+            val one = ExactLpNumber.of(1L)
+            val source = ExactLpModel(
+                listOf(listOf(ExactLpEntry(0, one))), listOf(one),
+                List(2) { ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(one))) },
+                listOf(ExactLpRow()), ExactLpObjective(List(2) { if (it == costColumn) one else zero }),
+            )
+            val model = assertNotNull(LpExactState(source).toWorkingModel())
+            val solver = object : LpSolver {
+                override val infeasibleRay: DoubleArray? = null
+                override fun solve(warm: Basis?): FloatLpResult? = null
+                override fun solvePrimal(warm: Basis?): FloatLpResult? = null
+                override fun continuationBasis(model: LpModel) =
+                    Basis(intArrayOf(1), arrayOf(VarStatus.AT_LOWER, VarStatus.BASIC))
+            }
+
+            val result = certifyLpResult(model, solver, null)
+
+            assertEquals(LpVerdict.FEASIBLE, result.verdict)
+            assertNotNull(result.witness)
+            assertNull(result.bound)
+        }
+    }
+
+    @Test
+    fun `constant continuation bounds and witnesses honor independent policy rejection`() {
+        for (rejected in listOf(LpCertifier.INTEGER, LpCertifier.EXACT_BASIS)) {
+            val source = assertNotNull(LpBuilder().apply { addVar(0L, 1L) }.build(Sense.MINIMIZE).authoritativeModel())
+            val model = assertNotNull(LpExactState(source).toWorkingModel())
+            val solver = object : LpSolver {
+                override val infeasibleRay: DoubleArray? = null
+                override fun solve(warm: Basis?): FloatLpResult? = null
+                override fun solvePrimal(warm: Basis?): FloatLpResult? = null
+                override fun continuationBasis(model: LpModel) = Basis(intArrayOf(), arrayOf(VarStatus.AT_LOWER))
+            }
+            val policy = LpCertificationPolicy { route, success -> success && route != rejected }
+
+            val result = certifyLpResult(model, solver, null, policy = policy)
+
+            if (rejected == LpCertifier.INTEGER) {
+                assertEquals(LpVerdict.FEASIBLE, result.verdict)
+                assertNotNull(result.witness)
+                assertNull(result.bound)
+            } else {
+                assertEquals(LpVerdict.CERTIFIED_BOUND, result.verdict)
+                assertNull(result.witness)
+                assertEquals(BigFraction.ZERO, result.lowerBound)
+                assertEquals(0L, result.integerObjectiveLowerBound)
+            }
+        }
+    }
+
+    @Test
+    fun `cancellation before or during constant bound callbacks withholds the new bound`() {
+        for (stage in listOf("before", "observer", "policy")) {
+            val source = assertNotNull(LpBuilder().apply { addVar(0L, 1L) }.build(Sense.MINIMIZE).authoritativeModel())
+            val model = assertNotNull(LpExactState(source).toWorkingModel())
+            var cancelled = stage == "before"
+            var boundObserved = false
+            val solver = object : LpSolver {
+                override val infeasibleRay: DoubleArray? = null
+                override fun solve(warm: Basis?): FloatLpResult? = null
+                override fun solvePrimal(warm: Basis?): FloatLpResult? = null
+                override fun continuationBasis(model: LpModel) = Basis(intArrayOf(), arrayOf(VarStatus.AT_LOWER))
+            }
+            val observer = object : LpCertificationObserver {
+                override fun observeExactInput(accepted: Boolean) = Unit
+                override fun observeSolve(metrics: LpSolveMetrics, component: Boolean) = Unit
+                override fun observe(certifier: LpCertifier, success: Boolean) {
+                    if (certifier == LpCertifier.INTEGER) {
+                        boundObserved = success
+                        if (stage == "observer") cancelled = true
+                    }
+                }
+            }
+            val policy = LpCertificationPolicy { route, success ->
+                if (stage == "policy" && route == LpCertifier.INTEGER) cancelled = true
+                success
+            }
+
+            val result = certifyLpResult(model, solver, null, Cancellation { cancelled }, observer, policy)
+
+            assertTrue(cancelled)
+            assertNull(result.bound)
+            assertEquals(stage != "before", boundObserved)
+            assertEquals(if (stage == "before") LpVerdict.INDETERMINATE else LpVerdict.FEASIBLE, result.verdict)
+        }
+    }
+
+    @Test
+    fun `native continuation conflict excludes a constant objective bound`() {
+        val source = assertNotNull(LpBuilder().apply {
+            addVar(0L, 1L)
+            addRow(intArrayOf(0), longArrayOf(1L), Relation.GE, 2L)
+        }.build(Sense.MINIMIZE).authoritativeModel())
+        val model = assertNotNull(LpExactState(source).toWorkingModel())
+        val solver = object : LpSolver {
+            override val infeasibleRay: DoubleArray? = null
+            override fun solve(warm: Basis?): FloatLpResult? = null
+            override fun solvePrimal(warm: Basis?): FloatLpResult? = null
+            override fun continuationBasis(model: LpModel) =
+                Basis(intArrayOf(1), arrayOf(VarStatus.AT_LOWER, VarStatus.BASIC))
+        }
+
+        val result = certifyLpResult(model, solver, null)
+
+        assertEquals(LpVerdict.INFEASIBLE, result.verdict)
+        assertNotNull(result.rationalConflict)
+        assertNull(result.bound)
+        assertNull(result.witness)
+    }
+
     @Test
     fun `source conflict support aggregates repeated rows before selecting strict sides`() {
         val zero = ExactLpNumber.of(0L)

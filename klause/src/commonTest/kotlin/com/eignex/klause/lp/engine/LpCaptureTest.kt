@@ -297,7 +297,6 @@ class LpCaptureTest {
                 val chained = assertNotNull(next.solvePrimal(first.basis))
                 assertFailsWith<IllegalArgumentException> { LpCapturedBasis.capture(chained.basis) }
             }
-            assertTrue(solver.rebind(bridge.model.rebind(longArrayOf(0L), longArrayOf(0L)), Cancellation.Never))
             val reused = assertNotNull(solver.resolveBounds())
             assertFailsWith<IllegalArgumentException> { LpCapturedBasis.capture(reused.basis) }
             solver.close()

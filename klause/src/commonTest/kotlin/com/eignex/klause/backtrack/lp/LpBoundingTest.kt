@@ -13,15 +13,20 @@ import com.eignex.klause.lp.bounding.LpParams
 import com.eignex.klause.lp.bounding.LpPlan
 import com.eignex.klause.lp.bounding.rootLpRelaxationBound
 import com.eignex.klause.lp.bounding.roundUpToResidue
+import com.eignex.klause.lp.bounding.solveNode
 import com.eignex.klause.lp.bounding.sparseCertifiedPrune
 import com.eignex.klause.lp.bounding.sparseSafePrune
 import com.eignex.klause.lp.engine.Basis
+import com.eignex.klause.lp.engine.LpBuilder
 import com.eignex.klause.lp.engine.LpEngineFactory
 import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.LpPricingOptions
 import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.lp.engine.PersistentLpSolver
 import com.eignex.klause.lp.engine.ProductionLpEngineFactory
+import com.eignex.klause.lp.engine.Relation
+import com.eignex.klause.lp.engine.Sense
+import com.eignex.klause.lp.engine.authoritativeModel
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.simplex.exact.BigFraction
@@ -32,11 +37,113 @@ import com.eignex.klause.solver.search.VarRef
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class LpBoundingTest {
+    @Test
+    fun `noncanonical legacy node fallback keeps source hints and closes displaced owners`() {
+        val model = LpBuilder().apply {
+            addVar(0L, 10L, cost = 1L)
+            addRow(intArrayOf(0), longArrayOf(1L), Relation.GE, 3L)
+            addRow(intArrayOf(0), longArrayOf(1L), Relation.GE, 4L)
+        }.build(Sense.MINIMIZE)
+        model.csc.rowIdx[0] = 1
+        model.csc.rowIdx[1] = 0
+        val closes = ArrayList<Int>()
+        val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+            override fun newPersistentSolver(
+                model: LpModel,
+                cancellation: Cancellation,
+                refactorUpdateLimit: Int,
+                iterationLimit: Int,
+                workLimit: Long,
+                trackDegeneracy: Boolean,
+                pricing: LpPricingOptions,
+            ): PersistentLpSolver {
+                val id = closes.size
+                closes.add(0)
+                val delegate = ProductionLpEngineFactory.newPersistentSolver(
+                    model, cancellation, refactorUpdateLimit, iterationLimit, workLimit, trackDegeneracy, pricing,
+                )
+                return object : PersistentLpSolver by delegate {
+                    override fun close() {
+                        closes[id]++
+                        delegate.close()
+                    }
+                }
+            }
+        }
+        val problem = Problem(0, 0, emptyArray(), emptyArray())
+        LpEngine(problem, LinearObjective(), LpParams(), SolveStatsSink("fallback"), LpSolveContext(factory)).use { engine ->
+            for (lower in listOf(0L, 5L, 1L, 0L)) {
+                val next = model.rebind(longArrayOf(lower), longArrayOf(10L))
+                assertNull(next.authoritativeModel())
+
+                val result = assertNotNull(engine.solveNode(next, null, Cancellation.Never))
+
+                assertEquals(maxOf(4L, lower).toDouble(), assertNotNull(result.second).objective)
+                assertEquals(1, result.first.lastMetrics.initialRefactorizations)
+                assertTrue(result.first.lastWorkOps > 0L)
+                assertEquals(List(closes.size - 1) { 1 } + 0, closes)
+            }
+        }
+        assertEquals(listOf(1, 1, 1, 1), closes)
+    }
+
+    @Test
+    fun `failed legacy replacement preserves cleanup failures and closes the staged owner`() {
+        val model = LpBuilder().apply {
+            addVar(0L, 10L)
+            addRow(intArrayOf(0), longArrayOf(1L), Relation.GE, 3L)
+            addRow(intArrayOf(0), longArrayOf(1L), Relation.GE, 4L)
+        }.build(Sense.MINIMIZE)
+        model.csc.rowIdx[0] = 1
+        model.csc.rowIdx[1] = 0
+        val failures = listOf(IllegalStateException("displaced"), IllegalStateException("staged"))
+        val closes = ArrayList<Int>()
+        val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+            override fun newPersistentSolver(
+                model: LpModel,
+                cancellation: Cancellation,
+                refactorUpdateLimit: Int,
+                iterationLimit: Int,
+                workLimit: Long,
+                trackDegeneracy: Boolean,
+                pricing: LpPricingOptions,
+            ): PersistentLpSolver {
+                val id = closes.size
+                closes.add(0)
+                val delegate = ProductionLpEngineFactory.newPersistentSolver(
+                    model, cancellation, refactorUpdateLimit, iterationLimit, workLimit, trackDegeneracy, pricing,
+                )
+                return object : PersistentLpSolver by delegate {
+                    override fun close() {
+                        closes[id]++
+                        delegate.close()
+                        throw failures[id]
+                    }
+                }
+            }
+        }
+        val problem = Problem(0, 0, emptyArray(), emptyArray())
+        LpEngine(problem, LinearObjective(), LpParams(), SolveStatsSink("fallback"), LpSolveContext(factory)).use { engine ->
+            assertNotNull(engine.solveNode(model, null, Cancellation.Never)?.second)
+
+            val failure = assertFailsWith<IllegalStateException> {
+                engine.solveNode(model.rebind(longArrayOf(5L), longArrayOf(10L)), null, Cancellation.Never)
+            }
+
+            assertSame(failures[0], failure)
+            assertSame(failures[1], failure.suppressedExceptions.single())
+        }
+        assertEquals(listOf(1, 1), closes)
+    }
+
     @Test
     fun `a feasible strict precheck preserves objective variable propagation`() {
         val problem = Problem(

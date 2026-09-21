@@ -17,7 +17,7 @@ internal data class LpPricingOptions(
     val tieSeed: Long = 0L,
 )
 
-/** Immutable construction seam shared by standalone solves and one [com.eignex.klause.lp.bounding.LpEngine]. */
+/** Immutable construction seam for standalone and persistent solves. */
 internal interface LpEngineFactory {
     fun newGeneralSolver(model: LpModel, cancellation: Cancellation, pricing: LpPricingOptions): LpSolver
 

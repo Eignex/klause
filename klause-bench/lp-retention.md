@@ -64,6 +64,9 @@ that they prove all consumer acceptance. No isolated full-search speedup is clai
 
 ## 7.6 handoff: migration versus acceptance
 
+The [7.6 architecture and migration boundary](lp-architecture.md) records the caller replacements
+and validation limits; the handoff below preserves the obligations assigned before that migration.
+
 **Actual remaining migration/audit surface.** [LpBounding.solveNode][bounding] still uses
 `PersistentLpSolver.rebind` only after exact projection is unavailable; eligible finite/theory paths
 use the scoped trail. [LpReplay][replay] retains legacy capture rebind events. 7.6 must enumerate the

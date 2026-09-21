@@ -34,10 +34,15 @@ class RevisedSimplexResolveBoundsTest {
     @Test
     fun `a bound-only revision re-solves without rebuilding the factorization`() {
         val model = base()
-        val simplex = RevisedSimplex(model)
+        val initial = LpExactState(assertNotNull(model.authoritativeModel()))
+        val simplex = RevisedSimplex(assertNotNull(initial.toWorkingModel()))
         assertNotNull(simplex.solve(null))
 
-        assertTrue(simplex.rebind(model.rebind(longArrayOf(2L, 0L), longArrayOf(10L, 10L)), Cancellation.Never))
+        val next = LpExactState(
+            assertNotNull(model.rebind(longArrayOf(2L, 0L), longArrayOf(10L, 10L)).authoritativeModel()),
+            boundRevision = 1L,
+        )
+        assertTrue(simplex.adopt(next, Cancellation.Never))
         val again = assertNotNull(simplex.resolveBounds())
 
         assertEquals(0, again.refactorizations, "the kept factorization must carry the re-solve")
@@ -48,10 +53,12 @@ class RevisedSimplexResolveBoundsTest {
         val lo = longArrayOf(2L, 1L)
         val hi = longArrayOf(10L, 10L)
         val model = base()
-        val simplex = RevisedSimplex(model)
+        val initial = LpExactState(assertNotNull(model.authoritativeModel()))
+        val simplex = RevisedSimplex(assertNotNull(initial.toWorkingModel()))
         assertNotNull(simplex.solve(null))
 
-        assertTrue(simplex.rebind(model.rebind(lo, hi), Cancellation.Never))
+        val next = LpExactState(assertNotNull(model.rebind(lo, hi).authoritativeModel()), boundRevision = 1L)
+        assertTrue(simplex.adopt(next, Cancellation.Never))
         val reused = assertNotNull(simplex.resolveBounds())
         val cold = assertNotNull(RevisedSimplex(base().rebind(lo, hi)).solve(null))
 
@@ -60,26 +67,30 @@ class RevisedSimplexResolveBoundsTest {
 
     @Test
     fun `a model with a different matrix is refused rather than reused`() {
-        val simplex = RevisedSimplex(base())
+        val initial = LpExactState(assertNotNull(base().authoritativeModel()))
+        val simplex = RevisedSimplex(assertNotNull(initial.toWorkingModel()))
         assertNotNull(simplex.solve(null))
+        val changed = base()
+        changed.csc.colVal[0] = -2L
 
-        // A second build is an equal model over its own arrays, which is exactly what a rebuilt or
-        // cut-augmented relaxation is — reusing a factorization across it would be unsound.
-        assertFalse(
-            simplex.rebind(base(), Cancellation.Never),
-            "only a shared matrix and objective may reuse the factorization",
-        )
+        assertFalse(simplex.adopt(LpExactState(assertNotNull(changed.authoritativeModel())), Cancellation.Never))
+        assertEquals(3.0, assertNotNull(simplex.resolveBounds()).objective)
     }
 
     @Test
-    fun `closing a rebound engine releases its injected basis`() {
+    fun `closing an adopted engine releases its injected basis`() {
         val model = base()
         lateinit var factors: KotlinBasisSolver
-        val simplex = RevisedSimplex(model, basisSolverFactory = { matrix ->
+        val initial = LpExactState(assertNotNull(model.authoritativeModel()))
+        val simplex = RevisedSimplex(assertNotNull(initial.toWorkingModel()), basisSolverFactory = { matrix ->
             KotlinBasisSolver(matrix).also { factors = it }
         })
         assertNotNull(simplex.solve())
-        assertTrue(simplex.rebind(model.rebind(longArrayOf(2L, 1L), longArrayOf(10L, 10L)), Cancellation.Never))
+        val next = LpExactState(
+            assertNotNull(model.rebind(longArrayOf(2L, 1L), longArrayOf(10L, 10L)).authoritativeModel()),
+            boundRevision = 1L,
+        )
+        assertTrue(simplex.adopt(next, Cancellation.Never))
         val result = assertNotNull(simplex.resolveBounds())
         assertEquals(4.0, result.objective, 1e-9)
         assertEquals(0, result.refactorizations)
@@ -227,10 +238,10 @@ class RevisedSimplexResolveBoundsTest {
     }
 
     @Test
-    fun `bounded native trail and legacy rebind traces agree on exact source optima`() {
+    fun `bounded native trail and imported bound traces agree on exact source optima`() {
         val measurements = ArrayList<List<Long>>()
         repeat(3) { repetition ->
-            val legacySource = base()
+            val capturedSource = base()
             val zero = ExactLpNumber.of(0L)
             val box = ExactLpBounds(ExactLpSide(zero), ExactLpSide(ExactLpNumber.of(10L)))
             val source = ExactLpModel(
@@ -242,20 +253,21 @@ class RevisedSimplexResolveBoundsTest {
             )
             val trail = LpBoundTrail(source)
             RevisedSimplex(assertNotNull(trail.state.toWorkingModel())).use { native ->
-                RevisedSimplex(legacySource).use { legacy ->
+                val imported = LpExactState(assertNotNull(capturedSource.authoritativeModel()))
+                RevisedSimplex(assertNotNull(imported.toWorkingModel())).use { adopted ->
                     assertNotNull(native.solve())
-                    assertNotNull(legacy.solve())
+                    assertNotNull(adopted.solve())
                     val nativeInitialWork = native.lastWorkOps
-                    val legacyInitialWork = legacy.lastWorkOps
+                    val adoptedInitialWork = adopted.lastWorkOps
                     var nativeFactors = native.lastRefactorizations.toLong()
-                    var legacyFactors = legacy.lastRefactorizations.toLong()
+                    var adoptedFactors = adopted.lastRefactorizations.toLong()
                     val nativeInitialFactors = nativeFactors
-                    val legacyInitialFactors = legacyFactors
+                    val adoptedInitialFactors = adoptedFactors
                     var nativeWork = 0L
-                    var legacyWork = 0L
+                    var adoptedWork = 0L
                     var attempts = 0L
                     var nativeSolved = 0L
-                    var legacySolved = 0L
+                    var adoptedSolved = 0L
                     repeat(8) { cycle ->
                         for (step in 0..4) {
                             when (step) {
@@ -292,23 +304,31 @@ class RevisedSimplexResolveBoundsTest {
                             val expectedY = maxOf(lower[1], 3L - expectedX)
                             val expectedPoint = listOf(expectedX, expectedY).map(BigFraction::ofLong)
                             val expectedBound = BigFraction.ofLong(expectedX + 2L * expectedY)
-                            val legacyModel = legacySource.rebind(lower, upper)
-                            assertTrue(legacy.rebind(legacyModel, Cancellation.Never))
-                            val legacyResult = legacy.resolveBounds()
+                            val capturedModel = capturedSource.rebind(lower, upper)
+                            val importedBounds = LpExactState(
+                                assertNotNull(capturedModel.authoritativeModel()),
+                                boundRevision = attempts + 1L,
+                            )
+                            assertTrue(adopted.adopt(importedBounds, Cancellation.Never))
+                            val adoptedResult = adopted.resolveBounds()
                             attempts++
                             if (nativeResult != null) nativeSolved++
-                            if (legacyResult != null) legacySolved++
+                            if (adoptedResult != null) adoptedSolved++
                             nativeWork += native.lastWorkOps
-                            legacyWork += legacy.lastWorkOps
+                            adoptedWork += adopted.lastWorkOps
                             nativeFactors += native.lastRefactorizations
-                            legacyFactors += legacy.lastRefactorizations
+                            adoptedFactors += adopted.lastRefactorizations
                             if (repetition == 0) {
                                 val certified = certifyLpResult(
                                     assertNotNull(trail.state.toWorkingModel()),
                                     native,
                                     nativeResult,
                                 )
-                                val baseline = certifyLpResult(legacyModel, legacy, legacyResult)
+                                val baseline = certifyLpResult(
+                                    assertNotNull(importedBounds.toWorkingModel()),
+                                    adopted,
+                                    adoptedResult,
+                                )
                                 val checked = listOfNotNull(
                                     certified,
                                     baseline,
@@ -328,16 +348,16 @@ class RevisedSimplexResolveBoundsTest {
                         }
                     }
                     val measurement = listOf(
-                        nativeInitialWork, legacyInitialWork, nativeWork, legacyWork, nativeFactors, legacyFactors,
-                        nativeFactors - nativeInitialFactors, legacyFactors - legacyInitialFactors,
-                        attempts, nativeSolved, legacySolved,
+                        nativeInitialWork, adoptedInitialWork, nativeWork, adoptedWork, nativeFactors, adoptedFactors,
+                        nativeFactors - nativeInitialFactors, adoptedFactors - adoptedInitialFactors,
+                        attempts, nativeSolved, adoptedSolved,
                     )
                     measurements += measurement
                     assertEquals(40L, attempts)
                     assertEquals(attempts, nativeSolved)
-                    assertEquals(attempts, legacySolved)
+                    assertEquals(attempts, adoptedSolved)
                     assertTrue(nativeFactors - nativeInitialFactors <= attempts / 8L)
-                    assertTrue(legacyFactors - legacyInitialFactors <= attempts / 8L)
+                    assertTrue(adoptedFactors - adoptedInitialFactors <= attempts / 8L)
                 }
             }
         }

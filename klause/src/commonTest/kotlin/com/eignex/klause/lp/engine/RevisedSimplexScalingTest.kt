@@ -184,15 +184,16 @@ class RevisedSimplexScalingTest {
     }
 
     @Test
-    fun `bound rebind retains the scaled factors`() {
+    fun `bound adoption retains the scaled factors`() {
         val model = mixedIntegerModel()
-        val solver = RevisedSimplex(model)
+        val initial = LpExactState(assertNotNull(model.authoritativeModel()))
+        val solver = RevisedSimplex(assertNotNull(initial.toWorkingModel()))
         assertNotNull(solver.solve())
         assertTrue(solver.scalingMetrics.applied)
         val version = solver.scaleVersion
         val next = model.rebind(longArrayOf(2L, 0L), longArrayOf(10L, 10L))
 
-        assertTrue(solver.rebind(next, Cancellation.Never))
+        assertTrue(solver.adopt(LpExactState(assertNotNull(next.authoritativeModel()), boundRevision = 1L), Cancellation.Never))
         val reused = assertNotNull(solver.resolveBounds())
         val fresh = assertNotNull(RevisedSimplex(next).solve())
 

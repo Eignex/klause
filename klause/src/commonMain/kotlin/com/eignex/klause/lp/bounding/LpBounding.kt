@@ -125,7 +125,7 @@ internal fun LpEngine.dualSimplex(model: LpModel, cancellation: Cancellation): T
 
 /*
  * Eligible CP nodes adopt exact bound changes into the retained scoped owner. A local row/layout
- * change replaces that owner. Nonprojectable legacy models use persistent rebind when compatible.
+ * change replaces that owner. Legacy models without exact authority use a bounded fresh solve.
  * Warm hints apply only to a fresh solve; a retained scoped owner already has its basis factorized.
  */
 // Replacement cleanup must preserve arbitrary solve and close failures.
@@ -142,9 +142,6 @@ internal fun LpEngine.solveNode(
         cpAdapter.localModel()
         if (!propagator.install(model, exact)) return null
         return propagator.solveFloat(warm, cancellation)
-    }
-    nodeSimplex?.let { kept ->
-        if (kept.rebind(model, cancellation)) return kept to kept.resolveBounds()
     }
     val fresh = newPersistentLpSolver(
         model,

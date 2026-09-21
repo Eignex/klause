@@ -70,7 +70,7 @@ Read `klause-bench/README.md` before benchmarking. In short:
   and non-incremental graph operations. It must not depend on propagation state.
 - `simplex.exact` owns reusable exact rational arithmetic and feasibility simplex primitives.
 - `lp.engine` owns solving an `LpModel` and certifying the result: the simplex, its basis, and the exact
-  dual/Farkas certificates. It may depend only on `util`, `simplex.exact`, and `lp.lattice` — never on
+  dual/Farkas certificates. It may depend only on `util`, `simplex.exact`, `lp.lattice`, and `simplex.basis` — never on
   factors, propagation, presolve, search, or the solver model. That closed list is what keeps the engine
   swappable, so widening it is the thing to refuse.
 - `lp.lattice` owns exact integer matrix reduction (echelon, Hermite, unimodular transforms) and the

@@ -84,7 +84,6 @@ private enum class DeclineCall {
     PERSISTENT,
     SOLVE,
     SOLVE_PRIMAL,
-    REBIND,
     ADOPT,
     PREPARE_LOGICALS,
     RESOLVE_BOUNDS,
@@ -225,10 +224,6 @@ private class RecordingPersistentSolver(
         return persistent.adopt(state, token)
     }
 
-    override fun rebind(next: LpModel, token: Cancellation): Boolean {
-        calls += DeclineCall.REBIND
-        return persistent.rebind(next, token)
-    }
 
     override fun resolveBounds(allowance: LpFloatAllowance?): FloatLpResult? {
         calls += DeclineCall.RESOLVE_BOUNDS
@@ -481,7 +476,6 @@ class LpDeclineDisciplineTest {
             assertFalse(node.pruneNode(session, 1.5, -1, true))
             assertFalse(node.pruneNode(PropagationSession(problem), 1.5, -1, true))
             assertTrue(nodeHarness.factory.calls.contains(DeclineCall.PERSISTENT))
-            assertFalse(nodeHarness.factory.calls.contains(DeclineCall.REBIND))
             assertTrue(nodeHarness.factory.calls.contains(DeclineCall.ADOPT))
             assertTrue(nodeHarness.factory.calls.contains(DeclineCall.PREPARE_LOGICALS))
             assertTrue(nodeHarness.factory.calls.contains(DeclineCall.RESOLVE_BOUNDS))
@@ -702,6 +696,33 @@ class LpDeclineDisciplineTest {
                 ) in optimize,
         )
         assertTrue("sawIndeterminateLeaf -> MinimizeResult.Unknown" in optimize)
+    }
+
+    @Test
+    fun `LP arithmetic kernels keep policy references outside their boundary`() {
+        val root = repositoryRoot().resolve("klause/src/commonMain/kotlin/com/eignex/klause")
+        val packages = mapOf(
+            "lp/engine" to setOf("lp.engine", "util", "simplex.exact", "lp.lattice", "simplex.basis"),
+            "lp/lattice" to setOf("lp.lattice", "util"),
+            "simplex/exact" to setOf("simplex.exact", "util"),
+            "simplex/basis" to setOf("simplex.basis", "util"),
+        )
+        val numericTypes = setOf("simplex.exact.BigFraction", "simplex.exact.Frac128", "simplex.exact.Frac128Ops")
+        val reference = Regex("com\\.eignex\\.klause\\.([A-Za-z_][A-Za-z_0-9.]*)")
+        for ((directory, allowed) in packages) {
+            val sources = kotlinSources(root.resolve(directory))
+            assertTrue(sources.isNotEmpty(), "missing kernel sources: $directory")
+            for (path in sources) {
+                for (match in reference.findAll(path.readText())) {
+                    val name = match.groupValues[1].trimEnd('.')
+                    assertTrue(
+                        allowed.any { name == it || name.startsWith("$it.") } ||
+                            (directory == "simplex/basis" && name in numericTypes),
+                        "$path: ${match.value}",
+                    )
+                }
+            }
+        }
     }
 
     @Test

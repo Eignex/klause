@@ -102,64 +102,87 @@ internal object LpReplay {
         var model = capture.model.toModel()
         val settings = capture.settings
         var cancellation: Cancellation = PollBudgetCancellation(settings.cancellationPollLimit)
-        val solver = newSolver(model, settings, cancellation, context)
+        val boundUpdates = if (capture.events.any { it is LpReplayEvent.Rebind }) ReplayBoundUpdates(model) else null
+        val solver = newSolver(boundUpdates?.working ?: model, settings, cancellation, context)
         val steps = ArrayList<LpReplayStep>(capture.events.size)
         val continuationBudget = ReplayContinuationBudget(continuationLimits)
         solver.use {
             ReplayStrictCertification(model, settings, context).use { strict ->
                 capture.events.forEachIndexed { index, event ->
                     val step = when (event) {
-                        is LpReplayEvent.Solve -> replaySolve(
+                        is LpReplayEvent.Solve -> if (boundUpdates?.restore(solver, cancellation) == false) {
+                            declinedStep(index, LpReplayOperation.SOLVE)
+                        } else {
+                            replaySolve(
                             index,
                             LpReplayOperation.SOLVE,
-                            model,
+                            boundUpdates?.working ?: model,
                             solver,
                             cancellation,
                             context,
                             strict,
                             continuationBudget,
                         ) { solver.solve(event.warm?.toBasis(model.hasUpper, model.m)) }
+                        }
 
-                        is LpReplayEvent.SolvePrimal -> replaySolve(
+                        is LpReplayEvent.SolvePrimal -> if (boundUpdates?.restore(solver, cancellation) == false) {
+                            declinedStep(index, LpReplayOperation.SOLVE_PRIMAL)
+                        } else {
+                            replaySolve(
                             index,
                             LpReplayOperation.SOLVE_PRIMAL,
-                            model,
+                            boundUpdates?.working ?: model,
                             solver,
                             cancellation,
                             context,
                             strict,
                             continuationBudget,
                         ) { solver.solvePrimal(event.warm?.toBasis(model.hasUpper, model.m)) }
+                        }
 
                         is LpReplayEvent.Rebind -> {
                             val next = model.rebind(event.lo, event.hi)
                             if (event.cancellationPollLimit != null) {
                                 cancellation = PollBudgetCancellation(event.cancellationPollLimit)
                             }
-                            check((solver as PersistentLpSolver).rebind(next, cancellation)) {
-                                "persistent solver rejected replay rebind at event $index"
-                            }
+                            checkNotNull(boundUpdates).replace(next, solver, cancellation)
                             model = next
                             emptyStep(index, LpReplayOperation.REBIND)
                         }
 
-                        is LpReplayEvent.ResolveBounds -> replaySolve(
+                        is LpReplayEvent.ResolveBounds -> if (boundUpdates?.restore(solver, cancellation) == false) {
+                            declinedStep(index, LpReplayOperation.RESOLVE_BOUNDS)
+                        } else {
+                            replaySolve(
                             index,
                             LpReplayOperation.RESOLVE_BOUNDS,
-                            model,
+                            boundUpdates?.working ?: model,
                             solver,
                             cancellation,
                             context,
                             strict,
                             continuationBudget,
                         ) { (solver as PersistentLpSolver).resolveBounds() }
+                        }
 
-                        is LpReplayEvent.ResolveGated -> replayUncertified(
+                        is LpReplayEvent.ResolveGated -> if (
+                            boundUpdates?.mask(event.enforced, solver, cancellation) == false
+                        ) {
+                            declinedStep(index, LpReplayOperation.RESOLVE_GATED, event.enforced)
+                        } else {
+                            replayUncertified(
                             index,
                             LpReplayOperation.RESOLVE_GATED,
                             solver,
                             event.enforced,
-                        ) { (solver as PersistentLpSolver).resolveGated(event.enforced.copyOf()) }
+                        ) {
+                            if (boundUpdates == null) {
+                                (solver as PersistentLpSolver).resolveGated(event.enforced.copyOf())
+                            } else {
+                                (solver as PersistentLpSolver).resolveBounds()
+                            }
+                        }
+                        }
 
                         else -> error("unsupported event passed replay preflight: ${event::class.simpleName}")
                     }
@@ -283,6 +306,73 @@ internal object LpReplay {
         0,
         LpCertificationCapability.NO_CLAIM,
     )
+
+    private fun declinedStep(index: Int, operation: LpReplayOperation, enforced: BooleanArray? = null): LpReplayStep =
+        LpReplayStep(
+            index, operation, LpCandidateKind.NONE, LpVerdict.INDETERMINATE,
+            null, null, null, false, false, false, LpSolveMetrics(), emptyList(), 0, 0,
+            if (enforced == null) {
+                LpCertificationCapability.NO_CLAIM
+            } else {
+                LpCertificationCapability.GATED_ACTIVE_STATE_UNAVAILABLE
+            },
+            enforced?.copyOf(),
+        )
+}
+
+private class ReplayBoundUpdates(model: LpModel) {
+    private var full = LpExactState(requireNotNull(model.authoritativeModel()))
+    private var revision = 0L
+    private var available = true
+    private var masked = false
+    var working: LpModel = requireNotNull(full.toWorkingModel())
+        private set
+
+    fun replace(model: LpModel, solver: LpSolver, token: Cancellation) {
+        val next = state(requireNotNull(model.authoritativeModel()))
+        if (full.sameMatrix(next)) next.inheritProjection(full)
+        full = next
+        masked = false
+        adopt(next, solver, token)
+    }
+
+    fun restore(solver: LpSolver, token: Cancellation): Boolean {
+        if (!available || !masked) return available
+        val next = state(full.baseModel)
+        next.inheritProjection(full)
+        full = next
+        masked = false
+        return adopt(next, solver, token)
+    }
+
+    fun mask(enforced: BooleanArray, solver: LpSolver, token: Cancellation): Boolean {
+        if (!available) return false
+        val rows = full.rows.deactivate(enforced.indices.filterTo(HashSet()) { !enforced[it] })
+        val next = state(full.baseModel, rows)
+        next.inheritProjection(full)
+        masked = true
+        return adopt(next, solver, token)
+    }
+
+    private fun state(model: ExactLpModel, rows: LpScopedRows = LpScopedRows.initial(model.m)): LpExactState {
+        revision++
+        return LpExactState(
+            model,
+            boundRevision = revision,
+            popRevision = revision,
+            rows = rows,
+            rowRevision = revision,
+        )
+    }
+
+    private fun adopt(state: LpExactState, solver: LpSolver, token: Cancellation): Boolean {
+        // A rejected transition leaves the donor's result slots intact; none belong to the requested state.
+        available = false
+        if (!(solver as PersistentLpSolver).adopt(state, token)) return false
+        working = requireNotNull(state.toWorkingModel())
+        available = true
+        return true
+    }
 }
 
 private class ReplayStrictCertification(

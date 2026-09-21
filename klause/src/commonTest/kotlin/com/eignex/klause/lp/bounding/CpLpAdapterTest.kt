@@ -66,7 +66,6 @@ class CpLpAdapterTest {
             ),
         )
         var constructions = 0
-        var rebinds = 0
         var closes = 0
         val factory = object : LpEngineFactory by ProductionLpEngineFactory {
             override fun newPersistentSolver(
@@ -89,10 +88,6 @@ class CpLpAdapterTest {
                     pricing,
                 )
                 return object : PersistentLpSolver by delegate {
-                    override fun rebind(next: LpModel, token: Cancellation): Boolean {
-                        rebinds++
-                        return delegate.rebind(next, token)
-                    }
                     override fun close() {
                         closes++
                         delegate.close()
@@ -145,12 +140,10 @@ class CpLpAdapterTest {
             assertEquals(0, engine.propagator.lastMetrics.warmStartRefactorizations)
             assertContentEquals(saved, initial.primal)
             assertEquals(1, constructions)
-            assertEquals(0, rebinds)
             engine.releasePersistentSolvers()
             assertEquals(constructions, closes)
             assertNotNull(engine.solveNode(restored.model, null, Cancellation.Never)?.second)
             assertEquals(2, constructions)
-            assertEquals(0, rebinds)
         }
         assertEquals(constructions, closes)
     }

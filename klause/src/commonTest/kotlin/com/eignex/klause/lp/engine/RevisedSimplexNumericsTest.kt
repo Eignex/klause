@@ -447,7 +447,6 @@ class RevisedSimplexNumericsTest {
             })
             assertNotNull(simplex.solve())
             assertTrue(simplex.gomoryCuts(4).isNotEmpty())
-            assertTrue(simplex.rebind(model.rebind(LongArray(3), LongArray(3) { 2L }), Cancellation.Never))
             fail = true
 
             val result = if (gated) simplex.resolveGated(BooleanArray(3) { true }) else simplex.resolveBounds()
