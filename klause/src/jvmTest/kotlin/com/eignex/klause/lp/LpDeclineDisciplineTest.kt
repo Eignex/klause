@@ -224,7 +224,6 @@ private class RecordingPersistentSolver(
         return persistent.adopt(state, token)
     }
 
-
     override fun resolveBounds(allowance: LpFloatAllowance?): FloatLpResult? {
         calls += DeclineCall.RESOLVE_BOUNDS
         return persistent.resolveBounds(allowance)

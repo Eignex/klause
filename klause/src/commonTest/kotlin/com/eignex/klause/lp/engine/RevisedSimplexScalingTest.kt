@@ -193,7 +193,12 @@ class RevisedSimplexScalingTest {
         val version = solver.scaleVersion
         val next = model.rebind(longArrayOf(2L, 0L), longArrayOf(10L, 10L))
 
-        assertTrue(solver.adopt(LpExactState(assertNotNull(next.authoritativeModel()), boundRevision = 1L), Cancellation.Never))
+        assertTrue(
+            solver.adopt(
+                LpExactState(assertNotNull(next.authoritativeModel()), boundRevision = 1L),
+                Cancellation.Never,
+            ),
+        )
         val reused = assertNotNull(solver.resolveBounds())
         val fresh = assertNotNull(RevisedSimplex(next).solve())
 

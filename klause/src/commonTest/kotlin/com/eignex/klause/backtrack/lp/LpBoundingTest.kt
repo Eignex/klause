@@ -68,7 +68,13 @@ class LpBoundingTest {
                 val id = closes.size
                 closes.add(0)
                 val delegate = ProductionLpEngineFactory.newPersistentSolver(
-                    model, cancellation, refactorUpdateLimit, iterationLimit, workLimit, trackDegeneracy, pricing,
+                    model,
+                    cancellation,
+                    refactorUpdateLimit,
+                    iterationLimit,
+                    workLimit,
+                    trackDegeneracy,
+                    pricing,
                 )
                 return object : PersistentLpSolver by delegate {
                     override fun close() {
@@ -79,7 +85,13 @@ class LpBoundingTest {
             }
         }
         val problem = Problem(0, 0, emptyArray(), emptyArray())
-        LpEngine(problem, LinearObjective(), LpParams(), SolveStatsSink("fallback"), LpSolveContext(factory)).use { engine ->
+        LpEngine(
+            problem,
+            LinearObjective(),
+            LpParams(),
+            SolveStatsSink("fallback"),
+            LpSolveContext(factory),
+        ).use { engine ->
             for (lower in listOf(0L, 5L, 1L, 0L)) {
                 val next = model.rebind(longArrayOf(lower), longArrayOf(10L))
                 assertNull(next.authoritativeModel())
@@ -119,7 +131,13 @@ class LpBoundingTest {
                 val id = closes.size
                 closes.add(0)
                 val delegate = ProductionLpEngineFactory.newPersistentSolver(
-                    model, cancellation, refactorUpdateLimit, iterationLimit, workLimit, trackDegeneracy, pricing,
+                    model,
+                    cancellation,
+                    refactorUpdateLimit,
+                    iterationLimit,
+                    workLimit,
+                    trackDegeneracy,
+                    pricing,
                 )
                 return object : PersistentLpSolver by delegate {
                     override fun close() {
@@ -131,7 +149,13 @@ class LpBoundingTest {
             }
         }
         val problem = Problem(0, 0, emptyArray(), emptyArray())
-        LpEngine(problem, LinearObjective(), LpParams(), SolveStatsSink("fallback"), LpSolveContext(factory)).use { engine ->
+        LpEngine(
+            problem,
+            LinearObjective(),
+            LpParams(),
+            SolveStatsSink("fallback"),
+            LpSolveContext(factory),
+        ).use { engine ->
             assertNotNull(engine.solveNode(model, null, Cancellation.Never)?.second)
 
             val failure = assertFailsWith<IllegalStateException> {

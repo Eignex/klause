@@ -567,8 +567,12 @@ class LpReplayTest {
         val capture = LpCapture.capture(
             model,
             LpReplaySettings(
-                "constant-bound", 76L, LpReplaySolverKind.PERSISTENT,
-                componentSplit = false, pivotLimit = 1, workLimit = 10L,
+                "constant-bound",
+                76L,
+                LpReplaySolverKind.PERSISTENT,
+                componentSplit = false,
+                pivotLimit = 1,
+                workLimit = 10L,
             ),
             listOf(
                 LpReplayEvent.Solve(),
@@ -617,7 +621,13 @@ class LpReplayTest {
                 pricing: LpPricingOptions,
             ): PersistentLpSolver {
                 val delegate = ProductionLpEngineFactory.newPersistentSolver(
-                    model, cancellation, refactorUpdateLimit, iterationLimit, workLimit, trackDegeneracy, pricing,
+                    model,
+                    cancellation,
+                    refactorUpdateLimit,
+                    iterationLimit,
+                    workLimit,
+                    trackDegeneracy,
+                    pricing,
                 )
                 return object : PersistentLpSolver by delegate {
                     override fun adopt(state: LpExactState, token: Cancellation): Boolean =
@@ -697,7 +707,13 @@ class LpReplayTest {
                     pricing: LpPricingOptions,
                 ): PersistentLpSolver {
                     val delegate = ProductionLpEngineFactory.newPersistentSolver(
-                        model, cancellation, refactorUpdateLimit, iterationLimit, workLimit, trackDegeneracy, pricing,
+                        model,
+                        cancellation,
+                        refactorUpdateLimit,
+                        iterationLimit,
+                        workLimit,
+                        trackDegeneracy,
+                        pricing,
                     )
                     return object : PersistentLpSolver by delegate {
                         override fun adopt(state: LpExactState, token: Cancellation): Boolean {
@@ -729,7 +745,10 @@ class LpReplayTest {
 
             val steps = LpReplay.replay(capture, context = LpSolveContext(factory)).steps
 
-            assertEquals(if (rhs == 0L) LpVerdict.ATTAINED_OPTIMUM else LpVerdict.INFEASIBLE, steps[0].productionVerdict)
+            assertEquals(
+                if (rhs == 0L) LpVerdict.ATTAINED_OPTIMUM else LpVerdict.INFEASIBLE,
+                steps[0].productionVerdict,
+            )
             for (step in steps.subList(2, 6)) {
                 assertEquals(LpVerdict.INDETERMINATE, step.productionVerdict)
                 assertEquals(LpCandidateKind.NONE, step.candidate)
@@ -755,7 +774,13 @@ class LpReplayTest {
         val model = LpBuilder().apply { addVar(0L, 10L, cost = 1L) }.build(Sense.MINIMIZE)
         val capture = LpCapture.capture(
             model,
-            LpReplaySettings("reset", 76L, LpReplaySolverKind.PERSISTENT, componentSplit = false, cancellationPollLimit = 1),
+            LpReplaySettings(
+                "reset",
+                76L,
+                LpReplaySolverKind.PERSISTENT,
+                componentSplit = false,
+                cancellationPollLimit = 1,
+            ),
             listOf(
                 LpReplayEvent.Rebind(longArrayOf(5L), longArrayOf(10L)),
                 LpReplayEvent.ResolveBounds(),
