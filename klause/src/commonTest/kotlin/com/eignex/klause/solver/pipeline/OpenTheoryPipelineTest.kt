@@ -5,6 +5,7 @@ import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.Bits
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -13,6 +14,28 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class OpenTheoryPipelineTest {
+
+    @Test
+    fun `preparation reads a maximized objective in minimize sense`() {
+        // `maximize x` subject to `x <= 7`. Lowering x is safe, so a source pass reading the raw
+        // coefficient sees `+1 >= 0` and pins x at 0 — the one value maximization rules out. Preparation
+        // has to resolve the sense the way execution does, or it reports a model the solve never sees.
+        val openUpper = Bits(1).also { it.set(0) }
+        val model = Problem(
+            numBoolVars = 0,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(0), null, openUpper),
+            factors = arrayOf<Factor>(Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 7)),
+        )
+        val request = OpenTheoryRequest(
+            model = model,
+            objective = LinearObjective(intCoefficients = longArrayOf(1L)),
+            maximize = true,
+        )
+
+        val preparation = OpenTheoryPipeline.prepare(request)
+
+        assertEquals(7L, preparation.model.intBounds.upper(0), "x must keep the values maximization wants")
+    }
 
     @Test
     fun `preparation reports LP work used to close an open side`() {

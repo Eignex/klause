@@ -59,30 +59,29 @@ internal object DominatedVariables {
         objectiveBoolCoeffs: Map<Int, Long> = emptyMap(),
     ): PassDelta {
         val safety = scanSafety(problem)
-        var domainsNarrowed = false
-        val domains = problem.rootIntDomains()
+        // Allocated on the first pin: the copy is one entry per column, and a round on a wide model far
+        // more often finds nothing to pin than something. Its nullness is also what carries the pinned
+        // domains only when a pin actually narrowed one, so a bool-only fixing yields a pure-add delta
+        // the fixpoint check reads correctly.
+        var domains: Array<IntDomain>? = null
+        fun pin(v: Int, value: Long) {
+            val target = domains ?: problem.rootIntDomains().also { domains = it }
+            target[v] = IntDomain(value, value)
+        }
         for (v in 0 until problem.numIntVars) {
             if (!safety.pinnable(v)) continue
             val d = problem.rootIntDomain(v)
             if (d.min == d.max) continue // already fixed
             val c = objectiveIntCoeffs[v] ?: 0L
             when {
-                safety.downSafe[v] && c >= 0L -> {
-                    domains[v] = IntDomain(d.min, d.min)
-                    domainsNarrowed = true
-                }
-
-                safety.upSafe[v] && c <= 0L -> {
-                    domains[v] = IntDomain(d.max, d.max)
-                    domainsNarrowed = true
-                }
+                safety.downSafe[v] && c >= 0L -> pin(v, d.min)
+                safety.upSafe[v] && c <= 0L -> pin(v, d.max)
             }
         }
         val extra = safety.boolPins(objectiveBoolCoeffs)
-        if (!domainsNarrowed && extra.isEmpty()) return PassDelta()
-        // Carry the pinned domains only when a pin actually narrowed one, so a bool-only fixing yields a
-        // pure-add delta the fixpoint check reads correctly.
-        return PassDelta(addedFactors = extra, domains = if (domainsNarrowed) domains else null)
+        val pinned = domains
+        if (pinned == null && extra.isEmpty()) return PassDelta()
+        return PassDelta(addedFactors = extra, domains = pinned)
     }
 
     /**
