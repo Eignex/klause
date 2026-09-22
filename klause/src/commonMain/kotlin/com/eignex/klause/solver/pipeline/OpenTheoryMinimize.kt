@@ -417,6 +417,10 @@ class OpenTheoryMinimizer internal constructor(
             is OpenTheoryAssignment.ExactLra -> check(terms.isEmpty()) {
                 "a route with no integer column cannot value an objective weighting one"
             }
+
+            // A rebuild recovers Boolean columns only, so the objective's integer terms read the witness
+            // underneath it at that route's own width.
+            is OpenTheoryAssignment.Rebuilt -> return valueOf(assignment.base)
         }
         return total
     }
@@ -466,6 +470,17 @@ private fun OpenTheoryAssignment.exactWitness(realColumns: Int): ExactWitness = 
         { assignment.reals[it] },
         { error("a route with no integer column cannot value an objective weighting one") },
     )
+
+    // Numeric columns come from the route underneath, which alone knows their width; only the Booleans
+    // are the rebuild's.
+    is OpenTheoryAssignment.Rebuilt -> base.exactWitness(realColumns).withTruth { bools[it] }
+}
+
+/** This witness reading its Boolean columns through [truth] instead. */
+private fun ExactWitness.withTruth(truth: (Int) -> Boolean): ExactWitness = object : ExactWitness {
+    override fun at(column: Int): BigFraction = this@withTruth.at(column)
+
+    override fun truth(boolVar: Int): Boolean = truth(boolVar)
 }
 
 /** One route's witness over the certificate's mixed column space: reals first, then integer columns. */

@@ -2,7 +2,6 @@ package com.eignex.klause.presolve
 
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.solver.Sample
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.IntHashSet
 
@@ -12,7 +11,7 @@ import com.eignex.klause.util.IntHashSet
  * resolvent of `C` and `D` on `var(ℓ)` is a tautology (i.e. `C` and `D` clash on some other variable).
  * A blocked clause is satisfiability-redundant and removed; if a solution of the reduced problem
  * falsifies `C`, setting `ℓ` true repairs it without breaking any `D` (each is already satisfied by the
- * clashing literal), which [BlockedReconstruct] does in reverse elimination order.
+ * clashing literal), which [asRebuilds] states in reverse elimination order.
  *
  * Operates on the shared [SatClauseDb]. The blocking literal's variable must be [SatClauseDb.eligible]
  * — objective-free and appearing solely in clean all-Boolean clauses — so flipping it during
@@ -49,7 +48,7 @@ internal object BlockedClauseElimination {
             removed.add(Blocked(c, blocking))
         }
 
-        return db.toDelta(if (removed.isEmpty()) null else BlockedReconstruct(removed)::reconstruct)
+        return db.toDelta(removed.asRebuilds().asSampleLift())
     }
 
     /** A literal of [c] whose variable is eligible and on which [c] is blocked, or `null`. */
@@ -89,27 +88,12 @@ internal object BlockedClauseElimination {
     private class Blocked(val clause: IntArray, val blockingLit: Int)
 
     /**
-     * Recovers a solution by repairing any falsified blocked clause. In reverse elimination order, a
-     * blocked clause that the current assignment leaves unsatisfied is repaired by forcing its blocking
-     * literal true; the blocking property guarantees this satisfies the clause without falsifying any
-     * clause that contained the opposite literal.
+     * The removed clauses as the steps that repair them, latest first.
+     *
+     * A blocked clause the assignment leaves unsatisfied is repaired by forcing its blocking literal
+     * true; the blocking property guarantees this satisfies the clause without falsifying any clause
+     * that contained the opposite literal.
      */
-    private class BlockedReconstruct(private val removed: List<Blocked>) {
-        fun reconstruct(sample: Sample): Sample {
-            if (removed.isEmpty()) return sample
-            val bools = sample.bools.copyOf()
-            for (i in removed.indices.reversed()) {
-                val b = removed[i]
-                if (!satisfied(b.clause, bools)) {
-                    bools[Lit.variable(b.blockingLit)] = Lit.isPositive(b.blockingLit)
-                }
-            }
-            return sample.copy(bools = bools)
-        }
-
-        private fun satisfied(c: IntArray, bools: BooleanArray): Boolean {
-            for (l in c) if (Lit.evaluate(l, bools[Lit.variable(l)])) return true
-            return false
-        }
-    }
+    private fun List<Blocked>.asRebuilds(): BoolRebuilds =
+        BoolRebuilds(asReversed().map { BoolRebuild.RepairClause(it.clause, it.blockingLit) })
 }

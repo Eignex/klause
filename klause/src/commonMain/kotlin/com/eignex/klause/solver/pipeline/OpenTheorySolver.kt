@@ -1,6 +1,7 @@
 package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.presolve.BoolRebuilds
 import com.eignex.klause.presolve.OpenPresolveResult
 import com.eignex.klause.presolve.PreparedSource
 import com.eignex.klause.presolve.PresolveBudget
@@ -69,6 +70,37 @@ sealed interface OpenTheoryAssignment {
         override fun intValue(id: Int): String = assignment.ints[id].toString()
         override fun realValue(id: Int): String = assignment.reals[id].toString()
     }
+
+    /**
+     * A witness of a reduced model, carrying the Boolean columns a source pass eliminated.
+     *
+     * Only the Booleans are restated: an eliminated column's value is computed here, while every column
+     * the reduction left alone keeps whatever precision [base] answers it in.
+     */
+    class Rebuilt(
+        /** Witness of the model the eliminating pass produced. */
+        val base: OpenTheoryAssignment,
+        /** Boolean values of the model before the elimination. */
+        val bools: BooleanArray,
+    ) : OpenTheoryAssignment {
+        override fun boolValue(id: Int): Boolean = bools[id]
+        override fun intValue(id: Int): String = base.intValue(id)
+        override fun realValue(id: Int): String = base.realValue(id)
+    }
+}
+
+/**
+ * [assignment] with the Boolean columns this rebuild recovers, over a model of [numBoolVars] columns.
+ *
+ * The open lane's half of the reconstruction: the steps are stated once, in the presolve layer, and each
+ * lane reads its own witness into the `BooleanArray` they evaluate over. A witness answers by accessor
+ * and cannot be written through, so the recovered values ride along in a wrapper rather than in place.
+ */
+internal fun BoolRebuilds.lift(assignment: OpenTheoryAssignment, numBoolVars: Int): OpenTheoryAssignment {
+    if (isEmpty) return assignment
+    val bools = BooleanArray(numBoolVars) { assignment.boolValue(it) }
+    rebuildInto(bools)
+    return OpenTheoryAssignment.Rebuilt(assignment, bools)
 }
 
 /** The common verdict surface of the complete open-model theory routes. */
