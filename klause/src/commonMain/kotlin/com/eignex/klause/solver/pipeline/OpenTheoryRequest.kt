@@ -62,6 +62,11 @@ class OpenTheoryRequest internal constructor(
     /** Complete open-theory route [model] declares, before source-safe preparation transforms it. */
     val route: ProblemPipeline get() = componentPlan.theoryPipeline
 
+    // Every phase below reads minimize-sense coefficients — source presolve pins a column by their sign —
+    // so the request's sense is resolved once, here, rather than at each of them.
+    internal val minimizedObjective: LinearObjective?
+        get() = objective?.let { if (maximize) it.negated() else it }
+
     /** Return this request with the caller's resolved source-preparation policy. */
     fun withPresolve(
         config: PresolveConfig,
@@ -107,7 +112,7 @@ object OpenTheoryPipeline {
      */
     fun prepare(request: OpenTheoryRequest): OpenPreparation {
         val source = request.model.prepareOpenSource(
-            request.objective,
+            request.minimizedObjective,
             request.presolveConfig,
             request.solutionSetSensitive,
             request.presolveCancellation,
@@ -137,7 +142,7 @@ object OpenTheoryPipeline {
 
     /** Execute [request] through its selected complete theory route. */
     fun execute(request: OpenTheoryRequest, params: TheoryParams = TheoryParams()): OpenTheoryExecution {
-        val objective = request.objective
+        val objective = request.minimizedObjective
         if (objective == null) {
             return OpenTheoryExecution.Satisfy(
                 OpenTheoryEngine(
@@ -150,11 +155,10 @@ object OpenTheoryPipeline {
                 ).solve(params),
             )
         }
-        val driven = if (request.maximize) objective.negated() else objective
         return OpenTheoryExecution.Optimize(
             OpenTheoryMinimizer(
                 request.model,
-                driven,
+                objective,
                 request.presolveConfig,
                 request.solutionSetSensitive,
                 request.presolveCancellation,

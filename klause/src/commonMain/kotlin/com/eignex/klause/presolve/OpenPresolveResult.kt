@@ -42,6 +42,11 @@ sealed interface OpenPresolveResult {
  *
  * The two are separable, and callers that route from the prepared model run them apart — the factor
  * passes decide which lane owns what, so they have to finish before ownership is selected.
+ *
+ * No objective reaches the passes through this entry point, so they reduce for feasibility: a
+ * solution-set-altering pass reads every column as costing nothing and may pin one to the bound an
+ * optimizing caller's optimum sits away from. A caller that optimizes states its objective by preparing
+ * an `OpenTheoryRequest` instead.
  */
 fun Problem.presolveOpen(cancellation: Cancellation = Cancellation.Never): OpenPresolveResult =
     presolveOpen(PresolveConfig.DEFAULT, null, false, cancellation, null)
