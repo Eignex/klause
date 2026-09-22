@@ -2260,6 +2260,19 @@ sealed interface com.eignex.klause.solver.pipeline/OpenTheoryAssignment { // com
         final fun realValue(kotlin/Int): kotlin/String // com.eignex.klause.solver.pipeline/OpenTheoryAssignment.ExactLra.realValue|realValue(kotlin.Int){}[0]
         final fun toString(): kotlin/String // com.eignex.klause.solver.pipeline/OpenTheoryAssignment.ExactLra.toString|toString(){}[0]
     }
+
+    final class Rebuilt : com.eignex.klause.solver.pipeline/OpenTheoryAssignment { // com.eignex.klause.solver.pipeline/OpenTheoryAssignment.Rebuilt|null[0]
+        constructor <init>(com.eignex.klause.solver.pipeline/OpenTheoryAssignment, kotlin/BooleanArray) // com.eignex.klause.solver.pipeline/OpenTheoryAssignment.Rebuilt.<init>|<init>(com.eignex.klause.solver.pipeline.OpenTheoryAssignment;kotlin.BooleanArray){}[0]
+
+        final val base // com.eignex.klause.solver.pipeline/OpenTheoryAssignment.Rebuilt.base|{}base[0]
+            final fun <get-base>(): com.eignex.klause.solver.pipeline/OpenTheoryAssignment // com.eignex.klause.solver.pipeline/OpenTheoryAssignment.Rebuilt.base.<get-base>|<get-base>(){}[0]
+        final val bools // com.eignex.klause.solver.pipeline/OpenTheoryAssignment.Rebuilt.bools|{}bools[0]
+            final fun <get-bools>(): kotlin/BooleanArray // com.eignex.klause.solver.pipeline/OpenTheoryAssignment.Rebuilt.bools.<get-bools>|<get-bools>(){}[0]
+
+        final fun boolValue(kotlin/Int): kotlin/Boolean // com.eignex.klause.solver.pipeline/OpenTheoryAssignment.Rebuilt.boolValue|boolValue(kotlin.Int){}[0]
+        final fun intValue(kotlin/Int): kotlin/String // com.eignex.klause.solver.pipeline/OpenTheoryAssignment.Rebuilt.intValue|intValue(kotlin.Int){}[0]
+        final fun realValue(kotlin/Int): kotlin/String // com.eignex.klause.solver.pipeline/OpenTheoryAssignment.Rebuilt.realValue|realValue(kotlin.Int){}[0]
+    }
 }
 
 sealed interface com.eignex.klause.solver.pipeline/OpenTheoryExecution { // com.eignex.klause.solver.pipeline/OpenTheoryExecution|null[0]

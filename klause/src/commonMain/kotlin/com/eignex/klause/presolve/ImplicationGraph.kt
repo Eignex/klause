@@ -10,7 +10,6 @@ import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.propagate
 import com.eignex.klause.propagation.propagatedImplicationGraph
-import com.eignex.klause.solver.Sample
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
@@ -24,8 +23,8 @@ import com.eignex.klause.util.MutableIntIntMap
  *  - **Equivalent-literal substitution**: literals on a mutual-implication cycle are logically equal,
  *    so the variables they name are interchangeable. Each cycle collapses to a single representative
  *    and every other member is substituted away (a plain rename via `Factor.remap`,
- *    the same machinery affine aliasing uses), then rebuilt for the caller via
- *    [ImplicationReduction.reconstruct].
+ *    the same machinery affine aliasing uses), then rebuilt for the caller by the steps
+ *    [asRebuilds] states.
  *  - **Transitive reduction**: a binary clause `a -> b` whose conclusion is already reachable from
  *    `a` through *other* binary clauses is entailed by that chain, so propagation still derives it and
  *    the clause can be dropped.
@@ -38,9 +37,8 @@ internal object ImplicationGraph {
 
     /**
      * Run the pass on [problem], bounded to [maxCandidates] pinned Booleans (mirroring [Probing]'s
-     * per-invocation cap). Returns the reduced problem plus an [ImplicationReduction] whose
-     * `reconstruct` lifts a solution back by copying each merged variable's value from its
-     * representative; the round engine composes it with the other passes' reconstructs.
+     * per-invocation cap). Returns the reduced problem plus a lift that copies each merged variable's
+     * value from its representative; the round engine composes it with the other passes' reconstructs.
      */
     fun reduce(
         problem: Problem,
@@ -66,7 +64,7 @@ internal object ImplicationGraph {
         return PresolveShared.identityDelta(
             problem.factors,
             reduced,
-            reconstruct = ImplicationReduction(merges)::reconstruct,
+            reconstruct = merges.asRebuilds().asSampleLift(),
         )
     }
 
@@ -377,18 +375,10 @@ internal object ImplicationGraph {
 internal class BoolMerge(val from: Int, val into: Int)
 
 /**
- * The equivalent-literal merges [ImplicationGraph.reduce] made, holding the data to rebuild merged
- * variables. Pass a solution of the reduced problem through [reconstruct] to recover a solution of the
- * original.
+ * The equivalent-literal merges [ImplicationGraph.reduce] made, as the steps that rebuild them.
+ *
+ * A representative is never itself merged away (the smallest id in a component is the representative and
+ * only larger ids merge into it), so the merges rebuild in the order they were found.
  */
-internal class ImplicationReduction(private val merges: List<BoolMerge>) {
-    /** Recover each merged variable in a solution [sample] by copying its representative's value.
-     *  Representatives are never themselves merged away (the smallest id in a component is the rep and
-     *  only larger ids merge into it), so a single forward pass suffices. */
-    fun reconstruct(sample: Sample): Sample {
-        if (merges.isEmpty()) return sample
-        val bools = sample.bools.copyOf()
-        for (m in merges) bools[m.from] = bools[m.into]
-        return sample.copy(bools = bools)
-    }
-}
+internal fun List<BoolMerge>.asRebuilds(): BoolRebuilds =
+    BoolRebuilds(map { BoolRebuild.CopyLiteral(it.from, Lit.make(it.into, true)) })

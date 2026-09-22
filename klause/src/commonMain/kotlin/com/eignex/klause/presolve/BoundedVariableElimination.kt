@@ -2,7 +2,6 @@ package com.eignex.klause.presolve
 
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.solver.Sample
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
@@ -18,7 +17,7 @@ import com.eignex.klause.util.IntHashSet
  * Operates on the shared [SatClauseDb], so a variable is eliminable only when [SatClauseDb.eligible] —
  * objective-free and appearing solely in clean all-Boolean clauses. The eliminated `v` is left
  * unconstrained in the reduced problem, so this is **not** solution-set preserving (a complete
- * enumerator over-counts); its value is recovered from the removed clauses by [BveReconstruct].
+ * enumerator over-counts); its value is recovered from the removed clauses by [asRebuilds].
  */
 internal object BoundedVariableElimination {
 
@@ -48,7 +47,7 @@ internal object BoundedVariableElimination {
             eliminateVar(v, db, eliminations)
         }
 
-        return db.toDelta(if (eliminations.isEmpty()) null else BveReconstruct(eliminations)::reconstruct)
+        return db.toDelta(eliminations.asRebuilds().asSampleLift())
     }
 
     private fun eliminateVar(v: Int, db: SatClauseDb, eliminations: ArrayList<VarElim>) {
@@ -119,43 +118,13 @@ internal object BoundedVariableElimination {
     private class VarElim(val v: Int, val clauses: List<IntArray>)
 
     /**
-     * Recovers eliminated Boolean variables from a solution of the reduced problem. Each variable is set
-     * to satisfy the clauses it appeared in: a clause not satisfied by its other (already-recovered)
-     * literals forces `v` to the polarity of its `v` literal; bounded resolution guarantees the two
-     * polarities are never forced at once. Eliminations are replayed in reverse order, so a variable
-     * whose clauses reference a later-eliminated variable reads that variable's recovered value.
+     * The eliminations as the steps that recover them, latest first.
+     *
+     * Each variable is set to satisfy the clauses it appeared in: a clause not satisfied by its other
+     * (already-recovered) literals forces `v` to the polarity of its `v` literal, and bounded resolution
+     * guarantees the two polarities are never forced at once. Reversed, so a variable whose clauses
+     * reference a later-eliminated variable reads that variable's recovered value.
      */
-    private class BveReconstruct(private val eliminations: List<VarElim>) {
-        fun reconstruct(sample: Sample): Sample {
-            if (eliminations.isEmpty()) return sample
-            val bools = sample.bools.copyOf()
-            for (i in eliminations.indices.reversed()) {
-                val e = eliminations[i]
-                var value = false
-                for (c in e.clauses) {
-                    if (satisfiedIgnoring(c, e.v, bools)) continue
-                    value = valueSatisfying(c, e.v)
-                    break
-                }
-                bools[e.v] = value
-            }
-            return sample.copy(bools = bools)
-        }
-
-        /** True if clause [c] is satisfied by a literal other than the one over [v]. */
-        private fun satisfiedIgnoring(c: IntArray, v: Int, bools: BooleanArray): Boolean {
-            for (l in c) {
-                val w = Lit.variable(l)
-                if (w == v) continue
-                if (Lit.evaluate(l, bools[w])) return true
-            }
-            return false
-        }
-
-        /** The value of [v] that makes its literal in clause [c] true. */
-        private fun valueSatisfying(c: IntArray, v: Int): Boolean {
-            for (l in c) if (Lit.variable(l) == v) return Lit.isPositive(l)
-            return false
-        }
-    }
+    private fun List<VarElim>.asRebuilds(): BoolRebuilds =
+        BoolRebuilds(asReversed().map { BoolRebuild.SatisfyClauses(it.v, it.clauses) })
 }
