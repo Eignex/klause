@@ -92,8 +92,12 @@ internal fun renderModel(ints: Map<String, Int>, bools: Map<String, Int>, reals:
         append("(\n")
         for ((name, id) in ints) append("  (define-fun $name () Int ${smtInteger(s.ints[id].toString())})\n")
         for ((name, id) in bools) append("  (define-fun $name () Bool ${s.bools[id]})\n")
-        val exactReals = if (reals.isEmpty()) emptyList() else requireNotNull(s.exactReals) {
+        val exactReals = if (reals.isEmpty()) {
+            emptyList()
+        } else {
+            requireNotNull(s.exactReals) {
             "SMT model has no certified real values"
+        }
         }
         for ((name, id) in reals) {
             append("  (define-fun $name () Real ${smtReal(exactReals[id].toString())})\n")
@@ -115,8 +119,7 @@ internal fun renderOpenTheoryModel(
     append(")")
 }
 
-private fun smtInteger(value: String): String =
-    if (value.startsWith('-')) "(- ${value.drop(1)})" else value
+private fun smtInteger(value: String): String = if (value.startsWith('-')) "(- ${value.drop(1)})" else value
 
 private fun smtReal(value: String): String {
     val negative = value.startsWith('-')
