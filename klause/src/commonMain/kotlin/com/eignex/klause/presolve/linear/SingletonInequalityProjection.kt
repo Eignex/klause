@@ -11,7 +11,7 @@ import com.eignex.klause.util.IntArrayList
 
 /**
  * Project out a variable that occurs in exactly one linear **inequality** and nowhere else (nor in the
- * objective) — the singleton-column case [AffineElimination] does not reach (it substitutes only
+ * objective) — the singleton-column case [AffineSingletons] does not reach (it substitutes only
  * *equality*-defined variables). In `a·x + rest ⟨≤/≥⟩ b`, giving `rest` the most room means driving `x`
  * to the bound that minimizes (for `≤`) or maximizes (for `≥`) `a·x`; the surviving constraint on `rest`
  * is then `rest ⟨≤/≥⟩ b − a·x_best` (exact Fourier-Motzkin elimination of `x` from a single inequality).

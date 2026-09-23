@@ -83,6 +83,20 @@ object Presolve {
         pivotOrder = pivotOrder,
     )
 
+    /** Affine elimination over a canonical source model. See
+     *  [AffineSingletons.eliminateSourceAffineSingletons]. */
+    internal fun eliminateSourceAffineSingletons(
+        problem: Problem,
+        objectiveIntVars: Set<Int>,
+        cancellation: Cancellation,
+        pivotOrder: AffinePivotOrder,
+    ): SourceDelta = AffineSingletons.eliminateSourceAffineSingletons(
+        problem,
+        objectiveIntVars,
+        cancellation,
+        pivotOrder = pivotOrder,
+    )
+
     /** Constraint subsumption / redundant-constraint removal. See [RedundantConstraints]. */
     fun removeRedundantConstraints(problem: BakedProblem): PassDelta =
         RedundantConstraints.removeRedundantConstraints(problem, ColumnRanges.of(problem.rootIntDomainsInPlace))

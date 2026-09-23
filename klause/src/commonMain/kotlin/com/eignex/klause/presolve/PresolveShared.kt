@@ -101,6 +101,12 @@ internal object PresolveShared {
         return PassDelta(dropped.toIntArray(), added, domains, reconstruct)
     }
 
+    /** [identityDelta] in the source lane's change form, carrying [rebuild] as data rather than a lift. */
+    fun sourceIdentityDelta(inputFactors: Array<Factor>, out: List<Factor>, rebuild: SourceRebuilds): SourceDelta {
+        val delta = identityDelta(inputFactors, out)
+        return SourceDelta(delta.droppedIndices, delta.addedFactors, rebuild = rebuild)
+    }
+
     fun rebuildProblem(
         problem: BakedProblem,
         factors: List<Factor>,
