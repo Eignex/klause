@@ -99,7 +99,7 @@ private fun unsupportedOpenMpsModel(): Nothing =
 internal fun renderMpsModel(compiled: MpsCompiled, s: Sample): String = buildString {
     append("v")
     for (col in compiled.columns) {
-        val value = if (col.real) s.reals[col.id] else s.ints[col.id]
+        val value = if (col.real) s.approximateRealValue(col.id) else s.ints[col.id]
         append(" ${col.name}=$value")
     }
 }
