@@ -83,8 +83,8 @@ object Presolver {
         val host = object : PresolveRoundEngine.RoundHost {
             var current = problem
 
-            // In the order the passes fired, which is the order [BoolRebuilds.compose] reverses.
-            val rebuilds = ArrayList<BoolRebuilds>()
+            // In the order the passes fired, which is the order [SourceRebuilds.compose] reverses.
+            val rebuilds = ArrayList<SourceRebuilds>()
 
             override fun runPass(pass: PresolvePass, slice: Cancellation?): PassOutcome {
                 val delta = pass.applySource(current, slice?.let(ctx::withCancellation) ?: ctx)
@@ -106,7 +106,7 @@ object Presolver {
             ctx.presolveBudget,
             host,
         )
-        return SourcePresolved(host.current, rounds.fired, rounds.infeasible, BoolRebuilds.compose(host.rebuilds))
+        return SourcePresolved(host.current, rounds.fired, rounds.infeasible, SourceRebuilds.compose(host.rebuilds))
     }
 
     /** Apply [config]'s passes to [problem] under [context], returning the transformed problem and a

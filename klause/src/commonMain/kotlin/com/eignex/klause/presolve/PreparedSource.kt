@@ -34,7 +34,7 @@ internal class PreparedSource(
     /** Source passes that changed the model, in first-fire order. */
     val passesFired: List<PresolvePass>,
     /** Recovers the Boolean columns the phase eliminated, in the order they are recovered. */
-    val rebuild: BoolRebuilds,
+    val rebuild: SourceRebuilds,
     /** What remains of the presolve phase's allowance. */
     val budget: PresolveBudget?,
 ) {
@@ -57,7 +57,7 @@ internal class PreparedSource(
             infeasible = false,
             objective = null,
             passesFired = emptyList(),
-            rebuild = BoolRebuilds.NONE,
+            rebuild = SourceRebuilds.NONE,
             budget = budget,
         )
     }

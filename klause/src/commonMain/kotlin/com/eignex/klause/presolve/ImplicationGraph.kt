@@ -380,5 +380,5 @@ internal class BoolMerge(val from: Int, val into: Int)
  * A representative is never itself merged away (the smallest id in a component is the representative and
  * only larger ids merge into it), so the merges rebuild in the order they were found.
  */
-internal fun List<BoolMerge>.asRebuilds(): BoolRebuilds =
-    BoolRebuilds(map { BoolRebuild.CopyLiteral(it.from, Lit.make(it.into, true)) })
+internal fun List<BoolMerge>.asRebuilds(): SourceRebuilds =
+    SourceRebuilds(map { RebuildStep.CopyLiteral(it.from, Lit.make(it.into, true)) })
