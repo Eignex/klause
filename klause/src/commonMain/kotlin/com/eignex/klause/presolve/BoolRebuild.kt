@@ -119,8 +119,7 @@ internal class BoolRebuilds(private val steps: List<BoolRebuild>) {
          * does. [PresolveRoundEngine.compose] folds the finite lane's lifts over the same order.
          */
         fun compose(passes: List<BoolRebuilds>): BoolRebuilds {
-            val steps = ArrayList<BoolRebuild>()
-            for (i in passes.indices.reversed()) steps += passes[i].steps
+            val steps = passes.asReversed().flatMap { it.steps }
             return if (steps.isEmpty()) NONE else BoolRebuilds(steps)
         }
     }

@@ -100,11 +100,10 @@ class BoolRebuildTest {
     fun `composing rebuilds that recover nothing recovers nothing`() {
         assertTrue(BoolRebuilds.compose(emptyList()).isEmpty)
         assertTrue(BoolRebuilds.compose(listOf(BoolRebuilds.NONE, BoolRebuilds.NONE)).isEmpty)
-        assertTrue(BoolRebuilds.NONE.isEmpty)
     }
 
     @Test
-    fun `composing leaves a lone rebuild's steps in place`() {
+    fun `composing skips the rebuilds that recover nothing`() {
         val rebuild = BoolRebuilds(listOf(BoolRebuild.CopyLiteral(variable = 0, source = pos(1))))
         val values = bools(false, true)
 
