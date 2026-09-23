@@ -159,6 +159,7 @@ class LiveLpTheoryTest {
             ),
         )
         source.componentPlan().search(source, emptyMap()).use { planned ->
+            val component = assertIs<ExactLiraSearchComponent>(planned.theory)
             val session = planned.session
             session.initialize()
             val split = assertNotNull(
@@ -174,6 +175,7 @@ class LiveLpTheoryTest {
             val conflict = assertIs<ComponentResult.Conflict>(session.push(SearchDecision.Theory(split.positive)))
             val clause = assertNotNull(conflict.explanation)
             assertContentEquals(intArrayOf(Lit.make(0, false), split.negative.literal), clause.literals.sortedArray())
+            assertTrue(assertNotNull(component.lpMetrics).preparationSuccesses > 0L)
             val learned = assertIs<SearchConflictResolution.Backjump>(
                 session.explainedConflict(clause),
             ).conflict

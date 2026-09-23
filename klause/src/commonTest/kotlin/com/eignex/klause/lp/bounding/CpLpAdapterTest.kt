@@ -56,6 +56,60 @@ import kotlin.test.assertTrue
 
 class CpLpAdapterTest {
     @Test
+    fun `a shifted source row survives cut pool remapping`() {
+        val problem = Problem(
+            0,
+            2,
+            arrayOf(IntDomain(-3, 5), IntDomain(2, 8)),
+            arrayOf(Linear(intArrayOf(2, -1), intArrayOf(0, 1), LinearOp.GE, -4)),
+        )
+        LpEngine(
+            problem,
+            LinearObjective(intCoefficients = longArrayOf(0, 0)),
+            LpParams(lpPlan = LpPlan(bounding = true)),
+            SolveStatsSink(backend = "source-cut"),
+        ).use { engine ->
+            val cp = CpSearchComponent(PropagationSession(problem))
+            engine.cpAdapter.attach(cp.session, feasibility = false)
+            val shared = SearchSession(listOf(cp, engine.propagator))
+            shared.initialize()
+            val relaxer = assertNotNull(engine.lpRelaxer)
+            val root = engine.nodeRelaxation(relaxer, cp.session)
+            val cut = Cut(intArrayOf(root.model.slackCol(0)), longArrayOf(1), Relation.GE, 0, global = true)
+            val source = assertNotNull(SourceCut.fromCut(cut, root).orNull())
+            for (x in -3L..5L) {
+                for (y in 2L..8L) {
+                    val lhs = source.expression.value { variable ->
+                        BigFraction.ofLong(if (variable.id == 0) x else y)
+                    }
+                    assertEquals(2 * x - y >= -4, lhs >= source.rhs)
+                }
+            }
+            val boundary = source.expression.value { variable ->
+                BigFraction.ofLong(if (variable.id == 0) -1 else 2)
+            }
+            assertEquals(source.rhs, boundary)
+            engine.recordSearchCuts(listOf(cut), DoubleArray(root.model.numVars), root, cp.session)
+            assertEquals(1, engine.cutPool.cuts().size)
+            shared.push(SearchDecision.IntAtLeast(0, -1))
+            val sibling = engine.nodeRelaxation(relaxer, cp.session)
+            assertEquals(1, engine.cutPool.cuts().size)
+            val remapped = engine.cutPool.cuts().single()
+            assertTrue(remapped.global)
+            val applied = relaxer.build(cp.session, listOf(remapped))
+            assertEquals(sibling.model.m + 1, applied.model.m)
+            for (x in -3L..5L) {
+                for (y in 2L..8L) {
+                    val values = longArrayOf(x, y)
+                    val lhs = remapped.cols.indices.sumOf { remapped.coeffs[it] * values[remapped.cols[it]] }
+                    assertEquals(2 * x - y >= -4, lhs >= remapped.rhs)
+                }
+            }
+            assertNotNull(sibling.sourceMap)
+        }
+    }
+
+    @Test
     fun `shared bound changes and pop reuse factors with source equivalent proof views`() {
         val problem = Problem(
             0,
@@ -246,6 +300,12 @@ class CpLpAdapterTest {
             engine.recordSearchCuts(listOf(cut), doubleArrayOf(1.0), relaxation, cp.session)
             assertEquals(1, engine.cutPool.cuts().size)
             assertTrue(engine.cutPool.exportGlobalCuts().isEmpty())
+            val consumed = engine.cutPool.cuts().single()
+            assertContentEquals(intArrayOf(relaxation.intColOf[0]), consumed.cols)
+            assertEquals(1L, consumed.coeffs.single())
+            assertEquals(1L, consumed.rhs)
+            assertFalse(consumed.global)
+            assertEquals(facts, assertNotNull(consumed.provenance).facts.filter { !it.global })
             val cutRelaxation = relaxer.build(cp.session, engine.cutPool.cuts())
             val reason = IntArrayList()
             assertTrue(
@@ -375,7 +435,7 @@ class CpLpAdapterTest {
         LpEngine(
             problem,
             objective,
-            LpParams(lpPlan = LpPlan(bounding = true)),
+            LpParams(lpPlan = LpPlan(bounding = true, learn = true)),
             SolveStatsSink(backend = "live-guard"),
         ).use { engine ->
             val cp = CpSearchComponent(PropagationSession(problem))
@@ -509,6 +569,15 @@ class CpLpAdapterTest {
             assertTrue(excludedWithoutGuard > 0)
             engine.recordSearchCuts(listOf(child), DoubleArray(withParent.model.n), withParent, cp.session)
             assertEquals(1, engine.cutPool.cuts().size)
+            assertTrue(
+                engine.pruneNode(
+                    cp.session,
+                    effectiveBound = Double.POSITIVE_INFINITY,
+                    objectiveVar = -1,
+                    objectiveAscending = true,
+                ),
+            )
+            assertEquals(clause.toSet(), assertNotNull(engine.lastBackjump()).literals.toSet())
             shared.popTo(0)
             engine.nodeRelaxation(relaxer, cp.session)
             assertTrue(engine.cutPool.cuts().isEmpty())
