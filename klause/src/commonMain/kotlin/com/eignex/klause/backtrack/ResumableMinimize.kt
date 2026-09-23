@@ -11,6 +11,7 @@ import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.lp.bounding.LpEngine
 import com.eignex.klause.lp.bounding.harvestRootCuts
+import com.eignex.klause.lp.bounding.linearLowerBound
 import com.eignex.klause.lp.bounding.rootLpRelaxationBound
 import com.eignex.klause.lp.bounding.shaveObjectiveLb
 import com.eignex.klause.lp.bounding.shaveVariableBounds
@@ -182,8 +183,10 @@ internal class ResumableMinimize(
     private var incumbents = minimizingSampleExchange(problem)
     private val bestObj: Double get() = incumbents.bound()
     private val singleObj = objective.singleIntObjective()
+    private val discreteObjective = objective.realCoefficients.all { it == 0.0 }
     private var objVarBest: Long? = null
     private val externalShared = params.objectiveBoundSupplier != null
+    private var lastExternalCutoff = Double.POSITIVE_INFINITY
     private val sink = SolveStatsSink(backend = "backtrack")
     private var lastObjBoundAsserted: Long? = null
     private var lastBoolCutoffRhs: Long? = null
@@ -204,16 +207,6 @@ internal class ResumableMinimize(
         lpEngine.lpHints = lpHints
     }
 
-    private val pruneIf: (PropagationSession) -> Boolean = { session ->
-        val externalBound = params.objectiveBoundSupplier?.invoke() ?: Double.POSITIVE_INFINITY
-        val effectiveBound = if (externalBound < bestObj) externalBound else bestObj
-        lpEngine.pruneNode(
-            session,
-            effectiveBound,
-            singleObj?.varId ?: -1,
-            singleObj?.ascending ?: true,
-        )
-    }
     private val cp = CpSearchComponent(
         PropagationSession(
             problem,
@@ -406,6 +399,7 @@ internal class ResumableMinimize(
         lastOpenCutoff = null
         done = null
         pendingIncumbent = null
+        sawIndeterminateLeaf = false
     }
 
     /** Advance the search to the next reportable [StepEvent].
@@ -816,7 +810,23 @@ internal class ResumableMinimize(
     /** Refutes LP-dominated partial assignments through the shared frame stack. */
     private inner class LpNodePolicy : SearchNodePolicy {
         override fun beforeBranch(context: SearchContext): SearchNodeDisposition {
-            if (!pruneIf(session)) return SearchNodeDisposition.Expand
+            val externalBound = params.objectiveBoundSupplier?.invoke() ?: Double.POSITIVE_INFINITY
+            if (rebindable) {
+                require(!externalBound.isNaN() && externalBound <= lastExternalCutoff) {
+                    "repair objective cutoff must be non-increasing"
+                }
+                lastExternalCutoff = externalBound
+            }
+            val effectiveBound = if (externalBound < bestObj) externalBound else bestObj
+            if (rebindable && discreteObjective) {
+                val lower = lpEngine.linearLowerBound(objective, session)
+                if (lower != Long.MIN_VALUE && lower >= effectiveBound) return SearchNodeDisposition.Prune
+            }
+            // Persistent LP fixings may use only a cutoff that survives every later repair.
+            val lpBound = if (rebindable) externalBound else effectiveBound
+            if (!lpEngine.pruneNode(session, lpBound, singleObj?.varId ?: -1, singleObj?.ascending ?: true)) {
+                return SearchNodeDisposition.Expand
+            }
             val learned = lpEngine.lastBackjump()
             return if (learned != null &&
                 learned.asserting &&
@@ -952,7 +962,11 @@ internal class ResumableMinimize(
             withinSlice && !budget.exhausted()
         }
         override val observer = brancher
-        override val modelContinuation = SearchModelContinuation.BlockAtRoot
+        override val modelContinuation = if (rebindable) {
+            SearchModelContinuation.Chronological
+        } else {
+            SearchModelContinuation.BlockAtRoot
+        }
         override val modelPolicy: SearchModelPolicy = IncumbentPolicy()
         override val nodePolicy: SearchNodePolicy = LpNodePolicy()
         override val lifecycle: SearchRunLifecycle get() = this
@@ -987,6 +1001,7 @@ internal class ResumableMinimize(
 
     private fun applyObjectiveBound(): SearchRunDisposition {
         session.installObjectiveBoolBound(objective.boolWeights)
+        if (rebindable) return SearchRunDisposition.Continue
         return if (assertObjectiveBoundAtRoot() || tightenOpenColumnsAtRoot()) {
             SearchRunDisposition.Exhausted
         } else {
