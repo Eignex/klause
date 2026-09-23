@@ -15,6 +15,11 @@ import com.eignex.klause.solver.Sample
  * Every step reads the values recovered so far and writes at most one variable, so a list of them is
  * applied in order and the producer is responsible for emitting an order in which each step's reads are
  * already recovered.
+ *
+ * A step names columns of the model before the elimination, and the reduced model has to keep every one
+ * of them: a pass leaves an eliminated column in place and unconstrained rather than renumbering the
+ * Boolean space. Both lanes evaluate over an array indexed by those ids, so a pass that renumbered
+ * instead would have its steps read and write the wrong columns.
  */
 internal sealed interface BoolRebuild {
 
@@ -52,17 +57,6 @@ internal class BoolRebuilds(private val steps: List<BoolRebuild>) {
 
     /** Whether this recovers nothing, so a lane can skip adapting its witness at all. */
     val isEmpty: Boolean get() = steps.isEmpty()
-
-    /** This rebuild followed by [next], for composing the passes of one round. */
-    fun andThen(next: BoolRebuilds): BoolRebuilds = when {
-        isEmpty -> next
-
-        next.isEmpty -> this
-
-        // `next` ran on the model this one produced, so its columns are recovered first and this one's
-        // steps then read them.
-        else -> BoolRebuilds(next.steps + steps)
-    }
 
     /** Recover the eliminated columns into [bools], which holds the reduced model's Boolean values. */
     fun rebuildInto(bools: BooleanArray) {
@@ -110,10 +104,25 @@ internal class BoolRebuilds(private val steps: List<BoolRebuild>) {
         return false
     }
 
-    /** The rebuild that recovers nothing. */
+    /** Ways to obtain a rebuild. */
     companion object {
         /** No column was eliminated. */
         val NONE = BoolRebuilds(emptyList())
+
+        /**
+         * The rebuilds of [passes] as one, taking them in the order the passes ran.
+         *
+         * Recovery runs the other way round from elimination: each pass eliminated columns from the model
+         * the pass before it produced, so the last pass's columns are recovered first and every earlier
+         * pass's steps then read them. Composing a whole sequence rather than a pair keeps that reversal
+         * in one place — a pairwise operator reads as "this, then that" and states the opposite of what it
+         * does. [PresolveRoundEngine.compose] folds the finite lane's lifts over the same order.
+         */
+        fun compose(passes: List<BoolRebuilds>): BoolRebuilds {
+            val steps = ArrayList<BoolRebuild>()
+            for (i in passes.indices.reversed()) steps += passes[i].steps
+            return if (steps.isEmpty()) NONE else BoolRebuilds(steps)
+        }
     }
 }
 
