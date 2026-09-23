@@ -712,6 +712,7 @@ private fun sourceValueMatches(source: MpsSourceNumber?, value: Double): Boolean
 
 private fun sourceIntegerLowerMatches(source: MpsSourceNumber?, value: Double?): Boolean {
     val exact = source.finiteMps()?.fraction ?: return intLowerOrNull(value) == null
+    if (exact < BigFraction.ofLong(Long.MIN_VALUE)) return false
     val lowered = intLowerOrNull(value) ?: return false
     return BigFraction.ofLong(lowered) >= exact &&
         (lowered == Long.MIN_VALUE || BigFraction.ofLong(lowered - 1L) < exact)
@@ -719,6 +720,7 @@ private fun sourceIntegerLowerMatches(source: MpsSourceNumber?, value: Double?):
 
 private fun sourceIntegerUpperMatches(source: MpsSourceNumber?, value: Double?): Boolean {
     val exact = source.finiteMps()?.fraction ?: return intUpperOrNull(value) == null
+    if (exact > BigFraction.ofLong(Long.MAX_VALUE)) return false
     val lowered = intUpperOrNull(value) ?: return false
     return BigFraction.ofLong(lowered) <= exact &&
         (lowered == Long.MAX_VALUE || BigFraction.ofLong(lowered + 1L) > exact)
