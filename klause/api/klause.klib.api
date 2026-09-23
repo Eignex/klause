@@ -5050,6 +5050,10 @@ final class com.eignex.klause.formats.mps/MpsCompiled { // com.eignex.klause.for
         final fun <get-objectiveErrorBound>(): kotlin/Double? // com.eignex.klause.formats.mps/MpsCompiled.objectiveErrorBound.<get-objectiveErrorBound>|<get-objectiveErrorBound>(){}[0]
     final val objectiveScale // com.eignex.klause.formats.mps/MpsCompiled.objectiveScale|{}objectiveScale[0]
         final fun <get-objectiveScale>(): kotlin/Long // com.eignex.klause.formats.mps/MpsCompiled.objectiveScale.<get-objectiveScale>|<get-objectiveScale>(){}[0]
+    final val sourceDifference // com.eignex.klause.formats.mps/MpsCompiled.sourceDifference|{}sourceDifference[0]
+        final fun <get-sourceDifference>(): kotlin/String? // com.eignex.klause.formats.mps/MpsCompiled.sourceDifference.<get-sourceDifference>|<get-sourceDifference>(){}[0]
+    final val sourceExact // com.eignex.klause.formats.mps/MpsCompiled.sourceExact|{}sourceExact[0]
+        final fun <get-sourceExact>(): kotlin/Boolean // com.eignex.klause.formats.mps/MpsCompiled.sourceExact.<get-sourceExact>|<get-sourceExact>(){}[0]
 
     final fun component1(): com.eignex.klause.ir/Problem // com.eignex.klause.formats.mps/MpsCompiled.component1|component1(){}[0]
     final fun component2(): com.eignex.klause.ir/LinearObjectiveSpec? // com.eignex.klause.formats.mps/MpsCompiled.component2|component2(){}[0]
@@ -5062,6 +5066,7 @@ final class com.eignex.klause.formats.mps/MpsCompiled { // com.eignex.klause.for
     final fun copy(com.eignex.klause.ir/Problem = ..., com.eignex.klause.ir/LinearObjectiveSpec? = ..., kotlin/Boolean = ..., kotlin.collections/List<com.eignex.klause.formats.mps/MpsColumn> = ..., kotlin/Long = ..., kotlin/Double? = ..., kotlin/Boolean = ..., kotlin/Int = ...): com.eignex.klause.formats.mps/MpsCompiled // com.eignex.klause.formats.mps/MpsCompiled.copy|copy(com.eignex.klause.ir.Problem;com.eignex.klause.ir.LinearObjectiveSpec?;kotlin.Boolean;kotlin.collections.List<com.eignex.klause.formats.mps.MpsColumn>;kotlin.Long;kotlin.Double?;kotlin.Boolean;kotlin.Int){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.formats.mps/MpsCompiled.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.eignex.klause.formats.mps/MpsCompiled.hashCode|hashCode(){}[0]
+    final fun sourceWitness(kotlin/LongArray, kotlin.collections/List<com.eignex.klause.simplex.exact/BigFraction>?): com.eignex.klause.formats.mps/MpsSourceWitness // com.eignex.klause.formats.mps/MpsCompiled.sourceWitness|sourceWitness(kotlin.LongArray;kotlin.collections.List<com.eignex.klause.simplex.exact.BigFraction>?){}[0]
     final fun toString(): kotlin/String // com.eignex.klause.formats.mps/MpsCompiled.toString|toString(){}[0]
 }
 
@@ -5162,6 +5167,22 @@ final class com.eignex.klause.formats.mps/MpsObjective { // com.eignex.klause.fo
     final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.formats.mps/MpsObjective.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.eignex.klause.formats.mps/MpsObjective.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.eignex.klause.formats.mps/MpsObjective.toString|toString(){}[0]
+}
+
+final class com.eignex.klause.formats.mps/MpsSourceWitness { // com.eignex.klause.formats.mps/MpsSourceWitness|null[0]
+    constructor <init>(kotlin.collections/List<com.eignex.klause.simplex.exact/BigFraction>, com.eignex.klause.simplex.exact/BigFraction) // com.eignex.klause.formats.mps/MpsSourceWitness.<init>|<init>(kotlin.collections.List<com.eignex.klause.simplex.exact.BigFraction>;com.eignex.klause.simplex.exact.BigFraction){}[0]
+
+    final val objective // com.eignex.klause.formats.mps/MpsSourceWitness.objective|{}objective[0]
+        final fun <get-objective>(): com.eignex.klause.simplex.exact/BigFraction // com.eignex.klause.formats.mps/MpsSourceWitness.objective.<get-objective>|<get-objective>(){}[0]
+    final val values // com.eignex.klause.formats.mps/MpsSourceWitness.values|{}values[0]
+        final fun <get-values>(): kotlin.collections/List<com.eignex.klause.simplex.exact/BigFraction> // com.eignex.klause.formats.mps/MpsSourceWitness.values.<get-values>|<get-values>(){}[0]
+
+    final fun component1(): kotlin.collections/List<com.eignex.klause.simplex.exact/BigFraction> // com.eignex.klause.formats.mps/MpsSourceWitness.component1|component1(){}[0]
+    final fun component2(): com.eignex.klause.simplex.exact/BigFraction // com.eignex.klause.formats.mps/MpsSourceWitness.component2|component2(){}[0]
+    final fun copy(kotlin.collections/List<com.eignex.klause.simplex.exact/BigFraction> = ..., com.eignex.klause.simplex.exact/BigFraction = ...): com.eignex.klause.formats.mps/MpsSourceWitness // com.eignex.klause.formats.mps/MpsSourceWitness.copy|copy(kotlin.collections.List<com.eignex.klause.simplex.exact.BigFraction>;com.eignex.klause.simplex.exact.BigFraction){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.formats.mps/MpsSourceWitness.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.eignex.klause.formats.mps/MpsSourceWitness.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.eignex.klause.formats.mps/MpsSourceWitness.toString|toString(){}[0]
 }
 
 final class com.eignex.klause.formats.mps/MpsVar { // com.eignex.klause.formats.mps/MpsVar|null[0]

@@ -78,6 +78,16 @@ class MpsCompiled(
 ) {
     private var exactLpSource: (() -> ExactLpModel)? = null
     private var exactLpCache: ExactLpModel? = null
+    private var sourceModel: MpsModel? = null
+    private var sourceMismatch: String? = null
+
+    /** Whether the lowered rows, bounds, and objective have the original source values. */
+    val sourceExact: Boolean get() = sourceModel != null && sourceMismatch == null
+
+    /** The first source value the lowered model does not retain, if any. */
+    val sourceDifference: String?
+        get() = if (sourceModel == null) "compiled model lacks source mapping" else sourceMismatch
+
     internal val exactLpModel: ExactLpModel?
         get() {
             exactLpCache?.let { return it }
@@ -87,6 +97,48 @@ class MpsCompiled(
     internal fun withExactLpModel(source: () -> ExactLpModel): MpsCompiled = apply {
         check(exactLpSource == null) { "exact MPS LP model is already attached" }
         exactLpSource = source
+    }
+
+    internal fun withSourceModel(source: MpsModel, mismatch: String?): MpsCompiled = apply {
+        check(sourceModel == null) { "MPS source model is already attached" }
+        sourceModel = source
+        sourceMismatch = mismatch
+    }
+
+    /** Check a solved point against the original decimal MPS rows, bounds, and objective. */
+    fun sourceWitness(ints: LongArray, reals: List<BigFraction>?): MpsSourceWitness {
+        val source = checkNotNull(sourceModel) { "MPS source model is unavailable" }
+        val numbers = source.sourceNumbers()
+        val values = columns.map { column -> sourceColumnValue(column, ints, reals) }
+        source.variables.forEachIndexed { index, variable ->
+            val value = values[index]
+            val (lower, upper) = numbers.variableBounds[index]
+            if (lower.finiteMps()?.fraction?.let { value < it } == true ||
+                upper.finiteMps()?.fraction?.let { value > it } == true
+            ) {
+                throw MpsLoweringException("source witness violates bound on '${variable.name}'")
+            }
+        }
+        source.constraints.forEachIndexed { rowIndex, row ->
+            val indicator = row.indicator
+            val trigger = if (indicator?.whenOne == true) 1L else 0L
+            if (indicator != null && values[indicator.column] != BigFraction.ofLong(trigger)) {
+                return@forEachIndexed
+            }
+            val activity = row.indices.indices.fold(BigFraction.ZERO) { sum, entry ->
+                sum + numbers.constraintCoefficients[rowIndex][entry].fraction * values[row.indices[entry]]
+            }
+            val (lower, upper) = numbers.constraintBounds[rowIndex]
+            if (lower.finiteMps()?.fraction?.let { activity < it } == true ||
+                upper.finiteMps()?.fraction?.let { activity > it } == true
+            ) {
+                throw MpsLoweringException("source witness violates row '${row.name}'")
+            }
+        }
+        val objective = source.objective.indices.indices.fold(numbers.objectiveConstant.fraction) { sum, entry ->
+            sum + numbers.objectiveCoefficients[entry].fraction * values[source.objective.indices[entry]]
+        }
+        return MpsSourceWitness(values, objective)
     }
 
     fun copy(
@@ -117,6 +169,8 @@ class MpsCompiled(
         ) {
             result.exactLpSource = exactLpSource
             result.exactLpCache = exactLpCache
+            result.sourceModel = sourceModel
+            result.sourceMismatch = sourceMismatch
         }
         return result
     }
@@ -152,6 +206,23 @@ class MpsCompiled(
         "columns=$columns, objectiveScale=$objectiveScale, objectiveErrorBound=$objectiveErrorBound, " +
         "hasInnerConstraintApproximation=$hasInnerConstraintApproximation, floatColumns=$floatColumns)"
 }
+
+private fun sourceColumnValue(column: MpsColumn, ints: LongArray, reals: List<BigFraction>?): BigFraction =
+    if (column.real) {
+        reals?.getOrNull(column.id)
+            ?: throw MpsLoweringException("continuous column '${column.name}' lacks an exact certified value")
+    } else {
+        ints.getOrNull(column.id)?.let(BigFraction::ofLong)
+            ?: throw MpsLoweringException("integer column '${column.name}' has no value")
+    }
+
+/** A point checked against the original MPS decimal authority. */
+data class MpsSourceWitness(
+    /** Values in source column order. */
+    val values: List<BigFraction>,
+    /** Objective in source units and sense. */
+    val objective: BigFraction,
+)
 
 private fun Double?.sameDataValue(other: Double?): Boolean = when {
     this == null -> other == null
@@ -247,7 +318,7 @@ fun MpsModel.toProblem(): MpsCompiled {
         }
     }
 
-    val objRowScale = objectiveRowScale(isFloat)
+    val objRowScale = objectiveRowScale()
     val objScale = objRowScale.multiplier
     val objectiveErrorBound =
         if (objective.indices.isEmpty()) null else objectiveApproximationError(objRowScale, isFloat)
@@ -278,6 +349,7 @@ fun MpsModel.toProblem(): MpsCompiled {
         hasInnerConstraintApproximation,
         numReal,
     ).withExactLpModel { exactInput.toExactLpModel() }
+        .withSourceModel(exactInput, exactInput.sourceMismatch(isFloat, objRowScale))
 }
 
 // Build the authoritative source LP beside the compatible hybrid Problem lowering.
@@ -583,6 +655,75 @@ private fun MpsConstraint.realRowScale(): RowScale? {
 /** [value] on this scale as a whole number, or unchanged when there is no scale to restate it on. */
 private fun RowScale?.restate(value: Double): Double = if (this == null) value else scale(value).toDouble()
 
+private fun MpsModel.sourceMismatch(isFloat: BooleanArray, objectiveScale: RowScale): String? {
+    val source = sourceNumbers()
+    for (index in variables.indices) {
+        val variable = variables[index]
+        val (lower, upper) = source.variableBounds[index]
+        val valid = if (isFloat[index]) {
+            sourceValueMatches(lower, openLower(variable.lower)) &&
+                sourceValueMatches(upper, openUpper(variable.upper))
+        } else {
+            sourceIntegerLowerMatches(lower, variable.lower) &&
+                sourceIntegerUpperMatches(upper, variable.upper)
+        }
+        if (!valid) return "column bound '${variable.name}'"
+    }
+    for (rowIndex in constraints.indices) {
+        val row = constraints[rowIndex]
+        val scale = if (row.indices.any { isFloat[it] }) row.realRowScale() else row.integerRowScale()
+        if (scale !is RowScale.Exact) return "row '${row.name}' scale"
+        val coefficients = source.constraintCoefficients[rowIndex]
+        for (entry in row.indices.indices) {
+            if (!scaledValueMatches(coefficients[entry], row.coeffs[entry], scale)) {
+                return "row '${row.name}' coefficient"
+            }
+        }
+        val (lower, upper) = source.constraintBounds[rowIndex]
+        if (!scaledBoundMatches(lower, rowBound(row.lower), scale) ||
+            !scaledBoundMatches(upper, rowBound(row.upper), scale)
+        ) {
+            return "row '${row.name}' bound"
+        }
+    }
+    if (objectiveScale !is RowScale.Exact) return "objective scale"
+    for (entry in objective.indices.indices) {
+        if (!scaledValueMatches(source.objectiveCoefficients[entry], objective.coeffs[entry], objectiveScale)) {
+            return "objective coefficient '${variables[objective.indices[entry]].name}'"
+        }
+    }
+    if (!scaledValueMatches(source.objectiveConstant, objective.constant, objectiveScale)) {
+        return "objective constant"
+    }
+    return null
+}
+
+private fun scaledValueMatches(source: MpsSourceNumber, value: Double, scale: RowScale.Exact): Boolean =
+    source.fraction * BigFraction.ofLong(scale.multiplier) ==
+        BigFraction.ofLong(scale.scale(value))
+
+private fun scaledBoundMatches(source: MpsSourceNumber?, value: Double?, scale: RowScale.Exact): Boolean {
+    val exact = source.finiteMps() ?: return value == null
+    return value != null && scaledValueMatches(exact, value, scale)
+}
+
+private fun sourceValueMatches(source: MpsSourceNumber?, value: Double): Boolean =
+    source.finiteMps()?.fraction == BigFraction.ofDouble(value)
+
+private fun sourceIntegerLowerMatches(source: MpsSourceNumber?, value: Double?): Boolean {
+    val exact = source.finiteMps()?.fraction ?: return intLowerOrNull(value) == null
+    val lowered = intLowerOrNull(value) ?: return false
+    return BigFraction.ofLong(lowered) >= exact &&
+        (lowered == Long.MIN_VALUE || BigFraction.ofLong(lowered - 1L) < exact)
+}
+
+private fun sourceIntegerUpperMatches(source: MpsSourceNumber?, value: Double?): Boolean {
+    val exact = source.finiteMps()?.fraction ?: return intUpperOrNull(value) == null
+    val lowered = intUpperOrNull(value) ?: return false
+    return BigFraction.ofLong(lowered) <= exact &&
+        (lowered == Long.MAX_VALUE || BigFraction.ofLong(lowered + 1L) > exact)
+}
+
 /** Emit a row touching a continuous variable as a real ([Double]-coefficient) LP-only [Linear] row over
  *  its integer and real parts. */
 private fun emitRealRow(
@@ -697,12 +838,11 @@ private fun emitIndicatedRealRow(
     rowBound(c.lower)?.let { post(LinearOp.GE, scale.restate(it)) }
 }
 
-/** The scale carrying the objective's integer-column coefficients and its constant onto whole numbers.
- *  A term on a float column keeps its double and so places no demand on the scale; an underflowing
- *  integer term is handled by [objectiveApproximationError]. */
-private fun MpsModel.objectiveRowScale(isFloat: BooleanArray): RowScale {
+/** The scale carrying objective coefficients and the constant onto whole numbers when possible.
+ *  An underflowing integer term is handled by [objectiveApproximationError]. */
+private fun MpsModel.objectiveRowScale(): RowScale {
     val builder = RowScaleBuilder()
-    objective.indices.forEachIndexed { k, idx -> if (!isFloat[idx]) builder.observe(objective.coeffs[k]) }
+    objective.indices.forEachIndexed { k, _ -> builder.observe(objective.coeffs[k]) }
     builder.observe(objective.constant)
     return builder.resolve()
 }
@@ -747,7 +887,11 @@ private fun MpsModel.buildObjective(
     val realCoefficients = DoubleArray(numReal)
     objective.indices.forEachIndexed { k, idx ->
         if (isFloat[idx]) {
-            realCoefficients[realVarOf[idx]] = objective.coeffs[k] * scale.multiplier.toDouble()
+            realCoefficients[realVarOf[idx]] = if (scale is RowScale.Exact) {
+                scale.scale(objective.coeffs[k]).toDouble()
+            } else {
+                objective.coeffs[k] * scale.multiplier.toDouble()
+            }
         } else {
             intCoefficients[intVarOf[idx]] = scale.scale(objective.coeffs[k])
         }
