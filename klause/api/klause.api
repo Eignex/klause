@@ -8213,20 +8213,17 @@ public final class com/eignex/klause/solver/ResumableSearch$DefaultImpls {
 }
 
 public final class com/eignex/klause/solver/Sample {
-	public fun <init> ([Z[J[D)V
-	public synthetic fun <init> ([Z[J[DILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public final fun component1 ()[Z
-	public final fun component2 ()[J
-	public final fun component3 ()[D
-	public final fun copy ([Z[J[D)Lcom/eignex/klause/solver/Sample;
-	public static synthetic fun copy$default (Lcom/eignex/klause/solver/Sample;[Z[J[DILjava/lang/Object;)Lcom/eignex/klause/solver/Sample;
+	public fun <init> ([Z[J[DLjava/util/List;)V
+	public synthetic fun <init> ([Z[J[DLjava/util/List;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun copy ([Z[J[DLjava/util/List;)Lcom/eignex/klause/solver/Sample;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/Sample;[Z[J[DLjava/util/List;ILjava/lang/Object;)Lcom/eignex/klause/solver/Sample;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getBools ()[Z
+	public final fun getExactReals ()Ljava/util/List;
 	public final fun getInts ()[J
 	public final fun getReals ()[D
 	public final fun hammingDistanceTo (Lcom/eignex/klause/solver/Sample;)I
 	public fun hashCode ()I
-	public fun toString ()Ljava/lang/String;
 }
 
 public abstract interface class com/eignex/klause/solver/Session : java/lang/AutoCloseable {

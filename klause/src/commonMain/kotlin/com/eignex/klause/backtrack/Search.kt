@@ -557,6 +557,7 @@ private class ResidualRealComponent(
                     BooleanArray(problem.numBoolVars) { cp.session.boolValue(it) ?: false },
                     LongArray(problem.numIntVars) { cp.session.intDomain(it).min },
                     result.reals,
+                    result.exactReals,
                 )
             }
 

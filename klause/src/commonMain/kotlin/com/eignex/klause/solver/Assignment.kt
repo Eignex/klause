@@ -3,6 +3,7 @@ package com.eignex.klause.solver
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.indices
 import com.eignex.klause.ir.randomValue
+import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.Bits
 import com.eignex.klause.util.EmptyDoubleArray
 import kotlin.random.Random
@@ -63,7 +64,7 @@ class Assignment(
 }
 
 /** Immutable assignment snapshot yielded by the solver. */
-data class Sample(
+class Sample(
     /** Boolean values indexed by variable id. */
     val bools: BooleanArray,
     /** Integer values indexed by variable id. */
@@ -72,7 +73,26 @@ data class Sample(
      *  integer/Boolean core. Populated at a search leaf from the residual LP solution, so a
      *  hybrid MIP/CP solution carries its continuous part. */
     val reals: DoubleArray = EmptyDoubleArray,
+    exactReals: List<BigFraction>? = null,
 ) {
+    /** Certified real values indexed by real variable id, when a residual LP supplied them. */
+    val exactReals: List<BigFraction>? = exactReals?.let {
+        if (it is ExactRealValues) it else ExactRealValues(it)
+    }
+
+    init {
+        require(this.exactReals == null || this.exactReals.size == reals.size) {
+            "exact and approximate real coordinates differ"
+        }
+    }
+
+    /** Copy this assignment; replacing the approximate reals discards their exact authority unless supplied. */
+    fun copy(
+        bools: BooleanArray = this.bools,
+        ints: LongArray = this.ints,
+        reals: DoubleArray = this.reals,
+        exactReals: List<BigFraction>? = if (reals === this.reals) this.exactReals else null,
+    ): Sample = Sample(bools, ints, reals, exactReals)
 
     /** Number of Boolean and integer values that differ from [other]. */
     fun hammingDistanceTo(other: Sample): Int {
@@ -85,8 +105,15 @@ data class Sample(
     override fun equals(other: Any?): Boolean {
         if (other !is Sample) return false
         return bools.contentEquals(other.bools) && ints.contentEquals(other.ints) &&
-            reals.contentEquals(other.reals)
+            reals.contentEquals(other.reals) && exactReals == other.exactReals
     }
     override fun hashCode(): Int =
-        31 * (31 * bools.contentHashCode() + ints.contentHashCode()) + reals.contentHashCode()
+        31 * (31 * (31 * bools.contentHashCode() + ints.contentHashCode()) + reals.contentHashCode()) +
+            (exactReals?.hashCode() ?: 0)
+}
+
+private class ExactRealValues(values: List<BigFraction>) : AbstractList<BigFraction>() {
+    private val snapshot = values.toTypedArray()
+    override val size: Int get() = snapshot.size
+    override fun get(index: Int): BigFraction = snapshot[index]
 }
