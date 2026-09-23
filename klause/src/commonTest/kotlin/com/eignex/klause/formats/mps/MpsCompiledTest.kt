@@ -15,6 +15,61 @@ import kotlin.test.assertTrue
 
 class MpsCompiledTest {
 
+    @Test
+    fun `source check accepts an exact rational continuous optimum`() {
+        val compiled = Mps.parse(
+            "ROWS\n N COST\n E R\nCOLUMNS\n X COST 1 R 3\nRHS\n RHS R 1\nENDATA",
+        ).toProblem()
+
+        val witness = compiled.sourceWitness(LongArray(0), listOf(BigFraction.ofLong(3L).reciprocal()))
+
+        assertTrue(compiled.sourceExact)
+        assertTrue(compiled.copy().sourceExact)
+        assertFalse(compiled.copy(objectiveScale = 2L).sourceExact)
+        assertEquals("1/3", witness.values.single().toString())
+        assertEquals("1/3", witness.objective.toString())
+    }
+
+    @Test
+    fun `source check rejects a rounded original row coefficient`() {
+        val compiled = Mps.parse(
+            "ROWS\n N COST\n E R\nCOLUMNS\n X COST 1 R 3.0000000000000001\nRHS\n RHS R 1\nENDATA",
+        ).toProblem()
+
+        assertFalse(compiled.sourceExact)
+        assertEquals("row 'R' coefficient", compiled.sourceDifference)
+        assertFailsWith<MpsLoweringException> {
+            compiled.sourceWitness(LongArray(0), listOf(BigFraction.ofLong(3L).reciprocal()))
+        }
+    }
+
+    @Test
+    fun `source check keeps the exact objective when a decimal cost rounds`() {
+        val compiled = Mps.parse(
+            "ROWS\n N COST\n E R\nCOLUMNS\n X COST 0.10000000000000000001 R 3\nRHS\n RHS R 1\nENDATA",
+        ).toProblem()
+
+        val witness = compiled.sourceWitness(LongArray(0), listOf(BigFraction.ofLong(3L).reciprocal()))
+
+        assertFalse(compiled.sourceExact)
+        assertEquals("objective coefficient 'X'", compiled.sourceDifference)
+        assertEquals("10000000000000000001/300000000000000000000", witness.objective.toString())
+    }
+
+    @Test
+    fun `source objective keeps maximize sense and the negated objective RHS`() {
+        val compiled = Mps.parse(
+            "OBJSENSE\n MAX\nROWS\n N COST\n E R\nCOLUMNS\n X COST 0.5 R 1\n" +
+                "RHS\n RHS R 2 COST 3\nENDATA",
+        ).toProblem()
+
+        val witness = compiled.sourceWitness(LongArray(0), listOf(BigFraction.ofLong(2L)))
+
+        assertTrue(compiled.maximize)
+        assertTrue(compiled.sourceExact)
+        assertEquals("-2", witness.objective.toString())
+    }
+
     private fun lower(vars: List<MpsVar>, row: MpsConstraint): Linear {
         val compiled = MpsModel(
             "m",

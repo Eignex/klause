@@ -3,13 +3,16 @@ package com.eignex.klause.cli
 import com.eignex.klause.formats.mps.Mps
 import com.eignex.klause.formats.mps.MpsCompiled
 import com.eignex.klause.formats.mps.MpsLoweringException
+import com.eignex.klause.formats.mps.MpsSourceWitness
 import com.eignex.klause.formats.mps.toProblem
+import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.toLinearObjective
 import com.eignex.klause.solver.pipeline.OpenTheoryAssignment
 import com.eignex.klause.solver.pipeline.SourceProblemRoute
 import com.eignex.klause.solver.pipeline.pipelineRoute
 import com.eignex.klause.solver.result.LpStats
+import com.ionspin.kotlin.bignum.integer.BigInteger
 import kotlin.math.abs
 import kotlin.math.floor
 import kotlin.time.TimeSource
@@ -32,6 +35,9 @@ internal object MpsMode : CliMode {
         private var objectiveScale = 1L
         private var objectiveErrorBound: Double? = null
         private var hasInnerConstraintApproximation = false
+        private var sourceExact = true
+        private var sourceDifference: String? = null
+        private var latestSourceWitness: MpsSourceWitness? = null
 
         override fun flags(): List<FlagSpec> = emptyList()
 
@@ -40,12 +46,19 @@ internal object MpsMode : CliMode {
             objectiveScale = compiled.objectiveScale
             objectiveErrorBound = compiled.objectiveErrorBound
             hasInnerConstraintApproximation = compiled.hasInnerConstraintApproximation
+            sourceExact = compiled.sourceExact
+            sourceDifference = compiled.sourceDifference
+            latestSourceWitness = null
             cliLogger(common.verbose).v {
                 "parsed ${fileName(path)}: int=${compiled.model.numIntVars} " +
                     "factors=${compiled.model.factors.size} float-cols=${compiled.floatColumns} " +
                     "objScale=${compiled.objectiveScale}"
             }
-            val render: (Sample) -> String = { s -> renderMpsModel(compiled, s) }
+            val render: (Sample) -> String = { sample ->
+                val witness = compiled.sourceWitness(sample.ints, sample.exactReals)
+                latestSourceWitness = witness
+                renderMpsWitness(compiled, witness)
+            }
             val objective = compiled.objective?.toLinearObjective()
             var routingLpStats = LpStats()
             val routingStart = TimeSource.Monotonic.markNow()
@@ -70,6 +83,11 @@ internal object MpsMode : CliMode {
                     if (compiled.model.numIntVars == 0 && compiled.model.numRealVars != 0) {
                         unsupportedOpenMpsModel()
                     }
+                    if (!compiled.sourceExact) {
+                        throw MpsLoweringException(
+                            "open MPS source differs from the lowered model at ${compiled.sourceDifference}",
+                        )
+                    }
                     if (compiled.objective?.realCoefficients?.any { it != 0.0 } == true) {
                         throw MpsLoweringException("open MPS optimization over a continuous objective is unsupported")
                     }
@@ -87,8 +105,14 @@ internal object MpsMode : CliMode {
             }
         }
 
-        override fun output(common: CommonOptions): OutputProtocol =
-            MpsOutput(objectiveScale, objectiveErrorBound, hasInnerConstraintApproximation)
+        override fun output(common: CommonOptions): OutputProtocol = MpsOutput(
+            objectiveScale,
+            objectiveErrorBound,
+            hasInnerConstraintApproximation,
+            sourceExact,
+            sourceDifference,
+            { latestSourceWitness },
+        )
     }
 }
 
@@ -96,11 +120,13 @@ private fun unsupportedOpenMpsModel(): Nothing =
     throw MpsLoweringException("open MPS models require a supported theory pipeline")
 
 /** Render an MPS solution line: `v name=value` per column, a continuous column shown as its LP value. */
-internal fun renderMpsModel(compiled: MpsCompiled, s: Sample): String = buildString {
+internal fun renderMpsModel(compiled: MpsCompiled, s: Sample): String =
+    renderMpsWitness(compiled, compiled.sourceWitness(s.ints, s.exactReals))
+
+private fun renderMpsWitness(compiled: MpsCompiled, witness: MpsSourceWitness): String = buildString {
     append("v")
-    for (col in compiled.columns) {
-        val value = if (col.real) s.approximateRealValue(col.id) else s.ints[col.id]
-        append(" ${col.name}=$value")
+    for (index in compiled.columns.indices) {
+        append(" ${compiled.columns[index].name}=${exactMpsNumber(witness.values[index])}")
     }
 }
 
@@ -118,6 +144,9 @@ internal class MpsOutput(
     private val objectiveScale: Long = 1L,
     private val objectiveErrorBound: Double? = null,
     private val hasInnerConstraintApproximation: Boolean = false,
+    private val sourceExact: Boolean = true,
+    private val sourceDifference: String? = null,
+    private val sourceWitness: () -> MpsSourceWitness? = { null },
 ) : BufferedBestOutput() {
     private var bestObjective: Long? = null
 
@@ -128,23 +157,35 @@ internal class MpsOutput(
     override val commentPrefix: String = "c"
     override val streamObjective: Boolean = true
 
-    override fun formatObjective(objective: Long): String = scaledDecimal(objective, objectiveScale)
+    override fun formatObjective(objective: Long): String =
+        sourceWitness()?.let { exactMpsNumber(it.objective) } ?: scaledDecimal(objective, objectiveScale)
 
     /** The solver value is on [objectiveScale] like the integral one, so undo the scale and print the
      *  decimal the source states. */
-    override fun formatContinuousObjective(objective: Double): String = scaledDecimal(objective, objectiveScale)
+    override fun formatContinuousObjective(objective: Double): String =
+        sourceWitness()?.let { exactMpsNumber(it.objective) } ?: scaledDecimal(objective, objectiveScale)
 
     override fun statusLine(verdict: Verdict): String = when (verdict) {
         Verdict.SATISFIABLE, Verdict.BEST_FOUND, Verdict.OPTIMAL ->
-            if (verdict == Verdict.OPTIMAL && objectiveErrorBound == null && !hasInnerConstraintApproximation) {
+            if (verdict == Verdict.OPTIMAL && objectiveErrorBound == null &&
+                !hasInnerConstraintApproximation && sourceExact
+            ) {
                 "s OPTIMUM FOUND"
             } else {
                 "s SATISFIABLE"
             }
 
-        Verdict.UNBOUNDED -> "s UNBOUNDED"
+        Verdict.UNBOUNDED -> when {
+            sourceExact -> "s UNBOUNDED"
+            best != null -> "s SATISFIABLE"
+            else -> "s UNKNOWN"
+        }
 
-        Verdict.UNSATISFIABLE -> if (hasInnerConstraintApproximation) "s UNKNOWN" else "s UNSATISFIABLE"
+        Verdict.UNSATISFIABLE -> if (hasInnerConstraintApproximation || !sourceExact) {
+            "s UNKNOWN"
+        } else {
+            "s UNSATISFIABLE"
+        }
 
         Verdict.UNKNOWN -> "s UNKNOWN"
     }
@@ -172,8 +213,29 @@ internal class MpsOutput(
             null
         }
         val cause = super.verdictReason(verdict)
-        return listOfNotNull(approximation, constraintQualification, cause).joinToString("; ").ifEmpty { null }
+        val sourceQualification = sourceDifference?.let { "lowered model differs from MPS source at $it" }
+        return listOfNotNull(approximation, constraintQualification, sourceQualification, cause)
+            .joinToString("; ").ifEmpty { null }
     }
+}
+
+/** Print terminating rationals as exact decimals and other rationals as reduced fractions. */
+private fun exactMpsNumber(value: BigFraction): String {
+    val negative = value.signum() < 0
+    val magnitude = if (negative) -value.num else value.num
+    val whole = magnitude / value.den
+    var remainder = magnitude % value.den
+    if (remainder == BigInteger.ZERO) return "${if (negative) "-" else ""}$whole"
+    val fractional = StringBuilder()
+    repeat(64) {
+        remainder *= BigInteger.fromLong(10L)
+        fractional.append(remainder / value.den)
+        remainder %= value.den
+        if (remainder == BigInteger.ZERO) {
+            return "${if (negative) "-" else ""}$whole.$fractional"
+        }
+    }
+    return value.toString()
 }
 
 /** Format an MPS objective whose continuous columns make it non-integral. A value that lands on a whole
