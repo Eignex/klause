@@ -9,6 +9,9 @@ import com.eignex.klause.bench.runner.ResolvedProblem
 import com.eignex.klause.bench.source.CorpusFetcher
 import kotlinx.serialization.Serializable
 import java.io.File
+import java.math.BigDecimal
+import java.math.BigInteger
+import java.math.MathContext
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -354,7 +357,7 @@ internal object SolverInvocation {
 
                     // `o <cost>`: one line per improving incumbent (model-oriented objective).
                     line.startsWith(XCSP_OBJECTIVE_PREFIX) ->
-                        line.removePrefix(XCSP_OBJECTIVE_PREFIX).trim().toDoubleOrNull()?.let {
+                        parsePbObjective(line.removePrefix(XCSP_OBJECTIVE_PREFIX).trim())?.let {
                             objective = it
                             markIncumbent()
                         }
@@ -423,6 +426,16 @@ internal object SolverInvocation {
         )
     }
 
+    internal fun parsePbObjective(text: String): Double? {
+        text.toDoubleOrNull()?.let { return it.takeIf(Double::isFinite) }
+        val parts = text.split('/', limit = 3)
+        if (parts.size != 2 || parts.any { !SIGNED_INTEGER.matches(it) }) return null
+        val denominator = BigInteger(parts[1])
+        if (denominator == BigInteger.ZERO) return null
+        return BigDecimal(BigInteger(parts[0])).divide(BigDecimal(denominator), MathContext.DECIMAL128)
+            .toDouble().takeIf(Double::isFinite)
+    }
+
     /**
      * The reason a solver declined a model it had already parsed, or null when the failure is anything
      * else.
@@ -470,6 +483,7 @@ internal object SolverInvocation {
     private const val MODEL_OBJECTIVE_KEY = "_objective"
     private const val STAT_PREFIX = "%%%mzn-stat:"
     private const val ARM_PREFIX = "%%%klause-arm:"
+    private val SIGNED_INTEGER = Regex("[+-]?[0-9]+")
 
     // XCSP3 competition output stream (klause-cli's `.xml` front-end).
     private const val XCSP_SATISFIABLE = "s SATISFIABLE"

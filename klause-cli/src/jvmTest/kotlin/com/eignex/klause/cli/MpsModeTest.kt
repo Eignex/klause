@@ -49,4 +49,15 @@ class MpsModeTest {
         assertTrue("s SATISFIABLE" in text, text)
         assertTrue("lowered model differs from MPS source at objective coefficient 'X'" in text, text)
     }
+
+    @Test
+    fun `a source difference declines negative terminal claims`() {
+        listOf(Verdict.UNSATISFIABLE, Verdict.UNBOUNDED).forEach { verdict ->
+            val output = MpsOutput(sourceExact = false, sourceDifference = "row 'R' coefficient")
+
+            val text = capture { output.onComplete(verdict) }
+
+            assertTrue("s UNKNOWN" in text, text)
+        }
+    }
 }

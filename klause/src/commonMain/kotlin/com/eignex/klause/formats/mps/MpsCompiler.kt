@@ -63,10 +63,10 @@ class MpsCompiled(
     val maximize: Boolean,
     /** Columns in declaration order, each mapping a name to its integer- or real-variable id. */
     val columns: List<MpsColumn>,
-    /** Power of ten the retained objective was multiplied by to carry its integer-column coefficients
-     *  onto whole numbers (1 when they already are). */
+    /** Power of ten multiplying the retained objective, set by integer terms when present and by real
+     *  terms for a pure-real objective. */
     val objectiveScale: Long,
-    /** Maximum absolute difference between the reported retained objective and the source objective,
+    /** Maximum absolute difference between the retained objective and the source objective,
      *  over the declared integer-column bounds; null when no objective term was dropped. */
     val objectiveErrorBound: Double?,
     /** True when an integer row was tightened to an inner approximation after a term underflowed.
@@ -318,7 +318,7 @@ fun MpsModel.toProblem(): MpsCompiled {
         }
     }
 
-    val objRowScale = objectiveRowScale()
+    val objRowScale = objectiveRowScale(isFloat)
     val objScale = objRowScale.multiplier
     val objectiveErrorBound =
         if (objective.indices.isEmpty()) null else objectiveApproximationError(objRowScale, isFloat)
@@ -687,8 +687,15 @@ private fun MpsModel.sourceMismatch(isFloat: BooleanArray, objectiveScale: RowSc
         }
     }
     if (objectiveScale !is RowScale.Exact) return "objective scale"
+    val onlyRealTerms = objective.indices.all { isFloat[it] }
     for (entry in objective.indices.indices) {
-        if (!scaledValueMatches(source.objectiveCoefficients[entry], objective.coeffs[entry], objectiveScale)) {
+        val index = objective.indices[entry]
+        val retained = if (isFloat[index]) {
+            BigFraction.ofDouble(objectiveScale.realObjectiveCoefficient(objective.coeffs[entry], onlyRealTerms))
+        } else {
+            BigFraction.ofLong(objectiveScale.scale(objective.coeffs[entry]))
+        }
+        if (retained != source.objectiveCoefficients[entry].fraction * BigFraction.ofLong(objectiveScale.multiplier)) {
             return "objective coefficient '${variables[objective.indices[entry]].name}'"
         }
     }
@@ -840,14 +847,20 @@ private fun emitIndicatedRealRow(
     rowBound(c.lower)?.let { post(LinearOp.GE, scale.restate(it)) }
 }
 
-/** The scale carrying objective coefficients and the constant onto whole numbers when possible.
- *  An underflowing integer term is handled by [objectiveApproximationError]. */
-private fun MpsModel.objectiveRowScale(): RowScale {
+/** The scale carrying integer objective coefficients onto whole numbers when possible. A pure-real
+ *  objective uses its real terms to recover their source decimals. */
+private fun MpsModel.objectiveRowScale(isFloat: BooleanArray): RowScale {
     val builder = RowScaleBuilder()
-    objective.indices.forEachIndexed { k, _ -> builder.observe(objective.coeffs[k]) }
+    val onlyRealTerms = objective.indices.all { isFloat[it] }
+    objective.indices.forEachIndexed { k, index ->
+        if (onlyRealTerms || !isFloat[index]) builder.observe(objective.coeffs[k])
+    }
     builder.observe(objective.constant)
     return builder.resolve()
 }
+
+private fun RowScale.realObjectiveCoefficient(value: Double, onlyRealTerms: Boolean): Double =
+    if (onlyRealTerms && this is RowScale.Exact) scale(value).toDouble() else value * multiplier.toDouble()
 
 /**
  * Bounds the objective difference introduced when [scale] drops a coefficient. Every dropped term must
@@ -887,13 +900,10 @@ private fun MpsModel.buildObjective(
 ): LinearObjectiveSpec {
     val intCoefficients = LongArray(numInt)
     val realCoefficients = DoubleArray(numReal)
+    val onlyRealTerms = objective.indices.all { isFloat[it] }
     objective.indices.forEachIndexed { k, idx ->
         if (isFloat[idx]) {
-            realCoefficients[realVarOf[idx]] = if (scale is RowScale.Exact) {
-                scale.scale(objective.coeffs[k]).toDouble()
-            } else {
-                objective.coeffs[k] * scale.multiplier.toDouble()
-            }
+            realCoefficients[realVarOf[idx]] = scale.realObjectiveCoefficient(objective.coeffs[k], onlyRealTerms)
         } else {
             intCoefficients[intVarOf[idx]] = scale.scale(objective.coeffs[k])
         }

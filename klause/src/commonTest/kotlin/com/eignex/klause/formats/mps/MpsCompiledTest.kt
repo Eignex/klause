@@ -85,6 +85,38 @@ class MpsCompiledTest {
     }
 
     @Test
+    fun `a mixed objective keeps integer scaling independent of real cost`() {
+        val compiled = Mps.parse(
+            "ROWS\n N COST\nCOLUMNS\n MARK0 'MARKER' 'INTORG'\n X COST 1\n" +
+                " MARK1 'MARKER' 'INTEND'\n Y COST 0.333333333333333\n" +
+                "BOUNDS\n UP BND X 10000\n UP BND Y 1\nENDATA",
+        ).toProblem()
+
+        assertEquals(1L, compiled.objectiveScale)
+        assertEquals(1L, assertNotNull(compiled.objective).intCoefficients.single())
+        assertFalse(compiled.sourceExact)
+        assertEquals("objective coefficient 'Y'", compiled.sourceDifference)
+    }
+
+    @Test
+    fun `a mixed objective with exact binary real cost preserves source equality`() {
+        val compiled = MpsModel(
+            "m",
+            ObjectiveSense.MINIMIZE,
+            MpsObjective("COST", intArrayOf(0, 1), doubleArrayOf(1.0, 0.5), 0.0),
+            listOf(
+                MpsVar("X", integer = true, lower = 0.0, upper = 10000.0),
+                MpsVar("Y", integer = false, lower = 0.0, upper = 1.0),
+            ),
+            emptyList(),
+        ).toProblem()
+
+        assertEquals(1L, compiled.objectiveScale)
+        assertEquals(0.5, assertNotNull(compiled.objective).realCoefficients.single())
+        assertTrue(compiled.sourceExact)
+    }
+
+    @Test
     fun `source objective keeps maximize sense and the negated objective RHS`() {
         val compiled = Mps.parse(
             "OBJSENSE\n MAX\nROWS\n N COST\n E R\nCOLUMNS\n X COST 0.5 R 1\n" +

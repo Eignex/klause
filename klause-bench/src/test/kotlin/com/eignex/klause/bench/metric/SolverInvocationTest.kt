@@ -61,6 +61,39 @@ class SolverInvocationTest {
     }
 
     @Test
+    fun `a rational competition objective retains incumbent and optimum status`() {
+        val r = SolverInvocation.invoke(
+            listOf("sh", "-c", "printf '%s\\n' 'o -1/3' 's OPTIMUM FOUND'"),
+            SolverInvocation.Dialect.PB_COMPETITION,
+        )
+
+        assertTrue(r.feasible == true)
+        assertTrue(r.proven)
+        assertEquals(-1.0 / 3.0, r.objective)
+        assertNotNull(r.timeToBestMs)
+        assertEquals("o -1/3\ns OPTIMUM FOUND\n", r.rawOutput)
+    }
+
+    @Test
+    fun `competition objectives parse decimal exponent and large finite fractions`() {
+        val huge = "1" + "0".repeat(400)
+        val cases = listOf("-2.5" to -2.5, "1e2" to 100.0, "+1/-4" to -0.25, "$huge/$huge" to 1.0)
+
+        cases.forEach { (source, expected) ->
+            assertEquals(expected, SolverInvocation.parsePbObjective(source), source)
+        }
+    }
+
+    @Test
+    fun `competition objectives reject malformed and nonfinite fractions`() {
+        val cases = listOf("1/0", "1//2", "1.0/2", "NaN", "Infinity", "1e999", "1${"0".repeat(400)}/1")
+
+        cases.forEach { source ->
+            assertNull(SolverInvocation.parsePbObjective(source), source)
+        }
+    }
+
+    @Test
     fun `a subprocess killed by the hard timeout is recorded as an undecided run`() {
         val r = SolverInvocation.invoke(listOf("sleep", "5"), SolverInvocation.Dialect.MINIZINC, hardTimeoutMs = 100)
         assertNull(r.feasible)
