@@ -46,10 +46,10 @@ fun writeFlatZincSolution(program: FlatZincProgram, sample: Sample, outputObject
     return sb.toString()
 }
 
-/** The solved value of a float variable: its LP-only continuous value from [Sample.reals], or the value
+/** The solved value of a float variable: its LP-only continuous value from [Sample.approximateRealValue], or the value
  *  of its bucket index. */
 private fun floatSolutionValue(b: FloatBucketing, sample: Sample): Double =
-    if (b.lpOnly) sample.reals[b.varId] else b.valueOf(sample.ints[b.varId].toInt())
+    if (b.lpOnly) sample.approximateRealValue(b.varId) else b.valueOf(sample.ints[b.varId].toInt())
 
 private fun objectiveVarName(solve: SolveDirective): String? = when (solve) {
     is SolveDirective.Minimize -> solve.objVar

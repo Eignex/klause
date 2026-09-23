@@ -137,10 +137,10 @@ class CompiledSchema internal constructor(
         return out
     }
 
-    /** Decode [handle]'s real value from [sample] — from [Sample.reals] for an LP-only continuous
+    /** Decode [handle]'s real value from [sample] — from [Sample.approximateRealValue] for an LP-only continuous
      *  column, else from the bucket index. */
     fun decode(handle: FloatHandle, sample: Sample): Double {
-        realVarIdByName[handle.name]?.let { return sample.reals[it] }
+        realVarIdByName[handle.name]?.let { return sample.approximateRealValue(it) }
         val spec = floatDecoders[handle.name]
             ?: error("No float variable named '${handle.name}'")
         val id = intVarIdByName[handle.name]

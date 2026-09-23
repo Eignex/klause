@@ -11493,9 +11493,12 @@ final class com.eignex.klause.solver/Sample { // com.eignex.klause.solver/Sample
         final fun <get-exactReals>(): kotlin.collections/List<com.eignex.klause.simplex.exact/BigFraction>? // com.eignex.klause.solver/Sample.exactReals.<get-exactReals>|<get-exactReals>(){}[0]
     final val ints // com.eignex.klause.solver/Sample.ints|{}ints[0]
         final fun <get-ints>(): kotlin/LongArray // com.eignex.klause.solver/Sample.ints.<get-ints>|<get-ints>(){}[0]
+    final val numRealVars // com.eignex.klause.solver/Sample.numRealVars|{}numRealVars[0]
+        final fun <get-numRealVars>(): kotlin/Int // com.eignex.klause.solver/Sample.numRealVars.<get-numRealVars>|<get-numRealVars>(){}[0]
     final val reals // com.eignex.klause.solver/Sample.reals|{}reals[0]
         final fun <get-reals>(): kotlin/DoubleArray // com.eignex.klause.solver/Sample.reals.<get-reals>|<get-reals>(){}[0]
 
+    final fun approximateRealValue(kotlin/Int): kotlin/Double // com.eignex.klause.solver/Sample.approximateRealValue|approximateRealValue(kotlin.Int){}[0]
     final fun copy(kotlin/BooleanArray = ..., kotlin/LongArray = ..., kotlin/DoubleArray = ..., kotlin.collections/List<com.eignex.klause.simplex.exact/BigFraction>? = ...): com.eignex.klause.solver/Sample // com.eignex.klause.solver/Sample.copy|copy(kotlin.BooleanArray;kotlin.LongArray;kotlin.DoubleArray;kotlin.collections.List<com.eignex.klause.simplex.exact.BigFraction>?){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver/Sample.equals|equals(kotlin.Any?){}[0]
     final fun hammingDistanceTo(com.eignex.klause.solver/Sample): kotlin/Int // com.eignex.klause.solver/Sample.hammingDistanceTo|hammingDistanceTo(com.eignex.klause.solver.Sample){}[0]

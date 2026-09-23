@@ -22,7 +22,7 @@ import com.eignex.klause.util.Cancellation
  * neither complete nor sound to surface however good its integer part looks.
  */
 internal fun sampleAdmission(problem: Problem): CandidateVerifier<Sample, Double> = CandidateVerifier { candidate ->
-    val certified = candidate.assignment.reals.size
+    val certified = candidate.assignment.numRealVars
     when {
         !candidate.objective.isFinite() -> Verification.Rejected("non-finite objective ${candidate.objective}")
 
