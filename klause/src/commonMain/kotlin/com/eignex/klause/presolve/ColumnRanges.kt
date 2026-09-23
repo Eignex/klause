@@ -7,7 +7,8 @@ import com.eignex.klause.ir.IntDomain
  * How wide each integer column is, for a reduction whose argument charges a column its whole range.
  *
  * An activity argument — a knapsack lift, a maximal-activity domination, a disjointness test — needs both
- * of a column's sides. A column the model leaves open has no width to charge, so [isClosed] answers false
+ * of a column's sides. A reduction that states one bound needs only that side, which [hasLower] and
+ * [hasUpper] answer separately. A column the model leaves open has no width to charge, so [isClosed] answers false
  * for it and [min] / [max] say nothing. A caller reads every column its row mentions and declines the row
  * when any of them is open, which is what lets a row over closed columns reduce on a model that is open
  * somewhere else. Reading the model as a whole instead — open anywhere, so charge nothing — is what kept
@@ -21,10 +22,16 @@ internal interface ColumnRanges {
     /** Whether column [v] is bounded on both sides, so [min] and [max] give it a width. */
     fun isClosed(v: Int): Boolean
 
-    /** Lower end of column [v]. Defined only where [isClosed]. */
+    /** Whether column [v] is bounded below, so [min] answers for it. */
+    fun hasLower(v: Int): Boolean = isClosed(v)
+
+    /** Whether column [v] is bounded above, so [max] answers for it. */
+    fun hasUpper(v: Int): Boolean = isClosed(v)
+
+    /** Lower end of column [v]. Defined only where [hasLower]. */
     fun min(v: Int): Long
 
-    /** Upper end of column [v]. Defined only where [isClosed]. */
+    /** Upper end of column [v]. Defined only where [hasUpper]. */
     fun max(v: Int): Long
 
     /** Whether every column in [vars] has a width, so a row over them may be charged. */
@@ -56,6 +63,8 @@ internal interface ColumnRanges {
          */
         fun of(bounds: IntBounds): ColumnRanges = object : ColumnRanges {
             override fun isClosed(v: Int): Boolean = bounds.hasLower(v) && bounds.hasUpper(v)
+            override fun hasLower(v: Int): Boolean = bounds.hasLower(v)
+            override fun hasUpper(v: Int): Boolean = bounds.hasUpper(v)
             override fun min(v: Int): Long = bounds.lower(v)
             override fun max(v: Int): Long = bounds.upper(v)
         }

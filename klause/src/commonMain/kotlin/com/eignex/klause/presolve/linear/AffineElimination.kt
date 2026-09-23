@@ -5,17 +5,22 @@ import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.IntegerConstants
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.Term
 import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.ir.linearRows
 import com.eignex.klause.presolve.AffinePivotOrder
+import com.eignex.klause.presolve.ColumnRanges
 import com.eignex.klause.presolve.PassDelta
 import com.eignex.klause.presolve.Presolve
 import com.eignex.klause.presolve.PresolveShared
+import com.eignex.klause.presolve.RebuildStep
 import com.eignex.klause.presolve.SharedIntOccurrence
+import com.eignex.klause.presolve.SourceDelta
+import com.eignex.klause.presolve.SourceRebuilds
+import com.eignex.klause.presolve.asSampleLift
 import com.eignex.klause.presolve.equivalentLinear
 import com.eignex.klause.propagation.BakedProblem
-import com.eignex.klause.solver.Sample
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.CheckedLongOverflowException
 import com.eignex.klause.util.IntArrayList
@@ -34,7 +39,7 @@ internal object AffineSingletons {
      * `x = B + Σ_j A_j·y_j` where `A_j = −c_x·c_j` and `B = c_x·b`. The defining equality is dropped,
      * the affine relation is folded into every other [Linear] that mentions `x`, and bounds on the
      * `y_j` are added so `x` stays inside its declared domain; `x` becomes unconstrained and is
-     * rebuilt from the solution via [AffineElimination.reconstruct].
+     * rebuilt from the solution by the steps [asRebuilds] states.
      *
      * Two-term equalities are the common case (an alias or a one-partner definition); the `n`-term
      * generalisation projects out an *implied-free* variable defined by a longer sum (e.g. an
@@ -66,7 +71,75 @@ internal object AffineSingletons {
         maxFactors: Int = AFFINE_MAX_FACTORS,
         pivotOrder: AffinePivotOrder = AffinePivotOrder.MARKOWITZ,
     ): PassDelta {
-        if (problem.numIntVars == 0) return PassDelta()
+        val domains = problem.rootIntDomains()
+        val out = run(
+            problem,
+            ColumnRanges.of(domains),
+            domains,
+            objectiveIntVars,
+            cancellation,
+            sharedIntOcc,
+            capWide,
+            incrementalTouchedVars,
+            maxFactors,
+            pivotOrder,
+        ) ?: return PassDelta()
+        return PresolveShared.identityDelta(
+            problem.factors,
+            out.factors,
+            domains,
+            out.subs.asRebuilds().asSampleLift(),
+        )
+    }
+
+    /**
+     * [eliminateAffineSingletons] over a canonical source model.
+     *
+     * Two differences, both forced by what a declaration states. A bound row is emitted only for a side
+     * the model bounds, since an open side gives `x` no bound to carry over to its terms. And the
+     * residue-class doubletons are left alone: restricting a partner to the values that keep `x` an
+     * in-domain integer is a value set with holes, which a range cannot state and a hull would state
+     * wrongly — it would admit the partner values that make `x` non-integral.
+     */
+    fun eliminateSourceAffineSingletons(
+        problem: Problem,
+        objectiveIntVars: Set<Int> = emptySet(),
+        cancellation: Cancellation = Cancellation.Never,
+        maxFactors: Int = AFFINE_MAX_FACTORS,
+        pivotOrder: AffinePivotOrder = AffinePivotOrder.MARKOWITZ,
+    ): SourceDelta {
+        val out = run(
+            problem,
+            ColumnRanges.of(problem.intBounds),
+            domains = null,
+            objectiveIntVars = objectiveIntVars,
+            cancellation = cancellation,
+            sharedIntOcc = null,
+            capWide = false,
+            incrementalTouchedVars = null,
+            maxFactors = maxFactors,
+            pivotOrder = pivotOrder,
+        ) ?: return SourceDelta()
+        return PresolveShared.sourceIdentityDelta(problem.factors, out.factors, out.subs.asRebuilds())
+    }
+
+    /** What one run of the elimination produced: the surviving factors and the substitutions it recorded. */
+    private class Eliminated(val factors: List<Factor>, val subs: List<AffineSub>)
+
+    @Suppress("LongParameterList") // one body serves both lanes; the parameters are the lane's differences
+    private fun run(
+        problem: Problem,
+        ranges: ColumnRanges,
+        domains: Array<IntDomain>?,
+        objectiveIntVars: Set<Int>,
+        cancellation: Cancellation,
+        sharedIntOcc: SharedIntOccurrence?,
+        capWide: Boolean,
+        incrementalTouchedVars: IntArray?,
+        maxFactors: Int,
+        pivotOrder: AffinePivotOrder,
+    ): Eliminated? {
+        if (problem.numIntVars == 0) return null
         // Membership is tested per candidate variable, so the caller's boxed set is unpacked once here
         // rather than boxing an Int on every check.
         val objVars = IntHashSet().apply { for (v in objectiveIntVars) add(v) }
@@ -76,13 +149,12 @@ internal object AffineSingletons {
         // affine-defined variables simply stay and are solved directly) and, per a solve A/B over the
         // hakank suite, disabling affine did not change whether any instance solved. The threshold sits
         // far above what any non-giant model reaches, so ordinary instances are unaffected (byte-identical).
-        if (problem.factors.size > maxFactors) return PassDelta()
+        if (problem.factors.size > maxFactors) return null
         val eliminated = BooleanArray(problem.numIntVars)
+        // Where every column is closed there is nothing to refuse, so the finite lane pays no predicate.
+        val pivotable: ((Int) -> Boolean)? =
+            if (domains != null) null else { x: Int -> ranges.isClosed(x) }
         val subs = ArrayList<AffineSub>()
-        // One copy of the root domains for the whole pass: the candidate scans read it and the residue loop
-        // below narrows it in place, so taking it per scan would allocate O(numIntVars) on every barren
-        // re-run — the path the incremental scan exists to keep at O(delta).
-        val domains = problem.rootIntDomains()
         // Before any fold the working set is byte-for-byte the pristine input, so the first candidate scan
         // can read the session's shared occurrence index directly (its CSR is in stable-id order). If no
         // candidate exists there, the pass is fruitless and returns without ever building the mutable
@@ -101,13 +173,14 @@ internal object AffineSingletons {
                     objVars,
                     capWide,
                     domains,
+                    pivotable,
                     cancellation,
                 )
             } else {
-                findAffineCandidate(seed, 0, eliminated, objVars, capWide, cancellation) != null ||
-                    findResidueCandidate(seed, eliminated, objVars, domains, cancellation) != null
+                findAffineCandidate(seed, 0, eliminated, objVars, capWide, pivotable, cancellation) != null ||
+                    (domains != null && findResidueCandidate(seed, eliminated, objVars, domains, cancellation) != null)
             }
-            if (!hasCandidate) return PassDelta()
+            if (!hasCandidate) return null
         }
         // The working set holds the factors by stable id (tombstones for drops, appends for the folded
         // rewrites and bound rows) and a per-variable occurrence index maintained across eliminations.
@@ -125,7 +198,7 @@ internal object AffineSingletons {
         // the order as much as on the set: folding the cheap pivots first shrinks the graph, so folds that
         // would have been expensive become cheap or stop existing. The gates below (fill-in budget, absorb
         // cap) can only refuse a fold; they cannot defer one.
-        val order = AffinePivotOrders.new(pivotOrder, ws, eliminated, objVars, capWide, cancellation)
+        val order = AffinePivotOrders.new(pivotOrder, ws, eliminated, objVars, capWide, pivotable, cancellation)
         // Cumulative substitution fill-in (Σ pivot-degree · substituted-terms). A dense chain of wide
         // folds is superlinear and can dominate presolve on large models where it barely simplifies;
         // once the budget is spent the loop stops, leaving the remaining affine-defined variables to be
@@ -134,7 +207,7 @@ internal object AffineSingletons {
         while (!cancellation()) {
             val cand = order.next() ?: break
             fillIn += ws.degreeOf(cand.x).toLong() * cand.termVars.size
-            order.onFolded(foldOutVariable(problem, ws, cand))
+            order.onFolded(foldOutVariable(problem, ranges, ws, cand))
             eliminated[cand.x] = true
             subs.add(AffineSub(cand.x, cand.constTerm, cand.termVars, cand.termCoeffs))
             if (fillIn > AFFINE_FILL_IN_BUDGET) break
@@ -144,23 +217,18 @@ internal object AffineSingletons {
         // integer. Restrict `y` to those values (a domain modification, not a folded factor) and
         // reconstruct `x` with the divisor. Runs after the unit-pivot loop, so a residue partner `y`
         // is always a surviving variable.
-        while (!cancellation()) {
+        while (domains != null && !cancellation()) {
             val r = findResidueCandidate(ws, eliminated, objVars, domains, cancellation) ?: break
             ws.drop(r.defIdx)
             domains[r.y] = r.restrictedY
             eliminated[r.x] = true
             subs.add(AffineSub(r.x, r.constTerm, intArrayOf(r.y), longArrayOf(r.coeffY), divisor = r.divisor))
         }
-        if (subs.isEmpty()) return PassDelta()
+        if (subs.isEmpty()) return null
         // The eliminations rebuilt the factor list in place; recover the delta against the input by
         // identity — every survivor is === an input factor, so the drops are the inputs absent from
         // [factors] and the adds are the factors [foldOutVariable] introduced (rewrites + domain bounds).
-        return PresolveShared.identityDelta(
-            problem.factors,
-            ws.liveFactors(),
-            domains,
-            AffineElimination(subs)::reconstruct,
-        )
+        return Eliminated(ws.liveFactors(), subs)
     }
 
     /**
@@ -333,6 +401,7 @@ internal object AffineSingletons {
         eliminated: BooleanArray,
         objectiveIntVars: IntHashSet,
         capWide: Boolean,
+        pivotable: ((Int) -> Boolean)? = null,
         cancellation: Cancellation = Cancellation.Never,
     ): AffineCandidate? {
         // The scan walks the live factors in stable-id order — the same order a fresh compacted list would
@@ -355,6 +424,7 @@ internal object AffineSingletons {
                 eliminated,
                 objectiveIntVars,
                 capWide,
+                pivotable,
                 cancellation,
             )?.let { return it }
             di = ws.nextEqId(di + 1)
@@ -382,6 +452,8 @@ internal object AffineSingletons {
         eliminated: BooleanArray,
         objectiveIntVars: IntHashSet,
         capWide: Boolean,
+        // Null where every column is closed, so no pivot is refused for want of a bound.
+        pivotable: ((Int) -> Boolean)?,
         cancellation: Cancellation = Cancellation.Never,
     ): AffineCandidate? {
         val f = ws.factorAt(di)?.equivalentLinear() ?: return null
@@ -394,6 +466,10 @@ internal object AffineSingletons {
             val x = f.vars[xi]
             val cx = row.coeff(xi)
             if (eliminated[x] || x in objectiveIntVars) continue
+            // A column with an open side states no bound to carry over to the terms it folds into, so
+            // eliminating it would drop the row a later bound proof reads and leave the column itself
+            // unconstrained — trading a lane the model could have routed to for one reduction.
+            if (pivotable != null && !pivotable(x)) continue
             // The substitution `x = (bound − Σ c_j·y_j) / c_x` stays integral for *every*
             // assignment of the partners only when `c_x` divides each `c_j` and the bound — for a
             // unit pivot trivially, and for a non-unit pivot exactly when `x` is implied-free
@@ -460,7 +536,10 @@ internal object AffineSingletons {
         eliminated: BooleanArray,
         objectiveIntVars: IntHashSet,
         capWide: Boolean,
-        domains: Array<IntDomain>,
+        // Null where the lane states ranges rather than domains, which is where no residue doubleton is
+        // eliminated at all — so there is no residue candidate to look for either.
+        domains: Array<IntDomain>?,
+        pivotable: ((Int) -> Boolean)?,
         cancellation: Cancellation = Cancellation.Never,
     ): Boolean {
         val checked = IntHashSet()
@@ -480,12 +559,17 @@ internal object AffineSingletons {
                         eliminated,
                         objectiveIntVars,
                         capWide,
+                        pivotable,
                         cancellation,
                     ) != null
                 ) {
                     return true
                 }
-                if (residueCandidateInFactor(seed, di, eliminated, objectiveIntVars, domains) != null) return true
+                if (domains != null &&
+                    residueCandidateInFactor(seed, di, eliminated, objectiveIntVars, domains) != null
+                ) {
+                    return true
+                }
             }
         }
         return false
@@ -919,7 +1003,7 @@ internal object AffineSingletons {
          * equality [c].`defIdx` and rewriting only the factors that mention `x` in place, then appending
          * the domain-bound rows. The def id is tombstoned last so the occurrence scan below still sees it.
          */
-        fun fold(problem: BakedProblem, c: AffineCandidate): Int {
+        fun fold(ranges: ColumnRanges, c: AffineCandidate): Int {
             val singlePartner = c.termVars.size == 1
             // Snapshot the occurrence ids of `x` before mutating them: [replace] rewrites x's occurrence
             // list as it goes, and the def id must be skipped rather than folded into itself.
@@ -948,7 +1032,7 @@ internal object AffineSingletons {
                 if (next !== f) replace(id, f, next)
             }
             drop(c.defIdx)
-            for (bound in domainBoundsOnTerms(problem.rootIntDomain(c.x), c)) append(bound)
+            for (bound in domainBoundsOnTerms(ranges, c)) append(bound)
             // The lowest stable id whose candidacy this fold can newly establish: only the rewritten
             // factors (the pivot's occurrences) change content, so no factor below their minimum can
             // become a candidate. The candidate scan resumes from here instead of restarting at 0.
@@ -961,7 +1045,7 @@ internal object AffineSingletons {
          * intrinsic to a rename — `Factor.remap` returns a fresh object for every factor — so this stays
          * O(live factors); only `x`'s occurrences migrate to `y`, so the index is patched, not rebuilt.
          */
-        fun alias(problem: BakedProblem, c: AffineCandidate): Int {
+        fun alias(problem: Problem, ranges: ColumnRanges, c: AffineCandidate): Int {
             val boolMap = IntArray(problem.numBoolVars) { it }
             val intMap = IntArray(problem.numIntVars) { it }
             val y = c.termVars[0]
@@ -1000,7 +1084,7 @@ internal object AffineSingletons {
             // eliminated, so any remaining x count is dead.
             drop(c.defIdx)
             atCapCount[c.x] = 0
-            for (bound in domainBoundsOnTerms(problem.rootIntDomain(c.x), c)) append(bound)
+            for (bound in domainBoundsOnTerms(ranges, c)) append(bound)
             // Only the rewritten factors (`x`'s occurrences, now renamed to `y`) change content, so — as in
             // [fold] — no factor below their minimum can newly become a candidate; the scan resumes from
             // here instead of restarting at 0. (The occurrence-scoped remap above is what makes this valid:
@@ -1014,8 +1098,8 @@ internal object AffineSingletons {
     // Σ termCoeffs·termVars` into every other Linear mentioning `x`. In both cases bounds on the term
     // vars keep `x` within its domain. Returns the lowest stable id whose candidacy the fold can newly
     // establish — the point the candidate scan may safely resume from (0 for the whole-set alias rename).
-    private fun foldOutVariable(problem: BakedProblem, ws: WorkingSet, c: AffineCandidate): Int =
-        if (c.isAlias) ws.alias(problem, c) else ws.fold(problem, c)
+    private fun foldOutVariable(problem: Problem, ranges: ColumnRanges, ws: WorkingSet, c: AffineCandidate): Int =
+        if (c.isAlias) ws.alias(problem, ranges, c) else ws.fold(ranges, c)
 
     /** [l] with `x` replaced by `constTerm + Σ A_j·y_j`: drop `x`'s term, add `coeff_x·A_j` to each
      *  term var `y_j`, shift the bound by `−coeff_x·constTerm`. The [Linear] constructor re-coalesces
@@ -1043,14 +1127,20 @@ internal object AffineSingletons {
         return Linear(newCoeffs, newVars, l.op, row.bound - cX * c.constTerm)
     }
 
-    /** Bounds on the term vars enforcing that `x = constTerm + Σ termCoeffs·termVars` stays within
-     *  `x`'s domain [domX]. */
-    private fun domainBoundsOnTerms(domX: IntDomain, c: AffineCandidate): List<Factor> {
-        val coeffs = c.termCoeffs.copyOf()
-        return listOf(
-            Linear(coeffs, c.termVars.copyOf(), LinearOp.LE, domX.max - c.constTerm),
-            Linear(coeffs, c.termVars.copyOf(), LinearOp.GE, domX.min - c.constTerm),
-        )
+    /** Bounds on the term vars enforcing that `x = constTerm + Σ termCoeffs·termVars` stays within the
+     *  extent [ranges] gives `x`, one row per side it bounds. */
+    private fun domainBoundsOnTerms(ranges: ColumnRanges, c: AffineCandidate): List<Factor> {
+        val rows = ArrayList<Factor>(2)
+        // One row per side the model actually bounds. A column open above states no upper row: there is
+        // no bound on `x` to carry over to its terms, and inventing one would constrain the partners by
+        // an endpoint the model never gave.
+        if (ranges.hasUpper(c.x)) {
+            rows.add(Linear(c.termCoeffs.copyOf(), c.termVars.copyOf(), LinearOp.LE, ranges.max(c.x) - c.constTerm))
+        }
+        if (ranges.hasLower(c.x)) {
+            rows.add(Linear(c.termCoeffs.copyOf(), c.termVars.copyOf(), LinearOp.GE, ranges.min(c.x) - c.constTerm))
+        }
+        return rows
     }
 }
 
@@ -1067,26 +1157,15 @@ internal class AffineSub(
 )
 
 /**
- * The affine eliminations [Presolve] made, holding the data to rebuild the
- * eliminated variables. Pass a solution of the reduced problem through [reconstruct] to recover a
- * solution of the original.
+ * The affine eliminations as the steps that rebuild them, latest first.
+ *
+ * Reverse elimination order: an eliminated `x` may depend on a `y` eliminated later (a chain), and a
+ * later elimination never depends on an earlier one (the candidate scan skips already-eliminated
+ * partners), so reversing guarantees every `y` is recovered before the `x` that reads it.
  */
-internal class AffineElimination(private val subs: List<AffineSub>) {
-    /** Recover the eliminated variables in a solution [sample] of the reduced problem. Processed in reverse
-     *  elimination order: an eliminated `x` may depend on a `y` eliminated later (a chain), and a
-     *  later elimination never depends on an earlier one (the candidate scan skips already-eliminated
-     *  partners), so reverse order guarantees every `y` is reconstructed before the `x` that reads it. */
-    fun reconstruct(sample: Sample): Sample {
-        if (subs.isEmpty()) return sample
-        val ints = sample.ints.copyOf()
-        for (s in subs.asReversed()) {
-            var v = s.constTerm
-            for (k in s.termVars.indices) v += s.termCoeffs[k] * ints[s.termVars[k]]
-            ints[s.x] = if (s.divisor == 1L) v else v / s.divisor
-        }
-        return sample.copy(ints = ints)
-    }
-}
+internal fun List<AffineSub>.asRebuilds(): SourceRebuilds = SourceRebuilds(
+    asReversed().map { RebuildStep.AffineValue(it.x, it.constTerm, it.termVars, it.termCoeffs, it.divisor) },
+)
 
 /** Whether folding `x = constTerm + Σ termCoeffs·termVars` into the Linear row [f] would overflow
  *  64-bit arithmetic in the shifted bound or any folded coefficient. Each product/sum runs through the

@@ -15,10 +15,14 @@ internal object AffinePivotOrders {
         eliminated: BooleanArray,
         objectiveIntVars: IntHashSet,
         capWide: Boolean,
+        pivotable: ((Int) -> Boolean)?,
         cancellation: Cancellation,
     ): AffineSingletons.PivotOrder = when (policy) {
-        AffinePivotOrder.STABLE_ID -> StableIdOrder(ws, eliminated, objectiveIntVars, capWide, cancellation)
-        AffinePivotOrder.MARKOWITZ -> MarkowitzOrder(ws, eliminated, objectiveIntVars, capWide, cancellation)
+        AffinePivotOrder.STABLE_ID ->
+            StableIdOrder(ws, eliminated, objectiveIntVars, capWide, pivotable, cancellation)
+
+        AffinePivotOrder.MARKOWITZ ->
+            MarkowitzOrder(ws, eliminated, objectiveIntVars, capWide, pivotable, cancellation)
     }
 
     private class StableIdOrder(
@@ -26,12 +30,20 @@ internal object AffinePivotOrders {
         private val eliminated: BooleanArray,
         private val objectiveIntVars: IntHashSet,
         private val capWide: Boolean,
+        private val pivotable: ((Int) -> Boolean)?,
         private val cancellation: Cancellation,
     ) : AffineSingletons.PivotOrder {
         private var scanFrom = 0
 
-        override fun next(): AffineSingletons.AffineCandidate? =
-            AffineSingletons.findAffineCandidate(ws, scanFrom, eliminated, objectiveIntVars, capWide, cancellation)
+        override fun next(): AffineSingletons.AffineCandidate? = AffineSingletons.findAffineCandidate(
+            ws,
+            scanFrom,
+            eliminated,
+            objectiveIntVars,
+            capWide,
+            pivotable,
+            cancellation,
+        )
 
         override fun onFolded(minRewrittenId: Int) {
             scanFrom = minRewrittenId
@@ -43,6 +55,7 @@ internal object AffinePivotOrders {
         private val eliminated: BooleanArray,
         private val objectiveIntVars: IntHashSet,
         private val capWide: Boolean,
+        private val pivotable: ((Int) -> Boolean)?,
         private val cancellation: Cancellation,
     ) : AffineSingletons.PivotOrder {
         private val heap = PivotHeap()
@@ -68,6 +81,7 @@ internal object AffinePivotOrders {
                     eliminated,
                     objectiveIntVars,
                     capWide,
+                    pivotable,
                     cancellation,
                 )
                 if (cand == null) {

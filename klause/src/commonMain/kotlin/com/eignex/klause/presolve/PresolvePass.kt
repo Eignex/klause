@@ -111,11 +111,21 @@ enum class PresolvePass(
     ELIMINATE_AFFINE_SINGLETONS(
         "affine",
         Stage.PROBLEM,
-        Capability.FINITE,
+        Capability.SOURCE,
         PresolveTiming.FAST,
         preservesSolutionSet = false,
         autoEligible = true,
     ) {
+        // The source form states a bound row only for a side the model bounds and leaves the
+        // residue-class doubletons alone, since restricting a partner to a residue class is a value set
+        // a range cannot state. The finite form below keeps both.
+        override fun applySource(problem: Problem, ctx: PresolveContext) = Presolve.eliminateSourceAffineSingletons(
+            problem,
+            ctx.objectiveIntVars,
+            ctx.cancellation,
+            ctx.affinePivotOrder,
+        )
+
         override fun applyFinite(problem: BakedProblem, ctx: PresolveContext) = Presolve.eliminateAffineSingletons(
             problem,
             ctx.objectiveIntVars,

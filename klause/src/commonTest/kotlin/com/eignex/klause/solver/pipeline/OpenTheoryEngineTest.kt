@@ -245,11 +245,9 @@ class OpenTheoryEngineTest {
 
         val result = OpenTheoryEngine(parsed.model, sourceRoute(parsed.model)).solve()
 
-        val ints = assertIs<OpenTheoryAssignment.ExactLira>(
-            assertIs<OpenTheoryResult.Sat>(result).assignment,
-        ).assignment.ints
-        val x = ints[parsed.intVarNames.getValue("x")]
-        val y = ints[parsed.intVarNames.getValue("y")]
+        val witness = assertIs<OpenTheoryResult.Sat>(result).assignment
+        val x = BigInteger.parseString(witness.intValue(parsed.intVarNames.getValue("x")))
+        val y = BigInteger.parseString(witness.intValue(parsed.intVarNames.getValue("y")))
         assertEquals(y, x)
         assertTrue(y >= BigInteger.parseString("100000000000000000000"))
     }
@@ -272,8 +270,8 @@ class OpenTheoryEngineTest {
 
         val result = OpenTheoryEngine(parsed.model, sourceRoute(parsed.model)).solve()
 
-        val assignment = assertIs<OpenTheoryAssignment.ExactLira>(assertIs<OpenTheoryResult.Sat>(result).assignment)
-        assertEquals("6", assignment.assignment.ints[parsed.intVarNames.getValue("r")].toString())
+        val assignment = assertIs<OpenTheoryResult.Sat>(result).assignment
+        assertEquals("6", assignment.intValue(parsed.intVarNames.getValue("r")))
     }
 
     @Test
