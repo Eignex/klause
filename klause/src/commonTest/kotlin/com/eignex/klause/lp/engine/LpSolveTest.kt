@@ -809,6 +809,78 @@ class LpSolveTest {
     }
 
     @Test
+    fun `an exact finite bound prevents recession evaluation`() {
+        val model = LpBuilder().apply { addOpenAboveVar(0L) }.build(Sense.MINIMIZE)
+        val cache = LpCounterResults()
+        val first = solveAndCertify(model, counterResults = cache)
+        assertEquals(LpVerdict.ATTAINED_OPTIMUM, first.verdict)
+        assertNotNull(first.bound)
+        assertNotNull(first.witness)
+        val repeated = object : LpSolver {
+            override val infeasibleRay: DoubleArray? = null
+            override val recessionDirection: DoubleArray? get() = error("a finite bound excludes unboundedness")
+            override fun solve(warm: Basis?): FloatLpResult? = null
+            override fun solvePrimal(warm: Basis?): FloatLpResult? = null
+        }
+
+        for (cancelled in listOf(false, true)) {
+            val result = certifyLpResult(model, repeated, null, Cancellation { cancelled }, counterResults = cache)
+
+            assertEquals(LpVerdict.ATTAINED_OPTIMUM, result.verdict)
+            assertEquals(BigFraction.ZERO, result.lowerBound)
+            assertEquals(first.exactPrimal, result.exactPrimal)
+        }
+    }
+
+    @Test
+    fun `objective replacement releases a retained bound for unboundedness`() {
+        val model = LpBuilder().apply { addOpenAboveVar(0L) }.build(Sense.MINIMIZE)
+        val cache = LpCounterResults()
+        val first = solveAndCertify(model, counterResults = cache)
+        assertEquals(LpVerdict.ATTAINED_OPTIMUM, first.verdict)
+        assertNotNull(cache.read(model, ProductionLpCertificationPolicy)?.bound)
+        val next = model.withSingleColumnObjective(0, -1L)
+        val solver = object : LpSolver {
+            override val infeasibleRay: DoubleArray? = null
+            override val recessionDirection = doubleArrayOf(1.0)
+            override fun solve(warm: Basis?): FloatLpResult? = null
+            override fun solvePrimal(warm: Basis?): FloatLpResult? = null
+            override fun continuationBasis(model: LpModel) = Basis(intArrayOf(), arrayOf(VarStatus.AT_LOWER))
+        }
+
+        val result = certifyLpResult(next, solver, null, counterResults = cache)
+
+        assertEquals(LpVerdict.UNBOUNDED, result.verdict)
+        val proof = assertNotNull(result.unboundedness)
+        assertNotNull(checkedLpWitness(next, proof.witness.primal))
+        assertTrue(proof.direction.single() > BigFraction.ZERO)
+        assertNull(result.lowerBound)
+    }
+
+    @Test
+    fun `bound replacement invalidates a stronger retained lower bound`() {
+        val model = LpBuilder().apply { addVar(0L, 3L, cost = 1L) }.build(Sense.MINIMIZE)
+        val cache = LpCounterResults()
+        assertEquals(BigFraction.ZERO, solveAndCertify(model, counterResults = cache).lowerBound)
+        val next = model.rebind(longArrayOf(-1L), longArrayOf(3L))
+        val solver = object : LpSolver {
+            override val infeasibleRay: DoubleArray? = null
+            override fun solve(warm: Basis?): FloatLpResult? = null
+            override fun solvePrimal(warm: Basis?): FloatLpResult? = null
+            override fun continuationBasis(model: LpModel) = Basis(intArrayOf(), arrayOf(VarStatus.AT_LOWER))
+        }
+
+        assertNotNull(cache.read(model, ProductionLpCertificationPolicy)?.bound)
+        val result = certifyLpResult(next, solver, null, counterResults = cache)
+
+        val bound = result.lowerBound
+        assertTrue(bound == null || bound <= BigFraction.MINUS_ONE)
+        val witness = assertNotNull(result.witness)
+        assertEquals(assertNotNull(checkedLpWitness(next, witness.primal)).objective, witness.objective)
+        assertTrue(result.verdict == LpVerdict.FEASIBLE || result.verdict == LpVerdict.ATTAINED_OPTIMUM)
+    }
+
+    @Test
     fun `candidate rejection is not cached as a model counter result`() {
         val model = LpBuilder().apply {
             val x = addVar(0L, 3L, cost = 1L)
