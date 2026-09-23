@@ -5,6 +5,8 @@ import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.lp.bounding.LpEmphasis
 import com.eignex.klause.lp.bounding.LpTechnique
 import com.eignex.klause.lp.engine.LpZeroObjectivePricing
+import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.pipeline.FiniteEngine
 import com.eignex.klause.solver.pipeline.ValSelectorKind
 import com.eignex.klause.solver.pipeline.VarSelectorKind
@@ -19,6 +21,27 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class CliModeTest {
+
+    @Test
+    fun `SMT finite decimals and integral reals render as exact real terms`() {
+        val half = BigFraction.ofLong(2).reciprocal()
+        val whole = BigFraction.ofLong(5)
+        val sample = Sample(BooleanArray(0), LongArray(0), doubleArrayOf(0.5, 5.0), listOf(half, whole))
+
+        val model = renderModel(emptyMap(), emptyMap(), mapOf("half" to 0, "whole" to 1), sample)
+
+        assertTrue("(define-fun half () Real (/ 1.0 2.0))" in model, model)
+        assertTrue("(define-fun whole () Real 5.0)" in model, model)
+    }
+
+    @Test
+    fun `SMT model refuses an uncertified real sample`() {
+        val sample = Sample(BooleanArray(0), LongArray(0), doubleArrayOf(2.0 / 3.0))
+
+        assertFailsWith<IllegalArgumentException> {
+            renderModel(emptyMap(), emptyMap(), mapOf("x" to 0), sample)
+        }
+    }
 
     @Test
     fun `SMT-LIB statistics include exact theory counters`() {
@@ -275,7 +298,75 @@ class CliModeTest {
 
         assertEquals(0, code, out)
         assertTrue(out.lines().firstOrNull() == "sat", out)
-        assertTrue("(define-fun x () Real 1/3)" in out, out)
+        assertTrue("(define-fun x () Real (/ 1.0 3.0))" in out, out)
+    }
+
+    @Test
+    fun `bounded SMT mixed model preserves a nonterminating rational witness`() {
+        val smt = File.createTempFile("clirational", ".smt2").apply {
+            writeText(
+                """(set-logic QF_LIRA)
+(set-option :produce-models true)
+(declare-const x Real) (declare-const y Int) (assert (= (* 3 x) y)) (assert (> y 1)) (assert (< y 4)) (assert (distinct x 1))
+(check-sat)
+(get-model)
+""",
+            )
+            deleteOnExit()
+        }
+
+        val out = capture { assertEquals(0, runCli(arrayOf("-p", "1", "-r", "570", "-t", "5000", smt.absolutePath))) }
+
+        assertEquals("sat", out.lines().firstOrNull(), out)
+        assertTrue("(define-fun y () Int 2)" in out, out)
+        assertTrue("(define-fun x () Real (/ 2.0 3.0))" in out, out)
+        assertFalse("0.6666666666666666" in out, out)
+    }
+
+    @Test
+    fun `bounded SMT mixed model prints a negative exact witness`() {
+        val smt = File.createTempFile("clinegative", ".smt2").apply {
+            writeText(
+                """
+                (set-logic QF_LIRA)
+                (declare-const x Real) (declare-const y Int)
+                (assert (= (* 3 x) y))
+                (assert (> y (- 3))) (assert (< y (- 1)))
+                (assert (> x (- 1.0))) (assert (< x 0.0))
+                (check-sat)
+                """.trimIndent(),
+            )
+            deleteOnExit()
+        }
+
+        val out = capture { assertEquals(0, runCli(arrayOf(smt.absolutePath))) }
+
+        assertEquals("sat", out.lines().firstOrNull(), out)
+        assertTrue("(define-fun y () Int (- 2))" in out, out)
+        assertTrue("(define-fun x () Real (- (/ 2.0 3.0)))" in out, out)
+    }
+
+    @Test
+    fun `bounded SMT real objective preserves its exact incumbent`() {
+        val smt = File.createTempFile("cliobjective", ".smt2").apply {
+            writeText(
+                """
+                (set-logic QF_LIRA)
+                (declare-const x Real) (declare-const y Int)
+                (assert (= (* 3 x) y))
+                (assert (> y 1)) (assert (< y 4))
+                (minimize x)
+                (check-sat)
+                """.trimIndent(),
+            )
+            deleteOnExit()
+        }
+
+        val out = capture { assertEquals(0, runCli(arrayOf(smt.absolutePath))) }
+
+        assertEquals("sat", out.lines().firstOrNull(), out)
+        assertTrue("(define-fun y () Int 2)" in out, out)
+        assertTrue("(define-fun x () Real (/ 2.0 3.0))" in out, out)
     }
 
     @Test

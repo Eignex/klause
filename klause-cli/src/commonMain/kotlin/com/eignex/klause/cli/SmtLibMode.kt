@@ -90,11 +90,13 @@ internal object SmtLibMode : CliMode {
 internal fun renderModel(ints: Map<String, Int>, bools: Map<String, Int>, reals: Map<String, Int>, s: Sample): String =
     buildString {
         append("(\n")
-        for ((name, id) in ints) append("  (define-fun $name () Int ${s.ints[id]})\n")
+        for ((name, id) in ints) append("  (define-fun $name () Int ${smtInteger(s.ints[id].toString())})\n")
         for ((name, id) in bools) append("  (define-fun $name () Bool ${s.bools[id]})\n")
+        val exactReals = if (reals.isEmpty()) emptyList() else requireNotNull(s.exactReals) {
+            "SMT model has no certified real values"
+        }
         for ((name, id) in reals) {
-            val v = if (id < s.reals.size) s.reals[id] else 0.0
-            append("  (define-fun $name () Real $v)\n")
+            append("  (define-fun $name () Real ${smtReal(exactReals[id].toString())})\n")
         }
         append(")")
     }
@@ -107,10 +109,25 @@ internal fun renderOpenTheoryModel(
     assignment: OpenTheoryAssignment,
 ): String = buildString {
     append("(\n")
-    for ((name, id) in ints) append("  (define-fun $name () Int ${assignment.intValue(id)})\n")
+    for ((name, id) in ints) append("  (define-fun $name () Int ${smtInteger(assignment.intValue(id))})\n")
     for ((name, id) in bools) append("  (define-fun $name () Bool ${assignment.boolValue(id)})\n")
-    for ((name, id) in reals) append("  (define-fun $name () Real ${assignment.realValue(id)})\n")
+    for ((name, id) in reals) append("  (define-fun $name () Real ${smtReal(assignment.realValue(id))})\n")
     append(")")
+}
+
+private fun smtInteger(value: String): String =
+    if (value.startsWith('-')) "(- ${value.drop(1)})" else value
+
+private fun smtReal(value: String): String {
+    val negative = value.startsWith('-')
+    val magnitude = if (negative) value.drop(1) else value
+    val parts = magnitude.split('/')
+    require(parts.size in 1..2 && parts.all { it.isNotEmpty() && it.all { c -> c.isDigit() || c == '.' } }) {
+        "invalid exact real value: $value"
+    }
+    val realParts = parts.map { if ('.' in it) it else "$it.0" }
+    val term = if (realParts.size == 1) realParts[0] else "(/ ${realParts[0]} ${realParts[1]})"
+    return if (negative) "(- $term)" else term
 }
 
 /** SMT-LIB output protocol: `sat`/`unsat`/`unknown` + the buffered model on sat. */
