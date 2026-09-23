@@ -347,13 +347,13 @@ enum class PresolvePass(
     ELIMINATE_BOOL_VARS(
         "bve",
         Stage.PROBLEM,
-        Capability.FINITE,
+        Capability.SOURCE,
         PresolveTiming.EXHAUSTIVE,
         preservesSolutionSet = false,
         autoEligible = true,
     ) {
-        override fun applyFinite(problem: BakedProblem, ctx: PresolveContext) =
-            Presolve.eliminateBoolVars(problem, ctx.objectiveBoolVars, ctx.cancellation)
+        override fun applySource(problem: Problem, ctx: PresolveContext) =
+            Presolve.eliminateSourceBoolVars(problem, ctx.objectiveBoolVars, ctx.cancellation)
     },
 
     /** Blocked-clause elimination over the pure-SAT part: drop a clause blocked on an eligible

@@ -192,6 +192,13 @@ object Presolve {
         cancellation: Cancellation = Cancellation.Never,
     ): PassDelta = BoundedVariableElimination.eliminate(problem, objectiveBoolVars, cancellation)
 
+    /** Bounded variable elimination over a canonical source model. See [BoundedVariableElimination]. */
+    internal fun eliminateSourceBoolVars(
+        problem: Problem,
+        objectiveBoolVars: Set<Int>,
+        cancellation: Cancellation,
+    ): SourceDelta = BoundedVariableElimination.eliminateSource(problem, objectiveBoolVars, cancellation)
+
     /** Blocked-clause elimination over the pure-SAT part. See [BlockedClauseElimination]. */
     fun eliminateBlockedClauses(
         problem: Problem,

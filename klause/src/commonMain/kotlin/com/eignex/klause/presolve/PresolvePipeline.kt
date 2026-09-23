@@ -78,6 +78,7 @@ object PresolvePipeline {
             infeasible = presolved.infeasible,
             objective = refit(linearObjective, presolved.problem),
             passesFired = presolved.passesFired,
+            rebuild = presolved.rebuild,
             budget = presolveBudget,
         )
     }
@@ -208,6 +209,9 @@ object PresolvePipeline {
         val seeded = RootBaker.reseed(baked, bakeConfig)
         val bakeElapsed = bakeStart.elapsedNow()
         val reconstructs = ArrayList<(Sample) -> Sample>() // in application order
+        // The source phase ran before every round below, so its columns are recovered after theirs — first
+        // in application order is last through the fold.
+        prepared.rebuild.asSampleLift()?.let(reconstructs::add)
         val firedPasses = LinkedHashSet<String>() // pass ids that fired, across all rounds, in first-fire order
         prepared.passesFired.forEach { firedPasses.add(it.id) }
         // Pseudo-Boolean lane substitution: a `{0, 1}` integer column becomes a Boolean literal and the rows

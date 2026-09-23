@@ -290,8 +290,14 @@ class OpenTheoryEngine internal constructor(
                 branching as? SearchRunObserver ?: SearchRunObserver.None,
             )
             return when (result) {
+                // The witness is of the prepared model, so the columns preparation eliminated are
+                // recovered before it leaves this route. Boolean ids are the source model's throughout —
+                // a source pass leaves an eliminated column in place rather than renumbering.
                 is SearchResult.Satisfied -> OpenTheoryResult.Sat(
-                    assignment(result.model, checkNotNull(planned.theory), route),
+                    prepared.rebuild.lift(
+                        assignment(result.model, checkNotNull(planned.theory), route),
+                        prepared.source.numBoolVars,
+                    ),
                     stats.finish(state, planned.session),
                 )
 

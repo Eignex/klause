@@ -83,6 +83,9 @@ object Presolver {
         val host = object : PresolveRoundEngine.RoundHost {
             var current = problem
 
+            // In the order the passes fired, which is the order [BoolRebuilds.compose] reverses.
+            val rebuilds = ArrayList<BoolRebuilds>()
+
             override fun runPass(pass: PresolvePass, slice: Cancellation?): PassOutcome {
                 val delta = pass.applySource(current, slice?.let(ctx::withCancellation) ?: ctx)
                 if (delta.infeasible) return PassOutcome.INFEASIBLE
@@ -90,6 +93,7 @@ object Presolver {
                 // A proved range can empty a column whose declaration it intersects, which refutes the
                 // model even though the pass itself only claimed a bound.
                 current = current.withSourcePassDelta(delta) ?: return PassOutcome.INFEASIBLE
+                if (!delta.rebuild.isEmpty) rebuilds.add(delta.rebuild)
                 return PassOutcome.CHANGED
             }
 
@@ -102,7 +106,7 @@ object Presolver {
             ctx.presolveBudget,
             host,
         )
-        return SourcePresolved(host.current, rounds.fired, rounds.infeasible)
+        return SourcePresolved(host.current, rounds.fired, rounds.infeasible, BoolRebuilds.compose(host.rebuilds))
     }
 
     /** Apply [config]'s passes to [problem] under [context], returning the transformed problem and a
