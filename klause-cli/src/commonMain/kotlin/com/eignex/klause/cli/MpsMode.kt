@@ -160,8 +160,7 @@ internal class MpsOutput(
     override fun formatObjective(objective: Long): String =
         sourceWitness()?.let { exactMpsNumber(it.objective) } ?: scaledDecimal(objective, objectiveScale)
 
-    /** The solver value is on [objectiveScale] like the integral one, so undo the scale and print the
-     *  decimal the source states. */
+    /** Print the checked source objective when available; otherwise undo the solver's scale. */
     override fun formatContinuousObjective(objective: Double): String =
         sourceWitness()?.let { exactMpsNumber(it.objective) } ?: scaledDecimal(objective, objectiveScale)
 
@@ -195,9 +194,9 @@ internal class MpsOutput(
     override fun verdictReason(verdict: Verdict): String? {
         val approximation = objectiveErrorBound?.let {
             if (verdict == Verdict.OPTIMAL && !hasInnerConstraintApproximation) {
-                "objective approximation error <= $it; retained objective is optimal"
+                "objective approximation error <= $it (retained versus source); retained objective is optimal"
             } else {
-                "objective approximation error <= $it"
+                "objective approximation error <= $it (retained versus source)"
             }
         }
         val constraintQualification = if (hasInnerConstraintApproximation) {
@@ -219,7 +218,7 @@ internal class MpsOutput(
     }
 }
 
-/** Print terminating rationals as exact decimals and other rationals as reduced fractions. */
+/** Print terminating rationals within 64 decimal places as decimals, and others as fractions. */
 private fun exactMpsNumber(value: BigFraction): String {
     val negative = value.signum() < 0
     val magnitude = if (negative) -value.num else value.num
