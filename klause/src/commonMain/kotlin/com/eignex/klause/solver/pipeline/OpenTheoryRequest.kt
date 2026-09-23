@@ -109,6 +109,10 @@ object OpenTheoryPipeline {
      * For a caller inspecting or A/B-comparing a presolve configuration. On an open model this phase is
      * the only reduction that runs before a route is chosen, and its effect on the open sides is what
      * decides how much the theory is left to do — neither of which a solving run reports.
+     *
+     * Inspection only: a pass may resolve a Boolean column away and leave it unconstrained, and the
+     * reconstruction that recovers it stays with the preparation rather than travelling on the model. A
+     * caller that wants a witness runs [execute], which lifts one before it leaves the route.
      */
     fun prepare(request: OpenTheoryRequest): OpenPreparation {
         val source = request.model.prepareOpenSource(

@@ -25,8 +25,25 @@ sealed interface OpenPresolveResult {
      *
      * @property spec the same model over tighter bounds; every other part of it is carried through.
      * @property closedSides how many open sides the phase proved a bound for.
+     * @property rebuild recovers the Boolean columns the phase eliminated, empty when it eliminated none.
      */
-    class Tightened(val spec: Problem, val closedSides: Int) : OpenPresolveResult
+    class Tightened internal constructor(val spec: Problem, val closedSides: Int, internal val rebuild: BoolRebuilds) :
+        OpenPresolveResult {
+        /** A closing that eliminated no column, so a witness of [spec] is already one of the input. */
+        constructor(spec: Problem, closedSides: Int) : this(spec, closedSides, BoolRebuilds.NONE)
+
+        /**
+         * Recover into [bools] the Boolean columns the phase eliminated.
+         *
+         * A factor pass may resolve a Boolean away and leave its column unconstrained in [spec], so a
+         * witness of [spec] is a witness of the input only once this has run over it. [bools] holds the
+         * witness indexed by the input model's Boolean ids — the phase leaves an eliminated column in
+         * place rather than renumbering — and is written in place.
+         */
+        fun rebuildEliminatedBooleans(bools: BooleanArray) {
+            rebuild.rebuildInto(bools)
+        }
+    }
 
     /**
      * The model has no solution.
@@ -53,6 +70,10 @@ sealed interface OpenPresolveResult {
  *    its coefficients happen to land on here.
  *  - Enumerating or counting needs [solutionSetSensitive], which holds every non-preserving pass back.
  *
+ * A pass may also resolve a Boolean column away and leave it unconstrained, so a witness of the result
+ * is a witness of this model only after [OpenPresolveResult.Tightened.rebuildEliminatedBooleans] has run
+ * over it.
+ *
  * [config] selects the passes, [cancellation] and [budget] bound them.
  */
 fun Problem.presolveOpen(
@@ -72,7 +93,12 @@ fun Problem.presolveOpen(
         budget,
     )
     if (source.infeasible) return OpenPresolveResult.Refuted
-    return source.problem.closeOpenBounds(preparationCancellation)
+    return when (val closed = source.problem.closeOpenBounds(preparationCancellation)) {
+        OpenPresolveResult.Refuted -> closed
+
+        is OpenPresolveResult.Tightened ->
+            OpenPresolveResult.Tightened(closed.spec, closed.closedSides, source.rebuild)
+    }
 }
 
 /**
