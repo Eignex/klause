@@ -95,6 +95,10 @@ sealed interface OpenTheoryAssignment {
  * The open lane's half of the reconstruction: the steps are stated once, in the presolve layer, and each
  * lane reads its own witness into the `BooleanArray` they evaluate over. A witness answers by accessor
  * and cannot be written through, so the recovered values ride along in a wrapper rather than in place.
+ *
+ * [numBoolVars] counts the columns before the elimination, and [assignment] is asked for every one of
+ * them — including the eliminated ones, which a pass leaves in place and unconstrained. A pass that
+ * renumbered the Boolean space instead would put an id past the end of the witness it produced.
  */
 internal fun BoolRebuilds.lift(assignment: OpenTheoryAssignment, numBoolVars: Int): OpenTheoryAssignment {
     if (isEmpty) return assignment

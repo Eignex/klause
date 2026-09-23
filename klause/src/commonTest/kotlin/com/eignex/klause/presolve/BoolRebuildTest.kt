@@ -5,7 +5,6 @@ import com.eignex.klause.solver.Sample
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
-import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 /**
@@ -85,24 +84,33 @@ class BoolRebuildTest {
     @Test
     fun `composition recovers the later elimination first`() {
         // x0 copies x1, and x1 copies x2. The pass that eliminated x1 ran second, so its column has to be
-        // recovered before the step that reads it — otherwise x0 takes a value x1 did not have yet.
+        // recovered before the step that reads it — otherwise x0 takes a value x1 did not have yet. The
+        // list is in the order the passes ran, so this also pins which end of it recovers first.
         val first = BoolRebuilds(listOf(BoolRebuild.CopyLiteral(variable = 0, source = pos(1))))
         val second = BoolRebuilds(listOf(BoolRebuild.CopyLiteral(variable = 1, source = pos(2))))
         val values = bools(false, false, true)
 
-        first.andThen(second).rebuildInto(values)
+        BoolRebuilds.compose(listOf(first, second)).rebuildInto(values)
 
         assertTrue(values[1], "the later elimination is recovered first")
         assertTrue(values[0], "so the earlier one reads its recovered value")
     }
 
     @Test
-    fun `composing with an empty rebuild changes nothing`() {
-        val rebuild = BoolRebuilds(listOf(BoolRebuild.CopyLiteral(variable = 0, source = pos(1))))
-
-        assertSame(rebuild, rebuild.andThen(BoolRebuilds.NONE))
-        assertSame(rebuild, BoolRebuilds.NONE.andThen(rebuild))
+    fun `composing rebuilds that recover nothing recovers nothing`() {
+        assertTrue(BoolRebuilds.compose(emptyList()).isEmpty)
+        assertTrue(BoolRebuilds.compose(listOf(BoolRebuilds.NONE, BoolRebuilds.NONE)).isEmpty)
         assertTrue(BoolRebuilds.NONE.isEmpty)
+    }
+
+    @Test
+    fun `composing leaves a lone rebuild's steps in place`() {
+        val rebuild = BoolRebuilds(listOf(BoolRebuild.CopyLiteral(variable = 0, source = pos(1))))
+        val values = bools(false, true)
+
+        BoolRebuilds.compose(listOf(BoolRebuilds.NONE, rebuild, BoolRebuilds.NONE)).rebuildInto(values)
+
+        assertTrue(values[0])
     }
 
     @Test
