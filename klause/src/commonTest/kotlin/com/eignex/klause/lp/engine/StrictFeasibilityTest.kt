@@ -98,6 +98,37 @@ class StrictFeasibilityTest {
     }
 
     @Test
+    fun `a bounded strict correction returns a source witness within its pivot budget`() {
+        val zero = ExactLpNumber.of(0L)
+        val one = ExactLpNumber.of(1L)
+        val source = ExactLpModel(
+            listOf(listOf(ExactLpEntry(0, ExactLpNumber.of(3L)))),
+            listOf(one),
+            listOf(
+                ExactLpColumn(ExactLpBounds(ExactLpSide(zero, strict = true), ExactLpSide(one)), integral = false),
+                ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(zero)), integral = false),
+            ),
+            listOf(ExactLpRow()),
+            ExactLpObjective(listOf(zero, zero)),
+        )
+        val limits = LpRefinementLimits(maxPivots = 4)
+        LpScopedSolver(LpExactState(source)).use { owner ->
+            val result = refineLp(
+                assertNotNull(owner.state.toWorkingModel()),
+                LpRefinementRequest(owner, owner.refinementCache, limits),
+            )
+
+            assertEquals(
+                BigFraction.of(BigInteger.ONE, BigInteger.fromInt(3)),
+                assertNotNull(result.witness).primal.single(),
+            )
+            assertTrue(result.metrics.observedPivots > 0)
+            assertEquals(result.metrics.observedPivots, result.metrics.pivots)
+            assertTrue(owner.refinementCache.pivots <= limits.maxPivots)
+        }
+    }
+
+    @Test
     fun `strict rational admission respects the source bit budget`() {
         val zero = ExactLpNumber.of(0L)
         val tiny = ExactLpNumber.of(BigFraction.of(BigInteger.ONE, BigInteger.ONE shl 40))
@@ -212,6 +243,69 @@ class StrictFeasibilityTest {
             assertEquals(1, result.metrics.strictWitnesses)
             assertEquals(0, result.metrics.luFactories)
             assertEquals(0, result.metrics.rounds)
+        }
+    }
+
+    @Test
+    fun `a strict endpoint cannot be published as a source witness`() {
+        val zero = ExactLpNumber.of(0L)
+        val source = ExactLpModel(
+            listOf(emptyList()),
+            emptyList(),
+            listOf(
+                ExactLpColumn(
+                    ExactLpBounds(ExactLpSide(zero, strict = true), ExactLpSide(ExactLpNumber.of(1L))),
+                    integral = false,
+                ),
+            ),
+            emptyList(),
+            ExactLpObjective(listOf(zero)),
+        )
+        LpScopedSolver(LpExactState(source)).use { owner ->
+            val result = refineLp(
+                assertNotNull(owner.state.toWorkingModel()),
+                LpRefinementRequest(owner, owner.refinementCache, LpRefinementLimits(maxAuxiliaries = 0)),
+                witness = ExactLpWitness(listOf(BigFraction.ZERO), BigFraction.ZERO),
+            )
+
+            assertNull(result.witness)
+            assertEquals(LpRefinementDecline.CANDIDATE, result.metrics.decline)
+        }
+    }
+
+    @Test
+    fun `spent cumulative pivots prevent another strict child`() {
+        val zero = ExactLpNumber.of(0L)
+        val one = ExactLpNumber.of(1L)
+        val source = ExactLpModel(
+            listOf(listOf(ExactLpEntry(0, ExactLpNumber.of(3L)))),
+            listOf(one),
+            listOf(
+                ExactLpColumn(
+                    ExactLpBounds(ExactLpSide(zero, strict = true), ExactLpSide(one)),
+                    integral = false,
+                ),
+                ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(zero)), integral = false),
+            ),
+            listOf(ExactLpRow()),
+            ExactLpObjective(listOf(zero, zero)),
+        )
+        LpScopedSolver(LpExactState(source)).use { owner ->
+            val first = refineLp(
+                assertNotNull(owner.state.toWorkingModel()),
+                LpRefinementRequest(owner, owner.refinementCache, LpRefinementLimits(maxPivots = 4)),
+            )
+            val spent = first.metrics.pivots
+            assertTrue(spent > 0)
+            assertTrue(spent < 4)
+            val result = refineLp(
+                assertNotNull(owner.state.toWorkingModel()),
+                LpRefinementRequest(owner, owner.refinementCache, LpRefinementLimits(maxPivots = spent)),
+            )
+
+            assertNull(result.witness)
+            assertEquals(LpRefinementDecline.PIVOTS, result.metrics.decline)
+            assertEquals(spent, owner.refinementCache.pivots)
         }
     }
 
@@ -437,51 +531,58 @@ class StrictFeasibilityTest {
             emptyList(),
             ExactLpObjective(listOf(zero)),
         )
-        var fail = true
-        val factory = object : LpEngineFactory by ProductionLpEngineFactory {
-            override fun newPersistentSolver(
-                model: LpModel,
-                cancellation: Cancellation,
-                refactorUpdateLimit: Int,
-                iterationLimit: Int,
-                workLimit: Long,
-                trackDegeneracy: Boolean,
-                pricing: LpPricingOptions,
-            ): PersistentLpSolver {
-                val engine = ProductionLpEngineFactory.newPersistentSolver(
-                    model,
-                    cancellation,
-                    refactorUpdateLimit,
-                    iterationLimit,
-                    workLimit,
-                    trackDegeneracy,
-                    pricing,
-                )
-                return object : PersistentLpSolver by engine {
-                    override fun resolveBounds(allowance: LpFloatAllowance?): FloatLpResult? {
-                        if (fail) error("injected auxiliary failure")
-                        return engine.resolveBounds(allowance)
+        for (failAfterSolve in listOf(false, true)) {
+            var fail = true
+            val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+                override fun newPersistentSolver(
+                    model: LpModel,
+                    cancellation: Cancellation,
+                    refactorUpdateLimit: Int,
+                    iterationLimit: Int,
+                    workLimit: Long,
+                    trackDegeneracy: Boolean,
+                    pricing: LpPricingOptions,
+                ): PersistentLpSolver {
+                    val engine = ProductionLpEngineFactory.newPersistentSolver(
+                        model,
+                        cancellation,
+                        refactorUpdateLimit,
+                        iterationLimit,
+                        workLimit,
+                        trackDegeneracy,
+                        pricing,
+                    )
+                    return object : PersistentLpSolver by engine {
+                        override fun resolveBounds(allowance: LpFloatAllowance?): FloatLpResult? {
+                            if (fail && !failAfterSolve) error("injected auxiliary failure")
+                            val result = engine.resolveBounds(allowance)
+                            if (fail) error("injected auxiliary failure")
+                            return result
+                        }
                     }
                 }
             }
-        }
-        LpScopedSolver(LpExactState(source), context = LpSolveContext(engineFactory = factory)).use { owner ->
-            assertFailsWith<IllegalStateException> {
-                refineLp(
-                    assertNotNull(owner.state.toWorkingModel()),
-                    LpRefinementRequest(owner, owner.refinementCache, LpRefinementLimits()),
-                )
-            }
-            val spent = owner.refinementCache.work
-            assertTrue(spent > 0L)
-            val closed = assertNotNull(owner.lastWorkingMetrics).owners
-            assertEquals(1L, closed.createdOwners)
-            assertEquals(0L, closed.currentOwners)
-            owner.requireAvailable()
-            fail = false
+            LpScopedSolver(LpExactState(source), context = LpSolveContext(engineFactory = factory)).use { owner ->
+                assertFailsWith<IllegalStateException> {
+                    refineLp(
+                        assertNotNull(owner.state.toWorkingModel()),
+                        LpRefinementRequest(owner, owner.refinementCache, LpRefinementLimits()),
+                    )
+                }
+                val spent = owner.refinementCache.work
+                assertTrue(spent > 0L)
+                val observed = owner.refinementCache.lastMetrics.observedPivots
+                if (failAfterSolve) assertTrue(observed > 0)
+                assertEquals(observed, owner.refinementCache.pivots)
+                val closed = assertNotNull(owner.lastWorkingMetrics).owners
+                assertEquals(1L, closed.createdOwners)
+                assertEquals(0L, closed.currentOwners)
+                owner.requireAvailable()
+                fail = false
 
-            assertNotNull(owner.solve(refinementLimits = LpRefinementLimits(maxWork = 2_000_000))?.witness)
-            assertTrue(owner.refinementCache.work > spent)
+                assertNotNull(owner.solve(refinementLimits = LpRefinementLimits(maxWork = 2_000_000))?.witness)
+                assertTrue(owner.refinementCache.work > spent)
+            }
         }
     }
 }
