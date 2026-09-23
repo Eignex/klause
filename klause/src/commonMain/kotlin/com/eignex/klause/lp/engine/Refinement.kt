@@ -716,8 +716,6 @@ private class RefinementRun(
     ): Pair<LpSolver, FloatLpResult?>? {
         val before = scope.metrics
         val allowance = if (first) firstAllowance else meter.allowance(false)
-        // prepareLogicals performs no simplex pivots; reserve its full ceiling conservatively.
-        if (first) meter.completed(0L, pivots = firstAllowance.iterations)
         return try {
             scope.solveFloat(warm, if (warm != null) null else allowance)
         } finally {

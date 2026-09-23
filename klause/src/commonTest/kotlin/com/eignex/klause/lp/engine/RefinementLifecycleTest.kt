@@ -161,6 +161,94 @@ class RefinementLifecycleTest {
     }
 
     @Test
+    fun `a stale source state cannot publish a refinement proof`() {
+        val builder = LpBuilder()
+        builder.addRealVar(0.0, 2.0)
+        val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+        LpScopedSolver(state).use { owner ->
+            assertTrue(owner.assertBound(0, false, ExactLpSide(ExactLpNumber.of(1L)), 7L))
+            val result = refineLp(
+                assertNotNull(state.toWorkingModel()),
+                LpRefinementRequest(owner, owner.refinementCache, LpRefinementLimits()),
+            )
+
+            assertEquals(LpRefinementDecline.AUTHORITY, result.metrics.decline)
+            assertNull(result.witness)
+            assertNull(result.bound)
+            assertNull(result.conflict)
+            assertTrue(owner.state !== state)
+        }
+    }
+
+    @Test
+    fun `singular source basis is rejected as a candidate`() {
+        val zero = ExactLpNumber.of(0L)
+        val state = LpExactState(
+            ExactLpModel(
+                listOf(emptyList()),
+                listOf(zero),
+                listOf(
+                    ExactLpColumn(ExactLpBounds(ExactLpSide(zero, strict = true)), integral = false),
+                    ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(zero)), integral = false),
+                ),
+                listOf(ExactLpRow()),
+                ExactLpObjective(listOf(zero, zero)),
+            ),
+        )
+        val basis = Basis(intArrayOf(0), arrayOf(VarStatus.BASIC, VarStatus.FIXED))
+        LpScopedSolver(state).use { owner ->
+            val result = refineLp(
+                assertNotNull(state.toWorkingModel()),
+                LpRefinementRequest(owner, owner.refinementCache, LpRefinementLimits()),
+                basis = basis,
+                preferBasis = true,
+            )
+
+            assertEquals(LpRefinementDecline.CANDIDATE, result.metrics.decline)
+            assertNotNull(result.sourceSingularBasis)
+            assertNull(result.witness)
+        }
+    }
+
+    @Test
+    fun `work exhaustion during source basis verification stays a resource decline`() {
+        val zero = ExactLpNumber.of(0L)
+        val state = LpExactState(
+            ExactLpModel(
+                listOf(emptyList()),
+                listOf(zero),
+                listOf(
+                    ExactLpColumn(ExactLpBounds(ExactLpSide(zero, strict = true)), integral = false),
+                    ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(zero)), integral = false),
+                ),
+                listOf(ExactLpRow()),
+                ExactLpObjective(listOf(zero, zero)),
+            ),
+        )
+        val basis = Basis(intArrayOf(0), arrayOf(VarStatus.BASIC, VarStatus.FIXED))
+        var basisDecline: ExactBasisDecline? = null
+        LpScopedSolver(state).use { owner ->
+            val result = refineLp(
+                assertNotNull(state.toWorkingModel()),
+                LpRefinementRequest(
+                    owner,
+                    owner.refinementCache,
+                    LpRefinementLimits(maxWork = 54),
+                    onBasisVerification = { basisDecline = it.decline },
+                ),
+                basis = basis,
+                preferBasis = true,
+            )
+
+            assertEquals(ExactBasisDecline.WORK, basisDecline)
+            assertEquals(LpRefinementDecline.WORK, result.metrics.decline)
+            assertTrue(result.metrics.luFactories > 0)
+            assertNull(result.sourceSingularBasis)
+            assertNull(result.witness)
+        }
+    }
+
+    @Test
     fun `a preferred source basis certifies attainment without a correction child`() {
         val builder = LpBuilder()
         val x = builder.addRealVar(0.0, 2.0, cost = 1.0)
