@@ -132,11 +132,15 @@ class CpLpAdapterTest {
             assertEquals(9.0, tightened.objective)
 
             var strongerCounterexample = false
-            for (x in 2L..7L) for (y in 2L..7L) for (z in 2L..7L) {
-                if (x == y || x == z || y == z) continue
-                val lhs = sourceCoefficients[0] * x + sourceCoefficients[1] * y + sourceCoefficients[2] * z
-                assertTrue(lhs >= sourceThreshold)
-                if (lhs < sourceThreshold + 1) strongerCounterexample = true
+            for (x in 2L..7L) {
+                for (y in 2L..7L) {
+                    for (z in 2L..7L) {
+                        if (x == y || x == z || y == z) continue
+                        val lhs = sourceCoefficients[0] * x + sourceCoefficients[1] * y + sourceCoefficients[2] * z
+                        assertTrue(lhs >= sourceThreshold)
+                        if (lhs < sourceThreshold + 1) strongerCounterexample = true
+                    }
+                }
             }
             assertTrue(strongerCounterexample)
         }
@@ -181,18 +185,25 @@ class CpLpAdapterTest {
             assertEquals(local.model.m + 1, localApplied.model.m)
             assertFalse(localApplied.model.rowGlobal.last())
             assertTrue(localApplied.model.rowPremises.last() == null)
-            assertEquals(12.0, assertNotNull(engine.solveNode(localApplied.model, null, Cancellation.Never)?.second).objective)
+            assertEquals(
+                12.0,
+                assertNotNull(engine.solveNode(localApplied.model, null, Cancellation.Never)?.second).objective,
+            )
 
             var missingGuardCounterexample = false
             var strongerCounterexample = false
-            for (x in 0L..5L) for (y in 0L..5L) for (z in 0L..5L) {
-                if (x == y || x == z || y == z || y < 3 || z < 3) continue
-                val sum = x + y + z
-                if (x >= 3) {
-                    assertTrue(sum >= emitted.rhs)
-                    if (sum < emitted.rhs + 1) strongerCounterexample = true
-                } else if (sum < emitted.rhs) {
-                    missingGuardCounterexample = true
+            for (x in 0L..5L) {
+                for (y in 0L..5L) {
+                    for (z in 0L..5L) {
+                        if (x == y || x == z || y == z || y < 3 || z < 3) continue
+                        val sum = x + y + z
+                        if (x >= 3) {
+                            assertTrue(sum >= emitted.rhs)
+                            if (sum < emitted.rhs + 1) strongerCounterexample = true
+                        } else if (sum < emitted.rhs) {
+                            missingGuardCounterexample = true
+                        }
+                    }
                 }
             }
             assertTrue(missingGuardCounterexample)
@@ -203,7 +214,10 @@ class CpLpAdapterTest {
             val sibling = engine.nodeRelaxation(relaxer, cp.session)
             assertTrue(engine.cutPool.cuts().isEmpty())
             assertEquals(0, sibling.model.m)
-            assertEquals(6.0, assertNotNull(engine.solveNode(sibling.model, null, Cancellation.Never)?.second).objective)
+            assertEquals(
+                6.0,
+                assertNotNull(engine.solveNode(sibling.model, null, Cancellation.Never)?.second).objective,
+            )
         }
     }
 
