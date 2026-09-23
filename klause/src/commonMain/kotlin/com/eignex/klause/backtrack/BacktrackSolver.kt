@@ -97,8 +97,11 @@ class BacktrackSolver internal constructor(
         )
         return object : RepairSearch {
             override fun repair(assumptions: Assumptions, decisionBudget: Long, cutoff: Double): Sample? {
-                activeCutoff = cutoff
                 try {
+                    require(!cutoff.isNaN() && cutoff <= activeCutoff) {
+                        "repair objective cutoff must be non-increasing"
+                    }
+                    activeCutoff = cutoff
                     handle.rebind(assumptions, decisionBudget)
                     var best: Sample? = null
                     while (!handle.isDone) {

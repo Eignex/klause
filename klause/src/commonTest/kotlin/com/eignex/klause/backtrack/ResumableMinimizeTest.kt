@@ -113,6 +113,77 @@ internal class UnresolvedRealLeafFixture(val withIncumbent: Boolean) {
 
 class ResumableMinimizeTest {
     @Test
+    fun `rebind can prove the same optimum after an exhausted fragment`() {
+        val objective = LinearObjective(boolWeights = longArrayOf(-1L))
+        val solver = BacktrackSolver(Problem(1, 0, emptyArray(), emptyArray()).bake())
+
+        ResumableMinimize(solver, objective, BacktrackParams(), pausable = false, rebindable = true).use { search ->
+            repeat(3) {
+                if (it > 0) search.rebind(Assumptions.None, 100L)
+                val result = assertIs<MinimizeResult.Optimal>(
+                    search.runSlice(Cancellation.Never, 1000L, 100L) {},
+                )
+                assertEquals(-1.0, result.objective)
+            }
+        }
+    }
+
+    @Test
+    fun `rebind preserves a restricted optimum after LP bounding`() {
+        val weights = intArrayOf(6, 7, 2, 3, 5, 9, 4, 3, 4)
+        val profits = longArrayOf(7, 5, 4, 3, 8, 6, 5, 8, 6)
+        val problem = Problem(
+            0,
+            weights.size,
+            Array(weights.size) { IntDomain(0, 1) },
+            arrayOf(Linear(weights.copyOf(), IntArray(weights.size) { it }, LinearOp.LE, 25)),
+        ).bake()
+        val objective = LinearObjective(intCoefficients = LongArray(profits.size) { -profits[it] })
+        val params = BacktrackParams(
+            randomSeed = 62L,
+            lubyRestartBase = 1,
+            lpPlan = LpPlan(bounding = true, boundEvery = 1),
+        )
+
+        ResumableMinimize(BacktrackSolver(problem), objective, params, rebindable = true).use { search ->
+            val initial = assertIs<MinimizeResult.Optimal>(
+                search.runSlice(Cancellation.Never, 1000L, 100000L) {},
+            )
+            assertEquals(-38.0, initial.objective)
+
+            search.rebind(Assumptions.None.withInt(0, 0), 100000L)
+            val restricted = assertIs<MinimizeResult.Optimal>(
+                search.runSlice(Cancellation.Never, 1000L, 100000L) {},
+            )
+            assertEquals(-36.0, restricted.objective)
+            assertEquals(0L, restricted.sample.ints[0])
+            assertTrue(weights.indices.sumOf { weights[it] * restricted.sample.ints[it] } <= 25L)
+            assertEquals(-36L, objective.evaluateLong(restricted.sample))
+        }
+    }
+
+    @Test
+    fun `rebind clears an indeterminate verdict after a resolved fragment`() {
+        val fixture = UnresolvedRealLeafFixture(false)
+        fixture.acceptProof = { _, _ -> false }
+
+        ResumableMinimize(fixture.solver, fixture.objective, fixture.params, rebindable = true).use { search ->
+            val first = assertIs<MinimizeResult.Unknown>(
+                search.runSlice(Cancellation.Never, 1000L, 100L) {},
+            )
+            assertEquals(TerminationReason.Unsupported, first.reason)
+
+            fixture.acceptProof = { _, _ -> true }
+            search.rebind(Assumptions.None, 100L)
+            val second = assertIs<MinimizeResult.Optimal>(
+                search.runSlice(Cancellation.Never, 1000L, 100L) {},
+            )
+            assertEquals(0.5, second.objective)
+        }
+        assertEquals(fixture.opened, fixture.closed)
+    }
+
+    @Test
     fun `constant real leaf completion requires its independently accepted bound`() {
         for (acceptBound in listOf(false, true)) {
             val fixture = UnresolvedRealLeafFixture(false)
@@ -278,12 +349,11 @@ class ResumableMinimizeTest {
             search.rebind(Assumptions.None.withInt(0, 1L), 256L)
             fixture.acceptProof = { _, _ -> true }
             val offered = ArrayList<Double>()
-            val result = assertIs<MinimizeResult.BestFound>(
+            val result = assertIs<MinimizeResult.Optimal>(
                 search.runSlice(Cancellation.Never, 1000L, 256L) {
                     offered += it.objectiveValue
                 },
             )
-            assertEquals(TerminationReason.Unsupported, result.reason)
             assertEquals(listOf(0.5), offered)
             assertEquals(1L, result.sample.ints.single())
             assertEquals(0.5, result.sample.reals.single())
