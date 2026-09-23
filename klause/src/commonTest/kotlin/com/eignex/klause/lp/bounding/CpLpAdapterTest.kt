@@ -7,6 +7,8 @@ import com.eignex.klause.factor.table.Table
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.lp.cut.AllDifferentSeparator
+import com.eignex.klause.lp.cut.CutContext
 import com.eignex.klause.lp.cut.SourceCut
 import com.eignex.klause.lp.cut.orNull
 import com.eignex.klause.lp.engine.Cut
@@ -55,6 +57,201 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class CpLpAdapterTest {
+    @Test
+    fun `generated Hall cut survives pool remapping as an exact source row`() {
+        val problem = Problem(
+            0,
+            3,
+            Array(3) { IntDomain(2, 7) },
+            arrayOf(AllDifferent(intArrayOf(0, 1, 2), domainMin = 2, domainSize = 6)),
+        )
+        LpEngine(
+            problem,
+            LinearObjective(intCoefficients = longArrayOf(1, 1, 1)),
+            LpParams(lpPlan = LpPlan(bounding = true, cuts = true)),
+            SolveStatsSink(backend = "generated-hall"),
+        ).use { engine ->
+            val cp = CpSearchComponent(PropagationSession(problem))
+            engine.cpAdapter.attach(cp.session, feasibility = false)
+            val search = SearchSession(listOf(cp, engine.propagator))
+            search.initialize()
+            val relaxer = assertNotNull(engine.lpRelaxer)
+            val root = engine.nodeRelaxation(relaxer, cp.session)
+            assertEquals(0, root.model.m)
+            val rootResult = assertNotNull(engine.solveNode(root.model, null, Cancellation.Never)?.second)
+            assertEquals(6.0, rootResult.objective)
+            val emitted = AllDifferentSeparator()
+                .separate(CutContext(problem, root, rootResult.primal, cp.session))
+                .single { it.rel == Relation.GE }
+            assertTrue(emitted.global)
+            assertContentEquals(intArrayOf(0, 1, 2).map { root.intColOf[it] }.toIntArray(), emitted.cols)
+            assertContentEquals(longArrayOf(1, 1, 1), emitted.coeffs)
+            assertEquals(9L, emitted.rhs)
+            assertTrue(emitted.provenance == null)
+            val harvested = engine.harvestRootCuts(
+                relaxer,
+                cp.session,
+                listOf(AllDifferentSeparator()),
+                gomory = false,
+                mir = false,
+            )
+            assertTrue(harvested.any { it.global && it.rel == emitted.rel && it.rhs == emitted.rhs })
+            engine.recordSearchCuts(listOf(emitted), rootResult.primal, root, cp.session)
+            assertEquals(1, engine.cutPool.size)
+
+            search.push(SearchDecision.IntAtLeast(0, 4))
+            val node = engine.nodeRelaxation(relaxer, cp.session)
+            val consumed = engine.cutPool.cuts().single()
+            assertTrue(consumed.global)
+            assertContentEquals(emitted.cols, consumed.cols)
+            assertContentEquals(emitted.coeffs, consumed.coeffs)
+            assertEquals(emitted.rhs, consumed.rhs)
+            val baseResult = assertNotNull(engine.solveNode(node.model, null, Cancellation.Never)?.second)
+            assertEquals(8.0, baseResult.objective)
+            val applied = relaxer.build(cp.session, listOf(consumed))
+            assertEquals(node.model.m + 1, applied.model.m)
+            assertContentEquals(intArrayOf(0, 1, 2), IntArray(3) { applied.intColOf[it] })
+            val row = applied.model.m - 1
+            val coefficients = LongArray(applied.model.n)
+            for (column in coefficients.indices) {
+                applied.model.forEachInColumn(column) { index, value ->
+                    if (index == row) coefficients[column] = value
+                }
+            }
+            val sourceCoefficients = coefficients.map { -it }.toLongArray()
+            val sourceThreshold = -applied.model.rhs[row] -
+                coefficients.indices.sumOf { coefficients[it] * applied.model.loShift[it] }
+            assertContentEquals(longArrayOf(1, 1, 1), sourceCoefficients)
+            assertEquals(9L, sourceThreshold)
+            assertContentEquals(longArrayOf(4, 2, 2), applied.model.loShift.copyOfRange(0, 3))
+            assertEquals(-1L, applied.model.rhs[row])
+            assertTrue(applied.model.rowGlobal[row])
+            assertTrue(!applied.model.hasUpper[applied.model.slackCol(row)])
+            assertTrue(applied.model.rowPremises[row] == null)
+            val tightened = assertNotNull(engine.solveNode(applied.model, null, Cancellation.Never)?.second)
+            assertEquals(9.0, tightened.objective)
+
+            var strongerCounterexample = false
+            for (x in 2L..7L) for (y in 2L..7L) for (z in 2L..7L) {
+                if (x == y || x == z || y == z) continue
+                val lhs = sourceCoefficients[0] * x + sourceCoefficients[1] * y + sourceCoefficients[2] * z
+                assertTrue(lhs >= sourceThreshold)
+                if (lhs < sourceThreshold + 1) strongerCounterexample = true
+            }
+            assertTrue(strongerCounterexample)
+        }
+    }
+
+    @Test
+    fun `generated local Hall cut declines pool reuse after its bound is withdrawn`() {
+        val problem = Problem(
+            0,
+            3,
+            Array(3) { IntDomain(0, 5) },
+            arrayOf(AllDifferent(intArrayOf(0, 1, 2), domainMin = 0, domainSize = 6)),
+        )
+        LpEngine(
+            problem,
+            LinearObjective(intCoefficients = longArrayOf(1, 1, 1)),
+            LpParams(lpPlan = LpPlan(bounding = true, cuts = true)),
+            SolveStatsSink(backend = "local-hall"),
+        ).use { engine ->
+            val cp = CpSearchComponent(PropagationSession(problem))
+            engine.cpAdapter.attach(cp.session, feasibility = false)
+            val search = SearchSession(listOf(cp, engine.propagator))
+            search.initialize()
+            search.push(SearchDecision.IntAtLeast(1, 3))
+            search.push(SearchDecision.IntAtLeast(2, 3))
+            search.push(SearchDecision.IntAtLeast(0, 3))
+            val relaxer = assertNotNull(engine.lpRelaxer)
+            val local = engine.nodeRelaxation(relaxer, cp.session)
+            assertEquals(0, local.model.m)
+            val base = assertNotNull(engine.solveNode(local.model, null, Cancellation.Never)?.second)
+            assertEquals(9.0, base.objective)
+            val emitted = AllDifferentSeparator()
+                .separate(CutContext(problem, local, base.primal, cp.session))
+                .single { it.rel == Relation.GE }
+            assertEquals(12L, emitted.rhs)
+            assertFalse(emitted.global)
+            assertTrue(emitted.provenance == null)
+            engine.recordSearchCuts(listOf(emitted), base.primal, local, cp.session)
+            assertTrue(engine.cutPool.cuts().isEmpty())
+            assertEquals(0, engine.cutPool.size)
+            val localApplied = relaxer.build(cp.session, listOf(emitted))
+            assertEquals(local.model.m + 1, localApplied.model.m)
+            assertFalse(localApplied.model.rowGlobal.last())
+            assertTrue(localApplied.model.rowPremises.last() == null)
+            assertEquals(12.0, assertNotNull(engine.solveNode(localApplied.model, null, Cancellation.Never)?.second).objective)
+
+            var missingGuardCounterexample = false
+            var strongerCounterexample = false
+            for (x in 0L..5L) for (y in 0L..5L) for (z in 0L..5L) {
+                if (x == y || x == z || y == z || y < 3 || z < 3) continue
+                val sum = x + y + z
+                if (x >= 3) {
+                    assertTrue(sum >= emitted.rhs)
+                    if (sum < emitted.rhs + 1) strongerCounterexample = true
+                } else if (sum < emitted.rhs) {
+                    missingGuardCounterexample = true
+                }
+            }
+            assertTrue(missingGuardCounterexample)
+            assertTrue(strongerCounterexample)
+
+            search.popTo(2)
+            search.push(SearchDecision.IntAtMost(0, 2))
+            val sibling = engine.nodeRelaxation(relaxer, cp.session)
+            assertTrue(engine.cutPool.cuts().isEmpty())
+            assertEquals(0, sibling.model.m)
+            assertEquals(6.0, assertNotNull(engine.solveNode(sibling.model, null, Cancellation.Never)?.second).objective)
+        }
+    }
+
+    @Test
+    fun `root harvest refuses a Hall cut based on an invented upper bound`() {
+        val problem = Problem(
+            0,
+            3,
+            Array(3) { IntDomain(0, 5) },
+            arrayOf(AllDifferent(intArrayOf(0, 1, 2), domainMin = 0, domainSize = 6)),
+            openIntHi = booleanArrayOf(true, false, false),
+        )
+        assertFalse(problem.intBounds.hasUpper(0))
+        val objective = LinearObjective(intCoefficients = longArrayOf(-1, -1, -1))
+        LpEngine(
+            problem,
+            objective,
+            LpParams(lpPlan = LpPlan(bounding = true, cuts = true)),
+            SolveStatsSink(backend = "open-hall"),
+        ).use { engine ->
+            val session = PropagationSession(problem)
+            val relaxer = assertNotNull(engine.lpRelaxer)
+            val relaxation = relaxer.build(session)
+            val emitted = AllDifferentSeparator()
+                .separate(CutContext(problem, relaxation, DoubleArray(relaxation.model.numVars) { 5.0 }, session))
+                .single { it.rel == Relation.LE }
+            assertEquals(12L, emitted.rhs)
+            assertFalse(emitted.global)
+            val originalSourceWitness = longArrayOf(6, 3, 4)
+            assertTrue(originalSourceWitness[0] >= problem.intBounds.lower(0))
+            assertTrue(originalSourceWitness[1] in problem.intBounds.lower(1)..problem.intBounds.upper(1))
+            assertTrue(originalSourceWitness[2] in problem.intBounds.lower(2)..problem.intBounds.upper(2))
+            assertTrue(originalSourceWitness.distinct().size == 3)
+            assertTrue(originalSourceWitness[0] + originalSourceWitness[1] + originalSourceWitness[2] > emitted.rhs)
+            val harvested = engine.harvestRootCuts(
+                relaxer,
+                session,
+                listOf(AllDifferentSeparator()),
+                gomory = false,
+                mir = false,
+            )
+            engine.cutPool.addAll(harvested)
+            assertTrue(harvested.none { it.global && it.rel == Relation.LE && it.rhs == emitted.rhs })
+            assertTrue(engine.lpGlobalCuts.isEmpty())
+            assertTrue(engine.cutPool.exportGlobalCuts().isEmpty())
+        }
+    }
+
     @Test
     fun `a shifted source row survives cut pool remapping`() {
         val problem = Problem(

@@ -997,9 +997,9 @@ internal fun LpEngine.rootLpObjective(
 /**
  * Harvest a persistent pool of **global** cuts from the root relaxation on the sparse
  * revised-simplex path. Each round solves the (cut-augmented) root LP, separates violated cuts from the
- * LP point, and keeps the fresh ones; because the separation reads the undecided root domains, every
- * harvested cut is valid at *every* solution of the problem, so it is forced [Cut.global] = true and
- * stays sound when applied at any node. Determinant overflow keeps whatever cuts stayed within 64 bits.
+ * LP point, and keeps the fresh ones whose source proof or separator scope is global. A root box may
+ * close a source-open side, so root separation alone does not make a cut global. Determinant overflow
+ * keeps whatever global cuts stayed within 64 bits.
  */
 @Suppress("LongParameterList", "TooGenericExceptionCaught") // root ownership must preserve arbitrary solver failures
 internal fun LpEngine.harvestRootCuts(
@@ -1033,8 +1033,7 @@ internal fun LpEngine.harvestRootCuts(
                 pool.observe(result.primal)
                 resultObserved = true
                 val ctx = CutContext(problem, relaxation, result.primal, session)
-                // Structural separators read the LP point and factor structure (not the constraint rows), so a
-                // cut they separate over the undecided root is valid at every solution — force it global.
+                // Keep only cuts justified beyond the root box; open source sides can have invented endpoints.
                 val structural = separators.flatMap { it.separate(ctx) }
                     .mapNotNull {
                         when {
@@ -1045,7 +1044,7 @@ internal fun LpEngine.harvestRootCuts(
 
                             it.global -> it
 
-                            else -> Cut(it.cols, it.coeffs, it.rel, it.rhs, global = true)
+                            else -> null
                         }
                     }
                 // Source mapping discharges every rounding bound and recursively retains parent premises.
