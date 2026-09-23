@@ -46,9 +46,11 @@ sealed interface OpenPresolveResult {
  * **State what the result is for.** Some source passes discard optimum-equivalent solutions, and what
  * they may discard depends on what the caller is about to do:
  *  - Deciding satisfiability needs nothing stated. Every reduction preserves it.
- *  - Optimizing needs [objective], in the minimize sense [LinearObjective] is written in. Dual fixing
- *    pins a column by the sign of its coefficient, so leaving this null makes every column cost nothing
- *    and pins it to whichever bound its rows allow — which is an optimum only by accident.
+ *  - Optimizing needs [objective], in the minimize sense [LinearObjective] is written in and indexed in
+ *    this model's own variable space. Dual fixing pins a column by the sign of its coefficient, so
+ *    leaving this null makes every column cost nothing and pins it to whichever bound its rows allow —
+ *    which is an optimum only by accident, and an objective built for a different model pins by whatever
+ *    its coefficients happen to land on here.
  *  - Enumerating or counting needs [solutionSetSensitive], which holds every non-preserving pass back.
  *
  * [config] selects the passes, [cancellation] and [budget] bound them.
