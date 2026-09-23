@@ -96,8 +96,8 @@ internal fun renderModel(ints: Map<String, Int>, bools: Map<String, Int>, reals:
             emptyList()
         } else {
             requireNotNull(s.exactReals) {
-            "SMT model has no certified real values"
-        }
+                "SMT model has no certified real values"
+            }
         }
         for ((name, id) in reals) {
             append("  (define-fun $name () Real ${smtReal(exactReals[id].toString())})\n")
