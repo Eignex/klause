@@ -6,6 +6,7 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.incumbent.Candidate
 import com.eignex.klause.solver.incumbent.Publication
@@ -99,7 +100,15 @@ class IncumbentCandidatesTest {
     fun `a proposal without certified real values is rejected`() {
         val withReals = problem(numRealVars = 1)
         assertIs<Verification.Rejected>(verify(withReals, sample(b0 = true, x0 = 1, x1 = 2)))
-        val certified = sample(b0 = true, x0 = 1, x1 = 2, reals = doubleArrayOf(0.5))
+        assertIs<Verification.Rejected>(
+            verify(withReals, sample(b0 = true, x0 = 1, x1 = 2, reals = doubleArrayOf(0.5))),
+        )
+        val certified = Sample(
+            booleanArrayOf(true),
+            longArrayOf(1, 2),
+            doubleArrayOf(0.5),
+            listOf(BigFraction.ofLong(2).reciprocal()),
+        )
         assertIs<Verification.Accepted<Sample, Double>>(verify(withReals, certified))
     }
 
