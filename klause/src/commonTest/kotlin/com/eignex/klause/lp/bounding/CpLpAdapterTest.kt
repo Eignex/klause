@@ -88,14 +88,6 @@ class CpLpAdapterTest {
             assertContentEquals(longArrayOf(1, 1, 1), emitted.coeffs)
             assertEquals(9L, emitted.rhs)
             assertTrue(emitted.provenance == null)
-            val harvested = engine.harvestRootCuts(
-                relaxer,
-                cp.session,
-                listOf(AllDifferentSeparator()),
-                gomory = false,
-                mir = false,
-            )
-            assertTrue(harvested.any { it.global && it.rel == emitted.rel && it.rhs == emitted.rhs })
             engine.recordSearchCuts(listOf(emitted), rootResult.primal, root, cp.session)
             assertEquals(1, engine.cutPool.size)
 
@@ -147,7 +139,7 @@ class CpLpAdapterTest {
     }
 
     @Test
-    fun `generated local Hall cut declines pool reuse after its bound is withdrawn`() {
+    fun `generated local Hall cut is absent from the pool and sibling`() {
         val problem = Problem(
             0,
             3,
@@ -218,6 +210,32 @@ class CpLpAdapterTest {
                 6.0,
                 assertNotNull(engine.solveNode(sibling.model, null, Cancellation.Never)?.second).objective,
             )
+        }
+    }
+
+    @Test
+    fun `root harvest retains a Hall cut over declared finite bounds`() {
+        val problem = Problem(
+            0,
+            2,
+            Array(2) { IntDomain(0, 3) },
+            arrayOf(AllDifferent(intArrayOf(0, 1), domainMin = 0, domainSize = 4)),
+        )
+        LpEngine(
+            problem,
+            LinearObjective(intCoefficients = longArrayOf(1, 1)),
+            LpParams(lpPlan = LpPlan(bounding = true, cuts = true)),
+            SolveStatsSink(backend = "finite-hall"),
+        ).use { engine ->
+            val relaxer = assertNotNull(engine.lpRelaxer)
+            val harvested = engine.harvestRootCuts(
+                relaxer,
+                PropagationSession(problem),
+                listOf(AllDifferentSeparator()),
+                gomory = false,
+                mir = false,
+            )
+            assertTrue(harvested.any { it.global && it.rel == Relation.GE && it.rhs == 1L })
         }
     }
 
