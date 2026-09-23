@@ -80,8 +80,10 @@ internal object WorkingModelCoverage {
             params,
         )
         val initial = assertIs<MinimizeResult.Optimal>(first.runSlice(Cancellation.Never, 1000L, 256L) {})
+        assertEquals(1L, initial.sample.ints[0])
         assertEquals(0.5, initial.sample.reals[0])
-        initial.sample.reals[0] = -100.0
+        initial.sample.ints[0] = 0L
+        assertEquals(0.5, initial.sample.ints[0] + initial.sample.reals[0])
         first.replacingObjective(LinearObjective(realCoefficients = doubleArrayOf(-1.0)), params).use { second ->
             val offered = ArrayList<Double>()
             val result = assertIs<MinimizeResult.Optimal>(
