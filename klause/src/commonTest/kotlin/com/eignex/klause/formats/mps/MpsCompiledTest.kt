@@ -57,6 +57,34 @@ class MpsCompiledTest {
     }
 
     @Test
+    fun `source check rejects an integer lower bound beyond long range`() {
+        val compiled = MpsModel(
+            "m",
+            ObjectiveSense.MINIMIZE,
+            MpsObjective("", IntArray(0), DoubleArray(0), 0.0),
+            listOf(MpsVar("X", integer = true, lower = -1e19, upper = 0.0)),
+            emptyList(),
+        ).toProblem()
+
+        assertFalse(compiled.sourceExact)
+        assertEquals("column bound 'X'", compiled.sourceDifference)
+    }
+
+    @Test
+    fun `source check rejects an integer upper bound beyond long range`() {
+        val compiled = MpsModel(
+            "m",
+            ObjectiveSense.MINIMIZE,
+            MpsObjective("", IntArray(0), DoubleArray(0), 0.0),
+            listOf(MpsVar("X", integer = true, lower = 0.0, upper = 1e19)),
+            emptyList(),
+        ).toProblem()
+
+        assertFalse(compiled.sourceExact)
+        assertEquals("column bound 'X'", compiled.sourceDifference)
+    }
+
+    @Test
     fun `source objective keeps maximize sense and the negated objective RHS`() {
         val compiled = Mps.parse(
             "OBJSENSE\n MAX\nROWS\n N COST\n E R\nCOLUMNS\n X COST 0.5 R 1\n" +
