@@ -411,6 +411,32 @@ class OpenPresolveTest {
     }
 
     @Test
+    fun `an eliminated boolean column is recovered from the tightened result`() {
+        val openHi = Bits(1).also { it.set(0) }
+        val spec = Problem(
+            numBoolVars = 3,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(0), null, openHi),
+            factors = arrayOf<Factor>(
+                Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
+                Clause(intArrayOf(Lit.make(0, false), Lit.make(2, true))),
+            ),
+        )
+
+        val result = assertIs<OpenPresolveResult.Tightened>(
+            spec.presolveOpen(PresolveConfig(PresolveEmphasis.AGGRESSIVE)),
+        )
+
+        val witness = BooleanArray(3)
+        result.rebuildEliminatedBooleans(witness)
+        assertTrue(
+            spec.factors.filterIsInstance<Clause>().all { c ->
+                c.literals.any { Lit.evaluate(it, witness[Lit.variable(it)]) }
+            },
+            "a witness of the reduced model lifts to one of the input",
+        )
+    }
+
+    @Test
     fun `open bound tightening reads every row of an increasing chain`() {
         val spec = openAbove(
             3,
