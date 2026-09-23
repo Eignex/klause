@@ -56,7 +56,7 @@ internal object BoundedVariableElimination {
         problem: Problem,
         objectiveBoolVars: Set<Int>,
         cancellation: Cancellation,
-        delta: (SatClauseDb, BoolRebuilds) -> T,
+        delta: (SatClauseDb, SourceRebuilds) -> T,
     ): T? {
         val nb = problem.numBoolVars
         if (nb == 0) return null
@@ -150,6 +150,6 @@ internal object BoundedVariableElimination {
      * guarantees the two polarities are never forced at once. Reversed, so a variable whose clauses
      * reference a later-eliminated variable reads that variable's recovered value.
      */
-    private fun List<VarElim>.asRebuilds(): BoolRebuilds =
-        BoolRebuilds(asReversed().map { BoolRebuild.SatisfyClauses(it.v, it.clauses) })
+    private fun List<VarElim>.asRebuilds(): SourceRebuilds =
+        SourceRebuilds(asReversed().map { RebuildStep.SatisfyClauses(it.v, it.clauses) })
 }

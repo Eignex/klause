@@ -27,10 +27,13 @@ sealed interface OpenPresolveResult {
      * @property closedSides how many open sides the phase proved a bound for.
      * @property rebuild recovers the Boolean columns the phase eliminated, empty when it eliminated none.
      */
-    class Tightened internal constructor(val spec: Problem, val closedSides: Int, internal val rebuild: BoolRebuilds) :
-        OpenPresolveResult {
+    class Tightened internal constructor(
+        val spec: Problem,
+        val closedSides: Int,
+        internal val rebuild: SourceRebuilds,
+    ) : OpenPresolveResult {
         /** A closing that eliminated no column, so a witness of [spec] is already one of the input. */
-        constructor(spec: Problem, closedSides: Int) : this(spec, closedSides, BoolRebuilds.NONE)
+        constructor(spec: Problem, closedSides: Int) : this(spec, closedSides, SourceRebuilds.NONE)
 
         /**
          * Recover into [bools] the Boolean columns the phase eliminated.

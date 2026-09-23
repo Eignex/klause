@@ -35,7 +35,7 @@ internal class SourcePresolved(
     /** Whether the lane proved the input infeasible. */
     val infeasible: Boolean = false,
     /** Recovers the Boolean columns the passes eliminated, in the order they are recovered. */
-    val rebuild: BoolRebuilds = BoolRebuilds.NONE,
+    val rebuild: SourceRebuilds = SourceRebuilds.NONE,
 )
 
 /**
@@ -57,8 +57,8 @@ internal class SourceDelta(
     val bounds: IntBounds? = null,
     /** Whether the pass proved infeasibility. */
     val infeasible: Boolean = false,
-    /** Recovers the Boolean columns this pass eliminated, or [BoolRebuilds.NONE] when it eliminated none. */
-    val rebuild: BoolRebuilds = BoolRebuilds.NONE,
+    /** Recovers the Boolean columns this pass eliminated, or [SourceRebuilds.NONE] when it eliminated none. */
+    val rebuild: SourceRebuilds = SourceRebuilds.NONE,
 ) {
     /**
      * Whether the pass left the factor list, every column's range and every column unchanged.

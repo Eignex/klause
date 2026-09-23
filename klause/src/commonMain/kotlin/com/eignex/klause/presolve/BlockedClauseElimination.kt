@@ -94,6 +94,6 @@ internal object BlockedClauseElimination {
      * true; the blocking property guarantees this satisfies the clause without falsifying any clause
      * that contained the opposite literal.
      */
-    private fun List<Blocked>.asRebuilds(): BoolRebuilds =
-        BoolRebuilds(asReversed().map { BoolRebuild.RepairClause(it.clause, it.blockingLit) })
+    private fun List<Blocked>.asRebuilds(): SourceRebuilds =
+        SourceRebuilds(asReversed().map { RebuildStep.RepairClause(it.clause, it.blockingLit) })
 }

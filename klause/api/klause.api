@@ -8938,10 +8938,11 @@ public final class com/eignex/klause/solver/pipeline/OpenTheoryAssignment$ExactL
 }
 
 public final class com/eignex/klause/solver/pipeline/OpenTheoryAssignment$Rebuilt : com/eignex/klause/solver/pipeline/OpenTheoryAssignment {
-	public fun <init> (Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;[Z)V
+	public fun <init> (Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;[Z[Lcom/ionspin/kotlin/bignum/integer/BigInteger;)V
 	public fun boolValue (I)Z
 	public final fun getBase ()Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;
 	public final fun getBools ()[Z
+	public final fun getInts ()[Lcom/ionspin/kotlin/bignum/integer/BigInteger;
 	public fun intValue (I)Ljava/lang/String;
 	public fun realValue (I)Ljava/lang/String;
 }

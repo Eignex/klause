@@ -73,7 +73,7 @@ internal class SatClauseDb private constructor(
     }
 
     /** The same rewrite as the source lane's delta, stating [rebuild] as data rather than as a lift. */
-    fun toSourceDelta(rebuild: BoolRebuilds): SourceDelta {
+    fun toSourceDelta(rebuild: SourceRebuilds): SourceDelta {
         val (dropped, added) = rewrite()
         if (dropped.isEmpty() && added.isEmpty()) return SourceDelta()
         return SourceDelta(droppedIndices = dropped, addedFactors = added, rebuild = rebuild)

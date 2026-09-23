@@ -418,9 +418,14 @@ class OpenTheoryMinimizer internal constructor(
                 "a route with no integer column cannot value an objective weighting one"
             }
 
-            // A rebuild recovers Boolean columns only, so the objective's integer terms read the witness
-            // underneath it at that route's own width.
-            is OpenTheoryAssignment.Rebuilt -> return valueOf(assignment.base)
+            // A rebuild that recovered integer columns is the only place their values exist; one that
+            // recovered none leaves them to the witness underneath, at that route's own width.
+            is OpenTheoryAssignment.Rebuilt -> {
+                val recovered = assignment.ints ?: return valueOf(assignment.base)
+                for (i in terms.indices) {
+                    total += BigInteger.fromLong(coefficients[i]) * recovered[terms[i]]
+                }
+            }
         }
         return total
     }
@@ -471,9 +476,23 @@ private fun OpenTheoryAssignment.exactWitness(realColumns: Int): ExactWitness = 
         { error("a route with no integer column cannot value an objective weighting one") },
     )
 
-    // Numeric columns come from the route underneath, which alone knows their width; only the Booleans
-    // are the rebuild's.
-    is OpenTheoryAssignment.Rebuilt -> base.exactWitness(realColumns).withTruth { bools[it] }
+    // Real columns come from the route underneath, which alone knows their width. The integer columns are
+    // the rebuild's whenever it recovered any — reading the witness under it would take their values from
+    // before the elimination.
+    is OpenTheoryAssignment.Rebuilt -> base.exactWitness(realColumns)
+        .withTruth { bools[it] }
+        .let { under -> ints?.let { recovered -> under.withInts(realColumns, recovered) } ?: under }
+}
+
+/** This witness reading its integer columns off [ints] instead, with [realColumns] reals ahead of them. */
+private fun ExactWitness.withInts(realColumns: Int, ints: Array<BigInteger>): ExactWitness = object : ExactWitness {
+    override fun at(column: Int): BigFraction = if (column < realColumns) {
+        this@withInts.at(column)
+    } else {
+        BigFraction.of(ints[column - realColumns], BigInteger.ONE)
+    }
+
+    override fun truth(boolVar: Int): Boolean = this@withInts.truth(boolVar)
 }
 
 /** This witness reading its Boolean columns through [truth] instead. */

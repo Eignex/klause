@@ -1,11 +1,11 @@
 package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.presolve.BoolRebuilds
 import com.eignex.klause.presolve.OpenPresolveResult
 import com.eignex.klause.presolve.PreparedSource
 import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.presolve.PresolveConfig
+import com.eignex.klause.presolve.SourceRebuilds
 import com.eignex.klause.presolve.closeOpenBounds
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.pipeline.ProblemPipeline
@@ -29,6 +29,7 @@ import com.eignex.klause.solver.search.Vsids
 import com.eignex.klause.theory.qflra.ExactLiraAssignment
 import com.eignex.klause.theory.qflra.ExactLraAssignment
 import com.eignex.klause.util.Cancellation
+import com.ionspin.kotlin.bignum.integer.BigInteger
 
 /** A complete witness emitted by an open-model theory route. */
 sealed interface OpenTheoryAssignment {
@@ -82,9 +83,11 @@ sealed interface OpenTheoryAssignment {
         val base: OpenTheoryAssignment,
         /** Boolean values of the model before the elimination. */
         val bools: BooleanArray,
+        /** Integer values of the model before the elimination, or null when no column was eliminated. */
+        val ints: Array<BigInteger>?,
     ) : OpenTheoryAssignment {
         override fun boolValue(id: Int): Boolean = bools[id]
-        override fun intValue(id: Int): String = base.intValue(id)
+        override fun intValue(id: Int): String = ints?.get(id)?.toString() ?: base.intValue(id)
         override fun realValue(id: Int): String = base.realValue(id)
     }
 }
@@ -96,15 +99,27 @@ sealed interface OpenTheoryAssignment {
  * lane reads its own witness into the `BooleanArray` they evaluate over. A witness answers by accessor
  * and cannot be written through, so the recovered values ride along in a wrapper rather than in place.
  *
- * [numBoolVars] counts the columns before the elimination, and [assignment] is asked for every one of
- * them — including the eliminated ones, which a pass leaves in place and unconstrained. A pass that
- * renumbered the Boolean space instead would put an id past the end of the witness it produced.
+ * [numBoolVars] and [numIntVars] count the columns before the elimination, and [assignment] is asked for
+ * every one of them — including the eliminated ones, which a pass leaves in place and unconstrained. A
+ * pass that renumbered instead would put an id past the end of the witness it produced.
+ *
+ * Integer values are read at arbitrary precision, which is the width an open route answers in; they are
+ * materialized only when a step recovers one, so a Boolean-only reconstruction costs no parsing.
  */
-internal fun BoolRebuilds.lift(assignment: OpenTheoryAssignment, numBoolVars: Int): OpenTheoryAssignment {
+internal fun SourceRebuilds.lift(
+    assignment: OpenTheoryAssignment,
+    numBoolVars: Int,
+    numIntVars: Int,
+): OpenTheoryAssignment {
     if (isEmpty) return assignment
     val bools = BooleanArray(numBoolVars) { assignment.boolValue(it) }
-    rebuildInto(bools)
-    return OpenTheoryAssignment.Rebuilt(assignment, bools)
+    if (!touchesInts) {
+        rebuildInto(bools)
+        return OpenTheoryAssignment.Rebuilt(assignment, bools, ints = null)
+    }
+    val ints = Array(numIntVars) { BigInteger.parseString(assignment.intValue(it)) }
+    rebuildInto(bools, ints)
+    return OpenTheoryAssignment.Rebuilt(assignment, bools, ints)
 }
 
 /** The common verdict surface of the complete open-model theory routes. */
@@ -297,6 +312,7 @@ class OpenTheoryEngine internal constructor(
                     prepared.rebuild.lift(
                         assignment(result.model, checkNotNull(planned.theory), route),
                         prepared.source.numBoolVars,
+                        prepared.source.numIntVars,
                     ),
                     stats.finish(state, planned.session),
                 )
