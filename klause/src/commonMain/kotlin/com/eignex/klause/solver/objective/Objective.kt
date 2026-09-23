@@ -98,8 +98,8 @@ data class LinearObjective(
         // The discrete part is exact; the continuous part is the LP-only real terms, present in [sample]
         // only at a leaf where the residual LP resolved them.
         var total = evaluateLong(sample).toDouble()
-        for (r in 0 until minOf(sample.reals.size, realCoefficients.size)) {
-            total += realCoefficients[r] * sample.reals[r]
+        for (r in 0 until minOf(sample.numRealVars, realCoefficients.size)) {
+            total += realCoefficients[r] * sample.approximateRealValue(r)
         }
         return total
     }
