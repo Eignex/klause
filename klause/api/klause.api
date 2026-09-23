@@ -7187,8 +7187,8 @@ public final class com/eignex/klause/presolve/OpenPresolveResult$Tightened : com
 }
 
 public final class com/eignex/klause/presolve/OpenPresolveResultKt {
-	public static final fun presolveOpen (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/presolve/OpenPresolveResult;
-	public static synthetic fun presolveOpen$default (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/util/Cancellation;ILjava/lang/Object;)Lcom/eignex/klause/presolve/OpenPresolveResult;
+	public static final fun presolveOpen (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/presolve/PresolveConfig;Lcom/eignex/klause/solver/objective/LinearObjective;ZLcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/presolve/PresolveBudget;)Lcom/eignex/klause/presolve/OpenPresolveResult;
+	public static synthetic fun presolveOpen$default (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/presolve/PresolveConfig;Lcom/eignex/klause/solver/objective/LinearObjective;ZLcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/presolve/PresolveBudget;ILjava/lang/Object;)Lcom/eignex/klause/presolve/OpenPresolveResult;
 }
 
 public final class com/eignex/klause/presolve/PassDelta {

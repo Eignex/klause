@@ -10,6 +10,7 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.LpStatsSink
 import com.eignex.klause.util.Bits
 import kotlin.test.Test
@@ -98,6 +99,32 @@ class OpenPresolveTest {
         assertTrue(result.spec.intBounds.hasUpper(0), "the source pin closed the side")
         assertEquals(0L, result.spec.intBounds.lower(0))
         assertEquals(0L, result.spec.intBounds.upper(0))
+    }
+
+    @Test
+    fun `a stated objective keeps a column off the bound its optimum sits away from`() {
+        // Maximizing x over `x <= 7` puts the optimum at 7, stated here as the minimize objective -x.
+        // Lowering x never violates the row, so with no objective dual fixing pins it to 0 — an optimum
+        // only by accident. The coefficient is what holds the pin back.
+        val spec = openAbove(1, row(0 to 1L, op = LinearOp.LE, bound = 7L))
+        val objective = LinearObjective(intCoefficients = longArrayOf(-1L))
+
+        val result = assertIs<OpenPresolveResult.Tightened>(spec.presolveOpen(objective = objective))
+
+        assertEquals(0L, result.spec.intBounds.lower(0))
+        assertEquals(7L, result.spec.intBounds.upper(0), "the optimum stays reachable")
+    }
+
+    @Test
+    fun `a solution-set-sensitive caller keeps every column unpinned`() {
+        // Counting has to see the whole set, so the passes that discard optimum-equivalent solutions are
+        // held back and the bound the tightening proves is the only narrowing.
+        val spec = openAbove(1, row(0 to 1L, op = LinearOp.LE, bound = 7L))
+
+        val result = assertIs<OpenPresolveResult.Tightened>(spec.presolveOpen(solutionSetSensitive = true))
+
+        assertEquals(0L, result.spec.intBounds.lower(0))
+        assertEquals(7L, result.spec.intBounds.upper(0))
     }
 
     @Test
