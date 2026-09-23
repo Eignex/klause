@@ -122,8 +122,9 @@ internal fun LpEngine.lbTreeSearch(objective: LinearObjective, cancellation: Can
                     LpVerdict.FEASIBLE, LpVerdict.ATTAINED_OPTIMUM, LpVerdict.UNBOUNDED -> Unit
                     else -> continue
                 }
-                sample = Sample(sample.bools, sample.ints, leaf.reals)
-                leaf.exactReals ?: continue
+                val exact = leaf.exactReals ?: continue
+                sample = Sample(sample.bools, sample.ints, leaf.reals, exact)
+                exact
             } else {
                 emptyList()
             }

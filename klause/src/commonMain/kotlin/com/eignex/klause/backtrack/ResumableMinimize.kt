@@ -651,7 +651,7 @@ internal class ResumableMinimize(
             ) {
                 return null
             }
-            sample.copy(reals = real.reals)
+            sample.copy(reals = real.reals, exactReals = real.exactReals)
         }
         if (token()) return null
         return recordIfImproving(accepted, objective.evaluate(accepted))
@@ -926,7 +926,7 @@ internal class ResumableMinimize(
 
                     LpVerdict.FEASIBLE, LpVerdict.ATTAINED_OPTIMUM, LpVerdict.UNBOUNDED -> {
                         if (real.verdict != LpVerdict.ATTAINED_OPTIMUM) sawIndeterminateLeaf = true
-                        val full = sample.copy(reals = real.reals)
+                        val full = sample.copy(reals = real.reals, exactReals = real.exactReals)
                         recordIfImproving(full, objective.evaluate(full))
                     }
                 }
