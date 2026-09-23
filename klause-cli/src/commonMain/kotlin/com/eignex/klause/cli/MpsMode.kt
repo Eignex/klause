@@ -166,7 +166,9 @@ internal class MpsOutput(
 
     override fun statusLine(verdict: Verdict): String = when (verdict) {
         Verdict.SATISFIABLE, Verdict.BEST_FOUND, Verdict.OPTIMAL ->
-            if (verdict == Verdict.OPTIMAL && objectiveErrorBound == null &&
+            if (best == null) {
+                "s UNKNOWN"
+            } else if (verdict == Verdict.OPTIMAL && objectiveErrorBound == null &&
                 !hasInnerConstraintApproximation && sourceExact
             ) {
                 "s OPTIMUM FOUND"

@@ -44,10 +44,23 @@ class MpsModeTest {
     fun `a source difference qualifies the lowered optimum`() {
         val output = MpsOutput(sourceExact = false, sourceDifference = "objective coefficient 'X'")
 
-        val text = capture { output.onComplete(Verdict.OPTIMAL) }
+        val text = capture {
+            output.onSolution("v X=1", objective = 1L)
+            output.onComplete(Verdict.OPTIMAL)
+        }
 
         assertTrue("s SATISFIABLE" in text, text)
         assertTrue("lowered model differs from MPS source at objective coefficient 'X'" in text, text)
+    }
+
+    @Test
+    fun `a feasible verdict without a verified source witness is unknown`() {
+        val output = MpsOutput(sourceExact = false, sourceDifference = "row 'R' coefficient")
+
+        val text = capture { output.onComplete(Verdict.OPTIMAL) }
+
+        assertTrue("s UNKNOWN" in text, text)
+        assertTrue("s SATISFIABLE" !in text, text)
     }
 
     @Test
