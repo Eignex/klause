@@ -43,30 +43,31 @@ sealed interface OpenPresolveResult {
  * The two are separable, and callers that route from the prepared model run them apart — the factor
  * passes decide which lane owns what, so they have to finish before ownership is selected.
  *
- * No objective reaches the passes through this entry point, so they reduce for feasibility: a
- * solution-set-altering pass reads every column as costing nothing and may pin one to the bound an
- * optimizing caller's optimum sits away from. A caller that optimizes states its objective by preparing
- * an `OpenTheoryRequest` instead.
+ * **State what the result is for.** Some source passes discard optimum-equivalent solutions, and what
+ * they may discard depends on what the caller is about to do:
+ *  - Deciding satisfiability needs nothing stated. Every reduction preserves it.
+ *  - Optimizing needs [objective], in the minimize sense [LinearObjective] is written in. Dual fixing
+ *    pins a column by the sign of its coefficient, so leaving this null makes every column cost nothing
+ *    and pins it to whichever bound its rows allow — which is an optimum only by accident.
+ *  - Enumerating or counting needs [solutionSetSensitive], which holds every non-preserving pass back.
+ *
+ * [config] selects the passes, [cancellation] and [budget] bound them.
  */
-fun Problem.presolveOpen(cancellation: Cancellation = Cancellation.Never): OpenPresolveResult =
-    presolveOpen(PresolveConfig.DEFAULT, null, false, cancellation, null)
-
-/** Internal open preparation with the caller's resolved source-presolve policy. */
-internal fun Problem.presolveOpen(
+fun Problem.presolveOpen(
     config: PresolveConfig = PresolveConfig.DEFAULT,
-    linearObjective: LinearObjective? = null,
+    objective: LinearObjective? = null,
     solutionSetSensitive: Boolean = false,
     cancellation: Cancellation = Cancellation.Never,
-    presolveBudget: PresolveBudget? = null,
+    budget: PresolveBudget? = null,
 ): OpenPresolveResult {
-    val preparationCancellation = Cancellation { cancellation() || presolveBudget?.remaining() == 0L }
+    val preparationCancellation = Cancellation { cancellation() || budget?.remaining() == 0L }
     val source = PresolvePipeline.prepareSource(
         this,
         config,
-        linearObjective,
+        objective,
         solutionSetSensitive,
         preparationCancellation,
-        presolveBudget,
+        budget,
     )
     if (source.infeasible) return OpenPresolveResult.Refuted
     return source.problem.closeOpenBounds(preparationCancellation)
