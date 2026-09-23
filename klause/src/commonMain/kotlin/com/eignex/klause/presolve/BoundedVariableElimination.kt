@@ -32,9 +32,34 @@ internal object BoundedVariableElimination {
         problem: Problem,
         objectiveBoolVars: Set<Int> = emptySet(),
         cancellation: Cancellation = Cancellation.Never,
-    ): PassDelta {
+    ): PassDelta = run(problem, objectiveBoolVars, cancellation) { db, rebuild ->
+        db.toDelta(rebuild.asSampleLift())
+    } ?: PassDelta()
+
+    /**
+     * [eliminate] over a canonical source model.
+     *
+     * Resolution reads the clause database and nothing else — no domain, no propagation — so the whole
+     * argument holds before a finite projection exists. `SatClauseDb.build` marks a Boolean ineligible
+     * when any factor that is not a clean clause touches it, scanning every factor directly, so a
+     * Boolean an integer row reads is never resolved away and the open columns beside it are untouched.
+     */
+    fun eliminateSource(
+        problem: Problem,
+        objectiveBoolVars: Set<Int> = emptySet(),
+        cancellation: Cancellation = Cancellation.Never,
+    ): SourceDelta = run(problem, objectiveBoolVars, cancellation) { db, rebuild ->
+        db.toSourceDelta(rebuild)
+    } ?: SourceDelta()
+
+    private fun <T> run(
+        problem: Problem,
+        objectiveBoolVars: Set<Int>,
+        cancellation: Cancellation,
+        delta: (SatClauseDb, BoolRebuilds) -> T,
+    ): T? {
         val nb = problem.numBoolVars
-        if (nb == 0) return PassDelta()
+        if (nb == 0) return null
         val db = SatClauseDb.build(problem, objectiveBoolVars)
 
         val eliminations = ArrayList<VarElim>()
@@ -47,7 +72,7 @@ internal object BoundedVariableElimination {
             eliminateVar(v, db, eliminations)
         }
 
-        return db.toDelta(eliminations.asRebuilds().asSampleLift())
+        return delta(db, eliminations.asRebuilds())
     }
 
     private fun eliminateVar(v: Int, db: SatClauseDb, eliminations: ArrayList<VarElim>) {

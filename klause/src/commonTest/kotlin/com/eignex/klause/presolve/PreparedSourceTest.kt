@@ -80,6 +80,7 @@ class PreparedSourceTest {
             infeasible = false,
             objective = null,
             passesFired = emptyList(),
+            rebuild = BoolRebuilds.NONE,
             budget = null,
         )
 

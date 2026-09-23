@@ -24,8 +24,8 @@ class Presolved(
  * What the source lane made of a canonical model: the rewritten declarations and factors, and whether a
  * pass refuted it.
  *
- * No reconstruction: a source pass may not eliminate a column, so a sample of [problem] is already a
- * sample of the model the lane was handed.
+ * [rebuild] recovers the Boolean columns the passes eliminated. Integer columns are still never
+ * eliminated here, so a witness needs nothing beyond it.
  */
 internal class SourcePresolved(
     /** The transformed model, or the input itself when no pass fired. */
@@ -34,15 +34,19 @@ internal class SourcePresolved(
     val passesFired: List<PresolvePass> = emptyList(),
     /** Whether the lane proved the input infeasible. */
     val infeasible: Boolean = false,
+    /** Recovers the Boolean columns the passes eliminated, in the order they are recovered. */
+    val rebuild: BoolRebuilds = BoolRebuilds.NONE,
 )
 
 /**
  * A source pass's explicit change to its input problem.
  *
- * Deliberately narrower than [PassDelta]: no finite domains and no sample lift, so what a pass running
- * before any finite projection exists may produce is stated by the type rather than checked on the way
- * through. [bounds] is the one range it may state, and a model-level range is not a finite domain — it
- * says how far a column can reach, while a domain says which values it may take.
+ * Deliberately narrower than [PassDelta]: no finite domains, and a reconstruction stated as data rather
+ * than as a closure over one lane's witness, so what a pass running before any finite projection exists
+ * may produce is said by the type rather than checked on the way through. [bounds] is the one range it
+ * may state, and a model-level range is not a finite domain — it says how far a column can reach, while
+ * a domain says which values it may take. [rebuild] covers Boolean columns only; eliminating an integer
+ * column needs a step shape that carries values at both lanes' widths, which does not exist yet.
  */
 internal class SourceDelta(
     /** Indices of input factors removed or replaced. */
@@ -53,9 +57,17 @@ internal class SourceDelta(
     val bounds: IntBounds? = null,
     /** Whether the pass proved infeasibility. */
     val infeasible: Boolean = false,
+    /** Recovers the Boolean columns this pass eliminated, or [BoolRebuilds.NONE] when it eliminated none. */
+    val rebuild: BoolRebuilds = BoolRebuilds.NONE,
 ) {
-    /** Whether the pass left the factor list and every column's range unchanged. */
-    val isEmpty: Boolean get() = droppedIndices.isEmpty() && addedFactors.isEmpty() && bounds == null
+    /**
+     * Whether the pass left the factor list, every column's range and every column unchanged.
+     *
+     * [rebuild] counts: an empty delta is reported `UNCHANGED` and never applied, so a pass that
+     * eliminated a column while rewriting nothing else would have its reconstruction silently dropped.
+     */
+    val isEmpty: Boolean
+        get() = droppedIndices.isEmpty() && addedFactors.isEmpty() && bounds == null && rebuild.isEmpty
 
     /**
      * This change as the finite lane's delta, for a source pass running over a baked model.
@@ -63,20 +75,24 @@ internal class SourceDelta(
      * A proved range reaches the finite lane as a narrowing of [rootDomains], not as the range itself:
      * the lane branches on values, so a bound it cannot fold into a domain would be a bound it never
      * enforces. Intersecting can empty a column that neither endpoint crossed, which is a refutation.
+     *
+     * [rebuild] becomes that lane's sample lift, which is the same steps read over its own witness.
      */
     fun asPassDelta(rootDomains: Array<IntDomain>): PassDelta {
-        val proved = bounds ?: return PassDelta(droppedIndices, addedFactors, infeasible = infeasible)
+        val lift = rebuild.asSampleLift()
+        val proved = bounds
+            ?: return PassDelta(droppedIndices, addedFactors, reconstruct = lift, infeasible = infeasible)
         require(proved.size == rootDomains.size) {
             "proved ranges for ${proved.size} columns over a model of ${rootDomains.size}"
         }
         var narrowed: Array<IntDomain>? = null
         for (v in rootDomains.indices) {
             val next = rootDomains[v].narrowedBy(proved, v)
-                ?: return PassDelta(droppedIndices, addedFactors, infeasible = true)
+                ?: return PassDelta(droppedIndices, addedFactors, reconstruct = lift, infeasible = true)
             if (next === rootDomains[v]) continue
             (narrowed ?: rootDomains.copyOf().also { narrowed = it })[v] = next
         }
-        return PassDelta(droppedIndices, addedFactors, narrowed, infeasible = infeasible)
+        return PassDelta(droppedIndices, addedFactors, narrowed, lift, infeasible = infeasible)
     }
 }
 

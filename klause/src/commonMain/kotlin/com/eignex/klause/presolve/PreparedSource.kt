@@ -11,9 +11,9 @@ import com.eignex.klause.solver.result.PresolveStats
  * pass that rewrites factors moves factor ownership with it, so a plan selected ahead of this phase is
  * indexed by factors the prepared model no longer has.
  *
- * There is no reconstruction to carry: a source pass may rewrite rows but never eliminate a column, so a
- * sample of [problem] is already a sample of [source]. The lane's change type says so
- * ([SourceDelta] cannot lift a sample), which is what makes the absence a guarantee rather than a habit.
+ * [rebuild] recovers the Boolean columns the phase eliminated, so a witness of [problem] becomes one of
+ * [source] by running it. Integer columns are still never eliminated here — [SourceDelta] states a
+ * reconstruction over Boolean columns and nothing else — so the lift a caller needs is this and no more.
  *
  * [budget] is carried rather than re-derived, so every phase after this one spends what is left of the
  * same allowance instead of restarting it.
@@ -33,6 +33,8 @@ internal class PreparedSource(
     val objective: LinearObjective?,
     /** Source passes that changed the model, in first-fire order. */
     val passesFired: List<PresolvePass>,
+    /** Recovers the Boolean columns the phase eliminated, in the order they are recovered. */
+    val rebuild: BoolRebuilds,
     /** What remains of the presolve phase's allowance. */
     val budget: PresolveBudget?,
 ) {
@@ -55,6 +57,7 @@ internal class PreparedSource(
             infeasible = false,
             objective = null,
             passesFired = emptyList(),
+            rebuild = BoolRebuilds.NONE,
             budget = budget,
         )
     }

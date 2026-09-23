@@ -67,6 +67,19 @@ internal class SatClauseDb private constructor(
      * itself later removed contributes nothing.
      */
     fun toDelta(reconstruct: ((Sample) -> Sample)?): PassDelta {
+        val (dropped, added) = rewrite()
+        if (dropped.isEmpty() && added.isEmpty()) return PassDelta()
+        return PassDelta(droppedIndices = dropped, addedFactors = added, reconstruct = reconstruct)
+    }
+
+    /** The same rewrite as the source lane's delta, stating [rebuild] as data rather than as a lift. */
+    fun toSourceDelta(rebuild: BoolRebuilds): SourceDelta {
+        val (dropped, added) = rewrite()
+        if (dropped.isEmpty() && added.isEmpty()) return SourceDelta()
+        return SourceDelta(droppedIndices = dropped, addedFactors = added, rebuild = rebuild)
+    }
+
+    private fun rewrite(): Pair<IntArray, List<Factor>> {
         val dropped = IntArrayList()
         for (v in vacuous) dropped.add(v)
         val added = ArrayList<Factor>()
@@ -78,8 +91,7 @@ internal class SatClauseDb private constructor(
                 lits != null && orig < 0 -> added.add(Clause(lits))
             }
         }
-        if (dropped.isEmpty() && added.isEmpty()) return PassDelta()
-        return PassDelta(droppedIndices = dropped.toIntArray(), addedFactors = added, reconstruct = reconstruct)
+        return dropped.toIntArray() to added
     }
 
     companion object {
