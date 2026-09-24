@@ -59,9 +59,9 @@ internal fun CommonOptions.routingCancellation(): Cancellation {
         solveStop
     } else {
         routingSlice(
-        PresolveBudget { cap - nowMillis() },
-        solveStop,
-    )
+            PresolveBudget { cap - nowMillis() },
+            solveStop,
+        )
     }
     routingToken = token
     return token

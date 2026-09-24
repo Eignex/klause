@@ -13,7 +13,7 @@ import com.eignex.klause.util.Cancellation
 internal fun ComponentPlan.theoryComponent(
     spec: Problem,
     smtStats: SmtStatsSink? = null,
-    theoryLpStop: Cancellation? = null,
+    theorySolveStop: Cancellation? = null,
 ): TheoryComponent? {
     val fragment = theoryFragment(spec)
     return when (theoryPipeline) {
@@ -26,7 +26,7 @@ internal fun ComponentPlan.theoryComponent(
         ProblemPipeline.EXACT_LRA -> ExactLiraSearchComponent(fragment) { assignment, model ->
             assignment.reals.forEachIndexed { variable, value -> model.put(SearchRealValue(variable), value) }
         }.also { component ->
-            component.useSharedLpStop(theoryLpStop)
+            component.useSolveStop(theorySolveStop)
             smtStats?.let(component::observeWith)
         }
 
@@ -38,7 +38,7 @@ internal fun ComponentPlan.theoryComponent(
             }
             assignment.reals.forEachIndexed { variable, value -> model.put(SearchRealValue(variable), value) }
         }.also { component ->
-            component.useSharedLpStop(theoryLpStop)
+            component.useSolveStop(theorySolveStop)
             smtStats?.let(component::observeWith)
         }
 

@@ -84,9 +84,11 @@ class ExactLiraSearchComponent(
     private var candidate: List<BigFraction>? = null
     private var dirty = true
     private var solveContext = LpSolveContext.Production
-    private var sharedLpStop: Cancellation? = null
+    private var solveStop: Cancellation? = null
+    private var operationAllowance: (Cancellation) -> Cancellation = { it.shorten(0.5) }
     private var operationStop = Cancellation.Never
-    private var ownLpStop: Cancellation? = null
+    internal var operationBudgetExhausted = false
+        private set
     private val arithmeticRows = model.factors.flatMap { it.linearRows }.filter { row ->
         (0 until row.size).any { !Term.isBool(row.ref(it)) }
     }
@@ -123,9 +125,14 @@ class ExactLiraSearchComponent(
         solveContext = context
     }
 
-    internal fun useSharedLpStop(stop: Cancellation?) {
+    internal fun useSolveStop(stop: Cancellation?) {
         check(context == null)
-        sharedLpStop = stop
+        solveStop = stop
+    }
+
+    internal fun useOperationAllowance(allowance: (Cancellation) -> Cancellation) {
+        check(context == null)
+        operationAllowance = allowance
     }
 
     internal val lpMetrics get() = lp.metrics
@@ -142,7 +149,7 @@ class ExactLiraSearchComponent(
     override fun initialize(context: SearchContext): ComponentResult {
         check(this.context == null) { "a theory component belongs to one immutable source session" }
         this.context = context
-        operationStop = stageStop(context)
+        beginOperation(context)
         return try {
             if (!system.install() || operationStop()) {
                 ComponentResult.Indeterminate
@@ -150,12 +157,12 @@ class ExactLiraSearchComponent(
                 lp.initialize(context).takeUnless { operationStop() } ?: ComponentResult.Indeterminate
             }
         } finally {
-            operationStop = Cancellation.Never
+            endOperation(context)
         }
     }
 
     override fun assert(decision: SearchDecision, context: SearchContext): ComponentResult {
-        operationStop = stageStop(context)
+        beginOperation(context)
         return try {
             if (operationStop()) {
                 ComponentResult.Indeterminate
@@ -164,13 +171,13 @@ class ExactLiraSearchComponent(
                 if (operationStop()) ComponentResult.Indeterminate else result
             }
         } finally {
-            operationStop = Cancellation.Never
+            endOperation(context)
         }
     }
     override fun propagate(context: SearchContext): ComponentResult = lp.propagate(context)
     override fun check(context: SearchContext): ComponentCheck = lp.check(context)
     override fun nextBranch(context: SearchContext): List<SearchDecision>? {
-        operationStop = stageStop(context)
+        beginOperation(context)
         return try {
             if (operationStop()) {
                 outcome = ComponentCheck.Indeterminate
@@ -185,7 +192,7 @@ class ExactLiraSearchComponent(
                 }
             }
         } finally {
-            operationStop = Cancellation.Never
+            endOperation(context)
         }
     }
     override fun retract(decisionLevel: Int) = lp.retract(decisionLevel)
@@ -310,17 +317,24 @@ class ExactLiraSearchComponent(
     }
 
     private fun relax(context: SearchContext): ComponentResult {
-        operationStop = stageStop(context)
+        beginOperation(context)
         return try {
             relaxWithin(context)
         } finally {
-            operationStop = Cancellation.Never
+            endOperation(context)
         }
     }
 
-    private fun stageStop(context: SearchContext): Cancellation = sharedLpStop ?: ownLpStop
-        ?: ((context as? SearchSession)?.stopToken() ?: Cancellation(context::cancelled))
-            .shorten(0.5).also { ownLpStop = it }
+    private fun beginOperation(context: SearchContext) {
+        operationBudgetExhausted = false
+        val parent = solveStop ?: (context as? SearchSession)?.stopToken() ?: Cancellation(context::cancelled)
+        operationStop = operationAllowance(parent)
+    }
+
+    private fun endOperation(context: SearchContext) {
+        if (operationStop() && !context.cancelled()) operationBudgetExhausted = true
+        operationStop = Cancellation.Never
+    }
 
     private fun relaxWithin(context: SearchContext): ComponentResult {
         if (operationStop()) return ComponentResult.Indeterminate

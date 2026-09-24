@@ -58,16 +58,19 @@ class ExactLiraSearchComponentTest {
             factors = arrayOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 0)),
         )
         val context = SearchSession(emptyList())
+        var spent = false
 
         ExactLiraSearchComponent(model).use { component ->
-            component.useSharedLpStop(Cancellation { true })
+            component.useOperationAllowance { parent -> Cancellation { parent() || spent } }
+            spent = true
             assertIs<ComponentResult.Indeterminate>(component.initialize(context))
+            assertTrue(component.operationBudgetExhausted)
             assertTrue(!context.cancelled())
         }
     }
 
     @Test
-    fun `branching declines after the shared theory LP allowance expires`() {
+    fun `branching declines when its operation allowance expires`() {
         val model = Problem(
             numBoolVars = 0,
             intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(1), null, null),
@@ -77,12 +80,42 @@ class ExactLiraSearchComponentTest {
         val context = SearchSession(emptyList())
 
         ExactLiraSearchComponent(model).use { component ->
-            component.useSharedLpStop(Cancellation { spent })
+            component.useOperationAllowance { parent -> Cancellation { parent() || spent } }
             assertIs<ComponentResult.Consistent>(component.initialize(context))
             spent = true
 
             assertNull(component.nextBranch(context))
             assertIs<ComponentCheck.Indeterminate>(component.check(context))
+            assertTrue(component.operationBudgetExhausted)
+            assertTrue(!context.cancelled())
+        }
+    }
+
+    @Test
+    fun `successful theory assertions and checks receive fresh operation allowances`() {
+        val model = Problem(
+            numBoolVars = 0,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(1), null, null),
+            factors = arrayOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 0)),
+        )
+        val context = SearchSession(emptyList())
+        var attempts = 0
+        var firstSpent = false
+
+        ExactLiraSearchComponent(model).use { component ->
+            component.useOperationAllowance { parent ->
+                val attempt = ++attempts
+                Cancellation { parent() || (attempt == 1 && firstSpent) }
+            }
+            assertIs<ComponentResult.Consistent>(component.initialize(context))
+            firstSpent = true
+
+            assertIs<ComponentResult.Consistent>(component.assert(SearchDecision.IntAtMost(0, 1L), context))
+            assertIs<ComponentResult.Consistent>(component.propagate(context))
+            assertIs<ComponentResult.Consistent>(component.assert(SearchDecision.IntAtLeast(0, 0L), context))
+            assertIs<ComponentResult.Consistent>(component.propagate(context))
+            assertEquals(5, attempts)
+            assertTrue(!component.operationBudgetExhausted)
             assertTrue(!context.cancelled())
         }
     }

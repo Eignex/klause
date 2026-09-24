@@ -27,6 +27,7 @@ import com.eignex.klause.solver.search.SearchRunObserver
 import com.eignex.klause.solver.search.SearchSolveParams
 import com.eignex.klause.solver.search.Vsids
 import com.eignex.klause.theory.qflra.ExactLiraAssignment
+import com.eignex.klause.theory.qflra.ExactLiraSearchComponent
 import com.eignex.klause.theory.qflra.ExactLraAssignment
 import com.eignex.klause.util.Cancellation
 import com.ionspin.kotlin.bignum.integer.BigInteger
@@ -276,7 +277,7 @@ class OpenTheoryEngine internal constructor(
             cancellation = cancellation,
             learnedDb = SearchLearnedDbParams(params.maxLearnedClauses, params.lbdGlue),
             smtStats = state.smt,
-            theoryLpStop = state.theoryLpStop(cancellation),
+            theorySolveStop = cancellation,
         )
         planned.use {
             planned.session.attachOpenTheoryWork(work)
@@ -289,7 +290,8 @@ class OpenTheoryEngine internal constructor(
 
                 ComponentResult.Indeterminate -> return unknown(
                     params.timeout(),
-                    planned.session.checkBudgetExhausted(),
+                    planned.session.checkBudgetExhausted() ||
+                        (planned.theory as? ExactLiraSearchComponent)?.operationBudgetExhausted == true,
                     stats,
                     state,
                 )
@@ -329,7 +331,8 @@ class OpenTheoryEngine internal constructor(
 
                 SearchResult.Indeterminate -> unknown(
                     params.timeout(),
-                    planned.session.checkBudgetExhausted() || planned.session.decisionBudgetExhausted(),
+                    planned.session.checkBudgetExhausted() || planned.session.decisionBudgetExhausted() ||
+                        (planned.theory as? ExactLiraSearchComponent)?.operationBudgetExhausted == true,
                     stats,
                     state,
                     planned.session,
@@ -361,7 +364,7 @@ class OpenTheoryEngine internal constructor(
         return OpenTheoryResult.Unknown(
             if (timedOut) {
                 TerminationReason.Timeout
-            } else if (budgetExhausted || state.work.exhausted || state.theoryLpExhausted) {
+            } else if (budgetExhausted || state.work.exhausted) {
                 TerminationReason.BudgetExhausted
             } else {
                 TerminationReason.Cancelled
@@ -426,13 +429,6 @@ internal class OpenTheorySolveState(private val params: TheoryParams) {
     private var drawStats = OpenHintStats()
     private var steering: CountingCandidateHints? = null
     private var deferred: SearchCandidateHints? = null
-    private var lpStop: Cancellation? = null
-
-    /** One nonrenewing theory LP allowance across every optimization round. */
-    fun theoryLpStop(parent: Cancellation): Cancellation = lpStop
-        ?: parent.shorten(0.5).also { lpStop = it }
-
-    val theoryLpExhausted: Boolean get() = lpStop?.invoke() == true && !params.timeout() && !params.cancellation()
 
     /**
      * The request's one unverified branch-order hint, deferred until enough splits have asked for it.

@@ -47,7 +47,7 @@ internal fun ComponentPlan.search(
     cancellation: Cancellation,
     learnedDb: SearchLearnedDbParams,
     smtStats: SmtStatsSink?,
-    theoryLpStop: Cancellation? = null,
+    theorySolveStop: Cancellation? = null,
 ): PlannedSearch {
     val components = ArrayList<SearchComponent>(3)
     val cp = if (hasCpComponent) {
@@ -66,7 +66,7 @@ internal fun ComponentPlan.search(
         .filter { factorOwner(it) != FactorOwner.CP }
         .mapNotNull { spec.factors[it] as? Cardinality }
     if (cardinalities.isNotEmpty()) components += CardinalitySearchComponent(cardinalities)
-    val theory = theoryComponent(spec, smtStats, theoryLpStop)
+    val theory = theoryComponent(spec, smtStats, theorySolveStop)
     if (theory != null) components += theory
     cp?.rebase()
     return PlannedSearch(

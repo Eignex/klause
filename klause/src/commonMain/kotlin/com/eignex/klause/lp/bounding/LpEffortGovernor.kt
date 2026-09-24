@@ -106,12 +106,11 @@ internal class LpEffortGovernor(
 
     /** Milliseconds of backstop left, or null when it is disabled — used to time-box the one-shot root
      *  work against the same allowance the per-node solves draw from. */
-    fun remainingMillis(): Long? =
-        if (wallBackstopMillis > 0L) {
-            ((wallBackstopNanos - spentNanos).coerceAtLeast(0L) / NANOS_PER_MILLI)
-        } else {
-            null
-        }
+    fun remainingMillis(): Long? = if (wallBackstopMillis > 0L) {
+        ((wallBackstopNanos - spentNanos).coerceAtLeast(0L) / NANOS_PER_MILLI)
+    } else {
+        null
+    }
 
     private companion object {
         const val NANOS_PER_MILLI = 1_000_000L
