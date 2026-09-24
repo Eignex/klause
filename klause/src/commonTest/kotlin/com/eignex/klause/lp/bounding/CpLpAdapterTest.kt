@@ -11,6 +11,7 @@ import com.eignex.klause.lp.cut.AllDifferentSeparator
 import com.eignex.klause.lp.cut.CutContext
 import com.eignex.klause.lp.cut.SourceCut
 import com.eignex.klause.lp.cut.orNull
+import com.eignex.klause.lp.engine.Basis
 import com.eignex.klause.lp.engine.Cut
 import com.eignex.klause.lp.engine.CutExpression
 import com.eignex.klause.lp.engine.CutInputRow
@@ -29,6 +30,7 @@ import com.eignex.klause.lp.engine.ProductionLpEngineFactory
 import com.eignex.klause.lp.engine.Relation
 import com.eignex.klause.lp.engine.Sense
 import com.eignex.klause.lp.engine.TableauCutProvenance
+import com.eignex.klause.lp.engine.TableauCutSolver
 import com.eignex.klause.lp.engine.exactBounds
 import com.eignex.klause.lp.engine.exactShift
 import com.eignex.klause.lp.engine.integerFarkasRay
@@ -57,6 +59,386 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class CpLpAdapterTest {
+    @Test
+    fun `mixed integer real tableau route declines both cut families`() {
+        val problem = Problem(
+            0,
+            2,
+            arrayOf(IntDomain(1, 5), IntDomain(1, 5)),
+            arrayOf(
+                Linear(
+                    intArrayOf(0, 1),
+                    doubleArrayOf(2.0, 2.0),
+                    intArrayOf(0),
+                    doubleArrayOf(1.0),
+                    LinearOp.LE,
+                    7.0,
+                ),
+            ),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(1.0),
+        )
+        LpEngine(
+            problem,
+            LinearObjective(intCoefficients = longArrayOf(-1, -1)),
+            LpParams(lpPlan = LpPlan(bounding = true, cuts = true)),
+            SolveStatsSink(backend = "mixed-tableau-decline"),
+        ).use { engine ->
+            val session = PropagationSession(problem)
+            val relaxer = assertNotNull(engine.lpRelaxer)
+            val relaxation = relaxer.build(session)
+            assertTrue(relaxation.model.hasContinuous)
+            val simplex = engine.dualSimplex(relaxation.model, Cancellation.Never)
+            try {
+                val result = assertNotNull(simplex.solve())
+                assertEquals(-3.5, result.objective)
+                assertTrue(simplex.gomoryCuts(8).isEmpty())
+                assertTrue(simplex.mirCuts(8).isEmpty())
+            } finally {
+                simplex.close()
+            }
+            assertTrue(engine.harvestRootCuts(relaxer, session, emptyList(), gomory = true, mir = true).isEmpty())
+        }
+    }
+
+    @Test
+    fun `generated local tableau cut follows its source bound through pop and sibling`() {
+        val problem = Problem(
+            0,
+            3,
+            Array(3) { IntDomain(0, 5) },
+            arrayOf(Linear(intArrayOf(2, 2, 1), intArrayOf(0, 1, 2), LinearOp.LE, 9)),
+        )
+        LpEngine(
+            problem,
+            LinearObjective(intCoefficients = longArrayOf(-1, -1, 0)),
+            LpParams(lpPlan = LpPlan(bounding = true, cuts = true)),
+            SolveStatsSink(backend = "local-tableau"),
+        ).use { engine ->
+            val cp = CpSearchComponent(PropagationSession(problem))
+            engine.cpAdapter.attach(cp.session, feasibility = false)
+            val search = SearchSession(listOf(cp, engine.propagator))
+            search.initialize()
+            search.push(SearchDecision.IntAtLeast(2, 2))
+            val relaxer = assertNotNull(engine.lpRelaxer)
+            val local = engine.nodeRelaxation(relaxer, cp.session)
+            val simplex = engine.dualSimplex(local.model, Cancellation.Never)
+            val (baseResult, raw) = try {
+                val result = assertNotNull(simplex.solve())
+                result to simplex.gomoryCuts(8).single()
+            } finally {
+                simplex.close()
+            }
+            assertEquals(-3.5, baseResult.objective)
+            val tableau = assertNotNull(raw.tableau)
+            assertNull(raw.provenance)
+            assertEquals(Relation.GE, raw.rel)
+            assertContentEquals(intArrayOf(0, 1), raw.cols)
+            assertContentEquals(longArrayOf(-1, -1), raw.coeffs)
+            assertEquals(-3L, raw.rhs)
+            val source = assertNotNull(SourceCut.fromCut(raw, local).orNull())
+            val rule = source.provenance.rules.single()
+            val multiplier = rule.rows.single().multiplier
+            assertTrue(multiplier > 0)
+            assertEquals(2L * multiplier, rule.divisor)
+            assertEquals(1L, rule.reduction)
+            assertFalse(rule.mir)
+            assertEquals(tableau.divisor, rule.divisor)
+            val sourceX = CutSource(CutSourceKind.INTEGER, 0)
+            val sourceY = CutSource(CutSourceKind.INTEGER, 1)
+            val z = CutSource(CutSourceKind.INTEGER, 2)
+            assertEquals(
+                CutPremise.Row(
+                    CutExpression(
+                        mapOf(
+                            sourceX to BigFraction.ofLong(2),
+                            sourceY to BigFraction.ofLong(2),
+                            z to BigFraction.ONE,
+                        ),
+                    ),
+                    Relation.LE,
+                    BigFraction.ofLong(9),
+                ),
+                rule.rows.single().row,
+            )
+            assertEquals(Relation.GE, source.relation)
+            assertEquals(
+                CutPremise.Row(
+                    CutExpression(mapOf(sourceX to BigFraction.MINUS_ONE, sourceY to BigFraction.MINUS_ONE)),
+                    Relation.GE,
+                    BigFraction.ofLong(-3),
+                ),
+                source.provenance.conclusion,
+            )
+            val guard = CutPremise.Bound(
+                CutExpression(mapOf(z to BigFraction.ONE)),
+                false,
+                BigFraction.ofLong(2),
+            )
+            for (variable in listOf(sourceX, sourceY, z)) {
+                val expression = CutExpression(mapOf(variable to BigFraction.ONE))
+                assertTrue(source.provenance.facts.contains(CutProofFact(CutPremise.Integral(expression), true)))
+            }
+            assertTrue(source.provenance.facts.contains(CutProofFact(guard, false)))
+            assertFalse(source.provenance.global)
+            assertTrue(source.provenance.facts.none { it.premise == source.provenance.conclusion })
+
+            assertTrue(engine.cutPool.cuts().isEmpty())
+            engine.recordSearchCuts(listOf(raw), baseResult.primal, local, cp.session)
+            val consumed = engine.cutPool.cuts().single()
+            assertFalse(consumed.global)
+            assertEquals(tableau.divisor, consumed.provenance?.rules?.single()?.divisor)
+            assertFalse(assertNotNull(consumed.provenance).rules.single().mir)
+            assertTrue(engine.cutPool.exportGlobalCuts().isEmpty())
+            val applied = relaxer.build(cp.session, listOf(consumed))
+            val row = applied.model.m - 1
+            assertFalse(applied.model.rowGlobal[row])
+            assertSame(consumed.provenance, applied.sourceMap?.parent(row))
+            assertNull(applied.model.rowPremises[row])
+            assertContentEquals(longArrayOf(0, 0, 2), applied.model.loShift)
+            val coefficients = LongArray(applied.model.n)
+            for (column in coefficients.indices) {
+                applied.model.forEachInColumn(column) { index, value ->
+                    if (index == row) coefficients[column] = value
+                }
+            }
+            assertContentEquals(longArrayOf(1, 1, 0), coefficients)
+            assertEquals(3L, applied.model.rhs[row])
+            assertFalse(applied.model.hasUpper[applied.model.slackCol(row)])
+            val tightened = assertNotNull(engine.solveNode(applied.model, null, Cancellation.Never)?.second)
+            assertEquals(-3.0, tightened.objective)
+
+            for (x in 0L..5L) {
+                for (y in 0L..5L) {
+                    for (value in 2L..5L) {
+                        if (2 * x + 2 * y + value > 9) continue
+                        assertTrue(x + y <= 3)
+                        val lhs = source.expression.value { term ->
+                            BigFraction.ofLong(
+                                when (term.id) {
+                                    0 -> x
+                                    1 -> y
+                                    else -> value
+                                },
+                            )
+                        }
+                        assertTrue(lhs >= source.rhs)
+                    }
+                }
+            }
+            assertTrue(2L * 1 + 2L * 2 + 2 <= 9 && 1L + 2L > applied.model.rhs[row] - 1)
+            assertTrue(2L * 4 + 2L * 0 + 0 <= 9 && 4L + 0L > applied.model.rhs[row])
+
+            search.popTo(0)
+            engine.nodeRelaxation(relaxer, cp.session)
+            assertTrue(engine.cutPool.cuts().isEmpty())
+            search.push(SearchDecision.IntAtMost(2, 1))
+            engine.nodeRelaxation(relaxer, cp.session)
+            assertTrue(engine.cutPool.cuts().isEmpty())
+            assertTrue(engine.cutPool.exportGlobalCuts().isEmpty())
+            search.popTo(0)
+            search.push(SearchDecision.IntAtLeast(2, 3))
+            engine.nodeRelaxation(relaxer, cp.session)
+            val reactivated = engine.cutPool.cuts().single()
+            assertFalse(reactivated.global)
+            assertTrue(assertNotNull(reactivated.provenance).facts.contains(CutProofFact(guard, false)))
+            val sibling = relaxer.build(cp.session, listOf(reactivated))
+            val siblingRow = sibling.model.m - 1
+            assertContentEquals(longArrayOf(0, 0, 3), sibling.model.loShift)
+            assertEquals(3L, sibling.model.rhs[siblingRow])
+            assertFalse(sibling.model.rowGlobal[siblingRow])
+            assertSame(reactivated.provenance, sibling.sourceMap?.parent(siblingRow))
+            val siblingCoefficients = LongArray(sibling.model.n)
+            for (column in siblingCoefficients.indices) {
+                sibling.model.forEachInColumn(column) { index, value ->
+                    if (index == siblingRow) siblingCoefficients[column] = value
+                }
+            }
+            assertContentEquals(longArrayOf(1, 1, 0), siblingCoefficients)
+        }
+    }
+
+    @Test
+    fun `generated tableau cuts reach a shifted source row and a solved relaxation`() {
+        for (mir in listOf(false, true)) {
+            val rawCuts = ArrayList<Cut>()
+            val solved = ArrayList<Pair<LpModel, Double>>()
+            val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+                override fun newTableauSolver(
+                    model: LpModel,
+                    cancellation: Cancellation,
+                    iterationLimit: Int,
+                    workLimit: Long,
+                    trackDegeneracy: Boolean,
+                    pricing: LpPricingOptions,
+                ): TableauCutSolver {
+                    val solver = ProductionLpEngineFactory.newTableauSolver(
+                        model,
+                        cancellation,
+                        iterationLimit,
+                        workLimit,
+                        trackDegeneracy,
+                        pricing,
+                    )
+                    return object : TableauCutSolver by solver {
+                        override fun solve(warm: Basis?) = solver.solve(warm).also { result ->
+                            if (result != null) solved.add(model to result.objective)
+                        }
+                        override fun gomoryCuts(maxCuts: Int): List<Cut> =
+                            solver.gomoryCuts(maxCuts).also(rawCuts::addAll)
+                        override fun mirCuts(maxCuts: Int): List<Cut> = solver.mirCuts(maxCuts).also(rawCuts::addAll)
+                    }
+                }
+            }
+            val problem = Problem(
+                0,
+                2,
+                arrayOf(IntDomain(1, 5), IntDomain(1, 5)),
+                arrayOf(Linear(intArrayOf(2, 2), intArrayOf(0, 1), LinearOp.LE, 7)),
+            )
+            LpEngine(
+                problem,
+                LinearObjective(intCoefficients = longArrayOf(-1, -1)),
+                LpParams(lpPlan = LpPlan(bounding = true, cuts = true)),
+                SolveStatsSink(backend = if (mir) "tableau-mir" else "tableau-gomory"),
+                solveContext = LpSolveContext(engineFactory = factory),
+            ).use { engine ->
+                val session = PropagationSession(problem)
+                val relaxer = assertNotNull(engine.lpRelaxer)
+                val base = relaxer.build(session)
+                assertContentEquals(longArrayOf(1, 1), base.model.loShift)
+
+                val harvested = engine.harvestRootCuts(
+                    relaxer,
+                    session,
+                    emptyList(),
+                    gomory = !mir,
+                    mir = mir,
+                )
+                assertTrue(solved.size >= 2)
+                assertEquals(-3.5, solved.first().second)
+                assertEquals(-3.0, solved.last().second)
+                val generated = harvested.single()
+                val raw = rawCuts.single()
+                val tableau = assertNotNull(raw.tableau)
+                assertNull(raw.provenance)
+                assertEquals(mir, tableau.mir)
+                assertEquals(Relation.GE, raw.rel)
+                assertContentEquals(intArrayOf(0, 1), raw.cols)
+                assertContentEquals(longArrayOf(-1, -1), raw.coeffs)
+                assertEquals(-3L, raw.rhs)
+                assertContentEquals(raw.cols, generated.cols)
+                assertContentEquals(raw.coeffs, generated.coeffs)
+                assertEquals(raw.rhs, generated.rhs)
+                val source = assertNotNull(SourceCut.fromCut(generated, base).orNull())
+                val sourceX = CutSource(CutSourceKind.INTEGER, 0)
+                val sourceY = CutSource(CutSourceKind.INTEGER, 1)
+                val row = assertNotNull(source.provenance.conclusion)
+                val rule = source.provenance.rules.single()
+                assertEquals(mir, rule.mir)
+                val multiplier = rule.rows.single().multiplier
+                assertTrue(multiplier > 0)
+                assertEquals(2L * multiplier, rule.divisor)
+                assertEquals(tableau.divisor, rule.divisor)
+                assertEquals(if (mir) multiplier else 1L, rule.reduction)
+                assertEquals(tableau.reduction, rule.reduction)
+                assertEquals(
+                    CutPremise.Row(
+                        CutExpression(mapOf(sourceX to BigFraction.ofLong(2), sourceY to BigFraction.ofLong(2))),
+                        Relation.LE,
+                        BigFraction.ofLong(7),
+                    ),
+                    rule.rows.single().row,
+                )
+                assertEquals(Relation.GE, source.relation)
+                assertEquals(
+                    CutPremise.Row(
+                        CutExpression(mapOf(sourceX to BigFraction.MINUS_ONE, sourceY to BigFraction.MINUS_ONE)),
+                        Relation.GE,
+                        BigFraction.ofLong(-3),
+                    ),
+                    row,
+                )
+                assertTrue(source.provenance.facts.none { it.premise == row })
+                for (sourceVariable in listOf(sourceX, sourceY)) {
+                    val expression = CutExpression(mapOf(sourceVariable to BigFraction.ONE))
+                    assertTrue(source.provenance.facts.contains(CutProofFact(CutPremise.Integral(expression), true)))
+                    assertTrue(
+                        source.provenance.facts.contains(
+                            CutProofFact(CutPremise.Bound(expression, false, BigFraction.ONE), true),
+                        ),
+                    )
+                }
+                assertTrue(source.provenance.global)
+
+                engine.cutPool.addAll(harvested)
+                val root = engine.nodeRelaxation(relaxer, session)
+                val consumed = engine.cutPool.cuts().single()
+                assertTrue(consumed.global)
+                val applied = relaxer.build(session, listOf(consumed))
+                val solvedModel = solved.last().first
+                assertEquals(root.model.m + 1, solvedModel.m)
+                assertContentEquals(applied.model.csc.colPtr, solvedModel.csc.colPtr)
+                assertContentEquals(applied.model.csc.rowIdx, solvedModel.csc.rowIdx)
+                assertContentEquals(applied.model.csc.colVal, solvedModel.csc.colVal)
+                assertContentEquals(applied.model.rhs, solvedModel.rhs)
+                assertContentEquals(applied.model.loShift, solvedModel.loShift)
+                val cutRow = solvedModel.m - 1
+                val structural = LongArray(solvedModel.n)
+                for (column in structural.indices) {
+                    solvedModel.forEachInColumn(column) { rowIndex, value ->
+                        if (rowIndex == cutRow) structural[column] = value
+                    }
+                }
+                assertContentEquals(longArrayOf(1, 1), structural)
+                assertEquals(1L, solvedModel.rhs[cutRow])
+                assertContentEquals(longArrayOf(1, 1), solvedModel.loShift)
+                assertTrue(solvedModel.rowGlobal[cutRow])
+                assertNull(solvedModel.rowPremises[cutRow])
+                assertSame(consumed.provenance, applied.sourceMap?.parent(cutRow))
+                assertFalse(solvedModel.hasUpper[solvedModel.slackCol(cutRow)])
+                val sourceThreshold = solvedModel.rhs[cutRow] +
+                    structural.indices.sumOf { structural[it] * solvedModel.loShift[it] }
+                assertEquals(3L, sourceThreshold)
+
+                for (x in 1L..5L) {
+                    for (y in 1L..5L) {
+                        if (2 * x + 2 * y > 7) continue
+                        val observed = row.expression.value { BigFraction.ofLong(if (it == sourceX) x else y) }
+                        assertTrue(observed >= row.rhs)
+                        assertTrue(x + y <= sourceThreshold)
+                    }
+                }
+                assertTrue(2L * 1 + 2L * 2 <= 7 && 1L + 2L > sourceThreshold - 1)
+
+                session.implyIntAtLeast(0, 2)
+                engine.nodeRelaxation(relaxer, session)
+                val remapped = engine.cutPool.cuts().single()
+                assertTrue(remapped.global)
+                val shifted = relaxer.build(session, listOf(remapped))
+                val shiftedRow = shifted.model.m - 1
+                assertContentEquals(longArrayOf(2, 1), shifted.model.loShift)
+                assertEquals(0L, shifted.model.rhs[shiftedRow])
+                assertSame(remapped.provenance, shifted.sourceMap?.parent(shiftedRow))
+                val shiftedCoefficients = LongArray(shifted.model.n)
+                for (column in shiftedCoefficients.indices) {
+                    shifted.model.forEachInColumn(column) { index, value ->
+                        if (index == shiftedRow) shiftedCoefficients[column] = value
+                    }
+                }
+                assertContentEquals(longArrayOf(1, 1), shiftedCoefficients)
+                assertEquals(
+                    sourceThreshold,
+                    shifted.model.rhs[shiftedRow] +
+                        shiftedCoefficients.indices.sumOf {
+                            shiftedCoefficients[it] * shifted.model.loShift[it]
+                        },
+                )
+            }
+        }
+    }
+
     @Test
     fun `generated Hall cut survives pool remapping as an exact source row`() {
         val problem = Problem(
