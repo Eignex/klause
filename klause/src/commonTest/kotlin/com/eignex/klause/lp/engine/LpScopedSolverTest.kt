@@ -6,6 +6,7 @@ import com.eignex.klause.simplex.basis.BasisPhaseWork
 import com.eignex.klause.simplex.basis.BasisRepair
 import com.eignex.klause.simplex.basis.BasisRepairControl
 import com.eignex.klause.simplex.basis.BasisSolver
+import com.eignex.klause.simplex.basis.BasisUpdate
 import com.eignex.klause.simplex.basis.IndexedVector
 import com.eignex.klause.simplex.basis.KotlinBasisSolver
 import com.eignex.klause.simplex.exact.BigFraction
@@ -21,6 +22,139 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class LpScopedSolverTest {
+    @Test
+    fun `failed adoption after a solve does not repeat its pivot charge`() {
+        val state = LpExactState(lowerBoundModel())
+        var reject = false
+        val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+            override fun newPersistentSolver(
+                model: LpModel,
+                cancellation: Cancellation,
+                refactorUpdateLimit: Int,
+                iterationLimit: Int,
+                workLimit: Long,
+                trackDegeneracy: Boolean,
+                pricing: LpPricingOptions,
+            ): PersistentLpSolver {
+                val delegate = ProductionLpEngineFactory.newPersistentSolver(
+                    model,
+                    cancellation,
+                    refactorUpdateLimit,
+                    iterationLimit,
+                    workLimit,
+                    trackDegeneracy,
+                    pricing,
+                )
+                return object : PersistentLpSolver by delegate {
+                    override fun adopt(state: LpExactState, token: Cancellation): Boolean =
+                        !reject && delegate.adopt(state, token)
+                }
+            }
+        }
+        LpScopedSolver(state, context = LpSolveContext(engineFactory = factory)).use { owner ->
+            owner.withWorkingModel(LpWorkingModel.overrides(state)) { scope ->
+                assertNotNull(scope.solveFloat())
+                val completed = scope.metrics.solves
+                assertTrue(completed.pivots > 0)
+                reject = true
+
+                assertNull(scope.solveFloat())
+
+                assertEquals(completed, scope.metrics.solves)
+                assertTrue(scope.metrics.owners.preparationWork > 0L)
+            }
+            assertEquals(0L, assertNotNull(owner.lastWorkingMetrics).owners.currentOwners)
+            owner.requireAvailable()
+        }
+    }
+
+    @Test
+    fun `failed adoption after preparation charges only preparation`() {
+        val state = LpExactState(lowerBoundModel())
+        var adoptions = 0
+        val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+            override fun newPersistentSolver(
+                model: LpModel,
+                cancellation: Cancellation,
+                refactorUpdateLimit: Int,
+                iterationLimit: Int,
+                workLimit: Long,
+                trackDegeneracy: Boolean,
+                pricing: LpPricingOptions,
+            ): PersistentLpSolver {
+                val delegate = ProductionLpEngineFactory.newPersistentSolver(
+                    model,
+                    cancellation,
+                    refactorUpdateLimit,
+                    iterationLimit,
+                    workLimit,
+                    trackDegeneracy,
+                    pricing,
+                )
+                return object : PersistentLpSolver by delegate {
+                    override fun adopt(state: LpExactState, token: Cancellation): Boolean =
+                        ++adoptions == 1 && delegate.adopt(state, token)
+                }
+            }
+        }
+        LpScopedSolver(state, context = LpSolveContext(engineFactory = factory)).use { owner ->
+            owner.withWorkingModel(LpWorkingModel.overrides(state)) { scope ->
+                assertNull(scope.solveFloat())
+
+                assertEquals(2, adoptions)
+                assertEquals(LpSolveMetrics(), scope.metrics.solves)
+                assertTrue(scope.metrics.owners.preparationWork > 0L)
+            }
+            assertEquals(0L, assertNotNull(owner.lastWorkingMetrics).owners.currentOwners)
+        }
+    }
+
+    @Test
+    fun `engine failure after a pivot retains completed solve charge`() {
+        val state = LpExactState(lowerBoundModel())
+        val failure = IllegalStateException("basis update failed")
+        val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+            override fun newPersistentSolver(
+                model: LpModel,
+                cancellation: Cancellation,
+                refactorUpdateLimit: Int,
+                iterationLimit: Int,
+                workLimit: Long,
+                trackDegeneracy: Boolean,
+                pricing: LpPricingOptions,
+            ): PersistentLpSolver = RevisedSimplex(
+                model,
+                cancellation,
+                refactorUpdateLimit,
+                iterationLimit,
+                workLimit,
+                trackDegeneracy,
+                basisSolverFactory = { matrix ->
+                    val delegate = KotlinBasisSolver(matrix)
+                    object : BasisSolver by delegate {
+                        override fun update(
+                            pivotRow: Int,
+                            entering: Int,
+                            spike: IndexedVector,
+                            pivotEta: IndexedVector?,
+                        ): BasisUpdate = throw failure
+                    }
+                },
+                pricing = pricing,
+            )
+        }
+        LpScopedSolver(state, context = LpSolveContext(engineFactory = factory)).use { owner ->
+            owner.withWorkingModel(LpWorkingModel.overrides(state)) { scope ->
+                assertSame(failure, assertFailsWith<IllegalStateException> { scope.solveFloat() })
+
+                assertEquals(1, scope.metrics.solves.pivots)
+                assertTrue(scope.metrics.solves.workOps > 0L)
+            }
+            assertEquals(0L, assertNotNull(owner.lastWorkingMetrics).owners.currentOwners)
+            owner.requireAvailable()
+        }
+    }
+
     @Test
     fun `fresh replacement keeps partial units and records unknown work`() {
         val factory = object : LpEngineFactory by ProductionLpEngineFactory {
