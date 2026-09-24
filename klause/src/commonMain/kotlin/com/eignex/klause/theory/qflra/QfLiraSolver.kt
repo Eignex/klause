@@ -48,6 +48,7 @@ import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchIntValue
 import com.eignex.klause.solver.search.SearchModel
 import com.eignex.klause.solver.search.SearchRealValue
+import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.solver.search.SearchTheoryDecision
 import com.eignex.klause.solver.search.TheoryComponent
 import com.eignex.klause.util.Cancellation
@@ -334,6 +335,9 @@ class ExactLiraSearchComponent(
             return null
         }
         if (reduced !is ExactLiraReduction.Bounded) {
+            if (!context.cancelled() && (context as? SearchSession)?.canCommitOpenTheoryDecision() != false) {
+                sourceIntegerSplit(requireNotNull(candidate), context)?.let { return it }
+            }
             outcome = ComponentCheck.Indeterminate
             return null
         }
@@ -394,6 +398,20 @@ class ExactLiraSearchComponent(
         val split = SourceBoundAtom.integerSplit(context, terms, value)
         if (split == null) outcome = ComponentCheck.Indeterminate
         return split?.alternatives()
+    }
+
+    private fun sourceIntegerSplit(point: List<BigFraction>, context: SearchContext): List<SearchDecision>? {
+        if (point.size != model.numRealVars + model.numIntVars) return null
+        for (integer in 0 until model.numIntVars) {
+            val value = point[model.numRealVars + integer]
+            if (value.isInteger()) continue
+            return SourceBoundAtom.integerSplit(
+                context,
+                listOf(SourceBoundTerm(SearchIntValue(integer), BigFraction.ONE)),
+                value,
+            )?.alternatives()
+        }
+        return null
     }
 
     private fun acceptWitness(point: List<BigFraction>): ExactLiraAssignment? {

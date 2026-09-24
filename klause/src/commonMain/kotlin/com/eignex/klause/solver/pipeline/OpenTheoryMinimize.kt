@@ -213,9 +213,15 @@ class OpenTheoryMinimizer internal constructor(
         // Not extra work: the opening round decides the model under no bound at all, so the close it would
         // have run is this one. A refutation here is over the genuinely open ranges rather than inside an
         // invented box, so it refutes the model itself — which, with no witness yet, is infeasibility.
+        var closingInterrupted = false
+        val closingCancellation = Cancellation {
+            val interrupted = stop() || prepared.budget?.remaining() == 0L
+            if (interrupted) closingInterrupted = true
+            interrupted
+        }
         val base = when (
             val closed = prepared.problem.closeOpenBounds(
-                Cancellation { stop() || prepared.budget?.remaining() == 0L },
+                closingCancellation,
                 stats.lp,
             )
         ) {
@@ -227,6 +233,10 @@ class OpenTheoryMinimizer internal constructor(
 
             is OpenPresolveResult.Tightened -> closed.spec
         }
+        // A second bounded attempt on the same opening model cannot read a stronger input. If the
+        // first attempt changed a declared range or saw cancellation, let the round close again.
+        var reuseOpeningBoundAttempt = base.sameDeclaredIntegerRanges(prepared.problem) &&
+            !closingInterrupted && !stop() && prepared.budget?.remaining() != 0L
         val state = OpenTheorySolveState(params)
         fun finish(round: SolveStats): SolveStats {
             stats.stop()
@@ -243,7 +253,9 @@ class OpenTheoryMinimizer internal constructor(
             val result = OpenTheoryEngine(
                 OpenSourcePreparation.Planned(prepared, spec, plan),
                 presolveCancellation,
+                reuseOpeningBoundAttempt,
             ).solve(params, state)
+            reuseOpeningBoundAttempt = false
             when (result) {
                 is OpenTheoryResult.Sat -> {
                     val value = objective.valueOf(result.assignment)
@@ -443,6 +455,23 @@ class OpenTheoryMinimizer internal constructor(
         val LONG_MIN: BigInteger = BigInteger.fromLong(Long.MIN_VALUE)
         val LONG_MAX: BigInteger = BigInteger.fromLong(Long.MAX_VALUE)
     }
+}
+
+private fun Problem.sameDeclaredIntegerRanges(other: Problem): Boolean {
+    if (numIntVars != other.numIntVars || factors !== other.factors ||
+        realLower !== other.realLower || realUpper !== other.realUpper
+    ) {
+        return false
+    }
+    val left = intBounds
+    val right = other.intBounds
+    for (v in 0 until numIntVars) {
+        if (left.hasLower(v) != right.hasLower(v) || left.hasUpper(v) != right.hasUpper(v)) return false
+        if (left.hasLower(v) && left.lower(v) != right.lower(v)) return false
+        if (left.hasUpper(v) && left.upper(v) != right.upper(v)) return false
+        if (declaredIntDomains.declaredOrNull(v) !== other.declaredIntDomains.declaredOrNull(v)) return false
+    }
+    return true
 }
 
 /**

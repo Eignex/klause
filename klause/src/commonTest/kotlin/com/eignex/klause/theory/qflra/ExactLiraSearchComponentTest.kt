@@ -51,6 +51,48 @@ import kotlin.test.assertTrue
 class ExactLiraSearchComponentTest {
 
     @Test
+    fun `fractional source integer branches after reduction admission declines`() {
+        val model = Problem(
+            numBoolVars = 0,
+            intBounds = IntBounds.fromModelBounds(LongArray(35), LongArray(35) { if (it == 0) 1L else 0L }, null, null),
+            factors = arrayOf(Linear(intArrayOf(2), intArrayOf(0), LinearOp.GE, 1)),
+        )
+        val stats = SmtStatsSink()
+        ExactLiraSearchComponent(model).use { component ->
+            component.observeWith(stats)
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(0))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+
+            val result = assertIs<SearchResult.Satisfied>(session.solve(0))
+
+            val assignment = assertNotNull(result.model.valueOf<ExactLiraAssignment>(component))
+            assertEquals(BigInteger.ONE, assignment.ints[0])
+            assertTrue(stats.snapshot().sourceLp.operations > 0L)
+            assertEquals(0L, stats.snapshot().reductionRequests)
+        }
+    }
+
+    @Test
+    fun `source split leaves an unchecked branch indeterminate`() {
+        val model = Problem(
+            numBoolVars = 0,
+            intBounds = IntBounds.fromModelBounds(LongArray(35), LongArray(35) { if (it == 0) 1L else 0L }, null, null),
+            factors = arrayOf(Linear(intArrayOf(2), intArrayOf(0), LinearOp.GE, 1)),
+        )
+        val stats = SmtStatsSink()
+        ExactLiraSearchComponent(model).use { component ->
+            component.observeWith(stats)
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(0), maxChecks = 2)
+            assertIs<ComponentResult.Consistent>(session.initialize())
+
+            assertIs<SearchResult.Indeterminate>(session.solve(0))
+
+            assertTrue(stats.snapshot().sourceLp.operations > 0L)
+            assertEquals(0L, stats.snapshot().unexplainedConflicts)
+        }
+    }
+
+    @Test
     fun `root restart retains conditional reasons and registered atom names`() {
         val source = Problem(
             numBoolVars = 1,
@@ -110,7 +152,7 @@ class ExactLiraSearchComponentTest {
     }
 
     @Test
-    fun `a satisfiable equality subset cannot publish a full source witness`() {
+    fun `source branches refute an integer system with a satisfiable equality subset`() {
         val model = Problem(
             numBoolVars = 0,
             intBounds = IntBounds.fromModelBounds(longArrayOf(0L), longArrayOf(1L), null, null),
@@ -131,9 +173,9 @@ class ExactLiraSearchComponentTest {
             val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(0))
             assertIs<ComponentResult.Consistent>(session.initialize())
 
-            assertIs<SearchResult.Indeterminate>(session.solve(0))
+            assertIs<SearchResult.Exhausted>(session.solve(0))
 
-            assertTrue(stats.snapshot().sourceLp.operations >= 5L)
+            assertTrue(stats.snapshot().sourceLp.operations > 0L)
             assertEquals(0L, stats.snapshot().unexplainedConflicts)
         }
         assertIs<TheoryCheck.Infeasible>(ExactLiraSolver(model).check(booleanArrayOf(), exactContext()))
