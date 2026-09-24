@@ -84,6 +84,11 @@ class ExactLiraSearchComponent(
     private var candidate: List<BigFraction>? = null
     private var dirty = true
     private var solveContext = LpSolveContext.Production
+    private var solveStop: Cancellation? = null
+    private var operationAllowance: (Cancellation) -> Cancellation = { it.shorten(0.5) }
+    private var operationStop = Cancellation.Never
+    internal var operationBudgetExhausted = false
+        private set
     private val arithmeticRows = model.factors.flatMap { it.linearRows }.filter { row ->
         (0 until row.size).any { !Term.isBool(row.ref(it)) }
     }
@@ -101,7 +106,7 @@ class ExactLiraSearchComponent(
                 override fun retract(decisionLevel: Int) = retractSource(decisionLevel)
             },
             solveContext = solveContext,
-            cancellation = Cancellation { context?.cancelled() == true },
+            cancellation = Cancellation { operationStop() || context?.cancelled() == true },
             certificationObserver = object : LpCertificationObserver {
                 override fun observe(certifier: LpCertifier, success: Boolean) = Unit
                 override fun observeExactInput(accepted: Boolean) = Unit
@@ -120,6 +125,16 @@ class ExactLiraSearchComponent(
         solveContext = context
     }
 
+    internal fun useSolveStop(stop: Cancellation?) {
+        check(context == null)
+        solveStop = stop
+    }
+
+    internal fun useOperationAllowance(allowance: (Cancellation) -> Cancellation) {
+        check(context == null)
+        operationAllowance = allowance
+    }
+
     internal val lpMetrics get() = lp.metrics
 
     internal fun observeWith(stats: SmtStatsSink) {
@@ -134,17 +149,52 @@ class ExactLiraSearchComponent(
     override fun initialize(context: SearchContext): ComponentResult {
         check(this.context == null) { "a theory component belongs to one immutable source session" }
         this.context = context
-        if (!system.install()) return ComponentResult.Indeterminate
-        return lp.initialize(context)
+        beginOperation(context)
+        return try {
+            if (!system.install() || operationStop()) {
+                ComponentResult.Indeterminate
+            } else {
+                lp.initialize(context).takeUnless { operationStop() } ?: ComponentResult.Indeterminate
+            }
+        } finally {
+            endOperation(context)
+        }
     }
 
-    override fun assert(decision: SearchDecision, context: SearchContext): ComponentResult = lp.assert(
-        decision,
-        context,
-    )
+    override fun assert(decision: SearchDecision, context: SearchContext): ComponentResult {
+        beginOperation(context)
+        return try {
+            if (operationStop()) {
+                ComponentResult.Indeterminate
+            } else {
+                val result = lp.assertWithin(decision, context, operationStop)
+                if (operationStop()) ComponentResult.Indeterminate else result
+            }
+        } finally {
+            endOperation(context)
+        }
+    }
     override fun propagate(context: SearchContext): ComponentResult = lp.propagate(context)
     override fun check(context: SearchContext): ComponentCheck = lp.check(context)
-    override fun nextBranch(context: SearchContext): List<SearchDecision>? = lp.nextBranch(context)
+    override fun nextBranch(context: SearchContext): List<SearchDecision>? {
+        beginOperation(context)
+        return try {
+            if (operationStop()) {
+                outcome = ComponentCheck.Indeterminate
+                null
+            } else {
+                val branches = lp.nextBranch(context)
+                if (operationStop()) {
+                    outcome = ComponentCheck.Indeterminate
+                    null
+                } else {
+                    branches
+                }
+            }
+        } finally {
+            endOperation(context)
+        }
+    }
     override fun retract(decisionLevel: Int) = lp.retract(decisionLevel)
     override fun onRestart(context: SearchContext) = lp.onRestart(context)
     override fun close() {
@@ -184,7 +234,7 @@ class ExactLiraSearchComponent(
                         reduced.budget.run(
                             branchRows,
                             model.numRealVars + model.numIntVars,
-                            Cancellation(context::cancelled),
+                            operationStop,
                         ) {
                             branchRows.all { row ->
                                 reduced.system.transform(row).columns.all(reduced.system::boundedColumn)
@@ -267,6 +317,27 @@ class ExactLiraSearchComponent(
     }
 
     private fun relax(context: SearchContext): ComponentResult {
+        beginOperation(context)
+        return try {
+            relaxWithin(context)
+        } finally {
+            endOperation(context)
+        }
+    }
+
+    private fun beginOperation(context: SearchContext) {
+        operationBudgetExhausted = false
+        val parent = solveStop ?: (context as? SearchSession)?.stopToken() ?: Cancellation(context::cancelled)
+        operationStop = operationAllowance(parent)
+    }
+
+    private fun endOperation(context: SearchContext) {
+        if (operationStop() && !context.cancelled()) operationBudgetExhausted = true
+        operationStop = Cancellation.Never
+    }
+
+    private fun relaxWithin(context: SearchContext): ComponentResult {
+        if (operationStop()) return ComponentResult.Indeterminate
         if (!dirty) return ComponentResult.Consistent
         if (bools.any { it == UNASSIGNED } && arithmeticRows.none {
                 it.truthUnder(bools) != null
@@ -275,12 +346,12 @@ class ExactLiraSearchComponent(
             return ComponentResult.Consistent
         }
         val asserted = assertSource(context)
-        if (!asserted || context.cancelled()) {
+        if (!asserted || operationStop()) {
             return ComponentResult.Indeterminate
         }
         if (!context.consumeCheck()) return ComponentResult.Indeterminate
-        val result = lp.solve() ?: return ComponentResult.Indeterminate
-        if (context.cancelled()) return ComponentResult.Indeterminate
+        val result = lp.solve(token = operationStop) ?: return ComponentResult.Indeterminate
+        if (operationStop()) return ComponentResult.Indeterminate
         dirty = false
         candidate = result.exactPrimal?.take(model.numRealVars + model.numIntVars)
         if (result.verdict == LpVerdict.INFEASIBLE) {
@@ -305,7 +376,7 @@ class ExactLiraSearchComponent(
 
     private fun branch(context: SearchContext): List<SearchDecision>? {
         if (bools.any { it == UNASSIGNED } || outcome != null) return null
-        if (context.cancelled() || !context.consumeCheck()) {
+        if (operationStop() || !context.consumeCheck()) {
             outcome = ComponentCheck.Indeterminate
             return null
         }
@@ -326,7 +397,7 @@ class ExactLiraSearchComponent(
         val reduced = node.retainedReduction ?: reduction.reduce(
             bools,
             node.withPublishedBounds(model.numIntVars, context::intLowerBound, context::intUpperBound),
-            Cancellation(context::cancelled),
+            operationStop,
             smtStats,
         )
         if (reduced == ExactLiraReduction.Infeasible) {
@@ -335,7 +406,7 @@ class ExactLiraSearchComponent(
             return null
         }
         if (reduced !is ExactLiraReduction.Bounded) {
-            if (!context.cancelled() && (context as? SearchSession)?.canCommitOpenTheoryDecision() != false) {
+            if (!operationStop() && (context as? SearchSession)?.canCommitOpenTheoryDecision() != false) {
                 sourceIntegerSplit(requireNotNull(candidate), context)?.let { return it }
             }
             outcome = ComponentCheck.Indeterminate
@@ -361,7 +432,7 @@ class ExactLiraSearchComponent(
             outcome = ComponentCheck.Indeterminate
             return null
         }
-        when (val bounded = reduced.solver.solve(node, Cancellation(context::cancelled))) {
+        when (val bounded = reduced.solver.solve(node, operationStop)) {
             is ExactReducedSearchResult.Split -> {
                 return registeredSplit(reduced, bounded.integer, bounded.floor.asFraction(), context)
             }
@@ -375,7 +446,7 @@ class ExactLiraSearchComponent(
 
             is ExactReducedSearchResult.Found -> {
                 assignment = acceptWitness(bounded.sourceValues)
-                outcome = if (assignment != null && !context.cancelled()) {
+                outcome = if (assignment != null && !operationStop()) {
                     ComponentCheck.Feasible
                 } else {
                     ComponentCheck.Indeterminate
@@ -420,8 +491,9 @@ class ExactLiraSearchComponent(
         ) {
             return null
         }
-        val rows = reduction.sourceRows(bools, node, Cancellation { context?.cancelled() == true }) ?: return null
-        if (!point.satisfiesSourceRows(rows, Cancellation { context?.cancelled() == true })) return null
+        val token = Cancellation { operationStop() || context?.cancelled() == true }
+        val rows = reduction.sourceRows(bools, node, token) ?: return null
+        if (!point.satisfiesSourceRows(rows, token)) return null
         val strict = rows.any { it.strict }
         val wide = rows.hasWideIntegerData() || point.any { it.num.abs() > WIDE_INTEGER_LIMIT }
         smtStats?.observeWitnessCandidate(strict, wide)

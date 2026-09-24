@@ -27,6 +27,7 @@ import com.eignex.klause.solver.search.SearchRunObserver
 import com.eignex.klause.solver.search.SearchSolveParams
 import com.eignex.klause.solver.search.Vsids
 import com.eignex.klause.theory.qflra.ExactLiraAssignment
+import com.eignex.klause.theory.qflra.ExactLiraSearchComponent
 import com.eignex.klause.theory.qflra.ExactLraAssignment
 import com.eignex.klause.util.Cancellation
 import com.ionspin.kotlin.bignum.integer.BigInteger
@@ -235,7 +236,7 @@ class OpenTheoryEngine internal constructor(
 
     private fun solvePrepared(params: TheoryParams, state: OpenTheorySolveState): OpenTheoryResult {
         val work = state.work
-        val cancellation = Cancellation { params.timeout() || params.cancellation() }
+        val cancellation = params.timeout or params.cancellation
         val stats = SolveStatsSink(backend = declaredRoute.backendName())
         stats.start()
         // Preparation reads the whole model, so a budget already spent is answered before that work
@@ -276,6 +277,7 @@ class OpenTheoryEngine internal constructor(
             cancellation = cancellation,
             learnedDb = SearchLearnedDbParams(params.maxLearnedClauses, params.lbdGlue),
             smtStats = state.smt,
+            theorySolveStop = cancellation,
         )
         planned.use {
             planned.session.attachOpenTheoryWork(work)
@@ -288,7 +290,8 @@ class OpenTheoryEngine internal constructor(
 
                 ComponentResult.Indeterminate -> return unknown(
                     params.timeout(),
-                    planned.session.checkBudgetExhausted(),
+                    planned.session.checkBudgetExhausted() ||
+                        (planned.theory as? ExactLiraSearchComponent)?.operationBudgetExhausted == true,
                     stats,
                     state,
                 )
@@ -328,7 +331,8 @@ class OpenTheoryEngine internal constructor(
 
                 SearchResult.Indeterminate -> unknown(
                     params.timeout(),
-                    planned.session.checkBudgetExhausted() || planned.session.decisionBudgetExhausted(),
+                    planned.session.checkBudgetExhausted() || planned.session.decisionBudgetExhausted() ||
+                        (planned.theory as? ExactLiraSearchComponent)?.operationBudgetExhausted == true,
                     stats,
                     state,
                     planned.session,

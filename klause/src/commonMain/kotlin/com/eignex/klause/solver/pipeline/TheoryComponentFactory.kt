@@ -7,9 +7,14 @@ import com.eignex.klause.solver.search.SearchRealValue
 import com.eignex.klause.solver.search.TheoryComponent
 import com.eignex.klause.theory.difference.DifferenceSearchComponent
 import com.eignex.klause.theory.qflra.ExactLiraSearchComponent
+import com.eignex.klause.util.Cancellation
 
 /** Builds the theory component selected by this plan. */
-internal fun ComponentPlan.theoryComponent(spec: Problem, smtStats: SmtStatsSink? = null): TheoryComponent? {
+internal fun ComponentPlan.theoryComponent(
+    spec: Problem,
+    smtStats: SmtStatsSink? = null,
+    theorySolveStop: Cancellation? = null,
+): TheoryComponent? {
     val fragment = theoryFragment(spec)
     return when (theoryPipeline) {
         ProblemPipeline.DIFFERENCE_THEORY -> DifferenceSearchComponent.withRootBounds(
@@ -21,6 +26,7 @@ internal fun ComponentPlan.theoryComponent(spec: Problem, smtStats: SmtStatsSink
         ProblemPipeline.EXACT_LRA -> ExactLiraSearchComponent(fragment) { assignment, model ->
             assignment.reals.forEachIndexed { variable, value -> model.put(SearchRealValue(variable), value) }
         }.also { component ->
+            component.useSolveStop(theorySolveStop)
             smtStats?.let(component::observeWith)
         }
 
@@ -32,6 +38,7 @@ internal fun ComponentPlan.theoryComponent(spec: Problem, smtStats: SmtStatsSink
             }
             assignment.reals.forEachIndexed { variable, value -> model.put(SearchRealValue(variable), value) }
         }.also { component ->
+            component.useSolveStop(theorySolveStop)
             smtStats?.let(component::observeWith)
         }
 

@@ -1,8 +1,10 @@
 package com.eignex.klause.lp.bounding
 
+import com.eignex.klause.util.Cancellation
+
 /**
- * Decides when the node LP has stopped earning the search time it costs, and demotes it to a floor
- * budget rather than switching it off.
+ * Demotes node LP work to a floor budget when its deterministic cost is too high. A cumulative wall
+ * backstop stops optional LP work when its share of the solve deadline is spent.
  *
  * The signal is **deterministic work per node explored** — [com.eignex.klause.lp.engine.LpWork]
  * operations, not wall-clock time.
@@ -22,11 +24,8 @@ package com.eignex.klause.lp.bounding
  * and [backstopFired] records when it did, so a run whose counters do not reproduce says why instead of
  * leaving it a mystery.
  *
- * A prune spares the LP from the clock permanently and restarts the deterministic rule's evidence
- * window, on the same reasoning [LpWorkBudget] uses: a relaxation that prunes is worth its cost, and the
- * models with the most to gain from demotion are the ones that never prune at all. The asymmetry is the
- * point — a clock overruling a relaxation that demonstrably pays is the non-determinism this replaced,
- * while a deterministic cost-per-node judgement is not answered by a prune a million nodes ago.
+ * A prune restarts the deterministic evidence window. Wall time stays cumulative, including useful
+ * solves: the LP is optional search work and cannot consume the solve's whole allowance.
  */
 internal class LpEffortGovernor(
     private val opsPerNodeCap: Long,
@@ -36,15 +35,15 @@ internal class LpEffortGovernor(
     private var ops = 0L
     private var nodes = 0L
     private var solves = 0
-    private var spentMillis = 0L
+    private val wallBackstopNanos = if (wallBackstopMillis > Long.MAX_VALUE / NANOS_PER_MILLI) {
+        Long.MAX_VALUE
+    } else {
+        wallBackstopMillis * NANOS_PER_MILLI
+    }
+    private var spentNanos = 0L
     private var demoted = false
 
-    /** Set by the first prune, and only ever read by [chargeWall]: a productive relaxation is spared
-     *  the clock for good, while the deterministic rule stays live on a restarted window. */
-    private var everPruned = false
-
-    /** Whether the node LP has been demoted to its floor budget. Never a hard off switch: a demoted LP
-     *  still bounds, and with a persistent basis its solves still advance the next one. */
+    /** Whether the node LP has been demoted to its floor budget. A wall-exhausted LP is skipped. */
     val isDemoted: Boolean get() = demoted
 
     /** Whether the wall-clock backstop — rather than the deterministic ratio — caused the demotion.
@@ -63,9 +62,8 @@ internal class LpEffortGovernor(
         solves++
         if (pruned) {
             // A prune invalidates a deterministic demotion, but starts a new evidence window so a later
-            // expensive relaxation can be demoted again. The wall-clock gate remains disabled permanently.
-            everPruned = true
-            demoted = false
+            // expensive relaxation can be demoted again.
+            demoted = wallExhausted
             ops = 0L
             nodes = 0L
             solves = 0
@@ -81,17 +79,40 @@ internal class LpEffortGovernor(
      * Charge [millis] of LP wall time against the backstop. Only ever tightens: it demotes, and records
      * that it was the clock and not the work that decided.
      */
-    fun chargeWall(millis: Long) {
-        spentMillis += millis
-        if (demoted || everPruned || wallBackstopMillis <= 0L) return
-        if (spentMillis >= wallBackstopMillis) {
+    fun chargeWall(millis: Long) = chargeWallNanos(
+        if (millis > Long.MAX_VALUE / NANOS_PER_MILLI) {
+            Long.MAX_VALUE
+        } else {
+            millis.coerceAtLeast(0L) * NANOS_PER_MILLI
+        },
+    )
+
+    fun chargeWallNanos(nanos: Long) {
+        val charge = nanos.coerceAtLeast(0L)
+        spentNanos += minOf(charge, Long.MAX_VALUE - spentNanos)
+        if (wallBackstopMillis <= 0L) return
+        if (spentNanos >= wallBackstopNanos) {
             demoted = true
             backstopFired = true
         }
     }
 
+    /** The current operation draws from the same ledger as earlier root and node LP work. */
+    fun operationCancellation(parent: Cancellation, elapsedNanos: () -> Long): Cancellation = Cancellation {
+        parent() || (wallBackstopMillis > 0L && elapsedNanos() >= wallBackstopNanos - spentNanos)
+    }
+
+    val wallExhausted: Boolean get() = wallBackstopMillis > 0L && spentNanos >= wallBackstopNanos
+
     /** Milliseconds of backstop left, or null when it is disabled — used to time-box the one-shot root
      *  work against the same allowance the per-node solves draw from. */
-    fun remainingMillis(): Long? =
-        if (wallBackstopMillis > 0L) (wallBackstopMillis - spentMillis).coerceAtLeast(0L) else null
+    fun remainingMillis(): Long? = if (wallBackstopMillis > 0L) {
+        ((wallBackstopNanos - spentNanos).coerceAtLeast(0L) / NANOS_PER_MILLI)
+    } else {
+        null
+    }
+
+    private companion object {
+        const val NANOS_PER_MILLI = 1_000_000L
+    }
 }

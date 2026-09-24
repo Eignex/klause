@@ -239,8 +239,8 @@ data class LpPlan(
      *  sole cap when the time remaining is unknown (the non-pausable one-shot path). */
     val rootBudgetMillis: Long = 30_000,
     /**
-     * Share of the total solve budget the node LP may spend before the wall-clock **backstop** demotes
-     * it to its floor budget ([LpEffortGovernor]).
+     * Share of the total solve budget optional root and node LP work may spend before the wall-clock
+     * **backstop** stops it ([LpEffortGovernor]).
      *
      * This is a backstop, not the policy. What decides LP effort is deterministic work —
      * [boundMaxOpsPerNode] per node explored, and [boundAdaptiveWork] per solve — so that two identical
@@ -250,10 +250,9 @@ data class LpPlan(
      * costs reproducibility for nothing. `LpStats.wallBackstop` records when it did fire, so a run whose
      * counters do not reproduce says why.
      *
-     * A prune restores the LP and restarts the window it is judged over, and demotion is a floor
-     * rather than an off switch — a demoted
-     * LP still bounds, and with a persistent basis its solves still advance the next one. `0.0` disables
-     * the backstop; it has no effect when the total budget is unknown.
+     * A prune restarts the deterministic work window. The wall allowance remains cumulative across
+     * root and node work; once spent, optional node LP work stops so search retains its time.
+     * `0.0` disables the wall cap; it has no effect when the total budget is unknown.
      */
     val lpWallBudgetFraction: Double = 0.25,
     /**

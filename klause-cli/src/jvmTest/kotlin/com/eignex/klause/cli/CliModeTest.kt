@@ -5,12 +5,14 @@ import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.lp.bounding.LpEmphasis
 import com.eignex.klause.lp.bounding.LpTechnique
 import com.eignex.klause.lp.engine.LpZeroObjectivePricing
+import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.pipeline.FiniteEngine
 import com.eignex.klause.solver.pipeline.ValSelectorKind
 import com.eignex.klause.solver.pipeline.VarSelectorKind
 import com.eignex.klause.solver.pipeline.ineffectiveNumerics
+import com.eignex.klause.util.Cancellation
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.PrintStream
@@ -1358,6 +1360,166 @@ class CliModeTest {
         for ((timeLimitMs, expected) in cases) {
             assertEquals(expected, SolveCore.derivedPresolveBudgetMs(timeLimitMs, 0.1), "timeLimitMs=$timeLimitMs")
         }
+    }
+
+    @Test
+    fun `routing and source preparation share one presolve deadline`() {
+        val common = CommonOptions().apply {
+            timeLimitMs = 60_000L
+            deadlineAtMs = nowMillis() + 60_000L
+        }
+        val before = nowMillis()
+        assertFalse(common.routingCancellation()())
+        val after = nowMillis()
+        val deadline = requireNotNull(common.presolveDeadlineAtMs)
+        assertTrue(deadline in before + 6_000L..after + 6_000L)
+
+        common.presolveDeadlineAtMs = nowMillis() - 1L
+        val (cancel, budget) = SolveCore.presolveAllowance(common, Cancellation.Never, common.deadlineAtMs)
+        assertTrue(cancel())
+        assertEquals(0L, budget?.remaining())
+    }
+
+    @Test
+    fun `routing exhaustion leaves source preparation runnable`() {
+        var remaining = 6_000L
+        val parent = PresolveBudget { remaining }
+        val route = routingSlice(parent, Cancellation.Never)
+
+        remaining = 3_000L
+
+        assertTrue(route())
+        assertEquals(3_000L, parent.remaining())
+        assertFalse(parent.slice(1_000L)())
+    }
+
+    @Test
+    fun `routing allowance cannot restart after local exhaustion`() {
+        val common = CommonOptions().apply {
+            timeLimitMs = 60_000L
+            deadlineAtMs = nowMillis() + 60_000L
+        }
+        val route = common.routingCancellation()
+        val parent = common.presolveDeadlineAtMs
+
+        assertTrue(route === common.routingCancellation())
+        assertEquals(parent, common.presolveDeadlineAtMs)
+    }
+
+    @Test
+    fun `global cancellation also stops a routing slice`() {
+        var stopped = false
+        val route = routingSlice(PresolveBudget { 6_000L }, Cancellation { stopped })
+        assertFalse(route())
+
+        stopped = true
+
+        assertTrue(route())
+    }
+
+    @Test
+    fun `routing applies explicit presolve budget before configured fraction`() {
+        val oldBudget = System.getProperty(CliKnobs.presolveBudgetMs)
+        val oldFraction = System.getProperty(CliKnobs.presolveBudgetFraction)
+        try {
+            System.setProperty(CliKnobs.presolveBudgetMs, "12000")
+            System.setProperty(CliKnobs.presolveBudgetFraction, "0.02")
+            val common = CommonOptions().apply {
+                timeLimitMs = 60_000L
+                deadlineAtMs = nowMillis() + 60_000L
+            }
+            val before = nowMillis()
+            assertFalse(common.routingCancellation()())
+            val after = nowMillis()
+            val deadline = requireNotNull(common.presolveDeadlineAtMs)
+            assertTrue(deadline in before + 12_000L..after + 12_000L)
+
+            System.setProperty(CliKnobs.presolveBudgetMs, "1")
+            SolveCore.presolveAllowance(common, Cancellation.Never, common.deadlineAtMs)
+            assertEquals(deadline, common.presolveDeadlineAtMs)
+        } finally {
+            if (oldBudget == null) {
+                System.clearProperty(CliKnobs.presolveBudgetMs)
+            } else {
+                System.setProperty(CliKnobs.presolveBudgetMs, oldBudget)
+            }
+            if (oldFraction == null) {
+                System.clearProperty(CliKnobs.presolveBudgetFraction)
+            } else {
+                System.setProperty(CliKnobs.presolveBudgetFraction, oldFraction)
+            }
+        }
+    }
+
+    @Test
+    fun `routing uses configured presolve fraction`() {
+        val oldBudget = System.getProperty(CliKnobs.presolveBudgetMs)
+        val oldFraction = System.getProperty(CliKnobs.presolveBudgetFraction)
+        try {
+            System.setProperty(CliKnobs.presolveBudgetMs, "invalid")
+            System.setProperty(CliKnobs.presolveBudgetFraction, "0.2")
+            val common = CommonOptions().apply {
+                timeLimitMs = 60_000L
+                deadlineAtMs = nowMillis() + 60_000L
+            }
+            val before = nowMillis()
+            assertFalse(common.routingCancellation()())
+            val after = nowMillis()
+            val deadline = requireNotNull(common.presolveDeadlineAtMs)
+            assertTrue(deadline in before + 12_000L..after + 12_000L)
+        } finally {
+            if (oldBudget == null) {
+                System.clearProperty(CliKnobs.presolveBudgetMs)
+            } else {
+                System.setProperty(CliKnobs.presolveBudgetMs, oldBudget)
+            }
+            if (oldFraction == null) {
+                System.clearProperty(CliKnobs.presolveBudgetFraction)
+            } else {
+                System.setProperty(CliKnobs.presolveBudgetFraction, oldFraction)
+            }
+        }
+    }
+
+    @Test
+    fun `disabled presolve cap remains disabled after routing`() {
+        val oldBudget = System.getProperty(CliKnobs.presolveBudgetMs)
+        try {
+            System.setProperty(CliKnobs.presolveBudgetMs, "0")
+            val common = CommonOptions().apply {
+                timeLimitMs = 60_000L
+                deadlineAtMs = nowMillis() + 60_000L
+            }
+            assertFalse(common.routingCancellation()())
+            assertTrue(common.presolveAllowanceInitialized)
+            assertEquals(null, common.presolveDeadlineAtMs)
+
+            val (cancel, budget) = SolveCore.presolveAllowance(common, Cancellation.Never, common.deadlineAtMs)
+            assertFalse(cancel())
+            assertEquals(null, budget)
+        } finally {
+            if (oldBudget == null) {
+                System.clearProperty(CliKnobs.presolveBudgetMs)
+            } else {
+                System.setProperty(CliKnobs.presolveBudgetMs, oldBudget)
+            }
+        }
+    }
+
+    @Test
+    fun `disabled routing proof leaves presolve allowance for preparation`() {
+        val common = CommonOptions().apply {
+            timeLimitMs = 60_000L
+            deadlineAtMs = nowMillis() + 60_000L
+            engineParams += "open-bound-proof=false"
+        }
+        assertTrue(common.routingCancellation()())
+        assertTrue(common.routingCancellation()())
+        assertFalse(common.presolveAllowanceInitialized)
+
+        val (cancel, budget) = SolveCore.presolveAllowance(common, Cancellation.Never, common.deadlineAtMs)
+        assertFalse(cancel())
+        assertTrue(budget != null && budget.remaining() in 0L..6_000L)
     }
 
     @Test

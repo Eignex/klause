@@ -3,12 +3,23 @@ package com.eignex.klause.solver.search
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.propagation.propagate
 import com.eignex.klause.solver.result.OpenTheoryWorkSink
+import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.seconds
 
 class SearchSessionTest {
+
+    @Test
+    fun `theory components receive the solve deadline`() {
+        val stop = Cancellation.after(1.seconds)
+        val session = SearchSession(emptyList(), cancellation = stop)
+
+        assertTrue(session.stopToken() === stop)
+        assertTrue(session.stopToken().deadline() != null)
+    }
 
     @Test
     fun `open work counts each committed public decision kind`() {

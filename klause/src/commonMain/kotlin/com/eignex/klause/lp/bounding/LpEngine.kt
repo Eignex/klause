@@ -36,6 +36,7 @@ import com.eignex.klause.lp.engine.newPersistentLpSolver
 import com.eignex.klause.lp.engine.solveAndCertify
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.lp.relaxation.LeafRealResult
+import com.eignex.klause.lp.relaxation.LpAssemblyCancelled
 import com.eignex.klause.lp.relaxation.LpAuxiliarySources
 import com.eignex.klause.lp.relaxation.LpExplanation
 import com.eignex.klause.lp.relaxation.LpRelaxation
@@ -338,9 +339,9 @@ internal class LpEngine(
     // whole budget bounding nothing (elitserien/cyclic-rcpsp: lpMs≈budget, prunes=0, too few solves to
     // warm up). When the total solve budget is known, the LP (one-shot root work charged via
     // [chargeRootLpWall] + the per-node solves timed in the bound) may spend at most
-    // `min(fraction × budget, cap)` of it before search; if it hits that while still under the ladder's
-    // warmup and not having pruned, per-node LP is disabled and the arm runs as a bare combinatorial
-    // search. A cheap LP reaches the warmup first and is left to the ladder. See [LpEffortGovernor].
+    // `fraction × budget` of it before optional node LP work stops and the arm runs as a bare
+    // combinatorial search. In-flight cancellation shares the same ledger as root work, so one solve
+    // cannot cross the allowance before the breaker observes it. See [LpEffortGovernor].
     private val lpWallBreaker = LpEffortGovernor(
         opsPerNodeCap = params.lpPlan.boundMaxOpsPerNode,
         wallBackstopMillis = params.solveBudgetMillis?.takeIf { params.lpPlan.lpWallBudgetFraction > 0.0 }
@@ -433,7 +434,10 @@ internal class LpEngine(
     /** Charge the one-shot pre-search root LP work's wall time against the shared LP wall budget,
      *  so root and per-node solves compete for the same fraction of the deadline. Called once, after the
      *  root work, by [com.eignex.klause.backtrack.ResumableMinimize]. Root work never counts as a prune. */
-    fun chargeRootLpWall(millis: Long) = lpWallBreaker.chargeWall(millis)
+    fun chargeRootLpWall(millis: Long) {
+        lpWallBreaker.chargeWall(millis)
+        if (lpWallBreaker.backstopFired) sink.lp.observeWallBackstop()
+    }
 
     // Adaptive LP effort ladder: the emphasis sets the ceiling
     // rung (cuts when enabled, else the bare bound), and a rolling prune-rate window descends one rung
@@ -467,6 +471,7 @@ internal class LpEngine(
     // The current legacy fallback owner remains live for metrics until replacement or engine close.
     internal var nodeSimplex: PersistentLpSolver? = null
     internal var nodeUsesTrail: Boolean = false
+    private var nodeLpCancellation: Cancellation = params.cancellation
 
     internal val cpAdapter = CpLpAdapter(this)
     internal val propagator = LpPropagator(
@@ -480,7 +485,7 @@ internal class LpEngine(
             )
         },
         solveContext = solveContext,
-        cancellation = params.cancellation,
+        cancellation = Cancellation { nodeLpCancellation() },
     )
 
     internal fun nodeRelaxation(relaxer: CpToLpRelaxation, session: PropagationSession): LpRelaxation {
@@ -492,7 +497,7 @@ internal class LpEngine(
     private fun buildNodeRelaxation(relaxer: CpToLpRelaxation, session: PropagationSession): LpRelaxation {
         if (!persistentResolved) {
             persistentResolved = true
-            val base = relaxer.build(PropagationSession(problem))
+            val base = relaxer.build(PropagationSession(problem), cancellation = nodeLpCancellation)
             if (base.persistentEligible) persistentRelaxation = base
         }
         persistentRelaxation?.let { cpAdapter.relaxation(it, session)?.let { rebound -> return rebound } }
@@ -511,12 +516,12 @@ internal class LpEngine(
             residualCache?.let { cached ->
                 if (residualCacheKey?.contentEquals(key) == true) return cached
             }
-            val built = relaxer.build(session)
+            val built = relaxer.build(session, cancellation = nodeLpCancellation)
             residualCache = built
             residualCacheKey = key
             return built
         }
-        return relaxer.build(session)
+        return relaxer.build(session, cancellation = nodeLpCancellation)
     }
 
     internal var lpCounterResults = LpCounterResults()
@@ -542,13 +547,13 @@ internal class LpEngine(
         if (!params.lpPlan.realResidual || residualOversized) return null
         if (!gatedResolved) {
             gatedResolved = true
-            val built = lpRelaxer?.buildGatedResidual()
+            val built = lpRelaxer?.buildGatedResidual(nodeLpCancellation)
             if (built != null && built.gatedRows.isNotEmpty() && built.model.n > 0) {
                 val enforced = BooleanArray(built.model.m)
                 val simplex = try {
                     newPersistentLpSolver(
                         built.model,
-                        params.cancellation,
+                        Cancellation { nodeLpCancellation() },
                         refactorUpdateLimit = GATED_UPDATE_LIMIT,
                         factory = solveContext.engineFactory,
                         pricing = pricingOptions,
@@ -604,7 +609,7 @@ internal class LpEngine(
         val model = relaxation.model
         val certified = solveAndCertify(
             model,
-            cancellation = params.cancellation,
+            cancellation = params.cancellation.shorten(0.5),
             componentSplit = params.lpPlan.componentSplit,
             observer = sink.lp.certificationObserver(LpRoute.STANDALONE),
             context = solveContext,
@@ -750,13 +755,10 @@ internal class LpEngine(
             objectiveAscending: Boolean,
         ): Boolean {
             val lpRelaxerL = lpRelaxer ?: return false
-            // The residual real check is the model's only decision procedure for its real rows — a
-            // demoted LP would leave the search enumerating a space it can never refute — so the
-            // adaptive shedding (breaker, ladder, depth/cadence) does not apply to it.
-            val essential = params.lpPlan.realResidual && !residualOversized
             if (params.lpPlan.realResidual && residualOversized) return false
+            if (lpWallBreaker.wallExhausted) return false
             lpWallBreaker.observeNode()
-            if (!essential && (
+            if (!params.lpPlan.realResidual && (
                     session.decisionLevel > params.lpPlan.boundMaxDepth ||
                         ++lpCheckCounter % params.lpPlan.boundEvery != 0 ||
                         !lpLadder.shouldRun()
@@ -774,25 +776,37 @@ internal class LpEngine(
             } else {
                 null
             }
-            val solveStart = if (lpWallBreaker.remainingMillis() != null) TimeSource.Monotonic.markNow() else null
-            val outcome = lpBoundAndFix(
-                lpRelaxerL,
-                session,
-                effectiveBound,
-                sink,
-                objectiveVar = objectiveVar,
-                objectiveAscending = objectiveAscending,
-                cancellation = params.cancellation,
-                hints = lpHints,
-                learn = params.lpPlan.learn,
-                warm = warm,
-                cutsAllowed = cutsAllowed,
-            )
+            val solveStart = if (lpWallBreaker.remainingMillis() != null) {
+                TimeSource.Monotonic.markNow()
+            } else {
+                null
+            }
+            val localCancel = solveStart?.let { start ->
+                lpWallBreaker.operationCancellation(params.cancellation) { start.elapsedNow().inWholeNanoseconds }
+            } ?: params.cancellation
+            nodeLpCancellation = localCancel
+            val outcome = try {
+                lpBoundAndFix(
+                    lpRelaxerL,
+                    session,
+                    effectiveBound,
+                    sink,
+                    objectiveVar = objectiveVar,
+                    objectiveAscending = objectiveAscending,
+                    cancellation = localCancel,
+                    hints = lpHints,
+                    learn = params.lpPlan.learn,
+                    warm = warm,
+                    cutsAllowed = cutsAllowed,
+                )
+            } finally {
+                solveStart?.let { lpWallBreaker.chargeWallNanos(it.elapsedNow().inWholeNanoseconds) }
+                nodeLpCancellation = params.cancellation
+            }
             // Deterministic first: what this node's LP actually cost, against the nodes explored. The
             // clock is charged separately and only as a backstop for cost the meter cannot see.
             lpWallBreaker.observeSolve(pendingSolveOps, outcome.prune)
             pendingSolveOps = 0L
-            solveStart?.let { lpWallBreaker.chargeWall(it.elapsedNow().inWholeMilliseconds) }
             if (lpWallBreaker.backstopFired) sink.lp.observeWallBackstop()
             if (lpWallBreaker.isDemoted) sink.lp.observeDemoted()
             lpPivotBudget.observe(pruned = outcome.prune, couldPrune = effectiveBound.isFinite())
@@ -854,7 +868,12 @@ internal class LpEngine(
         // NaN probe (the hull is the only structure) keeps it. Candidates are the factors that emitted a
         // HULL row in the full build.
         val suppressed = mutableSetOf<Int>()
-        for (factorId in relaxer.build(PropagationSession(problem)).hullFactorIds) {
+        val hullIds = try {
+            relaxer.build(PropagationSession(problem), cancellation = cancellation).hullFactorIds
+        } catch (_: LpAssemblyCancelled) {
+            return
+        }
+        for (factorId in hullIds) {
             val probe = buildRelaxer(params.lpPlan, suppressed + factorId) ?: continue
             val bound = rootLpObjective(probe, cancellation)
             if (!bound.isNaN() && bound >= full - HULL_PRUNE_TOL) suppressed.add(factorId)

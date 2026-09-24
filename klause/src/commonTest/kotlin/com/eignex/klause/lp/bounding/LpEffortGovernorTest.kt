@@ -1,5 +1,6 @@
 package com.eignex.klause.lp.bounding
 
+import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -9,8 +10,7 @@ import kotlin.test.assertTrue
 /**
  * When the node LP stops earning its keep, and on what evidence.
  *
- * The demotion rule has to be a function of work and nodes alone — anything read off a clock makes two
- * identical runs diverge, which is the defect this replaces.
+ * Deterministic work decides the adaptive effort; the cumulative clock caps optional LP time.
  */
 class LpEffortGovernorTest {
 
@@ -147,13 +147,59 @@ class LpEffortGovernorTest {
     }
 
     @Test
-    fun `a pruning LP is spared by the backstop too`() {
+    fun `a pruning LP still spends the shared wall allowance`() {
         val g = governor()
         g.nodes(1)
         g.observeSolve(opsSpent = 10L, pruned = true)
 
         g.chargeWall(1_000_000L)
 
-        assertFalse(g.isDemoted, "the clock does not overrule a relaxation that demonstrably pays")
+        assertTrue(g.wallExhausted)
+        assertTrue(g.isDemoted)
+        assertTrue(g.backstopFired)
+    }
+
+    @Test
+    fun `one node LP stops at the remaining shared allowance`() {
+        val g = governor(wallMillis = 1_000L)
+        g.chargeWall(700L)
+        var elapsed = 0L
+        val stop = g.operationCancellation(Cancellation.Never) { elapsed }
+        assertFalse(stop())
+
+        elapsed = 300_000_000L
+
+        assertTrue(stop())
+        g.chargeWallNanos(elapsed)
+        assertTrue(g.wallExhausted)
+        assertTrue(g.operationCancellation(Cancellation.Never) { 0L }())
+    }
+
+    @Test
+    fun `global cancellation stops node LP before its local allowance`() {
+        val g = governor(wallMillis = 1_000L)
+        var cancelled = false
+        val stop = g.operationCancellation(Cancellation { cancelled }) { 0L }
+        assertFalse(stop())
+
+        cancelled = true
+
+        assertTrue(stop())
+    }
+
+    @Test
+    fun `short repeated node LP attempts spend the same allowance`() {
+        val g = governor(wallMillis = 1L)
+        repeat(3) {
+            val stop = g.operationCancellation(Cancellation.Never) { 250_000L }
+            assertFalse(stop())
+            g.chargeWallNanos(250_000L)
+        }
+        val stop = g.operationCancellation(Cancellation.Never) { 250_000L }
+        assertTrue(stop())
+        g.chargeWallNanos(250_000L)
+
+        assertTrue(g.wallExhausted)
+        assertEquals(0L, g.remainingMillis())
     }
 }

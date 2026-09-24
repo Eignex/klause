@@ -577,9 +577,9 @@ internal class CpToLpRelaxation(
      * the result is independent of any session. This is the float filter's persistent model; exact
      * certificates keep running on the per-node pin-consulting [build], whose magnitudes rationalize.
      */
-    fun buildGatedResidual(): LpRelaxation? {
+    fun buildGatedResidual(cancellation: Cancellation = Cancellation.Never): LpRelaxation? {
         if (!realResidual || problem.numIntVars > 0) return null
-        return Assembler(RootDomains(problem), gated = true).assemble(emptyList())
+        return Assembler(RootDomains(problem), gated = true, cancellation = cancellation).assemble(emptyList())
     }
 
     private fun intCost(i: Int): Long = objective?.intCoefficients?.getOrElse(i) { 0L } ?: 0L

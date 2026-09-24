@@ -8,6 +8,7 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.util.Bits
+import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
@@ -37,6 +38,24 @@ class PreparedSourceTest {
 
         assertTrue(prepared.changed)
         assertContains(prepared.stats.passes, PresolvePass.AGGREGATE_SUB_SUMS.id)
+    }
+
+    @Test
+    fun `source reduction runs after routing slice exhaustion`() {
+        var remaining = 6_000L
+        val parent = PresolveBudget { remaining }
+        val routeStop = parent.slice(parent.remaining() / 2)
+        remaining = 3_000L
+        assertTrue(routeStop())
+
+        val prepared = PresolvePipeline.prepareSource(
+            aggregatable(),
+            cancellation = Cancellation { parent.remaining() == 0L },
+            presolveBudget = parent,
+        )
+
+        assertContains(prepared.stats.passes, PresolvePass.AGGREGATE_SUB_SUMS.id)
+        assertTrue(parent.remaining() > 0L)
     }
 
     @Test

@@ -7,6 +7,7 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.lp.bounding.LpEmphasis
 import com.eignex.klause.lp.engine.LpZeroObjectivePricing
+import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.presolve.PresolveEmphasis
 import com.eignex.klause.presolve.PresolvePass
 import com.eignex.klause.solver.Sample
@@ -46,15 +47,48 @@ import com.eignex.klause.util.Cancellation
  * A share of `-t` on the policy presolve takes, capped by the run's own deadline, so proving a bound can
  * never consume the run it was supposed to route.
  *
- * Consumes `open-bound-proof` from [CommonOptions.engineParams] on the way through, so a mode calls this
- * exactly once per run: a second call finds the key gone and answers as if the proof had been asked for.
+ * Consumes `open-bound-proof` from [CommonOptions.engineParams] once and retains the same token if a
+ * frontend asks again. A route cannot restart its slice or change a disabled proof into an enabled one.
  */
 internal fun CommonOptions.routingCancellation(): Cancellation {
-    if (!takeOpenBoundProof()) return Cancellation { true }
-    val budgetMs = SolveCore.derivedPresolveBudgetMs(timeLimitMs, CliKnobs.DEFAULT_PRESOLVE_BUDGET_FRACTION)
-    if (budgetMs <= 0) return Cancellation.Never
-    val cap = minOf(deadlineAtMs ?: Long.MAX_VALUE, nowMillis() + budgetMs)
-    return Cancellation { nowMillis() > cap }
+    routingToken?.let { return it }
+    if (!takeOpenBoundProof()) return Cancellation { true }.also { routingToken = it }
+    val cap = sharedPresolveDeadline()
+    val solveStop = Cancellation { deadlineAtMs?.let { nowMillis() >= it } == true }
+    val token = if (cap == null) {
+        solveStop
+    } else {
+        routingSlice(
+            PresolveBudget { cap - nowMillis() },
+            solveStop,
+        )
+    }
+    routingToken = token
+    return token
+}
+
+/** Routing receives one pass-sized slice of the shared allowance; source preparation keeps the rest. */
+internal fun routingSlice(budget: PresolveBudget, solveStop: Cancellation): Cancellation {
+    val slice = budget.slice((budget.remaining() / 2).coerceAtLeast(1L))
+    return Cancellation { solveStop() || slice() }
+}
+
+/** One allowance for routing and the source preparation that follows it. */
+internal fun CommonOptions.sharedPresolveDeadline(): Long? {
+    if (!presolveAllowanceInitialized) {
+        val explicit = cliProp(CliKnobs.presolveBudgetMs)?.toLongOrNull()
+        val fraction = cliProp(CliKnobs.presolveBudgetFraction)?.toDoubleOrNull()
+            ?: CliKnobs.DEFAULT_PRESOLVE_BUDGET_FRACTION
+        val budgetMs = explicit ?: SolveCore.derivedPresolveBudgetMs(timeLimitMs, fraction)
+        presolveDeadlineAtMs = if (budgetMs <= 0L) {
+            null
+        } else {
+            val now = nowMillis()
+            minOf(deadlineAtMs ?: Long.MAX_VALUE, now + minOf(budgetMs, Long.MAX_VALUE - now))
+        }
+        presolveAllowanceInitialized = true
+    }
+    return presolveDeadlineAtMs
 }
 
 /**
@@ -97,6 +131,11 @@ internal class CommonOptions {
      *  ([CliMode.load]) and the solve phase ([SolveCore]) so the two phases don't each spend a
      *  fresh full budget (which would let `-t` overshoot ~2×). Null when no `-t` is given. */
     var deadlineAtMs: Long? = null
+
+    /** Null also represents an explicitly disabled cap, so initialization is tracked separately. */
+    internal var presolveAllowanceInitialized = false
+    internal var presolveDeadlineAtMs: Long? = null
+    internal var routingToken: Cancellation? = null
 
     /** Wall time (ms) the front-end load took — parse + construction-time bake — set by the driver
      *  around `session.load`, so `dry-run-presolve` can split parse from bake. */

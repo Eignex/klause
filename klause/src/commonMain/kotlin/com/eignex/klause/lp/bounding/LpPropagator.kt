@@ -318,10 +318,13 @@ internal class LpPropagator(
         return ComponentResult.Consistent
     }
 
-    override fun assert(decision: SearchDecision, context: SearchContext): ComponentResult {
+    override fun assert(decision: SearchDecision, context: SearchContext): ComponentResult =
+        assertWithin(decision, context, Cancellation.Never)
+
+    internal fun assertWithin(decision: SearchDecision, context: SearchContext, token: Cancellation): ComponentResult {
         if (proofContext != null && proofContext !== context) return ComponentResult.Indeterminate
         proofContext = context
-        if (owner != null && !atLevel(context.decisionLevel, Cancellation.Never)) return ComponentResult.Indeterminate
+        if (owner != null && !atLevel(context.decisionLevel, token)) return ComponentResult.Indeterminate
         sourcePremises?.record(decision, context)
         return policy.assert(decision, context)
     }

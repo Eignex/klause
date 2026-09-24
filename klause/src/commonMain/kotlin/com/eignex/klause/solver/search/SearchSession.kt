@@ -213,6 +213,8 @@ class SearchSession(
 
     override fun cancelled(): Boolean = cancellation()
 
+    internal fun stopToken(): Cancellation = cancellation
+
     /** Initialize all components at the shared root. */
     fun initialize(): ComponentResult {
         val result = runComponents { it.initialize(this) }
