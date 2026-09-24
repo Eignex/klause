@@ -255,15 +255,17 @@ internal class LpPropagator(
             current.solveFloat(if (solved) null else warm, token, allowance).also { solved = true }
         }
 
-    fun solve(token: Cancellation = cancellation): CertifiedLpResult? = solveOwned {
-        val profile = effort()
-        it.solve(
-            token = Cancellation { cancellation() || token() },
-            continuationLimits = profile.continuation,
-            fullContinuation = profile.fullContinuation,
-            observer = certificationObserver,
-        )
-    }
+    fun solve(token: Cancellation = cancellation, sparsePointRecovery: Boolean = false): CertifiedLpResult? =
+        solveOwned {
+            val profile = effort()
+            it.solve(
+                token = Cancellation { cancellation() || token() },
+                continuationLimits = profile.continuation,
+                fullContinuation = profile.fullContinuation,
+                observer = certificationObserver,
+                sparsePointRecovery = sparsePointRecovery,
+            )
+        }
 
     private inline fun <T> solveOwned(action: (LpScopedSolver) -> T): T? = withOwner { current ->
         try {

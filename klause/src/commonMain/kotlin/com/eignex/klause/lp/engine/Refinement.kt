@@ -133,7 +133,7 @@ internal class LpRefinementResult(
     val metrics: LpRefinementMetrics,
 )
 
-private class RefinementStop(val reason: LpRefinementDecline) : RuntimeException()
+internal class RefinementStop(val reason: LpRefinementDecline) : RuntimeException()
 
 internal class RefinementMeter(
     val limits: LpRefinementLimits,
@@ -210,11 +210,73 @@ internal class RefinementMeter(
         )
     }
 
+    fun divide(a: BigFraction, b: BigFraction): BigFraction {
+        operands(a, b)
+        return number(a * b.reciprocal())
+    }
+
+    fun pointVisit(value: BigFraction) {
+        if (maxOf(value.num.bitLength(), value.den.bitLength()) > limits.maxBits) {
+            stop(LpRefinementDecline.BITS)
+        }
+        charge()
+    }
+
+    fun pointCompare(a: BigFraction, b: BigFraction): Int {
+        pointVisit(a)
+        pointVisit(b)
+        if (a.den == b.den) return a.num.compareTo(b.num)
+        if (a.signum() != b.signum()) return a.signum().compareTo(b.signum())
+        val bits = maxOf(
+            a.num.bitLength() + b.den.bitLength(),
+            b.num.bitLength() + a.den.bitLength(),
+        )
+        if (bits > limits.maxBits) stop(LpRefinementDecline.BITS)
+        val limbs = (bits.toLong() + 63L) / 64L
+        charge(limbs * limbs, 128L + 4L * bits)
+        return a.compareTo(b)
+    }
+
+    fun pointAdd(a: BigFraction, b: BigFraction): BigFraction = when {
+        a.isZero -> {
+            pointVisit(b)
+            b
+        }
+
+        b.isZero -> {
+            pointVisit(a)
+            a
+        }
+
+        else -> add(a, b)
+    }
+
+    fun pointMultiply(a: BigFraction, b: BigFraction): BigFraction = when {
+        a.isZero || b.isZero -> {
+            pointVisit(a)
+            pointVisit(b)
+            BigFraction.ZERO
+        }
+
+        a == BigFraction.ONE -> {
+            pointVisit(b)
+            b
+        }
+
+        b == BigFraction.ONE -> {
+            pointVisit(a)
+            a
+        }
+
+        else -> multiply(a, b)
+    }
+
     private fun operands(a: BigFraction, b: BigFraction) {
         number(a)
         number(b)
         val bits = maxOf(a.num.bitLength(), a.den.bitLength()).toLong() +
             maxOf(b.num.bitLength(), b.den.bitLength()) + 1L
+        if (bits > limits.maxBits) stop(LpRefinementDecline.BITS)
         val limbs = (bits + 63L) / 64L
         charge(limbs * limbs, 128L + 4L * bits)
     }
