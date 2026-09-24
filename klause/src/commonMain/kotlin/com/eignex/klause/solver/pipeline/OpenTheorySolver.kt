@@ -163,6 +163,7 @@ class OpenTheoryEngine internal constructor(
     // rounds through one engine pay for it once.
     private val prepareSource: (Cancellation) -> OpenSourcePreparation,
     private val preparationCancellation: Cancellation,
+    private val reuseOpeningBoundAttempt: Boolean,
 ) {
     private var preparation: OpenSourcePreparation? = null
 
@@ -199,13 +200,15 @@ class OpenTheoryEngine internal constructor(
             )
         },
         presolveCancellation,
+        false,
     )
 
     /** Decide an already-prepared model under the plan selected from it. */
     internal constructor(
         planned: OpenSourcePreparation.Planned,
         preparationCancellation: Cancellation,
-    ) : this(planned.route, { planned }, preparationCancellation)
+        reuseOpeningBoundAttempt: Boolean,
+    ) : this(planned.route, { planned }, preparationCancellation, reuseOpeningBoundAttempt)
 
     init {
         require(declaredRoute != ProblemPipeline.FINITE_CP && declaredRoute != ProblemPipeline.UNSUPPORTED_OPEN) {
@@ -252,14 +255,18 @@ class OpenTheoryEngine internal constructor(
         // Close the open sides before the theory sees them. A proved bound narrows the box the theory
         // searches; a refutation here is over the genuinely open ranges, so it refutes the unbounded model
         // rather than an invented box, and is reportable as unsat.
-        val model = when (
-            val closed = routed.model.closeOpenBounds(
-                boundCancellation(prepared, cancellation),
-                stats.lp,
-            )
-        ) {
-            OpenPresolveResult.Refuted -> return OpenTheoryResult.Unsat(stats.finish(state))
-            is OpenPresolveResult.Tightened -> closed.spec
+        val model = if (reuseOpeningBoundAttempt) {
+            routed.model
+        } else {
+            when (
+                val closed = routed.model.closeOpenBounds(
+                    boundCancellation(prepared, cancellation),
+                    stats.lp,
+                )
+            ) {
+                OpenPresolveResult.Refuted -> return OpenTheoryResult.Unsat(stats.finish(state))
+                is OpenPresolveResult.Tightened -> closed.spec
+            }
         }
         val cpDomains = plan.cpSourceDomains(model)
         val planned = plan.search(

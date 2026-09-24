@@ -94,6 +94,32 @@ class OpenTheoryMinimizeTest {
     }
 
     @Test
+    fun `a repeated opening bound close is avoided`() {
+        val parsed = modelOf("(declare-const x Int)")
+        val x = parsed.intVarNames.getValue("x")
+        val objective = LinearObjective(intCoefficients = LongArray(parsed.model.numIntVars).also { it[x] = 1L })
+
+        val result = OpenTheoryMinimizer(parsed.model, objective).minimize()
+
+        assertIs<OpenTheoryOptimum.Unbounded>(result)
+        assertEquals(2.0, result.stats.lp.standalonePasses.sum)
+    }
+
+    @Test
+    fun `constant objective reuses an unchanged opening bound attempt`() {
+        val parsed = modelOf("(declare-const x Int)")
+        val objective = LinearObjective(
+            intCoefficients = LongArray(parsed.model.numIntVars),
+            constant = 5L,
+        )
+
+        val result = OpenTheoryMinimizer(parsed.model, objective).minimize()
+
+        assertEquals("5", assertIs<OpenTheoryOptimum.Optimal>(result).value.toString())
+        assertEquals(2.0, result.stats.lp.standalonePasses.sum)
+    }
+
+    @Test
     fun `minimizing a negated column descends to the far side of its range`() {
         val parsed = modelOf(
             """
