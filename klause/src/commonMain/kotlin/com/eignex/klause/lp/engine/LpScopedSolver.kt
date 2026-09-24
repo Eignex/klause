@@ -199,14 +199,16 @@ internal class LpScopedSolver(
         if (!prepare(token)) return null
         val current = requireNotNull(solver)
         var failure: Throwable? = null
+        var solveStarted = false
         val result = try {
             if (!current.adopt(state, token)) return null
+            solveStarted = true
             if (warm == null) current.resolveBounds(allowance) else current.solve(warm)
         } catch (primary: Throwable) {
             failure = primary
             throw primary
         } finally {
-            recordSolveCompletion(current, failure)
+            recordSolveCompletion(current, failure, solveStarted)
         }
         if (token()) return null
         return current to result
@@ -427,12 +429,14 @@ internal class LpScopedSolver(
     }
 
     @Suppress("TooGenericExceptionCaught")
-    private fun recordSolveCompletion(current: PersistentLpSolver, primary: Throwable?) {
+    private fun recordSolveCompletion(current: PersistentLpSolver, primary: Throwable?, solveStarted: Boolean) {
         var failure = primary
-        try {
-            lastMetrics = current.lastMetrics
-        } catch (telemetry: Throwable) {
-            if (failure == null) failure = telemetry else failure.addSuppressed(telemetry)
+        if (solveStarted) {
+            try {
+                lastMetrics = current.lastMetrics
+            } catch (telemetry: Throwable) {
+                if (failure == null) failure = telemetry else failure.addSuppressed(telemetry)
+            }
         }
         try {
             recordPendingAppendSolve(current)

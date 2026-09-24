@@ -664,9 +664,15 @@ private class RefinementRun(
         withChild(residual.working, anchor) { scope, firstAllowance ->
             for (round in 1..(meter.limits.maxRounds - meter.metrics.rounds).coerceAtLeast(0)) {
                 meter.poll()
-                if (round > 1 && !scope.replaceState(residual.working)) meter.stop(LpRefinementDecline.ADOPTION)
+                if (round > 1 && !scope.replaceState(residual.working)) {
+                    meter.poll()
+                    meter.stop(LpRefinementDecline.ADOPTION)
+                }
                 val attempt = numerical(scope, if (round == 1) basis else null, firstAllowance, round == 1)
-                val float = attempt?.second ?: meter.stop(LpRefinementDecline.NUMERICAL)
+                val float = attempt?.second ?: run {
+                    meter.poll()
+                    meter.stop(LpRefinementDecline.NUMERICAL)
+                }
                 val correction = RefinementAuthority(scope.state, meter)
                 val dx = correction.seed(float.primal, float.basis)
                 x = x.indices.map { meter.add(x[it], meter.multiply(dx[it], residual.primalScale.reciprocal())) }
