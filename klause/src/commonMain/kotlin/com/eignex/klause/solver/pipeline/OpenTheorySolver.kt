@@ -235,7 +235,7 @@ class OpenTheoryEngine internal constructor(
 
     private fun solvePrepared(params: TheoryParams, state: OpenTheorySolveState): OpenTheoryResult {
         val work = state.work
-        val cancellation = Cancellation { params.timeout() || params.cancellation() }
+        val cancellation = params.timeout or params.cancellation
         val stats = SolveStatsSink(backend = declaredRoute.backendName())
         stats.start()
         // Preparation reads the whole model, so a budget already spent is answered before that work
@@ -276,6 +276,7 @@ class OpenTheoryEngine internal constructor(
             cancellation = cancellation,
             learnedDb = SearchLearnedDbParams(params.maxLearnedClauses, params.lbdGlue),
             smtStats = state.smt,
+            theoryLpStop = state.theoryLpStop(cancellation),
         )
         planned.use {
             planned.session.attachOpenTheoryWork(work)
@@ -360,7 +361,7 @@ class OpenTheoryEngine internal constructor(
         return OpenTheoryResult.Unknown(
             if (timedOut) {
                 TerminationReason.Timeout
-            } else if (budgetExhausted || state.work.exhausted) {
+            } else if (budgetExhausted || state.work.exhausted || state.theoryLpExhausted) {
                 TerminationReason.BudgetExhausted
             } else {
                 TerminationReason.Cancelled
@@ -425,6 +426,13 @@ internal class OpenTheorySolveState(private val params: TheoryParams) {
     private var drawStats = OpenHintStats()
     private var steering: CountingCandidateHints? = null
     private var deferred: SearchCandidateHints? = null
+    private var lpStop: Cancellation? = null
+
+    /** One nonrenewing theory LP allowance across every optimization round. */
+    fun theoryLpStop(parent: Cancellation): Cancellation = lpStop
+        ?: parent.shorten(0.5).also { lpStop = it }
+
+    val theoryLpExhausted: Boolean get() = lpStop?.invoke() == true && !params.timeout() && !params.cancellation()
 
     /**
      * The request's one unverified branch-order hint, deferred until enough splits have asked for it.

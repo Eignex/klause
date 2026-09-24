@@ -51,6 +51,43 @@ import kotlin.test.assertTrue
 class ExactLiraSearchComponentTest {
 
     @Test
+    fun `local theory LP exhaustion is indeterminate while search remains active`() {
+        val model = Problem(
+            numBoolVars = 0,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(1), null, null),
+            factors = arrayOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 0)),
+        )
+        val context = SearchSession(emptyList())
+
+        ExactLiraSearchComponent(model).use { component ->
+            component.useSharedLpStop(Cancellation { true })
+            assertIs<ComponentResult.Indeterminate>(component.initialize(context))
+            assertTrue(!context.cancelled())
+        }
+    }
+
+    @Test
+    fun `branching declines after the shared theory LP allowance expires`() {
+        val model = Problem(
+            numBoolVars = 0,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(1), null, null),
+            factors = arrayOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 0)),
+        )
+        var spent = false
+        val context = SearchSession(emptyList())
+
+        ExactLiraSearchComponent(model).use { component ->
+            component.useSharedLpStop(Cancellation { spent })
+            assertIs<ComponentResult.Consistent>(component.initialize(context))
+            spent = true
+
+            assertNull(component.nextBranch(context))
+            assertIs<ComponentCheck.Indeterminate>(component.check(context))
+            assertTrue(!context.cancelled())
+        }
+    }
+
+    @Test
     fun `fractional source integer branches after reduction admission declines`() {
         val model = Problem(
             numBoolVars = 0,

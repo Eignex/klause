@@ -3,8 +3,8 @@ package com.eignex.klause.lp.bounding
 import com.eignex.klause.util.Cancellation
 
 /**
- * Decides when the node LP has stopped earning the search time it costs, and demotes it to a floor
- * budget rather than switching it off.
+ * Demotes node LP work to a floor budget when its deterministic cost is too high. A cumulative wall
+ * backstop stops optional LP work when its share of the solve deadline is spent.
  *
  * The signal is **deterministic work per node explored** — [com.eignex.klause.lp.engine.LpWork]
  * operations, not wall-clock time.
@@ -43,8 +43,7 @@ internal class LpEffortGovernor(
     private var spentNanos = 0L
     private var demoted = false
 
-    /** Whether the node LP has been demoted to its floor budget. Never a hard off switch: a demoted LP
-     *  still bounds, and with a persistent basis its solves still advance the next one. */
+    /** Whether the node LP has been demoted to its floor budget. A wall-exhausted LP is skipped. */
     val isDemoted: Boolean get() = demoted
 
     /** Whether the wall-clock backstop — rather than the deterministic ratio — caused the demotion.
@@ -81,8 +80,11 @@ internal class LpEffortGovernor(
      * that it was the clock and not the work that decided.
      */
     fun chargeWall(millis: Long) = chargeWallNanos(
-        if (millis > Long.MAX_VALUE / NANOS_PER_MILLI) Long.MAX_VALUE
-        else millis.coerceAtLeast(0L) * NANOS_PER_MILLI,
+        if (millis > Long.MAX_VALUE / NANOS_PER_MILLI) {
+            Long.MAX_VALUE
+        } else {
+            millis.coerceAtLeast(0L) * NANOS_PER_MILLI
+        },
     )
 
     fun chargeWallNanos(nanos: Long) {
@@ -105,8 +107,11 @@ internal class LpEffortGovernor(
     /** Milliseconds of backstop left, or null when it is disabled — used to time-box the one-shot root
      *  work against the same allowance the per-node solves draw from. */
     fun remainingMillis(): Long? =
-        if (wallBackstopMillis > 0L) ((wallBackstopNanos - spentNanos).coerceAtLeast(0L) / NANOS_PER_MILLI)
-        else null
+        if (wallBackstopMillis > 0L) {
+            ((wallBackstopNanos - spentNanos).coerceAtLeast(0L) / NANOS_PER_MILLI)
+        } else {
+            null
+        }
 
     private companion object {
         const val NANOS_PER_MILLI = 1_000_000L

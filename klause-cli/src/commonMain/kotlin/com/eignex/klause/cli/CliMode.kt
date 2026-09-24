@@ -55,10 +55,14 @@ internal fun CommonOptions.routingCancellation(): Cancellation {
     if (!takeOpenBoundProof()) return Cancellation { true }.also { routingToken = it }
     val cap = sharedPresolveDeadline()
     val solveStop = Cancellation { deadlineAtMs?.let { nowMillis() >= it } == true }
-    val token = if (cap == null) solveStop else routingSlice(
+    val token = if (cap == null) {
+        solveStop
+    } else {
+        routingSlice(
         PresolveBudget { cap - nowMillis() },
         solveStop,
     )
+    }
     routingToken = token
     return token
 }

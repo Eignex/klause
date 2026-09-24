@@ -344,7 +344,7 @@ class OpenTheoryMinimizer internal constructor(
             terms,
             coefficients,
             witness.exactWitness(model.numRealVars),
-            Cancellation { presolveCancellation() || params.cancellation() || params.timeout() },
+            state.theoryLpStop(params.timeout or params.cancellation),
             state.smt::observeSourceLp,
         )
         rayRefusedForEveryWitness = ray == false && model.statesOneBranch()

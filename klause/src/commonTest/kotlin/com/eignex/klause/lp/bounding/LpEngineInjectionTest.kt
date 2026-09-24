@@ -47,6 +47,20 @@ class LpEngineInjectionTest {
         override fun solvePrimal(warm: Basis?) = null
     }
 
+    @Test
+    fun `root LP wall exhaustion is reported before node work`() {
+        val problem = boundedProblem()
+        val sink = SolveStatsSink(backend = "root-wall")
+        LpEngine(
+            problem,
+            LinearObjective(intCoefficients = LongArray(problem.numIntVars)),
+            LpParams(lpPlan = LpPlan(bounding = true), solveBudgetMillis = 4L),
+            sink,
+        ).use { it.chargeRootLpWall(2L) }
+
+        assertTrue(sink.lp.snapshot().wallBackstop)
+    }
+
     private fun accountingEngine(backend: String): LpEngine = LpEngine(
         Problem(numBoolVars = 0, numIntVars = 0, intDomains = emptyArray(), factors = emptyArray()),
         LinearObjective(),

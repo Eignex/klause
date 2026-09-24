@@ -36,6 +36,7 @@ import com.eignex.klause.lp.engine.newPersistentLpSolver
 import com.eignex.klause.lp.engine.solveAndCertify
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.lp.relaxation.LeafRealResult
+import com.eignex.klause.lp.relaxation.LpAssemblyCancelled
 import com.eignex.klause.lp.relaxation.LpAuxiliarySources
 import com.eignex.klause.lp.relaxation.LpExplanation
 import com.eignex.klause.lp.relaxation.LpRelaxation
@@ -433,7 +434,10 @@ internal class LpEngine(
     /** Charge the one-shot pre-search root LP work's wall time against the shared LP wall budget,
      *  so root and per-node solves compete for the same fraction of the deadline. Called once, after the
      *  root work, by [com.eignex.klause.backtrack.ResumableMinimize]. Root work never counts as a prune. */
-    fun chargeRootLpWall(millis: Long) = lpWallBreaker.chargeWall(millis)
+    fun chargeRootLpWall(millis: Long) {
+        lpWallBreaker.chargeWall(millis)
+        if (lpWallBreaker.backstopFired) sink.lp.observeWallBackstop()
+    }
 
     // Adaptive LP effort ladder: the emphasis sets the ceiling
     // rung (cuts when enabled, else the bare bound), and a rolling prune-rate window descends one rung
@@ -493,7 +497,7 @@ internal class LpEngine(
     private fun buildNodeRelaxation(relaxer: CpToLpRelaxation, session: PropagationSession): LpRelaxation {
         if (!persistentResolved) {
             persistentResolved = true
-            val base = relaxer.build(PropagationSession(problem))
+            val base = relaxer.build(PropagationSession(problem), cancellation = nodeLpCancellation)
             if (base.persistentEligible) persistentRelaxation = base
         }
         persistentRelaxation?.let { cpAdapter.relaxation(it, session)?.let { rebound -> return rebound } }
@@ -512,12 +516,12 @@ internal class LpEngine(
             residualCache?.let { cached ->
                 if (residualCacheKey?.contentEquals(key) == true) return cached
             }
-            val built = relaxer.build(session)
+            val built = relaxer.build(session, cancellation = nodeLpCancellation)
             residualCache = built
             residualCacheKey = key
             return built
         }
-        return relaxer.build(session)
+        return relaxer.build(session, cancellation = nodeLpCancellation)
     }
 
     internal var lpCounterResults = LpCounterResults()
@@ -543,7 +547,7 @@ internal class LpEngine(
         if (!params.lpPlan.realResidual || residualOversized) return null
         if (!gatedResolved) {
             gatedResolved = true
-            val built = lpRelaxer?.buildGatedResidual()
+            val built = lpRelaxer?.buildGatedResidual(nodeLpCancellation)
             if (built != null && built.gatedRows.isNotEmpty() && built.model.n > 0) {
                 val enforced = BooleanArray(built.model.m)
                 val simplex = try {
@@ -864,7 +868,12 @@ internal class LpEngine(
         // NaN probe (the hull is the only structure) keeps it. Candidates are the factors that emitted a
         // HULL row in the full build.
         val suppressed = mutableSetOf<Int>()
-        for (factorId in relaxer.build(PropagationSession(problem)).hullFactorIds) {
+        val hullIds = try {
+            relaxer.build(PropagationSession(problem), cancellation = cancellation).hullFactorIds
+        } catch (_: LpAssemblyCancelled) {
+            return
+        }
+        for (factorId in hullIds) {
             val probe = buildRelaxer(params.lpPlan, suppressed + factorId) ?: continue
             val bound = rootLpObjective(probe, cancellation)
             if (!bound.isNaN() && bound >= full - HULL_PRUNE_TOL) suppressed.add(factorId)

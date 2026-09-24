@@ -27,7 +27,9 @@ import com.ionspin.kotlin.bignum.integer.BigInteger
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.minutes
 
 class OpenTheoryEngineTest {
 
@@ -96,6 +98,32 @@ class OpenTheoryEngineTest {
     }
 
     @Test
+    fun `spent theory LP allowance reports budget exhaustion while global search remains active`() {
+        val openUpper = Bits(2).also { bits -> repeat(2) { bits.set(it) } }
+        val model = Problem(
+            numBoolVars = 0,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(0, 0), LongArray(2), null, openUpper),
+            factors = arrayOf(Linear(longArrayOf(2, 4), intArrayOf(0, 1), LinearOp.NE, 3)),
+        )
+        val params = TheoryParams()
+        val state = OpenTheorySolveState(params)
+        state.theoryLpStop(Cancellation { true })
+
+        val result = OpenTheoryEngine(
+            model,
+            ProblemPipeline.EXACT_LIRA,
+            PresolveConfig.NONE,
+            false,
+            Cancellation.Never,
+            null,
+        ).solve(params, state)
+
+        val unknown = assertIs<OpenTheoryResult.Unknown>(result)
+        assertEquals(TerminationReason.BudgetExhausted, unknown.reason)
+        assertEquals(false, unknown.stats.run.timedOut)
+    }
+
+    @Test
     fun `open route distinguishes external cancellation from a wall timeout`() {
         val openUpper = Bits(1).also { it.set(0) }
         val model = Problem(
@@ -146,6 +174,18 @@ class OpenTheoryEngineTest {
 
         assertEquals(TerminationReason.BudgetExhausted, second.reason)
         assertEquals(1L, second.stats.openTheory.openBoolDecisions)
+    }
+
+    @Test
+    fun `theory lp allowance stays fixed across feasibility rounds`() {
+        val state = OpenTheorySolveState(TheoryParams())
+        val parent = Cancellation.after(1.minutes)
+
+        val first = state.theoryLpStop(parent)
+        val second = state.theoryLpStop(parent)
+
+        assertSame(first, second)
+        assertTrue(first.deadline()!! < parent.deadline()!!)
     }
 
     @Test

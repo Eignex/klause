@@ -1438,10 +1438,16 @@ class CliModeTest {
             SolveCore.presolveAllowance(common, Cancellation.Never, common.deadlineAtMs)
             assertEquals(deadline, common.presolveDeadlineAtMs)
         } finally {
-            if (oldBudget == null) System.clearProperty(CliKnobs.presolveBudgetMs)
-            else System.setProperty(CliKnobs.presolveBudgetMs, oldBudget)
-            if (oldFraction == null) System.clearProperty(CliKnobs.presolveBudgetFraction)
-            else System.setProperty(CliKnobs.presolveBudgetFraction, oldFraction)
+            if (oldBudget == null) {
+                System.clearProperty(CliKnobs.presolveBudgetMs)
+            } else {
+                System.setProperty(CliKnobs.presolveBudgetMs, oldBudget)
+            }
+            if (oldFraction == null) {
+                System.clearProperty(CliKnobs.presolveBudgetFraction)
+            } else {
+                System.setProperty(CliKnobs.presolveBudgetFraction, oldFraction)
+            }
         }
     }
 
@@ -1462,10 +1468,16 @@ class CliModeTest {
             val deadline = requireNotNull(common.presolveDeadlineAtMs)
             assertTrue(deadline in before + 12_000L..after + 12_000L)
         } finally {
-            if (oldBudget == null) System.clearProperty(CliKnobs.presolveBudgetMs)
-            else System.setProperty(CliKnobs.presolveBudgetMs, oldBudget)
-            if (oldFraction == null) System.clearProperty(CliKnobs.presolveBudgetFraction)
-            else System.setProperty(CliKnobs.presolveBudgetFraction, oldFraction)
+            if (oldBudget == null) {
+                System.clearProperty(CliKnobs.presolveBudgetMs)
+            } else {
+                System.setProperty(CliKnobs.presolveBudgetMs, oldBudget)
+            }
+            if (oldFraction == null) {
+                System.clearProperty(CliKnobs.presolveBudgetFraction)
+            } else {
+                System.setProperty(CliKnobs.presolveBudgetFraction, oldFraction)
+            }
         }
     }
 
@@ -1486,8 +1498,11 @@ class CliModeTest {
             assertFalse(cancel())
             assertEquals(null, budget)
         } finally {
-            if (oldBudget == null) System.clearProperty(CliKnobs.presolveBudgetMs)
-            else System.setProperty(CliKnobs.presolveBudgetMs, oldBudget)
+            if (oldBudget == null) {
+                System.clearProperty(CliKnobs.presolveBudgetMs)
+            } else {
+                System.setProperty(CliKnobs.presolveBudgetMs, oldBudget)
+            }
         }
     }
 

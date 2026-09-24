@@ -239,8 +239,8 @@ data class LpPlan(
      *  sole cap when the time remaining is unknown (the non-pausable one-shot path). */
     val rootBudgetMillis: Long = 30_000,
     /**
-     * Share of the total solve budget the node LP may spend before the wall-clock **backstop** demotes
-     * it to its floor budget ([LpEffortGovernor]).
+     * Share of the total solve budget optional root and node LP work may spend before the wall-clock
+     * **backstop** stops it ([LpEffortGovernor]).
      *
      * This is a backstop, not the policy. What decides LP effort is deterministic work —
      * [boundMaxOpsPerNode] per node explored, and [boundAdaptiveWork] per solve — so that two identical

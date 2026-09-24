@@ -31,6 +31,7 @@ import com.eignex.klause.lp.engine.lpConditioning
 import com.eignex.klause.lp.engine.newPersistentLpSolver
 import com.eignex.klause.lp.engine.newTableauCutSolver
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
+import com.eignex.klause.lp.relaxation.LpAssemblyCancelled
 import com.eignex.klause.lp.relaxation.LpExplanation
 import com.eignex.klause.lp.relaxation.LpRelaxation
 import com.eignex.klause.lp.relaxation.withCpBounds
@@ -249,6 +250,8 @@ internal fun LpEngine.lpBoundAndFix(
     // A coefficient overflow in the relaxation build loses the bound; recover a sound one via the
     // integer-multiplier 128-bit certification. A failure just keeps the node.
     sparseCertifiedPrune(relaxer, session, bound, sink, cancellation)
+} catch (_: LpAssemblyCancelled) {
+    LpNodeOutcome(false, null)
 } finally {
     sink.lp.clockStop()
 }
@@ -277,7 +280,7 @@ private fun LpEngine.foldSelectedCuts(
     val selected = cutPool.select(res.primal, objectiveCoefficients(base.model), cutPool.maxCuts)
     if (selected.isEmpty()) return base to res
     val tightened = try {
-        sink.lp.observeCutBuild(selected.size) { relaxer.build(session, selected) }
+        sink.lp.observeCutBuild(selected.size) { relaxer.build(session, selected, cancellation) }
     } catch (_: CheckedLongOverflowException) {
         return base to res // overflow in the cut-augmented build: keep the prior (sound) relaxation
     }
@@ -368,7 +371,7 @@ internal fun LpEngine.sparseSafePrune(
             // prunes without ever building the per-node model. Strictness-only conflicts (no non-strict
             // certificate exists) still fall through to the exact rational path below.
             val gatedRay = filter.simplex.infeasibleRay?.copyOf()
-            if (gatedRay != null) {
+            if (gatedRay != null && !cancellation()) {
                 for (i in 0 until gatedModel.m) if (!filter.enforced[i]) gatedRay[i] = 0.0
                 val ray = solveContext.certificationPolicy.acceptNullable(
                     LpCertifier.EXACT_FARKAS,
@@ -394,6 +397,7 @@ internal fun LpEngine.sparseSafePrune(
         }
     }
     val relaxation = nodeRelaxation(relaxer, session)
+    if (cancellation()) return LpNodeOutcome(false, null)
     if (relaxation.model.n == 0) return LpNodeOutcome(false, null)
     sink.lp.observeSolve()
     val model = relaxation.model
@@ -427,6 +431,7 @@ internal fun LpEngine.sparseSafePrune(
     } else {
         observeSolveCost(sink, simplex)
     }
+    if (cancellation()) return LpNodeOutcome(false, null)
     // Feed the budget from the solve itself. A solve that produced no result at all was infeasible or
     // bailed numerically, which says nothing about how much budget the next one deserves.
     floatResult?.let {
@@ -487,6 +492,7 @@ internal fun LpEngine.sparseSafePrune(
     // globally-valid cuts only tightens the bound, and selecting against the live point loads just the
     // cuts that move it — bounding the per-node cut count by efficacy instead of the whole pool.
     val (cutRel, cutRes) = foldSelectedCuts(relaxer, session, relaxation, result, cancellation, sink)
+    if (cancellation()) return LpNodeOutcome(false, null)
     var boundRel = cutRel
     var boundRes = cutRes
     if (cutsAllowed && session.decisionLevel in 1..params.lpPlan.cutSearchMaxDepth &&
@@ -515,7 +521,7 @@ internal fun LpEngine.sparseSafePrune(
                 cutPool.maxCuts,
             ) + localCuts
             val tightened = try {
-                sink.lp.observeCutBuild(selectedCuts.size) { relaxer.build(session, selectedCuts) }
+                sink.lp.observeCutBuild(selectedCuts.size) { relaxer.build(session, selectedCuts, cancellation) }
             } catch (_: CheckedLongOverflowException) {
                 break // overflow in the cut-augmented build: keep the prior (sound) relaxation
             }
@@ -538,6 +544,7 @@ internal fun LpEngine.sparseSafePrune(
     // The exact basis-certificate backs the prune bound, the learnable objective-bound reason and the
     // reduced-cost fixing. Compute it once when any of them needs it; a singular/unbounded certify
     // yields null and each falls back to its cheap certificate-less path, which is sound.
+    if (cancellation()) return LpNodeOutcome(false, null)
     val cert = if ((learn && canPropagate) || canPrune) {
         solveContext.certificationPolicy.acceptNullable(
             LpCertifier.INTEGER,
@@ -555,6 +562,7 @@ internal fun LpEngine.sparseSafePrune(
     } else {
         null
     }
+    if (cancellation()) return LpNodeOutcome(false, null)
     // Neither the float safe bound nor the certificate's integer-multiplier bound dominates the other,
     // so the prune decides on the tighter of the two rather than on the float bound alone.
     val lower = certifiedTightObjectiveLowerBound(
@@ -616,6 +624,7 @@ internal fun LpEngine.sparseSafePrune(
     // for the improving gap, but not an attained LP optimum: the certificate inequality holds for any
     // rounded dual vector.
     if (canPrune && cert != null &&
+        !cancellation() &&
         applySparseReducedCostFixing(
             boundRel,
             cert,
@@ -625,6 +634,7 @@ internal fun LpEngine.sparseSafePrune(
             objectiveVar,
             objectiveAscending,
             learn,
+            cancellation,
         )
     ) {
         return LpNodeOutcome(true, null)
@@ -652,7 +662,9 @@ internal fun LpEngine.applySparseReducedCostFixing(
     objectiveVar: Int = -1,
     objectiveAscending: Boolean = true,
     learn: Boolean = false,
+    cancellation: Cancellation = Cancellation.Never,
 ): Boolean {
+    if (cancellation()) return false
     if (sourceObjectiveRange(relaxation) == null) return false
     val ceiling = enclosingCutoff(bound)?.ceilLong() ?: return false
     if (ceiling == Long.MIN_VALUE) return false
@@ -666,6 +678,7 @@ internal fun LpEngine.applySparseReducedCostFixing(
     }
     val canLearn = reasonSupport != null
     for (col in relaxation.colVarId.indices) {
+        if (cancellation()) return false
         val varId = relaxation.colVarId[col]
         if (varId < 0) continue // auxiliary column — no CP variable to fix
         val isBool = relaxation.colIsBool[col]
@@ -929,7 +942,7 @@ internal fun LpEngine.rootLpRelaxationBound(
     globalCuts: List<Cut>,
     cancellation: Cancellation = Cancellation.Never,
 ): Double = try {
-    val relaxation = relaxer.build(PropagationSession(problem), globalCuts)
+    val relaxation = relaxer.build(PropagationSession(problem), globalCuts, cancellation)
     if (relaxation.model.n == 0) {
         Double.NaN
     } else {
@@ -961,6 +974,8 @@ internal fun LpEngine.rootLpRelaxationBound(
     }
 } catch (_: CheckedLongOverflowException) {
     Double.NaN
+} catch (_: LpAssemblyCancelled) {
+    Double.NaN
 }
 
 /**
@@ -974,7 +989,7 @@ internal fun LpEngine.rootLpObjective(
     relaxer: CpToLpRelaxation,
     cancellation: Cancellation = Cancellation.Never,
 ): Double = try {
-    val relaxation = relaxer.build(PropagationSession(problem))
+    val relaxation = relaxer.build(PropagationSession(problem), cancellation = cancellation)
     if (relaxation.model.n == 0) {
         Double.NaN
     } else {
@@ -991,6 +1006,8 @@ internal fun LpEngine.rootLpObjective(
         if (result != null) result.objective + relaxation.objectiveConstant.toDouble() else Double.NaN
     }
 } catch (_: CheckedLongOverflowException) {
+    Double.NaN
+} catch (_: LpAssemblyCancelled) {
     Double.NaN
 }
 
@@ -1014,7 +1031,7 @@ internal fun LpEngine.harvestRootCuts(
     if (separators.isEmpty() && !gomory && !mir) return emptyList()
     val pool = CutPool()
     try {
-        var relaxation = relaxer.build(session)
+        var relaxation = relaxer.build(session, cancellation = cancellation)
         if (relaxation.model.n == 0) return emptyList()
         var simplex = dualSimplex(relaxation.model, cancellation)
         var ownedSimplex: TableauCutSolver? = simplex
@@ -1061,7 +1078,7 @@ internal fun LpEngine.harvestRootCuts(
                 observeRootCutAccounting(candidates.size, 0, 0)
                 if (added == 0) break
                 val selected = pool.cuts()
-                relaxation = observeRootCutBuild(selected.size) { relaxer.build(session, selected) }
+                relaxation = observeRootCutBuild(selected.size) { relaxer.build(session, selected, cancellation) }
                 val replacement = dualSimplex(relaxation.model, cancellation)
                 ownedSimplex = replacement
                 simplex.close()
@@ -1097,6 +1114,8 @@ internal fun LpEngine.harvestRootCuts(
         }
     } catch (_: CheckedLongOverflowException) {
         return pool.cuts() // keep whatever stayed within 64-bit determinants — still globally valid
+    } catch (_: LpAssemblyCancelled) {
+        return pool.cuts()
     }
     return pool.cuts()
 }
