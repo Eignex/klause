@@ -134,4 +134,27 @@ class SourceAffineTest {
             assertTrue(satisfies(problem, lifted), "rebuild produced ${lifted.toList()}, not a solution")
         }
     }
+
+    @Test
+    fun `a binary column is left to the substitution that turns it into a literal`() {
+        // Both columns declare {0, 1}. Eliminating one takes it out of SUBSTITUTE_BINARY_COLUMNS' reach
+        // and leaves a model that was going to be pure pseudo-Boolean as a hybrid, which costs it the
+        // lane rather than a reduction.
+        val problem = model(
+            2,
+            1L,
+            emptySet(),
+            row(0 to 1L, 1 to -1L, op = LinearOp.EQ, bound = 0L),
+            row(0 to 1L, 1 to 1L, op = LinearOp.LE, bound = 1L),
+        )
+
+        val delta = Presolve.eliminateSourceAffineSingletons(
+            problem,
+            emptySet(),
+            Cancellation.Never,
+            AffinePivotOrder.MARKOWITZ,
+        )
+
+        assertTrue(delta.isEmpty, "a {0, 1} column is never a source pivot")
+    }
 }
