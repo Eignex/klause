@@ -151,9 +151,10 @@ internal object AffineSingletons {
         // far above what any non-giant model reaches, so ordinary instances are unaffected (byte-identical).
         if (problem.factors.size > maxFactors) return null
         val eliminated = BooleanArray(problem.numIntVars)
-        // Where every column is closed there is nothing to refuse, so the finite lane pays no predicate.
+        // Where every column is closed and binary substitution has already run, there is nothing to
+        // refuse, so the finite lane pays no predicate.
         val pivotable: ((Int) -> Boolean)? =
-            if (domains != null) null else { x: Int -> ranges.isClosed(x) }
+            if (domains != null) null else { x: Int -> ranges.isClosed(x) && !ranges.isBinary(x) }
         val subs = ArrayList<AffineSub>()
         // Before any fold the working set is byte-for-byte the pristine input, so the first candidate scan
         // can read the session's shared occurrence index directly (its CSR is in stable-id order). If no

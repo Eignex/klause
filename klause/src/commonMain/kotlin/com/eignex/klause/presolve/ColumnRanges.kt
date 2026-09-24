@@ -34,6 +34,16 @@ internal interface ColumnRanges {
     /** Upper end of column [v]. Defined only where [hasUpper]. */
     fun max(v: Int): Long
 
+    /**
+     * Whether column [v] admits exactly `{0, 1}`, so it is one
+     * [com.eignex.klause.presolve.PresolvePass.SUBSTITUTE_BINARY_COLUMNS] turns into a literal.
+     *
+     * A source reduction that eliminates one of these takes it out of that substitution's reach, and a
+     * model that would have become pure pseudo-Boolean is left a hybrid instead — which costs it the
+     * lane rather than a reduction.
+     */
+    fun isBinary(v: Int): Boolean = isClosed(v) && min(v) == 0L && max(v) == 1L
+
     /** Whether every column in [vars] has a width, so a row over them may be charged. */
     fun allClosed(vars: IntArray): Boolean {
         for (v in vars) if (!isClosed(v)) return false
