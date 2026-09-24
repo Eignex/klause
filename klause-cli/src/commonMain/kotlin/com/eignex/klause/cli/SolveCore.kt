@@ -324,19 +324,14 @@ internal object SolveCore {
      * engine slices per pass. Derived by [derivedPresolveBudgetMs] as a share of the run's own `-t`
      * budget rather than a flat figure. An explicit `klause.presolve.budget.ms` still wins.
      */
-    private fun presolveAllowance(
+    internal fun presolveAllowance(
         common: CommonOptions,
         solveCancel: Cancellation,
         solveDeadline: Long?,
     ): Pair<Cancellation, PresolveBudget?> {
-        val explicit = cliProp(CliKnobs.presolveBudgetMs)?.toLongOrNull()
-        val fraction = cliProp(CliKnobs.presolveBudgetFraction)?.toDoubleOrNull()
-            ?: CliKnobs.DEFAULT_PRESOLVE_BUDGET_FRACTION
-        val budgetMs = explicit ?: derivedPresolveBudgetMs(common.timeLimitMs, fraction)
-        if (budgetMs <= 0) return solveCancel to null
-        val presolveDeadline = nowMillis() + budgetMs
+        val presolveDeadline = common.sharedPresolveDeadline() ?: return solveCancel to null
         val cap = solveDeadline?.let { minOf(it, presolveDeadline) } ?: presolveDeadline
-        return Cancellation { nowMillis() > cap } to PresolveBudget { cap - nowMillis() }
+        return Cancellation { solveCancel() || nowMillis() > cap } to PresolveBudget { cap - nowMillis() }
     }
 
     /** Naked single backtrack solve for the `fixed`/FD engine. A model annotation selects its heuristic;
