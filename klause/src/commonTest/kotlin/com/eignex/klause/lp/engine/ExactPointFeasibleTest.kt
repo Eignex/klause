@@ -146,7 +146,7 @@ class ExactPointFeasibleTest {
 
             assertNull(first.witness)
             assertEquals(LpRefinementDecline.CANCELLED, first.decline)
-            assertEquals(first.work, owner.refinementCache.work)
+            assertEquals(first.work, owner.pointRecoveryCache.work)
         }
     }
 
@@ -168,7 +168,7 @@ class ExactPointFeasibleTest {
             assertNull(result.witness)
             assertEquals(LpRefinementDecline.CANCELLED, result.decline)
             assertTrue(result.work > 0L)
-            assertEquals(result.work, owner.refinementCache.work)
+            assertEquals(result.work, owner.pointRecoveryCache.work)
         }
     }
 
@@ -189,7 +189,7 @@ class ExactPointFeasibleTest {
 
             assertNull(result.witness)
             assertEquals(LpRefinementDecline.BITS, result.decline)
-            assertEquals(result.work, owner.refinementCache.work)
+            assertEquals(result.work, owner.pointRecoveryCache.work)
         }
     }
 
@@ -213,7 +213,7 @@ class ExactPointFeasibleTest {
 
             assertNull(result.witness)
             assertEquals(LpRefinementDecline.ALLOCATION, result.decline)
-            assertEquals(result.allocation, owner.refinementCache.allocation)
+            assertEquals(result.allocation, owner.pointRecoveryCache.allocation)
         }
     }
 
@@ -225,11 +225,11 @@ class ExactPointFeasibleTest {
         val state = LpExactState(
             source.copy(
                 objective = ExactLpObjective(
-            listOf(ExactLpNumber.of(2L)),
-            scale = ExactLpNumber.of(2L),
-            externalConstant = ExactLpNumber.of(3L),
-        )
-            )
+                    listOf(ExactLpNumber.of(2L)),
+                    scale = ExactLpNumber.of(2L),
+                    externalConstant = ExactLpNumber.of(3L),
+                ),
+            ),
         )
 
         LpScopedSolver(state).use { owner ->
@@ -251,7 +251,7 @@ class ExactPointFeasibleTest {
     }
 
     @Test
-    fun `point work exhaustion persists in the source ledger`() {
+    fun `point work limit applies to each attempt while source spending accumulates`() {
         val builder = LpBuilder()
         builder.addRealVar(0.0, 1.0)
         val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
@@ -279,8 +279,97 @@ class ExactPointFeasibleTest {
             assertNull(first.witness)
             assertEquals(LpRefinementDecline.WORK, first.decline)
             assertEquals(LpRefinementDecline.WORK, second.decline)
-            assertEquals(first.work + second.work, owner.refinementCache.work)
-            assertEquals(2L, owner.refinementCache.work)
+            assertEquals(first.work + second.work, owner.pointRecoveryCache.work)
+            assertEquals(4L, owner.pointRecoveryCache.work)
+            assertEquals(0L, owner.refinementCache.work)
+        }
+    }
+
+    @Test
+    fun `two checked points may exceed one attempt limit in the source ledger`() {
+        val builder = LpBuilder()
+        builder.addRealVar(0.0, 1.0)
+        val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+
+        LpScopedSolver(state).use { owner ->
+            val model = assertNotNull(state.toWorkingModel())
+            val first = recoverExactPointWitness(
+                model,
+                doubleArrayOf(0.5),
+                LpRefinementRequest(owner, owner.refinementCache, LpRefinementLimits()),
+                Cancellation.Never,
+            )
+            val second = recoverExactPointWitness(
+                model,
+                doubleArrayOf(0.5),
+                LpRefinementRequest(owner, owner.refinementCache, LpRefinementLimits(maxWork = first.work)),
+                Cancellation.Never,
+            )
+
+            assertNotNull(first.witness)
+            assertNotNull(second.witness)
+            assertEquals(first.work, second.work)
+            assertEquals(first.work + second.work, owner.pointRecoveryCache.work)
+            assertTrue(owner.pointRecoveryCache.work > first.work)
+            assertEquals(0L, owner.refinementCache.work)
+        }
+    }
+
+    @Test
+    fun `dense refinement cannot reuse a successful sparse point allowance`() {
+        val builder = LpBuilder()
+        builder.addRealVar(0.0, 1.0)
+        val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+
+        LpScopedSolver(state).use { owner ->
+            val model = assertNotNull(state.toWorkingModel())
+            val point = recoverExactPointWitness(
+                model,
+                doubleArrayOf(0.5),
+                LpRefinementRequest(owner, owner.refinementCache, LpRefinementLimits()),
+                Cancellation.Never,
+            )
+            assertNotNull(point.witness)
+            val request = LpRefinementRequest(
+                owner,
+                owner.refinementCache,
+                LpRefinementLimits(),
+                sourceWorkLimit = point.work,
+            )
+
+            val dense = refineLp(model, request, additionalSourceWork = point.work)
+
+            assertEquals(LpRefinementDecline.WORK, dense.metrics.decline)
+            assertEquals(0L, dense.metrics.work)
+            assertEquals(point.work, owner.pointRecoveryCache.work)
+            assertEquals(0L, owner.refinementCache.work)
+        }
+    }
+
+    @Test
+    fun `dense refinement cannot reuse a failed sparse point allowance`() {
+        val builder = LpBuilder()
+        builder.addRealVar(0.0, 1.0)
+        val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+
+        LpScopedSolver(state).use { owner ->
+            val model = assertNotNull(state.toWorkingModel())
+            val request = LpRefinementRequest(
+                owner,
+                owner.refinementCache,
+                LpRefinementLimits(maxWork = 2L),
+                sourceWorkLimit = 2L,
+            )
+            val point = recoverExactPointWitness(model, doubleArrayOf(0.5), request, Cancellation.Never)
+
+            val dense = refineLp(model, request, additionalSourceWork = point.work)
+
+            assertNull(point.witness)
+            assertEquals(LpRefinementDecline.WORK, point.decline)
+            assertEquals(LpRefinementDecline.WORK, dense.metrics.decline)
+            assertEquals(0L, dense.metrics.work)
+            assertEquals(2L, owner.pointRecoveryCache.work)
+            assertEquals(0L, owner.refinementCache.work)
         }
     }
 

@@ -340,6 +340,7 @@ internal fun certifyLpResult(
             preferredBasisCache = solver.exactBasisCache.takeIf {
                 result != null && policy === ProductionLpCertificationPolicy
             },
+            additionalSourceWork = pointRecovery?.work ?: 0L,
         )
         refined = recovered
         recovered.sourceSingularBasis?.let { rejected ->

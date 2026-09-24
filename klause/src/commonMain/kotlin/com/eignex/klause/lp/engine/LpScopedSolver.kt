@@ -39,6 +39,7 @@ internal class LpScopedSolver(
 ) : AutoCloseable {
     private val continuationCache = LpExactContinuationCache()
     internal val refinementCache = LpRefinementCache()
+    internal val pointRecoveryCache = LpRefinementCache()
     private var trail = LpBoundTrail(initial)
     private var solver: PersistentLpSolver? = null
     private var closed = false
