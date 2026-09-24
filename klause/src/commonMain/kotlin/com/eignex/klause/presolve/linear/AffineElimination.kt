@@ -1132,16 +1132,49 @@ internal object AffineSingletons {
      *  extent [ranges] gives `x`, one row per side it bounds. */
     private fun domainBoundsOnTerms(ranges: ColumnRanges, c: AffineCandidate): List<Factor> {
         val rows = ArrayList<Factor>(2)
-        // One row per side the model actually bounds. A column open above states no upper row: there is
-        // no bound on `x` to carry over to its terms, and inventing one would constrain the partners by
-        // an endpoint the model never gave.
+        // One row per side the model actually bounds, and only where the terms do not already imply it.
+        // A column open above states no upper row: there is no bound on `x` to carry over to its terms,
+        // and inventing one would constrain the partners by an endpoint the model never gave.
         if (ranges.hasUpper(c.x)) {
-            rows.add(Linear(c.termCoeffs.copyOf(), c.termVars.copyOf(), LinearOp.LE, ranges.max(c.x) - c.constTerm))
+            val bound = ranges.max(c.x) - c.constTerm
+            if (termActivity(ranges, c, upper = true)?.let { it > bound } != false) {
+                rows.add(Linear(c.termCoeffs.copyOf(), c.termVars.copyOf(), LinearOp.LE, bound))
+            }
         }
         if (ranges.hasLower(c.x)) {
-            rows.add(Linear(c.termCoeffs.copyOf(), c.termVars.copyOf(), LinearOp.GE, ranges.min(c.x) - c.constTerm))
+            val bound = ranges.min(c.x) - c.constTerm
+            if (termActivity(ranges, c, upper = false)?.let { it < bound } != false) {
+                rows.add(Linear(c.termCoeffs.copyOf(), c.termVars.copyOf(), LinearOp.GE, bound))
+            }
         }
         return rows
+    }
+
+    /**
+     * The largest ([upper]) or smallest value `Σ termCoeffs·termVars` can take over the term columns'
+     * own ranges, or null when it is unbounded that way or the sum leaves `Long`.
+     *
+     * A bound row exists to keep `x` inside its extent once `x` itself is gone. Where the terms cannot
+     * reach past that extent on their own the row states nothing, and emitting it anyway is how a fold
+     * that removes one equality leaves two rows behind — the growth that makes elimination cost more
+     * than it saves. Null is the safe answer: the row is emitted whenever redundancy is not provable.
+     */
+    private fun termActivity(ranges: ColumnRanges, c: AffineCandidate, upper: Boolean): Long? {
+        var total = 0L
+        try {
+            for (k in c.termVars.indices) {
+                val v = c.termVars[k]
+                val a = c.termCoeffs[k]
+                if (a == 0L) continue
+                // The endpoint that drives the sum the way this side asks for.
+                val takeUpper = (a > 0L) == upper
+                if (if (takeUpper) !ranges.hasUpper(v) else !ranges.hasLower(v)) return null
+                total = addExact(total, mulExact(a, if (takeUpper) ranges.max(v) else ranges.min(v)))
+            }
+        } catch (_: CheckedLongOverflowException) {
+            return null
+        }
+        return total
     }
 }
 
