@@ -49,6 +49,7 @@ internal class CertifiedLpResult(
     val basisVerification: ExactBasisMetrics? = null,
     val continuation: ExactContinuationMetrics? = null,
     val refinement: LpRefinementMetrics? = null,
+    val exactPoint: ExactPointRecovery? = null,
 ) {
     val verdict: LpVerdict = when {
         farkasRay != null || rationalConflict != null || boundConflict != null -> LpVerdict.INFEASIBLE
@@ -202,6 +203,7 @@ internal fun certifyLpResult(
     continuationLimits: ExactContinuationLimits = ExactContinuationLimits(),
     fullContinuation: Boolean = true,
     refinement: LpRefinementRequest? = null,
+    sparsePointRecovery: Boolean = false,
 ): CertifiedLpResult {
     val certificationStarted = refinement?.let { TimeSource.Monotonic.markNow() }
     if (!model.finiteExactInput()) return CertifiedLpResult(null, null, null, null, null, false, { null })
@@ -309,6 +311,7 @@ internal fun certifyLpResult(
     var exactBasis: ExactBasisVerification? = null
     var continued: LpContinuationVerification? = earlyContinuation
     var refined: LpRefinementResult? = null
+    var pointRecovery: ExactPointRecovery? = null
     var numericalWitness = earlyContinuation?.witness ?: witness
     var numericalBound = bound
     var numericalConflict: BigRationalConflict? = null
@@ -330,7 +333,8 @@ internal fun certifyLpResult(
             directAllocation = (reconstruction?.metrics?.allocation ?: 0L) + (exactBasis?.metrics?.allocation ?: 0L) +
                 (capturedTarget?.metrics?.allocation ?: 0L),
             needPoint = numericalWitness == null, direction = solver.recessionDirection,
-            directElapsed = certificationStarted?.elapsedNow() ?: Duration.ZERO,
+            directElapsed = (certificationStarted?.elapsedNow() ?: Duration.ZERO) -
+                (pointRecovery?.elapsed ?: Duration.ZERO),
             reconstructInitial = reconstruction == null,
             preferBasis = result != null && policy === ProductionLpCertificationPolicy,
             preferredBasisCache = solver.exactBasisCache.takeIf {
@@ -404,9 +408,27 @@ internal fun certifyLpResult(
         model.m > RationalBasisLimits().dimension && policy === ProductionLpCertificationPolicy && !cancellation()
     ) {
         pointAttempted = true
-        val point = exactPointWitness(model, result.primal, observer)
+        val ordinary = exactPointWitness(
+            model,
+            result.primal,
+            observer.takeUnless { sparsePointRecovery },
+        )
+        val point = if (ordinary != null || !sparsePointRecovery) {
+            if (sparsePointRecovery) observer?.observe(LpCertifier.EXACT_POINT, true)
+            ordinary
+        } else {
+            val recovered = recoverExactPointWitness(
+                model,
+                result.primal,
+                refinement,
+                cancellation,
+                observer,
+            )
+            pointRecovery = recovered
+            recovered.witness
+        }
         numericalWitness = point
-        witness = point
+        witness = policy.acceptNullable(LpCertifier.EXACT_POINT, point)
     }
     if (result != null && (numericalWitness == null || numericalBound?.value != numericalWitness?.objective) &&
         !cancellation()
@@ -593,6 +615,7 @@ internal fun certifyLpResult(
         reconstruction = reconstruction?.metrics,
         basisVerification = exactBasis?.metrics,
         continuation = continued?.metrics ?: capturedTarget?.metrics,
+        exactPoint = pointRecovery,
         conflictSupport =
         refined?.support?.takeIf { conflict === refined.conflict }
             ?: continued?.support?.takeIf { conflict === continued.conflict }
@@ -817,23 +840,57 @@ internal fun checkedLpConflict(model: LpModel, conflict: BigRationalConflict): B
     return rhs < minimum || (rhs == minimum && strict)
 }
 
-internal fun checkedLpWitness(model: LpModel, primal: List<BigFraction>): ExactLpWitness? {
-    if (primal.size != model.n || !model.finiteExactInput()) return null
-    val shifted = primal.mapIndexed { j, value -> value - model.exactShift(j) }
+internal fun checkedLpWitness(
+    model: LpModel,
+    primal: List<BigFraction>,
+    meter: RefinementMeter? = null,
+): ExactLpWitness? {
+    if (primal.size != model.n) return null
+    meter?.charge(model.n.toLong() + model.m, 16L * (model.n.toLong() + model.m))
+    if (!model.finiteExactInput()) return null
+    fun add(a: BigFraction, b: BigFraction): BigFraction = meter?.pointAdd(a, b) ?: a + b
+    fun multiply(a: BigFraction, b: BigFraction): BigFraction = meter?.pointMultiply(a, b) ?: a * b
+    fun subtract(a: BigFraction, b: BigFraction): BigFraction =
+        if (b.isZero) a else add(a, meter?.number(b.negated()) ?: b.negated())
+    val shifted = primal.mapIndexed { j, value -> subtract(value, model.exactShift(j)) }
+    for (j in shifted.indices) {
+        meter?.charge()
+        if (!model.withinExactBounds(j, shifted[j], meter)) return null
+    }
     val activity = MutableList(model.m) { BigFraction.ZERO }
     for (j in 0 until model.n) {
-        if (!model.withinExactBounds(j, shifted[j])) return null
-        model.forEachRationalColumn(j) { row, a -> activity[row] += a * shifted[j] }
+        model.forEachRationalColumn(j) { row, a ->
+            meter?.charge()
+            activity[row] = add(activity[row], multiply(a, shifted[j]))
+        }
     }
     var objective = model.exactConstant()
-    for (j in 0 until model.n) objective += model.exactCost(j) * shifted[j]
-    for (row in 0 until model.m) {
-        val slack = model.exactRhs(row) - activity[row]
-        val column = model.slackCol(row)
-        if (!model.withinExactBounds(column, slack) || (model.exactRowStrict(row) && slack.isZero)) return null
-        objective += model.exactCost(column) * slack
+    for (j in 0 until model.n) {
+        meter?.charge()
+        objective = add(objective, multiply(model.exactCost(j), shifted[j]))
     }
-    return ExactLpWitness(primal.toList(), model.sourceObjective(objective))
+    for (row in 0 until model.m) {
+        meter?.charge()
+        val slack = subtract(model.exactRhs(row), activity[row])
+        val column = model.slackCol(row)
+        if (!model.withinExactBounds(column, slack, meter) ||
+            (model.exactRowStrict(row) && slack.isZero)
+        ) {
+            return null
+        }
+        objective = add(objective, multiply(model.exactCost(column), slack))
+    }
+    val source = model.exactState?.model?.objective
+    val sourceObjective = if (meter != null && source != null) {
+        add(
+            multiply(objective, meter.number(meter.number(source.scale.value).reciprocal())),
+            source.externalConstant.value,
+        )
+    } else {
+        model.sourceObjective(objective)
+    }
+    meter?.charge(model.n.toLong(), model.n.toLong() * 8L)
+    return ExactLpWitness(primal.toList(), sourceObjective)
 }
 
 internal fun checkedLpUnboundedness(
@@ -925,10 +982,23 @@ internal fun LpModel.exactBounds(j: Int): ExactLpBounds {
 
 private fun LpModel.exactRowStrict(row: Int): Boolean = exactState?.model?.row(row)?.strict ?: rowStrict[row]
 
-internal fun LpModel.withinExactBounds(j: Int, value: BigFraction): Boolean {
+internal fun LpModel.withinExactBounds(j: Int, value: BigFraction, meter: RefinementMeter? = null): Boolean {
     val bounds = exactBounds(j)
-    bounds.lower?.let { if (value < it.number.value || (it.strict && value == it.number.value)) return false }
-    bounds.upper?.let { if (value > it.number.value || (it.strict && value == it.number.value)) return false }
+    meter?.pointVisit(value)
+    bounds.lower?.let {
+        if ((meter?.pointCompare(value, it.number.value) ?: value.compareTo(it.number.value)) < 0 ||
+            (it.strict && value == it.number.value)
+        ) {
+            return false
+        }
+    }
+    bounds.upper?.let {
+        if ((meter?.pointCompare(value, it.number.value) ?: value.compareTo(it.number.value)) > 0 ||
+            (it.strict && value == it.number.value)
+        ) {
+            return false
+        }
+    }
     return true
 }
 

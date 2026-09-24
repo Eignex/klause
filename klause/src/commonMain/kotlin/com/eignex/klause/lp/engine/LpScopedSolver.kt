@@ -158,6 +158,7 @@ internal class LpScopedSolver(
         fullContinuation: Boolean = true,
         observer: LpCertificationObserver? = null,
         refinementLimits: LpRefinementLimits = LpRefinementLimits(),
+        sparsePointRecovery: Boolean = false,
     ): CertifiedLpResult? {
         val attempt = solveFloat(warm, token) ?: return null
         val certified = certifyLpResult(
@@ -171,6 +172,7 @@ internal class LpScopedSolver(
             continuationLimits = continuationLimits,
             fullContinuation = fullContinuation,
             observer = observer,
+            sparsePointRecovery = sparsePointRecovery,
             refinement = LpRefinementRequest(
                 this,
                 refinementCache,
