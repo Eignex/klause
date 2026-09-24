@@ -103,9 +103,15 @@ internal class LpRefinementRequest(
     private val sourceSolve: LpSolveMetrics = LpSolveMetrics(),
     val onBasisVerification: ((ExactBasisMetrics) -> Unit)? = null,
 ) {
-    fun effectiveLimits(): LpRefinementLimits = limits.copy(
+    val pointCache: LpRefinementCache get() = source.pointRecoveryCache
+
+    private fun remainingSourceWork(additionalSourceWork: Long): Long =
+        ((sourceWorkLimit - preparationWork).coerceAtLeast(0L) - sourceSolve.workOps).coerceAtLeast(0L)
+            .let { (it - additionalSourceWork).coerceAtLeast(0L) }
+
+    fun effectiveLimits(additionalSourceWork: Long = 0L): LpRefinementLimits = limits.copy(
         maxWork = if (sourceWorkLimit > 0L) {
-            minOf(limits.maxWork, (sourceWorkLimit - preparationWork - sourceSolve.workOps).coerceAtLeast(0L))
+            minOf(limits.maxWork, remainingSourceWork(additionalSourceWork))
         } else {
             limits.maxWork
         },
@@ -140,6 +146,7 @@ internal class RefinementMeter(
     private val cache: LpRefinementCache,
     private val cancellation: Cancellation,
     private val onBasisVerification: ((ExactBasisMetrics) -> Unit)? = null,
+    private val perAttempt: Boolean = false,
 ) {
     private val started = TimeSource.Monotonic.markNow()
     private val initialWork = cache.work
@@ -148,23 +155,32 @@ internal class RefinementMeter(
     private var directWork = 0L
     private var directAllocation = 0L
     var metrics = LpRefinementMetrics()
-    val token = Cancellation { cancellation() || cache.elapsed + started.elapsedNow() >= limits.time }
+    val token = Cancellation { cancellation() || elapsedForLimit() >= limits.time }
     val spentWork: Long get() = cache.work
-    val remainingWork: Long get() = (limits.maxWork - cache.work).coerceAtLeast(0L)
-    val remainingAllocation: Long get() = (limits.maxAllocation - cache.allocation).coerceAtLeast(0L)
+    val remainingWork: Long get() = minOf(
+        limits.maxWork - if (perAttempt) cache.work - initialWork else cache.work,
+        Long.MAX_VALUE - cache.work,
+    ).coerceAtLeast(0L)
+    val remainingAllocation: Long get() = minOf(
+        limits.maxAllocation - if (perAttempt) cache.allocation - initialAllocation else cache.allocation,
+        Long.MAX_VALUE - cache.allocation,
+    ).coerceAtLeast(0L)
     val remainingPivots: Int get() = (limits.maxPivots - cache.pivots).coerceAtLeast(0)
 
     fun poll() {
         if (cancellation()) stop(LpRefinementDecline.CANCELLED)
-        if (cache.elapsed + started.elapsedNow() >= limits.time) stop(LpRefinementDecline.TIME)
+        if (elapsedForLimit() >= limits.time) stop(LpRefinementDecline.TIME)
     }
+
+    private fun elapsedForLimit(): Duration = started.elapsedNow() +
+        if (perAttempt) Duration.ZERO else cache.elapsed
 
     fun charge(work: Long = 1L, bytes: Long = 0L) {
         poll()
         if (work > remainingWork) stop(LpRefinementDecline.WORK)
         if (bytes > remainingAllocation) stop(LpRefinementDecline.ALLOCATION)
-        cache.work += work
-        cache.allocation += bytes
+        cache.work = addSaturated(cache.work, work)
+        cache.allocation = addSaturated(cache.allocation, bytes)
     }
 
     fun prior(work: Long, allocation: Long, elapsed: Duration) {
@@ -1224,9 +1240,10 @@ internal fun refineLp(
     reconstructInitial: Boolean = true,
     preferBasis: Boolean = false,
     preferredBasisCache: ExactBasisCache? = null,
+    additionalSourceWork: Long = 0L,
 ): LpRefinementResult {
     val state = model.exactState
-    val limits = request.effectiveLimits()
+    val limits = request.effectiveLimits(additionalSourceWork)
     val cache = request.cache
     val meter = RefinementMeter(limits, cache, cancellation, request.onBasisVerification)
     var run: RefinementRun? = null

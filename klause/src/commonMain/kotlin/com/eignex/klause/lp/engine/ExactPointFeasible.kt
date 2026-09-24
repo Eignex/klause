@@ -47,7 +47,7 @@ internal fun recoverExactPointWitness(
     cancellation: Cancellation,
     observer: LpCertificationObserver? = null,
 ): ExactPointRecovery {
-    val meter = RefinementMeter(request.effectiveLimits(), request.cache, cancellation)
+    val meter = RefinementMeter(request.effectiveLimits(), request.pointCache, cancellation, perAttempt = true)
     var witness: ExactLpWitness? = null
     var checks = 0
     var repairs = 0
