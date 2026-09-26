@@ -1,16 +1,23 @@
 package com.eignex.klause.backtrack
 
+import com.eignex.klause.backtrack.selector.IndomainMax
 import com.eignex.klause.factor.bool.Cardinality
+import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.Assumptions
+import com.eignex.klause.propagation.ClauseExchange
+import com.eignex.klause.propagation.PropagationSession
+import com.eignex.klause.propagation.SharedClause
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.objective.LinearObjective
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 /**
  * The persistent LNS repair handle ([BacktrackSolver.openRepair], #644): one search re-seeded across
@@ -44,15 +51,128 @@ class RepairSearchTest {
     }
 
     @Test
-    fun `repair rejects an increasing cutoff`() {
+    fun `repair rejects an increasing or NaN cutoff`() {
         val objective = LinearObjective(boolWeights = longArrayOf(-1L))
         val solver = BacktrackSolver(Problem(1, 0, emptyArray(), emptyArray()).bake())
 
-        solver.openRepair(objective, BacktrackParams()).use { repair ->
-            assertNotNull(repair.repair(Assumptions.None, 100L, 0.0))
-            assertFailsWith<IllegalArgumentException> {
-                repair.repair(Assumptions.None, 100L, 1.0)
+        for (invalid in listOf(1.0, Double.NaN)) {
+            solver.openRepair(objective, BacktrackParams()).use { repair ->
+                assertNotNull(repair.repair(Assumptions.None, 100L, 0.0))
+                assertFailsWith<IllegalArgumentException> {
+                    repair.repair(Assumptions.None, 100L, invalid)
+                }
             }
+        }
+    }
+
+    @Test
+    fun `repair compares wide discrete objectives to the cutoff exactly`() {
+        val cutoff = -9_007_199_254_740_992.0
+        val cutoffAsLong = -9_007_199_254_740_992L
+        val solver = BacktrackSolver(Problem(1, 0, emptyArray(), emptyArray()).bake())
+
+        for (weight in listOf(-9_007_199_254_740_993L, cutoffAsLong)) {
+            val objective = LinearObjective(boolWeights = longArrayOf(weight))
+            val improvingSourceValues = listOf(0L, weight).filter { it < cutoffAsLong }
+            solver.openRepair(objective, BacktrackParams()).use { repair ->
+                val sample = repair.repair(Assumptions.None, 100L, cutoff)
+                if (improvingSourceValues.isEmpty()) {
+                    assertNull(sample)
+                } else {
+                    assertEquals(true, assertNotNull(sample).bools.single())
+                    assertEquals(improvingSourceValues.single(), objective.evaluateLong(sample))
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `repair respects a fractional cutoff`() {
+        val objective = LinearObjective(boolWeights = longArrayOf(-2L))
+        val solver = BacktrackSolver(Problem(1, 0, emptyArray(), emptyArray()).bake())
+
+        for (cutoff in listOf(-1.5, -2.0)) {
+            val improvingSourceValues = listOf(0L, -2L).filter { it.toDouble() < cutoff }
+            solver.openRepair(objective, BacktrackParams()).use { repair ->
+                val sample = repair.repair(Assumptions.None, 100L, cutoff)
+                if (improvingSourceValues.isEmpty()) {
+                    assertNull(sample)
+                } else {
+                    assertEquals(improvingSourceValues.single(), objective.evaluateLong(assertNotNull(sample)))
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `repair rejects an overflowing discrete score above the cutoff`() {
+        val objective = LinearObjective(boolWeights = longArrayOf(Long.MAX_VALUE, Long.MAX_VALUE))
+        val solver = BacktrackSolver(Problem(2, 0, emptyArray(), emptyArray()).bake())
+        val forced = Assumptions(mapOf(0 to true, 1 to true), emptyMap())
+        val sourceCost = BigFraction.ofLong(Long.MAX_VALUE) + BigFraction.ofLong(Long.MAX_VALUE)
+        assertTrue(sourceCost > BigFraction.ofLong(1L))
+
+        solver.openRepair(objective, BacktrackParams()).use { repair ->
+            assertNull(repair.repair(forced, 100L, 1.0))
+        }
+    }
+
+    @Test
+    fun `repair publishes a second exact improvement with the same displayed score`() {
+        val values = listOf(-9_007_199_254_740_992L, -9_007_199_254_740_993L)
+        val problem = Problem(0, 1, arrayOf(IntDomain(values.min(), values.max())), emptyArray()).bake()
+        val objective = LinearObjective(intCoefficients = longArrayOf(1L))
+        val offers = ArrayList<Long>()
+        val params = BacktrackParams(
+            valueSelector = IndomainMax,
+            improvedSolutionSink = { sample, _ -> offers += sample.ints.single() },
+        )
+
+        BacktrackSolver(problem).openRepair(objective, params).use { repair ->
+            val best = assertNotNull(repair.repair(Assumptions.None, 100L, Double.POSITIVE_INFINITY))
+            assertEquals(values.min(), best.ints.single())
+            assertEquals(values, offers)
+        }
+    }
+
+    @Test
+    fun `repair retains finite cutoff LP fixing and finds a worse restricted optimum`() {
+        val fixture = FiniteCutoffKnapsackFixture
+        var observedSession: PropagationSession? = null
+        val exchange = object : ClauseExchange {
+            override fun onRestart(session: PropagationSession) = Unit
+            override fun onSearchStart(session: PropagationSession) {
+                observedSession = session
+            }
+
+            override fun publishGlobal(clause: SharedClause) = Unit
+        }
+        val params = fixture.params.copy(clauseExchange = exchange)
+
+        BacktrackSolver(fixture.problem).openRepair(fixture.objective, params).use { repair ->
+            val initial = assertNotNull(repair.repair(Assumptions.None, 100000L, 4.0))
+            val initialMask = fixture.weights.indices.sumOf { initial.ints[it].toInt() shl it }
+            assertTrue(initialMask in fixture.improvingMasks(4L))
+            assertEquals(-4L, fixture.sourceCost(initialMask))
+            assertEquals(-4L, fixture.objective.evaluateLong(initial))
+            assertEquals(1L, assertNotNull(observedSession).intDomain(1).min)
+
+            val restricted = assertNotNull(repair.repair(Assumptions.None.withInt(0, 0), 100000L, 4.0))
+            val restrictedMask = fixture.weights.indices.sumOf { restricted.ints[it].toInt() shl it }
+            assertTrue(restrictedMask in fixture.improvingMasks(4L, 0L))
+            assertEquals(3L, fixture.sourceCost(restrictedMask))
+            assertEquals(3L, fixture.objective.evaluateLong(restricted))
+            assertEquals(1L, assertNotNull(observedSession).intDomain(1).min)
+
+            assertNull(repair.repair(Assumptions.None.withInt(0, 0), 100000L, 3.0))
+            assertTrue(fixture.improvingMasks(3L, 0L).isEmpty())
+
+            val improved = assertNotNull(repair.repair(Assumptions.None.withInt(0, 1), 100000L, 2.0))
+            assertEquals(-4L, fixture.objective.evaluateLong(improved))
+            assertEquals(-4L, fixture.improvingMasks(2L, 1L).minOf(fixture::sourceCost))
+
+            assertNull(repair.repair(Assumptions.None, 100000L, -4.0))
+            assertTrue(fixture.improvingMasks(-4L).isEmpty())
         }
     }
 

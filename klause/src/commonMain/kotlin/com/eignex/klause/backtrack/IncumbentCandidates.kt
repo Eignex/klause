@@ -3,6 +3,7 @@ package com.eignex.klause.backtrack
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
+import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.incumbent.Candidate
 import com.eignex.klause.solver.incumbent.CandidateVerifier
@@ -10,6 +11,71 @@ import com.eignex.klause.solver.incumbent.IncumbentExchange
 import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.Cancellation
+import kotlin.math.nextDown
+import kotlin.math.nextUp
+
+internal class SourceObjectiveScore(reported: Double, val exact: BigFraction? = null) {
+    val pruningBound: Double = exact?.let { exactDoubleCeiling(it, reported) } ?: reported
+    val display: Double = exact?.toDouble()?.takeIf { it.isFinite() } ?: pruningBound
+}
+
+private fun exactDoubleCeiling(exact: BigFraction, reported: Double): Double {
+    if (exact.isZero) return 0.0
+    val approximation = exact.toDouble().takeIf { it.isFinite() } ?: reported
+    if (approximation.isFinite()) {
+        var ceiling = approximation
+        repeat(4) {
+            if (checkNotNull(BigFraction.ofDouble(ceiling)) < exact) {
+                ceiling = ceiling.nextUp()
+                if (!ceiling.isFinite()) return ceiling
+            } else {
+                val predecessor = ceiling.nextDown()
+                if (!predecessor.isFinite() || checkNotNull(BigFraction.ofDouble(predecessor)) < exact) {
+                    return ceiling
+                }
+                ceiling = predecessor
+            }
+        }
+    }
+    val magnitude = if (exact.signum() < 0) exact.negated() else exact
+    // Dividing separately rounded numerator and denominator need not enclose the rational.
+    var below = 0L
+    var above = Double.POSITIVE_INFINITY.toRawBits()
+    while (above - below > 1L) {
+        val middle = below + (above - below) / 2L
+        if (checkNotNull(BigFraction.ofDouble(Double.fromBits(middle))) < magnitude) {
+            below = middle
+        } else {
+            above = middle
+        }
+    }
+    if (exact.signum() > 0) return Double.fromBits(above)
+    val aboveValue = Double.fromBits(above)
+    return if (aboveValue.isFinite() && BigFraction.ofDouble(aboveValue) == magnitude) {
+        -aboveValue
+    } else {
+        -Double.fromBits(below)
+    }
+}
+
+internal fun exactSourceObjective(objective: LinearObjective, sample: Sample): BigFraction? {
+    val exactReals = sample.exactReals
+    if (objective.realCoefficients.any { it != 0.0 } && exactReals == null) return null
+    var exact = BigFraction.ofLong(objective.constant)
+    for (i in 0 until minOf(objective.boolWeights.size, sample.bools.size)) {
+        if (sample.bools[i]) exact += BigFraction.ofLong(objective.boolWeights[i])
+    }
+    for (i in 0 until minOf(objective.intCoefficients.size, sample.ints.size)) {
+        exact += BigFraction.ofLong(objective.intCoefficients[i]) * BigFraction.ofLong(sample.ints[i])
+    }
+    if (exactReals != null) {
+        for (i in 0 until minOf(objective.realCoefficients.size, exactReals.size)) {
+            val coefficient = BigFraction.ofDouble(objective.realCoefficients[i]) ?: return null
+            exact += coefficient * exactReals[i]
+        }
+    }
+    return exact
+}
 
 /**
  * What every producer's proposal must satisfy before it can stand as a minimisation incumbent,
@@ -35,10 +101,25 @@ internal fun sampleAdmission(problem: Problem): CandidateVerifier<Sample, Double
 
 /** The versioned incumbent a minimisation run publishes through: [sampleAdmission] decides what may
  *  stand, and only a strict decrease installs. */
-internal fun minimizingSampleExchange(problem: Problem): IncumbentExchange<Sample, Double> = IncumbentExchange(
-    improves = { candidate, standing -> candidate < standing },
-    verifier = sampleAdmission(problem),
-)
+internal fun minimizingSampleExchange(problem: Problem): IncumbentExchange<Sample, SourceObjectiveScore> {
+    val admission = sampleAdmission(problem)
+    return IncumbentExchange(
+        improves = { candidate, standing ->
+            if (candidate.exact != null && standing.exact != null) {
+                candidate.exact < standing.exact
+            } else {
+                candidate.display < standing.display
+            }
+        },
+        verifier = CandidateVerifier { candidate ->
+            when (val result = admission.verify(Candidate(candidate.assignment, candidate.objective.display))) {
+                is Verification.Accepted -> Verification.Accepted(candidate)
+                is Verification.Rejected -> result
+                is Verification.Indeterminate -> result
+            }
+        },
+    )
+}
 
 /**
  * Finite composed verification of an untrusted proposal: re-derive the assignment's feasibility from

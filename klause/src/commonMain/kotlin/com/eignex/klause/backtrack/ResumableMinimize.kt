@@ -11,7 +11,6 @@ import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.lp.bounding.LpEngine
 import com.eignex.klause.lp.bounding.harvestRootCuts
-import com.eignex.klause.lp.bounding.linearLowerBound
 import com.eignex.klause.lp.bounding.rootLpRelaxationBound
 import com.eignex.klause.lp.bounding.shaveObjectiveLb
 import com.eignex.klause.lp.bounding.shaveVariableBounds
@@ -27,13 +26,13 @@ import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.baked
 import com.eignex.klause.propagation.conditionedRoot
+import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.ResumableSearch
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.incumbent.Candidate
 import com.eignex.klause.solver.incumbent.IncumbentSubscription
 import com.eignex.klause.solver.incumbent.Publication
 import com.eignex.klause.solver.incumbent.Verification
-import com.eignex.klause.solver.incumbent.bound
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SearchEvent
@@ -181,7 +180,7 @@ internal class ResumableMinimize(
     // version the exchange stamps tells the offering producer whether *it* installed the improvement.
     // Replaced wholesale by [rebind], whose fragment incumbent starts empty again.
     private var incumbents = minimizingSampleExchange(problem)
-    private val bestObj: Double get() = incumbents.bound()
+    private val bestObj: Double get() = incumbents.current()?.objective?.pruningBound ?: Double.POSITIVE_INFINITY
     private val singleObj = objective.singleIntObjective()
     private val discreteObjective = objective.realCoefficients.all { it == 0.0 }
     private var objVarBest: Long? = null
@@ -191,6 +190,23 @@ internal class ResumableMinimize(
     private var lastObjBoundAsserted: Long? = null
     private var lastBoolCutoffRhs: Long? = null
     private var lastOpenCutoff: Long? = null
+
+    private fun externalCutoff(): Double {
+        val bound = params.objectiveBoundSupplier?.invoke() ?: Double.POSITIVE_INFINITY
+        if (rebindable) {
+            require(!bound.isNaN() && bound <= lastExternalCutoff) {
+                "repair objective cutoff must be non-increasing"
+            }
+            lastExternalCutoff = bound
+        }
+        return bound
+    }
+
+    private fun beatsExternalCutoff(exact: BigFraction, cutoff: Double): Boolean {
+        if (cutoff == Double.NEGATIVE_INFINITY) return false
+        if (cutoff == Double.POSITIVE_INFINITY) return true
+        return exact < checkNotNull(BigFraction.ofDouble(cutoff))
+    }
 
     // Built once; persists across slices, so warm starts roll forward. Always constructed so the
     // always-on linear lower bound runs; its internal bounds are null/empty when their feature flag
@@ -295,6 +311,7 @@ internal class ResumableMinimize(
         // different node on a faster machine and every counter downstream would follow.
         run.fixedCancellationCadence = sliceNodeEnd >= 0L
         try {
+            if (rebindable) externalCutoff()
             while (true) {
                 when (val e = runUntilEvent()) {
                     is StepEvent.Incumbent -> onIncumbent(e.result)
@@ -456,16 +473,16 @@ internal class ResumableMinimize(
         val b = incumbents.current()
         return when {
             b != null && sawIndeterminateLeaf ->
-                MinimizeResult.BestFound(b.assignment, b.objective, TerminationReason.Unsupported, stats)
+                MinimizeResult.BestFound(b.assignment, b.objective.display, TerminationReason.Unsupported, stats)
 
             sawIndeterminateLeaf -> MinimizeResult.Unknown(TerminationReason.Unsupported, stats)
 
             externalShared && b != null ->
-                MinimizeResult.BestFound(b.assignment, b.objective, TerminationReason.SearchExhausted, stats)
+                MinimizeResult.BestFound(b.assignment, b.objective.display, TerminationReason.SearchExhausted, stats)
 
             externalShared -> MinimizeResult.Unknown(TerminationReason.SearchExhausted, stats)
 
-            b != null -> MinimizeResult.Optimal(b.assignment, b.objective, stats)
+            b != null -> MinimizeResult.Optimal(b.assignment, b.objective.display, stats)
 
             else -> MinimizeResult.Infeasible(core, stats)
         }
@@ -477,7 +494,7 @@ internal class ResumableMinimize(
         val stats = sink.snapshot()
         val b = incumbents.current()
         return if (b != null) {
-            MinimizeResult.BestFound(b.assignment, b.objective, TerminationReason.BudgetExhausted, stats)
+            MinimizeResult.BestFound(b.assignment, b.objective.display, TerminationReason.BudgetExhausted, stats)
         } else {
             MinimizeResult.Unknown(TerminationReason.BudgetExhausted, stats)
         }
@@ -567,15 +584,18 @@ internal class ResumableMinimize(
      *  to surface when this call installed it, else null. Admission — a finite score, and the certified
      *  continuous values only a leaf's residual LP can attach — is [sampleAdmission]'s to decide. */
     private fun recordIfImproving(sample: Sample, o: Double): MinimizeResult.WithSample? {
-        if (incumbents.offer(sample, o) !is Publication.Installed) return null
+        val exact = if (rebindable) exactSourceObjective(objective, sample) ?: return null else null
+        if (exact != null && !beatsExternalCutoff(exact, externalCutoff())) return null
+        val score = SourceObjectiveScore(o, exact)
+        if (incumbents.offer(sample, score) !is Publication.Installed) return null
         if (singleObj != null) objVarBest = sample.ints[singleObj.varId]
-        params.improvedSolutionSink?.invoke(sample, o)
-        params.onEvent?.invoke(SearchEvent.Incumbent(o))
+        params.improvedSolutionSink?.invoke(sample, score.display)
+        params.onEvent?.invoke(SearchEvent.Incumbent(score.display))
         // Carry the counters as they stand. A caller that consumes the improvement stream and stops when
         // it dries up holds only the last step it saw, so an incumbent without stats leaves the whole run
         // reporting nothing — search and LP alike. Snapshotting mid-search is sound: it reads elapsed time
         // live rather than requiring the sink to have been stopped.
-        return MinimizeResult.BestFound(sample, o, TerminationReason.BudgetExhausted, sink.snapshot())
+        return MinimizeResult.BestFound(sample, score.display, TerminationReason.BudgetExhausted, sink.snapshot())
     }
 
     /**
@@ -810,17 +830,10 @@ internal class ResumableMinimize(
     /** Refutes LP-dominated partial assignments through the shared frame stack. */
     private inner class LpNodePolicy : SearchNodePolicy {
         override fun beforeBranch(context: SearchContext): SearchNodeDisposition {
-            val externalBound = params.objectiveBoundSupplier?.invoke() ?: Double.POSITIVE_INFINITY
-            if (rebindable) {
-                require(!externalBound.isNaN() && externalBound <= lastExternalCutoff) {
-                    "repair objective cutoff must be non-increasing"
-                }
-                lastExternalCutoff = externalBound
-            }
+            val externalBound = externalCutoff()
             val effectiveBound = if (externalBound < bestObj) externalBound else bestObj
             if (rebindable && discreteObjective) {
-                val lower = lpEngine.linearLowerBound(objective, session)
-                if (lower != Long.MIN_VALUE && lower >= effectiveBound) return SearchNodeDisposition.Prune
+                if (lpEngine.linearBoundDominates(session, effectiveBound)) return SearchNodeDisposition.Prune
             }
             // Persistent LP fixings may use only a cutoff that survives every later repair.
             val lpBound = if (rebindable) externalBound else effectiveBound

@@ -54,6 +54,7 @@ import com.eignex.klause.util.EmptyDoubleArray
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
+import kotlin.math.abs
 import kotlin.time.TimeSource
 
 /** The persistent gated-residual float filter: the node-invariant [relaxation], the ONE [simplex]
@@ -686,6 +687,33 @@ internal class LpEngine(
         return false
     }
 
+    internal fun linearBoundDominates(session: PropagationSession, cutoff: Double): Boolean {
+        if (cutoff.isNaN() || cutoff == Double.POSITIVE_INFINITY) return false
+        if (cutoff == Double.NEGATIVE_INFINITY) return true
+        if (abs(cutoff) < 9_007_199_254_740_992.0) {
+            val lower = linearLowerBound(objective, session)
+            return lower != Long.MIN_VALUE && lower >= cutoff
+        }
+
+        // Long-to-Double rounding at wide cutoffs can turn a strict improvement into equality.
+        var lower = BigFraction.ofLong(objective.constant)
+        for (b in 0 until minOf(session.problem.numBoolVars, objective.boolWeights.size)) {
+            val weight = objective.boolWeights[b]
+            val value = session.boolValue(b)
+            if (value == true || (value == null && weight < 0L)) {
+                lower += BigFraction.ofLong(weight)
+            }
+        }
+        for (i in 0 until minOf(session.problem.numIntVars, objective.intCoefficients.size)) {
+            val coefficient = objective.intCoefficients[i]
+            if (coefficient == 0L) continue
+            val domain = session.intDomain(i)
+            val endpoint = if (coefficient > 0L) domain.min else domain.max
+            lower += BigFraction.ofLong(coefficient) * BigFraction.ofLong(endpoint)
+        }
+        return lower >= checkNotNull(BigFraction.ofDouble(cutoff))
+    }
+
     /** Discrete objective lower-bound dominance against the incumbent. */
     private inner class LinearBound : RelaxationBound {
         override val applicable: Boolean = objective.realCoefficients.all { it == 0.0 }
@@ -695,7 +723,7 @@ internal class LpEngine(
             effectiveBound: Double,
             objectiveVar: Int,
             objectiveAscending: Boolean,
-        ): Boolean = linearLowerBound(objective, session) >= effectiveBound
+        ): Boolean = linearBoundDominates(session, effectiveBound)
     }
 
     /** Scheduling-feasibility prune arm (energetic and cumulative-flow — same prune family): every

@@ -13,6 +13,7 @@ import com.eignex.klause.solver.incumbent.Publication
 import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.Cancellation
+import com.ionspin.kotlin.bignum.integer.BigInteger
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -115,17 +116,58 @@ class IncumbentCandidatesTest {
     @Test
     fun `a non-finite objective never becomes an incumbent`() {
         val exchange = minimizingSampleExchange(problem())
-        assertIs<Publication.Rejected>(exchange.offer(sample(b0 = true, x0 = 1, x1 = 2), Double.NaN))
+        assertIs<Publication.Rejected>(
+            exchange.offer(sample(b0 = true, x0 = 1, x1 = 2), SourceObjectiveScore(Double.NaN)),
+        )
         assertNull(exchange.current())
     }
 
     @Test
     fun `only a strict improvement installs`() {
         val exchange = minimizingSampleExchange(problem())
-        assertIs<Publication.Installed<Sample, Double>>(exchange.offer(sample(true, 1, 2), 3.0))
-        assertIs<Publication.NotImproving>(exchange.offer(sample(true, 0, 3), 3.0))
-        assertIs<Publication.NotImproving>(exchange.offer(sample(true, 2, 2), 4.0))
-        val better = assertIs<Publication.Installed<Sample, Double>>(exchange.offer(sample(true, 0, 1), 1.0))
+        assertIs<Publication.Installed<Sample, SourceObjectiveScore>>(
+            exchange.offer(sample(true, 1, 2), SourceObjectiveScore(3.0)),
+        )
+        assertIs<Publication.NotImproving>(exchange.offer(sample(true, 0, 3), SourceObjectiveScore(3.0)))
+        assertIs<Publication.NotImproving>(exchange.offer(sample(true, 2, 2), SourceObjectiveScore(4.0)))
+        val better = assertIs<Publication.Installed<Sample, SourceObjectiveScore>>(
+            exchange.offer(sample(true, 0, 1), SourceObjectiveScore(1.0)),
+        )
         assertEquals(2L, better.incumbent.version, "two installations over four offers")
+    }
+
+    @Test
+    fun `exact improvement replaces an incumbent with the same displayed score`() {
+        val exchange = minimizingSampleExchange(problem())
+        val display = -9_007_199_254_740_992.0
+        val first = SourceObjectiveScore(display, BigFraction.ofLong(-9_007_199_254_740_992L))
+        val second = SourceObjectiveScore(display, BigFraction.ofLong(-9_007_199_254_740_993L))
+
+        assertIs<Publication.Installed<Sample, SourceObjectiveScore>>(exchange.offer(sample(true, 1, 2), first))
+        val replaced = assertIs<Publication.Installed<Sample, SourceObjectiveScore>>(
+            exchange.offer(sample(true, 0, 3), second),
+        )
+        assertEquals(2L, replaced.incumbent.version)
+        assertEquals(second.exact, exchange.current()?.objective?.exact)
+    }
+
+    @Test
+    fun `exact incumbent bound encloses a rational beyond one floating point step`() {
+        val exact = BigFraction.of(
+            BigInteger.fromLong(16_003_601_413_338_437L),
+            BigInteger.fromLong(17_309_130_200_826_847L),
+        )
+        val score = SourceObjectiveScore(exact.toDouble(), exact)
+
+        assertTrue(checkNotNull(BigFraction.ofDouble(score.pruningBound)) >= exact)
+    }
+
+    @Test
+    fun `exact incumbent score ignores an overflowed reported objective`() {
+        val exact = BigFraction.ofLong(Long.MAX_VALUE) + BigFraction.ofLong(Long.MAX_VALUE)
+        val score = SourceObjectiveScore(-2.0, exact)
+
+        assertTrue(score.display > 0.0)
+        assertTrue(checkNotNull(BigFraction.ofDouble(score.pruningBound)) >= exact)
     }
 }
