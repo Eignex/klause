@@ -77,6 +77,105 @@ class ExactPointFeasibleTest {
     }
 
     @Test
+    fun `coupled row residuals admit fewer corrections than violations`() {
+        val builder = LpBuilder()
+        val x = builder.addRealVar(0.0, 1.0)
+        val y = builder.addRealVar(0.0, 1.0)
+        val z = builder.addRealVar(0.0, 1.0)
+        builder.addRealRow(intArrayOf(x, y), doubleArrayOf(1.0, 1.0), Relation.LE, 1.0)
+        builder.addRealRow(intArrayOf(x, z), doubleArrayOf(1.0, 1.0), Relation.LE, 1.0)
+        builder.addRealRow(intArrayOf(x, y), doubleArrayOf(1.0, 2.0), Relation.LE, 1.625)
+        builder.addRealRow(intArrayOf(x, z), doubleArrayOf(1.0, 2.0), Relation.LE, 1.625)
+        builder.addRealRow(intArrayOf(x, y, z), doubleArrayOf(1.0, 1.0, 1.0), Relation.LE, 1.6875)
+        val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+
+        LpScopedSolver(state).use { owner ->
+            val model = assertNotNull(state.toWorkingModel())
+            val result = recoverExactPointWitness(
+                model,
+                doubleArrayOf(0.5, 0.625, 0.625),
+                LpRefinementRequest(owner, owner.refinementCache, LpRefinementLimits()),
+                Cancellation.Never,
+            )
+
+            assertTrue(result.repairs in 1..4)
+            val witness = assertNotNull(result.witness)
+            assertNotNull(checkedLpWitness(model, witness.primal))
+        }
+    }
+
+    @Test
+    fun `coupled row residuals decline when corrections violate fixed rows`() {
+        val builder = LpBuilder()
+        val x = builder.addRealVar(0.0, 1.0)
+        val y = builder.addRealVar(0.0, 1.0)
+        val z = builder.addRealVar(0.0, 1.0)
+        builder.addRealRow(intArrayOf(x, y), doubleArrayOf(1.0, 1.0), Relation.LE, 1.0)
+        builder.addRealRow(intArrayOf(x, z), doubleArrayOf(1.0, 1.0), Relation.LE, 1.0)
+        builder.addRealRow(intArrayOf(x, y), doubleArrayOf(1.0, 2.0), Relation.LE, 1.625)
+        builder.addRealRow(intArrayOf(x, z), doubleArrayOf(1.0, 2.0), Relation.LE, 1.625)
+        builder.addRealRow(intArrayOf(x, y, z), doubleArrayOf(1.0, 1.0, 1.0), Relation.LE, 1.6875)
+        builder.addRealRow(intArrayOf(x), doubleArrayOf(1.0), Relation.GE, 0.5)
+        builder.addRealRow(intArrayOf(y), doubleArrayOf(1.0), Relation.GE, 0.625)
+        builder.addRealRow(intArrayOf(z), doubleArrayOf(1.0), Relation.GE, 0.625)
+        val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+
+        LpScopedSolver(state).use { owner ->
+            val result = recoverExactPointWitness(
+                assertNotNull(state.toWorkingModel()),
+                doubleArrayOf(0.5, 0.625, 0.625),
+                LpRefinementRequest(owner, owner.refinementCache, LpRefinementLimits()),
+                Cancellation.Never,
+            )
+
+            assertNull(result.witness)
+            assertEquals(0, result.repairs)
+            assertEquals(LpRefinementDecline.CANDIDATE, result.decline)
+        }
+    }
+
+    @Test
+    fun `coupled row recovery declines below its charged allocation`() {
+        val builder = LpBuilder()
+        val x = builder.addRealVar(0.0, 1.0)
+        val y = builder.addRealVar(0.0, 1.0)
+        val z = builder.addRealVar(0.0, 1.0)
+        builder.addRealRow(intArrayOf(x, y), doubleArrayOf(1.0, 1.0), Relation.LE, 1.0)
+        builder.addRealRow(intArrayOf(x, z), doubleArrayOf(1.0, 1.0), Relation.LE, 1.0)
+        builder.addRealRow(intArrayOf(x, y), doubleArrayOf(1.0, 2.0), Relation.LE, 1.625)
+        builder.addRealRow(intArrayOf(x, z), doubleArrayOf(1.0, 2.0), Relation.LE, 1.625)
+        builder.addRealRow(intArrayOf(x, y, z), doubleArrayOf(1.0, 1.0, 1.0), Relation.LE, 1.6875)
+        val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+
+        LpScopedSolver(state).use { owner ->
+            val model = assertNotNull(state.toWorkingModel())
+            val primal = doubleArrayOf(0.5, 0.625, 0.625)
+            val full = recoverExactPointWitness(
+                model,
+                primal,
+                LpRefinementRequest(owner, owner.refinementCache, LpRefinementLimits()),
+                Cancellation.Never,
+            )
+            val limited = recoverExactPointWitness(
+                model,
+                primal,
+                LpRefinementRequest(
+                    owner,
+                    owner.refinementCache,
+                    LpRefinementLimits(maxAllocation = full.allocation - 1L),
+                ),
+                Cancellation.Never,
+            )
+
+            assertNotNull(full.witness)
+            assertNull(limited.witness)
+            assertEquals(LpRefinementDecline.ALLOCATION, limited.decline)
+            assertTrue(limited.allocation < full.allocation)
+            assertEquals(full.allocation + limited.allocation, owner.pointRecoveryCache.allocation)
+        }
+    }
+
+    @Test
     fun `incompatible rows reject a reconstructed point`() {
         val builder = LpBuilder()
         val x = builder.addRealVar(0.0, 1.0)

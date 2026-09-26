@@ -175,7 +175,6 @@ private fun scanPoint(model: LpModel, candidate: List<BigFraction>, meter: Refin
         }
         if (target != null) {
             if (target.strict || model.exactState?.model?.row(row)?.strict == true) return null
-            if (violations.size == MAX_POINT_REPAIRS) return null
             meter.charge(bytes = 48L)
             violations += PointViolation(row, slack, target.number.value)
         }
