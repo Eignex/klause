@@ -1,5 +1,6 @@
 package com.eignex.klause.backtrack
 
+import com.eignex.klause.backtrack.selector.IndomainMax
 import com.eignex.klause.backtrack.selector.IndomainMin
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.ir.IntDomain
@@ -111,6 +112,32 @@ internal class UnresolvedRealLeafFixture(val withIncumbent: Boolean) {
     }
 }
 
+internal object FiniteCutoffKnapsackFixture {
+    val weights = intArrayOf(6, 3)
+    val profits = longArrayOf(7, 8)
+    val problem = Problem(
+        0,
+        weights.size,
+        Array(weights.size) { IntDomain(0, 1) },
+        arrayOf(Linear(weights.copyOf(), IntArray(weights.size) { it }, LinearOp.LE, 25)),
+    ).bake()
+    val objective = LinearObjective(intCoefficients = LongArray(profits.size) { -profits[it] }, constant = 11L)
+    val params = BacktrackParams(
+        randomSeed = 62L,
+        lubyRestartBase = 1,
+        lpPlan = LpPlan(bounding = true, boundEvery = 1, rootMaxWork = 1L),
+    )
+
+    fun sourceCost(mask: Int): Long = 11L - profits.indices.sumOf { if (mask and (1 shl it) != 0) profits[it] else 0L }
+
+    fun improvingMasks(cutoff: Long, firstValue: Long? = null): List<Int> =
+        (0 until (1 shl weights.size)).filter { mask ->
+            (firstValue == null || (mask and 1).toLong() == firstValue) &&
+                weights.indices.sumOf { if (mask and (1 shl it) != 0) weights[it] else 0 } <= 25 &&
+                sourceCost(mask) < cutoff
+        }
+}
+
 class ResumableMinimizeTest {
     @Test
     fun `rebind can prove the same optimum after an exhausted fragment`() {
@@ -159,6 +186,186 @@ class ResumableMinimizeTest {
             assertEquals(0L, restricted.sample.ints[0])
             assertTrue(weights.indices.sumOf { weights[it] * restricted.sample.ints[it] } <= 25L)
             assertEquals(-36L, objective.evaluateLong(restricted.sample))
+        }
+    }
+
+    @Test
+    fun `finite cutoff LP fixings preserve improving source assignments across rebind`() {
+        val fixture = FiniteCutoffKnapsackFixture
+        var cutoff = 4.0
+        var observedSession: PropagationSession? = null
+        val exchange = object : ClauseExchange {
+            override fun onRestart(session: PropagationSession) = Unit
+            override fun onSearchStart(session: PropagationSession) {
+                observedSession = session
+            }
+
+            override fun publishGlobal(clause: SharedClause) = Unit
+        }
+        val params = fixture.params.copy(objectiveBoundSupplier = { cutoff }, clauseExchange = exchange)
+        assertEquals(-4L, fixture.improvingMasks(4L).minOf(fixture::sourceCost))
+        assertEquals(3L, fixture.improvingMasks(4L, 0L).minOf(fixture::sourceCost))
+
+        ResumableMinimize(
+            BacktrackSolver(fixture.problem),
+            fixture.objective,
+            params,
+            pausable = false,
+            rebindable = true,
+        ).use { search ->
+            val initial = assertIs<MinimizeResult.BestFound>(
+                search.runSlice(Cancellation.Never, 1000L, 100000L) {},
+            )
+            assertEquals(TerminationReason.SearchExhausted, initial.reason)
+            assertEquals(-4.0, initial.objective)
+            val initialMask = fixture.weights.indices.sumOf { initial.sample.ints[it].toInt() shl it }
+            assertTrue(initialMask in fixture.improvingMasks(4L))
+            assertEquals(fixture.sourceCost(initialMask), fixture.objective.evaluateLong(initial.sample))
+            assertTrue(search.stats.lp.nodePasses.sum > 0.0)
+            assertTrue(search.stats.lp.fixed.sum > 0.0)
+            assertTrue(search.stats.lp.rootReducedCostFixes.sum > 0.0)
+
+            val session = assertNotNull(observedSession)
+            assertEquals(0, session.decisionLevel)
+            assertEquals(1L, session.intDomain(1).min)
+            assertEquals(1L, session.intDomain(1).max)
+            for (mask in fixture.improvingMasks(4L)) {
+                for (v in fixture.weights.indices) {
+                    assertTrue((mask shr v and 1).toLong() in session.intDomain(v))
+                }
+            }
+
+            search.rebind(Assumptions.None.withInt(0, 0), 100000L)
+            assertEquals(1L, session.intDomain(1).min)
+            for (mask in fixture.improvingMasks(4L, 0L)) {
+                for (v in fixture.weights.indices) {
+                    assertTrue((mask shr v and 1).toLong() in session.intDomain(v))
+                }
+            }
+            val restricted = assertIs<MinimizeResult.BestFound>(
+                search.runSlice(Cancellation.Never, 1000L, 100000L) {},
+            )
+            assertEquals(TerminationReason.SearchExhausted, restricted.reason)
+            assertEquals(3.0, restricted.objective)
+            val restrictedMask = fixture.weights.indices.sumOf { restricted.sample.ints[it].toInt() shl it }
+            assertTrue(restrictedMask in fixture.improvingMasks(4L, 0L))
+            assertEquals(fixture.sourceCost(restrictedMask), fixture.objective.evaluateLong(restricted.sample))
+
+            cutoff = 3.0
+            search.rebind(Assumptions.None.withInt(0, 0), 100000L)
+            val excluded = assertIs<MinimizeResult.Unknown>(
+                search.runSlice(Cancellation.Never, 1000L, 100000L) {},
+            )
+            assertEquals(TerminationReason.SearchExhausted, excluded.reason)
+            assertTrue(fixture.improvingMasks(3L, 0L).isEmpty())
+
+            cutoff = 2.0
+            search.rebind(Assumptions.None.withInt(0, 1), 100000L)
+            for (mask in fixture.improvingMasks(2L, 1L)) {
+                for (v in fixture.weights.indices) {
+                    assertTrue((mask shr v and 1).toLong() in session.intDomain(v))
+                }
+            }
+            val improving = assertIs<MinimizeResult.BestFound>(
+                search.runSlice(Cancellation.Never, 1000L, 100000L) {},
+            )
+            assertEquals(TerminationReason.SearchExhausted, improving.reason)
+            assertEquals(-4.0, improving.objective)
+            assertEquals(-4L, fixture.improvingMasks(2L, 1L).minOf(fixture::sourceCost))
+
+            cutoff = -4.0
+            search.rebind(Assumptions.None, 100000L)
+            val exhausted = assertIs<MinimizeResult.Unknown>(
+                search.runSlice(Cancellation.Never, 1000L, 100000L) {},
+            )
+            assertEquals(TerminationReason.SearchExhausted, exhausted.reason)
+            assertTrue(fixture.improvingMasks(-4L).isEmpty())
+        }
+    }
+
+    @Test
+    fun `finite cutoff without LP leaves the source domain free`() {
+        val fixture = FiniteCutoffKnapsackFixture
+        var observedSession: PropagationSession? = null
+        val exchange = object : ClauseExchange {
+            override fun onRestart(session: PropagationSession) = Unit
+            override fun onSearchStart(session: PropagationSession) {
+                observedSession = session
+            }
+
+            override fun publishGlobal(clause: SharedClause) = Unit
+        }
+        val params = fixture.params.copy(
+            lpPlan = LpPlan(bounding = false),
+            objectiveBoundSupplier = { 4.0 },
+            clauseExchange = exchange,
+        )
+
+        ResumableMinimize(
+            BacktrackSolver(fixture.problem),
+            fixture.objective,
+            params,
+            pausable = false,
+            rebindable = true,
+        ).use { search ->
+            val result = assertIs<MinimizeResult.BestFound>(
+                search.runSlice(Cancellation.Never, 1000L, 100000L) {},
+            )
+            assertEquals(-4.0, result.objective)
+            assertEquals(0.0, search.stats.lp.nodePasses.sum)
+            assertEquals(0.0, search.stats.lp.fixed.sum)
+            val domain = assertNotNull(observedSession).intDomain(1)
+            assertEquals(0L, domain.min)
+            assertEquals(1L, domain.max)
+        }
+    }
+
+    @Test
+    fun `raw repair rejects an increasing or NaN cutoff`() {
+        val fixture = FiniteCutoffKnapsackFixture
+        for (invalid in listOf(5.0, Double.NaN)) {
+            var cutoff = 4.0
+            val params = fixture.params.copy(objectiveBoundSupplier = { cutoff })
+            ResumableMinimize(
+                BacktrackSolver(fixture.problem),
+                fixture.objective,
+                params,
+                pausable = false,
+                rebindable = true,
+            ).use { search ->
+                assertIs<MinimizeResult.BestFound>(
+                    search.runSlice(Cancellation.Never, 1000L, 100000L) {},
+                )
+                cutoff = invalid
+                search.rebind(Assumptions.None.withInt(0, 2), 100000L)
+                assertFailsWith<IllegalArgumentException> {
+                    search.runSlice(Cancellation.Never, 1000L, 100000L) {}
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `raw repair publishes a second exact improvement with the same displayed score`() {
+        val values = listOf(-9_007_199_254_740_992L, -9_007_199_254_740_993L)
+        val problem = Problem(0, 1, arrayOf(IntDomain(values.min(), values.max())), emptyArray()).bake()
+        val objective = LinearObjective(intCoefficients = longArrayOf(1L))
+        val params = BacktrackParams(valueSelector = IndomainMax, objectiveBoundSupplier = { Double.POSITIVE_INFINITY })
+
+        ResumableMinimize(
+            BacktrackSolver(problem),
+            objective,
+            params,
+            pausable = false,
+            rebindable = true,
+        ).use { search ->
+            val offers = ArrayList<Long>()
+            val result = assertIs<MinimizeResult.BestFound>(
+                search.runSlice(Cancellation.Never, 1000L, 100L) { offers += it.sample.ints.single() },
+            )
+            assertEquals(TerminationReason.SearchExhausted, result.reason)
+            assertEquals(values, offers)
+            assertEquals(values.min(), result.sample.ints.single())
         }
     }
 
