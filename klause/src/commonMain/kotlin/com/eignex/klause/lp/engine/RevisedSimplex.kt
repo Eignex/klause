@@ -114,6 +114,8 @@ internal class RevisedSimplex(
     PersistentLpSolver {
     internal var lastNumericalMetrics = SimplexNumericalMetrics()
         private set
+    override var lastTermination: LpFloatTermination? = null
+        private set
     private var numericalFailure = false
     private val tolerance = TOL
     private val feasibilityTolerance = FEAS_TOL
@@ -565,7 +567,10 @@ internal class RevisedSimplex(
      * a later call succeeds.
      */
     private fun refactorize(reason: LpRefactorReason): RefactorResult {
-        if (repairStop != null) return RefactorResult.FAILED
+        if (repairStop != null) {
+            lastTermination = repairTermination()
+            return RefactorResult.FAILED
+        }
         refactorizations++
         when (reason) {
             LpRefactorReason.INITIAL -> initialRefactorizations++
@@ -609,11 +614,15 @@ internal class RevisedSimplex(
                 work.add(control.spentWork)
                 repairStop = control.stop
                 repairCallbackFailure = control.callbackFailure
+                if (repairStop != null) lastTermination = repairTermination()
             }
             return when (recovery) {
                 is BasisRecoveryResult.Failed -> {
                     numericalFailure = true
-                    if (recovery.decline == BasisRepairDecline.CANCELLED) repairStop = BasisRepairStop.CANCELLED
+                    if (recovery.decline == BasisRepairDecline.CANCELLED) {
+                        repairStop = BasisRepairStop.CANCELLED
+                        lastTermination = LpFloatTermination.CANCELLED
+                    }
                     invalidateBasisDependentState()
                     RefactorResult.FAILED
                 }
@@ -978,6 +987,7 @@ internal class RevisedSimplex(
     }
 
     override fun prepareLogicals(token: Cancellation): Basis? {
+        lastTermination = null
         continuationAvailable = false
         stoppedContinuationBasis = null
         exactBasisCache.clear()
@@ -1007,6 +1017,7 @@ internal class RevisedSimplex(
     }
 
     override fun adopt(state: LpExactState, token: Cancellation): Boolean {
+        lastTermination = null
         val current = model.exactState ?: return false
         if (!current.sameMatrix(state) || token()) return false
         val next = state.toWorkingModel() ?: return false
@@ -1143,12 +1154,39 @@ internal class RevisedSimplex(
         cachedStatus = null
     }
 
-    private fun resourcesRemain(progress: SolveProgress): Boolean = repairStop == null &&
-        progress.iterations < maxIterations &&
-        (effectiveWorkLimit == 0L || work.ops < effectiveWorkLimit) && !cancellation()
+    private fun remainingStop(progress: SolveProgress): LpFloatTermination? = when {
+        cancellation() || repairStop == BasisRepairStop.CANCELLED -> LpFloatTermination.CANCELLED
+        repairStop == BasisRepairStop.WORK -> LpFloatTermination.WORK
+        repairStop == BasisRepairStop.UNKNOWN_WORK -> LpFloatTermination.OTHER
+        effectiveWorkLimit > 0L && work.ops >= effectiveWorkLimit -> LpFloatTermination.WORK
+        progress.iterations >= maxIterations -> LpFloatTermination.PIVOTS
+        else -> null
+    }
+
+    private fun repairTermination(): LpFloatTermination = if (cancellation()) {
+        LpFloatTermination.CANCELLED
+    } else {
+        when (repairStop) {
+            BasisRepairStop.CANCELLED -> LpFloatTermination.CANCELLED
+            BasisRepairStop.WORK -> LpFloatTermination.WORK
+            BasisRepairStop.UNKNOWN_WORK, null -> LpFloatTermination.OTHER
+        }
+    }
+
+    private fun resourcesRemain(progress: SolveProgress): Boolean {
+        val stop = remainingStop(progress) ?: return true
+        lastTermination = stop
+        return false
+    }
+
+    private fun stopped(reason: LpFloatTermination, result: FloatLpResult? = null): FloatLpResult? {
+        lastTermination = reason
+        return result
+    }
 
     @Suppress("TooGenericExceptionCaught")
     private fun runNumericalSolve(progress: SolveProgress, block: (reset: Boolean) -> FloatLpResult?): FloatLpResult? {
+        lastTermination = null
         lastNumericalMetrics = SimplexNumericalMetrics()
         numericalFailure = false
         return try {
@@ -1162,13 +1200,23 @@ internal class RevisedSimplex(
                 clearNumericalPublication()
                 basisKept = false
                 result = null
+                lastTermination = LpFloatTermination.OTHER
             }
             if (result == null && infeasibleRay == null && numericalFailure) {
                 basisFactorized = false
                 basisKept = false
             }
+            lastTermination = when {
+                result?.optimal == true -> LpFloatTermination.OPTIMAL_CANDIDATE
+                lastTermination != null -> lastTermination
+                result != null -> LpFloatTermination.OTHER
+                infeasibleRay != null -> LpFloatTermination.INFEASIBLE_CANDIDATE
+                numericalFailure -> LpFloatTermination.NUMERICAL
+                else -> LpFloatTermination.OTHER
+            }
             result
         } catch (primary: Throwable) {
+            lastTermination = null
             try {
                 close()
             } catch (cleanup: Throwable) {
@@ -1190,13 +1238,14 @@ internal class RevisedSimplex(
         continuationAvailable = true
         numericalFailure = false
         val candidate = block(reset)
-        if (candidate == null && allowUnscaledFallback && numerical.applied && resourcesRemain(progress) &&
-            infeasibleRay == null && numericalFailure
+        if (candidate == null && allowUnscaledFallback && numerical.applied &&
+            infeasibleRay == null && numericalFailure && resourcesRemain(progress)
         ) {
             installUnscaledFallback(model)
             return numericalSolve(progress, block, false, reset = false)
         }
         val result = if (model.exactState != null && cancellation()) {
+            lastTermination = LpFloatTermination.CANCELLED
             solvedExactState = null
             optimalBasis = null
             optimalPrimal = null
@@ -1253,6 +1302,7 @@ internal class RevisedSimplex(
 
     @Suppress("TooGenericExceptionCaught")
     private fun retireAfterArithmeticFailure(primary: ArithmeticException): FloatLpResult? {
+        lastTermination = LpFloatTermination.NUMERICAL
         val continuation = continuationBasis(model)
         try {
             close()
@@ -1333,6 +1383,7 @@ internal class RevisedSimplex(
         if (model.exactState != null &&
             (enforced != null || cancellation() || model.exactState?.conflict != null)
         ) {
+            if (cancellation()) lastTermination = LpFloatTermination.CANCELLED
             return null
         }
         val kept = reuse && basisKept && basisFactorized
@@ -1420,19 +1471,18 @@ internal class RevisedSimplex(
         var haveBeta = false
         while (progress.iterations < maxIter) {
             val iteration = progress.dualIterations++
+            // Cooperative deadline, phased off the first iteration so a spent budget never starts.
+            if (iteration % CANCEL_POLL == 0 && cancellation()) {
+                return stopped(
+                    LpFloatTermination.CANCELLED,
+                    if (haveBeta && model.exactState == null) truncated(beta) else null,
+                )
+            }
             // Work budget, checked before the iteration that would exceed it. Pivots are not a unit of
             // cost — one costs an order of magnitude more on a dense basis than a sparse one — so a
             // budget stated in work means the same thing on every model, which a pivot count does not.
             if (effectiveWorkLimit > 0L && work.ops >= effectiveWorkLimit) {
-                return if (haveBeta) truncated(beta) else null
-            }
-            // Cooperative deadline: a pivot updates the factorization in place (cheap), but an unbounded
-            // loop on a large model would still blow the wall-clock limit. Stopping here yields the
-            // current iterate rather than nothing: every basis the dual simplex passes through is
-            // dual-feasible, so its objective is a valid lower bound even though the primal is not yet
-            // feasible. Phased off the first iteration so an already-spent budget never starts a solve.
-            if (iteration % CANCEL_POLL == 0 && cancellation()) {
-                return if (haveBeta && model.exactState == null) truncated(beta) else null
+                return stopped(LpFloatTermination.WORK, if (haveBeta) truncated(beta) else null)
             }
             // β = B⁻¹ (b − Σ_{j nonbasic at upper} A_j·u_j)
             if (!useCached) {
@@ -1496,8 +1546,15 @@ internal class RevisedSimplex(
                 if (!(gamma[r] < DEVEX_WEIGHT_THRESHOLD * trueWeight)) break
                 gamma[r] = trueWeight
                 lastDevexWeightCorrections++
-                if (cancellation()) return if (model.exactState == null) truncated(beta) else null
-                if (effectiveWorkLimit > 0L && work.ops >= effectiveWorkLimit) return truncated(beta)
+                if (cancellation()) {
+                    return stopped(
+                        LpFloatTermination.CANCELLED,
+                        if (model.exactState == null) truncated(beta) else null,
+                    )
+                }
+                if (effectiveWorkLimit > 0L && work.ops >= effectiveWorkLimit) {
+                    return stopped(LpFloatTermination.WORK, truncated(beta))
+                }
             }
 
             val y = duals()
@@ -1569,7 +1626,8 @@ internal class RevisedSimplex(
             }
             if (entering == EnteringChoice.ResourceStopped) {
                 lastTheoryPricingResourceStops++
-                return if (model.exactState == null) truncated(beta) else null
+                val reason = if (cancellation()) LpFloatTermination.CANCELLED else LpFloatTermination.WORK
+                return stopped(reason, if (model.exactState == null) truncated(beta) else null)
             }
             val q = (entering as EnteringChoice.Selected).column
             if (q == null) {
@@ -1578,8 +1636,15 @@ internal class RevisedSimplex(
                 // and retry once per solve. A basis with no folded updates is already fresh.
                 if (!progress.dualNumericalRecoveryTried && worst <= feasibilityTolerance && solver().updateCount > 0) {
                     progress.dualNumericalRecoveryTried = true
-                    if (cancellation()) return if (model.exactState == null) truncated(beta) else null
-                    if (effectiveWorkLimit > 0L && work.ops >= effectiveWorkLimit) return truncated(beta)
+                    if (cancellation()) {
+                        return stopped(
+                            LpFloatTermination.CANCELLED,
+                            if (model.exactState == null) truncated(beta) else null,
+                        )
+                    }
+                    if (effectiveWorkLimit > 0L && work.ops >= effectiveWorkLimit) {
+                        return stopped(LpFloatTermination.WORK, truncated(beta))
+                    }
                     when (refactorize(LpRefactorReason.NUMERICAL_RECOVERY)) {
                         RefactorResult.UNCHANGED -> Unit
                         RefactorResult.BASIS_CHANGED -> return restartDual(enforced, progress)
@@ -1598,7 +1663,7 @@ internal class RevisedSimplex(
                 basisKept = true // the seated basis stays dual-feasible for the next [resolve]
                 retainBasicValues(beta)
                 solvedExactState = model.exactState
-                return null
+                return stopped(LpFloatTermination.INFEASIBLE_CANDIDATE)
             }
 
             spike(q) // spike η = B⁻¹ A_q in the pre-pivot factorization
@@ -1627,11 +1692,12 @@ internal class RevisedSimplex(
         }
         // Iteration budget spent. Same reasoning as the cancellation exit: the iterate bounds, so hand
         // it back rather than discarding the work.
-        return if (haveBeta) truncated(beta) else null
+        return stopped(LpFloatTermination.PIVOTS, if (haveBeta) truncated(beta) else null)
     }
 
     private fun restartDual(enforced: BooleanArray?, progress: SolveProgress): FloatLpResult? {
-        if (progress.restarts >= MAX_SOLVE_RESTARTS || cancellation()) return null
+        if (cancellation()) return stopped(LpFloatTermination.CANCELLED)
+        if (progress.restarts >= MAX_SOLVE_RESTARTS) return stopped(LpFloatTermination.NUMERICAL)
         progress.restarts++
         basisKept = true
         return solveCore(
@@ -2286,15 +2352,24 @@ internal class RevisedSimplex(
     @Suppress("CyclomaticComplexMethod", "NestedBlockDepth", "ReturnCount", "LongMethod")
     private fun primalPhase1(progress: SolveProgress): IterationResult {
         val beta = basicValues(phaseOneBeta)
-        if (effectiveWorkLimit > 0L && work.ops >= effectiveWorkLimit) return IterationResult.FAILED
+        if (effectiveWorkLimit > 0L && work.ops >= effectiveWorkLimit) {
+            lastTermination = LpFloatTermination.WORK
+            return IterationResult.FAILED
+        }
         val gamma = phaseOneGradient
         val pi = phaseOneDuals
         val alphaBuf = alphaValues
         val maxIter = maxIterations
         while (progress.iterations < maxIter) {
             val iteration = progress.primalIterations++
-            if (effectiveWorkLimit > 0L && work.ops >= effectiveWorkLimit) return IterationResult.FAILED
-            if (iteration % CANCEL_POLL == 0 && cancellation()) return IterationResult.FAILED
+            if (iteration % CANCEL_POLL == 0 && cancellation()) {
+                lastTermination = LpFloatTermination.CANCELLED
+                return IterationResult.FAILED
+            }
+            if (effectiveWorkLimit > 0L && work.ops >= effectiveWorkLimit) {
+                lastTermination = LpFloatTermination.WORK
+                return IterationResult.FAILED
+            }
             var w = 0.0
             for (i in 0 until m) {
                 val v = basicVar[i]
@@ -2345,6 +2420,7 @@ internal class RevisedSimplex(
                     basisKept = true
                     retainBasicValues(beta)
                 }
+                lastTermination = LpFloatTermination.INFEASIBLE_CANDIDATE
                 return IterationResult.FAILED
             }
 
@@ -2408,6 +2484,7 @@ internal class RevisedSimplex(
             }
             basicValues(beta)
         }
+        lastTermination = LpFloatTermination.PIVOTS
         return IterationResult.FAILED // budget exhausted
     }
 
@@ -2436,7 +2513,10 @@ internal class RevisedSimplex(
     ): FloatLpResult? {
         if (reset) resetSolveState(warm != null || reuse)
         if (!reset && !resourcesRemain(progress)) return null
-        if (model.exactState != null && (cancellation() || model.exactState?.conflict != null)) return null
+        if (model.exactState != null && (cancellation() || model.exactState?.conflict != null)) {
+            if (cancellation()) lastTermination = LpFloatTermination.CANCELLED
+            return null
+        }
         basisKept = false
         if (!reuse || !basisFactorized) {
             if (warm == null || !tryWarmStart(warm)) {
@@ -2453,7 +2533,7 @@ internal class RevisedSimplex(
         }
         if (model.exactState != null) repairNonbasicStatuses()
         val beta = basicValues(primalBeta)
-        if (effectiveWorkLimit > 0L && work.ops >= effectiveWorkLimit) return null
+        if (effectiveWorkLimit > 0L && work.ops >= effectiveWorkLimit) return stopped(LpFloatTermination.WORK)
         when (refactorAtQualitySafePoint()) {
             null -> Unit
             RefactorResult.UNCHANGED -> return restartPrimal(progress)
@@ -2475,8 +2555,8 @@ internal class RevisedSimplex(
         val alphaBuf = alphaValues
         while (progress.iterations < maxIter) {
             val iteration = progress.primalIterations++
-            if (effectiveWorkLimit > 0L && work.ops >= effectiveWorkLimit) return null
-            if (iteration % CANCEL_POLL == 0 && cancellation()) return null
+            if (iteration % CANCEL_POLL == 0 && cancellation()) return stopped(LpFloatTermination.CANCELLED)
+            if (effectiveWorkLimit > 0L && work.ops >= effectiveWorkLimit) return stopped(LpFloatTermination.WORK)
             // Floating Bland ordering is a bounded anti-cycling heuristic, not a termination proof.
             val bland = progress.primalDegenerate >= blandStall
             if (bland && !progress.primalBlandActive) lastNumericalMetrics.primalBlandEntries++
@@ -2540,7 +2620,7 @@ internal class RevisedSimplex(
                     leavingVar = basicVar[i]
                 }
             }
-            if (tMax >= Double.MAX_VALUE) return null // unbounded objective
+            if (tMax >= Double.MAX_VALUE) return stopped(LpFloatTermination.UNBOUNDED_CANDIDATE)
             if (leaving == -1) {
                 // The entering variable reaches its opposite bound first: flip it, no basis change.
                 status[q] = if (qAtLower) VarStatus.AT_UPPER else VarStatus.AT_LOWER
@@ -2565,11 +2645,12 @@ internal class RevisedSimplex(
             }
             basicValues(beta)
         }
-        return null // budget exhausted
+        return stopped(LpFloatTermination.PIVOTS) // budget exhausted
     }
 
     private fun restartPrimal(progress: SolveProgress): FloatLpResult? {
-        if (progress.restarts >= MAX_SOLVE_RESTARTS || cancellation()) return null
+        if (cancellation()) return stopped(LpFloatTermination.CANCELLED)
+        if (progress.restarts >= MAX_SOLVE_RESTARTS) return stopped(LpFloatTermination.NUMERICAL)
         progress.restarts++
         basisKept = true
         return solvePrimalCore(

@@ -49,6 +49,7 @@ class RevisedSimplexRecoveryTest {
         assertNull(solver.solve())
 
         assertTrue(cancelled)
+        assertEquals(LpFloatTermination.CANCELLED, solver.lastTermination)
         assertEquals(1, solver.lastPivots)
         assertNull(solver.infeasibleRay)
         assertNull(solver.solvedExactState)
@@ -89,6 +90,7 @@ class RevisedSimplexRecoveryTest {
 
         assertEquals(1, solver.lastPivots)
         assertEquals(1, solver.lastNumericalMetrics.capExits)
+        assertEquals(LpFloatTermination.PIVOTS, solver.lastTermination)
         assertNull(solver.infeasibleRay)
         assertNull(solver.solvedExactState)
         assertTrue(solver.gomoryCuts(1).isEmpty())
@@ -157,7 +159,30 @@ class RevisedSimplexRecoveryTest {
         assertEquals(1, solves)
         assertEquals(4L, solver.lastWorkOps)
         assertEquals(1, solver.lastNumericalMetrics.capExits)
+        assertEquals(LpFloatTermination.WORK, solver.lastTermination)
         solver.close()
+    }
+
+    @Test
+    fun `unrecoverable arithmetic failure reports numerical termination`() {
+        val builder = LpBuilder()
+        val column = builder.addVar(0L, 2L, cost = 1L)
+        builder.addRow(mapOf(column to 1024L), Relation.GE, 1024L)
+        RevisedSimplex(
+            builder.build(Sense.MINIMIZE),
+            basisSolverFactory = { matrix ->
+                val delegate = KotlinBasisSolver(matrix)
+                object : BasisSolver by delegate {
+                    override fun ftran(x: IndexedVector, expectedDensity: Double): Unit =
+                        throw BasisArithmeticException("numerical control")
+                }
+            },
+        ).use { solver ->
+            assertNull(solver.solve())
+
+            assertEquals(LpFloatTermination.NUMERICAL, solver.lastTermination)
+            assertNull(solver.infeasibleRay)
+        }
     }
 
     @Test
@@ -230,6 +255,7 @@ class RevisedSimplexRecoveryTest {
 
         assertNull(solver.solvePrimal())
 
+        assertEquals(LpFloatTermination.UNBOUNDED_CANDIDATE, solver.lastTermination)
         assertEquals(1, solver.lastSingularRefactorizations)
         assertEquals(0, solver.scalingMetrics.fallbacks)
         solver.close()

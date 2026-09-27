@@ -55,6 +55,31 @@ class LpComponentsTest {
             assertEquals(LpVerdict.ATTAINED_OPTIMUM, result.verdict)
             assertEquals(2, raw.blocks)
             assertTrue(solver.lastMetrics.workOps > 0L)
+            assertEquals(LpFloatTermination.OPTIMAL_CANDIDATE, solver.lastTermination)
+        }
+    }
+
+    @Test
+    fun `component solve preserves a child work stop`() {
+        val builder = LpBuilder()
+        repeat(2) {
+            val column = builder.addVar(0L, 4L, cost = 1L)
+            builder.addRow(intArrayOf(column), longArrayOf(1L), Relation.GE, 1L)
+        }
+        var part = 0
+        val solver = assertNotNull(
+            componentLpSolverOrNull(
+                builder.build(Sense.MINIMIZE),
+                com.eignex.klause.util.Cancellation.Never,
+                { model, _ -> RevisedSimplex(model, workLimit = if (part++ == 0) 0L else 1L) },
+            ),
+        )
+        solver.use {
+            assertNull(it.solve())
+
+            assertEquals(LpFloatTermination.WORK, it.lastTermination)
+            assertTrue(it.lastMetrics.workOps > 0L)
+            assertNull(it.infeasibleRay)
         }
     }
 
@@ -99,6 +124,7 @@ class LpComponentsTest {
         val solver = newLpSolver(model)
         assertIs<ComponentLpSolver>(solver)
         assertNull(solver.solve(null))
+        assertEquals(LpFloatTermination.INFEASIBLE_CANDIDATE, solver.lastTermination)
         val ray = solver.infeasibleRay
         assertNotNull(ray, "the infeasible block's ray scatters to the full model")
         assertEquals(model.m, ray.size)
@@ -232,6 +258,7 @@ class LpComponentsTest {
         solver.use {
             val hint = assertNotNull(it.solve())
             assertEquals(false, hint.optimal)
+            assertNull(it.lastTermination)
             val result = certifyLpResult(model, it, hint)
             assertEquals(LpVerdict.FEASIBLE, result.verdict)
             assertEquals(listOf(BigFraction.ONE, BigFraction.ofLong(3L)), result.exactPrimal)

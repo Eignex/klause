@@ -21,6 +21,18 @@ internal enum class LpRefactorReason {
     PRIMAL,
 }
 
+/** Outcome of one float invocation; candidates still require independent exact certification. */
+internal enum class LpFloatTermination {
+    OPTIMAL_CANDIDATE,
+    INFEASIBLE_CANDIDATE,
+    UNBOUNDED_CANDIDATE,
+    WORK,
+    PIVOTS,
+    CANCELLED,
+    NUMERICAL,
+    OTHER,
+}
+
 /** Optional, solve-scoped observer for certification and exact-input eligibility. */
 internal interface LpCertificationObserver {
     fun observe(certifier: LpCertifier, success: Boolean)
@@ -81,6 +93,9 @@ internal data class LpSolveMetrics(
  * certifying the result downstream ([integerCertify] / [integerFarkasRay]), never from these.
  */
 internal interface LpSolver : AutoCloseable {
+    /** Most recent solve invocation. Null means the engine does not report a reason or has not solved. */
+    val lastTermination: LpFloatTermination? get() = null
+
     /**
      * Solve the relaxation, optionally warm-started from a prior optimal [warm] basis of the same model
      * structure; null on non-convergence / dual-unbounded / singular basis. The warm basis only changes
