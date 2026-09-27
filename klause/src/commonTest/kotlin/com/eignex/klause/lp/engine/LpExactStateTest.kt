@@ -6,11 +6,106 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
+import kotlin.test.assertNotSame
 import kotlin.test.assertNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class LpExactStateTest {
+    @Test
+    fun `equal and weaker assertions retain declared source while strict assertion selects its premise`() {
+        val zero = ExactLpNumber.of(0L)
+        val ieeeZero = ExactLpNumber.ofIeee(-0.0)
+        val declaredPremise = ExactLpPremises(listOf(ExactLpPremise(9, false, zero)))
+        val assertedPremise = ExactLpPremises(listOf(ExactLpPremise(10, true, zero)), listOf(3))
+        val model = ExactLpModel(
+            listOf(emptyList(), emptyList()),
+            emptyList(),
+            listOf(
+                ExactLpColumn(ExactLpBounds(ExactLpSide(ieeeZero, premises = declaredPremise))),
+                ExactLpColumn(ExactLpBounds()),
+            ),
+            emptyList(),
+            ExactLpObjective(listOf(zero, zero)),
+        )
+        val trail = LpBoundTrail(model)
+        val root = trail.state
+        assertTrue(trail.push())
+        assertTrue(trail.assertBound(0, false, ExactLpSide(ExactLpNumber.of(-1L), premises = assertedPremise), 1L))
+        assertTrue(trail.assertBound(0, false, ExactLpSide(zero, premises = assertedPremise), 2L))
+        assertTrue(trail.assertBound(1, false, ExactLpSide(ExactLpNumber.of(1L)), 3L))
+
+        assertSame(model.column(0), trail.state.model.column(0))
+        assertEquals(-1L, trail.state.activeSide(0, false)?.witness)
+        assertEquals(declaredPremise, trail.state.model.column(0).bounds.lower?.premises)
+        assertEquals((-0.0).toRawBits(), trail.state.model.column(0).bounds.lower?.number?.ieeeBits)
+        assertEquals(listOf(1L, 2L, 3L), trail.state.assertions.map { it.witness })
+
+        assertTrue(trail.assertBound(0, false, ExactLpSide(ieeeZero, strict = true, premises = assertedPremise), 4L))
+        assertNotSame(model.column(0), trail.state.model.column(0))
+        assertEquals(4L, trail.state.activeSide(0, false)?.witness)
+        assertEquals(assertedPremise, trail.state.model.column(0).bounds.lower?.premises)
+        assertTrue(trail.pop(0))
+        assertSame(model.column(0), trail.state.model.column(0))
+        assertTrue(root.model.sameAuthority(trail.state.model))
+    }
+
+    @Test
+    fun `exact model copies isolate caller collections and preserve unchanged authority`() {
+        val zero = ExactLpNumber.of(0L)
+        val one = ExactLpNumber.of(1L)
+        val entries = mutableListOf(ExactLpEntry(0, one))
+        val matrix = mutableListOf<List<ExactLpEntry>>(entries)
+        val rhs = mutableListOf(one)
+        val columns = mutableListOf(ExactLpColumn(ExactLpBounds()), ExactLpColumn(ExactLpBounds()))
+        val rows = mutableListOf(ExactLpRow())
+        val costs = mutableListOf(zero, zero)
+        val model = ExactLpModel(matrix, rhs, columns, rows, ExactLpObjective(costs))
+        val copiedRhs = mutableListOf(one)
+        val copiedColumns = columns.toMutableList()
+        val copiedRows = rows.toMutableList()
+        val copy = model.copy(rhs = copiedRhs, columns = copiedColumns, rows = copiedRows)
+
+        entries.clear()
+        matrix.clear()
+        rhs[0] = zero
+        columns.clear()
+        rows.clear()
+        costs.clear()
+        copiedRhs[0] = zero
+        copiedColumns.clear()
+        copiedRows.clear()
+
+        assertTrue(model.sameAuthority(copy))
+        assertTrue(model.sameAuthority(model.copy()))
+        assertEquals(listOf(ExactLpEntry(0, one)), model.entries(0))
+        assertEquals(one, copy.rhs(0))
+        assertEquals(2, copy.numVars)
+        assertEquals(1, copy.m)
+    }
+
+    @Test
+    fun `inactive strict rows remove logical strictness integrality and sides`() {
+        val zero = ExactLpNumber.of(0L)
+        val model = ExactLpModel(
+            listOf(emptyList()),
+            listOf(zero),
+            listOf(ExactLpColumn(ExactLpBounds()), ExactLpColumn(ExactLpBounds(ExactLpSide(zero)))),
+            listOf(ExactLpRow(strict = true)),
+            ExactLpObjective(listOf(zero, zero)),
+        )
+        val active = LpExactState(model)
+        val inactive = LpExactState(model, rows = LpScopedRows.initial(1).deactivate(setOf(0)))
+
+        assertTrue(assertNotNull(active.model.column(1).bounds.lower).strict)
+        assertTrue(active.model.column(1).integral)
+        assertFalse(inactive.model.row(0).strict)
+        assertFalse(inactive.model.column(1).integral)
+        assertNull(inactive.model.column(1).bounds.lower)
+        assertTrue(model.row(0).strict)
+        assertFalse(assertNotNull(model.column(1).bounds.lower).strict)
+    }
+
     @Test
     fun `working projections preserve rational authority and source metadata`() {
         val zero = ExactLpNumber.of(0L)

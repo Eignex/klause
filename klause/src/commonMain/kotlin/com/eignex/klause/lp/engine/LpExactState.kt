@@ -117,17 +117,30 @@ internal class LpExactState internal constructor(
             val previous = sides[assertion.column]
             if (previous == null || assertion.strongerThan(previous)) sides[assertion.column] = assertion
         }
-        model = baseModel.copy(
-            columns = List(baseModel.numVars) { j ->
-                baseModel.column(j).copy(
-                    bounds = ExactLpBounds(lower[j]?.side, upper[j]?.side),
-                    integral = baseModel.column(j).integral && (j < baseModel.n || rows.row(j - baseModel.n).active),
-                )
-            },
-            rows = List(baseModel.m) {
-                if (rows.row(it).active) baseModel.row(it) else baseModel.row(it).copy(strict = false)
-            },
-        )
+        val columns = List(baseModel.numVars) { j ->
+            val original = baseModel.column(j)
+            val lowerSide = lower[j]?.side
+            val upperSide = upper[j]?.side
+            val integral = original.integral && (j < baseModel.n || rows.row(j - baseModel.n).active)
+            if (lowerSide == original.bounds.lower && upperSide == original.bounds.upper &&
+                integral == original.integral
+            ) {
+                original
+            } else {
+                original.copy(bounds = ExactLpBounds(lowerSide, upperSide), integral = integral)
+            }
+        }
+        model = if (rows.activeCount == rows.size) {
+            baseModel.copy(columns = columns)
+        } else {
+            baseModel.copy(
+                columns = columns,
+                rows = List(baseModel.m) {
+                    val row = baseModel.row(it)
+                    if (rows.row(it).active || !row.strict) row else row.copy(strict = false)
+                },
+            )
+        }
         conflict = (0 until model.numVars).firstOrNull { !model.column(it).bounds.consistent }?.let {
             LpBoundConflict(it, requireNotNull(lower[it]), requireNotNull(upper[it]))
         }
