@@ -231,6 +231,107 @@ class SequentialPortfolioTest {
     }
 
     @Test
+    fun `a rejected improvement cannot become the sequential optimum`() {
+        val valid = Sample(BooleanArray(0), longArrayOf(10))
+        val rejected = Sample(BooleanArray(0), longArrayOf(5))
+        val later = Sample(BooleanArray(0), longArrayOf(7))
+        val first = TrackingResumableSearch(
+            MinimizeResult.Unknown(TerminationReason.Unsupported),
+            MinimizeResult.BestFound(valid, 10.0, TerminationReason.BudgetExhausted),
+        )
+        val second = TrackingResumableSearch(
+            MinimizeResult.Unknown(TerminationReason.Unsupported),
+            MinimizeResult.BestFound(rejected, 5.0, TerminationReason.BudgetExhausted),
+        )
+        val third = TrackingResumableSearch(MinimizeResult.Optimal(later, 7.0))
+        val seen = mutableListOf<Long>()
+        val portfolio = SequentialPortfolio.exp3(
+            listOf(
+                trackingWorker("valid", 0, first),
+                trackingWorker("rejected", 1, second),
+                trackingWorker("later", 2, third),
+            ),
+        )
+
+        val failure = assertFailsWith<IllegalArgumentException> {
+            portfolio.minimize { improvement ->
+                val value = assertIs<MinimizeResult.WithSample>(improvement.result).sample.ints.single()
+                if (value == 5L) throw IllegalArgumentException("source witness violates row 'R'")
+                seen += value
+            }
+        }
+
+        assertEquals("source witness violates row 'R'", failure.message)
+        assertEquals(listOf(10L), seen)
+        assertEquals(1, first.closes)
+        assertEquals(1, second.closes)
+        assertEquals(0, third.closes)
+    }
+
+    @Test
+    fun `a rejected first improvement cannot produce a sequential verdict`() {
+        val sample = Sample(BooleanArray(0), longArrayOf(5))
+        val handle = TrackingResumableSearch(
+            MinimizeResult.Optimal(sample, 5.0),
+            MinimizeResult.BestFound(sample, 5.0, TerminationReason.BudgetExhausted),
+        )
+        val portfolio = SequentialPortfolio.exp3(listOf(trackingWorker("rejected", 0, handle)))
+
+        val failure = assertFailsWith<IllegalArgumentException> {
+            portfolio.minimize { throw IllegalArgumentException("source witness violates row 'R'") }
+        }
+
+        assertEquals("source witness violates row 'R'", failure.message)
+        assertEquals(1, handle.closes)
+    }
+
+    @Test
+    fun `nonimproving candidates do not reach the output callback`() {
+        val valid = Sample(BooleanArray(0), longArrayOf(10))
+        val worse = Sample(BooleanArray(0), longArrayOf(11))
+        val first = TrackingResumableSearch(
+            MinimizeResult.Unknown(TerminationReason.Unsupported),
+            MinimizeResult.BestFound(valid, 10.0, TerminationReason.BudgetExhausted),
+        )
+        val second = TrackingResumableSearch(
+            MinimizeResult.Unknown(TerminationReason.Unsupported),
+            MinimizeResult.BestFound(worse, 11.0, TerminationReason.BudgetExhausted),
+        )
+        val portfolio = SequentialPortfolio.exp3(
+            listOf(trackingWorker("valid", 0, first), trackingWorker("worse", 1, second)),
+        )
+        val seen = mutableListOf<Long>()
+
+        val result = assertIs<MinimizeResult.BestFound>(
+            portfolio.minimize { improvement ->
+            seen += assertIs<MinimizeResult.WithSample>(improvement.result).sample.ints.single()
+        }
+        )
+
+        assertEquals(10L, result.sample.ints.single())
+        assertEquals(listOf(10L), seen)
+    }
+
+    @Test
+    fun `an output callback failure remains the primary failure during cleanup`() {
+        val sample = Sample(BooleanArray(0), longArrayOf(1))
+        val handle = TrackingResumableSearch(
+            MinimizeResult.Optimal(sample, 1.0),
+            MinimizeResult.BestFound(sample, 1.0, TerminationReason.BudgetExhausted),
+            closeFailure = "close failure",
+        )
+        val portfolio = SequentialPortfolio.exp3(listOf(trackingWorker("failing", 0, handle)))
+
+        val failure = assertFailsWith<IllegalStateException> {
+            portfolio.minimize { error("output failure") }
+        }
+
+        assertEquals("output failure", failure.message)
+        assertEquals(1, handle.closes)
+        assertEquals("close failure", failure.suppressedExceptions.single().message)
+    }
+
+    @Test
     fun `unresolved leaf is not shared as a conflict with a fresh arm`() {
         val fixture = UnresolvedRealLeafFixture(true)
         val problem = Problem(
