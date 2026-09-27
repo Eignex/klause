@@ -427,12 +427,12 @@ private fun closeOwners(primaryFailure: Throwable?, vararg owners: AutoCloseable
 }
 
 private data class Measurement<T>(val value: T, val nanos: Long, val bytes: Long)
-private data class SourceResidual(val absolute: Double, val relative: Double, val scale: Double)
+internal data class SourceResidual(val absolute: Double, val relative: Double, val scale: Double)
 
 private const val RESIDUAL_ABSOLUTE = 1e-10
 private const val RESIDUAL_RELATIVE = 1e-9
 
-private fun BasisTraceMatrix.toSparseMatrix(): SparseMatrix = SparseMatrix.wrap(
+internal fun BasisTraceMatrix.toSparseMatrix(): SparseMatrix = SparseMatrix.wrap(
     rows,
     columns,
     copyColumnPointers(),
@@ -440,7 +440,7 @@ private fun BasisTraceMatrix.toSparseMatrix(): SparseMatrix = SparseMatrix.wrap(
     DoubleArray(entries) { valueAt(it) },
 )
 
-private fun sourceResidual(
+internal fun sourceResidual(
     matrix: BasisTraceMatrix,
     headings: List<BasisHeading>,
     sourceColumns: Int,

@@ -425,6 +425,162 @@ class BasisTraceTest {
         assertEquals(6.0, Double.fromBits(requireNotNull(trace.origins.first().upperBits)))
     }
 
+    @Test
+    fun `rebuild comparison replays following solves from the same basis`() {
+        val fixture = comparisonTrace()
+
+        val result = BasisRebuildComparison.compare(fixture, 5)
+
+        assertTrue(result.valid, result.captured.errors.joinToString() + result.deferred.errors.joinToString())
+        assertEquals(3, result.captured.builds)
+        assertEquals(2, result.deferred.builds)
+        assertEquals(result.captured.ftrans, result.deferred.ftrans)
+        assertEquals(result.captured.backendWork?.ftran?.attempts, result.deferred.backendWork?.ftran?.attempts)
+    }
+
+    @Test
+    fun `rebuild comparison rejects a changed basis checkpoint`() {
+        val fixture = comparisonTrace()
+
+        assertFailsWith<IllegalArgumentException> { BasisRebuildComparison.compare(fixture, 0) }
+    }
+
+    @Test
+    fun `rebuild comparison reports cancellation in both arms`() {
+        val fixture = comparisonTrace()
+
+        val result = BasisRebuildComparison.compare(fixture, 5, cancelled = { true })
+
+        assertTrue(result.captured.errors.any { "cancelled" in it })
+        assertTrue(result.deferred.errors.any { "cancelled" in it })
+    }
+
+    @Test
+    fun `rebuild comparison closes owners after a factory failure`() {
+        val created = ArrayList<TrackingBasisSolver>()
+        var calls = 0
+        val factory: (SparseMatrix) -> BasisSolver = { matrix ->
+            calls++
+            if (calls == 2) throw IllegalStateException("factory")
+            TrackingBasisSolver(KotlinBasisSolver(matrix)).also(created::add)
+        }
+
+        assertFailsWith<IllegalStateException> {
+            BasisRebuildComparison.compare(comparisonTrace(), 5, factory)
+        }
+
+        assertEquals(1, created.size)
+        assertEquals(1, created.single().closeCalls)
+    }
+
+    @Test
+    fun `rebuild comparison reports close failures from both owners`() {
+        val created = ArrayList<TrackingBasisSolver>()
+        val factory: (SparseMatrix) -> BasisSolver = { matrix ->
+            TrackingBasisSolver(
+                KotlinBasisSolver(matrix),
+                closeFailure = IllegalStateException("close-${created.size}"),
+            ).also(created::add)
+        }
+
+        val result = BasisRebuildComparison.compare(comparisonTrace(), 5, factory)
+
+        assertTrue(result.captured.errors.any { "solver close failure" in it })
+        assertTrue(result.deferred.errors.any { "solver close failure" in it })
+        assertTrue(created.all { it.closeCalls == 1 })
+    }
+
+    @Test
+    fun `rebuild comparison reports a solver decline`() {
+        val factory: (SparseMatrix) -> BasisSolver = { matrix ->
+            val delegate = KotlinBasisSolver(matrix)
+            object : BasisSolver by delegate {
+                override fun update(
+                    pivotRow: Int,
+                    entering: Int,
+                    spike: IndexedVector,
+                    pivotEta: IndexedVector?,
+                ): BasisUpdate = BasisUpdate.SINGULAR
+            }
+        }
+
+        val result = BasisRebuildComparison.compare(comparisonTrace(), 5, factory)
+
+        assertTrue(result.captured.errors.any { "declined" in it })
+        assertTrue(result.deferred.errors.any { "declined" in it })
+        assertEquals(1, result.captured.declines)
+        assertEquals(1, result.deferred.declines)
+    }
+
+    @Test
+    fun `rebuild comparison rejects an independent residual error`() {
+        val factory: (SparseMatrix) -> BasisSolver = { matrix ->
+            val delegate = KotlinBasisSolver(matrix)
+            object : BasisSolver by delegate {
+                override fun ftran(x: IndexedVector, expectedDensity: Double) {
+                    delegate.ftran(x, expectedDensity)
+                    val values = x.toDoubleArray()
+                    values[0] += 0.25
+                    x.scatter(values)
+                }
+            }
+        }
+
+        val result = BasisRebuildComparison.compare(comparisonTrace(), 5, factory)
+
+        assertTrue(result.captured.errors.any { "source residual" in it })
+        assertTrue(result.deferred.errors.any { "source residual" in it })
+    }
+
+    @Test
+    fun `rebuild comparison respects backend rebuild advice`() {
+        val original = comparisonTrace()
+        val fixture = original.copyWithOperations(original.operations.filterIndexed { index, _ -> index != 4 })
+        val factory: (SparseMatrix) -> BasisSolver = { matrix ->
+            val delegate = KotlinBasisSolver(matrix)
+            object : BasisSolver by delegate {
+                override fun update(
+                    pivotRow: Int,
+                    entering: Int,
+                    spike: IndexedVector,
+                    pivotEta: IndexedVector?,
+                ): BasisUpdate {
+                    delegate.update(pivotRow, entering, spike, pivotEta)
+                    return BasisUpdate.REFACTORIZE
+                }
+            }
+        }
+
+        val result = BasisRebuildComparison.compare(fixture, 4, factory)
+
+        assertTrue(result.deferred.errors.any { "mandatory rebuild" in it })
+        assertTrue(result.captured.errors.isEmpty())
+    }
+
+    private fun comparisonTrace(): BasisTrace {
+        val original = trace(simpleMatrix())
+        val evolved = listOf(BasisHeading.Source(0), BasisHeading.Unit(1))
+        val operations = original.operations + listOf(
+            BasisTraceOperation.Factorize(evolved, true),
+            BasisTraceOperation.Solve(
+                3,
+                false,
+                BasisVectorRole.GENERAL,
+                0.0.toRawBits(),
+                BasisTraceVector(doubleArrayOf(4.0, 5.0), intArrayOf(0, 1)),
+            ),
+            BasisTraceOperation.Factorize(evolved, true),
+            BasisTraceOperation.Solve(
+                4,
+                true,
+                BasisVectorRole.GENERAL,
+                0.0.toRawBits(),
+                BasisTraceVector(doubleArrayOf(1.0, 2.0), intArrayOf(0, 1)),
+            ),
+        )
+        return original.copyWithOperations(operations)
+    }
+
     private fun trace(matrix: BasisTraceMatrix): BasisTrace {
         val initial = listOf(BasisHeading.Unit(0), BasisHeading.Unit(1))
         val operations = listOf(

@@ -64,6 +64,31 @@ allocations. The oracle checks are outside the timed regions. Preparation-plus-u
 `synthetic_prepared`: a shadow basis recomputes the referenced solves and applies the update, while shadow setup
 and checkpoint builds stay outside that metric and the composed lifecycle.
 
+`compare` replays one complete `mps-afiro` operation window under its captured rebuilds and a fixed
+deferred schedule: skip the successful same-heading checkpoint at operation 41, rebuild at the next
+captured checkpoint at 86, and continue through operation 93. It runs one warmup and four alternating
+pairs; `trace=... checkpoint=...` selects another complete trace and validated same-heading checkpoint with a later build
+and following solve. A same-heading checkpoint has the identical immutable matrix and ordered basis;
+the trace does not record the production reason for rebuilding, so this is a basis-level cost experiment,
+not authorization to change solver policy. Any changed/failed/initial checkpoint, unexpected backend
+rebuild advice, numerical decline or 16-update harness limit invalidates that pair. The backend's own
+50-update limit remains in force. Both arms receive the same ordered trace operations and RHS vectors,
+but each computes its own spike and pivotal row. Cancellation is checked between operations in both arms.
+
+The comparator checks each update state in a separate validation pass and checks every measured solve output
+after replay against the stored CSC matrix and a fresh factorization of its recorded headings. This keeps
+oracle probes out of measured backend work. Timed phases cover owner
+setup, every captured build, RHS preparation and solves, updates, and close. NDJSON records phase and total
+elapsed time, current-thread CPU, Java allocations, plus independent backend work units. Native allocations
+are unavailable. Validity requires both arms to complete the whole window with independent numerical checks;
+captured update labels do not prove the deferred arm. These operation traces contain no complete LP bounds,
+objective, source proof or exact certificate, so they cannot establish an exact solver outcome. The fixed
+40-boxed-integer full-solver regression remains a separate control for any later policy proposal.
+
+```
+./gradlew :klause:basisTrace --args="compare"
+```
+
 Repair, snapshots and extension are covered by the dedicated engine tests rather than by replay, which drives
 only factorization, FTRAN, BTRAN and updates.
 
