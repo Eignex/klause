@@ -19,9 +19,87 @@ fun main(args: Array<String>) {
         "list" -> tracePaths(options).forEach { printListRecord(it) }
         "replay" -> tracePaths(options).forEach { replay(it, benchmark = false) }
         "benchmark" -> tracePaths(options).forEach { replay(it, benchmark = true) }
+        "compare" -> compareRebuilds(options)
         "capture" -> capture(options)
         "verify" -> verifyCorpus(tracePaths(options))
-        else -> error("usage: basisTrace list|replay|benchmark|capture|verify [key=value ...]")
+        else -> error("usage: basisTrace list|replay|benchmark|compare|capture|verify [key=value ...]")
+    }
+}
+
+private fun compareRebuilds(options: Map<String, String>) {
+    val path = options["trace"]?.let(Path::of) ?: corpusDirectory().resolve("mps-afiro.kbtrace")
+    val trace = BasisTraceCodec.read(path)
+    val checkpoint = options["checkpoint"]?.toInt() ?: 41
+    val hash = sha256(Files.readAllBytes(path))
+    BasisRebuildComparison.compare(trace, checkpoint)
+    for (pair in 0 until 4) {
+        val deferredFirst = pair % 2 == 1
+        val result = BasisRebuildComparison.compare(trace, checkpoint, deferredFirst = deferredFirst)
+        val fields = mutableListOf<Pair<String, Any?>>(
+            "command" to "compare",
+            "id" to trace.metadata.id,
+            "sourceSha256" to trace.metadata.sourceSha256,
+            "artifactSha256" to hash,
+            "koblasArtifactSha256" to artifactHash(SparseMatrix::class.java),
+            "javaRuntime" to System.getProperty("java.runtime.version"),
+            "pair" to pair,
+            "deferredFirst" to deferredFirst,
+            "deferredCheckpoint" to result.deferredCheckpoint,
+            "nextCheckpoint" to result.nextCheckpoint,
+            "operations" to trace.operations.size,
+            "maxUpdatesSinceBuild" to BasisRebuildComparison.MAX_UPDATES_SINCE_BUILD,
+            "valid" to result.valid,
+            "pairedErrors" to result.pairedErrors.joinToString(" | "),
+        )
+        fields += rebuildFields("captured", result.captured)
+        fields += rebuildFields("deferred", result.deferred)
+        println(json(*fields.toTypedArray()))
+    }
+}
+
+private fun rebuildFields(prefix: String, report: RebuildArmReport): List<Pair<String, Any?>> = buildList {
+    add("${prefix}Builds" to report.builds)
+    add("${prefix}Ftrans" to report.ftrans)
+    add("${prefix}Btrans" to report.btrans)
+    add("${prefix}Updates" to report.updates)
+    add("${prefix}AdvisedUpdates" to report.advisedUpdates)
+    add("${prefix}Declines" to report.declines)
+    add("${prefix}MaxUpdateChain" to report.maxUpdateChain)
+    add("${prefix}MaxResidual" to report.maxResidual)
+    add("${prefix}MaxFreshDifference" to report.maxFreshDifference)
+    add("${prefix}Errors" to report.errors.joinToString(" | "))
+    for ((name, phase) in listOf(
+        "Setup" to report.setup,
+        "Factor" to report.factor,
+        "Solve" to report.solve,
+        "Update" to report.update,
+        "Finalization" to report.finalization,
+    )) {
+        add("$prefix${name}ElapsedNanos" to phase.elapsedNanos)
+        add("$prefix${name}CpuNanos" to phase.cpuNanos)
+        add("$prefix${name}JavaBytes" to phase.javaBytes.takeIf { it >= 0 })
+    }
+    add("${prefix}TotalElapsedNanos" to report.totalElapsedNanos)
+    add("${prefix}TotalCpuNanos" to report.totalCpuNanos.takeIf { it >= 0 })
+    add("${prefix}TotalJavaBytes" to report.totalJavaBytes.takeIf { it >= 0 })
+    val work = report.backendWork
+    add("${prefix}WorkComplete" to work?.complete)
+    add("${prefix}WorkSaturated" to work?.saturated)
+    add("${prefix}WorkUnits" to work?.units)
+    add("${prefix}BuildWorkUnits" to work?.refactorization?.units)
+    add("${prefix}RepairWorkUnits" to work?.repair?.units)
+    add("${prefix}FtranWorkUnits" to work?.ftran?.units)
+    add("${prefix}BtranWorkUnits" to work?.btran?.units)
+    add("${prefix}UpdateWorkUnits" to work?.update?.units)
+    for ((name, phase) in listOf(
+        "Build" to work?.refactorization,
+        "Repair" to work?.repair,
+        "Ftran" to work?.ftran,
+        "Btran" to work?.btran,
+        "Update" to work?.update,
+    )) {
+        add("$prefix${name}Attempts" to phase?.attempts)
+        add("$prefix${name}Declines" to phase?.declines)
     }
 }
 
