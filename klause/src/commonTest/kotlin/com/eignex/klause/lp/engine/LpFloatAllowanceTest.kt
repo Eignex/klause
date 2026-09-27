@@ -25,12 +25,16 @@ class LpFloatAllowanceTest {
             val first = assertNotNull(solver.resolveBounds(LpFloatAllowance(100_000L, 0)))
             assertTrue(first.optimal)
             assertEquals(4.0, first.objective)
+            assertEquals(LpFloatTermination.OPTIMAL_CANDIDATE, solver.lastTermination)
 
             assertFalse(solver.resolveBounds(LpFloatAllowance(1L, 0))?.optimal == true)
+            assertEquals(LpFloatTermination.WORK, solver.lastTermination)
             assertTrue(solver.lastWorkOps >= 1L)
             assertTrue(assertNotNull(solver.resolveBounds(LpFloatAllowance(0L, 0))).optimal)
+            assertEquals(LpFloatTermination.OPTIMAL_CANDIDATE, solver.lastTermination)
 
             assertFalse(solver.resolveBounds()?.optimal == true)
+            assertEquals(LpFloatTermination.WORK, solver.lastTermination)
             assertTrue(solver.lastWorkOps >= 1L)
         }
     }
@@ -46,13 +50,18 @@ class LpFloatAllowanceTest {
         val state = LpExactState(source)
         RevisedSimplex(assertNotNull(state.toWorkingModel())).use { solver ->
             assertFalse(solver.resolveBounds(LpFloatAllowance(0L, 1))?.optimal == true)
+            assertEquals(LpFloatTermination.PIVOTS, solver.lastTermination)
             assertTrue(solver.lastPivots <= 1)
+            assertFalse(solver.adopt(state, Cancellation { true }))
+            assertNull(solver.lastTermination)
             assertTrue(assertNotNull(solver.resolveBounds(LpFloatAllowance(0L, 100))).optimal)
+            assertEquals(LpFloatTermination.OPTIMAL_CANDIDATE, solver.lastTermination)
             val objective = ExactLpObjective(List(8) { ExactLpNumber.of(if (it < 4) -1L else 0L) })
             val revised = LpExactState(source.copy(objective = objective), objectiveRevision = 1L)
             assertTrue(solver.adopt(revised))
 
             assertFalse(solver.resolveBounds(LpFloatAllowance(0L, 1))?.optimal == true)
+            assertEquals(LpFloatTermination.PIVOTS, solver.lastTermination)
             assertTrue(solver.lastPivots <= 1)
             val result = assertNotNull(solver.resolveBounds(LpFloatAllowance(0L, 100)))
 
@@ -83,12 +92,15 @@ class LpFloatAllowanceTest {
                             solver.resolveBounds(LpFloatAllowance(0L, 0))
                         },
                     )
+                    assertNull(solver.lastTermination)
                 } else {
                     assertNull(solver.resolveBounds(LpFloatAllowance(0L, 0)))
+                    assertEquals(LpFloatTermination.CANCELLED, solver.lastTermination)
                 }
                 stopped = false
 
                 assertFalse(solver.resolveBounds()?.optimal == true)
+                assertEquals(LpFloatTermination.WORK, solver.lastTermination)
                 assertTrue(solver.lastWorkOps >= 1L)
             }
         }

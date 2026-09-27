@@ -67,6 +67,8 @@ internal class LpScopedSolver(
         private set
     var lastMetrics: LpSolveMetrics = LpSolveMetrics()
         private set
+    var lastFloatTermination: LpFloatTermination? = null
+        private set
     val metrics: LpScopedMetrics get() = LpScopedMetrics(
         editAttempts, editSuccesses, preparationAttempts, preparationSuccesses,
         preparationWork, preparationRefactorizations, createdOwners, closedOwners, peakOwners,
@@ -199,21 +201,32 @@ internal class LpScopedSolver(
         requireAvailable()
         lastResult = null
         lastMetrics = LpSolveMetrics()
+        lastFloatTermination = null
         if (!prepare(token)) return null
         val current = requireNotNull(solver)
         var failure: Throwable? = null
         var solveStarted = false
         val result = try {
-            if (!current.adopt(state, token)) return null
-            solveStarted = true
-            if (warm == null) current.resolveBounds(allowance) else current.solve(warm)
+            try {
+                if (!current.adopt(state, token)) return null
+                solveStarted = true
+                (if (warm == null) current.resolveBounds(allowance) else current.solve(warm)).also {
+                    lastFloatTermination = current.lastTermination
+                }
+            } catch (primary: Throwable) {
+                failure = primary
+                throw primary
+            } finally {
+                completeSolveCompletion(current, failure, solveStarted)
+            }
         } catch (primary: Throwable) {
-            failure = primary
+            lastFloatTermination = null
             throw primary
-        } finally {
-            recordSolveCompletion(current, failure, solveStarted)
         }
-        if (token()) return null
+        if (token()) {
+            lastFloatTermination = LpFloatTermination.CANCELLED
+            return null
+        }
         return current to result
     }
 
@@ -432,19 +445,37 @@ internal class LpScopedSolver(
     }
 
     @Suppress("TooGenericExceptionCaught")
+    private fun completeSolveCompletion(current: PersistentLpSolver, primary: Throwable?, solveStarted: Boolean) {
+        try {
+            recordSolveCompletion(current, primary, solveStarted)
+        } catch (telemetry: Throwable) {
+            if (primary == null) throw telemetry
+            if (telemetry !== primary) primary.addSuppressed(telemetry)
+        }
+    }
+
+    @Suppress("TooGenericExceptionCaught")
     private fun recordSolveCompletion(current: PersistentLpSolver, primary: Throwable?, solveStarted: Boolean) {
         var failure = primary
         if (solveStarted) {
             try {
                 lastMetrics = current.lastMetrics
             } catch (telemetry: Throwable) {
-                if (failure == null) failure = telemetry else failure.addSuppressed(telemetry)
+                if (failure == null) {
+                    failure = telemetry
+                } else if (failure !== telemetry) {
+                    failure.addSuppressed(telemetry)
+                }
             }
         }
         try {
             recordPendingAppendSolve(current)
         } catch (telemetry: Throwable) {
-            if (failure == null) failure = telemetry else failure.addSuppressed(telemetry)
+            if (failure == null) {
+                failure = telemetry
+            } else if (failure !== telemetry) {
+                failure.addSuppressed(telemetry)
+            }
         }
         if (primary == null && failure != null) throw failure
     }

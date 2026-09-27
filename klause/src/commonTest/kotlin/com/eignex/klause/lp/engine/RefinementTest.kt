@@ -57,6 +57,7 @@ class RefinementTest {
                         pricing,
                     )
                     return object : PersistentLpSolver by delegate {
+                        override val lastTermination: LpFloatTermination? get() = null
                         override fun resolveBounds(allowance: LpFloatAllowance?): FloatLpResult? {
                             assertNotNull(delegate.resolveBounds(allowance))
                             completed = delegate.lastMetrics
@@ -88,6 +89,78 @@ class RefinementTest {
                 assertTrue(result.metrics.preparationWork > 0L)
                 assertEquals(0L, assertNotNull(owner.lastWorkingMetrics).owners.currentOwners)
                 owner.requireAvailable()
+            }
+        }
+    }
+
+    @Test
+    fun `real child work and pivot stops retain their refinement reason`() {
+        val builder = LpBuilder()
+        repeat(4) {
+            val column = builder.addVar(0L, 4L, cost = 1L)
+            builder.addRow(intArrayOf(column), longArrayOf(1L), Relation.GE, 1L)
+        }
+        val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+        for ((local, expected) in listOf(
+            LpFloatTermination.WORK to LpRefinementDecline.WORK,
+            LpFloatTermination.PIVOTS to LpRefinementDecline.PIVOTS,
+        )) {
+            var childResult: FloatLpResult? = null
+            var childReason: LpFloatTermination? = null
+            var childCalls = 0
+            val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+                override fun newPersistentSolver(
+                    model: LpModel,
+                    cancellation: Cancellation,
+                    refactorUpdateLimit: Int,
+                    iterationLimit: Int,
+                    workLimit: Long,
+                    trackDegeneracy: Boolean,
+                    pricing: LpPricingOptions,
+                ): PersistentLpSolver {
+                    val delegate = ProductionLpEngineFactory.newPersistentSolver(
+                        model,
+                        cancellation,
+                        refactorUpdateLimit,
+                        iterationLimit,
+                        workLimit,
+                        trackDegeneracy,
+                        pricing,
+                    )
+                    return object : PersistentLpSolver by delegate {
+                        override fun resolveBounds(allowance: LpFloatAllowance?): FloatLpResult? {
+                            childCalls++
+                            childResult = delegate.resolveBounds(
+                                if (local == LpFloatTermination.WORK) {
+                                    LpFloatAllowance(1L, 100)
+                                } else {
+                                    LpFloatAllowance(assertNotNull(allowance).work, 1)
+                                },
+                            )
+                            childReason = delegate.lastTermination
+                            return childResult?.takeIf { it.optimal }
+                        }
+                    }
+                }
+            }
+            LpScopedSolver(state, context = LpSolveContext(engineFactory = factory)).use { owner ->
+                val result = refineLp(
+                    assertNotNull(state.toWorkingModel()),
+                    LpRefinementRequest(
+                        owner,
+                        owner.refinementCache,
+                        LpRefinementLimits(maxRounds = 1, maxAuxiliaries = 0, time = 30.seconds),
+                    ),
+                    DoubleArray(4) { 0.5 },
+                    DoubleArray(4),
+                )
+
+                assertEquals(1, childCalls)
+                assertTrue(childResult?.optimal != true)
+                assertEquals(local, childReason)
+                assertEquals(expected, result.metrics.decline)
+                assertNull(result.conflict)
+                assertEquals(0L, assertNotNull(owner.lastWorkingMetrics).owners.currentOwners)
             }
         }
     }

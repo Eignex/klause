@@ -749,7 +749,13 @@ private class RefinementRun(
                 val attempt = numerical(scope, if (round == 1) basis else null, firstAllowance, round == 1)
                 val float = attempt?.second ?: run {
                     meter.poll()
-                    meter.stop(LpRefinementDecline.NUMERICAL)
+                    val reason = when (scope.lastFloatTermination) {
+                        LpFloatTermination.WORK -> LpRefinementDecline.WORK
+                        LpFloatTermination.PIVOTS -> LpRefinementDecline.PIVOTS
+                        LpFloatTermination.CANCELLED -> LpRefinementDecline.CANCELLED
+                        else -> if (attempt == null) LpRefinementDecline.ADOPTION else LpRefinementDecline.NUMERICAL
+                    }
+                    meter.stop(reason)
                 }
                 val correction = RefinementAuthority(scope.state, meter)
                 val dx = correction.seed(float.primal, float.basis)

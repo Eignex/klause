@@ -29,6 +29,26 @@ import kotlin.test.assertTrue
 class RevisedSimplexPrimalTest {
 
     @Test
+    fun `primal stops report their invocation caps`() {
+        val builder = LpBuilder()
+        repeat(2) {
+            val column = builder.addVar(0L, 3L, cost = 1L)
+            builder.addRow(intArrayOf(column), longArrayOf(1L), Relation.GE, 1L)
+        }
+        val model = builder.build(Sense.MINIMIZE)
+        for ((work, pivots, expected) in listOf(
+            Triple(1L, 100, LpFloatTermination.WORK),
+            Triple(0L, 1, LpFloatTermination.PIVOTS),
+        )) {
+            RevisedSimplex(model, workLimit = work, iterationLimit = pivots).use { solver ->
+                assertNull(solver.solvePrimal())
+
+                assertEquals(expected, solver.lastTermination)
+            }
+        }
+    }
+
+    @Test
     fun `native lower upper free and fixed seats certify their source optimum`() {
         val zero = ExactLpNumber.of(0L)
         val one = ExactLpNumber.of(1L)

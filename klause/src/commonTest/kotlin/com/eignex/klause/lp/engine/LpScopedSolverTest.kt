@@ -23,6 +23,129 @@ import kotlin.test.assertTrue
 
 class LpScopedSolverTest {
     @Test
+    fun `failed adoption cannot reuse a prior work stop`() {
+        val state = LpExactState(lowerBoundModel())
+        var reject = false
+        val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+            override fun newPersistentSolver(
+                model: LpModel,
+                cancellation: Cancellation,
+                refactorUpdateLimit: Int,
+                iterationLimit: Int,
+                workLimit: Long,
+                trackDegeneracy: Boolean,
+                pricing: LpPricingOptions,
+            ): PersistentLpSolver {
+                val delegate = ProductionLpEngineFactory.newPersistentSolver(
+                    model,
+                    cancellation,
+                    refactorUpdateLimit,
+                    iterationLimit,
+                    workLimit,
+                    trackDegeneracy,
+                    pricing,
+                )
+                return object : PersistentLpSolver by delegate {
+                    override fun adopt(state: LpExactState, token: Cancellation): Boolean =
+                        !reject && delegate.adopt(state, token)
+                }
+            }
+        }
+        LpScopedSolver(state, context = LpSolveContext(engineFactory = factory)).use { owner ->
+            owner.withWorkingModel(LpWorkingModel.overrides(state)) { scope ->
+                val first = assertNotNull(scope.solveFloat(allowance = LpFloatAllowance(1L, 100)))
+                assertNull(first.second)
+                assertEquals(LpFloatTermination.WORK, scope.lastFloatTermination)
+                val spent = scope.metrics.solves
+                reject = true
+
+                assertNull(scope.solveFloat())
+
+                assertNull(scope.lastFloatTermination)
+                assertEquals(spent, scope.metrics.solves)
+            }
+        }
+    }
+
+    @Test
+    fun `cancellation after a completed child retains its scoped reason`() {
+        val state = LpExactState(lowerBoundModel())
+        var cancelled = false
+        val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+            override fun newPersistentSolver(
+                model: LpModel,
+                cancellation: Cancellation,
+                refactorUpdateLimit: Int,
+                iterationLimit: Int,
+                workLimit: Long,
+                trackDegeneracy: Boolean,
+                pricing: LpPricingOptions,
+            ): PersistentLpSolver {
+                val delegate = ProductionLpEngineFactory.newPersistentSolver(
+                    model,
+                    cancellation,
+                    refactorUpdateLimit,
+                    iterationLimit,
+                    workLimit,
+                    trackDegeneracy,
+                    pricing,
+                )
+                return object : PersistentLpSolver by delegate {
+                    override fun resolveBounds(allowance: LpFloatAllowance?): FloatLpResult? =
+                        delegate.resolveBounds(allowance).also { cancelled = true }
+                }
+            }
+        }
+        LpScopedSolver(state, context = LpSolveContext(engineFactory = factory)).use { owner ->
+            owner.withWorkingModel(LpWorkingModel.overrides(state), Cancellation { cancelled }) { scope ->
+                assertNull(scope.solveFloat())
+
+                assertEquals(LpFloatTermination.CANCELLED, scope.lastFloatTermination)
+                assertTrue(scope.metrics.solves.workOps > 0L)
+            }
+        }
+    }
+
+    @Test
+    fun `telemetry throwing the primary instance preserves the solve failure`() {
+        val state = LpExactState(lowerBoundModel())
+        val failure = IllegalStateException("solve and telemetry")
+        val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+            override fun newPersistentSolver(
+                model: LpModel,
+                cancellation: Cancellation,
+                refactorUpdateLimit: Int,
+                iterationLimit: Int,
+                workLimit: Long,
+                trackDegeneracy: Boolean,
+                pricing: LpPricingOptions,
+            ): PersistentLpSolver {
+                val delegate = ProductionLpEngineFactory.newPersistentSolver(
+                    model,
+                    cancellation,
+                    refactorUpdateLimit,
+                    iterationLimit,
+                    workLimit,
+                    trackDegeneracy,
+                    pricing,
+                )
+                return object : PersistentLpSolver by delegate {
+                    override val lastMetrics: LpSolveMetrics get() = throw failure
+                    override fun resolveBounds(allowance: LpFloatAllowance?): FloatLpResult? = throw failure
+                }
+            }
+        }
+        LpScopedSolver(state, context = LpSolveContext(engineFactory = factory)).use { owner ->
+            owner.withWorkingModel(LpWorkingModel.overrides(state)) { scope ->
+                assertSame(failure, assertFailsWith<IllegalStateException> { scope.solveFloat() })
+
+                assertNull(scope.lastFloatTermination)
+                assertTrue(failure.suppressedExceptions.isEmpty())
+            }
+        }
+    }
+
+    @Test
     fun `failed adoption after a solve does not repeat its pivot charge`() {
         val state = LpExactState(lowerBoundModel())
         var reject = false
@@ -54,12 +177,14 @@ class LpScopedSolverTest {
         LpScopedSolver(state, context = LpSolveContext(engineFactory = factory)).use { owner ->
             owner.withWorkingModel(LpWorkingModel.overrides(state)) { scope ->
                 assertNotNull(scope.solveFloat())
+                assertEquals(LpFloatTermination.OPTIMAL_CANDIDATE, scope.lastFloatTermination)
                 val completed = scope.metrics.solves
                 assertTrue(completed.pivots > 0)
                 reject = true
 
                 assertNull(scope.solveFloat())
 
+                assertNull(scope.lastFloatTermination)
                 assertEquals(completed, scope.metrics.solves)
                 assertTrue(scope.metrics.owners.preparationWork > 0L)
             }
@@ -101,6 +226,7 @@ class LpScopedSolverTest {
             owner.withWorkingModel(LpWorkingModel.overrides(state)) { scope ->
                 assertNull(scope.solveFloat())
 
+                assertNull(scope.lastFloatTermination)
                 assertEquals(2, adoptions)
                 assertEquals(LpSolveMetrics(), scope.metrics.solves)
                 assertTrue(scope.metrics.owners.preparationWork > 0L)
@@ -147,6 +273,7 @@ class LpScopedSolverTest {
             owner.withWorkingModel(LpWorkingModel.overrides(state)) { scope ->
                 assertSame(failure, assertFailsWith<IllegalStateException> { scope.solveFloat() })
 
+                assertNull(scope.lastFloatTermination)
                 assertEquals(1, scope.metrics.solves.pivots)
                 assertTrue(scope.metrics.solves.workOps > 0L)
             }

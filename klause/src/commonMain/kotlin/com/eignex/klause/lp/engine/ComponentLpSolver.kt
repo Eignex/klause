@@ -33,6 +33,8 @@ internal class ComponentLpSolver(
     private val certificationKey = exactLpStateKey(model)
     private var blockResults: List<FloatLpResult>? = null
     private var metrics = LpSolveMetrics()
+    override var lastTermination: LpFloatTermination? = null
+        private set
 
     override val lastMetrics: LpSolveMetrics get() = metrics
 
@@ -43,11 +45,20 @@ internal class ComponentLpSolver(
         for (s in solvers) s.close()
     }
 
-    override fun solve(warm: Basis?): FloatLpResult? = stitch { s -> s.solve(null) }
+    override fun solve(warm: Basis?): FloatLpResult? = invoke { s -> s.solve(null) }
 
-    override fun solvePrimal(warm: Basis?): FloatLpResult? = stitch { s -> s.solvePrimal(null) }
+    override fun solvePrimal(warm: Basis?): FloatLpResult? = invoke { s -> s.solvePrimal(null) }
+
+    @Suppress("TooGenericExceptionCaught") // Clear the invocation reason for any child failure.
+    private inline fun invoke(op: (LpSolver) -> FloatLpResult?): FloatLpResult? = try {
+        stitch(op)
+    } catch (primary: Throwable) {
+        lastTermination = null
+        throw primary
+    }
 
     private inline fun stitch(op: (LpSolver) -> FloatLpResult?): FloatLpResult? {
+        lastTermination = null
         infeasibleRay = null
         blockResults = null
         metrics = LpSolveMetrics()
@@ -66,7 +77,10 @@ internal class ComponentLpSolver(
             val c = model.costD(j)
             var shifted = 0.0
             if (c < 0.0) {
-                if (!model.hasFiniteUpper(j)) return null // unbounded objective, as the engine reports
+                if (!model.hasFiniteUpper(j)) {
+                    lastTermination = LpFloatTermination.UNBOUNDED_CANDIDATE
+                    return null // unbounded objective, as the engine reports
+                }
                 shifted = model.upperD(j)
                 status[j] = VarStatus.AT_UPPER
             }
@@ -77,6 +91,7 @@ internal class ComponentLpSolver(
             val part = parts[k]
             val r = op(solvers[k]) ?: run {
                 metrics += solvers[k].lastMetrics
+                lastTermination = solvers[k].lastTermination
                 // A dual-unbounded block is a candidate infeasibility of the whole model: its float
                 // ray extends with zeros on the other blocks' rows.
                 solvers[k].infeasibleRay?.let { ray ->
@@ -87,6 +102,7 @@ internal class ComponentLpSolver(
                 return null
             }
             metrics += solvers[k].lastMetrics
+            if (!r.optimal && lastTermination == null) lastTermination = solvers[k].lastTermination
             results.add(r)
             objective += r.objective
             val sub = part.model
@@ -109,6 +125,7 @@ internal class ComponentLpSolver(
             }
         }
         blockResults = results
+        if (results.all { it.optimal }) lastTermination = LpFloatTermination.OPTIMAL_CANDIDATE
         return FloatLpResult(
             basis = Basis(basicVars, status),
             objective = objective,

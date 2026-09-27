@@ -67,6 +67,7 @@ internal class LpWorkingScope internal constructor(
     private val children = ArrayList<LpWorkingMetrics>()
 
     val state: LpExactState get() = model.state
+    val lastFloatTermination: LpFloatTermination? get() = owner.lastFloatTermination
     val metrics: LpWorkingMetrics get() = LpWorkingMetrics(
         attempts,
         solves,

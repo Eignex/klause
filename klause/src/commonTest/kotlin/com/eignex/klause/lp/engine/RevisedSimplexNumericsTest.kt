@@ -24,9 +24,10 @@ class RevisedSimplexNumericsTest {
         val x = b.addVar(0L, 1L, cost = 1L)
         b.addRow(mapOf(x to 1L), Relation.GE, 2L)
         val model = b.build(Sense.MINIMIZE)
-        val solver = RevisedSimplex(model)
+        val solver = RevisedSimplex(model, iterationLimit = 1)
 
         assertNull(solver.solve())
+        assertEquals(LpFloatTermination.INFEASIBLE_CANDIDATE, solver.lastTermination)
 
         assertNotNull(
             integerFarkasRay(
