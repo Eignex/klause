@@ -27,9 +27,9 @@ internal class LpProjectionMeter(
         if (cancellation()) throw LpProjectionStop()
     }
 
-    fun reserveVectors(model: ExactLpModel) {
+    fun reserveVectors(model: ExactLpModel, materialize: Boolean = true) {
         val vectors = model.m.toLong() + model.numVars + model.n
-        reserve(vectors * 4L + 1L, vectors * 64L + 512L, matrix = false)
+        reserve(vectors * 4L + 1L, if (materialize) vectors * 64L + 512L else 0L, matrix = false)
     }
 
     fun reserve(work: Long, bytes: Long, matrix: Boolean) {
@@ -159,14 +159,18 @@ internal class LpExactState internal constructor(
         null
     }
 
-    private fun projectWorkingModel(meter: LpProjectionMeter): LpModel? {
-        meter.poll()
-        if (!projectionAttempted) {
-            val completed = LpMatrixProjection.create(model, meter)
-            meter.poll()
-            projection = completed
-            projectionAttempted = true
+    fun canProjectWorkingModel(cancellation: Cancellation = Cancellation.Never): Boolean = try {
+        val meter = LpProjectionMeter(cancellation = cancellation)
+        ensureMatrixProjection(meter) && run {
+            meter.reserveVectors(model, materialize = false)
+            projectScalars(meter) != null
         }
+    } catch (_: LpProjectionStop) {
+        false
+    }
+
+    private fun projectWorkingModel(meter: LpProjectionMeter): LpModel? {
+        if (!ensureMatrixProjection(meter)) return null
         val matrix = projection ?: return null
         meter.reserveVectors(model)
         val rhs = DoubleArray(model.m)
@@ -174,27 +178,7 @@ internal class LpExactState internal constructor(
         val uppers = DoubleArray(model.numVars)
         val hasUpper = BooleanArray(model.numVars)
         val origins = DoubleArray(model.n)
-        for (i in rhs.indices) {
-            meter.poll()
-            rhs[i] = model.rhs(i).project() ?: return null
-        }
-        for (j in 0 until model.numVars) {
-            meter.poll()
-            costs[j] = model.objective.cost(j).project(nonzeroRequired = true) ?: return null
-            model.column(j).bounds.lower?.let { if (it.number.project() == null) return null }
-            model.column(j).bounds.upper?.let {
-                uppers[j] = it.number.project() ?: return null
-                hasUpper[j] = true
-            }
-            if (j < model.n) origins[j] = model.column(j).origin.project() ?: return null
-        }
-        val constant = model.objective.constant.project() ?: return null
-        if (model.objective.scale.project(nonzeroRequired = true) == null ||
-            model.objective.externalConstant.project() == null
-        ) {
-            return null
-        }
-        meter.poll()
+        val constant = projectScalars(meter, rhs, costs, uppers, hasUpper, origins) ?: return null
         return LpModel(
             n = model.n,
             m = model.m,
@@ -215,6 +199,55 @@ internal class LpExactState internal constructor(
             ),
             exactState = this,
         )
+    }
+
+    private fun ensureMatrixProjection(meter: LpProjectionMeter): Boolean {
+        meter.poll()
+        if (!projectionAttempted) {
+            val completed = LpMatrixProjection.create(model, meter)
+            meter.poll()
+            projection = completed
+            projectionAttempted = true
+        }
+        return projection != null
+    }
+
+    private fun projectScalars(
+        meter: LpProjectionMeter,
+        rhs: DoubleArray? = null,
+        costs: DoubleArray? = null,
+        uppers: DoubleArray? = null,
+        hasUpper: BooleanArray? = null,
+        origins: DoubleArray? = null,
+    ): Double? {
+        for (i in 0 until model.m) {
+            meter.poll()
+            val value = model.rhs(i).project() ?: return null
+            if (rhs != null) rhs[i] = value
+        }
+        for (j in 0 until model.numVars) {
+            meter.poll()
+            val cost = model.objective.cost(j).project(nonzeroRequired = true) ?: return null
+            if (costs != null) costs[j] = cost
+            model.column(j).bounds.lower?.let { if (it.number.project() == null) return null }
+            model.column(j).bounds.upper?.let {
+                val upper = it.number.project() ?: return null
+                if (uppers != null) uppers[j] = upper
+                if (hasUpper != null) hasUpper[j] = true
+            }
+            if (j < model.n) {
+                val origin = model.column(j).origin.project() ?: return null
+                if (origins != null) origins[j] = origin
+            }
+        }
+        val constant = model.objective.constant.project() ?: return null
+        if (model.objective.scale.project(nonzeroRequired = true) == null ||
+            model.objective.externalConstant.project() == null
+        ) {
+            return null
+        }
+        meter.poll()
+        return constant
     }
 }
 

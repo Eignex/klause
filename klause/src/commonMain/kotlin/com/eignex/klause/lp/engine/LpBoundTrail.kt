@@ -50,7 +50,10 @@ internal class LpBoundTrail(initial: LpExactState) {
         if (token()) return LpBoundBatchResult.Declined(0)
         state.conflict?.let { return LpBoundBatchResult.Conflict(0, it) }
         if (assertions.isEmpty()) return LpBoundBatchResult.Applied(0)
-        if (state.toWorkingModel() == null) return assertUnprojectedBounds(assertions, token)
+        if (!state.canProjectWorkingModel(token)) {
+            if (token()) return LpBoundBatchResult.Declined(0)
+            return assertUnprojectedBounds(assertions, token)
+        }
         val before = state.assertions
         val witnesses = before.mapTo(HashSet()) { it.witness }
         val lower = Array(state.model.numVars) { state.activeSide(it, false) }
@@ -294,7 +297,7 @@ internal class LpBoundTrail(initial: LpExactState) {
     ).also { if (matrixRevision == state.matrixRevision) it.inheritProjection(state) }
 
     private fun commit(next: LpExactState, token: Cancellation): Boolean {
-        if (token() || next.toWorkingModel() == null || token()) return false
+        if (token() || !next.canProjectWorkingModel(token) || token()) return false
         state = next
         return true
     }
