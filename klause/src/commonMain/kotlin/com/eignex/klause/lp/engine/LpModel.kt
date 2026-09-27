@@ -931,7 +931,14 @@ internal class ExactLpModel private constructor(
             "coordinate changes require recentered"
         }
         require(rhs.size == m)
-        return ExactLpModel(matrix, rhs.toList(), columns.toList(), rows.toList(), objective, false)
+        return ExactLpModel(
+            matrix,
+            if (rhs === rightHandSide) rightHandSide else rhs.toList(),
+            if (columns === this.columns) this.columns else columns.toList(),
+            if (rows === this.rows) this.rows else rows.toList(),
+            objective,
+            false,
+        )
     }
 
     fun recentered(origins: List<ExactLpNumber>): ExactLpModel {
