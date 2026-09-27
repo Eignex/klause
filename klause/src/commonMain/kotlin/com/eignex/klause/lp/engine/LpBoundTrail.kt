@@ -297,7 +297,7 @@ internal class LpBoundTrail(initial: LpExactState) {
     ).also { if (matrixRevision == state.matrixRevision) it.inheritProjection(state) }
 
     private fun commit(next: LpExactState, token: Cancellation): Boolean {
-        if (token() || !next.canProjectWorkingModel(token) || token()) return false
+        if (token() || !next.canProjectWorkingModel() || token()) return false
         state = next
         return true
     }
