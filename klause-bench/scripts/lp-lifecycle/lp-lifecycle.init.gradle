@@ -1,0 +1,13 @@
+gradle.projectsEvaluated {
+    def project = rootProject.project(':klause')
+    def sourceRoot = new File(rootProject.rootDir, 'klause-bench/scripts/lp-lifecycle/kotlin')
+    project.kotlin.sourceSets.getByName('jvmTest').kotlin.srcDir(sourceRoot)
+    def compilation = project.kotlin.targets.getByName('jvm').compilations.getByName('test')
+    project.tasks.register('lpLifecycleComparison', JavaExec) {
+        group = 'verification'
+        dependsOn(compilation.compileTaskProvider)
+        classpath(compilation.output.allOutputs, compilation.runtimeDependencyFiles)
+        mainClass.set('com.eignex.klause.lp.bounding.LpLifecycleComparisonKt')
+        workingDir(rootProject.rootDir)
+    }
+}
