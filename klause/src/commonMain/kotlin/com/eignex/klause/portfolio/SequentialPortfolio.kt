@@ -4,7 +4,6 @@ import com.eignex.klause.solver.ResumableSearch
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.incumbent.IncumbentExchange
-import com.eignex.klause.solver.incumbent.Publication
 import com.eignex.klause.solver.incumbent.bound
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SolveStats
@@ -186,7 +185,7 @@ class SequentialPortfolio(
      * elapsed time — the anytime/credit telemetry, identical in shape to the parallel executor's.
      */
     // Cleanup attempts every handle and preserves a primary failure.
-    @Suppress("TooGenericExceptionCaught", "ThrowingExceptionFromFinally")
+    @Suppress("TooGenericExceptionCaught", "ThrowingExceptionFromFinally", "ThrowsCount")
     override fun minimize(
         cancellation: Cancellation,
         onImprovement: ((AttributedImprovement) -> Unit)?,
@@ -218,15 +217,21 @@ class SequentialPortfolio(
         // paused instead of finishing — which, under a wall clock, is usually all of them.
         val perArm = arrayOfNulls<SolveStats>(workers.size)
         var primaryFailure: Throwable? = null
+        var callbackFailure: Throwable? = null
         // Consecutive non-improving segments per arm; drives re-seeding (see [reseedStaleThreshold]).
         val staleSegments = IntArray(workers.size)
 
         // Fold a strictly-improving incumbent into the shared bound + fire the telemetry callback,
         // attributing it to the arm of the active segment ([armLabel]).
         fun accept(r: MinimizeResult.WithSample) {
-            if (incumbent.offer(r.sample, r.objectiveValue) is Publication.Installed) {
+            if (!r.objective.isFinite() || r.objective >= readBound()) return
+            try {
                 onImprovement?.invoke(AttributedImprovement(armLabel, armId, start.elapsedNow(), r))
+            } catch (failure: Throwable) {
+                callbackFailure = failure
+                throw failure
             }
+            incumbent.offer(r.sample, r.objective)
         }
 
         try {
@@ -275,6 +280,7 @@ class SequentialPortfolio(
                         }
                     }
                 }
+                callbackFailure?.let { throw it }
                 if (terminal is MinimizeResult.WithSample) accept(terminal)
                 if (handle != null) {
                     perArm[arm] = handle.stats

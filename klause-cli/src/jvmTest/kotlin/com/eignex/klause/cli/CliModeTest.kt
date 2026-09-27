@@ -512,6 +512,36 @@ class CliModeTest {
     }
 
     @Test
+    fun `a sequential MPS source rejection emits no terminal claim`() {
+        val mps = File.createTempFile("clisourcereject", ".mps").apply {
+            writeText(
+                """
+                NAME ROUNDEDSOURCE
+                ROWS
+                 N COST
+                 E R
+                COLUMNS
+                 X COST 1 R 3.0000000000000001
+                RHS
+                 RHS R 1
+                ENDATA
+                """.trimIndent(),
+            )
+            deleteOnExit()
+        }
+        var code = -1
+        var out = ""
+
+        val err = captureErr {
+            out = capture { code = runCli(arrayOf("-e", "cp", "-p", "1", mps.absolutePath)) }
+        }
+
+        assertEquals(2, code)
+        assertTrue("source witness violates row 'R'" in err, err)
+        assertTrue(out.lineSequence().none { it.startsWith("s ") || it.startsWith("o ") || it.startsWith("v ") }, out)
+    }
+
+    @Test
     fun `an unknown approximate MPS objective does not claim a retained optimum`() {
         val output = MpsOutput(objectiveErrorBound = 0.75)
 
