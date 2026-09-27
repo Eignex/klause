@@ -223,4 +223,26 @@ class LpBoundTrailTest {
 
         assertSame(before, trail.state)
     }
+
+    @Test
+    fun `cancellation during scalar admission leaves the prior state`() {
+        val zero = ExactLpNumber.of(0L)
+        val source = ExactLpModel(
+            listOf(emptyList()),
+            List(4) { zero },
+            List(5) { ExactLpColumn(ExactLpBounds()) },
+            List(4) { ExactLpRow() },
+            ExactLpObjective(List(5) { zero }),
+        )
+        val trail = LpBoundTrail(source)
+        assertNotNull(trail.state.toWorkingModel())
+        val before = trail.state
+        var polls = 0
+
+        assertFalse(trail.push(Cancellation { ++polls >= 7 }))
+
+        assertSame(before, trail.state)
+        assertEquals(7, polls)
+        assertTrue(trail.push())
+    }
 }

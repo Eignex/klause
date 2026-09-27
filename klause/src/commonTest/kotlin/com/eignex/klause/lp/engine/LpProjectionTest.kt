@@ -91,4 +91,72 @@ class LpProjectionTest {
         assertEquals(BigFraction.ZERO, source.rhs(0).value)
         assertTrue(source.sameMatrix(copied))
     }
+
+    @Test
+    fun `admission and materialization agree across scalar roles`() {
+        val zero = ExactLpNumber.of(0L)
+        val one = ExactLpNumber.of(1L)
+        val huge = ExactLpNumber.of(BigFraction.of(BigInteger.ONE shl 2048, BigInteger.ONE))
+        val tiny = ExactLpNumber.of(BigFraction.of(BigInteger.ONE, BigInteger.ONE shl 2048))
+        val roles = listOf(
+            "valid", "matrix", "rhs", "cost", "lower", "upper", "origin", "constant", "scale", "external",
+        )
+        for (role in roles) {
+            val source = ExactLpModel(
+                listOf(listOf(ExactLpEntry(0, if (role == "matrix") huge else one))),
+                listOf(if (role == "rhs") huge else ExactLpNumber.ofIeee(-0.0)),
+                listOf(
+                    ExactLpColumn(
+                        ExactLpBounds(
+                            lower = ExactLpSide(if (role == "lower") huge else zero, strict = true),
+                            upper = ExactLpSide(if (role == "upper") huge else one),
+                        ),
+                        origin = if (role == "origin") huge else ExactLpNumber.ofIeee(-0.0),
+                    ),
+                    ExactLpColumn(ExactLpBounds(ExactLpSide(zero))),
+                ),
+                listOf(ExactLpRow(global = false, strict = true)),
+                ExactLpObjective(
+                    listOf(if (role == "cost") tiny else one, zero),
+                    constant = if (role == "constant") huge else zero,
+                    scale = if (role == "scale") tiny else one,
+                    externalConstant = if (role == "external") huge else zero,
+                ),
+            )
+            assertEquals(
+                LpExactState(source).toWorkingModel() != null,
+                LpExactState(source).canProjectWorkingModel(),
+                role,
+            )
+        }
+    }
+
+    @Test
+    fun `admission leaves fresh working vectors for each consumer`() {
+        val zero = ExactLpNumber.of(0L)
+        val source = ExactLpModel(
+            listOf(listOf(ExactLpEntry(0, ExactLpNumber.ofIeee(Double.MIN_VALUE)))),
+            listOf(ExactLpNumber.ofIeee(-0.0)),
+            listOf(
+                ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(ExactLpNumber.of(3L)))),
+                ExactLpColumn(ExactLpBounds()),
+            ),
+            listOf(ExactLpRow()),
+            ExactLpObjective(listOf(ExactLpNumber.of(2L), zero)),
+        )
+        val state = LpExactState(source)
+        assertTrue(state.canProjectWorkingModel())
+        val first = assertNotNull(state.toWorkingModel())
+        assertNotNull(first.doubleView).rhs[0] = 99.0
+        assertNotNull(first.doubleView).cost[0] = 99.0
+        assertNotNull(first.doubleView).upper[0] = 99.0
+        first.tag[0] = 99
+
+        val second = assertNotNull(state.toWorkingModel())
+
+        assertEquals((-0.0).toRawBits(), second.rhsD(0).toRawBits())
+        assertEquals(2.0, second.costD(0))
+        assertEquals(3.0, second.upperD(0))
+        assertEquals(-1, second.tag[0])
+    }
 }
