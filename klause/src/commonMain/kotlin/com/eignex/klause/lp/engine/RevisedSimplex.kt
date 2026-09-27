@@ -1450,6 +1450,18 @@ internal class RevisedSimplex(
         }
         resetGamma() // fresh Devex reference frame for this solve
         val maxIter = maxIterations
+        // Exact bounds stay fixed for this solve; the leaving scan otherwise reads every basic column
+        // from the exact model on every iteration.
+        val finiteLower = if (m > 0 && model.exactState != null) {
+            BooleanArray(numVars) { model.hasFiniteLower(it) }
+        } else {
+            null
+        }
+        val finiteUpper = if (m > 0 && model.exactState != null) {
+            BooleanArray(numVars) { model.hasFiniteUpper(it) }
+        } else {
+            null
+        }
         val rhsAdj = basicRhs
         val beta = dualBeta
         var useCached = kept && model.exactState != null && restoreBasicValues(beta)
@@ -1518,8 +1530,12 @@ internal class RevisedSimplex(
                     val v = basicVar[i]
                     // An unenforced row's basic slack is free: its value is never a violation.
                     if (enforced != null && v >= n && !enforced[v - n]) continue
-                    val below = if (model.hasFiniteLower(v)) numerical.lowerD(v) - beta[i] else Double.NEGATIVE_INFINITY
-                    val above = if (model.hasFiniteUpper(v)) {
+                    val below = if (finiteLower?.get(v) ?: model.hasFiniteLower(v)) {
+                        numerical.lowerD(v) - beta[i]
+                    } else {
+                        Double.NEGATIVE_INFINITY
+                    }
+                    val above = if (finiteUpper?.get(v) ?: model.hasFiniteUpper(v)) {
                         beta[i] - numerical.upperD(v)
                     } else {
                         Double.NEGATIVE_INFINITY
