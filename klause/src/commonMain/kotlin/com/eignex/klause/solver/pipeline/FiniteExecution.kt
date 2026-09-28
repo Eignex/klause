@@ -79,6 +79,12 @@ class FiniteSolveRequest(
     val onPortfolioEvent: ((worker: String, event: SearchEvent) -> Unit)?,
     /** Whether to stop after preparation. */
     val prepareOnly: Boolean = false,
+    /**
+     * Tolerance semantics for continuous leaves: a check of a source-space sample (the model as the caller built
+     * it, before presolve). When set, a float LP optimum may decide a leaf, and a float incumbent may stand, if the
+     * check accepts it; `null` keeps exact semantics.
+     */
+    val toleranceCheck: ((Sample) -> Boolean)? = null,
 )
 
 /** The prepared model and terminal engine result of one finite solve. */
@@ -203,6 +209,8 @@ internal class FiniteExecutionRequest(
     val onPortfolioEvent: ((worker: String, event: SearchEvent) -> Unit)?,
     /** LP dependencies for the fixed complete route. */
     val lpSolveContext: LpSolveContext,
+    /** Tolerance semantics for continuous leaves; see [BacktrackParams.toleranceCheck]. */
+    val toleranceCheck: ((Sample) -> Boolean)? = null,
 )
 
 /** Streaming hooks owned by a rendering frontend. */
@@ -349,6 +357,7 @@ internal fun FinitePipeline.solve(
             onEvent = request.onEvent,
             onPortfolioEvent = request.onPortfolioEvent,
             lpSolveContext = lpSolveContext,
+            toleranceCheck = request.toleranceCheck?.let { check -> { check(preparation.reconstruct(it)) } },
         ),
         FiniteExecutionCallbacks(
             onSample = { sample -> callbacks.onSample(preparation.reconstruct(sample)) },
@@ -427,11 +436,12 @@ private fun executeFixed(request: FiniteExecutionRequest, callbacks: FiniteExecu
     val solver = BacktrackSolver(request.problem, request.lpSolveContext)
     if (plan.dryRun) return FiniteExecutionResult.DryRun("solver dry-run:", solver.describe(plan.params).lines())
 
+    val params = plan.params.copy(toleranceCheck = request.toleranceCheck)
     val start = TimeSource.Monotonic.markNow()
     return if (request.optimize) {
-        executeFixedOptimize(solver, plan.params, requireNotNull(request.objective), callbacks, start)
+        executeFixedOptimize(solver, params, requireNotNull(request.objective), callbacks, start)
     } else {
-        executeFixedSatisfy(solver, plan.params, request, callbacks, start)
+        executeFixedSatisfy(solver, params, request, callbacks, start)
     }
 }
 
@@ -581,6 +591,7 @@ private fun executePortfolio(
                 request.problem.numBoolVars,
                 request.problem.numIntVars,
             ),
+            toleranceCheck = request.toleranceCheck,
         ),
     )
     when (plan) {

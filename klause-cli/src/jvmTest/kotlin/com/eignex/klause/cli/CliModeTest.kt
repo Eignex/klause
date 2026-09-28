@@ -512,7 +512,7 @@ class CliModeTest {
     }
 
     @Test
-    fun `a sequential MPS source rejection emits no terminal claim`() {
+    fun `a rounded MPS source row is solved within tolerance`() {
         val mps = File.createTempFile("clisourcereject", ".mps").apply {
             writeText(
                 """
@@ -530,15 +530,12 @@ class CliModeTest {
             deleteOnExit()
         }
         var code = -1
-        var out = ""
 
-        val err = captureErr {
-            out = capture { code = runCli(arrayOf("-e", "cp", "-p", "1", mps.absolutePath)) }
-        }
+        val out = capture { code = runCli(arrayOf("-e", "cp", "-p", "1", mps.absolutePath)) }
 
-        assertEquals(2, code)
-        assertTrue("source witness violates row 'R'" in err, err)
-        assertTrue(out.lineSequence().none { it.startsWith("s ") || it.startsWith("o ") || it.startsWith("v ") }, out)
+        assertEquals(0, code, out)
+        assertTrue("s OPTIMUM FOUND" in out, out)
+        assertTrue("v X=0.3333333333333333" in out, out)
     }
 
     @Test

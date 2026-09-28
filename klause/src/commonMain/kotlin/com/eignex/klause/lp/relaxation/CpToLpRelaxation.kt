@@ -304,6 +304,7 @@ internal fun leafRealFeasibility(
     sink: LpStatsSink? = null,
     context: LpSolveContext = LpSolveContext.Production,
     pricing: LpPricingOptions = LpPricingOptions(),
+    toleranceCheck: ((Sample) -> Boolean)? = null,
 ): LeafRealResult {
     val relaxation = CpToLpRelaxation(problem, objective).build(SampleDomains(sample))
     // Bound the residual-LP solve by the search deadline: on a continuous-heavy model a single leaf LP is a
@@ -316,8 +317,15 @@ internal fun leafRealFeasibility(
         observer = sink?.certificationObserver(LpRoute.STANDALONE),
         context = context,
         pricing = pricing,
+        floatAccept = toleranceCheck?.let { check ->
+            { result -> check(sample.copy(reals = relaxation.floatReals(result.primal, problem.numRealVars))) }
+        },
+        floatOffset = relaxation.objectiveConstant.toDouble(),
     )
     certified.float?.let { sink?.observeComponentSplit(it.blocks) }
+    certified.floatOptimum?.let { float ->
+        return LeafRealResult(LpVerdict.ATTAINED_OPTIMUM, relaxation.floatReals(float.primal, problem.numRealVars))
+    }
     if (certified.verdict == LpVerdict.INFEASIBLE) return LeafRealResult(LpVerdict.INFEASIBLE, EmptyDoubleArray)
     val primal = certified.exactPrimal ?: return LeafRealResult(LpVerdict.INDETERMINATE, EmptyDoubleArray)
     // Read each continuous column's solved value back onto its real variable (see [LpRelaxation.colRealId]);
@@ -332,6 +340,16 @@ internal fun leafRealFeasibility(
         }
     }
     return LeafRealResult(certified.verdict, DoubleArray(exactReals.size) { exactReals[it].toDouble() }, exactReals)
+}
+
+/** Continuous variable values of an LP [primal], summing each split variable's `x⁺ − x⁻` columns. */
+internal fun LpRelaxation.floatReals(primal: DoubleArray, numRealVars: Int): DoubleArray {
+    val reals = DoubleArray(numRealVars)
+    for (col in colRealId.indices) {
+        val r = colRealId[col]
+        if (r >= 0 && col < primal.size) reals[r] += colRealSign[col] * primal[col]
+    }
+    return reals
 }
 
 /** The residual-LP verdict at a leaf plus, on [LpVerdict.FEASIBLE], the continuous variables' solved

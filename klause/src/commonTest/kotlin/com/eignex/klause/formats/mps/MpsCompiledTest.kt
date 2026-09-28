@@ -610,4 +610,31 @@ class MpsCompiledTest {
             assertEquals(listOf(trigger, trigger), premise.thresholds.toList())
         }
     }
+
+    @Test
+    fun `the tolerance check admits a row violation below the MPS tolerance only`() {
+        val compiled = Mps.parse(
+            "ROWS\n N COST\n G R\nCOLUMNS\n X COST 1 R 1\nRHS\n RHS R 1\nBOUNDS\n UP BND X 10\nENDATA",
+        ).toProblem()
+
+        for ((value, admitted) in listOf(1.0 - 1e-9 to true, 1.0 - 1e-3 to false, 1.0 to true)) {
+            assertEquals(admitted, compiled.withinTolerance(LongArray(0), doubleArrayOf(value)), "$value")
+        }
+    }
+
+    @Test
+    fun `the source objective of a float point is exact in its doubles`() {
+        val compiled = Mps.parse(
+            "ROWS\n N COST\n G R\nCOLUMNS\n Y COST 1e5 R 1\n X COST 99999.9999999701976776123046875 R 1\n" +
+                "RHS\n RHS R 1\nBOUNDS\n FR BND Y\nENDATA",
+        ).toProblem()
+        val y = -999_999_999_999.0
+        val x = 1e12
+
+        val objective = compiled.sourceObjective(LongArray(0), doubleArrayOf(y, x))
+
+        val expected = BigFraction.ofLong(100_000L) * BigFraction.ofLong(-999_999_999_999L) +
+            BigFraction.ofDouble(99999.9999999701976776123046875)!! * BigFraction.ofLong(1_000_000_000_000L)
+        assertEquals(expected, objective)
+    }
 }

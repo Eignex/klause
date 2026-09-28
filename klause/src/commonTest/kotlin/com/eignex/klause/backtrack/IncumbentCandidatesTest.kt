@@ -170,4 +170,16 @@ class IncumbentCandidatesTest {
         assertTrue(score.display > 0.0)
         assertTrue(checkNotNull(BigFraction.ofDouble(score.pruningBound)) >= exact)
     }
+
+    @Test
+    fun `a float incumbent stands only when the tolerance check accepts it`() {
+        for ((real, installed) in listOf(0.5 to true, 0.9 to false)) {
+            val exchange = minimizingSampleExchange(problem(numRealVars = 1)) { it.reals.single() <= 0.75 }
+            val float = sample(b0 = true, x0 = 1, x1 = 2, reals = doubleArrayOf(real))
+
+            val publication = exchange.offer(float, SourceObjectiveScore(objective.evaluate(float)))
+
+            assertEquals(installed, publication is Publication.Installed, "$real")
+        }
+    }
 }

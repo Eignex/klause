@@ -58,8 +58,14 @@ private fun exactDoubleCeiling(exact: BigFraction, reported: Double): Double {
     }
 }
 
-internal fun exactSourceObjective(objective: LinearObjective, sample: Sample): BigFraction? {
-    val exactReals = sample.exactReals
+internal fun exactSourceObjective(
+    objective: LinearObjective,
+    sample: Sample,
+    toleranceCheck: ((Sample) -> Boolean)? = null,
+): BigFraction? {
+    // Under tolerance semantics the float reals are the values, so the score is their exact sum.
+    val floatReals = if (toleranceCheck == null) null else sample.reals.map { BigFraction.ofDouble(it) }
+    val exactReals = sample.exactReals ?: floatReals?.filterNotNull()?.takeIf { it.size == sample.reals.size }
     if (objective.realCoefficients.any { it != 0.0 } && exactReals == null) return null
     var exact = BigFraction.ofLong(objective.constant)
     for (i in 0 until minOf(objective.boolWeights.size, sample.bools.size)) {
@@ -87,12 +93,19 @@ internal fun exactSourceObjective(objective: LinearObjective, sample: Sample): B
  * a proposal without them came from a producer that neither solved nor certified the reals, so it is
  * neither complete nor sound to surface however good its integer part looks.
  */
-internal fun sampleAdmission(problem: Problem): CandidateVerifier<Sample, Double> = CandidateVerifier { candidate ->
+internal fun sampleAdmission(
+    problem: Problem,
+    toleranceCheck: ((Sample) -> Boolean)? = null,
+): CandidateVerifier<Sample, Double> = CandidateVerifier { candidate ->
     val certified = candidate.assignment.exactReals?.size ?: 0
+
+    // Tolerance semantics admit float reals the front end's source check accepts; certified reals need no check.
+    fun tolerated() = toleranceCheck != null && candidate.assignment.reals.size == problem.numRealVars &&
+        toleranceCheck(candidate.assignment)
     when {
         !candidate.objective.isFinite() -> Verification.Rejected("non-finite objective ${candidate.objective}")
 
-        problem.numRealVars > 0 && certified < problem.numRealVars ->
+        problem.numRealVars > 0 && certified < problem.numRealVars && !tolerated() ->
             Verification.Rejected("$certified of ${problem.numRealVars} real values certified")
 
         else -> Verification.Accepted(candidate)
@@ -101,8 +114,11 @@ internal fun sampleAdmission(problem: Problem): CandidateVerifier<Sample, Double
 
 /** The versioned incumbent a minimisation run publishes through: [sampleAdmission] decides what may
  *  stand, and only a strict decrease installs. */
-internal fun minimizingSampleExchange(problem: Problem): IncumbentExchange<Sample, SourceObjectiveScore> {
-    val admission = sampleAdmission(problem)
+internal fun minimizingSampleExchange(
+    problem: Problem,
+    toleranceCheck: ((Sample) -> Boolean)? = null,
+): IncumbentExchange<Sample, SourceObjectiveScore> {
+    val admission = sampleAdmission(problem, toleranceCheck)
     return IncumbentExchange(
         improves = { candidate, standing ->
             if (candidate.exact != null && standing.exact != null) {

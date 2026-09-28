@@ -35,9 +35,9 @@ internal object MpsMode : CliMode {
         private var objectiveScale = 1L
         private var objectiveErrorBound: Double? = null
         private var hasInnerConstraintApproximation = false
+        private var toleranceDifference: String? = null
         private var sourceExact = true
-        private var sourceDifference: String? = null
-        private var latestSourceWitness: MpsSourceWitness? = null
+        private var latestSourceObjective: BigFraction? = null
 
         override fun flags(): List<FlagSpec> = emptyList()
 
@@ -46,18 +46,24 @@ internal object MpsMode : CliMode {
             objectiveScale = compiled.objectiveScale
             objectiveErrorBound = compiled.objectiveErrorBound
             hasInnerConstraintApproximation = compiled.hasInnerConstraintApproximation
+            toleranceDifference = compiled.toleranceDifference
             sourceExact = compiled.sourceExact
-            sourceDifference = compiled.sourceDifference
-            latestSourceWitness = null
+            latestSourceObjective = null
             cliLogger(common.verbose).v {
                 "parsed ${fileName(path)}: int=${compiled.model.numIntVars} " +
                     "factors=${compiled.model.factors.size} float-cols=${compiled.floatColumns} " +
                     "objScale=${compiled.objectiveScale}"
             }
             val render: (Sample) -> String = { sample ->
-                val witness = compiled.sourceWitness(sample.ints, sample.exactReals)
-                latestSourceWitness = witness
-                renderMpsWitness(compiled, witness)
+                if (sample.exactReals == null && compiled.model.numRealVars > 0) {
+                    // A float leaf under tolerance semantics: its values are the doubles themselves.
+                    latestSourceObjective = compiled.sourceObjective(sample.ints, sample.reals)
+                    renderMpsFloat(compiled, sample)
+                } else {
+                    val witness = compiled.sourceWitness(sample.ints, sample.exactReals)
+                    latestSourceObjective = witness.objective
+                    renderMpsWitness(compiled, witness)
+                }
             }
             val objective = compiled.objective?.toLinearObjective()
             var routingLpStats = LpStats()
@@ -71,13 +77,16 @@ internal object MpsMode : CliMode {
             val routingElapsedMs = routingStart.elapsedNow().inWholeMilliseconds
             return when (route) {
                 // Finite solving minimizes; the open route negates a maximized objective itself.
-                is SourceProblemRoute.Finite -> linearSolvable(
-                    route.problem,
-                    if (compiled.maximize) objective?.negated() else objective,
-                    compiled.maximize,
-                    render,
-                    routingLpStats = routingLpStats,
-                    routingElapsedMs = routingElapsedMs,
+                is SourceProblemRoute.Finite -> mpsLinearSolvable(
+                    compiled,
+                    linearSolvable(
+                        route.problem,
+                        if (compiled.maximize) objective?.negated() else objective,
+                        compiled.maximize,
+                        render,
+                        routingLpStats = routingLpStats,
+                        routingElapsedMs = routingElapsedMs,
+                    ),
                 )
 
                 is SourceProblemRoute.OpenTheory -> {
@@ -110,15 +119,29 @@ internal object MpsMode : CliMode {
             objectiveScale,
             objectiveErrorBound,
             hasInnerConstraintApproximation,
+            toleranceDifference == null,
+            toleranceDifference,
+            { latestSourceObjective },
             sourceExact,
-            sourceDifference,
-            { latestSourceWitness },
         )
     }
 }
 
 private fun unsupportedOpenMpsModel(): Nothing =
     throw MpsLoweringException("open MPS models require a supported theory pipeline")
+
+// MPS results use tolerance semantics: a float leaf stands when the source rows hold within MPS_TOLERANCE.
+private fun mpsLinearSolvable(compiled: MpsCompiled, solvable: Solvable): Solvable =
+    solvable.withToleranceCheck { sample -> compiled.withinTolerance(sample.ints, sample.reals) }
+
+/** Render a float solution: integer columns exactly, continuous columns as the shortest decimal of their double. */
+private fun renderMpsFloat(compiled: MpsCompiled, sample: Sample): String = buildString {
+    append("v")
+    for (column in compiled.columns) {
+        val value = if (column.real) sample.reals[column.id].toString() else sample.ints[column.id].toString()
+        append(" ${column.name}=$value")
+    }
+}
 
 /** Render an MPS solution line: `v name=value` per column, a continuous column shown as its LP value. */
 internal fun renderMpsModel(compiled: MpsCompiled, s: Sample): String =
@@ -147,7 +170,9 @@ internal class MpsOutput(
     private val hasInnerConstraintApproximation: Boolean = false,
     private val sourceExact: Boolean = true,
     private val sourceDifference: String? = null,
-    private val sourceWitness: () -> MpsSourceWitness? = { null },
+    private val sourceObjective: () -> BigFraction? = { null },
+    // An infeasibility or unboundedness proof covers the lowered model only, so it needs the source exactly.
+    private val proofExact: Boolean = sourceExact,
 ) : BufferedBestOutput() {
     private var bestObjective: Long? = null
 
@@ -159,11 +184,11 @@ internal class MpsOutput(
     override val streamObjective: Boolean = true
 
     override fun formatObjective(objective: Long): String =
-        sourceWitness()?.let { exactMpsNumber(it.objective) } ?: scaledDecimal(objective, objectiveScale)
+        sourceObjective()?.let(::exactMpsNumber) ?: scaledDecimal(objective, objectiveScale)
 
     /** Print the checked source objective when available; otherwise undo the solver's scale. */
     override fun formatContinuousObjective(objective: Double): String =
-        sourceWitness()?.let { exactMpsNumber(it.objective) } ?: scaledDecimal(objective, objectiveScale)
+        sourceObjective()?.let(::exactMpsNumber) ?: scaledDecimal(objective, objectiveScale)
 
     override fun statusLine(verdict: Verdict): String = when (verdict) {
         Verdict.SATISFIABLE, Verdict.BEST_FOUND, Verdict.OPTIMAL ->
@@ -178,12 +203,12 @@ internal class MpsOutput(
             }
 
         Verdict.UNBOUNDED -> when {
-            sourceExact -> "s UNBOUNDED"
+            proofExact -> "s UNBOUNDED"
             best != null -> "s SATISFIABLE"
             else -> "s UNKNOWN"
         }
 
-        Verdict.UNSATISFIABLE -> if (hasInnerConstraintApproximation || !sourceExact) {
+        Verdict.UNSATISFIABLE -> if (hasInnerConstraintApproximation || !proofExact) {
             "s UNKNOWN"
         } else {
             "s UNSATISFIABLE"

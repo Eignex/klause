@@ -1,6 +1,5 @@
 package com.eignex.klause.cli
 
-import com.eignex.klause.formats.mps.MpsSourceWitness
 import com.eignex.klause.simplex.exact.BigFraction
 import java.io.ByteArrayOutputStream
 import java.io.PrintStream
@@ -23,7 +22,7 @@ class MpsModeTest {
     @Test
     fun `a source objective with no finite decimal prints as a fraction`() {
         val third = BigFraction.ofLong(3L).reciprocal()
-        val output = MpsOutput(sourceWitness = { MpsSourceWitness(listOf(third), third) })
+        val output = MpsOutput(sourceObjective = { third })
 
         val text = capture { output.onSolution("v X=1/3", objective = 0L, continuousObjective = 1.0 / 3.0) }
 
@@ -33,7 +32,7 @@ class MpsModeTest {
     @Test
     fun `a source objective with a finite decimal stays decimal`() {
         val half = BigFraction.ofLong(2L).reciprocal()
-        val output = MpsOutput(sourceWitness = { MpsSourceWitness(listOf(half), half) })
+        val output = MpsOutput(sourceObjective = { half })
 
         val text = capture { output.onSolution("v X=0.5", objective = 0L, continuousObjective = 0.5) }
 
@@ -67,6 +66,17 @@ class MpsModeTest {
     fun `a source difference declines negative terminal claims`() {
         listOf(Verdict.UNSATISFIABLE, Verdict.UNBOUNDED).forEach { verdict ->
             val output = MpsOutput(sourceExact = false, sourceDifference = "row 'R' coefficient")
+
+            val text = capture { output.onComplete(verdict) }
+
+            assertTrue("s UNKNOWN" in text, text)
+        }
+    }
+
+    @Test
+    fun `a source within tolerance still declines negative terminal claims`() {
+        listOf(Verdict.UNSATISFIABLE, Verdict.UNBOUNDED).forEach { verdict ->
+            val output = MpsOutput(sourceExact = true, proofExact = false)
 
             val text = capture { output.onComplete(verdict) }
 

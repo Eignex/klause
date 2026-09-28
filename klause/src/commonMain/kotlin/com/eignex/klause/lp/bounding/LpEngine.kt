@@ -40,12 +40,14 @@ import com.eignex.klause.lp.relaxation.LpAssemblyCancelled
 import com.eignex.klause.lp.relaxation.LpAuxiliarySources
 import com.eignex.klause.lp.relaxation.LpExplanation
 import com.eignex.klause.lp.relaxation.LpRelaxation
+import com.eignex.klause.lp.relaxation.floatReals
 import com.eignex.klause.lp.relaxation.gatedEnforcement
 import com.eignex.klause.lp.relaxation.withCpBounds
 import com.eignex.klause.lp.relaxation.withModel
 import com.eignex.klause.propagation.ConflictAnalyzer.AnalysisResult.Learned
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.LpRoute
 import com.eignex.klause.solver.result.SolveStatsSink
@@ -601,7 +603,7 @@ internal class LpEngine(
      * active rows' premises) and stashes it for [lastBackjump]. On [LpVerdict.FEASIBLE] the returned
      * reals complete the assignment into a full solution.
      */
-    fun leafCertify(session: PropagationSession): LeafRealResult {
+    fun leafCertify(session: PropagationSession, toleranceCheck: ((Sample) -> Boolean)? = null): LeafRealResult {
         requireOpen()
         lpBackjump = null
         if (residualOversized) return LeafRealResult(LpVerdict.INDETERMINATE, EmptyDoubleArray)
@@ -616,8 +618,15 @@ internal class LpEngine(
             context = solveContext,
             counterResults = lpCounterResults,
             pricing = pricingOptions,
+            floatAccept = toleranceCheck?.let { check ->
+                { result -> check(leafSample(session, relaxation.floatReals(result.primal, problem.numRealVars))) }
+            },
+            floatOffset = relaxation.objectiveConstant.toDouble(),
         )
         certified.float?.let { sink.lp.observeComponentSplit(it.blocks) }
+        certified.floatOptimum?.let { float ->
+            return LeafRealResult(LpVerdict.ATTAINED_OPTIMUM, relaxation.floatReals(float.primal, problem.numRealVars))
+        }
         return when (certified.verdict) {
             LpVerdict.FEASIBLE, LpVerdict.ATTAINED_OPTIMUM, LpVerdict.UNBOUNDED -> {
                 val primal = certified.exactPrimal
@@ -655,6 +664,12 @@ internal class LpEngine(
             )
         }
     }
+
+    private fun leafSample(session: PropagationSession, reals: DoubleArray): Sample = Sample(
+        BooleanArray(problem.numBoolVars) { session.boolValue(it) ?: false },
+        LongArray(problem.numIntVars) { session.intDomain(it).min },
+        reals,
+    )
 
     /** The active rows' premises as one clause — the whole activating-literal set is real-infeasible.
      *  Weaker than a ray-filtered clause but still a valid theory lemma; null when some non-global row

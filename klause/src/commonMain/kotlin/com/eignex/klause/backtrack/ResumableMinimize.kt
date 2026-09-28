@@ -179,7 +179,7 @@ internal class ResumableMinimize(
     // best directly, so one admission rule and one strict-improvement test decide what stands — and the
     // version the exchange stamps tells the offering producer whether *it* installed the improvement.
     // Replaced wholesale by [rebind], whose fragment incumbent starts empty again.
-    private var incumbents = minimizingSampleExchange(problem)
+    private var incumbents = minimizingSampleExchange(problem, params.toleranceCheck)
     private val bestObj: Double get() = incumbents.current()?.objective?.pruningBound ?: Double.POSITIVE_INFINITY
     private val singleObj = objective.singleIntObjective()
     private val discreteObjective = objective.realCoefficients.all { it == 0.0 }
@@ -409,7 +409,7 @@ internal class ResumableMinimize(
         run.reset()
         inprocessing?.reset()
         firstRun = true
-        incumbents = minimizingSampleExchange(problem)
+        incumbents = minimizingSampleExchange(problem, params.toleranceCheck)
         objVarBest = null
         lastObjBoundAsserted = null
         lastBoolCutoffRhs = null
@@ -584,7 +584,11 @@ internal class ResumableMinimize(
      *  to surface when this call installed it, else null. Admission — a finite score, and the certified
      *  continuous values only a leaf's residual LP can attach — is [sampleAdmission]'s to decide. */
     private fun recordIfImproving(sample: Sample, o: Double): MinimizeResult.WithSample? {
-        val exact = if (rebindable) exactSourceObjective(objective, sample) ?: return null else null
+        val exact = if (rebindable) {
+            exactSourceObjective(objective, sample, params.toleranceCheck) ?: return null
+        } else {
+            null
+        }
         if (exact != null && !beatsExternalCutoff(exact, externalCutoff())) return null
         val score = SourceObjectiveScore(o, exact)
         if (incumbents.offer(sample, score) !is Publication.Installed) return null
@@ -662,6 +666,7 @@ internal class ResumableMinimize(
                 sink = sink.lp,
                 context = solver.lpSolveContext,
                 pricing = LpPricingOptions(params.zeroObjectivePricing, params.randomSeed ?: 0L),
+                toleranceCheck = params.toleranceCheck,
             )
             if (real.verdict !in listOf(
                     LpVerdict.FEASIBLE,
@@ -928,6 +933,7 @@ internal class ResumableMinimize(
                     sink = sink.lp,
                     context = solver.lpSolveContext,
                     pricing = LpPricingOptions(params.zeroObjectivePricing, params.randomSeed ?: 0L),
+                    toleranceCheck = params.toleranceCheck,
                 )
                 when (real.verdict) {
                     LpVerdict.INFEASIBLE -> null

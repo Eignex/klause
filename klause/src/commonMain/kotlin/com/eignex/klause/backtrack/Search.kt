@@ -531,6 +531,7 @@ private class ResidualRealComponent(
     solveContext: LpSolveContext,
 ) : SearchComponent,
     LpSearchResource {
+    private val toleranceCheck = params.toleranceCheck
     private val engine = LpEngine(
         problem,
         LinearObjective(intCoefficients = LongArray(problem.numIntVars)),
@@ -550,7 +551,7 @@ private class ResidualRealComponent(
     override fun check(context: SearchContext): ComponentCheck {
         completed = null
         if (context.cancelled()) return ComponentCheck.Indeterminate
-        val result = engine.leafCertify(cp.session)
+        val result = engine.leafCertify(cp.session, toleranceCheck)
         return when (result.verdict) {
             LpVerdict.FEASIBLE, LpVerdict.ATTAINED_OPTIMUM, LpVerdict.UNBOUNDED -> ComponentCheck.Feasible.also {
                 completed = Sample(

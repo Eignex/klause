@@ -32,9 +32,11 @@ import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.EmptyLongArray
 import com.ionspin.kotlin.bignum.integer.BigInteger
 import kotlin.math.abs
+import kotlin.math.absoluteValue
 import kotlin.math.ceil
 import kotlin.math.floor
 import kotlin.math.nextUp
+import kotlin.math.ulp
 
 /** Raised when an MPS source model cannot be represented by klause's lowering. */
 class MpsLoweringException(msg: String) : IllegalArgumentException("MPS: $msg")
@@ -80,6 +82,7 @@ class MpsCompiled(
     private var exactLpCache: ExactLpModel? = null
     private var sourceModel: MpsModel? = null
     private var sourceMismatch: String? = null
+    private var toleranceMismatch: String? = null
 
     /** Whether the lowered rows, bounds, and objective have the original source values. */
     val sourceExact: Boolean get() = sourceModel != null && sourceMismatch == null
@@ -87,6 +90,73 @@ class MpsCompiled(
     /** The first source value the lowered model does not retain, if any. */
     val sourceDifference: String?
         get() = if (sourceModel == null) "compiled model lacks source mapping" else sourceMismatch
+
+    /**
+     * The first lowered value that differs from its binary64 source value by more than a few ulp — the difference
+     * that matters under tolerance semantics, where decimal restatement and scaled-cost rounding do not count.
+     */
+    val toleranceDifference: String?
+        get() = if (sourceModel == null) "compiled model lacks source mapping" else toleranceMismatch
+
+    /**
+     * Whether a point satisfies every source row and column bound within tolerance: at most
+     * [MPS_TOLERANCE]·max(1, |bound|, Σ|aᵢxᵢ|) per row and [MPS_TOLERANCE]·max(1, |bound|) per bound, in binary64
+     * source values. [ints] and [reals] are indexed by the lowered model's integer and real variable ids; an
+     * indicated row is checked only when its indicator holds.
+     */
+    fun withinTolerance(ints: LongArray, reals: DoubleArray): Boolean {
+        if (sourceModel == null) return false
+        val source = toleranceSource
+        val values = DoubleArray(columns.size) { index ->
+            val column = columns[index]
+            val value = if (column.real) reals.getOrNull(column.id) else ints.getOrNull(column.id)?.toDouble()
+            value ?: return false
+        }
+        for (index in values.indices) {
+            val value = values[index]
+            if (!value.isFinite()) return false
+            val lower = source.lower[index]
+            val upper = source.upper[index]
+            if (value < lower - MPS_TOLERANCE * maxOf(1.0, abs(lower))) return false
+            if (value > upper + MPS_TOLERANCE * maxOf(1.0, abs(upper))) return false
+        }
+        for (row in source.rows) {
+            if (row.indicatorColumn >= 0 && values[row.indicatorColumn] != row.indicatorValue) continue
+            var activity = 0.0
+            var magnitude = 0.0
+            for (entry in row.columns.indices) {
+                val term = row.coefficients[entry] * values[row.columns[entry]]
+                activity += term
+                magnitude += abs(term)
+            }
+            if (activity < row.lower - MPS_TOLERANCE * maxOf(1.0, abs(row.lower), magnitude)) return false
+            if (activity > row.upper + MPS_TOLERANCE * maxOf(1.0, abs(row.upper), magnitude)) return false
+        }
+        return true
+    }
+
+    // Binary64 source values, read once: tolerance checks run from every portfolio arm. Read only once the source is
+    // attached, so the snapshot never caches its absence.
+    private val toleranceSource: ToleranceSource by lazy {
+        val source = checkNotNull(sourceModel) { "MPS source model is unavailable" }
+        val numbers = source.sourceNumbers()
+        val bounds = numbers.variableBounds
+        ToleranceSource(
+            lower = DoubleArray(columns.size) { bounds[it].first.finiteMps()?.double ?: Double.NEGATIVE_INFINITY },
+            upper = DoubleArray(columns.size) { bounds[it].second.finiteMps()?.double ?: Double.POSITIVE_INFINITY },
+            rows = source.constraints.mapIndexed { rowIndex, row ->
+                val (lower, upper) = numbers.constraintBounds[rowIndex]
+                ToleranceRow(
+                    row.indices.copyOf(),
+                    DoubleArray(row.indices.size) { numbers.constraintCoefficients[rowIndex][it].double },
+                    lower.finiteMps()?.double ?: Double.NEGATIVE_INFINITY,
+                    upper.finiteMps()?.double ?: Double.POSITIVE_INFINITY,
+                    row.indicator?.column ?: -1,
+                    if (row.indicator?.whenOne == true) 1.0 else 0.0,
+                )
+            },
+        )
+    }
 
     internal val exactLpModel: ExactLpModel?
         get() {
@@ -99,10 +169,11 @@ class MpsCompiled(
         exactLpSource = source
     }
 
-    internal fun withSourceModel(source: MpsModel, mismatch: String?): MpsCompiled = apply {
+    internal fun withSourceModel(source: MpsModel, mismatch: String?, toleranceMismatch: String?): MpsCompiled = apply {
         check(sourceModel == null) { "MPS source model is already attached" }
         sourceModel = source
         sourceMismatch = mismatch
+        this.toleranceMismatch = toleranceMismatch
     }
 
     /** Check a solved point against the original decimal MPS rows, bounds, and objective. */
@@ -141,6 +212,25 @@ class MpsCompiled(
         return MpsSourceWitness(values, objective)
     }
 
+    /**
+     * The exact source objective at a binary64 point, in source units and sense: the decimal coefficients times the
+     * doubles themselves, so a printed float witness reports its own objective free of summation error. Null when a
+     * value is missing or not finite.
+     */
+    fun sourceObjective(ints: LongArray, reals: DoubleArray): BigFraction? {
+        val source = checkNotNull(sourceModel) { "MPS source model is unavailable" }
+        val numbers = source.sourceNumbers()
+        return source.objective.indices.indices.fold(numbers.objectiveConstant.fraction) { sum, entry ->
+            val column = columns[source.objective.indices[entry]]
+            val value = if (column.real) {
+                reals.getOrNull(column.id)?.let(BigFraction::ofDouble)
+            } else {
+                ints.getOrNull(column.id)?.let(BigFraction::ofLong)
+            }
+            sum + numbers.objectiveCoefficients[entry].fraction * (value ?: return null)
+        }
+    }
+
     fun copy(
         model: Problem = this.model,
         objective: LinearObjectiveSpec? = this.objective,
@@ -171,6 +261,7 @@ class MpsCompiled(
             result.exactLpCache = exactLpCache
             result.sourceModel = sourceModel
             result.sourceMismatch = sourceMismatch
+            result.toleranceMismatch = toleranceMismatch
         }
         return result
     }
@@ -216,6 +307,17 @@ private fun sourceColumnValue(column: MpsColumn, ints: LongArray, reals: List<Bi
             ?: throw MpsLoweringException("integer column '${column.name}' has no value")
     }
 
+private class ToleranceSource(val lower: DoubleArray, val upper: DoubleArray, val rows: List<ToleranceRow>)
+
+private class ToleranceRow(
+    val columns: IntArray,
+    val coefficients: DoubleArray,
+    val lower: Double,
+    val upper: Double,
+    val indicatorColumn: Int,
+    val indicatorValue: Double,
+)
+
 /** A point checked against the original MPS decimal authority. */
 data class MpsSourceWitness(
     /** Values in source column order. */
@@ -229,6 +331,9 @@ private fun Double?.sameDataValue(other: Double?): Boolean = when {
     other == null -> false
     else -> toBits() == other.toBits()
 }
+
+/** Primal feasibility tolerance of MPS results under tolerance semantics, the HiGHS default. */
+const val MPS_TOLERANCE: Double = 1e-7
 
 /** Bounds at or beyond this magnitude are the MPS "infinity" convention (`1e30`), not a literal bound. */
 private const val MPS_INFINITY = 1e20
@@ -349,7 +454,11 @@ fun MpsModel.toProblem(): MpsCompiled {
         hasInnerConstraintApproximation,
         numReal,
     ).withExactLpModel { exactInput.toExactLpModel() }
-        .withSourceModel(exactInput, exactInput.sourceMismatch(isFloat, objRowScale))
+        .withSourceModel(
+            exactInput,
+            exactInput.sourceMismatch(isFloat, objRowScale),
+            exactInput.toleranceMismatch(isFloat, objRowScale),
+        )
 }
 
 // Build the authoritative source LP beside the compatible hybrid Problem lowering.
@@ -704,6 +813,63 @@ private fun MpsModel.sourceMismatch(isFloat: BooleanArray, objectiveScale: RowSc
     }
     return null
 }
+
+private fun MpsModel.toleranceMismatch(isFloat: BooleanArray, objectiveScale: RowScale): String? {
+    val source = sourceNumbers()
+    for (index in variables.indices) {
+        val variable = variables[index]
+        val (lower, upper) = source.variableBounds[index]
+        val valid = if (isFloat[index]) {
+            nearlyEqual(openLower(variable.lower), lower.finiteMps()?.double ?: Double.NEGATIVE_INFINITY) &&
+                nearlyEqual(openUpper(variable.upper), upper.finiteMps()?.double ?: Double.POSITIVE_INFINITY)
+        } else {
+            sourceIntegerLowerMatches(lower, variable.lower) && sourceIntegerUpperMatches(upper, variable.upper)
+        }
+        if (!valid) return "column bound '${variable.name}'"
+    }
+    for (rowIndex in constraints.indices) {
+        val row = constraints[rowIndex]
+        val scale: RowScale? = if (row.indices.any { isFloat[it] }) row.realRowScale() else row.integerRowScale()
+        fun retained(value: Double): Double =
+            if (scale == null) value else scale.scale(value).toDouble() / scale.multiplier
+        val coefficients = source.constraintCoefficients[rowIndex]
+        if (row.indices.indices.any { !nearlyEqual(retained(row.coeffs[it]), coefficients[it].double) }) {
+            return "row '${row.name}' coefficient"
+        }
+        val (lower, upper) = source.constraintBounds[rowIndex]
+        fun sideMatches(side: MpsSourceNumber?, value: Double?): Boolean {
+            val exact = side.finiteMps() ?: return rowBound(value) == null
+            val bound = rowBound(value) ?: return false
+            return nearlyEqual(retained(bound), exact.double)
+        }
+        if (!sideMatches(lower, row.lower) || !sideMatches(upper, row.upper)) return "row '${row.name}' bound"
+    }
+    val onlyRealTerms = objective.indices.all { isFloat[it] }
+    val multiplier = objectiveScale.multiplier.toDouble()
+    for (entry in objective.indices.indices) {
+        val index = objective.indices[entry]
+        val value = objective.coeffs[entry]
+        val retained = if (isFloat[index]) {
+            objectiveScale.realObjectiveCoefficient(value, onlyRealTerms) / multiplier
+        } else {
+            objectiveScale.scale(value).toDouble() / multiplier
+        }
+        if (!nearlyEqual(retained, source.objectiveCoefficients[entry].double)) {
+            return "objective coefficient '${variables[index].name}'"
+        }
+    }
+    val constant = objectiveScale.scale(objective.constant).toDouble() / multiplier
+    return if (nearlyEqual(constant, source.objectiveConstant.double)) null else "objective constant"
+}
+
+// Equal within a few ulp of [source]: zero equals only zero and an infinity only itself.
+private fun nearlyEqual(value: Double, source: Double): Boolean = when {
+    value == source -> true
+    source == 0.0 || !source.isFinite() || !value.isFinite() -> false
+    else -> abs(value - source) <= NEARLY_EQUAL_ULPS * source.absoluteValue.ulp
+}
+
+private const val NEARLY_EQUAL_ULPS = 4.0
 
 private fun scaledValueMatches(source: MpsSourceNumber, value: Double, scale: RowScale.Exact): Boolean =
     source.fraction * BigFraction.ofLong(scale.multiplier) ==
