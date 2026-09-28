@@ -221,7 +221,7 @@ class RationalBasisFactorsTest {
     @Test
     fun `cancellation interrupts construction and solves without partial publication`() {
         val matrix = matrix(listOf(3, 2, 1), listOf(1, 4, 2), listOf(2, 1, 5))
-        for (after in listOf(0, 80)) {
+        for (after in listOf(0, 2)) {
             var polls = 0
             val result = RationalBasisFactors.factor(matrix, cancellation = Cancellation { polls++ >= after })
             assertEquals(RationalBasisDecline.CANCELLED, assertIs<RationalBasisBuild.Declined>(result).reason)
@@ -233,12 +233,29 @@ class RationalBasisFactorsTest {
             val result = factors.solve(
                 List(3) { BigFraction.ONE },
                 transpose,
-                cancellation = Cancellation { polls++ >= 80 },
+                cancellation = Cancellation { polls++ >= 2 },
             )
             assertEquals(RationalBasisDecline.CANCELLED, assertIs<RationalBasisSolve.Declined>(result).reason)
             assertTrue(result.stats.work > 0)
         }
         checkSolves(matrix, factors)
+    }
+
+    @Test
+    fun `cancellation inside a long elimination stops within two poll strides of work`() {
+        val n = 40
+        val rows = List(n) { i -> List(n) { j -> if (i == j) 3 * n else (i * 7 + j * 3) % 11 + 1 } }
+        var reads = 0
+
+        val result = RationalBasisFactors.factor(
+            matrix(*rows.toTypedArray()),
+            cancellation = Cancellation { reads++ >= 80 },
+        )
+
+        val declined = assertIs<RationalBasisBuild.Declined>(result)
+        assertEquals(RationalBasisDecline.CANCELLED, declined.reason)
+        assertEquals(1, declined.stats.builds)
+        assertTrue(declined.stats.work in 1L..8192L, "${declined.stats.work}")
     }
 
     @Test

@@ -4,6 +4,7 @@ import com.eignex.klause.simplex.basis.RationalBasisLimits
 import com.eignex.klause.simplex.basis.RationalBasisStats
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.PollStride
 import kotlin.time.TimeSource
 
 internal class ExactBasisStop(val reason: ExactBasisDecline) : RuntimeException()
@@ -29,6 +30,7 @@ internal class ExactBasisMeter(val limits: ExactBasisLimits, private val cancell
     var orderDecline: ExactBasisOrderDecline? = null
 
     val token = Cancellation { cancellation() || started.elapsedNow() >= limits.factor.time }
+    private val stride = PollStride()
 
     fun poll() {
         if (cancellation()) throw ExactBasisStop(ExactBasisDecline.CANCELLED)
@@ -36,7 +38,8 @@ internal class ExactBasisMeter(val limits: ExactBasisLimits, private val cancell
     }
 
     fun charge(units: Long = 1L, bytes: Long = 0L) {
-        poll()
+        // Charges space out their clock reads; direct polls stay immediate.
+        if (stride.due(units)) poll()
         if (units > limits.factor.work - work.sum()) throw ExactBasisStop(ExactBasisDecline.WORK)
         if (bytes > limits.factor.allocationBytes - allocation.sum()) throw ExactBasisStop(ExactBasisDecline.MEMORY)
         work[phase.ordinal] += units
