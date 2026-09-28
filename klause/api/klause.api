@@ -8554,6 +8554,7 @@ public final class com/eignex/klause/solver/objective/LinearObjective : com/eign
 	public final fun getIntCoefficients ()[J
 	public final fun getRealCoefficients ()[D
 	public fun hashCode ()I
+	public final fun negated ()Lcom/eignex/klause/solver/objective/LinearObjective;
 	public final fun singleIntObjective ()Lcom/eignex/klause/solver/objective/SingleIntObjective;
 	public fun toString ()Ljava/lang/String;
 }

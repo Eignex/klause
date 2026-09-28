@@ -82,6 +82,14 @@ data class LinearObjective(
     val realCoefficients: DoubleArray = EmptyDoubleArray,
 ) : Objective {
 
+    /** This objective with every coefficient and the constant negated: minimizing it maximizes this one. */
+    fun negated(): LinearObjective = LinearObjective(
+        boolWeights = LongArray(boolWeights.size) { -boolWeights[it] },
+        intCoefficients = LongArray(intCoefficients.size) { -intCoefficients[it] },
+        constant = -constant,
+        realCoefficients = DoubleArray(realCoefficients.size) { -realCoefficients[it] },
+    )
+
     /** Exact integer objective value of [sample]; lower is better. */
     fun evaluateLong(sample: Sample): Long {
         var total = constant

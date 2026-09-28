@@ -9933,6 +9933,7 @@ final class com.eignex.klause.solver.objective/LinearObjective : com.eignex.klau
     final fun evaluateLong(com.eignex.klause.solver/Assignment): kotlin/Long // com.eignex.klause.solver.objective/LinearObjective.evaluateLong|evaluateLong(com.eignex.klause.solver.Assignment){}[0]
     final fun evaluateLong(com.eignex.klause.solver/Sample): kotlin/Long // com.eignex.klause.solver.objective/LinearObjective.evaluateLong|evaluateLong(com.eignex.klause.solver.Sample){}[0]
     final fun hashCode(): kotlin/Int // com.eignex.klause.solver.objective/LinearObjective.hashCode|hashCode(){}[0]
+    final fun negated(): com.eignex.klause.solver.objective/LinearObjective // com.eignex.klause.solver.objective/LinearObjective.negated|negated(){}[0]
     final fun singleIntObjective(): com.eignex.klause.solver.objective/SingleIntObjective? // com.eignex.klause.solver.objective/LinearObjective.singleIntObjective|singleIntObjective(){}[0]
     final fun toString(): kotlin/String // com.eignex.klause.solver.objective/LinearObjective.toString|toString(){}[0]
 }

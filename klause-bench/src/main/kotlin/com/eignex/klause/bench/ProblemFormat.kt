@@ -108,13 +108,6 @@ internal object MpsFormat : ProblemFormat {
         val objective = if (compiled.maximize) rawObjective?.negated() else rawObjective
         return Ingested(problem, objective)
     }
-
-    /** Minimise-canonical view of a raw MPS maximise objective (the bench always minimises). */
-    private fun LinearObjective.negated(): LinearObjective = LinearObjective(
-        boolWeights = LongArray(boolWeights.size) { -boolWeights[it] },
-        intCoefficients = LongArray(intCoefficients.size) { -intCoefficients[it] },
-        constant = -constant,
-    )
 }
 
 private fun Problem.requireFiniteBenchModel(file: File): Problem {

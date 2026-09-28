@@ -171,11 +171,3 @@ object OpenTheoryPipeline {
         )
     }
 }
-
-/** The objective whose minimum is this one's maximum. */
-private fun LinearObjective.negated(): LinearObjective = LinearObjective(
-    boolWeights = LongArray(boolWeights.size) { -boolWeights[it] },
-    intCoefficients = LongArray(intCoefficients.size) { -intCoefficients[it] },
-    constant = -constant,
-    realCoefficients = DoubleArray(realCoefficients.size) { -realCoefficients[it] },
-)

@@ -304,8 +304,8 @@ class SequentialPortfolioTest {
 
         val result = assertIs<MinimizeResult.BestFound>(
             portfolio.minimize { improvement ->
-            seen += assertIs<MinimizeResult.WithSample>(improvement.result).sample.ints.single()
-        }
+                seen += assertIs<MinimizeResult.WithSample>(improvement.result).sample.ints.single()
+            },
         )
 
         assertEquals(10L, result.sample.ints.single())
