@@ -4,6 +4,7 @@ import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.Frac128
 import com.eignex.klause.simplex.exact.Frac128Ops
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.PollStride
 import com.ionspin.kotlin.bignum.integer.BigInteger
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
@@ -163,6 +164,7 @@ private class RationalMeter(val limits: RationalBasisLimits, private val cancell
     var proposedAttempts = 0
     var fallbacks = 0
     var restarts = 0
+    private val stride = PollStride()
 
     fun poll() {
         if (cancellation()) throw RationalStop(RationalBasisDecline.CANCELLED)
@@ -181,14 +183,19 @@ private class RationalMeter(val limits: RationalBasisLimits, private val cancell
         if (n > limits.dimension || n.toLong() * n > Int.MAX_VALUE) throw RationalStop(RationalBasisDecline.DIMENSION)
     }
 
+    // Per-charge checks space out their clock reads; the explicit polls above stay immediate.
+    private fun pollIfDue(units: Long = 1L) {
+        if (stride.due(units)) poll()
+    }
+
     fun step(units: Long = 1) {
-        poll()
+        pollIfDue(units)
         if (units > limits.work - work) throw RationalStop(RationalBasisDecline.WORK)
         work += units
     }
 
     fun allocate(bytes: Long) {
-        poll()
+        pollIfDue()
         if (bytes > limits.allocationBytes - allocation) throw RationalStop(RationalBasisDecline.MEMORY)
         allocation += bytes
     }
@@ -199,13 +206,13 @@ private class RationalMeter(val limits: RationalBasisLimits, private val cancell
     }
 
     fun fill(count: Int) {
-        poll()
+        pollIfDue()
         if (count > limits.fill) throw RationalStop(RationalBasisDecline.FILL)
         peakFill = maxOf(peakFill, count)
     }
 
     fun bits(bits: Int) {
-        poll()
+        pollIfDue()
         if (bits > limits.bits) throw RationalStop(RationalBasisDecline.BITS)
         maxBits = maxOf(maxBits, bits)
     }
