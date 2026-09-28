@@ -32,7 +32,21 @@ internal class Solvable(
     val routingLpStats: LpStats = LpStats(),
     /** Wall time spent proving bounds for pipeline selection. */
     val routingElapsedMs: Long = 0L,
+    /** Tolerance semantics for continuous leaves: a check of a source-space sample; `null` keeps exact semantics. */
+    val toleranceCheck: ((Sample) -> Boolean)? = null,
 ) {
+    /** This instance solved under tolerance semantics with [check]. */
+    fun withToleranceCheck(check: (Sample) -> Boolean): Solvable = Solvable(
+        finite,
+        render,
+        objectiveValue,
+        continuousObjectiveValue,
+        pipeline,
+        routingLpStats,
+        routingElapsedMs,
+        check,
+    )
+
     constructor(
         /** Finite CP problem. */
         problem: Problem?,

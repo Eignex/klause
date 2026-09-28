@@ -10,6 +10,7 @@ import com.eignex.klause.lp.engine.LpZeroObjectivePricing
 import com.eignex.klause.portfolio.EngineMix
 import com.eignex.klause.portfolio.Kind
 import com.eignex.klause.portfolio.PortfolioScenario
+import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.result.SearchEvent
 import com.eignex.klause.util.Cancellation
 
@@ -35,6 +36,8 @@ class PortfolioPlanRequest(
     val nodeBudget: NodeBudget?,
     /** Optional model search-annotation arm. */
     val annotationArm: BacktrackParams?,
+    /** Tolerance semantics for every backtrack arm's continuous leaves; see [BacktrackParams.toleranceCheck]. */
+    val toleranceCheck: ((Sample) -> Boolean)? = null,
 )
 
 /** A resolved finite portfolio route, before a problem is materialized into workers. */
@@ -157,6 +160,6 @@ fun FinitePipeline.planPortfolio(request: PortfolioPlanRequest): PortfolioPlan {
                 nodeBudget = request.nodeBudget,
                 zeroObjectivePricing = request.zeroObjectivePricing,
             ),
-        ),
+        ).copy(toleranceCheck = request.toleranceCheck),
     )
 }

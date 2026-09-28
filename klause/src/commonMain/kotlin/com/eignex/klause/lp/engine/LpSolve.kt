@@ -50,8 +50,11 @@ internal class CertifiedLpResult(
     val continuation: ExactContinuationMetrics? = null,
     val refinement: LpRefinementMetrics? = null,
     val exactPoint: ExactPointRecovery? = null,
+    // A float optimum accepted under tolerance semantics in place of exact evidence; its primal is not exact.
+    val floatOptimum: FloatLpResult? = null,
 ) {
     val verdict: LpVerdict = when {
+        floatOptimum != null -> LpVerdict.ATTAINED_OPTIMUM
         farkasRay != null || rationalConflict != null || boundConflict != null -> LpVerdict.INFEASIBLE
         unboundedness != null -> LpVerdict.UNBOUNDED
         witness != null && bound?.value == witness.objective -> LpVerdict.ATTAINED_OPTIMUM
@@ -115,6 +118,8 @@ internal fun solveAndCertify(
     counterResults: LpCounterResults? = null,
     pricing: LpPricingOptions = LpPricingOptions(),
     refinementLimits: LpRefinementLimits = LpRefinementLimits(),
+    floatAccept: ((FloatLpResult) -> Boolean)? = null,
+    floatOffset: Double = 0.0,
 ): CertifiedLpResult {
     val authoritative = if (model.exactState != null) {
         model
@@ -137,7 +142,10 @@ internal fun solveAndCertify(
     }
     val result = certifyAuthoritativeSolve(
         authoritative, warm, cancellation, componentSplit, observer, context, counters, pricing, refinementLimits,
+        floatAccept,
+        floatOffset,
     )
+    if (result.floatOptimum != null) return result
     if (authoritative !== model) {
         if ((result.witness?.let { checkedLpWitness(model, it.primal) } == null && result.witness != null) ||
             result.rationalConflict?.let { !checkedLpConflict(model, it) } == true || cancellation()
@@ -159,6 +167,8 @@ private fun certifyAuthoritativeSolve(
     counterResults: LpCounterResults?,
     pricing: LpPricingOptions,
     refinementLimits: LpRefinementLimits,
+    floatAccept: ((FloatLpResult) -> Boolean)?,
+    floatOffset: Double,
 ): CertifiedLpResult = newLpSolver(
     model,
     cancellation,
@@ -170,6 +180,12 @@ private fun certifyAuthoritativeSolve(
         solver.solve(warm)
     } finally {
         observer?.observeSolve(solver.lastMetrics, solver is ComponentLpSolverCapability)
+    }
+    // Tolerance semantics accept a float optimum before any exact work; a rejected one falls through to it.
+    if (floatAccept != null && result != null && result.optimal && !cancellation()) {
+        floatOptimum(model, result, floatAccept, floatOffset, cancellation)?.let { float ->
+            return@use CertifiedLpResult(float, null, null, null, null, false, { null }, floatOptimum = float)
+        }
     }
     val state = model.exactState
     if (state == null || solver is ComponentLpSolverCapability) {
@@ -1159,3 +1175,31 @@ internal fun exactLpStateKey(model: ExactLpModel): ByteArray? {
 }
 
 private const val MAX_COUNTER_KEY_VALUES = 4096L
+
+// A float optimum the dual check cannot prove gets one cleanup: primal pivots from its own basis at a pricing
+// tolerance well below the engine's, as a solver re-optimizes when unscaled infeasibilities exceed its tolerance.
+// A stop the engine made early moves on to the true optimum in a few pivots; a basis already optimal but priced
+// with noisy duals finds nothing to pivot on and is left to the exact ladder, so the pivots are capped.
+private fun floatOptimum(
+    model: LpModel,
+    result: FloatLpResult,
+    floatAccept: (FloatLpResult) -> Boolean,
+    offset: Double,
+    cancellation: Cancellation,
+): FloatLpResult? {
+    val candidate = if (floatDualFeasible(model, result, offset)) {
+        result
+    } else {
+        RevisedSimplex(
+            model,
+            cancellation,
+            iterationLimit = CLEANUP_PIVOTS,
+            primalPricingTolerance = CLEANUP_PRICING_TOLERANCE,
+        ).use { it.solvePrimal(result.basis) }
+            ?.takeIf { it.optimal && !cancellation() && floatDualFeasible(model, it, offset) }
+    }
+    return candidate?.takeIf(floatAccept)
+}
+
+private const val CLEANUP_PRICING_TOLERANCE: Double = 1e-12
+private const val CLEANUP_PIVOTS: Int = 100

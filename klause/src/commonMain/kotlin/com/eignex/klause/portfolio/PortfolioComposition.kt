@@ -8,6 +8,7 @@ import com.eignex.klause.localsearch.strategy.LocalSearchRecipe
 import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.lp.engine.LpZeroObjectivePricing
 import com.eignex.klause.propagation.BakedProblem
+import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.SearchEvent
@@ -75,6 +76,8 @@ data class PortfolioScenario(
     val lpCeiling: LpConfig = LpConfig.AGGRESSIVE,
     /** Entering-column policy used by every backtrack arm's zero-objective LP solves. */
     val zeroObjectivePricing: LpZeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT,
+    /** Tolerance semantics for every backtrack arm's continuous leaves; see [BacktrackParams.toleranceCheck]. */
+    val toleranceCheck: ((Sample) -> Boolean)? = null,
     /** Optional override of the local-search arm pool — per-arm factories (a fresh recipe per slot).
      *  `null` uses the curated `LocalSearchCatalog` pool unchanged; a non-null pool is the CLI's resolved
      *  recipes (a named base, or the curated pool with axis edits applied). */
@@ -195,6 +198,11 @@ internal object PortfolioComposition {
 
     /** The ordered arm list for [scenario] — exactly [PortfolioScenario.arms] arms. */
     fun compose(scenario: PortfolioScenario): List<WorkerConfig> {
+        val check = scenario.toleranceCheck ?: return composeArms(scenario)
+        return composeArms(scenario).map { if (it is BacktrackWorkerConfig) it.withToleranceCheck(check) else it }
+    }
+
+    private fun composeArms(scenario: PortfolioScenario): List<WorkerConfig> {
         val count = scenario.arms
         return when (scenario.engine) {
             EngineMix.LOCAL_SEARCH -> lsArms(scenario.kind, count, scenario.lsPool)

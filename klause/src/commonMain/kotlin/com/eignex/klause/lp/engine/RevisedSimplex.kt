@@ -110,6 +110,7 @@ internal class RevisedSimplex(
     private val pricing: LpPricingOptions = LpPricingOptions(),
     private val reuseRationalOrder: Boolean = true,
     private val scalingOptions: LpScalingOptions = LpScalingOptions(),
+    private val primalPricingTolerance: Double = TOL,
 ) : TableauCutSolver,
     PersistentLpSolver {
     internal var lastNumericalMetrics = SimplexNumericalMetrics()
@@ -2586,14 +2587,14 @@ internal class RevisedSimplex(
             }
             var q = -1
             var qAtLower = true
-            var best = tolerance
+            var best = primalPricingTolerance
             for (j in 0 until numVars) {
                 if (status[j] == VarStatus.BASIC || model.fixed(j)) continue
                 val dj = cost(j) - dotColumn(y, j)
                 val atLower = status[j] == VarStatus.AT_LOWER || (status[j] == VarStatus.FREE && dj < 0.0)
                 // From lower, increasing improves iff d_j < 0; from upper, decreasing improves iff d_j > 0.
                 val gain = if (atLower) -dj else dj
-                if (gain <= tolerance) continue
+                if (gain <= primalPricingTolerance) continue
                 if (bland) {
                     q = j // first (lowest-index) improving column
                     qAtLower = atLower

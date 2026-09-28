@@ -303,6 +303,12 @@ data class BacktrackParams(
     val lpPlan: LpPlan = LpPlan(),
     /** Entering-column policy for exactly zero-objective LP solves. */
     val zeroObjectivePricing: LpZeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT,
+    /**
+     * Tolerance semantics for continuous leaves: when set, a float LP optimum is accepted without exact
+     * certification if this check accepts the completed sample, and an incumbent without exact reals is admitted
+     * when it passes the same check. `null` keeps exact semantics.
+     */
+    val toleranceCheck: ((Sample) -> Boolean)? = null,
     /** Cooperative cancellation predicate; see [Cancellation]. */
     val cancellation: Cancellation = Cancellation.Never,
     /** Per-call fire floor before propagation polls [cancellation]; see [PROPAGATION_CANCEL_FLOOR].
