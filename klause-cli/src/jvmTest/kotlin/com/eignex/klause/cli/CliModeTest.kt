@@ -542,6 +542,58 @@ class CliModeTest {
     }
 
     @Test
+    fun `an MPS maximize objective reports its maximum`() {
+        val integer = """
+            NAME          MAXINT
+            OBJSENSE
+                MAX
+            ROWS
+             N  COST
+             L  R
+            COLUMNS
+                M1        'MARKER'                 'INTORG'
+                I         COST           1.0   R           1.0
+                J         COST           2.0   R           1.0
+                M2        'MARKER'                 'INTEND'
+            RHS
+                RHS       R              4
+            BOUNDS
+             UP BND       I              10
+             UP BND       J              3
+            ENDATA
+        """.trimIndent()
+        val continuous = """
+            NAME          MAXREAL
+            OBJSENSE
+                MAX
+            ROWS
+             N  COST
+             L  R
+            COLUMNS
+                X         COST           3.0   R           1.0
+                Y         COST           1.0   R           2.0
+            RHS
+                RHS       R              1.5
+            BOUNDS
+             LO BND       X              0.125
+             UP BND       X              0.375
+             UP BND       Y              0.75
+            ENDATA
+        """.trimIndent()
+        for ((text, expected) in listOf(integer to listOf("o 7", "v I=1 J=3"), continuous to listOf("o 1.6875"))) {
+            val mps = File.createTempFile("climaximize", ".mps").apply {
+                writeText(text)
+                deleteOnExit()
+            }
+
+            val out = capture { main(arrayOf(mps.absolutePath)) }
+
+            assertTrue("s OPTIMUM FOUND" in out, out)
+            for (line in expected) assertTrue(out.lineSequence().any { it == line }, out)
+        }
+    }
+
+    @Test
     fun `an unknown approximate MPS objective does not claim a retained optimum`() {
         val output = MpsOutput(objectiveErrorBound = 0.75)
 

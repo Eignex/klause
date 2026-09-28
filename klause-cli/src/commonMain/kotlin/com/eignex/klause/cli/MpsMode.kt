@@ -70,9 +70,10 @@ internal object MpsMode : CliMode {
             )
             val routingElapsedMs = routingStart.elapsedNow().inWholeMilliseconds
             return when (route) {
+                // Finite solving minimizes; the open route negates a maximized objective itself.
                 is SourceProblemRoute.Finite -> linearSolvable(
                     route.problem,
-                    objective,
+                    if (compiled.maximize) objective?.negated() else objective,
                     compiled.maximize,
                     render,
                     routingLpStats = routingLpStats,
