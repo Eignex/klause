@@ -3041,13 +3041,15 @@ private fun EngineRefactorTrigger.refactorReason(): LpRefactorReason = when (thi
 
     EngineRefactorTrigger.BACKEND_REQUESTED -> LpRefactorReason.BACKEND_REQUESTED
 
-    EngineRefactorTrigger.HARD_UPDATE_CAP -> LpRefactorReason.UPDATE_LIMIT
-
-    EngineRefactorTrigger.RESIDUAL,
+    // The cost triggers end an update chain that has grown too dear, as the hard cap does; only a bad residual is
+    // numerical recovery.
+    EngineRefactorTrigger.HARD_UPDATE_CAP,
     EngineRefactorTrigger.FILL_GROWTH,
     EngineRefactorTrigger.SOLVE_WORK_GROWTH,
     EngineRefactorTrigger.SYNTHETIC_WORK,
-    -> LpRefactorReason.NUMERICAL_RECOVERY
+    -> LpRefactorReason.UPDATE_LIMIT
+
+    EngineRefactorTrigger.RESIDUAL -> LpRefactorReason.NUMERICAL_RECOVERY
 }
 
 /** What folding a pivot into the basis did to it. */
