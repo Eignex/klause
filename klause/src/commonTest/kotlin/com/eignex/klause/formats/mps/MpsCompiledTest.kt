@@ -8,7 +8,6 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
-import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -189,53 +188,50 @@ class MpsCompiledTest {
     }
 
     @Test
-    fun `an underflowing bounded objective term carries its maximum error`() {
+    fun `an objective too wide for one scale keeps its source values`() {
         val compiled = MpsModel(
             "m",
             ObjectiveSense.MINIMIZE,
             MpsObjective("cost", intArrayOf(0, 1), doubleArrayOf(1e15, 0.25), 0.0),
             listOf(
                 MpsVar("x", integer = true, lower = 0.0, upper = 1.0),
-                MpsVar("y", integer = true, lower = -2.0, upper = 3.0),
+                MpsVar("y", integer = true, lower = 0.0, upper = null),
             ),
             emptyList(),
         ).toProblem()
 
-        assertEquals(0.75, compiled.objectiveErrorBound)
+        assertTrue(compiled.sourceExact, compiled.sourceDifference)
+        assertEquals(listOf("x", "y"), compiled.columns.map { it.name })
     }
 
     @Test
-    fun `an underflowing objective term on an unbounded column is rejected`() {
-        val error = assertFailsWith<MpsLoweringException> {
-            MpsModel(
-                "m",
-                ObjectiveSense.MINIMIZE,
-                MpsObjective("cost", intArrayOf(0, 1), doubleArrayOf(1e15, 0.25), 0.0),
-                listOf(
-                    MpsVar("x", integer = true, lower = 0.0, upper = 1.0),
-                    MpsVar("y", integer = true, lower = 0.0, upper = null),
-                ),
-                emptyList(),
-            ).toProblem()
-        }
-
-        assertTrue("unbounded column 'y'" in error.message.orEmpty())
-    }
-
-    @Test
-    fun `an underflowing integer constraint is tightened to its inner upper side`() {
+    fun `an integer row too wide for one scale keeps every term`() {
         val row = lower(
             twoFinite,
             MpsConstraint("c", intArrayOf(0, 1), doubleArrayOf(1e15, 0.25), null, 1e15),
         )
 
         val constants = assertNotNull(row.integerConstants)
-        assertEquals(listOf(1_000_000_000_000_000L, 0L), row.vars.indices.map { constants.coeff(it) })
-        assertEquals(999_999_999_999_997L, constants.bound)
+        assertEquals(listOf(4_000_000_000_000_000L, 1L), row.vars.indices.map { constants.coeff(it) })
+        assertEquals(4_000_000_000_000_000L, constants.bound)
     }
 
     @Test
-    fun `an underflowing indicated integer constraint is qualified`() {
+    fun `an integer row too wide for long coefficients lowers onto exact wide ones`() {
+        val compiled = Mps.parse(
+            "ROWS\n N COST\n L R\nCOLUMNS\n M1 'MARKER' 'INTORG'\n X R 1e18\n Y R 0.001\n M2 'MARKER' 'INTEND'\n" +
+                "RHS\n RHS R 1e18\nBOUNDS\n UP BND X 1\n UP BND Y 1\nENDATA",
+        ).toProblem()
+
+        val constants = assertNotNull((compiled.model.factors.single() as Linear).wideConstants)
+        val coefficients = (0 until constants.coefficients.size).map { constants.coefficients.at(it).toString() }
+        assertEquals(listOf("1000000000000000000000", "1"), coefficients)
+        assertEquals("1000000000000000000000", constants.bound.toString())
+        assertTrue(compiled.sourceExact, compiled.sourceDifference)
+    }
+
+    @Test
+    fun `an indicated integer row too wide for one scale keeps its source values`() {
         val compiled = MpsModel(
             "m",
             ObjectiveSense.MINIMIZE,
@@ -257,7 +253,7 @@ class MpsCompiledTest {
             ),
         ).toProblem()
 
-        assertTrue(compiled.hasInnerConstraintApproximation)
+        assertTrue(compiled.sourceExact, compiled.sourceDifference)
     }
 
     @Test
@@ -549,19 +545,6 @@ class MpsCompiledTest {
             "9007199254740993",
             compiledCopy.exactLpModel?.objective?.cost(0)?.value.toString(),
         )
-    }
-
-    @Test
-    fun `compiled value equality retains nullable Double semantics`() {
-        val source = Mps.parse("ROWS\n N COST\nCOLUMNS\n X COST 1\nENDATA").toProblem()
-        val positiveZero = source.copy(objectiveErrorBound = 0.0)
-        val negativeZero = source.copy(objectiveErrorBound = -0.0)
-        val firstNaN = source.copy(objectiveErrorBound = Double.NaN)
-        val secondNaN = source.copy(objectiveErrorBound = Double.NaN)
-
-        assertNotEquals(positiveZero, negativeZero)
-        assertEquals(firstNaN, secondNaN)
-        assertEquals(firstNaN.hashCode(), secondNaN.hashCode())
     }
 
     @Test

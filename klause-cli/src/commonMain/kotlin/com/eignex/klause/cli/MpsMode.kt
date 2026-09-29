@@ -33,8 +33,6 @@ internal object MpsMode : CliMode {
 
     private class Session : ModeSession {
         private var objectiveScale = 1L
-        private var objectiveErrorBound: Double? = null
-        private var hasInnerConstraintApproximation = false
         private var toleranceDifference: String? = null
         private var sourceExact = true
         private var latestSourceObjective: BigFraction? = null
@@ -44,8 +42,6 @@ internal object MpsMode : CliMode {
         override fun load(path: String, common: CommonOptions): Solvable {
             val compiled = Mps.parse(openFileSource(path)).toProblem()
             objectiveScale = compiled.objectiveScale
-            objectiveErrorBound = compiled.objectiveErrorBound
-            hasInnerConstraintApproximation = compiled.hasInnerConstraintApproximation
             toleranceDifference = compiled.toleranceDifference
             sourceExact = compiled.sourceExact
             latestSourceObjective = null
@@ -117,8 +113,6 @@ internal object MpsMode : CliMode {
 
         override fun output(common: CommonOptions): OutputProtocol = MpsOutput(
             objectiveScale,
-            objectiveErrorBound,
-            hasInnerConstraintApproximation,
             toleranceDifference == null,
             toleranceDifference,
             { latestSourceObjective },
@@ -166,8 +160,6 @@ internal fun renderMpsOpenModel(compiled: MpsCompiled, assignment: OpenTheoryAss
 /** MPS output protocol (PB-competition-style `s`/`o`/`v`). */
 internal class MpsOutput(
     private val objectiveScale: Long = 1L,
-    private val objectiveErrorBound: Double? = null,
-    private val hasInnerConstraintApproximation: Boolean = false,
     private val sourceExact: Boolean = true,
     private val sourceDifference: String? = null,
     private val sourceObjective: () -> BigFraction? = { null },
@@ -194,9 +186,7 @@ internal class MpsOutput(
         Verdict.SATISFIABLE, Verdict.BEST_FOUND, Verdict.OPTIMAL ->
             if (best == null) {
                 "s UNKNOWN"
-            } else if (verdict == Verdict.OPTIMAL && objectiveErrorBound == null &&
-                !hasInnerConstraintApproximation && sourceExact
-            ) {
+            } else if (verdict == Verdict.OPTIMAL && sourceExact) {
                 "s OPTIMUM FOUND"
             } else {
                 "s SATISFIABLE"
@@ -208,11 +198,7 @@ internal class MpsOutput(
             else -> "s UNKNOWN"
         }
 
-        Verdict.UNSATISFIABLE -> if (hasInnerConstraintApproximation || !proofExact) {
-            "s UNKNOWN"
-        } else {
-            "s UNSATISFIABLE"
-        }
+        Verdict.UNSATISFIABLE -> if (proofExact) "s UNSATISFIABLE" else "s UNKNOWN"
 
         Verdict.UNKNOWN -> "s UNKNOWN"
     }
@@ -220,28 +206,9 @@ internal class MpsOutput(
     override fun keepStat(key: String): Boolean = true
 
     override fun verdictReason(verdict: Verdict): String? {
-        val approximation = objectiveErrorBound?.let {
-            if (verdict == Verdict.OPTIMAL && !hasInnerConstraintApproximation) {
-                "objective approximation error <= $it (retained versus source); retained objective is optimal"
-            } else {
-                "objective approximation error <= $it (retained versus source)"
-            }
-        }
-        val constraintQualification = if (hasInnerConstraintApproximation) {
-            when (verdict) {
-                Verdict.SATISFIABLE, Verdict.BEST_FOUND, Verdict.OPTIMAL, Verdict.UNBOUNDED ->
-                    "satisfying assignment passed the inner constraint approximation"
-
-                Verdict.UNSATISFIABLE -> "inner constraint approximation is infeasible; source boundary is unresolved"
-
-                Verdict.UNKNOWN -> "inner constraint approximation leaves the source boundary unresolved"
-            }
-        } else {
-            null
-        }
         val cause = super.verdictReason(verdict)
         val sourceQualification = sourceDifference?.let { "lowered model differs from MPS source at $it" }
-        return listOfNotNull(approximation, constraintQualification, sourceQualification, cause)
+        return listOfNotNull(sourceQualification, cause)
             .joinToString("; ").ifEmpty { null }
     }
 }

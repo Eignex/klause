@@ -477,7 +477,7 @@ class CliModeTest {
     }
 
     @Test
-    fun `an approximate MPS objective does not claim an exact optimum`() {
+    fun `an MPS objective too wide for one scale reports its exact optimum`() {
         val mps = File.createTempFile("cliapproxobjective", ".mps").apply {
             writeText(
                 """
@@ -507,8 +507,9 @@ class CliModeTest {
         val out = capture { code = runCli(arrayOf(mps.absolutePath)) }
 
         assertEquals(0, code, out)
-        assertTrue("s SATISFIABLE" in out, out)
-        assertTrue("objective approximation error <= 0.75" in out, out)
+        assertTrue("s OPTIMUM FOUND" in out, out)
+        assertTrue(out.lineSequence().any { it == "o 999999999999999.5" }, out)
+        assertTrue(out.lineSequence().any { it == "v X=1 Y=-2" }, out)
     }
 
     @Test
@@ -591,13 +592,36 @@ class CliModeTest {
     }
 
     @Test
-    fun `an unknown approximate MPS objective does not claim a retained optimum`() {
-        val output = MpsOutput(objectiveErrorBound = 0.75)
+    fun `an MPS row too wide for one scale solves to its exact optimum`() {
+        val mps = File.createTempFile("cliwiderow", ".mps").apply {
+            writeText(
+                """
+                NAME          WIDEROW
+                OBJSENSE
+                    MAX
+                ROWS
+                 N  COST
+                 L  R
+                COLUMNS
+                    M1        'MARKER'                 'INTORG'
+                    X         COST           10        R           1e15
+                    Y         COST           1         R           0.25
+                    M2        'MARKER'                 'INTEND'
+                RHS
+                    RHS       R              3000000000000000.5
+                BOUNDS
+                 UP BND       X              10
+                 UP BND       Y              10
+                ENDATA
+                """.trimIndent(),
+            )
+            deleteOnExit()
+        }
 
-        val out = capture { output.onComplete(Verdict.UNKNOWN) }
+        val out = capture { main(arrayOf(mps.absolutePath)) }
 
-        assertTrue("objective approximation error <= 0.75" in out, out)
-        assertTrue("retained objective is optimal" !in out, out)
+        assertTrue("s OPTIMUM FOUND" in out, out)
+        assertTrue(out.lineSequence().any { it == "v X=3 Y=2" }, out)
     }
 
     @Test
@@ -643,16 +667,6 @@ class CliModeTest {
         assertTrue("label=continuous objective=0 continuousObjective=60.0 time=20" in out, out)
         assertTrue("label=mixed-min objective=-3 continuousObjective=-63.5 time=30" in out, out)
         assertTrue("label=mixed-max objective=3 continuousObjective=63.5 time=40" in out, out)
-    }
-
-    @Test
-    fun `an exhausted inner MPS constraint approximation is qualified`() {
-        val output = MpsOutput(hasInnerConstraintApproximation = true)
-
-        val out = capture { output.onComplete(Verdict.UNSATISFIABLE) }
-
-        assertTrue("s UNKNOWN" in out, out)
-        assertTrue("source boundary is unresolved" in out, out)
     }
 
     @Test
