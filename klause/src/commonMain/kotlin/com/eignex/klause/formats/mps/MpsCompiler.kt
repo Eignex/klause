@@ -28,14 +28,12 @@ import com.eignex.klause.lp.engine.Sense
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.Bits
 import com.eignex.klause.util.EmptyDoubleArray
-import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.EmptyLongArray
 import com.ionspin.kotlin.bignum.integer.BigInteger
 import kotlin.math.abs
 import kotlin.math.absoluteValue
 import kotlin.math.ceil
 import kotlin.math.floor
-import kotlin.math.nextUp
 import kotlin.math.ulp
 
 /** Raised when an MPS source model cannot be represented by klause's lowering. */
@@ -68,14 +66,7 @@ class MpsCompiled(
     /** Power of ten multiplying the retained objective, set by integer terms when present and by real
      *  terms for a pure-real objective. */
     val objectiveScale: Long,
-    /** Maximum absolute difference between the retained objective and the source objective,
-     *  over the declared integer-column bounds; null when no objective term was dropped. */
-    val objectiveErrorBound: Double?,
-    /** True when an integer row was tightened to an inner approximation after a term underflowed.
-     *  A satisfying assignment is sound for the source model, while exhaustion leaves its boundary
-     *  unresolved. */
-    val hasInnerConstraintApproximation: Boolean,
-    /** Count of LP-only continuous (real) columns (zero for a pure-integer instance). */
+    /** Count of the source's continuous columns (zero for a pure-integer instance). */
     val floatColumns: Int,
 ) {
     private var exactLpSource: (() -> ExactLpModel)? = null
@@ -237,25 +228,11 @@ class MpsCompiled(
         maximize: Boolean = this.maximize,
         columns: List<MpsColumn> = this.columns,
         objectiveScale: Long = this.objectiveScale,
-        objectiveErrorBound: Double? = this.objectiveErrorBound,
-        hasInnerConstraintApproximation: Boolean = this.hasInnerConstraintApproximation,
         floatColumns: Int = this.floatColumns,
     ): MpsCompiled {
-        val result = MpsCompiled(
-            model,
-            objective,
-            maximize,
-            columns,
-            objectiveScale,
-            objectiveErrorBound,
-            hasInnerConstraintApproximation,
-            floatColumns,
-        )
+        val result = MpsCompiled(model, objective, maximize, columns, objectiveScale, floatColumns)
         if (model === this.model && objective === this.objective && columns === this.columns &&
-            maximize == this.maximize && objectiveScale == this.objectiveScale &&
-            objectiveErrorBound.sameDataValue(this.objectiveErrorBound) &&
-            hasInnerConstraintApproximation == this.hasInnerConstraintApproximation &&
-            floatColumns == this.floatColumns
+            maximize == this.maximize && objectiveScale == this.objectiveScale && floatColumns == this.floatColumns
         ) {
             result.exactLpSource = exactLpSource
             result.exactLpCache = exactLpCache
@@ -271,16 +248,11 @@ class MpsCompiled(
     operator fun component3(): Boolean = maximize
     operator fun component4(): List<MpsColumn> = columns
     operator fun component5(): Long = objectiveScale
-    operator fun component6(): Double? = objectiveErrorBound
-    operator fun component7(): Boolean = hasInnerConstraintApproximation
-    operator fun component8(): Int = floatColumns
+    operator fun component6(): Int = floatColumns
 
     override fun equals(other: Any?): Boolean = other is MpsCompiled &&
         model == other.model && objective == other.objective && maximize == other.maximize &&
-        columns == other.columns && objectiveScale == other.objectiveScale &&
-        objectiveErrorBound.sameDataValue(other.objectiveErrorBound) &&
-        hasInnerConstraintApproximation == other.hasInnerConstraintApproximation &&
-        floatColumns == other.floatColumns
+        columns == other.columns && objectiveScale == other.objectiveScale && floatColumns == other.floatColumns
 
     override fun hashCode(): Int {
         var result = model.hashCode()
@@ -288,14 +260,11 @@ class MpsCompiled(
         result = 31 * result + maximize.hashCode()
         result = 31 * result + columns.hashCode()
         result = 31 * result + objectiveScale.hashCode()
-        result = 31 * result + (objectiveErrorBound?.hashCode() ?: 0)
-        result = 31 * result + hasInnerConstraintApproximation.hashCode()
         return 31 * result + floatColumns
     }
 
     override fun toString(): String = "MpsCompiled(model=$model, objective=$objective, maximize=$maximize, " +
-        "columns=$columns, objectiveScale=$objectiveScale, objectiveErrorBound=$objectiveErrorBound, " +
-        "hasInnerConstraintApproximation=$hasInnerConstraintApproximation, floatColumns=$floatColumns)"
+        "columns=$columns, objectiveScale=$objectiveScale, floatColumns=$floatColumns)"
 }
 
 private fun sourceColumnValue(column: MpsColumn, ints: LongArray, reals: List<BigFraction>?): BigFraction =
@@ -326,12 +295,6 @@ data class MpsSourceWitness(
     val objective: BigFraction,
 )
 
-private fun Double?.sameDataValue(other: Double?): Boolean = when {
-    this == null -> other == null
-    other == null -> false
-    else -> toBits() == other.toBits()
-}
-
 /** Primal feasibility tolerance of MPS results under tolerance semantics, the HiGHS default. */
 const val MPS_TOLERANCE: Double = 1e-7
 
@@ -350,9 +313,14 @@ private const val MPS_INFINITY = 1e20
  *  - a constraint or objective term touching a float becomes a real ([Double]-coefficient) [Linear] row;
  *    a purely-integer row with a fractional coefficient is multiplied onto the least common denominator
  *    of the decimals it is written with, so the integer row restates the source rather than rounding it.
+ *    A row too wide for one power of ten to carry onto [Long] is restated from its exact source numbers,
+ *    over [BigInteger] coefficients when they outgrow [Long].
+ *  - an objective too wide for one power of ten is restated as an auxiliary continuous column `z` with
+ *    the real row `z = Σ cᵢxᵢ + constant`, and `z` is optimized; [MpsCompiled.columns] omits `z`.
  */
 fun MpsModel.toProblem(): MpsCompiled {
     val exactInput = exactAdapterSnapshot()
+    val sourceNumbers = exactInput.sourceNumbers()
     val isFloat = BooleanArray(variables.size) { !variables[it].integer }
     val intVarOf = IntArray(variables.size) { -1 }
     val realVarOf = IntArray(variables.size) { -1 }
@@ -360,9 +328,22 @@ fun MpsModel.toProblem(): MpsCompiled {
     var numReal = 0
     for (i in variables.indices) if (isFloat[i]) realVarOf[i] = numReal++ else intVarOf[i] = numInt++
 
+    val objRowScale = objectiveRowScale(isFloat)
+    val objectiveRow = if (objective.indices.isNotEmpty() && objRowScale is RowScale.Unrepresentable) {
+        objectiveColumnRow()
+    } else {
+        null
+    }
+    val objectiveColumn = if (objectiveRow == null) -1 else numReal
+    val numModelReal = if (objectiveRow == null) numReal else numReal + 1
+
     // Real-variable bounds use ±∞. Integer source sides remain genuinely open when MPS omits them.
-    val realLower = DoubleArray(numReal)
-    val realUpper = DoubleArray(numReal)
+    val realLower = DoubleArray(numModelReal)
+    val realUpper = DoubleArray(numModelReal)
+    if (objectiveRow != null) {
+        realLower[objectiveColumn] = Double.NEGATIVE_INFINITY
+        realUpper[objectiveColumn] = Double.POSITIVE_INFINITY
+    }
     val lower = LongArray(numInt)
     val upper = LongArray(numInt)
     var openLoBits: Bits? = null
@@ -385,8 +366,7 @@ fun MpsModel.toProblem(): MpsCompiled {
 
     val factors = ArrayList<Factor>()
     val guards = IndicatorGuards(variables, intVarOf, factors)
-    var hasInnerConstraintApproximation = false
-    for (c in constraints) {
+    for ((rowIndex, c) in constraints.withIndex()) {
         if (c.indices.isEmpty()) {
             if (!emptyRowHolds(c.lower, c.upper)) {
                 throw MpsLoweringException("constraint row '${c.name}' has no variables but its bound is infeasible")
@@ -399,17 +379,16 @@ fun MpsModel.toProblem(): MpsCompiled {
             if (touchesFloat) {
                 emitRealRow(factors, c, isFloat, intVarOf, realVarOf)
             } else {
-                hasInnerConstraintApproximation = emitIntRow(factors, c, variables, intVarOf) ||
-                    hasInnerConstraintApproximation
+                emitIntRow(factors, c, intVarOf) { exactIntegerRow(c, rowIndex, sourceNumbers, intVarOf) }
             }
         } else {
             val guard = guards.guardFor(indicator, c.name)
             if (touchesFloat) {
                 emitIndicatedRealRow(factors, c, isFloat, intVarOf, realVarOf, guard, guards)
             } else {
-                hasInnerConstraintApproximation =
-                    emitIndicatedIntRow(factors, c, variables, intVarOf, guard, guards) ||
-                    hasInnerConstraintApproximation
+                emitIndicatedIntRow(factors, c, intVarOf, guard, guards) {
+                    exactIntegerRow(c, rowIndex, sourceNumbers, intVarOf)
+                }
             }
         }
     }
@@ -423,21 +402,26 @@ fun MpsModel.toProblem(): MpsCompiled {
         }
     }
 
-    val objRowScale = objectiveRowScale(isFloat)
-    val objScale = objRowScale.multiplier
-    val objectiveErrorBound =
-        if (objective.indices.isEmpty()) null else objectiveApproximationError(objRowScale, isFloat)
-    val objective = if (objective.indices.isEmpty()) {
-        null
-    } else {
-        buildObjective(isFloat, intVarOf, realVarOf, guards.numBool, numInt, numReal, objRowScale)
+    if (objectiveRow != null) {
+        emitRealRow(
+            factors,
+            objectiveRow,
+            isFloat.copyOf(variables.size + 1).also { it[variables.size] = true },
+            intVarOf.copyOf(variables.size + 1).also { it[variables.size] = -1 },
+            realVarOf.copyOf(variables.size + 1).also { it[variables.size] = objectiveColumn },
+        )
+    }
+    val objective = when {
+        objective.indices.isEmpty() -> null
+        objectiveRow != null -> columnObjective(guards.numBool, numInt, numModelReal, objectiveColumn)
+        else -> buildObjective(isFloat, intVarOf, realVarOf, guards.numBool, numInt, numReal, objRowScale)
     }
 
     val model = Problem(
         numBoolVars = guards.numBool,
         intBounds = IntBounds.fromModelBounds(lower, upper, openLoBits, openHiBits),
         factors = factors.toTypedArray(),
-        numRealVars = numReal,
+        numRealVars = numModelReal,
         realLower = realLower,
         realUpper = realUpper,
     )
@@ -449,15 +433,13 @@ fun MpsModel.toProblem(): MpsCompiled {
         objective,
         sense == ObjectiveSense.MAXIMIZE,
         columns,
-        objScale,
-        objectiveErrorBound,
-        hasInnerConstraintApproximation,
+        if (objectiveRow == null) objRowScale.multiplier else 1L,
         numReal,
     ).withExactLpModel { exactInput.toExactLpModel() }
         .withSourceModel(
             exactInput,
-            exactInput.sourceMismatch(isFloat, objRowScale),
-            exactInput.toleranceMismatch(isFloat, objRowScale),
+            exactInput.sourceMismatch(isFloat, objRowScale, objectiveRow),
+            exactInput.toleranceMismatch(isFloat, objRowScale, objectiveRow),
         )
 }
 
@@ -614,31 +596,47 @@ private fun MpsSourceNumber.shiftedBy(origin: ExactLpNumber): ExactLpNumber =
 private fun com.ionspin.kotlin.bignum.integer.BigInteger.isOne(): Boolean =
     this == com.ionspin.kotlin.bignum.integer.BigInteger.ONE
 
-/** Emit a purely-integer row over integer-variable ids, multiplied onto the scale that carries its
- *  coefficients and bounds onto whole numbers. */
-private fun emitIntRow(
+/**
+ * Emit a purely-integer row over integer-variable ids, multiplied onto the scale that carries its coefficients and
+ * bounds onto whole numbers. A row no single power of ten carries is restated from its [exact] source numbers.
+ */
+private inline fun emitIntRow(
     factors: MutableList<Factor>,
     c: MpsConstraint,
-    variables: List<MpsVar>,
     intVarOf: IntArray,
-): Boolean {
-    val vars = IntArray(c.indices.size) { intVarOf[c.indices[it]] }
+    exact: () -> ExactIntegerRow,
+) {
     val scale = c.integerRowScale()
+    if (scale is RowScale.Unrepresentable) {
+        val row = exact()
+        for (side in row.sides) {
+            if (row.vars.isEmpty()) {
+                if (!side.holdsWithoutTerms()) {
+                    throw MpsLoweringException("constraint row '${c.name}' cancels to no variables but is infeasible")
+                }
+                continue
+            }
+            val narrow = row.narrowCoefficients
+            factors.add(
+                if (narrow != null && side.bound.fitsLong()) {
+                    Linear(narrow, row.vars, side.op, side.bound.longValue())
+                } else {
+                    Linear(row.vars, row.coefficients, side.op, side.bound)
+                },
+            )
+        }
+        return
+    }
+    val vars = IntArray(c.indices.size) { intVarOf[c.indices[it]] }
     val coeffs = LongArray(c.indices.size) { scale.scale(c.coeffs[it]) }
-    return emitInnerRow(
-        c,
-        scale,
-        variables,
-        post = { op, bound -> factors.add(Linear(coeffs, vars, op, bound)) },
-        postImpossible = { factors.add(Linear(EmptyLongArray, EmptyIntArray, LinearOp.LE, -1L)) },
-    )
+    emitRow(rowBound(c.lower), rowBound(c.upper), scale::scale) { op, bound ->
+        factors.add(Linear(coeffs, vars, op, bound))
+    }
 }
 
 /**
- * The scale carrying a purely-integer row onto whole numbers.
- *
- * A row whose smallest term rounds to zero at every usable scale is emitted as an inner approximation:
- * every finite side is tightened enough that a satisfying retained row also satisfies the source row.
+ * The scale carrying a purely-integer row onto whole numbers. A row whose smallest term rounds to zero at every
+ * usable scale is [RowScale.Unrepresentable] and is restated through [exactIntegerRow] instead.
  */
 private fun MpsConstraint.integerRowScale(): RowScale {
     val builder = RowScaleBuilder()
@@ -648,60 +646,81 @@ private fun MpsConstraint.integerRowScale(): RowScale {
     return builder.resolve()
 }
 
-/**
- * Emits the inner side of an underflowing integer row. `R` is the retained integral row and `S` the
- * source row in scaled units. With `|R - S| <= error`, `R <= floor(bound - error)` and
- * `R >= ceil(bound + error)` imply their respective source sides. A missing finite bound makes the
- * inner condition empty instead of making an unsound claim about a candidate.
- */
-private fun emitInnerRow(
-    c: MpsConstraint,
-    scale: RowScale,
-    variables: List<MpsVar>,
-    post: (LinearOp, Long) -> Unit,
-    postImpossible: () -> Unit,
-): Boolean {
-    if (scale !is RowScale.Unrepresentable) {
-        emitRow(rowBound(c.lower), rowBound(c.upper), scale::scale, post)
-        return false
+/** One side `Σ coefficients·vars ⟨op⟩ bound` of an [ExactIntegerRow]. */
+private class ExactIntegerSide(val op: LinearOp, val bound: BigInteger) {
+    fun holdsWithoutTerms(): Boolean = when (op) {
+        LinearOp.LE -> bound.signum() >= 0
+        LinearOp.GE -> bound.signum() <= 0
+        LinearOp.EQ -> bound.isZero()
+        LinearOp.NE -> !bound.isZero()
     }
-    val error = c.innerApproximationError(variables, scale)
-    if (error == null) {
-        postImpossible()
-        return true
-    }
-    c.upper?.let { upper ->
-        val bound = floor(upper * scale.multiplier - error)
-        if (bound < Long.MIN_VALUE) {
-            postImpossible()
-        } else {
-            post(LinearOp.LE, bound.toLong())
-        }
-    }
-    c.lower?.let { lower ->
-        val bound = ceil(lower * scale.multiplier + error)
-        if (bound > Long.MAX_VALUE) {
-            postImpossible()
-        } else {
-            post(LinearOp.GE, bound.toLong())
-        }
-    }
-    return true
 }
 
-/** Error bound in the retained row's integral units, or null when an underflowing term is unbounded. */
-private fun MpsConstraint.innerApproximationError(variables: List<MpsVar>, scale: RowScale): Double? {
-    var error = 0.0
-    indices.forEachIndexed { k, index ->
-        val delta = abs(scale.scale(coeffs[k]).toDouble() - coeffs[k] * scale.multiplier)
-        if (delta == 0.0) return@forEachIndexed
-        val variable = variables[index]
-        val lower = intLowerOrNull(variable.lower) ?: return null
-        val upper = intUpperOrNull(variable.upper) ?: return null
-        error = (error + (delta * maxOf(abs(lower.toDouble()), abs(upper.toDouble()))).nextUp()).nextUp()
-    }
-    return error
+/** A purely-integer source row over distinct integer-variable ids with coprime whole coefficients. */
+private class ExactIntegerRow(
+    val vars: IntArray,
+    val coefficients: Array<BigInteger>,
+    val sides: List<ExactIntegerSide>,
+) {
+    /** The coefficients as [Long], or null when one does not fit. */
+    val narrowCoefficients: LongArray? =
+        if (coefficients.all { it.fitsLong() }) LongArray(coefficients.size) { coefficients[it].longValue() } else null
 }
+
+/**
+ * The integer row [c] restated exactly: its source coefficients multiplied onto their least common denominator and
+ * divided by their greatest common divisor. Over integer columns the left side is then whole, so a fractional upper
+ * bound floors and a fractional lower bound ceils without changing the row's solutions; a fractional equality becomes
+ * the two contradictory sides it implies.
+ */
+private fun exactIntegerRow(
+    c: MpsConstraint,
+    rowIndex: Int,
+    source: MpsSourceNumbers,
+    intVarOf: IntArray,
+): ExactIntegerRow {
+    val numbers = source.constraintCoefficients[rowIndex]
+    val sums = LinkedHashMap<Int, BigFraction>()
+    for (entry in c.indices.indices) {
+        val variable = intVarOf[c.indices[entry]]
+        sums[variable] = (sums[variable] ?: BigFraction.ZERO) + numbers[entry].fraction
+    }
+    val terms = sums.entries.filter { !it.value.isZero }
+    var denominator = BigInteger.ONE
+    for ((_, value) in terms) denominator = denominator / denominator.gcd(value.den) * value.den
+    val scaled = terms.map { (_, value) -> value.num * (denominator / value.den) }
+    var divisor: BigInteger? = null
+    for (value in scaled) divisor = divisor?.gcd(value.abs()) ?: value.abs()
+    val multiplier = BigFraction.of(denominator, divisor ?: BigInteger.ONE)
+    val (lower, upper) = source.constraintBounds[rowIndex]
+    val low = lower.finiteMps()?.fraction?.times(multiplier)
+    val high = upper.finiteMps()?.fraction?.times(multiplier)
+    val sides = buildList {
+        if (low != null && low == high && low.den.isOne()) {
+            add(ExactIntegerSide(LinearOp.EQ, low.num))
+        } else {
+            high?.let { add(ExactIntegerSide(LinearOp.LE, it.floor())) }
+            low?.let { add(ExactIntegerSide(LinearOp.GE, it.ceil())) }
+        }
+    }
+    return ExactIntegerRow(
+        IntArray(terms.size) { terms[it].key },
+        Array(scaled.size) { scaled[it] / (divisor ?: BigInteger.ONE) },
+        sides,
+    )
+}
+
+private fun BigFraction.floor(): BigInteger {
+    val quotient = num / den
+    return if (num.signum() < 0 && quotient * den != num) quotient - BigInteger.ONE else quotient
+}
+
+private fun BigFraction.ceil(): BigInteger = -negated().floor()
+
+private val LONG_MIN = BigInteger.fromLong(Long.MIN_VALUE)
+private val LONG_MAX = BigInteger.fromLong(Long.MAX_VALUE)
+
+private fun BigInteger.fitsLong(): Boolean = this in LONG_MIN..LONG_MAX
 
 /** A row's terms split into its integer and its continuous part, each variable-id/coefficient parallel. */
 private class RealRowParts(
@@ -764,7 +783,11 @@ private fun MpsConstraint.realRowScale(): RowScale? {
 /** [value] on this scale as a whole number, or unchanged when there is no scale to restate it on. */
 private fun RowScale?.restate(value: Double): Double = if (this == null) value else scale(value).toDouble()
 
-private fun MpsModel.sourceMismatch(isFloat: BooleanArray, objectiveScale: RowScale): String? {
+private fun MpsModel.sourceMismatch(
+    isFloat: BooleanArray,
+    objectiveScale: RowScale,
+    objectiveRow: MpsConstraint?,
+): String? {
     val source = sourceNumbers()
     for (index in variables.indices) {
         val variable = variables[index]
@@ -780,6 +803,7 @@ private fun MpsModel.sourceMismatch(isFloat: BooleanArray, objectiveScale: RowSc
     }
     for (rowIndex in constraints.indices) {
         val row = constraints[rowIndex]
+        if (row.restatedFromSource(isFloat)) continue
         val scale = if (row.indices.any { isFloat[it] }) row.realRowScale() else row.integerRowScale()
         if (scale !is RowScale.Exact) return "row '${row.name}' scale"
         val coefficients = source.constraintCoefficients[rowIndex]
@@ -794,6 +818,21 @@ private fun MpsModel.sourceMismatch(isFloat: BooleanArray, objectiveScale: RowSc
         ) {
             return "row '${row.name}' bound"
         }
+    }
+    if (objectiveRow != null) {
+        val scale = objectiveRow.realRowScale()
+        fun retained(value: Double): BigFraction? = if (scale == null) {
+            BigFraction.ofDouble(value)
+        } else {
+            BigFraction.of(BigInteger.fromLong(scale.scale(value)), BigInteger.fromLong(scale.multiplier))
+        }
+        for (entry in objective.indices.indices) {
+            if (retained(objectiveRow.coeffs[entry]) != source.objectiveCoefficients[entry].fraction.negated()) {
+                return "objective coefficient '${variables[objective.indices[entry]].name}'"
+            }
+        }
+        val constant = objectiveRow.lower ?: return "objective constant"
+        return if (retained(constant) == source.objectiveConstant.fraction) null else "objective constant"
     }
     if (objectiveScale !is RowScale.Exact) return "objective scale"
     val onlyRealTerms = objective.indices.all { isFloat[it] }
@@ -814,7 +853,11 @@ private fun MpsModel.sourceMismatch(isFloat: BooleanArray, objectiveScale: RowSc
     return null
 }
 
-private fun MpsModel.toleranceMismatch(isFloat: BooleanArray, objectiveScale: RowScale): String? {
+private fun MpsModel.toleranceMismatch(
+    isFloat: BooleanArray,
+    objectiveScale: RowScale,
+    objectiveRow: MpsConstraint?,
+): String? {
     val source = sourceNumbers()
     for (index in variables.indices) {
         val variable = variables[index]
@@ -829,6 +872,7 @@ private fun MpsModel.toleranceMismatch(isFloat: BooleanArray, objectiveScale: Ro
     }
     for (rowIndex in constraints.indices) {
         val row = constraints[rowIndex]
+        if (row.restatedFromSource(isFloat)) continue
         val scale: RowScale? = if (row.indices.any { isFloat[it] }) row.realRowScale() else row.integerRowScale()
         fun retained(value: Double): Double =
             if (scale == null) value else scale.scale(value).toDouble() / scale.multiplier
@@ -843,6 +887,18 @@ private fun MpsModel.toleranceMismatch(isFloat: BooleanArray, objectiveScale: Ro
             return nearlyEqual(retained(bound), exact.double)
         }
         if (!sideMatches(lower, row.lower) || !sideMatches(upper, row.upper)) return "row '${row.name}' bound"
+    }
+    if (objectiveRow != null) {
+        val scale = objectiveRow.realRowScale()
+        fun retained(value: Double): Double =
+            if (scale == null) value else scale.scale(value).toDouble() / scale.multiplier
+        for (entry in objective.indices.indices) {
+            if (!nearlyEqual(retained(objectiveRow.coeffs[entry]), -source.objectiveCoefficients[entry].double)) {
+                return "objective coefficient '${variables[objective.indices[entry]].name}'"
+            }
+        }
+        val constant = objectiveRow.lower ?: return "objective constant"
+        return if (nearlyEqual(retained(constant), source.objectiveConstant.double)) null else "objective constant"
     }
     val onlyRealTerms = objective.indices.all { isFloat[it] }
     val multiplier = objectiveScale.multiplier.toDouble()
@@ -861,6 +917,10 @@ private fun MpsModel.toleranceMismatch(isFloat: BooleanArray, objectiveScale: Ro
     val constant = objectiveScale.scale(objective.constant).toDouble() / multiplier
     return if (nearlyEqual(constant, source.objectiveConstant.double)) null else "objective constant"
 }
+
+// An integer row no power of ten carries is lowered from its exact source numbers, so it restates the source.
+private fun MpsConstraint.restatedFromSource(isFloat: BooleanArray): Boolean =
+    indices.none { isFloat[it] } && integerRowScale() is RowScale.Unrepresentable
 
 // Equal within a few ulp of [source]: zero equals only zero and an infinity only itself.
 private fun nearlyEqual(value: Double, source: Double): Boolean = when {
@@ -965,30 +1025,45 @@ private fun postGuardImplies(factors: MutableList<Factor>, guard: Int, cond: Int
 }
 
 /** Emit a purely-integer indicated row: a fresh `cond <-> row` reification per emitted part plus the
- *  `guard -> cond` clause, so the row is relaxed whenever the indicator column takes the other value. */
-private fun emitIndicatedIntRow(
+ *  `guard -> cond` clause, so the row is relaxed whenever the indicator column takes the other value. A row no
+ *  single power of ten carries is restated from its [exact] source numbers. */
+private inline fun emitIndicatedIntRow(
     factors: MutableList<Factor>,
     c: MpsConstraint,
-    variables: List<MpsVar>,
     intVarOf: IntArray,
     guard: Int,
     guards: IndicatorGuards,
-): Boolean {
-    val vars = IntArray(c.indices.size) { intVarOf[c.indices[it]] }
+    exact: () -> ExactIntegerRow,
+) {
     val scale = c.integerRowScale()
+    if (scale is RowScale.Unrepresentable) {
+        val row = exact()
+        for (side in row.sides) {
+            if (row.vars.isEmpty()) {
+                // A side violated with no terms left forbids the trigger value.
+                if (!side.holdsWithoutTerms()) factors.add(Clause(intArrayOf(Lit.negate(Lit.make(guard, true)))))
+                continue
+            }
+            val cond = guards.newBool()
+            val narrow = row.narrowCoefficients
+            factors.add(
+                if (narrow != null && side.bound.fitsLong()) {
+                    ReifiedLinear(cond, narrow, row.vars, side.op, side.bound.longValue())
+                } else {
+                    ReifiedLinear(cond, row.vars, row.coefficients, side.op, side.bound)
+                },
+            )
+            postGuardImplies(factors, guard, cond)
+        }
+        return
+    }
+    val vars = IntArray(c.indices.size) { intVarOf[c.indices[it]] }
     val coeffs = LongArray(c.indices.size) { scale.scale(c.coeffs[it]) }
-    fun post(op: LinearOp, bound: Long, rowCoeffs: LongArray = coeffs, rowVars: IntArray = vars) {
+    emitRow(rowBound(c.lower), rowBound(c.upper), scale::scale) { op, bound ->
         val cond = guards.newBool()
-        factors.add(ReifiedLinear(cond, rowCoeffs, rowVars, op, bound))
+        factors.add(ReifiedLinear(cond, coeffs, vars, op, bound))
         postGuardImplies(factors, guard, cond)
     }
-    return emitInnerRow(
-        c,
-        scale,
-        variables,
-        post = { op, bound -> post(op, bound) },
-        postImpossible = { post(LinearOp.LE, -1L, EmptyLongArray, EmptyIntArray) },
-    )
 }
 
 /** Emit an indicated row touching a continuous column. [ReifiedRealLinear] carries inequalities only, so
@@ -1029,31 +1104,30 @@ private fun RowScale.realObjectiveCoefficient(value: Double, onlyRealTerms: Bool
     if (onlyRealTerms && this is RowScale.Exact) scale(value).toDouble() else value * multiplier.toDouble()
 
 /**
- * Bounds the objective difference introduced when [scale] drops a coefficient. Every dropped term must
- * have a finite integer-column bound; otherwise no finite statement about the source objective exists.
+ * The row `z − Σ cᵢxᵢ = constant` defining the auxiliary objective column `z`, which takes the column index just past
+ * the source columns. It is a real row, so its coefficients keep their source values rather than a shared scale.
  */
-private fun MpsModel.objectiveApproximationError(scale: RowScale, isFloat: BooleanArray): Double? {
-    if (scale !is RowScale.Unrepresentable) return null
-    var error = abs(scale.scale(objective.constant).toDouble() / scale.multiplier - objective.constant)
-    objective.indices.forEachIndexed { k, index ->
-        if (isFloat[index]) return@forEachIndexed
-        val source = objective.coeffs[k]
-        val delta = abs(scale.scale(source).toDouble() / scale.multiplier - source)
-        if (delta == 0.0) return@forEachIndexed
-        val variable = variables[index]
-        val lower = intLowerOrNull(variable.lower)
-            ?: mpsLoweringError(
-                "objective drops a term on unbounded column '${variable.name}', so its error is unbounded",
-            )
-        val upper = intUpperOrNull(variable.upper)
-            ?: mpsLoweringError(
-                "objective drops a term on unbounded column '${variable.name}', so its error is unbounded",
-            )
-        error += delta * maxOf(abs(lower.toDouble()), abs(upper.toDouble()))
-    }
-    if (!error.isFinite()) mpsLoweringError("objective approximation error exceeds a finite double")
-    return error
+private fun MpsModel.objectiveColumnRow(): MpsConstraint {
+    val constant = rowBound(objective.constant)
+        ?: throw MpsLoweringException("objective constant ${objective.constant} is at the MPS infinity marker")
+    val terms = objective.coeffs.size
+    return MpsConstraint(
+        objective.name,
+        objective.indices + variables.size,
+        DoubleArray(terms + 1) { if (it < terms) -objective.coeffs[it] else 1.0 },
+        constant,
+        constant,
+    )
 }
+
+/** The objective `min z` (or `max z`) over the auxiliary objective [column]. */
+private fun columnObjective(numBool: Int, numInt: Int, numReal: Int, column: Int): LinearObjectiveSpec =
+    LinearObjectiveSpec(
+        boolWeights = if (numBool == 0) EmptyLongArray else LongArray(numBool),
+        intCoefficients = LongArray(numInt),
+        constant = 0L,
+        realCoefficients = DoubleArray(numReal).also { it[column] = 1.0 },
+    )
 
 private fun MpsModel.buildObjective(
     isFloat: BooleanArray,
