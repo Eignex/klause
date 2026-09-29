@@ -165,7 +165,7 @@ class LocalSearchSolver(
     internal fun solveInternal(params: LocalSearchParams, warm: WarmState?): SolveResult {
         val sink = SolveStatsSink(backend = "ls")
         sink.start()
-        if (problem.numRealVars > 0 || hasWideIntValues(problem) || hasWideFactor(problem)) {
+        if (!localSearchSupports(problem)) {
             // LP-only continuous variables are resolved by the LP relaxation, which local search does not
             // run; their linear rows carry no invariant, so LS would ignore them and could report a
             // solution that violates them. Domain values past the 32-bit range make the incremental
@@ -194,7 +194,7 @@ class LocalSearchSolver(
         // LP-only continuous variables, wide int domains, and wide-coefficient factors are not soundly
         // evaluated by local search (see [solveInternal]); stream nothing rather than assignments that
         // may violate factors.
-        if (problem.numRealVars > 0 || hasWideIntValues(problem) || hasWideFactor(problem)) return emptySequence()
+        if (!localSearchSupports(problem)) return emptySequence()
         val eff = effectiveAssumptions(params.assumptions) ?: return emptySequence()
         return streamImpl(params, eff, warm)
     }
@@ -278,7 +278,7 @@ class LocalSearchSolver(
     ): Sequence<MinimizeResult> = sequence {
         val sink = SolveStatsSink(backend = "ls")
         sink.start()
-        if (problem.numRealVars > 0 || hasWideIntValues(problem) || hasWideFactor(problem)) {
+        if (!localSearchSupports(problem)) {
             // Same soundness boundary as [solveInternal]: LP-only continuous variables, wide int
             // domains, and wide-coefficient factors are not evaluated by local search, so it could
             // optimize an incumbent that ignores — and may violate — them. Decline.
@@ -862,6 +862,13 @@ class LocalSearchSolver(
         const val ROUND_FEEDBACK_STEPS: Int = 1024
     }
 }
+
+/**
+ * Whether local search can soundly run on [problem]: no LP-only continuous variables, no int values past the 32-bit
+ * range, and no factor with over-64-bit coefficients. A portfolio leaves its local-search arms out otherwise.
+ */
+internal fun localSearchSupports(problem: BakedProblem): Boolean =
+    problem.numRealVars == 0 && !hasWideIntValues(problem) && !hasWideFactor(problem)
 
 /** True when any int domain holds values past the 32-bit range, or spans more than the enumerable
  *  range (`!enumerable`). The first would wrap local search's incremental violation/objective
