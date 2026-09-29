@@ -217,6 +217,21 @@ class MpsCompiledTest {
     }
 
     @Test
+    fun `an integer row with more decimals than a double carries lowers onto its exact decimals`() {
+        val compiled = Mps.parse(
+            "ROWS\n N COST\n L R\nCOLUMNS\n M1 'MARKER' 'INTORG'\n X R 1\n Y R 0.12345678901234567\n" +
+                " M2 'MARKER' 'INTEND'\nRHS\n RHS R 1\nBOUNDS\n UP BND X 1\n UP BND Y 1\nENDATA",
+        ).toProblem()
+
+        val row = compiled.model.factors.single() as Linear
+        val constants = assertNotNull(row.integerConstants)
+        val coefficients = row.vars.indices.map { constants.coeff(it) }
+        assertEquals(listOf(100_000_000_000_000_000L, 12_345_678_901_234_567L), coefficients)
+        assertEquals(100_000_000_000_000_000L, constants.bound)
+        assertTrue(compiled.sourceExact, compiled.sourceDifference)
+    }
+
+    @Test
     fun `an integer row too wide for long coefficients lowers onto exact wide ones`() {
         val compiled = Mps.parse(
             "ROWS\n N COST\n L R\nCOLUMNS\n M1 'MARKER' 'INTORG'\n X R 1e18\n Y R 0.001\n M2 'MARKER' 'INTEND'\n" +

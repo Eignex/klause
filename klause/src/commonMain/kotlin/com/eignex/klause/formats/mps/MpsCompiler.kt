@@ -313,8 +313,8 @@ private const val MPS_INFINITY = 1e20
  *  - a constraint or objective term touching a float becomes a real ([Double]-coefficient) [Linear] row;
  *    a purely-integer row with a fractional coefficient is multiplied onto the least common denominator
  *    of the decimals it is written with, so the integer row restates the source rather than rounding it.
- *    A row too wide for one power of ten to carry onto [Long] is restated from its exact source numbers,
- *    over [BigInteger] coefficients when they outgrow [Long].
+ *    A row no power of ten restates exactly on [Long] is rebuilt from its exact source numbers, over
+ *    [BigInteger] coefficients when they outgrow [Long].
  *  - an objective too wide for one power of ten is restated as an auxiliary continuous column `z` with
  *    the real row `z = Σ cᵢxᵢ + constant`, and `z` is optimized; [MpsCompiled.columns] omits `z`.
  */
@@ -598,7 +598,7 @@ private fun com.ionspin.kotlin.bignum.integer.BigInteger.isOne(): Boolean =
 
 /**
  * Emit a purely-integer row over integer-variable ids, multiplied onto the scale that carries its coefficients and
- * bounds onto whole numbers. A row no single power of ten carries is restated from its [exact] source numbers.
+ * bounds onto whole numbers. A row no power of ten restates exactly is rebuilt from its [exact] source numbers.
  */
 private inline fun emitIntRow(
     factors: MutableList<Factor>,
@@ -607,7 +607,7 @@ private inline fun emitIntRow(
     exact: () -> ExactIntegerRow,
 ) {
     val scale = c.integerRowScale()
-    if (scale is RowScale.Unrepresentable) {
+    if (scale !is RowScale.Exact) {
         val row = exact()
         for (side in row.sides) {
             if (row.vars.isEmpty()) {
@@ -635,8 +635,8 @@ private inline fun emitIntRow(
 }
 
 /**
- * The scale carrying a purely-integer row onto whole numbers. A row whose smallest term rounds to zero at every
- * usable scale is [RowScale.Unrepresentable] and is restated through [exactIntegerRow] instead.
+ * The scale carrying a purely-integer row onto whole numbers. Only a [RowScale.Exact] scale is used; a row whose
+ * values would round at every usable power of ten is rebuilt through [exactIntegerRow] instead.
  */
 private fun MpsConstraint.integerRowScale(): RowScale {
     val builder = RowScaleBuilder()
@@ -918,9 +918,9 @@ private fun MpsModel.toleranceMismatch(
     return if (nearlyEqual(constant, source.objectiveConstant.double)) null else "objective constant"
 }
 
-// An integer row no power of ten carries is lowered from its exact source numbers, so it restates the source.
+// An integer row no power of ten restates is lowered from its exact source numbers, so it restates the source.
 private fun MpsConstraint.restatedFromSource(isFloat: BooleanArray): Boolean =
-    indices.none { isFloat[it] } && integerRowScale() is RowScale.Unrepresentable
+    indices.none { isFloat[it] } && integerRowScale() !is RowScale.Exact
 
 // Equal within a few ulp of [source]: zero equals only zero and an infinity only itself.
 private fun nearlyEqual(value: Double, source: Double): Boolean = when {
@@ -1026,7 +1026,7 @@ private fun postGuardImplies(factors: MutableList<Factor>, guard: Int, cond: Int
 
 /** Emit a purely-integer indicated row: a fresh `cond <-> row` reification per emitted part plus the
  *  `guard -> cond` clause, so the row is relaxed whenever the indicator column takes the other value. A row no
- *  single power of ten carries is restated from its [exact] source numbers. */
+ *  power of ten restates exactly is rebuilt from its [exact] source numbers. */
 private inline fun emitIndicatedIntRow(
     factors: MutableList<Factor>,
     c: MpsConstraint,
@@ -1036,7 +1036,7 @@ private inline fun emitIndicatedIntRow(
     exact: () -> ExactIntegerRow,
 ) {
     val scale = c.integerRowScale()
-    if (scale is RowScale.Unrepresentable) {
+    if (scale !is RowScale.Exact) {
         val row = exact()
         for (side in row.sides) {
             if (row.vars.isEmpty()) {
