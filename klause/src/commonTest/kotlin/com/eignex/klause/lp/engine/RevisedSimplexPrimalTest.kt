@@ -288,6 +288,26 @@ class RevisedSimplexPrimalTest {
     }
 
     @Test
+    fun `cost triggered refactors are counted as update limits rather than numerical recovery`() {
+        val builder = LpBuilder()
+        repeat(60) {
+            val variable = builder.addVar(0L, 3L, cost = 1L)
+            builder.addRow(intArrayOf(variable), longArrayOf(1L), Relation.GE, 1L)
+        }
+        val model = builder.build(Sense.MINIMIZE)
+
+        RevisedSimplex(
+            model,
+            basisSolverFactory = { matrix -> MeteredBtranSolver(KotlinBasisSolver(matrix)) },
+        ).use { solver ->
+            assertNotNull(solver.solvePrimal())
+
+            assertEquals(0, solver.lastMetrics.numericalRecoveryRefactorizations)
+            assertTrue(solver.lastMetrics.updateLimitRefactorizations > 4, "${solver.lastMetrics}")
+        }
+    }
+
+    @Test
     fun `generation changing quality restarts share one recovery budget`() {
         val builder = LpBuilder()
         repeat(40) {
