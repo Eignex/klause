@@ -1733,8 +1733,24 @@ internal class RevisedSimplex(
             current.nnz,
             quality = pendingSolveQuality.also { pendingSolveQuality = null },
         ) ?: return null
+        lastSafePointTrigger = trigger
         return refactorize(trigger.refactorReason())
     }
+
+    // The trigger of the latest safe-point refactor: a routine cost trigger that leaves the basis unchanged needs no
+    // recovery, while a residual one spends the shared restart budget.
+    private var lastSafePointTrigger: EngineRefactorTrigger? = null
+
+    private val routineRefactor: Boolean
+        get() = when (lastSafePointTrigger) {
+            EngineRefactorTrigger.HARD_UPDATE_CAP,
+            EngineRefactorTrigger.FILL_GROWTH,
+            EngineRefactorTrigger.SOLVE_WORK_GROWTH,
+            EngineRefactorTrigger.SYNTHETIC_WORK,
+            -> true
+
+            else -> false
+        }
 
     /** `b − Σ_{j nonbasic at upper} A_j·u_j` into [out], the right-hand side the basic values solve. */
     private fun adjustedRhs(out: DoubleArray) {
@@ -2411,8 +2427,17 @@ internal class RevisedSimplex(
             btranDense(gamma, pi, dualVec)
             when (refactorAtQualitySafePoint()) {
                 null -> Unit
-                RefactorResult.UNCHANGED -> return IterationResult.RESTART
+
+                // Fresh factors of the same basis after a routine trigger: re-derive β on them and price again,
+                // spending no restart; the iteration it takes keeps a trigger at every safe point bounded.
+                RefactorResult.UNCHANGED -> {
+                    if (!routineRefactor) return IterationResult.RESTART
+                    basicValues(beta)
+                    continue
+                }
+
                 RefactorResult.BASIS_CHANGED -> return IterationResult.BASIS_CHANGED
+
                 RefactorResult.FAILED -> return IterationResult.FAILED
             }
             // Entering reduces w: from lower if π·A_j > 0, from upper if π·A_j < 0; pick the steepest.
@@ -2553,7 +2578,7 @@ internal class RevisedSimplex(
         if (effectiveWorkLimit > 0L && work.ops >= effectiveWorkLimit) return stopped(LpFloatTermination.WORK)
         when (refactorAtQualitySafePoint()) {
             null -> Unit
-            RefactorResult.UNCHANGED -> return restartPrimal(progress)
+            RefactorResult.UNCHANGED -> if (routineRefactor) basicValues(beta) else return restartPrimal(progress)
             RefactorResult.BASIS_CHANGED -> return restartPrimal(progress)
             RefactorResult.FAILED -> return null
         }
@@ -2581,8 +2606,15 @@ internal class RevisedSimplex(
             val y = duals()
             when (refactorAtQualitySafePoint()) {
                 null -> Unit
-                RefactorResult.UNCHANGED -> return restartPrimal(progress)
+
+                RefactorResult.UNCHANGED -> {
+                    if (!routineRefactor) return restartPrimal(progress)
+                    basicValues(beta)
+                    continue
+                }
+
                 RefactorResult.BASIS_CHANGED -> return restartPrimal(progress)
+
                 RefactorResult.FAILED -> return null
             }
             var q = -1

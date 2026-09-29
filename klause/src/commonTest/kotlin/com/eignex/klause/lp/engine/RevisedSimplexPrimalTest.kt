@@ -6,8 +6,13 @@ import com.eignex.klause.lp.engine.Relation
 import com.eignex.klause.lp.engine.RevisedSimplex
 import com.eignex.klause.lp.engine.Sense
 import com.eignex.klause.lp.engine.integerDualLowerBoundCeil
+import com.eignex.klause.simplex.basis.BasisBuildKind
+import com.eignex.klause.simplex.basis.BasisBuildWork
+import com.eignex.klause.simplex.basis.BasisOperationWork
+import com.eignex.klause.simplex.basis.BasisPhaseWork
 import com.eignex.klause.simplex.basis.BasisSolveQuality
 import com.eignex.klause.simplex.basis.BasisSolver
+import com.eignex.klause.simplex.basis.BasisWork
 import com.eignex.klause.simplex.basis.IndexedVector
 import com.eignex.klause.simplex.basis.KotlinBasisSolver
 import com.eignex.klause.simplex.exact.BigFraction
@@ -260,6 +265,29 @@ class RevisedSimplexPrimalTest {
     }
 
     @Test
+    fun `routine refactors of an unchanged basis spend no primal restart`() {
+        // Sixty covering rows need sixty phase-one pivots; the metered solver fires a synthetic work trigger every
+        // eighth update, more often than the restart budget allows.
+        val builder = LpBuilder()
+        repeat(60) {
+            val variable = builder.addVar(0L, 3L, cost = 1L)
+            builder.addRow(intArrayOf(variable), longArrayOf(1L), Relation.GE, 1L)
+        }
+        val model = builder.build(Sense.MINIMIZE)
+
+        RevisedSimplex(
+            model,
+            basisSolverFactory = { matrix -> MeteredBtranSolver(KotlinBasisSolver(matrix)) },
+        ).use { solver ->
+            val result = solver.solvePrimal()
+
+            assertEquals(60.0, assertNotNull(result).objective, 1e-9)
+            val triggers = solver.lastRefactorPolicyMetrics.triggers[EngineRefactorTrigger.SYNTHETIC_WORK] ?: 0L
+            assertTrue(triggers > 4, "$triggers")
+        }
+    }
+
+    @Test
     fun `generation changing quality restarts share one recovery budget`() {
         val builder = LpBuilder()
         repeat(40) {
@@ -283,4 +311,20 @@ class RevisedSimplexPrimalTest {
 private class PersistentlyBadQualitySolver(private val delegate: BasisSolver) : BasisSolver by delegate {
     override fun solveQuality(rhs: DoubleArray, solution: IndexedVector, transpose: Boolean): BasisSolveQuality =
         BasisSolveQuality(1e-4, 1e-4)
+}
+
+// Reports a fixed build and dual-solve work, so the synthetic work trigger fires at a chosen cadence.
+private class MeteredBtranSolver(private val delegate: BasisSolver) : BasisSolver by delegate {
+    private var btrans = 0L
+
+    override fun btran(x: IndexedVector, expectedDensity: Double) {
+        btrans++
+        delegate.btran(x, expectedDensity)
+    }
+
+    override val basisWork: BasisWork
+        get() = BasisWork(BasisBuildWork(BasisBuildKind.REFACTORIZATION, true, 1, 0, 0, 0, 85, 85))
+
+    override val basisOperationWork: BasisOperationWork
+        get() = BasisOperationWork(btran = BasisPhaseWork(btrans, btrans, 10 * btrans))
 }
