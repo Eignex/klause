@@ -1077,6 +1077,8 @@ internal class RevisedSimplex(
         colVal = columns.values
         rebuildRowView()
         refactorPolicy = RefactorPolicy(RefactorPolicyConfig(hardUpdateCap = refactorUpdateLimit))
+        // Artificial sides are scaled values of the retired view.
+        clearArtificialBounds()
         invalidateBasisDependentState()
         if (failure != null) throw failure
     }
@@ -1181,6 +1183,11 @@ internal class RevisedSimplex(
     }
 
     private fun stopped(reason: LpFloatTermination, result: FloatLpResult? = null): FloatLpResult? {
+        // A stop leaves the seated basis for continuation, which reads it against the real bounds.
+        if (artificialLower != null) {
+            clearArtificialBounds()
+            repairNonbasicStatuses()
+        }
         lastTermination = reason
         return result
     }
@@ -1324,6 +1331,7 @@ internal class RevisedSimplex(
     }
 
     private fun resetSolveState(warmAttempted: Boolean) {
+        clearArtificialBounds()
         repairStop = null
         repairCallbackFailure = null
         degenerateColumns = 0
@@ -1394,6 +1402,7 @@ internal class RevisedSimplex(
         warmStarted = if (reset) kept else warmStarted || kept
         // A warm basis can be singular; fall back to the (always non-singular) slack cold start.
         if (!kept) {
+            clearArtificialBounds()
             if (warm == null) {
                 coldStart()
             } else {
@@ -1443,29 +1452,35 @@ internal class RevisedSimplex(
         if ((warmStarted || after != null) &&
             (!kept || !sameObjective || !sameSeats) && !dualFeasible()
         ) {
-            if (kept && before != null && after != null && before.model.objective != after.model.objective) {
-                objectiveWarmAttempts++
-                objectiveWarmRepairs++
+            // Only the slack start is boxed: a warm or kept basis carries a pivot path the primal can
+            // continue, and boxing it would trade that for a cold dual.
+            val slackStart = !kept && !warmStarted && after != null
+            if (!slackStart || !installArtificialBounds()) {
+                if (kept && before != null && after != null && before.model.objective != after.model.objective) {
+                    objectiveWarmAttempts++
+                    objectiveWarmRepairs++
+                }
+                return solvePrimalCore(null, reuse = true, reset = false, progress = progress)
             }
-            return solvePrimalCore(null, reuse = true, reset = false, progress = progress)
         }
         resetGamma() // fresh Devex reference frame for this solve
         val maxIter = maxIterations
-        // Exact bounds stay fixed for this solve; the leaving scan otherwise reads every basic column
-        // from the exact model on every iteration.
+        // Bounds stay fixed for this solve; the leaving scan otherwise reads every basic column from the
+        // exact model on every iteration. Artificial sides count as finite until they are dropped.
         val finiteLower = if (m > 0 && model.exactState != null) {
-            BooleanArray(numVars) { model.hasFiniteLower(it) }
+            BooleanArray(numVars) { finiteLowerAt(it) }
         } else {
             null
         }
         val finiteUpper = if (m > 0 && model.exactState != null) {
-            BooleanArray(numVars) { model.hasFiniteUpper(it) }
+            BooleanArray(numVars) { finiteUpperAt(it) }
         } else {
             null
         }
         val rhsAdj = basicRhs
         val beta = dualBeta
-        var useCached = kept && model.exactState != null && restoreBasicValues(beta)
+        // Cached basic values were seated on the real bounds, which an artificial seat does not match.
+        var useCached = kept && model.exactState != null && artificialLower == null && restoreBasicValues(beta)
         val pivotRowEntry = pivotRowEntries // ρ·A_j per nonbasic, reused by the bound-flip ratio test
         val ratioBuf = enteringRatios // |d_j / a_j| per eligible nonbasic
         val elig = eligibleColumns
@@ -1482,20 +1497,20 @@ internal class RevisedSimplex(
         // Whether an iterate's basic values are in [beta], so a solve that stops short can still hand
         // back its bound. The buffer is reused, and holds the last iterate the loop completed.
         var haveBeta = false
-        while (progress.iterations < maxIter) {
+        iterations@ while (progress.iterations < maxIter) {
             val iteration = progress.dualIterations++
             // Cooperative deadline, phased off the first iteration so a spent budget never starts.
             if (iteration % CANCEL_POLL == 0 && cancellation()) {
                 return stopped(
                     LpFloatTermination.CANCELLED,
-                    if (haveBeta && model.exactState == null) truncated(beta) else null,
+                    if (haveBeta && model.exactState == null) boundOnly(beta) else null,
                 )
             }
             // Work budget, checked before the iteration that would exceed it. Pivots are not a unit of
             // cost — one costs an order of magnitude more on a dense basis than a sparse one — so a
             // budget stated in work means the same thing on every model, which a pivot count does not.
             if (effectiveWorkLimit > 0L && work.ops >= effectiveWorkLimit) {
-                return stopped(LpFloatTermination.WORK, if (haveBeta) truncated(beta) else null)
+                return stopped(LpFloatTermination.WORK, if (haveBeta) boundOnly(beta) else null)
             }
             // β = B⁻¹ (b − Σ_{j nonbasic at upper} A_j·u_j)
             if (!useCached) {
@@ -1532,12 +1547,12 @@ internal class RevisedSimplex(
                     // An unenforced row's basic slack is free: its value is never a violation.
                     if (enforced != null && v >= n && !enforced[v - n]) continue
                     val below = if (finiteLower?.get(v) ?: model.hasFiniteLower(v)) {
-                        numerical.lowerD(v) - beta[i]
+                        lowerAt(v) - beta[i]
                     } else {
                         Double.NEGATIVE_INFINITY
                     }
                     val above = if (finiteUpper?.get(v) ?: model.hasFiniteUpper(v)) {
-                        beta[i] - numerical.upperD(v)
+                        beta[i] - upperAt(v)
                     } else {
                         Double.NEGATIVE_INFINITY
                     }
@@ -1550,6 +1565,25 @@ internal class RevisedSimplex(
                         r = i
                         worst = viol
                         belowLower = isBelow
+                    }
+                }
+                if (r == -1 && artificialLower != null) {
+                    // Optimal for the boxed LP. With no nonbasic seated on an artificial side it is optimal
+                    // for the real LP as well: every basic value already meets the real bounds.
+                    when {
+                        artificialSeats() == 0 -> dropArtificialBounds(finiteLower, finiteUpper)
+
+                        // The dual never moves a dual-degenerate nonbasic, so widening could not clear such a seat.
+                        releaseDegenerateArtificialSeats() > 0 -> continue@iterations
+
+                        artificialWidenings < MAX_ARTIFICIAL_WIDENINGS -> {
+                            // Widening moves only nonbasic seats, so the basis stays dual feasible.
+                            widenSeatedArtificialBounds()
+                            progress.dualIterations--
+                            continue@iterations
+                        }
+
+                        else -> return handArtificialBasisToPrimal(progress)
                     }
                 }
                 if (r == -1) {
@@ -1566,11 +1600,11 @@ internal class RevisedSimplex(
                 if (cancellation()) {
                     return stopped(
                         LpFloatTermination.CANCELLED,
-                        if (model.exactState == null) truncated(beta) else null,
+                        if (model.exactState == null) boundOnly(beta) else null,
                     )
                 }
                 if (effectiveWorkLimit > 0L && work.ops >= effectiveWorkLimit) {
-                    return stopped(LpFloatTermination.WORK, truncated(beta))
+                    return stopped(LpFloatTermination.WORK, boundOnly(beta))
                 }
             }
 
@@ -1644,7 +1678,7 @@ internal class RevisedSimplex(
             if (entering == EnteringChoice.ResourceStopped) {
                 lastTheoryPricingResourceStops++
                 val reason = if (cancellation()) LpFloatTermination.CANCELLED else LpFloatTermination.WORK
-                return stopped(reason, if (model.exactState == null) truncated(beta) else null)
+                return stopped(reason, if (model.exactState == null) boundOnly(beta) else null)
             }
             val q = (entering as EnteringChoice.Selected).column
             if (q == null) {
@@ -1656,11 +1690,11 @@ internal class RevisedSimplex(
                     if (cancellation()) {
                         return stopped(
                             LpFloatTermination.CANCELLED,
-                            if (model.exactState == null) truncated(beta) else null,
+                            if (model.exactState == null) boundOnly(beta) else null,
                         )
                     }
                     if (effectiveWorkLimit > 0L && work.ops >= effectiveWorkLimit) {
-                        return stopped(LpFloatTermination.WORK, truncated(beta))
+                        return stopped(LpFloatTermination.WORK, boundOnly(beta))
                     }
                     when (refactorize(LpRefactorReason.NUMERICAL_RECOVERY)) {
                         RefactorResult.UNCHANGED -> Unit
@@ -1669,6 +1703,18 @@ internal class RevisedSimplex(
                     }
                     resetGamma()
                     progress.dualIterations-- // recovery is not a pivot and must not consume [iterationLimit]
+                    continue
+                }
+                if (artificialLower != null) {
+                    // The ray proves only the boxed LP infeasible: an artificial seat or range may be what
+                    // blocks every entering column. With no artificial seat the basis is dual feasible for the
+                    // real bounds, so the iteration is re-derived on them; otherwise the primal decides.
+                    if (artificialSeats() > 0) {
+                        if (releaseDegenerateArtificialSeats() > 0) continue
+                        return handArtificialBasisToPrimal(progress)
+                    }
+                    dropArtificialBounds(finiteLower, finiteUpper)
+                    progress.dualIterations--
                     continue
                 }
                 // Dual unbounded ⇒ primal infeasible. Record the basis + leaving row so the caller can
@@ -1709,7 +1755,7 @@ internal class RevisedSimplex(
         }
         // Iteration budget spent. Same reasoning as the cancellation exit: the iterate bounds, so hand
         // it back rather than discarding the work.
-        return stopped(LpFloatTermination.PIVOTS, if (haveBeta) truncated(beta) else null)
+        return stopped(LpFloatTermination.PIVOTS, if (haveBeta) boundOnly(beta) else null)
     }
 
     private fun restartDual(enforced: BooleanArray?, progress: SolveProgress): FloatLpResult? {
@@ -1757,7 +1803,7 @@ internal class RevisedSimplex(
         for (i in 0 until m) out[i] = numerical.rhsD(i)
         for (j in 0 until numVars) {
             if (status[j] == VarStatus.BASIC) continue
-            val u = seat(numerical, status[j], j)
+            val u = currentSeat(status[j], j)
             if (u == 0.0) continue
             sparseAxpy(out, -u, j)
             work.add(2 * (colPtr[j + 1] - colPtr[j]))
@@ -1780,7 +1826,22 @@ internal class RevisedSimplex(
             VarStatus.AT_LOWER
         }
 
-    private fun boundRange(column: Int): Double = numerical.boundRangeD(column)
+    /** [seat] on the numerical view, reading an artificial side where one is installed. */
+    private fun currentSeat(side: VarStatus, column: Int): Double = when (side) {
+        VarStatus.AT_UPPER -> upperAt(column)
+        VarStatus.AT_LOWER, VarStatus.FIXED -> lowerAt(column)
+        VarStatus.FREE, VarStatus.BASIC -> 0.0
+    }
+
+    private fun boundRange(column: Int): Double {
+        val lower = artificialLower
+        val upper = artificialUpper
+        if (lower == null || upper == null || (lower[column].isNaN() && upper[column].isNaN())) {
+            return numerical.boundRangeD(column)
+        }
+        if (!finiteLowerAt(column) || !finiteUpperAt(column)) return Double.MAX_VALUE
+        return upperAt(column) - lowerAt(column)
+    }
 
     private fun defaultStatus(column: Int): VarStatus = when {
         model.exactState != null && model.fixed(column) -> VarStatus.FIXED
@@ -1799,8 +1860,8 @@ internal class RevisedSimplex(
             if (status[j] == VarStatus.BASIC) continue
             status[j] = when {
                 model.fixed(j) -> VarStatus.FIXED
-                status[j] == VarStatus.AT_LOWER && model.hasFiniteLower(j) -> VarStatus.AT_LOWER
-                status[j] == VarStatus.AT_UPPER && model.hasFiniteUpper(j) -> VarStatus.AT_UPPER
+                status[j] == VarStatus.AT_LOWER && finiteLowerAt(j) -> VarStatus.AT_LOWER
+                status[j] == VarStatus.AT_UPPER && finiteUpperAt(j) -> VarStatus.AT_UPPER
                 else -> defaultStatus(j)
             }
         }
@@ -1820,6 +1881,183 @@ internal class RevisedSimplex(
             }
         }
         return true
+    }
+
+    /*
+     * Artificial bounds: the dual phase one for a slack start that is not dual feasible.
+     *
+     * Each nonbasic column whose reduced cost points at an infinite side is seated on a finite artificial
+     * bound there, which makes the start dual feasible for the boxed LP, and the dual simplex solves that.
+     * The sides live only in these scaled arrays (NaN where the side is the model's own), never in the model
+     * or its exact state. A boxed optimum or ray is a statement about the boxed LP only: it is published once
+     * no nonbasic sits on an artificial side, at which point the basis is a basis of the real LP with the
+     * same values, and otherwise the bounds widen or the basis goes to the primal simplex.
+     */
+    private var artificialLower: DoubleArray? = null
+    private var artificialUpper: DoubleArray? = null
+    private var artificialWidenings = 0
+
+    private fun finiteLowerAt(column: Int): Boolean =
+        model.hasFiniteLower(column) || artificialLower?.get(column)?.isNaN() == false
+
+    private fun finiteUpperAt(column: Int): Boolean =
+        model.hasFiniteUpper(column) || artificialUpper?.get(column)?.isNaN() == false
+
+    private fun lowerAt(column: Int): Double {
+        val artificial = artificialLower?.get(column)
+        return if (artificial == null || artificial.isNaN()) numerical.lowerD(column) else artificial
+    }
+
+    private fun upperAt(column: Int): Double {
+        val artificial = artificialUpper?.get(column)
+        return if (artificial == null || artificial.isNaN()) numerical.upperD(column) else artificial
+    }
+
+    /**
+     * Seat the slack start dual feasibly, boxing the infinite sides that dual feasibility needs. False when a
+     * reduced cost is not finite or the seats still fail the dual check, leaving the primal fallback in charge.
+     */
+    private fun installArtificialBounds(): Boolean {
+        val y = duals()
+        val width = artificialBoundWidth()
+        val lower = DoubleArray(numVars) { Double.NaN }
+        val upper = DoubleArray(numVars) { Double.NaN }
+        var boxed = 0
+        for (j in 0 until numVars) {
+            if (status[j] == VarStatus.BASIC || model.fixed(j)) continue
+            val reduced = cost(j) - dotColumn(y, j)
+            if (!reduced.isFinite()) return false
+            val hasLower = model.hasFiniteLower(j)
+            val hasUpper = model.hasFiniteUpper(j)
+            when {
+                reduced < -tolerance -> {
+                    if (!hasUpper) {
+                        upper[j] = if (hasLower) maxOf(width, numerical.lowerD(j) + width) else width
+                        boxed++
+                    }
+                    status[j] = VarStatus.AT_UPPER
+                }
+
+                reduced > tolerance -> {
+                    if (!hasLower) {
+                        lower[j] = if (hasUpper) minOf(-width, numerical.upperD(j) - width) else -width
+                        boxed++
+                    }
+                    status[j] = VarStatus.AT_LOWER
+                }
+            }
+        }
+        if (boxed > 0) {
+            artificialLower = lower
+            artificialUpper = upper
+            artificialWidenings = 0
+        }
+        if (!dualFeasible()) {
+            clearArtificialBounds()
+            repairNonbasicStatuses()
+            return false
+        }
+        if (boxed > 0) lastNumericalMetrics.artificialStarts++
+        return true
+    }
+
+    /** The artificial box half-width: past every finite bound and rhs magnitude, within a range double precision
+     *  still resolves at the pricing tolerance. */
+    private fun artificialBoundWidth(): Double {
+        var magnitude = 0.0
+        for (i in 0 until m) {
+            val value = abs(numerical.rhsD(i))
+            if (value.isFinite()) magnitude = maxOf(magnitude, value)
+        }
+        for (j in 0 until numVars) {
+            val lower = if (model.hasFiniteLower(j)) abs(numerical.lowerD(j)) else 0.0
+            val upper = if (model.hasFiniteUpper(j)) abs(numerical.upperD(j)) else 0.0
+            if (lower.isFinite()) magnitude = maxOf(magnitude, lower)
+            if (upper.isFinite()) magnitude = maxOf(magnitude, upper)
+        }
+        return (ARTIFICIAL_BOUND_FACTOR * magnitude).coerceIn(ARTIFICIAL_BOUND_FLOOR, ARTIFICIAL_BOUND_CEILING)
+    }
+
+    /** Nonbasic columns seated on an artificial side. */
+    private fun artificialSeats(): Int {
+        val lower = artificialLower ?: return 0
+        val upper = artificialUpper ?: return 0
+        var seated = 0
+        for (j in 0 until numVars) {
+            when (status[j]) {
+                VarStatus.AT_LOWER -> if (!lower[j].isNaN()) seated++
+                VarStatus.AT_UPPER -> if (!upper[j].isNaN()) seated++
+                else -> Unit
+            }
+        }
+        return seated
+    }
+
+    private fun widenSeatedArtificialBounds() {
+        val lower = artificialLower ?: return
+        val upper = artificialUpper ?: return
+        for (j in 0 until numVars) {
+            when (status[j]) {
+                VarStatus.AT_LOWER -> if (!lower[j].isNaN()) lower[j] *= ARTIFICIAL_BOUND_WIDENING
+                VarStatus.AT_UPPER -> if (!upper[j].isNaN()) upper[j] *= ARTIFICIAL_BOUND_WIDENING
+                else -> Unit
+            }
+        }
+        artificialWidenings++
+        lastNumericalMetrics.artificialWidenings++
+    }
+
+    /** Retire the artificial sides once no nonbasic sits on one; the leaving scan's finiteness follows. */
+    private fun dropArtificialBounds(finiteLower: BooleanArray?, finiteUpper: BooleanArray?) {
+        clearArtificialBounds()
+        if (finiteLower != null) for (j in 0 until numVars) finiteLower[j] = model.hasFiniteLower(j)
+        if (finiteUpper != null) for (j in 0 until numVars) finiteUpper[j] = model.hasFiniteUpper(j)
+    }
+
+    private fun clearArtificialBounds() {
+        artificialLower = null
+        artificialUpper = null
+        artificialWidenings = 0
+    }
+
+    /**
+     * Reseat every artificially seated column whose reduced cost is zero within tolerance on a real side, or free
+     * at zero when it has none; the count reseated. Any seat is dual feasible for such a column, so the basis stays
+     * dual feasible while the basic values move.
+     */
+    private fun releaseDegenerateArtificialSeats(): Int {
+        val lower = artificialLower ?: return 0
+        val upper = artificialUpper ?: return 0
+        val y = duals()
+        var released = 0
+        for (j in 0 until numVars) {
+            val seated = when (status[j]) {
+                VarStatus.AT_LOWER -> !lower[j].isNaN()
+                VarStatus.AT_UPPER -> !upper[j].isNaN()
+                else -> false
+            }
+            if (!seated || abs(cost(j) - dotColumn(y, j)) > tolerance) continue
+            status[j] = when {
+                model.hasFiniteLower(j) -> VarStatus.AT_LOWER
+                model.hasFiniteUpper(j) -> VarStatus.AT_UPPER
+                else -> VarStatus.FREE
+            }
+            released++
+        }
+        lastNumericalMetrics.artificialReleases += released
+        return released
+    }
+
+    /**
+     * The boxed solve cannot settle the real LP. Its basis rests on artificial seats the primal would only reseat
+     * arbitrarily, so the primal restarts from the slack start the solve had before boxing.
+     */
+    private fun handArtificialBasisToPrimal(progress: SolveProgress): FloatLpResult? {
+        lastNumericalMetrics.artificialHandoffs++
+        clearArtificialBounds()
+        coldStart()
+        if (refactorize(LpRefactorReason.PRIMAL) == RefactorResult.FAILED) return null
+        return solvePrimalCore(null, reuse = true, reset = false, progress = progress)
     }
 
     private fun retainBasicValues(beta: DoubleArray) {
@@ -2281,6 +2519,9 @@ internal class RevisedSimplex(
         )
     }
 
+    // A boxed iterate bounds only the boxed LP, a restriction of the real one, so it is withheld.
+    private fun boundOnly(beta: DoubleArray): FloatLpResult? = if (artificialLower != null) null else truncated(beta)
+
     /** The basis at the last optimal [solve]; null until an optimal solve. For tableau cut generation. */
     private var optimalBasis: Basis? = null
 
@@ -2554,6 +2795,8 @@ internal class RevisedSimplex(
         progress: SolveProgress = SolveProgress(),
     ): FloatLpResult? {
         if (reset) resetSolveState(warm != null || reuse)
+        // The primal runs on the real bounds only; repairing the statuses below reseats any artificial seat.
+        clearArtificialBounds()
         if (!reset && !resourcesRemain(progress)) return null
         if (model.exactState != null && (cancellation() || model.exactState?.conflict != null)) {
             if (cancellation()) lastTermination = LpFloatTermination.CANCELLED
@@ -2738,6 +2981,18 @@ internal class RevisedSimplex(
         const val CANCEL_POLL: Int = 32
 
         const val MAX_SOLVE_RESTARTS: Int = 4
+
+        /** The artificial box spans this multiple of the model's largest finite magnitude, within the floor and
+         *  ceiling below. */
+        const val ARTIFICIAL_BOUND_FACTOR: Double = 1e3
+        const val ARTIFICIAL_BOUND_FLOOR: Double = 1e6
+        const val ARTIFICIAL_BOUND_CEILING: Double = 1e9
+
+        /** Factor an artificial bound grows by when an optimum of the boxed LP sits on it. */
+        const val ARTIFICIAL_BOUND_WIDENING: Double = 1e3
+
+        /** Widening rounds before the basis goes to the primal: past 1e15 a seat swamps double precision. */
+        const val MAX_ARTIFICIAL_WIDENINGS: Int = 2
     }
 }
 
@@ -2848,4 +3103,16 @@ private fun lpColumns(model: LpScalingView): SparseMatrix {
 internal class SimplexNumericalMetrics {
     var primalBlandEntries = 0
     var capExits = 0
+
+    /** Solves whose slack start the dual simplex took over from artificial bounds. */
+    var artificialStarts = 0
+
+    /** Rounds that widened an artificial bound an optimum of the boxed LP sat on. */
+    var artificialWidenings = 0
+
+    /** Boxed solves that restarted the primal simplex from the slack start instead of publishing. */
+    var artificialHandoffs = 0
+
+    /** Dual-degenerate columns moved off an artificial seat onto a real one. */
+    var artificialReleases = 0
 }
