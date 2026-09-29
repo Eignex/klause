@@ -330,6 +330,35 @@ class CpToLpRelaxationTest {
     }
 
     @Test
+    fun `exact duals carry a float leaf past a degenerate reduced cost on an unbounded column`() {
+        // min x0 + x1 with 5·x0 + 5·x1 ≥ 1 and neither column bounded above: at the dual 1/5 both price exactly zero,
+        // but fl(1/5) lies above it, leaving the nonbasic column a wrong-signed reduced cost that nothing bounds.
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 0,
+            intDomains = emptyArray(),
+            factors = arrayOf<Factor>(
+                Linear(longArrayOf(), intArrayOf(), doubleArrayOf(5.0, 5.0), intArrayOf(0, 1), LinearOp.GE, 1L),
+            ),
+            numRealVars = 2,
+            realLower = doubleArrayOf(0.0, 0.0),
+            realUpper = doubleArrayOf(Double.POSITIVE_INFINITY, Double.POSITIVE_INFINITY),
+        )
+        val vetoed = LpSolveContext(certificationPolicy = LpCertificationPolicy { _, _ -> false })
+
+        val result = leafRealFeasibility(
+            problem,
+            LinearObjective(realCoefficients = doubleArrayOf(1.0, 1.0)),
+            Sample(booleanArrayOf(), longArrayOf()),
+            context = vetoed,
+            toleranceCheck = { true },
+        )
+
+        assertEquals(LpVerdict.ATTAINED_OPTIMUM, result.verdict)
+        assertEquals(0.2, result.reals.sum(), eps)
+    }
+
+    @Test
     fun `a float leaf optimum is refused when rounding understates a row's implied range`() {
         // min 1e5·y + c·w + c·x − 1e5, y + w + x ≥ 1, 1e-8·x − a − Σu − b ≤ −2e-5, w ≤ 1500: in doubles the u vanish
         // beside a and b, so the row implies x ≤ −2000 below its own lower bound; that negative range must not
