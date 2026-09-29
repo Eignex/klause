@@ -1176,10 +1176,13 @@ internal fun exactLpStateKey(model: ExactLpModel): ByteArray? {
 
 private const val MAX_COUNTER_KEY_VALUES = 4096L
 
-// A float optimum the dual check cannot prove gets one cleanup: primal pivots from its own basis at a pricing
-// tolerance well below the engine's, as a solver re-optimizes when unscaled infeasibilities exceed its tolerance.
-// A stop the engine made early moves on to the true optimum in a few pivots; a basis already optimal but priced
-// with noisy duals finds nothing to pivot on and is left to the exact ladder, so the pivots are capped.
+// A float optimum the dual check cannot prove under the engine's duals is checked again under the exact duals of
+// its own basis: at a dual-degenerate optimum a reduced cost that is exactly zero takes a random sign from any
+// inexact duals, and only the exact zero clears a column nothing bounds. A basis whose exact duals leave some
+// reduced cost truly wrong-signed, or whose exact duals decline, gets one cleanup: primal pivots from its own basis
+// at a pricing tolerance well below the engine's, as a solver re-optimizes when unscaled infeasibilities exceed its
+// tolerance. A stop the engine made early moves on to the true optimum in a few pivots; a basis already optimal but
+// priced with noisy duals finds nothing to pivot on and is left to the exact ladder, so the pivots are capped.
 private fun floatOptimum(
     model: LpModel,
     result: FloatLpResult,
@@ -1187,19 +1190,40 @@ private fun floatOptimum(
     offset: Double,
     cancellation: Cancellation,
 ): FloatLpResult? {
-    val candidate = if (floatDualFeasible(model, result, offset)) {
-        result
-    } else {
-        RevisedSimplex(
-            model,
-            cancellation,
-            iterationLimit = CLEANUP_PIVOTS,
-            primalPricingTolerance = CLEANUP_PRICING_TOLERANCE,
-        ).use { it.solvePrimal(result.basis) }
-            ?.takeIf { it.optimal && !cancellation() && floatDualFeasible(model, it, offset) }
+    val verdict = provenFloatOptimum(model, result, offset, cancellation)
+    if (verdict == FloatDualVerdict.ACCEPTED) return result.takeIf(floatAccept)
+    if (verdict == FloatDualVerdict.REFUSED || cancellation()) return null
+    val cleanup = RevisedSimplex(
+        model,
+        cancellation,
+        iterationLimit = CLEANUP_PIVOTS,
+        primalPricingTolerance = CLEANUP_PRICING_TOLERANCE,
+    ).use { it.solvePrimal(result.basis) }
+        ?.takeIf { it.optimal && !cancellation() }
+        ?: return null
+    return cleanup.takeIf {
+        provenFloatOptimum(model, it, offset, cancellation) == FloatDualVerdict.ACCEPTED && floatAccept(it)
     }
-    return candidate?.takeIf(floatAccept)
 }
 
+// ACCEPTED when the engine's duals or the basis's exact duals prove the optimum; WRONG_SIGNED when that is left
+// undecided by a declined exact solve or refuted by a truly wrong-signed exact reduced cost; REFUSED otherwise.
+private fun provenFloatOptimum(
+    model: LpModel,
+    result: FloatLpResult,
+    offset: Double,
+    cancellation: Cancellation,
+): FloatDualVerdict {
+    if (floatDualFeasible(model, result, offset)) return FloatDualVerdict.ACCEPTED
+    val duals = exactBasisDuals(
+        model,
+        result.basis,
+        result.duals,
+        cancellation.shorten(EXACT_DUAL_BUDGET_FRACTION),
+    ).duals ?: return FloatDualVerdict.WRONG_SIGNED
+    return floatDualVerdict(model, result, offset, exactDuals = duals)
+}
+
+private const val EXACT_DUAL_BUDGET_FRACTION: Double = 0.5
 private const val CLEANUP_PRICING_TOLERANCE: Double = 1e-12
 private const val CLEANUP_PIVOTS: Int = 100
