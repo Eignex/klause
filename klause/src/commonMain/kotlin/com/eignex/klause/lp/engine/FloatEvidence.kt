@@ -139,7 +139,7 @@ internal fun floatDualVerdict(
         improvement += (max(wrong, 0.0) + noise) * range
         if (!improvement.isFinite()) return refusal()
     }
-    val limit = tolerance * max(1.0, abs(objective))
+    val limit = tolerance * max(1.0, abs(objective) - objectiveRounding(exact, result, offset))
     if (improvement > limit) return refusal()
     // The padded residuals decide cheaply; a point whose padding alone would refuse it has its residuals taken exactly.
     val weights = exactDuals?.magnitudes ?: result.duals
@@ -169,16 +169,30 @@ private fun nonbasicSlack(exact: ExactLpModel, result: FloatLpResult, i: Int): E
     }
 }
 
+// How far the float objective can overstate the true one: its summation's rounding over every priced term and the
+// constants, in the scaled units the limit is taken in. The limit scales with the smaller size, never the larger.
+private fun objectiveRounding(exact: ExactLpModel, result: FloatLpResult, offset: Double): Double {
+    val scale = exact.objective.scale.approximation
+    var magnitude = abs(exact.objective.constant.approximation) + abs(offset * scale)
+    for (j in 0 until exact.n) magnitude += abs(exact.objective.cost(j).approximation * result.primal[j])
+    return (exact.n + 4) * UNIT_ROUNDOFF * magnitude
+}
+
 private fun exactResidualGap(exact: ExactLpModel, result: FloatLpResult, duals: DoubleArray): Double? {
+    // Only rows whose slack rests on a bound under a nonzero dual add to the gap, so only they need exact activity.
+    val counted = BooleanArray(exact.m) { result.basis.status[exact.n + it] != VarStatus.BASIC && duals[it] != 0.0 }
     val activity = Array(exact.m) { BigFraction.ZERO }
     for (j in 0 until exact.n) {
+        if (exact.entries(j).none { counted[it.row] }) continue
         val shifted = (BigFraction.ofDouble(result.primal[j]) ?: return null) - exact.column(j).origin.value
         if (shifted.isZero) continue
-        for (entry in exact.entries(j)) activity[entry.row] += entry.number.value * shifted
+        for (entry in exact.entries(j)) {
+            if (counted[entry.row]) activity[entry.row] += entry.number.value * shifted
+        }
     }
     var gap = 0.0
     for (i in 0 until exact.m) {
-        if (result.basis.status[exact.n + i] == VarStatus.BASIC || duals[i] == 0.0) continue
+        if (!counted[i]) continue
         val slack = nonbasicSlack(exact, result, i) ?: return null
         val residual = magnitudeAbove(activity[i] + slack.value - exact.rhs(i).value) ?: return null
         // The residual is already rounded up; the factor covers the product.
