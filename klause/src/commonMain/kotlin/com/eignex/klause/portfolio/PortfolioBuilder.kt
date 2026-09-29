@@ -1,6 +1,7 @@
 package com.eignex.klause.portfolio
 
 import com.eignex.klause.localsearch.DefinitionalSweep
+import com.eignex.klause.localsearch.localSearchSupports
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.incumbent.IncumbentExchange
 import com.eignex.klause.solver.objective.IncrementalObjective
@@ -42,7 +43,12 @@ object PortfolioBuilder {
         definitionalSweep: DefinitionalSweep? = null,
         onEvent: ((worker: String, event: SearchEvent) -> Unit)? = null,
     ): List<PortfolioWorker> {
-        val composed = PortfolioComposition.compose(scenario)
+        // Local-search arms decline a model they cannot run at once, and being non-resumable they would be
+        // rescheduled every slice, so the run leaves them out; an all-local-search mix keeps them and declines. The
+        // scenario's own arm count is taken first, so leaving them out never lets a later-ranked arm in.
+        val composed = PortfolioComposition.compose(scenario).take(scenario.arms).let { arms ->
+            if (localSearchSupports(problem)) arms else arms.filter { it !is LocalSearchWorkerConfig }.ifEmpty { arms }
+        }
         // Expand the composed arms to one entry per lane. A lane is a worker slot; a parallel track
         // wants one per core, the sequential track one per arm — so laneCount is maxOf(arms, cores).
         // When arms >= cores (every existing scenario) this is a no-op cycle that returns the composed
@@ -50,7 +56,7 @@ object PortfolioBuilder {
         // cycling the composed arms so the extra lanes are seed-diversified replicas: materialize feeds
         // each lane's index as its per-worker seed offset, exactly as diverse() wraps past the pool onto
         // fresh seeds, so a replica of a config gets a distinct seed.
-        val laneCount = maxOf(scenario.arms, scenario.cores)
+        val laneCount = maxOf(composed.size, scenario.cores)
         val lanes = List(laneCount) { composed[it % composed.size] }
         // Lane i is a replica of composed arm i % composed.size, so that is its stable arm identity:
         // replicas of one config share an armId, distinct composed arms get distinct ones.
