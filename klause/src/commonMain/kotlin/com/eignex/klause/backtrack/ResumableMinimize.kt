@@ -924,11 +924,13 @@ internal class ResumableMinimize(
             val incumbent = if (problem.numRealVars == 0) {
                 recordIfImproving(sample, objective.evaluate(sample))
             } else {
+                // Only the run's end may cut a leaf LP short. A slice boundary pauses at the next decision, and
+                // a leaf it cut would read as unresolved, which ends the whole search without a verdict.
                 val real = leafRealFeasibility(
                     problem,
                     objective,
                     sample,
-                    Cancellation { sliceCancelled() },
+                    Cancellation { solveCancelled() },
                     componentSplit = params.lpPlan.componentSplit,
                     sink = sink.lp,
                     context = solver.lpSolveContext,
