@@ -362,13 +362,23 @@ class LpLifecycleTest {
         val solver = BacktrackSolver(wideProblem().bake(), context(factory))
         val repair = solver.openRepair(objective(), params())
 
-        repair.repair(Assumptions.None, decisionBudget = 2L, cutoff = Double.POSITIVE_INFINITY)
+        repair.repair(
+            Assumptions.None,
+            decisionBudget = 2L,
+            cutoff = Double.POSITIVE_INFINITY,
+            cancellation = Cancellation.Never,
+        )
         val kept = factory.persistent.single()
         val operations = kept.operations
         val factorizations = kept.factorizations
         assertFalse(kept.closed)
 
-        repair.repair(Assumptions.None, decisionBudget = 2L, cutoff = Double.POSITIVE_INFINITY)
+        repair.repair(
+            Assumptions.None,
+            decisionBudget = 2L,
+            cutoff = Double.POSITIVE_INFINITY,
+            cancellation = Cancellation.Never,
+        )
 
         assertEquals(1, factory.persistent.size)
         assertTrue(kept.operations > operations)
@@ -393,10 +403,20 @@ class LpLifecycleTest {
         val factory = LifecycleFactory().also { it.failPersistentClose = true }
         val solver = BacktrackSolver(wideProblem().bake(), context(factory))
         val repair = solver.openRepair(objective(), params().copy(clauseExchange = exchange))
-        repair.repair(Assumptions.None, decisionBudget = 2L, cutoff = Double.POSITIVE_INFINITY)
+        repair.repair(
+            Assumptions.None,
+            decisionBudget = 2L,
+            cutoff = Double.POSITIVE_INFINITY,
+            cancellation = Cancellation.Never,
+        )
 
         val failure = assertFailsWith<IllegalStateException> {
-            repair.repair(Assumptions.None, decisionBudget = 2L, cutoff = Double.POSITIVE_INFINITY)
+            repair.repair(
+                Assumptions.None,
+                decisionBudget = 2L,
+                cutoff = Double.POSITIVE_INFINITY,
+                cancellation = Cancellation.Never,
+            )
         }
 
         assertEquals("rebind failure", failure.message)
@@ -410,7 +430,7 @@ class LpLifecycleTest {
         val problem = wideProblem().bake()
         val objective = objective()
         val repair = RepairOperator { context ->
-            context.repairSearch?.repair(context.pinAssumptions, 2L, context.bestObjective)
+            context.repairSearch?.repair(context.pinAssumptions, 2L, context.bestObjective, context.params.cancellation)
             factory.failPersistentClose = true
             error("owner failure")
         }

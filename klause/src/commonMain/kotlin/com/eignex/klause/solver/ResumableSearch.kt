@@ -105,11 +105,12 @@ interface ResumableOptimizer<P : SolverParams> : Optimizer<P> {
 internal interface RepairSearch : AutoCloseable {
     /**
      * Solve the fragment pinned by [assumptions] under a [decisionBudget] (decisions), pruning against
-     * [cutoff]. The caller MUST keep [cutoff] monotone non-increasing across calls — the reused session
-     * retains permanent objective-bound clauses, so a monotone cutoff keeps every stale bound looser than
-     * the current one (never a wrong prune). Returns the best strictly-better completion found, or null.
+     * [cutoff] and stopping when [cancellation] fires. The caller MUST keep [cutoff] monotone
+     * non-increasing across calls — the reused session retains permanent objective-bound clauses, so a
+     * monotone cutoff keeps every stale bound looser than the current one (never a wrong prune). Returns
+     * the best strictly-better completion found, or null.
      */
-    fun repair(assumptions: Assumptions, decisionBudget: Long, cutoff: Double): Sample?
+    fun repair(assumptions: Assumptions, decisionBudget: Long, cutoff: Double, cancellation: Cancellation): Sample?
 
     override fun close() {}
 }
