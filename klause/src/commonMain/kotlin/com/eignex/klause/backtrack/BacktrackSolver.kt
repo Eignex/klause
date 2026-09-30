@@ -23,6 +23,7 @@ import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.Cancellation
 import kotlin.random.Random
+import kotlin.time.ComparableTimeMark
 
 /**
  * Complete depth-first search over a `Problem`'s assignment space, driven by propagation
@@ -88,20 +89,33 @@ class BacktrackSolver internal constructor(
     @Suppress("TooGenericExceptionCaught") // the repair owner must preserve arbitrary primary and cleanup failures
     internal fun openRepair(objective: LinearObjective, params: BacktrackParams): RepairSearch {
         var activeCutoff = Double.POSITIVE_INFINITY
+        // The handle is non-pausable, so its own token is all that stops a fragment's search and its leaf LP
+        // checks; each repair points it at that repair's caller token.
+        var activeCancellation = params.cancellation
+        val handleCancellation = object : Cancellation {
+            override fun isCancelled(): Boolean = activeCancellation()
+            override fun deadline(): ComparableTimeMark? = activeCancellation.deadline()
+        }
         val handle = ResumableMinimize(
             this,
             objective,
-            params.copy(objectiveBoundSupplier = { activeCutoff }),
+            params.copy(objectiveBoundSupplier = { activeCutoff }, cancellation = handleCancellation),
             pausable = false,
             rebindable = true,
         )
         return object : RepairSearch {
-            override fun repair(assumptions: Assumptions, decisionBudget: Long, cutoff: Double): Sample? {
+            override fun repair(
+                assumptions: Assumptions,
+                decisionBudget: Long,
+                cutoff: Double,
+                cancellation: Cancellation,
+            ): Sample? {
                 try {
                     require(!cutoff.isNaN() && cutoff <= activeCutoff) {
                         "repair objective cutoff must be non-increasing"
                     }
                     activeCutoff = cutoff
+                    activeCancellation = params.cancellation or cancellation
                     handle.rebind(assumptions, decisionBudget)
                     var best: Sample? = null
                     while (!handle.isDone) {

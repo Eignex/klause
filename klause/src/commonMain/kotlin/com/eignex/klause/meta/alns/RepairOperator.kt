@@ -116,14 +116,20 @@ internal class BacktrackRepair(val label: String = "standard", val maxDecisions:
     override fun repair(context: RepairContext): Sample? {
         // Persistent path: reuse one session + LP across fragments, pruning against the monotone
         // best-so-far cutoff (the reused session's accumulated objective bounds stay monotone-tightening).
-        context.repairSearch?.let { return it.repair(context.pinAssumptions, maxDecisions, context.bestObjective) }
+        context.repairSearch?.let {
+            return it.repair(context.pinAssumptions, maxDecisions, context.bestObjective, context.params.cancellation)
+        }
         // Fallback: a fresh bounded solve per repair, pruning against this iteration's incumbent.
         val engine = context.backtrack ?: return null
         val base = context.backtrackParams ?: return null
         val incumbentObjective = context.objective.evaluate(context.incumbent)
         val pinned = base
             .withAssumptions(context.pinAssumptions)
-            .copy(maxDecisions = maxDecisions, objectiveBoundSupplier = { incumbentObjective })
+            .copy(
+                maxDecisions = maxDecisions,
+                objectiveBoundSupplier = { incumbentObjective },
+                cancellation = base.cancellation or context.params.cancellation,
+            )
         return engine.minimize(context.objective, pinned).assignment
     }
 

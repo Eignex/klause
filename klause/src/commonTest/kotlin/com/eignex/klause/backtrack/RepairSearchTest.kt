@@ -12,6 +12,7 @@ import com.eignex.klause.propagation.SharedClause
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -33,7 +34,7 @@ class RepairSearchTest {
 
         solver.openRepair(objective, BacktrackParams()).use { repair ->
             repeat(3) {
-                val sample = assertNotNull(repair.repair(Assumptions.None, 100L, 0.0))
+                val sample = assertNotNull(repair.repair(Assumptions.None, 100L, 0.0, Cancellation.Never))
                 assertEquals(-1.0, objective.evaluate(sample))
             }
         }
@@ -45,8 +46,9 @@ class RepairSearchTest {
         val solver = BacktrackSolver(Problem(1, 0, emptyArray(), emptyArray()).bake())
 
         solver.openRepair(objective, BacktrackParams()).use { repair ->
-            assertEquals(-1.0, objective.evaluate(assertNotNull(repair.repair(Assumptions.None, 100L, 0.0))))
-            assertNull(repair.repair(Assumptions.None, 100L, -1.0))
+            val best = assertNotNull(repair.repair(Assumptions.None, 100L, 0.0, Cancellation.Never))
+            assertEquals(-1.0, objective.evaluate(best))
+            assertNull(repair.repair(Assumptions.None, 100L, -1.0, Cancellation.Never))
         }
     }
 
@@ -57,9 +59,9 @@ class RepairSearchTest {
 
         for (invalid in listOf(1.0, Double.NaN)) {
             solver.openRepair(objective, BacktrackParams()).use { repair ->
-                assertNotNull(repair.repair(Assumptions.None, 100L, 0.0))
+                assertNotNull(repair.repair(Assumptions.None, 100L, 0.0, Cancellation.Never))
                 assertFailsWith<IllegalArgumentException> {
-                    repair.repair(Assumptions.None, 100L, invalid)
+                    repair.repair(Assumptions.None, 100L, invalid, Cancellation.Never)
                 }
             }
         }
@@ -75,7 +77,7 @@ class RepairSearchTest {
             val objective = LinearObjective(boolWeights = longArrayOf(weight))
             val improvingSourceValues = listOf(0L, weight).filter { it < cutoffAsLong }
             solver.openRepair(objective, BacktrackParams()).use { repair ->
-                val sample = repair.repair(Assumptions.None, 100L, cutoff)
+                val sample = repair.repair(Assumptions.None, 100L, cutoff, Cancellation.Never)
                 if (improvingSourceValues.isEmpty()) {
                     assertNull(sample)
                 } else {
@@ -94,7 +96,7 @@ class RepairSearchTest {
         for (cutoff in listOf(-1.5, -2.0)) {
             val improvingSourceValues = listOf(0L, -2L).filter { it.toDouble() < cutoff }
             solver.openRepair(objective, BacktrackParams()).use { repair ->
-                val sample = repair.repair(Assumptions.None, 100L, cutoff)
+                val sample = repair.repair(Assumptions.None, 100L, cutoff, Cancellation.Never)
                 if (improvingSourceValues.isEmpty()) {
                     assertNull(sample)
                 } else {
@@ -113,7 +115,7 @@ class RepairSearchTest {
         assertTrue(sourceCost > BigFraction.ofLong(1L))
 
         solver.openRepair(objective, BacktrackParams()).use { repair ->
-            assertNull(repair.repair(forced, 100L, 1.0))
+            assertNull(repair.repair(forced, 100L, 1.0, Cancellation.Never))
         }
     }
 
@@ -129,7 +131,9 @@ class RepairSearchTest {
         )
 
         BacktrackSolver(problem).openRepair(objective, params).use { repair ->
-            val best = assertNotNull(repair.repair(Assumptions.None, 100L, Double.POSITIVE_INFINITY))
+            val best = assertNotNull(
+                repair.repair(Assumptions.None, 100L, Double.POSITIVE_INFINITY, Cancellation.Never),
+            )
             assertEquals(values.min(), best.ints.single())
             assertEquals(values, offers)
         }
@@ -150,28 +154,32 @@ class RepairSearchTest {
         val params = fixture.params.copy(clauseExchange = exchange)
 
         BacktrackSolver(fixture.problem).openRepair(fixture.objective, params).use { repair ->
-            val initial = assertNotNull(repair.repair(Assumptions.None, 100000L, 4.0))
+            val initial = assertNotNull(repair.repair(Assumptions.None, 100000L, 4.0, Cancellation.Never))
             val initialMask = fixture.weights.indices.sumOf { initial.ints[it].toInt() shl it }
             assertTrue(initialMask in fixture.improvingMasks(4L))
             assertEquals(-4L, fixture.sourceCost(initialMask))
             assertEquals(-4L, fixture.objective.evaluateLong(initial))
             assertEquals(1L, assertNotNull(observedSession).intDomain(1).min)
 
-            val restricted = assertNotNull(repair.repair(Assumptions.None.withInt(0, 0), 100000L, 4.0))
+            val restricted = assertNotNull(
+                repair.repair(Assumptions.None.withInt(0, 0), 100000L, 4.0, Cancellation.Never),
+            )
             val restrictedMask = fixture.weights.indices.sumOf { restricted.ints[it].toInt() shl it }
             assertTrue(restrictedMask in fixture.improvingMasks(4L, 0L))
             assertEquals(3L, fixture.sourceCost(restrictedMask))
             assertEquals(3L, fixture.objective.evaluateLong(restricted))
             assertEquals(1L, assertNotNull(observedSession).intDomain(1).min)
 
-            assertNull(repair.repair(Assumptions.None.withInt(0, 0), 100000L, 3.0))
+            assertNull(repair.repair(Assumptions.None.withInt(0, 0), 100000L, 3.0, Cancellation.Never))
             assertTrue(fixture.improvingMasks(3L, 0L).isEmpty())
 
-            val improved = assertNotNull(repair.repair(Assumptions.None.withInt(0, 1), 100000L, 2.0))
+            val improved = assertNotNull(
+                repair.repair(Assumptions.None.withInt(0, 1), 100000L, 2.0, Cancellation.Never),
+            )
             assertEquals(-4L, fixture.objective.evaluateLong(improved))
             assertEquals(-4L, fixture.improvingMasks(2L, 1L).minOf(fixture::sourceCost))
 
-            assertNull(repair.repair(Assumptions.None, 100000L, -4.0))
+            assertNull(repair.repair(Assumptions.None, 100000L, -4.0, Cancellation.Never))
             assertTrue(fixture.improvingMasks(-4L).isEmpty())
         }
     }
@@ -186,11 +194,11 @@ class RepairSearchTest {
         val params = BacktrackParams(pbObjectiveCutoff = true, lubyRestartBase = 1)
 
         solver.openRepair(objective, params).use { repair ->
-            val full = assertNotNull(repair.repair(Assumptions.None, 1000L, 0.0))
+            val full = assertNotNull(repair.repair(Assumptions.None, 1000L, 0.0, Cancellation.Never))
             assertEquals(-4.0, objective.evaluate(full))
 
             val restricted = assertNotNull(
-                repair.repair(Assumptions(mapOf(0 to false), emptyMap()), 1000L, 0.0),
+                repair.repair(Assumptions(mapOf(0 to false), emptyMap()), 1000L, 0.0, Cancellation.Never),
             )
             assertEquals(false, restricted.bools[0])
             assertEquals(-3.0, objective.evaluate(restricted))
@@ -207,12 +215,22 @@ class RepairSearchTest {
         val handle = BacktrackSolver(problem.bake()).openRepair(objective, BacktrackParams())
 
         // Pin 2,3 false → exactly-one over {0,1}; the cheaper choice is var 1 (weight 5).
-        val a = handle.repair(Assumptions(mapOf(2 to false, 3 to false), emptyMap()), 2_000L, Double.POSITIVE_INFINITY)
+        val a = handle.repair(
+            Assumptions(mapOf(2 to false, 3 to false), emptyMap()),
+            2_000L,
+            Double.POSITIVE_INFINITY,
+            Cancellation.Never,
+        )
         assertNotNull(a)
         assertEquals(5.0, objective.evaluate(a))
 
         // Reuse the SAME handle with a different pin set → {2,3}; the cheaper choice is var 3 (weight 3).
-        val b = handle.repair(Assumptions(mapOf(0 to false, 1 to false), emptyMap()), 2_000L, Double.POSITIVE_INFINITY)
+        val b = handle.repair(
+            Assumptions(mapOf(0 to false, 1 to false), emptyMap()),
+            2_000L,
+            Double.POSITIVE_INFINITY,
+            Cancellation.Never,
+        )
         assertNotNull(b)
         assertEquals(3.0, objective.evaluate(b), "the re-seeded fragment solves correctly, uncorrupted by the first")
 

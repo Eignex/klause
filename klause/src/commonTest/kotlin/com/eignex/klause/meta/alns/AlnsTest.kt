@@ -20,6 +20,7 @@ import com.eignex.klause.solver.incumbent.IncumbentExchange
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.TerminationReason
+import com.eignex.klause.util.Cancellation
 import com.eignex.kumulant.bandit.univariate.BetaBernoulliTS
 import com.eignex.kumulant.bandit.univariate.MultiArmedBandit
 import kotlin.random.Random
@@ -27,6 +28,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNotSame
+import kotlin.test.assertNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
@@ -337,6 +339,33 @@ class AlnsTest {
         assertEquals(false, sample.bools[1])
         assertEquals(false, sample.bools[2])
         assertEquals(true, sample.bools[3], "free var 3 should be flipped to satisfy exactly-one")
+    }
+
+    @Test
+    fun `backtrack repair stops at the run cancellation on both the reused and the fresh solve path`() {
+        val factor = Cardinality.exactlyOne(
+            intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true), Lit.make(3, true)),
+        )
+        val problem = Problem(4, 0, emptyArray(), listOf(factor)).bake()
+        val objective = LinearObjective(boolWeights = longArrayOf(10L, 5L, 8L, 3L))
+        val solver = BacktrackSolver(problem)
+        for (reused in listOf(true, false)) {
+            solver.openRepair(objective, BacktrackParams()).use { handle ->
+                val context = RepairContext(
+                    inner = LocalSearchSolver(problem),
+                    params = LocalSearchParams(randomSeed = 0L, cancellation = Cancellation { true }),
+                    objective = objective,
+                    pinAssumptions = Assumptions.None,
+                    incumbent = Sample(booleanArrayOf(true, false, false, false), LongArray(0)),
+                    freed = FreedVars(intArrayOf(0, 1, 2, 3), IntArray(0)),
+                    backtrack = solver,
+                    backtrackParams = BacktrackParams(),
+                    repairSearch = handle.takeIf { reused },
+                    bestObjective = 10.0,
+                )
+                assertNull(BacktrackRepair().repair(context), "reused=$reused")
+            }
+        }
     }
 
     @Test
