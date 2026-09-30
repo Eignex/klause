@@ -9,9 +9,11 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 /**
@@ -88,5 +90,33 @@ class ResumableNodeSliceTest {
         val afterSecond = search.stats.search.nodes.sum
 
         assertTrue(afterSecond > afterFirst, "the second slice must add nodes, not replay the first")
+    }
+
+    @Test
+    fun `a mixed search sliced one node at a time still proves its optimum`() {
+        val n = 3
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = n,
+            intDomains = Array(n) { IntDomain(0, 2) },
+            factors = arrayOf<Factor>(
+                Linear(LongArray(n) { 1L }, IntArray(n) { it }, doubleArrayOf(1.0), intArrayOf(0), LinearOp.GE, 5L),
+            ),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(10.0),
+        ).bake()
+        val objective = LinearObjective(
+            intCoefficients = longArrayOf(2L, 3L, 1L),
+            realCoefficients = doubleArrayOf(1.5),
+        )
+        val search = BacktrackSolver(problem).resumable(objective, BacktrackParams(randomSeed = 0L))
+
+        var terminal: MinimizeResult? = null
+        while (terminal == null) {
+            terminal = search.runSlice(Cancellation.Never, sliceMillis = 60_000, sliceNodes = 1L) { }
+        }
+
+        assertEquals(6.5, assertIs<MinimizeResult.Optimal>(terminal).objective)
     }
 }
