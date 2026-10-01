@@ -8,6 +8,7 @@ import com.eignex.klause.lp.engine.ExactLpNumber
 import com.eignex.klause.lp.engine.IntegerCertificate
 import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.integerFarkasRay
+import com.eignex.klause.lp.engine.rationalizeToIntegerModel
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.Int128
@@ -158,13 +159,22 @@ internal object LpExplanation {
      */
     fun infeasibilityClause(relaxation: LpRelaxation, ray: LongArray, session: PropagationSession): IntArray? {
         val model = relaxation.model
+        // A real model's ray is certified against its real coefficients, which the integer store does not
+        // hold: a real row is all zeros there. Signing ρ·A_j from that store would drop every real row's
+        // share, seat columns on the wrong side, and leave out bounds the proof rests on. The scaled-integer
+        // rationalization the certificate was checked on has the same signs, since its scale is positive.
+        val coefficients = if (model.doubleView == null) {
+            model
+        } else {
+            rationalizeToIntegerModel(model, outwardRealUppers = true)?.model ?: return null
+        }
         val lits = IntArrayList()
         val seen = IntHashSet()
         val rows = (0 until model.m).filter { ray[it] != 0L }.toIntArray()
         if (!addRowPremiseLits(lits, seen, relaxation, rows, session)) return null
         for (col in relaxation.colVarId.indices) {
             val ajAcc = Int128()
-            model.forEachInColumn(col) { i, a -> ajAcc.addProduct(ray[i], a) }
+            coefficients.forEachInColumn(col) { i, a -> ajAcc.addProduct(ray[i], a) }
             if (ajAcc.overflow) return null // can't determine the premise side ⇒ inexpressible
             val sign = if (ajAcc.hi == 0L && ajAcc.lo == 0L) {
                 0

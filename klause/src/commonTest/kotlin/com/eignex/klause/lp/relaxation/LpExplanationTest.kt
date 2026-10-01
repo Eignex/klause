@@ -74,4 +74,32 @@ class LpExplanationTest {
         val clause = LpExplanation.infeasibilityClause(relaxation, ray, session)
         assertEquals(listOf(session.boundGeLit(x, 2, positive = false)), clause?.toList())
     }
+
+    @Test
+    fun `a farkas nogood through a real row cites the bound that row carries`() {
+        // x in [2,5], y in [0,5]; the real row 0.5x - 0.5y <= 0 and the integer row y <= 1. Their sum is
+        // x <= 1, so the proof rests on x >= 2 alone, and y cancels out of it.
+        val b = LpBuilder()
+        val x = b.addVar(2, 5, cost = 0)
+        val y = b.addVar(0, 5, cost = 0)
+        b.addRealRow(intArrayOf(x, y), doubleArrayOf(0.5, -0.5), Relation.LE, 0.0)
+        b.addRow(mapOf(y to 1L), Relation.LE, 1)
+        val model = b.build(Sense.MINIMIZE)
+        val simplex = RevisedSimplex(model)
+        assertTrue(simplex.solve() == null, "the LP is infeasible, so solve() must return null")
+        val ray = assertNotNull(integerFarkasRay(model, assertNotNull(simplex.infeasibleRay)))
+        val relaxation = LpRelaxation(
+            model = model,
+            colVarId = intArrayOf(x, y),
+            colIsBool = booleanArrayOf(false, false),
+            objectiveConstant = 0L,
+            intColOf = intArrayOf(x, y),
+            boolColOf = IntArray(0),
+        )
+        val session = PropagationSession(Problem(0, 2, arrayOf(IntDomain(2, 5), IntDomain(0, 5)), arrayOf<Factor>()))
+
+        val clause = LpExplanation.infeasibilityClause(relaxation, ray, session)
+
+        assertEquals(listOf(session.boundGeLit(x, 2, positive = false)), clause?.toList())
+    }
 }
