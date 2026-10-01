@@ -141,7 +141,8 @@ internal class LpBoundTrail(initial: LpExactState) {
         if (!canDeactivate(removed, assertions)) return false
         val next = snapshot(
             assertions = assertions,
-            rows = state.rows.deactivate(removed),
+            // The same rows object when none go, so the popped state can derive from this one.
+            rows = if (removed.isEmpty()) state.rows else state.rows.deactivate(removed),
             rowRevision = state.rowRevision + if (removed.isEmpty()) 0L else 1L,
             scopes = state.scopes.take(targetDepth),
             boundRevision = state.boundRevision + 1L,
@@ -294,6 +295,7 @@ internal class LpBoundTrail(initial: LpExactState) {
         changedColumns,
         rows,
         rowRevision,
+        previous = state,
     ).also { if (matrixRevision == state.matrixRevision) it.inheritProjection(state) }
 
     private fun commit(next: LpExactState, token: Cancellation): Boolean {

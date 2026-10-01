@@ -912,8 +912,8 @@ internal class ExactLpModel private constructor(
                 require(column.all { it.row in 0 until m })
                 require(column.zipWithNext().all { (a, b) -> a.row < b.row })
             }
+            require((n until numVars).all { this.columns[it].origin.value.isZero }) { "slack origins must be zero" }
         }
-        require((n until numVars).all { this.columns[it].origin.value.isZero }) { "slack origins must be zero" }
     }
 
     fun column(j: Int): ExactLpColumn = columns[j]
@@ -939,6 +939,17 @@ internal class ExactLpModel private constructor(
             objective,
             false,
         )
+    }
+
+    /**
+     * This model with [columns] in place of its own, for a caller that changed only bounds and integrality, so
+     * every origin, and with it every invariant [copy] rechecks, is the one this model already holds. The bound
+     * trail derives a state per search push from its predecessor this way; [copy]'s checks are linear in the
+     * columns, with exact arithmetic, and would cost every push that much.
+     */
+    fun withBoundColumns(columns: List<ExactLpColumn>): ExactLpModel {
+        require(columns.size == numVars)
+        return ExactLpModel(matrix, rightHandSide, columns, rows, objective, false)
     }
 
     fun recentered(origins: List<ExactLpNumber>): ExactLpModel {
