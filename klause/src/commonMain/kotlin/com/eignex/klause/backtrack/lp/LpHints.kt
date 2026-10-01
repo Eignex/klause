@@ -64,11 +64,12 @@ internal class LpHints(numIntVars: Int, numBoolVars: Int) : LpHintSink {
                 intVal[v] = primal[col]
                 intStamp[v] = solveStamp
             }
-            // Reduced cost dⱼ = cⱼ − yᵀAⱼ over the structural column; |dⱼ| feeds the pseudo-cost average.
+            // Reduced cost dⱼ = cⱼ − yᵀAⱼ over the structural column; |dⱼ| feeds the pseudo-cost average. Read
+            // through the double view, which holds a real row's coefficients; the integer store holds it as zeros.
             if (col >= model.n) continue
             var dot = 0.0
-            model.forEachInColumn(col) { i, a -> dot += duals[i] * a }
-            val rc = abs(model.cost[col].toDouble() - dot)
+            model.forEachInColumnD(col) { i, a -> dot += duals[i] * a }
+            val rc = abs(model.costD(col) - dot)
             if (rc <= RC_TOL) continue // basic / zero-reduced-cost: no objective-sensitivity signal
             if (relaxation.colIsBool[col]) {
                 boolRc[v] = if (boolRc[v].isNaN()) rc else RC_DECAY * boolRc[v] + (1.0 - RC_DECAY) * rc
