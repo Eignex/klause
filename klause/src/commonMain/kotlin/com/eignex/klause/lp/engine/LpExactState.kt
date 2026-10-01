@@ -63,14 +63,24 @@ internal class LpExactState internal constructor(
     changedColumns: List<Int> = emptyList(),
     val rows: LpScopedRows = LpScopedRows.initial(baseModel.m),
     val rowRevision: Long = 0L,
+    /**
+     * The state this one follows on the trail. When it shares this state's base model and rows, only the columns
+     * whose assertions differ are rebuilt and the rest are taken from it: a search push otherwise rebuilds every
+     * column and rechecks every assertion, which on a large model costs more than the node it is for.
+     */
+    previous: LpExactState? = null,
 ) {
     private val activeAssertions = assertions.toList()
     private val scopeMarks = scopes.toList()
     private val changed = changedColumns.toList()
-    private val lower = arrayOfNulls<LpBoundAssertion>(baseModel.numVars)
-    private val upper = arrayOfNulls<LpBoundAssertion>(baseModel.numVars)
+    private val lower: Array<LpBoundAssertion?>
+    private val upper: Array<LpBoundAssertion?>
+    private val inconsistent: BooleanArray
     private var projection: LpMatrixProjection? = null
     private var projectionAttempted = false
+
+    // Whether every right-hand side, cost, bound and origin projects to a finite double; null until checked.
+    private var scalarsProjectable: Boolean? = null
 
     val assertions: List<LpBoundAssertion> get() = activeAssertions.toList()
     val scopes: List<Int> get() = scopeMarks.toList()
@@ -82,14 +92,60 @@ internal class LpExactState internal constructor(
     init {
         require(listOf(matrixRevision, boundRevision, objectiveRevision, popRevision, rowRevision).all { it >= 0L })
         require(rows.size == baseModel.m)
+        require(scopeMarks.all { it in 0..activeAssertions.size })
+        require(scopeMarks.zipWithNext().all { (a, b) -> a <= b })
+        require(changed.all { it in 0 until baseModel.numVars } && changed.distinct().size == changed.size)
+        val source = previous?.takeIf { it.baseModel === baseModel && it.rows === rows }
+        if (source == null) {
+            validateRows()
+            validateAssertions(0)
+            lower = arrayOfNulls(baseModel.numVars)
+            upper = arrayOfNulls(baseModel.numVars)
+            for (j in 0 until baseModel.numVars) seedDeclared(j)
+            for (assertion in activeAssertions) tighten(assertion)
+            model = fullModel()
+            inconsistent = BooleanArray(model.numVars) { !model.column(it).bounds.consistent }
+        } else {
+            val shared = sharedPrefix(source.activeAssertions)
+            validateAssertions(shared)
+            val touched = HashSet<Int>()
+            for (index in shared until source.activeAssertions.size) touched.add(source.activeAssertions[index].column)
+            for (index in shared until activeAssertions.size) touched.add(activeAssertions[index].column)
+            lower = source.lower.copyOf()
+            upper = source.upper.copyOf()
+            for (j in touched) seedDeclared(j)
+            if (touched.isNotEmpty()) {
+                for (assertion in activeAssertions) if (assertion.column in touched) tighten(assertion)
+            }
+            model = if (touched.isEmpty()) {
+                source.model
+            } else {
+                source.model.withBoundColumns(
+                    List(baseModel.numVars) { if (it in touched) column(it) else source.model.column(it) },
+                )
+            }
+            inconsistent = source.inconsistent.copyOf()
+            for (j in touched) inconsistent[j] = !model.column(j).bounds.consistent
+            // Right-hand sides, costs and origins are the base model's, so only the touched bounds can change it.
+            if (source.scalarsProjectable == true) scalarsProjectable = touched.all { boundsProject(it) }
+        }
+        conflict = inconsistent.indexOfFirst { it }.takeIf { it >= 0 }?.let {
+            LpBoundConflict(it, requireNotNull(lower[it]), requireNotNull(upper[it]))
+        }
+    }
+
+    private fun validateRows() {
         require(rows.entries().all { !it.active || it.depth == null || it.depth <= depth })
         require(
             (0 until rows.size).all { rows.row(it).active || baseModel.objective.cost(baseModel.n + it).value.isZero },
         )
-        require(scopeMarks.all { it in 0..activeAssertions.size })
-        require(scopeMarks.zipWithNext().all { (a, b) -> a <= b })
-        require(activeAssertions.map { it.witness }.distinct().size == activeAssertions.size)
-        for ((index, assertion) in activeAssertions.withIndex()) {
+    }
+
+    // Checks the assertions from [from] on; the ones before it were checked when the state that shares them was built.
+    private fun validateAssertions(from: Int) {
+        val witnesses = HashSet<Long>()
+        for (index in from until activeAssertions.size) {
+            val assertion = activeAssertions[index]
             require(assertion.column in 0 until baseModel.numVars && assertion.witness >= 0L)
             require(assertion.column < baseModel.n || rows.row(assertion.column - baseModel.n).active)
             require(
@@ -97,40 +153,59 @@ internal class LpExactState internal constructor(
                     assertion.depth >= (rows.row(assertion.column - baseModel.n).depth ?: 0),
             )
             require(assertion.depth == scopeMarks.count { it <= index })
+            require(witnesses.add(assertion.witness))
         }
-        require(changed.all { it in 0 until baseModel.numVars } && changed.distinct().size == changed.size)
-        for (j in 0 until baseModel.numVars) {
-            if (j >= baseModel.n && !rows.row(j - baseModel.n).active) continue
-            val declared = baseModel.column(j).bounds
-            val bounds = if (j >= baseModel.n && baseModel.row(j - baseModel.n).strict &&
-                declared.lower?.number?.value?.isZero == true
-            ) {
-                declared.copy(lower = declared.lower.copy(strict = true))
-            } else {
-                declared
-            }
-            lower[j] = bounds.lower?.let { LpBoundAssertion(j, false, it, -2L * j - 1L, 0) }
-            upper[j] = bounds.upper?.let { LpBoundAssertion(j, true, it, -2L * j - 2L, 0) }
+        if (from > 0 && witnesses.isNotEmpty()) {
+            for (index in 0 until from) require(activeAssertions[index].witness !in witnesses)
         }
-        for (assertion in activeAssertions) {
-            val sides = if (assertion.upper) upper else lower
-            val previous = sides[assertion.column]
-            if (previous == null || assertion.strongerThan(previous)) sides[assertion.column] = assertion
+    }
+
+    private fun sharedPrefix(before: List<LpBoundAssertion>): Int {
+        val limit = minOf(before.size, activeAssertions.size)
+        var k = 0
+        while (k < limit && before[k] === activeAssertions[k]) k++
+        return k
+    }
+
+    private fun seedDeclared(j: Int) {
+        lower[j] = null
+        upper[j] = null
+        if (j >= baseModel.n && !rows.row(j - baseModel.n).active) return
+        val declared = baseModel.column(j).bounds
+        val bounds = if (j >= baseModel.n && baseModel.row(j - baseModel.n).strict &&
+            declared.lower?.number?.value?.isZero == true
+        ) {
+            declared.copy(lower = declared.lower.copy(strict = true))
+        } else {
+            declared
         }
-        val columns = List(baseModel.numVars) { j ->
-            val original = baseModel.column(j)
-            val lowerSide = lower[j]?.side
-            val upperSide = upper[j]?.side
-            val integral = original.integral && (j < baseModel.n || rows.row(j - baseModel.n).active)
-            if (lowerSide == original.bounds.lower && upperSide == original.bounds.upper &&
-                integral == original.integral
-            ) {
-                original
-            } else {
-                original.copy(bounds = ExactLpBounds(lowerSide, upperSide), integral = integral)
-            }
+        lower[j] = bounds.lower?.let { LpBoundAssertion(j, false, it, -2L * j - 1L, 0) }
+        upper[j] = bounds.upper?.let { LpBoundAssertion(j, true, it, -2L * j - 2L, 0) }
+    }
+
+    private fun tighten(assertion: LpBoundAssertion) {
+        val sides = if (assertion.upper) upper else lower
+        val previous = sides[assertion.column]
+        if (previous == null || assertion.strongerThan(previous)) sides[assertion.column] = assertion
+    }
+
+    private fun column(j: Int): ExactLpColumn {
+        val original = baseModel.column(j)
+        val lowerSide = lower[j]?.side
+        val upperSide = upper[j]?.side
+        val integral = original.integral && (j < baseModel.n || rows.row(j - baseModel.n).active)
+        return if (lowerSide == original.bounds.lower && upperSide == original.bounds.upper &&
+            integral == original.integral
+        ) {
+            original
+        } else {
+            original.copy(bounds = ExactLpBounds(lowerSide, upperSide), integral = integral)
         }
-        model = if (rows.activeCount == rows.size) {
+    }
+
+    private fun fullModel(): ExactLpModel {
+        val columns = List(baseModel.numVars) { column(it) }
+        return if (rows.activeCount == rows.size) {
             baseModel.copy(columns = columns)
         } else {
             baseModel.copy(
@@ -141,9 +216,12 @@ internal class LpExactState internal constructor(
                 },
             )
         }
-        conflict = (0 until model.numVars).firstOrNull { !model.column(it).bounds.consistent }?.let {
-            LpBoundConflict(it, requireNotNull(lower[it]), requireNotNull(upper[it]))
-        }
+    }
+
+    private fun boundsProject(j: Int): Boolean {
+        val bounds = model.column(j).bounds
+        return (bounds.lower == null || bounds.lower.number.project() != null) &&
+            (bounds.upper == null || bounds.upper.number.project() != null)
     }
 
     fun activeSide(column: Int, upper: Boolean): LpBoundAssertion? = if (upper) this.upper[column] else lower[column]
@@ -176,7 +254,7 @@ internal class LpExactState internal constructor(
         val meter = LpProjectionMeter(cancellation = cancellation)
         ensureMatrixProjection(meter) && run {
             meter.reserveVectors(model, materialize = false)
-            projectScalars(meter) != null
+            scalarsProjectable ?: (projectScalars(meter) != null).also { scalarsProjectable = it }
         }
     } catch (_: LpProjectionStop) {
         false
