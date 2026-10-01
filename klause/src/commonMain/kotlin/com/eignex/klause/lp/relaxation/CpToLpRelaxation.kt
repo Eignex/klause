@@ -318,39 +318,59 @@ internal fun leafRealFeasibility(
         context = context,
         pricing = pricing,
         floatAccept = toleranceCheck?.let { check ->
-            { result -> check(sample.copy(reals = relaxation.floatReals(result.primal, problem.numRealVars))) }
+            { result -> check(sample.copy(reals = relaxation.floatReals(result.primal, problem))) }
         },
         floatOffset = relaxation.objectiveConstant.toDouble(),
     )
     certified.float?.let { sink?.observeComponentSplit(it.blocks) }
     certified.floatOptimum?.let { float ->
-        return LeafRealResult(LpVerdict.ATTAINED_OPTIMUM, relaxation.floatReals(float.primal, problem.numRealVars))
+        return LeafRealResult(LpVerdict.ATTAINED_OPTIMUM, relaxation.floatReals(float.primal, problem))
     }
     if (certified.verdict == LpVerdict.INFEASIBLE) return LeafRealResult(LpVerdict.INFEASIBLE, EmptyDoubleArray)
     val primal = certified.exactPrimal ?: return LeafRealResult(LpVerdict.INDETERMINATE, EmptyDoubleArray)
-    // Read each continuous column's solved value back onto its real variable (see [LpRelaxation.colRealId]);
-    // a split (lower-unbounded) variable accumulates x⁺ − x⁻ across its two columns.
-    val exactReals = MutableList(problem.numRealVars) { BigFraction.ZERO }
-    val colRealId = relaxation.colRealId
-    for (col in colRealId.indices) {
-        val r = colRealId[col]
-        if (r >= 0 && col < primal.size) {
-            exactReals[r] +=
-                BigFraction.ofLong(relaxation.colRealSign[col].toLong()) * primal[col]
-        }
-    }
+    val exactReals = relaxation.exactReals(primal, problem)
     return LeafRealResult(certified.verdict, DoubleArray(exactReals.size) { exactReals[it].toDouble() }, exactReals)
 }
 
-/** Continuous variable values of an LP [primal], summing each split variable's `x⁺ − x⁻` columns. */
-internal fun LpRelaxation.floatReals(primal: DoubleArray, numRealVars: Int): DoubleArray {
-    val reals = DoubleArray(numRealVars)
+/**
+ * Continuous variable values of an LP [primal], summing each split variable's `x⁺ − x⁻` columns. A variable no
+ * column carries appears in no emitted row and has no objective weight, so it takes [restingReal].
+ */
+internal fun LpRelaxation.floatReals(primal: DoubleArray, problem: Problem): DoubleArray {
+    val reals = DoubleArray(problem.numRealVars)
+    val carried = BooleanArray(problem.numRealVars)
     for (col in colRealId.indices) {
         val r = colRealId[col]
-        if (r >= 0 && col < primal.size) reals[r] += colRealSign[col] * primal[col]
+        if (r >= 0 && col < primal.size) {
+            reals[r] += colRealSign[col] * primal[col]
+            carried[r] = true
+        }
     }
+    for (r in reals.indices) if (!carried[r]) reals[r] = restingReal(problem, r)
     return reals
 }
+
+/** The exact counterpart of [floatReals], over a certified exact [primal]. */
+internal fun LpRelaxation.exactReals(primal: List<BigFraction>, problem: Problem): MutableList<BigFraction> {
+    val reals = MutableList(problem.numRealVars) { BigFraction.ZERO }
+    val carried = BooleanArray(problem.numRealVars)
+    for (col in colRealId.indices) {
+        val r = colRealId[col]
+        if (r >= 0 && col < primal.size) {
+            reals[r] += BigFraction.ofLong(colRealSign[col].toLong()) * primal[col]
+            carried[r] = true
+        }
+    }
+    for (r in reals.indices) if (!carried[r]) reals[r] = checkNotNull(BigFraction.ofDouble(restingReal(problem, r)))
+    return reals
+}
+
+/**
+ * The point of real variable [r]'s bounds nearest zero. Any point of them completes a leaf for a variable the
+ * relaxation leaves out; zero is not one when the bounds exclude it, as for a column fixed away from it.
+ */
+private fun restingReal(problem: Problem, r: Int): Double =
+    0.0.coerceIn(problem.realLower[r], problem.realUpper[r])
 
 /** The residual-LP verdict at a leaf plus, on [LpVerdict.FEASIBLE], the continuous variables' solved
  *  values (indexed by real var id) that complete the discrete assignment into a full solution. */

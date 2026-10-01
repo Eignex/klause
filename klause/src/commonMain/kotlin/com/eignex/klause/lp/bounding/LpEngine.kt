@@ -40,6 +40,7 @@ import com.eignex.klause.lp.relaxation.LpAssemblyCancelled
 import com.eignex.klause.lp.relaxation.LpAuxiliarySources
 import com.eignex.klause.lp.relaxation.LpExplanation
 import com.eignex.klause.lp.relaxation.LpRelaxation
+import com.eignex.klause.lp.relaxation.exactReals
 import com.eignex.klause.lp.relaxation.floatReals
 import com.eignex.klause.lp.relaxation.gatedEnforcement
 import com.eignex.klause.lp.relaxation.withCpBounds
@@ -619,26 +620,19 @@ internal class LpEngine(
             counterResults = lpCounterResults,
             pricing = pricingOptions,
             floatAccept = toleranceCheck?.let { check ->
-                { result -> check(leafSample(session, relaxation.floatReals(result.primal, problem.numRealVars))) }
+                { result -> check(leafSample(session, relaxation.floatReals(result.primal, problem))) }
             },
             floatOffset = relaxation.objectiveConstant.toDouble(),
         )
         certified.float?.let { sink.lp.observeComponentSplit(it.blocks) }
         certified.floatOptimum?.let { float ->
-            return LeafRealResult(LpVerdict.ATTAINED_OPTIMUM, relaxation.floatReals(float.primal, problem.numRealVars))
+            return LeafRealResult(LpVerdict.ATTAINED_OPTIMUM, relaxation.floatReals(float.primal, problem))
         }
         return when (certified.verdict) {
             LpVerdict.FEASIBLE, LpVerdict.ATTAINED_OPTIMUM, LpVerdict.UNBOUNDED -> {
                 val primal = certified.exactPrimal
                     ?: return LeafRealResult(LpVerdict.INDETERMINATE, EmptyDoubleArray)
-                val exactReals = MutableList(problem.numRealVars) { BigFraction.ZERO }
-                for (col in relaxation.colRealId.indices) {
-                    val r = relaxation.colRealId[col]
-                    if (r >= 0 && col < primal.size) {
-                        exactReals[r] +=
-                            BigFraction.ofLong(relaxation.colRealSign[col].toLong()) * primal[col]
-                    }
-                }
+                val exactReals = relaxation.exactReals(primal, problem)
                 LeafRealResult(
                     certified.verdict,
                     DoubleArray(exactReals.size) { exactReals[it].toDouble() },
