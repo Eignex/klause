@@ -220,6 +220,26 @@ class CpToLpRelaxationTest {
     }
 
     @Test
+    fun `a leaf gives a real variable no row touches a value inside its bounds`() {
+        // r0 >= 1 is the only row; r1 in [2, 3] sits in none, so the relaxation carries no column for it.
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 0,
+            intDomains = emptyArray(),
+            factors = arrayOf<Factor>(
+                Linear(longArrayOf(), intArrayOf(), doubleArrayOf(1.0), intArrayOf(0), LinearOp.GE, 1L),
+            ),
+            numRealVars = 2,
+            realLower = doubleArrayOf(0.0, 2.0),
+            realUpper = doubleArrayOf(5.0, 3.0),
+        )
+
+        val result = leafRealFeasibility(problem, null, Sample(booleanArrayOf(), longArrayOf()))
+
+        assertEquals(listOf(2.0, 2.0), listOf(result.reals[1], result.exactReals!![1].toDouble()))
+    }
+
+    @Test
     fun `a float leaf optimum is refused when a small reduced cost spans an unbounded column`() {
         // min −9e-13·x with x ≤ 1e18 through a row and no column bound: a float optimum at x = 0 prices x below even
         // the cleanup's tolerance, yet leaves −9e5 unreached.
