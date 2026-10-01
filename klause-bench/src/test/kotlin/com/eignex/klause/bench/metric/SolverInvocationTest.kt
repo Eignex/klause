@@ -23,12 +23,12 @@ class SolverInvocationTest {
 
     @Test
     fun `a klause dist that cannot start is reported as a defect`() {
-        assertNotNull(SolverInvocation.klauseCliDefect(File("/bin/false")))
+        assertNotNull(SolverInvocation.klauseCliDefect(File("/usr/bin/false")))
     }
 
     @Test
     fun `a klause dist that answers version is no defect`() {
-        assertNull(SolverInvocation.klauseCliDefect(File("/bin/true")))
+        assertNull(SolverInvocation.klauseCliDefect(File("/usr/bin/true")))
     }
 
     @Test
