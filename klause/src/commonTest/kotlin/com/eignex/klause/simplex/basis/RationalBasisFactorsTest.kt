@@ -476,4 +476,9 @@ class RationalBasisFactorsTest {
             RationalBasisFactors.factor(emptyList(), RationalBasisOrder(intArrayOf(), intArrayOf())),
         ).factors
     }
+
+    @Test
+    fun `the default limits bound work and never the clock`() {
+        assertEquals(Duration.INFINITE, RationalBasisLimits().time)
+    }
 }

@@ -10,6 +10,7 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
+import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
 class RefinementTest {
@@ -399,5 +400,10 @@ class RefinementTest {
             assertNull(result.witness)
             assertNull(owner.lastWorkingMetrics)
         }
+    }
+
+    @Test
+    fun `the default limits bound work and never the clock`() {
+        assertEquals(Duration.INFINITE, LpRefinementLimits().time)
     }
 }

@@ -9,7 +9,6 @@ import com.eignex.klause.simplex.exact.BigRationalConflict
 import com.eignex.klause.util.Cancellation
 import com.ionspin.kotlin.bignum.integer.BigInteger
 import kotlin.time.Duration
-import kotlin.time.Duration.Companion.seconds
 import kotlin.time.TimeSource
 
 internal data class LpRefinementLimits(
@@ -21,7 +20,9 @@ internal data class LpRefinementLimits(
     val maxWork: Long = 1_000_000L,
     val maxAllocation: Long = 32L * 1024 * 1024,
     val maxPivots: Int = 256,
-    val time: Duration = 2.seconds,
+    // Unlimited by default: a clock limit makes whether a certificate stands depend on machine speed and load,
+    // which changes the search tree. The deterministic limits bound the work; a caller can still set a time.
+    val time: Duration = Duration.INFINITE,
 ) {
     init {
         require(maxRounds in 0..64 && maxAuxiliaries in 0..2)

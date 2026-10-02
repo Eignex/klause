@@ -13,14 +13,15 @@ import kotlin.math.max
 import kotlin.math.nextUp
 import kotlin.math.pow
 import kotlin.time.Duration
-import kotlin.time.Duration.Companion.seconds
 import kotlin.time.TimeSource
 
 internal data class ExactDualLimits(
     val maxSteps: Int = 400,
     val maxBits: Int = 16384,
     val allocationBytes: Long = 1L shl 30,
-    val time: Duration = 5.seconds,
+    // Unlimited by default: a clock limit makes whether a certificate stands depend on machine speed and load,
+    // which changes the search tree. The deterministic limits bound the work; a caller can still set a time.
+    val time: Duration = Duration.INFINITE,
 ) {
     init {
         require(maxSteps >= 0 && maxBits > 0 && allocationBytes >= 0L)
