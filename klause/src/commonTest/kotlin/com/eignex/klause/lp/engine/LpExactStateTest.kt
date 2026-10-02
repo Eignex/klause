@@ -2,7 +2,9 @@ package com.eignex.klause.lp.engine
 
 import com.eignex.klause.simplex.exact.BigFraction
 import com.ionspin.kotlin.bignum.integer.BigInteger
+import kotlin.random.Random
 import kotlin.test.Test
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
@@ -406,6 +408,64 @@ class LpExactStateTest {
                     val expected = value / expectedScale + expectedConstant
                     repeat(2) { assertEquals(expected.toRawBits(), working.objectiveD(value).toRawBits()) }
                 }
+            }
+        }
+    }
+
+    @Test
+    fun `a working model derived from its predecessor equals a fresh projection`() {
+        val zero = ExactLpNumber.of(0L)
+        val one = ExactLpNumber.of(1L)
+        val model = ExactLpModel(
+            listOf(listOf(ExactLpEntry(0, one)), listOf(ExactLpEntry(0, one), ExactLpEntry(1, one)), emptyList()),
+            listOf(one, zero),
+            listOf(
+                ExactLpColumn(ExactLpBounds(ExactLpSide(ExactLpNumber.of(-2L)), ExactLpSide(ExactLpNumber.of(2L)))),
+                ExactLpColumn(ExactLpBounds(lower = ExactLpSide(zero))),
+                ExactLpColumn(ExactLpBounds()),
+                ExactLpColumn(ExactLpBounds(lower = ExactLpSide(zero))),
+                ExactLpColumn(ExactLpBounds(lower = ExactLpSide(zero))),
+            ),
+            listOf(ExactLpRow(), ExactLpRow(strict = true)),
+            ExactLpObjective(listOf(one, zero, one, zero, zero)),
+        )
+        for (seed in 0 until 3) {
+            val random = Random(seed)
+            val trail = LpBoundTrail(model)
+            var working = assertNotNull(trail.state.toWorkingModel())
+            var witness = 0L
+            repeat(150) {
+                when (random.nextInt(10)) {
+                    in 0..2 -> trail.push()
+                    in 3..4 -> trail.pop(random.nextInt(trail.state.depth + 1))
+                    else -> trail.assertBound(
+                        random.nextInt(model.numVars),
+                        random.nextBoolean(),
+                        ExactLpSide(ExactLpNumber.of(random.nextLong(-3L, 4L)), strict = random.nextInt(5) == 0),
+                        witness++,
+                    )
+                }
+                val state = trail.state
+                val fresh = LpExactState(
+                    state.baseModel, state.assertions, state.scopes, state.matrixRevision, state.boundRevision,
+                    state.objectiveRevision, state.popRevision, state.changedColumns, state.rows, state.rowRevision,
+                ).toWorkingModel()
+                val derived = state.toWorkingModel(base = working)
+
+                assertEquals(fresh == null, derived == null, "seed $seed")
+                if (fresh == null || derived == null) return@repeat
+                val a = assertNotNull(derived.doubleView)
+                val b = assertNotNull(fresh.doubleView)
+                assertContentEquals(b.upper, a.upper, "seed $seed")
+                assertContentEquals(b.hasUpper, a.hasUpper, "seed $seed")
+                assertContentEquals(fresh.hasUpper, derived.hasUpper, "seed $seed")
+                assertContentEquals(b.rhs, a.rhs, "seed $seed")
+                assertContentEquals(b.cost, a.cost, "seed $seed")
+                assertContentEquals(b.loShift, a.loShift, "seed $seed")
+                assertContentEquals(b.colVal, a.colVal, "seed $seed")
+                assertContentEquals(fresh.colContinuous, derived.colContinuous, "seed $seed")
+                assertSame(state, derived.exactState)
+                working = derived
             }
         }
     }

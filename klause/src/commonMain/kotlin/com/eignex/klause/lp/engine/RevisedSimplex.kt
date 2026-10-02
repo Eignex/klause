@@ -1021,7 +1021,7 @@ internal class RevisedSimplex(
         lastTermination = null
         val current = model.exactState ?: return false
         if (!current.sameMatrix(state) || token()) return false
-        val next = state.toWorkingModel() ?: return false
+        val next = state.toWorkingModel(base = model) ?: return false
         if (token()) return false
         continuationAvailable = false
         stoppedContinuationBasis = null

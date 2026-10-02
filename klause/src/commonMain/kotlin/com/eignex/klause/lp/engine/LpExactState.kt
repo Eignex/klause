@@ -82,6 +82,9 @@ internal class LpExactState internal constructor(
     // Whether every right-hand side, cost, bound and origin projects to a finite double; null until checked.
     private var scalarsProjectable: Boolean? = null
 
+    // This state's projected working model, once built: the state is immutable, so every reader can share it.
+    private var working: LpModel? = null
+
     val assertions: List<LpBoundAssertion> get() = activeAssertions.toList()
     val scopes: List<Int> get() = scopeMarks.toList()
     val changedColumns: List<Int> get() = changed.toList()
@@ -244,10 +247,67 @@ internal class LpExactState internal constructor(
     val matrixProjectionStatus: LpMatrixProjectionStatus? get() = projection?.status
     val matrixProjectionDeclined: Boolean get() = projectionAttempted && projection == null
 
-    fun toWorkingModel(meter: LpProjectionMeter = LpProjectionMeter()): LpModel? = try {
-        projectWorkingModel(meter)
+    /**
+     * The double working model of this state. When [base] is the working model of a state with this state's base
+     * model, rows and matrix, only the columns whose bounds differ from it are projected and every other array is
+     * shared with it; a bound assertion otherwise projects every right-hand side, cost and bound again.
+     */
+    fun toWorkingModel(meter: LpProjectionMeter = LpProjectionMeter(), base: LpModel? = null): LpModel? = try {
+        working ?: (base?.let { derivedWorkingModel(it, meter) } ?: projectWorkingModel(meter))?.also { working = it }
     } catch (_: LpProjectionStop) {
         null
+    }
+
+    private fun derivedWorkingModel(base: LpModel, meter: LpProjectionMeter): LpModel? {
+        val prior = base.exactState ?: return null
+        if (prior.baseModel !== baseModel || prior.rows !== rows || prior.matrixRevision != matrixRevision) return null
+        if (!ensureMatrixProjection(meter)) return null
+        val matrix = projection ?: return null
+        val view = base.doubleView ?: return null
+        if (base.csc !== matrix.csc || base.n != model.n || base.m != model.m) return null
+        meter.reserve(model.numVars.toLong(), 0L, matrix = false)
+        var uppers: DoubleArray? = null
+        var hasUpper: BooleanArray? = null
+        for (j in 0 until model.numVars) {
+            val column = model.column(j)
+            val before = prior.model.column(j)
+            if (column === before) continue
+            meter.poll()
+            if (column.integral != before.integral) return null
+            column.bounds.lower?.let { if (it.number.project() == null) return null }
+            if (uppers == null) uppers = view.upper.copyOf()
+            if (hasUpper == null) hasUpper = view.hasUpper.copyOf()
+            val upper = column.bounds.upper
+            if (upper == null) {
+                uppers[j] = 0.0
+                hasUpper[j] = false
+            } else {
+                uppers[j] = upper.number.project() ?: return null
+                hasUpper[j] = true
+            }
+        }
+        val nextHasUpper = hasUpper ?: view.hasUpper
+        return LpModel(
+            n = base.n,
+            m = base.m,
+            csc = base.csc,
+            rhs = base.rhs,
+            cost = base.cost,
+            upper = base.upper,
+            hasUpper = nextHasUpper.copyOf(),
+            loShift = base.loShift,
+            objConstant = base.objConstant,
+            sense = base.sense,
+            tag = base.tag,
+            rowGlobal = base.rowGlobal,
+            rowStrict = base.rowStrict,
+            colContinuous = base.colContinuous,
+            doubleView = LpDoubleView(
+                view.colPtr, view.rowIdx, view.colVal, view.rhs, view.cost, uppers ?: view.upper, nextHasUpper,
+                view.objConstant, view.loShift,
+            ),
+            exactState = this,
+        )
     }
 
     fun canProjectWorkingModel(cancellation: Cancellation = Cancellation.Never): Boolean = try {
