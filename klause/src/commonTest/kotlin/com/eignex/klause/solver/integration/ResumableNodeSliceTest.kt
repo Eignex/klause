@@ -7,6 +7,7 @@ import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
@@ -118,5 +119,36 @@ class ResumableNodeSliceTest {
         }
 
         assertEquals(6.5, assertIs<MinimizeResult.Optimal>(terminal).objective)
+    }
+
+    /** A three-row 0/1 knapsack: its LP relaxation is fractional at the root, so the LP arm branches. */
+    private fun knapsack(): Problem {
+        val n = 20
+        val vars = IntArray(n) { it }
+        return Problem(
+            numBoolVars = 0,
+            numIntVars = n,
+            intDomains = Array(n) { IntDomain(0, 1) },
+            factors = Array<Factor>(3) { row ->
+                Linear(LongArray(n) { ((it * 7 + row * 13) % 17 + 3).toLong() }, vars, LinearOp.LE, 80L + row * 7)
+            },
+        )
+    }
+
+    @Test
+    fun `an LP arm's slice spends its LP work as nodes`() {
+        val params = BacktrackParams(randomSeed = 0L, lpConfig = LpConfig.AGGRESSIVE)
+        val objective = LinearObjective(intCoefficients = LongArray(20) { -((it * 11 % 19) + 5).toLong() })
+        val lp = { BacktrackSolver(knapsack().bake()).resumable(objective, params) }
+        val whole = lp().also { it.runSlice(Cancellation.Never, sliceMillis = 60_000, sliceNodes = -1L) { } }
+        val budget = (whole.stats.search.nodes.sum / 2).toLong()
+        val search = lp()
+
+        val terminal = search.runSlice(Cancellation.Never, sliceMillis = 60_000, sliceNodes = budget) { }
+
+        assertTrue(
+            terminal == null && search.stats.search.nodes.sum < budget,
+            "slice ${search.stats.search.nodes.sum} of $budget, terminal $terminal",
+        )
     }
 }
