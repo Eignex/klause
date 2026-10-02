@@ -7,6 +7,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.time.Duration
 
 class ExactDualsTest {
     // Equality rows A·x = 1 over nonnegative columns costing 1 each, with every structural column basic.
@@ -77,5 +78,10 @@ class ExactDualsTest {
             assertEquals(reason, outcome.decline)
             assertTrue(outcome.steps <= limits.maxSteps)
         }
+    }
+
+    @Test
+    fun `the default limits bound work and never the clock`() {
+        assertEquals(Duration.INFINITE, ExactDualLimits().time)
     }
 }

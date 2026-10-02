@@ -7,7 +7,6 @@ import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.PollStride
 import com.ionspin.kotlin.bignum.integer.BigInteger
 import kotlin.time.Duration
-import kotlin.time.Duration.Companion.seconds
 import kotlin.time.TimeSource
 
 // Orders map pivot positions to source rows/columns. Factory calls copy caller-owned arrays.
@@ -19,7 +18,9 @@ internal data class RationalBasisLimits(
     val allocationBytes: Long = 256L * 1024 * 1024,
     val fill: Int = 16384,
     val bits: Int = 4096,
-    val time: Duration = 5.seconds,
+    // Unlimited by default: a clock limit makes whether a certificate stands depend on machine speed and load,
+    // which changes the search tree. The deterministic limits bound the work; a caller can still set a time.
+    val time: Duration = Duration.INFINITE,
 ) {
     init {
         require(dimension >= 0 && work >= 0 && allocationBytes >= 0 && fill >= 0 && bits >= 0)
