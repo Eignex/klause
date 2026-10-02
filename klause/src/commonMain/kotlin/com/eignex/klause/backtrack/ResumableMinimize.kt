@@ -152,6 +152,9 @@ internal class ResumableMinimize(
     // lets two identical invocations report identical counters.
     private var sliceNodeEnd: Long = -1L
 
+    // LP work already turned into slice nodes; see [chargeSliceLpWork].
+    private var sliceLpWorkMark = 0L
+
     private fun sliceCancelled(): Boolean = solveCancelled() || (pausable && sliceExpired())
 
     /**
@@ -306,6 +309,7 @@ internal class ResumableMinimize(
         globalToken = global
         sliceEnd = TimeSource.Monotonic.markNow() + sliceMillis.milliseconds
         sliceNodeEnd = if (sliceNodes >= 0L) sink.search.nodeCount + sliceNodes else -1L
+        sliceLpWorkMark = lpEngine.totalSolveWork()
         // A counted budget only means something if the search polls on a counted cadence: the run stops
         // where it polls, and the default cadence is tuned by elapsed time, so the pause would land on a
         // different node on a faster machine and every counter downstream would follow.
@@ -832,9 +836,23 @@ internal class ResumableMinimize(
             lpHints?.order(variable, values) ?: values
     }
 
+    // Spend the LP work done since the last charge from the slice's node budget, at LP_WORK_PER_NODE work per node.
+    // A node-bounded slice otherwise prices an LP node like a CP one, so an LP arm's slice runs many times as long
+    // as another arm's and starves the arms queued behind it. The charge lands at a node boundary and only moves
+    // the slice end, so the slice pauses at its next poll exactly as if it had explored that many nodes; it stays a
+    // function of the search, and runs remain reproducible.
+    private fun chargeSliceLpWork() {
+        if (sliceNodeEnd < 0L) return
+        val nodes = (lpEngine.totalSolveWork() - sliceLpWorkMark) / LP_WORK_PER_NODE
+        if (nodes <= 0L) return
+        sliceNodeEnd -= nodes
+        sliceLpWorkMark += nodes * LP_WORK_PER_NODE
+    }
+
     /** Refutes LP-dominated partial assignments through the shared frame stack. */
     private inner class LpNodePolicy : SearchNodePolicy {
         override fun beforeBranch(context: SearchContext): SearchNodeDisposition {
+            chargeSliceLpWork()
             val externalBound = externalCutoff()
             val effectiveBound = if (externalBound < bestObj) externalBound else bestObj
             if (rebindable && discreteObjective) {
@@ -1030,3 +1048,8 @@ internal class ResumableMinimize(
         }
     }
 }
+
+// LP work (simplex plus the node-LP overhead the engine charges) that costs about as much time as one CP search
+// node: the median ratio of LP work per second with the default LP arm to conflictDriven's nodes per second, over
+// 13 MIPLIB 2017 models with continuous columns, was 519 (spread 58 to 8145, geometric mean 629).
+private const val LP_WORK_PER_NODE = 600L
