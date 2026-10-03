@@ -19,6 +19,7 @@ import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.CheckedLongOverflowException
 import com.eignex.klause.util.EmptyDoubleArray
 import com.eignex.klause.util.addExact
+import com.eignex.klause.util.chargeTally
 import com.eignex.klause.util.mulExact
 import com.eignex.klause.util.subExact
 import kotlin.math.abs
@@ -371,7 +372,7 @@ private fun fbbtTightenOpenIntBounds(
         pass++
         for (f in rows) {
             if (spent || b.crossed || budgetSpent()) break
-            cancellation.charge(1L + f.vars.size)
+            cancellation.chargeTally("fbbt", 1L + f.vars.size)
             val row = f.integerConstants ?: continue
             val coeffs = row.coeffs // materialising accessor: read once per row, never per direction
             if (propagateRow(coeffs, f.vars, row.bound, sign = 1L, b = b)) changed = true
@@ -380,7 +381,7 @@ private fun fbbtTightenOpenIntBounds(
         }
         for (f in mixed) {
             if (spent || b.crossed || budgetSpent()) break
-            cancellation.charge(1L + f.vars.size + f.realVars.size)
+            cancellation.chargeTally("fbbt", 1L + f.vars.size + f.realVars.size)
             if (f.op != LinearOp.GE && propagateRealRow(f, sign = 1.0, b = b, rLo = rLo, rUp = rUp)) changed = true
             if (f.op != LinearOp.LE && propagateRealRow(f, sign = -1.0, b = b, rLo = rLo, rUp = rUp)) changed = true
         }

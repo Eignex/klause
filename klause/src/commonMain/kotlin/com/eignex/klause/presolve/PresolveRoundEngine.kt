@@ -2,6 +2,7 @@ package com.eignex.klause.presolve
 
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.WorkTally
 
 /** Abort a pass schedule after a round makes only a marginal complexity reduction. */
 private const val PRESOLVE_ABORT_FRACTION = 0.001
@@ -69,7 +70,7 @@ internal object PresolveRoundEngine {
                 ranAny = true
                 val slice = budget?.let { sliceOf(it, cancellation, eligible) }
                 eligible--
-                when (host.runPass(pass, slice)) {
+                when (WorkTally.timed("pass:" + pass.id) { host.runPass(pass, slice) }) {
                     PassOutcome.INFEASIBLE -> {
                         fired.add(pass)
                         infeasible = true

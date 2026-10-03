@@ -5,6 +5,7 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
+import com.eignex.klause.util.chargeTally
 
 /**
  * Bounded variable elimination (BVE, Eén–Biere) over the pure-SAT part of the model. A Boolean
@@ -69,7 +70,7 @@ internal object BoundedVariableElimination {
             .sortedBy { db.occ(Lit.make(it, true)).size + db.occ(Lit.make(it, false)).size }
         for ((idx, v) in order.withIndex()) {
             if ((idx and CANCEL_POLL_MASK) == 0 && cancellation()) break
-            cancellation.charge(1L + db.occ(Lit.make(v, true)).size + db.occ(Lit.make(v, false)).size)
+            cancellation.chargeTally("bve", 1L + db.occ(Lit.make(v, true)).size + db.occ(Lit.make(v, false)).size)
             eliminateVar(v, db, eliminations)
         }
 

@@ -13,6 +13,7 @@ import com.eignex.klause.solver.result.LpHarvestReport
 import com.eignex.klause.solver.result.LpStats
 import com.eignex.klause.solver.result.PresolveStats
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.WorkTally
 import kotlin.time.TimeSource
 
 /** Round cap for the presolve↔LP-harvest fixpoint: a spin guard, never the real stop. The loop
@@ -71,7 +72,7 @@ object PresolvePipeline {
         if (problem is BakedProblem) return PreparedSource.unchanged(problem, presolveBudget)
         val context = PresolveContext.of(linearObjective, solutionSetSensitive, problem.hasSymmetryBreaking)
             .withPresolveBudget(presolveBudget)
-        val presolved = Presolver.runSource(problem, config, context, phaseCancellation(cancellation, presolveBudget))
+        val presolved = WorkTally.timed("source") { Presolver.runSource(problem, config, context, phaseCancellation(cancellation, presolveBudget)) }
         return PreparedSource(
             source = problem,
             problem = presolved.problem,
@@ -156,14 +157,14 @@ object PresolvePipeline {
         // bake would reach. Gated on span so small models never pay the LP.
         val wideSpan = Presolve.maxIntSpan(sourceProblem) > KlauseConfig.current.largeSpanThreshold
         val rootInfeasible = if (!prepared.infeasible && wideSpan) {
-            lpRootInfeasibleReporting(
+            WorkTally.timed("prebake-lp") { lpRootInfeasibleReporting(
                 sourceProblem,
                 objective,
                 LpPlan(bounding = true),
                 preBakeSlice(cancellation, presolveBudget),
                 zeroObjectivePricing,
                 randomSeed,
-            )
+            ) }
         } else {
             LpRootInfeasibleResult(infeasible = false, stats = LpStats())
         }
@@ -189,14 +190,14 @@ object PresolvePipeline {
         // one step per round (O(span)). Solution-set-preserving, so it is sound before the bake. Gated on
         // span so small models never pay the OBBT.
         val rootBounds = if (wideSpan) {
-            lpRootBoundsReporting(
+            WorkTally.timed("prebake-obbt") { lpRootBoundsReporting(
                 sourceProblem,
                 objective,
                 LpPlan(bounding = true),
                 preBakeSlice(cancellation, presolveBudget),
                 zeroObjectivePricing,
                 randomSeed,
-            )
+            ) }
         } else {
             LpRootBoundsResult(sourceProblem, LpStats())
         }
@@ -206,8 +207,8 @@ object PresolvePipeline {
         // directly-constructed (already-baked) problem, so this is where a front-end's deferred base bake
         // actually happens, after the O(one-LP) pre-bake infeasibility/OBBT that must precede it.
         val bakeStart = TimeSource.Monotonic.markNow()
-        val baked = prebaked.bake(cancellation)
-        val seeded = RootBaker.reseed(baked, bakeConfig)
+        val baked = WorkTally.timed("bake") { prebaked.bake(cancellation) }
+        val seeded = WorkTally.timed("reseed") { RootBaker.reseed(baked, bakeConfig) }
         val bakeElapsed = bakeStart.elapsedNow()
         val reconstructs = ArrayList<(Sample) -> Sample>() // in application order
         // The source phase ran before every round below, so its columns are recovered after theirs — first
@@ -240,10 +241,10 @@ object PresolvePipeline {
         var infeasible = false
         var round = 0
         while (round++ < MAX_PRESOLVE_HARVEST_ROUNDS && !cancellation()) {
-            val pre = Presolver.run(current, config, context, cancellation)
+            val pre = WorkTally.timed("presolver") { Presolver.run(current, config, context, cancellation) }
             infeasible = infeasible || pre.infeasible
             val harvestResult = harvestPlan?.let {
-                lpHarvestReporting(
+                WorkTally.timed("harvest") { lpHarvestReporting(
                     pre.problem,
                     objective,
                     it,
@@ -251,7 +252,7 @@ object PresolvePipeline {
                     cancellation,
                     zeroObjectivePricing,
                     randomSeed,
-                )
+                ) }
             }
             harvestResult?.let {
                 harvestStats = harvestStats.mergedWith(it.stats)

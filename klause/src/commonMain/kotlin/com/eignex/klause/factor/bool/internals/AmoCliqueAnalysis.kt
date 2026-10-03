@@ -10,6 +10,7 @@ import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.MutableIntIntMap
 import com.eignex.klause.util.MutableIntObjectMap
+import com.eignex.klause.util.chargeTally
 
 /** At-most-one cliques (each a set of Lit-encoded literals, at most one satisfied) recognised
  *  soundly from a single factor:
@@ -120,7 +121,7 @@ internal fun mergeCliques(cliques: List<Set<Int>>, cancellation: Cancellation = 
             continue
         }
         budget -= cost
-        cancellation.charge(cost)
+        cancellation.chargeTally("clique", cost)
         val members = clique.toHashSet()
         // Candidates: lits adjacent to every base member, taken in id order for determinism. Each
         // one is then re-checked against the members added before it, which the candidate set of the
@@ -128,7 +129,7 @@ internal fun mergeCliques(cliques: List<Set<Int>>, cancellation: Cancellation = 
         val candidates = graph.commonNeighbours(clique)
         val checks = candidates.size.toLong() * clique.size
         budget -= checks
-        cancellation.charge(checks)
+        cancellation.chargeTally("clique", checks)
         for (c in candidates) {
             if (members.all { it == c || graph.adjacent(it, c) }) members.add(c)
         }

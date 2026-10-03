@@ -17,6 +17,7 @@ import com.eignex.klause.solver.result.LpRoute
 import com.eignex.klause.solver.result.LpStatsSink
 import com.eignex.klause.util.Bits
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.WorkTally
 
 /** What the open-model presolve phase concluded. */
 sealed interface OpenPresolveResult {
@@ -146,10 +147,15 @@ internal fun Problem.closeOpenBounds(
     // Exact arithmetic refutes ahead of the tightening below, which reads the same rows in `Long` and
     // `Double`. A coefficient times an open bound is the product that leaves 64 bits, so the systems
     // whose forced values are largest are the ones only this pass reaches.
-    if (exactBoundsInfeasible(declared, intRows, cancellation)) return OpenPresolveResult.Refuted
+    if (WorkTally.timed("route-exact") { exactBoundsInfeasible(declared, intRows, cancellation) }) {
+        return OpenPresolveResult.Refuted
+    }
     // Then the relaxation over the same open ranges. A Farkas ray reaches the systems no bound ever
     // crosses, which is what both the pass above and the tightening below need to conclude anything.
-    if (openLpInfeasible(declared, intRows, cancellation, lpStats?.certificationObserver(LpRoute.STANDALONE))) {
+    if (WorkTally.timed("route-lp") {
+            openLpInfeasible(declared, intRows, cancellation, lpStats?.certificationObserver(LpRoute.STANDALONE))
+        }
+    ) {
         return OpenPresolveResult.Refuted
     }
     // Only now is there nothing left to do: closing is what a model with no open side does not need, and
@@ -160,7 +166,7 @@ internal fun Problem.closeOpenBounds(
     if (declared.none { it.lo == null || it.hi == null }) {
         return OpenPresolveResult.Tightened(problem, closedSides = 0)
     }
-    val tightened = tightenOpenIntBounds(
+    val tightened = WorkTally.timed("route-tighten") { tightenOpenIntBounds(
         declared,
         intRows,
         cancellation = cancellation,
@@ -168,10 +174,10 @@ internal fun Problem.closeOpenBounds(
         realLower = problem.realLower,
         realUpper = problem.realUpper,
         observer = lpStats?.certificationObserver(LpRoute.STANDALONE),
-    )
+    ) }
     if (tightened.refuted) return OpenPresolveResult.Refuted
 
-    val bounds = fillFromStructure(tightened.bounds, intRows, cancellation)
+    val bounds = WorkTally.timed("route-structural") { fillFromStructure(tightened.bounds, intRows, cancellation) }
     // Both a tightened and a structural bound are necessary conditions on their column, so a pair that
     // crosses has no integer point between them — over the open ranges, not inside a box.
     if (bounds.any { crossed(it) }) return OpenPresolveResult.Refuted

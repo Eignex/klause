@@ -5,6 +5,7 @@ import com.eignex.klause.presolve.equivalentLinear
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.LongArrayList
+import com.eignex.klause.util.chargeTally
 
 /** Selects the next affine pivot without changing the candidate admissibility rules. */
 internal object AffinePivotOrders {
@@ -72,7 +73,7 @@ internal object AffinePivotOrders {
             var rejected = 0
             while (!heap.isEmpty()) {
                 if ((polled++ and CANCEL_POLL_MASK) == 0 && cancellation()) return null
-                cancellation.charge(1L)
+                cancellation.chargeTally("affine", 1L)
                 if (rejected >= AFFINE_SCAN_ABORT) return null
                 val key = heap.peekCost()
                 val id = heap.popId()

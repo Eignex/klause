@@ -1,6 +1,7 @@
 package com.eignex.klause.lp.lattice
 
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.chargeTally
 import com.ionspin.kotlin.bignum.integer.BigInteger
 
 /**
@@ -83,7 +84,7 @@ internal fun bareissEchelon(
         val pivotValue = w[p][c]
         for (q in bucket) {
             if (q == p) continue
-            cancellation.charge(1L + w[q].index.size + w[p].index.size)
+            cancellation.chargeTally("lattice", 1L + w[q].index.size + w[p].index.size)
             val factor = w[q][c]
             val g = gcdOf(pivotValue, factor)
             val scaleQ = pivotValue / g

@@ -28,6 +28,7 @@ import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.LongArrayList
 import com.eignex.klause.util.LongHashSet
 import com.eignex.klause.util.addExact
+import com.eignex.klause.util.chargeTally
 import com.eignex.klause.util.mulExact
 import com.eignex.klause.util.subExact
 
@@ -208,7 +209,7 @@ internal object AffineSingletons {
         while (!cancellation()) {
             val cand = order.next() ?: break
             val foldCost = ws.degreeOf(cand.x).toLong() * cand.termVars.size
-            cancellation.charge(1L + foldCost)
+            cancellation.chargeTally("affine", 1L + foldCost)
             fillIn += foldCost
             order.onFolded(foldOutVariable(problem, ranges, ws, cand))
             eliminated[cand.x] = true
@@ -308,7 +309,7 @@ internal object AffineSingletons {
         var di = ws.nextEqId(0)
         while (di < ws.size) {
             if ((polled++ and CANCEL_POLL_MASK) == 0 && cancellation()) return null
-            cancellation.charge(1L)
+            cancellation.chargeTally("affine", 1L)
             residueCandidateInFactor(
                 ws,
                 di,
@@ -422,7 +423,7 @@ internal object AffineSingletons {
             // Count iterations (a dense counter) rather than keying on [di], which a candidate index makes
             // sparse. Giving up returns the folds made so far — sound (an unfound pivot simply stays).
             if ((polled++ and CANCEL_POLL_MASK) == 0 && cancellation()) return null
-            cancellation.charge(1L)
+            cancellation.chargeTally("affine", 1L)
             candidateInFactor(
                 ws,
                 di,
@@ -464,7 +465,7 @@ internal object AffineSingletons {
         val f = ws.factorAt(di)?.equivalentLinear() ?: return null
         if (f.op != LinearOp.EQ || f.vars.size < 2) return null
         val row = f.integerConstants ?: return null
-        cancellation.charge(f.vars.size.toLong())
+        cancellation.chargeTally("affine", f.vars.size.toLong())
         for (xi in f.vars.indices) {
             // A single wide row can carry thousands of pivot candidates each running an O(occurrences)
             // overflow check, so poll the deadline between them (and inside the check below).
@@ -559,7 +560,7 @@ internal object AffineSingletons {
                 // a row, so on a wide-row model it must be interruptible. Bailing reports "no candidate", so
                 // affine skips this firing — sound (a partial pass only forgoes reduction).
                 if ((polled++ and CANCEL_POLL_MASK) == 0 && cancellation()) return false
-                cancellation.charge(1L)
+                cancellation.chargeTally("affine", 1L)
                 if (candidateInFactor(
                         seed,
                         di,
@@ -735,7 +736,7 @@ internal object AffineSingletons {
                 // A high-degree pivot's overflow check walks every row it mentions; poll so one candidate's
                 // check cannot outrun the budget. Treat a bail as "would overflow" — skipping the fold is sound.
                 if ((polled++ and CANCEL_POLL_MASK) == 0 && cancellation()) return true
-                cancellation.charge(1L)
+                cancellation.chargeTally("affine", 1L)
                 val id = occ.flat[k]
                 val f = factors[id].equivalentLinear()
                 if (id != defIdx && f?.integerConstants != null && foldRowOverflowsLong(
@@ -940,7 +941,7 @@ internal object AffineSingletons {
                 // A high-degree pivot's overflow check walks every row it mentions; poll so one candidate's
                 // check cannot outrun the budget. Treat a bail as "would overflow" — skipping the fold is sound.
                 if ((polled++ and CANCEL_POLL_MASK) == 0 && cancellation()) return true
-                cancellation.charge(1L)
+                cancellation.chargeTally("affine", 1L)
                 val id = occ[k]
                 val f = slots[id]?.equivalentLinear()
                 if (id != defIdx && f?.integerConstants != null && foldRowOverflowsLong(

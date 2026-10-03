@@ -19,6 +19,7 @@ import com.eignex.klause.util.LongArrayList
 import com.eignex.klause.util.LongHashSet
 import com.eignex.klause.util.MutableIntIntMap
 import com.eignex.klause.util.MutableIntObjectMap
+import com.eignex.klause.util.chargeTally
 
 internal object SymmetryBreaking {
 
@@ -184,7 +185,7 @@ internal object SymmetryBreaking {
             // Bail on a fired presolve budget — the scan and the per-candidate keying below are the
             // value-symmetry phase's cost; returning what is grouped so far only forgoes value pins.
             if (cancellation()) return null
-            cancellation.charge(problem.numIntVars.toLong())
+            cancellation.chargeTally("symmetry", problem.numIntVars.toLong())
             val sig = LongArrayList()
             for (x in 0 until problem.numIntVars) if (value in problem.rootIntDomain(x)) sig.add(x.toLong())
             if (!sig.isEmpty()) incidence.getOrPut(RefineKey(sig.toLongArray())) { ArrayList() }.add(value)
@@ -436,7 +437,7 @@ internal object SymmetryBreaking {
             // 10 factors, 10394 vars, ~23s at budget=0). Including the per-variable term bounds the
             // round count by the work budget as intended.
             if (budget != null) budget[0] -= arcsPerRound + nInt + nBool
-            cancellation.charge(arcsPerRound.toLong() + nInt + nBool)
+            cancellation.chargeTally("symmetry", arcsPerRound.toLong() + nInt + nBool)
             val next = assignColours(sigInt, sigBool, intColour, boolColour)
             if (next == numColours) return intColour to boolColour // partition stable
             numColours = next
@@ -634,7 +635,7 @@ internal object SymmetryBreaking {
                 if (orbit.connected(index.getOrDefault(r, 0), index.getOrDefault(v, 0))) continue
                 val leaf = refineToDiscrete(problem, seedIntBase, seedBoolBase, v, budget, cancellation) ?: continue
                 val perm = buildPerm(refLeaf, leaf, nInt, nBool) ?: continue
-                cancellation.charge(problem.factors.size.toLong())
+                cancellation.chargeTally("symmetry", problem.factors.size.toLong())
                 if (!isAutomorphism(problem, base, perm.second, perm.first)) continue
                 gens.add(perm)
                 index.forEach { g, gi ->
@@ -682,7 +683,7 @@ internal object SymmetryBreaking {
             if (budget[0] <= 0 || cancellation()) return null
             val before = budget[0]
             val (ic, bc) = equitablePartition(problem, seedInt, seedBool, budget)
-            cancellation.charge(before.toLong() - budget[0])
+            cancellation.chargeTally("symmetry", before.toLong() - budget[0])
             val leaf = IntArray(n) { -1 }
             val cellSize = IntArray(n)
             for (v in 0 until nInt) {
@@ -814,7 +815,7 @@ internal object SymmetryBreaking {
                 val u = scope[i]
                 val v = scope[j]
                 if (ds.connected(u, v)) continue
-                cancellation.charge(pairCost)
+                cancellation.chargeTally("symmetry", pairCost)
                 if (verify(u, v)) ds.union(u, v)
             }
         }

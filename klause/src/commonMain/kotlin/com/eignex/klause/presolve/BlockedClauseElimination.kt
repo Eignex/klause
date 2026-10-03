@@ -4,6 +4,7 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.IntHashSet
+import com.eignex.klause.util.chargeTally
 
 /**
  * Blocked-clause elimination (BCE, Järvisalo–Biere–Heule) over the pure-SAT part of the model. A
@@ -53,7 +54,7 @@ internal object BlockedClauseElimination {
 
     /** A literal of [c] whose variable is eligible and on which [c] is blocked, or `null`. */
     private fun blockingLiteral(db: SatClauseDb, c: IntArray, cancellation: Cancellation): Int? {
-        cancellation.charge(1L + c.size)
+        cancellation.chargeTally("bce", 1L + c.size)
         for (l in c) {
             if (!db.eligible[Lit.variable(l)]) continue
             if (blockedOn(db, c, l, cancellation)) return l
@@ -65,7 +66,7 @@ internal object BlockedClauseElimination {
     private fun blockedOn(db: SatClauseDb, c: IntArray, l: Int, cancellation: Cancellation): Boolean {
         val opposite = db.occ(Lit.negate(l))
         if (opposite.size > OCCURRENCE_CAP) return false
-        cancellation.charge(c.size.toLong() + opposite.size)
+        cancellation.chargeTally("bce", c.size.toLong() + opposite.size)
         val v = Lit.variable(l)
         val cLits = IntHashSet(c.size)
         for (k in c) if (Lit.variable(k) != v) cLits.add(k)

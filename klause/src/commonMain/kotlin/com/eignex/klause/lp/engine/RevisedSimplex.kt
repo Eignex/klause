@@ -16,6 +16,7 @@ import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.SparseSlices
 import com.eignex.klause.util.argsortBy
+import com.eignex.klause.util.chargeTally
 import com.eignex.koblas.SparseMatrix
 import com.eignex.koblas.koblas
 import kotlin.math.abs
@@ -259,7 +260,7 @@ internal class RevisedSimplex(
 
     private fun chargeWork() {
         val ops = work.ops
-        if (ops > chargedOps) stopToken.charge(ops - chargedOps)
+        if (ops > chargedOps) stopToken.chargeTally("simplex", ops - chargedOps)
         chargedOps = ops
     }
 

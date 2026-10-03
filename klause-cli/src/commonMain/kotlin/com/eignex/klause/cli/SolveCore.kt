@@ -115,6 +115,7 @@ internal object SolveCore {
                     )
                     errPrintln("  open sides closed: ${prepared.closedSides}")
                     presolveBudget?.let { errPrintln("  work: ${it.spent()} of ${it.allowance}") }
+                    errPrintln("PREP" + com.eignex.klause.util.WorkTally.report())
                     if (prepared.infeasible) errPrintln("  preparation refuted the model")
                     return
                 }
@@ -681,7 +682,8 @@ internal object SolveCore {
             val p1 = preparation.problem
             "presolve [${request.engine.id}]: factors ${p0.numFactors}→${p1.numFactors}, " +
                 "ints ${p0.numIntVars}→${p1.numIntVars}, bools ${p0.numBoolVars}→${p1.numBoolVars}" +
-                presolveWorkText(request.presolveBudget, workBefore, result.preparationElapsed)
+                presolveWorkText(request.presolveBudget, workBefore, result.preparationElapsed) +
+                " PREP" + com.eignex.klause.util.WorkTally.report()
         }
         when (val outcome = result.outcome) {
             FiniteSolveOutcome.PreparedOnly -> {

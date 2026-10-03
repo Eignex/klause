@@ -1,6 +1,7 @@
 package com.eignex.klause.lp.lattice
 
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.chargeTally
 import com.ionspin.kotlin.bignum.integer.BigInteger
 
 /**
@@ -50,7 +51,7 @@ internal fun hermiteNormalForm(
         // algorithm run across columns and terminates for the same reason.
         while (true) {
             if (cancellation()) return null
-            cancellation.charge(1L + h.rowSupport[row].size)
+            cancellation.chargeTally("lattice", 1L + h.rowSupport[row].size)
             var minCol = -1
             var minAbs = BigInteger.ZERO
             var nonZero = 0

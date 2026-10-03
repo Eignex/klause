@@ -3,6 +3,7 @@ package com.eignex.klause.lp
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.chargeTally
 import com.ionspin.kotlin.bignum.integer.BigInteger
 
 /**
@@ -132,10 +133,10 @@ private fun substitute(rows: MutableList<Row>, definition: Row, target: Int, can
         if (v == target) continue
         valueTerms[v] = -ci * scale
     }
-    cancellation.charge(rows.size.toLong())
+    cancellation.chargeTally("exact", rows.size.toLong())
     for (row in rows) {
         val k = row.coeffs.remove(target) ?: continue
-        cancellation.charge(1L + valueTerms.size)
+        cancellation.chargeTally("exact", 1L + valueTerms.size)
         row.bound -= k * valueBound
         for ((v, ci) in valueTerms) {
             val merged = (row.coeffs[v] ?: BigInteger.ZERO) + k * ci
@@ -178,7 +179,7 @@ private inline fun tightenRow(
         // single pass over the row; the caller reads the early exit as "not refuted", the same answer an
         // exhausted propagation gives.
         if (cancellation()) return false
-        cancellation.charge(row.coeffs.size.toLong())
+        cancellation.chargeTally("exact", row.coeffs.size.toLong())
         var restMin: BigInteger? = BigInteger.ZERO
         var restMax: BigInteger? = BigInteger.ZERO
         for ((i, ci) in row.coeffs) {

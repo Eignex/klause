@@ -21,6 +21,7 @@ import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.CheckedLongOverflowException
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.addExact
+import com.eignex.klause.util.chargeTally
 import com.eignex.klause.util.mulExact
 import com.eignex.klause.util.subExact
 
@@ -55,7 +56,7 @@ internal object CoefficientStrengthening {
             // partial pass is sound (each rewrite is feasible-set-preserving; the rest stay unstrengthened).
             if ((i and STRENGTHEN_CANCEL_POLL_MASK) == 0 && cancellation()) break
             val factor = factors[i]
-            cancellation.charge(1L + factor.structuralKeyWeight)
+            cancellation.chargeTally("strengthen", 1L + factor.structuralKeyWeight)
             if (indivisibleEquality(factor)) {
                 infeasible = true
                 break

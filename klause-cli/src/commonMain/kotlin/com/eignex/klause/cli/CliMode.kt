@@ -74,7 +74,8 @@ internal fun CommonOptions.logRoute(route: SourceProblemRoute, elapsedMs: Long) 
             is SourceProblemRoute.UnsupportedOpen -> "unsupported"
             SourceProblemRoute.Refuted -> "refuted"
         }
-        "route: $lane in ${elapsedMs}ms" + presolveBudget?.let { ", routing work ${it.spent()}" }.orEmpty()
+        "route: $lane in ${elapsedMs}ms" + presolveBudget?.let { ", routing work ${it.spent()}" }.orEmpty() +
+            " ROUTE" + com.eignex.klause.util.WorkTally.report()
     }
 }
 
