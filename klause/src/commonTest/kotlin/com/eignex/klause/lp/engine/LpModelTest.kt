@@ -439,4 +439,70 @@ class LpModelTest {
 
         assertFalse(model.finiteExactInput())
     }
+
+    @Test
+    fun `an integer right-hand side past binary64 integers keeps its exact value for certification`() {
+        val model = LpBuilder().apply {
+            addRealVar(0.0, 1.0)
+            val x = addVar(0L, 1L)
+            addRow(intArrayOf(x), longArrayOf(1L), Relation.LE, PAST_BINARY64)
+        }.build(Sense.MINIMIZE)
+
+        assertTrue(model.finiteExactInput())
+        assertEquals(BigFraction.ofLong(PAST_BINARY64), model.exactRhs(0))
+    }
+
+    @Test
+    fun `an integer upper bound past binary64 integers keeps its exact value for certification`() {
+        val model = LpBuilder().apply {
+            addRealVar(0.0, 1.0)
+            addVar(0L, PAST_BINARY64)
+        }.build(Sense.MINIMIZE)
+
+        assertTrue(model.finiteExactInput())
+        assertEquals(BigFraction.ofLong(PAST_BINARY64), model.exactUpper(1))
+    }
+
+    @Test
+    fun `integer model data past binary64 integers keeps the model from exact certification`() {
+        val variants = mapOf<String, LpBuilder.() -> Unit>(
+            "coefficient" to { addRow(intArrayOf(addVar(0L, 1L)), longArrayOf(PAST_BINARY64), Relation.LE, 1L) },
+            "cost" to { addVar(0L, 1L, cost = PAST_BINARY64) },
+            "lower bound" to { addVar(PAST_BINARY64, PAST_BINARY64 + 1L) },
+        )
+        for ((name, variant) in variants) {
+            val model = LpBuilder().apply {
+                addRealVar(0.0, 1.0)
+                variant()
+            }.build(Sense.MINIMIZE)
+
+            assertFalse(model.finiteExactInput(), name)
+        }
+    }
+
+    @Test
+    fun `a row objective coefficient past binary64 integers keeps the model from exact certification`() {
+        val model = LpBuilder().apply {
+            addRealVar(0.0, 1.0)
+            addVar(0L, 1L)
+        }.build(Sense.MINIMIZE)
+
+        assertFalse(model.withRowObjective(intArrayOf(1), longArrayOf(PAST_BINARY64)).finiteExactInput())
+    }
+
+    @Test
+    fun `the free integer stand-in does not keep the model from exact certification`() {
+        val model = LpBuilder().apply {
+            addRealVar(0.0, 1.0)
+            val x = addFreeVar(null, null)
+            addRow(intArrayOf(x), longArrayOf(1L), Relation.LE, 5L)
+        }.build(Sense.MINIMIZE)
+
+        assertTrue(model.finiteExactInput())
+        assertEquals(BigFraction.ofLong(5L) - exactDouble(-LP_UNBOUNDED_PROBE.toDouble()), model.exactRhs(0))
+    }
+
+    private companion object {
+        const val PAST_BINARY64: Long = (1L shl 53) + 1L
+    }
 }
