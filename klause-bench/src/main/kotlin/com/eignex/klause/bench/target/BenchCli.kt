@@ -177,7 +177,7 @@ object BenchCli {
         val search = parseKlauseSearch(f, params)
         println("=== solve over ${refs.size} instance(s) ===")
         SolveMetric.run(
-            BenchLoad.resolveRefs(refs),
+            BenchLoad.resolveLazily(refs),
             budget,
             backend ?: SolverInvocation.KLAUSE,
             search ?: KlauseSearch(),
@@ -214,10 +214,9 @@ object BenchCli {
         // `param=` is repeatable, so it is collected from the raw args rather than the dedup'd map;
         // `p=1 param=strategy=sweep` is the bandit-scheduled recipe sweep.
         val params = filterArgs.filter { it.startsWith("param=") }.map { it.substringAfter('=') }
-        val entries = BenchLoad.resolveRefs(refs)
-        println("=== calibrate ($engine, -p$cores): ${entries.size} instance(s), ${budget.timeoutMillis}ms ===")
+        println("=== calibrate ($engine, -p$cores): ${refs.size} instance(s), ${budget.timeoutMillis}ms ===")
         val dir = SolveMetric.run(
-            entries,
+            BenchLoad.resolveLazily(refs),
             budget,
             SolverInvocation.KLAUSE,
             KlauseSearch(engine = engine, processors = cores, params = params),
