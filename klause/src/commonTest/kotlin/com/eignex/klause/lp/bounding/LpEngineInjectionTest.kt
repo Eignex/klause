@@ -145,6 +145,24 @@ class LpEngineInjectionTest {
     }
 
     @Test
+    fun `node overhead counts as node work and is reported apart from the simplex`() {
+        val sink = SolveStatsSink(backend = "node-overhead")
+        val engine = LpEngine(Problem(0, 0, emptyArray(), emptyArray()), LinearObjective(), LpParams(), sink)
+
+        engine.use { it.noteNodeOverhead(11L) }
+
+        assertEquals(
+            listOf(11L, 11L, 11.0, 0.0),
+            listOf(
+                engine.pendingNodeSolveWork(),
+                engine.totalSolveWork(),
+                sink.snapshot().lp.overheadOps.sum,
+                sink.snapshot().lp.workOps.sum,
+            ),
+        )
+    }
+
+    @Test
     fun `root work uses supplied metrics and saturates`() {
         val engine = accountingEngine("root-work-override")
         val solver = metricSolver(1L)

@@ -55,6 +55,7 @@ internal fun lpStatPairs(stats: SolveStats): List<Pair<String, String>> {
     out += "lpCuts" to "${stats.lp.cuts.sum.toLong()}"
     out += "lpPivots" to "${stats.lp.pivots.sum.toLong()}"
     out += "lpWorkOps" to "${stats.lp.workOps.sum.toLong()}"
+    out += "lpOverheadOps" to "${stats.lp.overheadOps.sum.toLong()}"
     out += "lpNodePasses" to "${stats.lp.nodePasses.sum.toLong()}"
     if (stats.lp.nodePasses.sum > 0.0) {
         out += "lpWorkOpsPerNode" to "${(stats.lp.workOps.sum / stats.lp.nodePasses.sum).toLong()}"

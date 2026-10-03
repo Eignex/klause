@@ -261,6 +261,11 @@ data class LpStats(
      * keyed on it behaves the same on a loaded machine as on an idle one.
      */
     val workOps: SumResult = ZERO_COUNT,
+    /**
+     * Deterministic node-LP work outside the simplex, on the [workOps] scale: relaxation builds, solver setup,
+     * exact certification, reduced-cost fixing and scoped bound edits. [workOps] plus this is what a node LP costs.
+     */
+    val overheadOps: SumResult = ZERO_COUNT,
     /** Max sparse-LU fill ratio `(nnz L+U)/nnz B` over all factorizations; >1 = fill-in growth. */
     val luMaxFill: MaxResult = NO_MAX,
     /** Max sparse-LU density `(nnz L+U)/m²`; approaching 1.0 means the LU filled in to effectively dense. */
@@ -410,6 +415,7 @@ data class LpStats(
         fixed = SumResult(fixed.sum + o.fixed.sum),
         pivots = SumResult(pivots.sum + o.pivots.sum),
         workOps = SumResult(workOps.sum + o.workOps.sum),
+        overheadOps = SumResult(overheadOps.sum + o.overheadOps.sum),
         luMaxFill = MaxResult(maxOf(luMaxFill.max, o.luMaxFill.max)),
         luMaxDensity = MaxResult(maxOf(luMaxDensity.max, o.luMaxDensity.max)),
         luMaxDim = MaxResult(maxOf(luMaxDim.max, o.luMaxDim.max)),
@@ -545,6 +551,7 @@ internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
     // A running total, not a [CountStat]: that counts observations and ignores their magnitude, which is
     // how the other counters record units (a unit update repeated). Work is a magnitude per solve.
     private var workOpsTotal: Long = 0L
+    private var overheadOpsTotal: Long = 0L
     private var wallBackstop = false
     private var demoted = false
     private var clock: TimeMark? = null
@@ -738,6 +745,11 @@ internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
         if (ops > 0L) workOpsTotal += ops
     }
 
+    /** Record node-LP work the simplex does not meter; see [LpStats.overheadOps]. */
+    fun observeOverhead(ops: Long) {
+        if (ops > 0L && probeRoute == LpRoute.NODE) overheadOpsTotal += ops
+    }
+
     /** Record one node LP solve's sparse-LU fill ratio, density, and basis dimension. [luMaxDim] is
      *  the largest basis seen across all solves, tracked independently of [luMaxDensity] — a single
      *  running max cannot also report the dimension at which the max density occurred, so treat the
@@ -846,6 +858,7 @@ internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
         fixed = fixed.read(),
         pivots = pivots.read(),
         workOps = SumResult(workOpsTotal.toDouble()),
+        overheadOps = SumResult(overheadOpsTotal.toDouble()),
         wallBackstop = wallBackstop,
         demoted = demoted,
         luMaxFill = luMaxFill.read(),

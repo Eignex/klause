@@ -71,6 +71,8 @@ internal class LpPropagator(
     private val solveContext: LpSolveContext = LpSolveContext.Production,
     private val cancellation: Cancellation = Cancellation.Never,
     private val certificationObserver: LpCertificationObserver? = null,
+    // Each bound edit costs the scoped solver a pass over the model's columns; the engine charges it as LP work.
+    private val onEdit: (Long) -> Unit = {},
 ) : SearchComponent,
     SearchBrancher,
     AutoCloseable {
@@ -181,8 +183,14 @@ internal class LpPropagator(
 
     fun atLevel(depth: Int, token: Cancellation = cancellation): Boolean {
         val current = owner ?: return false
-        if (depth < current.state.depth && !current.pop(depth, token)) return invalidate()
-        while (current.state.depth < depth) if (!current.push(token)) return invalidate()
+        if (depth < current.state.depth) {
+            onEdit(current.state.model.numVars.toLong())
+            if (!current.pop(depth, token)) return invalidate()
+        }
+        while (current.state.depth < depth) {
+            onEdit(current.state.model.numVars.toLong())
+            if (!current.push(token)) return invalidate()
+        }
         return true
     }
 
@@ -197,6 +205,7 @@ internal class LpPropagator(
         val previous = current.state.activeSide(column, upper)?.side
         if (previous == side) return true
         val witness = nextWitness++
+        onEdit(current.state.model.numVars.toLong())
         if (witness == Long.MAX_VALUE || !current.assertBound(column, upper, side, witness)) {
             return invalidate()
         }
@@ -235,6 +244,7 @@ internal class LpPropagator(
                 if (!ExactLpBounds(activeLower, activeUpper).consistent) break@columns
             }
         }
+        onEdit(current.state.model.numVars.toLong())
         val result = current.assertBounds(assertions)
         if (result !is LpBoundBatchResult.Declined) {
             for (index in 0 until result.count) {

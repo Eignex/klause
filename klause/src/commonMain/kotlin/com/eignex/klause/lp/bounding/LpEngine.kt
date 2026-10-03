@@ -27,6 +27,7 @@ import com.eignex.klause.lp.cut.SharedCut
 import com.eignex.klause.lp.engine.Basis
 import com.eignex.klause.lp.engine.Cut
 import com.eignex.klause.lp.engine.LpCounterResults
+import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.LpPricingOptions
 import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.lp.engine.LpSolver
@@ -402,6 +403,19 @@ internal class LpEngine(
 
     internal fun pendingNodeSolveWork(): Long = pendingSolveOps
 
+    /**
+     * Charge [ops] of node-LP work the simplex does not meter: building the relaxation, setting a solver up,
+     * certifying exactly, fixing by reduced cost and editing the scoped solver's bounds. It counts toward the
+     * same node and total work as a solve, so the effort governor and anything that slices on [totalSolveWork]
+     * see what an LP node costs. Each site charges its own size, weighted to roughly one simplex work operation
+     * per unit (see [LpNodeOverhead]).
+     */
+    internal fun noteNodeOverhead(ops: Long) {
+        if (ops <= 0L) return
+        noteSolveOps(ops)
+        sink.lp.observeOverhead(ops)
+    }
+
     private fun saturatingAdd(a: Long, b: Long): Long = if (b > 0L && a > Long.MAX_VALUE - b) Long.MAX_VALUE else a + b
 
     /**
@@ -480,6 +494,7 @@ internal class LpEngine(
     internal val cpAdapter = CpLpAdapter(this)
     internal val propagator = LpPropagator(
         cpAdapter,
+        onEdit = { noteNodeOverhead(it * LpNodeOverhead.EDIT) },
         effort = {
             LpEffortProfile(
                 iterations = nodePivotBudget(),
@@ -504,7 +519,12 @@ internal class LpEngine(
             val base = relaxer.build(PropagationSession(problem), cancellation = nodeLpCancellation)
             if (base.persistentEligible) persistentRelaxation = base
         }
-        persistentRelaxation?.let { cpAdapter.relaxation(it, session)?.let { rebound -> return rebound } }
+        persistentRelaxation?.let {
+            cpAdapter.relaxation(it, session)?.let { rebound ->
+                noteNodeOverhead(rebound.model.numVars.toLong() * LpNodeOverhead.EDIT)
+                return rebound
+            }
+        }
         // Residual real models rebuild only when an activating pin changed: with no integer columns
         // every row and bound is a function of the aux-bool pin set alone, so an unchanged fingerprint
         // means the previously built relaxation is byte-identical — the common case along a dive,
@@ -521,11 +541,13 @@ internal class LpEngine(
                 if (residualCacheKey?.contentEquals(key) == true) return cached
             }
             val built = relaxer.build(session, cancellation = nodeLpCancellation)
+            noteNodeOverhead(built.model.extent() * LpNodeOverhead.BUILD)
             residualCache = built
             residualCacheKey = key
             return built
         }
         return relaxer.build(session, cancellation = nodeLpCancellation)
+            .also { noteNodeOverhead(it.model.extent() * LpNodeOverhead.BUILD) }
     }
 
     internal var lpCounterResults = LpCounterResults()
@@ -964,3 +986,18 @@ private const val INITIAL_NODE_WORK_OPS = 1_000_000L
 
 /** Divisor on the size-derived work baseline, mirroring CP-SAT's `num_cols / 40` iteration baseline. */
 private const val SIZE_BUDGET_DIVISOR = 40L
+
+/**
+ * Weights that put the node-LP costs the simplex does not meter on its scale, in work operations per unit of
+ * each site's size. Exact certification runs on rationals, which is what its weight reflects.
+ */
+internal object LpNodeOverhead {
+    const val BUILD = 4L
+    const val SETUP = 2L
+    const val EXACT = 32L
+    const val FIXING = 2L
+    const val EDIT = 1L
+}
+
+/** Rows, columns and nonzeros: the size every whole-model pass over [this] is linear in. */
+internal fun LpModel.extent(): Long = n.toLong() + m + (doubleView?.colVal?.size ?: csc.rowIdx.size)
