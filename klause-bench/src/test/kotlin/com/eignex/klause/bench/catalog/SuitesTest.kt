@@ -29,7 +29,6 @@ class SuitesTest {
         "pb-comp",
         "pb-comp-wbo",
         "pb-comp-2025",
-        "pb-comp-2025-wbo",
         "maxsat-unweighted",
         "maxsat-weighted",
     )
