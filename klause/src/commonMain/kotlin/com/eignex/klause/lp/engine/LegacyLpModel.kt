@@ -28,7 +28,9 @@ internal fun LpModel.authoritativeModel(): ExactLpModel? {
                 }
             }
         },
-        dv?.rhs?.map(ExactLpNumber::ofIeee) ?: rhs.map(ExactLpNumber::of),
+        dv?.let { view ->
+            List(m) { view.shifts.value.rhs(it)?.let(ExactLpNumber::of) ?: ExactLpNumber.ofIeee(view.rhs[it]) }
+        } ?: rhs.map(ExactLpNumber::of),
         List(numVars) { column ->
             ExactLpColumn(
                 legacyBounds(column),
@@ -61,7 +63,14 @@ internal fun LpModel.authoritativeModel(): ExactLpModel? {
         },
         ExactLpObjective(
             dv?.cost?.map(ExactLpNumber::ofIeee) ?: cost.map(ExactLpNumber::of),
-            dv?.let { ExactLpNumber.ofIeee(it.objConstant) } ?: ExactLpNumber.of(objConstant),
+            dv?.let { view ->
+                val exact = view.exactObjConstant()
+                if (exact == exactDouble(view.objConstant)) {
+                    ExactLpNumber.ofIeee(view.objConstant)
+                } else {
+                    ExactLpNumber.of(exact)
+                }
+            } ?: ExactLpNumber.of(objConstant),
             sense = sense,
         ),
     )
@@ -77,7 +86,11 @@ private fun LpModel.legacyBounds(column: Int): ExactLpBounds = ExactLpBounds(
         )
     },
     if (hasFiniteUpper(column) && (column >= n || !probeClampedHi[column])) {
-        ExactLpSide(doubleView?.let { ExactLpNumber.ofIeee(it.upper[column]) } ?: ExactLpNumber.of(upper[column]))
+        ExactLpSide(
+            doubleView?.let { view ->
+                view.shifts.value.upper(column)?.let(ExactLpNumber::of) ?: ExactLpNumber.ofIeee(view.upper[column])
+            } ?: ExactLpNumber.of(upper[column]),
+        )
     } else {
         null
     },

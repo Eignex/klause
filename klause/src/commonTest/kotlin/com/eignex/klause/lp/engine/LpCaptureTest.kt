@@ -395,7 +395,7 @@ class LpCaptureTest {
     }
 
     @Test
-    fun `checked integral bridge uses unchanged capture v1 bytes`() {
+    fun `checked integral bridge captures the bytes of its legacy model`() {
         val zero = ExactLpNumber.of(0L)
         val model = ExactLpModel(
             listOf(emptyList()),
@@ -409,9 +409,21 @@ class LpCaptureTest {
 
         val bytes = LpCapture.capture(model, settings, emptyList()).encode()
 
-        assertEquals(1, LP_CAPTURE_VERSION)
         assertContentEquals(LpCapture.capture(legacy, settings, emptyList()).encode(), bytes)
         assertContentEquals(bytes, LpCapture.decode(bytes).encode())
+    }
+
+    @Test
+    fun `capture keeps the exact value of a shifted right-hand side that rounded`() {
+        val model = LpBuilder().apply {
+            val x = addRealVar(-4.2e18, 0.0)
+            addRealRow(intArrayOf(x), doubleArrayOf(1.0), Relation.LE, 300.0)
+        }.build(Sense.MINIMIZE)
+        val bytes = LpCapture.capture(model, LpReplaySettings("shift", 0L), emptyList()).encode()
+
+        val replayed = LpCapture.decode(bytes).model.toModel()
+
+        assertEquals(exactDouble(300.0) + exactDouble(4.2e18), replayed.exactRhs(0))
     }
 
     @Test
@@ -590,7 +602,7 @@ class LpCaptureTest {
             bytes[8] = 0
             bytes[9] = 0
             bytes[10] = 0
-            bytes[11] = 2
+            bytes[11] = 99
         }
         val truncated = capture.encode().copyOf(capture.encode().size - 1)
         val unknownEvent = capture.encode().also { bytes ->

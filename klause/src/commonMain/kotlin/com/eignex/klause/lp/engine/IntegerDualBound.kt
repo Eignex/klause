@@ -1,7 +1,9 @@
 package com.eignex.klause.lp.engine
 
+import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.Int128
+import com.ionspin.kotlin.bignum.integer.BigInteger
 import kotlin.math.abs
 import kotlin.math.ceil
 import kotlin.math.floor
@@ -446,19 +448,25 @@ private fun rationalizeToIntegerModelUnchecked(model: LpModel, outwardRealUppers
     val dv = model.doubleView ?: return RationalizedLp(model, 1L, objConstantExact = true)
     val n = model.n
     val numVars = model.numVars
-    val s = commonScale(model) ?: return null
+    // The exact shifted values, not the view's binary64 roundings of them, are the model being certified.
+    val rhs = List(model.m) { dv.exactRhs(it) }
+    val logicalUppers = List(model.m) { if (dv.hasUpper[n + it]) dv.exactUpper(n + it) else BigFraction.ZERO }
+    val exactObjConstant = dv.exactObjConstant()
+    val bits = commonScale(model, rhs, logicalUppers, exactObjConstant) ?: return null
+    val s = (1L shl bits).toDouble()
     val upper = LongArray(numVars)
     for (j in 0 until numVars) {
         if (!dv.hasUpper[j]) continue
         if (j >= n) {
-            upper[j] = scaledInteger(dv.upper[j], s) ?: return null
+            upper[j] = scaledInteger(logicalUppers[j - n], bits) ?: return null
         } else {
-            val u = if (outwardRealUppers) ceil(dv.upper[j]) else floor(dv.upper[j])
-            if (u < 0.0 || u >= LONG_LIMIT) return null
-            upper[j] = u.toLong()
+            val exact = dv.exactUpper(j)
+            val u = if (outwardRealUppers) exact.ceilLong() else exact.negated().ceilLong()?.let { -it }
+            if (u == null || u < 0L) return null
+            upper[j] = u
         }
     }
-    val objConstant = scaledInteger(dv.objConstant, s)
+    val objConstant = scaledInteger(exactObjConstant, bits)
     return RationalizedLp(
         LpModel(
             n = n,
@@ -468,7 +476,7 @@ private fun rationalizeToIntegerModelUnchecked(model: LpModel, outwardRealUppers
                 dv.rowIdx.copyOf(),
                 LongArray(dv.colVal.size) { checkNotNull(scaledInteger(dv.colVal[it], s)) },
             ),
-            rhs = LongArray(model.m) { checkNotNull(scaledInteger(dv.rhs[it], s)) },
+            rhs = LongArray(model.m) { checkNotNull(scaledInteger(rhs[it], bits)) },
             cost = LongArray(numVars) { checkNotNull(scaledInteger(dv.cost[it], if (it < n) s else 1.0)) },
             upper = upper,
             hasUpper = dv.hasUpper.copyOf(),
@@ -482,24 +490,32 @@ private fun rationalizeToIntegerModelUnchecked(model: LpModel, outwardRealUppers
             probeClampedLo = model.probeClampedLo.copyOf(),
             probeClampedHi = model.probeClampedHi.copyOf(),
         ),
-        s.toLong(),
+        1L shl bits,
         objConstant != null,
     )
 }
 
-private fun commonScale(model: LpModel): Double? {
+private fun commonScale(
+    model: LpModel,
+    rhs: List<BigFraction>,
+    logicalUppers: List<BigFraction>,
+    objConstant: BigFraction,
+): Int? {
     val dv = checkNotNull(model.doubleView)
     // Implicit logical columns absorb the row scale, so fractional logical costs cannot enter this route.
     if ((model.n until model.numVars).any { scaledInteger(dv.cost[it], 1.0) == null }) return null
-    var fallback: Double? = null
-    for (k in 0..MAX_SCALE_BITS) {
+    var exactRange = 0..MAX_SCALE_BITS
+    for (value in rhs) exactRange = exactRange.meet(scaleRange(value))
+    for (value in logicalUppers) exactRange = exactRange.meet(scaleRange(value))
+    val objectiveRange = scaleRange(objConstant)
+    var fallback: Int? = null
+    for (k in exactRange) {
         val s = (1L shl k).toDouble()
-        if (dv.colVal.all { scaledInteger(it, s) != null } && dv.rhs.all { scaledInteger(it, s) != null } &&
-            (0 until model.n).all { scaledInteger(dv.cost[it], s) != null } &&
-            (model.n until model.numVars).all { !dv.hasUpper[it] || scaledInteger(dv.upper[it], s) != null }
+        if (dv.colVal.all { scaledInteger(it, s) != null } &&
+            (0 until model.n).all { scaledInteger(dv.cost[it], s) != null }
         ) {
-            if (fallback == null) fallback = s
-            if (scaledInteger(dv.objConstant, s) != null) return s
+            if (fallback == null) fallback = k
+            if (k in objectiveRange) return k
         }
     }
     return fallback
@@ -513,6 +529,22 @@ private fun scaledInteger(value: Double, scale: Double): Long? {
     return scaled.toLong()
 }
 
+private fun scaledInteger(value: BigFraction, bits: Int): Long? {
+    if (bits !in scaleRange(value)) return null
+    return (value.num * (BigInteger.ONE shl bits) / value.den).longValue(exactRequired = true)
+}
+
+// The exponents k at which value·2ᵏ is an integer below MAX_EXACT_INT in magnitude: from the power of two in the
+// denominator up to the headroom the numerator leaves. A denominator with an odd factor admits none.
+private fun scaleRange(value: BigFraction): IntRange {
+    if (value.isZero) return 0..MAX_SCALE_BITS
+    val need = value.den.bitLength() - 1
+    if (value.den != BigInteger.ONE shl need) return IntRange.EMPTY
+    return need..(EXACT_INT_BITS + need - value.num.abs().bitLength())
+}
+
+private fun IntRange.meet(other: IntRange): IntRange = maxOf(first, other.first)..minOf(last, other.last)
+
 /** Requested scale: fine enough to keep rounding loss negligible, capped by [chooseScale]. */
 private const val DEFAULT_SCALE_BITS = 40
 
@@ -525,5 +557,6 @@ private const val MULTIPLIER_BITS = 52
 /** Integers below this magnitude round-trip exactly through `Double` (`2⁵³`); matches the certifier. */
 private const val MAX_EXACT_INT: Double = 9.007199254740992E15
 
-/** `Long.MAX_VALUE` as a `Double` (`2⁶³`): a real column's rounded upper must stay below it to convert. */
-private const val LONG_LIMIT: Double = 9.223372036854776E18
+/** Integers below [MAX_EXACT_INT] in magnitude have at most this many bits. */
+private const val EXACT_INT_BITS = 53
+

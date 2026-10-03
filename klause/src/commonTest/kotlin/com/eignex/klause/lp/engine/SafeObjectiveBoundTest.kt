@@ -129,10 +129,7 @@ class SafeObjectiveBoundTest {
             addRealVar(0.0, 1.0)
         }.build(Sense.MINIMIZE)
         model.doubleView!!.loShift[0] = 0.5
-        model.doubleView.objConstant = 0.0
 
-        assertEquals(null, model.exactObjectiveLowerBoundCeil(doubleArrayOf()))
-        model.doubleView.objConstant = 0.5
         assertEquals(1L, model.exactObjectiveLowerBoundCeil(doubleArrayOf()))
     }
 

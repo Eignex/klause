@@ -971,15 +971,15 @@ internal fun LpModel.exactCost(j: Int): BigFraction = exactState?.model?.objecti
     ?: BigFraction.ofLong(cost[j])
 
 internal fun LpModel.exactUpper(j: Int): BigFraction = exactState?.model?.column(j)?.bounds?.upper?.number?.value
-    ?: doubleView?.let { exactDouble(it.upper[j]) }
+    ?: doubleView?.exactUpper(j)
     ?: BigFraction.ofLong(upper[j])
 
 internal fun LpModel.exactRhs(i: Int): BigFraction = exactState?.model?.rhs(i)?.value
-    ?: doubleView?.let { exactDouble(it.rhs[i]) }
+    ?: doubleView?.exactRhs(i)
     ?: BigFraction.ofLong(rhs[i])
 
 internal fun LpModel.exactConstant(): BigFraction = exactState?.model?.objective?.constant?.value
-    ?: doubleView?.let { exactDouble(it.objConstant) }
+    ?: doubleView?.exactObjConstant()
     ?: BigFraction.ofLong(objConstant)
 
 internal fun LpModel.exactLower(j: Int): BigFraction = exactBounds(j).lower?.number?.value ?: BigFraction.ZERO
@@ -1048,6 +1048,7 @@ internal fun LpModel.finiteExactInput(): Boolean {
         return rhs.size == m && cost.size == numVars && upper.size == numVars &&
             hasUpper.size == numVars && loShift.size == n && upper.indices.all { !hasUpper[it] || upper[it] >= 0L }
     }
+    if (dv.inexactCoefficients) return false
     return dv.rhs.size == m && dv.cost.size == numVars && dv.upper.size == numVars &&
         dv.hasUpper.size == numVars && dv.loShift.size == n &&
         dv.colVal.all { it.isFinite() } && dv.rhs.all { it.isFinite() } && dv.cost.all { it.isFinite() } &&
