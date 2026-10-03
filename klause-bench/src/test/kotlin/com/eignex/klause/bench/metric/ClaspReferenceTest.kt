@@ -62,4 +62,20 @@ class ClaspReferenceTest {
         val opb = "* #variable= 2 #constraint= 1\nmin: 1 x1 +1 x2 ;\n+1 x1 +1 x2 >= 1 ;\n"
         assertEquals(opb, ClaspReference.opbWithProblemLine(opb))
     }
+
+    @Test
+    fun `a new-format wcnf gets a problem line and hard clauses at the top weight`() {
+        val wcnf = "c two soft, one hard\nh 1 2 0\n3 -1 0\n4 -2 0\n"
+
+        val out = ClaspReference.wcnfWithProblemLine(wcnf)
+
+        assertEquals("p wcnf 2 3 8\n8 1 2 0\n3 -1 0\n4 -2 0\n", out)
+    }
+
+    @Test
+    fun `a classic wcnf passes unchanged`() {
+        val wcnf = "p wcnf 2 2 9\n9 1 2 0\n3 -1 0\n"
+
+        assertEquals(wcnf, ClaspReference.wcnfWithProblemLine(wcnf))
+    }
 }
