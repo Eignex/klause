@@ -101,7 +101,7 @@ internal const val DEFAULT_REFACTOR_UPDATE_LIMIT: Int = 64
  */
 internal class RevisedSimplex(
     private var model: LpModel,
-    private var cancellation: Cancellation = Cancellation.Never,
+    cancellation: Cancellation = Cancellation.Never,
     private val refactorUpdateLimit: Int = DEFAULT_REFACTOR_UPDATE_LIMIT,
     private val iterationLimit: Int = 0,
     private val workLimit: Long = 0L,
@@ -247,6 +247,22 @@ internal class RevisedSimplex(
     private var singularRefactorizations = 0
     private var smallPivotBails = 0
     private val work = LpWork()
+
+    // The work counted into [work] is charged to the caller's token at every poll and when a solve ends,
+    // so a work-metered token stops the solve at the same pivot however loaded the machine is.
+    private var stopToken: Cancellation = cancellation
+    private var chargedOps = 0L
+    private val cancellation: Cancellation = Cancellation {
+        chargeWork()
+        stopToken()
+    }
+
+    private fun chargeWork() {
+        val ops = work.ops
+        if (ops > chargedOps) stopToken.charge(ops - chargedOps)
+        chargedOps = ops
+    }
+
     private var maxLuFill = 0.0 // max (nnz of the held factors) / nnz(B) over this solve's factorizations
     private var maxLuDensity = 0.0 // max (nnz of the held factors) / m² — 1.0 means the factors are dense
     private var maxLuDim = 0 // basis dimension m at which maxLuDensity was observed
@@ -999,7 +1015,7 @@ internal class RevisedSimplex(
         cachedNumerical = null
         cachedStatus = null
         if (model.exactState == null || token()) return null
-        cancellation = token
+        stopToken = token
         return try {
             coldStart()
             if (refactorize(LpRefactorReason.INITIAL) == RefactorResult.FAILED || token() ||
@@ -1026,7 +1042,7 @@ internal class RevisedSimplex(
         continuationAvailable = false
         stoppedContinuationBasis = null
         refreshNumerical(next)
-        cancellation = token
+        stopToken = token
         solvedExactState = null
         optimalBasis = null
         optimalPrimal = null
@@ -1192,8 +1208,15 @@ internal class RevisedSimplex(
         return result
     }
 
+    private fun runNumericalSolve(progress: SolveProgress, block: (reset: Boolean) -> FloatLpResult?): FloatLpResult? =
+        try {
+            runChargedSolve(progress, block)
+        } finally {
+            chargeWork()
+        }
+
     @Suppress("TooGenericExceptionCaught")
-    private fun runNumericalSolve(progress: SolveProgress, block: (reset: Boolean) -> FloatLpResult?): FloatLpResult? {
+    private fun runChargedSolve(progress: SolveProgress, block: (reset: Boolean) -> FloatLpResult?): FloatLpResult? {
         lastTermination = null
         lastNumericalMetrics = SimplexNumericalMetrics()
         numericalFailure = false
@@ -1374,7 +1397,9 @@ internal class RevisedSimplex(
         lastTheoryPricingEstimatedFtranWorkOps = 0L
         lastTheoryPricingSelections = 0
         lastTheorySelectedColumn = -1
+        chargeWork()
         work.reset()
+        chargedOps = 0L
         warmStarted = false
     }
 

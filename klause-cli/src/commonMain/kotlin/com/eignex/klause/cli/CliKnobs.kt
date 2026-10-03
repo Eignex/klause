@@ -18,10 +18,11 @@ internal object CliKnobs {
     /** Default LP relaxation ceiling spec (parsed by `LpConfig.parse`): `klause.lp` / `KLAUSE_LP`. */
     val lp by propertyKnob()
 
-    /** Soft wall-clock budget (milliseconds) for the presolve phase: `klause.presolve.budget.ms` /
-     *  `KLAUSE_PRESOLVE_BUDGET_MS`. The presolve round engine and its long-running passes poll it and
-     *  bail with the reductions made so far, so a pathologically large model can't spend unbounded time
-     *  in presolve. `0` or negative disables the cap. Defaults to [DEFAULT_PRESOLVE_BUDGET_MS]. */
+    /** Presolve budget, in milliseconds' worth of work, for the presolve phase: `klause.presolve.budget.ms`
+     *  / `KLAUSE_PRESOLVE_BUDGET_MS`. Converted to work units at [PRESOLVE_WORK_PER_MS]; the presolve
+     *  round engine and its long-running passes charge their work against it and bail with the reductions
+     *  made so far, so a pathologically large model can't spend unbounded effort in presolve. `0` or
+     *  negative disables the cap. Defaults to [DEFAULT_PRESOLVE_BUDGET_MS]. */
     val presolveBudgetMs by propertyKnob()
 
     /** Share of the solve budget presolve may spend: `klause.presolve.budget.fraction` /
@@ -48,4 +49,8 @@ internal object CliKnobs {
      *  default 0.1) — at `-t 5000` presolve is handed the entire time limit and the search gets none.
      *  Only ever binds where the floor would otherwise displace the search it precedes. */
     const val MAX_PRESOLVE_BUDGET_SHARE = 0.25
+
+    /** Presolve work units one millisecond of presolve budget buys, so the millisecond policy above keeps
+     *  its reach while the phase counts work instead of reading a clock. */
+    const val PRESOLVE_WORK_PER_MS = 100_000L
 }

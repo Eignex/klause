@@ -29,6 +29,10 @@ import kotlin.time.TimeSource
  * be *computed* from the token itself rather than threaded alongside it — see [shorten]. Composites
  * ([or] / [and]) surface the earliest deadline of their sides.
  *
+ * Work-metered tokens expose their [workMeter], so an engine that counts its own deterministic work can
+ * [charge] it to whatever budget the token stands for without that budget being threaded beside the
+ * token. A plain token has no meter and ignores charges; composites surface either side's meter.
+ *
  * Cancellation is **cooperative**: engines check it between work units (per flip in
  * local search, per decision-block in backtrack). A request to cancel is observed within
  * a few hundred operations, not instantly.
@@ -50,14 +54,24 @@ fun interface Cancellation {
      *  separate numeric channel, so budgets like [shorten] can be derived from the token itself. */
     fun deadline(): ComparableTimeMark? = null
 
+    /** The deterministic work budget this token stops on, or `null` when it stops on something else. */
+    fun workMeter(): WorkMeter? = null
+
+    /** Charge [units] of deterministic work to this token's [workMeter]; a no-op on a token without one. */
+    fun charge(units: Long) {
+        workMeter()?.charge(units)
+    }
+
     /** Cancel when either side cancels. Short-circuit on the receiver; the composite reports the earlier
-     *  of the two [deadline]s (whichever bound bites first). */
+     *  of the two [deadline]s (whichever bound bites first) and whichever side's [workMeter] it finds. */
     infix fun or(other: Cancellation): Cancellation {
         val self = this
         val combined = earlierDeadline(self.deadline(), other.deadline())
+        val meter = self.workMeter() ?: other.workMeter()
         return object : Cancellation {
             override fun isCancelled(): Boolean = self.isCancelled() || other.isCancelled()
             override fun deadline(): ComparableTimeMark? = combined
+            override fun workMeter(): WorkMeter? = meter
         }
     }
 
@@ -65,7 +79,11 @@ fun interface Cancellation {
      *  exhausted" two-key escapes that shouldn't fire on either alone. */
     infix fun and(other: Cancellation): Cancellation {
         val self = this
-        return Cancellation { self.isCancelled() && other.isCancelled() }
+        val meter = self.workMeter() ?: other.workMeter()
+        return object : Cancellation {
+            override fun isCancelled(): Boolean = self.isCancelled() && other.isCancelled()
+            override fun workMeter(): WorkMeter? = meter
+        }
     }
 
     /**

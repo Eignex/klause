@@ -98,8 +98,8 @@ internal class LpEffortGovernor(
     }
 
     /** The current operation draws from the same ledger as earlier root and node LP work. */
-    fun operationCancellation(parent: Cancellation, elapsedNanos: () -> Long): Cancellation = Cancellation {
-        parent() || (wallBackstopMillis > 0L && elapsedNanos() >= wallBackstopNanos - spentNanos)
+    fun operationCancellation(parent: Cancellation, elapsedNanos: () -> Long): Cancellation = parent or Cancellation {
+        wallBackstopMillis > 0L && elapsedNanos() >= wallBackstopNanos - spentNanos
     }
 
     val wallExhausted: Boolean get() = wallBackstopMillis > 0L && spentNanos >= wallBackstopNanos

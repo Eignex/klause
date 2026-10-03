@@ -700,10 +700,12 @@ abstract fun interface com.eignex.klause.solver.search/SearchUnassignListener { 
 abstract fun interface com.eignex.klause.util/Cancellation { // com.eignex.klause.util/Cancellation|null[0]
     abstract fun isCancelled(): kotlin/Boolean // com.eignex.klause.util/Cancellation.isCancelled|isCancelled(){}[0]
     open fun and(com.eignex.klause.util/Cancellation): com.eignex.klause.util/Cancellation // com.eignex.klause.util/Cancellation.and|and(com.eignex.klause.util.Cancellation){}[0]
+    open fun charge(kotlin/Long) // com.eignex.klause.util/Cancellation.charge|charge(kotlin.Long){}[0]
     open fun deadline(): kotlin.time/ComparableTimeMark? // com.eignex.klause.util/Cancellation.deadline|deadline(){}[0]
     open fun invoke(): kotlin/Boolean // com.eignex.klause.util/Cancellation.invoke|invoke(){}[0]
     open fun or(com.eignex.klause.util/Cancellation): com.eignex.klause.util/Cancellation // com.eignex.klause.util/Cancellation.or|or(com.eignex.klause.util.Cancellation){}[0]
     open fun shorten(kotlin/Double): com.eignex.klause.util/Cancellation // com.eignex.klause.util/Cancellation.shorten|shorten(kotlin.Double){}[0]
+    open fun workMeter(): com.eignex.klause.util/WorkMeter? // com.eignex.klause.util/Cancellation.workMeter|workMeter(){}[0]
 
     final object Companion { // com.eignex.klause.util/Cancellation.Companion|null[0]
         final val Never // com.eignex.klause.util/Cancellation.Companion.Never|{}Never[0]
@@ -712,6 +714,10 @@ abstract fun interface com.eignex.klause.util/Cancellation { // com.eignex.klaus
         final fun after(kotlin.time/Duration): com.eignex.klause.util/Cancellation // com.eignex.klause.util/Cancellation.Companion.after|after(kotlin.time.Duration){}[0]
         final fun until(kotlin.time/ComparableTimeMark): com.eignex.klause.util/Cancellation // com.eignex.klause.util/Cancellation.Companion.until|until(kotlin.time.ComparableTimeMark){}[0]
     }
+}
+
+abstract fun interface com.eignex.klause.util/WorkMeter { // com.eignex.klause.util/WorkMeter|null[0]
+    abstract fun charge(kotlin/Long) // com.eignex.klause.util/WorkMeter.charge|charge(kotlin.Long){}[0]
 }
 
 abstract interface <#A: com.eignex.klause.solver/SolverParams> com.eignex.klause.solver/Optimizer : com.eignex.klause.solver/Solver<#A> { // com.eignex.klause.solver/Optimizer|null[0]
@@ -9256,11 +9262,17 @@ final class com.eignex.klause.presolve/PassDelta { // com.eignex.klause.presolve
         final fun <get-reconstruct>(): kotlin/Function1<com.eignex.klause.solver/Sample, com.eignex.klause.solver/Sample>? // com.eignex.klause.presolve/PassDelta.reconstruct.<get-reconstruct>|<get-reconstruct>(){}[0]
 }
 
-final class com.eignex.klause.presolve/PresolveBudget { // com.eignex.klause.presolve/PresolveBudget|null[0]
-    constructor <init>(kotlin/Function0<kotlin/Long>) // com.eignex.klause.presolve/PresolveBudget.<init>|<init>(kotlin.Function0<kotlin.Long>){}[0]
+final class com.eignex.klause.presolve/PresolveBudget : com.eignex.klause.util/WorkMeter { // com.eignex.klause.presolve/PresolveBudget|null[0]
+    constructor <init>(kotlin/Long) // com.eignex.klause.presolve/PresolveBudget.<init>|<init>(kotlin.Long){}[0]
 
+    final val allowance // com.eignex.klause.presolve/PresolveBudget.allowance|{}allowance[0]
+        final fun <get-allowance>(): kotlin/Long // com.eignex.klause.presolve/PresolveBudget.allowance.<get-allowance>|<get-allowance>(){}[0]
+
+    final fun charge(kotlin/Long) // com.eignex.klause.presolve/PresolveBudget.charge|charge(kotlin.Long){}[0]
+    final fun orSpent(com.eignex.klause.util/Cancellation): com.eignex.klause.util/Cancellation // com.eignex.klause.presolve/PresolveBudget.orSpent|orSpent(com.eignex.klause.util.Cancellation){}[0]
     final fun remaining(): kotlin/Long // com.eignex.klause.presolve/PresolveBudget.remaining|remaining(){}[0]
     final fun slice(kotlin/Long): com.eignex.klause.util/Cancellation // com.eignex.klause.presolve/PresolveBudget.slice|slice(kotlin.Long){}[0]
+    final fun spent(): kotlin/Long // com.eignex.klause.presolve/PresolveBudget.spent|spent(){}[0]
 }
 
 final class com.eignex.klause.presolve/PresolveConfig { // com.eignex.klause.presolve/PresolveConfig|null[0]
