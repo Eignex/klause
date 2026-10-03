@@ -14,10 +14,14 @@ import java.net.URI
  *    [ExternalCollection]; the collection is fetched **on first use** (automatically and
  *    transparently, with a clear log line) into [cacheRoot] and reused thereafter.
  *  - [ProblemSource.InCode] has no file and is resolved by the solver layer, not here.
+ *
+ * Fetched instances are stored zstd-compressed (see [CorpusFiles]), so a resolved file may be
+ * `<name>.<ext>.zst`; read it through [CorpusFiles], never directly.
  */
 internal object CorpusFetcher {
 
-    /** Compression suffix → the system decompressor that strips it in place (see [decompressInPlace]). */
+    /** Compression suffix → the system decompressor that strips it in place (see [decompressInPlace]), ahead
+     *  of the recompression to zstd. */
     private val DECOMPRESS_TOOLS = mapOf("xz" to "unxz", "bz2" to "bunzip2", "gz" to "gunzip", "lzma" to "unlzma")
 
     /** Resolve the workspace root. Honors `-Dklause.workspace.root`; otherwise walks up from
@@ -49,14 +53,15 @@ internal object CorpusFetcher {
             require(it.isFile) { "vendored file missing: ${source.workspaceRelPath}" }
         }
 
-        is ProblemSource.External -> File(ensure(source.collection), source.relPath).also {
+        is ProblemSource.External -> stored(File(ensure(source.collection), source.relPath)).also {
             require(it.isFile) { "instance '${source.relPath}' not found in collection '${source.collection.id}'" }
         }
 
         is ProblemSource.ExternalIndexed -> {
             val files = ensure(source.collection).walkTopDown()
-                .filter { it.isFile && it.extension == source.ext }
-                .sortedBy { it.name }
+                .filter { it.isFile && CorpusFiles.formatExtension(it) == source.ext }
+                .sortedBy { CorpusFiles.plainPath(it.name) }
+                .distinctBy { CorpusFiles.plainPath(it.path) }
                 .toList()
             require(source.index in files.indices) {
                 "collection '${source.collection.id}' has ${files.size} *.${source.ext} files; " +
@@ -66,6 +71,18 @@ internal object CorpusFetcher {
         }
 
         is ProblemSource.InCode -> error("InCode sources have no file")
+    }
+
+    /** [file] as stored: itself when present, else its compressed or plain counterpart. A catalog path names
+     *  either form, and a cache mid-migration may hold either. */
+    private fun stored(file: File): File {
+        if (file.isFile) return file
+        val counterpart = if (CorpusFiles.isCompressed(file)) {
+            File(CorpusFiles.plainPath(file.path))
+        } else {
+            File(file.path + CorpusFiles.SUFFIX)
+        }
+        return if (counterpart.isFile) counterpart else file
     }
 
     /** The root directory of [collection] in the cache, fetching it if not already present. */
@@ -109,6 +126,7 @@ internal object CorpusFetcher {
         URI(c.url).toURL().openStream().use { input -> tar.outputStream().use { input.copyTo(it) } }
         run("tar", "xzf", tar.absolutePath, "-C", dir.absolutePath)
         tar.delete()
+        compress(dir)
     }
 
     private fun tar(c: ExternalCollection, dir: File) {
@@ -117,8 +135,9 @@ internal object CorpusFetcher {
         URI(c.url).toURL().openStream().use { input -> tar.outputStream().use { input.copyTo(it) } }
         run("tar", "xf", tar.absolutePath, "-C", dir.absolutePath)
         tar.delete()
-        // PB competition instances ship individually `*.opb.xz`/`*.wbo.xz`; decompress in place.
+        // PB competition instances ship individually `*.opb.xz`/`*.wbo.xz`; recompress them to zstd.
         decompressInPlace(dir)
+        compress(dir)
     }
 
     private fun tarballZst(c: ExternalCollection, dir: File) {
@@ -127,6 +146,7 @@ internal object CorpusFetcher {
         URI(c.url).toURL().openStream().use { input -> tar.outputStream().use { input.copyTo(it) } }
         run("tar", "--zstd", "-xf", tar.absolutePath, "-C", dir.absolutePath)
         tar.delete()
+        compress(dir)
     }
 
     private fun zip(c: ExternalCollection, dir: File) {
@@ -137,9 +157,9 @@ internal object CorpusFetcher {
         zip.delete()
         dropOversized(c, dir)
         // Competition archives ship instances individually compressed (XCSP3 `*.xml.lzma`, MaxSAT
-        // `*.wcnf.xz`); unzip leaves them packed, so decompress in place to the plain file the
-        // front-end reads. A no-op for archives with no compressed members.
+        // `*.wcnf.xz`, MIPLIB `*.mps.gz`); unzip leaves them packed, so recompress them to zstd.
         decompressInPlace(dir)
+        compress(dir)
     }
 
     /** Drop extracted files over [ExternalCollection.maxFileMb] (measured on the still-compressed
@@ -152,7 +172,7 @@ internal object CorpusFetcher {
     }
 
     /** Decompress every individually-compressed instance under [dir] in place, stripping the
-     *  compression suffix so the front-end reads the plain file (`foo.cnf.xz` → `foo.cnf`). Covers the
+     *  compression suffix (`foo.cnf.xz` → `foo.cnf`) so [compress] can store it as zstd. Covers the
      *  suffixes competition corpora use; a no-op for anything already plain. Chunked to stay under the
      *  argument-length limit. */
     private fun decompressInPlace(dir: File) {
@@ -165,6 +185,12 @@ internal object CorpusFetcher {
             log("decompressing ${packed.size} .$ext instance(s) in '${dir.name}'")
             for (chunk in packed.chunked(500)) runCmd(null, listOf(tool, "-q", "-f") + chunk)
         }
+    }
+
+    /** Store every instance under a freshly extracted [dir] zstd-compressed. */
+    private fun compress(dir: File) {
+        val done = CorpusFiles.compressTree(dir, ::log)
+        if (done.files > 0) log("compressed ${done.files} instance(s) in '${dir.name}'")
     }
 
     private fun run(vararg cmd: String) = runCmd(null, cmd.asList())

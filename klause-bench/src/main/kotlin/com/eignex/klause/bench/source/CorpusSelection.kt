@@ -110,7 +110,8 @@ internal object CorpusSelection {
          *  DIMACS `.cnf`), but a flat corpus whose family lives in the filename passes [familyOf] —
          *  e.g. XCSP3, where `AircraftAssemblyLine-1-178-00-0_c23` groups under `AircraftAssemblyLine`
          *  via the series prefix, so `per-family` samples across series instead of near-identical
-         *  parameterizations. */
+         *  parameterizations. A `*.ext.zst` file is the same instance stored compressed, named without the
+         *  suffix; when both forms are present (a cache mid-migration) the instance is listed once. */
         data class Flat(
             val subDir: String,
             val ext: String,
@@ -120,12 +121,13 @@ internal object CorpusSelection {
                 val base = if (subDir.isEmpty()) root else File(root, subDir)
                 if (!base.isDirectory) return emptyList()
                 return base.walkTopDown()
-                    .filter { it.isFile && it.extension == ext }
-                    .sortedBy { it.relativeTo(base).path }
+                    .filter { it.isFile && CorpusFiles.formatExtension(it) == ext }
+                    .sortedBy { CorpusFiles.plainPath(it.relativeTo(base).path) }
                     .map {
-                        val name = it.relativeTo(base).path.removeSuffix(".$ext")
+                        val name = CorpusFiles.plainPath(it.relativeTo(base).path).removeSuffix(".$ext")
                         Discovered(name, it.relativeTo(root).path, familyKey = familyOf(name))
                     }
+                    .distinctBy { it.name }
                     .toList()
             }
         }

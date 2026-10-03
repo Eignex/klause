@@ -3,6 +3,7 @@ package com.eignex.klause.bench.metric
 import com.eignex.klause.bench.catalog.ProblemRef
 import com.eignex.klause.bench.runner.Budget
 import com.eignex.klause.bench.source.CorpusFetcher
+import com.eignex.klause.bench.source.CorpusFiles
 import com.eignex.klause.formats.mps.Mps
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicLong
@@ -70,7 +71,7 @@ internal object ScipReference {
      *  stdin and read as MPS; SCIP's objective sense (from the model's `OBJSENSE`) orients the reported
      *  bound. */
     fun run(ref: ProblemRef, budget: Budget): SolverInvocation.Result {
-        val text = CorpusFetcher.resolve(ref.source).readText()
+        val text = CorpusFiles.readText(CorpusFetcher.resolve(ref.source))
         // MPS default is minimise; an `OBJSENSE MAXIMIZE` flips it. SCIP reports the bound in this
         // orientation, so record it for the entry (and virtual-best comparison).
         val maximize = runCatching { Mps.parse(text).sense == ObjectiveDirection.MAXIMIZE }.getOrDefault(false)

@@ -149,6 +149,8 @@ internal object SolverInvocation {
         val file = if (entry.ref.format == Format.MINIZINC) {
             MiniZincRunner().compileFzn(entry.ref)
         } else {
+            // A compressed `.zst` instance is passed as is: klause-cli decompresses it while reading, so
+            // the decompression counts toward the solve time as it would for any compressed input.
             CorpusFetcher.resolve(entry.ref.source)
         }
         return buildList {

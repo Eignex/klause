@@ -3,6 +3,7 @@ package com.eignex.klause.bench.metric
 import com.eignex.klause.bench.catalog.Format
 import com.eignex.klause.bench.catalog.ProblemRef
 import com.eignex.klause.bench.source.CorpusFetcher
+import com.eignex.klause.bench.source.CorpusFiles
 
 /**
  * Source-text structural features of an instance — filled by [InstanceClassifier] from the raw source
@@ -46,7 +47,7 @@ internal object InstanceClassifier {
 
     /** Source-text features for [ref], or null if the source can't be read. */
     fun classify(ref: ProblemRef): InstanceFeatures? =
-        runCatching { fromSource(ref.format, CorpusFetcher.resolve(ref.source).readText()) }.getOrNull()
+        runCatching { fromSource(ref.format, CorpusFiles.readText(CorpusFetcher.resolve(ref.source))) }.getOrNull()
 
     /** The format-specific heuristic over the raw source [text] (the testable core of [classify]). */
     fun fromSource(format: Format, text: String): InstanceFeatures {
