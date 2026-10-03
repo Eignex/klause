@@ -484,6 +484,7 @@ object BenchCli {
             xcsp3 -> {
                 r = cached ?: Xcsp3CpSatReference.run(ref, budget, settings.processors ?: 1)
                     .also { BenchCache.store(key, it) }
+                r.stats["error"]?.let { println("?? ${ref.name} ERROR: $it") }
                 // Objective sense is unknowable without parsing the model; the container carries it in stats.
                 maximize = r.stats["maximize"].toBoolean()
             }
