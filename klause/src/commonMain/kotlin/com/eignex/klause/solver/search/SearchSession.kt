@@ -1022,6 +1022,12 @@ class SearchRun internal constructor(
                                 return finish(SearchRunEvent.Indeterminate.Component)
                             }
 
+                            SearchModelDisposition.Skip -> {
+                                resumeAfterSolution = false
+                                lastModel = null
+                                if (!backtrack()) return stopAfterBacktrack()
+                            }
+
                             SearchModelDisposition.Continue -> {
                                 resumeAfterSolution = false
                                 when (modelContinuation) {
