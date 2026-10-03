@@ -23,7 +23,7 @@ internal object ProblemKind {
         Format.DIMACS, Format.JSON_SCHEMA, Format.IN_CODE -> false
 
         else -> {
-            val text = runCatching { CorpusFetcher.resolve(ref.source).readText() }.getOrNull()
+            val text = runCatching { CorpusFiles.readText(CorpusFetcher.resolve(ref.source)) }.getOrNull()
             when {
                 text == null -> false
                 ref.format == Format.MINIZINC -> hasSolveObjective(text)

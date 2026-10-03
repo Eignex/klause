@@ -69,6 +69,7 @@ internal val DECOMPRESSORS = mapOf(
     "xz" to listOf("xz", "-dc"),
     "gz" to listOf("gzip", "-dc"),
     "bz2" to listOf("bzip2", "-dc"),
+    "zst" to listOf("zstd", "-dcq"),
 )
 
 /** The trailing compression suffix (lowercased) when [path] names a compressed file, else null. */

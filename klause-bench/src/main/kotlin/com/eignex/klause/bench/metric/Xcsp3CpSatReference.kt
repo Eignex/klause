@@ -4,6 +4,7 @@ import com.eignex.klause.bench.catalog.ProblemRef
 import com.eignex.klause.bench.report.Reports
 import com.eignex.klause.bench.runner.Budget
 import com.eignex.klause.bench.source.CorpusFetcher
+import com.eignex.klause.bench.source.CorpusFiles
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
 import java.io.File
@@ -73,9 +74,12 @@ internal object Xcsp3CpSatReference {
     /** Solve [ref]'s XCSP3 `.xml` with cp-sat in the container under [budget], pinning cp-sat to
      *  [workers] search workers (the sweep parallelizes across instances, so 1 keeps a container from
      *  fanning out to every core). The objective sense (`maximize`), unknowable without parsing the
-     *  model, is carried back in `stats["maximize"]`. */
-    fun run(ref: ProblemRef, budget: Budget, workers: Int): SolverInvocation.Result {
-        val xml = CorpusFetcher.resolve(ref.source)
+     *  model, is carried back in `stats["maximize"]`. A compressed instance is mounted as a decompressed
+     *  staged copy, since the container reads a plain file. */
+    fun run(ref: ProblemRef, budget: Budget, workers: Int): SolverInvocation.Result =
+        CorpusFiles.withPlainFile(CorpusFetcher.resolve(ref.source)) { run(it, budget, workers) }
+
+    private fun run(xml: File, budget: Budget, workers: Int): SolverInvocation.Result {
         val timeoutSec = (budget.timeoutMillis / 1000).coerceAtLeast(1)
         val name = "$CONTAINER_LABEL-${seq.incrementAndGet()}"
         val cmd = listOf(

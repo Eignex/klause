@@ -3,6 +3,8 @@ package com.eignex.klause.bench.metric
 import com.eignex.klause.bench.catalog.ProblemRef
 import com.eignex.klause.bench.runner.Budget
 import com.eignex.klause.bench.source.CorpusFetcher
+import com.eignex.klause.bench.source.CorpusFiles
+import java.io.File
 import java.util.concurrent.TimeUnit
 
 /**
@@ -38,9 +40,12 @@ internal object Z3Reference {
     /** Decide [ref] (an SMT-LIB `.smt2`) with z3 under [budget]. Bounded so a whole-corpus parallel sweep
      *  is safe: `-T:<sec>` caps wall-clock (z3 then answers `unknown`), `-memory:<MB>` caps RAM, and
      *  `sat.threads=1 parallel.enable=false` keep it single-threaded (no fan-out per process). A watchdog
-     *  force-kills a run that ignores its own limits, so one solve can never hang or starve the box. */
-    fun run(ref: ProblemRef, budget: Budget): SolverInvocation.Result {
-        val file = CorpusFetcher.resolve(ref.source)
+     *  force-kills a run that ignores its own limits, so one solve can never hang or starve the box. A
+     *  compressed instance is decompressed to a staged copy before the clock starts. */
+    fun run(ref: ProblemRef, budget: Budget): SolverInvocation.Result =
+        CorpusFiles.withPlainFile(CorpusFetcher.resolve(ref.source)) { run(it, budget) }
+
+    private fun run(file: File, budget: Budget): SolverInvocation.Result {
         val timeoutSec = (budget.timeoutMillis / 1000).coerceAtLeast(1)
         val cmd = listOf(
             BINARY,

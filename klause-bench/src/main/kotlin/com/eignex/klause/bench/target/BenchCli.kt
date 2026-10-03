@@ -23,6 +23,7 @@ import com.eignex.klause.bench.report.Reports
 import com.eignex.klause.bench.runner.Budget
 import com.eignex.klause.bench.runner.MZN_RANDOM_SEED
 import com.eignex.klause.bench.source.CorpusFetcher
+import com.eignex.klause.bench.source.CorpusFiles
 import com.eignex.klause.bench.source.CorpusSelection
 import com.eignex.klause.bench.source.ProblemKind
 import com.eignex.klause.bench.tools.ProfileConfig
@@ -34,11 +35,11 @@ import com.eignex.klause.bench.tune.StratifiedPool
 import com.eignex.klause.bench.tune.TuneEngine
 import com.eignex.klause.bench.tune.Tuner
 import com.eignex.klause.bench.tune.VizierTuner
-import kotlinx.serialization.decodeFromString
 import java.io.File
 import java.util.concurrent.Callable
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicInteger
+import kotlinx.serialization.decodeFromString
 
 /**
  * Single entry point for the bench: `./gradlew :klause-bench:bench --args="<command>"`.
@@ -68,6 +69,8 @@ import java.util.concurrent.atomic.AtomicInteger
  *  - `credit [--by structure|format] <a.csv> <b.csv> …` — win-share + greedy set-cover credit between
  *    per-run result CSVs, keyed by (suite, problem), sliceable by a feature column (see [credit]).
  *  - `preview [filters…]` — print the instances a run would cover, without running.
+ *  - `corpus compress [<dir>]` — store every plain instance in the corpus cache (or [dir]) zstd-compressed,
+ *    in place; the migration for a cache fetched before the cache stored instances compressed.
  *  - `list` — suites; `list <suite>` — problems in a suite.
  */
 object BenchCli {
@@ -77,6 +80,8 @@ object BenchCli {
 
     /** Truncate coverage values to three decimals for the `tune` palette console output. */
     private const val COVERAGE_DECIMALS = 1000.0
+
+    private const val MIB = 1024L * 1024
 
     /** CLI entry point dispatching bench subcommands. */
     @JvmStatic
@@ -98,10 +103,12 @@ object BenchCli {
 
             "credit" -> credit(args.drop(1))
 
+            "corpus" -> corpus(args.drop(1))
+
             else ->
                 error(
                     "unknown command '$cmd' " +
-                        "(commands: solve, preview, calibrate, reference, classify, tune, credit, list)",
+                        "(commands: solve, preview, calibrate, reference, classify, tune, credit, corpus, list)",
                 )
         }
     }
@@ -132,6 +139,19 @@ object BenchCli {
         println(
             "classified ${features.size} (skipped $skipped unreadable); reference tables: " +
                 "$updated rows updated, $unmatched with no table row",
+        )
+    }
+
+    /** `corpus compress [<dir>]`: compress the plain instances under [dir] (default: the corpus cache) in
+     *  place. Safe to interrupt and re-run; see [CorpusFiles.compressTree]. */
+    private fun corpus(args: List<String>) {
+        require(args.firstOrNull() == "compress") { "usage: corpus compress [<dir>]" }
+        val root = args.getOrNull(1)?.let { File(it) } ?: CorpusFetcher.cacheRoot
+        require(root.isDirectory) { "no corpus directory at $root" }
+        println("=== corpus compress: $root ===")
+        val done = CorpusFiles.compressTree(root, ::println)
+        println(
+            "compressed ${done.files} instance(s): ${done.plainBytes / MIB} MiB -> ${done.packedBytes / MIB} MiB",
         )
     }
 
@@ -575,7 +595,7 @@ object BenchCli {
      *  path needs no klause `Problem`. A `satisfy` model — or one whose solve item is not in the top
      *  `.mzn` — is treated as a CSP: feasibility only, no `-a` enumeration. */
     private fun solveKind(ref: ProblemRef): Pair<Boolean, Boolean> {
-        val stripped = CorpusFetcher.resolve(ref.source).readText()
+        val stripped = CorpusFiles.readText(CorpusFetcher.resolve(ref.source))
             .replace(Regex("/\\*.*?\\*/", RegexOption.DOT_MATCHES_ALL), " ")
             .replace(Regex("%[^\n]*"), " ")
         val keyword = Regex("""\bsolve\b[^;]*?\b(satisfy|minimize|maximize)\b""", RegexOption.DOT_MATCHES_ALL)
@@ -716,6 +736,7 @@ object BenchCli {
             |  bench calibrate [filters…]            diverse arm palette from a live pool run (kind=cop; engine=mixed|ls|cp, p=)
             |  bench reference [filters…]            harvest optima/verdicts into per-solver tables (cp-sat/clasp/z3 by format)
             |  bench preview [filters…]              show what a run would cover
+            |  bench corpus compress [<dir>]         zstd-compress the plain instances in the corpus cache, in place
             |  bench list [<suite>]                  list suites, or problems in a suite
             |
             |Filters: suite=a,b (suite=core = in-process core) kind=cop|csp category=SAT,OPTIMIZATION

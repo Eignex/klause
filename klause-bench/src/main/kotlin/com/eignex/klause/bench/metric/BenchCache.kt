@@ -4,6 +4,7 @@ import com.eignex.klause.bench.catalog.ProblemRef
 import com.eignex.klause.bench.report.Reports
 import com.eignex.klause.bench.runner.Budget
 import com.eignex.klause.bench.source.CorpusFetcher
+import com.eignex.klause.bench.source.CorpusFiles
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import java.io.File
@@ -15,7 +16,8 @@ import java.security.MessageDigest
  * first: a hit replays the stored result with no subprocess, a miss invokes and stores. This is the
  * "known record of solved/presolved things" — reference baselines stay frozen across runs while
  * klause iterates (klause's key also folds in the klause-cli binary's mtime, so a rebuild
- * invalidates only klause's entries, not the references').
+ * invalidates only klause's entries, not the references'). The bytes hashed are the decompressed ones, so
+ * an instance keeps its key whether the corpus stores it plain or compressed.
  *
  * Disable with `-Dklause.bench.cache=false`. Lives under `build/bench-cache/`.
  */
@@ -24,10 +26,14 @@ internal object BenchCache {
     private val dir by lazy { File("build/bench-cache").apply { mkdirs() } }
 
     /** Key for solving [ref] with [solver] (the settings-encoding label) under [budget]. */
-    fun keyFor(ref: ProblemRef, solver: String, budget: Budget): String {
+    fun keyFor(ref: ProblemRef, solver: String, budget: Budget): String =
+        keyFor(CorpusFetcher.resolve(ref.source), ref.data?.let { CorpusFetcher.resolve(it) }, solver, budget)
+
+    /** Key for solving the instance in [model] (plus its optional [data] file) with [solver] under [budget]. */
+    fun keyFor(model: File, data: File?, solver: String, budget: Budget): String {
         val md = MessageDigest.getInstance("SHA-256")
-        md.update(CorpusFetcher.resolve(ref.source).readBytes())
-        ref.data?.let { md.update(CorpusFetcher.resolve(it).readBytes()) }
+        CorpusFiles.update(md, model)
+        data?.let { CorpusFiles.update(md, it) }
         md.update("|$solver|t=${budget.timeoutMillis}".toByteArray())
         // klause iterates → invalidate its entries when the cli binary changes; references are external.
         if (solver.startsWith("klause")) {

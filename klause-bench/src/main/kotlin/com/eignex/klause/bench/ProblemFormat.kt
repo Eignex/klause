@@ -1,6 +1,7 @@
 package com.eignex.klause.bench
 
 import com.eignex.klause.bench.catalog.Format
+import com.eignex.klause.bench.source.CorpusFiles
 import com.eignex.klause.compile.compile
 import com.eignex.klause.formats.dimacs.Dimacs
 import com.eignex.klause.formats.dimacs.toProblem
@@ -39,14 +40,14 @@ internal interface ProblemFormat {
 internal object DimacsFormat : ProblemFormat {
     override val format = Format.DIMACS
     override val inProcess = true
-    override fun ingest(file: File) = Ingested(Dimacs.parse(file.readText()).toProblem())
+    override fun ingest(file: File) = Ingested(Dimacs.parse(CorpusFiles.readText(file)).toProblem())
 }
 
 internal object WcnfFormat : ProblemFormat {
     override val format = Format.WCNF
     override val inProcess = true
     override fun ingest(file: File): Ingested {
-        val wcnf = Dimacs.parseWcnf(file.readText()).toProblem()
+        val wcnf = Dimacs.parseWcnf(CorpusFiles.readText(file)).toProblem()
         return Ingested(wcnf.problem, wcnf.objective.toLinearObjective())
     }
 }
@@ -55,7 +56,7 @@ internal object OpbFormat : ProblemFormat {
     override val format = Format.OPB
     override val inProcess = true
     override fun ingest(file: File): Ingested {
-        val opb = Opb.parse(file.readText()).toProblem()
+        val opb = Opb.parse(CorpusFiles.readText(file)).toProblem()
         return Ingested(opb.problem, opb.objective?.toLinearObjective())
     }
 }
@@ -63,7 +64,7 @@ internal object OpbFormat : ProblemFormat {
 internal object JsonSchemaFormat : ProblemFormat {
     override val format = Format.JSON_SCHEMA
     override val inProcess = true
-    override fun ingest(file: File) = Ingested(JsonSchema.parse(file.readText()).compile().problem)
+    override fun ingest(file: File) = Ingested(JsonSchema.parse(CorpusFiles.readText(file)).compile().problem)
 }
 
 /** Compiled by the `minizinc` CLI, then parsed in-process — see `runner.MiniZincRunner`. */
@@ -78,7 +79,7 @@ internal object Xcsp3Format : ProblemFormat {
     override val format = Format.XCSP3
     override val inProcess = true
     override fun ingest(file: File): Ingested {
-        val parsed = Xcsp3.parse(file.readText())
+        val parsed = Xcsp3.parse(CorpusFiles.readText(file))
         return Ingested(parsed.problem, parsed.objective?.toLinearObjective())
     }
 }
@@ -90,7 +91,7 @@ internal object SmtLibFormat : ProblemFormat {
     override val inProcess = true
     override fun ingest(file: File): Ingested {
         val strict = System.getProperty("klause.bench.smtlib.strictBounds")?.toBooleanStrictOrNull() ?: false
-        val parsed = SmtLib.parse(file.readText(), strictBounds = strict)
+        val parsed = SmtLib.parse(CorpusFiles.readText(file), strictBounds = strict)
         return Ingested(parsed.model.requireFiniteBenchModel(file), parsed.objective?.toLinearObjective())
     }
 }
@@ -102,7 +103,7 @@ internal object MpsFormat : ProblemFormat {
     override val format = Format.MPS
     override val inProcess = true
     override fun ingest(file: File): Ingested {
-        val compiled = Mps.parse(file.readText()).toProblem()
+        val compiled = Mps.parse(CorpusFiles.readText(file)).toProblem()
         val problem = compiled.model.requireFiniteBenchModel(file)
         val rawObjective = compiled.objective?.toLinearObjective()
         val objective = if (compiled.maximize) rawObjective?.negated() else rawObjective

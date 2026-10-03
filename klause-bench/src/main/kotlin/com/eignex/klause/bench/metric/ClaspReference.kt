@@ -4,6 +4,7 @@ import com.eignex.klause.bench.catalog.Format
 import com.eignex.klause.bench.catalog.ProblemRef
 import com.eignex.klause.bench.runner.Budget
 import com.eignex.klause.bench.source.CorpusFetcher
+import com.eignex.klause.bench.source.CorpusFiles
 import java.math.BigInteger
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicLong
@@ -65,7 +66,7 @@ internal object ClaspReference {
      *  stdin (OPB and WCNF get their problem line synthesized first). Objective sense is always minimise for OPB
      *  (clasp's only PB mode); DIMACS has none — both report `maximize=false`. */
     fun run(ref: ProblemRef, budget: Budget): SolverInvocation.Result {
-        val text = CorpusFetcher.resolve(ref.source).readText()
+        val text = CorpusFiles.readText(CorpusFetcher.resolve(ref.source))
         val input = when (ref.format) {
             Format.OPB -> opbWithProblemLine(text)
             Format.WCNF -> wcnfWithProblemLine(text)

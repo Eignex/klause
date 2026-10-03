@@ -124,6 +124,22 @@ class CorpusSelectionTest {
         }
     }
 
+    @Test
+    fun `Flat layout finds a compressed instance and names it without the suffix`() {
+        val root = Files.createTempDirectory("zstsel").toFile()
+        try {
+            File(root, "PB24/fam").mkdirs()
+            File(root, "PB24/fam/inst.opb.zst").writeBytes(byteArrayOf())
+
+            val found = Layout.Flat("PB24", "opb").discover(root)
+
+            assertEquals(listOf("fam/inst"), found.map { it.name })
+            assertEquals(listOf("PB24/fam/inst.opb.zst"), found.map { it.mznRelPath })
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
     // Balanced selection: (format, name) items; family = name prefix, group = format.
     private fun items(format: String, count: Int) = (1..count).map { format to "$format$it/x" }
     private val family = { item: Pair<String, String> -> item.second.substringBefore('/') }
