@@ -21,6 +21,7 @@ import com.eignex.klause.bench.metric.Xcsp3CpSatReference
 import com.eignex.klause.bench.metric.Z3Reference
 import com.eignex.klause.bench.report.Reports
 import com.eignex.klause.bench.runner.Budget
+import com.eignex.klause.bench.runner.MZN_RANDOM_SEED
 import com.eignex.klause.bench.source.CorpusFetcher
 import com.eignex.klause.bench.source.CorpusSelection
 import com.eignex.klause.bench.source.ProblemKind
@@ -465,7 +466,8 @@ object BenchCli {
             xcsp3 -> "$backend-xcsp3"
             smt -> "z3"
             mps -> "scip"
-            else -> backend
+            // The seed fixes the instance a random-data model compiles to, so results under another seed differ.
+            else -> "$backend-seed$MZN_RANDOM_SEED"
         }
         val key = BenchCache.keyFor(ref, cacheTag, budget)
         val cached = BenchCache.load(key)
