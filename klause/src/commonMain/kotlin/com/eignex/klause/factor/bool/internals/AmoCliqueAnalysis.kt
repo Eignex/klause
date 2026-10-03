@@ -120,12 +120,15 @@ internal fun mergeCliques(cliques: List<Set<Int>>, cancellation: Cancellation = 
             continue
         }
         budget -= cost
+        cancellation.charge(cost)
         val members = clique.toHashSet()
         // Candidates: lits adjacent to every base member, taken in id order for determinism. Each
         // one is then re-checked against the members added before it, which the candidate set of the
         // *base* clique does not account for.
         val candidates = graph.commonNeighbours(clique)
-        budget -= candidates.size.toLong() * clique.size
+        val checks = candidates.size.toLong() * clique.size
+        budget -= checks
+        cancellation.charge(checks)
         for (c in candidates) {
             if (members.all { it == c || graph.adjacent(it, c) }) members.add(c)
         }

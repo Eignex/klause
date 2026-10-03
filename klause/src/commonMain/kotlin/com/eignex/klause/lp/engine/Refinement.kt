@@ -156,7 +156,7 @@ internal class RefinementMeter(
     private var directWork = 0L
     private var directAllocation = 0L
     var metrics = LpRefinementMetrics()
-    val token = Cancellation { cancellation() || elapsedForLimit() >= limits.time }
+    val token = cancellation or Cancellation { elapsedForLimit() >= limits.time }
     val spentWork: Long get() = cache.work
     val remainingWork: Long get() = minOf(
         limits.maxWork - if (perAttempt) cache.work - initialWork else cache.work,

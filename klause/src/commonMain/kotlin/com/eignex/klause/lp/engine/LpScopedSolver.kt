@@ -268,7 +268,7 @@ internal class LpScopedSolver(
         val childIterations = allowance?.iterations?.let {
             if (iterationLimit > 0) minOf(it, iterationLimit) else it
         } ?: iterationLimit
-        val scopeToken = Cancellation { cancellation() || token() }
+        val scopeToken = cancellation or token
         val child = LpScopedSolver(
             working.state, scopeToken, context, refactorUpdateLimit, childIterations, childWork,
             trackDegeneracy, maxRetainedRows, pricing,

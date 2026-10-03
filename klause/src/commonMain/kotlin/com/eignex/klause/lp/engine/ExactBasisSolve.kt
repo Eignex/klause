@@ -29,7 +29,7 @@ internal class ExactBasisMeter(val limits: ExactBasisLimits, private val cancell
     var orderFallbacks = 0
     var orderDecline: ExactBasisOrderDecline? = null
 
-    val token = Cancellation { cancellation() || started.elapsedNow() >= limits.factor.time }
+    val token = cancellation or Cancellation { started.elapsedNow() >= limits.factor.time }
     private val stride = PollStride()
 
     fun poll() {

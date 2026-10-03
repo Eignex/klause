@@ -71,7 +71,7 @@ object PresolvePipeline {
         if (problem is BakedProblem) return PreparedSource.unchanged(problem, presolveBudget)
         val context = PresolveContext.of(linearObjective, solutionSetSensitive, problem.hasSymmetryBreaking)
             .withPresolveBudget(presolveBudget)
-        val presolved = Presolver.runSource(problem, config, context, cancellation)
+        val presolved = Presolver.runSource(problem, config, context, phaseCancellation(cancellation, presolveBudget))
         return PreparedSource(
             source = problem,
             problem = presolved.problem,
@@ -119,13 +119,14 @@ object PresolvePipeline {
         linearObjective: LinearObjective?,
         config: PresolveConfig,
         solutionSetSensitive: Boolean,
-        cancellation: Cancellation = Cancellation.Never,
+        callerCancellation: Cancellation = Cancellation.Never,
         zeroObjectivePricing: LpZeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT,
         randomSeed: Long? = null,
     ): PresolveOutcome {
         val problem = prepared.source
         val sourceProblem = prepared.problem
         val presolveBudget = prepared.budget
+        val cancellation = phaseCancellation(callerCancellation, presolveBudget)
         // Root-bake probing (failed-literal / SAC) runs in the presolve lane via [RootBaker]: resolve it
         // from the config once and thread it through the context so every rebuild re-derives it.
         val bakeConfig = BakeConfig.from(config)
@@ -324,13 +325,20 @@ private fun refit(objective: LinearObjective?, problem: Problem): LinearObjectiv
 }
 
 /**
+ * [cancellation], stopping as well once [budget] is spent, and carrying [budget] as the meter every pass
+ * and LP solve below charges. Whatever token the caller built, the phase's work lands in its own budget.
+ */
+private fun phaseCancellation(cancellation: Cancellation, budget: PresolveBudget?): Cancellation =
+    budget?.orSpent(cancellation) ?: cancellation
+
+/**
  * A slice of [budget] for one pre-bake root LP, falling back to [cancellation] when the phase carries no
- * budget. These run before any pass, so a relaxation the LP cannot close in the time available would
- * otherwise spend the whole allowance and leave the round engine none — and, cancelled mid-solve, it
- * yields nothing at all for the time it took. Half of what remains, matching the round engine's own
- * per-pass policy, so each stage costs a bounded share of the phase rather than the phase itself.
+ * budget. These run before any pass, so a relaxation the LP cannot close within the allowance would
+ * otherwise spend all of it and leave the round engine none — and, cancelled mid-solve, it yields nothing
+ * at all for the work it did. Half of what remains, matching the round engine's own per-pass policy, so
+ * each stage costs a bounded share of the phase rather than the phase itself. The simplex charges its
+ * work through the slice, which is what stops it at the same pivot on every run.
  */
 private fun preBakeSlice(cancellation: Cancellation, budget: PresolveBudget?): Cancellation = budget?.let {
-    val slice = it.slice(it.remaining() / 2)
-    Cancellation { cancellation() || slice() }
+    it.slice(it.remaining() / 2) or cancellation
 } ?: cancellation

@@ -74,7 +74,7 @@ internal object SolveCore {
         // engine: an engine-local check leaves the driver re-entering arms that cancel at their first
         // poll, which burns the whole deadline and overshoots the cap several times over.
         val (deadline, deadlineCancel) = deadlineCancellation(common)
-        val (presolveCancel, presolveBudget) = presolveAllowance(common, deadlineCancel, deadline)
+        val (presolveCancel, presolveBudget) = presolveAllowance(common, deadlineCancel)
         when (val pipeline = rawSolvable.pipeline) {
             is SolvablePipeline.OpenTheory -> {
                 val nodeLimit = takeOpenNodeLimit(common)
@@ -114,6 +114,7 @@ internal object SolveCore {
                         constructionBakeElapsed = Duration.ZERO,
                     )
                     errPrintln("  open sides closed: ${prepared.closedSides}")
+                    presolveBudget?.let { errPrintln("  work: ${it.spent()} of ${it.allowance}") }
                     if (prepared.infeasible) errPrintln("  preparation refuted the model")
                     return
                 }
@@ -131,6 +132,7 @@ internal object SolveCore {
                     ) {
                         budgetSpent(common, it)
                     }
+                    logOpenPresolveWork(common, presolveBudget)
                     return
                 }
                 output.begin(optimize = false, maximize = false)
@@ -164,6 +166,7 @@ internal object SolveCore {
                         if (result is OpenTheoryResult.Sat) 1L else 0L,
                     )
                 }
+                logOpenPresolveWork(common, presolveBudget)
                 return
             }
 
@@ -322,16 +325,15 @@ internal object SolveCore {
     /**
      * The presolve phase's allowance, as a [Cancellation] for the phase and a [PresolveBudget] the round
      * engine slices per pass. Derived by [derivedPresolveBudgetMs] as a share of the run's own `-t`
-     * budget rather than a flat figure. An explicit `klause.presolve.budget.ms` still wins.
+     * budget rather than a flat figure, and counted in work. An explicit `klause.presolve.budget.ms` still
+     * wins. The run's deadline in [solveCancel] is the only clock left on the phase, as a safety net.
      */
     internal fun presolveAllowance(
         common: CommonOptions,
         solveCancel: Cancellation,
-        solveDeadline: Long?,
     ): Pair<Cancellation, PresolveBudget?> {
-        val presolveDeadline = common.sharedPresolveDeadline() ?: return solveCancel to null
-        val cap = solveDeadline?.let { minOf(it, presolveDeadline) } ?: presolveDeadline
-        return Cancellation { solveCancel() || nowMillis() > cap } to PresolveBudget { cap - nowMillis() }
+        val budget = common.sharedPresolveBudget() ?: return solveCancel to null
+        return budget.orSpent(solveCancel) to budget
     }
 
     /** Naked single backtrack solve for the `fixed`/FD engine. A model annotation selects its heuristic;
@@ -402,6 +404,22 @@ internal object SolveCore {
             output,
         )
     }
+
+    /** The open route's presolve work under `-v`: routing, source preparation and bound closing together. */
+    private fun logOpenPresolveWork(common: CommonOptions, budget: PresolveBudget?) {
+        if (budget == null) return
+        cliLogger(common.verbose).v { "presolve [open]: work ${budget.spent()} of ${budget.allowance}" }
+    }
+
+    /**
+     * The work [budget] was charged since [before], beside the [elapsed] it took and the whole allowance's
+     * standing — the figures that relate the work unit to time, so the work-per-millisecond rate can be
+     * measured on any corpus. Empty when presolve ran without a budget.
+     */
+    private fun presolveWorkText(budget: PresolveBudget?, before: Long, elapsed: Duration): String =
+        budget?.let {
+            ", work ${it.spent() - before} in ${elapsed.inWholeMilliseconds}ms (${it.spent()} of ${it.allowance})"
+        }.orEmpty()
 
     /** Print what presolve did (`dry-run-presolve`) to stderr: the presolve-phase wall time,
      *  variable/constraint counts, total integer-domain span, the per-factor-kind histogram delta, the LP
@@ -639,6 +657,7 @@ internal object SolveCore {
         common: CommonOptions,
         output: OutputProtocol,
     ) {
+        val workBefore = request.presolveBudget?.spent() ?: 0L
         val result = FinitePipeline.solve(
             request,
             FiniteSolveCallbacks(
@@ -661,7 +680,8 @@ internal object SolveCore {
             val p0 = solvable.finiteProblem
             val p1 = preparation.problem
             "presolve [${request.engine.id}]: factors ${p0.numFactors}→${p1.numFactors}, " +
-                "ints ${p0.numIntVars}→${p1.numIntVars}, bools ${p0.numBoolVars}→${p1.numBoolVars}"
+                "ints ${p0.numIntVars}→${p1.numIntVars}, bools ${p0.numBoolVars}→${p1.numBoolVars}" +
+                presolveWorkText(request.presolveBudget, workBefore, result.preparationElapsed)
         }
         when (val outcome = result.outcome) {
             FiniteSolveOutcome.PreparedOnly -> {
