@@ -656,14 +656,7 @@ internal class ResumableMinimize(
      */
     private fun firstRunWork(): MinimizeResult.WithSample? {
         sink.start()
-        // Charge the one-shot root LP work's wall time against the shared LP wall budget on every
-        // exit path, so it competes with the per-node solves for the same fraction of the deadline.
-        val rootWorkStart = TimeSource.Monotonic.markNow()
-        try {
-            return firstRunWorkBody()
-        } finally {
-            lpEngine.chargeRootLpWall(rootWorkStart.elapsedNow().inWholeMilliseconds)
-        }
+        return firstRunWorkBody()
     }
 
     private fun revalidateInitialCandidate(): MinimizeResult.WithSample? {
@@ -805,25 +798,25 @@ internal class ResumableMinimize(
      * [BacktrackParams.solveBudgetMillis] and [startMark] on the non-pausable one-shot path — so
      * the cap tracks the real deadline on the FD track too instead of degrading to the absolute ceiling,
      * which exceeds a short budget and would let root work consume the whole solve. Only the absolute cap
-     * applies when neither the slice end nor the budget is known. A non-positive fraction disables the
-     * cap.
+     * applies when neither the slice end nor the budget is known. It also stops once the LP has spent
+     * `LpPlan.rootMaxWork` or the LP work allowance the node solves share. A non-positive fraction
+     * disables the cap.
      */
     private fun rootLpBudget(): Cancellation {
         val fraction = params.lpPlan.rootBudgetFraction
         if (fraction <= 0.0) return params.cancellation
         val cap = params.lpPlan.rootBudgetMillis
         val remaining = remainingBudgetMillis()
-        var budgetMillis = if (remaining != null) minOf((remaining * fraction).toLong(), cap) else cap
-        // Also cap the one-shot root work by the shared LP wall budget, so an expensive-but-useless
-        // root relaxation cannot spend more than the whole LP subsystem is allotted before search starts.
-        lpEngine.lpWallRemainingMillis()?.let { budgetMillis = minOf(budgetMillis, it) }
+        val budgetMillis = if (remaining != null) minOf((remaining * fraction).toLong(), cap) else cap
         // Work first, clock second. A harvest bounded by time keeps a different set of cuts on every
         // run, and the search inherits them, so nothing downstream is comparable to itself; bounding it
         // by work makes the harvest a property of the model. The deadline stays as the backstop for
         // cost the meter cannot see.
         val opsBudget = lpEngine.params.lpPlan.rootMaxWork
+        // The shared LP work allowance caps it too, so an expensive-but-useless root relaxation cannot spend
+        // more than the whole LP subsystem is allotted before search starts.
         return params.cancellation or
-            Cancellation { lpEngine.workSpentExceeds(opsBudget) } or
+            Cancellation { lpEngine.workSpentExceeds(opsBudget) || lpEngine.lpWorkAllowanceSpent() } or
             Cancellation.after(budgetMillis.coerceAtLeast(0).milliseconds)
     }
 

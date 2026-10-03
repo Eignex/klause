@@ -17,9 +17,17 @@ internal data class LpPricingOptions(
     val tieSeed: Long = 0L,
 )
 
-/** Immutable construction seam for standalone and persistent solves. */
+/**
+ * Immutable construction seam for standalone and persistent solves. Each `workLimit` bounds one solve in
+ * [LpWork] operations, 0 leaving it unbounded.
+ */
 internal interface LpEngineFactory {
-    fun newGeneralSolver(model: LpModel, cancellation: Cancellation, pricing: LpPricingOptions): LpSolver
+    fun newGeneralSolver(
+        model: LpModel,
+        cancellation: Cancellation,
+        workLimit: Long,
+        pricing: LpPricingOptions,
+    ): LpSolver
 
     fun newComponentSolver(
         model: LpModel,
@@ -49,8 +57,12 @@ internal interface LpEngineFactory {
 }
 
 internal object ProductionLpEngineFactory : LpEngineFactory {
-    override fun newGeneralSolver(model: LpModel, cancellation: Cancellation, pricing: LpPricingOptions): LpSolver =
-        RevisedSimplex(model, cancellation, pricing = pricing)
+    override fun newGeneralSolver(
+        model: LpModel,
+        cancellation: Cancellation,
+        workLimit: Long,
+        pricing: LpPricingOptions,
+    ): LpSolver = RevisedSimplex(model, cancellation, workLimit = workLimit, pricing = pricing)
 
     override fun newComponentSolver(
         model: LpModel,

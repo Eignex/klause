@@ -327,8 +327,12 @@ class LpInstrumentationHarness {
         override fun newGeneralSolver(
             model: LpModel,
             cancellation: Cancellation,
+            workLimit: Long,
             pricing: LpPricingOptions,
-        ): LpSolver = MeasuringSolver(ProductionLpEngineFactory.newGeneralSolver(model, cancellation, pricing), sink)
+        ): LpSolver = MeasuringSolver(
+            ProductionLpEngineFactory.newGeneralSolver(model, cancellation, workLimit, pricing),
+            sink,
+        )
     }
 
     private class MeasuringSolver(private val delegate: LpSolver, private val sink: MetricsSink) :

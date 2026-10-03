@@ -25,13 +25,19 @@ internal class RecordingLpEngineFactory(private val delegate: LpEngineFactory = 
     LpEngineFactory {
     val calls = ArrayList<EngineConstructionCall>()
 
-    override fun newGeneralSolver(model: LpModel, cancellation: Cancellation, pricing: LpPricingOptions): LpSolver {
+    override fun newGeneralSolver(
+        model: LpModel,
+        cancellation: Cancellation,
+        workLimit: Long,
+        pricing: LpPricingOptions,
+    ): LpSolver {
         calls += EngineConstructionCall(
             EngineConstruction.GENERAL,
+            workLimit = workLimit,
             zeroObjectivePricing = pricing.zeroObjective,
             tieSeed = pricing.tieSeed,
         )
-        return delegate.newGeneralSolver(model, cancellation, pricing)
+        return delegate.newGeneralSolver(model, cancellation, workLimit, pricing)
     }
 
     override fun newComponentSolver(
@@ -245,6 +251,7 @@ class LpSolverInjectionTest {
             override fun newGeneralSolver(
                 model: LpModel,
                 cancellation: Cancellation,
+                workLimit: Long,
                 pricing: LpPricingOptions,
             ): LpSolver {
                 construction++
@@ -266,6 +273,7 @@ class LpSolverInjectionTest {
             override fun newGeneralSolver(
                 model: LpModel,
                 cancellation: Cancellation,
+                workLimit: Long,
                 pricing: LpPricingOptions,
             ): LpSolver = closeTrackingSolver { closed++ }
 
@@ -299,6 +307,7 @@ class LpSolverInjectionTest {
             override fun newGeneralSolver(
                 model: LpModel,
                 cancellation: Cancellation,
+                workLimit: Long,
                 pricing: LpPricingOptions,
             ): LpSolver {
                 assertSame(token, cancellation)

@@ -78,7 +78,7 @@ internal fun lpStatPairs(stats: SolveStats): List<Pair<String, String>> {
     appendRouteSolveStats(out, "Standalone", stats.lp.standaloneRoute)
     appendRouteSolveStats(out, "Component", stats.lp.componentRoute)
     appendRouteSolveStats(out, "Root", stats.lp.rootRoute)
-    if (stats.lp.wallBackstop) out += "lpWallBackstop" to "1"
+    if (stats.lp.workAllowanceSpent) out += "lpWorkAllowanceSpent" to "1"
     if (stats.lp.demoted) out += "lpDemoted" to "1"
     if (stats.lp.luMaxFill.max.isFinite()) out += "lpLuMaxFill" to round4(stats.lp.luMaxFill.max)
     if (stats.lp.luMaxDensity.max.isFinite()) out += "lpLuMaxDensity" to round4(stats.lp.luMaxDensity.max)
