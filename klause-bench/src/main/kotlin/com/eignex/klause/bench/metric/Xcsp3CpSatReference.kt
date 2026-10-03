@@ -6,6 +6,7 @@ import com.eignex.klause.bench.runner.Budget
 import com.eignex.klause.bench.source.CorpusFetcher
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
+import java.io.File
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicLong
 
@@ -96,7 +97,18 @@ internal object Xcsp3CpSatReference {
             timeoutSec.toString(),
             workers.toString(),
         )
-        val proc = ProcessBuilder(cmd).redirectErrorStream(false).start()
+        // CPMpy's parser chatter goes to stderr. A pipe nobody drains fills and blocks the container until the
+        // watchdog kills it, so it goes to a file, whose tail also explains a missing verdict.
+        val stderr = File.createTempFile("$CONTAINER_LABEL-", ".err")
+        try {
+            return solve(cmd, name, budget, stderr)
+        } finally {
+            stderr.delete()
+        }
+    }
+
+    private fun solve(cmd: List<String>, name: String, budget: Budget, stderr: File): SolverInvocation.Result {
+        val proc = ProcessBuilder(cmd).redirectError(stderr).start()
         // Watchdog: `docker kill` the CONTAINER (not just the client) if it blows the deadline — CPMpy's
         // parse phase is not time-bounded and can hang/balloon, and killing only the client leaves the
         // container running. Killing the container closes stdout, so the read below can't block forever.
@@ -118,26 +130,53 @@ internal object Xcsp3CpSatReference {
         val stdout = proc.inputStream.bufferedReader().readText()
         proc.waitFor(DOCKER_INSPECT_WAIT_MS, TimeUnit.MILLISECONDS)
         watchdog.interrupt()
-        val json = stdout.lineSequence().lastOrNull { it.trimStart().startsWith("{") }
-            ?: error("xcsp3 cp-sat: no JSON verdict (${stdout.take(200)})")
-        val v = Reports.json.decodeFromString<Verdict>(json)
-        if (v.exit == "ERROR") error("xcsp3 cp-sat: ${v.error ?: "unknown"}")
+        val exit = runCatching { proc.exitValue() }.getOrNull()
+        // docker itself failed and the container never ran: an error to retry, not a result to cache.
+        check(exit !in DOCKER_RUN_FAILED) {
+            "xcsp3 cp-sat: docker run exited $exit: ${stderr.readText().takeLast(ERROR_TAIL_CHARS)}"
+        }
+        val v = stdout.lineSequence().lastOrNull { it.trimStart().startsWith("{") }
+            ?.let { Reports.json.decodeFromString<Verdict>(it) }
+        return when {
+            v == null -> undecided(cmd, stdout, "no JSON verdict (${stderr.readText().takeLast(ERROR_TAIL_CHARS)})")
+            v.exit == "ERROR" -> undecided(cmd, stdout, v.error ?: "unknown")
+            else -> decided(cmd, stdout, v)
+        }
+    }
+
+    private fun decided(cmd: List<String>, stdout: String, v: Verdict): SolverInvocation.Result {
         val feasible = when (v.exit) {
             "OPTIMAL", "FEASIBLE" -> true
             "UNSATISFIABLE" -> false
             else -> null
         }
-        val proven = v.exit == "OPTIMAL" || v.exit == "UNSATISFIABLE"
         val timeMs = ((v.runtime ?: 0.0) * 1000).toLong()
         return SolverInvocation.Result(
             feasible = feasible,
             objective = v.objective,
             timeToBestMs = timeMs.takeIf { feasible == true },
             timeToFirstFeasibleMs = timeMs.takeIf { feasible == true },
-            proven = proven,
+            proven = v.exit == "OPTIMAL" || v.exit == "UNSATISFIABLE",
             stats = mapOf("solveTime" to (v.runtime?.toString() ?: "0"), "maximize" to v.maximize.toString()),
             rawOutput = stdout,
             command = cmd.joinToString(" "),
         )
     }
+
+    // A container that ran but gave no verdict, from a parse failure, an unsupported constraint or an OOM kill,
+    // fails the same way on every run. It is a result, so the bench caches it instead of solving it again.
+    private fun undecided(cmd: List<String>, stdout: String, error: String) = SolverInvocation.Result(
+        feasible = null,
+        objective = null,
+        timeToBestMs = null,
+        proven = false,
+        stats = mapOf("error" to "xcsp3 cp-sat: $error"),
+        rawOutput = stdout,
+        command = cmd.joinToString(" "),
+    )
 }
+
+private const val ERROR_TAIL_CHARS = 200
+
+// `docker run` exit codes for a failure of docker itself or of starting the container.
+private val DOCKER_RUN_FAILED = 125..127
