@@ -167,16 +167,28 @@ class MpsCompiled(
         this.toleranceMismatch = toleranceMismatch
     }
 
-    /** Check a solved point against the original decimal MPS rows, bounds, and objective. */
+    /**
+     * Check a solved point against the original decimal MPS rows, bounds, and objective: exactly when the lowered
+     * model restates the source ([sourceExact]), and otherwise within the tolerance [withinTolerance] applies,
+     * computed over the decimals. An exact certificate of a binary64 restatement holds over the doubles it was
+     * certified on, not over the decimals they round, so an exact check of it would reject a point that sits on a
+     * rounded row or bound.
+     */
     fun sourceWitness(ints: LongArray, reals: List<BigFraction>?): MpsSourceWitness {
         val source = checkNotNull(sourceModel) { "MPS source model is unavailable" }
         val numbers = source.sourceNumbers()
+        val tolerance = if (sourceExact) BigFraction.ZERO else MPS_TOLERANCE_EXACT
+        fun slack(vararg scales: BigFraction?): BigFraction =
+            tolerance * scales.fold(BigFraction.ONE) { widest, scale ->
+                val magnitude = scale?.absolute() ?: return@fold widest
+                if (magnitude > widest) magnitude else widest
+            }
         val values = columns.map { column -> sourceColumnValue(column, ints, reals) }
         source.variables.forEachIndexed { index, variable ->
             val value = values[index]
             val (lower, upper) = numbers.variableBounds[index]
-            if (lower.finiteMps()?.fraction?.let { value < it } == true ||
-                upper.finiteMps()?.fraction?.let { value > it } == true
+            if (lower.finiteMps()?.fraction?.let { value < it - slack(it) } == true ||
+                upper.finiteMps()?.fraction?.let { value > it + slack(it) } == true
             ) {
                 throw MpsLoweringException("source witness violates bound on '${variable.name}'")
             }
@@ -187,12 +199,16 @@ class MpsCompiled(
             if (indicator != null && values[indicator.column] != BigFraction.ofLong(trigger)) {
                 return@forEachIndexed
             }
-            val activity = row.indices.indices.fold(BigFraction.ZERO) { sum, entry ->
-                sum + numbers.constraintCoefficients[rowIndex][entry].fraction * values[row.indices[entry]]
+            var activity = BigFraction.ZERO
+            var magnitude = BigFraction.ZERO
+            for (entry in row.indices.indices) {
+                val term = numbers.constraintCoefficients[rowIndex][entry].fraction * values[row.indices[entry]]
+                activity += term
+                magnitude += term.absolute()
             }
             val (lower, upper) = numbers.constraintBounds[rowIndex]
-            if (lower.finiteMps()?.fraction?.let { activity < it } == true ||
-                upper.finiteMps()?.fraction?.let { activity > it } == true
+            if (lower.finiteMps()?.fraction?.let { activity < it - slack(it, magnitude) } == true ||
+                upper.finiteMps()?.fraction?.let { activity > it + slack(it, magnitude) } == true
             ) {
                 throw MpsLoweringException("source witness violates row '${row.name}'")
             }
@@ -276,6 +292,8 @@ private fun sourceColumnValue(column: MpsColumn, ints: LongArray, reals: List<Bi
             ?: throw MpsLoweringException("integer column '${column.name}' has no value")
     }
 
+private fun BigFraction.absolute(): BigFraction = if (signum() < 0) negated() else this
+
 private class ToleranceSource(val lower: DoubleArray, val upper: DoubleArray, val rows: List<ToleranceRow>)
 
 private class ToleranceRow(
@@ -297,6 +315,8 @@ data class MpsSourceWitness(
 
 /** Primal feasibility tolerance of MPS results under tolerance semantics, the HiGHS default. */
 const val MPS_TOLERANCE: Double = 1e-7
+
+private val MPS_TOLERANCE_EXACT = BigFraction.of(BigInteger.ONE, BigInteger.fromLong(10_000_000L))
 
 /** Bounds at or beyond this magnitude are the MPS "infinity" convention (`1e30`), not a literal bound. */
 private const val MPS_INFINITY = 1e20
