@@ -86,7 +86,7 @@ fun Problem.presolveOpen(
     cancellation: Cancellation = Cancellation.Never,
     budget: PresolveBudget? = null,
 ): OpenPresolveResult {
-    val preparationCancellation = Cancellation { cancellation() || budget?.remaining() == 0L }
+    val preparationCancellation = budget?.orSpent(cancellation) ?: cancellation
     val source = PresolvePipeline.prepareSource(
         this,
         config,

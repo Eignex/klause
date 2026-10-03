@@ -13,6 +13,7 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.LpStatsSink
 import com.eignex.klause.util.Bits
+import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -259,6 +260,35 @@ class OpenPresolveTest {
         assertEquals(7L, result.spec.intBounds.upper(0))
         assertEquals(3L, result.spec.intBounds.lower(1))
         assertEquals(3L, result.spec.intBounds.upper(1))
+    }
+
+    private fun jointlyDetermined(): Problem = fullyOpen(
+        2,
+        row(0 to 1L, 1 to 1L, op = LinearOp.EQ, bound = 10L),
+        row(0 to 1L, 1 to -1L, op = LinearOp.EQ, bound = 4L),
+    )
+
+    private fun closingWork(): Long {
+        val budget = PresolveBudget(Long.MAX_VALUE)
+        jointlyDetermined().closeOpenBounds(budget.orSpent(Cancellation.Never))
+        return budget.spent()
+    }
+
+    @Test
+    fun `bound closing charges the same work on every run`() {
+        val first = closingWork()
+
+        assertTrue(first > 0L, "the bound proof must charge the work it does")
+        assertEquals(first, closingWork())
+    }
+
+    @Test
+    fun `a spent allowance closes no open side`() {
+        val spent = PresolveBudget(0L).orSpent(Cancellation.Never)
+
+        val result = assertIs<OpenPresolveResult.Tightened>(jointlyDetermined().closeOpenBounds(spent))
+
+        assertEquals(0, result.closedSides)
     }
 
     @Test
