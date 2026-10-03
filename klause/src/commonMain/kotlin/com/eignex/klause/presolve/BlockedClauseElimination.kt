@@ -43,7 +43,7 @@ internal object BlockedClauseElimination {
         for (s in 0 until db.slotCount) {
             val c = db.clause(s) ?: continue
             if ((considered++ and CANCEL_POLL_MASK) == 0 && cancellation()) break
-            val blocking = blockingLiteral(db, c) ?: continue
+            val blocking = blockingLiteral(db, c, cancellation) ?: continue
             db.remove(s)
             removed.add(Blocked(c, blocking))
         }
@@ -52,18 +52,20 @@ internal object BlockedClauseElimination {
     }
 
     /** A literal of [c] whose variable is eligible and on which [c] is blocked, or `null`. */
-    private fun blockingLiteral(db: SatClauseDb, c: IntArray): Int? {
+    private fun blockingLiteral(db: SatClauseDb, c: IntArray, cancellation: Cancellation): Int? {
+        cancellation.charge(BCE_WORK_WEIGHT * (1L + c.size))
         for (l in c) {
             if (!db.eligible[Lit.variable(l)]) continue
-            if (blockedOn(db, c, l)) return l
+            if (blockedOn(db, c, l, cancellation)) return l
         }
         return null
     }
 
     /** Whether [c] is blocked on [l]: every live clause containing `¬l` clashes with [c] elsewhere. */
-    private fun blockedOn(db: SatClauseDb, c: IntArray, l: Int): Boolean {
+    private fun blockedOn(db: SatClauseDb, c: IntArray, l: Int, cancellation: Cancellation): Boolean {
         val opposite = db.occ(Lit.negate(l))
         if (opposite.size > OCCURRENCE_CAP) return false
+        cancellation.charge(BCE_WORK_WEIGHT * (c.size.toLong() + opposite.size))
         val v = Lit.variable(l)
         val cLits = IntHashSet(c.size)
         for (k in c) if (Lit.variable(k) != v) cLits.add(k)
@@ -97,3 +99,7 @@ internal object BlockedClauseElimination {
     private fun List<Blocked>.asRebuilds(): SourceRebuilds =
         SourceRebuilds(asReversed().map { RebuildStep.RepairClause(it.clause, it.blockingLit) })
 }
+
+// Work units per occurrence visited, against one simplex op. No model in the calibration sample (60 MIPLIB 2017,
+// 40 QF_LIA and 40 MiniZinc Challenge) ran this pass, so it takes the weight the other per-term passes measured.
+private const val BCE_WORK_WEIGHT = 10L

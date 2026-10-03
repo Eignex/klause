@@ -42,15 +42,14 @@ class PreparedSourceTest {
 
     @Test
     fun `source reduction runs after routing slice exhaustion`() {
-        var remaining = 6_000L
-        val parent = PresolveBudget { remaining }
+        val parent = PresolveBudget(6_000L)
         val routeStop = parent.slice(parent.remaining() / 2)
-        remaining = 3_000L
+        routeStop.charge(3_000L)
         assertTrue(routeStop())
 
         val prepared = PresolvePipeline.prepareSource(
             aggregatable(),
-            cancellation = Cancellation { parent.remaining() == 0L },
+            cancellation = parent.orSpent(Cancellation.Never),
             presolveBudget = parent,
         )
 

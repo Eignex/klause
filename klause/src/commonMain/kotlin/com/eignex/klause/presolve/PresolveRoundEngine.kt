@@ -106,7 +106,6 @@ internal object PresolveRoundEngine {
     private fun sliceOf(budget: PresolveBudget, cancellation: Cancellation, eligible: Int): Cancellation {
         val left = budget.remaining()
         val share = if (eligible > 1) left / 2 else left
-        val slice = budget.slice(share)
-        return Cancellation { cancellation() || slice() }
+        return budget.slice(share) or cancellation
     }
 }

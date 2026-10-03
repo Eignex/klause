@@ -143,7 +143,7 @@ internal class LpWorkingScope internal constructor(
         return try {
             owner.solve(
                 warm,
-                Cancellation { cancellation() || token() },
+                cancellation or token,
                 continuationLimits = continuationLimits,
                 fullContinuation = fullContinuation,
                 observer = accounting,

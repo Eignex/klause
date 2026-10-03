@@ -20,6 +20,7 @@ import com.eignex.klause.propagation.propagate
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -496,5 +497,63 @@ class PresolverTest {
         val baked = problem.bake()
         val pre = Presolver.run(baked, PresolveConfig.parse("affine"), ctx)
         assertSame(baked, pre.problem)
+    }
+
+    private fun reducibleChain(): Problem = Problem(
+        0,
+        3,
+        Array(3) { IntDomain(0, 9) },
+        arrayOf<Factor>(
+            Linear(intArrayOf(2, -2, -2), intArrayOf(0, 1, 2), LinearOp.EQ, 0),
+            Linear(intArrayOf(1, 1), intArrayOf(1, 2), LinearOp.LE, 4),
+        ),
+    )
+
+    private fun chargedWork(): Long {
+        val budget = PresolveBudget(Long.MAX_VALUE)
+        Presolver.run(
+            reducibleChain().bake(),
+            PresolveConfig.DEFAULT,
+            PresolveContext.EMPTY.withPresolveBudget(budget),
+            budget.orSpent(Cancellation.Never),
+        )
+        return budget.spent()
+    }
+
+    @Test
+    fun `the same model charges the same presolve work on every run`() {
+        val first = chargedWork()
+
+        assertTrue(first > 0L, "the passes must charge the work they do")
+        assertEquals(first, chargedWork())
+    }
+
+    @Test
+    fun `a pass that charges nothing itself still spends the budget`() {
+        val budget = PresolveBudget(Long.MAX_VALUE)
+
+        Presolver.run(
+            reducibleChain().bake(),
+            PresolveConfig.parse(PresolvePass.FUSE_LINEAR_BOUNDS.id),
+            PresolveContext.EMPTY.withPresolveBudget(budget),
+            budget.orSpent(Cancellation.Never),
+        )
+
+        assertTrue(budget.spent() > 0L)
+    }
+
+    @Test
+    fun `a spent work budget runs no pass`() {
+        val problem = reducibleChain().bake()
+        val budget = PresolveBudget(0L)
+
+        val presolved = Presolver.run(
+            problem,
+            PresolveConfig.DEFAULT,
+            PresolveContext.EMPTY.withPresolveBudget(budget),
+            budget.orSpent(Cancellation.Never),
+        )
+
+        assertSame(problem, presolved.problem)
     }
 }
