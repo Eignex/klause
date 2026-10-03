@@ -261,7 +261,7 @@ internal class LpModel(
         if (negCol >= 0) cost[negCol] = -unitCost
         var constant = mulExact(unitCost, loShift[col])
         if (negCol >= 0) constant = subExact(constant, mulExact(unitCost, loShift[negCol]))
-        val dv = doubleView?.copyObjective()
+        val dv = doubleView?.copyObjective(unitCost.roundsInBinary64())
         if (dv != null) {
             dv.cost.fill(0.0)
             dv.cost[col] = unitCost.toDouble()
@@ -297,7 +297,7 @@ internal class LpModel(
             cost[cols[k]] = coeffs[k]
             constant = addExact(constant, mulExact(coeffs[k], loShift[cols[k]]))
         }
-        val dv = doubleView?.copyObjective()
+        val dv = doubleView?.copyObjective(coeffs.any { it.roundsInBinary64() })
         if (dv != null) {
             dv.cost.fill(0.0)
             var dc = 0.0
@@ -363,8 +363,9 @@ internal class LpDoubleView(
     var objConstant: Double,
     val loShift: DoubleArray,
     /**
-     * Whether summing repeated entries of one column in a row rounded, so [colVal] is not the source coefficient.
-     * The separate entries are gone once summed, so no exact certificate may be taken over such a view.
+     * Whether [colVal], [cost] or [loShift] is not the source's: an integer coefficient, cost or lower bound past
+     * binary64's integer range rounded on conversion, or summing repeated entries of one column in a row rounded.
+     * The engines and the exact readers share these arrays, so no exact certificate may be taken over such a view.
      */
     val inexactCoefficients: Boolean = false,
     /**
@@ -722,6 +723,10 @@ internal class LpBuilder {
      *  rows. Integer columns and rows contribute their exact [Long] values widened to double. */
     private fun buildDoubleView(n: Int, m: Int, signedSense: Long): LpDoubleView {
         val loD = DoubleArray(n) { contLo.getOrDefault(it, lo[it].toDouble()) }
+        // The open-side stand-in rounds too, but it is no source bound: the view shifts by its rounding throughout.
+        var roundedSource = (0 until n).any {
+            it !in continuousCols && it !in clampedLoCols && lo[it].roundsInBinary64()
+        }
         val rhsD = DoubleArray(m)
         val arithmetic = ExactDoubleArithmetic()
         val roundedRows = IntArrayList()
@@ -733,11 +738,12 @@ internal class LpBuilder {
             for (k in row.cols.indices) {
                 val j = row.cols[k]
                 val value = row.valsD?.get(k) ?: row.vals[k].toDouble()
+                if (row.valsD == null && row.vals[k].roundsInBinary64()) roundedSource = true
                 val coeff = if (flip) -value else value
                 b = arithmetic.sum(b, -arithmetic.product(coeff, loD[j]))
             }
             rhsD[i] = b
-            if (arithmetic.rounded) roundedRows.add(i)
+            if (arithmetic.rounded || (row.rhsD == null && row.rhs.roundsInBinary64())) roundedRows.add(i)
         }
         val colRowBuckets = Array(n) { IntArrayList() }
         val colValBuckets = Array(n) { ArrayList<Double>() }
@@ -762,7 +768,7 @@ internal class LpBuilder {
                 }
             }
         }
-        val inexactCoefficients = arithmetic.rounded
+        val summedRounded = arithmetic.rounded
         val colPtr = IntArray(n + 1)
         for (j in 0 until n) colPtr[j + 1] = colPtr[j] + colRowBuckets[j].size
         val rowIdx = IntArray(colPtr[n])
@@ -786,45 +792,53 @@ internal class LpBuilder {
         val roundedColumns = IntArrayList()
         for (j in 0 until n) {
             costD[j] = signed * contCost.getOrDefault(j, this.cost[j].toDouble())
+            if (j !in continuousCols && this.cost[j].roundsInBinary64()) roundedSource = true
             hasUpperD[j] = j !in openAboveCols
             arithmetic.reset()
             upperD[j] = arithmetic.sum(contHi.getOrDefault(j, hi[j].toDouble()), -loD[j])
+            val roundedHi = j !in continuousCols && j !in clampedHiCols && hi[j].roundsInBinary64()
             // An open side's upper is a stand-in nothing certifies against, so its rounding does not matter.
-            if (arithmetic.rounded && hasUpperD[j]) roundedColumns.add(j)
+            if ((arithmetic.rounded || roundedHi) && hasUpperD[j]) roundedColumns.add(j)
             objConstantD += costD[j] * loD[j]
         }
         for (i in 0 until m) {
             hasUpperD[n + i] = rows[i].rel == Relation.EQ
         }
         return LpDoubleView(
-            colPtr, rowIdx, colVal, rhsD, costD, upperD, hasUpperD, objConstantD, loD, inexactCoefficients,
+            colPtr, rowIdx, colVal, rhsD, costD, upperD, hasUpperD, objConstantD, loD, roundedSource || summedRounded,
             exactShifts(roundedRows.toIntArray(), roundedColumns.toIntArray(), loD),
         )
     }
 
     /** The exact values of the [roundedRows]' shifted right-hand sides and the [roundedColumns]' shifted uppers,
-     *  recomputed from the unshifted binary64 inputs when an exact reader first asks. */
+     *  recomputed from the unshifted source inputs, integer ones read as [Long], when an exact reader first asks.
+     *  Every shift is by the view's own [loD], which is the source's lower bound wherever the view certifies. */
     private fun exactShifts(roundedRows: IntArray, roundedColumns: IntArray, loD: DoubleArray): Lazy<LpExactShifts> {
         if (roundedRows.isEmpty() && roundedColumns.isEmpty()) return lazyOf(LpExactShifts.NONE)
         // The unsummed entries keep a row exact even where summing its repeated columns would round.
         val sources = Array(roundedRows.size) { rows[roundedRows[it]] }
-        val rawUppers = DoubleArray(roundedColumns.size) {
+        val rawUppers = List(roundedColumns.size) {
             val j = roundedColumns[it]
-            contHi.getOrDefault(j, hi[j].toDouble())
+            when {
+                j in continuousCols -> exactDouble(contHi.getOrDefault(j, 0.0))
+                // The stand-in for +∞ keeps the value the view solves with; no source bound stands behind it.
+                j in clampedHiCols -> exactDouble(hi[j].toDouble())
+                else -> BigFraction.ofLong(hi[j])
+            }
         }
         return lazy {
             val rhs = sources.map { row ->
                 val flip = row.rel == Relation.GE
-                val rawRhs = exactDouble(row.rhsD ?: row.rhs.toDouble())
+                val rawRhs = row.rhsD?.let(::exactDouble) ?: BigFraction.ofLong(row.rhs)
                 var b = if (flip) rawRhs.negated() else rawRhs
                 for (k in row.cols.indices) {
-                    val value = exactDouble(row.valsD?.get(k) ?: row.vals[k].toDouble())
+                    val value = row.valsD?.let { exactDouble(it[k]) } ?: BigFraction.ofLong(row.vals[k])
                     val coeff = if (flip) value.negated() else value
                     b -= coeff * exactDouble(loD[row.cols[k]])
                 }
                 b
             }
-            val upper = List(roundedColumns.size) { exactDouble(rawUppers[it]) - exactDouble(loD[roundedColumns[it]]) }
+            val upper = List(roundedColumns.size) { rawUppers[it] - exactDouble(loD[roundedColumns[it]]) }
             LpExactShifts(roundedRows, rhs, roundedColumns, upper)
         }
     }
@@ -873,9 +887,18 @@ internal class LpBuilder {
     }
 }
 
-private fun LpDoubleView.copyObjective(): LpDoubleView = LpDoubleView(
-    colPtr, rowIdx, colVal, rhs, cost.copyOf(), upper, hasUpper, objConstant, loShift, inexactCoefficients, shifts,
+private fun LpDoubleView.copyObjective(roundedCost: Boolean): LpDoubleView = LpDoubleView(
+    colPtr, rowIdx, colVal, rhs, cost.copyOf(), upper, hasUpper, objConstant, loShift,
+    inexactCoefficients || roundedCost, shifts,
 )
+
+private const val TWO_POW_63: Double = 9.223372036854775808E18
+
+/** Whether this value has no binary64 equal; the saturating [Double.toLong] would hide 2^63 − 1 rounding up. */
+private fun Long.roundsInBinary64(): Boolean {
+    val d = toDouble()
+    return d >= TWO_POW_63 || d.toLong() != this
+}
 
 // This foundation deliberately does not implement ExactSimplexModel: legacy solvers require a
 // checked projection before they can see any of its values.
