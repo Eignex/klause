@@ -7,6 +7,7 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.portfolio.EngineMix
+import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.bake
@@ -105,6 +106,29 @@ class FinitePipelineTest {
         assertFalse(preparation.problem is BakedProblem)
         assertFailsWith<IllegalArgumentException> { preparation.executableProblem() }
         assertTrue(cancellationPolls > 0)
+    }
+
+    @Test
+    fun `a spent presolve allowance still hands the engine a fully baked model`() {
+        val problem = Problem(
+            numBoolVars = 0,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(0, 0), longArrayOf(5, 5), null, null),
+            factors = arrayOf<Factor>(Linear(longArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 1)),
+        )
+        val spent = PresolveBudget(0L)
+
+        val preparation = FinitePipeline.prepare(
+            FinitePipelineRequest(
+                problem = problem,
+                engine = FiniteEngine.BACKTRACK,
+                presolveConfig = PresolveConfig.NONE,
+                cancellation = spent.orSpent(Cancellation.Never),
+                solveCancellation = Cancellation.Never,
+                presolveBudget = spent,
+            ),
+        )
+
+        assertEquals(1L, preparation.executableProblem().rootIntDomain(0).max)
     }
 
     @Test

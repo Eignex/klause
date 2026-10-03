@@ -8700,8 +8700,8 @@ public final class com/eignex/klause/solver/pipeline/FinitePipelinePreparation {
 }
 
 public final class com/eignex/klause/solver/pipeline/FinitePipelineRequest {
-	public fun <init> (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/pipeline/FiniteEngine;Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/presolve/PresolveConfig;ZZLcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/presolve/PresolveBudget;Lcom/eignex/klause/lp/engine/LpZeroObjectivePricing;Ljava/lang/Long;Lcom/eignex/klause/solver/pipeline/ComponentPlan;)V
-	public synthetic fun <init> (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/pipeline/FiniteEngine;Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/presolve/PresolveConfig;ZZLcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/presolve/PresolveBudget;Lcom/eignex/klause/lp/engine/LpZeroObjectivePricing;Ljava/lang/Long;Lcom/eignex/klause/solver/pipeline/ComponentPlan;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/pipeline/FiniteEngine;Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/presolve/PresolveConfig;ZZLcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/presolve/PresolveBudget;Lcom/eignex/klause/lp/engine/LpZeroObjectivePricing;Ljava/lang/Long;Lcom/eignex/klause/solver/pipeline/ComponentPlan;)V
+	public synthetic fun <init> (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/pipeline/FiniteEngine;Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/presolve/PresolveConfig;ZZLcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/presolve/PresolveBudget;Lcom/eignex/klause/lp/engine/LpZeroObjectivePricing;Ljava/lang/Long;Lcom/eignex/klause/solver/pipeline/ComponentPlan;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun getCancellation ()Lcom/eignex/klause/util/Cancellation;
 	public final fun getComponentPlan ()Lcom/eignex/klause/solver/pipeline/ComponentPlan;
 	public final fun getEngine ()Lcom/eignex/klause/solver/pipeline/FiniteEngine;
@@ -8712,6 +8712,7 @@ public final class com/eignex/klause/solver/pipeline/FinitePipelineRequest {
 	public final fun getProblem ()Lcom/eignex/klause/ir/Problem;
 	public final fun getRandomSeed ()Ljava/lang/Long;
 	public final fun getSolutionSetSensitive ()Z
+	public final fun getSolveCancellation ()Lcom/eignex/klause/util/Cancellation;
 	public final fun getZeroObjectivePricing ()Lcom/eignex/klause/lp/engine/LpZeroObjectivePricing;
 }
 

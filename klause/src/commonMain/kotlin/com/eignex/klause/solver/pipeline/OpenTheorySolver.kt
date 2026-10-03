@@ -347,11 +347,10 @@ class OpenTheoryEngine internal constructor(
 
     /** The bound-closing phase's allowance: what is left of preparation's, capped by the solve's own. */
     private fun boundCancellation(prepared: PreparedSource, cancellation: Cancellation): Cancellation =
-        Cancellation { alsoStoppedBy(cancellation)() || prepared.budget?.remaining() == 0L }
+        alsoStoppedBy(cancellation).let { stop -> prepared.budget?.orSpent(stop) ?: stop }
 
     /** The preparation allowance and the solve's own stop, whichever fires first. */
-    private fun alsoStoppedBy(cancellation: Cancellation): Cancellation =
-        Cancellation { preparationCancellation() || cancellation() }
+    private fun alsoStoppedBy(cancellation: Cancellation): Cancellation = preparationCancellation or cancellation
 
     private fun unknown(
         timedOut: Boolean,

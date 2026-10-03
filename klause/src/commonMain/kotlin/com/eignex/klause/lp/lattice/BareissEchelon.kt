@@ -91,6 +91,7 @@ internal fun bareissEchelon(
         val pivotValue = w[p][c]
         for (q in bucket) {
             if (q == p) continue
+            cancellation.charge(LATTICE_WORK_WEIGHT * (1L + w[q].index.size + w[p].index.size))
             val factor = w[q][c]
             val g = gcdOf(pivotValue, factor)
             val scaleQ = pivotValue / g
@@ -189,3 +190,7 @@ private fun divide(row: SparseIntRow, by: BigInteger): SparseIntRow =
     SparseIntRow(row.index, Array(row.index.size) { row.value[it] / by })
 
 private tailrec fun gcdOf(a: BigInteger, b: BigInteger): BigInteger = if (b.isZero()) a.abs() else gcdOf(b, a % b)
+
+// Work units per big-integer entry an elimination step touches, against one simplex op: routing time per unit
+// over the calibration sample's models that reached the reduction (QF_LIA), ~4e-3 ms.
+internal const val LATTICE_WORK_WEIGHT = 1500L

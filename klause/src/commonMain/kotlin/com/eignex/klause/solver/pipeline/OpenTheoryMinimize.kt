@@ -23,6 +23,7 @@ import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.WorkMeter
 import com.ionspin.kotlin.bignum.integer.BigInteger
 
 /**
@@ -187,7 +188,7 @@ class OpenTheoryMinimizer internal constructor(
         val stats = SolveStatsSink(backend = "")
         stats.start()
         stats.backend = route.backendName()
-        val stop = Cancellation { presolveCancellation() || params.cancellation() || params.timeout() }
+        val stop = presolveCancellation or params.cancellation or params.timeout
         val prepared = PresolvePipeline.prepareSource(
             source,
             presolveConfig,
@@ -214,10 +215,11 @@ class OpenTheoryMinimizer internal constructor(
         // have run is this one. A refutation here is over the genuinely open ranges rather than inside an
         // invented box, so it refutes the model itself — which, with no witness yet, is infeasibility.
         var closingInterrupted = false
-        val closingCancellation = Cancellation {
-            val interrupted = stop() || prepared.budget?.remaining() == 0L
-            if (interrupted) closingInterrupted = true
-            interrupted
+        val closingStop = prepared.budget?.orSpent(stop) ?: stop
+        val closingCancellation = object : Cancellation {
+            override fun isCancelled(): Boolean = closingStop().also { if (it) closingInterrupted = true }
+
+            override fun workMeter(): WorkMeter? = closingStop.workMeter()
         }
         val base = when (
             val closed = prepared.problem.closeOpenBounds(

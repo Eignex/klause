@@ -31,6 +31,12 @@ class FinitePipelineRequest(
     val solutionSetSensitive: Boolean = false,
     /** Cancellation shared by preparation and the eventual solve. */
     val cancellation: Cancellation = Cancellation.Never,
+    /**
+     * The run's own stop, without the presolve allowance [cancellation] may carry. The bake that hands the
+     * prepared model to the engine reads only this, so a spent allowance never leaves the engine a model
+     * baked part way.
+     */
+    val solveCancellation: Cancellation = cancellation,
     /** Optional budget allocated to the presolve phase. */
     val presolveBudget: PresolveBudget? = null,
     /** Entering-column policy used by zero-objective LP solves during finite presolve. */
@@ -113,9 +119,9 @@ object FinitePipeline {
         val finiteModel = if (outcome.stats.infeasible) {
             outcome.problem
         } else if (outcome.changed) {
-            outcome.problem.bake(request.cancellation)
+            outcome.problem.bake(request.solveCancellation)
         } else {
-            request.problem.bake(request.cancellation)
+            request.problem.bake(request.solveCancellation)
         }
         return FinitePipelinePreparation(
             problem = finiteModel,
