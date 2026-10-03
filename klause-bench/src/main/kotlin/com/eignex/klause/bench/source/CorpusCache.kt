@@ -139,7 +139,7 @@ internal class CorpusCache(
     /** Write through a temp file and a rename, so a reader never sees a torn file. */
     private fun writeMeta(id: String, props: Properties) {
         metaDir.mkdirs()
-        val tmp = File.createTempFile("$id.", ".tmp", metaDir)
+        val tmp = Files.createTempFile(metaDir.toPath(), "$id.", ".tmp").toFile()
         tmp.outputStream().use { props.store(it, null) }
         Files.move(tmp.toPath(), metaFile(id).toPath(), StandardCopyOption.REPLACE_EXISTING)
     }
