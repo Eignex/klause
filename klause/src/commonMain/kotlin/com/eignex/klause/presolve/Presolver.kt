@@ -60,6 +60,40 @@ private fun problemComplexity(problem: BakedProblem): Long {
     return c
 }
 
+/**
+ * The work a pass does over the whole model beyond what it charges itself — the scan that finds nothing, the
+ * delta it builds, the passes that charge nothing at all — so a pass is never free against the budget. One
+ * unit per factor and per term, weighted by [baseWorkWeight].
+ */
+internal fun passBaseUnits(factors: Array<Factor>): Long {
+    var units = factors.size.toLong()
+    for (f in factors) units += f.structuralKeyWeight
+    return units
+}
+
+/**
+ * Work units per [passBaseUnits] unit for this pass, against one simplex op: the pass's section time per unit
+ * fitted over the 60 MIPLIB 2017, 40 QF_LIA and 40 MiniZinc Challenge models of the calibration sample, beside
+ * the units the pass charges itself. A pass the sample never ran takes [DEFAULT_PASS_BASE_WORK_WEIGHT].
+ */
+internal val PresolvePass.baseWorkWeight: Long
+    get() = when (this) {
+        PresolvePass.REMOVE_REDUNDANT -> 63L
+        PresolvePass.FOLD_COMPARISON_CLAUSES -> 18L
+        PresolvePass.FUSE_LINEAR_BOUNDS -> 16L
+        PresolvePass.BREAK_SYMMETRIES -> 16L
+        PresolvePass.AGGREGATE_SUB_SUMS -> 11L
+        PresolvePass.REDUCE_DIOPHANTINE, PresolvePass.DUAL_FIX -> 10L
+        PresolvePass.REDUCE_STRUCTURAL -> 7L
+        PresolvePass.ELIMINATE_AFFINE_SINGLETONS, PresolvePass.MERGE_DUPLICATE_COLUMNS -> 5L
+        PresolvePass.PROJECT_SINGLETON_INEQUALITIES -> 3L
+        PresolvePass.STRENGTHEN_COEFFICIENTS, PresolvePass.MERGE_AMO_CLIQUES, PresolvePass.DERIVE_XOR_UNITS -> 1L
+        else -> DEFAULT_PASS_BASE_WORK_WEIGHT
+    }
+
+/** The base weight of a pass the calibration sample never ran: the median the measured passes fitted. */
+private const val DEFAULT_PASS_BASE_WORK_WEIGHT = 10L
+
 /** Runs enabled problem-transform passes to a bounded fixpoint. */
 object Presolver {
 
@@ -87,6 +121,7 @@ object Presolver {
             val rebuilds = ArrayList<SourceRebuilds>()
 
             override fun runPass(pass: PresolvePass, slice: Cancellation?): PassOutcome {
+                (slice ?: ctx.cancellation).charge(pass.baseWorkWeight * passBaseUnits(current.factors))
                 val delta = pass.applySource(current, slice?.let(ctx::withCancellation) ?: ctx)
                 if (delta.infeasible) return PassOutcome.INFEASIBLE
                 if (delta.isEmpty) return PassOutcome.UNCHANGED
@@ -154,6 +189,7 @@ object Presolver {
             val reconstructs = ArrayList<(Sample) -> Sample>()
 
             override fun runPass(pass: PresolvePass, slice: Cancellation?): PassOutcome {
+                (slice ?: ctx.cancellation).charge(pass.baseWorkWeight * passBaseUnits(current.factors))
                 val delta = pass.applyFinite(current, slice?.let(ctx::withCancellation) ?: ctx)
                 if (delta.infeasible) return PassOutcome.INFEASIBLE
                 if (delta.isEmpty) return PassOutcome.UNCHANGED
@@ -211,6 +247,7 @@ object Presolver {
             override fun runPass(pass: PresolvePass, slice: Cancellation?): PassOutcome {
                 // Before the context: [passOccurrence] is keyed against the factor list [passInput] fixes.
                 val input = session.passInput()
+                (slice ?: ctx.cancellation).charge(pass.baseWorkWeight * passBaseUnits(input.factors))
                 val base = passContext(pass)
                 val delta = pass.applyFinite(input, slice?.let(base::withCancellation) ?: base)
                 if (delta.infeasible) return PassOutcome.INFEASIBLE

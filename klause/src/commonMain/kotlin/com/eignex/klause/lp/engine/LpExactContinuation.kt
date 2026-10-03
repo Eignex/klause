@@ -176,7 +176,7 @@ internal fun continueExactLp(
                             false,
                         )
                     },
-                    cancellation = Cancellation { cancellation() || verification.elapsedNs >= remaining.maxTimeNs },
+                    cancellation = cancellation or Cancellation { verification.elapsedNs >= remaining.maxTimeNs },
                     limits = defaults.copy(
                         maxWork = minOf(defaults.maxWork, (remaining.maxWork - verification.work).coerceAtLeast(0)),
                         maxAllocation = minOf(

@@ -72,6 +72,7 @@ internal object AffinePivotOrders {
             var rejected = 0
             while (!heap.isEmpty()) {
                 if ((polled++ and CANCEL_POLL_MASK) == 0 && cancellation()) return null
+                cancellation.charge(AFFINE_WORK_WEIGHT)
                 if (rejected >= AFFINE_SCAN_ABORT) return null
                 val key = heap.peekCost()
                 val id = heap.popId()

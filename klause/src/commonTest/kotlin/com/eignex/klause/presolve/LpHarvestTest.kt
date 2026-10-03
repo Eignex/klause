@@ -329,6 +329,34 @@ class LpHarvestTest {
     }
 
     @Test
+    fun `the root feasibility LP charges its simplex work to the presolve budget`() {
+        val budget = PresolveBudget(Long.MAX_VALUE)
+
+        lpRootInfeasibleReporting(
+            coverSystem(),
+            LinearObjective(),
+            LpPlan(bounding = true),
+            budget.orSpent(Cancellation.Never),
+        )
+
+        assertTrue(budget.spent() > 0L, "the simplex work must reach the budget its token carries")
+    }
+
+    @Test
+    fun `the root feasibility LP stops once its charged work spends the budget`() {
+        val budget = PresolveBudget(1L)
+
+        val result = lpRootInfeasibleReporting(
+            coverSystem(),
+            LinearObjective(),
+            LpPlan(bounding = true),
+            budget.orSpent(Cancellation.Never),
+        )
+
+        assertFalse(result.infeasible, "a spent work budget must stop the solve short of a verdict")
+    }
+
+    @Test
     fun `lpRootInfeasible certifies a wide difference cycle without paying the bake fixpoint`() {
         // x < y and y < x over a span the bake would narrow one step per round (O(span)); the root LP
         // certifies the contradiction in one solve, so this returns fast regardless of the span.

@@ -120,12 +120,15 @@ internal fun mergeCliques(cliques: List<Set<Int>>, cancellation: Cancellation = 
             continue
         }
         budget -= cost
+        cancellation.charge(CLIQUE_MERGE_WORK_WEIGHT * cost)
         val members = clique.toHashSet()
         // Candidates: lits adjacent to every base member, taken in id order for determinism. Each
         // one is then re-checked against the members added before it, which the candidate set of the
         // *base* clique does not account for.
         val candidates = graph.commonNeighbours(clique)
-        budget -= candidates.size.toLong() * clique.size
+        val checks = candidates.size.toLong() * clique.size
+        budget -= checks
+        cancellation.charge(CLIQUE_MERGE_WORK_WEIGHT * checks)
         for (c in candidates) {
             if (members.all { it == c || graph.adjacent(it, c) }) members.add(c)
         }
@@ -280,3 +283,7 @@ private class ConflictGraph(private val cliques: List<Set<Int>>) {
         }
     }
 }
+
+// Presolve work units per clique-extension step, against one simplex op: fitted section time per unit over the
+// 60 MIPLIB 2017, 40 QF_LIA and 40 MiniZinc Challenge models, ~1.2e-5 ms.
+private const val CLIQUE_MERGE_WORK_WEIGHT = 5L

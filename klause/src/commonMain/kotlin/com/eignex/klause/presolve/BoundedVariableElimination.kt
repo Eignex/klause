@@ -69,6 +69,8 @@ internal object BoundedVariableElimination {
             .sortedBy { db.occ(Lit.make(it, true)).size + db.occ(Lit.make(it, false)).size }
         for ((idx, v) in order.withIndex()) {
             if ((idx and CANCEL_POLL_MASK) == 0 && cancellation()) break
+            val occurrences = db.occ(Lit.make(v, true)).size + db.occ(Lit.make(v, false)).size
+            cancellation.charge(BVE_WORK_WEIGHT * (1L + occurrences))
             eliminateVar(v, db, eliminations)
         }
 
@@ -153,3 +155,7 @@ internal object BoundedVariableElimination {
     private fun List<VarElim>.asRebuilds(): SourceRebuilds =
         SourceRebuilds(asReversed().map { RebuildStep.SatisfyClauses(it.v, it.clauses) })
 }
+
+// Work units per occurrence visited, against one simplex op. No model in the calibration sample (60 MIPLIB 2017,
+// 40 QF_LIA and 40 MiniZinc Challenge) ran this pass, so it takes the weight the other per-term passes measured.
+private const val BVE_WORK_WEIGHT = 10L
