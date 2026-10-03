@@ -85,11 +85,21 @@ internal object CorpusFetcher {
         return if (counterpart.isFile) counterpart else file
     }
 
-    /** The root directory of [collection] in the cache, fetching it if not already present. */
+    /** Collections resolved in this JVM, which the cache cap never evicts. */
+    private val usedThisRun: MutableSet<String> = HashSet()
+
+    /** The size-capped view of [cacheRoot] (see [CorpusCache]), pinning what this run has resolved. */
+    fun cache(): CorpusCache = CorpusCache(cacheRoot, CorpusCache.configuredCapBytes(), usedThisRun, log = ::log)
+
+    /** The root directory of [collection] in the cache, fetching it if not already present. A fetch first
+     *  evicts least recently used collections to fit the cache cap, and again once the new one has landed. */
     fun ensure(collection: ExternalCollection): File {
         val dir = File(cacheRoot, collection.id)
-        if (dir.isDirectory && (dir.list()?.isNotEmpty() == true)) return dir
+        val cache = cache()
+        cache.markUsed(collection.id)
+        if (cache.isPresent(collection.id)) return dir
         cacheRoot.mkdirs()
+        cache.enforce()
         log("fetching '${collection.id}' (${collection.license}) — ${collection.reason}")
         when (val m = collection.fetch) {
             is FetchMethod.GitClone -> gitClone(collection, m, dir)
@@ -98,6 +108,8 @@ internal object CorpusFetcher {
             FetchMethod.TarballZst -> tarballZst(collection, dir)
             FetchMethod.Zip -> zip(collection, dir)
         }
+        cache.recordSize(collection.id)
+        cache.enforce()
         return dir
     }
 

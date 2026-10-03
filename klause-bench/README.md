@@ -298,6 +298,17 @@ A cache fetched before compression is migrated in place, file by file: each arch
 ./gradlew :klause-bench:bench --args="corpus compress /path/to/collection"   one directory
 ```
 
+### Cache size cap
+
+The corpus cache is capped at 60 GB (decimal). Set the cap with `-Dklause.bench.corpus.maxGb=N` or `KLAUSE_BENCH_CORPUS_MAX_GB=N`; `0` or `off` removes it. The unit of eviction is a whole collection directory, since every collection is re-fetchable and evicting one only costs a re-download. Before fetching a collection and again once it has landed, the bench evicts least recently used collections until the cache fits the cap. It never evicts a collection this run has used, and when only those remain it warns and carries on over the cap. Only the evicting JVM's own use pins a collection, so parallel shards sharing a cache should fetch their collections first or run with the cap off.
+
+Each collection's size and last use are kept in `<cache>/.meta/<id>.properties`, so a lookup never walks the instance files. The size is recorded when a fetch or `corpus compress` finishes, and measured once for a collection fetched before it was tracked. An eviction renames the collection into `<cache>/.trash/` before deleting it, so an interrupted eviction never leaves a half collection that looks fetched; the next eviction pass empties the trash. The result cache `build/bench-cache/` is not capped.
+
+```
+./gradlew :klause-bench:bench --args="corpus gc"       apply the cap now, print what it evicted and the cache
+./gradlew :klause-bench:bench --args="corpus status"   list collections with size and last use
+```
+
 ### Dataset categorization
 
 Every discovered suite carries a `Category` (`SAT`/`UNSAT`/`CSP`/`OPTIMIZATION`/…) and `Format`; `bench classify` additionally fills in source-text structural features (`InstanceClassifier`) that land in the reference tables (below) — `structure` (the coarse niche class: `global`/`linear`/`pseudo-boolean`/`sat`/`arithmetic`), global/linear constraint counts, `boolHeavy`, and **`logic`**: the axis that matters most for SMT-LIB, where it is the instance's declared `(set-logic …)` verbatim (`QF_LIA`, `QF_NRA`, …), and a lighter one for MPS, where it is `MIP`/`LP` from the presence of an `INTORG` marker. Suites are also named by logic/year where that is the natural grouping (`smtlib-qflia`, `smtlib-qfnra`, `mzn-challenge-2025`, `pb-comp-2025`), so `suite=` selection doubles as a category filter without needing `bench classify` to have run first.
