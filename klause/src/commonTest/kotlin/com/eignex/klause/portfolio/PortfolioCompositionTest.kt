@@ -19,6 +19,31 @@ class PortfolioCompositionTest {
     }
 
     @Test
+    fun `a model with continuous columns gets the default LP arm after the first two backtrack arms`() {
+        for (kind in Kind.entries) {
+            val scenario = PortfolioScenario.sequential(kind, engine = EngineMix.MIXED, arms = 6)
+                .copy(realColumns = true)
+
+            val backtrack = PortfolioComposition.compose(scenario).filterIsInstance<BacktrackWorkerConfig>()
+
+            assertEquals(
+                listOf("satOptimized", "conflictDriven", "lp-default"),
+                backtrack.take(3).map { it.label },
+                "$kind",
+            )
+        }
+    }
+
+    @Test
+    fun `a model without continuous columns keeps the curated backtrack order`() {
+        val scenario = PortfolioScenario.sequential(Kind.COP, engine = EngineMix.MIXED, arms = 6)
+
+        val backtrack = PortfolioComposition.compose(scenario).filterIsInstance<BacktrackWorkerConfig>()
+
+        assertEquals(listOf("satOptimized", "conflictDriven"), backtrack.map { it.label })
+    }
+
+    @Test
     fun `the node allowance reaches every arm that runs a backtrack engine`() {
         val budget = NodeBudget(limit = 100)
         val arms = PortfolioComposition.compose(
