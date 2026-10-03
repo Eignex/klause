@@ -52,6 +52,7 @@ internal object SmtLibMode : CliMode {
                 onLpStats = { routingLpStats = it },
             )
             val routingElapsedMs = routingStart.elapsedNow().inWholeMilliseconds
+            common.logRoute(route, routingElapsedMs)
             return when (route) {
                 is SourceProblemRoute.Finite -> linearSolvable(
                     route.problem,

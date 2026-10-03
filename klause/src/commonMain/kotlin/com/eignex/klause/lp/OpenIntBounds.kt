@@ -141,6 +141,7 @@ internal fun tightenOpenIntBounds(
         for (maximize in booleanArrayOf(true, false)) {
             if (if (maximize) cur.hi != null else cur.lo != null) continue
             solves++
+            cancellation.charge(LP_CERTIFY_WORK_WEIGHT * certifyUnits(base))
             val model = base.withSingleColumnObjective(
                 posCol[v],
                 if (maximize) -1L else 1L,
@@ -211,6 +212,7 @@ private fun tightenByNeighborhoodProbes(
         for (maximize in booleanArrayOf(true, false)) {
             if (if (maximize) cur.hi != null else cur.lo != null) continue
             solves++
+            cancellation.charge(LP_CERTIFY_WORK_WEIGHT * certifyUnits(nb.model))
             val model = nb.model.withSingleColumnObjective(p, if (maximize) -1L else 1L, negCol = q)
             val solver = newLpSolver(model, cancellation, factory = context.engineFactory)
             val result = try {
@@ -371,6 +373,7 @@ private fun fbbtTightenOpenIntBounds(
         pass++
         for (f in rows) {
             if (spent || b.crossed || budgetSpent()) break
+            cancellation.charge(FBBT_WORK_WEIGHT * (1L + f.vars.size))
             val row = f.integerConstants ?: continue
             val coeffs = row.coeffs // materialising accessor: read once per row, never per direction
             if (propagateRow(coeffs, f.vars, row.bound, sign = 1L, b = b)) changed = true
@@ -379,6 +382,7 @@ private fun fbbtTightenOpenIntBounds(
         }
         for (f in mixed) {
             if (spent || b.crossed || budgetSpent()) break
+            cancellation.charge(FBBT_WORK_WEIGHT * (1L + f.vars.size + f.realVars.size))
             if (f.op != LinearOp.GE && propagateRealRow(f, sign = 1.0, b = b, rLo = rLo, rUp = rUp)) changed = true
             if (f.op != LinearOp.LE && propagateRealRow(f, sign = -1.0, b = b, rLo = rLo, rUp = rUp)) changed = true
         }
@@ -620,3 +624,14 @@ private fun ceilDivSafe(a: Long, b: Long): Long? {
     val q = a.floorDiv(b)
     return if (a % b != 0L) (if (q == Long.MAX_VALUE) null else q + 1L) else q
 }
+
+/** The size of one certified probe of [model]: its nonzeros, rows and columns. */
+internal fun certifyUnits(model: LpModel): Long = model.csc.colPtr[model.n].toLong() + model.m + model.n
+
+// Work units per entry of a probe certified exactly, against one simplex op: routing time per unit over the
+// calibration sample's routed models (60 MIPLIB 2017, 40 QF_LIA), ~4.9e-4 ms beside the simplex work.
+internal const val LP_CERTIFY_WORK_WEIGHT = 183L
+
+// Work units per term propagated by the interval prefilter, against one simplex op. Its time hides inside the
+// probes' in the calibration sample, so it takes the weight the other per-term passes measured.
+private const val FBBT_WORK_WEIGHT = 10L

@@ -52,6 +52,7 @@ internal fun openLpInfeasible(
         return false
     }
     if (model.n == 0 || cancellation()) return false
+    cancellation.charge(LP_CERTIFY_WORK_WEIGHT * certifyUnits(model))
     return solveAndCertify(
         model,
         cancellation = cancellation,

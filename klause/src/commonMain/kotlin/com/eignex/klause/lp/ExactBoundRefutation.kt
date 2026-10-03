@@ -113,7 +113,7 @@ private fun eliminateOpenDefinitions(
         }
         if (chosenRow < 0) return
         val definition = rows.removeAt(chosenRow)
-        if (!substitute(rows, definition, chosenVar)) return
+        if (!substitute(rows, definition, chosenVar, cancellation)) return
     }
 }
 
@@ -122,7 +122,7 @@ private fun eliminateOpenDefinitions(
  * grow past the work cap, which abandons elimination with the rows already rewritten — still a sound
  * system, just a less reduced one.
  */
-private fun substitute(rows: MutableList<Row>, definition: Row, target: Int): Boolean {
+private fun substitute(rows: MutableList<Row>, definition: Row, target: Int, cancellation: Cancellation): Boolean {
     val c = definition.coeffs.getValue(target)
     // |c| = 1, so `target = (bound − rest) / c` is exact: scale by c itself rather than dividing.
     val scale = if (c > BigInteger.ZERO) BigInteger.ONE else BigInteger.ONE.negate()
@@ -132,8 +132,10 @@ private fun substitute(rows: MutableList<Row>, definition: Row, target: Int): Bo
         if (v == target) continue
         valueTerms[v] = -ci * scale
     }
+    cancellation.charge(EXACT_REFUTATION_WORK_WEIGHT * rows.size)
     for (row in rows) {
         val k = row.coeffs.remove(target) ?: continue
+        cancellation.charge(EXACT_REFUTATION_WORK_WEIGHT * (1L + valueTerms.size))
         row.bound -= k * valueBound
         for ((v, ci) in valueTerms) {
             val merged = (row.coeffs[v] ?: BigInteger.ZERO) + k * ci
@@ -176,6 +178,7 @@ private inline fun tightenRow(
         // single pass over the row; the caller reads the early exit as "not refuted", the same answer an
         // exhausted propagation gives.
         if (cancellation()) return false
+        cancellation.charge(EXACT_REFUTATION_WORK_WEIGHT * row.coeffs.size)
         var restMin: BigInteger? = BigInteger.ZERO
         var restMax: BigInteger? = BigInteger.ZERO
         for ((i, ci) in row.coeffs) {
@@ -209,6 +212,10 @@ private inline fun tightenRow(
     }
     return false
 }
+
+// Work units per big-integer term this refutation touches, against one simplex op: median time per unit over
+// the calibration sample's routed models (60 MIPLIB 2017, 40 QF_LIA), ~4.3e-4 ms.
+private const val EXACT_REFUTATION_WORK_WEIGHT = 161L
 
 /** Enough sweeps for a long implication chain, few enough that a slowly-converging system still stops. */
 private const val MAX_ROUNDS = 64
