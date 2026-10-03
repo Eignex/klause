@@ -7,23 +7,15 @@ import com.eignex.klause.bench.runner.Runners
 /** Corpus resolution for the metrics. Solving correctness is the responsibility of klause's own
  *  test suite (brute-force oracles etc.), not the bench — so there is no cross-engine gate here. */
 internal object BenchLoad {
-    /** Resolve every ref with the appropriate runner (MiniZinc compile or in-process). An instance that
-     *  fails to resolve (an unsupported front-end feature — common on in-progress competition corpora
-     *  like XCSP3) is **skipped with a warning** rather than aborting the whole selection, so a bulk run
-     *  covers everything that compiles today. The skipped set is printed so the gap stays visible. */
-    fun resolveRefs(refs: List<ProblemRef>): List<ResolvedProblem> {
-        val resolved = ArrayList<ResolvedProblem>(refs.size)
-        val skipped = ArrayList<Pair<String, String>>()
-        for (ref in refs) {
-            runCatching { Runners.resolve(ref) }
-                .onSuccess { resolved += it }
-                .onFailure { skipped += ref.name to (it.message ?: it::class.simpleName ?: "resolve error") }
-        }
-        if (skipped.isNotEmpty()) {
-            println("[load] skipped ${skipped.size}/${refs.size} unresolvable instance(s):")
-            skipped.take(10).forEach { (name, why) -> println("  - $name: ${why.take(100)}") }
-            if (skipped.size > 10) println("  … and ${skipped.size - 10} more")
-        }
-        return resolved
+    /** Resolve each ref with the appropriate runner (MiniZinc compile or in-process) as the sequence is read.
+     *  A resolved model can hold its whole parsed problem, so a long selection resolved up front outgrows the
+     *  heap; a subprocess solve needs only the instance it is running. An instance that fails to resolve (an
+     *  unsupported front-end feature — common on in-progress competition corpora like XCSP3) is **skipped
+     *  with a warning** rather than aborting the whole selection, so a bulk run covers everything that
+     *  compiles today. */
+    fun resolveLazily(refs: List<ProblemRef>): Sequence<ResolvedProblem> = refs.asSequence().mapNotNull { ref ->
+        runCatching { Runners.resolve(ref) }
+            .onFailure { println("[load] skipped ${ref.name}: ${it.message.orEmpty().take(100)}") }
+            .getOrNull()
     }
 }

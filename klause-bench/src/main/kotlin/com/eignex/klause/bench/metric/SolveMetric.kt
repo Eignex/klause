@@ -98,7 +98,7 @@ internal object SolveMetric {
      *  take only processors + free. When [profile] is set, profiles the klause engine in-process
      *  instead (subprocess solves can't be JFR-sampled from the bench JVM). */
     fun run(
-        entries: List<ResolvedProblem>,
+        entries: Sequence<ResolvedProblem>,
         budget: Budget = Budget(),
         solverId: String = SolverInvocation.KLAUSE,
         search: KlauseSearch = KlauseSearch(),
@@ -106,7 +106,7 @@ internal object SolveMetric {
         label: String? = null,
     ): File? {
         if (profile != null) {
-            profileEngine(entries, budget, solverId, search, profile)
+            profileEngine(entries.toList(), budget, solverId, search, profile)
             return null
         }
         val settings = SolverInvocation.Settings(
@@ -132,7 +132,7 @@ internal object SolveMetric {
         // Feature columns (structure/format/…) are joined onto each result row from the committed
         // oracle table, so `output/<tag>.csv` is analysable by structure/size out of the box.
         val features = ReferenceStore.load()
-        val resultRows = ArrayList<ReferenceEntry>(entries.size)
+        val resultRows = ArrayList<ReferenceEntry>()
         for (entry in entries) {
             val optimize = entry.objective != null
             val kind = if (optimize) "optimize" else "satisfy"
@@ -163,7 +163,7 @@ internal object SolveMetric {
         // A per-run result table in the reference-table schema (solver = this config's tag) — the input
         // `bench credit` compares, keyed by (suite, problem), sliceable by the joined feature columns.
         ReferenceStore.writeCsv(File("output", "$tag.csv"), resultRows)
-        println("\n$feasible/${entries.size} feasible, $proved proved  (output/$tag/, output/$tag.csv)")
+        println("\n$feasible/${resultRows.size} feasible, $proved proved  (output/$tag/, output/$tag.csv)")
         return outDir
     }
 
