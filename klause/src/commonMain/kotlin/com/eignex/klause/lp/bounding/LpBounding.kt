@@ -144,6 +144,7 @@ internal fun LpEngine.solveNode(
         if (!propagator.install(model, exact)) return null
         return propagator.solveFloat(warm, cancellation)
     }
+    noteNodeOverhead(model.extent() * LpNodeOverhead.SETUP)
     val fresh = newPersistentLpSolver(
         model,
         cancellation,
@@ -281,9 +282,11 @@ private fun LpEngine.foldSelectedCuts(
     if (selected.isEmpty()) return base to res
     val tightened = try {
         sink.lp.observeCutBuild(selected.size) { relaxer.build(session, selected, cancellation) }
+            .also { noteNodeOverhead(it.model.extent() * LpNodeOverhead.BUILD) }
     } catch (_: CheckedLongOverflowException) {
         return base to res // overflow in the cut-augmented build: keep the prior (sound) relaxation
     }
+    noteNodeOverhead(tightened.model.extent() * LpNodeOverhead.SETUP)
     val cutSimplex = dualSimplex(tightened.model, cancellation)
     val r = try {
         cutSimplex.solve()
@@ -375,7 +378,7 @@ internal fun LpEngine.sparseSafePrune(
                 for (i in 0 until gatedModel.m) if (!filter.enforced[i]) gatedRay[i] = 0.0
                 val ray = solveContext.certificationPolicy.acceptNullable(
                     LpCertifier.EXACT_FARKAS,
-                    certifyLpFarkas(gatedModel, gatedRay, onRoute = {
+                    certifyLpFarkas(gatedModel.alsoCharged(this), gatedRay, onRoute = {
                         sink.lp.observeFarkasRoute(
                             it == FarkasRoute.RECONSTRUCTED,
                             it == FarkasRoute.EXACT_BASIS,
@@ -448,7 +451,7 @@ internal fun LpEngine.sparseSafePrune(
         val ray = if (floatRay != null) {
             solveContext.certificationPolicy.acceptNullable(
                 LpCertifier.EXACT_FARKAS,
-                certifyLpFarkas(model, floatRay, onRoute = {
+                certifyLpFarkas(model.alsoCharged(this), floatRay, onRoute = {
                     sink.lp.observeFarkasRoute(
                         it == FarkasRoute.RECONSTRUCTED,
                         it == FarkasRoute.EXACT_BASIS,
@@ -522,9 +525,11 @@ internal fun LpEngine.sparseSafePrune(
             ) + localCuts
             val tightened = try {
                 sink.lp.observeCutBuild(selectedCuts.size) { relaxer.build(session, selectedCuts, cancellation) }
+                    .also { noteNodeOverhead(it.model.extent() * LpNodeOverhead.BUILD) }
             } catch (_: CheckedLongOverflowException) {
                 break // overflow in the cut-augmented build: keep the prior (sound) relaxation
             }
+            noteNodeOverhead(tightened.model.extent() * LpNodeOverhead.SETUP)
             val roundSimplex = dualSimplex(tightened.model, cancellation)
             val r = try {
                 roundSimplex.solve()
@@ -566,7 +571,7 @@ internal fun LpEngine.sparseSafePrune(
     // Neither the float safe bound nor the certificate's integer-multiplier bound dominates the other,
     // so the prune decides on the tighter of the two rather than on the float bound alone.
     val lower = certifiedTightObjectiveLowerBound(
-        boundRel.model,
+        boundRel.model.alsoCharged(this),
         boundRes.duals,
         cert,
         sink.lp.certificationObserver(LpRoute.NODE),
@@ -677,6 +682,7 @@ internal fun LpEngine.applySparseReducedCostFixing(
         null
     }
     val canLearn = reasonSupport != null
+    noteNodeOverhead(relaxation.colVarId.size.toLong() * LpNodeOverhead.FIXING)
     for (col in relaxation.colVarId.indices) {
         if (cancellation()) return false
         val varId = relaxation.colVarId[col]
@@ -898,6 +904,7 @@ internal fun LpEngine.sparseCertifiedPrune(
     val relaxation = nodeRelaxation(relaxer, session)
     if (relaxation.model.n == 0) return LpNodeOutcome(false, null)
     sink.lp.observeSolve()
+    noteNodeOverhead(relaxation.model.extent() * LpNodeOverhead.SETUP)
     val recoverySimplex = dualSimplex(relaxation.model, cancellation)
     val result = try {
         recoverySimplex.solve()
@@ -914,7 +921,7 @@ internal fun LpEngine.sparseCertifiedPrune(
     // integer-multiplier bound carries no rounding margin, the float one never declines. A null (neither
     // available) keeps the node.
     val lb = certifiedTightObjectiveLowerBound(
-        relaxation.model,
+        relaxation.model.alsoCharged(this),
         result.duals,
         sink.lp.certificationObserver(LpRoute.NODE),
         solveContext.certificationPolicy,
@@ -1195,3 +1202,7 @@ private fun LpEngine.strictSourcePrune(
 }
 
 private const val STRICT_FILTER_EPS = 1e-7
+
+/** [this] model, with an exact pass over it charged to [engine]: the certificates below work in rationals. */
+private fun LpModel.alsoCharged(engine: LpEngine): LpModel =
+    also { engine.noteNodeOverhead(extent() * LpNodeOverhead.EXACT) }
