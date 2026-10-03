@@ -55,14 +55,14 @@ internal class MiniZincRunner(
      *  Cached + concurrency-safe: a `.fzn` newer than its `.mzn`(+`.dzn`) sources is reused
      *  (skip recompile); a fresh compile goes to a unique temp file and is then **atomically
      *  renamed** into place, so several bench JVMs compiling the same instance in parallel can
-     *  never observe a half-written `.fzn`. (Source mtimes only — bump/clean `build/mzn-fzn` if the
+     *  never observe a half-written `.fzn`. (Source mtimes only — bump/clean `build/mzn-fzn-seed*` if the
      *  klause redefinition library itself changes.) */
     fun compileFzn(ref: ProblemRef): File {
         require(supports(ref)) { "${ref.name}: MiniZincRunner only resolves MINIZINC problems" }
         val root = CorpusFetcher.workspaceRoot()
         val mzn = CorpusFetcher.resolve(ref.source)
         val dzn = ref.data?.let { CorpusFetcher.resolve(it) }
-        val workDir = File(root, "klause-bench/build/mzn-fzn").apply { mkdirs() }
+        val workDir = File(root, "klause-bench/build/mzn-fzn-seed$MZN_RANDOM_SEED").apply { mkdirs() }
         val fzn = File(workDir, "${ref.name.replace('/', '_')}.fzn")
         val upToDate = fzn.exists() &&
             fzn.lastModified() >= mzn.lastModified() &&
@@ -82,6 +82,8 @@ internal class MiniZincRunner(
             add("--solver")
             add(msc.absolutePath)
             add("-c")
+            add("--random-seed")
+            add(MZN_RANDOM_SEED.toString())
             add("-G")
             add(libDir.absolutePath)
             add("--output-fzn-to-file")
@@ -110,3 +112,10 @@ internal class MiniZincRunner(
         }
     }
 }
+
+/**
+ * The seed every MiniZinc compile and reference solve runs with. Some models draw their data at compile time
+ * (`uniform`, `bernoulli`, ...), and an unseeded compile draws afresh on every run, so klause and the reference
+ * would otherwise solve different instances.
+ */
+internal const val MZN_RANDOM_SEED = 1

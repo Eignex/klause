@@ -4,6 +4,7 @@ import com.eignex.klause.bench.catalog.Format
 import com.eignex.klause.bench.catalog.ProblemRef
 import com.eignex.klause.bench.catalog.ProblemSource
 import com.eignex.klause.bench.runner.Budget
+import com.eignex.klause.bench.runner.MZN_RANDOM_SEED
 import com.eignex.klause.bench.runner.MiniZincRunner
 import com.eignex.klause.bench.runner.ResolvedProblem
 import com.eignex.klause.bench.source.CorpusFetcher
@@ -227,6 +228,8 @@ internal object SolverInvocation {
             add(budget.timeoutMillis.toString())
             add("--output-mode")
             add("dzn")
+            add("--random-seed")
+            add(MZN_RANDOM_SEED.toString())
             add("-s")
             if (optimize) {
                 add("-a")
