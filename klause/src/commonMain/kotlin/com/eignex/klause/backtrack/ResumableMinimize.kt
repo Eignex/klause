@@ -152,8 +152,13 @@ internal class ResumableMinimize(
     // lets two identical invocations report identical counters.
     private var sliceNodeEnd: Long = -1L
 
-    // LP work already turned into slice nodes; see [chargeSliceLpWork].
+    // LP work already turned into slice nodes; see [chargeSliceLpWork]. It runs across slices, so work done
+    // between two slices, the root LP included, is charged to the next one.
     private var sliceLpWorkMark = 0L
+
+    // Nodes an earlier slice spent past its budget. One LP solve can cost many slices' worth of nodes, and a
+    // slice cannot stop inside it, so the excess is repaid from the slices that follow.
+    private var sliceNodeDebt = 0L
 
     private fun sliceCancelled(): Boolean = solveCancelled() || (pausable && sliceExpired())
 
@@ -309,7 +314,16 @@ internal class ResumableMinimize(
         globalToken = global
         sliceEnd = TimeSource.Monotonic.markNow() + sliceMillis.milliseconds
         sliceNodeEnd = if (sliceNodes >= 0L) sink.search.nodeCount + sliceNodes else -1L
-        sliceLpWorkMark = lpEngine.totalSolveWork()
+        chargeSliceLpWork()
+        if (sliceNodeEnd >= 0L) {
+            val repaid = minOf(sliceNodeDebt, sliceNodes)
+            sliceNodeDebt -= repaid
+            sliceNodeEnd -= repaid
+            if (sliceNodeEnd <= sink.search.nodeCount) {
+                sliceNodeDebt += sink.search.nodeCount - sliceNodeEnd
+                return null
+            }
+        }
         // A counted budget only means something if the search polls on a counted cadence: the run stops
         // where it polls, and the default cadence is tuned by elapsed time, so the pause would land on a
         // different node on a faster machine and every counter downstream would follow.
@@ -320,7 +334,10 @@ internal class ResumableMinimize(
                 when (val e = runUntilEvent()) {
                     is StepEvent.Incumbent -> onIncumbent(e.result)
                     is StepEvent.Terminal -> return e.result
-                    StepEvent.Paused -> return null
+                    StepEvent.Paused -> {
+                        noteSliceOverspend()
+                        return null
+                    }
                 }
             }
         } catch (failure: Throwable) {
@@ -847,6 +864,13 @@ internal class ResumableMinimize(
         if (nodes <= 0L) return
         sliceNodeEnd -= nodes
         sliceLpWorkMark += nodes * LP_WORK_PER_NODE
+    }
+
+    // Carry what the slice spent past its budget, the LP work since the last charge included, into the next ones.
+    private fun noteSliceOverspend() {
+        if (sliceNodeEnd < 0L) return
+        chargeSliceLpWork()
+        sliceNodeDebt += (sink.search.nodeCount - sliceNodeEnd).coerceAtLeast(0L)
     }
 
     /** Refutes LP-dominated partial assignments through the shared frame stack. */

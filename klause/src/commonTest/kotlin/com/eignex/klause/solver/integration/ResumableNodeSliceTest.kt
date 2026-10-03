@@ -121,25 +121,27 @@ class ResumableNodeSliceTest {
         assertEquals(6.5, assertIs<MinimizeResult.Optimal>(terminal).objective)
     }
 
-    /** A three-row 0/1 knapsack: its LP relaxation is fractional at the root, so the LP arm branches. */
-    private fun knapsack(): Problem {
-        val n = 20
+    /** A multi-row 0/1 knapsack: its LP relaxation is fractional at the root, so the LP arm branches. */
+    private fun knapsack(n: Int = 20, rows: Int = 3): Problem {
         val vars = IntArray(n) { it }
         return Problem(
             numBoolVars = 0,
             numIntVars = n,
             intDomains = Array(n) { IntDomain(0, 1) },
-            factors = Array<Factor>(3) { row ->
-                Linear(LongArray(n) { ((it * 7 + row * 13) % 17 + 3).toLong() }, vars, LinearOp.LE, 80L + row * 7)
+            factors = Array<Factor>(rows) { row ->
+                Linear(LongArray(n) { ((it * 7 + row * 13) % 17 + 3).toLong() }, vars, LinearOp.LE, 4L * n + row * 7)
             },
         )
     }
 
+    private fun knapsackLp(n: Int = 20, rows: Int = 3) = BacktrackSolver(knapsack(n, rows).bake()).resumable(
+        LinearObjective(intCoefficients = LongArray(n) { -((it * 11 % 19) + 5).toLong() }),
+        BacktrackParams(randomSeed = 0L, lpConfig = LpConfig.AGGRESSIVE),
+    )
+
     @Test
     fun `an LP arm's slice spends its LP work as nodes`() {
-        val params = BacktrackParams(randomSeed = 0L, lpConfig = LpConfig.AGGRESSIVE)
-        val objective = LinearObjective(intCoefficients = LongArray(20) { -((it * 11 % 19) + 5).toLong() })
-        val lp = { BacktrackSolver(knapsack().bake()).resumable(objective, params) }
+        val lp = { knapsackLp() }
         val whole = lp().also { it.runSlice(Cancellation.Never, sliceMillis = 60_000, sliceNodes = -1L) { } }
         val budget = (whole.stats.search.nodes.sum / 2).toLong()
         val search = lp()
@@ -150,5 +152,18 @@ class ResumableNodeSliceTest {
             terminal == null && search.stats.search.nodes.sum < budget,
             "slice ${search.stats.search.nodes.sum} of $budget, terminal $terminal",
         )
+    }
+
+    @Test
+    fun `an LP arm repays the LP work one slice overspent with slices that explore nothing`() {
+        val search = knapsackLp(n = 60, rows = 6)
+
+        val idle = (1..50).count {
+            val before = search.stats.search.nodes.sum
+            search.runSlice(Cancellation.Never, sliceMillis = 60_000, sliceNodes = 1L) { } == null &&
+                search.stats.search.nodes.sum == before
+        }
+
+        assertTrue(idle > 0, "every one-node slice explored a node")
     }
 }
