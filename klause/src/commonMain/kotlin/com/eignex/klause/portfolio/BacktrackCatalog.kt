@@ -191,6 +191,19 @@ object BacktrackCatalog {
         Kind.CSP -> cspOrder
     }
 
+    /**
+     * [rankedArms] with [BacktrackArm.LpDefault] third when the model has continuous columns. A row that
+     * touches a real column never propagates in CP, so on such a model node LP is the only propagation those
+     * rows get, and the first two arms run without it. They keep their slots, since they are what finds most
+     * incumbents there; [PortfolioComposition] gives such a model the backtrack slot for the LP arm.
+     */
+    private fun rankedArms(kind: Kind, realColumns: Boolean): List<BacktrackArm> {
+        val order = rankedArms(kind)
+        if (!realColumns) return order
+        val rest = order.filter { it != BacktrackArm.LpDefault }
+        return rest.take(2) + BacktrackArm.LpDefault + rest.drop(2)
+    }
+
     /** The shared string-boundary / order-driven accessors (see [ArmCatalog]); this catalog supplies
      *  the per-[Kind] order ([rankedArms]) to the pool builders. */
     private val catalog = ArmCatalog(BacktrackArm.entries, BacktrackArm::label, ::make)
@@ -204,8 +217,9 @@ object BacktrackCatalog {
     /** A fresh recipe for the arm named [label] (the single string boundary — CLI `bt-arm=`, campaigns). */
     fun byLabel(label: String): BacktrackRecipe = catalog.byLabel(label)
 
-    /** One fresh recipe for every arm of [kind], in credit order. */
-    fun ranked(kind: Kind): List<BacktrackRecipe> = catalog.ranked(rankedArms(kind))
+    /** One fresh recipe for every arm of [kind], in credit order; see [rankedArms] for [realColumns]. */
+    fun ranked(kind: Kind, realColumns: Boolean = false): List<BacktrackRecipe> =
+        catalog.ranked(rankedArms(kind, realColumns))
 
     /** Per-arm recipe factories for [kind], in credit order — each builds a fresh recipe (the factory
      *  shape a campaign or the CLI feeds to `PortfolioScenario.btPool`). */
