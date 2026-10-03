@@ -313,6 +313,7 @@ internal fun FinitePipeline.solve(
             explicitPresolveConfig = request.explicitPresolveConfig,
             solutionSetSensitive = request.solutionSetSensitive,
             cancellation = request.presolveCancellation,
+            solveCancellation = request.cancellation,
             presolveBudget = request.presolveBudget,
             zeroObjectivePricing = request.zeroObjectivePricing,
             randomSeed = request.randomSeed,

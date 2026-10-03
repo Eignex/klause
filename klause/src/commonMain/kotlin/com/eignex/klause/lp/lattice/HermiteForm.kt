@@ -50,6 +50,7 @@ internal fun hermiteNormalForm(
         // algorithm run across columns and terminates for the same reason.
         while (true) {
             if (cancellation()) return null
+            cancellation.charge(1L + h.rowSupport[row].size)
             var minCol = -1
             var minAbs = BigInteger.ZERO
             var nonZero = 0
