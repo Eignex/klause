@@ -3,6 +3,7 @@ package com.eignex.klause.backtrack
 import com.eignex.klause.backtrack.selector.IndomainMax
 import com.eignex.klause.backtrack.selector.IndomainMin
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
@@ -789,5 +790,35 @@ class ResumableMinimizeTest {
                 assertIs<MinimizeResult.Optimal>(replacement.runSlice(Cancellation.Never, 1000L, 256L) {})
             }
         }
+    }
+
+    @Test
+    fun `a leaf the LP cannot decide is passed over instead of ending the search`() {
+        // x0 + x1 + x2 + r >= 5 over x in [0,2], r in [0,10]; with every certifier vetoed no leaf LP decides.
+        val n = 3
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = n,
+            intDomains = Array(n) { IntDomain(0, 2) },
+            factors = arrayOf<Factor>(
+                Linear(LongArray(n) { 1L }, IntArray(n) { it }, doubleArrayOf(1.0), intArrayOf(0), LinearOp.GE, 5L),
+            ),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(10.0),
+        ).bake()
+        val vetoed = LpSolveContext(certificationPolicy = LpCertificationPolicy { _, _ -> false })
+        val objective = LinearObjective(
+            intCoefficients = longArrayOf(2L, 3L, 1L),
+            realCoefficients = doubleArrayOf(1.5),
+        )
+        val search = BacktrackSolver(problem, vetoed).resumable(objective, BacktrackParams(randomSeed = 0L))
+
+        var terminal: MinimizeResult? = null
+        while (terminal == null) {
+            terminal = search.runSlice(Cancellation.Never, sliceMillis = 60_000, sliceNodes = -1L) { }
+        }
+
+        assertTrue(terminal is MinimizeResult.Unknown && search.stats.lp.standalonePasses.sum > 1.0, "$terminal")
     }
 }

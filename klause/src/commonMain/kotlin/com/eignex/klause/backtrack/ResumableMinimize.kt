@@ -921,11 +921,14 @@ internal class ResumableMinimize(
         ): SearchModelDisposition {
             val sample = checkNotNull(model.valueOf<Sample>(cp))
             brancher.onSolution(sample)
+            // What this leaf left open, apart from the run-wide record in sawIndeterminateLeaf.
+            var unresolved = false
+            var incomplete = false
             val incumbent = if (problem.numRealVars == 0) {
                 recordIfImproving(sample, objective.evaluate(sample))
             } else {
                 // Only the run's end may cut a leaf LP short. A slice boundary pauses at the next decision, and
-                // a leaf it cut would read as unresolved, which ends the whole search without a verdict.
+                // a leaf it cut would read as unresolved and be passed over, though a longer LP might have decided it.
                 val real = leafRealFeasibility(
                     problem,
                     objective,
@@ -942,11 +945,15 @@ internal class ResumableMinimize(
 
                     LpVerdict.INDETERMINATE, LpVerdict.CERTIFIED_BOUND -> {
                         sawIndeterminateLeaf = true
+                        unresolved = true
                         null
                     }
 
                     LpVerdict.FEASIBLE, LpVerdict.ATTAINED_OPTIMUM, LpVerdict.UNBOUNDED -> {
-                        if (real.verdict != LpVerdict.ATTAINED_OPTIMUM) sawIndeterminateLeaf = true
+                        if (real.verdict != LpVerdict.ATTAINED_OPTIMUM) {
+                            sawIndeterminateLeaf = true
+                            incomplete = true
+                        }
                         val full = sample.copy(reals = real.reals, exactReals = real.exactReals)
                         recordIfImproving(full, objective.evaluate(full))
                     }
@@ -954,8 +961,12 @@ internal class ResumableMinimize(
             }
             pendingIncumbent = incumbent
             return when {
-                // Blocking an unresolved leaf would let its nogood escape as a proved shared conflict.
-                sawIndeterminateLeaf -> SearchModelDisposition.Indeterminate
+                // A leaf the LP could not decide is passed over rather than ending the arm: the search goes on to
+                // other leaves, and the sticky flag keeps the terminal from claiming exhaustion or an optimum.
+                unresolved -> SearchModelDisposition.Skip
+
+                // Blocking a leaf whose real part is unproved would let its nogood escape as a proved shared conflict.
+                incomplete -> SearchModelDisposition.Indeterminate
 
                 incumbent == null -> SearchModelDisposition.Continue
 

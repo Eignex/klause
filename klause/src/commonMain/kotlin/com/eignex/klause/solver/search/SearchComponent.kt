@@ -263,6 +263,13 @@ sealed interface SearchModelDisposition {
 
     /** Stop without excluding a model whose feasibility or required proof remains unresolved. */
     data object Indeterminate : SearchModelDisposition
+
+    /**
+     * Leave this model unresolved and keep traversing by chronological backtracking. Nothing is learned from it,
+     * so no nogood that rests on the unresolved check can reach another arm as a proved conflict; the caller keeps
+     * its own record that the run can no longer prove exhaustion.
+     */
+    data object Skip : SearchModelDisposition
 }
 
 /** Selects whether a shared run expands the current node. */

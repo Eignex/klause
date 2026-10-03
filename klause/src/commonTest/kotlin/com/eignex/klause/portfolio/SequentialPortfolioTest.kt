@@ -366,12 +366,12 @@ class SequentialPortfolioTest {
                 objectiveBoundSupplier = { Double.POSITIVE_INFINITY },
             ),
         ).use { search ->
-            val result = assertIs<MinimizeResult.Unknown>(search.runSlice(Cancellation { declined }, 1000L, 256L) {})
+            val result = assertIs<MinimizeResult.Unknown>(search.runSlice(Cancellation.Never, 1000L, 256L) {})
             assertEquals(TerminationReason.Unsupported, result.reason)
             assertTrue(search.isDone)
         }
         assertTrue(declined)
-        assertEquals(1, fixture.opened)
+        assertTrue(fixture.opened > 1, "the donor passes over each undecided leaf")
         assertEquals(fixture.opened, fixture.closed)
         assertTrue(pool.drainSince(0L).clauses.isEmpty())
         val worker = PortfolioWorker.of(
