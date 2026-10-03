@@ -184,6 +184,7 @@ internal object SymmetryBreaking {
             // Bail on a fired presolve budget — the scan and the per-candidate keying below are the
             // value-symmetry phase's cost; returning what is grouped so far only forgoes value pins.
             if (cancellation()) return null
+            cancellation.charge(problem.numIntVars.toLong())
             val sig = LongArrayList()
             for (x in 0 until problem.numIntVars) if (value in problem.rootIntDomain(x)) sig.add(x.toLong())
             if (!sig.isEmpty()) incidence.getOrPut(RefineKey(sig.toLongArray())) { ArrayList() }.add(value)
@@ -259,7 +260,7 @@ internal object SymmetryBreaking {
         val n = values.size
         if (n > MAX_VERIFIED_GROUP) return emptyList()
         val ds = IntDisjointSet(n)
-        unionVerifiedPairs(ds, IntArray(n) { it }, cancellation) { i, j ->
+        unionVerifiedPairs(ds, IntArray(n) { it }, problem.factors.size.toLong(), cancellation) { i, j ->
             verifyValueSwap(problem, base, values[i], values[j])
         }
         return ds.groups().map { group -> group.map { values[it] } }
@@ -435,6 +436,7 @@ internal object SymmetryBreaking {
             // 10 factors, 10394 vars, ~23s at budget=0). Including the per-variable term bounds the
             // round count by the work budget as intended.
             if (budget != null) budget[0] -= arcsPerRound + nInt + nBool
+            cancellation.charge(arcsPerRound.toLong() + nInt + nBool)
             val next = assignColours(sigInt, sigBool, intColour, boolColour)
             if (next == numColours) return intColour to boolColour // partition stable
             numColours = next
@@ -632,6 +634,7 @@ internal object SymmetryBreaking {
                 if (orbit.connected(index.getOrDefault(r, 0), index.getOrDefault(v, 0))) continue
                 val leaf = refineToDiscrete(problem, seedIntBase, seedBoolBase, v, budget, cancellation) ?: continue
                 val perm = buildPerm(refLeaf, leaf, nInt, nBool) ?: continue
+                cancellation.charge(problem.factors.size.toLong())
                 if (!isAutomorphism(problem, base, perm.second, perm.first)) continue
                 gens.add(perm)
                 index.forEach { g, gi ->
@@ -677,7 +680,9 @@ internal object SymmetryBreaking {
             // The refinement itself charges the budget per arc; a spent budget (or a fired presolve
             // cancellation) means the partition below may be partial, so abandon this leaf.
             if (budget[0] <= 0 || cancellation()) return null
+            val before = budget[0]
             val (ic, bc) = equitablePartition(problem, seedInt, seedBool, budget)
+            cancellation.charge(before.toLong() - budget[0])
             val leaf = IntArray(n) { -1 }
             val cellSize = IntArray(n)
             for (v in 0 until nInt) {
@@ -791,10 +796,12 @@ internal object SymmetryBreaking {
     }
 
     /** Test every unordered pair within [scope] with [verify] (skipping pairs already connected) and
-     *  union the verified ones in [ds]. The shared inner step of every verified-orbit grouping. */
+     *  union the verified ones in [ds], charging [pairCost] per pair tested. The shared inner step of every
+     *  verified-orbit grouping. */
     private inline fun unionVerifiedPairs(
         ds: IntDisjointSet,
         scope: IntArray,
+        pairCost: Long,
         cancellation: Cancellation = Cancellation.Never,
         verify: (Int, Int) -> Boolean,
     ) {
@@ -806,7 +813,9 @@ internal object SymmetryBreaking {
                 if (cancellation()) return
                 val u = scope[i]
                 val v = scope[j]
-                if (!ds.connected(u, v) && verify(u, v)) ds.union(u, v)
+                if (ds.connected(u, v)) continue
+                cancellation.charge(pairCost)
+                if (verify(u, v)) ds.union(u, v)
             }
         }
     }

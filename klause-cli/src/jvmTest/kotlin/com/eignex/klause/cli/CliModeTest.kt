@@ -20,6 +20,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class CliModeTest {
@@ -1456,30 +1457,27 @@ class CliModeTest {
     }
 
     @Test
-    fun `routing and source preparation share one presolve deadline`() {
+    fun `routing and source preparation share one presolve allowance`() {
         val common = CommonOptions().apply {
             timeLimitMs = 60_000L
             deadlineAtMs = nowMillis() + 60_000L
         }
-        val before = nowMillis()
         assertFalse(common.routingCancellation()())
-        val after = nowMillis()
-        val deadline = requireNotNull(common.presolveDeadlineAtMs)
-        assertTrue(deadline in before + 6_000L..after + 6_000L)
+        val shared = requireNotNull(common.presolveBudget)
+        assertEquals(presolveWorkFor(6_000L), shared.allowance)
 
-        common.presolveDeadlineAtMs = nowMillis() - 1L
-        val (cancel, budget) = SolveCore.presolveAllowance(common, Cancellation.Never, common.deadlineAtMs)
+        shared.charge(shared.allowance)
+        val (cancel, budget) = SolveCore.presolveAllowance(common, Cancellation.Never)
+        assertSame(shared, budget)
         assertTrue(cancel())
-        assertEquals(0L, budget?.remaining())
     }
 
     @Test
     fun `routing exhaustion leaves source preparation runnable`() {
-        var remaining = 6_000L
-        val parent = PresolveBudget { remaining }
+        val parent = PresolveBudget(6_000L)
         val route = routingSlice(parent, Cancellation.Never)
 
-        remaining = 3_000L
+        route.charge(3_000L)
 
         assertTrue(route())
         assertEquals(3_000L, parent.remaining())
@@ -1493,16 +1491,16 @@ class CliModeTest {
             deadlineAtMs = nowMillis() + 60_000L
         }
         val route = common.routingCancellation()
-        val parent = common.presolveDeadlineAtMs
+        val parent = common.presolveBudget
 
         assertTrue(route === common.routingCancellation())
-        assertEquals(parent, common.presolveDeadlineAtMs)
+        assertSame(parent, common.presolveBudget)
     }
 
     @Test
     fun `global cancellation also stops a routing slice`() {
         var stopped = false
-        val route = routingSlice(PresolveBudget { 6_000L }, Cancellation { stopped })
+        val route = routingSlice(PresolveBudget(6_000L), Cancellation { stopped })
         assertFalse(route())
 
         stopped = true
@@ -1521,15 +1519,13 @@ class CliModeTest {
                 timeLimitMs = 60_000L
                 deadlineAtMs = nowMillis() + 60_000L
             }
-            val before = nowMillis()
             assertFalse(common.routingCancellation()())
-            val after = nowMillis()
-            val deadline = requireNotNull(common.presolveDeadlineAtMs)
-            assertTrue(deadline in before + 12_000L..after + 12_000L)
+            val shared = requireNotNull(common.presolveBudget)
+            assertEquals(presolveWorkFor(12_000L), shared.allowance)
 
             System.setProperty(CliKnobs.presolveBudgetMs, "1")
-            SolveCore.presolveAllowance(common, Cancellation.Never, common.deadlineAtMs)
-            assertEquals(deadline, common.presolveDeadlineAtMs)
+            SolveCore.presolveAllowance(common, Cancellation.Never)
+            assertSame(shared, common.presolveBudget)
         } finally {
             if (oldBudget == null) {
                 System.clearProperty(CliKnobs.presolveBudgetMs)
@@ -1555,11 +1551,8 @@ class CliModeTest {
                 timeLimitMs = 60_000L
                 deadlineAtMs = nowMillis() + 60_000L
             }
-            val before = nowMillis()
             assertFalse(common.routingCancellation()())
-            val after = nowMillis()
-            val deadline = requireNotNull(common.presolveDeadlineAtMs)
-            assertTrue(deadline in before + 12_000L..after + 12_000L)
+            assertEquals(presolveWorkFor(12_000L), common.presolveBudget?.allowance)
         } finally {
             if (oldBudget == null) {
                 System.clearProperty(CliKnobs.presolveBudgetMs)
@@ -1585,9 +1578,9 @@ class CliModeTest {
             }
             assertFalse(common.routingCancellation()())
             assertTrue(common.presolveAllowanceInitialized)
-            assertEquals(null, common.presolveDeadlineAtMs)
+            assertEquals(null, common.presolveBudget)
 
-            val (cancel, budget) = SolveCore.presolveAllowance(common, Cancellation.Never, common.deadlineAtMs)
+            val (cancel, budget) = SolveCore.presolveAllowance(common, Cancellation.Never)
             assertFalse(cancel())
             assertEquals(null, budget)
         } finally {
@@ -1610,9 +1603,14 @@ class CliModeTest {
         assertTrue(common.routingCancellation()())
         assertFalse(common.presolveAllowanceInitialized)
 
-        val (cancel, budget) = SolveCore.presolveAllowance(common, Cancellation.Never, common.deadlineAtMs)
+        val (cancel, budget) = SolveCore.presolveAllowance(common, Cancellation.Never)
         assertFalse(cancel())
-        assertTrue(budget != null && budget.remaining() in 0L..6_000L)
+        assertEquals(presolveWorkFor(6_000L), budget?.remaining())
+    }
+
+    @Test
+    fun `a presolve allowance too large to count saturates rather than wraps`() {
+        assertEquals(Long.MAX_VALUE, presolveWorkFor(Long.MAX_VALUE / 2))
     }
 
     @Test

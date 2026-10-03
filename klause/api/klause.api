@@ -7263,10 +7263,14 @@ public final class com/eignex/klause/presolve/Presolve {
 	public static synthetic fun strengthenCoefficients$default (Lcom/eignex/klause/presolve/Presolve;Lcom/eignex/klause/propagation/BakedProblem;Lcom/eignex/klause/util/Cancellation;ILjava/lang/Object;)Lcom/eignex/klause/presolve/PassDelta;
 }
 
-public final class com/eignex/klause/presolve/PresolveBudget {
-	public fun <init> (Lkotlin/jvm/functions/Function0;)V
+public final class com/eignex/klause/presolve/PresolveBudget : com/eignex/klause/util/WorkMeter {
+	public fun <init> (J)V
+	public fun charge (J)V
+	public final fun getAllowance ()J
+	public final fun orSpent (Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/util/Cancellation;
 	public final fun remaining ()J
 	public final fun slice (J)Lcom/eignex/klause/util/Cancellation;
+	public final fun spent ()J
 }
 
 public final class com/eignex/klause/presolve/PresolveConfig {
@@ -11524,11 +11528,13 @@ public final class com/eignex/klause/util/Bits$Companion {
 public abstract interface class com/eignex/klause/util/Cancellation {
 	public static final field Companion Lcom/eignex/klause/util/Cancellation$Companion;
 	public fun and (Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/util/Cancellation;
+	public fun charge (J)V
 	public fun deadline ()Lkotlin/time/ComparableTimeMark;
 	public fun invoke ()Z
 	public abstract fun isCancelled ()Z
 	public fun or (Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/util/Cancellation;
 	public fun shorten (D)Lcom/eignex/klause/util/Cancellation;
+	public fun workMeter ()Lcom/eignex/klause/util/WorkMeter;
 }
 
 public final class com/eignex/klause/util/Cancellation$Companion {
@@ -11539,10 +11545,12 @@ public final class com/eignex/klause/util/Cancellation$Companion {
 
 public final class com/eignex/klause/util/Cancellation$DefaultImpls {
 	public static fun and (Lcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/util/Cancellation;
+	public static fun charge (Lcom/eignex/klause/util/Cancellation;J)V
 	public static fun deadline (Lcom/eignex/klause/util/Cancellation;)Lkotlin/time/ComparableTimeMark;
 	public static fun invoke (Lcom/eignex/klause/util/Cancellation;)Z
 	public static fun or (Lcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/util/Cancellation;
 	public static fun shorten (Lcom/eignex/klause/util/Cancellation;D)Lcom/eignex/klause/util/Cancellation;
+	public static fun workMeter (Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/util/WorkMeter;
 }
 
 public final class com/eignex/klause/util/CharReader {
@@ -11614,5 +11622,9 @@ public final class com/eignex/klause/util/PermutationGroup {
 public final class com/eignex/klause/util/StringCharSource : com/eignex/klause/util/CharSource {
 	public fun <init> (Ljava/lang/String;)V
 	public fun next ()Ljava/lang/String;
+}
+
+public abstract interface class com/eignex/klause/util/WorkMeter {
+	public abstract fun charge (J)V
 }
 

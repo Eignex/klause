@@ -58,6 +58,7 @@ import com.eignex.klause.util.EmptyDoubleArray
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
+import com.eignex.klause.util.WorkMeter
 import kotlin.math.abs
 import kotlin.time.TimeSource
 
@@ -491,6 +492,14 @@ internal class LpEngine(
     internal var nodeUsesTrail: Boolean = false
     private var nodeLpCancellation: Cancellation = params.cancellation
 
+    // Follows [nodeLpCancellation] as it is swapped, meter included, so work charged by a solver built
+    // before a swap still reaches the current budget.
+    private val nodeLpToken = object : Cancellation {
+        override fun isCancelled(): Boolean = nodeLpCancellation()
+
+        override fun workMeter(): WorkMeter? = nodeLpCancellation.workMeter()
+    }
+
     internal val cpAdapter = CpLpAdapter(this)
     internal val propagator = LpPropagator(
         cpAdapter,
@@ -504,7 +513,7 @@ internal class LpEngine(
             )
         },
         solveContext = solveContext,
-        cancellation = Cancellation { nodeLpCancellation() },
+        cancellation = nodeLpToken,
     )
 
     internal fun nodeRelaxation(relaxer: CpToLpRelaxation, session: PropagationSession): LpRelaxation {
@@ -579,7 +588,7 @@ internal class LpEngine(
                 val simplex = try {
                     newPersistentLpSolver(
                         built.model,
-                        Cancellation { nodeLpCancellation() },
+                        nodeLpToken,
                         refactorUpdateLimit = GATED_UPDATE_LIMIT,
                         factory = solveContext.engineFactory,
                         pricing = pricingOptions,
