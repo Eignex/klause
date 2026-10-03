@@ -397,4 +397,46 @@ class LpModelTest {
         assertEquals(14L, rebound.objConstant)
         assertFailsWith<IllegalArgumentException> { model.copy(columns = listOf(model.column(0).copy(origin = zero))) }
     }
+
+    @Test
+    fun `a Farkas ray is checked against the exact shift where binary64 rounds it`() {
+        // A + U + B + V >= 0 over B in [-4.2e18, -4e18]: shifting by B's lower bound puts 4.2e18 + 300 on the
+        // right-hand side, which binary64 rounds up by 212 — enough to make the feasible model look infeasible.
+        for ((vUpper, infeasible) in listOf(-100.0 to false, -250.0 to true)) {
+            val model = LpBuilder().apply {
+                val a = addRealVar(0.0, 4e18, cost = 1.0)
+                val u = addRealVar(0.0, 200.0)
+                val b = addRealVar(-4.2e18, -4e18)
+                val v = addRealVar(-300.0, vUpper)
+                addRealRow(intArrayOf(a, u, b, v), doubleArrayOf(1.0, 1.0, 1.0, 1.0), Relation.GE, 0.0)
+            }.build(Sense.MINIMIZE)
+
+            assertEquals(infeasible, sourceFarkasValid(model, longArrayOf(-1L)), "V <= $vUpper")
+        }
+    }
+
+    @Test
+    fun `a shift from the open-side stand-in that rounds is read exactly`() {
+        val model = LpBuilder().apply {
+            val a = addRealVar(null, 4e3, cost = 1.0)
+            val v = addRealVar(-300.0, -100.0)
+            addRealRow(intArrayOf(a, v), doubleArrayOf(0.1, 1.0), Relation.GE, 0.0)
+        }.build(Sense.MINIMIZE)
+
+        assertTrue(model.finiteExactInput())
+        assertEquals(
+            exactDouble(0.1) * exactDouble(-LP_UNBOUNDED_PROBE.toDouble()) + exactDouble(-300.0),
+            model.exactRhs(0),
+        )
+    }
+
+    @Test
+    fun `a repeated column whose summed coefficient rounds keeps the model from exact certification`() {
+        val model = LpBuilder().apply {
+            val a = addRealVar(0.0, 1.0)
+            addRealRow(intArrayOf(a, a), doubleArrayOf(1.0, 1e-30), Relation.LE, 1.0)
+        }.build(Sense.MINIMIZE)
+
+        assertFalse(model.finiteExactInput())
+    }
 }

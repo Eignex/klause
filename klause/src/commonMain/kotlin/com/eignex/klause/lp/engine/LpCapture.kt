@@ -3,7 +3,7 @@ package com.eignex.klause.lp.engine
 import com.eignex.klause.simplex.exact.BigFraction
 import com.ionspin.kotlin.bignum.integer.BigInteger
 
-internal const val LP_CAPTURE_VERSION: Int = 1
+internal const val LP_CAPTURE_VERSION: Int = 2
 internal const val LP_EVENT_VERSION: Int = 1
 
 /** Which captured numeric view is authoritative. A double view preserves the IEEE bits presented to
@@ -50,7 +50,8 @@ internal class LpCapturedPremises(
 }
 
 /** Authoritative IEEE-754 input. Its CSC is independent of the Long placeholder CSC because a
- * real-only coefficient can be absent from the integer view; both stores preserve ascending rows. */
+ * real-only coefficient can be absent from the integer view; both stores preserve ascending rows. The exact
+ * values of shifted entries that rounded travel with the bits, so a replayed view certifies what its source did. */
 internal class LpCapturedDoubleView(
     val colPtr: IntArray,
     val rowIdx: IntArray,
@@ -61,6 +62,8 @@ internal class LpCapturedDoubleView(
     val hasUpper: BooleanArray,
     val objConstantBits: Long,
     val loShiftBits: LongArray,
+    val inexactCoefficients: Boolean = false,
+    val shifts: Lazy<LpExactShifts> = lazyOf(LpExactShifts.NONE),
 ) {
     fun copy(): LpCapturedDoubleView = LpCapturedDoubleView(
         colPtr.copyOf(),
@@ -72,6 +75,8 @@ internal class LpCapturedDoubleView(
         hasUpper.copyOf(),
         objConstantBits,
         loShiftBits.copyOf(),
+        inexactCoefficients,
+        shifts,
     )
 }
 
@@ -137,6 +142,8 @@ internal class LpCapturedModel(
                 it.hasUpper.copyOf(),
                 Double.fromBits(it.objConstantBits),
                 it.loShiftBits.toDoubleArray(),
+                it.inexactCoefficients,
+                it.shifts,
             )
         }
         return LpModel(
@@ -245,6 +252,8 @@ internal class LpCapturedModel(
                     it.hasUpper.copyOf(),
                     it.objConstant.toRawBits(),
                     it.loShift.toRawBitsArray(),
+                    it.inexactCoefficients,
+                    it.shifts,
                 )
             }
             val authority = if (dv == null) {
@@ -306,6 +315,12 @@ private fun LpCapturedDoubleView.validate(n: Int, m: Int, numVars: Int) {
         "double column data length differs from $numVars"
     }
     require(loShiftBits.size == n) { "double shift length differs from $n" }
+    if (shifts.isInitialized()) {
+        val exact = shifts.value
+        require(exact.rows.all { it in 0 until m } && exact.columns.all { it in 0 until n }) {
+            "exact shift index outside the model"
+        }
+    }
 }
 
 internal class LpCapturedBasis(val basicVars: IntArray, val statuses: IntArray) {
@@ -680,6 +695,8 @@ private class CaptureWriter(private val valueLimit: Int = Int.MAX_VALUE, private
             bools(it.hasUpper)
             long(it.objConstantBits)
             longs(it.loShiftBits)
+            bool(it.inexactCoefficients)
+            exactShifts(it.shifts.value)
         }
     }
 
@@ -859,7 +876,10 @@ private class CaptureReader(private val data: ByteArray) {
         val continuous = bools()
         val authority = numericAuthorityFromWireCode(int())
         val dv = if (bool()) {
-            LpCapturedDoubleView(ints(), ints(), longs(), longs(), longs(), longs(), bools(), long(), longs())
+            LpCapturedDoubleView(
+                ints(), ints(), longs(), longs(), longs(), longs(), bools(), long(), longs(), bool(),
+                lazyOf(exactShifts()),
+            )
         } else {
             null
         }
@@ -1138,23 +1158,45 @@ private fun CaptureReader.exactState(): LpExactState {
 private class CaptureBudgetExceeded : RuntimeException()
 private val EXACT_CAPTURE_MAGIC: ByteArray = byteArrayOf(0x4b, 0x4c, 0x50, 0x45, 0x58, 0x41, 0x43, 0x54)
 
+private fun CaptureWriter.exactShifts(shifts: LpExactShifts) {
+    ints(shifts.rows)
+    shifts.rhs.forEach { fraction(it) }
+    ints(shifts.columns)
+    shifts.upper.forEach { fraction(it) }
+}
+
+private fun CaptureReader.exactShifts(): LpExactShifts {
+    val rows = ints()
+    val rhs = List(rows.size) { fraction() }
+    val columns = ints()
+    return LpExactShifts(rows, rhs, columns, List(columns.size) { fraction() })
+}
+
+private fun CaptureWriter.fraction(value: BigFraction) {
+    rationalPart(value.num)
+    rationalPart(value.den)
+}
+
+private fun CaptureReader.fraction(): BigFraction {
+    val numerator = BigInteger.parseString(string())
+    val denominator = BigInteger.parseString(string())
+    require(denominator.signum() > 0) { "exact LP denominator must be positive" }
+    return BigFraction.of(numerator, denominator)
+}
+
 private fun CaptureWriter.exactNumber(number: ExactLpNumber) {
     bool(number.ieeeBits != null)
     if (number.ieeeBits != null) {
         long(number.ieeeBits)
     } else {
-        rationalPart(number.value.num)
-        rationalPart(number.value.den)
+        fraction(number.value)
     }
 }
 
 private fun CaptureReader.exactNumber(): ExactLpNumber = if (bool()) {
     ExactLpNumber.ofIeee(Double.fromBits(long()))
 } else {
-    val numerator = BigInteger.parseString(string())
-    val denominator = BigInteger.parseString(string())
-    require(denominator.signum() > 0) { "exact LP denominator must be positive" }
-    ExactLpNumber.of(BigFraction.of(numerator, denominator))
+    ExactLpNumber.of(fraction())
 }
 
 private fun CaptureWriter.exactPremises(premises: ExactLpPremises?) {

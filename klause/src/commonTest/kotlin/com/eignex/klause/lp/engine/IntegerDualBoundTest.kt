@@ -147,9 +147,8 @@ class IntegerDualBoundTest {
     @Test
     fun `inexact objective constant records one rejected rationalization`() {
         val builder = LpBuilder()
-        builder.addRealVar(0.0, 1.0)
+        builder.addRealVar(1e-10, 1.0, cost = 1.0)
         val model = builder.build(Sense.MINIMIZE)
-        model.doubleView!!.objConstant = Double.MAX_VALUE
         var exactInputAttempts = 0
         var exactInputRejections = 0
         val observer = object : LpCertificationObserver {
@@ -277,8 +276,7 @@ class IntegerDualBoundTest {
 
     @Test
     fun `inexact binary objective constant cannot be accepted as zero`() {
-        val model = LpBuilder().apply { addRealVar(0.0, 1.0) }.build(Sense.MINIMIZE)
-        model.doubleView!!.objConstant = 1e-10
+        val model = LpBuilder().apply { addRealVar(1e-10, 1.0, cost = 1.0) }.build(Sense.MINIMIZE)
 
         assertEquals(false, assertNotNull(rationalizeToIntegerModel(model, true)).objConstantExact)
         assertEquals(null, rationalizedDualLowerBoundCeil(model, doubleArrayOf()))

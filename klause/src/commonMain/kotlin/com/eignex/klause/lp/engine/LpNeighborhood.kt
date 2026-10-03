@@ -272,7 +272,8 @@ internal fun LpModel.restrictTo(
         LpDoubleView(
             colPtr = dColPtr, rowIdx = dRowIdx, colVal = dColVal,
             rhs = dRhs, cost = dCost, upper = dUpper, hasUpper = dHasUpper,
-            objConstant = dObjConstant, loShift = dLoShift,
+            objConstant = dObjConstant, loShift = dLoShift, inexactCoefficients = view.inexactCoefficients,
+            shifts = restrictedShifts(view.shifts, takenRows, takenCols),
         )
     }
     val model = LpModel(
@@ -287,4 +288,16 @@ internal fun LpModel.restrictTo(
     // Hand a borrowed buffer back in the state it arrived in.
     if (rowMapScratch != null) for (r in 0 until subM) rowMap[takenRows[r]] = -1
     return LpNeighborhood(model, colMap, takenRows.toIntArray(), takenCols.toIntArray())
+}
+
+// A row keeps its parent's exact right-hand side: the shifts of every column it reads are already folded into it.
+private fun restrictedShifts(
+    parent: Lazy<LpExactShifts>,
+    rows: IntArrayList,
+    columns: IntArrayList,
+): Lazy<LpExactShifts> {
+    if (parent.isInitialized() && parent.value === LpExactShifts.NONE) return parent
+    val takenRows = rows.toIntArray()
+    val takenColumns = columns.toIntArray()
+    return lazy { parent.value.restrict(takenRows, takenColumns) }
 }

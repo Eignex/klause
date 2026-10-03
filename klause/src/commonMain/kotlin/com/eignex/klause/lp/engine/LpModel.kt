@@ -10,6 +10,7 @@ import com.eignex.klause.util.LongArrayList
 import com.eignex.klause.util.MutableIntDoubleMap
 import com.eignex.klause.util.MutableIntLongMap
 import com.eignex.klause.util.addExact
+import com.eignex.klause.util.binarySearchInt
 import com.eignex.klause.util.mulExact
 import com.eignex.klause.util.subExact
 import com.eignex.klause.util.toSortedIntArray
@@ -231,7 +232,8 @@ internal class LpModel(
             }
             LpDoubleView(
                 view.colPtr, view.rowIdx, view.colVal, view.rhs, view.cost, widths,
-                view.hasUpper, view.objConstant, view.loShift,
+                view.hasUpper, view.objConstant, view.loShift, view.inexactCoefficients,
+                lazy { view.shifts.value.withExactUppers() },
             )
         }
         return LpModel(
@@ -360,7 +362,92 @@ internal class LpDoubleView(
      *  [LpModel.withSingleColumnObjective] copies [cost] and replaces this constant with the new objective. */
     var objConstant: Double,
     val loShift: DoubleArray,
-) : ExactSimplexDoubleView
+    /**
+     * Whether summing repeated entries of one column in a row rounded, so [colVal] is not the source coefficient.
+     * The separate entries are gone once summed, so no exact certificate may be taken over such a view.
+     */
+    val inexactCoefficients: Boolean = false,
+    /**
+     * The exact values of the shifted [rhs] and [upper] entries that rounded in binary64, computed on first use.
+     * The float engines solve the rounded arrays; every exact reader goes through [exactRhs] and [exactUpper].
+     */
+    val shifts: Lazy<LpExactShifts> = lazyOf(LpExactShifts.NONE),
+) : ExactSimplexDoubleView {
+    /** The exact shifted right-hand side of row [i]. */
+    fun exactRhs(i: Int): BigFraction = shifts.value.rhs(i) ?: exactDouble(rhs[i])
+
+    /** The exact shifted upper bound of variable [j]. */
+    fun exactUpper(j: Int): BigFraction = shifts.value.upper(j) ?: exactDouble(upper[j])
+
+    /** The exact objective constant `Σ cost_j·loShift_j`, of which [objConstant] is the binary64 rounding. */
+    fun exactObjConstant(): BigFraction {
+        val arithmetic = ExactDoubleArithmetic()
+        var sum = 0.0
+        for (j in loShift.indices) sum = arithmetic.sum(sum, arithmetic.product(cost[j], loShift[j]))
+        if (!arithmetic.rounded) return exactDouble(sum)
+        var exact = BigFraction.ZERO
+        for (j in loShift.indices) {
+            if (cost[j] != 0.0 && loShift[j] != 0.0) exact += exactDouble(cost[j]) * exactDouble(loShift[j])
+        }
+        return exact
+    }
+}
+
+/**
+ * The exact values of an [LpDoubleView]'s shifted right-hand sides ([rows]/[rhs]) and structural upper bounds
+ * ([columns]/[upper]) wherever binary64 rounded them, each list ascending by index. Every entry not listed is
+ * exact as the view stores it. Shifting by a lower bound far from the data, the [LP_UNBOUNDED_PROBE] stand-in
+ * of an open side included, rounds; the exact value keeps the model the certificates reason about the source's.
+ */
+internal class LpExactShifts(
+    val rows: IntArray,
+    val rhs: List<BigFraction>,
+    val columns: IntArray,
+    val upper: List<BigFraction>,
+) {
+    init {
+        require(rows.size == rhs.size && columns.size == upper.size) { "exact shift lists differ in size" }
+        require((1 until rows.size).all { rows[it - 1] < rows[it] }) { "exact shift rows must ascend" }
+        require((1 until columns.size).all { columns[it - 1] < columns[it] }) { "exact shift columns must ascend" }
+    }
+
+    /** The exact right-hand side of row [i], or null when the stored one is exact. */
+    fun rhs(i: Int): BigFraction? = rows.binarySearchInt(i).let { if (it >= 0) rhs[it] else null }
+
+    /** The exact upper bound of column [j], or null when the stored one is exact. */
+    fun upper(j: Int): BigFraction? = columns.binarySearchInt(j).let { if (it >= 0) upper[it] else null }
+
+    /** These shifts over the sub-model of [takenRows] and [takenColumns], renumbered by position. */
+    fun restrict(takenRows: IntArray, takenColumns: IntArray): LpExactShifts {
+        if (this === NONE) return NONE
+        val subRows = IntArrayList()
+        val subRhs = ArrayList<BigFraction>()
+        for (r in takenRows.indices) {
+            rhs(takenRows[r])?.let {
+                subRows.add(r)
+                subRhs.add(it)
+            }
+        }
+        val subColumns = IntArrayList()
+        val subUpper = ArrayList<BigFraction>()
+        for (c in takenColumns.indices) {
+            upper(takenColumns[c])?.let {
+                subColumns.add(c)
+                subUpper.add(it)
+            }
+        }
+        return LpExactShifts(subRows.toIntArray(), subRhs, subColumns.toIntArray(), subUpper)
+    }
+
+    /** These shifts after every structural upper bound was replaced by an exactly stored one. */
+    fun withExactUppers(): LpExactShifts =
+        if (columns.isEmpty()) this else LpExactShifts(rows, rhs, EmptyIntArray, emptyList())
+
+    companion object {
+        /** No rounded entry. */
+        val NONE: LpExactShifts = LpExactShifts(EmptyIntArray, emptyList(), EmptyIntArray, emptyList())
+    }
+}
 
 /**
  * Builds an [LpModel] from structural variables and constraint rows. Coefficients are accumulated
@@ -636,20 +723,25 @@ internal class LpBuilder {
     private fun buildDoubleView(n: Int, m: Int, signedSense: Long): LpDoubleView {
         val loD = DoubleArray(n) { contLo.getOrDefault(it, lo[it].toDouble()) }
         val rhsD = DoubleArray(m)
+        val arithmetic = ExactDoubleArithmetic()
+        val roundedRows = IntArrayList()
         for ((i, row) in rows.withIndex()) {
             val flip = row.rel == Relation.GE
             val rawRhs = row.rhsD ?: row.rhs.toDouble()
             var b = if (flip) -rawRhs else rawRhs
+            arithmetic.reset()
             for (k in row.cols.indices) {
                 val j = row.cols[k]
                 val value = row.valsD?.get(k) ?: row.vals[k].toDouble()
                 val coeff = if (flip) -value else value
-                b -= coeff * loD[j]
+                b = arithmetic.sum(b, -arithmetic.product(coeff, loD[j]))
             }
             rhsD[i] = b
+            if (arithmetic.rounded) roundedRows.add(i)
         }
         val colRowBuckets = Array(n) { IntArrayList() }
         val colValBuckets = Array(n) { ArrayList<Double>() }
+        arithmetic.reset()
         for ((i, row) in rows.withIndex()) {
             val flip = row.rel == Relation.GE
             val summed = MutableIntDoubleMap(row.cols.size)
@@ -657,7 +749,7 @@ internal class LpBuilder {
                 val j = row.cols[k]
                 val value = row.valsD?.get(k) ?: row.vals[k].toDouble()
                 val coeff = if (flip) -value else value
-                summed.put(j, summed.getOrDefault(j, 0.0) + coeff)
+                summed.put(j, arithmetic.sum(summed.getOrDefault(j, 0.0), coeff))
             }
             // Ascending column order keeps the CSC deterministic; i ascends ⇒ rows ascend within a column.
             val summedCols = IntArrayList()
@@ -670,6 +762,7 @@ internal class LpBuilder {
                 }
             }
         }
+        val inexactCoefficients = arithmetic.rounded
         val colPtr = IntArray(n + 1)
         for (j in 0 until n) colPtr[j + 1] = colPtr[j] + colRowBuckets[j].size
         val rowIdx = IntArray(colPtr[n])
@@ -690,16 +783,50 @@ internal class LpBuilder {
         val hasUpperD = BooleanArray(numVars)
         val signed = signedSense.toDouble()
         var objConstantD = 0.0
+        val roundedColumns = IntArrayList()
         for (j in 0 until n) {
             costD[j] = signed * contCost.getOrDefault(j, this.cost[j].toDouble())
-            upperD[j] = contHi.getOrDefault(j, hi[j].toDouble()) - loD[j]
             hasUpperD[j] = j !in openAboveCols
+            arithmetic.reset()
+            upperD[j] = arithmetic.sum(contHi.getOrDefault(j, hi[j].toDouble()), -loD[j])
+            // An open side's upper is a stand-in nothing certifies against, so its rounding does not matter.
+            if (arithmetic.rounded && hasUpperD[j]) roundedColumns.add(j)
             objConstantD += costD[j] * loD[j]
         }
         for (i in 0 until m) {
             hasUpperD[n + i] = rows[i].rel == Relation.EQ
         }
-        return LpDoubleView(colPtr, rowIdx, colVal, rhsD, costD, upperD, hasUpperD, objConstantD, loD)
+        return LpDoubleView(
+            colPtr, rowIdx, colVal, rhsD, costD, upperD, hasUpperD, objConstantD, loD, inexactCoefficients,
+            exactShifts(roundedRows.toIntArray(), roundedColumns.toIntArray(), loD),
+        )
+    }
+
+    /** The exact values of the [roundedRows]' shifted right-hand sides and the [roundedColumns]' shifted uppers,
+     *  recomputed from the unshifted binary64 inputs when an exact reader first asks. */
+    private fun exactShifts(roundedRows: IntArray, roundedColumns: IntArray, loD: DoubleArray): Lazy<LpExactShifts> {
+        if (roundedRows.isEmpty() && roundedColumns.isEmpty()) return lazyOf(LpExactShifts.NONE)
+        // The unsummed entries keep a row exact even where summing its repeated columns would round.
+        val sources = Array(roundedRows.size) { rows[roundedRows[it]] }
+        val rawUppers = DoubleArray(roundedColumns.size) {
+            val j = roundedColumns[it]
+            contHi.getOrDefault(j, hi[j].toDouble())
+        }
+        return lazy {
+            val rhs = sources.map { row ->
+                val flip = row.rel == Relation.GE
+                val rawRhs = exactDouble(row.rhsD ?: row.rhs.toDouble())
+                var b = if (flip) rawRhs.negated() else rawRhs
+                for (k in row.cols.indices) {
+                    val value = exactDouble(row.valsD?.get(k) ?: row.vals[k].toDouble())
+                    val coeff = if (flip) value.negated() else value
+                    b -= coeff * exactDouble(loD[row.cols[k]])
+                }
+                b
+            }
+            val upper = List(roundedColumns.size) { exactDouble(rawUppers[it]) - exactDouble(loD[roundedColumns[it]]) }
+            LpExactShifts(roundedRows, rhs, roundedColumns, upper)
+        }
     }
 
     /** Build the CSC core over the `n` structural columns from the accumulated [rows]: `>=` rows are
@@ -747,7 +874,7 @@ internal class LpBuilder {
 }
 
 private fun LpDoubleView.copyObjective(): LpDoubleView = LpDoubleView(
-    colPtr, rowIdx, colVal, rhs, cost.copyOf(), upper, hasUpper, objConstant, loShift,
+    colPtr, rowIdx, colVal, rhs, cost.copyOf(), upper, hasUpper, objConstant, loShift, inexactCoefficients, shifts,
 )
 
 // This foundation deliberately does not implement ExactSimplexModel: legacy solvers require a
@@ -1058,4 +1185,55 @@ private fun ExactLpBounds.recentered(delta: BigFraction): ExactLpBounds {
     if (delta.isZero) return this
     fun shift(side: ExactLpSide?): ExactLpSide? = side?.copy(number = ExactLpNumber.of(side.number.value - delta))
     return ExactLpBounds(shift(lower), shift(upper))
+}
+
+/**
+ * Binary64 sums and products that record whether any of them rounded, through the error-free transformations:
+ * Knuth's TwoSum, and Dekker's TwoProduct over a Veltkamp split. Common code has no fused multiply-add to do it
+ * in one step. A split that would overflow counts as rounded, which only ever sends a value to the exact rational
+ * recomputation.
+ */
+internal class ExactDoubleArithmetic {
+    var rounded = false
+        private set
+
+    fun reset() {
+        rounded = false
+    }
+
+    fun sum(a: Double, b: Double): Double {
+        val s = a + b
+        if (!rounded) {
+            val bb = s - a
+            if (!s.isFinite() || (a - (s - bb)) + (b - bb) != 0.0) rounded = true
+        }
+        return s
+    }
+
+    fun product(a: Double, b: Double): Double {
+        val p = a * b
+        if (!rounded && a != 0.0 && b != 0.0) {
+            val (ah, al) = split(a) ?: return p.also { rounded = true }
+            val (bh, bl) = split(b) ?: return p.also { rounded = true }
+            // Near the bottom of the range the error terms themselves underflow, so a tiny product is not trusted.
+            if (!p.isFinite() || kotlin.math.abs(p) < TINY ||
+                ((ah * bh - p) + ah * bl + al * bh) + al * bl != 0.0
+            ) {
+                rounded = true
+            }
+        }
+        return p
+    }
+
+    private fun split(a: Double): Pair<Double, Double>? {
+        val c = VELTKAMP * a
+        if (!c.isFinite()) return null
+        val high = c - (c - a)
+        return high to (a - high)
+    }
+
+    private companion object {
+        const val VELTKAMP = 134_217_729.0 // 2^27 + 1
+        const val TINY = 1e-250
+    }
 }

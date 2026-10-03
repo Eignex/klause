@@ -395,6 +395,40 @@ class CliModeTest {
     }
 
     @Test
+    fun `an MPS LP whose bound shift rounds in binary64 is not reported infeasible`() {
+        val mps = File.createTempFile("clishift", ".mps").apply {
+            writeText(
+                """
+                NAME T
+                ROWS
+                 N COST
+                 G S1
+                COLUMNS
+                    A         COST      1   S1  1
+                    U         S1        1
+                    B         S1        1
+                    V         S1        1
+                RHS
+                    RHS       S1        0
+                BOUNDS
+                 UP BND A 4e18
+                 UP BND U 200
+                 LO BND B -4.2e18
+                 UP BND B -4e18
+                 LO BND V -300
+                 UP BND V -100
+                ENDATA
+                """.trimIndent(),
+            )
+            deleteOnExit()
+        }
+
+        val out = capture { main(arrayOf("-t", "2000", mps.absolutePath)) }
+
+        assertFalse("UNSATISFIABLE" in out, out)
+    }
+
+    @Test
     fun `an open MPS difference row is solved without a finite search box`() {
         val mps = File.createTempFile("clidiff", ".mps").apply {
             writeText(
