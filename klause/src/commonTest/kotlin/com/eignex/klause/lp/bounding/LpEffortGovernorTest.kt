@@ -1,6 +1,5 @@
 package com.eignex.klause.lp.bounding
 
-import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -10,33 +9,33 @@ import kotlin.test.assertTrue
 /**
  * When the node LP stops earning its keep, and on what evidence.
  *
- * Deterministic work decides the adaptive effort; the cumulative clock caps optional LP time.
+ * Work per node decides the adaptive effort; a cumulative work allowance caps optional LP work.
  */
 class LpEffortGovernorTest {
 
-    private fun governor(opsPerNode: Long = 1_000L, wallMillis: Long = 5_000L, warmup: Int = 4) =
-        LpEffortGovernor(opsPerNodeCap = opsPerNode, wallBackstopMillis = wallMillis, warmupSolves = warmup)
+    private fun governor(opsPerNode: Long = 1_000L, allowance: Long = 5_000_000L, warmup: Int = 4) =
+        LpEffortGovernor(opsPerNodeCap = opsPerNode, workAllowance = allowance, warmupSolves = warmup)
 
     private fun LpEffortGovernor.nodes(n: Int) = repeat(n) { observeNode() }
 
     @Test
-    fun `an LP costing less than its allowance per node is left alone`() {
+    fun `an LP costing less than its per-node cap is left alone`() {
         val g = governor()
         g.nodes(100)
 
         repeat(10) { g.observeSolve(opsSpent = 5_000L, pruned = false) }
 
-        assertFalse(g.isDemoted, "50k ops over 100 nodes is well inside a 1000-per-node allowance")
+        assertFalse(g.isDemoted, "50k ops over 100 nodes is well inside a 1000-per-node cap")
     }
 
     @Test
-    fun `an LP outspending its allowance per node is demoted`() {
+    fun `an LP outspending its per-node cap is demoted`() {
         val g = governor()
         g.nodes(10)
 
         repeat(10) { g.observeSolve(opsSpent = 5_000L, pruned = false) }
 
-        assertTrue(g.isDemoted, "50k ops over 10 nodes is five times the allowance")
+        assertTrue(g.isDemoted, "50k ops over 10 nodes is five times the cap")
     }
 
     @Test
@@ -61,36 +60,78 @@ class LpEffortGovernorTest {
     }
 
     @Test
-    fun `the deterministic rule demotes without the clock being charged at all`() {
+    fun `the ratio rule demotes without spending the allowance`() {
         val g = governor()
         g.nodes(10)
 
         repeat(10) { g.observeSolve(opsSpent = 5_000L, pruned = false) }
 
         assertTrue(g.isDemoted)
-        assertFalse(g.backstopFired, "work decided this, so the run is still reproducible")
+        assertFalse(g.allowanceSpent)
     }
 
     @Test
-    fun `the wall backstop demotes what the work meter cannot see`() {
-        val g = governor(opsPerNode = Long.MAX_VALUE / 2)
-        g.nodes(1000)
-        repeat(10) { g.observeSolve(opsSpent = 1L, pruned = false) }
+    fun `spending the allowance demotes a cheap LP`() {
+        val g = governor(opsPerNode = Long.MAX_VALUE / 2, allowance = 1_000L)
 
-        g.chargeWall(6_000L)
+        g.chargeWork(1_000L)
 
-        assertTrue(g.isDemoted, "time the meter never charged still has to be survivable")
-        assertTrue(g.backstopFired, "and the run must say the clock decided, not the work")
+        assertTrue(g.isDemoted)
+        assertTrue(g.allowanceSpent)
     }
 
     @Test
-    fun `a disabled backstop never fires`() {
-        val g = governor(opsPerNode = Long.MAX_VALUE / 2, wallMillis = 0L)
+    fun `work short of the allowance leaves the LP alone`() {
+        val g = governor(opsPerNode = Long.MAX_VALUE / 2, allowance = 1_000L)
 
-        g.chargeWall(1_000_000L)
+        g.chargeWork(999L)
 
         assertFalse(g.isDemoted)
-        assertFalse(g.backstopFired)
+    }
+
+    @Test
+    fun `a disabled allowance is never spent`() {
+        val g = governor(opsPerNode = Long.MAX_VALUE / 2, allowance = 0L)
+
+        g.chargeWork(Long.MAX_VALUE)
+
+        assertFalse(g.allowanceSpent)
+    }
+
+    @Test
+    fun `the remaining allowance shrinks with charges and floors at zero`() {
+        val g = governor(allowance = 1_000L)
+        g.chargeWork(400L)
+        assertEquals(600L, g.remainingWork())
+
+        g.chargeWork(5_000L)
+
+        assertEquals(0L, g.remainingWork(), "a solve capped by this must never see it go negative")
+    }
+
+    @Test
+    fun `a disabled allowance reports no remaining work`() {
+        assertNull(governor(allowance = 0L).remainingWork())
+    }
+
+    @Test
+    fun `charges saturate rather than wrap`() {
+        val g = governor(allowance = Long.MAX_VALUE)
+        g.chargeWork(Long.MAX_VALUE - 1L)
+
+        g.chargeWork(Long.MAX_VALUE)
+
+        assertTrue(g.allowanceSpent)
+    }
+
+    @Test
+    fun `a negative charge refunds nothing`() {
+        val g = governor(allowance = 1_000L)
+        g.chargeWork(400L)
+
+        g.chargeWork(-300L)
+
+        assertEquals(600L, g.remainingWork())
     }
 
     @Test
@@ -103,22 +144,6 @@ class LpEffortGovernorTest {
         g.observeSolve(opsSpent = 5_000L, pruned = true)
 
         assertFalse(g.isDemoted, "a prune is the demotion being proved wrong, so it has to be reversible")
-    }
-
-    @Test
-    fun `the backstop allowance shrinks with charges and floors at zero`() {
-        val g = governor(wallMillis = 1_000L)
-
-        g.chargeWall(400L)
-        assertEquals(600L, g.remainingMillis())
-        g.chargeWall(5_000L)
-
-        assertEquals(0L, g.remainingMillis(), "the root work shares this allowance and must not see it go negative")
-    }
-
-    @Test
-    fun `a disabled backstop reports no allowance`() {
-        assertNull(governor(wallMillis = 0L).remainingMillis())
     }
 
     @Test
@@ -147,59 +172,23 @@ class LpEffortGovernorTest {
     }
 
     @Test
-    fun `a pruning LP still spends the shared wall allowance`() {
-        val g = governor()
+    fun `a pruning LP still spends the shared allowance`() {
+        val g = governor(allowance = 1_000L)
         g.nodes(1)
         g.observeSolve(opsSpent = 10L, pruned = true)
 
-        g.chargeWall(1_000_000L)
+        g.chargeWork(1_000L)
 
-        assertTrue(g.wallExhausted)
         assertTrue(g.isDemoted)
-        assertTrue(g.backstopFired)
     }
 
     @Test
-    fun `one node LP stops at the remaining shared allowance`() {
-        val g = governor(wallMillis = 1_000L)
-        g.chargeWall(700L)
-        var elapsed = 0L
-        val stop = g.operationCancellation(Cancellation.Never) { elapsed }
-        assertFalse(stop())
+    fun `a prune does not restore an LP whose allowance is spent`() {
+        val g = governor(allowance = 1_000L)
+        g.chargeWork(1_000L)
 
-        elapsed = 300_000_000L
+        g.observeSolve(opsSpent = 10L, pruned = true)
 
-        assertTrue(stop())
-        g.chargeWallNanos(elapsed)
-        assertTrue(g.wallExhausted)
-        assertTrue(g.operationCancellation(Cancellation.Never) { 0L }())
-    }
-
-    @Test
-    fun `global cancellation stops node LP before its local allowance`() {
-        val g = governor(wallMillis = 1_000L)
-        var cancelled = false
-        val stop = g.operationCancellation(Cancellation { cancelled }) { 0L }
-        assertFalse(stop())
-
-        cancelled = true
-
-        assertTrue(stop())
-    }
-
-    @Test
-    fun `short repeated node LP attempts spend the same allowance`() {
-        val g = governor(wallMillis = 1L)
-        repeat(3) {
-            val stop = g.operationCancellation(Cancellation.Never) { 250_000L }
-            assertFalse(stop())
-            g.chargeWallNanos(250_000L)
-        }
-        val stop = g.operationCancellation(Cancellation.Never) { 250_000L }
-        assertTrue(stop())
-        g.chargeWallNanos(250_000L)
-
-        assertTrue(g.wallExhausted)
-        assertEquals(0L, g.remainingMillis())
+        assertTrue(g.isDemoted, "the allowance is cumulative across useful solves too")
     }
 }

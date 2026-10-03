@@ -310,12 +310,13 @@ data class LpStats(
     val numericalRecoveryRefactorizations: SumResult = ZERO_COUNT,
     /** Refactorizations during primal simplex. */
     val primalRefactorizations: SumResult = ZERO_COUNT,
-    /** Whether the wall-clock backstop demoted the node LP — the one policy input that is not
-     *  deterministic, so a run whose counters do not reproduce is explained by this being set. */
-    val wallBackstop: Boolean = false,
+    /** Whether root and node LP work spent the LP work allowance (`LpPlan.lpWorkBudgetFraction`),
+     *  after which optional node LP work stops. */
+    val workAllowanceSpent: Boolean = false,
     /** Whether the node LP was ever demoted to its floor budget, by either rule.
      *
-     *  Distinct from [wallBackstop], which says only that the clock rather than the work meter decided.
+     *  Distinct from [workAllowanceSpent], which says only that the cumulative allowance rather than the
+     *  per-node ratio decided.
      *  Without this a demotion by the deterministic rule leaves no trace at all, so a run that spent its
      *  budget on a throttled relaxation reads the same as one that never throttled. */
     val demoted: Boolean = false,
@@ -445,7 +446,7 @@ data class LpStats(
             numericalRecoveryRefactorizations.sum + o.numericalRecoveryRefactorizations.sum,
         ),
         primalRefactorizations = SumResult(primalRefactorizations.sum + o.primalRefactorizations.sum),
-        wallBackstop = wallBackstop || o.wallBackstop,
+        workAllowanceSpent = workAllowanceSpent || o.workAllowanceSpent,
         demoted = demoted || o.demoted,
         componentSplits = SumResult(componentSplits.sum + o.componentSplits.sum),
         componentBlocks = MaxResult(maxOf(componentBlocks.max, o.componentBlocks.max)),
@@ -552,7 +553,7 @@ internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
     // how the other counters record units (a unit update repeated). Work is a magnitude per solve.
     private var workOpsTotal: Long = 0L
     private var overheadOpsTotal: Long = 0L
-    private var wallBackstop = false
+    private var workAllowanceSpent = false
     private var demoted = false
     private var clock: TimeMark? = null
 
@@ -729,9 +730,9 @@ internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
         repeat(count) { pivots.update(1.0) }
     }
 
-    /** Record that the wall-clock backstop, not the deterministic work rule, demoted the LP. */
-    fun observeWallBackstop() {
-        wallBackstop = true
+    /** Record that LP work spent its cumulative allowance. */
+    fun observeWorkAllowanceSpent() {
+        workAllowanceSpent = true
     }
 
     /** Record that the node LP stands demoted to its floor budget, whichever rule decided. */
@@ -859,7 +860,7 @@ internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
         pivots = pivots.read(),
         workOps = SumResult(workOpsTotal.toDouble()),
         overheadOps = SumResult(overheadOpsTotal.toDouble()),
-        wallBackstop = wallBackstop,
+        workAllowanceSpent = workAllowanceSpent,
         demoted = demoted,
         luMaxFill = luMaxFill.read(),
         luMaxDensity = luMaxDensity.read(),

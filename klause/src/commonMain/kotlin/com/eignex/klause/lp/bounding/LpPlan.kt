@@ -72,8 +72,8 @@ data class LpPlan(
      *
      * A ratio rather than a wall-clock fraction because it is scale-free and reproducible: it says *the
      * LP is taxing the search* without needing to know how long the run may take or how fast the machine
-     * is, so two identical invocations demote at the same point. The wall clock survives only as a
-     * backstop ([lpWallBudgetFraction]) for cost the work meter cannot see.
+     * is, so two identical invocations demote at the same point. The total is capped separately, also in
+     * work ([lpWorkBudgetFraction]).
      */
     val boundMaxOpsPerNode: Long = 20_000L,
     /**
@@ -239,22 +239,20 @@ data class LpPlan(
      *  sole cap when the time remaining is unknown (the non-pausable one-shot path). */
     val rootBudgetMillis: Long = 30_000,
     /**
-     * Share of the total solve budget optional root and node LP work may spend before the wall-clock
-     * **backstop** stops it ([LpEffortGovernor]).
+     * Share of the total solve budget optional root and node LP work may spend, as a cumulative **work
+     * allowance** ([LpEffortGovernor]).
      *
-     * This is a backstop, not the policy. What decides LP effort is deterministic work —
-     * [boundMaxOpsPerNode] per node explored, and [boundAdaptiveWork] per solve — so that two identical
-     * invocations spend the same effort at the same points. The clock is kept only for cost the work
-     * meter cannot see (allocation, garbage collection, exact certification, the rational fallback), and
-     * is deliberately loose enough not to fire in ordinary operation: a backstop that fires routinely
-     * costs reproducibility for nothing. `LpStats.wallBackstop` records when it did fire, so a run whose
-     * counters do not reproduce says why.
+     * The share converts to [com.eignex.klause.lp.engine.LpWork] operations at a fixed rate calibrated
+     * on MIPLIB, so the allowance is a function of the budget and never of the clock: two identical
+     * invocations stop their LP at the same point. It counts what the engine's work meter counts —
+     * simplex work and the node-LP overhead charged in the same unit — and each solve is capped at what is
+     * left of it. `LpStats.workAllowanceSpent` records when it ran out.
      *
-     * A prune restarts the deterministic work window. The wall allowance remains cumulative across
-     * root and node work; once spent, optional node LP work stops so search retains its time.
-     * `0.0` disables the wall cap; it has no effect when the total budget is unknown.
+     * The allowance is cumulative across root and node work, prunes included; once spent, optional node
+     * LP work stops so search keeps its time. `0.0` disables it; it has no effect when the total budget is
+     * unknown.
      */
-    val lpWallBudgetFraction: Double = 0.25,
+    val lpWorkBudgetFraction: Double = 0.25,
     /**
      * Energetic makespan lower-bound row for the scheduling globals. When true and
      * [bounding] holds, each Cumulative / Disjunctive whose makespan variable `M` can be verified

@@ -9,7 +9,7 @@ package com.eignex.klause.lp.bounding
  * relaxation that prunes is worth its pivots, and capping one costs bound quality outright. So the
  * budget is aimed only at the profile that measurably does not repay it — an LP that has run
  * [warmupSolves] solves without a single prune. A prune lifts the budget and restarts the window it is
- * judged over, on the same rule [LpEffortGovernor]'s deterministic half uses and for the same reason:
+ * judged over, on the same rule [LpEffortGovernor]'s per-node ratio uses and for the same reason:
  * a prune says the judgement was wrong, so the cap applies again only once another warmup of prunable
  * solves goes by without one. Latching it instead left a relaxation that pruned once early uncapped for
  * the rest of the run, however expensive it became.
