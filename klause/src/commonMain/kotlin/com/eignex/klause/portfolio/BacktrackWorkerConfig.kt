@@ -111,16 +111,17 @@ internal class BacktrackWorkerConfig(
         /** The top-[count] prefix of [BacktrackCatalog.ranked], wrapping past the pool size so larger
          *  pools repeat the strong arms on fresh seeds (seed-twin diversity for luck-bound close calls).
          *  Each arm is capped under [lpCeiling] (default `AGGRESSIVE`, no overrides = uncapped) and
-         *  spends [nodeBudget]. */
+         *  spends [nodeBudget]. [realColumns] is the model trait [BacktrackCatalog.ranked] orders by. */
         fun diverse(
             kind: Kind,
             count: Int,
             lpCeiling: LpConfig = LpConfig.AGGRESSIVE,
             nodeBudget: NodeBudget? = null,
             zeroObjectivePricing: LpZeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT,
+            realColumns: Boolean = false,
         ): List<BacktrackWorkerConfig> {
             require(count >= 1) { "count must be ≥ 1" }
-            val order = BacktrackCatalog.ranked(kind)
+            val order = BacktrackCatalog.ranked(kind, realColumns)
             return List(count) {
                 BacktrackWorkerConfig(
                     order[it % order.size].capLp(lpCeiling).spending(nodeBudget),
