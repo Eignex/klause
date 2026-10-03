@@ -296,19 +296,6 @@ internal object Suites {
                 )
             },
             DynamicSuite(
-                "pb-comp-2025-wbo",
-                "Pseudo-Boolean Competition 2025 WBO soft-constraint set (fetched; 1/family)",
-                defaultPerFamily = 1,
-            ) { sel ->
-                CorpusSelection.select(
-                    ExternalCollections.pbComp2025,
-                    CorpusSelection.Layout.Flat("PB25", "wbo", familyOf = { it.substringBeforeLast('/', it) }),
-                    sel,
-                    Category.OPTIMIZATION,
-                    format = Format.OPB,
-                )
-            },
-            DynamicSuite(
                 "pb07-opb",
                 "PB'07 native pseudo-Boolean OPB benchmarks (fetched, 487 crafted instances; " +
                     "optimization/decision, linear + non-linear)",
@@ -1079,8 +1066,8 @@ internal object ExternalCollections {
         fetch = FetchMethod.Tar,
     )
 
-    /** PB'25 selected-benchmark set, same archive shape as [pbComp2024] (`.opb.xz` + `.wbo.xz` under
-     *  a per-competition dir). */
+    /** PB'25 selected-benchmark set: `.opb.xz` under `PB25/normalized-PB25`. Unlike [pbComp2024] it has no WBO
+     *  track. */
     val pbComp2025 = ExternalCollection(
         id = "pb-comp-2025",
         url = "https://www.cril.univ-artois.fr/PB25/benchs/selected-PB25.tar",
