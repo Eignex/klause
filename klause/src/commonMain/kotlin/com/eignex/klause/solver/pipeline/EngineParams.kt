@@ -566,6 +566,7 @@ private fun rejectIneffectiveNumerics(canonical: String, acceptanceValues: Set<S
  *  - `--param ls=N` / `bt=N` instead set BOTH the count (`ls + bt`) and the mix (LS-only /
  *    backtrack-only / mixed). Mutually exclusive with `arms`.
  *  - neither ⇒ [defaultArms] arms of [defaultEngine].
+ *  - `--param ls-share=f` sets the fraction of a MIXED pool given to local search, in place of the kind's default.
  *
  * The exact LS:backtrack split within a MIXED pool stays the composition's (kind-derived) decision.
  */
@@ -591,7 +592,9 @@ fun buildPortfolioScenario(
     val clauseShareLbd = p.int("clause-share-lbd")
     val clauseShareLen = p.int("clause-share-len")
     val sliceNodes = p.long("slice-nodes")
-    p.finish("portfolio", "arms, ls, bt, seed, lambda, clause-share-lbd, clause-share-len, slice-nodes")
+    val lsShare = p.double("ls-share")
+    p.finish("portfolio", "arms, ls, bt, seed, lambda, clause-share-lbd, clause-share-len, slice-nodes, ls-share")
+    require(lsShare == null || lsShare in 0.0..1.0) { "portfolio needs 0 ≤ ls-share ≤ 1 (got $lsShare)" }
     if (armsParam != null && (ls != null || bt != null)) {
         pipelineConfigError("portfolio: set either `arms=N` or `ls=/bt=`, not both")
     }
@@ -626,6 +629,7 @@ fun buildPortfolioScenario(
     clauseShareLbd?.let { scenario = scenario.copy(clauseShareMaxLbd = it) }
     clauseShareLen?.let { scenario = scenario.copy(clauseShareMaxLen = it) }
     sliceNodes?.let { scenario = scenario.copy(sliceNodes = it) }
+    lsShare?.let { scenario = scenario.copy(lsShare = it) }
     return scenario
 }
 

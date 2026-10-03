@@ -108,6 +108,8 @@ data class PortfolioScenario(
      * applies, so this cannot overrun it.
      */
     val sliceNodes: Long = DEFAULT_SLICE_NODES,
+    /** Fraction of a MIXED pool given to local-search arms; `null` takes [PortfolioComposition.lsShare] for [kind]. */
+    val lsShare: Double? = null,
     /** Optional solve-spanning decision-node allowance, applied here rather than by the caller so that
      *  every arm that runs a backtrack engine spends the one counter — including the ones that build
      *  their own [BacktrackParams] instead of drawing a [BacktrackRecipe] from a pool. Editing the pools
@@ -272,7 +274,8 @@ internal object PortfolioComposition {
         // At least one of each engine once count ≥ 2; below that the single slot goes to LS (the
         // fast first-incumbent engine).
         val count = scenario.arms
-        val lsCount = (count * lsShare(scenario.kind)).roundToInt().coerceIn(if (count >= 2) 1 else count, count)
+        val share = scenario.lsShare ?: lsShare(scenario.kind)
+        val lsCount = (count * share).roundToInt().coerceIn(if (count >= 2) 1 else count, count)
         val btCount = count - lsCount
         val arms = ArrayList<WorkerConfig>(count)
         val local = lsArms(scenario.kind, lsCount, scenario.lsPool)

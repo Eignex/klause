@@ -87,4 +87,14 @@ class PortfolioCompositionTest {
             }
         }
     }
+
+    @Test
+    fun `an ls-share override sets how many arms of a mixed pool run local search`() {
+        val scenario = PortfolioScenario.sequential(Kind.COP, engine = EngineMix.MIXED, arms = 6)
+            .copy(lsShare = 1.0 / 3.0)
+
+        val arms = PortfolioComposition.compose(scenario)
+
+        assertEquals(2, arms.count { it is LocalSearchWorkerConfig })
+    }
 }
