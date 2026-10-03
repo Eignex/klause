@@ -283,13 +283,13 @@ class LpStatsTest {
     }
 
     @Test
-    fun `a demotion by the work rule is recorded without the clock backstop`() {
+    fun `a demotion by the per-node rule is recorded without the allowance being spent`() {
         val sink = LpStatsSink()
 
         sink.observeDemoted()
 
         val stats = sink.snapshot()
         assertTrue(stats.demoted)
-        assertFalse(stats.wallBackstop, "the deterministic rule must be distinguishable from the clock")
+        assertFalse(stats.workAllowanceSpent, "the ratio rule must be distinguishable from the allowance")
     }
 }

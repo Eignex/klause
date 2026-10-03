@@ -107,11 +107,13 @@ internal fun solveAndCertify(
     )
 }
 
-// Float termination hints never determine the proof strength.
+// Float termination hints never determine the proof strength. A float solve stopped by [workLimit] (0: unbounded)
+// supplies at most a candidate to certify.
 internal fun solveAndCertify(
     model: LpModel,
     warm: Basis? = null,
     cancellation: Cancellation = Cancellation.Never,
+    workLimit: Long = 0L,
     componentSplit: Boolean = true,
     observer: LpCertificationObserver? = null,
     context: LpSolveContext = LpSolveContext.Production,
@@ -141,8 +143,8 @@ internal fun solveAndCertify(
         }
     }
     val result = certifyAuthoritativeSolve(
-        authoritative, warm, cancellation, componentSplit, observer, context, counters, pricing, refinementLimits,
-        floatAccept,
+        authoritative, warm, cancellation, workLimit, componentSplit, observer, context, counters, pricing,
+        refinementLimits, floatAccept,
         floatOffset,
     )
     if (result.floatOptimum != null) return result
@@ -161,6 +163,7 @@ private fun certifyAuthoritativeSolve(
     model: LpModel,
     warm: Basis?,
     cancellation: Cancellation,
+    workLimit: Long,
     componentSplit: Boolean,
     observer: LpCertificationObserver?,
     context: LpSolveContext,
@@ -175,6 +178,7 @@ private fun certifyAuthoritativeSolve(
     componentSplit,
     context.engineFactory,
     pricing,
+    workLimit,
 ).use { solver ->
     val result = try {
         solver.solve(warm)

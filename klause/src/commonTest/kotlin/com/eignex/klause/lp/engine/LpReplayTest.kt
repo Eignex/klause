@@ -27,6 +27,7 @@ class LpReplayTest {
                 override fun newGeneralSolver(
                     model: LpModel,
                     cancellation: Cancellation,
+                    workLimit: Long,
                     pricing: LpPricingOptions,
                 ): LpSolver = object : LpSolver {
                     override val infeasibleRay: DoubleArray? = null
@@ -152,10 +153,11 @@ class LpReplayTest {
             override fun newGeneralSolver(
                 model: LpModel,
                 cancellation: Cancellation,
+                workLimit: Long,
                 pricing: LpPricingOptions,
             ): LpSolver {
                 sourceOwners++
-                val delegate = ProductionLpEngineFactory.newGeneralSolver(model, cancellation, pricing)
+                val delegate = ProductionLpEngineFactory.newGeneralSolver(model, cancellation, workLimit, pricing)
                 return object : LpSolver by delegate {
                     override fun solve(warm: Basis?): FloatLpResult? {
                         calls += "solve"

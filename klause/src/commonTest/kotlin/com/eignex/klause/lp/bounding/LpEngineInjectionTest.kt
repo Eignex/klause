@@ -47,18 +47,76 @@ class LpEngineInjectionTest {
         override fun solvePrimal(warm: Basis?) = null
     }
 
-    @Test
-    fun `root LP wall exhaustion is reported before node work`() {
+    private fun budgetedEngine(sink: SolveStatsSink, plan: LpPlan = LpPlan(bounding = true)): LpEngine {
         val problem = boundedProblem()
-        val sink = SolveStatsSink(backend = "root-wall")
-        LpEngine(
+        // 4 ms at a quarter share is a 20k-operation allowance.
+        return LpEngine(
             problem,
             LinearObjective(intCoefficients = LongArray(problem.numIntVars)),
-            LpParams(lpPlan = LpPlan(bounding = true), solveBudgetMillis = 4L),
+            LpParams(lpPlan = plan, solveBudgetMillis = 4L),
             sink,
-        ).use { it.chargeRootLpWall(2L) }
+        )
+    }
 
-        assertTrue(sink.lp.snapshot().wallBackstop)
+    @Test
+    fun `root work spending the LP allowance is reported before node work`() {
+        val sink = SolveStatsSink(backend = "root-allowance")
+
+        budgetedEngine(sink).use { it.observeRootSolve(metricSolver(), LpSolveMetrics(workOps = 20_000L)) }
+
+        assertTrue(sink.lp.snapshot().workAllowanceSpent)
+    }
+
+    @Test
+    fun `root work short of the LP allowance leaves it unspent`() {
+        val sink = SolveStatsSink(backend = "root-allowance-left")
+
+        budgetedEngine(sink).use { it.observeRootSolve(metricSolver(), LpSolveMetrics(workOps = 19_999L)) }
+
+        assertFalse(sink.lp.snapshot().workAllowanceSpent)
+    }
+
+    @Test
+    fun `node solves are capped at the remaining LP allowance`() {
+        val engine = budgetedEngine(SolveStatsSink(backend = "node-cap"))
+
+        val budget = engine.use {
+            it.observeRootSolve(metricSolver(), LpSolveMetrics(workOps = 5_000L))
+            it.nodeWorkBudget()
+        }
+
+        assertEquals(15_000L, budget)
+    }
+
+    @Test
+    fun `the LP allowance caps node solves without an adaptive budget`() {
+        val engine = budgetedEngine(
+            SolveStatsSink(backend = "node-cap-fixed"),
+            LpPlan(bounding = true, boundAdaptiveWork = false),
+        )
+
+        assertEquals(20_000L, engine.use { it.nodeWorkBudget() })
+    }
+
+    @Test
+    fun `a spent LP allowance still bounds node solves`() {
+        val engine = budgetedEngine(SolveStatsSink(backend = "node-cap-spent"))
+
+        val budget = engine.use {
+            it.observeRootSolve(metricSolver(), LpSolveMetrics(workOps = 50_000L))
+            it.nodeWorkBudget()
+        }
+
+        assertEquals(1L, budget, "a solve limit of 0 would mean unbounded")
+    }
+
+    @Test
+    fun `node overhead spends the LP allowance`() {
+        val sink = SolveStatsSink(backend = "overhead-allowance")
+
+        budgetedEngine(sink).use { it.noteNodeOverhead(20_000L) }
+
+        assertTrue(sink.lp.snapshot().workAllowanceSpent)
     }
 
     private fun accountingEngine(backend: String): LpEngine = LpEngine(
@@ -276,6 +334,23 @@ class LpEngineInjectionTest {
         val construction = factory.calls.single { it.kind == EngineConstruction.GENERAL }
         assertEquals(LpZeroObjectivePricing.LARGEST_PIVOT, construction.zeroObjectivePricing)
         assertEquals(47L, construction.tieSeed)
+    }
+
+    @Test
+    fun `leaf certification caps its solve by work`() {
+        val problem = boundedProblem()
+        val factory = RecordingLpEngineFactory()
+        val engine = LpEngine(
+            problem,
+            LinearObjective(intCoefficients = LongArray(problem.numIntVars)),
+            LpParams(lpPlan = LpPlan(bounding = true, realResidual = true, componentSplit = false)),
+            SolveStatsSink(backend = "leaf-work"),
+            LpSolveContext(factory, decline),
+        )
+
+        engine.use { it.leafCertify(PropagationSession(problem)) }
+
+        assertTrue(factory.calls.single { it.kind == EngineConstruction.GENERAL }.workLimit > 0L)
     }
 
     @Test

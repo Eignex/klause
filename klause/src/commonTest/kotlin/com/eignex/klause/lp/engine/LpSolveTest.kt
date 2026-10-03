@@ -470,6 +470,7 @@ class LpSolveTest {
                 override fun newGeneralSolver(
                     model: LpModel,
                     cancellation: Cancellation,
+                    workLimit: Long,
                     pricing: LpPricingOptions,
                 ): LpSolver = error("engine entered")
             },
@@ -633,11 +634,12 @@ class LpSolveTest {
                 override fun newGeneralSolver(
                     model: LpModel,
                     cancellation: Cancellation,
+                    workLimit: Long,
                     pricing: LpPricingOptions,
                 ): LpSolver {
                     calls++
                     assertNotNull(model.exactState)
-                    return ProductionLpEngineFactory.newGeneralSolver(model, cancellation, pricing)
+                    return ProductionLpEngineFactory.newGeneralSolver(model, cancellation, workLimit, pricing)
                 }
                 override fun newComponentSolver(
                     model: LpModel,
