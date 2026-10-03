@@ -30,7 +30,7 @@ class MpsCompiledTest {
     }
 
     @Test
-    fun `source check rejects a rounded original row coefficient`() {
+    fun `source check rejects a point beyond tolerance of a rounded original row`() {
         val compiled = Mps.parse(
             "ROWS\n N COST\n E R\nCOLUMNS\n X COST 1 R 3.0000000000000001\nRHS\n RHS R 1\nENDATA",
         ).toProblem()
@@ -38,8 +38,22 @@ class MpsCompiledTest {
         assertFalse(compiled.sourceExact)
         assertEquals("row 'R' coefficient", compiled.sourceDifference)
         assertFailsWith<MpsLoweringException> {
-            compiled.sourceWitness(LongArray(0), listOf(BigFraction.ofLong(3L).reciprocal()))
+            compiled.sourceWitness(LongArray(0), listOf(BigFraction.ofLong(2L).reciprocal()))
         }
+    }
+
+    @Test
+    fun `source check accepts an exact point on a rounded row within tolerance`() {
+        val compiled = Mps.parse(
+            "ROWS\n N COST\n G R\nCOLUMNS\n X COST 1 R 1\n MARK0 'MARKER' 'INTORG'\n" +
+                " K R -0.00222609232214646\n MARK1 'MARKER' 'INTEND'\nBOUNDS\n FX BND K 1\nENDATA",
+        ).toProblem()
+        val onLoweredRow = assertNotNull(BigFraction.ofDouble(0.00222609232214646))
+
+        val witness = compiled.sourceWitness(longArrayOf(1L), listOf(onLoweredRow))
+
+        assertFalse(compiled.sourceExact)
+        assertEquals(onLoweredRow, witness.values.first())
     }
 
     @Test
