@@ -361,15 +361,15 @@ object BenchCli {
     private fun reference(filterArgs: List<String>) {
         val f = filterArgs.filter { "=" in it }.associate { it.substringBefore('=') to it.substringAfter('=') }
         // Best strong solver per format: cp-sat for MiniZinc (`minizinc --solver`) and XCSP3 (the CPMpy
-        // container — OR-Tools has no XCSP3 frontend), clasp for DIMACS/OPB (the Boolean formats cp-sat
+        // container — OR-Tools has no XCSP3 frontend), clasp for DIMACS/OPB/WCNF (the Boolean formats cp-sat
         // can't read), z3 for SMT-LIB, SCIP for MPS (MIP). Other formats have no path.
         val refs = select(f).filter {
             it.format == Format.MINIZINC || it.format == Format.XCSP3 ||
-                it.format == Format.DIMACS || it.format == Format.OPB ||
+                it.format == Format.DIMACS || it.format == Format.OPB || it.format == Format.WCNF ||
                 it.format == Format.SMTLIB || it.format == Format.MPS
         }
         if (refs.isEmpty()) {
-            println("(no MiniZinc/XCSP3/DIMACS/OPB/SMT-LIB/MPS problems matched the selection)")
+            println("(no MiniZinc/XCSP3/DIMACS/OPB/WCNF/SMT-LIB/MPS problems matched the selection)")
             return
         }
         val backend = (f["backend"] ?: f["reference"] ?: "cp-sat").lowercase()
@@ -380,7 +380,7 @@ object BenchCli {
             "XCSP3 reference needs the ${Xcsp3CpSatReference.IMAGE} image " +
                 "(build it: docker build -t ${Xcsp3CpSatReference.IMAGE} klause-bench/xcsp3-cpsat)"
         }
-        val clasp = refs.any { it.format == Format.DIMACS || it.format == Format.OPB }
+        val clasp = refs.any { it.format == Format.DIMACS || it.format == Format.OPB || it.format == Format.WCNF }
         require(!clasp || ClaspReference.imageAvailable()) {
             "DIMACS/OPB reference needs the ${ClaspReference.IMAGE} image " +
                 "(build it: docker build -t ${ClaspReference.IMAGE} klause-bench/clasp)"
@@ -455,7 +455,7 @@ object BenchCli {
         // Per-format solver: DIMACS/OPB by clasp, XCSP3 by the CPMpy cp-sat container (OR-Tools reads no
         // XCSP3), MiniZinc by `minizinc --solver`. Each row records the solver that produced it, so the
         // table stays honest about which oracle each format came from. All cache and score identically.
-        val clasp = ref.format == Format.DIMACS || ref.format == Format.OPB
+        val clasp = ref.format == Format.DIMACS || ref.format == Format.OPB || ref.format == Format.WCNF
         val xcsp3 = ref.format == Format.XCSP3
         val smt = ref.format == Format.SMTLIB
         val mps = ref.format == Format.MPS
@@ -548,7 +548,7 @@ object BenchCli {
     /** The per-format reference solver id: DIMACS/OPB by clasp, SMT-LIB by z3, MPS by scip, else the
      *  requested MiniZinc [backend]. One source of truth so the decisive and unknown-row paths agree. */
     private fun solverIdFor(ref: ProblemRef, backend: String): String = when (ref.format) {
-        Format.DIMACS, Format.OPB -> "clasp"
+        Format.DIMACS, Format.OPB, Format.WCNF -> "clasp"
         Format.SMTLIB -> "z3"
         Format.MPS -> "scip"
         else -> backend

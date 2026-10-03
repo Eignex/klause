@@ -4,8 +4,10 @@ import com.eignex.klause.bench.catalog.Format
 import com.eignex.klause.bench.catalog.ProblemRef
 import com.eignex.klause.bench.runner.Budget
 import com.eignex.klause.bench.source.CorpusFetcher
+import java.math.BigInteger
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicLong
+import kotlin.math.abs
 
 /**
  * The DIMACS / OPB reference. cp-sat (OR-Tools) has no native SAT/pseudo-Boolean frontend, so these two
@@ -59,12 +61,16 @@ internal object ClaspReference {
         p.waitFor(DOCKER_INSPECT_WAIT_MS, TimeUnit.MILLISECONDS) && p.exitValue() == 0
     }.getOrElse { false }
 
-    /** Solve [ref] (DIMACS or OPB) with clasp under [budget], single-threaded. The instance is piped on
-     *  stdin (OPB gets its problem line synthesized first). Objective sense is always minimise for OPB
+    /** Solve [ref] (DIMACS, OPB or WCNF) with clasp under [budget], single-threaded. The instance is piped on
+     *  stdin (OPB and WCNF get their problem line synthesized first). Objective sense is always minimise for OPB
      *  (clasp's only PB mode); DIMACS has none — both report `maximize=false`. */
     fun run(ref: ProblemRef, budget: Budget): SolverInvocation.Result {
         val text = CorpusFetcher.resolve(ref.source).readText()
-        val input = if (ref.format == Format.OPB) opbWithProblemLine(text) else text
+        val input = when (ref.format) {
+            Format.OPB -> opbWithProblemLine(text)
+            Format.WCNF -> wcnfWithProblemLine(text)
+            else -> text
+        }
         val timeoutSec = (budget.timeoutMillis / 1000).coerceAtLeast(1)
         val name = "$CONTAINER_LABEL-${seq.incrementAndGet()}"
         val cmd = listOf(
@@ -167,6 +173,28 @@ internal object ClaspReference {
         }
         return "* #variable= $nVar #constraint= $nCon\n$text"
     }
+
+    /**
+     * [text] in the classic `p wcnf` form clasp reads. The MaxSAT Evaluation format since 2022 has no problem
+     * line and marks hard clauses with `h`; they become clauses at the top weight, one more than every soft
+     * weight together, so no set of soft clauses can outweigh one hard clause. A classic file passes unchanged.
+     */
+    internal fun wcnfWithProblemLine(text: String): String {
+        if (WCNF_PROBLEM_LINE.containsMatchIn(text)) return text
+        val clauses = text.lineSequence().map { it.trim() }.filter { it.isNotEmpty() && !it.startsWith("c") }.toList()
+        var maxVar = 0
+        var softTotal = BigInteger.ZERO
+        for (clause in clauses) {
+            val tokens = clause.split(Regex("""\s+"""))
+            if (tokens[0] != "h") softTotal += tokens[0].toBigInteger()
+            for (literal in tokens.drop(1)) maxVar = maxOf(maxVar, abs(literal.toInt()))
+        }
+        val top = softTotal + BigInteger.ONE
+        val body = clauses.joinToString("\n") { if (it.startsWith("h ")) "$top ${it.removePrefix("h ")}" else it }
+        return "p wcnf $maxVar ${clauses.size} $top\n$body\n"
+    }
+
+    private val WCNF_PROBLEM_LINE = Regex("""(?m)^\s*p\s+wcnf\b""")
 
     private val PROBLEM_LINE = Regex("""(?m)^\s*\*\s*#variable=""")
     private val VARIABLE = Regex("""x(\d+)""")
