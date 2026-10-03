@@ -346,7 +346,12 @@ class LpLifecycleTest {
         assertFalse(beforeResume.closed)
         val operations = beforeResume.operations
 
-        assertNull(search.runSlice(Cancellation.Never, Long.MAX_VALUE, sliceNodes = 1L) {})
+        // A slice can repay an earlier one's overrun without exploring, so resume until the search moves on.
+        repeat(RESUME_ATTEMPTS) {
+            if (beforeResume.operations == operations) {
+                assertNull(search.runSlice(Cancellation.Never, Long.MAX_VALUE, sliceNodes = 1L) {})
+            }
+        }
 
         assertEquals(1, factory.persistent.size)
         assertTrue(beforeResume.operations > operations)
@@ -641,3 +646,5 @@ class LpLifecycleTest {
         realUpper = doubleArrayOf(1.0),
     )
 }
+
+private const val RESUME_ATTEMPTS = 64
