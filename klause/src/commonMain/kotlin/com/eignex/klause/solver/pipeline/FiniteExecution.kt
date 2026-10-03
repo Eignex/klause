@@ -592,6 +592,7 @@ private fun executePortfolio(
                 request.problem.numIntVars,
             ),
             toleranceCheck = request.toleranceCheck,
+            realColumns = request.problem.numRealVars > 0,
         ),
     )
     when (plan) {

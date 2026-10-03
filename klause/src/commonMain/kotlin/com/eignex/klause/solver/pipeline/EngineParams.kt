@@ -582,6 +582,7 @@ fun buildPortfolioScenario(
     btPool: List<() -> BacktrackRecipe>? = null,
     annotationArm: BacktrackParams? = null,
     nodeBudget: NodeBudget? = null,
+    realColumns: Boolean = false,
 ): PortfolioScenario {
     val seed = p.long("seed") ?: fallbackSeed ?: 1L
     val lambda = p.double("lambda") ?: 1.0
@@ -622,6 +623,7 @@ fun buildPortfolioScenario(
         btPool = btPool,
         annotationArm = annotationArm,
         nodeBudget = nodeBudget,
+        realColumns = realColumns,
     )
     clauseShareLbd?.let { scenario = scenario.copy(clauseShareMaxLbd = it) }
     clauseShareLen?.let { scenario = scenario.copy(clauseShareMaxLen = it) }
