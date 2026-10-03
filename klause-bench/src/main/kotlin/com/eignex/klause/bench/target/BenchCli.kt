@@ -22,6 +22,7 @@ import com.eignex.klause.bench.metric.Z3Reference
 import com.eignex.klause.bench.report.Reports
 import com.eignex.klause.bench.runner.Budget
 import com.eignex.klause.bench.runner.MZN_RANDOM_SEED
+import com.eignex.klause.bench.source.CorpusCache
 import com.eignex.klause.bench.source.CorpusFetcher
 import com.eignex.klause.bench.source.CorpusFiles
 import com.eignex.klause.bench.source.CorpusSelection
@@ -36,6 +37,8 @@ import com.eignex.klause.bench.tune.TuneEngine
 import com.eignex.klause.bench.tune.Tuner
 import com.eignex.klause.bench.tune.VizierTuner
 import java.io.File
+import java.time.Instant
+import java.time.temporal.ChronoUnit
 import java.util.concurrent.Callable
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicInteger
@@ -71,6 +74,8 @@ import kotlinx.serialization.decodeFromString
  *  - `preview [filters…]` — print the instances a run would cover, without running.
  *  - `corpus compress [<dir>]` — store every plain instance in the corpus cache (or [dir]) zstd-compressed,
  *    in place; the migration for a cache fetched before the cache stored instances compressed.
+ *  - `corpus gc` — evict least recently used collections until the corpus cache fits its cap, then list it.
+ *  - `corpus status` — list the cached collections with size and last use.
  *  - `list` — suites; `list <suite>` — problems in a suite.
  */
 object BenchCli {
@@ -82,6 +87,8 @@ object BenchCli {
     private const val COVERAGE_DECIMALS = 1000.0
 
     private const val MIB = 1024L * 1024
+
+    private const val MIB_COLUMN_WIDTH = 14
 
     /** CLI entry point dispatching bench subcommands. */
     @JvmStatic
@@ -143,17 +150,47 @@ object BenchCli {
     }
 
     /** `corpus compress [<dir>]`: compress the plain instances under [dir] (default: the corpus cache) in
-     *  place. Safe to interrupt and re-run; see [CorpusFiles.compressTree]. */
+     *  place. Safe to interrupt and re-run; see [CorpusFiles.compressTree]. `corpus gc` applies the cache cap
+     *  now and `corpus status` lists the cached collections; see [CorpusCache]. */
     private fun corpus(args: List<String>) {
-        require(args.firstOrNull() == "compress") { "usage: corpus compress [<dir>]" }
-        val root = args.getOrNull(1)?.let { File(it) } ?: CorpusFetcher.cacheRoot
+        when (args.firstOrNull()) {
+            "compress" -> corpusCompress(args.getOrNull(1)?.let { File(it) } ?: CorpusFetcher.cacheRoot)
+            "gc" -> corpusGc()
+            "status" -> printCorpusStatus(CorpusFetcher.cache())
+            else -> error("usage: corpus compress [<dir>] | corpus gc | corpus status")
+        }
+    }
+
+    private fun corpusCompress(root: File) {
         require(root.isDirectory) { "no corpus directory at $root" }
         println("=== corpus compress: $root ===")
         val done = CorpusFiles.compressTree(root, ::println)
+        CorpusFetcher.cache().recordSizesUnder(root)
         println(
             "compressed ${done.files} instance(s): ${done.plainBytes / MIB} MiB -> ${done.packedBytes / MIB} MiB",
         )
     }
+
+    private fun corpusGc() {
+        val cap = CorpusCache.configuredCapBytes()
+        println("=== corpus gc: ${CorpusFetcher.cacheRoot} (cap ${cap?.let { "${it / MIB} MiB" } ?: "off"}) ===")
+        val cache = CorpusFetcher.cache()
+        val evicted = cache.enforce().evicted
+        evicted.forEach { println("evicted ${it.id} (${it.bytes / MIB} MiB)") }
+        println("evicted ${evicted.size} collection(s)")
+        printCorpusStatus(cache)
+    }
+
+    private fun printCorpusStatus(cache: CorpusCache) {
+        val entries = cache.collections()
+        for (e in entries.asReversed()) {
+            val used = Instant.ofEpochMilli(e.lastUsedMillis).truncatedTo(ChronoUnit.SECONDS)
+            println("${mibColumn(e.bytes)}  $used  ${e.id}")
+        }
+        println("${mibColumn(entries.sumOf { it.bytes })}  total, ${entries.size} collection(s)")
+    }
+
+    private fun mibColumn(bytes: Long): String = "${bytes / MIB} MiB".padStart(MIB_COLUMN_WIDTH)
 
     /** Credit between per-run result CSVs (emitted by `solve` as `output/<config>.csv`, reference-table
      *  schema): `credit [--by structure|format] <a.csv> <b.csv> [c.csv …]`. Joins on (suite, problem),
