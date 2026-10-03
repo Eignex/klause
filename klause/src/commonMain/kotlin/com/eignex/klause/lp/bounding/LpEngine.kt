@@ -59,7 +59,6 @@ import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 import kotlin.math.abs
-import kotlin.time.TimeSource
 
 /** The persistent gated-residual float filter: the node-invariant [relaxation], the ONE [simplex]
  *  instance re-solving it with its kept factorization, and the reusable per-row [enforced] buffer
@@ -160,7 +159,7 @@ internal class LpEngine(
         metrics: com.eignex.klause.lp.engine.LpSolveMetrics = solver.lastMetrics,
     ) {
         sink.lp.observeEngineCost(LpRoute.ROOT, metrics)
-        totalSolveOps = saturatingAdd(totalSolveOps, metrics.workOps)
+        chargeWork(metrics.workOps)
     }
 
     internal fun rootCertificationObserver() = sink.lp.certificationObserver(LpRoute.ROOT)
@@ -339,18 +338,16 @@ internal class LpEngine(
     }
     private var lpCheckCounter = 0
 
-    // Wall-clock LP circuit breaker: the count-based [lpLadder] below needs a warmup window of
-    // solves to demote, so it can never shed an LP whose single solve is seconds — that LP just burns the
-    // whole budget bounding nothing (elitserien/cyclic-rcpsp: lpMs≈budget, prunes=0, too few solves to
-    // warm up). When the total solve budget is known, the LP (one-shot root work charged via
-    // [chargeRootLpWall] + the per-node solves timed in the bound) may spend at most
-    // `fraction × budget` of it before optional node LP work stops and the arm runs as a bare
-    // combinatorial search. In-flight cancellation shares the same ledger as root work, so one solve
-    // cannot cross the allowance before the breaker observes it. See [LpEffortGovernor].
-    private val lpWallBreaker = LpEffortGovernor(
+    // Cumulative LP work allowance: the count-based [lpLadder] below needs a warmup window of solves to
+    // demote, so it can never shed an LP whose single solve is enormous — that LP just spends the whole
+    // budget bounding nothing (elitserien/cyclic-rcpsp: lpMs≈budget, prunes=0, too few solves to warm up).
+    // When the total solve budget is known, root and node LP work together may spend at most
+    // `fraction × budget` worth of work ([lpWorkAllowance]) before optional node LP work stops and the arm
+    // runs as a bare combinatorial search. Each solve is capped at what is left ([nodeWorkBudget]), so one
+    // solve cannot run far past the allowance before the ledger sees it. See [LpEffortGovernor].
+    private val lpEffortGovernor = LpEffortGovernor(
         opsPerNodeCap = params.lpPlan.boundMaxOpsPerNode,
-        wallBackstopMillis = params.solveBudgetMillis?.takeIf { params.lpPlan.lpWallBudgetFraction > 0.0 }
-            ?.let { (it * params.lpPlan.lpWallBudgetFraction).toLong() } ?: 0L,
+        workAllowance = lpWorkAllowance(params.solveBudgetMillis, params.lpPlan.lpWorkBudgetFraction),
         warmupSolves = LpEffortLadder.DEFAULT_WARMUP,
     )
 
@@ -380,10 +377,15 @@ internal class LpEngine(
      * solves still advance the next one — so there is nothing to gain from silencing it entirely that a
      * floor does not already get.
      */
-    internal fun nodeWorkBudget(): Long = when {
-        !adaptiveWork -> 0L
-        lpWallBreaker.isDemoted -> MIN_NODE_WORK_OPS
-        else -> lpWorkBudget.ops()
+    internal fun nodeWorkBudget(): Long {
+        val budget = when {
+            !adaptiveWork -> 0L
+            lpEffortGovernor.isDemoted -> MIN_NODE_WORK_OPS
+            else -> lpWorkBudget.ops()
+        }
+        // A solve limit of 0 means unbounded, so a spent allowance still leaves one operation.
+        val remaining = lpEffortGovernor.remainingWork()?.coerceAtLeast(1L) ?: return budget
+        return if (budget == 0L) remaining else minOf(budget, remaining)
     }
 
     // Work the current node's LP has charged, across its base, cut-augmented and recovery solves.
@@ -392,7 +394,13 @@ internal class LpEngine(
     /** Add one solve's work to the current node's total. */
     internal fun noteSolveOps(ops: Long) {
         pendingSolveOps = saturatingAdd(pendingSolveOps, ops)
+        chargeWork(ops)
+    }
+
+    private fun chargeWork(ops: Long) {
         totalSolveOps = saturatingAdd(totalSolveOps, ops)
+        lpEffortGovernor.chargeWork(ops)
+        if (lpEffortGovernor.allowanceSpent) sink.lp.observeWorkAllowanceSpent()
     }
 
     // Work charged since this engine was built, across every solve including the one-shot root work.
@@ -444,18 +452,24 @@ internal class LpEngine(
         return (perPass / SIZE_BUDGET_DIVISOR * columns).coerceIn(MIN_NODE_WORK_OPS, MAX_NODE_WORK_OPS)
     }
 
-    /** Milliseconds of LP wall budget left, or `null` when no budget is set (breaker off). The
-     *  one-shot root work is time-boxed to this so it competes with the per-node solves for one budget,
-     *  rather than the looser [LpPlan.rootBudgetFraction] cap alone letting it consume the whole slice. */
-    fun lpWallRemainingMillis(): Long? = lpWallBreaker.remainingMillis()
-
-    /** Charge the one-shot pre-search root LP work's wall time against the shared LP wall budget,
-     *  so root and per-node solves compete for the same fraction of the deadline. Called once, after the
-     *  root work, by [com.eignex.klause.backtrack.ResumableMinimize]. Root work never counts as a prune. */
-    fun chargeRootLpWall(millis: Long) {
-        lpWallBreaker.chargeWall(millis)
-        if (lpWallBreaker.backstopFired) sink.lp.observeWallBackstop()
+    /**
+     * The work a leaf's cold solve of [model] may spend: one dense pass per column-derived iteration, which is
+     * [sizeBudget] without the divisor that prices a warm-started node re-solve. A work cap rather than a share
+     * of the deadline, so whether a leaf decides is a property of the model and not of the machine.
+     */
+    private fun leafWorkBudget(model: LpModel): Long {
+        val columns = model.n
+        val rows = model.m
+        if (columns <= 0 || rows <= 0) return MIN_LEAF_WORK_OPS
+        val perPass = rows.toLong() * columns
+        if (perPass > MAX_LEAF_WORK_OPS / columns) return MAX_LEAF_WORK_OPS
+        return (perPass * columns).coerceIn(MIN_LEAF_WORK_OPS, MAX_LEAF_WORK_OPS)
     }
+
+    /** Whether root and node LP work have together spent the work allowance. The one-shot root work stops
+     *  on it, so it competes with the per-node solves for one allowance rather than the looser
+     *  [LpPlan.rootBudgetFraction] cap alone letting it consume the whole slice. */
+    internal fun lpWorkAllowanceSpent(): Boolean = lpEffortGovernor.allowanceSpent
 
     // Adaptive LP effort ladder: the emphasis sets the ceiling
     // rung (cuts when enabled, else the bare bound), and a rolling prune-rate window descends one rung
@@ -489,7 +503,6 @@ internal class LpEngine(
     // The current legacy fallback owner remains live for metrics until replacement or engine close.
     internal var nodeSimplex: PersistentLpSolver? = null
     internal var nodeUsesTrail: Boolean = false
-    private var nodeLpCancellation: Cancellation = params.cancellation
 
     internal val cpAdapter = CpLpAdapter(this)
     internal val propagator = LpPropagator(
@@ -504,7 +517,7 @@ internal class LpEngine(
             )
         },
         solveContext = solveContext,
-        cancellation = Cancellation { nodeLpCancellation() },
+        cancellation = params.cancellation,
     )
 
     internal fun nodeRelaxation(relaxer: CpToLpRelaxation, session: PropagationSession): LpRelaxation {
@@ -516,7 +529,7 @@ internal class LpEngine(
     private fun buildNodeRelaxation(relaxer: CpToLpRelaxation, session: PropagationSession): LpRelaxation {
         if (!persistentResolved) {
             persistentResolved = true
-            val base = relaxer.build(PropagationSession(problem), cancellation = nodeLpCancellation)
+            val base = relaxer.build(PropagationSession(problem), cancellation = params.cancellation)
             if (base.persistentEligible) persistentRelaxation = base
         }
         persistentRelaxation?.let {
@@ -540,13 +553,13 @@ internal class LpEngine(
             residualCache?.let { cached ->
                 if (residualCacheKey?.contentEquals(key) == true) return cached
             }
-            val built = relaxer.build(session, cancellation = nodeLpCancellation)
+            val built = relaxer.build(session, cancellation = params.cancellation)
             noteNodeOverhead(built.model.extent() * LpNodeOverhead.BUILD)
             residualCache = built
             residualCacheKey = key
             return built
         }
-        return relaxer.build(session, cancellation = nodeLpCancellation)
+        return relaxer.build(session, cancellation = params.cancellation)
             .also { noteNodeOverhead(it.model.extent() * LpNodeOverhead.BUILD) }
     }
 
@@ -573,14 +586,15 @@ internal class LpEngine(
         if (!params.lpPlan.realResidual || residualOversized) return null
         if (!gatedResolved) {
             gatedResolved = true
-            val built = lpRelaxer?.buildGatedResidual(nodeLpCancellation)
+            val built = lpRelaxer?.buildGatedResidual(params.cancellation)
             if (built != null && built.gatedRows.isNotEmpty() && built.model.n > 0) {
                 val enforced = BooleanArray(built.model.m)
                 val simplex = try {
                     newPersistentLpSolver(
                         built.model,
-                        Cancellation { nodeLpCancellation() },
+                        params.cancellation,
                         refactorUpdateLimit = GATED_UPDATE_LIMIT,
+                        workLimit = lpEffortGovernor.remainingWork()?.coerceAtLeast(1L) ?: 0L,
                         factory = solveContext.engineFactory,
                         pricing = pricingOptions,
                     )
@@ -624,7 +638,8 @@ internal class LpEngine(
      * rows premise-cited, so an [LpVerdict.INFEASIBLE] leaf also derives a theory lemma over the
      * activating literals (a Farkas-ray clause when the certificate carries an integer ray, else the
      * active rows' premises) and stashes it for [lastBackjump]. On [LpVerdict.FEASIBLE] the returned
-     * reals complete the assignment into a full solution.
+     * reals complete the assignment into a full solution. The float solve is capped by work sized from the
+     * model; a leaf it stops short of a verdict is [LpVerdict.INDETERMINATE].
      */
     fun leafCertify(session: PropagationSession, toleranceCheck: ((Sample) -> Boolean)? = null): LeafRealResult {
         requireOpen()
@@ -635,7 +650,8 @@ internal class LpEngine(
         val model = relaxation.model
         val certified = solveAndCertify(
             model,
-            cancellation = params.cancellation.shorten(0.5),
+            cancellation = params.cancellation,
+            workLimit = leafWorkBudget(model),
             componentSplit = params.lpPlan.componentSplit,
             observer = sink.lp.certificationObserver(LpRoute.STANDALONE),
             context = solveContext,
@@ -815,8 +831,8 @@ internal class LpEngine(
         ): Boolean {
             val lpRelaxerL = lpRelaxer ?: return false
             if (params.lpPlan.realResidual && residualOversized) return false
-            if (lpWallBreaker.wallExhausted) return false
-            lpWallBreaker.observeNode()
+            if (lpEffortGovernor.allowanceSpent) return false
+            lpEffortGovernor.observeNode()
             if (!params.lpPlan.realResidual && (
                     session.decisionLevel > params.lpPlan.boundMaxDepth ||
                         ++lpCheckCounter % params.lpPlan.boundEvery != 0 ||
@@ -835,39 +851,23 @@ internal class LpEngine(
             } else {
                 null
             }
-            val solveStart = if (lpWallBreaker.remainingMillis() != null) {
-                TimeSource.Monotonic.markNow()
-            } else {
-                null
-            }
-            val localCancel = solveStart?.let { start ->
-                lpWallBreaker.operationCancellation(params.cancellation) { start.elapsedNow().inWholeNanoseconds }
-            } ?: params.cancellation
-            nodeLpCancellation = localCancel
-            val outcome = try {
-                lpBoundAndFix(
-                    lpRelaxerL,
-                    session,
-                    effectiveBound,
-                    sink,
-                    objectiveVar = objectiveVar,
-                    objectiveAscending = objectiveAscending,
-                    cancellation = localCancel,
-                    hints = lpHints,
-                    learn = params.lpPlan.learn,
-                    warm = warm,
-                    cutsAllowed = cutsAllowed,
-                )
-            } finally {
-                solveStart?.let { lpWallBreaker.chargeWallNanos(it.elapsedNow().inWholeNanoseconds) }
-                nodeLpCancellation = params.cancellation
-            }
-            // Deterministic first: what this node's LP actually cost, against the nodes explored. The
-            // clock is charged separately and only as a backstop for cost the meter cannot see.
-            lpWallBreaker.observeSolve(pendingSolveOps, outcome.prune)
+            val outcome = lpBoundAndFix(
+                lpRelaxerL,
+                session,
+                effectiveBound,
+                sink,
+                objectiveVar = objectiveVar,
+                objectiveAscending = objectiveAscending,
+                cancellation = params.cancellation,
+                hints = lpHints,
+                learn = params.lpPlan.learn,
+                warm = warm,
+                cutsAllowed = cutsAllowed,
+            )
+            // What this node's LP cost against the nodes explored; the allowance was charged as it spent.
+            lpEffortGovernor.observeSolve(pendingSolveOps, outcome.prune)
             pendingSolveOps = 0L
-            if (lpWallBreaker.backstopFired) sink.lp.observeWallBackstop()
-            if (lpWallBreaker.isDemoted) sink.lp.observeDemoted()
+            if (lpEffortGovernor.isDemoted) sink.lp.observeDemoted()
             lpPivotBudget.observe(pruned = outcome.prune, couldPrune = effectiveBound.isFinite())
             if (outcome.basis != null) {
                 while (lpBasisByDepth.size <= depth) lpBasisByDepth.add(null)
@@ -986,6 +986,26 @@ private const val INITIAL_NODE_WORK_OPS = 1_000_000L
 
 /** Divisor on the size-derived work baseline, mirroring CP-SAT's `num_cols / 40` iteration baseline. */
 private const val SIZE_BUDGET_DIVISOR = 40L
+
+/** Floor on a leaf solve's work cap: a small model's cold solve costs more than its shape alone suggests,
+ *  and a leaf the cap stops is one the search cannot decide. */
+private const val MIN_LEAF_WORK_OPS = 1_000_000L
+
+/** Ceiling on a leaf solve's work cap. Higher than the node ceiling because a leaf decides a complete
+ *  assignment: its verdict is the answer for that branch, not a bound the next node can improve on. */
+private const val MAX_LEAF_WORK_OPS = 1_000_000_000L
+
+// LP work (simplex plus the node-LP overhead the engine charges) done in about one millisecond of LP time: the
+// median ratio of LP work to LP milliseconds with the default LP arm over 13 MIPLIB 2017 models with continuous
+// columns was 18.7k (spread 6.4k to 72.8k).
+private const val LP_WORK_PER_MILLI = 20_000L
+
+/** The LP work allowance for [fraction] of a [budgetMillis] solve, or 0 (none) when either is unknown or off. */
+private fun lpWorkAllowance(budgetMillis: Long?, fraction: Double): Long {
+    if (budgetMillis == null || budgetMillis <= 0L || fraction <= 0.0) return 0L
+    // Double-to-Long conversion saturates, so a huge budget caps at Long.MAX_VALUE instead of wrapping.
+    return (budgetMillis * fraction * LP_WORK_PER_MILLI).toLong().coerceAtLeast(1L)
+}
 
 /**
  * Weights that put the node-LP costs the simplex does not meter on its scale, in work operations per unit of

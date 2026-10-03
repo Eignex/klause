@@ -4734,7 +4734,7 @@ public final class com/eignex/klause/lp/bounding/LpPlan {
 	public final fun getLbTreeSearch ()Z
 	public final fun getLearn ()Z
 	public final fun getLinMaxTightFace ()Z
-	public final fun getLpWallBudgetFraction ()D
+	public final fun getLpWorkBudgetFraction ()D
 	public final fun getMdd ()Z
 	public final fun getMir ()Z
 	public final fun getMirEnabled ()Z
@@ -9716,10 +9716,10 @@ public final class com/eignex/klause/solver/result/LpStats {
 	public final fun getStandaloneRoute ()Lcom/eignex/klause/solver/result/LpRouteSolveStats;
 	public final fun getStandaloneWorkOps ()Lcom/eignex/kumulant/stat/summary/SumResult;
 	public final fun getUpdateLimitRefactorizations ()Lcom/eignex/kumulant/stat/summary/SumResult;
-	public final fun getWallBackstop ()Z
 	public final fun getWarmStartAttempts ()Lcom/eignex/kumulant/stat/summary/SumResult;
 	public final fun getWarmStartHits ()Lcom/eignex/kumulant/stat/summary/SumResult;
 	public final fun getWarmStartRefactorizations ()Lcom/eignex/kumulant/stat/summary/SumResult;
+	public final fun getWorkAllowanceSpent ()Z
 	public final fun getWorkOps ()Lcom/eignex/kumulant/stat/summary/SumResult;
 	public fun hashCode ()I
 	public final fun mergedWith (Lcom/eignex/klause/solver/result/LpStats;)Lcom/eignex/klause/solver/result/LpStats;

@@ -129,6 +129,7 @@ class RevisedSimplexScalingTest {
         val solver = UnscaledLpEngineFactory.newGeneralSolver(
             mixedRealModel(),
             Cancellation.Never,
+            0L,
             LpPricingOptions(),
         )
 

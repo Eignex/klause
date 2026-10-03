@@ -279,7 +279,8 @@ internal interface PersistentLpSolver : LpSolver {
  *
  * A separable model first decomposes into its column components ([ComponentLpSolver]) — exact, and
  * each block factorizes at a fraction of the monolithic cost; [componentSplit] (default on, the
- * `lp-component-split` knob) opts out.
+ * `lp-component-split` knob) opts out. [workLimit] bounds the solve (each component's, when it splits) in
+ * [LpWork] operations, 0 leaving it unbounded; a solve it stops yields at most a bound to certify.
  */
 internal fun newLpSolver(
     model: LpModel,
@@ -287,16 +288,17 @@ internal fun newLpSolver(
     componentSplit: Boolean = true,
     factory: LpEngineFactory = ProductionLpEngineFactory,
     pricing: LpPricingOptions = LpPricingOptions(),
+    workLimit: Long = 0L,
 ): LpSolver {
     if (componentSplit) {
         componentLpSolverOrNull(
             model,
             cancellation,
-            { part, token -> factory.newGeneralSolver(part, token, pricing) },
+            { part, token -> factory.newGeneralSolver(part, token, workLimit, pricing) },
             factory::newComponentSolver,
         )?.let { return it }
     }
-    return factory.newGeneralSolver(model, cancellation, pricing)
+    return factory.newGeneralSolver(model, cancellation, workLimit, pricing)
 }
 
 /**
@@ -349,8 +351,18 @@ internal fun newPersistentLpSolver(
 internal object UnscaledLpEngineFactory : LpEngineFactory {
     private val disabled = LpScalingOptions(enabled = false)
 
-    override fun newGeneralSolver(model: LpModel, cancellation: Cancellation, pricing: LpPricingOptions): LpSolver =
-        RevisedSimplex(model, cancellation, pricing = pricing, scalingOptions = disabled)
+    override fun newGeneralSolver(
+        model: LpModel,
+        cancellation: Cancellation,
+        workLimit: Long,
+        pricing: LpPricingOptions,
+    ): LpSolver = RevisedSimplex(
+        model,
+        cancellation,
+        workLimit = workLimit,
+        pricing = pricing,
+        scalingOptions = disabled,
+    )
 
     override fun newComponentSolver(
         model: LpModel,

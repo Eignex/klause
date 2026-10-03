@@ -66,8 +66,13 @@ internal class UnresolvedRealLeafFixture(val withIncumbent: Boolean) {
     var opened = 0
     var closed = 0
     val factory = RecordingLpEngineFactory(object : LpEngineFactory by ProductionLpEngineFactory {
-        override fun newGeneralSolver(model: LpModel, cancellation: Cancellation, pricing: LpPricingOptions): LpSolver {
-            val delegate = ProductionLpEngineFactory.newGeneralSolver(model, cancellation, pricing)
+        override fun newGeneralSolver(
+            model: LpModel,
+            cancellation: Cancellation,
+            workLimit: Long,
+            pricing: LpPricingOptions,
+        ): LpSolver {
+            val delegate = ProductionLpEngineFactory.newGeneralSolver(model, cancellation, workLimit, pricing)
             opened++
             return object : LpSolver by delegate {
                 override fun close() {
@@ -407,6 +412,7 @@ class ResumableMinimizeTest {
                 override fun newGeneralSolver(
                     model: LpModel,
                     cancellation: Cancellation,
+                    workLimit: Long,
                     pricing: LpPricingOptions,
                 ): LpSolver = newPersistentSolver(
                     model,

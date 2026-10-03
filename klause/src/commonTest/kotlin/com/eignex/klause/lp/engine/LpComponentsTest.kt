@@ -237,7 +237,7 @@ class LpComponentsTest {
                 com.eignex.klause.util.Cancellation.Never,
                 { part, token ->
                     if (index++ == 0) {
-                        ProductionLpEngineFactory.newGeneralSolver(part, token, LpPricingOptions())
+                        ProductionLpEngineFactory.newGeneralSolver(part, token, 0L, LpPricingOptions())
                     } else {
                         object : LpSolver {
                             override val infeasibleRay: DoubleArray? = null
