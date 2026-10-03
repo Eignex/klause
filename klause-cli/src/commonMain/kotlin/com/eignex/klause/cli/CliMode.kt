@@ -17,6 +17,7 @@ import com.eignex.klause.solver.objective.toLinearObjective
 import com.eignex.klause.solver.pipeline.FiniteEngine
 import com.eignex.klause.solver.pipeline.OpenTheoryAssignment
 import com.eignex.klause.solver.pipeline.OpenTheoryRequest
+import com.eignex.klause.solver.pipeline.SourceProblemRoute
 import com.eignex.klause.solver.result.LpStats
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
@@ -58,6 +59,23 @@ internal fun CommonOptions.routingCancellation(): Cancellation {
     val token = sharedPresolveBudget()?.let { routingSlice(it, solveStop) } ?: solveStop
     routingToken = token
     return token
+}
+
+/**
+ * The lane routing chose under `-v`, beside the time it took and the work its bound proof charged. The
+ * lane and the work are functions of the model and flags alone, so two runs of one model agree on them
+ * however loaded the machine was; the time is what relates the work unit to the clock.
+ */
+internal fun CommonOptions.logRoute(route: SourceProblemRoute, elapsedMs: Long) {
+    cliLogger(verbose).v {
+        val lane = when (route) {
+            is SourceProblemRoute.Finite -> "finite"
+            is SourceProblemRoute.OpenTheory -> "open"
+            is SourceProblemRoute.UnsupportedOpen -> "unsupported"
+            SourceProblemRoute.Refuted -> "refuted"
+        }
+        "route: $lane in ${elapsedMs}ms" + presolveBudget?.let { ", routing work ${it.spent()}" }.orEmpty()
+    }
 }
 
 /** Routing receives one pass-sized slice of the shared allowance; source preparation keeps the rest. */

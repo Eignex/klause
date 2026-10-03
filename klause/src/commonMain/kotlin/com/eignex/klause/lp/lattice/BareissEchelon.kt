@@ -83,6 +83,7 @@ internal fun bareissEchelon(
         val pivotValue = w[p][c]
         for (q in bucket) {
             if (q == p) continue
+            cancellation.charge(1L + w[q].index.size + w[p].index.size)
             val factor = w[q][c]
             val g = gcdOf(pivotValue, factor)
             val scaleQ = pivotValue / g
