@@ -124,7 +124,12 @@ class ExactLiraSearchComponentTest {
     fun `fractional source integer branches after reduction admission declines`() {
         val model = Problem(
             numBoolVars = 0,
-            intBounds = IntBounds.fromModelBounds(LongArray(129), LongArray(129) { if (it == 0) 1L else 0L }, null, null),
+            intBounds = IntBounds.fromModelBounds(
+                LongArray(129),
+                LongArray(129) { if (it == 0) 1L else 0L },
+                null,
+                null,
+            ),
             factors = arrayOf(Linear(intArrayOf(2), intArrayOf(0), LinearOp.GE, 1)),
         )
         val stats = SmtStatsSink()
