@@ -146,12 +146,20 @@ internal object Compiler {
                     val dims = bracketInts(e.attr("size"))
                     if (dims.isEmpty()) throw UnsupportedXcsp3Exception("array size '${e.attr("size")}'")
                     arrayDims[id] = dims // retained so `<matrix>` refs reshape from the shape
-                    val dom = domainFor(e)
+                    val mixed = mixedCellDomains(e, id, dims)
+                    val uniform = if (mixed == null) domainFor(e) else null
 
                     // Declare one variable per cell of the (possibly multi-dimensional) array,
                     // naming cells x[i], x[i][j], … so index refs and `x[…][]` wildcards resolve.
+                    var flat = 0
                     fun declareCells(prefix: String, d: Int) {
-                        if (d == dims.size) return addVar(prefix, dom)
+                        if (d == dims.size) {
+                            val dom = mixed?.get(flat) ?: uniform
+                            flat++
+                            // A mixed array cell no `<domain>` lists is undefined, so it is not declared.
+                            if (dom != null) addVar(prefix, dom)
+                            return
+                        }
                         for (i in 0 until dims[d]) declareCells("$prefix[$i]", d + 1)
                     }
                     declareCells(id, 0)
@@ -159,6 +167,57 @@ internal object Compiler {
 
                 else -> throw UnsupportedXcsp3Exception("variable kind '${e.tag}'")
             }
+        }
+
+        /** Row-major per-cell domains of an array declared through `<domain for="…">` children, or null
+         *  for a uniform array. Each child's `for` lists cell references of this array (fixed indices,
+         *  `lo..hi` ranges, `[]` wildcards) or `others`, which covers every cell no other child lists. A
+         *  cell left uncovered is null. The children are never read through the array's `textContent`,
+         *  which concatenates their values into one union domain. */
+        private fun mixedCellDomains(e: XmlElement, id: String, dims: IntArray): Array<IntDomain?>? {
+            if (e.children.none { it.tag == "domain" }) return null
+            val size = dims.fold(1L) { acc, d -> acc * d }
+            if (size > Int.MAX_VALUE) throw UnsupportedXcsp3Exception("array '$id' of $size cells")
+            val cells = arrayOfNulls<IntDomain>(size.toInt())
+            var others: IntDomain? = null
+            for (part in e.children) {
+                if (part.tag != "domain") throw UnsupportedXcsp3Exception("array child '${part.tag}'")
+                val dom = domainFor(part)
+                for (tok in part.attr("for").splitWs()) {
+                    if (tok == "others") {
+                        others = dom
+                        continue
+                    }
+                    forEachCell(domainTargetSpecs(tok, id, dims), dims, 0, 0) { cells[it] = dom }
+                }
+            }
+            others?.let { dom -> for (i in cells.indices) if (cells[i] == null) cells[i] = dom }
+            return cells
+        }
+
+        /** The per-dimension index bounds of a `<domain for="…">` target, which must reference [id]'s cells. */
+        private fun domainTargetSpecs(tok: String, id: String, dims: IntArray): List<IntArray> {
+            val specs = if (tok.startsWith("$id[")) parseBracketSpecs(tok, id.length) else null
+            if (specs == null || specs.size != dims.size) {
+                throw UnsupportedXcsp3Exception("domain target '$tok' of array '$id'")
+            }
+            return specs
+        }
+
+        /** The row-major flat index of every cell [specs] selects within [dims]. */
+        private fun forEachCell(
+            specs: List<IntArray>,
+            dims: IntArray,
+            dim: Int,
+            flat: Int,
+            action: (Int) -> Unit,
+        ) {
+            if (dim == dims.size) return action(flat)
+            val spec = specs[dim]
+            val lo = if (spec[0] == Int.MIN_VALUE) 0 else spec[0]
+            val hi = if (spec[1] == Int.MAX_VALUE) dims[dim] - 1 else spec[1]
+            if (lo < 0 || hi >= dims[dim]) throw UnsupportedXcsp3Exception("domain target index out of range")
+            for (i in lo..hi) forEachCell(specs, dims, dim + 1, flat * dims[dim] + i, action)
         }
 
         internal fun addVar(name: String, dom: IntDomain) {
