@@ -140,6 +140,10 @@ object Presolve {
      *  See [StructuralReduction]. */
     fun reduceStructural(problem: BakedProblem): PassDelta = StructuralReduction.reduce(problem)
 
+    /** Per-factor structural self-reduction over declared domains, for factors over closed columns. */
+    internal fun reduceSourceStructural(problem: Problem, cancellation: Cancellation): SourceDelta =
+        StructuralReduction.reduceSource(problem, cancellation)
+
     /** Fold a reified comparison disjunction (a clause over sole-use single-variable reified-comparison
      *  indicators) into one [com.eignex.klause.factor.arithmetic.ComparisonClause]. See [ComparisonClauseFold]. */
     fun foldComparisonClauses(problem: BakedProblem): PassDelta = ComparisonClauseFold.fold(problem)
