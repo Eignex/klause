@@ -7257,7 +7257,8 @@ public final class com/eignex/klause/presolve/Presolve {
 	public static synthetic fun probe$default (Lcom/eignex/klause/presolve/Presolve;Lcom/eignex/klause/propagation/BakedProblem;ILcom/eignex/klause/util/Cancellation;ILjava/lang/Object;)Lcom/eignex/klause/presolve/PassDelta;
 	public final fun projectSingletonInequalities (Lcom/eignex/klause/propagation/BakedProblem;Ljava/util/Set;)Lcom/eignex/klause/presolve/PassDelta;
 	public static synthetic fun projectSingletonInequalities$default (Lcom/eignex/klause/presolve/Presolve;Lcom/eignex/klause/propagation/BakedProblem;Ljava/util/Set;ILjava/lang/Object;)Lcom/eignex/klause/presolve/PassDelta;
-	public final fun reduceDiophantine (Lcom/eignex/klause/propagation/BakedProblem;)Lcom/eignex/klause/presolve/PassDelta;
+	public final fun reduceDiophantine (Lcom/eignex/klause/propagation/BakedProblem;Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/presolve/PassDelta;
+	public static synthetic fun reduceDiophantine$default (Lcom/eignex/klause/presolve/Presolve;Lcom/eignex/klause/propagation/BakedProblem;Lcom/eignex/klause/util/Cancellation;ILjava/lang/Object;)Lcom/eignex/klause/presolve/PassDelta;
 	public final fun reduceImplicationGraph (Lcom/eignex/klause/ir/Problem;ILcom/eignex/klause/util/Cancellation;Ljava/util/Set;)Lcom/eignex/klause/presolve/PassDelta;
 	public static synthetic fun reduceImplicationGraph$default (Lcom/eignex/klause/presolve/Presolve;Lcom/eignex/klause/ir/Problem;ILcom/eignex/klause/util/Cancellation;Ljava/util/Set;ILjava/lang/Object;)Lcom/eignex/klause/presolve/PassDelta;
 	public final fun reduceStructural (Lcom/eignex/klause/propagation/BakedProblem;)Lcom/eignex/klause/presolve/PassDelta;

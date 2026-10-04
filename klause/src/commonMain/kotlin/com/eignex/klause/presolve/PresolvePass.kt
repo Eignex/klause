@@ -67,12 +67,18 @@ enum class PresolvePass(
     REDUCE_DIOPHANTINE(
         "diophantine",
         Stage.PROBLEM,
-        Capability.FINITE,
+        Capability.SOURCE,
         PresolveTiming.FAST,
         preservesSolutionSet = true,
         autoEligible = true,
     ) {
-        override fun applyFinite(problem: BakedProblem, ctx: PresolveContext) = Presolve.reduceDiophantine(problem)
+        override fun applySource(problem: Problem, ctx: PresolveContext) =
+            Presolve.reduceSourceDiophantine(problem, ctx.cancellation)
+
+        // A finite domain can hold the residue class itself, so the finite lane carves the off-class values
+        // a declared range alone can only shave off its ends.
+        override fun applyFinite(problem: BakedProblem, ctx: PresolveContext) =
+            Presolve.reduceDiophantine(problem, ctx.cancellation)
     },
 
     /** One-shot GF(2) elimination over all xor factors: emit implied root unit clauses. */

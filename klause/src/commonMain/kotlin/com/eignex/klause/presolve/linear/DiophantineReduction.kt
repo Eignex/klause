@@ -4,9 +4,12 @@ import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.presolve.PassDelta
+import com.eignex.klause.presolve.SourceDelta
 import com.eignex.klause.presolve.presolveLinearRows
 import com.eignex.klause.propagation.BakedProblem
+import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.LongArrayList
 import kotlin.math.abs
 
@@ -17,8 +20,10 @@ import kotlin.math.abs
  * empty range is a contradiction. This is the reasoning [CoefficientStrengthening] does not do (it only
  * divides the whole constraint by its coefficient gcd and rejects `g ∤ b`); the residue is per-variable.
  *
- * Only bounds are tightened, never interior holes — a residue class over a wide domain would be an
- * O(span) carve. Everything is gated to `|value| < 2³¹` so the modular arithmetic cannot overflow.
+ * The finite form carves the off-class values out of a domain of at most [SIZE_CAP] values and leaves a
+ * wider one alone, so a residue class never costs an O(span) sweep. The source form has only ranges to
+ * state, so it moves each closed side inward to the nearest in-class value and leaves an open side open.
+ * Everything is gated to `|value| < 2³¹` so the modular arithmetic cannot overflow.
  */
 internal object DiophantineReduction {
 
@@ -27,6 +32,10 @@ internal object DiophantineReduction {
     private const val SIZE_CAP = 4096
 
     /** `true` when `|v| < 2³¹`, so a product of two such values stays below 2⁶² — the overflow gate. */
+
+    // Work charged per equality scanned, scaled by its length: the residue scan is linear in the row.
+    private const val DIOPHANTINE_WORK_WEIGHT = 10L
+
     private fun fitsHalfLong(v: Long): Boolean = v > -(1L shl 31) && v < (1L shl 31)
 
     private fun gcd(a: Long, b: Long): Long {
@@ -69,10 +78,18 @@ internal object DiophantineReduction {
         return root to mod
     }
 
-    fun reduce(problem: BakedProblem): PassDelta {
-        var out: Array<IntDomain>? = null
-        for (f in presolveLinearRows(problem.factors.asList())) {
+    /** One column confined to `x ≡ root (mod mod)` by an equality, with `mod > 1`. */
+    private class Residue(val column: Int, val root: Long, val mod: Long)
+
+    /**
+     * Every residue class the integer equalities in [factors] confine a column to, in row order, or the
+     * column whose congruence has no solution at all. Reads coefficients alone, so both forms share it.
+     */
+    private fun residues(factors: List<Factor>, cancellation: Cancellation): Pair<List<Residue>, Int> {
+        val out = ArrayList<Residue>()
+        for (f in presolveLinearRows(factors)) {
             if (f.op != LinearOp.EQ) continue
+            cancellation.charge(DIOPHANTINE_WORK_WEIGHT * (1L + f.vars.size))
             val row = f.integerConstants ?: continue
             if (f.vars.size < 2 || !fitsHalfLong(row.bound)) continue
             if (f.vars.indices.any { !fitsHalfLong(row.coeff(it)) }) continue
@@ -85,25 +102,78 @@ internal object DiophantineReduction {
             for (j in 0 until n) {
                 val m = gcd(pre[j], suf[j + 1])
                 if (m <= 1L) continue
-                val sol = solveCongruence(row.coeff(j), row.bound, m) ?: return contradiction(problem, f.vars[j])
-                val (root, mod) = sol
-                if (mod <= 1L) continue
-                val v = f.vars[j]
-                val dom = out?.get(v) ?: problem.rootIntDomain(v)
-                // Carve interior off-residue values — the reduction bound propagation cannot make (it
-                // keeps only intervals). Iterate the domain's live values (O(size), never O(span)) and
-                // gate on [SIZE_CAP] so a wide contiguous domain is skipped rather than enumerated.
-                val live = dom.spanOrNull(SIZE_CAP.toLong()) ?: continue
-                if (!fitsHalfLong(dom.min) || !fitsHalfLong(dom.max)) continue
-                val remove = LongArrayList()
-                for (k in 0 until live.size) {
-                    val x = live.valueAt(k)
-                    if (((x - root) % mod + mod) % mod != 0L) remove.add(x)
-                }
-                if (remove.isEmpty()) continue
-                if (out == null) out = problem.rootIntDomains()
-                out[v] = out[v].excludeValues(remove.toLongArray()) ?: return contradiction(problem, v)
+                val (root, mod) = solveCongruence(row.coeff(j), row.bound, m) ?: return out to f.vars[j]
+                if (mod > 1L) out.add(Residue(f.vars[j], root, mod))
             }
+        }
+        return out to -1
+    }
+
+    /**
+     * The source form: each closed side of a confined column moves inward to the nearest in-class value.
+     *
+     * A congruence with no solution refutes. Moving both sides past each other also refutes, which the
+     * caller reads off the crossed range rather than this pass checking it.
+     */
+    fun reduceSource(problem: Problem, cancellation: Cancellation = Cancellation.Never): SourceDelta {
+        val (found, unsolvable) = residues(problem.factors.asList(), cancellation)
+        if (unsolvable >= 0) return SourceDelta(infeasible = true)
+        if (found.isEmpty()) return SourceDelta()
+        val bounds = problem.intBounds
+        // The tightening has no getters, so the narrowed sides are tracked here as each residue applies.
+        val lo = HashMap<Int, Long>()
+        val hi = HashMap<Int, Long>()
+        val tightening = bounds.tightening()
+        for (r in found) {
+            val v = r.column
+            if (bounds.hasLower(v)) {
+                val current = lo[v] ?: bounds.lower(v)
+                if (fitsHalfLong(current)) {
+                    val next = current + floorMod(r.root - current, r.mod)
+                    if (next > current) {
+                        lo[v] = next
+                        tightening.atLeast(v, next)
+                    }
+                }
+            }
+            if (bounds.hasUpper(v)) {
+                val current = hi[v] ?: bounds.upper(v)
+                if (fitsHalfLong(current)) {
+                    val next = current - floorMod(current - r.root, r.mod)
+                    if (next < current) {
+                        hi[v] = next
+                        tightening.atMost(v, next)
+                    }
+                }
+            }
+        }
+        return SourceDelta(bounds = tightening.build())
+    }
+
+    private fun floorMod(x: Long, m: Long): Long = ((x % m) + m) % m
+
+    fun reduce(problem: BakedProblem, cancellation: Cancellation = Cancellation.Never): PassDelta {
+        var out: Array<IntDomain>? = null
+        val (found, unsolvable) = residues(problem.factors.asList(), cancellation)
+        if (unsolvable >= 0) return contradiction(problem, unsolvable)
+        for (r in found) {
+            val root = r.root
+            val mod = r.mod
+            val v = r.column
+            val dom = out?.get(v) ?: problem.rootIntDomain(v)
+            // Carve interior off-residue values — the reduction bound propagation cannot make (it
+            // keeps only intervals). Iterate the domain's live values (O(size), never O(span)) and
+            // gate on [SIZE_CAP] so a wide contiguous domain is skipped rather than enumerated.
+            val live = dom.spanOrNull(SIZE_CAP.toLong()) ?: continue
+            if (!fitsHalfLong(dom.min) || !fitsHalfLong(dom.max)) continue
+            val remove = LongArrayList()
+            for (k in 0 until live.size) {
+                val x = live.valueAt(k)
+                if (floorMod(x - root, mod) != 0L) remove.add(x)
+            }
+            if (remove.isEmpty()) continue
+            if (out == null) out = problem.rootIntDomains()
+            out[v] = out[v].excludeValues(remove.toLongArray()) ?: return contradiction(problem, v)
         }
         return if (out == null) PassDelta() else PassDelta(domains = out)
     }
