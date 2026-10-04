@@ -135,6 +135,43 @@ class AffineEliminationTest {
     }
 
     @Test
+    fun `the single partner of a holed pivot keeps only values that rebuild onto its domain`() {
+        // x (0) in {3, 7} defined by x - 2y = 1, with y (1) in 1..3 kept out of a residue doubleton by
+        // y + w <= 4: y = 2 would put x on its hole, which the bounds alone cannot see.
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 3,
+            intDomains = arrayOf(
+                IntDomain(3, 7).excludeValues(longArrayOf(4, 5, 6))!!,
+                IntDomain(1, 3),
+                IntDomain(0, 1),
+            ),
+            factors = listOf(
+                Linear(intArrayOf(1, -2), intArrayOf(0, 1), LinearOp.EQ, 1),
+                Linear(intArrayOf(1, 1), intArrayOf(1, 2), LinearOp.LE, 4),
+            ),
+        )
+        checkFeasibleSetPreserved("holed pivot, one partner", problem)
+    }
+
+    @Test
+    fun `a holed pivot with several partners stays in the model`() {
+        // x (0) in {0, 4} = y + z over y, z in 0..2: the holes cannot move onto two partners, so y is
+        // folded out instead and x keeps its domain.
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 3,
+            intDomains = arrayOf(
+                IntDomain(0, 4).excludeValues(longArrayOf(1, 2, 3))!!,
+                IntDomain(0, 2),
+                IntDomain(0, 2),
+            ),
+            factors = listOf(Linear(intArrayOf(1, -1, -1), intArrayOf(0, 1, 2), LinearOp.EQ, 0)),
+        )
+        checkFeasibleSetPreserved("holed pivot, two partners", problem)
+    }
+
+    @Test
     fun `affine pass is skipped above the factor cap`() {
         // The same eliminable x = 2y + 1, but with the factor cap below the factor count: the pass is
         // skipped (sound — x stays, solved directly). At the default cap it eliminates as usual.
