@@ -249,6 +249,13 @@ object Presolve {
         cancellation: Cancellation = Cancellation.Never,
     ): PassDelta = BlockedClauseElimination.eliminate(problem, objectiveBoolVars, cancellation)
 
+    /** Blocked-clause elimination over a canonical source model. See [BlockedClauseElimination]. */
+    internal fun eliminateSourceBlockedClauses(
+        problem: Problem,
+        objectiveBoolVars: Set<Int>,
+        cancellation: Cancellation,
+    ): SourceDelta = BlockedClauseElimination.eliminateSource(problem, objectiveBoolVars, cancellation)
+
     /** At-most-one clique merging. See [AmoCliqueMerge]. */
     fun mergeAmoCliques(problem: Problem, cancellation: Cancellation = Cancellation.Never): PassDelta =
         AmoCliqueMerge.mergeAmoCliques(problem, cancellation)

@@ -417,13 +417,13 @@ enum class PresolvePass(
     ELIMINATE_BLOCKED_CLAUSES(
         "bce",
         Stage.PROBLEM,
-        Capability.FINITE,
+        Capability.SOURCE,
         PresolveTiming.EXHAUSTIVE,
         preservesSolutionSet = false,
         autoEligible = true,
     ) {
-        override fun applyFinite(problem: BakedProblem, ctx: PresolveContext) =
-            Presolve.eliminateBlockedClauses(problem, ctx.objectiveBoolVars, ctx.cancellation)
+        override fun applySource(problem: Problem, ctx: PresolveContext) =
+            Presolve.eliminateSourceBlockedClauses(problem, ctx.objectiveBoolVars, ctx.cancellation)
     },
 
     /** At-most-one clique merging: grow the pairwise exclusion constraints into maximal cliques and
