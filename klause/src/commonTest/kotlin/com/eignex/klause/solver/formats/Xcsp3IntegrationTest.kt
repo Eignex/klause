@@ -1499,6 +1499,28 @@ class Xcsp3IntegrationTest {
     }
 
     @Test
+    fun `a mixed array objective is optimal over each cell's own domain`() {
+        val xml = """
+            <instance format="XCSP3" type="COP">
+              <variables>
+                <array id="x" size="[3]">
+                  <domain for="x[0]"> 0 </domain><domain for="x[1]"> 0 1 10 </domain><domain for="x[2]"> 1 </domain>
+                </array>
+              </variables>
+              <constraints><intension> ne(x[0],x[1]) </intension></constraints>
+              <objectives><minimize type="sum"> x[] </minimize></objectives>
+            </instance>
+        """.trimIndent()
+        val parsed = Xcsp3.parse(xml)
+        val obj = requireNotNull(parsed.objective)
+
+        val r = BacktrackSolver(parsed.problem.bake()).minimize(obj.toLinearObjective(), BacktrackParams())
+
+        assertTrue(r is MinimizeResult.Optimal, "expected Optimal, got $r")
+        assertEquals(2.0, r.objective)
+    }
+
+    @Test
     fun `element over a variable matrix selects the indexed cell`() {
         val xml = """
             <instance type="CSP">

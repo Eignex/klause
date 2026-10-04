@@ -45,4 +45,54 @@ class Xcsp3ConstructionTest {
 
         assertEquals(mapOf("x" to 0), parsed.intVarNames)
     }
+
+    @Test
+    fun `each domain child of a mixed array types only the cells it lists`() {
+        val parsed = Xcsp3.parse(
+            """<instance><variables><array id="x" size="[2][2]">
+                <domain for="x[0][] x[1][1]"> 0 1 </domain><domain for="x[1][0..0]"> 5..9 </domain>
+                </array></variables></instance>""",
+        )
+
+        val bounds = parsed.intVarNames.mapValues { (_, v) ->
+            parsed.problem.intDomainOrNull(v)!!.let { it.min to it.max }
+        }
+
+        assertEquals(
+            mapOf(
+                "x[0][0]" to (0L to 1L),
+                "x[0][1]" to (0L to 1L),
+                "x[1][0]" to (5L to 9L),
+                "x[1][1]" to (0L to 1L),
+            ),
+            bounds,
+        )
+    }
+
+    @Test
+    fun `others types every mixed array cell no other domain child lists`() {
+        val parsed = Xcsp3.parse(
+            """<instance><variables><array id="x" size="[3]">
+                <domain for="others"> 4 </domain><domain for="x[1]"> 0..2 </domain>
+                </array></variables></instance>""",
+        )
+
+        val bounds = parsed.intVarNames.mapValues { (_, v) ->
+            parsed.problem.intDomainOrNull(v)!!.let { it.min to it.max }
+        }
+
+        assertEquals(mapOf("x[0]" to (4L to 4L), "x[1]" to (0L to 2L), "x[2]" to (4L to 4L)), bounds)
+    }
+
+    @Test
+    fun `a mixed array cell no domain child lists is not declared`() {
+        val parsed = Xcsp3.parse(
+            """<instance><variables><array id="x" size="[3]"><domain for="x[0] x[2]"> 0..1 </domain></array>
+                </variables><constraints><sum><list>x[]</list><condition>(ge, 2)</condition></sum></constraints>
+                </instance>""",
+        )
+
+        assertEquals(setOf("x[0]", "x[2]"), parsed.intVarNames.keys)
+        assertContentEquals(intArrayOf(0, 1), (parsed.problem.factors.single() as Linear).vars)
+    }
 }
