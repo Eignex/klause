@@ -168,6 +168,11 @@ Gradle itself builds fine. See `klause-cli/README.md` for the `JAVA_HOME` fix. N
 ```
 bench solve [filters…]               solve a selection (the bench's one measurement)
 bench preview [filters…]             print what a run would cover, without running
+bench select [filters…]              the same selection as JSON lines: suite, problem, collection, family, format, category
+bench solve-one suite=<id> problem=<name> [solve args…] [out=<dir>]
+                                     solve exactly one instance as `select` names it; writes its record to out=<dir>
+                                     (default output/<config>/) and no per-run table, for drivers that run one
+                                     instance per process
 bench list [<suite>]                 list suites, or the problems in one suite
 ```
 
@@ -176,14 +181,15 @@ bench list [<suite>]                 list suites, or the problems in one suite
 | filter | meaning |
 |---|---|
 | `suite=a,b` | restrict to named suites; `suite=core` expands to the in-process core |
-| `kind=cop\|csp` | keep optimization (COP) or satisfaction (CSP) problems — classified from the source's objective directive (MiniZinc `solve minimize/maximize`, OPB `min:`, SMT-LIB `(minimize`, XCSP3 `<objective>`); applied before sampling, so a capped `kind` selection fills its cap |
+| `kind=cop\|csp` | keep optimization (COP) or satisfaction (CSP) problems — classified from the source's objective directive (MiniZinc `solve minimize/maximize`, OPB `min:`, SMT-LIB `(minimize`, XCSP3 `<objective>`); checked as each family's cap is filled, so a capped `kind` selection fills its cap without reading every source |
 | `category=SAT,UNSAT,CSP,OPTIMIZATION,…` | keep only these categories |
 | `tag=…` / `name=<glob>[,…]` | tag membership / comma-separated OR of substring-or-`*`-glob patterns on the instance name (e.g. `name=cvrp,nfc,mario`) |
-| `per-family=N` `max=N` `seed=N` | cap and deterministically sample (discovered corpora) |
+| `per-family=N` `max=N` `seed=N` | cap and deterministically sample. Families are the corpus's own (the XCSP3 series, the MiniZinc challenge problem, …) and are counted per suite. A discovered suite's default cap (1 per family for most) applies only when `per-family` is unset; `per-family` replaces it, and `seed` samples within each family |
 | `balance=format` | split `max` evenly across the formats present, water-filling short formats' surplus into larger ones — so a broad multi-format sweep touches every format instead of filling with the format that has the most families |
 | `backend=<minizinc solver id>` | the single solver `solve` runs as a subprocess: a registered MiniZinc solver (`choco`/`gecode`/`yuck`/…) via `minizinc --solver`; unset (or `klause`) runs klause via `klause-cli`. Alias `reference=`. |
 | `timeout=<ms>` | per-instance solve budget |
 | `label=<name>` | free-form run tag folded into the `<config>` dir name (e.g. a klause version / fix name), so re-running the same config coexists as a distinct dir instead of overwriting — then `compare.sh` the two. References are version-stable, so this is mainly for klause across updates |
+| `solver-seed=N` | the solver's random seed (`-r`); unset keeps the bench's fixed seed. A non-default seed is folded into the `<config>` dir name, so seeds of one config coexist |
 | `engine=fixed\|cp\|mixed\|ls` `processors=N` | klause's search for a `solve` run (below), forwarded to the cli `-e`/`-p` (the cli owns the engine model). `engine` unset ⇒ no `-e`, so klause follows the cli's own default engine (the bench has no engine default of its own). `fixed=true` is a *separate* reference-only `-f` toggle |
 | `lp=off\|conservative\|default\|aggressive[±id…]` | klause only: forwarded as klause-cli `--lp` (the LP-relaxation emphasis / per-technique deltas). Folded into the `<config>` dir name, so `lp=off` vs `lp=aggressive` coexist — run twice and `compare.sh` to A/B the LP cost/benefit |
 | `param=key=value` (repeatable) | klause-cli `--param` engine knobs forwarded verbatim. `var-selector`/`val-selector` resolve a one-arm override pool on `engine=cp`, and on `engine=fixed` for an unannotated model (single-solver heuristic A/B) — run `solve` twice with different selectors, then `compare.sh` the two dirs. Folded into the `<config>` dir name so runs don't clobber |

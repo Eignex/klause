@@ -53,6 +53,9 @@ internal data class KlauseSearch(
     /** klause-cli `--presolve`: the presolve emphasis plus `+id`/`-id` per-pass deltas (e.g.
      *  `default,+lp-harvest`). null = unset (cli's own default). */
     val presolve: String? = null,
+    /** The solver's random seed (`-r` / `--random-seed`); null = the bench's fixed seed, so repeated runs of
+     *  one config are comparable unless seeds are swept on purpose. */
+    val seed: Long? = null,
 )
 
 /** One problem's result for one solver+settings+budget — the durable per-problem record. */
@@ -109,15 +112,7 @@ internal object SolveMetric {
             profileEngine(entries.toList(), budget, solverId, search, profile)
             return null
         }
-        val settings = SolverInvocation.Settings(
-            engine = if (solverId == SolverInvocation.KLAUSE) search.engine else null,
-            processors = search.processors,
-            free = !search.fixed,
-            seed = SOLVE_SEED,
-            params = if (solverId == SolverInvocation.KLAUSE) search.params else emptyList(),
-            lp = if (solverId == SolverInvocation.KLAUSE) search.lp else null,
-            presolve = if (solverId == SolverInvocation.KLAUSE) search.presolve else null,
-        )
+        val settings = settings(solverId, search)
         if (solverId == SolverInvocation.KLAUSE) {
             SolverInvocation.klauseCliDefect()?.let { error("the klause dist cannot solve: $it") }
         }
@@ -134,37 +129,78 @@ internal object SolveMetric {
         val features = ReferenceStore.load()
         val resultRows = ArrayList<ReferenceEntry>()
         for (entry in entries) {
-            val optimize = entry.objective != null
-            val kind = if (optimize) "optimize" else "satisfy"
-            val rec = runCatching {
-                val key = BenchCache.keyFor(entry.ref, tag, budget)
-                val r = BenchCache.load(key)
-                    ?: SolverInvocation.run(
-                        entry,
-                        solverId,
-                        settings,
-                        budget,
-                        optimize,
-                    ).also { BenchCache.store(key, it) }
-                File(outDir, flat(entry) + ".out").writeText(r.rawOutput)
-                record(entry, solverId, settings, budget, kind, timestamp, sha, r)
-            }.getOrElse {
-                println("?? [${entry.name}] $kind ERROR: ${it.message ?: it::class.simpleName}")
-                errorRecord(entry, solverId, settings, budget, kind, timestamp, sha)
-            }
+            val (rec, raw) = solve(entry, solverId, settings, budget, tag, timestamp, sha)
+            raw?.let { File(outDir, flat(entry) + ".out").writeText(it) }
             File(outDir, flat(entry) + ".json").writeText(Reports.json.encodeToString(rec))
             val suite = ReferenceStore.suiteOf(entry.ref)
             resultRows += resultRow(suite, rec, tag, features[suite to rec.problem])
             if (rec.feasible == true) feasible++
             if (rec.proven) proved++
             val mark = if (rec.feasible == null && !rec.proven) "??" else "ok"
-            println("$mark [${rec.problem}] $kind = ${display(rec)}")
+            println("$mark [${rec.problem}] ${rec.kind} = ${display(rec)}")
         }
         // A per-run result table in the reference-table schema (solver = this config's tag) — the input
         // `bench credit` compares, keyed by (suite, problem), sliceable by the joined feature columns.
         ReferenceStore.writeCsv(File("output", "$tag.csv"), resultRows)
         println("\n$feasible/${resultRows.size} feasible, $proved proved  (output/$tag/, output/$tag.csv)")
         return outDir
+    }
+
+    /** Solve the one problem [entry] as `solve` would, writing its [SolveRecord] to `<outDir>/<problem>.json`
+     *  and the raw solver output beside it, and return the record. Unlike [run] it writes no per-run table and
+     *  loads no reference tables, so one process per problem stays cheap; the caller gathers the records. */
+    fun solveOne(
+        entry: ResolvedProblem,
+        budget: Budget = Budget(),
+        solverId: String = SolverInvocation.KLAUSE,
+        search: KlauseSearch = KlauseSearch(),
+        label: String? = null,
+        outDir: File? = null,
+    ): SolveRecord {
+        val settings = settings(solverId, search)
+        if (solverId == SolverInvocation.KLAUSE) {
+            SolverInvocation.klauseCliDefect()?.let { error("the klause dist cannot solve: $it") }
+        }
+        val tag = configTag(solverId, settings, budget, label)
+        val dir = (outDir ?: File("output", tag)).apply { mkdirs() }
+        val (rec, raw) = solve(entry, solverId, settings, budget, tag, Instant.now().toString(), Reports.readGitSha())
+        raw?.let { File(dir, flat(entry) + ".out").writeText(it) }
+        File(dir, flat(entry) + ".json").writeText(Reports.json.encodeToString(rec))
+        return rec
+    }
+
+    private fun settings(solverId: String, search: KlauseSearch) = SolverInvocation.Settings(
+        engine = if (solverId == SolverInvocation.KLAUSE) search.engine else null,
+        processors = search.processors,
+        free = !search.fixed,
+        seed = search.seed ?: SOLVE_SEED,
+        params = if (solverId == SolverInvocation.KLAUSE) search.params else emptyList(),
+        lp = if (solverId == SolverInvocation.KLAUSE) search.lp else null,
+        presolve = if (solverId == SolverInvocation.KLAUSE) search.presolve else null,
+    )
+
+    /** One problem's record, from the cache or a fresh subprocess solve, with the raw solver output when the
+     *  solve ran; a solve that throws becomes an error record. */
+    private fun solve(
+        entry: ResolvedProblem,
+        solverId: String,
+        settings: SolverInvocation.Settings,
+        budget: Budget,
+        tag: String,
+        timestamp: String,
+        sha: String?,
+    ): Pair<SolveRecord, String?> {
+        val optimize = entry.objective != null
+        val kind = if (optimize) "optimize" else "satisfy"
+        return runCatching {
+            val key = BenchCache.keyFor(entry.ref, tag, budget)
+            val r = BenchCache.load(key)
+                ?: SolverInvocation.run(entry, solverId, settings, budget, optimize).also { BenchCache.store(key, it) }
+            record(entry, solverId, settings, budget, kind, timestamp, sha, r) to r.rawOutput
+        }.getOrElse {
+            println("?? [${entry.name}] $kind ERROR: ${it.message ?: it::class.simpleName}")
+            errorRecord(entry, solverId, settings, budget, kind, timestamp, sha) to null
+        }
     }
 
     /** This run's result for one instance as a reference-table-schema row: `solver` is the config [tag],
@@ -210,6 +246,7 @@ internal object SolveMetric {
         // and a null klause engine just means "the cli's default engine" (no suffix).
         if (s.engine == null && solverId != SolverInvocation.KLAUSE) append(if (s.free) "-free" else "-fixed")
         append("-t").append(budget.timeoutMillis / 1000).append('s')
+        if (s.seed != SOLVE_SEED) append("-r").append(s.seed)
         s.lp?.let { append("-lp-").append(it.replace(Regex("[^A-Za-z0-9.+-]"), "")) }
         s.presolve?.let { append("-ps-").append(it.replace(Regex("[^A-Za-z0-9.+-]"), "")) }
         if (s.params.isNotEmpty()) {

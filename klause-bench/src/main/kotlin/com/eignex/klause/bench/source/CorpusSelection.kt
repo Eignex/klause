@@ -164,6 +164,7 @@ internal object CorpusSelection {
                 expected = expected(File(root, d.mznRelPath)),
                 data = d.dznRelPath?.let { ProblemSource.External(collection, it) },
                 license = collection.license,
+                family = d.family,
             )
         }
     }

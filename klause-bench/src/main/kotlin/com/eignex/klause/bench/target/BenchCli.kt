@@ -22,6 +22,7 @@ import com.eignex.klause.bench.metric.Z3Reference
 import com.eignex.klause.bench.report.Reports
 import com.eignex.klause.bench.runner.Budget
 import com.eignex.klause.bench.runner.MZN_RANDOM_SEED
+import com.eignex.klause.bench.runner.Runners
 import com.eignex.klause.bench.source.CorpusCache
 import com.eignex.klause.bench.source.CorpusFetcher
 import com.eignex.klause.bench.source.CorpusFiles
@@ -36,13 +37,15 @@ import com.eignex.klause.bench.tune.StratifiedPool
 import com.eignex.klause.bench.tune.TuneEngine
 import com.eignex.klause.bench.tune.Tuner
 import com.eignex.klause.bench.tune.VizierTuner
+import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import java.io.File
 import java.time.Instant
 import java.time.temporal.ChronoUnit
 import java.util.concurrent.Callable
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicInteger
-import kotlinx.serialization.decodeFromString
 
 /**
  * Single entry point for the bench: `./gradlew :klause-bench:bench --args="<command>"`.
@@ -72,6 +75,8 @@ import kotlinx.serialization.decodeFromString
  *  - `credit [--by structure|format] <a.csv> <b.csv> …` — win-share + greedy set-cover credit between
  *    per-run result CSVs, keyed by (suite, problem), sliceable by a feature column (see [credit]).
  *  - `preview [filters…]` — print the instances a run would cover, without running.
+ *  - `select [filters…]` — the same selection as JSON lines naming each instance exactly, for `solve-one`.
+ *  - `solve-one suite=<id> problem=<name> [solve args…] [out=<dir>]` — solve one instance and write its record.
  *  - `corpus compress [<dir>]` — store every plain instance in the corpus cache (or [dir]) zstd-compressed,
  *    in place; the migration for a cache fetched before the cache stored instances compressed.
  *  - `corpus gc` — evict least recently used collections until the corpus cache fits its cap, then list it.
@@ -100,6 +105,10 @@ object BenchCli {
 
             "preview" -> run(args.drop(1), preview = true)
 
+            "select" -> printSelection(args.drop(1))
+
+            "solve-one" -> solveOne(args.drop(1))
+
             "calibrate" -> calibrate(args.drop(1))
 
             "reference" -> reference(args.drop(1))
@@ -115,7 +124,8 @@ object BenchCli {
             else ->
                 error(
                     "unknown command '$cmd' " +
-                        "(commands: solve, preview, calibrate, reference, classify, tune, credit, corpus, list)",
+                        "(commands: solve, solve-one, select, preview, calibrate, reference, classify, tune, credit, " +
+                        "corpus, list)",
                 )
         }
     }
@@ -241,6 +251,47 @@ object BenchCli {
             profile,
             label = f["label"],
         )
+    }
+
+    /** Print the [filterArgs] selection one JSON object per line: the suite and problem that name each instance
+     *  exactly for `solve-one`, its reference-table suite (`collection`), family, format and category. Resolving
+     *  a dynamic suite fetches its collection, so a selection also leaves every instance it names on disk. */
+    private fun printSelection(filterArgs: List<String>) {
+        val f = filterArgs.filter { "=" in it }.associate { it.substringBefore('=') to it.substringAfter('=') }
+        for (selected in selectProblems(f)) {
+            val line = buildJsonObject {
+                put("suite", selected.suite)
+                put("problem", selected.ref.name)
+                put("collection", ReferenceStore.suiteOf(selected.ref))
+                put("family", selected.family.substringAfter(':'))
+                put("format", selected.ref.format.name)
+                put("category", selected.ref.category.name)
+            }
+            println(line)
+        }
+    }
+
+    /** Solve exactly one problem, `suite=<id> problem=<name>` as `select` prints it, with `solve`'s solver
+     *  arguments, writing its record to `out=<dir>` (default `output/<config>/`). The suite resolves uncapped,
+     *  so any instance a selection could name is found. Exits non-zero when the problem is unknown or does not
+     *  resolve; a solve that errors still writes its error record. */
+    private fun solveOne(args: List<String>) {
+        val f = args.filter { "=" in it }.associate { it.substringBefore('=') to it.substringAfter('=') }
+        val suite = requireNotNull(f["suite"]) { "solve-one needs suite=<id>" }
+        val name = requireNotNull(f["problem"]) { "solve-one needs problem=<name>" }
+        val ref = Catalog.uncapped(suite).problems.singleOrNull { it.name == name }
+            ?: error("no problem '$name' in suite '$suite'")
+        val entry = Runners.resolve(ref)
+        val params = args.filter { it.startsWith("param=") }.map { it.substringAfter('=') }
+        val record = SolveMetric.solveOne(
+            entry,
+            f["timeout"]?.toLongOrNull()?.let { Budget(it) } ?: Budget(),
+            (f["backend"] ?: f["reference"])?.lowercase()?.takeIf { it != "klause" } ?: SolverInvocation.KLAUSE,
+            parseKlauseSearch(f, params) ?: KlauseSearch(),
+            label = f["label"],
+            outDir = f["out"]?.let(::File),
+        )
+        println("${record.problem}: feasible=${record.feasible} objective=${record.objective} proven=${record.proven}")
     }
 
     /** The fair arm tester: run the pool **once** as a live portfolio and rank arms by their real
@@ -519,9 +570,13 @@ object BenchCli {
         val solverId = solverIdFor(ref, backend)
         val cacheTag = when {
             clasp -> "clasp"
+
             xcsp3 -> "$backend-xcsp3"
+
             smt -> "z3"
+
             mps -> "scip"
+
             // The seed fixes the instance a random-data model compiles to, so results under another seed differ.
             else -> "$backend-seed$MZN_RANDOM_SEED"
         }
@@ -651,7 +706,7 @@ object BenchCli {
      *  to the cli `-e`/`--param`; `fixed=true` is the reference (`-f`) toggle. The cli owns the engine
      *  model; the bench just forwards. */
     private fun parseKlauseSearch(f: Map<String, String>, params: List<String>): KlauseSearch? {
-        val anySet = listOf("engine", "processors", "fixed", "lp", "presolve").any { f[it] != null } ||
+        val anySet = listOf("engine", "processors", "fixed", "lp", "presolve", "solver-seed").any { f[it] != null } ||
             params.isNotEmpty()
         if (!anySet) return null
         return KlauseSearch(
@@ -661,6 +716,7 @@ object BenchCli {
             params = params,
             lp = f["lp"],
             presolve = f["presolve"],
+            seed = f["solver-seed"]?.toLongOrNull(),
         )
     }
 
@@ -675,42 +731,50 @@ object BenchCli {
         else -> error("engine must be fixed|cp|mixed|ls|alns, got '$name'")
     }
 
-    /** Build the selection from filters: suites (`core` expands to the in-process core;
-     *  static-only unless named) → kind/category/tag/name filter → family-aware caps/sampling.
-     *  `kind=cop|csp` is applied *before* sampling (via [ProblemKind]) so a capped selection
-     *  fills its cap with the requested kind rather than under-filling. */
-    private fun select(f: Map<String, String>): List<ProblemRef> {
-        var refs: List<ProblemRef> = f["suite"]?.split(",")?.flatMap { expandSuite(it.trim()) }
-            ?: Catalog.suites.flatMap { it.problems }
-        f["kind"]?.let { kind ->
-            val wantCop = parseKind(kind)
-            refs = refs.filter { ProblemKind.isCop(it) == wantCop }
+    private fun select(f: Map<String, String>): List<ProblemRef> = selectProblems(f).map { it.ref }
+
+    /** Build the selection from filters: suites (`core` expands to the in-process core; static-only unless
+     *  named) → category/tag/name filter → per-family caps → overall cap → shard. Dynamic suites resolve
+     *  uncapped, so `per-family`/`seed` sample each corpus by its provider's own family key; a suite's default
+     *  per-family cap applies only when `per-family` is unset. Families are counted per suite, so two suites
+     *  sharing a family name do not share its cap. `kind=cop|csp` is checked only on the instances a cap
+     *  reaches (via [ProblemKind]), so a capped selection fills its cap with the requested kind without reading
+     *  every source of a large corpus. */
+    private fun selectProblems(f: Map<String, String>): List<SelectedProblem> {
+        val suiteIds = f["suite"]?.split(",")?.map { it.trim() }?.flatMap { expandSuiteIds(it) }
+            ?: Catalog.suites.map { it.id }
+        var candidates = suiteIds.flatMap { id ->
+            val default = Catalog.defaultPerFamily(id)
+            Catalog.uncapped(id).problems.map { SelectedProblem(id, it, default) }
         }
         f["category"]?.split(",")?.map { Category.valueOf(it.trim().uppercase()) }?.toSet()?.let { cats ->
-            refs = refs.filter { it.category in cats }
+            candidates = candidates.filter { it.ref.category in cats }
         }
-        f["tag"]?.split(
-            ",",
-        )?.map { it.trim() }?.toSet()?.let { tags -> refs = refs.filter { it.tags.any { t -> t in tags } } }
+        f["tag"]?.split(",")?.map { it.trim() }?.toSet()?.let { tags ->
+            candidates = candidates.filter { it.ref.tags.any { t -> t in tags } }
+        }
         // `name=` is a comma-separated OR of substring-or-`*`-glob patterns: keep an instance if
         // ANY pattern matches. Lets a curated selection list specific families, e.g.
         // `name=cvrp,nfc,mario`.
         f["name"]?.split(",")?.map { it.trim() }?.filter { it.isNotEmpty() }?.let { pats ->
-            refs = refs.filter { ref -> pats.any { matches(it, ref.name) } }
+            candidates = candidates.filter { c -> pats.any { matches(it, c.ref.name) } }
         }
-        val sel = CorpusSelection.Selection(
+        val wantCop = f["kind"]?.let(::parseKind)
+        val capped = BenchSelection.capFamilies(
+            candidates,
             perFamily = f["per-family"]?.toIntOrNull(),
-            maxInstances = f["max"]?.toIntOrNull(),
-            sampleSeed = f["seed"]?.toLongOrNull(),
+            seed = f["seed"]?.toLongOrNull(),
+            accept = { wantCop == null || ProblemKind.isCop(it) == wantCop },
         )
-        val family = { r: ProblemRef -> r.name.substringBefore('/') }
+        // Families are already capped; what is left is the round-robin interleave and the overall `max`.
+        val sel = CorpusSelection.Selection(maxInstances = f["max"]?.toIntOrNull())
         // `balance=format` splits `max` evenly across the formats present (water-filling short
         // formats' surplus into larger ones) instead of across families globally — so a broad
         // multi-format sweep touches every format rather than filling with the format that has the
         // most families. Unset keeps the family-global cap.
         val selected = when (f["balance"]?.lowercase()) {
-            null -> CorpusSelection.applySelectionBy(refs, sel, family)
-            "format" -> CorpusSelection.applyBalancedBy(refs, sel, family) { it.format }
+            null -> CorpusSelection.applySelectionBy(capped, sel) { it.family }
+            "format" -> CorpusSelection.applyBalancedBy(capped, sel, { it.family }) { it.ref.format }
             else -> error("balance must be 'format', got '${f["balance"]}'")
         }
         // Sharding for parallel sweeps: -Dklause.bench.shard=i/n keeps every n-th selected
@@ -730,9 +794,9 @@ object BenchCli {
     }
 
     /** Expand a suite token: `core` → every in-process core suite; otherwise the named suite. */
-    private fun expandSuite(token: String): List<ProblemRef> = when (token) {
-        "core" -> Targets.IN_PROCESS_CORE.flatMap { Catalog.suite(it).problems }
-        else -> Catalog.suite(token).problems
+    private fun expandSuiteIds(token: String): List<String> = when (token) {
+        "core" -> Targets.IN_PROCESS_CORE
+        else -> listOf(token)
     }
 
     private fun parseProfile(f: Map<String, String>): ProfileConfig? {
@@ -773,13 +837,15 @@ object BenchCli {
             |  bench calibrate [filters…]            diverse arm palette from a live pool run (kind=cop; engine=mixed|ls|cp, p=)
             |  bench reference [filters…]            harvest optima/verdicts into per-solver tables (cp-sat/clasp/z3 by format)
             |  bench preview [filters…]              show what a run would cover
+            |  bench select [filters…]               the selection as JSON lines (suite, problem, …)
+            |  bench solve-one suite= problem= […]   solve one instance; out=<dir> for its record
             |  bench corpus compress [<dir>]         zstd-compress the plain instances in the corpus cache, in place
             |  bench list [<suite>]                  list suites, or problems in a suite
             |
             |Filters: suite=a,b (suite=core = in-process core) kind=cop|csp category=SAT,OPTIMIZATION
             |         tag=… name=<glob>[,…] (comma=OR) per-family=N max=N seed=N backend=<minizinc solver id> timeout=<ms>
             |         balance=format (split max evenly across the formats present, for broad sweeps)
-            |         engine=fixed|cp|mixed|ls processors=N (klause search for solve)
+            |         engine=fixed|cp|mixed|ls processors=N solver-seed=N (klause search for solve)
             |         lp=off|conservative|default|aggressive[±id] (klause-cli --lp LP emphasis)
             |         presolve=off|conservative|default|aggressive[,±pass] (klause-cli --presolve)
             |         fixed=true (reference -f toggle)  param=key=value (klause-cli --param; var-/val-selector edit the cp pool)
