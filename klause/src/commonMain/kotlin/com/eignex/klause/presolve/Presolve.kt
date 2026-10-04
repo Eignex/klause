@@ -62,7 +62,12 @@ object Presolve {
 
     /** Per-variable modular (Diophantine) domain tightening for integer equalities. See
      *  [DiophantineReduction]. */
-    fun reduceDiophantine(problem: BakedProblem): PassDelta = DiophantineReduction.reduce(problem)
+    fun reduceDiophantine(problem: BakedProblem, cancellation: Cancellation = Cancellation.Never): PassDelta =
+        DiophantineReduction.reduce(problem, cancellation)
+
+    /** The Diophantine residue reduction over declared ranges, moving closed sides only. */
+    internal fun reduceSourceDiophantine(problem: Problem, cancellation: Cancellation): SourceDelta =
+        DiophantineReduction.reduceSource(problem, cancellation)
 
     /** Affine variable elimination. [incrementalTouchedVars] (from the incremental
      *  round engine) restricts a re-run's candidate scan to the variables the delta changed. */
