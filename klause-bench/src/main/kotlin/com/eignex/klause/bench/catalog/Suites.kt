@@ -32,7 +32,7 @@ internal object Suites {
     val all: List<Suite> by lazy {
         listOf(
             handwrittenCore, slackAllDifferent, dimacsCore, wcnfCore, opbCore, schemaCore,
-            smtlibCore, xcsp3Core, mpsCore, mznSmoke, satlibUf20, satLadder, satCrafted,
+            smtlibCore, xcsp3Core, mpsCore, mznSmoke, satCrafted,
         )
     }
 
@@ -167,58 +167,6 @@ internal object Suites {
                 CorpusSelection.select(
                     ExternalCollections.smtlibQfNra,
                     CorpusSelection.Layout.Flat("non-incremental/QF_NRA", "smt2"),
-                    sel,
-                    Category.CSP,
-                    format = Format.SMTLIB,
-                )
-            },
-            DynamicSuite(
-                "smtlib-qfuf",
-                "SMT-LIB QF_UF non-incremental set (fetched; z3-only, klause has no EUF theory)",
-                defaultPerFamily = 1,
-            ) { sel ->
-                CorpusSelection.select(
-                    ExternalCollections.smtlibQfUf,
-                    CorpusSelection.Layout.Flat("non-incremental/QF_UF", "smt2"),
-                    sel,
-                    Category.CSP,
-                    format = Format.SMTLIB,
-                )
-            },
-            DynamicSuite(
-                "smtlib-qfuflia",
-                "SMT-LIB QF_UFLIA non-incremental set (fetched; z3-only, klause has no EUF theory)",
-                defaultPerFamily = 1,
-            ) { sel ->
-                CorpusSelection.select(
-                    ExternalCollections.smtlibQfUflia,
-                    CorpusSelection.Layout.Flat("non-incremental/QF_UFLIA", "smt2"),
-                    sel,
-                    Category.CSP,
-                    format = Format.SMTLIB,
-                )
-            },
-            DynamicSuite(
-                "smtlib-qfbv",
-                "SMT-LIB QF_BV non-incremental set (fetched, 1.65GB; z3-only, klause has no bitvector theory)",
-                defaultPerFamily = 1,
-            ) { sel ->
-                CorpusSelection.select(
-                    ExternalCollections.smtlibQfBv,
-                    CorpusSelection.Layout.Flat("non-incremental/QF_BV", "smt2"),
-                    sel,
-                    Category.CSP,
-                    format = Format.SMTLIB,
-                )
-            },
-            DynamicSuite(
-                "smtlib-qfabv",
-                "SMT-LIB QF_ABV non-incremental set (fetched; z3-only, klause has neither theory)",
-                defaultPerFamily = 1,
-            ) { sel ->
-                CorpusSelection.select(
-                    ExternalCollections.smtlibQfAbv,
-                    CorpusSelection.Layout.Flat("non-incremental/QF_ABV", "smt2"),
                     sel,
                     Category.CSP,
                     format = Format.SMTLIB,
@@ -810,48 +758,6 @@ internal object Suites {
         vendored("infeasible-tiny", Category.UNSAT, Expected.Unsat)
     }
 
-    // External SAT collection (auto-fetched SATLIB tarball).
-
-    private val satlibUf20 = suite("satlib-uf20", "SATLIB uf20-91 SAT instances (auto-fetched sample)") {
-        // The full set is 1000 instances; reference a small, stable sample so the suite is
-        // usable out of the box. CorpusFetcher downloads the tarball on first resolve.
-        format = Format.DIMACS
-        val col = ExternalCollections.satlibUf20
-        // Tarball names instances `uf20-0<n>.cnf` (raw, unpadded n). Reference a small sample.
-        for (n in 1..5) {
-            external("uf20-$n", col, "uf20-0$n.cnf", Category.SAT, Expected.Sat)
-        }
-    }
-
-    // SAT performance datasets.
-
-    /** SATLIB random-3SAT phase-transition ladder (uf=SAT, uuf=UNSAT), V=50…250 — labelled
-     *  instances at increasing size for measuring CDCL scaling. A small sample per family
-     *  (the full tarball is fetched once and cached). */
-    private val satLadder = suite(
-        "sat-ladder",
-        "SATLIB random-3SAT phase-transition ladder (uf=SAT / uuf=UNSAT, 50–250 vars)",
-    ) {
-        format = Format.DIMACS
-        license = "SATLIB (public benchmarks)"
-        for ((name, col) in ExternalCollections.satlibLadder) {
-            val sat = name.startsWith("uf")
-            // The SATLIB tarballs sample instances with inconsistent zero-padding
-            // (uf50-031.cnf, uf50-0433.cnf, …), so a guessed filename like uf50-01.cnf doesn't
-            // exist. Reference the first few by index over the sorted collection instead.
-            for (n in 0 until 5) {
-                externalIndexed(
-                    "$name-${n + 1}",
-                    col,
-                    index = n,
-                    ext = "cnf",
-                    category = if (sat) Category.SAT else Category.UNSAT,
-                    expected = if (sat) Expected.Sat else Expected.Unsat,
-                )
-            }
-        }
-    }
-
     /** In-code crafted SAT: pigeonhole PHPₙ (UNSAT, CDCL stress) + random-3SAT at the phase
      *  transition. No fetch / no license; parametric for performance regression tracking. */
     private val satCrafted = suite(
@@ -1060,34 +966,6 @@ internal object ExternalCollections {
         url = smtlibLogic("QF_NRA"),
         license = "SMT-LIB (per-family licenses)",
         reason = "nonlinear real arithmetic (201MB compressed); z3-only, klause has no QF_NRA theory",
-        fetch = FetchMethod.TarballZst,
-    )
-    val smtlibQfUf = ExternalCollection(
-        id = "smtlib-qf_uf",
-        url = smtlibLogic("QF_UF"),
-        license = "SMT-LIB (per-family licenses)",
-        reason = "pure uninterpreted functions (52MB compressed); z3-only, klause rejects non-0-arity symbols",
-        fetch = FetchMethod.TarballZst,
-    )
-    val smtlibQfUflia = ExternalCollection(
-        id = "smtlib-qf_uflia",
-        url = smtlibLogic("QF_UFLIA"),
-        license = "SMT-LIB (per-family licenses)",
-        reason = "EUF + linear integer arithmetic (18MB compressed); z3-only, klause has no EUF theory",
-        fetch = FetchMethod.TarballZst,
-    )
-    val smtlibQfBv = ExternalCollection(
-        id = "smtlib-qf_bv",
-        url = smtlibLogic("QF_BV"),
-        license = "SMT-LIB (per-family licenses)",
-        reason = "fixed-size bitvectors (1.65GB compressed); z3-only, klause has no bitvector theory",
-        fetch = FetchMethod.TarballZst,
-    )
-    val smtlibQfAbv = ExternalCollection(
-        id = "smtlib-qf_abv",
-        url = smtlibLogic("QF_ABV"),
-        license = "SMT-LIB (per-family licenses)",
-        reason = "arrays + bitvectors (132MB compressed); z3-only, klause has neither theory",
         fetch = FetchMethod.TarballZst,
     )
 
