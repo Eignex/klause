@@ -31,6 +31,7 @@ import com.eignex.klause.localsearch.NoInvariant
 import com.eignex.klause.localsearch.invariantProjection
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.presolve.PresolveShared.withPassDelta
+import com.eignex.klause.presolve.PresolveShared.withSourcePassDelta
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.bake
@@ -38,6 +39,7 @@ import com.eignex.klause.propagation.propagate
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
@@ -858,5 +860,91 @@ class SymmetryBreakingTest {
             linear.remap(mapping).structuralKey().hashCode(),
             linear.remapStructuralHash(mapping),
         )
+    }
+
+    private fun sourceBroken(problem: Problem): Problem =
+        assertNotNull(problem.withSourcePassDelta(Presolve.breakSourceSymmetries(problem)))
+
+    /** `x + y = 4` with both columns from [yLow] / 0 upward, open above where flagged; the box covers
+     *  every solution so counting inside it counts the model. */
+    private fun openSum(openX: Boolean, openY: Boolean, yLow: Long = 0) = Problem(
+        numBoolVars = 0,
+        numIntVars = 2,
+        intDomains = arrayOf(IntDomain(0, 4), IntDomain(yLow, 4)),
+        factors = listOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.EQ, 4)),
+        openIntHi = booleanArrayOf(openX, openY),
+    )
+
+    /** `x ≠ y`, `y ≠ z` over closed `x, y ∈ 0..2` and `z` open above from [zLow]. */
+    private fun openColoring(zLow: Long) = Problem(
+        numBoolVars = 0,
+        numIntVars = 3,
+        intDomains = arrayOf(IntDomain(0, 2), IntDomain(0, 2), IntDomain(zLow, 3)),
+        factors = listOf(
+            Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.NE, 0),
+            Linear(intArrayOf(1, -1), intArrayOf(1, 2), LinearOp.NE, 0),
+        ),
+        openIntHi = booleanArrayOf(false, false, true),
+    )
+
+    @Test
+    fun `the source form orders interchangeable open columns`() {
+        val problem = openSum(openX = true, openY = true)
+
+        val after = countFeasible(sourceBroken(problem))
+
+        assertEquals(5, countFeasible(problem))
+        assertEquals(3, after, "x <= y keeps one of each swapped pair")
+    }
+
+    @Test
+    fun `the source form keeps columns with different open declarations apart`() {
+        listOf(
+            openSum(openX = true, openY = false),
+            openSum(openX = true, openY = true, yLow = 1),
+        ).forEach { problem ->
+            assertTrue(Presolve.breakSourceSymmetries(problem).isEmpty)
+        }
+    }
+
+    @Test
+    fun `the source form leaves a fully closed model to the finite form`() {
+        assertTrue(Presolve.breakSourceSymmetries(openSum(openX = false, openY = false)).isEmpty)
+    }
+
+    @Test
+    fun `the source form posts no propagator-only break over an open column`() {
+        // b0 <-> (x0 = 1), b1 <-> (x1 = 1): a joint swap only, which the finite form hands to SymmetryHandling.
+        val problem = Problem(
+            numBoolVars = 2,
+            numIntVars = 2,
+            intDomains = arrayOf(IntDomain(0, 2), IntDomain(0, 2)),
+            factors = listOf(
+                ReifiedLinear(auxBoolVar = 0, coeffs = intArrayOf(1), vars = intArrayOf(0), LinearOp.EQ, bound = 1),
+                ReifiedLinear(auxBoolVar = 1, coeffs = intArrayOf(1), vars = intArrayOf(1), LinearOp.EQ, bound = 1),
+            ),
+            openIntHi = booleanArrayOf(true, true),
+        )
+
+        val delta = Presolve.breakSourceSymmetries(problem)
+
+        assertTrue(delta.addedFactors.none { it is SymmetryHandling })
+    }
+
+    @Test
+    fun `the source form pins a value orbit an open column admits whole`() {
+        val problem = openColoring(zLow = 0)
+
+        val broken = sourceBroken(problem)
+
+        val orig = countFeasible(problem)
+        val after = countFeasible(broken)
+        assertTrue(after in 1 until orig, "expected a sound reduction: $orig -> $after")
+    }
+
+    @Test
+    fun `an open column admitting part of the values splits their orbit`() {
+        // 0 is admitted by x and y only, so relabeling it would move z out of its range.
+        assertTrue(Presolve.breakSourceSymmetries(openColoring(zLow = 1)).isEmpty)
     }
 }

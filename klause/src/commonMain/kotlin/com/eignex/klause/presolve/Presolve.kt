@@ -174,6 +174,14 @@ object Presolve {
         cancellation: Cancellation = Cancellation.Never,
     ): PassDelta = SymmetryBreaking.breakSymmetries(problem, objectiveIntVars, objectiveBoolVars, cancellation)
 
+    /** Symmetry breaking over a source model. See [SymmetryBreaking.breakSourceSymmetries]. */
+    internal fun breakSourceSymmetries(
+        problem: Problem,
+        objectiveIntVars: Set<Int> = emptySet(),
+        objectiveBoolVars: Set<Int> = emptySet(),
+        cancellation: Cancellation = Cancellation.Never,
+    ): SourceDelta = SymmetryBreaking.breakSourceSymmetries(problem, objectiveIntVars, objectiveBoolVars, cancellation)
+
     /** Value-precedence breaking over interchangeable value orbits. See [SymmetryBreaking]. */
     fun breakValuePrecedence(problem: BakedProblem, objectiveIntVars: Set<Int> = emptySet()): PassDelta =
         SymmetryBreaking.breakValuePrecedence(problem, objectiveIntVars)
