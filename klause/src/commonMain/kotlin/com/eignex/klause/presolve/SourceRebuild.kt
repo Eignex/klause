@@ -66,6 +66,26 @@ internal sealed interface RebuildStep {
         val termCoeffs: LongArray,
         val divisor: Long,
     ) : RebuildStep
+
+    /**
+     * Give integer column [variable] the extreme integer on the satisfying side of
+     * `(constTerm + Σ termCoeffs·termVars) / divisor`: the floor when [roundDown], the ceiling otherwise,
+     * then held inside [clamp] — an upper bound when rounding down, a lower bound when rounding up.
+     *
+     * The projection form: a column free in the direction that relaxes the one row it sat in is recovered
+     * as a value that row admits, since the row itself is gone. [clamp] is the column's other, closed side,
+     * or null when that side is open too. The division rounds toward the satisfying side rather than toward
+     * zero, which is what keeps the recovered value inside the row for a negative quotient.
+     */
+    class QuotientValue(
+        val variable: Int,
+        val constTerm: Long,
+        val termVars: IntArray,
+        val termCoeffs: LongArray,
+        val divisor: Long,
+        val roundDown: Boolean,
+        val clamp: Long?,
+    ) : RebuildStep
 }
 
 /**
@@ -80,7 +100,7 @@ internal class SourceRebuilds(private val steps: List<RebuildStep>) {
     val isEmpty: Boolean get() = steps.isEmpty()
 
     /** Whether any step recovers an integer column, so a lane knows if it must carry values at all. */
-    val touchesInts: Boolean get() = steps.any { it is RebuildStep.AffineValue }
+    val touchesInts: Boolean get() = steps.any { it is RebuildStep.AffineValue || it is RebuildStep.QuotientValue }
 
     /**
      * Recover the eliminated columns into [bools] and [ints], the reduced model's values.
@@ -94,6 +114,19 @@ internal class SourceRebuilds(private val steps: List<RebuildStep>) {
                 var v = step.constTerm
                 for (k in step.termVars.indices) v += step.termCoeffs[k] * ints[step.termVars[k]]
                 ints[step.variable] = if (step.divisor == 1L) v else v / step.divisor
+                continue
+            }
+            if (step is RebuildStep.QuotientValue) {
+                var n = step.constTerm
+                for (k in step.termVars.indices) n += step.termCoeffs[k] * ints[step.termVars[k]]
+                val down = n.floorDiv(step.divisor)
+                val value = if (step.roundDown || down * step.divisor == n) down else down + 1
+                val clamp = step.clamp
+                ints[step.variable] = when {
+                    clamp == null -> value
+                    step.roundDown -> minOf(value, clamp)
+                    else -> maxOf(value, clamp)
+                }
                 continue
             }
             rebuildBool(step, bools)
@@ -114,6 +147,29 @@ internal class SourceRebuilds(private val steps: List<RebuildStep>) {
                     v += ints[step.termVars[k]] * BigInteger.fromLong(step.termCoeffs[k])
                 }
                 ints[step.variable] = if (step.divisor == 1L) v else v / BigInteger.fromLong(step.divisor)
+                continue
+            }
+            if (step is RebuildStep.QuotientValue) {
+                var n = BigInteger.fromLong(step.constTerm)
+                for (k in step.termVars.indices) {
+                    n += ints[step.termVars[k]] * BigInteger.fromLong(step.termCoeffs[k])
+                }
+                val d = BigInteger.fromLong(step.divisor)
+                val truncated = n / d
+                val exact = truncated * d == n
+                // Truncation rounds toward zero; step to the satisfying side when it rounded the wrong way.
+                val negative = n.isNegative xor d.isNegative
+                val value = when {
+                    exact -> truncated
+                    step.roundDown -> if (negative) truncated - BigInteger.ONE else truncated
+                    else -> if (negative) truncated else truncated + BigInteger.ONE
+                }
+                val clamp = step.clamp?.let { BigInteger.fromLong(it) }
+                ints[step.variable] = when {
+                    clamp == null -> value
+                    step.roundDown -> if (value > clamp) clamp else value
+                    else -> if (value < clamp) clamp else value
+                }
                 continue
             }
             rebuildBool(step, bools)
@@ -147,7 +203,7 @@ internal class SourceRebuilds(private val steps: List<RebuildStep>) {
                     }
 
                 // Recovered by the value evaluators, which alone know the width to compute it at.
-                is RebuildStep.AffineValue -> Unit
+                is RebuildStep.AffineValue, is RebuildStep.QuotientValue -> Unit
             }
         }
     }

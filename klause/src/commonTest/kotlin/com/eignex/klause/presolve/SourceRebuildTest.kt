@@ -21,6 +21,47 @@ class SourceRebuildTest {
 
     private fun neg(v: Int) = Lit.make(v, false)
 
+    /** `x` rebuilt from `(3 - y) / divisor`, rounded toward the side [roundDown] names, with `y = 6`. */
+    private fun quotient(divisor: Long, roundDown: Boolean, clamp: Long? = null) = SourceRebuilds(
+        listOf(RebuildStep.QuotientValue(0, 3, intArrayOf(1), longArrayOf(-1), divisor, roundDown, clamp)),
+    )
+
+    @Test
+    fun `a quotient rounded down takes the floor of a negative fraction`() {
+        val ints = longArrayOf(0, 6)
+
+        quotient(divisor = 2, roundDown = true).rebuildInto(BooleanArray(0), ints)
+
+        assertEquals(-2L, ints[0], "(3 - 6) / 2 = -1.5, and truncation would give -1")
+    }
+
+    @Test
+    fun `a quotient rounded up takes the ceiling of a positive fraction`() {
+        val ints = longArrayOf(0, 6)
+
+        quotient(divisor = -2, roundDown = false).rebuildInto(BooleanArray(0), ints)
+
+        assertEquals(2L, ints[0], "(3 - 6) / -2 = 1.5")
+    }
+
+    @Test
+    fun `a quotient is held inside its clamp`() {
+        val ints = longArrayOf(0, 6)
+
+        quotient(divisor = 2, roundDown = true, clamp = -5).rebuildInto(BooleanArray(0), ints)
+
+        assertEquals(-5L, ints[0])
+    }
+
+    @Test
+    fun `a quotient rounds the same way at arbitrary precision`() {
+        val ints = arrayOf(BigInteger.ZERO, BigInteger.fromLong(6))
+
+        quotient(divisor = 2, roundDown = true).rebuildInto(BooleanArray(0), ints)
+
+        assertEquals(BigInteger.fromLong(-2), ints[0])
+    }
+
     @Test
     fun `a copy takes the value of its source literal`() {
         val rebuild = SourceRebuilds(listOf(RebuildStep.CopyLiteral(variable = 0, source = pos(1))))

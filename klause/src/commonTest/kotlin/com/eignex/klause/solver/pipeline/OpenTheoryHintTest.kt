@@ -76,7 +76,10 @@ class OpenTheoryHintTest {
         val result = OpenTheoryEngine(model, ProblemPipeline.DIFFERENCE_THEORY).solve(hinted())
 
         val sat = assertIs<OpenTheoryResult.Sat>(result)
-        assertIs<OpenTheoryAssignment.Difference>(sat.assignment)
+        // Source presolve projects a singleton column out of this model, so the theory's witness arrives
+        // wrapped with that column rebuilt on top; the hint must not have replaced the witness underneath.
+        val witness = (sat.assignment as? OpenTheoryAssignment.Rebuilt)?.base ?: sat.assignment
+        assertIs<OpenTheoryAssignment.Difference>(witness)
         assertTrue(satisfiesClauses(model, sat.assignment))
         assertEquals(1L, sat.stats.openHints.produced)
         assertEquals(3L, sat.stats.openHints.hintedVars)
