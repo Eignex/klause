@@ -206,6 +206,34 @@ class SourceLpTest {
     }
 
     @Test
+    fun `a small leaf with word sized coefficients is admitted for reduction`() {
+        val a = BigFraction.ofLong(4_294_967_296L)
+        val b = BigFraction.ofLong(3_435_973_837L)
+        val twelve = BigFraction.ofLong(12L)
+        val equality = ExactRationalInequality(intArrayOf(0, 1), listOf(a, b), twelve)
+        val rows = listOf(
+            exactColumnLower(0, BigFraction.ofLong(31L)),
+            exactColumnUpper(1, BigFraction.ofLong(-38L)),
+            exactColumnLower(2, BigFraction.ONE),
+            exactColumnUpper(2, BigFraction.ONE),
+            exactColumnLower(3, BigFraction.ZERO),
+            exactColumnUpper(3, BigFraction.ZERO),
+            exactColumnUpper(2, BigFraction.ONE),
+            exactColumnLower(2, BigFraction.ONE),
+            exactColumnUpper(1, BigFraction.ofLong(4_294_967_295L)),
+            exactColumnUpper(1, BigFraction.ZERO),
+            equality,
+            ExactRationalInequality(intArrayOf(0, 1), listOf(a.negated(), b.negated()), twelve.negated()),
+        )
+
+        val split = assertIs<ExactDoubleBoundedSplit.Split>(
+            sourceDoubleBoundedSplit(rows, 4, SourceLpBudget(), Cancellation.Never),
+        )
+
+        assertEquals(twelve, split.bounded.single { it.inequality === equality }.lower)
+    }
+
+    @Test
     fun `crossed opposite bounds do not publish an unexplained contradiction`() {
         val rows = listOf(exactColumnUpper(0, BigFraction.ZERO), exactColumnLower(0, BigFraction.ONE))
 
