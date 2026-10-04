@@ -173,6 +173,12 @@ internal fun Compiler.Builder.elementVarMatrix(
 
 internal fun Compiler.Builder.channel(e: XmlElement) {
     val lists = e.children.filter { it.tag == "list" }
+    val valueEl = e.child("value")
+    if (valueEl != null) {
+        require(lists.size == 1) { "channel: <value> needs exactly one <list>" }
+        val start = lists[0].attr("startIndex").ifBlank { "0" }.toInt()
+        return channelValue(refList(lists[0].textContent), singleTermVar(valueEl.textContent), start)
+    }
     when (lists.size) {
         1 -> {
             val f = refList(lists[0].textContent)
@@ -193,6 +199,18 @@ internal fun Compiler.Builder.channel(e: XmlElement) {
 
         else -> throw UnsupportedXcsp3Exception("channel: only 1- or 2-list forms supported")
     }
+}
+
+/** `channel` of a 0/1 list [xs] to a value [v] (XCSP3 Semantics 33): exactly one `xs[i]` is 1, and it
+ *  is the one at `v = i + start`. */
+internal fun Compiler.Builder.channelValue(xs: IntArray, v: Int, start: Int) {
+    for (i in xs.indices) {
+        val selected = reifyLinear(intArrayOf(1), intArrayOf(v), LinearOp.EQ, i + start)
+        val one = reifyLinear(intArrayOf(1), intArrayOf(xs[i]), LinearOp.EQ, 1)
+        factors.add(Clause(intArrayOf(Lit.negate(selected), one)))
+        factors.add(Clause(intArrayOf(selected, Lit.negate(one))))
+    }
+    factors.add(Linear(IntArray(xs.size) { 1 }, xs, LinearOp.EQ, 1))
 }
 
 /** A two-list `channel` with `|X| < |Y|` (XCSP3 Semantics 32): the one-way implication

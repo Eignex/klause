@@ -979,6 +979,24 @@ class Xcsp3IntegrationTest {
     }
 
     @Test
+    fun `channel of a 0-1 list to a value selects exactly the indexed variable`() {
+        val xml = """
+            <instance type="CSP">
+              <variables><array id="g" size="[3]"> 0 1 </array><var id="v"> 0..4 </var></variables>
+              <constraints>
+                <channel><list startIndex="1"> g[] </list><value> v </value></channel>
+              </constraints>
+            </instance>
+        """.trimIndent()
+        val parsed = Xcsp3.parse(xml)
+        val cols = listOf("g[0]", "g[1]", "g[2]", "v").map { parsed.intVarNames.getValue(it) }
+        val found = BacktrackSolver(parsed.problem.bake()).enumerate(BacktrackParams(randomSeed = 1L)).take(1_000)
+            .map { a -> cols.map { a.ints[it] } }.toSet()
+        val expected = setOf(listOf(1L, 0L, 0L, 1L), listOf(0L, 1L, 0L, 2L), listOf(0L, 0L, 1L, 3L))
+        assertEquals(expected, found)
+    }
+
+    @Test
     fun `circuit forms a subcircuit over the participating nodes`() {
         val xml = """
             <instance type="CSP">
