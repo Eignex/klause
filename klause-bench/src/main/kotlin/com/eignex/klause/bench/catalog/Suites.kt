@@ -252,6 +252,21 @@ internal object Suites {
                 }
             },
             DynamicSuite(
+                "satlib",
+                "Every SATLIB instance: the structured families and every random-3SAT set, uf=SAT / uuf=UNSAT " +
+                    "(fetched, ~6600; one family per set)",
+            ) { sel ->
+                ExternalCollections.satlib.flatMap { (col, category) ->
+                    CorpusSelection.select(
+                        col,
+                        CorpusSelection.Layout.Flat("", "cnf", familyOf = { col.id.removePrefix("satlib-") }),
+                        sel,
+                        category,
+                        format = Format.DIMACS,
+                    )
+                }
+            },
+            DynamicSuite(
                 "pb-comp",
                 "Pseudo-Boolean Competition 2024 selected OPB set (fetched; 1/family by default)",
                 defaultPerFamily = 1,
@@ -1101,6 +1116,12 @@ internal object ExternalCollections {
         reason = "4.4GB MSE'24 exact weighted track (flat `*.wcnf.xz`); fetched rather than vendored",
         fetch = FetchMethod.Zip,
     )
+
+    /** Every SATLIB collection with the category its instances share: the structured families, then the random-3SAT
+     *  sets, uf20 and the ladder's rungs. */
+    val satlib: List<Pair<ExternalCollection, Category>> get() =
+        dimacsClassic + (satlibUf20 to Category.SAT) +
+            satlibLadder.map { (name, col) -> col to if (name.startsWith("uf")) Category.SAT else Category.UNSAT }
 
     /** Ordered rungs (low→high vars) of the SAT and UNSAT ladders, keyed by family name. */
     val satlibLadder: Map<String, ExternalCollection> = listOf(

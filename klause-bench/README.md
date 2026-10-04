@@ -174,7 +174,9 @@ bench solve-one suite=<id> problem=<name> [solve args…] [out=<dir>]
                                      (default output/<config>/) and no per-run table, for drivers that run one
                                      instance per process. An instance that fails to load still gets a record:
                                      stats.unsupported when klause declines the model, stats.loadError when it does
-                                     not compile or parse
+                                     not compile or parse. backend=reference runs the format's reference
+                                     solver (clasp, the XCSP3 cp-sat image, z3, SCIP, or cp-sat for MiniZinc), as
+                                     `bench reference` does, on the instance as it is
 bench list [<suite>]                 list suites, or the problems in one suite
 ```
 

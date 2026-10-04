@@ -11,6 +11,7 @@ import com.eignex.klause.bench.metric.InstanceClassifier
 import com.eignex.klause.bench.metric.InstanceFeatures
 import com.eignex.klause.bench.metric.KlauseSearch
 import com.eignex.klause.bench.metric.ReferenceEntry
+import com.eignex.klause.bench.metric.ReferenceSolve
 import com.eignex.klause.bench.metric.ReferenceStore
 import com.eignex.klause.bench.metric.ResultCredit
 import com.eignex.klause.bench.metric.ScipReference
@@ -21,7 +22,6 @@ import com.eignex.klause.bench.metric.Xcsp3CpSatReference
 import com.eignex.klause.bench.metric.Z3Reference
 import com.eignex.klause.bench.report.Reports
 import com.eignex.klause.bench.runner.Budget
-import com.eignex.klause.bench.runner.MZN_RANDOM_SEED
 import com.eignex.klause.bench.source.CorpusCache
 import com.eignex.klause.bench.source.CorpusFetcher
 import com.eignex.klause.bench.source.CorpusFiles
@@ -561,62 +561,11 @@ object BenchCli {
         // Per-format solver: DIMACS/OPB by clasp, XCSP3 by the CPMpy cp-sat container (OR-Tools reads no
         // XCSP3), MiniZinc by `minizinc --solver`. Each row records the solver that produced it, so the
         // table stays honest about which oracle each format came from. All cache and score identically.
-        val clasp = ref.format == Format.DIMACS || ref.format == Format.OPB || ref.format == Format.WCNF
-        val xcsp3 = ref.format == Format.XCSP3
-        val smt = ref.format == Format.SMTLIB
-        val mps = ref.format == Format.MPS
-        val solverId = solverIdFor(ref, backend)
-        val cacheTag = when {
-            clasp -> "clasp"
-
-            xcsp3 -> "$backend-xcsp3"
-
-            smt -> "z3"
-
-            mps -> "scip"
-
-            // The seed fixes the instance a random-data model compiles to, so results under another seed differ.
-            else -> "$backend-seed$MZN_RANDOM_SEED"
-        }
-        val key = BenchCache.keyFor(ref, cacheTag, budget)
-        val cached = BenchCache.load(key)
-        val r: SolverInvocation.Result
-        val maximize: Boolean
-        when {
-            clasp -> {
-                r = cached ?: ClaspReference.run(ref, budget)
-                    .also { BenchCache.store(key, it) }
-                // clasp minimises OPB (its only PB sense) and DIMACS has no objective — both `false`.
-                maximize = r.stats["maximize"].toBoolean()
-            }
-
-            xcsp3 -> {
-                r = cached ?: Xcsp3CpSatReference.run(ref, budget, settings.processors ?: 1)
-                    .also { BenchCache.store(key, it) }
-                r.stats["error"]?.let { println("?? ${ref.name} ERROR: $it") }
-                // Objective sense is unknowable without parsing the model; the container carries it in stats.
-                maximize = r.stats["maximize"].toBoolean()
-            }
-
-            smt -> {
-                r = cached ?: Z3Reference.run(ref, budget).also { BenchCache.store(key, it) }
-                maximize = false // SMT-LIB benchmarks are decision instances — no objective to orient
-            }
-
-            mps -> {
-                r = cached ?: ScipReference.run(ref, budget).also { BenchCache.store(key, it) }
-                // SCIP reports the bound in the model's OBJSENSE orientation, carried in stats.
-                maximize = r.stats["maximize"].toBoolean()
-            }
-
-            else -> {
-                // MiniZinc: read (optimize, maximize) from the model's solve item.
-                val (optimize, max) = solveKind(ref)
-                r = cached ?: SolverInvocation.runReference(ref, backend, settings, budget, optimize)
-                    .also { BenchCache.store(key, it) }
-                maximize = max
-            }
-        }
+        val run = ReferenceSolve.run(ref, backend, settings, budget)
+        val solverId = run.solver
+        val r = run.result
+        val maximize = run.maximize
+        r.stats["error"]?.let { println("?? ${ref.name} ERROR: $it") }
         // Proof time when proven (the solver's `solveTime`, seconds -> ms); for an unproven feasible
         // witness the time-to-first-feasible (the CSP metric); a pure timeout stores the full budget.
         val solveMs = r.stats["solveTime"]?.toDoubleOrNull()?.let { (it * 1000).toLong() }
@@ -654,16 +603,7 @@ object BenchCli {
         // An instance the reference couldn't even run (parse/solver error) is also uncovered — record an
         // unknown row so coverage stays complete; the error is logged for visibility.
         println("?? ${ref.name} ERROR: ${it.message ?: it::class.simpleName}")
-        unknownRow(ref, maximize = false, solver = solverIdFor(ref, backend), budget = budget)
-    }
-
-    /** The per-format reference solver id: DIMACS/OPB by clasp, SMT-LIB by z3, MPS by scip, else the
-     *  requested MiniZinc [backend]. One source of truth so the decisive and unknown-row paths agree. */
-    private fun solverIdFor(ref: ProblemRef, backend: String): String = when (ref.format) {
-        Format.DIMACS, Format.OPB, Format.WCNF -> "clasp"
-        Format.SMTLIB -> "z3"
-        Format.MPS -> "scip"
-        else -> backend
+        unknownRow(ref, maximize = false, solver = ReferenceSolve.solverIdFor(ref, backend), budget = budget)
     }
 
     /** An "unknown" reference row for an instance the solver left undecided (timeout) or couldn't run:
@@ -680,22 +620,6 @@ object BenchCli {
             solver = solver,
             budgetMs = budget.timeoutMillis,
         )
-
-    /** Read `(optimize, maximize)` from the model's `solve` item (comments stripped) so the reference
-     *  path needs no klause `Problem`. A `satisfy` model — or one whose solve item is not in the top
-     *  `.mzn` — is treated as a CSP: feasibility only, no `-a` enumeration. */
-    private fun solveKind(ref: ProblemRef): Pair<Boolean, Boolean> {
-        val stripped = CorpusFiles.readText(CorpusFetcher.resolve(ref.source))
-            .replace(Regex("/\\*.*?\\*/", RegexOption.DOT_MATCHES_ALL), " ")
-            .replace(Regex("%[^\n]*"), " ")
-        val keyword = Regex("""\bsolve\b[^;]*?\b(satisfy|minimize|maximize)\b""", RegexOption.DOT_MATCHES_ALL)
-            .findAll(stripped).lastOrNull()?.groupValues?.get(1)
-        return when (keyword) {
-            "maximize" -> true to true
-            "minimize" -> true to false
-            else -> false to false
-        }
-    }
 
     /** The klause-side search for a `solve` run, from `engine=` / `processors=` / `fixed=` / `param=`.
      *  Returns null when none are set. Defaults: `engine` unset ⇒ no `-e`, so klause follows the cli's
