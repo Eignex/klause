@@ -154,6 +154,9 @@ internal data class ProblemRef(
     val data: ProblemSource? = null,
     val tags: Set<String> = emptySet(),
     val license: String = "internal",
+    /** The family a corpus provider grouped this instance under; null when the leading path component of [name]
+     *  is the family. */
+    val family: String? = null,
 )
 
 /** A named, described collection of [ProblemRef]s. */
@@ -190,6 +193,17 @@ internal object Catalog {
         }
         error("no such suite: $id (have $suiteIds)")
     }
+
+    /** Every problem of suite [id], without the per-family default a dynamic suite applies when the caller sets no
+     *  cap, so a caller that caps per family itself sees the whole corpus. The `-Dklause.bench.select.*` knobs
+     *  still apply. */
+    fun uncapped(id: String): Suite {
+        val dynamic = dynamicSuites.firstOrNull { it.id == id } ?: return suite(id)
+        return Suite(dynamic.id, dynamic.description, dynamic.provider(CorpusSelection.Selection.fromProps()))
+    }
+
+    /** The per-family cap suite [id] applies when the caller sets none; null for a suite kept whole. */
+    fun defaultPerFamily(id: String): Int? = dynamicSuites.firstOrNull { it.id == id }?.defaultPerFamily
 
     fun problems(vararg suiteIds: String): List<ProblemRef> =
         (if (suiteIds.isEmpty()) suites.map { it.id } else suiteIds.toList()).flatMap { suite(it).problems }
