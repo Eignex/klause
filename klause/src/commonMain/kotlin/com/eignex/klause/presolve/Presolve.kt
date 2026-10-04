@@ -5,6 +5,7 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.presolve.linear.AffineSingletons
 import com.eignex.klause.presolve.linear.CoefficientStrengthening
+import com.eignex.klause.presolve.linear.DependentEqualities
 import com.eignex.klause.presolve.linear.DiophantineReduction
 import com.eignex.klause.presolve.linear.LinearBoundFusion
 import com.eignex.klause.presolve.linear.LinearSubSumAggregation
@@ -104,6 +105,10 @@ object Presolve {
     /** Subsumption over what a source model states. See [RedundantConstraints]. */
     internal fun removeRedundantSourceConstraints(problem: Problem, cancellation: Cancellation): SourceDelta =
         RedundantConstraints.removeRedundantSourceConstraints(problem, cancellation)
+
+    /** Drop equalities the other equalities imply, or refute an inconsistent block. See [DependentEqualities]. */
+    internal fun dropSourceDependentEqualities(problem: Problem, cancellation: Cancellation): SourceDelta =
+        DependentEqualities.dropImplied(problem, cancellation)
 
     /** Cross-direction linear bound fusion (`≤`/`≥` over one vector → `=`, or infeasible when they
      *  cross). See [LinearBoundFusion]. */

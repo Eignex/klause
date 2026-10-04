@@ -557,6 +557,7 @@ open enum class com.eignex.klause.presolve/PresolvePass : kotlin/Enum<com.eignex
     enum entry AGGREGATE_SUB_SUMS // com.eignex.klause.presolve/PresolvePass.AGGREGATE_SUB_SUMS|null[0]
     enum entry BREAK_SYMMETRIES // com.eignex.klause.presolve/PresolvePass.BREAK_SYMMETRIES|null[0]
     enum entry DERIVE_XOR_UNITS // com.eignex.klause.presolve/PresolvePass.DERIVE_XOR_UNITS|null[0]
+    enum entry DROP_DEPENDENT_EQUALITIES // com.eignex.klause.presolve/PresolvePass.DROP_DEPENDENT_EQUALITIES|null[0]
     enum entry DUAL_FIX // com.eignex.klause.presolve/PresolvePass.DUAL_FIX|null[0]
     enum entry ELIMINATE_AFFINE_SINGLETONS // com.eignex.klause.presolve/PresolvePass.ELIMINATE_AFFINE_SINGLETONS|null[0]
     enum entry ELIMINATE_BLOCKED_CLAUSES // com.eignex.klause.presolve/PresolvePass.ELIMINATE_BLOCKED_CLAUSES|null[0]

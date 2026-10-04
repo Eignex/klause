@@ -7386,6 +7386,7 @@ public class com/eignex/klause/presolve/PresolvePass : java/lang/Enum {
 	public static final field BREAK_SYMMETRIES Lcom/eignex/klause/presolve/PresolvePass;
 	public static final field Companion Lcom/eignex/klause/presolve/PresolvePass$Companion;
 	public static final field DERIVE_XOR_UNITS Lcom/eignex/klause/presolve/PresolvePass;
+	public static final field DROP_DEPENDENT_EQUALITIES Lcom/eignex/klause/presolve/PresolvePass;
 	public static final field DUAL_FIX Lcom/eignex/klause/presolve/PresolvePass;
 	public static final field ELIMINATE_AFFINE_SINGLETONS Lcom/eignex/klause/presolve/PresolvePass;
 	public static final field ELIMINATE_BLOCKED_CLAUSES Lcom/eignex/klause/presolve/PresolvePass;

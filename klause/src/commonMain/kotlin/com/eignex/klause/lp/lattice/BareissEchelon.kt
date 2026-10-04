@@ -24,6 +24,13 @@ internal class BareissEchelon(
     /** True when a row reduced to `0 = c` with `c` non-zero: the equalities alone are unsatisfiable.
      *  Only ever set when right-hand sides were supplied, since without them it cannot be seen. */
     val inconsistent: Boolean = false,
+    /**
+     * Input rows that reduced to `0 = 0`, in ascending order: each is a rational combination of the rows
+     * kept as pivots, which are never among them, so the whole set can be dropped at once without
+     * changing the solution set. Empty when the elimination stopped early, since a row it never reached
+     * was never shown dependent.
+     */
+    val dependentRows: IntArray = IntArray(0),
 )
 
 /**
@@ -62,9 +69,10 @@ internal fun bareissEchelon(
     // in order visits each bucket once and never has to scan the rows that do not reach the column.
     val byLead = HashMap<Int, MutableList<Int>>()
     var inconsistent = false
+    val dependent = ArrayList<Int>()
     for (i in 0 until m) {
         if (w[i].isZero) {
-            if (rhs != null && !rhs[i].isZero()) inconsistent = true
+            if (rhs != null && !rhs[i].isZero()) inconsistent = true else dependent.add(i)
         } else {
             byLead.getOrPut(w[i].lead) { ArrayList() }.add(i)
         }
@@ -97,7 +105,7 @@ internal fun bareissEchelon(
             }
             w[q] = reduced
             if (reduced.isZero) {
-                if (rhs != null && !rhs[q].isZero()) inconsistent = true
+                if (rhs != null && !rhs[q].isZero()) inconsistent = true else dependent.add(q)
             } else {
                 byLead.getOrPut(reduced.lead) { ArrayList() }.add(q)
             }
@@ -107,7 +115,8 @@ internal fun bareissEchelon(
         if (rhs != null) keptRhs.add(rhs[p])
     }
 
-    return BareissEchelon(kept, pivots.toIntArray(), keptRhs.toTypedArray(), inconsistent)
+    dependent.sort()
+    return BareissEchelon(kept, pivots.toIntArray(), keptRhs.toTypedArray(), inconsistent, dependent.toIntArray())
 }
 
 /** The candidate with the fewest non-zeros, ties broken by row order so the reduction is reproducible. */

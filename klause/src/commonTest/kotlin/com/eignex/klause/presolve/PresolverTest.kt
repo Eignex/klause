@@ -46,6 +46,7 @@ class PresolverTest {
             PresolvePass.ELIMINATE_AFFINE_SINGLETONS,
             PresolvePass.AGGREGATE_SUB_SUMS,
             PresolvePass.REMOVE_REDUNDANT,
+            PresolvePass.DROP_DEPENDENT_EQUALITIES,
             PresolvePass.REDUCE_STRUCTURAL,
             PresolvePass.FOLD_COMPARISON_CLAUSES,
             PresolvePass.MERGE_DUPLICATE_COLUMNS,

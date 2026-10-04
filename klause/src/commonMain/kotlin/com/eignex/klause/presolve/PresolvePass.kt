@@ -170,6 +170,23 @@ enum class PresolvePass(
             )
     },
 
+    /** Drop the integer equalities the other equalities imply, by exact elimination over the equality
+     *  block, and refute a block with no rational solution. Catches a row dependent through three or more
+     *  others, which pairwise fusion and subsumption cannot; runs after them so duplicates are gone.
+     *  Solution-set exact. One elimination per input, so it stops re-running once it finds nothing. */
+    DROP_DEPENDENT_EQUALITIES(
+        "dependent-rows",
+        Stage.PROBLEM,
+        Capability.SOURCE,
+        PresolveTiming.MEDIUM,
+        preservesSolutionSet = true,
+        autoEligible = true,
+        skipAfterEmpty = true,
+    ) {
+        override fun applySource(problem: Problem, ctx: PresolveContext) =
+            Presolve.dropSourceDependentEqualities(problem, ctx.cancellation)
+    },
+
     /** Per-factor structural self-reduction — each factor rewrites itself into simpler / lower-arity
      *  factors when its structure pins it (e.g. an Element with a fixed index becomes a plain equality),
      *  removing the global. Solution-set exact, so it stays on for solution-set-sensitive queries. */

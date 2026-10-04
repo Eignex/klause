@@ -42,6 +42,23 @@ class BareissRhsTest {
     }
 
     @Test
+    fun `a row the others imply is reported by its input index`() {
+        // x + y = 3, y + z = 4, x + 2y + z = 7: the third is the sum of the first two.
+        val e = bareissEchelon(
+            sparseRows(longArrayOf(1, 1, 0), longArrayOf(0, 1, 1), longArrayOf(1, 2, 1)),
+            3,
+            vec(3, 4, 7),
+        )
+        assertEquals(listOf(2), e.dependentRows.toList())
+    }
+
+    @Test
+    fun `a row reduced to a nonzero constant is not reported dependent`() {
+        val e = bareissEchelon(sparseRows(longArrayOf(1, 1), longArrayOf(2, 2)), 2, vec(4, 9))
+        assertEquals(emptyList(), e.dependentRows.toList(), "0 = 1 refutes the system rather than repeating it")
+    }
+
+    @Test
     fun `coefficients alone still reduce with no right-hand side claimed`() {
         val e = bareissEchelon(sparseRows(longArrayOf(0, 1), longArrayOf(1, 0)), 2)
         assertEquals(2, e.rows.size)
