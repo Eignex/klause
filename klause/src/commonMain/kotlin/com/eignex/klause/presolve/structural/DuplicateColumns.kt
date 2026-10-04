@@ -2,18 +2,31 @@ package com.eignex.klause.presolve.structural
 
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.ir.Factor
+import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.presolve.PassDelta
 import com.eignex.klause.presolve.Presolve
+import com.eignex.klause.presolve.RebuildStep
 import com.eignex.klause.presolve.SharedIntOccurrence
+import com.eignex.klause.presolve.SourceDelta
+import com.eignex.klause.presolve.SourceRebuilds
 import com.eignex.klause.presolve.equivalentLinear
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.LongArrayList
 import com.eignex.klause.util.MutableIntLongMap
 
 internal object DuplicateColumns {
+
+    // Work charged per factor scanned, scaled by its arity: the source form reads each row twice.
+    private const val DUPLICATE_COLUMNS_WORK_WEIGHT = 10L
+
+    private const val OPEN_PATTERNS = 4
+
+    private const val SPLIT_BOUND_LIMIT = 1L shl 61
 
     /**
      * Duplicate-column aggregation. The row side already deduplicates identical constraints
@@ -128,6 +141,125 @@ internal object DuplicateColumns {
         }
         return PassDelta(dropped.toIntArray(), added, domains, DuplicateColumnMerges(batches)::reconstruct)
     }
+
+    /**
+     * The source form, over declared ranges, merging only into a representative whose range already is
+     * the aggregate's.
+     *
+     * A source delta can narrow a range but never widen one, so the aggregate `z = r + y` has to fit the
+     * representative `r` as declared. A side of the Minkowski sum is open when either column is open
+     * there and `r`'s bound plus `y`'s otherwise, so it equals `r`'s side exactly when `r` is open there
+     * or `y` is closed at `0`. Which members a representative absorbs depends only on which of its sides
+     * are open, so the pattern absorbing the most members of a class picks it.
+     *
+     * A column declaring holes stays out, as in the finite form: a split could land in one. Because each
+     * fold leaves `r`'s range unchanged, every split reads the declared bounds, and folds into the same
+     * representative are undone last first.
+     */
+    fun mergeSourceDuplicateColumns(
+        problem: Problem,
+        objectiveIntVars: Set<Int>,
+        cancellation: Cancellation = Cancellation.Never,
+    ): SourceDelta {
+        val n = problem.numIntVars
+        if (n < 2) return SourceDelta()
+        val bounds = problem.intBounds
+        val eligible = BooleanArray(n) { v ->
+            v !in objectiveIntVars &&
+                problem.declaredIntDomains.declaredOrNull(v)?.isContiguous() != false &&
+                (bounds.isOpenLower(v) || fitsSplit(bounds.lower(v))) &&
+                (bounds.isOpenUpper(v) || fitsSplit(bounds.upper(v)))
+        }
+        val factors = problem.factors
+        for (f in factors) {
+            cancellation.charge(DUPLICATE_COLUMNS_WORK_WEIGHT * (1L + f.intVars.size))
+            if (f.equivalentLinear()?.integerConstants != null) continue
+            for (v in f.intVars) eligible[v] = false
+        }
+        val signatures = columnSignatures(factors, n, eligible)
+        val classes = LinkedHashMap<List<Long>, IntArrayList>()
+        for (v in 0 until n) {
+            val sig = signatures[v] ?: continue
+            classes.getOrPut(sig) { IntArrayList() }.add(v)
+        }
+        val keepOf = IntArray(n) { it }
+        val steps = ArrayList<RebuildStep>()
+        for (members in classes.values) {
+            if (members.size < 2) continue
+            val rep = sourceRepresentative(members, bounds) ?: continue
+            val folded = IntArrayList()
+            for (k in 0 until members.size) {
+                val y = members[k]
+                if (y != rep && absorbs(rep, y, bounds)) folded.add(y)
+            }
+            for (k in folded.size - 1 downTo 0) {
+                val y = folded[k]
+                keepOf[y] = rep
+                steps.add(splitStep(rep, y, bounds))
+                steps.add(RebuildStep.AffineValue(rep, 0L, intArrayOf(rep, y), longArrayOf(1L, -1L), 1L))
+            }
+        }
+        if (steps.isEmpty()) return SourceDelta()
+        val dropped = IntArrayList()
+        val added = ArrayList<Factor>()
+        factors.forEachIndexed { i, f ->
+            val rewritten = aggregateColumns(f, keepOf)
+            if (rewritten !== f) {
+                dropped.add(i)
+                added.add(rewritten)
+            }
+        }
+        return SourceDelta(dropped.toIntArray(), added, rebuild = SourceRebuilds(steps))
+    }
+
+    /** The member of [members] whose open-side pattern absorbs the most others, or null when none absorbs one. */
+    private fun sourceRepresentative(members: IntArrayList, bounds: IntBounds): Int? {
+        var best: Int? = null
+        var bestCount = 0
+        val tried = BooleanArray(OPEN_PATTERNS)
+        for (k in 0 until members.size) {
+            val r = members[k]
+            val pattern = (if (bounds.isOpenLower(r)) 1 else 0) + (if (bounds.isOpenUpper(r)) 2 else 0)
+            if (tried[pattern]) continue
+            tried[pattern] = true
+            var count = 0
+            for (j in 0 until members.size) if (members[j] != r && absorbs(r, members[j], bounds)) count++
+            if (count > bestCount) {
+                best = r
+                bestCount = count
+            }
+        }
+        return best
+    }
+
+    /** Whether `rep + y` spans exactly [rep]'s declared range: each side open on [rep], or closed at `0` on [y]. */
+    private fun absorbs(rep: Int, y: Int, bounds: IntBounds): Boolean =
+        (bounds.isOpenLower(rep) || bounds.hasLower(y) && bounds.lower(y) == 0L) &&
+            (bounds.isOpenUpper(rep) || bounds.hasUpper(y) && bounds.upper(y) == 0L)
+
+    /**
+     * The step recovering [y] from the aggregate `z` held in [rep]'s slot, before [rep] itself is.
+     *
+     * A split needs `y ∈ [max(lo(y), z − hi(r)), min(hi(y), z − lo(r))]`, non-empty for every `z` in the
+     * Minkowski sum; its upper end is taken. With both of those sides open, [absorbs] has left `r` open
+     * above too, so `r` takes whatever `y` does and `y` sits at its lower bound, or `0` when it has none.
+     */
+    private fun splitStep(rep: Int, y: Int, bounds: IntBounds): RebuildStep = when {
+        bounds.hasLower(rep) -> RebuildStep.QuotientValue(
+            y,
+            -bounds.lower(rep),
+            intArrayOf(rep),
+            longArrayOf(1L),
+            1L,
+            roundDown = true,
+            clamp = if (bounds.hasUpper(y)) bounds.upper(y) else null,
+        )
+        bounds.hasUpper(y) -> RebuildStep.AffineValue(y, bounds.upper(y), IntArray(0), LongArray(0), 1L)
+        else -> RebuildStep.AffineValue(y, if (bounds.hasLower(y)) bounds.lower(y) else 0L, IntArray(0), LongArray(0), 1L)
+    }
+
+    /** Whether a declared bound leaves room for the `Long` evaluator to subtract it from an aggregate value. */
+    private fun fitsSplit(bound: Long): Boolean = bound > -SPLIT_BOUND_LIMIT && bound < SPLIT_BOUND_LIMIT
 
     /** [factor] with every dropped duplicate column folded into its representative: in a [Linear] row,
      *  remove each dropped variable's term and keep the representative's coefficient standing for the

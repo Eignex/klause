@@ -173,6 +173,13 @@ object Presolve {
     ): PassDelta =
         DuplicateColumns.mergeDuplicateColumns(problem, objectiveIntVars, sharedIntOcc, incrementalTouchedVars)
 
+    /** Duplicate-column aggregation over declared ranges, into a representative the aggregate fits. */
+    internal fun mergeSourceDuplicateColumns(
+        problem: Problem,
+        objectiveIntVars: Set<Int>,
+        cancellation: Cancellation,
+    ): SourceDelta = DuplicateColumns.mergeSourceDuplicateColumns(problem, objectiveIntVars, cancellation)
+
     /** Symmetry breaking by detecting interchangeable variables. See [SymmetryBreaking]. */
     fun breakSymmetries(
         problem: BakedProblem,

@@ -20,6 +20,8 @@ import com.eignex.klause.propagation.propagate
 import com.eignex.klause.propagation.propagatorProjection
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
+import com.eignex.klause.util.Cancellation
+import com.ionspin.kotlin.bignum.integer.BigInteger
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -112,6 +114,70 @@ class DuplicateColumnsTest {
             }
             if (i == n) return
         }
+    }
+
+    /** `x + y >= 7` and `x + y + w <= 40` over `x` (0), `y` (1), `w` (2), with `x` and `y` duplicate columns. */
+    private fun sourceModel(
+        x: IntDomain,
+        y: IntDomain,
+        openLo: BooleanArray? = null,
+        openHi: BooleanArray? = null,
+    ) = Problem(
+        numBoolVars = 0,
+        numIntVars = 3,
+        intDomains = arrayOf(x, y, IntDomain(0, 3)),
+        factors = listOf(
+            Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 7),
+            Linear(intArrayOf(1, 1, 1), intArrayOf(0, 1, 2), LinearOp.LE, 40),
+        ),
+        openIntLo = openLo,
+        openIntHi = openHi,
+    )
+
+    @Test
+    fun `the source form folds a column closed at zero into a representative open above`() {
+        val model = sourceModel(IntDomain(0, 100), IntDomain(0, 5), openHi = booleanArrayOf(true, false, false))
+        val delta = Presolve.mergeSourceDuplicateColumns(model, emptySet(), Cancellation.Never)
+        val ints = longArrayOf(12, 0, 3)
+
+        delta.rebuild.rebuildInto(BooleanArray(0), ints)
+
+        assertTrue(delta.addedFactors.none { 1 in it.intVars }, "y's terms are absorbed by x")
+        assertEquals(listOf(7L, 5L), ints.take(2), "y takes all it can of 12, x the rest")
+    }
+
+    @Test
+    fun `the source form splits an aggregate of two free columns`() {
+        val free = booleanArrayOf(true, true, false)
+        val model = sourceModel(IntDomain(0, 9), IntDomain(0, 9), openLo = free, openHi = free)
+        val delta = Presolve.mergeSourceDuplicateColumns(model, emptySet(), Cancellation.Never)
+        val ints = arrayOf(BigInteger.fromLong(-3), BigInteger.ZERO, BigInteger.ZERO)
+
+        delta.rebuild.rebuildInto(BooleanArray(0), ints)
+
+        assertEquals(listOf(BigInteger.fromLong(-3), BigInteger.ZERO), ints.take(2))
+    }
+
+    @Test
+    fun `the source form leaves closed columns whose aggregate would need a wider range`() {
+        val model = sourceModel(IntDomain(0, 9), IntDomain(1, 5))
+
+        val delta = Presolve.mergeSourceDuplicateColumns(model, emptySet(), Cancellation.Never)
+
+        assertTrue(delta.isEmpty)
+    }
+
+    @Test
+    fun `the source form does not fold a column declaring holes`() {
+        val model = sourceModel(
+            IntDomain(0, 100),
+            IntDomain(0, 4).excludeValue(2),
+            openHi = booleanArrayOf(true, false, false),
+        )
+
+        val delta = Presolve.mergeSourceDuplicateColumns(model, emptySet(), Cancellation.Never)
+
+        assertTrue(delta.isEmpty)
     }
 
     @Test
