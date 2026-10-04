@@ -151,10 +151,23 @@ internal object AffineSingletons {
         // far above what any non-giant model reaches, so ordinary instances are unaffected (byte-identical).
         if (problem.factors.size > maxFactors) return null
         val eliminated = BooleanArray(problem.numIntVars)
-        // Where every column is closed and binary substitution has already run, there is nothing to
+        // Once `x` is gone only its range survives, as the bound rows on its terms, so a pivot with interior
+        // holes could be rebuilt onto a value the model excludes. A source declaration has nowhere to carry
+        // them, so that lane refuses such a pivot outright; the finite lane takes one only with a single
+        // partner, which the loop below restricts to the values keeping `x` off its holes. Where every
+        // column is closed and contiguous and binary substitution has already run, there is nothing to
         // refuse, so the finite lane pays no predicate.
-        val pivotable: ((Int) -> Boolean)? =
-            if (domains != null) null else { x: Int -> ranges.isClosed(x) && !ranges.isBinary(x) }
+        val pivotable: ((Int, Int) -> Boolean)? = when {
+            domains == null -> { x: Int, _: Int ->
+                ranges.isClosed(x) && !ranges.isBinary(x) && (problem.intDomainOrNull(x)?.holeCount ?: 0L) == 0L
+            }
+
+            domains.any { it.holeCount > 0L } -> { x: Int, partners: Int ->
+                partners == 1 || domains[x].holeCount == 0L
+            }
+
+            else -> null
+        }
         val subs = ArrayList<AffineSub>()
         // Before any fold the working set is byte-for-byte the pristine input, so the first candidate scan
         // can read the session's shared occurrence index directly (its CSR is in stable-id order). If no
@@ -207,10 +220,18 @@ internal object AffineSingletons {
         var fillIn = 0L
         while (!cancellation()) {
             val cand = order.next() ?: break
+            val holed = domains != null && domains[cand.x].holeCount > 0L
+            val partnerDomain = if (holed) holedPivotPartner(checkNotNull(domains), cand) else null
+            if (holed && partnerDomain == null) {
+                // The holes have nowhere to go, so `x` stays; holding it keeps the gate from offering it again.
+                objVars.add(cand.x)
+                continue
+            }
             val foldCost = ws.degreeOf(cand.x).toLong() * cand.termVars.size
             cancellation.charge(AFFINE_WORK_WEIGHT * (1L + foldCost))
             fillIn += foldCost
             order.onFolded(foldOutVariable(problem, ranges, ws, cand))
+            if (partnerDomain != null) checkNotNull(domains)[cand.termVars[0]] = partnerDomain
             eliminated[cand.x] = true
             subs.add(AffineSub(cand.x, cand.constTerm, cand.termVars, cand.termCoeffs))
             if (fillIn > AFFINE_FILL_IN_BUDGET) break
@@ -362,6 +383,19 @@ internal object AffineSingletons {
         return null
     }
 
+    /**
+     * The domain of the single partner `y` of a holed pivot `x = constTerm + a·y`, restricted to the `y`
+     * that keep `x` off its holes, or null when `x` has more than one term, the partner is too wide to
+     * scan, or no `y` survives. Carrying the holes there lets the pivot fold without the rebuild landing
+     * on a value its domain excludes.
+     */
+    private fun holedPivotPartner(domains: Array<IntDomain>, c: AffineCandidate): IntDomain? {
+        if (c.termVars.size != 1) return null
+        val domY = domains[c.termVars[0]]
+        if (domY.max - domY.min > RESIDUE_DOMAIN_SPAN_CAP) return null
+        return restrictPartnerDomain(domY, domains[c.x], 1L, -c.termCoeffs[0], c.constTerm)
+    }
+
     /** The partner domain restricted to the `y` values for which `x = (c − b·y)/a` is an integer
      *  inside [domX], or `null` if no such `y` exists (leave the constraint for propagation to fail). */
     private fun restrictPartnerDomain(domY: IntDomain, domX: IntDomain, a: Long, b: Long, c: Long): IntDomain? {
@@ -405,7 +439,7 @@ internal object AffineSingletons {
         eliminated: BooleanArray,
         objectiveIntVars: IntHashSet,
         capWide: Boolean,
-        pivotable: ((Int) -> Boolean)? = null,
+        pivotable: ((Int, Int) -> Boolean)? = null,
         cancellation: Cancellation = Cancellation.Never,
     ): AffineCandidate? {
         // The scan walks the live factors in stable-id order — the same order a fresh compacted list would
@@ -457,8 +491,8 @@ internal object AffineSingletons {
         eliminated: BooleanArray,
         objectiveIntVars: IntHashSet,
         capWide: Boolean,
-        // Null where every column is closed, so no pivot is refused for want of a bound.
-        pivotable: ((Int) -> Boolean)?,
+        // Whether column `x` may pivot a row with the given number of partners; null admits every column.
+        pivotable: ((Int, Int) -> Boolean)?,
         cancellation: Cancellation = Cancellation.Never,
     ): AffineCandidate? {
         val f = ws.factorAt(di)?.equivalentLinear() ?: return null
@@ -474,8 +508,9 @@ internal object AffineSingletons {
             if (eliminated[x] || x in objectiveIntVars) continue
             // A column with an open side states no bound to carry over to the terms it folds into, so
             // eliminating it would drop the row a later bound proof reads and leave the column itself
-            // unconstrained — trading a lane the model could have routed to for one reduction.
-            if (pivotable != null && !pivotable(x)) continue
+            // unconstrained — trading a lane the model could have routed to for one reduction. A column
+            // with holes needs a single partner to take them: the bound rows carry only its range.
+            if (pivotable != null && !pivotable(x, f.vars.size - 1)) continue
             // The substitution `x = (bound − Σ c_j·y_j) / c_x` stays integral for *every*
             // assignment of the partners only when `c_x` divides each `c_j` and the bound — for a
             // unit pivot trivially, and for a non-unit pivot exactly when `x` is implied-free
@@ -545,7 +580,7 @@ internal object AffineSingletons {
         // Null where the lane states ranges rather than domains, which is where no residue doubleton is
         // eliminated at all — so there is no residue candidate to look for either.
         domains: Array<IntDomain>?,
-        pivotable: ((Int) -> Boolean)?,
+        pivotable: ((Int, Int) -> Boolean)?,
         cancellation: Cancellation = Cancellation.Never,
     ): Boolean {
         val checked = IntHashSet()

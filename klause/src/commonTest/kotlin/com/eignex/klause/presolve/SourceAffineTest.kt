@@ -3,6 +3,7 @@ package com.eignex.klause.presolve
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntBounds
+import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.presolve.PresolveShared.withSourcePassDelta
@@ -156,5 +157,29 @@ class SourceAffineTest {
         )
 
         assertTrue(delta.isEmpty, "a {0, 1} column is never a source pivot")
+    }
+
+    @Test
+    fun `a column with declared holes is never a pivot`() {
+        // x declares {0, 4}. Folding it out carries only its range onto y, so the rebuild could land x on
+        // 1..3. y is held as an objective column, so x is the only pivot the equality offers.
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 2,
+            intDomains = arrayOf(IntDomain(0, 4).excludeValues(longArrayOf(1, 2, 3))!!, IntDomain(0, 10)),
+            factors = listOf(
+                row(0 to 1L, 1 to -1L, op = LinearOp.EQ, bound = 1L),
+                row(0 to 1L, 1 to 1L, op = LinearOp.LE, bound = 9L),
+            ),
+        )
+
+        val delta = Presolve.eliminateSourceAffineSingletons(
+            problem,
+            setOf(1),
+            Cancellation.Never,
+            AffinePivotOrder.MARKOWITZ,
+        )
+
+        assertTrue(delta.isEmpty, "a column with holes is never a source pivot")
     }
 }

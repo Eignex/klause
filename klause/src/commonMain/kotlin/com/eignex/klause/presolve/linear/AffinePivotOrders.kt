@@ -15,7 +15,7 @@ internal object AffinePivotOrders {
         eliminated: BooleanArray,
         objectiveIntVars: IntHashSet,
         capWide: Boolean,
-        pivotable: ((Int) -> Boolean)?,
+        pivotable: ((Int, Int) -> Boolean)?,
         cancellation: Cancellation,
     ): AffineSingletons.PivotOrder = when (policy) {
         AffinePivotOrder.STABLE_ID ->
@@ -30,7 +30,7 @@ internal object AffinePivotOrders {
         private val eliminated: BooleanArray,
         private val objectiveIntVars: IntHashSet,
         private val capWide: Boolean,
-        private val pivotable: ((Int) -> Boolean)?,
+        private val pivotable: ((Int, Int) -> Boolean)?,
         private val cancellation: Cancellation,
     ) : AffineSingletons.PivotOrder {
         private var scanFrom = 0
@@ -55,7 +55,7 @@ internal object AffinePivotOrders {
         private val eliminated: BooleanArray,
         private val objectiveIntVars: IntHashSet,
         private val capWide: Boolean,
-        private val pivotable: ((Int) -> Boolean)?,
+        private val pivotable: ((Int, Int) -> Boolean)?,
         private val cancellation: Cancellation,
     ) : AffineSingletons.PivotOrder {
         private val heap = PivotHeap()
