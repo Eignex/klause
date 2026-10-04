@@ -31,9 +31,33 @@ internal object BlockedClauseElimination {
         problem: Problem,
         objectiveBoolVars: Set<Int> = emptySet(),
         cancellation: Cancellation = Cancellation.Never,
-    ): PassDelta {
-        val nb = problem.numBoolVars
-        if (nb == 0) return PassDelta()
+    ): PassDelta = run(problem, objectiveBoolVars, cancellation) { db, rebuild ->
+        db.toDelta(rebuild.asSampleLift())
+    } ?: PassDelta()
+
+    /**
+     * [eliminate] over a canonical source model.
+     *
+     * The blocked check reads the clause database and nothing else — no domain, no propagation — so the
+     * argument holds before a finite projection exists. A blocking literal's variable must be eligible,
+     * and `SatClauseDb.build` marks a Boolean ineligible when any factor that is not a clean clause
+     * touches it, so the repair never flips a Boolean an integer row or a reified row reads.
+     */
+    fun eliminateSource(
+        problem: Problem,
+        objectiveBoolVars: Set<Int> = emptySet(),
+        cancellation: Cancellation = Cancellation.Never,
+    ): SourceDelta = run(problem, objectiveBoolVars, cancellation) { db, rebuild ->
+        db.toSourceDelta(rebuild)
+    } ?: SourceDelta()
+
+    private fun <T> run(
+        problem: Problem,
+        objectiveBoolVars: Set<Int>,
+        cancellation: Cancellation,
+        delta: (SatClauseDb, SourceRebuilds) -> T,
+    ): T? {
+        if (problem.numBoolVars == 0) return null
         val db = SatClauseDb.build(problem, objectiveBoolVars)
 
         val removed = ArrayList<Blocked>()
@@ -48,7 +72,7 @@ internal object BlockedClauseElimination {
             removed.add(Blocked(c, blocking))
         }
 
-        return db.toDelta(removed.asRebuilds().asSampleLift())
+        return delta(db, removed.asRebuilds())
     }
 
     /** A literal of [c] whose variable is eligible and on which [c] is blocked, or `null`. */
