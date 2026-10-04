@@ -99,7 +99,11 @@ internal object ImplicationGraph {
     private class Reduction(val factors: List<Factor>, val merges: List<BoolMerge>)
 
     /** The implication edges the clean binary clauses among [factors] encode, both directions of each. */
-    private fun binaryClauseImplications(problem: Problem, factors: List<Factor>, cancellation: Cancellation): Adjacency {
+    private fun binaryClauseImplications(
+        problem: Problem,
+        factors: List<Factor>,
+        cancellation: Cancellation,
+    ): Adjacency {
         val adj = Adjacency(2 * problem.numBoolVars)
         cancellation.charge(IMPLICATION_GRAPH_WORK_WEIGHT * (1L + factors.size))
         for (f in factors) {
