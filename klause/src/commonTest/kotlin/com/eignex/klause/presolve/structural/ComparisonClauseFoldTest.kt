@@ -17,7 +17,9 @@ import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.propagation.propagatorProjection
 import kotlin.test.Test
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
+import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class ComparisonClauseFoldTest {
@@ -46,8 +48,70 @@ class ComparisonClauseFoldTest {
     private fun reif(aux: Int, v: Int, op: LinearOp, bound: Int) =
         ReifiedLinear(auxBoolVar = aux, coeffs = intArrayOf(1), vars = intArrayOf(v), op = op, bound = bound)
 
-    private fun problemOf(numBool: Int, domains: Array<IntDomain>, factors: List<Factor>) =
-        Problem(numBool, domains.size, domains, factors.toTypedArray())
+    private fun problemOf(
+        numBool: Int,
+        domains: Array<IntDomain>,
+        factors: List<Factor>,
+        openHi: BooleanArray? = null,
+    ) = Problem(numBool, domains.size, domains, factors.toTypedArray(), openIntHi = openHi)
+
+    /** `b0 ⇔ (x0 − x2 ≤ 0)`, `b1 ⇔ (x1 − x3 ≤ 0)` and `b0 ∨ b1`, with x2 and x3 declared `{1}` unless open above. */
+    private fun constantShifted(openConstants: Boolean) = problemOf(
+        numBool = 2,
+        domains = arrayOf(IntDomain(0, 3), IntDomain(0, 3), IntDomain(1, 1), IntDomain(1, 1)),
+        factors = listOf(
+            ReifiedLinear(0, intArrayOf(1, -1), intArrayOf(0, 2), LinearOp.LE, 0),
+            ReifiedLinear(1, intArrayOf(1, -1), intArrayOf(1, 3), LinearOp.LE, 0),
+            Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
+        ),
+        openHi = booleanArrayOf(false, false, openConstants, openConstants),
+    )
+
+    @Test
+    fun `the source form folds comparisons over open columns`() {
+        val problem = problemOf(
+            numBool = 2,
+            domains = arrayOf(IntDomain(0, 3), IntDomain(0, 3)),
+            factors = listOf(
+                reif(0, 0, LinearOp.LE, 1),
+                reif(1, 1, LinearOp.GE, 2),
+                Clause(intArrayOf(Lit.make(0, true), Lit.make(1, false))),
+            ),
+            openHi = booleanArrayOf(true, true),
+        )
+
+        val delta = ComparisonClauseFold.foldSource(problem)
+
+        assertEquals(setOf(0, 1, 2), delta.droppedIndices.toSet())
+        val folded = assertIs<ComparisonClause>(delta.addedFactors.single())
+        assertContentEquals(intArrayOf(0, 1), folded.vars)
+        assertContentEquals(arrayOf(LinearOp.LE, LinearOp.LE), folded.ops)
+        assertContentEquals(longArrayOf(1, 1), folded.consts)
+    }
+
+    @Test
+    fun `the source form moves a declared constant term into the bound`() {
+        val delta = ComparisonClauseFold.foldSource(constantShifted(openConstants = false))
+
+        val folded = assertIs<ComparisonClause>(delta.addedFactors.single())
+        assertContentEquals(longArrayOf(1, 1), folded.consts)
+    }
+
+    @Test
+    fun `the source form keeps a term over an open column out of the bound`() {
+        val delta = ComparisonClauseFold.foldSource(constantShifted(openConstants = true))
+
+        assertTrue(delta.isEmpty)
+    }
+
+    @Test
+    fun `an indicator the objective weighs keeps its reified definition`() {
+        val problem = constantShifted(openConstants = false)
+
+        val delta = ComparisonClauseFold.foldSource(problem, objectiveBoolVars = setOf(1))
+
+        assertTrue(delta.isEmpty)
+    }
 
     /** Enumerate a problem's solutions projected onto its integer variables. */
     private fun intSolutions(problem: Problem): HashSet<List<Long>> = BacktrackSolver(problem.bake())
