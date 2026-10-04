@@ -220,6 +220,13 @@ object Presolve {
         objectiveBoolVars: Set<Int> = emptySet(),
     ): PassDelta = ImplicationGraph.reduce(problem, maxCandidates, cancellation, objectiveBoolVars)
 
+    /** Binary implication graph presolve over a canonical source model. See [ImplicationGraph.reduceSource]. */
+    internal fun reduceSourceImplicationGraph(
+        problem: Problem,
+        cancellation: Cancellation,
+        objectiveBoolVars: Set<Int>,
+    ): SourceDelta = ImplicationGraph.reduceSource(problem, cancellation, objectiveBoolVars)
+
     /** Binary-implication graph (literal-indexed adjacency `lit -> forced lits`) for implication-aware
      *  consumers such as local search. See [ImplicationGraph]. */
     fun implicationGraph(

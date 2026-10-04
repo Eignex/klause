@@ -374,7 +374,8 @@ enum class PresolvePass(
             Presolve.probe(problem, PROBE_PASS_MAX_CANDIDATES, Cancellation.Never)
     },
 
-    /** Binary implication graph: harvest `lit -> lit` implications by probing-style pinning, collapse
+    /** Binary implication graph: harvest `lit -> lit` implications by probing-style pinning (from the
+     *  binary clauses alone before a finite projection exists), collapse
      *  same-polarity equivalent literals (mutual-implication cycles) to one representative, and drop
      *  transitively-redundant binary clauses. Substitution leaves a merged variable unconstrained and
      *  rebuilds it on reconstruct, so — like affine elimination — it inflates a complete enumerator's
@@ -382,11 +383,16 @@ enum class PresolvePass(
     IMPLICATION_GRAPH(
         "impl-graph",
         Stage.PROBLEM,
-        Capability.FINITE,
+        Capability.SOURCE,
         PresolveTiming.EXHAUSTIVE,
         preservesSolutionSet = false,
         autoEligible = true,
     ) {
+        override fun applySource(problem: Problem, ctx: PresolveContext) =
+            Presolve.reduceSourceImplicationGraph(problem, ctx.cancellation, ctx.objectiveBoolVars)
+
+        // Pinning a literal and propagating needs finite domains, so only the finite lane harvests the
+        // implications that longer clauses and other factor kinds carry; the source graph is the binaries.
         override fun applyFinite(problem: BakedProblem, ctx: PresolveContext) = Presolve.reduceImplicationGraph(
             problem,
             IMPLICATION_GRAPH_MAX_CANDIDATES,
