@@ -14,6 +14,7 @@ import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.MutableIntIntMap
+import com.eignex.klause.util.MutableLongIntMap
 
 /**
  * Binary implication graph presolve. Harvests `lit -> lit` implications the way [Probing] pins a
@@ -47,26 +48,72 @@ internal object ImplicationGraph {
         objectiveBoolVars: Set<Int> = emptySet(),
     ): PassDelta {
         if (problem.numBoolVars == 0) return PassDelta()
-
         val implications = harvestImplications(problem, maxCandidates, cancellation)
+        val reduction = reduceOver(problem, implications, objectiveBoolVars, cancellation) ?: return PassDelta()
+        return PresolveShared.identityDelta(
+            problem.factors,
+            reduction.factors,
+            reconstruct = reduction.merges.asRebuilds().asSampleLift(),
+        )
+    }
+
+    /**
+     * [reduce] over a canonical source model, with the graph read off the binary clauses.
+     *
+     * Pinning runs propagation, which needs a finite domain for every column, so the source form harvests
+     * no implication a longer clause or another factor kind would yield: its graph is exactly the clean
+     * binary clauses. A cycle there is still an equivalence every solution honours, and the rename and the
+     * transitive reduction read nothing else, so both hold before a finite projection exists.
+     */
+    fun reduceSource(
+        problem: Problem,
+        cancellation: Cancellation,
+        objectiveBoolVars: Set<Int> = emptySet(),
+    ): SourceDelta {
+        if (problem.numBoolVars == 0) return SourceDelta()
+        val implications = binaryClauseImplications(problem, problem.factors.asList(), cancellation)
+        val reduction = reduceOver(problem, implications, objectiveBoolVars, cancellation) ?: return SourceDelta()
+        return PresolveShared.sourceIdentityDelta(problem.factors, reduction.factors, reduction.merges.asRebuilds())
+    }
+
+    /** The factors after collapsing the cycles of [implications] and dropping entailed binaries, or `null`
+     *  when neither changed anything. */
+    private fun reduceOver(
+        problem: Problem,
+        implications: Adjacency,
+        objectiveBoolVars: Set<Int>,
+        cancellation: Cancellation,
+    ): Reduction? {
         val merges = compatibleMerges(
             problem,
             equivalentVariableMerges(problem.numBoolVars, implications, objectiveBoolVars),
         )
-
         val original = problem.factors.asList()
         val substituted = if (merges.isEmpty()) original else applyMerges(problem, merges)
-        val reduced = dropTransitivelyRedundantBinaries(problem, substituted)
-
-        // A rename/drop leaves survivors identity-equal to inputs; a pure no-op keeps the same list, which
-        // [identityDelta] renders as an empty delta (== the fresh path's `=== problem` fixpoint signal).
-        if (merges.isEmpty() && reduced === original) return PassDelta()
-        return PresolveShared.identityDelta(
-            problem.factors,
-            reduced,
-            reconstruct = merges.asRebuilds().asSampleLift(),
-        )
+        val reduced = dropTransitivelyRedundantBinaries(problem, substituted, cancellation)
+        // A rename/drop leaves survivors identity-equal to inputs; a pure no-op keeps the same list.
+        if (merges.isEmpty() && reduced === original) return null
+        return Reduction(reduced, merges)
     }
+
+    private class Reduction(val factors: List<Factor>, val merges: List<BoolMerge>)
+
+    /** The implication edges the clean binary clauses among [factors] encode, both directions of each. */
+    private fun binaryClauseImplications(problem: Problem, factors: List<Factor>, cancellation: Cancellation): Adjacency {
+        val adj = Adjacency(2 * problem.numBoolVars)
+        cancellation.charge(IMPLICATION_GRAPH_WORK_WEIGHT * (1L + factors.size))
+        for (f in factors) {
+            if (!isCleanBinary(f, problem.numBoolVars)) continue
+            val (a, b) = implicationEdges(f as Clause)
+            adj.addEdge(a.first, a.second)
+            adj.addEdge(b.first, b.second)
+        }
+        return adj
+    }
+
+    /** A two-literal clause over plain Booleans; an atom literal has no node in the literal graph. */
+    private fun isCleanBinary(f: Factor, numBoolVars: Int): Boolean =
+        f is Clause && f.literals.size == 2 && f.allLiteralsBool(numBoolVars)
 
     /**
      * Implications discovered by probing-style pinning, as a directed graph over **literals**
@@ -217,31 +264,48 @@ internal object ImplicationGraph {
      * Drop every binary clause whose implication is entailed by a longer chain of the *other* binary
      * clauses. A binary clause `(¬a ∨ b)` is the implication `a -> b` (and its contrapositive
      * `¬b -> ¬a`); both edges go into a graph built from the binary clauses **alone**. The clause is
-     * redundant exactly when `b` is reachable from `a` over the remaining edges without using this
-     * clause's own two edges — propagation then still derives `b` from `a`, so satisfiability and the
-     * optimum are untouched. Non-binary factors and unit clauses are always kept; when nothing is
-     * dropped [factors] is returned unchanged (identity, the pass's no-op signal).
+     * redundant exactly when `b` is reachable from `a` over the edges of the clauses still kept —
+     * propagation then still derives `b` from `a`, so satisfiability and the optimum are untouched.
+     *
+     * The clauses are settled one at a time and a dropped clause's edges leave the graph before the next
+     * is tested. Judging every clause against the whole graph would let the clauses of one cycle each
+     * vouch for the others and all drop together, losing the equivalence they jointly state. Edges are
+     * counted per clause, so a duplicate keeps exactly one copy.
+     *
+     * Non-binary factors and unit clauses are always kept; when nothing is dropped [factors] is returned
+     * unchanged (identity, the pass's no-op signal).
      */
-    private fun dropTransitivelyRedundantBinaries(problem: Problem, factors: List<Factor>): List<Factor> {
+    private fun dropTransitivelyRedundantBinaries(
+        problem: Problem,
+        factors: List<Factor>,
+        cancellation: Cancellation,
+    ): List<Factor> {
         val binaryIndices = IntArrayList()
-        factors.forEachIndexed { i, f -> if (f is Clause && f.literals.size == 2) binaryIndices.add(i) }
+        factors.forEachIndexed { i, f -> if (isCleanBinary(f, problem.numBoolVars)) binaryIndices.add(i) }
         if (binaryIndices.size < 2) return factors
 
-        val adj = Adjacency(2 * problem.numBoolVars)
+        val adj = binaryClauseImplications(problem, factors, cancellation)
+        val live = MutableLongIntMap()
         binaryIndices.forEach { i ->
-            val (a, b) = implicationEdges(factors[i] as Clause)
-            adj.addEdge(a.first, a.second)
-            adj.addEdge(b.first, b.second)
+            val (e1, e2) = implicationEdges(factors[i] as Clause)
+            live.addTo(e1.key, 1)
+            live.addTo(e2.key, 1)
         }
 
         val drop = IntHashSet()
-        binaryIndices.forEach { i ->
-            val clause = factors[i] as Clause
-            val (e1, e2) = implicationEdges(clause)
-            // Redundant iff the implication has an alternative path that avoids this clause's own two
-            // directed edges. Checking one direction suffices: the contrapositive is reachable iff the
-            // forward implication is, so a single source→target search settles the clause.
-            if (reachableAvoiding(adj, e1.first, e1.second, e1, e2)) drop.add(i)
+        for (k in 0 until binaryIndices.size) {
+            if (cancellation()) break
+            val i = binaryIndices[k]
+            val (e1, e2) = implicationEdges(factors[i] as Clause)
+            live.addTo(e1.key, -1)
+            live.addTo(e2.key, -1)
+            // Checking one direction suffices: the contrapositive is reachable iff the forward one is.
+            if (reachable(adj, live, e1.first, e1.second, cancellation)) {
+                drop.add(i)
+            } else {
+                live.addTo(e1.key, 1)
+                live.addTo(e2.key, 1)
+            }
         }
         if (drop.isEmpty()) return factors
 
@@ -257,9 +321,14 @@ internal object ImplicationGraph {
         return Edge(Lit.negate(p), q) to Edge(Lit.negate(q), p)
     }
 
-    /** Whether [target] is reachable from [source] over [adj] without traversing either [skip1] or
-     *  [skip2] (the edges of the clause under test) — a path of length ≥ 2 entailing `source -> target`. */
-    private fun reachableAvoiding(adj: Adjacency, source: Int, target: Int, skip1: Edge, skip2: Edge): Boolean {
+    /** Whether [target] is reachable from [source] over the edges of [adj] some kept clause still holds. */
+    private fun reachable(
+        adj: Adjacency,
+        live: MutableLongIntMap,
+        source: Int,
+        target: Int,
+        cancellation: Cancellation,
+    ): Boolean {
         val stack = IntArrayList()
         val seen = IntHashSet()
         stack.add(source)
@@ -267,10 +336,9 @@ internal object ImplicationGraph {
         while (!stack.isEmpty()) {
             val node = stack.last()
             stack.removeAt(stack.size - 1)
+            cancellation.charge(IMPLICATION_GRAPH_WORK_WEIGHT)
             adj.forEachNeighbor(node) { next ->
-                val skipped = (node == skip1.first && next == skip1.second) ||
-                    (node == skip2.first && next == skip2.second)
-                if (!skipped && next !in seen) {
+                if (next !in seen && live.getOrDefault(Edge(node, next).key, 0) > 0) {
                     if (next == target) return true
                     seen.add(next)
                     stack.add(next)
@@ -348,7 +416,9 @@ internal object ImplicationGraph {
         return component
     }
 
-    private data class Edge(val first: Int, val second: Int)
+    private data class Edge(val first: Int, val second: Int) {
+        val key: Long get() = (first.toLong() shl Int.SIZE_BITS) or (second.toLong() and 0xFFFF_FFFFL)
+    }
 
     /** Adjacency list over literal nodes `0 until [nodeCount]`, built incrementally. Parallel
      *  neighbour lists per node; reads expose a plain [IntArray] view for the SCC walk. */
@@ -382,3 +452,7 @@ internal class BoolMerge(val from: Int, val into: Int)
  */
 internal fun List<BoolMerge>.asRebuilds(): SourceRebuilds =
     SourceRebuilds(map { RebuildStep.CopyLiteral(it.from, Lit.make(it.into, true)) })
+
+// Work units per implication edge or graph node visited, against one simplex op. Uncalibrated: no model in
+// the calibration sample ran this pass, so it takes the weight the other per-term passes measured.
+private const val IMPLICATION_GRAPH_WORK_WEIGHT = 10L
