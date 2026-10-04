@@ -8,6 +8,7 @@ import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.StructuralKey
 import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.ir.values
@@ -47,12 +48,65 @@ internal object SymmetryBreaking {
         objectiveBoolVars: Set<Int> = emptySet(),
         cancellation: Cancellation = Cancellation.Never,
     ): PassDelta {
+        val extra = breakings(
+            problem,
+            FiniteColumns(problem),
+            objectiveIntVars,
+            objectiveBoolVars,
+            cancellation,
+            theoryOwnableOnly = false,
+        )
+        return if (extra.isEmpty()) PassDelta() else PassDelta(addedFactors = extra)
+    }
+
+    /**
+     * [breakSymmetries] over a source model that still has an open integer column.
+     *
+     * Two columns are interchangeable only when their declarations match: the same value set for closed
+     * columns, and for a column with an open side the same open sides and the same finite endpoints, which
+     * is all such a column declares. A value orbit is grouped by which columns admit each value, open
+     * columns included, so a transposition within it maps every declaration to itself; the scanned values
+     * are those of the closed columns, so an open column never contributes an endpoint it does not have.
+     *
+     * Only breaks some theory can own are posted, since a CP-only factor over an open column leaves that
+     * column with no lane: the scalar total orders, the Boolean orders, and the single-column value pin.
+     * The generator lex and the value-precedence chain are CP propagators and wait for the finite lane.
+     * A model with every column closed is left to the finite form outright, which reads root-propagated
+     * domains and posts both.
+     */
+    fun breakSourceSymmetries(
+        problem: Problem,
+        objectiveIntVars: Set<Int> = emptySet(),
+        objectiveBoolVars: Set<Int> = emptySet(),
+        cancellation: Cancellation = Cancellation.Never,
+    ): SourceDelta {
+        val bounds = problem.intBounds
+        if ((0 until problem.numIntVars).all { bounds.hasLower(it) && bounds.hasUpper(it) }) return SourceDelta()
+        val extra = breakings(
+            problem,
+            SourceColumns(problem),
+            objectiveIntVars,
+            objectiveBoolVars,
+            cancellation,
+            theoryOwnableOnly = true,
+        )
+        return if (extra.isEmpty()) SourceDelta() else SourceDelta(addedFactors = extra)
+    }
+
+    private fun breakings(
+        problem: Problem,
+        columns: ColumnValues,
+        objectiveIntVars: Set<Int>,
+        objectiveBoolVars: Set<Int>,
+        cancellation: Cancellation,
+        theoryOwnableOnly: Boolean,
+    ): List<Factor> {
         // Symmetry breaking is a one-shot transformation: once a [SymmetryHandling] factor is present
         // the generators have been found and posted. The presolve round engine re-enables this pass
         // whenever another pass changes the problem, but re-running would (a) re-search from scratch and
         // (b) have to remap (conjugate every generator) and re-key the heavy [SymmetryHandling] factor it
         // just added — an O(rounds) blow-up that dominated presolve on symmetric models. So detect once.
-        if (problem.factors.any { it is SymmetryHandling }) return PassDelta()
+        if (problem.factors.any { it is SymmetryHandling }) return emptyList()
 
         // A model too large for even one generator-refinement round ([GENERATOR_ROUND_COST_BUDGET]) is
         // skipped outright — not just for the generator search, but for the value / scalar heuristics too.
@@ -60,7 +114,7 @@ internal object SymmetryBreaking {
         // the round-cost scan itself are each O(factors); paying them only to post nothing dominates
         // presolve on the largest models (a 245k-factor routing model spends hundreds of ms here). Sound —
         // skipping symmetry breaking only ever forgoes a reduction, never changes a solution.
-        if (generatorRoundCost(problem) > GENERATOR_ROUND_COST_BUDGET) return PassDelta()
+        if (generatorRoundCost(problem) > GENERATOR_ROUND_COST_BUDGET) return emptyList()
 
         // Generator-based detection: individualization–refinement over the unified variable+factor
         // colouring yields verified automorphism generators (catching composite and bool/int-mixed
@@ -68,20 +122,23 @@ internal object SymmetryBreaking {
         // [SymmetryHandling] factor whose [SymmetryPropagator] enforces every generator's lex-leader
         // `V ≤lex σ(V)` at each search node — sound (the orbit lex-minimum satisfies it) and with no
         // static enumeration of group elements.
-        val generators = findGenerators(problem, objectiveIntVars, objectiveBoolVars, cancellation)
+        val generators = findGenerators(problem, columns, objectiveIntVars, objectiveBoolVars, cancellation)
         // For an orbit whose members are *individually* interchangeable (each single transposition is
         // itself an automorphism — a scalar symmetric group, not a lockstep matrix), the full total
         // order is sound and strictly stronger than the generator lex, so post it too.
         val scalarLex = scalarTotalOrders(problem, generators, objectiveIntVars, objectiveBoolVars)
-        val valuePins = breakValueSymmetry(problem, objectiveIntVars, cancellation)
-        if (generators.isEmpty() && scalarLex.isEmpty() && valuePins.isEmpty()) {
-            return PassDelta()
-        }
+        val valuePins = breakValueSymmetry(
+            problem,
+            columns,
+            objectiveIntVars,
+            cancellation,
+            chainPrecedence = !theoryOwnableOnly,
+        )
         val extra = ArrayList<Factor>()
-        if (generators.isNotEmpty()) extra.add(SymmetryHandling(generators))
+        if (generators.isNotEmpty() && !theoryOwnableOnly) extra.add(SymmetryHandling(generators))
         extra.addAll(scalarLex)
         extra.addAll(valuePins)
-        return PassDelta(addedFactors = extra)
+        return extra
     }
 
     /**
@@ -102,23 +159,25 @@ internal object SymmetryBreaking {
      * factor that is unkeyed or returns `null` from `Factor.remapValues` conservatively blocks it.
      */
     private fun breakValueSymmetry(
-        problem: BakedProblem,
+        problem: Problem,
+        columns: ColumnValues,
         objectiveIntVars: Set<Int>,
-        cancellation: Cancellation = Cancellation.Never,
+        cancellation: Cancellation,
+        chainPrecedence: Boolean,
     ): List<Factor> {
-        val orbits = verifiedValueOrbits(problem, cancellation) ?: return emptyList()
+        val orbits = verifiedValueOrbits(problem, columns, cancellation) ?: return emptyList()
         val extra = ArrayList<Factor>()
         for (orbit in orbits) {
             val orbitSet = LongHashSet()
             orbit.forEach { orbitSet.add(it) }
             val internal = (0 until problem.numIntVars)
-                .filter { it !in objectiveIntVars && domainWithin(problem.rootIntDomain(it), orbitSet) }
+                .filter { it !in objectiveIntVars && domainWithin(columns.finite(it), orbitSet) }
             when {
                 // Law–Lee value precedence (the default value break): introduce the orbit's values in
                 // sorted order across the interchangeable variables — one representative per value-symmetry
                 // class survives, strictly stronger than pinning a single variable. Needs ≥ 2 variables to
                 // chain; with one it degrades to the single-variable pin (the only sound break available).
-                internal.size >= 2 -> {
+                chainPrecedence && internal.size >= 2 -> {
                     val sortedValues = orbit.sorted()
                     val seq = internal.toIntArray()
                     for (i in 0 until sortedValues.size - 1) {
@@ -126,7 +185,7 @@ internal object SymmetryBreaking {
                     }
                 }
 
-                internal.size == 1 -> extra.add(
+                internal.isNotEmpty() -> extra.add(
                     Linear(longArrayOf(1), intArrayOf(internal[0]), LinearOp.EQ, orbit.min()),
                 )
             }
@@ -144,7 +203,8 @@ internal object SymmetryBreaking {
      * per-orbit action, not here.
      */
     private fun verifiedValueOrbits(
-        problem: BakedProblem,
+        problem: Problem,
+        columns: ColumnValues,
         cancellation: Cancellation = Cancellation.Never,
     ): List<List<Long>>? {
         if (problem.numIntVars == 0 || cancellation()) return null
@@ -166,7 +226,7 @@ internal object SymmetryBreaking {
         var lo = Long.MAX_VALUE
         var hi = Long.MIN_VALUE
         for (v in 0 until problem.numIntVars) {
-            val d = problem.rootIntDomain(v)
+            val d = columns.finite(v) ?: continue
             if (d.min < lo) lo = d.min
             if (d.max > hi) hi = d.max
         }
@@ -186,7 +246,7 @@ internal object SymmetryBreaking {
             if (cancellation()) return null
             cancellation.charge(problem.numIntVars.toLong())
             val sig = LongArrayList()
-            for (x in 0 until problem.numIntVars) if (value in problem.rootIntDomain(x)) sig.add(x.toLong())
+            for (x in 0 until problem.numIntVars) if (columns.contains(x, value)) sig.add(x.toLong())
             if (!sig.isEmpty()) incidence.getOrPut(RefineKey(sig.toLongArray())) { ArrayList() }.add(value)
         }
         val orbits = ArrayList<List<Long>>()
@@ -227,14 +287,15 @@ internal object SymmetryBreaking {
         // A verified orbit is interchangeable; ordering its first occurrences is sound. A
         // fully-internal variable (domain ⊆ orbit) exists only when the orbit equals the whole
         // incidence group, so a split orbit simply posts nothing — never unsound.
-        val orbits = verifiedValueOrbits(problem) ?: return PassDelta()
+        val columns = FiniteColumns(problem)
+        val orbits = verifiedValueOrbits(problem, columns) ?: return PassDelta()
         val extra = ArrayList<Factor>()
         for (orbit in orbits) {
             val orbitSet = LongHashSet()
             orbit.forEach { orbitSet.add(it) }
             val seq = IntArrayList()
             for (x in 0 until n) {
-                if (x !in objectiveIntVars && domainWithin(problem.rootIntDomain(x), orbitSet)) seq.add(x)
+                if (x !in objectiveIntVars && domainWithin(columns.finite(x), orbitSet)) seq.add(x)
             }
             if (seq.size < 2) continue
             val sortedValues = orbit.sorted()
@@ -252,7 +313,7 @@ internal object SymmetryBreaking {
      *  generate the full symmetric group on each resulting orbit. Groups beyond [MAX_VERIFIED_GROUP]
      *  are skipped (the O(n²·factors) guard, as for variables). */
     private fun verifyValueOrbits(
-        problem: BakedProblem,
+        problem: Problem,
         base: Map<StructuralKey, Int>,
         values: List<Long>,
         cancellation: Cancellation = Cancellation.Never,
@@ -270,7 +331,7 @@ internal object SymmetryBreaking {
      *  factor via `Factor.remapValues` and compare `Factor.structuralKey` counts against [base].
      *  `false` if any factor is not value-relabelable (returns `null`). The value analog of
      *  [isAutomorphism]. */
-    private fun verifyValueSwap(problem: BakedProblem, base: Map<StructuralKey, Int>, v: Long, w: Long): Boolean {
+    private fun verifyValueSwap(problem: Problem, base: Map<StructuralKey, Int>, v: Long, w: Long): Boolean {
         val swap = { x: Long ->
             if (x == v) {
                 w
@@ -283,7 +344,8 @@ internal object SymmetryBreaking {
         return PresolveShared.matchesMultiset(problem.factors.asList(), base) { it.remapValues(swap) }
     }
 
-    private fun domainWithin(d: IntDomain, values: LongHashSet): Boolean {
+    private fun domainWithin(d: IntDomain?, values: LongHashSet): Boolean {
+        if (d == null) return false
         for (v in d.min..d.max) {
             if (v !in d) continue
             if (v !in values) return false
@@ -307,6 +369,60 @@ internal object SymmetryBreaking {
     private const val SEED_INDIVIDUALIZED = 3L
     private const val SIG_PORT = 4L
     private const val SEED_DOMAIN_SURVIVORS = 5L
+    private const val SEED_OPEN_RANGE = 6L
+
+    /** The values each integer column admits, as far as the lane running the search knows them. */
+    private interface ColumnValues {
+        /** The finite value set of column [v], or null when [v] has an open side. */
+        fun finite(v: Int): IntDomain?
+
+        /** Whether column [v] admits [value]. */
+        fun contains(v: Int, value: Long): Boolean
+
+        /** A colour seed equal for two columns exactly when they admit the same values. */
+        fun seed(v: Int): RefineKey
+    }
+
+    /** Root-propagated domains of a finite projection. */
+    private class FiniteColumns(private val problem: BakedProblem) : ColumnValues {
+        override fun finite(v: Int): IntDomain = problem.rootIntDomain(v)
+
+        override fun contains(v: Int, value: Long): Boolean = value in problem.rootIntDomain(v)
+
+        override fun seed(v: Int): RefineKey = domainSeed(problem.rootIntDomain(v))
+    }
+
+    /**
+     * A source model's declarations. A column with an open side declares a range and no value set, so it
+     * admits every integer between its finite endpoints and is never read through the box it was stated in.
+     */
+    private class SourceColumns(problem: Problem) : ColumnValues {
+        private val bounds = problem.intBounds
+        private val closed = Array(problem.numIntVars) { v ->
+            if (bounds.hasLower(v) && bounds.hasUpper(v)) {
+                problem.declaredIntDomains.declaredOrNull(v) ?: IntDomain(bounds.lower(v), bounds.upper(v))
+            } else {
+                null
+            }
+        }
+
+        override fun finite(v: Int): IntDomain? = closed[v]
+
+        override fun contains(v: Int, value: Long): Boolean = finite(v)?.contains(value)
+            ?: ((!bounds.hasLower(v) || value >= bounds.lower(v)) &&
+                (!bounds.hasUpper(v) || value <= bounds.upper(v)))
+
+        override fun seed(v: Int): RefineKey = finite(v)?.let(::domainSeed) ?: RefineKey(
+            longArrayOf(
+                SPACE_INT,
+                SEED_OPEN_RANGE,
+                if (bounds.hasLower(v)) 1L else 0L,
+                if (bounds.hasLower(v)) bounds.lower(v) else 0L,
+                if (bounds.hasUpper(v)) 1L else 0L,
+                if (bounds.hasUpper(v)) bounds.upper(v) else 0L,
+            ),
+        )
+    }
 
     /** Domain signature so only variables with the *same* domain (bounds and holes) can group. */
     private fun domainSeed(d: IntDomain): RefineKey {
@@ -365,12 +481,13 @@ internal object SymmetryBreaking {
      * re-checks every candidate, so a wrong colouring can only miss symmetries, never invent one.
      */
     private fun refineColours(
-        problem: BakedProblem,
+        problem: Problem,
+        columns: ColumnValues,
         objectiveIntVars: Set<Int>,
         objectiveBoolVars: Set<Int>,
     ): Pair<IntArray, IntArray> {
         val seedInt = Array(problem.numIntVars) { v ->
-            if (v in objectiveIntVars) objectiveSeed(SPACE_INT, v) else domainSeed(problem.rootIntDomain(v))
+            if (v in objectiveIntVars) objectiveSeed(SPACE_INT, v) else columns.seed(v)
         }
         val seedBool = Array(problem.numBoolVars) { v ->
             if (v in objectiveBoolVars) objectiveSeed(SPACE_BOOL, v) else RefineKey(longArrayOf(SPACE_BOOL, SEED_BOOL))
@@ -387,7 +504,7 @@ internal object SymmetryBreaking {
      * partition's colour *is* a labeling comparable across individualization branches.
      */
     private fun equitablePartition(
-        problem: BakedProblem,
+        problem: Problem,
         seedInt: Array<RefineKey>,
         seedBool: Array<RefineKey>,
         budget: IntArray? = null,
@@ -457,7 +574,7 @@ internal object SymmetryBreaking {
      *  produces is re-checked by [isAutomorphism], so a collision can only cost extra verification, never
      *  admit a false symmetry. */
     private fun portSignature(
-        problem: BakedProblem,
+        problem: Problem,
         incident: IntArrayList,
         v: Int,
         isBool: Boolean,
@@ -515,7 +632,7 @@ internal object SymmetryBreaking {
 
     /** Test-only view of [refineColours] with no objective variables. */
     internal fun refineColoursForTest(problem: BakedProblem): Pair<IntArray, IntArray> =
-        refineColours(problem, emptySet(), emptySet())
+        refineColours(problem, FiniteColumns(problem), emptySet(), emptySet())
 
     // Three guards on the generator search: a size skip for models too large to bother, a deterministic
     // work budget on the refinement, and bailing with the generators found so far when it runs out.
@@ -558,7 +675,7 @@ internal object SymmetryBreaking {
     // Estimated cost of one refinement round: each factor is remapped and re-keyed once per incident
     // variable, at its Factor.structuralKeyWeight. The [GENERATOR_ROUND_COST_BUDGET] gate on this value is
     // what breakSymmetries uses to skip the whole pass on a model too large to carry symmetry.
-    private fun generatorRoundCost(problem: BakedProblem): Long {
+    private fun generatorRoundCost(problem: Problem): Long {
         var roundCost = 0L
         for (f in problem.factors) {
             val deg = (f.intVars.size + f.boolVars.size).toLong()
@@ -577,7 +694,8 @@ internal object SymmetryBreaking {
      * downstream orbit/lex breaking is sound by construction; an imperfect search only finds fewer.
      */
     private fun findGenerators(
-        problem: BakedProblem,
+        problem: Problem,
+        columns: ColumnValues,
         objectiveIntVars: Set<Int>,
         objectiveBoolVars: Set<Int>,
         cancellation: Cancellation = Cancellation.Never,
@@ -597,7 +715,7 @@ internal object SymmetryBreaking {
 
         val base = PresolveShared.structuralKeyMultiset(problem.factors.asList())
         val seedIntBase = Array(nInt) { v ->
-            if (v in objectiveIntVars) objectiveSeed(SPACE_INT, v) else domainSeed(problem.rootIntDomain(v))
+            if (v in objectiveIntVars) objectiveSeed(SPACE_INT, v) else columns.seed(v)
         }
         val seedBoolBase = Array(nBool) { v ->
             if (v in objectiveBoolVars) objectiveSeed(SPACE_BOOL, v) else RefineKey(longArrayOf(SPACE_BOOL, SEED_BOOL))
@@ -634,6 +752,9 @@ internal object SymmetryBreaking {
                 if (orbit.connected(index.getOrDefault(r, 0), index.getOrDefault(v, 0))) continue
                 val leaf = refineToDiscrete(problem, seedIntBase, seedBoolBase, v, budget, cancellation) ?: continue
                 val perm = buildPerm(refLeaf, leaf, nInt, nBool) ?: continue
+                // A permutation maps solutions to solutions only if it also maps every column's values onto
+                // its image's, which the factor check below does not see; the seeds are those values.
+                if ((0 until nInt).any { seedIntBase[it] != seedIntBase[perm.first[it]] }) continue
                 cancellation.charge(problem.factors.size.toLong())
                 if (!isAutomorphism(problem, base, perm.second, perm.first)) continue
                 gens.add(perm)
@@ -655,7 +776,7 @@ internal object SymmetryBreaking {
      */
     @Suppress("ReturnCount")
     private fun refineToDiscrete(
-        problem: BakedProblem,
+        problem: Problem,
         seedIntBase: Array<RefineKey>,
         seedBoolBase: Array<RefineKey>,
         firstIndiv: Int,
@@ -736,7 +857,7 @@ internal object SymmetryBreaking {
      * row is not an automorphism), so it is left to the row-wise generator lex — never column-ordered.
      */
     private fun scalarTotalOrders(
-        problem: BakedProblem,
+        problem: Problem,
         generators: List<Pair<IntArray, IntArray>>,
         objectiveIntVars: Set<Int>,
         objectiveBoolVars: Set<Int>,
@@ -787,7 +908,7 @@ internal object SymmetryBreaking {
     /** Whether remapping every factor through [boolMap]/[intMap] leaves the factor multiset (by
      *  structural key) unchanged — i.e. the maps encode an automorphism of the constraint set. */
     private fun isAutomorphism(
-        problem: BakedProblem,
+        problem: Problem,
         base: Map<StructuralKey, Int>,
         boolMap: IntArray,
         intMap: IntArray,

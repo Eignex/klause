@@ -266,16 +266,28 @@ enum class PresolvePass(
             Presolve.projectSingletonInequalities(problem, ctx.objectiveIntVars)
     },
 
-    /** Interchangeable-variable / block / value symmetry breaking. */
+    /** Interchangeable-variable / block / value symmetry breaking.
+     *
+     *  On a source model only the breaks a theory can own are posted, and only while some column is still
+     *  open; see [SymmetryBreaking.breakSourceSymmetries]. */
     BREAK_SYMMETRIES(
         "symmetry",
         Stage.PROBLEM,
-        Capability.FINITE,
+        Capability.SOURCE,
         PresolveTiming.MEDIUM,
         preservesSolutionSet = false,
         autoEligible = true,
         skipAfterEmpty = true,
     ) {
+        override fun applySource(problem: Problem, ctx: PresolveContext) = Presolve.breakSourceSymmetries(
+            problem,
+            ctx.objectiveIntVars,
+            ctx.objectiveBoolVars,
+            ctx.cancellation,
+        )
+
+        // Root-propagated domains can make columns interchangeable that their declarations tell apart, and
+        // once every column is finite the generator lex and the value-precedence chain have an owner.
         override fun applyFinite(problem: BakedProblem, ctx: PresolveContext) = Presolve.breakSymmetries(
             problem,
             ctx.objectiveIntVars,
