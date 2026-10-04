@@ -78,6 +78,8 @@ internal object ClaspReference {
             "docker",
             "run",
             "--rm",
+            // The output streams to this process; a container log would also keep it on the VM's disk.
+            "--log-driver", "none",
             "-i",
             "--name", name,
             // Hard resource ceilings so no single container can starve the host: memory (see
@@ -90,6 +92,9 @@ internal object ClaspReference {
             IMAGE,
             "--time-limit=$timeoutSec",
             "--parallel-mode=1",
+            // No models: on a large MaxSAT instance every improving model is gigabytes of `v` lines, and the
+            // reference reads only the status and `o` lines.
+            "--quiet=2,0",
         )
         val startNanos = System.nanoTime()
         val proc = ProcessBuilder(cmd).redirectErrorStream(false).start()

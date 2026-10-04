@@ -52,6 +52,18 @@ internal object BenchCache {
 
     fun store(key: String, result: SolverInvocation.Result) {
         if (!enabled) return
-        File(dir, "$key.json").writeText(Reports.json.encodeToString(result))
+        File(dir, "$key.json").writeText(Reports.json.encodeToString(compact(result)))
     }
+
+    /** [result] with its model lines dropped when its output is too large to keep: a solver can print gigabytes
+     *  of `v` lines on a large instance, while the status, objective and statistics lines are what a replay reads. */
+    internal fun compact(result: SolverInvocation.Result): SolverInvocation.Result =
+        if (result.rawOutput.length <= MAX_STORED_OUTPUT_CHARS) {
+            result
+        } else {
+            val kept = result.rawOutput.lineSequence().filterNot { it.startsWith("v ") }
+            result.copy(rawOutput = kept.joinToString("\n"))
+        }
 }
+
+private const val MAX_STORED_OUTPUT_CHARS = 8 * 1024 * 1024
