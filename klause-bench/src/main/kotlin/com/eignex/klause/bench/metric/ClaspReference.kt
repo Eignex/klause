@@ -212,7 +212,9 @@ internal object ClaspReference {
         companion object {
             fun of(format: Format, open: () -> BufferedReader): ClaspInput = when (format) {
                 Format.OPB -> ClaspInput(open, opbHeader(open)) { it }
+
                 Format.WCNF -> wcnf(open)
+
                 // SATLIB's random-3SAT files close with a `%` line and then a lone `0`, which clasp reads as an
                 // empty clause, making every one of them unsatisfiable. `%` ends the formula.
                 else -> ClaspInput(open, null, end = { it.trim() == "%" }) { it }
