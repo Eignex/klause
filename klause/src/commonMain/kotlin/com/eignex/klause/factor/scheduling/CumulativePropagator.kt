@@ -4,6 +4,7 @@ import com.eignex.klause.factor.OptPresence
 import com.eignex.klause.factor.arithmetic.internals.collectLinearTightenAntecedents
 import com.eignex.klause.factor.scheduling.internals.CumulativeEff
 import com.eignex.klause.factor.scheduling.internals.CumulativeThetaTree
+import com.eignex.klause.factor.scheduling.internals.EdgeFindingOmegas
 import com.eignex.klause.factor.scheduling.internals.MandatoryProfile
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.propagation.IntEvent
@@ -402,6 +403,7 @@ internal class CumulativePropagator(
         var scopedAntBuilt = false
         var ant: IntArray? = null
         var antBuilt = false
+        val omegas = EdgeFindingOmegas(m)
 
         var k = 0
         while (k < m) {
@@ -422,9 +424,8 @@ internal class CumulativePropagator(
                 val cI = cs[i]
                 val envWith = tree.envIfActivated(i, ests[i], eI)
                 if (envWith <= capTau) continue
-                val numerator = envTheta - (effCap - cI) * tau
-                if (numerator <= 0L) continue
-                val newEst = (numerator + cI - 1L) / cI
+                if (omegas.thetaSize != k) omegas.build(k, lctOrder, ests, lcts, energies)
+                val newEst = omegas.earliestStartAfter(cI, effCap) ?: continue
                 val v = starts[taskIds[i]]
                 if (newEst > state.intDomains[v].min) {
                     val reason: IntArray?
@@ -433,7 +434,9 @@ internal class CumulativePropagator(
                             scopedAnt = state.composeIntVarAtomAntecedents(activeStarts.toIntArray())
                             scopedAntBuilt = true
                         }
-                        reason = scopedAnt
+                        // The detection placed i at its earliest start, so `start(i) ≥ est(i)` is a premise:
+                        // without it the clause would also forbid running i before the whole of Θ.
+                        reason = withOwnEstPremise(state, v, scopedAnt)
                     } else {
                         if (!antBuilt) {
                             ant = state.composeIntVarAtomAntecedents(intVars)
@@ -446,5 +449,12 @@ internal class CumulativePropagator(
             }
         }
         return true
+    }
+
+    private fun withOwnEstPremise(state: PropagationState, v: Int, thetaReason: IntArray?): IntArray? {
+        val est = state.intDomains[v].min
+        if (est <= state.rootDomains[v].min) return thetaReason
+        val own = Lit.make(state.atomVarGe(v, est), false)
+        return if (thetaReason == null) intArrayOf(own) else thetaReason + own
     }
 }

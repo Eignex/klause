@@ -4,6 +4,7 @@ import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.backtrack.selector.Vsids
 import com.eignex.klause.factor.FactorPropagationOracle
+import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.scheduling.internals.CumulativeThetaTree
 import com.eignex.klause.ir.Factor
@@ -22,11 +23,14 @@ import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.propagation.propagate
 import com.eignex.klause.propagation.propagatorProjection
+import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.result.MinimizeResult
 import kotlin.math.abs
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
@@ -512,6 +516,55 @@ class CumulativePropagatorTest {
                 .map { it.ints.map { v -> v.toInt() } }.toHashSet()
             assertEquals(brute, found, "instance #$idx: cumulative backtrack solution set must equal brute force")
         }
+    }
+
+    @Test
+    fun `edge-finding does not push a task past a subset with no leftover energy`() {
+        // Capacity 13. B (d5, r10) is fixed at 5 and C (d4, r11) at 1; A (d16, r2) fits beside both from
+        // t=1. Θ = {B, C} precedes A, but neither subset of Θ has energy left over once A runs beside it,
+        // so A's start must stay at 1.
+        val factor = Cumulative(
+            starts = intArrayOf(0, 1, 2),
+            durations = longArrayOf(16, 5, 4),
+            resources = longArrayOf(2, 10, 11),
+            capacity = 13,
+        )
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 3,
+            intDomains = arrayOf(IntDomain(1, 30), IntDomain(1, 30), IntDomain(1, 30)),
+            factors = arrayOf<Factor>(factor),
+        )
+
+        val result = problem.propagate(Assumptions(ints = mapOf(1 to 5L, 2 to 1L)))
+
+        assertIs<PropagationResult.Implied>(result)
+        assertEquals(null, result.intMinOrNullCompat(0))
+    }
+
+    @Test
+    fun `cumulative search proves the known optimal makespan`() {
+        // Beldiceanu & Contejean's seven-task CHIP instance under capacity 13; its optimal makespan 23 is
+        // reached by starts [1, 17, 10, 10, 5, 5, 1]. Ints 0..6 are the starts, 7 is the makespan.
+        val durations = longArrayOf(16, 6, 13, 7, 5, 18, 4)
+        val resources = longArrayOf(2, 9, 3, 7, 10, 1, 11)
+        val n = durations.size
+        val makespan = n
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = n + 1,
+            intDomains = Array(n + 1) { if (it < n) IntDomain(1, 30) else IntDomain(1, 50) },
+            factors = arrayOf<Factor>(Cumulative(IntArray(n) { it }, durations, resources, capacity = 13)) +
+                Array<Factor>(n) {
+                    Linear(longArrayOf(1, -1), intArrayOf(it, makespan), LinearOp.LE, -durations[it])
+                },
+        )
+        val objective = LinearObjective(intCoefficients = LongArray(n + 1) { if (it == makespan) 1L else 0L })
+        val params = BacktrackParams(randomSeed = 3L, variableSelector = Vsids())
+
+        val result = BacktrackSolver(problem.bake()).minimize(objective, params)
+
+        assertEquals(23.0, assertIs<MinimizeResult.Optimal>(result).objective)
     }
 
     @Test
