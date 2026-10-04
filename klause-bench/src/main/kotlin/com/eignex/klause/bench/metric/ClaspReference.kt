@@ -73,7 +73,9 @@ internal object ClaspReference {
         // Streamed, never held: a MaxSAT instance can be gigabytes of text, and several run at once.
         val input = ClaspInput.of(ref.format) { CorpusFiles.open(file).bufferedReader() }
         val timeoutSec = (budget.timeoutMillis / 1000).coerceAtLeast(1)
-        val name = "$CONTAINER_LABEL-${seq.incrementAndGet()}"
+        // The process id keeps names apart across bench processes run side by side, one instance each, as a lab runs
+        // them: each counts from 1, and docker refuses a name already in use.
+        val name = "$CONTAINER_LABEL-${ProcessHandle.current().pid()}-${seq.incrementAndGet()}"
         val cmd = listOf(
             "docker",
             "run",
@@ -127,6 +129,11 @@ internal object ClaspReference {
         proc.waitFor(DOCKER_INSPECT_WAIT_MS, TimeUnit.MILLISECONDS)
         watchdog.interrupt()
         writer.interrupt()
+        val exit = runCatching { proc.exitValue() }.getOrNull()
+        // docker itself failed and the container never ran: an error to retry, not a result to cache.
+        check(exit !in DOCKER_RUN_FAILED) {
+            "clasp: docker run exited $exit: ${proc.errorStream.bufferedReader().readText().takeLast(ERROR_TAIL_CHARS)}"
+        }
         val elapsedMs = (System.nanoTime() - startNanos) / 1_000_000
         return parse(stdout, elapsedMs, cmd)
     }
