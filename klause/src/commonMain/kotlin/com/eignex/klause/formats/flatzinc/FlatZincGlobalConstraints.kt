@@ -146,7 +146,7 @@ internal fun FlatZincCompiler.emitMdd(c: FznConstraint) {
             ?.map { row -> LongArray(row.size) { row[it].toLong() } }
             ?: failHere("mdd: `${la.name}` is not a set-of-int parameter array")
 
-        else -> failHere("mdd: unsupported label arg ${la::class.simpleName}")
+        else -> unsupportedHere("mdd: unsupported label arg ${la::class.simpleName}")
     }
     // Dense node ids `0..N-1` for MDD nodes `1..N`, plus a synthetic terminal node `N` (edge target `0`);
     // nodes explicitly at the terminal level collapse onto local index 0, the terminal.

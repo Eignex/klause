@@ -4915,10 +4915,6 @@ final class com.eignex.klause.formats.dimacs/WeightedCnfClause { // com.eignex.k
     final fun toString(): kotlin/String // com.eignex.klause.formats.dimacs/WeightedCnfClause.toString|toString(){}[0]
 }
 
-final class com.eignex.klause.formats.flatzinc/FlatZincParseException : com.eignex.klause.formats/FormatException { // com.eignex.klause.formats.flatzinc/FlatZincParseException|null[0]
-    constructor <init>(kotlin/String, kotlin/Int, kotlin/Int) // com.eignex.klause.formats.flatzinc/FlatZincParseException.<init>|<init>(kotlin.String;kotlin.Int;kotlin.Int){}[0]
-}
-
 final class com.eignex.klause.formats.flatzinc/FlatZincProgram { // com.eignex.klause.formats.flatzinc/FlatZincProgram|null[0]
     constructor <init>(com.eignex.klause.ir/Problem, com.eignex.klause.formats.flatzinc/SolveDirective, kotlin.collections/Map<kotlin/String, kotlin/Int>, kotlin.collections/Map<kotlin/String, kotlin/Int>, kotlin.collections/Map<kotlin/String, com.eignex.klause.lowering/FloatBucketing>, kotlin.collections/Map<kotlin/String, com.eignex.klause.formats.flatzinc/FlatZincArray>, kotlin.collections/List<com.eignex.klause.formats.flatzinc/OutputItem>?, com.eignex.klause.formats.flatzinc/FlatZincSearchHints?, kotlin.collections/Map<kotlin/String, kotlin.collections/List<kotlin/String>> = ..., kotlin.collections/Map<kotlin/String, com.eignex.klause.formats.flatzinc/SetVarLayout> = ...) // com.eignex.klause.formats.flatzinc/FlatZincProgram.<init>|<init>(com.eignex.klause.ir.Problem;com.eignex.klause.formats.flatzinc.SolveDirective;kotlin.collections.Map<kotlin.String,kotlin.Int>;kotlin.collections.Map<kotlin.String,kotlin.Int>;kotlin.collections.Map<kotlin.String,com.eignex.klause.lowering.FloatBucketing>;kotlin.collections.Map<kotlin.String,com.eignex.klause.formats.flatzinc.FlatZincArray>;kotlin.collections.List<com.eignex.klause.formats.flatzinc.OutputItem>?;com.eignex.klause.formats.flatzinc.FlatZincSearchHints?;kotlin.collections.Map<kotlin.String,kotlin.collections.List<kotlin.String>>;kotlin.collections.Map<kotlin.String,com.eignex.klause.formats.flatzinc.SetVarLayout>){}[0]
 
@@ -5020,6 +5016,10 @@ final class com.eignex.klause.formats.flatzinc/SetVarLayout { // com.eignex.klau
     final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.formats.flatzinc/SetVarLayout.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.eignex.klause.formats.flatzinc/SetVarLayout.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.eignex.klause.formats.flatzinc/SetVarLayout.toString|toString(){}[0]
+}
+
+final class com.eignex.klause.formats.flatzinc/UnsupportedFlatZincException : com.eignex.klause.formats.flatzinc/FlatZincParseException { // com.eignex.klause.formats.flatzinc/UnsupportedFlatZincException|null[0]
+    constructor <init>(kotlin/String, kotlin/Int, kotlin/Int) // com.eignex.klause.formats.flatzinc/UnsupportedFlatZincException.<init>|<init>(kotlin.String;kotlin.Int;kotlin.Int){}[0]
 }
 
 final class com.eignex.klause.formats.json/JsonFormatException : com.eignex.klause.formats/FormatException { // com.eignex.klause.formats.json/JsonFormatException|null[0]
@@ -11813,6 +11813,10 @@ open class <#A: com.eignex.klause.solver/SolverParams> com.eignex.klause.solver/
     open fun samples(#A): kotlin.sequences/Sequence<com.eignex.klause.solver/Sample> // com.eignex.klause.solver/StatelessSession.samples|samples(1:0){}[0]
     open fun samples(com.eignex.klause.count/SamplingConfig, #A): kotlin.sequences/Sequence<com.eignex.klause.solver/Sample> // com.eignex.klause.solver/StatelessSession.samples|samples(com.eignex.klause.count.SamplingConfig;1:0){}[0]
     open fun solve(#A): com.eignex.klause.solver/SolveResult // com.eignex.klause.solver/StatelessSession.solve|solve(1:0){}[0]
+}
+
+open class com.eignex.klause.formats.flatzinc/FlatZincParseException : com.eignex.klause.formats/FormatException { // com.eignex.klause.formats.flatzinc/FlatZincParseException|null[0]
+    constructor <init>(kotlin/String, kotlin/Int, kotlin/Int) // com.eignex.klause.formats.flatzinc/FlatZincParseException.<init>|<init>(kotlin.String;kotlin.Int;kotlin.Int){}[0]
 }
 
 open class com.eignex.klause.formats/FormatException : kotlin/RuntimeException { // com.eignex.klause.formats/FormatException|null[0]

@@ -154,7 +154,7 @@ internal class FlatZincCompiler(
 
             is FznType.IntSet -> allocIntSet(d.name, t)
 
-            FznType.FloatAny -> failHere("variable `${d.name}`: unbounded `float` not supported; need a range")
+            FznType.FloatAny -> unsupportedHere("variable `${d.name}`: unbounded `float` not supported; need a range")
 
             is FznType.FloatRange -> allocFloat(d.name, t.lo, t.hi)
 
@@ -312,11 +312,11 @@ internal class FlatZincCompiler(
                     requireNotNull(bucketings).add(floatVars.getValue(elemName))
                 }
 
-                FznType.IntAny, FznType.FloatAny -> failHere("array `$name`: unbounded element type")
+                FznType.IntAny, FznType.FloatAny -> unsupportedHere("array `$name`: unbounded element type")
 
-                is FznType.SetOfInt -> failHere("array `$name`: array of set-of-int not supported")
+                is FznType.SetOfInt -> unsupportedHere("array `$name`: array of set-of-int not supported")
 
-                is FznType.Array -> failHere("nested arrays not supported")
+                is FznType.Array -> unsupportedHere("nested arrays not supported")
             }
         }
         val kind = arrayElementKind(type.element)
@@ -327,8 +327,8 @@ internal class FlatZincCompiler(
         FznType.Bool -> FlatZincArray.Vars.ElementKind.Bool
         is FznType.IntRange, is FznType.IntSet, FznType.IntAny -> FlatZincArray.Vars.ElementKind.Int
         is FznType.FloatRange, FznType.FloatAny -> FlatZincArray.Vars.ElementKind.Float
-        is FznType.SetOfInt -> failHere("set-of-int element kind not supported")
-        is FznType.Array -> failHere("nested arrays not supported")
+        is FznType.SetOfInt -> unsupportedHere("set-of-int element kind not supported")
+        is FznType.Array -> unsupportedHere("nested arrays not supported")
     }
 
     internal fun allocBool(name: String): Int {
@@ -644,14 +644,14 @@ internal class FlatZincCompiler(
                         }
                     }
 
-                    else -> failHere("show(): unsupported argument shape")
+                    else -> unsupportedHere("show(): unsupported argument shape")
                 }
             }
 
-            else -> failHere("output: unsupported function call `${e.name}`")
+            else -> unsupportedHere("output: unsupported function call `${e.name}`")
         }
 
-        else -> failHere("unsupported output item: ${e::class.simpleName}")
+        else -> unsupportedHere("unsupported output item: ${e::class.simpleName}")
     }
 
     // Source position of the declaration/constraint currently being compiled, so a semantic error
@@ -660,6 +660,13 @@ internal class FlatZincCompiler(
     private var currentCol = 0
 
     internal fun failHere(msg: String): Nothing = throw FlatZincParseException(msg, currentLine, currentCol)
+
+    /** Decline a well-formed construct klause does not support, at the current source position. */
+    internal fun unsupportedHere(msg: String): Nothing = throw UnsupportedFlatZincException(
+        msg,
+        currentLine,
+        currentCol,
+    )
 
     /** Require constraint [c] to carry exactly [n] arguments, failing with a [FlatZincParseException]
      *  (not a bare `require`/index crash) when a malformed instance supplies the wrong arity. */
