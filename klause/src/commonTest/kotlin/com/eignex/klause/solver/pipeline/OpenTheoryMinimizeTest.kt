@@ -6,6 +6,7 @@ import com.eignex.klause.formats.mps.MpsObjective
 import com.eignex.klause.formats.mps.MpsVar
 import com.eignex.klause.formats.mps.toProblem
 import com.eignex.klause.formats.smtlib.SmtLib
+import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.objective.toLinearObjective
 import com.eignex.klause.solver.result.RunStats
@@ -189,9 +190,17 @@ class OpenTheoryMinimizeTest {
             val x = parsed.intVarNames.getValue("x")
             val objective = LinearObjective(intCoefficients = LongArray(parsed.model.numIntVars).also { it[x] = 1L })
 
-            val result = assertIs<OpenTheoryOptimum.Bounded>(
-                OpenTheoryMinimizer(parsed.model, objective).minimize(TheoryParams(maxDecisions = decisions)),
+            // Folded into comparison clauses, the disjunctions put the first witness at the optimum, so the
+            // descent has no standing incumbent to stop beside; the reified form keeps its intermediate steps.
+            val minimizer = OpenTheoryMinimizer(
+                parsed.model,
+                objective,
+                PresolveConfig.parse("default,-comparison-clause"),
+                solutionSetSensitive = false,
+                presolveCancellation = Cancellation.Never,
+                presolveBudget = null,
             )
+            val result = assertIs<OpenTheoryOptimum.Bounded>(minimizer.minimize(TheoryParams(maxDecisions = decisions)))
 
             assertEquals(com.eignex.klause.solver.result.TerminationReason.BudgetExhausted, result.reason)
             val incumbent = assertNotNull(result.incumbent)

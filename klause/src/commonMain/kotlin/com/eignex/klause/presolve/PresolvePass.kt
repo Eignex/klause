@@ -220,12 +220,18 @@ enum class PresolvePass(
     FOLD_COMPARISON_CLAUSES(
         "comparison-clause",
         Stage.PROBLEM,
-        Capability.FINITE,
+        Capability.SOURCE,
         PresolveTiming.FAST,
         preservesSolutionSet = false,
         autoEligible = true,
     ) {
-        override fun applyFinite(problem: BakedProblem, ctx: PresolveContext) = Presolve.foldComparisonClauses(problem)
+        override fun applySource(problem: Problem, ctx: PresolveContext) =
+            Presolve.foldSourceComparisonClauses(problem, ctx.objectiveBoolVars, ctx.cancellation)
+
+        // Root propagation fixes columns the declarations leave free, and a fixed column is what lets a
+        // multi-term row reduce to a single-variable comparison.
+        override fun applyFinite(problem: BakedProblem, ctx: PresolveContext) =
+            Presolve.foldComparisonClauses(problem, ctx.objectiveBoolVars, ctx.cancellation)
     },
 
     /** Duplicate / parallel column aggregation — the column-side mirror of [REMOVE_REDUNDANT]. Folds
