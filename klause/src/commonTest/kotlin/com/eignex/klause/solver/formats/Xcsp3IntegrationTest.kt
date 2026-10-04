@@ -196,6 +196,26 @@ class Xcsp3IntegrationTest {
     }
 
     @Test
+    fun `allDifferent over several lists makes the tuples distinct not the variables`() {
+        // Three 0/1 pairs: the solutions are the 4 * 3 * 2 ordered choices of distinct tuples. One
+        // all-different over the six variables would be UNSAT.
+        val xml = """
+            <instance type="CSP">
+              <variables><array id="x" size="[3][2]"> 0 1 </array></variables>
+              <constraints>
+                <allDifferent><list> x[0][] </list><list> x[1][] </list><list> x[2][] </list></allDifferent>
+              </constraints>
+            </instance>
+        """.trimIndent()
+        val parsed = Xcsp3.parse(xml)
+        val idx = (0..2).map { r -> (0..1).map { c -> parsed.intVarNames.getValue("x[$r][$c]") } }
+        val found = BacktrackSolver(parsed.problem.bake()).enumerate(BacktrackParams(randomSeed = 1L)).take(1_000)
+            .map { a -> idx.map { row -> row.map { a.ints[it] } } }.toList()
+        assertEquals(24, found.toSet().size)
+        assertTrue(found.all { it.toSet().size == 3 }, "every solution has pairwise distinct tuples")
+    }
+
+    @Test
     fun `an arithmetic expression overflowing 64 bits routes to a wide row and stays sound`() {
         // A product of three near-max Int constants exceeds Long; folding routes it to a wide row rather
         // than rejecting or silently wrapping. x = 9.26e27 is unsatisfiable for x in 0..10 — decided exactly.
