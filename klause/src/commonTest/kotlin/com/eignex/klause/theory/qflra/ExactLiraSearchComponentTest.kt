@@ -124,7 +124,7 @@ class ExactLiraSearchComponentTest {
     fun `fractional source integer branches after reduction admission declines`() {
         val model = Problem(
             numBoolVars = 0,
-            intBounds = IntBounds.fromModelBounds(LongArray(35), LongArray(35) { if (it == 0) 1L else 0L }, null, null),
+            intBounds = IntBounds.fromModelBounds(LongArray(129), LongArray(129) { if (it == 0) 1L else 0L }, null, null),
             factors = arrayOf(Linear(intArrayOf(2), intArrayOf(0), LinearOp.GE, 1)),
         )
         val stats = SmtStatsSink()
@@ -223,9 +223,11 @@ class ExactLiraSearchComponentTest {
 
     @Test
     fun `source branches refute an integer system with a satisfiable equality subset`() {
+        // Unequal bounds on the padding columns keep the full reduction past its row limit while the
+        // equality subset stays small.
         val model = Problem(
             numBoolVars = 0,
-            intBounds = IntBounds.fromModelBounds(longArrayOf(0L), longArrayOf(1L), null, null),
+            intBounds = IntBounds.fromModelBounds(LongArray(66), LongArray(66) { 1L }, null, null),
             numRealVars = 3,
             realLower = DoubleArray(3) { Double.NEGATIVE_INFINITY },
             realUpper = DoubleArray(3) { Double.POSITIVE_INFINITY },
