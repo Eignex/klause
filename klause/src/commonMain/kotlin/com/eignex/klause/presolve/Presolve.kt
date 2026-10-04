@@ -203,6 +203,10 @@ object Presolve {
     fun probe(problem: BakedProblem, maxCandidates: Int, cancellation: Cancellation = Cancellation.Never): PassDelta =
         Probing.probe(problem, maxCandidates, cancellation)
 
+    /** Failed-literal and common-bound probing over a canonical source model. See [Probing.probeSource]. */
+    internal fun probeSource(problem: Problem, maxCandidates: Int, cancellation: Cancellation): SourceDelta =
+        Probing.probeSource(problem, maxCandidates, cancellation)
+
     /** Binary implication graph: equivalent-literal substitution and transitive reduction. See
      *  [ImplicationGraph]. */
     fun reduceImplicationGraph(

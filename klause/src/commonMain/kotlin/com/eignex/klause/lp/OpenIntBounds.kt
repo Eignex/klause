@@ -390,40 +390,51 @@ private fun fbbtTightenOpenIntBounds(
     return result()
 }
 
-/** Working per-variable bounds for [fbbtTightenOpenIntBounds] in primitive arrays (no `Long?` boxing): a
- *  side is open (`±∞`) when its `*Open` flag is set, else its value is in `*Val`. */
-private class MutableIntBounds(n: Int) {
+/**
+ * Per-column interval bounds that [propagateRow] reads and narrows: a side is open (`±∞`) when its `*Open`
+ * flag is set, else its value is in `*Val`. A setter that moves a side past the opposite one records the
+ * emptiness in [crossed] instead of storing a crossed pair, and propagation stops at it.
+ */
+internal interface IntervalBounds {
+    val crossed: Boolean
+    fun loOpen(i: Int): Boolean
+    fun hiOpen(i: Int): Boolean
+    fun loVal(i: Int): Long
+    fun hiVal(i: Int): Long
+    fun setLo(i: Int, v: Long)
+    fun setHi(i: Int, v: Long)
+}
+
+/** Working per-variable bounds for [fbbtTightenOpenIntBounds] in primitive arrays (no `Long?` boxing). */
+private class MutableIntBounds(n: Int) : IntervalBounds {
     private val loVal = LongArray(n)
     private val hiVal = LongArray(n)
     private val loOpen = BooleanArray(n) { true }
     private val hiOpen = BooleanArray(n) { true }
 
-    /**
-     * Whether a bound was ever set past the variable's opposite side — the rows imply an empty domain.
-     *
-     * The pair itself is collapsed to the point where the two sides met rather than stored crossed, so a
-     * consumer that reads the bounds regardless still gets a domain it can build a column over.
-     */
-    var crossed = false
-        private set
+    // Whether a bound was ever set past the variable's opposite side — the rows imply an empty domain. The
+    // pair itself is collapsed to the point where the two sides met rather than stored crossed, so a
+    // consumer that reads the bounds regardless still gets a domain it can build a column over.
+    private var isCrossed = false
+    override val crossed: Boolean get() = isCrossed
 
-    fun loOpen(i: Int) = loOpen[i]
-    fun hiOpen(i: Int) = hiOpen[i]
-    fun loVal(i: Int) = loVal[i]
-    fun hiVal(i: Int) = hiVal[i]
+    override fun loOpen(i: Int) = loOpen[i]
+    override fun hiOpen(i: Int) = hiOpen[i]
+    override fun loVal(i: Int) = loVal[i]
+    override fun hiVal(i: Int) = hiVal[i]
     fun loOrNull(i: Int): Long? = if (loOpen[i]) null else loVal[i]
     fun hiOrNull(i: Int): Long? = if (hiOpen[i]) null else hiVal[i]
 
-    fun setLo(i: Int, v: Long) {
+    override fun setLo(i: Int, v: Long) {
         val crossing = !hiOpen[i] && v > hiVal[i]
-        if (crossing) crossed = true
+        if (crossing) isCrossed = true
         loVal[i] = if (crossing) hiVal[i] else v
         loOpen[i] = false
     }
 
-    fun setHi(i: Int, v: Long) {
+    override fun setHi(i: Int, v: Long) {
         val crossing = !loOpen[i] && v < loVal[i]
-        if (crossing) crossed = true
+        if (crossing) isCrossed = true
         hiVal[i] = if (crossing) loVal[i] else v
         hiOpen[i] = false
     }
@@ -432,7 +443,7 @@ private class MutableIntBounds(n: Int) {
 /** Propagate the row `Σ (sign·coeffs(k))·vars(k) ≤ sign·bound` into [b], returning whether any bound
  *  tightened. Overflow in the exact activity arithmetic aborts this row (returns `false`). */
 @Suppress("ReturnCount", "LoopWithTooManyJumpStatements")
-private fun propagateRow(coeffs: LongArray, vars: IntArray, bound: Long, sign: Long, b: MutableIntBounds): Boolean =
+internal fun propagateRow(coeffs: LongArray, vars: IntArray, bound: Long, sign: Long, b: IntervalBounds): Boolean =
     try {
         val effBound = mulExact(sign, bound)
         // Minimum activity Σ min(aⱼ·xⱼ) over finite terms, plus how many terms are −∞ (open on the min side).
@@ -482,6 +493,27 @@ private fun propagateRow(coeffs: LongArray, vars: IntArray, bound: Long, sign: L
             }
         }
         changed
+    } catch (_: CheckedLongOverflowException) {
+        false
+    }
+
+/**
+ * Whether [b] already rules out the row `Σ (sign·coeffs(k))·vars(k) ≤ sign·bound`: every term is bounded on
+ * the side that minimises it and that minimum exceeds the bound. An unbounded term, or activity past 64
+ * bits, leaves the row possible.
+ */
+@Suppress("ReturnCount")
+internal fun rowRefuted(coeffs: LongArray, vars: IntArray, bound: Long, sign: Long, b: IntervalBounds): Boolean =
+    try {
+        var minActivity = 0L
+        for (idx in coeffs.indices) {
+            val a = mulExact(sign, coeffs[idx])
+            if (a == 0L) continue
+            val v = vars[idx]
+            if (if (a > 0L) b.loOpen(v) else b.hiOpen(v)) return false
+            minActivity = addExact(minActivity, mulExact(a, if (a > 0L) b.loVal(v) else b.hiVal(v)))
+        }
+        minActivity > mulExact(sign, bound)
     } catch (_: CheckedLongOverflowException) {
         false
     }

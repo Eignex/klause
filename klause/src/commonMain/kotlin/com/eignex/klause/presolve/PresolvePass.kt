@@ -357,7 +357,12 @@ enum class PresolvePass(
     /** Probing to fixpoint: tentatively pin each free Boolean, propagate, and keep only the
      *  deductions that hold in every solution — failed literals (emitted as unit clauses) and
      *  common-bound tightenings. Solution-preserving, so it needs no objective-variable exclusion. */
-    PROBE("probe", Stage.PROBLEM, Capability.FINITE, PresolveTiming.EXHAUSTIVE, true, autoEligible = true) {
+    PROBE("probe", Stage.PROBLEM, Capability.SOURCE, PresolveTiming.EXHAUSTIVE, true, autoEligible = true) {
+        override fun applySource(problem: Problem, ctx: PresolveContext) =
+            Presolve.probeSource(problem, PROBE_PASS_MAX_CANDIDATES, ctx.cancellation)
+
+        // The finite lane probes with the engine's own propagators over root domains, which see every
+        // factor and the holes a range cannot state.
         override fun applyFinite(problem: BakedProblem, ctx: PresolveContext) =
             Presolve.probe(problem, PROBE_PASS_MAX_CANDIDATES, Cancellation.Never)
     },

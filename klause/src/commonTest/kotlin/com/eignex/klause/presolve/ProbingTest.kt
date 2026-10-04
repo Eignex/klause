@@ -1,5 +1,6 @@
 package com.eignex.klause.presolve
 
+import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.IntDomain
@@ -14,6 +15,7 @@ import com.eignex.klause.propagation.propagate
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /**
@@ -203,5 +205,119 @@ class ProbingTest {
             Presolve.probe(problem.bake(), cap, Cancellation.Never).isEmpty,
             "nothing derivable is the pass's no-op signal",
         )
+    }
+
+    private fun sourceUnits(delta: SourceDelta): Set<Int> =
+        delta.addedFactors.filterIsInstance<Clause>().map { it.literals.single() }.toSet()
+
+    @Test
+    fun `the source form fixes the Booleans a clause chain forces at root`() {
+        val problem = Problem(
+            numBoolVars = 3,
+            numIntVars = 0,
+            intDomains = emptyArray(),
+            factors = listOf(
+                Clause(intArrayOf(Lit.make(0, true))),
+                Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true))),
+                Clause(intArrayOf(Lit.make(1, false), Lit.make(2, true))),
+            ),
+        )
+
+        val delta = Presolve.probeSource(problem, cap, Cancellation.Never)
+
+        assertEquals(setOf(Lit.make(1, true), Lit.make(2, true)), sourceUnits(delta))
+    }
+
+    @Test
+    fun `the source form fixes the activator of a row the declared range rules out`() {
+        // x ≥ 0 and open above, so b0 ↔ (x ≤ -1) can never hold.
+        val problem = Problem(
+            numBoolVars = 1,
+            numIntVars = 1,
+            intDomains = arrayOf(IntDomain(0, 100)),
+            factors = listOf(
+                ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, -1),
+            ),
+            openIntHi = booleanArrayOf(true),
+        )
+
+        val delta = Presolve.probeSource(problem, cap, Cancellation.Never)
+
+        assertEquals(setOf(Lit.make(0, false)), sourceUnits(delta))
+    }
+
+    @Test
+    fun `the source form forces the other polarity of a failed literal on an open column`() {
+        // b0 ↔ (x ≤ 3), b1 ↔ (x ≥ 10) and b0 → b1, with x open on both sides: b0 = true leaves b1 no room.
+        val problem = Problem(
+            numBoolVars = 2,
+            numIntVars = 1,
+            intDomains = arrayOf(IntDomain(0, 0)),
+            factors = listOf(
+                ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, 3),
+                ReifiedLinear(1, intArrayOf(1), intArrayOf(0), LinearOp.GE, 10),
+                Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true))),
+            ),
+            openIntLo = booleanArrayOf(true),
+            openIntHi = booleanArrayOf(true),
+        )
+
+        val delta = Presolve.probeSource(problem, cap, Cancellation.Never)
+
+        assertTrue(Lit.make(0, false) in sourceUnits(delta))
+    }
+
+    @Test
+    fun `the source form closes an open side both polarities bound`() {
+        // b0 ↔ (x ≤ 5), b1 ↔ (x ≤ 7) and b0 ∨ b1: x ≤ 5 under b0 = true, x ≤ 7 under b0 = false.
+        val problem = Problem(
+            numBoolVars = 2,
+            numIntVars = 1,
+            intDomains = arrayOf(IntDomain(0, 100)),
+            factors = listOf(
+                ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, 5),
+                ReifiedLinear(1, intArrayOf(1), intArrayOf(0), LinearOp.LE, 7),
+                Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
+            ),
+            openIntHi = booleanArrayOf(true),
+        )
+
+        val bounds = Presolve.probeSource(problem, cap, Cancellation.Never).bounds!!
+
+        assertFalse(bounds.isOpenUpper(0))
+        assertEquals(7L, bounds.upper(0))
+    }
+
+    @Test
+    fun `the source form refutes rows that cross over an open column`() {
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 1,
+            intDomains = arrayOf(IntDomain(0, 0)),
+            factors = listOf(
+                Linear(longArrayOf(1), intArrayOf(0), LinearOp.LE, 1L),
+                Linear(longArrayOf(1), intArrayOf(0), LinearOp.GE, 3L),
+            ),
+            openIntLo = booleanArrayOf(true),
+            openIntHi = booleanArrayOf(true),
+        )
+
+        assertTrue(Presolve.probeSource(problem, cap, Cancellation.Never).infeasible)
+    }
+
+    @Test
+    fun `the source form leaves a consequence of only one polarity alone`() {
+        // b0 ↔ (x ≥ 6) with x ≥ 0 and open above: both polarities admit solutions and agree on nothing.
+        val problem = Problem(
+            numBoolVars = 1,
+            numIntVars = 1,
+            intDomains = arrayOf(IntDomain(0, 100)),
+            factors = listOf(
+                ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.GE, 6),
+            ),
+            openIntHi = booleanArrayOf(true),
+        )
+
+        assertTrue(Presolve.probeSource(problem, cap, Cancellation.Never).isEmpty)
     }
 }
