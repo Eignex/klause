@@ -23,8 +23,8 @@ internal class SubcircuitInvariant(succ: IntArray, n: Int, computeCost: (LocalSe
                     if (target != cur) sink.addChannelingIntSet(state, v, target)
                 }
             } else {
-                if (cur < d.max) sink.addChannelingIntSet(state, v, cur + 1)
-                if (cur > d.min) sink.addChannelingIntSet(state, v, cur - 1)
+                if (cur < d.max) sink.addChannelingIntSet(state, v, d.higher(cur))
+                if (cur > d.min) sink.addChannelingIntSet(state, v, d.lower(cur))
                 repeat(MAX_TARGETS) {
                     val target = d.values.valueAt(state.rng.nextInt(span))
                     if (target != cur) sink.addChannelingIntSet(state, v, target)

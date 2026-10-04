@@ -10,6 +10,7 @@ import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.localsearch.LocalSearchSolver
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
+import com.eignex.klause.localsearch.MoveSink
 import com.eignex.klause.localsearch.strategy.ProbSat
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.bake
@@ -121,5 +122,30 @@ class ObjectiveBoundFactorTest {
         assertEquals(state.violated.contains(boundFactorId), surgicalViolated, "violated membership must match")
         assertTrue(state.boolBreakCount.contentEquals(surgicalBreak), "break vector must match")
         assertTrue(state.boolMakeCount.contentEquals(surgicalMake), "make vector must match")
+    }
+
+    @Test
+    fun `repair steps an objective variable across a hole`() {
+        val problem = Problem(
+            0,
+            2,
+            arrayOf(IntDomain(0, 5).excludeValue(3), IntDomain(0, 5)),
+            listOf(Linear(coeffs = intArrayOf(1, 1), vars = intArrayOf(0, 1), op = LinearOp.LE, bound = 10)),
+        )
+        val objective = LinearObjective(intCoefficients = longArrayOf(-1, -1))
+        val (overlay, bound) = assertIs<Pair<BakedProblem, MutableObjectiveBound>>(
+            objectiveBoundOverlay(problem.bake(), objective),
+        )
+        val state = LocalSearchState(overlay, Random(0))
+        state.assignment.setInt(0, 2)
+        state.recompute()
+        bound.tightenBelow(-2.0)
+        val boundFactorId = overlay.numFactors - 1
+        val sink = MoveSink()
+
+        state.factors[boundFactorId].proposeRepairMoves(state, boundFactorId, sink)
+
+        val xTargets = sink.list.filterIsInstance<Move.IntSet>().filter { it.varId == 0 }.map { it.newValue }
+        assertEquals(listOf(4L), xTargets, "raising x from 2 must skip the hole at 3")
     }
 }

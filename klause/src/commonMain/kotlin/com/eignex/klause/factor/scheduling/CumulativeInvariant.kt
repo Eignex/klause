@@ -277,8 +277,8 @@ internal class CumulativeInvariant(
                 val beforePeak = absT - d
                 if (beforePeak in dom && beforePeak != cur) sink.addChannelingIntSet(state, v, beforePeak)
             }
-            if (cur < dom.max) sink.addChannelingIntSet(state, v, cur + 1)
-            if (cur > dom.min) sink.addChannelingIntSet(state, v, cur - 1)
+            if (cur < dom.max) sink.addChannelingIntSet(state, v, dom.higher(cur))
+            if (cur > dom.min) sink.addChannelingIntSet(state, v, dom.lower(cur))
             val few = dom.spanOrNull(maxTargets.toLong())
             if (few != null) {
                 few.forEach { target -> if (target != cur) sink.addChannelingIntSet(state, v, target) }

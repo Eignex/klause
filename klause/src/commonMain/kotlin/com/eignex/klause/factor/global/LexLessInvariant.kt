@@ -83,8 +83,8 @@ internal class LexLessInvariant(private val xs: IntArray, private val ys: IntArr
         if (xV != yV && b in dx && a in dy) {
             sink.addCompound(listOf(Move.IntSet(xV, b), Move.IntSet(yV, a)))
         }
-        if (a > dx.min) sink.addChannelingIntSet(state, xV, a - 1)
-        if (b < dy.max) sink.addChannelingIntSet(state, yV, b + 1)
+        if (a > dx.min) sink.addChannelingIntSet(state, xV, dx.lower(a))
+        if (b < dy.max) sink.addChannelingIntSet(state, yV, dy.higher(b))
     }
 
     override fun proposeStructuredMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
@@ -202,11 +202,11 @@ internal class LexLessInvariant(private val xs: IntArray, private val ys: IntArr
             val dy = state.rootDomains[ys[i]]
             var added = false
             if (a > dx.min) {
-                sink.addChannelingIntSet(state, xs[i], a - 1)
+                sink.addChannelingIntSet(state, xs[i], dx.lower(a))
                 added = true
             }
             if (b < dy.max) {
-                sink.addChannelingIntSet(state, ys[i], b + 1)
+                sink.addChannelingIntSet(state, ys[i], dy.higher(b))
                 added = true
             }
             if (added) return

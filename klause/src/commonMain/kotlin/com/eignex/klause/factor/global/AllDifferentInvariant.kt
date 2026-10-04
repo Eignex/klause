@@ -299,8 +299,8 @@ internal class AllDifferentInvariant(
         }
         if (swapsAdded > 0) return
         val cur = state.assignment.intValue(occupant)
-        if (cur < d.max) sink.addChannelingIntSet(state, occupant, cur + 1)
-        if (cur > d.min) sink.addChannelingIntSet(state, occupant, cur - 1)
+        if (cur < d.max) sink.addChannelingIntSet(state, occupant, d.higher(cur))
+        if (cur > d.min) sink.addChannelingIntSet(state, occupant, d.lower(cur))
     }
 
     override fun proposeStructuredMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {

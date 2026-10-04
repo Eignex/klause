@@ -23,8 +23,8 @@ internal class CircuitInvariant(succ: IntArray, n: Int, computeCost: (LocalSearc
                     if (target != cur && target != i.toLong()) sink.addChannelingIntSet(state, v, target)
                 }
             } else {
-                if (cur < d.max) sink.addChannelingIntSet(state, v, cur + 1)
-                if (cur > d.min) sink.addChannelingIntSet(state, v, cur - 1)
+                if (cur < d.max) sink.addChannelingIntSet(state, v, d.higher(cur))
+                if (cur > d.min) sink.addChannelingIntSet(state, v, d.lower(cur))
                 repeat(MAX_TARGETS) {
                     val target = d.values.valueAt(state.rng.nextInt(span))
                     if (target != cur && target != i.toLong()) sink.addChannelingIntSet(state, v, target)
@@ -154,7 +154,7 @@ internal class CircuitInvariant(succ: IntArray, n: Int, computeCost: (LocalSearc
                 if (si < 0 || sj < 0) continue
                 val di = state.rootDomains[succ[i]]
                 val dj = state.rootDomains[succ[j]]
-                if (sj.toLong() !in di.min..di.max || si.toLong() !in dj.min..dj.max) continue
+                if (sj.toLong() !in di || si.toLong() !in dj) continue
                 sink.addCompound(listOf(Move.IntSet(succ[i], sj.toLong()), Move.IntSet(succ[j], si.toLong())))
                 swapsAdded++
             }

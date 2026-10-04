@@ -70,7 +70,7 @@ interface Invariant {
 
     /**
      * Suggest moves that would (or might) repair this factor when violated. The default lists
-     * a Boolean flip per boolVars member plus an `IntSet(±1)` per intVars member. Factors
+     * a Boolean flip per boolVars member plus a step to each in-domain neighbour per intVars member. Factors
      * with structural insight (e.g. a comparator can snap to its bound) override this.
      */
     fun proposeRepairMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
@@ -78,8 +78,8 @@ interface Invariant {
         for (i in state.problem.factors[factorId].intVars) {
             val cur = state.assignment.intValue(i)
             val d = state.rootDomains[i]
-            if (cur < d.max) sink.addChannelingIntSet(state, i, cur + 1L)
-            if (cur > d.min) sink.addChannelingIntSet(state, i, cur - 1L)
+            if (cur < d.max) sink.addChannelingIntSet(state, i, d.higher(cur))
+            if (cur > d.min) sink.addChannelingIntSet(state, i, d.lower(cur))
         }
     }
 

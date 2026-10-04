@@ -90,20 +90,22 @@ internal fun LocalSearchState.neighbourPrimitives(fid: Int, sink: MoveSink) {
     for (v in f.boolVars) for (nf in projection.boolOccurrences[v]) emitFactorPrimitives(fid, nf, seenFactors, sink)
 }
 
-/** [neighbourPrimitives] helper: primitives for one adjacent factor, deduplicated. Ints get ±1
- *  steps *and* the domain endpoints: on successor/path encodings the min endpoint is the semantic
- *  "remove from the structure" eject (`next(i)` → 0), letting a chain dismantle a parasitic
- *  successor fragment backwards — ±1 alone cannot express that jump. */
+/** [neighbourPrimitives] helper: primitives for one adjacent factor, deduplicated. Ints get a step to
+ *  each in-domain neighbour *and* the domain endpoints: on successor/path encodings the min endpoint is
+ *  the semantic "remove from the structure" eject (`next(i)` → 0), letting a chain dismantle a
+ *  parasitic successor fragment backwards — a neighbour step alone cannot express that jump. */
 internal fun LocalSearchState.emitFactorPrimitives(seed: Int, nf: Int, seenFactors: IntHashSet, sink: MoveSink) {
     if (nf == seed || !seenFactors.add(nf)) return
     val nfac = problem.factors[nf]
     for (u in nfac.intVars) {
         val cur = assignment.intValue(u)
         val d = rootDomains[u]
-        if (cur < d.max) sink.addChannelingIntSet(this, u, cur + 1)
-        if (cur > d.min) sink.addChannelingIntSet(this, u, cur - 1)
-        if (cur - 1 > d.min) sink.addChannelingIntSet(this, u, d.min)
-        if (cur + 1 < d.max) sink.addChannelingIntSet(this, u, d.max)
+        val up = if (cur < d.max) d.higher(cur) else cur
+        val down = if (cur > d.min) d.lower(cur) else cur
+        if (up != cur) sink.addChannelingIntSet(this, u, up)
+        if (down != cur) sink.addChannelingIntSet(this, u, down)
+        if (down > d.min) sink.addChannelingIntSet(this, u, d.min)
+        if (up < d.max) sink.addChannelingIntSet(this, u, d.max)
     }
     for (u in nfac.boolVars) sink.addBoolFlip(u)
 }

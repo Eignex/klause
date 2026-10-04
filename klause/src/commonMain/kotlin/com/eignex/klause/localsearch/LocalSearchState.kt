@@ -690,4 +690,17 @@ class LocalSearchState(
         updateViolation(factorId)
         adjustBoolBreakMake(factorId, +1)
     }
+
+    /**
+     * True iff every int var holds a value of its root domain. Domain membership is not a cost term, so
+     * a value in a hole reads as feasible at `cost == 0`; this is the check that keeps such an
+     * assignment from being reported. O(numIntVars), so it runs where an incumbent is published, never
+     * per move.
+     */
+    internal fun intValuesInDomain(): Boolean {
+        for (v in rootDomains.indices) {
+            if (assignment.intValue(v) !in rootDomains[v]) return false
+        }
+        return true
+    }
 }
