@@ -81,7 +81,9 @@ internal object Xcsp3CpSatReference {
 
     private fun run(xml: File, budget: Budget, workers: Int): SolverInvocation.Result {
         val timeoutSec = (budget.timeoutMillis / 1000).coerceAtLeast(1)
-        val name = "$CONTAINER_LABEL-${seq.incrementAndGet()}"
+        // The process id keeps names apart across bench processes run side by side, one instance each, as a lab runs
+        // them: each counts from 1, and docker refuses a name already in use.
+        val name = "$CONTAINER_LABEL-${ProcessHandle.current().pid()}-${seq.incrementAndGet()}"
         val cmd = listOf(
             "docker",
             "run",
@@ -182,7 +184,7 @@ internal object Xcsp3CpSatReference {
     )
 }
 
-private const val ERROR_TAIL_CHARS = 200
+internal const val ERROR_TAIL_CHARS = 200
 
 // `docker run` exit codes for a failure of docker itself or of starting the container.
-private val DOCKER_RUN_FAILED = 125..127
+internal val DOCKER_RUN_FAILED = 125..127
