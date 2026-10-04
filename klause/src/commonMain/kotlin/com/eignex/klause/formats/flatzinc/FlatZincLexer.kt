@@ -20,8 +20,13 @@ internal sealed interface FznToken {
 }
 
 /** Thrown on malformed FlatZinc with source location. */
-class FlatZincParseException(message: String, sourceLine: Int, sourceCol: Int) :
+open class FlatZincParseException(message: String, sourceLine: Int, sourceCol: Int) :
     FormatException("FlatZinc", "$message (at $sourceLine:$sourceCol)")
+
+/** Thrown on well-formed FlatZinc that uses a construct klause does not support, so a caller can tell a model
+ *  klause declines from a malformed one. */
+class UnsupportedFlatZincException(message: String, sourceLine: Int, sourceCol: Int) :
+    FlatZincParseException(message, sourceLine, sourceCol)
 
 /**
  * Single-pass FlatZinc tokenizer. Pulls characters from a [CharReader], so the whole source is never

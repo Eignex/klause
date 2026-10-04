@@ -268,5 +268,5 @@ internal fun FlatZincCompiler.processConstraint(c: FznConstraint) = when (c.name
 
     "set_partition_into", "fzn_set_partition_into" -> emitSetPartitionInto(c)
 
-    else -> failHere("unsupported FlatZinc builtin `${c.name}`")
+    else -> unsupportedHere("unsupported FlatZinc builtin `${c.name}`")
 }

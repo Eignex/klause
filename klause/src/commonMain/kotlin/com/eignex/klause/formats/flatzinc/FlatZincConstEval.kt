@@ -23,7 +23,7 @@ internal fun FlatZincCompiler.evaluateParam(e: FznExpr, declaredType: FznType): 
 
     is FznExpr.Ident -> params[e.name] ?: failHere("undefined parameter `${e.name}`")
 
-    else -> failHere("unsupported parameter initializer: ${e::class.simpleName}")
+    else -> unsupportedHere("unsupported parameter initializer: ${e::class.simpleName}")
 }
 
 internal fun FlatZincCompiler.compileParamArray(name: String, elem: FznType, lit: FznExpr.ArrayLit): FlatZincArray =
@@ -72,7 +72,7 @@ internal fun FlatZincCompiler.compileParamArray(name: String, elem: FznType, lit
             },
         )
 
-        is FznType.Array -> failHere("nested arrays not supported")
+        is FznType.Array -> unsupportedHere("nested arrays not supported")
     }
 
 internal fun FlatZincCompiler.evalIntConst(e: FznExpr): Long = when (e) {
@@ -338,9 +338,9 @@ internal fun FlatZincCompiler.resolveVarRef(e: FznExpr, declaredElement: FznType
         else -> failHere("expected float var, got ${e::class.simpleName}")
     }
 
-    is FznType.SetOfInt -> failHere("set-of-int element refs not supported")
+    is FznType.SetOfInt -> unsupportedHere("set-of-int element refs not supported")
 
-    is FznType.Array -> failHere("nested arrays not supported")
+    is FznType.Array -> unsupportedHere("nested arrays not supported")
 }
 
 internal fun FlatZincCompiler.nameOfBoundVar(e: FznExpr): String = (e as? FznExpr.Ident)?.name

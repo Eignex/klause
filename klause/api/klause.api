@@ -1974,7 +1974,7 @@ public final class com/eignex/klause/formats/flatzinc/FlatZincCompilerKt {
 	public static synthetic fun parseFlatZinc$default (Ljava/lang/String;IJZJJILjava/lang/Object;)Lcom/eignex/klause/formats/flatzinc/FlatZincProgram;
 }
 
-public final class com/eignex/klause/formats/flatzinc/FlatZincParseException : com/eignex/klause/formats/FormatException {
+public class com/eignex/klause/formats/flatzinc/FlatZincParseException : com/eignex/klause/formats/FormatException {
 	public fun <init> (Ljava/lang/String;II)V
 }
 
@@ -2164,6 +2164,10 @@ public final class com/eignex/klause/formats/flatzinc/SolveDirective$Satisfy : c
 	public fun equals (Ljava/lang/Object;)Z
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/formats/flatzinc/UnsupportedFlatZincException : com/eignex/klause/formats/flatzinc/FlatZincParseException {
+	public fun <init> (Ljava/lang/String;II)V
 }
 
 public final class com/eignex/klause/formats/json/JsonFormatException : com/eignex/klause/formats/FormatException {
