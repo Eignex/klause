@@ -87,5 +87,11 @@ private const val MAX_STORED_OUTPUT_CHARS = 8 * 1024 * 1024
 
 // The paths a klause-cli build reads. A change anywhere else, a regenerated reference table say, leaves results valid.
 private val BUILD_SOURCES = listOf(
-    "klause", "klause-cli", "klause-mzn-lib", "build.gradle.kts", "settings.gradle.kts", "gradle", "gradle.properties",
+    "klause",
+    "klause-cli",
+    "klause-mzn-lib",
+    "build.gradle.kts",
+    "settings.gradle.kts",
+    "gradle",
+    "gradle.properties",
 )

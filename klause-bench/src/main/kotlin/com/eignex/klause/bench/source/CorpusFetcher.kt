@@ -107,7 +107,9 @@ internal object CorpusFetcher {
             FetchMethod.Tar -> tar(collection, dir)
             FetchMethod.TarballZst -> tarballZst(collection, dir)
             FetchMethod.Zip -> zip(collection, dir)
+            is FetchMethod.Files -> files(collection, m, dir)
         }
+        collection.extensionless?.let { (marker, ext) -> nameBare(dir, marker, ext) }
         cache.recordSize(collection.id)
         cache.enforce()
         return dir
@@ -138,6 +140,9 @@ internal object CorpusFetcher {
         URI(c.url).toURL().openStream().use { input -> tar.outputStream().use { input.copyTo(it) } }
         run("tar", "xzf", tar.absolutePath, "-C", dir.absolutePath)
         tar.delete()
+        // MIPLIB 2010 ships `*.mps.gz` inside its tarball, some of them too large to be worth keeping.
+        dropOversized(c, dir)
+        decompressInPlace(dir)
         compress(dir)
     }
 
@@ -159,6 +164,40 @@ internal object CorpusFetcher {
         run("tar", "--zstd", "-xf", tar.absolutePath, "-C", dir.absolutePath)
         tar.delete()
         compress(dir)
+    }
+
+    private fun files(c: ExternalCollection, m: FetchMethod.Files, dir: File) {
+        dir.mkdirs()
+        // A failed fetch leaves no directory behind: a partial one would read as a fetched collection.
+        runCatching {
+            for (name in m.names) {
+                val text = URI(c.url.trimEnd('/') + "/" + name).toURL().readText()
+                // A server error or a redirect page comes back as HTML, which no converter should be given.
+                require(!text.trimStart().startsWith("<")) { "${c.id}: $name came back as a web page, not data" }
+                for ((instance, converted) in m.convert(name.substringBefore('.'), text)) {
+                    File(dir, "$instance.${m.extension}").writeText(converted)
+                }
+            }
+            compress(dir)
+        }.onFailure { dir.deleteRecursively() }.getOrThrow()
+    }
+
+    /** Give each extension-less file under [dir] whose first line that is not a comment starts with [marker] the
+     *  extension [ext]. */
+    private fun nameBare(dir: File, marker: String, ext: String) {
+        dir.walkTopDown().filter { it.isFile && CorpusFiles.formatExtension(it).isEmpty() }.forEach { file ->
+            // MPS comment lines (`*…`) may come first: MIPLIB 3 heads each file with a commented summary.
+            val head = CorpusFiles.open(file).bufferedReader().useLines { lines ->
+                lines.map { it.trimStart() }.firstOrNull { it.isNotEmpty() && !it.startsWith("*") }
+            }.orEmpty()
+            if (head.startsWith(marker)) {
+                val compressed = CorpusFiles.isCompressed(file)
+                val plain = CorpusFiles.plainPath(file.name)
+                file.renameTo(
+                    File(file.parentFile, "$plain.$ext" + if (compressed) file.name.removePrefix(plain) else ""),
+                )
+            }
+        }
     }
 
     private fun zip(c: ExternalCollection, dir: File) {

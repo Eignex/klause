@@ -2,6 +2,7 @@ package com.eignex.klause.bench.catalog
 
 import com.eignex.klause.bench.source.CorpusSelection
 import com.eignex.klause.bench.source.LibminizincExpected
+import com.eignex.klause.bench.source.OrLibrary
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedCardinality
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
@@ -248,6 +249,57 @@ internal object Suites {
                         sel,
                         category,
                         format = Format.DIMACS,
+                    )
+                }
+            },
+            DynamicSuite(
+                "miplib2010",
+                "MIPLIB 2010 collection (fetched, ~361 .mps; 1/family by default)",
+                defaultPerFamily = 1,
+            ) { sel ->
+                CorpusSelection.select(
+                    ExternalCollections.miplib2010,
+                    CorpusSelection.Layout.Flat(
+                        "miplib2010-1.1.3/instances/miplib2010",
+                        "mps",
+                        familyOf = ::miplibStem,
+                    ),
+                    sel,
+                    Category.OPTIMIZATION,
+                    format = Format.MPS,
+                )
+            },
+            DynamicSuite("miplib2003", "MIPLIB 2003 (fetched, 60 .mps)") { sel ->
+                CorpusSelection.select(
+                    ExternalCollections.miplib2003,
+                    CorpusSelection.Layout.Flat("", "mps", familyOf = ::miplibStem),
+                    sel,
+                    Category.OPTIMIZATION,
+                    format = Format.MPS,
+                )
+            },
+            DynamicSuite("miplib3", "MIPLIB 3 (fetched, 65 .mps)") { sel ->
+                CorpusSelection.select(
+                    ExternalCollections.miplib3,
+                    CorpusSelection.Layout.Flat("miplib3", "mps", familyOf = ::miplibStem),
+                    sel,
+                    Category.OPTIMIZATION,
+                    format = Format.MPS,
+                )
+            },
+            DynamicSuite(
+                "orlib",
+                "OR-Library MIP classes, converted to MPS: set covering, airline set partitioning, " +
+                    "warehouse location, " +
+                    "generalised assignment, multidimensional knapsack, bin packing, aircraft landing (fetched, ~600)",
+            ) { sel ->
+                ExternalCollections.orLibrary.flatMap { col ->
+                    CorpusSelection.select(
+                        col,
+                        CorpusSelection.Layout.Flat("", "mps", familyOf = { col.id.removePrefix("orlib-") }),
+                        sel,
+                        Category.OPTIMIZATION,
+                        format = Format.MPS,
                     )
                 }
             },
@@ -1115,6 +1167,87 @@ internal object ExternalCollections {
         license = "MaxSAT Evaluation (academic benchmarks)",
         reason = "4.4GB MSE'24 exact weighted track (flat `*.wcnf.xz`); fetched rather than vendored",
         fetch = FetchMethod.Zip,
+    )
+
+    val miplib2010 = ExternalCollection(
+        id = "miplib2010",
+        url = "https://miplib2010.zib.de/download/miplib2010-1.1.3-complete.tgz",
+        license = "MIPLIB 2010 (academic; freely available for research)",
+        reason = "361-instance collection, ~1.4GB; fetched once and filtered to the <=16MB instances",
+        fetch = FetchMethod.Tarball,
+        maxFileMb = 16,
+    )
+    val miplib2003 = ExternalCollection(
+        id = "miplib2003",
+        url = "https://miplib2010.zib.de/miplib2003/download/miplib2003.tar",
+        license = "MIPLIB 2003 (academic; freely available for research)",
+        reason = "60-instance library; fetched rather than vendored",
+        fetch = FetchMethod.Tar,
+    )
+    val miplib3 = ExternalCollection(
+        // Not `miplib3`: a copy fetched before the files were named would be taken as present and never renamed.
+        id = "miplib3-mps",
+        url = "https://miplib2010.zib.de/miplib3/miplib3.tar.gz",
+        license = "MIPLIB 3 (academic; freely available for research)",
+        reason = "65-instance classic library; its MPS files have no extension and are named on fetch",
+        fetch = FetchMethod.Tarball,
+        extensionless = "NAME" to "mps",
+    )
+
+    /** OR-Library classes converted to MPS on fetch (see [OrLibrary]), each with the files it is read from. */
+    val orLibrary: List<ExternalCollection> = listOf(
+        orLibrary(
+            "scp",
+            "set covering",
+            OrLibrary::setCovering,
+            (41..49) + 410 + (51..59) + 510 + (61..65),
+            listOf("a", "b", "c", "d", "e", "nre", "nrf", "nrg", "nrh"),
+            listOf("scpclr10", "scpclr11", "scpclr12", "scpclr13") +
+                (6..11).map { "scpcyc" + it.toString().padStart(2, '0') },
+        ),
+        orLibrary(
+            "spp",
+            "set partitioning (airline crew)",
+            OrLibrary::setPartitioning,
+            files = (1..43).map { "sppnw" + it.toString().padStart(2, '0') },
+        ),
+        orLibrary(
+            "cap",
+            "capacitated warehouse location",
+            OrLibrary::warehouseLocation,
+            files = listOf(
+                41, 42, 43, 44, 51, 61, 62, 63, 64, 71, 72, 73, 74, 81, 82, 83, 84, 91, 92, 93, 94,
+                101, 102, 103, 104, 111, 112, 113, 114, 121, 122, 123, 124, 131, 132, 133, 134,
+            ).map { "cap$it" },
+        ),
+        orLibrary("gap", "generalised assignment", OrLibrary::generalisedAssignment, files = (1..12).map { "gap$it" }),
+        orLibrary(
+            "mknap",
+            "multidimensional knapsack",
+            OrLibrary::multidimensionalKnapsack,
+            files = (1..9).map { "mknapcb$it" },
+        ),
+        orLibrary("binpack", "bin packing", OrLibrary::binPacking, files = (1..8).map { "binpack$it" }),
+        orLibrary("airland", "aircraft landing", OrLibrary::aircraftLanding, files = (1..13).map { "airland$it" }),
+    )
+
+    private fun orLibrary(
+        id: String,
+        what: String,
+        convert: (String, String) -> List<Pair<String, String>>,
+        scp: List<Int> = emptyList(),
+        scpSets: List<String> = emptyList(),
+        files: List<String> = emptyList(),
+    ) = ExternalCollection(
+        id = "orlib-$id",
+        url = "https://people.brunel.ac.uk/~mastjjb/jeb/orlib/files",
+        license = "OR-Library (J.E. Beasley; freely available for research)",
+        reason = "OR-Library $what, read from its own text format and written as MPS",
+        fetch = FetchMethod.Files(
+            (scp.map { "scp$it" } + scpSets.flatMap { set -> (1..5).map { "scp$set$it" } } + files).map { "$it.txt" },
+            "mps",
+            convert,
+        ),
     )
 
     /** Every SATLIB collection with the category its instances share: the structured families, then the random-3SAT
