@@ -18,6 +18,39 @@ import kotlin.test.assertTrue
 
 class SingletonInequalityProjectionTest {
 
+    /** `x + y <= 10` with `x` only there, declared `lo..9` and open below when [openBelow] is set. */
+    private fun sourceModel(openBelow: Boolean) = Problem(
+        numBoolVars = 0,
+        numIntVars = 2,
+        intDomains = arrayOf(IntDomain(2, 9), IntDomain(0, 20)),
+        factors = listOf(Linear(longArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 10)),
+        openIntLo = booleanArrayOf(openBelow, false),
+    )
+
+    @Test
+    fun `the source form pins a column whose relaxing side is closed`() {
+        val delta = SingletonInequalityProjection.projectSource(sourceModel(openBelow = false), emptySet())
+        val ints = longArrayOf(0, 8)
+
+        delta.rebuild.rebuildInto(BooleanArray(0), ints)
+
+        assertEquals(listOf(0), delta.droppedIndices.toList())
+        assertEquals(8L, (delta.addedFactors.single() as Linear).integerConstants!!.bound, "y <= 10 - 2")
+        assertEquals(2L, ints[0])
+    }
+
+    @Test
+    fun `the source form drops the row of a column free on its relaxing side`() {
+        val delta = SingletonInequalityProjection.projectSource(sourceModel(openBelow = true), emptySet())
+        val ints = longArrayOf(0, 15)
+
+        delta.rebuild.rebuildInto(BooleanArray(0), ints)
+
+        assertEquals(listOf(0), delta.droppedIndices.toList())
+        assertTrue(delta.addedFactors.isEmpty(), "x can always absorb the row, so nothing remains of it")
+        assertEquals(-5L, ints[0], "x + 15 <= 10")
+    }
+
     @Test
     fun `a declared singleton inequality reconstructs its projected variable`() {
         val source = Linear(longArrayOf(2, 1), intArrayOf(0, 1), LinearOp.LE, 10)

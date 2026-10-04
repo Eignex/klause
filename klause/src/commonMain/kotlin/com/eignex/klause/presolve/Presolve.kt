@@ -136,6 +136,13 @@ object Presolve {
     fun projectSingletonInequalities(problem: BakedProblem, objectiveIntVars: Set<Int> = emptySet()): PassDelta =
         SingletonInequalityProjection.project(problem, objectiveIntVars)
 
+    /** Singleton Fourier-Motzkin over declared ranges, dropping the row outright for a free column. */
+    internal fun projectSourceSingletonInequalities(
+        problem: Problem,
+        objectiveIntVars: Set<Int>,
+        cancellation: Cancellation,
+    ): SourceDelta = SingletonInequalityProjection.projectSource(problem, objectiveIntVars, cancellation)
+
     /** Per-factor structural self-reduction via `Factor.structuralReduce`.
      *  See [StructuralReduction]. */
     fun reduceStructural(problem: BakedProblem): PassDelta = StructuralReduction.reduce(problem)

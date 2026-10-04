@@ -252,11 +252,16 @@ enum class PresolvePass(
     PROJECT_SINGLETON_INEQUALITIES(
         "singleton-column",
         Stage.PROBLEM,
-        Capability.FINITE,
+        Capability.SOURCE,
         PresolveTiming.FAST,
         preservesSolutionSet = false,
         autoEligible = true,
     ) {
+        override fun applySource(problem: Problem, ctx: PresolveContext) =
+            Presolve.projectSourceSingletonInequalities(problem, ctx.objectiveIntVars, ctx.cancellation)
+
+        // Root-propagated domains can close a side the declaration left open, so the finite lane pins a
+        // column the source form would have to rebuild from its row.
         override fun applyFinite(problem: BakedProblem, ctx: PresolveContext) =
             Presolve.projectSingletonInequalities(problem, ctx.objectiveIntVars)
     },
