@@ -94,6 +94,15 @@ internal sealed interface FetchMethod {
     /** Download a `.zip` from [url] and extract it (instances may stay individually
      *  compressed inside, e.g. XCSP3 `*.xml.lzma`). */
     data object Zip : FetchMethod
+
+    /** Download each of [names] from under [url] and [convert] it, (file name, text) to (instance name, file text)
+     *  pairs written as `<instance>.<extension>`, for a library whose instances need translating, such as
+     *  OR-Library's own text formats into MPS. */
+    data class Files(
+        val names: List<String>,
+        val extension: String,
+        val convert: (String, String) -> List<Pair<String, String>>,
+    ) : FetchMethod
 }
 
 /**
@@ -113,6 +122,9 @@ internal data class ExternalCollection(
      *  huge archive (e.g. MIPLIB's `collection.zip`) whose giant instances would bloat the cache and
      *  only ever time out. Filters on the compressed size, so it runs before the `.gz` expansion. */
     val maxFileMb: Int? = null,
+    /** When set, a fetched file with no extension whose text begins with [extensionless]'s marker gains its
+     *  extension, so every reader recognises it: MIPLIB 3 ships its MPS files bare. */
+    val extensionless: Pair<String, String>? = null,
 )
 
 /** Where a problem's bytes come from. Resolved to a concrete file by `source.CorpusFetcher`. */
