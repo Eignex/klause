@@ -1,5 +1,6 @@
 package com.eignex.klause.bench.metric
 
+import com.eignex.klause.bench.catalog.Format
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -77,5 +78,12 @@ class ClaspReferenceTest {
         val wcnf = "p wcnf 2 2 9\n9 1 2 0\n3 -1 0\n"
 
         assertEquals(wcnf, ClaspReference.wcnfWithProblemLine(wcnf))
+    }
+
+    @Test
+    fun `a SATLIB trailer after the formula is not passed on as an empty clause`() {
+        val text = ClaspReference.ClaspInput.of(Format.DIMACS) { "p cnf 2 1\n1 2 0\n%\n0\n".reader().buffered() }.text()
+
+        assertEquals("p cnf 2 1\n1 2 0\n", text)
     }
 }

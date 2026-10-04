@@ -188,6 +188,8 @@ internal object ClaspReference {
     internal class ClaspInput private constructor(
         private val open: () -> BufferedReader,
         private val header: String?,
+        /** A line that ends the instance: it and everything after it stay out. */
+        private val end: (String) -> Boolean = { false },
         private val line: (String) -> String?,
     ) {
         fun writeTo(out: Writer) {
@@ -197,6 +199,7 @@ internal object ClaspReference {
             }
             open().useLines { lines ->
                 for (raw in lines) {
+                    if (end(raw)) break
                     val written = line(raw) ?: continue
                     out.write(written)
                     out.write("\n")
@@ -208,9 +211,11 @@ internal object ClaspReference {
 
         companion object {
             fun of(format: Format, open: () -> BufferedReader): ClaspInput = when (format) {
-                Format.OPB -> ClaspInput(open, opbHeader(open), { it })
+                Format.OPB -> ClaspInput(open, opbHeader(open)) { it }
                 Format.WCNF -> wcnf(open)
-                else -> ClaspInput(open, null, { it })
+                // SATLIB's random-3SAT files close with a `%` line and then a lone `0`, which clasp reads as an
+                // empty clause, making every one of them unsatisfiable. `%` ends the formula.
+                else -> ClaspInput(open, null, end = { it.trim() == "%" }) { it }
             }
 
             private fun opbHeader(open: () -> BufferedReader): String? = open().useLines { lines ->
