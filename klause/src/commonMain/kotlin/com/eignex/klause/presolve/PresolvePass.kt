@@ -242,11 +242,15 @@ enum class PresolvePass(
     MERGE_DUPLICATE_COLUMNS(
         "dup-columns",
         Stage.PROBLEM,
-        Capability.FINITE,
+        Capability.SOURCE,
         PresolveTiming.FAST,
         preservesSolutionSet = false,
         autoEligible = true,
     ) {
+        override fun applySource(problem: Problem, ctx: PresolveContext) =
+            Presolve.mergeSourceDuplicateColumns(problem, ctx.objectiveIntVars, ctx.cancellation)
+
+        // A finite delta can widen the representative to the Minkowski sum, which a source range cannot.
         override fun applyFinite(problem: BakedProblem, ctx: PresolveContext) =
             Presolve.mergeDuplicateColumns(problem, ctx.objectiveIntVars, ctx.sharedIntOcc, ctx.dupColumnsTouchedVars)
     },
