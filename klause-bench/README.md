@@ -172,7 +172,9 @@ bench select [filters…]              the same selection as JSON lines: suite, 
 bench solve-one suite=<id> problem=<name> [solve args…] [out=<dir>]
                                      solve exactly one instance as `select` names it; writes its record to out=<dir>
                                      (default output/<config>/) and no per-run table, for drivers that run one
-                                     instance per process
+                                     instance per process. An instance that fails to load still gets a record:
+                                     stats.unsupported when klause declines the model, stats.loadError when it does
+                                     not compile or parse
 bench list [<suite>]                 list suites, or the problems in one suite
 ```
 

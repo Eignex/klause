@@ -239,8 +239,9 @@ internal object CorpusSelection {
             val primary = pickPrimaryMzn(pd.name, candidates)
             val mznRel = primary.relativeTo(root).path
             val familyName = if (prefix != null) "$prefix/${pd.name}" else pd.name
+            // Challenge years from 2021 ship some instances' data as `.json`, which minizinc reads as it reads `.dzn`.
             val dzns = pd.walkTopDown().maxDepth(3)
-                .filter { it.isFile && it.extension == "dzn" }
+                .filter { it.isFile && it.extension in DATA_EXTENSIONS }
                 .sortedBy { it.relativeTo(pd).path }.toList()
             if (dzns.isEmpty()) {
                 // familyKey is set explicitly (not left to the name.substringBefore('/') fallback)
@@ -250,7 +251,7 @@ internal object CorpusSelection {
             } else {
                 dzns.mapTo(out) { dzn ->
                     Discovered(
-                        "$familyName/${dzn.relativeTo(pd).path.removeSuffix(".dzn")}",
+                        "$familyName/${dzn.relativeTo(pd).path.substringBeforeLast('.')}",
                         mznRel,
                         dzn.relativeTo(root).path,
                         familyKey = familyName,
@@ -260,6 +261,8 @@ internal object CorpusSelection {
         }
         return out
     }
+
+    private val DATA_EXTENSIONS = setOf("dzn", "json")
 
     /** Pick the canonical `.mzn` for [familyName] from [candidates]: exact basename, then
      *  `<family>_model` / `model` / `main`, then a family-prefixed non-`mznc` name, else
