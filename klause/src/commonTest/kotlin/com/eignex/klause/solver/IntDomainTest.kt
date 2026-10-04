@@ -2,6 +2,8 @@ package com.eignex.klause.solver
 
 import com.eignex.klause.config.DEFAULT_BITSET_THRESHOLD
 import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.ceilingOrNull
+import com.eignex.klause.ir.floorOrNull
 import com.eignex.klause.ir.indices
 import com.eignex.klause.ir.values
 import com.eignex.klause.util.LongArrayList
@@ -199,5 +201,22 @@ class IntDomainTest {
         // Contiguous neighbours are the immediate predecessor/successor.
         assertEquals(1, d.lower(2))
         assertEquals(7, d.higher(6))
+    }
+
+    private fun sparseWideDomain(): IntDomain =
+        IntDomain(0, 2_000_000).excludeValues(longArrayOf(0, 1, 2) + LongArray(99_992) { 8L + it })!!
+
+    @Test
+    fun `ceiling rounds a hole up to the next present value`() {
+        val d = sparseWideDomain()
+
+        assertEquals(100_000L, d.ceilingOrNull(8))
+    }
+
+    @Test
+    fun `floor rounds a hole down to the previous present value`() {
+        val d = sparseWideDomain()
+
+        assertEquals(7L, d.floorOrNull(99_999))
     }
 }

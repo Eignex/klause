@@ -7,9 +7,11 @@ import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move.Compound
 import com.eignex.klause.localsearch.Move.IntSet
 import com.eignex.klause.localsearch.MoveSink
+import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.bake
 import kotlin.random.Random
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
@@ -61,5 +63,45 @@ class IncreasingInvariantTest {
         assertTrue(state.factors[0].seedFeasible(state, 0))
         val v = LongArray(3) { state.assignment.intValue(it) }
         assertTrue(v[0] < v[1] && v[1] < v[2], "seed not strictly increasing: ${v.toList()}")
+    }
+
+    @Test
+    fun `cascade rounds a raised value up past a hole`() {
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 3,
+            intDomains = arrayOf(IntDomain(0, 9), IntDomain(0, 9).excludeValue(5), IntDomain(0, 9).excludeValue(5)),
+            factors = arrayOf<Factor>(Increasing(intArrayOf(0, 1, 2), strict = false)),
+        )
+        val state = LocalSearchState(problem.bake(), Random(0))
+        state.assignment.setInt(0, 5)
+        state.assignment.setInt(1, 1)
+        state.assignment.setInt(2, 3)
+        state.recompute()
+        val sink = MoveSink()
+
+        state.factors[0].proposeRepairMoves(state, 0, sink)
+
+        val compounds = sink.list.filterIsInstance<Compound>()
+        assertTrue(
+            compounds.any { it.parts == listOf(IntSet(1, 6), IntSet(2, 6)) },
+            "expected the raising cascade to land on 6, past the hole at 5, in $compounds",
+        )
+    }
+
+    @Test
+    fun `seedFeasible rounds a chain value up past a hole`() {
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 2,
+            intDomains = arrayOf(IntDomain(0, 9), IntDomain(0, 9).excludeValue(5)),
+            factors = arrayOf<Factor>(Increasing(intArrayOf(0, 1), strict = true)),
+        )
+        val state = LocalSearchState(problem.bake(), Random(0), Assumptions(ints = mapOf(0 to 4L)))
+        state.assignment.setInt(0, 4)
+
+        assertTrue(state.factors[0].seedFeasible(state, 0))
+
+        assertEquals(6L, state.assignment.intValue(1), "x1 must take the first present value above x0 = 4")
     }
 }

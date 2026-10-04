@@ -65,16 +65,16 @@ internal class LinearInvariant(
         val sum = state.longPayload[factorId]
         if (linearHolds(sum, op, bound)) return
         if (op == LinearOp.NE) {
-            // sum == bound; bump any non-zero-coeff variable by ±1 within its domain. Each
-            // single shift changes sum by ±|c_i| ≠ 0 → breaks the equality.
+            // sum == bound; step any non-zero-coeff variable to an in-domain neighbour. Each
+            // single shift changes sum by a non-zero multiple of c_i → breaks the equality.
             forEachRepairTerm(state) { i ->
                 val v = vars[i]
                 val c = coeffs[i]
                 if (c != 0L) {
                     val cur = state.assignment.intValue(v)
                     val d = state.rootDomains[v]
-                    if (cur > d.min) sink.addChannelingIntSet(state, v, cur - 1)
-                    if (cur < d.max) sink.addChannelingIntSet(state, v, cur + 1)
+                    if (cur > d.min) sink.addChannelingIntSet(state, v, d.lower(cur))
+                    if (cur < d.max) sink.addChannelingIntSet(state, v, d.higher(cur))
                 }
             }
             return
@@ -141,8 +141,7 @@ internal class LinearInvariant(
         val curU = state.assignment.intValue(u)
         val newU = curU + uShift
         if (newU == curU) return
-        val dom = state.rootDomains[u]
-        if (newU < dom.min || newU > dom.max) return
+        if (newU !in state.rootDomains[u]) return
         sink.add(IntSet(u, newU))
         sink.pin(u)
     }

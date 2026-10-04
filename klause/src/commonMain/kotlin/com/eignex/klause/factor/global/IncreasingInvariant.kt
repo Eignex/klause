@@ -1,6 +1,8 @@
 package com.eignex.klause.factor.global
 
 import com.eignex.klause.factor.compressViolation
+import com.eignex.klause.ir.ceilingOrNull
+import com.eignex.klause.ir.floorOrNull
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
@@ -92,8 +94,9 @@ internal class IncreasingInvariant(private val xs: IntArray, private val gap: In
     /**
      * Re-monotonise the chain by sweeping one direction and clamping each variable to the running
      * bound: [raise] pushes the suffix up (`target(i) = max(cur, target(i−1)+gap)`), `!raise` pulls
-     * the prefix down (`target(i) = min(cur, target(i+1)−gap)`). Aborts if the running bound leaves a
-     * variable's domain (no monotone completion in that direction). Emitted as one compound move.
+     * the prefix down (`target(i) = min(cur, target(i+1)−gap)`), a target in a hole rounding on in the
+     * sweep direction. Aborts if the running bound leaves a variable's domain (no monotone completion
+     * in that direction). Emitted as one compound move.
      */
     private fun proposeCascade(state: LocalSearchState, sink: MoveSink, raise: Boolean) {
         val n = xs.size
@@ -109,8 +112,7 @@ internal class IncreasingInvariant(private val xs: IntArray, private val gap: In
             } else {
                 val prev = if (raise) target[i - 1] + gap else target[i + 1] - gap
                 val want = if (raise) maxOf(cur, prev) else minOf(cur, prev)
-                if (if (raise) want > d.max else want < d.min) return
-                target[i] = want
+                target[i] = (if (raise) d.ceilingOrNull(want) else d.floorOrNull(want)) ?: return
             }
         }
         // Distinct-var dedup (last write wins) keeps the compound well-formed if a var repeats.
@@ -130,8 +132,14 @@ internal class IncreasingInvariant(private val xs: IntArray, private val gap: In
             val d = state.rootDomains[xs[i]]
             val lo = if (i == 0) d.min else maxOf(d.min, state.assignment.intValue(xs[i - 1]) + gap)
             val hi = if (i == n - 1) d.max else minOf(d.max, state.assignment.intValue(xs[i + 1]) - gap)
-            if (cur - 1 >= lo) sink.addChannelingIntSet(state, xs[i], cur - 1)
-            if (cur + 1 <= hi) sink.addChannelingIntSet(state, xs[i], cur + 1)
+            if (cur > d.min) {
+                val down = d.lower(cur)
+                if (down >= lo) sink.addChannelingIntSet(state, xs[i], down)
+            }
+            if (cur < d.max) {
+                val up = d.higher(cur)
+                if (up <= hi) sink.addChannelingIntSet(state, xs[i], up)
+            }
         }
     }
 
@@ -145,8 +153,7 @@ internal class IncreasingInvariant(private val xs: IntArray, private val gap: In
                 if (fv < floor) return false // a frozen value already breaks the chain
                 floor = fv + gap
             } else {
-                val pick = maxOf(d.min, floor)
-                if (pick > d.max) return false
+                val pick = d.ceilingOrNull(floor) ?: return false
                 state.assignment.setInt(v, pick)
                 floor = pick + gap
             }

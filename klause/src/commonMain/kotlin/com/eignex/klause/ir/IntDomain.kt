@@ -207,6 +207,28 @@ interface IntDomain {
 val IntDomain.values: IntSpan get() = span()
 
 /**
+ * Smallest in-domain value at or above [value], or null when [value] exceeds [IntDomain.max]. An interior
+ * hole rounds up to the next present value, located without walking the gap.
+ */
+internal fun IntDomain.ceilingOrNull(value: Long): Long? = when {
+    value <= min -> min
+    value > max -> null
+    value in this -> value
+    else -> higher(value)
+}
+
+/**
+ * Largest in-domain value at or below [value], or null when [value] is below [IntDomain.min]. An interior
+ * hole rounds down to the previous present value, located without walking the gap.
+ */
+internal fun IntDomain.floorOrNull(value: Long): Long? = when {
+    value >= max -> max
+    value < min -> null
+    value in this -> value
+    else -> lower(value)
+}
+
+/**
  * A uniformly random value of the domain, never a hole.
  *
  * Indexes the values when they can be indexed. A wider domain has no index space that reaches past

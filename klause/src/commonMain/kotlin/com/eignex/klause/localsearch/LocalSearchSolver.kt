@@ -353,7 +353,7 @@ class LocalSearchSolver(
                         if (params.cancellation()) return@sequence
                         cancelCountdown = CANCEL_CHECK_INTERVAL
                     }
-                    if (state.cost == 0L) {
+                    if (state.cost == 0L && state.intValuesInDomain()) {
                         if (!everFeasible) {
                             everFeasible = true
                             // Record at first feasibility, not in `finally`: the `firstOrNull` consumer
@@ -530,7 +530,7 @@ class LocalSearchSolver(
                 // Score the live assignment without copying it; the snapshot is taken only on a strict
                 // improvement, so the steady state allocates nothing per iteration.
                 val obj = objective.evaluate(state.assignment)
-                if (obj < bestObj) {
+                if (obj < bestObj && state.intValuesInDomain()) {
                     bestObj = obj
                     val snap = state.assignment.snapshot()
                     bestSample = snap

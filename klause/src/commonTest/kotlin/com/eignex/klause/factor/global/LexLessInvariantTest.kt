@@ -100,4 +100,26 @@ class LexLessInvariantTest {
             "expected prefix-break move at index 0 in $intSets",
         )
     }
+
+    @Test
+    fun `repair steps a lowered x across a hole to the next present value`() {
+        val factor = LexLess(intArrayOf(0), intArrayOf(1), strict = true)
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 2,
+            intDomains = arrayOf(IntDomain(0, 5).excludeValue(3), IntDomain(0, 5)),
+            factors = arrayOf<Factor>(factor),
+        )
+        val state = LocalSearchState(problem.bake(), Random(0))
+        state.assignment.setInt(0, 4)
+        state.assignment.setInt(1, 2)
+        state.recompute()
+        val sink = MoveSink()
+
+        state.factors[0].proposeRepairMoves(state, 0, sink)
+
+        val xTargets = sink.list.filterIsInstance<IntSet>().filter { it.varId == 0 }.map { it.newValue }
+        assertTrue(2L in xTargets, "expected the step below 4 to skip the hole at 3 in $xTargets")
+        assertTrue(3L !in xTargets, "a repair must never target the hole at 3: $xTargets")
+    }
 }

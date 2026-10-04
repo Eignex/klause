@@ -10,6 +10,7 @@ import com.eignex.klause.propagation.bake
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /**
@@ -76,6 +77,39 @@ class LocalSearchStateTest {
         assertTrue(Move.IntSet(0, 3) in ps, "compound must set the driving var")
         assertTrue(Move.IntSet(1, 0) in ps, "sibling must absorb the +2 drift to keep x + y = 3")
         assertEquals(2, ps.size, "no spurious extra parts")
+    }
+
+    @Test
+    fun `Linear EQ channeling never counter-shifts a sibling into a hole`() {
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 2,
+            intDomains = arrayOf(IntDomain(0, 5), IntDomain(0, 5).excludeValue(3)),
+            factors = arrayOf<Factor>(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.EQ, 4)),
+        )
+        val state = LocalSearchState(problem.bake(), Random(1))
+        state.assignment.setInt(0, 2)
+        state.assignment.setInt(1, 2)
+        state.recompute()
+
+        val move = state.synthesizeChannelingMove(intVar = 0, newValue = 1)
+
+        assertEquals(Move.IntSet(0, 1), move, "absorbing the drift would put y on the hole at 3")
+    }
+
+    @Test
+    fun `an int value in a hole is not within the domains`() {
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 1,
+            intDomains = arrayOf(IntDomain(0, 5).excludeValue(3)),
+            factors = arrayOf<Factor>(),
+        )
+        val state = LocalSearchState(problem.bake(), Random(1))
+
+        state.assignment.setInt(0, 3)
+
+        assertFalse(state.intValuesInDomain())
     }
 
     @Test
