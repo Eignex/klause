@@ -85,6 +85,24 @@ class CorpusSelectionTest {
     }
 
     @Test
+    fun `MznChallenge layout pairs json data like dzn`() {
+        val root = Files.createTempDirectory("mznjson").toFile()
+        try {
+            File(root, "accap").mkdirs()
+            File(root, "accap/accap.mzn").writeText("% model")
+            File(root, "accap/a4.json").writeText("{}")
+            File(root, "accap/a5.dzn").writeText("n=5;")
+            val found = Layout.MznChallenge().discover(root).sortedBy { it.name }
+            assertEquals(
+                listOf("accap/a4" to "accap/a4.json", "accap/a5" to "accap/a5.dzn"),
+                found.map { it.name to it.dznRelPath },
+            )
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
     fun `MznChallengeAllYears layout year-prefixes families so a repeated name doesn't collide`() {
         val root = Files.createTempDirectory("mznyears").toFile()
         try {

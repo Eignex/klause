@@ -2,11 +2,17 @@ package com.eignex.klause.bench.metric
 
 import com.eignex.klause.backtrack.BacktrackPresets
 import com.eignex.klause.backtrack.BacktrackSolver
+import com.eignex.klause.bench.catalog.ProblemRef
 import com.eignex.klause.bench.report.Reports
 import com.eignex.klause.bench.runner.Budget
 import com.eignex.klause.bench.runner.ResolvedProblem
+import com.eignex.klause.bench.runner.Runners
+import com.eignex.klause.bench.source.ProblemKind
 import com.eignex.klause.bench.tools.ProfileConfig
 import com.eignex.klause.bench.tools.Profiler
+import com.eignex.klause.formats.flatzinc.UnsupportedFlatZincException
+import com.eignex.klause.formats.smtlib.UnsupportedSmtException
+import com.eignex.klause.formats.xcsp3.UnsupportedXcsp3Exception
 import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.localsearch.LocalSearchSolver
 import com.eignex.klause.propagation.bake
@@ -96,6 +102,9 @@ internal data class SolveRecord(
 internal object SolveMetric {
     private const val SOLVE_SEED = 3L
 
+    /** Characters of a load failure's message kept in its record. */
+    private const val REASON_CAP = 400
+
     /** Run [solverId] (`"klause"` or a registered MiniZinc reference id) over [entries], saving one
      *  `.out` + `.json` per problem under `output/<config>/`. [search] applies to klause; references
      *  take only processors + free. When [profile] is set, profiles the klause engine in-process
@@ -146,11 +155,13 @@ internal object SolveMetric {
         return outDir
     }
 
-    /** Solve the one problem [entry] as `solve` would, writing its [SolveRecord] to `<outDir>/<problem>.json`
+    /** Solve the one problem [ref] as `solve` would, writing its [SolveRecord] to `<outDir>/<problem>.json`
      *  and the raw solver output beside it, and return the record. Unlike [run] it writes no per-run table and
-     *  loads no reference tables, so one process per problem stays cheap; the caller gathers the records. */
+     *  loads no reference tables, so one process per problem stays cheap; the caller gathers the records. A problem
+     *  that fails to load gets a record too, its reason under `stats.unsupported` when klause declines the model
+     *  and under `stats.loadError` otherwise, where `run` skips it: one problem per process has nothing to skip to. */
     fun solveOne(
-        entry: ResolvedProblem,
+        ref: ProblemRef,
         budget: Budget = Budget(),
         solverId: String = SolverInvocation.KLAUSE,
         search: KlauseSearch = KlauseSearch(),
@@ -163,10 +174,54 @@ internal object SolveMetric {
         }
         val tag = configTag(solverId, settings, budget, label)
         val dir = (outDir ?: File("output", tag)).apply { mkdirs() }
-        val (rec, raw) = solve(entry, solverId, settings, budget, tag, Instant.now().toString(), Reports.readGitSha())
-        raw?.let { File(dir, flat(entry) + ".out").writeText(it) }
-        File(dir, flat(entry) + ".json").writeText(Reports.json.encodeToString(rec))
+        val timestamp = Instant.now().toString()
+        val sha = Reports.readGitSha()
+        val name = ref.name.replace('/', '_')
+        val (rec, raw) = runCatching { Runners.resolve(ref) }.fold(
+            { entry -> solve(entry, solverId, settings, budget, tag, timestamp, sha) },
+            { failure -> loadFailureRecord(ref, solverId, settings, budget, timestamp, sha, failure) to null },
+        )
+        raw?.let { File(dir, "$name.out").writeText(it) }
+        File(dir, "$name.json").writeText(Reports.json.encodeToString(rec))
         return rec
+    }
+
+    /** The record of a problem that never reached the solver: undecided, with why under `stats`. */
+    internal fun loadFailureRecord(
+        ref: ProblemRef,
+        solverId: String,
+        s: SolverInvocation.Settings,
+        budget: Budget,
+        timestamp: String,
+        sha: String?,
+        failure: Throwable,
+    ): SolveRecord {
+        val reason = (failure.message ?: failure::class.simpleName.orEmpty()).lineSequence()
+            .map { it.trim() }.filter { it.isNotEmpty() }.joinToString(" / ").take(REASON_CAP)
+        return SolveRecord(
+            problem = ref.name,
+            solver = solverId,
+            engine = s.engine,
+            processors = s.processors ?: 1,
+            search = if (s.free) "free" else "fixed",
+            seed = s.seed,
+            budgetMs = budget.timeoutMillis,
+            kind = if (runCatching { ProblemKind.isCop(ref) }.getOrDefault(false)) "optimize" else "satisfy",
+            maximize = false,
+            feasible = null,
+            objective = null,
+            timeToBestMs = null,
+            proven = false,
+            stats = mapOf((if (declined(failure)) "unsupported" else "loadError") to reason),
+            gitSha = sha,
+            timestamp = timestamp,
+            command = "LOAD",
+        )
+    }
+
+    /** Whether klause declined a model it read, rather than the model failing to compile or parse. */
+    private fun declined(failure: Throwable): Boolean = generateSequence(failure) { it.cause }.any {
+        it is UnsupportedFlatZincException || it is UnsupportedXcsp3Exception || it is UnsupportedSmtException
     }
 
     private fun settings(solverId: String, search: KlauseSearch) = SolverInvocation.Settings(
