@@ -5,6 +5,9 @@ import com.eignex.klause.bench.catalog.ProblemRef
 import com.eignex.klause.bench.runner.Budget
 import com.eignex.klause.bench.source.CorpusFetcher
 import com.eignex.klause.bench.source.CorpusFiles
+import java.io.BufferedReader
+import java.io.StringWriter
+import java.io.Writer
 import java.math.BigInteger
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicLong
@@ -62,16 +65,13 @@ internal object ClaspReference {
         p.waitFor(DOCKER_INSPECT_WAIT_MS, TimeUnit.MILLISECONDS) && p.exitValue() == 0
     }.getOrElse { false }
 
-    /** Solve [ref] (DIMACS, OPB or WCNF) with clasp under [budget], single-threaded. The instance is piped on
-     *  stdin (OPB and WCNF get their problem line synthesized first). Objective sense is always minimise for OPB
-     *  (clasp's only PB mode); DIMACS has none — both report `maximize=false`. */
+    /** Solve [ref] (DIMACS, OPB or WCNF) with clasp under [budget], single-threaded. The instance is streamed
+     *  on stdin (OPB and WCNF get their problem line synthesized first). Objective sense is always minimise for
+     *  OPB (clasp's only PB mode); DIMACS has none — both report `maximize=false`. */
     fun run(ref: ProblemRef, budget: Budget): SolverInvocation.Result {
-        val text = CorpusFiles.readText(CorpusFetcher.resolve(ref.source))
-        val input = when (ref.format) {
-            Format.OPB -> opbWithProblemLine(text)
-            Format.WCNF -> wcnfWithProblemLine(text)
-            else -> text
-        }
+        val file = CorpusFetcher.resolve(ref.source)
+        // Streamed, never held: a MaxSAT instance can be gigabytes of text, and several run at once.
+        val input = ClaspInput.of(ref.format) { CorpusFiles.open(file).bufferedReader() }
         val timeoutSec = (budget.timeoutMillis / 1000).coerceAtLeast(1)
         val name = "$CONTAINER_LABEL-${seq.incrementAndGet()}"
         val cmd = listOf(
@@ -96,7 +96,7 @@ internal object ClaspReference {
         // Feed stdin on its own thread: clasp streams progress lines to stdout while parsing a large
         // instance, so writing all of stdin before reading stdout would deadlock on the pipe buffers.
         val writer = Thread {
-            runCatching { proc.outputStream.use { it.write(input.toByteArray()) } }
+            runCatching { proc.outputStream.bufferedWriter().use(input::writeTo) }
         }.apply {
             isDaemon = true
             start()
@@ -165,38 +165,97 @@ internal object ClaspReference {
     /** Prepend the standard OPB problem line `* #variable= N #constraint= M` when absent (the vendored
      *  instances omit it and clasp then rejects them). N = the highest `xK` index, M = the number of
      *  constraint lines (each terminated by `;`), excluding comments and the `min:`/`max:` objective. */
-    internal fun opbWithProblemLine(text: String): String {
-        if (PROBLEM_LINE.containsMatchIn(text)) return text
-        val nVar = VARIABLE.findAll(text).map { it.groupValues[1].toInt() }.maxOrNull() ?: 0
-        val nCon = text.lineSequence().count { line ->
-            val t = line.trim()
-            t.endsWith(";") && !t.startsWith("*") && !t.startsWith("min:") && !t.startsWith("max:")
-        }
-        return "* #variable= $nVar #constraint= $nCon\n$text"
-    }
+    internal fun opbWithProblemLine(text: String): String =
+        ClaspInput.of(Format.OPB) { text.reader().buffered() }.text()
 
     /**
      * [text] in the classic `p wcnf` form clasp reads. The MaxSAT Evaluation format since 2022 has no problem
      * line and marks hard clauses with `h`; they become clauses at the top weight, one more than every soft
      * weight together, so no set of soft clauses can outweigh one hard clause. A classic file passes unchanged.
      */
-    internal fun wcnfWithProblemLine(text: String): String {
-        if (WCNF_PROBLEM_LINE.containsMatchIn(text)) return text
-        val clauses = text.lineSequence().map { it.trim() }.filter { it.isNotEmpty() && !it.startsWith("c") }.toList()
-        var maxVar = 0
-        var softTotal = BigInteger.ZERO
-        for (clause in clauses) {
-            val tokens = clause.split(Regex("""\s+"""))
-            if (tokens[0] != "h") softTotal += tokens[0].toBigInteger()
-            for (literal in tokens.drop(1)) maxVar = maxOf(maxVar, abs(literal.toInt()))
+    internal fun wcnfWithProblemLine(text: String): String =
+        ClaspInput.of(Format.WCNF) { text.reader().buffered() }.text()
+
+    /**
+     * An instance as clasp reads it, written in two passes over [open]: the first works out the problem line a
+     * file without one needs, the second streams the body through, so the instance is never held in memory.
+     */
+    internal class ClaspInput private constructor(
+        private val open: () -> BufferedReader,
+        private val header: String?,
+        private val line: (String) -> String?,
+    ) {
+        fun writeTo(out: Writer) {
+            if (header != null) {
+                out.write(header)
+                out.write("\n")
+            }
+            open().useLines { lines ->
+                for (raw in lines) {
+                    val written = line(raw) ?: continue
+                    out.write(written)
+                    out.write("\n")
+                }
+            }
         }
-        val top = softTotal + BigInteger.ONE
-        val body = clauses.joinToString("\n") { if (it.startsWith("h ")) "$top ${it.removePrefix("h ")}" else it }
-        return "p wcnf $maxVar ${clauses.size} $top\n$body\n"
+
+        fun text(): String = StringWriter().also(::writeTo).toString()
+
+        companion object {
+            fun of(format: Format, open: () -> BufferedReader): ClaspInput = when (format) {
+                Format.OPB -> ClaspInput(open, opbHeader(open), { it })
+                Format.WCNF -> wcnf(open)
+                else -> ClaspInput(open, null, { it })
+            }
+
+            private fun opbHeader(open: () -> BufferedReader): String? = open().useLines { lines ->
+                var nVar = 0
+                var nCon = 0
+                for (line in lines) {
+                    if (PROBLEM_LINE.containsMatchIn(line)) return@useLines null
+                    VARIABLE.findAll(line).forEach { nVar = maxOf(nVar, it.groupValues[1].toInt()) }
+                    val t = line.trim()
+                    if (t.endsWith(";") && !t.startsWith("*") && !t.startsWith("min:") && !t.startsWith("max:")) nCon++
+                }
+                "* #variable= $nVar #constraint= $nCon"
+            }
+
+            private fun wcnf(open: () -> BufferedReader): ClaspInput {
+                var classic = false
+                var maxVar = 0
+                var clauses = 0
+                var softTotal = BigInteger.ZERO
+                open().useLines { lines ->
+                    for (raw in lines) {
+                        if (WCNF_PROBLEM_LINE.containsMatchIn(raw)) {
+                            classic = true
+                            break
+                        }
+                        val clause = raw.trim()
+                        if (clause.isEmpty() || clause.startsWith("c")) continue
+                        clauses++
+                        val tokens = clause.split(WHITESPACE)
+                        if (tokens[0] != "h") softTotal += tokens[0].toBigInteger()
+                        for (literal in tokens.drop(1)) maxVar = maxOf(maxVar, abs(literal.toInt()))
+                    }
+                }
+                if (classic) return ClaspInput(open, null) { it }
+                val top = softTotal + BigInteger.ONE
+                return ClaspInput(open, "p wcnf $maxVar $clauses $top") { raw ->
+                    val clause = raw.trim()
+                    when {
+                        clause.isEmpty() || clause.startsWith("c") -> null
+                        clause.startsWith("h ") -> "$top ${clause.removePrefix("h ")}"
+                        else -> clause
+                    }
+                }
+            }
+        }
     }
 
     private val WCNF_PROBLEM_LINE = Regex("""(?m)^\s*p\s+wcnf\b""")
 
     private val PROBLEM_LINE = Regex("""(?m)^\s*\*\s*#variable=""")
     private val VARIABLE = Regex("""x(\d+)""")
+    private val WHITESPACE = Regex("""\s+""")
 }
