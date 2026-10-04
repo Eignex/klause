@@ -167,7 +167,14 @@ internal class SourceLpBudget(
                 }
             }
             if (rhs.any { !admit(it) }) return null
-            val width = if (pairing) 4L * bits + 64L else bits + 4096L * (variables + rowCount) + 64L
+            // Hadamard: a minor of the scaled rows has at most their bits plus log2(n)/2 per row, so this
+            // bounds every exact basis intermediate without charging a fixed width per row.
+            val dimension = variables + rowCount
+            val width = if (pairing) {
+                4L * bits + 64L
+            } else {
+                bits + dimension * (Long.SIZE_BITS - dimension.countLeadingZeroBits()) + 64L
+            }
             val visits = 32L * if (pairing) {
                 entries + rowCount * entries + rowCount * rowCount + variables + 1L
             } else {
