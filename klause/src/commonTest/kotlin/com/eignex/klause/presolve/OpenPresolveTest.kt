@@ -187,8 +187,7 @@ class OpenPresolveTest {
         val result = assertIs<OpenPresolveResult.Tightened>(spec.presolveOpen())
 
         assertEquals(1, result.closedSides)
-        val aggregate = assertIs<Linear>(result.spec.factors.last())
-        assertTrue(aggregate.vars.contentEquals(intArrayOf(0)))
+        val aggregate = result.spec.factors.filterIsInstance<Linear>().single { it.vars.contentEquals(intArrayOf(0)) }
         assertEquals(4L, aggregate.integerConstants!!.bound)
         assertEquals(4L, result.spec.intBounds.upper(0))
     }
