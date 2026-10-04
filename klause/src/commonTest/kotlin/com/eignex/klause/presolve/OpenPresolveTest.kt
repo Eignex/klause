@@ -176,12 +176,12 @@ class OpenPresolveTest {
 
     @Test
     fun `source-safe factor passes run before open bound tightening`() {
-        // z = x + y lets the aggregate pass replace x + y <= 4 with z <= 4 without requiring a
+        // z = x + 2y lets the aggregate pass replace x + 2y <= 4 with z <= 4 without requiring a
         // finite CP domain for any column. The rewritten row then closes z's upper side.
         val spec = fullyOpen(
             3,
-            row(0 to 1L, 1 to -1L, 2 to -1L, op = LinearOp.EQ, bound = 0L),
-            row(1 to 1L, 2 to 1L, op = LinearOp.LE, bound = 4L),
+            row(0 to 1L, 1 to -1L, 2 to -2L, op = LinearOp.EQ, bound = 0L),
+            row(1 to 1L, 2 to 2L, op = LinearOp.LE, bound = 4L),
         )
 
         val result = assertIs<OpenPresolveResult.Tightened>(spec.presolveOpen())

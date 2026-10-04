@@ -37,8 +37,8 @@ class OpenSourcePreparationTest {
             numBoolVars = 0,
             intBounds = IntBounds.fromModelBounds(LongArray(6), upper, null, open),
             factors = arrayOf<Factor>(
-                Linear(longArrayOf(1, -1, -1), intArrayOf(0, 1, 2), LinearOp.EQ, 0L),
-                Linear(longArrayOf(1, 1), intArrayOf(1, 2), LinearOp.LE, 4L),
+                Linear(longArrayOf(1, -1, -2), intArrayOf(0, 1, 2), LinearOp.EQ, 0L),
+                Linear(longArrayOf(1, 2), intArrayOf(1, 2), LinearOp.LE, 4L),
                 AllDifferent(vars = intArrayOf(3, 4, 5), domainMin = 0, domainSize = 4),
             ),
         )

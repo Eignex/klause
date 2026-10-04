@@ -234,8 +234,8 @@ internal object DuplicateColumns {
 
     /** Whether `rep + y` spans exactly [rep]'s declared range: each side open on [rep], or closed at `0` on [y]. */
     private fun absorbs(rep: Int, y: Int, bounds: IntBounds): Boolean =
-        (bounds.isOpenLower(rep) || bounds.hasLower(y) && bounds.lower(y) == 0L) &&
-            (bounds.isOpenUpper(rep) || bounds.hasUpper(y) && bounds.upper(y) == 0L)
+        (bounds.isOpenLower(rep) || (bounds.hasLower(y) && bounds.lower(y) == 0L)) &&
+            (bounds.isOpenUpper(rep) || (bounds.hasUpper(y) && bounds.upper(y) == 0L))
 
     /**
      * The step recovering [y] from the aggregate `z` held in [rep]'s slot, before [rep] itself is.
@@ -255,7 +255,10 @@ internal object DuplicateColumns {
             clamp = if (bounds.hasUpper(y)) bounds.upper(y) else null,
         )
         bounds.hasUpper(y) -> RebuildStep.AffineValue(y, bounds.upper(y), IntArray(0), LongArray(0), 1L)
-        else -> RebuildStep.AffineValue(y, if (bounds.hasLower(y)) bounds.lower(y) else 0L, IntArray(0), LongArray(0), 1L)
+        else -> {
+            val atLower = if (bounds.hasLower(y)) bounds.lower(y) else 0L
+            RebuildStep.AffineValue(y, atLower, IntArray(0), LongArray(0), 1L)
+        }
     }
 
     /** Whether a declared bound leaves room for the `Long` evaluator to subtract it from an aggregate value. */
