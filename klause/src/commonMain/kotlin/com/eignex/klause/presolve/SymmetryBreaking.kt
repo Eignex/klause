@@ -82,11 +82,19 @@ internal object SymmetryBreaking {
     ): SourceDelta {
         val bounds = problem.intBounds
         if ((0 until problem.numIntVars).all { bounds.hasLower(it) && bounds.hasUpper(it) }) return SourceDelta()
+        // A column no factor reads is decided by no lane, so ordering it buys nothing and only adds a row the
+        // theory then has to carry; it is held fixed like an objective column.
+        val readInts = BooleanArray(problem.numIntVars)
+        val readBools = BooleanArray(problem.numBoolVars)
+        for (f in problem.factors) {
+            for (v in f.intVars) readInts[v] = true
+            for (v in f.boolVars) readBools[v] = true
+        }
         val extra = breakings(
             problem,
             SourceColumns(problem),
-            objectiveIntVars,
-            objectiveBoolVars,
+            objectiveIntVars + readInts.indices.filter { !readInts[it] },
+            objectiveBoolVars + readBools.indices.filter { !readBools[it] },
             cancellation,
             theoryOwnableOnly = true,
         )
