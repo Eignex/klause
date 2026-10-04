@@ -81,6 +81,8 @@ internal object ScipReference {
             "docker",
             "run",
             "--rm",
+            // The output streams to this process; a container log would also keep it on the VM's disk.
+            "--log-driver", "none",
             "-i",
             "--name", name,
             // Hard resource ceilings so no single container can starve the host: memory (see

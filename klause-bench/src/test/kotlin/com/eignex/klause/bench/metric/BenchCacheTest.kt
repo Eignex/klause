@@ -28,4 +28,20 @@ class BenchCacheTest {
             root.deleteRecursively()
         }
     }
+
+    @Test
+    fun `an oversized output keeps its status and objective lines and drops the model lines`() {
+        val model = "v " + "1 ".repeat(5_000_000)
+        val result = SolverInvocation.Result(
+            feasible = true,
+            objective = 3.0,
+            timeToBestMs = 1L,
+            proven = false,
+            stats = emptyMap(),
+            rawOutput = "o 3\n$model\ns SATISFIABLE",
+            command = "",
+        )
+
+        assertEquals("o 3\ns SATISFIABLE", BenchCache.compact(result).rawOutput)
+    }
 }
