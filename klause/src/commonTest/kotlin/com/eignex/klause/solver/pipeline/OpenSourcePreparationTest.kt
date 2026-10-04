@@ -24,21 +24,22 @@ import kotlin.test.assertNull
 class OpenSourcePreparationTest {
 
     /**
-     * `x = y + z` and `y + z <= 4` over open columns, then an `AllDifferent` over two bounded ones.
+     * `x = y + z` and `y + z <= 4` over open columns, then an `AllDifferent` over three bounded ones —
+     * three, because structural reduction rewrites a two-column one into a theory-owned `x - y != 0`.
      *
      * The aggregate pass rewrites the second row into `x <= 4`, which drops it and appends the rewrite —
      * so the `AllDifferent` moves up a slot and factor ownership no longer lines up with the input.
      */
     private fun aggregatable(openColumns: Boolean): Problem {
-        val open = if (openColumns) Bits(5).also { bits -> repeat(3) { bits.set(it) } } else null
-        val upper = if (openColumns) longArrayOf(0, 0, 0, 3, 3) else longArrayOf(9, 9, 9, 3, 3)
+        val open = if (openColumns) Bits(6).also { bits -> repeat(3) { bits.set(it) } } else null
+        val upper = if (openColumns) longArrayOf(0, 0, 0, 3, 3, 3) else longArrayOf(9, 9, 9, 3, 3, 3)
         return Problem(
             numBoolVars = 0,
-            intBounds = IntBounds.fromModelBounds(LongArray(5), upper, null, open),
+            intBounds = IntBounds.fromModelBounds(LongArray(6), upper, null, open),
             factors = arrayOf<Factor>(
                 Linear(longArrayOf(1, -1, -1), intArrayOf(0, 1, 2), LinearOp.EQ, 0L),
                 Linear(longArrayOf(1, 1), intArrayOf(1, 2), LinearOp.LE, 4L),
-                AllDifferent(vars = intArrayOf(3, 4), domainMin = 0, domainSize = 4),
+                AllDifferent(vars = intArrayOf(3, 4, 5), domainMin = 0, domainSize = 4),
             ),
         )
     }
@@ -137,7 +138,7 @@ class OpenSourcePreparationTest {
     @Test
     fun `a descent stopped before it starts prepares nothing`() {
         val model = aggregatable(openColumns = true)
-        val objective = LinearObjective(intCoefficients = longArrayOf(1, 0, 0, 0, 0))
+        val objective = LinearObjective(intCoefficients = longArrayOf(1, 0, 0, 0, 0, 0))
 
         val result = OpenTheoryMinimizer(model, objective)
             .minimize(TheoryParams(cancellation = Cancellation { true }))

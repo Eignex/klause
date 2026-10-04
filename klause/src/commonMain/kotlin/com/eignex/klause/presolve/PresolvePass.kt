@@ -199,11 +199,16 @@ enum class PresolvePass(
     REDUCE_STRUCTURAL(
         "structural",
         Stage.PROBLEM,
-        Capability.FINITE,
+        Capability.SOURCE,
         PresolveTiming.FAST,
         preservesSolutionSet = true,
         autoEligible = true,
     ) {
+        override fun applySource(problem: Problem, ctx: PresolveContext) =
+            Presolve.reduceSourceStructural(problem, ctx.cancellation)
+
+        // Root-propagated domains are narrower than the declarations, so the finite lane hands every factor
+        // the tighter view rather than offering it only to factors over closed columns.
         override fun applyFinite(problem: BakedProblem, ctx: PresolveContext) = Presolve.reduceStructural(problem)
     },
 

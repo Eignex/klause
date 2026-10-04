@@ -35,6 +35,30 @@ class StructuralReductionTest {
     private fun reduced(problem: Problem): Problem =
         problem.bake().let { it.withPassDelta(Presolve.reduceStructural(it), BakeConfig.NONE) }
 
+    /** A fixed index into a constant array, with the result column open above when [openResult] is set. */
+    private fun fixedElement(openResult: Boolean) = Problem(
+        numBoolVars = 0,
+        numIntVars = 2,
+        intDomains = arrayOf(IntDomain(2, 2), IntDomain(0, 100)),
+        factors = listOf(Element(idx = 0, result = 1, arr = longArrayOf(10, 20, 30), arrIsVars = false)),
+        openIntHi = booleanArrayOf(false, openResult),
+    )
+
+    @Test
+    fun `the source form rewrites a global whose columns are all closed`() {
+        val delta = StructuralReduction.reduceSource(fixedElement(openResult = false))
+
+        assertEquals(listOf(0), delta.droppedIndices.toList())
+        assertTrue(delta.addedFactors.single() is Linear)
+    }
+
+    @Test
+    fun `the source form leaves a global over an open column alone`() {
+        val delta = StructuralReduction.reduceSource(fixedElement(openResult = true))
+
+        assertTrue(delta.isEmpty)
+    }
+
     @Test
     fun `a fixed index into a constant array becomes a result equality`() {
         // idx = 2 (offset 1) selects arr[1] = 20, so result = 20.
