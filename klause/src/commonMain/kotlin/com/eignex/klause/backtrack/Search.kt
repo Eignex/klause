@@ -553,7 +553,11 @@ private class ResidualRealComponent(
         if (context.cancelled()) return ComponentCheck.Indeterminate
         val result = engine.leafCertify(cp.session, toleranceCheck)
         return when (result.verdict) {
-            LpVerdict.FEASIBLE, LpVerdict.ATTAINED_OPTIMUM, LpVerdict.UNBOUNDED -> ComponentCheck.Feasible.also {
+            LpVerdict.FEASIBLE,
+            LpVerdict.ATTAINED_OPTIMUM,
+            LpVerdict.TOLERANCE_OPTIMUM,
+            LpVerdict.UNBOUNDED,
+            -> ComponentCheck.Feasible.also {
                 completed = Sample(
                     BooleanArray(problem.numBoolVars) { cp.session.boolValue(it) ?: false },
                     LongArray(problem.numIntVars) { cp.session.intDomain(it).min },

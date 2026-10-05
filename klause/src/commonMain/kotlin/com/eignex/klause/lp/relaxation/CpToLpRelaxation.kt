@@ -286,8 +286,10 @@ private class SampleDomains(private val sample: Sample) : RelaxationDomains {
 /**
  * The certified feasibility verdict of the LP-only continuous relaxation at a full-assignment leaf
  * [sample], with every discrete variable pinned to its assigned value so the LP decides only the
- * continuous columns. [LpVerdict.FEASIBLE] means the reals have a feasible completion — the leaf is a
- * genuine solution; [LpVerdict.INFEASIBLE] (exact Farkas) means none exists — the leaf must be rejected;
+ * continuous columns. [LpVerdict.FEASIBLE] means the reals have an exact feasible completion — the leaf is a
+ * genuine solution — and [LpVerdict.ATTAINED_OPTIMUM] that the completion is also exactly optimal;
+ * [LpVerdict.TOLERANCE_OPTIMUM] is a float optimum [toleranceCheck] accepted, whose reals are not exact;
+ * [LpVerdict.INFEASIBLE] (exact Farkas) means no completion exists — the leaf must be rejected;
  * [LpVerdict.INDETERMINATE] means neither could be certified within the 128-bit budget, so the leaf's
  * status is unknown and the terminal verdict must degrade to `unknown` rather than claim UNSAT/SAT.
  *
@@ -324,7 +326,7 @@ internal fun leafRealFeasibility(
     )
     certified.float?.let { sink?.observeComponentSplit(it.blocks) }
     certified.floatOptimum?.let { float ->
-        return LeafRealResult(LpVerdict.ATTAINED_OPTIMUM, relaxation.floatReals(float.primal, problem))
+        return LeafRealResult(LpVerdict.TOLERANCE_OPTIMUM, relaxation.floatReals(float.primal, problem))
     }
     if (certified.verdict == LpVerdict.INFEASIBLE) return LeafRealResult(LpVerdict.INFEASIBLE, EmptyDoubleArray)
     val primal = certified.exactPrimal ?: return LeafRealResult(LpVerdict.INDETERMINATE, EmptyDoubleArray)

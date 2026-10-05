@@ -637,9 +637,10 @@ internal class LpEngine(
      * [session] — the strict-aware decider with the
      * rows premise-cited, so an [LpVerdict.INFEASIBLE] leaf also derives a theory lemma over the
      * activating literals (a Farkas-ray clause when the certificate carries an integer ray, else the
-     * active rows' premises) and stashes it for [lastBackjump]. On [LpVerdict.FEASIBLE] the returned
-     * reals complete the assignment into a full solution. The float solve is capped by work sized from the
-     * model; a leaf it stops short of a verdict is [LpVerdict.INDETERMINATE].
+     * active rows' premises) and stashes it for [lastBackjump]. On [LpVerdict.FEASIBLE] and
+     * [LpVerdict.ATTAINED_OPTIMUM] the returned reals complete the assignment exactly; on
+     * [LpVerdict.TOLERANCE_OPTIMUM] they are the float optimum [toleranceCheck] accepted. The float solve is
+     * capped by work sized from the model; a leaf it stops short of a verdict is [LpVerdict.INDETERMINATE].
      */
     fun leafCertify(session: PropagationSession, toleranceCheck: ((Sample) -> Boolean)? = null): LeafRealResult {
         requireOpen()
@@ -663,10 +664,12 @@ internal class LpEngine(
             floatOffset = relaxation.objectiveConstant.toDouble(),
         )
         certified.float?.let { sink.lp.observeComponentSplit(it.blocks) }
-        certified.floatOptimum?.let { float ->
-            return LeafRealResult(LpVerdict.ATTAINED_OPTIMUM, relaxation.floatReals(float.primal, problem))
-        }
         return when (certified.verdict) {
+            LpVerdict.TOLERANCE_OPTIMUM -> LeafRealResult(
+                LpVerdict.TOLERANCE_OPTIMUM,
+                relaxation.floatReals(checkNotNull(certified.floatOptimum).primal, problem),
+            )
+
             LpVerdict.FEASIBLE, LpVerdict.ATTAINED_OPTIMUM, LpVerdict.UNBOUNDED -> {
                 val primal = certified.exactPrimal
                     ?: return LeafRealResult(LpVerdict.INDETERMINATE, EmptyDoubleArray)

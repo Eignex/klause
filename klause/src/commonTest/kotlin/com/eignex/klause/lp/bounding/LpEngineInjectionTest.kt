@@ -13,6 +13,7 @@ import com.eignex.klause.lp.engine.LpCertificationPolicy
 import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.lp.engine.LpSolveMetrics
 import com.eignex.klause.lp.engine.LpSolver
+import com.eignex.klause.lp.engine.LpVerdict
 import com.eignex.klause.lp.engine.LpZeroObjectivePricing
 import com.eignex.klause.lp.engine.RecordingLpEngineFactory
 import com.eignex.klause.lp.tightenOpenIntBounds
@@ -334,6 +335,34 @@ class LpEngineInjectionTest {
         val construction = factory.calls.single { it.kind == EngineConstruction.GENERAL }
         assertEquals(LpZeroObjectivePricing.LARGEST_PIVOT, construction.zeroObjectivePricing)
         assertEquals(47L, construction.tieSeed)
+    }
+
+    @Test
+    fun `leaf certification reports a float optimum its tolerance check accepts as a tolerance optimum`() {
+        // 3x = 1 with x in [0, 2], minimizing x; every exact certifier is vetoed, so only float evidence can decide.
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 0,
+            intDomains = emptyArray(),
+            factors = arrayOf<Factor>(
+                Linear(longArrayOf(), intArrayOf(), doubleArrayOf(3.0), intArrayOf(0), LinearOp.EQ, 1L),
+            ),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(2.0),
+        )
+        val engine = LpEngine(
+            problem,
+            LinearObjective(realCoefficients = doubleArrayOf(1.0)),
+            LpParams(lpPlan = LpPlan(bounding = true, realResidual = true, componentSplit = false)),
+            SolveStatsSink(backend = "leaf-tolerance"),
+            LpSolveContext(certificationPolicy = LpCertificationPolicy { _, _ -> false }),
+        )
+
+        val leaf = engine.use { it.leafCertify(PropagationSession(problem), toleranceCheck = { true }) }
+
+        assertEquals(LpVerdict.TOLERANCE_OPTIMUM, leaf.verdict)
+        assertEquals(1.0 / 3.0, leaf.reals.single(), 1e-12)
     }
 
     @Test

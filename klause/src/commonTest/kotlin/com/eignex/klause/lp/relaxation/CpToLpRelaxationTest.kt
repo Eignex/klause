@@ -203,7 +203,7 @@ class CpToLpRelaxationTest {
         val cases = listOf<Pair<((Sample) -> Boolean)?, LpVerdict>>(
             null to LpVerdict.INDETERMINATE,
             { _: Sample -> false } to LpVerdict.INDETERMINATE,
-            { _: Sample -> true } to LpVerdict.ATTAINED_OPTIMUM,
+            { _: Sample -> true } to LpVerdict.TOLERANCE_OPTIMUM,
         )
         for ((check, verdict) in cases) {
             val result = leafRealFeasibility(
@@ -215,7 +215,7 @@ class CpToLpRelaxationTest {
             )
 
             assertEquals(verdict, result.verdict)
-            if (verdict == LpVerdict.ATTAINED_OPTIMUM) assertEquals(1.0 / 3.0, result.reals.single(), eps)
+            if (verdict == LpVerdict.TOLERANCE_OPTIMUM) assertEquals(1.0 / 3.0, result.reals.single(), eps)
         }
     }
 
@@ -345,7 +345,7 @@ class CpToLpRelaxationTest {
             toleranceCheck = { true },
         )
 
-        assertEquals(LpVerdict.ATTAINED_OPTIMUM, result.verdict)
+        assertEquals(LpVerdict.TOLERANCE_OPTIMUM, result.verdict)
         assertEquals(1e9, result.reals[1])
     }
 
@@ -374,7 +374,7 @@ class CpToLpRelaxationTest {
             toleranceCheck = { true },
         )
 
-        assertEquals(LpVerdict.ATTAINED_OPTIMUM, result.verdict)
+        assertEquals(LpVerdict.TOLERANCE_OPTIMUM, result.verdict)
         assertEquals(0.2, result.reals.sum(), eps)
     }
 
@@ -465,7 +465,7 @@ class CpToLpRelaxationTest {
             toleranceCheck = { true },
         )
 
-        assertEquals(LpVerdict.ATTAINED_OPTIMUM, result.verdict)
+        assertEquals(LpVerdict.TOLERANCE_OPTIMUM, result.verdict)
         assertEquals(1e12, result.reals[1])
     }
 
