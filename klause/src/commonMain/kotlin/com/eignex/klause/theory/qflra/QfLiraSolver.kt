@@ -45,12 +45,14 @@ import com.eignex.klause.solver.search.SearchAtomPremise
 import com.eignex.klause.solver.search.SearchBrancher
 import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchDecision
+import com.eignex.klause.solver.search.SearchExplanation
 import com.eignex.klause.solver.search.SearchIntValue
 import com.eignex.klause.solver.search.SearchModel
 import com.eignex.klause.solver.search.SearchRealValue
 import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.solver.search.SearchTheoryDecision
 import com.eignex.klause.solver.search.TheoryComponent
+import com.eignex.klause.solver.search.explainAtoms
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.MutableIntObjectMap
 import com.ionspin.kotlin.bignum.integer.BigInteger
@@ -76,7 +78,11 @@ class ExactLiraSearchComponent(
     private val bools = IntArray(model.numBoolVars) { UNASSIGNED }
     private val boolLevels = IntArray(model.numBoolVars) { -1 }
     private val root = SearchNode()
-    private val reduction = ExactLiraReductionCache(model, { solveContext }) { smtStats?.observeSourceLp(it) }
+    private val disjunctionAtoms = HashMap<Int, List<DisjunctAtom>>()
+    private var impliedDisjunct = false
+    private val reduction = ExactLiraReductionCache(model, disjunctionAtoms, { solveContext }) {
+        smtStats?.observeSourceLp(it)
+    }
     private val nodesByLevel = MutableIntObjectMap<SearchNode>()
     private var node = root
     private var assignment: ExactLiraAssignment? = null
@@ -149,6 +155,7 @@ class ExactLiraSearchComponent(
     override fun initialize(context: SearchContext): ComponentResult {
         check(this.context == null) { "a theory component belongs to one immutable source session" }
         this.context = context
+        registerDisjunctions(context)
         beginOperation(context)
         return try {
             if (!system.install() || operationStop()) {
@@ -199,6 +206,123 @@ class ExactLiraSearchComponent(
     override fun onRestart(context: SearchContext) = lp.onRestart(context)
     override fun close() {
         closeSourceLpOwners(listOfNotNull(if (lpDelegate.isInitialized()) lp else null, reduction))
+    }
+
+    private fun registerDisjunctions(context: SearchContext) {
+        for ((index, factor) in model.factors.withIndex()) {
+            if (factor.linearForm !is LinearForm.Disjunction || factor.linearRows.isEmpty()) continue
+            // A factor with any row that cannot be named keeps the private choice for all of its rows, so none of
+            // its rows is registered: a stray atom would be a Boolean no factor reads.
+            if (!factor.linearRows.all(::nameableDisjunct)) continue
+            val disjuncts = ArrayList<DisjunctAtom>(factor.linearRows.size)
+            for (row in factor.linearRows) disjuncts += registerDisjunct(row, context) ?: break
+            if (disjuncts.size == factor.linearRows.size) disjunctionAtoms[index] = disjuncts
+        }
+    }
+
+    private fun nameableDisjunct(row: LinearRow): Boolean {
+        if (row.booleanVariables().isNotEmpty()) return false
+        val comparison = row.exactComparison(model.numRealVars, truth = true) { false }
+        return comparison.terms.isNotEmpty() && (comparison.op == LinearOp.LE || comparison.op == LinearOp.GE)
+    }
+
+    private fun registerDisjunct(row: LinearRow, context: SearchContext): DisjunctAtom? {
+        if (!nameableDisjunct(row)) return null
+        val comparison = row.exactComparison(model.numRealVars, truth = true) { false }
+        val terms = comparison.terms.map { (column, coefficient) ->
+            val source = if (column < model.numRealVars) {
+                SearchRealValue(column)
+            } else {
+                SearchIntValue(column - model.numRealVars)
+            }
+            SourceBoundTerm(source, coefficient)
+        }
+        // An integral activity has no value strictly between consecutive integers, so the row and its
+        // complement are both non-strict and share their names with source integer branching.
+        val integral = !comparison.strict && comparison.terms.all { (column, coefficient) ->
+            column >= model.numRealVars && coefficient.den == BigInteger.ONE
+        }
+        return when (comparison.op) {
+            LinearOp.LE -> {
+                val split = if (integral) {
+                    SourceBoundAtom.integerSplit(context, terms, comparison.bound)
+                } else {
+                    SourceBoundAtom.rationalSplit(context, terms, comparison.bound, comparison.strict)
+                }
+                split?.let { DisjunctAtom(it.positive, it.negative) }
+            }
+
+            LinearOp.GE -> {
+                val split = if (integral) {
+                    val ceiling = comparison.bound.negated().floor().negate()
+                    SourceBoundAtom.integerSplit(context, terms, (ceiling - BigInteger.ONE).asFraction())
+                } else {
+                    SourceBoundAtom.rationalSplit(context, terms, comparison.bound, !comparison.strict)
+                }
+                split?.let { DisjunctAtom(it.negative, it.positive) }
+            }
+
+            // An equality is two bounds and a disequality a union of two, so neither is one exact pair.
+            LinearOp.EQ, LinearOp.NE -> null
+        }
+    }
+
+    // The shared engine sees each disjunct only as an atom, so the disjunction itself is held here; a
+    // learned clause carrying it could be forgotten by a database reduction. Reports whether it implied a disjunct,
+    // whose row reaches this component only when the engine delivers the implication.
+    private fun enforceDisjunctions(context: SearchContext): ComponentResult {
+        impliedDisjunct = false
+        for (disjuncts in disjunctionAtoms.values) {
+            if (disjuncts.any { context.truth(it.holds) == true }) continue
+            val undecided = disjuncts.filter { context.truth(it.holds) == null }
+            if (undecided.size > 1) continue
+            val open = undecided.singleOrNull()
+            val reason = disjunctionReason(disjuncts, open, context) ?: return ComponentResult.Indeterminate
+            if (open == null) {
+                smtStats?.observeConflict(reason)
+                outcome = ComponentCheck.Infeasible(reason)
+                return ComponentResult.Conflict(reason)
+            }
+            val implied = context.imply(open.holds.literal, reason)
+            if (implied !is ComponentResult.Consistent) return implied
+            impliedDisjunct = true
+        }
+        return ComponentResult.Consistent
+    }
+
+    private fun disjunctionReason(
+        disjuncts: List<DisjunctAtom>,
+        open: DisjunctAtom?,
+        context: SearchContext,
+    ): SearchExplanation? = context.explainAtoms(
+        SearchAtomPremise.All(
+            disjuncts.filter { it !== open }.map { SearchAtomPremise.Asserted(SearchDecision.Theory(it.fails)) },
+        ),
+        open?.let { SearchDecision.Theory(it.holds) },
+    )
+
+    private fun disjunctionBranch(context: SearchContext): List<SearchDecision>? {
+        for ((index, factor) in model.factors.withIndex()) {
+            if (factor.linearForm !is LinearForm.Disjunction) continue
+            val disjuncts = disjunctionAtoms[index]
+            if (disjuncts == null) {
+                val address = RowAddress(index, 0)
+                if (address in node.comparisonChoices) continue
+                return factor.linearRows.indices.map { SearchDecision.Theory(ExactLiraDecision(address, option = it)) }
+            }
+            if (disjuncts.any { context.truth(it.holds) == true }) continue
+            val open = disjuncts.firstOrNull { context.truth(it.holds) == null }
+            if (open != null) return listOf(SearchDecision.Theory(open.holds), SearchDecision.Theory(open.fails))
+            val reason = disjunctionReason(disjuncts, null, context)
+            outcome = if (reason == null) {
+                ComponentCheck.Indeterminate
+            } else {
+                smtStats?.observeConflict(reason)
+                ComponentCheck.Infeasible(reason)
+            }
+            return null
+        }
+        return null
     }
 
     private fun accept(decision: SearchDecision, context: SearchContext): ComponentResult {
@@ -339,6 +463,10 @@ class ExactLiraSearchComponent(
     private fun relaxWithin(context: SearchContext): ComponentResult {
         if (operationStop()) return ComponentResult.Indeterminate
         if (!dirty) return ComponentResult.Consistent
+        val enforced = enforceDisjunctions(context)
+        if (enforced !is ComponentResult.Consistent) return enforced
+        // The implied row is not asserted yet; solving now would only be repeated once it is delivered.
+        if (impliedDisjunct) return ComponentResult.Consistent
         if (bools.any { it == UNASSIGNED } && arithmeticRows.none {
                 it.truthUnder(bools) != null
             }
@@ -361,8 +489,8 @@ class ExactLiraSearchComponent(
             outcome = ComponentCheck.Infeasible(explanation)
             return ComponentResult.Conflict(explanation)
         }
-        val complete = bools.none { it == UNASSIGNED } && node.nextComparison(model) == null &&
-            node.nextDisequality(model, bools) == null
+        val complete = bools.none { it == UNASSIGNED } && node.selectsEveryDisjunction(model, disjunctionAtoms) &&
+            node.nextDisequality(model, disjunctionAtoms, bools) == null
         if (complete) {
             result.exactPrimal?.take(model.numRealVars + model.numIntVars)?.let { point ->
                 acceptWitness(point)?.let {
@@ -381,12 +509,9 @@ class ExactLiraSearchComponent(
             outcome = ComponentCheck.Indeterminate
             return null
         }
-        node.nextComparison(model)?.let { comparison ->
-            return model.factors[comparison.factor].linearRows.indices.map {
-                SearchDecision.Theory(ExactLiraDecision(comparison, option = it))
-            }
-        }
-        node.nextDisequality(model, bools)?.let { address ->
+        disjunctionBranch(context)?.let { return it }
+        if (outcome != null) return null
+        node.nextDisequality(model, disjunctionAtoms, bools)?.let { address ->
             return listOf(LinearOp.GE, LinearOp.LE).map {
                 SearchDecision.Theory(ExactLiraDecision(address, direction = it))
             }
@@ -433,7 +558,7 @@ class ExactLiraSearchComponent(
             outcome = ComponentCheck.Indeterminate
             return null
         }
-        when (val bounded = reduced.solver.solve(node, operationStop)) {
+        when (val bounded = reduced.solver.solve(node, node.searchedBranches(disjunctionAtoms), operationStop)) {
             is ExactReducedSearchResult.Split -> {
                 return registeredSplit(reduced, bounded.integer, bounded.floor.asFraction(), context)
             }
@@ -589,6 +714,7 @@ private sealed interface ExactLiraReduction {
  */
 private class ExactLiraReductionCache(
     private val model: Problem,
+    private val disjunctionAtoms: Map<Int, List<DisjunctAtom>>,
     solveContext: () -> LpSolveContext,
     onWork: (SourceLpWorkStats) -> Unit,
 ) : AutoCloseable {
@@ -614,8 +740,9 @@ private class ExactLiraReductionCache(
     }
 
     private fun admitsSourcePreparation(node: SearchNode): Boolean {
+        val searched = node.searchedBranches(disjunctionAtoms)
         if (model.numBoolVars > 512 || model.factors.size > 128 || node.branches.size > 128 ||
-            node.sourceBranches.size > 128 || node.sourceBranches.sumOf { it.terms.size.toLong() } > 512L
+            searched.size > 128 || searched.sumOf { it.terms.size.toLong() } > 512L
         ) {
             return false
         }
@@ -671,7 +798,8 @@ private class ExactLiraReductionCache(
             node.branches.sortedBy { it.variable },
             node.comparisonChoices.entries.sortedBy { it.key }.map { it.key to it.value },
             node.disequalityDirections.entries.sortedBy { it.key }.map { it.key to it.value },
-            node.sourceBranches,
+            // The rows are a conjunction, so the same branches reached in another order select the same artefact.
+            node.sourceBranches.toSet(),
         )
         results[key]?.let { cached ->
             mark?.let {
@@ -775,7 +903,7 @@ private class ExactLiraReductionCache(
             model.realLower[real].takeIf(Double::isFinite)?.let { rows += exactColumnLower(real, it.asFraction()) }
             model.realUpper[real].takeIf(Double::isFinite)?.let { rows += exactColumnUpper(real, it.asFraction()) }
         }
-        val complete = node.forEachSelectedRow(model) { factor, index, row ->
+        val complete = node.forEachSelectedRow(model, disjunctionAtoms) { factor, index, row ->
             if (cancellation()) return null
             val truth = row.truthUnder(bools) ?: return@forEachSelectedRow
             val comparison = row.exactComparison(model.numRealVars, truth) { bools[it] == TRUE }
@@ -799,7 +927,7 @@ private data class ExactLiraReductionKey(
     val branches: List<IntegerBranch>,
     val comparisons: List<Pair<RowAddress, Int>>,
     val directions: List<Pair<RowAddress, LinearOp>>,
-    val sourceBranches: List<SourceBoundAtom>,
+    val sourceBranches: Set<SourceBoundAtom>,
 )
 
 /**
@@ -878,9 +1006,9 @@ private class ExactReducedLiraSystem(private val reduction: ExactLiraReduction.B
         reduction.system.boundedColumn(realColumns + integer) && !values[realColumns + integer].isInteger()
     }
 
-    fun solve(node: SearchNode, cancellation: Cancellation): ExactReducedSearchResult {
+    fun solve(node: SearchNode, searched: List<SourceBoundAtom>, cancellation: Cancellation): ExactReducedSearchResult {
         return reduction.budget.run(reduction.sourceRows, columns, cancellation) { token ->
-            if (node.sourceBranches.size > 128 || node.sourceBranches.sumOf { it.terms.size.toLong() } > 512L ||
+            if (searched.size > 128 || searched.sumOf { it.terms.size.toLong() } > 512L ||
                 node.sourceBranches.any { atom ->
                     !listOf(
                         atom.threshold,
@@ -1084,15 +1212,21 @@ private data class SearchNode(
     fun withDirection(factor: RowAddress, direction: LinearOp): SearchNode =
         copy(disequalityDirections = disequalityDirections + (factor to direction))
 
-    fun nextComparison(model: Problem): RowAddress? = model.factors.indices.firstOrNull { index ->
-        model.factors[index].linearForm is LinearForm.Disjunction &&
-            RowAddress(index, 0) !in comparisonChoices
-    }?.let { RowAddress(it, 0) }
+    fun selectsEveryDisjunction(model: Problem, disjunctionAtoms: Map<Int, List<DisjunctAtom>>): Boolean =
+        forEachSelectedRow(model, disjunctionAtoms) { _, _, _ -> }
 
-    inline fun forEachSelectedRow(model: Problem, action: (Int, Int, LinearRow) -> Unit): Boolean {
+    // A disjunction named by registered atoms states its chosen row through sourceBranches.
+    inline fun forEachSelectedRow(
+        model: Problem,
+        disjunctionAtoms: Map<Int, List<DisjunctAtom>>,
+        action: (Int, Int, LinearRow) -> Unit,
+    ): Boolean {
         for ((index, factor) in model.factors.withIndex()) {
             val rows = factor.linearRows
-            if (factor.linearForm is LinearForm.Disjunction) {
+            val disjuncts = disjunctionAtoms[index]
+            if (disjuncts != null) {
+                if (disjuncts.none { it.row in sourceBranches }) return false
+            } else if (factor.linearForm is LinearForm.Disjunction) {
                 val selected = comparisonChoices[RowAddress(index, 0)] ?: return false
                 action(index, selected, rows[selected])
             } else {
@@ -1102,8 +1236,8 @@ private data class SearchNode(
         return true
     }
 
-    fun nextDisequality(model: Problem, bools: IntArray): RowAddress? {
-        forEachSelectedRow(model) { factor, index, row ->
+    fun nextDisequality(model: Problem, disjunctionAtoms: Map<Int, List<DisjunctAtom>>, bools: IntArray): RowAddress? {
+        forEachSelectedRow(model, disjunctionAtoms) { factor, index, row ->
             val truth = row.truthUnder(bools) ?: return@forEachSelectedRow
             if ((if (truth) row.relation else row.relation.complemented()) != LinearOp.NE) return@forEachSelectedRow
             val address = RowAddress(factor, index)
@@ -1141,6 +1275,28 @@ private fun SearchNode.withPublishedBounds(
     }
     return bounded
 }
+
+// holds states one row of a comparison disjunction and fails its exact complement.
+private class DisjunctAtom(val holds: RegisteredTheoryDecision, val fails: RegisteredTheoryDecision) {
+    val row = holds.payload as SourceBoundAtom
+    val complement = fails.payload as SourceBoundAtom
+}
+
+// The source branches search made. A decided disjunct restates a model row the size limits already count.
+private fun SearchNode.searchedBranches(disjunctionAtoms: Map<Int, List<DisjunctAtom>>): List<SourceBoundAtom> {
+    if (disjunctionAtoms.isEmpty()) return sourceBranches
+    val restated = HashSet<SourceBoundAtom>()
+    for (disjuncts in disjunctionAtoms.values) {
+        for (disjunct in disjuncts) {
+            restated += disjunct.row
+            restated += disjunct.complement
+        }
+    }
+    return sourceBranches.filter { it !in restated }
+}
+
+private fun SearchContext.truth(decision: RegisteredTheoryDecision): Boolean? =
+    boolValue(decision.literal ushr 1)?.let { it == (decision.literal and 1 == 0) }
 
 private data class ExactLiraDecision(val address: RowAddress, val option: Int = 0, val direction: LinearOp? = null) :
     SearchTheoryDecision

@@ -1,5 +1,6 @@
 package com.eignex.klause.theory.qflra
 
+import com.eignex.klause.factor.arithmetic.ComparisonClause
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
@@ -749,6 +750,133 @@ class ExactLiraSearchComponentTest {
         assertEquals(1L, snapshot.unexplainedConflicts)
         assertEquals(0L, snapshot.explainedConflicts)
     }
+
+    @Test
+    fun `a comparison clause takes its only feasible row`() {
+        ExactLiraSearchComponent(comparisonClauseModel(xUpper = 4)).use { component ->
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(0))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+
+            val result = assertIs<SearchResult.Satisfied>(session.solve(0))
+
+            val assignment = assertNotNull(result.model.valueOf<ExactLiraAssignment>(component))
+            assertEquals(listOf(BigInteger.fromInt(4), BigInteger.fromInt(-3)), assignment.ints.toList())
+        }
+    }
+
+    @Test
+    fun `a comparison clause with one row left open implies it`() {
+        // x >= 5, y <= -3, z >= 10 with x <= 4 and z <= 9: only y's row can hold.
+        val model = Problem(
+            numBoolVars = 0,
+            intBounds = openBounds(3),
+            factors = arrayOf(
+                ComparisonClause(
+                    intArrayOf(0, 1, 2),
+                    arrayOf(LinearOp.GE, LinearOp.LE, LinearOp.GE),
+                    longArrayOf(5, -3, 10),
+                ),
+                Linear(longArrayOf(1), intArrayOf(0), LinearOp.LE, 4),
+                Linear(longArrayOf(1), intArrayOf(2), LinearOp.LE, 9),
+            ),
+        )
+        ExactLiraSearchComponent(model).use { component ->
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(0))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+
+            val result = assertIs<SearchResult.Satisfied>(session.solve(0))
+
+            val assignment = assertNotNull(result.model.valueOf<ExactLiraAssignment>(component))
+            assertTrue(assignment.ints[1] <= BigInteger.fromInt(-3))
+        }
+    }
+
+    @Test
+    fun `a strict real disjunction is decided through its atoms`() {
+        // r in [0, 1] with (r < 0) or (r > upper): sat past 1/2, refuted past 1.
+        for ((upper, sat) in listOf(0.5 to true, 1.0 to false)) {
+            val below = Linear(
+                intVars = intArrayOf(),
+                intCoeffs = doubleArrayOf(),
+                realVars = intArrayOf(0),
+                realCoeffs = doubleArrayOf(1.0),
+                op = LinearOp.LE,
+                bound = 0.0,
+                strict = true,
+            )
+            val above = Linear(
+                intVars = intArrayOf(),
+                intCoeffs = doubleArrayOf(),
+                realVars = intArrayOf(0),
+                realCoeffs = doubleArrayOf(1.0),
+                op = LinearOp.GE,
+                bound = upper,
+                strict = true,
+            )
+            val clause = object : Factor by below {
+                override val linearForm: LinearForm = LinearForm.Disjunction(below.linearRows + above.linearRows)
+            }
+            val model = Problem(
+                numBoolVars = 0,
+                intBounds = openBounds(0),
+                numRealVars = 1,
+                realLower = doubleArrayOf(0.0),
+                realUpper = doubleArrayOf(1.0),
+                factors = arrayOf(clause),
+            )
+            ExactLiraSearchComponent(model).use { component ->
+                val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(0))
+                assertIs<ComponentResult.Consistent>(session.initialize())
+
+                val result = session.solve(0)
+
+                if (sat) {
+                    val model = assertIs<SearchResult.Satisfied>(result).model
+                    val witness = assertNotNull(model.valueOf<ExactLraAssignment>(component))
+                    val half = BigFraction.of(BigInteger.ONE, BigInteger.fromInt(2))
+                    assertTrue(witness.reals.single() > half, "upper $upper")
+                } else {
+                    assertIs<SearchResult.Exhausted>(result, "upper $upper")
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `a comparison clause with no feasible row is refuted`() {
+        ExactLiraSearchComponent(comparisonClauseModel(xUpper = 3)).use { component ->
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(0))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+
+            assertIs<SearchResult.Exhausted>(session.solve(0))
+        }
+    }
+
+    @Test
+    fun `conflicts through a chosen comparison clause row are explained`() {
+        val stats = SmtStatsSink()
+        ExactLiraSearchComponent(comparisonClauseModel(xUpper = 3)).use { component ->
+            component.observeWith(stats)
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(0))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+
+            session.solve(0)
+
+            val snapshot = stats.snapshot()
+            assertTrue(snapshot.explainedConflicts > 0L)
+            assertEquals(0L, snapshot.unexplainedConflicts)
+        }
+    }
+
+    private fun comparisonClauseModel(xUpper: Long) = Problem(
+        numBoolVars = 0,
+        intBounds = openBounds(2),
+        factors = arrayOf(
+            ComparisonClause(intArrayOf(0, 1), arrayOf(LinearOp.GE, LinearOp.LE), longArrayOf(5, -3)),
+            Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.EQ, 1),
+            Linear(longArrayOf(1), intArrayOf(0), LinearOp.LE, xUpper),
+        ),
+    )
 
     @Test
     fun `real disjunction search reports strict witness telemetry`() {
