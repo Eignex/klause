@@ -29,13 +29,14 @@ internal data class ExactContinuationLimits(
     val maxBits: Int = 4096,
     val maxWork: Long = 100_000_000L,
     val maxAllocation: Long = 256L * 1024L * 1024L,
-    val maxTimeNs: Long = 5_000_000_000L,
+    // Unset by default: the limits above are deterministic, and only a caller that asks for one gets a clock cap.
+    val maxTimeNs: Long? = null,
     val maxImportPivots: Int = 128,
     val maxPivots: Int = 10000,
 ) {
     init {
         require(maxRows >= 0 && maxColumns >= 0 && maxCells >= 0 && maxBits >= 24)
-        require(maxWork >= 0 && maxAllocation >= 0 && maxTimeNs >= 0 && maxImportPivots >= 0 && maxPivots >= 0)
+        require(maxWork >= 0 && maxAllocation >= 0 && (maxTimeNs ?: 0) >= 0 && maxImportPivots >= 0 && maxPivots >= 0)
     }
 }
 
@@ -106,7 +107,7 @@ internal class ContinuationBudget(val limits: ExactContinuationLimits, val token
     @Suppress("ThrowsCount")
     fun step(units: Long = 1L, bytes: Long = 0L) {
         if (token()) throw ContinuationStop(ContinuationDecline.CANCELLED)
-        if (elapsedNs >= limits.maxTimeNs) throw ContinuationStop(ContinuationDecline.TIME)
+        limits.maxTimeNs?.let { if (elapsedNs >= it) throw ContinuationStop(ContinuationDecline.TIME) }
         if (units > limits.maxWork - work) throw ContinuationStop(ContinuationDecline.WORK)
         if (bytes > limits.maxAllocation - allocation) throw ContinuationStop(ContinuationDecline.ALLOCATION)
         work += units
@@ -127,7 +128,10 @@ internal class ContinuationBudget(val limits: ExactContinuationLimits, val token
         val bits = maxOf(a.num.bitLength(), a.den.bitLength()).toLong() +
             maxOf(b.num.bitLength(), b.den.bitLength()) + 2L
         if (bits > limits.maxBits * 2L + 2L) throw ContinuationStop(ContinuationDecline.BITS)
-        step(bits, 128L + bits / 2L)
+        // Multiplying and gcd-normalising a fraction costs about the square of its word length, so a charge linear
+        // in bits lets the work limit admit far more wall time on wide values than on narrow ones.
+        val words = bits / Long.SIZE_BITS + 1L
+        step(bits + words * words, 128L + bits / 2L)
     }
 }
 
@@ -169,7 +173,7 @@ internal class ExactContinuation(private val input: ExactContinuationInput) {
             limits.copy(
                 maxWork = (limits.maxWork - work).coerceAtLeast(0),
                 maxAllocation = (limits.maxAllocation - allocation).coerceAtLeast(0),
-                maxTimeNs = (limits.maxTimeNs - elapsed).coerceAtLeast(0),
+                maxTimeNs = limits.maxTimeNs?.let { (it - elapsed).coerceAtLeast(0) },
             ),
             cancellation,
         )

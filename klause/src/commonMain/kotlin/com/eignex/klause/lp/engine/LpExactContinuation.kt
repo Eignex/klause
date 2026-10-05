@@ -127,7 +127,7 @@ internal fun continueExactLp(
     val captureLimits = limits.copy(
         maxWork = (limits.maxWork - cache.usedWork).coerceAtLeast(0),
         maxAllocation = (limits.maxAllocation - cache.usedAllocation).coerceAtLeast(0),
-        maxTimeNs = (limits.maxTimeNs - cache.usedTimeNs).coerceAtLeast(0),
+        maxTimeNs = limits.maxTimeNs?.let { (it - cache.usedTimeNs).coerceAtLeast(0) },
     )
     val capture = ContinuationBudget(captureLimits, cancellation)
     var metrics = ExactContinuationMetrics(invalidated = invalidated)
@@ -176,7 +176,9 @@ internal fun continueExactLp(
                             false,
                         )
                     },
-                    cancellation = cancellation or Cancellation { verification.elapsedNs >= remaining.maxTimeNs },
+                    cancellation = remaining.maxTimeNs?.let { cap ->
+                        cancellation or Cancellation { verification.elapsedNs >= cap }
+                    } ?: cancellation,
                     limits = defaults.copy(
                         maxWork = minOf(defaults.maxWork, (remaining.maxWork - verification.work).coerceAtLeast(0)),
                         maxAllocation = minOf(
@@ -255,11 +257,11 @@ internal fun continueExactLp(
     return LpContinuationVerification(point, conflict, support, combineContinuationMetrics(selection.metrics, metrics))
 }
 
-// Identity admission is separately bounded; it cannot replenish retained numerical work.
+// Identity admission is separately bounded; it cannot replenish retained numerical work. Its envelope is work and
+// allocation, so whether a continuation is admitted does not depend on the machine.
 private fun admissionLimits(limits: ExactContinuationLimits) = limits.copy(
     maxWork = minOf(limits.maxWork, 1_000_000L),
     maxAllocation = minOf(limits.maxAllocation, 4L * 1024L * 1024L),
-    maxTimeNs = minOf(limits.maxTimeNs, 100_000_000L),
 )
 
 private fun admitContinuation(model: LpModel, budget: ContinuationBudget) {
@@ -295,7 +297,7 @@ private fun selectContinuation(
         envelope.copy(
             maxWork = (envelope.maxWork - exported.work).coerceAtLeast(0),
             maxAllocation = (envelope.maxAllocation - exported.allocation).coerceAtLeast(0),
-            maxTimeNs = (envelope.maxTimeNs - exported.elapsedNs).coerceAtLeast(0),
+            maxTimeNs = envelope.maxTimeNs?.let { (it - exported.elapsedNs).coerceAtLeast(0) },
         ),
         cancellation,
     )
@@ -366,7 +368,7 @@ private fun selectContinuation(
 private fun remainingContinuationLimits(limits: ExactContinuationLimits, session: ExactContinuation?) = limits.copy(
     maxWork = (limits.maxWork - (session?.usedWork ?: 0L)).coerceAtLeast(0),
     maxAllocation = (limits.maxAllocation - (session?.usedAllocation ?: 0L)).coerceAtLeast(0),
-    maxTimeNs = (limits.maxTimeNs - (session?.usedTimeNs ?: 0L)).coerceAtLeast(0),
+    maxTimeNs = limits.maxTimeNs?.let { (it - (session?.usedTimeNs ?: 0L)).coerceAtLeast(0) },
 )
 
 private class ContinuationAuthority(val input: ExactContinuationInput, val origins: List<BigFraction>)
