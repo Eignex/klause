@@ -272,6 +272,45 @@ class RefinementTest {
     }
 
     @Test
+    fun `an exact point without a float optimum seeds refinement to the certified optimum`() {
+        val builder = LpBuilder()
+        val x = builder.addRealVar(0.0, 8.0, cost = 2.0)
+        builder.addRealRow(intArrayOf(x), doubleArrayOf(1.0), Relation.GE, 3.0)
+        val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+        val five = BigFraction.ofLong(5L)
+        LpScopedSolver(state).use { owner ->
+            val result = refineLp(
+                assertNotNull(state.toWorkingModel()),
+                LpRefinementRequest(owner, owner.refinementCache, LpRefinementLimits()),
+                witness = ExactLpWitness(listOf(five), BigFraction.ofLong(2L) * five),
+                needPoint = false,
+            )
+
+            assertEquals(listOf(BigFraction.ofLong(3L)), assertNotNull(result.witness).primal)
+            assertEquals(BigFraction.ofLong(6L), assertNotNull(result.bound).value)
+        }
+    }
+
+    @Test
+    fun `a seeded attempt is not a repeat of an unseeded one on the same state`() {
+        val builder = LpBuilder()
+        val x = builder.addRealVar(0.0, 8.0, cost = 2.0)
+        builder.addRealRow(intArrayOf(x), doubleArrayOf(1.0), Relation.GE, 3.0)
+        val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+        val seed = ExactLpWitness(listOf(BigFraction.ofLong(5L)), BigFraction.ofLong(10L))
+        val other = ExactLpWitness(listOf(BigFraction.ofLong(4L)), BigFraction.ofLong(8L))
+        LpScopedSolver(state).use { owner ->
+            val request = LpRefinementRequest(owner, owner.refinementCache, LpRefinementLimits())
+            refineLp(assertNotNull(state.toWorkingModel()), request)
+            val seeded = refineLp(assertNotNull(state.toWorkingModel()), request, witness = seed, needPoint = false)
+            val repeated = refineLp(assertNotNull(state.toWorkingModel()), request, witness = other, needPoint = false)
+
+            assertEquals(BigFraction.ofLong(6L), assertNotNull(seeded.bound).value)
+            assertEquals(LpRefinementDecline.REPEATED, repeated.metrics.decline)
+        }
+    }
+
+    @Test
     fun `residual correction reaches a fractional optimum including logical cost`() {
         val zero = ExactLpNumber.of(0L)
         val one = ExactLpNumber.of(1L)

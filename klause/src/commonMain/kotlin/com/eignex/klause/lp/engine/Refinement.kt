@@ -80,7 +80,40 @@ internal data class LpRefinementMetrics(
     val luSolves: Int = 0,
     val elapsed: Duration = Duration.ZERO,
     val decline: LpRefinementDecline? = null,
-)
+) {
+    // These counters and the later call's summed, with its decline.
+    fun plus(later: LpRefinementMetrics): LpRefinementMetrics = LpRefinementMetrics(
+        eligible = eligible || later.eligible,
+        strictAttempts = strictAttempts + later.strictAttempts,
+        strictWitnesses = strictWitnesses + later.strictWitnesses,
+        strictConflicts = strictConflicts + later.strictConflicts,
+        strictWork = strictWork + later.strictWork,
+        strictElapsed = strictElapsed + later.strictElapsed,
+        rounds = rounds + later.rounds,
+        stalls = stalls + later.stalls,
+        auxiliaries = auxiliaries + later.auxiliaries,
+        reconstructions = reconstructions + later.reconstructions,
+        witnesses = witnesses + later.witnesses,
+        bounds = bounds + later.bounds,
+        conflicts = conflicts + later.conflicts,
+        rays = rays + later.rays,
+        work = work + later.work,
+        allocation = allocation + later.allocation,
+        floatWork = floatWork + later.floatWork,
+        preparationWork = preparationWork + later.preparationWork,
+        reconstructionWork = reconstructionWork + later.reconstructionWork,
+        luWork = luWork + later.luWork,
+        pivots = pivots + later.pivots,
+        floatFactors = floatFactors + later.floatFactors,
+        observedPivots = observedPivots + later.observedPivots,
+        luFactories = luFactories + later.luFactories,
+        luBuilds = luBuilds + later.luBuilds,
+        luReuse = luReuse + later.luReuse,
+        luSolves = luSolves + later.luSolves,
+        elapsed = elapsed + later.elapsed,
+        decline = later.decline,
+    )
+}
 
 // Spending belongs to the source owner, not to a seed, temporary model, or returned proof.
 internal class LpRefinementCache {
@@ -90,6 +123,11 @@ internal class LpRefinementCache {
     internal var elapsed = Duration.ZERO
     internal var attempted: LpExactState? = null
     internal var lastLimits: LpRefinementLimits? = null
+
+    // An attempt seeded by a known exact point differs from one without: that point is the only start an optimality
+    // pass has when the float solve refused the model. One of each per state and limits keeps the spending bounded.
+    internal var attemptedUnseeded = false
+    internal var attemptedSeeded = false
     var lastMetrics = LpRefinementMetrics()
         internal set
 }
@@ -679,6 +717,12 @@ private class RefinementRun(
                 meter.metrics = meter.metrics.copy(rays = meter.metrics.rays + 1)
             }
         }
+        // Without a float optimum, an exact point is still a seed, whether the caller supplied it or the feasibility
+        // pass above found it: a float solve rounding the source's data can call a feasible model infeasible, and only
+        // rounds corrected around that point reach its optimum.
+        if (primal == null && point != null && unboundedness == null && meter.limits.maxRounds > 0) {
+            improve(source, null, DoubleArray(source.source.m), null, null, candidate, sourceFactors)
+        }
     }
 
     private fun check(
@@ -714,7 +758,7 @@ private class RefinementRun(
 
     private fun improve(
         a: RefinementAuthority,
-        primal: DoubleArray,
+        primal: DoubleArray?,
         duals: DoubleArray,
         proposed: Basis?,
         anchor: LpWorkingScope?,
@@ -726,7 +770,7 @@ private class RefinementRun(
         if (duals.size != a.source.m) meter.stop(LpRefinementDecline.CANDIDATE)
         val pointUsesBasis = output.point != null && output.pointUsesBasis
         val knownPoint = output.point?.let { a.fullPoint(it.primal) }
-        var x = knownPoint ?: a.seed(primal, proposed)
+        var x = knownPoint ?: a.seed(requireNotNull(primal), proposed)
         var y = duals.map { meter.number(BigFraction.ofDouble(it) ?: meter.stop(LpRefinementDecline.PROJECTION)) }
         var basis = proposed?.takeIf(a::validBasis)
         output.basis = basis
@@ -1259,9 +1303,16 @@ internal fun refineLp(
     try {
         if (state == null || request.source.state !== state) meter.stop(LpRefinementDecline.AUTHORITY)
         if (limits.maxRounds == 0 && limits.maxAuxiliaries == 0) meter.stop(LpRefinementDecline.DISABLED)
-        if (cache.attempted === state && limits == cache.lastLimits) meter.stop(LpRefinementDecline.REPEATED)
+        if (cache.attempted !== state || limits != cache.lastLimits) {
+            cache.attemptedUnseeded = false
+            cache.attemptedSeeded = false
+        }
+        if (if (witness == null) cache.attemptedUnseeded else cache.attemptedSeeded) {
+            meter.stop(LpRefinementDecline.REPEATED)
+        }
         cache.attempted = state
         cache.lastLimits = limits
+        if (witness == null) cache.attemptedUnseeded = true else cache.attemptedSeeded = true
         meter.prior(directWork, directAllocation, directElapsed)
         meter.charge()
         meter.metrics = meter.metrics.copy(eligible = true)
