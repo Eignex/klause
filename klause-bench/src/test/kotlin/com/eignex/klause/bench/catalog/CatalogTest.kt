@@ -46,6 +46,14 @@ class CatalogTest {
     }
 
     @Test
+    fun `xcsp3-core resolves a maximization with its sense and a minimise-canonical objective`() {
+        val resolved = InProcessRunner.resolve(ref("xcsp3-core", "sum-opt-tiny"))
+
+        assertTrue(resolved.maximize)
+        assertEquals(listOf(-3L, -2L, -1L), resolved.objective?.intCoefficients?.toList())
+    }
+
+    @Test
     fun `wcnf-core resolves the maxsat instance with a soft-clause objective`() {
         val ingested = WcnfFormat.ingest(CorpusFetcher.resolve(ref("wcnf-core", "maxsat-tiny").source))
         assertEquals(4, ingested.problem.numBoolVars)
