@@ -120,6 +120,12 @@ class MpsCompiled(
                 activity += term
                 magnitude += abs(term)
             }
+            // An overflowed term, or opposite infinities summing to NaN, leaves both comparisons below false
+            // whatever the row's real activity is; every operand is a finite binary64, so the row is exact instead.
+            if (!activity.isFinite() || !magnitude.isFinite()) {
+                if (!row.withinToleranceExactly(values)) return false
+                continue
+            }
             if (activity < row.lower - MPS_TOLERANCE * maxOf(1.0, abs(row.lower), magnitude)) return false
             if (activity > row.upper + MPS_TOLERANCE * maxOf(1.0, abs(row.upper), magnitude)) return false
         }
@@ -144,6 +150,13 @@ class MpsCompiled(
                     upper.finiteMps()?.double ?: Double.POSITIVE_INFINITY,
                     row.indicator?.column ?: -1,
                     if (row.indicator?.whenOne == true) 1.0 else 0.0,
+                    lazy {
+                        ExactToleranceRow(
+                            numbers.constraintCoefficients[rowIndex].map { it.fraction },
+                            lower.finiteMps()?.fraction,
+                            upper.finiteMps()?.fraction,
+                        )
+                    },
                 )
             },
         )
@@ -303,7 +316,37 @@ private class ToleranceRow(
     val upper: Double,
     val indicatorColumn: Int,
     val indicatorValue: Double,
-)
+    // The source's own coefficients and sides: a summed duplicate entry or a ranged side can be finite there and
+    // still overflow its binary64 projection.
+    private val exact: Lazy<ExactToleranceRow>,
+) {
+    // The tolerance test of [MpsCompiled.withinTolerance] for this row over the exact source numbers and the point's
+    // binary64 values, which are finite.
+    fun withinToleranceExactly(values: DoubleArray): Boolean {
+        val row = exact.value
+        var activity = BigFraction.ZERO
+        var magnitude = BigFraction.ZERO
+        for (entry in columns.indices) {
+            val value = checkNotNull(BigFraction.ofDouble(values[columns[entry]])) { "nonfinite tolerance point" }
+            val term = row.coefficients[entry] * value
+            activity += term
+            magnitude += term.absolute()
+        }
+        fun slack(bound: BigFraction): BigFraction {
+            var widest = if (magnitude > BigFraction.ONE) magnitude else BigFraction.ONE
+            if (bound.absolute() > widest) widest = bound.absolute()
+            return MPS_TOLERANCE_BINARY64 * widest
+        }
+        row.lower?.let { if (activity < it - slack(it)) return false }
+        row.upper?.let { if (activity > it + slack(it)) return false }
+        return true
+    }
+}
+
+private class ExactToleranceRow(val coefficients: List<BigFraction>, val lower: BigFraction?, val upper: BigFraction?)
+
+// The binary64 tolerance itself, so the exact test matches the one it stands in for.
+private val MPS_TOLERANCE_BINARY64: BigFraction = checkNotNull(BigFraction.ofDouble(MPS_TOLERANCE))
 
 /** A point checked against the original MPS decimal authority. */
 data class MpsSourceWitness(
