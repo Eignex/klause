@@ -635,6 +635,34 @@ class MpsCompiledTest {
     }
 
     @Test
+    fun `the tolerance check judges a row whose binary64 terms overflow by its exact activity`() {
+        val compiled = Mps.parse(
+            "ROWS\n N COST\n L R\nCOLUMNS\n X COST 1 R 1e308\n Y COST 1 R -1e308\nRHS\n RHS R 0\nENDATA",
+        ).toProblem()
+
+        val points = listOf(
+            doubleArrayOf(10.0, 9.0) to false,
+            doubleArrayOf(10.0, 10.0) to true,
+            doubleArrayOf(9.0, 10.0) to true,
+        )
+        for ((point, admitted) in points) {
+            assertEquals(admitted, compiled.withinTolerance(LongArray(0), point), point.toList().toString())
+        }
+    }
+
+    @Test
+    fun `the tolerance check reads a coefficient past binary64 range at its exact value`() {
+        // The two entries sum to 2e308, which no binary64 holds.
+        val compiled = Mps.parse(
+            "ROWS\n N COST\n L R\nCOLUMNS\n X COST 1 R 1e308\n X R 1e308\nRHS\n RHS R 1\nENDATA",
+        ).toProblem()
+
+        for ((value, admitted) in listOf(0.0 to true, 1.0 to false)) {
+            assertEquals(admitted, compiled.withinTolerance(LongArray(0), doubleArrayOf(value)), "$value")
+        }
+    }
+
+    @Test
     fun `the source objective of a float point is exact in its doubles`() {
         val compiled = Mps.parse(
             "ROWS\n N COST\n G R\nCOLUMNS\n Y COST 1e5 R 1\n X COST 99999.9999999701976776123046875 R 1\n" +
