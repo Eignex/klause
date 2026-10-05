@@ -48,14 +48,7 @@ internal object SymmetryBreaking {
         objectiveBoolVars: Set<Int> = emptySet(),
         cancellation: Cancellation = Cancellation.Never,
     ): PassDelta {
-        val extra = breakings(
-            problem,
-            FiniteColumns(problem),
-            objectiveIntVars,
-            objectiveBoolVars,
-            cancellation,
-            theoryOwnableOnly = false,
-        )
+        val extra = breakings(problem, FiniteColumns(problem), objectiveIntVars, objectiveBoolVars, cancellation)
         return if (extra.isEmpty()) PassDelta() else PassDelta(addedFactors = extra)
     }
 
@@ -73,6 +66,9 @@ internal object SymmetryBreaking {
      * The generator lex and the value-precedence chain are CP propagators and wait for the finite lane.
      * A model with every column closed is left to the finite form outright, which reads root-propagated
      * domains and posts both.
+     *
+     * A total order needs only transpositions, so the source form never runs the generator search: it
+     * tests the pairs inside each colour class directly, against the factors the two columns read.
      */
     fun breakSourceSymmetries(
         problem: Problem,
@@ -82,6 +78,8 @@ internal object SymmetryBreaking {
     ): SourceDelta {
         val bounds = problem.intBounds
         if ((0 until problem.numIntVars).all { bounds.hasLower(it) && bounds.hasUpper(it) }) return SourceDelta()
+        if (problem.factors.any { it is SymmetryHandling }) return SourceDelta()
+        if (generatorRoundCost(problem) > GENERATOR_ROUND_COST_BUDGET) return SourceDelta()
         // A column no factor reads is decided by no lane, so ordering it buys nothing and only adds a row the
         // theory then has to carry; it is held fixed like an objective column.
         val readInts = BooleanArray(problem.numIntVars)
@@ -90,14 +88,12 @@ internal object SymmetryBreaking {
             for (v in f.intVars) readInts[v] = true
             for (v in f.boolVars) readBools[v] = true
         }
-        val extra = breakings(
-            problem,
-            SourceColumns(problem),
-            objectiveIntVars + readInts.indices.filter { !readInts[it] },
-            objectiveBoolVars + readBools.indices.filter { !readBools[it] },
-            cancellation,
-            theoryOwnableOnly = true,
-        )
+        val heldInts = objectiveIntVars + readInts.indices.filter { !readInts[it] }
+        val heldBools = objectiveBoolVars + readBools.indices.filter { !readBools[it] }
+        val columns = SourceColumns(problem)
+        val extra = ArrayList<Factor>()
+        extra.addAll(transpositionOrders(problem, columns, heldInts, heldBools, cancellation))
+        extra.addAll(breakValueSymmetry(problem, columns, heldInts, cancellation, chainPrecedence = false))
         return if (extra.isEmpty()) SourceDelta() else SourceDelta(addedFactors = extra)
     }
 
@@ -107,7 +103,6 @@ internal object SymmetryBreaking {
         objectiveIntVars: Set<Int>,
         objectiveBoolVars: Set<Int>,
         cancellation: Cancellation,
-        theoryOwnableOnly: Boolean,
     ): List<Factor> {
         // Symmetry breaking is a one-shot transformation: once a [SymmetryHandling] factor is present
         // the generators have been found and posted. The presolve round engine re-enables this pass
@@ -135,18 +130,124 @@ internal object SymmetryBreaking {
         // itself an automorphism — a scalar symmetric group, not a lockstep matrix), the full total
         // order is sound and strictly stronger than the generator lex, so post it too.
         val scalarLex = scalarTotalOrders(problem, generators, objectiveIntVars, objectiveBoolVars)
-        val valuePins = breakValueSymmetry(
-            problem,
-            columns,
-            objectiveIntVars,
-            cancellation,
-            chainPrecedence = !theoryOwnableOnly,
-        )
+        val valuePins = breakValueSymmetry(problem, columns, objectiveIntVars, cancellation, chainPrecedence = true)
         val extra = ArrayList<Factor>()
-        if (generators.isNotEmpty() && !theoryOwnableOnly) extra.add(SymmetryHandling(generators))
+        if (generators.isNotEmpty()) extra.add(SymmetryHandling(generators))
         extra.addAll(scalarLex)
         extra.addAll(valuePins)
         return extra
+    }
+
+    /**
+     * Total orders over the columns that single transpositions map onto each other.
+     *
+     * A transposition is an automorphism only between two columns of one colour class, so the classes of
+     * the equitable partition are the candidates, and only when two columns share a seed can any class
+     * hold two. Each candidate pair is checked by [swapsOntoItself], and the verified pairs are unioned:
+     * transpositions connecting a set generate its whole symmetric group, so ordering the set keeps one
+     * representative of every orbit. Both checks are exact, so an exhausted budget only finds fewer.
+     */
+    private fun transpositionOrders(
+        problem: Problem,
+        columns: ColumnValues,
+        heldInts: Set<Int>,
+        heldBools: Set<Int>,
+        cancellation: Cancellation,
+    ): List<Factor> {
+        val nInt = problem.numIntVars
+        val nBool = problem.numBoolVars
+        val seedInt = Array(nInt) { v -> if (v in heldInts) objectiveSeed(SPACE_INT, v) else columns.seed(v) }
+        val freeBools = (0 until nBool).count { it !in heldBools }
+        val seeds = HashSet<RefineKey>()
+        val sharedSeed = (0 until nInt).any { v -> v !in heldInts && !seeds.add(seedInt[v]) }
+        if (!sharedSeed && freeBools < 2) return emptyList()
+        val seedBool = Array(nBool) { v ->
+            if (v in heldBools) objectiveSeed(SPACE_BOOL, v) else RefineKey(longArrayOf(SPACE_BOOL, SEED_BOOL))
+        }
+        val budget = intArrayOf(GENERATOR_WORK_BUDGET)
+        val (intColour, boolColour) = equitablePartition(problem, seedInt, seedBool, budget, cancellation)
+        val intInc = Array(nInt) { IntArrayList() }
+        val boolInc = Array(nBool) { IntArrayList() }
+        problem.factors.forEachIndexed { fi, f ->
+            for (v in f.intVars.distinct()) intInc[v].add(fi)
+            for (v in f.boolVars.distinct()) boolInc[v].add(fi)
+        }
+        val intMap = IntArray(nInt) { it }
+        val boolMap = IntArray(nBool) { it }
+        val mapping = VarRemap(boolMap, intMap)
+        val extra = ArrayList<Factor>()
+        for (cell in colourCells(intColour, heldInts)) {
+            for (group in verifiedGroups(problem, cell, intInc, intMap, mapping, cancellation)) {
+                for (j in 0 until group.size - 1) {
+                    extra.add(Linear(intArrayOf(1, -1), intArrayOf(group[j], group[j + 1]), LinearOp.LE, 0))
+                }
+            }
+        }
+        for (cell in colourCells(boolColour, heldBools)) {
+            for (group in verifiedGroups(problem, cell, boolInc, boolMap, mapping, cancellation)) {
+                for (j in 0 until group.size - 1) {
+                    extra.add(Clause(intArrayOf(Lit.make(group[j], false), Lit.make(group[j + 1], true))))
+                }
+            }
+        }
+        return extra
+    }
+
+    /** The columns of each colour outside [held], ascending, for every colour with 2 to [MAX_VERIFIED_GROUP]. */
+    private fun colourCells(colour: IntArray, held: Set<Int>): List<IntArray> {
+        val cells = MutableIntObjectMap<IntArrayList>()
+        for (v in colour.indices) if (v !in held) cells.getOrPut(colour[v]) { IntArrayList() }.add(v)
+        val out = ArrayList<IntArray>()
+        cells.forEach { _, members -> if (members.size in 2..MAX_VERIFIED_GROUP) out.add(members.toIntArray()) }
+        out.sortBy { it[0] }
+        return out
+    }
+
+    /** The members of [cell] that verified transpositions connect, each group ascending and of size 2 or more. */
+    private fun verifiedGroups(
+        problem: Problem,
+        cell: IntArray,
+        incident: Array<IntArrayList>,
+        identity: IntArray,
+        mapping: VarRemap,
+        cancellation: Cancellation,
+    ): List<IntArray> {
+        val ds = IntDisjointSet(cell.size)
+        var pairCost = 0L
+        for (v in cell) pairCost += incident[v].size
+        unionVerifiedPairs(ds, IntArray(cell.size) { it }, pairCost, cancellation) { i, j ->
+            swapsOntoItself(problem, incident, cell[i], cell[j], identity, mapping)
+        }
+        return ds.groups().filter { it.size >= 2 }.map { group ->
+            IntArray(group.size) { cell[group[it]] }.apply { sort() }
+        }
+    }
+
+    /**
+     * Whether swapping columns [a] and [b] maps the factor multiset onto itself.
+     *
+     * A factor reading neither column is its own image, and the image of one that reads either still reads
+     * one of them, so the swap is an automorphism exactly when it maps the factors reading [a] or [b] onto
+     * themselves. [identity] is the identity map of the swapped space, restored before returning.
+     */
+    private fun swapsOntoItself(
+        problem: Problem,
+        incident: Array<IntArrayList>,
+        a: Int,
+        b: Int,
+        identity: IntArray,
+        mapping: VarRemap,
+    ): Boolean {
+        val reading = (incident[a].toIntArray() + incident[b].toIntArray()).distinct()
+        val factors = reading.map { problem.factors[it] }
+        identity[a] = b
+        identity[b] = a
+        val swapped = PresolveShared.matchesMultiset(factors, PresolveShared.structuralKeyMultiset(factors)) {
+            it.remap(mapping)
+        }
+        identity[a] = a
+        identity[b] = b
+        return swapped
     }
 
     /**
