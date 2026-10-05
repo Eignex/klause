@@ -520,6 +520,28 @@ class OpenTheoryEngineTest {
     }
 
     @Test
+    fun `exact LIA answers a comparison clause through its only feasible row`() {
+        val open = Bits(2).also {
+            it.set(0)
+            it.set(1)
+        }
+        val model = Problem(
+            numBoolVars = 0,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(0, 0), longArrayOf(0, 0), open, open),
+            factors = arrayOf(
+                ComparisonClause(intArrayOf(0, 1), arrayOf(LinearOp.GE, LinearOp.LE), longArrayOf(5, -3)),
+                Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.EQ, 1),
+                Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 4),
+            ),
+        )
+
+        val result = OpenTheoryEngine(model, ProblemPipeline.EXACT_LIRA).solve()
+
+        val assignment = assertIs<OpenTheoryAssignment.ExactLira>(assertIs<OpenTheoryResult.Sat>(result).assignment)
+        assertEquals(listOf(BigInteger.fromInt(4), BigInteger.fromInt(-3)), assignment.assignment.ints.toList())
+    }
+
+    @Test
     fun `an order chain over open columns stays inside the theory fragment`() {
         // `x < y < z` over unbounded integers is pure difference logic. Posting it as an Increasing —
         // a global no theory holds — would have made the model unroutable for no gain.
