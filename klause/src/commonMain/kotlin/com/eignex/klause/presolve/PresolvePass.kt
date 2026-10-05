@@ -376,6 +376,25 @@ enum class PresolvePass(
         autoEligible = true,
     ),
 
+    /** [PROBE]'s source form on its own, at the default tier: run while some column is still open, where
+     *  the root fixpoint over the declared rows closes sides and failed literals that bounding cannot.
+     *  A model with every column closed is left to [PROBE], which reads root domains, and the plan drops
+     *  this entry wherever [PROBE] itself runs. Solution-preserving, like [PROBE]. */
+    PROBE_OPEN_RANGES(
+        "probe-open",
+        Stage.PROBLEM,
+        Capability.SOURCE,
+        PresolveTiming.MEDIUM,
+        true,
+        autoEligible = true,
+    ) {
+        override fun applySource(problem: Problem, ctx: PresolveContext): SourceDelta {
+            val bounds = problem.intBounds
+            if ((0 until problem.numIntVars).all { bounds.hasLower(it) && bounds.hasUpper(it) }) return SourceDelta()
+            return Presolve.probeSource(problem, PROBE_PASS_MAX_CANDIDATES, ctx.cancellation)
+        }
+    },
+
     /** Probing to fixpoint: tentatively pin each free Boolean, propagate, and keep only the
      *  deductions that hold in every solution — failed literals (emitted as unit clauses) and
      *  common-bound tightenings. Solution-preserving, so it needs no objective-variable exclusion. */

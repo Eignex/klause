@@ -23,6 +23,9 @@ import kotlin.test.assertNull
 /** Routing an open source model from what source-safe preparation produced, rather than from the input. */
 class OpenSourcePreparationTest {
 
+    /** Probing would close the open columns and drop the rewritten row, so the aggregate runs alone. */
+    private val aggregateOnly = PresolveConfig.parse(PresolvePass.AGGREGATE_SUB_SUMS.id)
+
     /**
      * `x = y + z` and `y + z <= 4` over open columns, then an `AllDifferent` over three bounded ones —
      * three, because structural reduction rewrites a two-column one into a theory-owned `x - y != 0`.
@@ -88,7 +91,7 @@ class OpenSourcePreparationTest {
         val model = aggregatable(openColumns = true)
         val declared = model.componentPlan()
 
-        val planned = assertIs<OpenSourcePreparation.Planned>(model.prepareOpenSource())
+        val planned = assertIs<OpenSourcePreparation.Planned>(model.prepareOpenSource(config = aggregateOnly))
 
         assertEquals(FactorOwner.CP, planned.plan.factorOwner(1))
         assertNotEquals(declared.factorOwner(1), planned.plan.factorOwner(1))
@@ -149,12 +152,14 @@ class OpenSourcePreparationTest {
 
     @Test
     fun `the bounded and the open lane rewrite the source the same way`() {
-        val open = assertIs<OpenSourcePreparation.Planned>(aggregatable(openColumns = true).prepareOpenSource())
+        val open = assertIs<OpenSourcePreparation.Planned>(
+            aggregatable(openColumns = true).prepareOpenSource(config = aggregateOnly),
+        )
         val bounded = FinitePipeline.prepare(
             FinitePipelineRequest(
                 aggregatable(openColumns = false),
                 FiniteEngine.BACKTRACK,
-                presolveConfig = PresolveConfig.parse(PresolvePass.AGGREGATE_SUB_SUMS.id),
+                presolveConfig = aggregateOnly,
             ),
         )
 

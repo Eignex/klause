@@ -102,12 +102,17 @@ class PresolveConfig(
         problemPasses(context, PresolvePass.Capability.FINITE)
 
     /** Problem-transform passes enabled for [context] and available [capability], in priority order. */
-    internal fun problemPasses(context: PresolveContext, capability: PresolvePass.Capability): List<PresolvePass> =
-        PresolvePass.entries.filter {
+    internal fun problemPasses(context: PresolveContext, capability: PresolvePass.Capability): List<PresolvePass> {
+        val passes = PresolvePass.entries.filter {
             it.stage == PresolvePass.Stage.PROBLEM &&
                 capability.supports(it.capability) &&
                 resolved(it, context)
         }
+        // The finite lane probes with [PresolvePass.PROBE] over root domains, and where that pass runs the
+        // open-range form would repeat its source half.
+        val probesElsewhere = capability == PresolvePass.Capability.FINITE || PresolvePass.PROBE in passes
+        return if (probesElsewhere) passes - PresolvePass.PROBE_OPEN_RANGES else passes
+    }
 
     /** Disable solution-set-collapsing passes for a pure local-search route. */
     fun forLocalSearch(): PresolveConfig = PresolveConfig(

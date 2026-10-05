@@ -184,9 +184,10 @@ class OpenPresolveTest {
             row(1 to 1L, 2 to 2L, op = LinearOp.LE, bound = 4L),
         )
 
-        // Ordering the interchangeable y and z would close their sides too; this test is about the aggregate.
-        val noSymmetry = PresolveConfig.parse("default,-symmetry")
-        val result = assertIs<OpenPresolveResult.Tightened>(spec.presolveOpen(noSymmetry))
+        // Ordering the interchangeable y and z, or probing the rows, would close sides too; this test is
+        // about the aggregate.
+        val aggregateOnly = PresolveConfig.parse("default,-symmetry,-probe-open")
+        val result = assertIs<OpenPresolveResult.Tightened>(spec.presolveOpen(aggregateOnly))
 
         assertEquals(1, result.closedSides)
         val aggregate = assertIs<Linear>(result.spec.factors.last())

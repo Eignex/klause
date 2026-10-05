@@ -268,6 +268,24 @@ class ProbingTest {
     }
 
     @Test
+    fun `the open-range probe leaves a model with every column closed alone`() {
+        val problem = Problem(
+            numBoolVars = 2,
+            numIntVars = 1,
+            intDomains = arrayOf(IntDomain(0, 20)),
+            factors = listOf(
+                ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, 3),
+                ReifiedLinear(1, intArrayOf(1), intArrayOf(0), LinearOp.GE, 10),
+                Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true))),
+            ),
+        )
+
+        val delta = PresolvePass.PROBE_OPEN_RANGES.applySource(problem, PresolveContext.EMPTY)
+
+        assertTrue(delta.isEmpty)
+    }
+
+    @Test
     fun `the source form closes an open side both polarities bound`() {
         // b0 ↔ (x ≤ 5), b1 ↔ (x ≤ 7) and b0 ∨ b1: x ≤ 5 under b0 = true, x ≤ 7 under b0 = false.
         val problem = Problem(

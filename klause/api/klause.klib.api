@@ -573,6 +573,7 @@ open enum class com.eignex.klause.presolve/PresolvePass : kotlin/Enum<com.eignex
     enum entry PROBE_FAILED_LITERALS // com.eignex.klause.presolve/PresolvePass.PROBE_FAILED_LITERALS|null[0]
     enum entry PROBE_INT_BOUNDS // com.eignex.klause.presolve/PresolvePass.PROBE_INT_BOUNDS|null[0]
     enum entry PROBE_INT_HOLES // com.eignex.klause.presolve/PresolvePass.PROBE_INT_HOLES|null[0]
+    enum entry PROBE_OPEN_RANGES // com.eignex.klause.presolve/PresolvePass.PROBE_OPEN_RANGES|null[0]
     enum entry PROJECT_SINGLETON_INEQUALITIES // com.eignex.klause.presolve/PresolvePass.PROJECT_SINGLETON_INEQUALITIES|null[0]
     enum entry REDUCE_DIOPHANTINE // com.eignex.klause.presolve/PresolvePass.REDUCE_DIOPHANTINE|null[0]
     enum entry REDUCE_STRUCTURAL // com.eignex.klause.presolve/PresolvePass.REDUCE_STRUCTURAL|null[0]

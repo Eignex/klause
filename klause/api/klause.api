@@ -7411,6 +7411,7 @@ public class com/eignex/klause/presolve/PresolvePass : java/lang/Enum {
 	public static final field PROBE_FAILED_LITERALS Lcom/eignex/klause/presolve/PresolvePass;
 	public static final field PROBE_INT_BOUNDS Lcom/eignex/klause/presolve/PresolvePass;
 	public static final field PROBE_INT_HOLES Lcom/eignex/klause/presolve/PresolvePass;
+	public static final field PROBE_OPEN_RANGES Lcom/eignex/klause/presolve/PresolvePass;
 	public static final field PROJECT_SINGLETON_INEQUALITIES Lcom/eignex/klause/presolve/PresolvePass;
 	public static final field REDUCE_DIOPHANTINE Lcom/eignex/klause/presolve/PresolvePass;
 	public static final field REDUCE_STRUCTURAL Lcom/eignex/klause/presolve/PresolvePass;

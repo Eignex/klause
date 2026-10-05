@@ -5,6 +5,7 @@ import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.Bits
 import kotlin.test.Test
@@ -41,7 +42,8 @@ class OpenTheoryPipelineTest {
     fun `preparation reports LP work used to close an open side`() {
         val openUpper = Bits(1).also { it.set(0) }
         // The `>= 2` row is what keeps dual fixing off this column: with only the `<= 7` row, lowering
-        // would be safe everywhere and the pin would close the side before any LP ran.
+        // would be safe everywhere and the pin would close the side before any LP ran. Probing would close
+        // it from the `<= 7` row alone, so it stays off.
         val request = OpenTheoryRequest(
             model = Problem(
                 numBoolVars = 0,
@@ -51,7 +53,7 @@ class OpenTheoryPipelineTest {
                     Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 2),
                 ),
             ),
-        )
+        ).withPresolve(PresolveConfig.parse("default,-probe-open"))
 
         val preparation = OpenTheoryPipeline.prepare(request)
 

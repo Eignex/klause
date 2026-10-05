@@ -200,12 +200,14 @@ class CliModeTest {
                 (assert (>= x 5))
                 (assert (or p q))
                 (assert (or (not p) (not q)))
+                (assert (=> p (>= x 6)))
                 (check-sat)
                 """.trimIndent(),
             )
             deleteOnExit()
         }
 
+        // The row under p tells p and q apart, so ordering them cannot settle the exactly-one in presolve.
         val plain = capture { assertEquals(0, runCli(arrayOf("-s", smt.absolutePath))) }
         // The default split threshold outlasts this model's whole search, so asking for a hint is not
         // enough to spend one.
