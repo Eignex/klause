@@ -1,6 +1,8 @@
 package com.eignex.klause.presolve
 
 import com.eignex.klause.ir.Factor
+import com.eignex.klause.ir.IntBounds
+import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.presolve.PresolveShared.withPassDelta
 import com.eignex.klause.presolve.PresolveShared.withSourcePassDelta
@@ -94,6 +96,28 @@ internal val PresolvePass.baseWorkWeight: Long
 /** The base weight of a pass the calibration sample never ran: the median the measured passes fitted. */
 private const val DEFAULT_PASS_BASE_WORK_WEIGHT = 10L
 
+/** [liveFactors] plus every column of [problem], the scale a pass's change is weighed against. */
+private fun modelSizeOf(liveFactors: Int, problem: Problem): Long =
+    liveFactors.toLong() + problem.numIntVars + problem.numBoolVars
+
+/** Factors [delta] drops or adds plus the columns it narrows from [domains]. */
+private fun changedUnitsOf(delta: PassDelta, domains: Array<IntDomain>): Long {
+    var units = (delta.droppedIndices.size + delta.addedFactors.size).toLong()
+    delta.domains?.let { next -> for (v in next.indices) if (next[v] !== domains[v]) units++ }
+    return units
+}
+
+/** Columns [proved] bounds more tightly than [current] does. */
+private fun narrowedColumns(current: IntBounds, proved: IntBounds): Int {
+    var n = 0
+    for (v in 0 until proved.size) {
+        val lower = proved.hasLower(v) && (!current.hasLower(v) || proved.lower(v) > current.lower(v))
+        val upper = proved.hasUpper(v) && (!current.hasUpper(v) || proved.upper(v) < current.upper(v))
+        if (lower || upper) n++
+    }
+    return n
+}
+
 /** Runs enabled problem-transform passes to a bounded fixpoint. */
 object Presolver {
 
@@ -119,20 +143,27 @@ object Presolver {
 
             // In the order the passes fired, which is the order [SourceRebuilds.compose] reverses.
             val rebuilds = ArrayList<SourceRebuilds>()
+            var changed = 0L
 
             override fun runPass(pass: PresolvePass, slice: Cancellation?): PassOutcome {
                 (slice ?: ctx.cancellation).charge(pass.baseWorkWeight * passBaseUnits(current.factors))
                 val delta = pass.applySource(current, slice?.let(ctx::withCancellation) ?: ctx)
                 if (delta.infeasible) return PassOutcome.INFEASIBLE
                 if (delta.isEmpty) return PassOutcome.UNCHANGED
+                val narrowed = delta.bounds?.let { narrowedColumns(current.intBounds, it) } ?: 0
                 // A proved range can empty a column whose declaration it intersects, which refutes the
                 // model even though the pass itself only claimed a bound.
                 current = current.withSourcePassDelta(delta) ?: return PassOutcome.INFEASIBLE
                 if (!delta.rebuild.isEmpty) rebuilds.add(delta.rebuild)
+                changed += delta.droppedIndices.size + delta.addedFactors.size + narrowed
                 return PassOutcome.CHANGED
             }
 
             override fun complexity(): Long = current.factors.size.toLong()
+
+            override fun modelSize(): Long = modelSizeOf(current.factors.size, current)
+
+            override fun changedUnits(): Long = changed
         }
         val rounds = PresolveRoundEngine.run(
             passes,
@@ -187,6 +218,7 @@ object Presolver {
         val host = object : PresolveRoundEngine.RoundHost {
             var current = problem
             val reconstructs = ArrayList<(Sample) -> Sample>()
+            var changed = 0L
 
             override fun runPass(pass: PresolvePass, slice: Cancellation?): PassOutcome {
                 (slice ?: ctx.cancellation).charge(pass.baseWorkWeight * passBaseUnits(current.factors))
@@ -194,11 +226,16 @@ object Presolver {
                 if (delta.infeasible) return PassOutcome.INFEASIBLE
                 if (delta.isEmpty) return PassOutcome.UNCHANGED
                 delta.reconstruct?.let(reconstructs::add)
+                changed += changedUnitsOf(delta, current.rootIntDomainsInPlace)
                 current = current.withPassDelta(delta, ctx.bakeConfig)
                 return PassOutcome.CHANGED
             }
 
             override fun complexity(): Long = problemComplexity(current)
+
+            override fun modelSize(): Long = modelSizeOf(current.factors.size, current)
+
+            override fun changedUnits(): Long = changed
         }
         val rounds = PresolveRoundEngine.run(passes, maxRounds, cancellation, ctx.presolveBudget, host)
         return Presolved(
@@ -243,6 +280,7 @@ object Presolver {
             var dupMark: PresolveSession.ChangeMark? = null
 
             val reconstructs = ArrayList<(Sample) -> Sample>()
+            var changed = 0L
 
             override fun runPass(pass: PresolvePass, slice: Cancellation?): PassOutcome {
                 // Before the context: [passOccurrence] is keyed against the factor list [passInput] fixes.
@@ -253,6 +291,7 @@ object Presolver {
                 if (delta.infeasible) return PassOutcome.INFEASIBLE
                 if (delta.isEmpty) return PassOutcome.UNCHANGED
                 delta.reconstruct?.let(reconstructs::add)
+                changed += changedUnitsOf(delta, input.rootIntDomainsInPlace)
                 session.applyDelta(delta)
                 return PassOutcome.CHANGED
             }
@@ -291,6 +330,10 @@ object Presolver {
                 if (mark == null || session.markStale(mark)) null else session.touchedIntVarsSince(mark)
 
             override fun complexity(): Long = session.complexity()
+
+            override fun modelSize(): Long = modelSizeOf(session.liveFactorCount, problem)
+
+            override fun changedUnits(): Long = changed
         }
         val rounds = PresolveRoundEngine.run(passes, maxRounds, cancellation, ctx.presolveBudget, host)
 
