@@ -42,6 +42,8 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
+import kotlin.time.ComparableTimeMark
+import kotlin.time.Duration.Companion.seconds
 
 internal class UnresolvedRealLeafFixture(val withIncumbent: Boolean) {
     val problem = Problem(
@@ -514,6 +516,42 @@ class ResumableMinimizeTest {
             assertTrue(boundChecked)
             assertEquals(opened, closed)
         }
+    }
+
+    @Test
+    fun `a real leaf LP is handed the run deadline`() {
+        val deadlines = ArrayList<ComparableTimeMark?>()
+        val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+            override fun newGeneralSolver(
+                model: LpModel,
+                cancellation: Cancellation,
+                workLimit: Long,
+                pricing: LpPricingOptions,
+            ): LpSolver {
+                deadlines += cancellation.deadline()
+                return ProductionLpEngineFactory.newGeneralSolver(model, cancellation, workLimit, pricing)
+            }
+        }
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 0,
+            intDomains = emptyArray(),
+            factors = arrayOf<Factor>(
+                Linear(longArrayOf(), intArrayOf(), doubleArrayOf(2.0), intArrayOf(0), LinearOp.EQ, 3L),
+            ),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(10.0),
+        ).bake()
+        val run = Cancellation.after(60.seconds)
+        val params = BacktrackParams(lpPlan = LpPlan(bounding = false, componentSplit = false))
+
+        BacktrackSolver(problem, LpSolveContext(factory))
+            .resumable(LinearObjective(realCoefficients = doubleArrayOf(1.0)), params)
+            .use { it.runSlice(run, 1000L, 256L) {} }
+
+        assertTrue(deadlines.isNotEmpty())
+        assertTrue(deadlines.all { it == run.deadline() }, "every leaf LP budgets against the run's own deadline")
     }
 
     @Test

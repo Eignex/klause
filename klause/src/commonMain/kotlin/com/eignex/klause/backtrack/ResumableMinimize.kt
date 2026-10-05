@@ -61,6 +61,7 @@ import com.eignex.klause.solver.search.SearchTraversalPolicy
 import com.eignex.klause.solver.search.VarRef
 import com.eignex.klause.util.Cancellation
 import kotlin.coroutines.cancellation.CancellationException
+import kotlin.time.ComparableTimeMark
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TimeSource
 
@@ -175,6 +176,17 @@ internal class ResumableMinimize(
      * deadline [runSlice] is handed — so a caller that supplies none leaves propagation unbounded.
      */
     private fun solveCancelled(): Boolean = if (pausable) globalToken() else baseCancellation()
+
+    // solveCancelled as a token that also states the run's deadline, so a phase it is handed can budget a share of
+    // the time left (Cancellation.shorten) rather than read a bare predicate as having no time limit at all.
+    private fun runEndToken(): Cancellation {
+        val deadline = (if (pausable) globalToken else baseCancellation).deadline()
+        return object : Cancellation {
+            override fun isCancelled(): Boolean = solveCancelled()
+
+            override fun deadline(): ComparableTimeMark? = deadline
+        }
+    }
 
     /**
      * The node budget when one is armed, and *only* the node budget.
@@ -990,7 +1002,7 @@ internal class ResumableMinimize(
                     problem,
                     objective,
                     sample,
-                    Cancellation { solveCancelled() },
+                    runEndToken(),
                     componentSplit = params.lpPlan.componentSplit,
                     sink = sink.lp,
                     context = solver.lpSolveContext,
