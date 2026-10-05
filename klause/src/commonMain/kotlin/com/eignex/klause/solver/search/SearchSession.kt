@@ -915,6 +915,9 @@ class SearchRun internal constructor(
     private var decisions = 0L
     private var decisionsSinceRestart = 0L
     private var sawIndeterminate = false
+
+    // Whether the last [applyLearnedConflict] call reached its backjump, so the conflict that produced it is spent.
+    private var learnedApplied = false
     private var resumeAfterSolution = false
     private var lastModel: AssembledSearchModel? = null
     private var consumedModel = false
@@ -1057,11 +1060,20 @@ class SearchRun internal constructor(
 
                     is ComponentCheck.Infeasible -> {
                         observer.onConflict(null)
-                        if (resolveExplainedConflict(result.explanation)) {
-                            if (decisionsSinceRestart > 0 && params.restart.shouldRestart(decisionsSinceRestart)) {
-                                restart()?.let { return it }
+                        when (resolveExplainedConflict(result.explanation)) {
+                            LearnedOutcome.RESUMED -> {
+                                if (decisionsSinceRestart > 0 && params.restart.shouldRestart(decisionsSinceRestart)) {
+                                    restart()?.let { return it }
+                                }
+                                continue
                             }
-                            continue
+
+                            LearnedOutcome.ABANDONED -> {
+                                if (!backtrack()) return stopAfterBacktrack()
+                                continue
+                            }
+
+                            LearnedOutcome.UNAPPLIED -> Unit
                         }
                         retainExplanation(result.explanation)
                         if (decisionsSinceRestart > 0 && params.restart.shouldRestart(decisionsSinceRestart)) {
@@ -1139,13 +1151,19 @@ class SearchRun internal constructor(
 
                 is ComponentResult.Conflict -> {
                     observer.onConflict(decision)
-                    if (!session.hasNativeConflictResolver && resolveExplainedConflict(result.explanation)) {
-                        return Advance.Expanded
+                    val outcome = if (session.hasNativeConflictResolver) {
+                        LearnedOutcome.UNAPPLIED
+                    } else {
+                        resolveExplainedConflict(result.explanation)
                     }
+                    if (outcome == LearnedOutcome.RESUMED) return Advance.Expanded
                     if (session.decisionLevel < level) return Advance.Exhausted
-                    retainExplanation(result.explanation)
+                    // An abandoned learned conflict has already run its course; only an unapplied one leaves the
+                    // original conflict for the chronological resolvers.
+                    val unapplied = outcome == LearnedOutcome.UNAPPLIED
+                    if (unapplied) retainExplanation(result.explanation)
                     session.popTo(level)
-                    if (resolveConflict()) return Advance.Expanded
+                    if (unapplied && resolveConflict()) return Advance.Expanded
                     if (frames.isEmpty()) return Advance.Exhausted
                     if (frames.last() !== frame) return Advance.Exhausted
                 }
@@ -1202,27 +1220,16 @@ class SearchRun internal constructor(
         session.learn(explanation)
     }
 
-    private fun resolveExplainedConflict(explanation: SearchExplanation?): Boolean {
-        if (session.hasNativeConflictResolver) return false
-        when (val resolution = session.explainedConflict(explanation)) {
-            is SearchConflictResolution.Backjump -> {
-                return when (applyLearnedConflict(resolution.conflict)) {
-                    SearchLearnedConflictResult.Resume -> true
-
-                    SearchLearnedConflictResult.Exhausted,
-                    SearchLearnedConflictResult.Chronological,
-                    SearchLearnedConflictResult.Indeterminate,
-                    -> false
-
-                    is SearchLearnedConflictResult.Backjump -> error("learned conflict cascade did not terminate")
-                }
-            }
-
-            SearchConflictResolution.Exhausted -> return false
-
-            SearchConflictResolution.Chronological, null -> Unit
+    private fun resolveExplainedConflict(explanation: SearchExplanation?): LearnedOutcome {
+        if (session.hasNativeConflictResolver) return LearnedOutcome.UNAPPLIED
+        val resolution = session.explainedConflict(explanation)
+        if (resolution !is SearchConflictResolution.Backjump) return LearnedOutcome.UNAPPLIED
+        val result = applyLearnedConflict(resolution.conflict)
+        return when {
+            resumed(result) -> LearnedOutcome.RESUMED
+            learnedApplied -> LearnedOutcome.ABANDONED
+            else -> LearnedOutcome.UNAPPLIED
         }
-        return false
     }
 
     private fun resolveConflict(): Boolean {
@@ -1234,26 +1241,38 @@ class SearchRun internal constructor(
             SearchConflictResolution.Exhausted -> return false
 
             is SearchConflictResolution.Backjump -> {
-                return when (applyLearnedConflict(resolution.conflict)) {
-                    SearchLearnedConflictResult.Resume -> true
-
-                    SearchLearnedConflictResult.Exhausted,
-                    SearchLearnedConflictResult.Chronological,
-                    SearchLearnedConflictResult.Indeterminate,
-                    -> false
-
-                    is SearchLearnedConflictResult.Backjump -> error("learned conflict cascade did not terminate")
-                }
+                return resumed(applyLearnedConflict(resolution.conflict))
             }
         }
     }
 
+    // Whether a learned conflict left the search to resume from its backjump level. By the time it returns, the
+    // backjump has already dropped the frames above that level, so a caller that is not resumed backtracks below it.
+    // That is sound when the asserted consequence was refuted, but an indeterminate propagation refuted nothing: the
+    // region it covered goes unsearched, so the run cannot claim to have exhausted the space.
+    private fun resumed(result: SearchLearnedConflictResult): Boolean = when (result) {
+        SearchLearnedConflictResult.Resume -> true
+
+        SearchLearnedConflictResult.Exhausted,
+        SearchLearnedConflictResult.Chronological,
+        -> false
+
+        SearchLearnedConflictResult.Indeterminate -> {
+            sawIndeterminate = true
+            false
+        }
+
+        is SearchLearnedConflictResult.Backjump -> error("learned conflict cascade did not terminate")
+    }
+
     private fun applyLearnedConflict(initial: SearchLearnedConflict): SearchLearnedConflictResult {
         var conflict = initial
+        learnedApplied = false
         repeat(MAX_NODE_BACKJUMPS) {
             if (conflict.decisionLevel !in 0..session.decisionLevel) {
                 return SearchLearnedConflictResult.Chronological
             }
+            learnedApplied = true
             params.restart.recordConflict(conflict.lbd, session.decisionLevel)
             observer.onLearnedConflict(conflict)
             session.popTo(conflict.decisionLevel)
@@ -1472,4 +1491,16 @@ sealed interface SearchResult {
 
     /** A component or a solve-wide limit prevented an exact verdict. */
     data object Indeterminate : SearchResult
+}
+
+/** What one learned conflict did to the run. */
+private enum class LearnedOutcome {
+    /** The search resumes from the backjump level. */
+    RESUMED,
+
+    /** The conflict was never applied; the original conflict is still live. */
+    UNAPPLIED,
+
+    /** The backjump ran but did not resume, so the caller backtracks below it. */
+    ABANDONED,
 }

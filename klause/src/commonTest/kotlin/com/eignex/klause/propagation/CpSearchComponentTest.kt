@@ -248,6 +248,32 @@ class CpSearchComponentTest {
     }
 
     @Test
+    fun `a learned clause whose import a peer cannot decide leaves the run unknown`() {
+        // CP learns the root unit b0 from its first decision; a peer that cannot decide b0 refutes nothing.
+        val propagation = PropagationSession(
+            Problem(
+                2,
+                0,
+                emptyArray(),
+                arrayOf(
+                    Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
+                    Clause(intArrayOf(Lit.make(0, true), Lit.make(1, false))),
+                ),
+            ),
+        )
+        val peer = object : SearchComponent {
+            override fun assert(decision: SearchDecision, context: SearchContext): ComponentResult =
+                if (context.boolValue(0) == true) ComponentResult.Indeterminate else ComponentResult.Consistent
+        }
+        val session = SearchSession(listOf(CpSearchComponent(propagation), peer))
+        val run = session.openRun(numBoolVars = 2)
+
+        assertIs<ComponentResult.Consistent>(session.initialize())
+
+        assertIs<SearchRunEvent.Indeterminate>(run.next())
+    }
+
+    @Test
     fun `a Boolean CP conflict is not duplicated into the shared database`() {
         val propagation = PropagationSession(
             Problem(

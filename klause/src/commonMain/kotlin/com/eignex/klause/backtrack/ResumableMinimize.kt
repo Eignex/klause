@@ -478,6 +478,9 @@ internal class ResumableMinimize(
 
                     pausable && sliceCancelled() -> StepEvent.Paused
 
+                    // A component that could not decide its part ends the run incomplete, not out of budget.
+                    e == SearchRunEvent.Indeterminate.Component -> terminal(terminalUndecided())
+
                     else -> terminal(terminalBudget())
                 }
             }
@@ -511,6 +514,17 @@ internal class ResumableMinimize(
             b != null -> MinimizeResult.Optimal(b.assignment, b.objective.display, stats)
 
             else -> MinimizeResult.Infeasible(core, stats)
+        }
+    }
+
+    private fun terminalUndecided(): MinimizeResult {
+        sink.stop()
+        val stats = sink.snapshot()
+        val b = incumbents.current()
+        return if (b != null) {
+            MinimizeResult.BestFound(b.assignment, b.objective.display, TerminationReason.Unsupported, stats)
+        } else {
+            MinimizeResult.Unknown(TerminationReason.Unsupported, stats)
         }
     }
 
@@ -926,14 +940,16 @@ internal class ResumableMinimize(
             return when (result) {
                 is PropagationResult.Implied -> {
                     // The clause stays in the CP database; see the note in CpSearchComponent.
-                    if (cp.import(result, session) !is ComponentResult.Consistent) {
-                        SearchLearnedConflictResult.Chronological
-                    } else {
-                        when (session.propagate()) {
+                    when (cp.import(result, session)) {
+                        ComponentResult.Consistent -> when (session.propagate()) {
                             ComponentResult.Consistent -> SearchLearnedConflictResult.Resume
                             is ComponentResult.Conflict -> SearchLearnedConflictResult.Chronological
                             ComponentResult.Indeterminate -> SearchLearnedConflictResult.Indeterminate
                         }
+
+                        is ComponentResult.Conflict -> SearchLearnedConflictResult.Chronological
+
+                        ComponentResult.Indeterminate -> SearchLearnedConflictResult.Indeterminate
                     }
                 }
 
