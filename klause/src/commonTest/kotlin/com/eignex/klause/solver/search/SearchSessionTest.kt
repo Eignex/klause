@@ -1,6 +1,7 @@
 package com.eignex.klause.solver.search
 
 import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.propagation.propagate
 import com.eignex.klause.solver.result.OpenTheoryWorkSink
 import com.eignex.klause.util.Cancellation
@@ -392,6 +393,36 @@ class SearchSessionTest {
         assertEquals(1, learned?.decisionLevel)
         assertTrue(learned?.guardLiterals?.contentEquals(intArrayOf(3, 4)) == true)
         assertEquals(true, session.boolValue(2))
+    }
+
+    @Test
+    fun `a learned conflict whose propagation is indeterminate leaves the run unknown`() {
+        // Not b0 and not b1 conflict, so the learned b0 or b1 backjumps into not b0, b1, which the theory cannot
+        // decide; b0 is refuted without a learned clause. Nothing refutes that undecided region.
+        val theory = object : SearchConflictResolver {
+            override val prefersNativeConflictAnalysis: Boolean get() = false
+
+            override fun propagate(context: SearchContext): ComponentResult = when {
+                context.boolValue(0) == true -> ComponentResult.Conflict()
+
+                context.boolValue(0) == false && context.boolValue(1) == false -> ComponentResult.Conflict(
+                    SearchExplanation(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
+                )
+
+                context.boolValue(0) == false && context.boolValue(1) == true -> ComponentResult.Indeterminate
+
+                else -> ComponentResult.Consistent
+            }
+
+            override fun resolveConflict(context: SearchContext): SearchConflictResolution =
+                SearchConflictResolution.Chronological
+        }
+        val session = SearchSession(listOf(theory))
+        val run = session.openRun(numBoolVars = 2)
+
+        assertIs<ComponentResult.Consistent>(session.initialize())
+
+        assertIs<SearchRunEvent.Indeterminate>(run.next())
     }
 
     @Test

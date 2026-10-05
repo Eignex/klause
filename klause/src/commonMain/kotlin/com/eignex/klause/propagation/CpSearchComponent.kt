@@ -294,14 +294,16 @@ class CpSearchComponent(
                     // The clause stays in this component's own database. Copying it into the shared one
                     // would give the same clause two watch indexes and two reduction policies, and the
                     // shared analyzer reaches this component's reasoning through [reasonFor] instead.
-                    if (import(result, session) !is ComponentResult.Consistent) {
-                        SearchLearnedConflictResult.Chronological
-                    } else {
-                        when (session.propagate()) {
+                    when (import(result, session)) {
+                        ComponentResult.Consistent -> when (session.propagate()) {
                             ComponentResult.Consistent -> SearchLearnedConflictResult.Resume
                             is ComponentResult.Conflict -> SearchLearnedConflictResult.Chronological
                             ComponentResult.Indeterminate -> SearchLearnedConflictResult.Indeterminate
                         }
+
+                        is ComponentResult.Conflict -> SearchLearnedConflictResult.Chronological
+
+                        ComponentResult.Indeterminate -> SearchLearnedConflictResult.Indeterminate
                     }
                 }
 
