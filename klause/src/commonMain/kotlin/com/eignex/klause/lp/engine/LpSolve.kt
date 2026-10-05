@@ -12,8 +12,18 @@ import com.ionspin.kotlin.bignum.integer.BigInteger
 import kotlin.time.Duration
 import kotlin.time.TimeSource
 
-// Bounds and witnesses remain independently available even when neither proves attainment.
-internal enum class LpVerdict { CERTIFIED_BOUND, FEASIBLE, ATTAINED_OPTIMUM, INFEASIBLE, UNBOUNDED, INDETERMINATE }
+// Bounds and witnesses remain independently available even when neither proves attainment. ATTAINED_OPTIMUM is exact:
+// an exact witness meeting an exact bound. TOLERANCE_OPTIMUM is a float optimum the caller accepted under its own
+// tolerance semantics, whose primal and objective are not exact.
+internal enum class LpVerdict {
+    CERTIFIED_BOUND,
+    FEASIBLE,
+    ATTAINED_OPTIMUM,
+    TOLERANCE_OPTIMUM,
+    INFEASIBLE,
+    UNBOUNDED,
+    INDETERMINATE,
+}
 
 internal class ExactLpWitness(val primal: List<BigFraction>, val objective: BigFraction)
 
@@ -54,7 +64,7 @@ internal class CertifiedLpResult(
     val floatOptimum: FloatLpResult? = null,
 ) {
     val verdict: LpVerdict = when {
-        floatOptimum != null -> LpVerdict.ATTAINED_OPTIMUM
+        floatOptimum != null -> LpVerdict.TOLERANCE_OPTIMUM
         farkasRay != null || rationalConflict != null || boundConflict != null -> LpVerdict.INFEASIBLE
         unboundedness != null -> LpVerdict.UNBOUNDED
         witness != null && bound?.value == witness.objective -> LpVerdict.ATTAINED_OPTIMUM

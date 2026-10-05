@@ -442,8 +442,14 @@ class LpDeclineDisciplineTest {
                     context = harness.context,
                 ).verdict
             ) {
-                LpVerdict.ATTAINED_OPTIMUM, LpVerdict.FEASIBLE, LpVerdict.UNBOUNDED -> ComponentCheck.Feasible
+                LpVerdict.ATTAINED_OPTIMUM,
+                LpVerdict.TOLERANCE_OPTIMUM,
+                LpVerdict.FEASIBLE,
+                LpVerdict.UNBOUNDED,
+                -> ComponentCheck.Feasible
+
                 LpVerdict.INFEASIBLE -> ComponentCheck.Infeasible()
+
                 LpVerdict.INDETERMINATE, LpVerdict.CERTIFIED_BOUND -> ComponentCheck.Indeterminate
             }
         }

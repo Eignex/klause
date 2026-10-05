@@ -704,6 +704,7 @@ internal class ResumableMinimize(
             if (real.verdict !in listOf(
                     LpVerdict.FEASIBLE,
                     LpVerdict.ATTAINED_OPTIMUM,
+                    LpVerdict.TOLERANCE_OPTIMUM,
                     LpVerdict.UNBOUNDED,
                 )
             ) {
@@ -1005,8 +1006,13 @@ internal class ResumableMinimize(
                         null
                     }
 
-                    LpVerdict.FEASIBLE, LpVerdict.ATTAINED_OPTIMUM, LpVerdict.UNBOUNDED -> {
-                        if (real.verdict != LpVerdict.ATTAINED_OPTIMUM) {
+                    LpVerdict.FEASIBLE,
+                    LpVerdict.ATTAINED_OPTIMUM,
+                    LpVerdict.TOLERANCE_OPTIMUM,
+                    LpVerdict.UNBOUNDED,
+                    -> {
+                        // A tolerance optimum completes the leaf on purpose: the source's own semantics accept it.
+                        if (real.verdict !in setOf(LpVerdict.ATTAINED_OPTIMUM, LpVerdict.TOLERANCE_OPTIMUM)) {
                             sawIndeterminateLeaf = true
                             incomplete = true
                         }
