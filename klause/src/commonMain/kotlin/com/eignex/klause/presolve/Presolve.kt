@@ -54,11 +54,13 @@ object Presolve {
         domains: Array<IntDomain>,
     ): PassDelta = CoefficientStrengthening.strengthenCoefficients(problem, cancellation, ColumnRanges.of(domains))
 
-    /** One-shot GF(2) elimination over all xor factors. */
-    fun deriveXorUnits(problem: Problem): PassDelta = XorUnits.deriveXorUnits(problem)
+    /** One-shot GF(2) elimination over the root parity system. See [XorUnits.deriveXorUnits]. */
+    fun deriveXorUnits(problem: BakedProblem): PassDelta =
+        XorUnits.deriveXorUnits(problem).asPassDelta(problem.rootIntDomainsInPlace)
 
     /** [deriveXorUnits] in the source lane's change form. */
-    internal fun deriveSourceXorUnits(problem: Problem): SourceDelta = XorUnits.deriveXorUnits(problem).asSourceDelta()
+    internal fun deriveSourceXorUnits(problem: Problem, cancellation: Cancellation): SourceDelta =
+        XorUnits.deriveXorUnits(problem, cancellation)
 
     /** Per-variable modular (Diophantine) domain tightening for integer equalities. See
      *  [DiophantineReduction]. */

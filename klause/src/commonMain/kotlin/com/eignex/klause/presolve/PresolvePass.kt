@@ -81,7 +81,9 @@ enum class PresolvePass(
             Presolve.reduceDiophantine(problem, ctx.cancellation)
     },
 
-    /** One-shot GF(2) elimination over all xor factors: emit implied root unit clauses. */
+    /** One-shot GF(2) elimination over the root parity system — every xor factor and the parity each integer
+     *  equality implies over its 0/1 columns — emitting the literals it forces as unit clauses, the 0/1 columns
+     *  it forces as fixed ranges, and a contradiction as a refutation. */
     DERIVE_XOR_UNITS(
         "xor-units",
         Stage.PROBLEM,
@@ -91,7 +93,8 @@ enum class PresolvePass(
         autoEligible = true,
         skipAfterEmpty = true,
     ) {
-        override fun applySource(problem: Problem, ctx: PresolveContext) = Presolve.deriveSourceXorUnits(problem)
+        override fun applySource(problem: Problem, ctx: PresolveContext) =
+            Presolve.deriveSourceXorUnits(problem, ctx.cancellation)
     },
 
     /** Cross-direction linear bound fusion — over the linear rows on one coefficient vector, an upper

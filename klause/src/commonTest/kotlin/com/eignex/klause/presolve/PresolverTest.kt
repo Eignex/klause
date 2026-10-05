@@ -367,7 +367,7 @@ class PresolverTest {
     }
 
     @Test
-    fun `xor-units pass turns a contradictory xor core into contradictory units`() {
+    fun `xor-units pass refutes a contradictory xor core`() {
         val problem = Problem(
             numBoolVars = 1,
             numIntVars = 0,
@@ -378,9 +378,8 @@ class PresolverTest {
             ),
         )
         val pre = Presolver.run(problem.bake(), PresolveConfig.parse("xor-units"))
-        val units = pre.problem.factors.filterIsInstance<Clause>().filter { it.literals.size == 1 }
-        assertTrue(units.any { it.literals[0] == Lit.make(0, true) })
-        assertTrue(units.any { it.literals[0] == Lit.make(0, false) })
+
+        assertTrue(pre.infeasible)
     }
 
     @Test
