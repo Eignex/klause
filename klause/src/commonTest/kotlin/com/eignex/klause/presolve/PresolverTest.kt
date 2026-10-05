@@ -208,6 +208,29 @@ class PresolverTest {
     }
 
     @Test
+    fun `the source lane probes open ranges at the default level`() {
+        val passes = PresolveConfig.parse("default")
+            .problemPasses(PresolveContext.EMPTY, PresolvePass.Capability.SOURCE)
+
+        assertTrue(PresolvePass.PROBE_OPEN_RANGES in passes)
+    }
+
+    @Test
+    fun `the finite lane leaves open-range probing out`() {
+        val passes = PresolveConfig.parse("default,+probe-open").problemPasses(PresolveContext.EMPTY)
+
+        assertTrue(PresolvePass.PROBE_OPEN_RANGES !in passes)
+    }
+
+    @Test
+    fun `the open-range probe gives way to the full probe`() {
+        val passes = PresolveConfig.parse("aggressive")
+            .problemPasses(PresolveContext.EMPTY, PresolvePass.Capability.SOURCE)
+
+        assertEquals(listOf(PresolvePass.PROBE), passes.filter { it.id.startsWith("probe") })
+    }
+
+    @Test
     fun `emphasis surfaces a probe budget and aggressive gets a larger one`() {
         // Each level exposes a finite SAC probe budget (no level leaves it unbounded), and the
         // aggressive level — the only one that auto-runs the EXHAUSTIVE probes — gets a larger one.

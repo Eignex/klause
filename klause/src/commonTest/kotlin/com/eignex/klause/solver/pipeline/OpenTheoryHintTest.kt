@@ -212,9 +212,9 @@ class OpenTheoryHintTest {
         val parsed = modelOf(
             """
                 (declare-const p Bool) (declare-const q Bool)
-                (declare-const x Int)
+                (declare-const x Int) (declare-const y Int)
                 (assert (or p q))
-                (assert (=> p (= (* 2 x) 1)))
+                (assert (=> p (= (+ (* 2 x) (* 4 y)) 1)))
             """.trimIndent(),
         )
         val p = parsed.boolVarNames.getValue("p")
@@ -231,14 +231,15 @@ class OpenTheoryHintTest {
     @Test
     fun `a hinted run still refutes an unsatisfiable model`() {
         // Both arms of the clause force the same parity-infeasible row, so the refutation is the exact
-        // search's own: the shared clauses this hint was drawn from are satisfiable on their own.
+        // search's own: the shared clauses this hint was drawn from are satisfiable on their own. Two open
+        // columns keep interval reasoning from refuting the row while probing.
         val parsed = modelOf(
             """
                 (declare-const p Bool) (declare-const q Bool)
                 (declare-const x Int) (declare-const z Int)
                 (assert (or p q))
-                (assert (=> p (= (* 2 x) 1)))
-                (assert (=> q (= (* 2 x) 1)))
+                (assert (=> p (= (+ (* 2 x) (* 4 z)) 1)))
+                (assert (=> q (= (+ (* 2 x) (* 4 z)) 1)))
             """.trimIndent(),
         )
 
@@ -249,6 +250,7 @@ class OpenTheoryHintTest {
 
     @Test
     fun `one hint serves every feasibility round of a descent`() {
+        // The row under p tells p and q apart, so ordering them cannot settle the exactly-one while probing.
         val parsed = modelOf(
             """
                 (declare-const p Bool) (declare-const q Bool)
@@ -256,6 +258,7 @@ class OpenTheoryHintTest {
                 (assert (or p q))
                 (assert (or (not p) (not q)))
                 (assert (>= x 3))
+                (assert (=> p (>= x 4)))
             """.trimIndent(),
         )
         val x = parsed.intVarNames.getValue("x")
