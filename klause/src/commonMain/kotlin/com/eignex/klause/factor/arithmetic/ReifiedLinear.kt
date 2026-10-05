@@ -121,11 +121,12 @@ class ReifiedLinear private constructor(
             // A wide row keys on its exact BigIntegers: feed the decimal strings char-by-char with an
             // out-of-char separator so distinct wide rows never collide.
             is WideConstants -> {
-                for (ch in c.bound.toString()) sink.long(ch.code.toLong())
+                val digits = c.keyDigits
+                for (code in digits[0]) sink.long(code)
                 for (i in vars.indices) {
                     sink.long(Long.MIN_VALUE)
                     sink.intVar(vars[i])
-                    for (ch in c.coefficients.at(i).toString()) sink.long(ch.code.toLong())
+                    for (code in digits[i + 1]) sink.long(code)
                 }
             }
 

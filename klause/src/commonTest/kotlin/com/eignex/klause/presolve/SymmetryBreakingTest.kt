@@ -36,6 +36,7 @@ import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.propagation.propagate
+import com.ionspin.kotlin.bignum.integer.BigInteger
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
@@ -862,6 +863,17 @@ class SymmetryBreakingTest {
         )
     }
 
+    @Test
+    fun `a wide row hashes like its remapped structural key on every keying`() {
+        val wide = BigInteger.parseString("18446744073709551616")
+        val row = ReifiedLinear(0, intArrayOf(0, 1, 2), arrayOf(wide, -wide, BigInteger.ONE), LinearOp.LE, wide)
+        val mapping = VarRemap(intArrayOf(1, 0), intArrayOf(2, 0, 1))
+
+        val hashes = List(3) { row.remapStructuralHash(mapping) }
+
+        assertEquals(List(3) { row.remap(mapping).structuralKey().hashCode() }, hashes)
+    }
+
     private fun sourceBroken(problem: Problem): Problem =
         assertNotNull(problem.withSourcePassDelta(Presolve.breakSourceSymmetries(problem)))
 
@@ -895,6 +907,25 @@ class SymmetryBreakingTest {
 
         assertEquals(5, countFeasible(problem))
         assertEquals(3, after, "x <= y keeps one of each swapped pair")
+    }
+
+    @Test
+    fun `the source form orders interchangeable booleans beside an open column`() {
+        val problem = Problem(
+            numBoolVars = 3,
+            numIntVars = 1,
+            intDomains = arrayOf(IntDomain(0, 3)),
+            factors = listOf(
+                Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true))),
+                Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 1),
+            ),
+            openIntHi = booleanArrayOf(true),
+        )
+
+        val after = countFeasible(sourceBroken(problem))
+
+        assertEquals(7 * 3, countFeasible(problem))
+        assertEquals(3 * 3, after, "b0 <= b1 <= b2 keeps one assignment per number of true literals")
     }
 
     @Test

@@ -260,11 +260,12 @@ class Linear private constructor(
             is WideConstants -> {
                 // Feed the decimal strings char-by-char with an out-of-char-range separator; unambiguous,
                 // so different wide rows never share a key.
-                for (ch in c.bound.toString()) sink.long(ch.code.toLong())
+                val digits = c.keyDigits
+                for (code in digits[0]) sink.long(code)
                 for (i in vars.indices) {
                     sink.long(Long.MIN_VALUE)
                     sink.intVar(vars[i])
-                    for (ch in c.coefficients.at(i).toString()) sink.long(ch.code.toLong())
+                    for (code in digits[i + 1]) sink.long(code)
                 }
             }
 
