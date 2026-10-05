@@ -24,8 +24,8 @@ internal data class ResolvedProblem(
     internal val ref: ProblemRef,
     private val ingest: Lazy<Problem>,
     internal val objective: LinearObjective? = null,
-    /** True when the model's objective is a maximization (so "better" = higher). MiniZinc sets it;
-     *  other formats leave it false (klause minimises internally). */
+    /** True when the source maximises its objective, so "better" means higher. [objective] stays
+     *  minimise-canonical either way. */
     internal val maximize: Boolean = false,
     /** Local-search-only gradient view of [objective] for decomposed objectives, when the model
      *  provides one (see `LocalSearchParams.lsObjective`). Null ⇒ LS descends [objective]. */
@@ -78,7 +78,7 @@ internal object InProcessRunner : Runner {
         require(format.inProcess) { "${ref.name}: format ${ref.format} is not in-process; use its dedicated runner" }
         val file = CorpusFetcher.resolve(src)
         return runCatching { format.ingest(file) }
-            .map { ResolvedProblem(ref, lazyOf(it.problem), it.objective) }
+            .map { ResolvedProblem(ref, lazy { it.problem }, it.objective, maximize = it.maximize) }
             .getOrElse { failure ->
                 // The in-process frontend cannot build this model — an open-bounded one, say. A
                 // subprocess run does not need it to, so carry the failure instead of dropping the

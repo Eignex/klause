@@ -12,6 +12,7 @@ import com.eignex.klause.formats.opb.Opb
 import com.eignex.klause.formats.opb.toProblem
 import com.eignex.klause.formats.smtlib.SmtLib
 import com.eignex.klause.formats.xcsp3.Xcsp3
+import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.objective.LinearObjective
@@ -20,8 +21,24 @@ import com.eignex.klause.solver.pipeline.ProblemPipeline
 import com.eignex.klause.solver.pipeline.sourceRoute
 import java.io.File
 
-/** A parsed instance lifted into klause's solver representation, plus an optional objective. */
-internal data class Ingested(val problem: Problem, val objective: LinearObjective? = null)
+/**
+ * A parsed instance lifted into klause's solver representation, plus an optional objective in the
+ * minimise-canonical form the runner expects, and whether the source maximises it. The XCSP3 and SMT-LIB
+ * parsers negate a maximised objective themselves; an MPS objective arrives in its source sense.
+ *
+ * The model is built on first read: a format whose in-process model needs finite bounds still reports its
+ * sense for an instance only the subprocess route can solve.
+ */
+internal class Ingested(
+    private val model: Lazy<Problem>,
+    val objective: LinearObjective? = null,
+    val maximize: Boolean = false,
+) {
+    constructor(problem: Problem, objective: LinearObjective? = null) : this(lazyOf(problem), objective)
+
+    /** The in-process model; throws for one the in-process frontend cannot build. */
+    val problem: Problem get() = model.value
+}
 
 /**
  * Turns a file in some [Format] into an [Ingested] klause [Problem]. Only **in-process**
@@ -80,7 +97,11 @@ internal object Xcsp3Format : ProblemFormat {
     override val inProcess = true
     override fun ingest(file: File): Ingested {
         val parsed = Xcsp3.parse(CorpusFiles.readText(file))
-        return Ingested(parsed.problem, parsed.objective?.toLinearObjective())
+        return Ingested(
+            lazyOf(parsed.problem),
+            parsed.objective?.toLinearObjective(),
+            parsed.sense == ObjectiveSense.MAXIMIZE,
+        )
     }
 }
 
@@ -92,7 +113,11 @@ internal object SmtLibFormat : ProblemFormat {
     override fun ingest(file: File): Ingested {
         val strict = System.getProperty("klause.bench.smtlib.strictBounds")?.toBooleanStrictOrNull() ?: false
         val parsed = SmtLib.parse(CorpusFiles.readText(file), strictBounds = strict)
-        return Ingested(parsed.model.requireFiniteBenchModel(file), parsed.objective?.toLinearObjective())
+        return Ingested(
+            lazy { parsed.model.requireFiniteBenchModel(file) },
+            parsed.objective?.toLinearObjective(),
+            parsed.sense == ObjectiveSense.MAXIMIZE,
+        )
     }
 }
 
@@ -104,10 +129,11 @@ internal object MpsFormat : ProblemFormat {
     override val inProcess = true
     override fun ingest(file: File): Ingested {
         val compiled = Mps.parse(CorpusFiles.readText(file)).toProblem()
-        val problem = compiled.model.requireFiniteBenchModel(file)
-        val rawObjective = compiled.objective?.toLinearObjective()
-        val objective = if (compiled.maximize) rawObjective?.negated() else rawObjective
-        return Ingested(problem, objective)
+        return Ingested(
+            lazy { compiled.model.requireFiniteBenchModel(file) },
+            compiled.objective?.toLinearObjective()?.let { if (compiled.maximize) it.negated() else it },
+            compiled.maximize,
+        )
     }
 }
 
