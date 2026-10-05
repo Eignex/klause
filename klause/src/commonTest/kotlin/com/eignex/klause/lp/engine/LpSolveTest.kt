@@ -1391,6 +1391,37 @@ class LpSolveTest {
     }
 
     @Test
+    fun `a feasible LP whose shifted rhs rounds to an infeasible float view certifies its exact optimum`() {
+        val zero = ExactLpSide(ExactLpNumber.of(0L))
+        val minusOne = ExactLpNumber.of(-1L)
+        fun column(upper: Long, origin: Long, cost: Long) = ExactLpColumn(
+            ExactLpBounds(zero, ExactLpSide(ExactLpNumber.of(upper))),
+            origin = ExactLpNumber.of(origin),
+            integral = false,
+        ) to ExactLpNumber.of(cost)
+        // The exact shifted rhs 4.2e18 + 300 rounds in binary64 past the 4.2e18 + 400 the columns can reach.
+        val columns = listOf(
+            column(4_000_000_000_000_000_000L, 0L, 1L),
+            column(200L, 0L, 0L),
+            column(200_000_000_000_000_000L, -4_200_000_000_000_000_000L, 0L),
+            column(200L, -300L, 0L),
+        )
+        val model = ExactLpModel(
+            List(columns.size) { listOf(ExactLpEntry(0, minusOne)) },
+            listOf(ExactLpNumber.of(-4_200_000_000_000_000_300L)),
+            columns.map { it.first } + ExactLpColumn(ExactLpBounds(zero), integral = false),
+            listOf(ExactLpRow()),
+            ExactLpObjective(columns.map { it.second } + ExactLpNumber.of(0L)),
+        )
+
+        val result = solveAndCertify(model)
+
+        assertEquals(LpVerdict.ATTAINED_OPTIMUM, result.verdict)
+        assertEquals(BigFraction.ofLong(3_999_999_999_999_999_900L), result.witness?.objective)
+        assertEquals(result.witness?.objective, result.lowerBound)
+    }
+
+    @Test
     fun `tall source roots certify the exact optimum with cold and explicit warm starts`() {
         for (warmStart in listOf(false, true)) {
             val builder = LpBuilder()

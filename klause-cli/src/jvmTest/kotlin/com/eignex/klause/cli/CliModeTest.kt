@@ -398,7 +398,7 @@ class CliModeTest {
     }
 
     @Test
-    fun `an MPS LP whose bound shift rounds in binary64 is not reported infeasible`() {
+    fun `an MPS LP whose bound shift rounds in binary64 is solved to a proven optimum`() {
         val mps = File.createTempFile("clishift", ".mps").apply {
             writeText(
                 """
@@ -428,7 +428,8 @@ class CliModeTest {
 
         val out = capture { main(arrayOf("-t", "2000", mps.absolutePath)) }
 
-        assertFalse("UNSATISFIABLE" in out, out)
+        assertTrue("s OPTIMUM FOUND" in out, out)
+        assertTrue(out.lineSequence().any { it == "o 3999999999999999900" }, out)
     }
 
     @Test

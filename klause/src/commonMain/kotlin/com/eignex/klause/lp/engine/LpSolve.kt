@@ -341,6 +341,8 @@ internal fun certifyLpResult(
     var exactBasis: ExactBasisVerification? = null
     var continued: LpContinuationVerification? = earlyContinuation
     var refined: LpRefinementResult? = null
+    // Both refinement calls a node can make, so the reported work is what certification spent.
+    var refinementMetrics: LpRefinementMetrics? = null
     var pointRecovery: ExactPointRecovery? = null
     var numericalWitness = earlyContinuation?.witness ?: witness
     var numericalBound = bound
@@ -349,22 +351,29 @@ internal fun certifyLpResult(
     var withheldBound = false
     var withheldConflict = false
     var pointAttempted = false
+    // A second, seeded refinement is charged only the direct work done since the first.
+    var chargedWork = 0L
+    var chargedAllocation = 0L
+    var chargedElapsed = Duration.ZERO
+    fun directElapsed(): Duration =
+        (certificationStarted?.elapsedNow() ?: Duration.ZERO) - (pointRecovery?.elapsed ?: Duration.ZERO)
     fun refine() {
         if (refinement == null || state == null || cancellation()) return
         if (result == null) {
             val decline = continuationTarget().metrics.decline
             if (decline != null && decline != ContinuationDecline.NO_BASIS) return
         }
+        val directWork = (reconstruction?.metrics?.work ?: 0L) + (exactBasis?.metrics?.work ?: 0L) +
+            (capturedTarget?.metrics?.work ?: 0L)
+        val directAllocation = (reconstruction?.metrics?.allocation ?: 0L) +
+            (exactBasis?.metrics?.allocation ?: 0L) + (capturedTarget?.metrics?.allocation ?: 0L)
         val recovered = refineLp(
             model, refinement, result?.primal, result?.duals,
             result?.basis ?: continuationTarget().basis, numericalWitness, cancellation,
-            directWork = (reconstruction?.metrics?.work ?: 0L) + (exactBasis?.metrics?.work ?: 0L) +
-                (capturedTarget?.metrics?.work ?: 0L),
-            directAllocation = (reconstruction?.metrics?.allocation ?: 0L) + (exactBasis?.metrics?.allocation ?: 0L) +
-                (capturedTarget?.metrics?.allocation ?: 0L),
+            directWork = (directWork - chargedWork).coerceAtLeast(0L),
+            directAllocation = (directAllocation - chargedAllocation).coerceAtLeast(0L),
             needPoint = numericalWitness == null, direction = solver.recessionDirection,
-            directElapsed = (certificationStarted?.elapsedNow() ?: Duration.ZERO) -
-                (pointRecovery?.elapsed ?: Duration.ZERO),
+            directElapsed = (directElapsed() - chargedElapsed).coerceAtLeast(Duration.ZERO),
             reconstructInitial = reconstruction == null,
             preferBasis = result != null && policy === ProductionLpCertificationPolicy,
             preferredBasisCache = solver.exactBasisCache.takeIf {
@@ -373,6 +382,10 @@ internal fun certifyLpResult(
             additionalSourceWork = pointRecovery?.work ?: 0L,
         )
         refined = recovered
+        refinementMetrics = refinementMetrics?.plus(recovered.metrics) ?: recovered.metrics
+        chargedWork = directWork
+        chargedAllocation = directAllocation
+        chargedElapsed = directElapsed()
         recovered.sourceSingularBasis?.let { rejected ->
             continuationTarget()
             solver.rejectSingularBasis(model, rejected)
@@ -572,6 +585,9 @@ internal fun certifyLpResult(
         val accepted = policy.acceptNullable(LpCertifier.RATIONAL, continued.takeIf { it.metrics.success })
         witness = accepted?.witness?.let { policy.acceptNullable(LpCertifier.EXACT_BASIS, it) }
         conflict = accepted?.conflict?.let { policy.acceptNullable(LpCertifier.EXACT_FARKAS, it) }
+        // Continuation proves feasibility only. Its point, found after refinement ran without one, seeds the
+        // refinement that can prove the optimum.
+        if (witness != null && bound?.value != witness?.objective && !cancellation()) refine()
     }
     if (continued == null) {
         capturedTarget?.let {
@@ -604,7 +620,7 @@ internal fun certifyLpResult(
             null,
             false,
             { null },
-            refinement = refined.metrics,
+            refinement = refinementMetrics,
         )
     }
     val certified = CertifiedLpResult(
@@ -642,7 +658,7 @@ internal fun certifyLpResult(
             compute
         } ?: { null },
         unboundedness = unboundedness,
-        refinement = refined?.metrics,
+        refinement = refinementMetrics,
         reconstruction = reconstruction?.metrics,
         basisVerification = exactBasis?.metrics,
         continuation = continued?.metrics ?: capturedTarget?.metrics,
