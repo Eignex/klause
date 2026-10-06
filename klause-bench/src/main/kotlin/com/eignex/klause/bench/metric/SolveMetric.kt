@@ -429,7 +429,7 @@ internal object SolveMetric {
     }
 
     /** The best-valued entry in [attribution], direction-aware — also the best-holder for per-arm credit
-     *  (see `BenchCli.portfolioWinners`), for the same reason: arrival order is not improvement order.
+     *  (see [ArmMining]), for the same reason: arrival order is not improvement order.
      *  Every entry in one run shares the same objective channel ([Attribution.continuousObjective] is a
      *  property of the whole model, not the arm), so once any entry carries one, every entry does —
      *  compare on it (the whole model-oriented value). Otherwise compare on [Attribution.exactObjective]
