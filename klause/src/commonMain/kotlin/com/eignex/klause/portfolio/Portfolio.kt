@@ -51,9 +51,10 @@ import kotlin.time.TimeSource
  * or, for satisfaction, a [ResumableSolve] ([PortfolioWorker.newResumableSolve]). The portfolio holds one handle
  * per such arm and *resumes* it each time the arm is scheduled, on whichever lane, so the arm continues its exact
  * search — learned clauses, trail, heuristics and LP warm-start caches intact. Local-search arms have no handle and
- * run a fresh segment warm-started from the shared incumbent. A resumable arm runs a constant [baseSliceWork]
- * each segment: resuming costs nothing, so short segments give the policy many decisions at no loss of depth. A
- * restarting arm's segments grow ([sliceGrowth]) so it can dig deeper than one short restart reaches.
+ * run a fresh segment warm-started from the shared incumbent. Every counted arm's segment spends the same work,
+ * growing by [sliceGrowth] after each segment: a restarting arm needs the growth to dig deeper than one short
+ * restart reaches, and a resumable arm takes it too, since an arm whose turns were shorter than its peers' would get
+ * less of the core than the policy picks it for.
  *
  * **Re-seeding plateaued arms ([reseedStaleThreshold]):** pure resume keeps one persistent trail, which converges
  * fast but forgoes the bound-guided re-exploration a cold restart buys. A resumable arm that fails to improve the
@@ -79,8 +80,8 @@ class Portfolio(
     /** Geometric growth applied to a restarting arm's slice after each segment. */
     private val sliceGrowth: Double = 1.5,
     /**
-     * Work each segment of a resumable arm spends, and the first segment of a counted local-search arm; a
-     * local-search arm's later segments grow by [sliceGrowth] up to [maxSliceWork].
+     * Work the first segment of a counted arm spends, resumable or local search; later segments grow by
+     * [sliceGrowth] up to [maxSliceWork].
      *
      * Work is measured in node-equivalents, one unit for every arm whatever its engine. A resumable backtrack arm
      * spends one per search node plus its LP work at the rate [com.eignex.klause.solver.ResumableSearch.runSlice]
@@ -95,7 +96,7 @@ class Portfolio(
      * The whole-solve deadline still applies, so this cannot overrun it.
      */
     private val baseSliceWork: Long = 5_000,
-    /** Cap on a single local-search segment's work. */
+    /** Cap on a single counted segment's work. */
     private val maxSliceWork: Long = 150_000,
     /** Local-search instructions that cost as much as one search node; see `LS_INSTRUCTIONS_PER_WORK`. */
     private val lsInstructionsPerWork: Double = LS_INSTRUCTIONS_PER_WORK,
@@ -151,7 +152,7 @@ class Portfolio(
             val work: Long
             if (handle != null) {
                 val workBefore = handle.work
-                val outcome = runCatching { handle.runSlice(run.token, Long.MAX_VALUE, baseSliceWork) }
+                val outcome = runCatching { handle.runSlice(run.token, Long.MAX_VALUE, claim.sliceWork) }
                 r = outcome.getOrNull()
                 failure = outcome.exceptionOrNull()
                 work = handle.work - workBefore
@@ -272,7 +273,7 @@ class Portfolio(
                 val workBefore = handle.work
                 // A terminal verdict means the arm finished; null means the slice ended with the search paused.
                 val outcome = runCatching {
-                    handle.runSlice(run.token, Long.MAX_VALUE, baseSliceWork) { accept(claim, it) }
+                    handle.runSlice(run.token, Long.MAX_VALUE, claim.sliceWork) { accept(claim, it) }
                 }
                 terminal = outcome.getOrNull()
                 failure = outcome.exceptionOrNull()
@@ -372,7 +373,7 @@ class Portfolio(
         private var remaining = workers.size
         private var probed = 0
         private var slice = baseSliceMillis
-        private var lsSliceWork = baseSliceWork
+        private var sliceWork = baseSliceWork
 
         /** Whether every arm has retired. */
         val allRetired: Boolean get() = remaining == 0
@@ -423,7 +424,7 @@ class Portfolio(
             val arm = if (probing) probed++ else policyPick()
             if (arm < 0 || retired[arm] || busy[arm]) return@locked null
             busy[arm] = true
-            Claim(arm, probing, slice, lsSliceWork)
+            Claim(arm, probing, slice, sliceWork)
         }
 
         // The policy's pick among free arms, falling back to the first free one if it keeps naming taken arms.
@@ -461,7 +462,7 @@ class Portfolio(
             // The probe runs at the base slice for every arm, so its cost stays flat in the arm count.
             if (!claim.probing) {
                 slice = grow(slice, maxSliceMillis)
-                lsSliceWork = grow(lsSliceWork, maxSliceWork)
+                sliceWork = grow(sliceWork, maxSliceWork)
             }
         }
 
