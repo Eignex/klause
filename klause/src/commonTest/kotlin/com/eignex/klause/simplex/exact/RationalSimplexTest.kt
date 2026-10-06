@@ -178,6 +178,32 @@ class RationalSimplexTest {
     }
 
     @Test
+    fun `fraction sums and differences match the normalized cross product`() {
+        for (a in fractionSamples) {
+            for (b in fractionSamples) {
+                assertEquals(BigFraction.of(a.num * b.den + b.num * a.den, a.den * b.den), a + b, "$a + $b")
+                assertEquals(BigFraction.of(a.num * b.den - b.num * a.den, a.den * b.den), a - b, "$a - $b")
+            }
+        }
+    }
+
+    @Test
+    fun `fraction products match the normalized cross product`() {
+        for (a in fractionSamples) {
+            for (b in fractionSamples) {
+                assertEquals(BigFraction.of(a.num * b.num, a.den * b.den), a * b, "$a * $b")
+            }
+        }
+    }
+
+    @Test
+    fun `fraction reciprocals match the normalized swap`() {
+        for (a in fractionSamples.filterNot { it.isZero }) {
+            assertEquals(BigFraction.of(a.den, a.num), a.reciprocal(), "1 / $a")
+        }
+    }
+
+    @Test
     fun `decides a fractional feasible system exactly`() {
         // 2x = 1 over x in [0, 1]: feasible only at the non-integer point x = 1/2.
         val b = LpBuilder()
@@ -547,4 +573,12 @@ class RationalSimplexTest {
         assertEquals("1/2", BigFraction.ofDouble(0.5).toString())
         assertEquals("3602879701896397/36028797018963968", BigFraction.ofDouble(0.1).toString())
     }
+
+    private val fractionSamples = listOf(
+        BigFraction.ZERO, BigFraction.ONE, BigFraction.MINUS_ONE, q(-6, 1), q(1, 2), q(-3, 4), q(5, 12),
+        q(7, 18), q(6, 35), q(-10, 21), q(1, 1024), checkNotNull(BigFraction.ofDouble(0.1)),
+        BigFraction.of(-(BigInteger.ONE shl 70), BigInteger.fromLong(3)),
+    )
+
+    private fun q(num: Long, den: Long) = BigFraction.of(BigInteger.fromLong(num), BigInteger.fromLong(den))
 }
