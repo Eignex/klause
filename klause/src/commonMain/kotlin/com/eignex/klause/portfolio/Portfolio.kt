@@ -74,7 +74,8 @@ class Portfolio(
     private val bandit: UnivariateBandit,
     /** Threads running segments at once; capped at the number of arms, since an arm runs on one lane at a time. */
     lanes: Int = 1,
-    /** First time slice for an arm with neither a work counter nor a resumable handle. */
+    /** First time slice of a non-resumable arm: the only bound on one with no work counter, an outer one on a
+     *  counted arm. */
     private val baseSliceMillis: Long = 2_000,
     /** Cap on a single segment's time slice. */
     private val maxSliceMillis: Long = 60_000,
@@ -91,19 +92,19 @@ class Portfolio(
      * destroy/repair loop instead of one inner solve (see [com.eignex.klause.meta.alns.Alns]'s class KDoc). A
      * common unit is what lets one schedule give every arm a comparable turn.
      *
-     * Counted arms are sliced by work, not the clock, past their probe. A segment bounded by time pauses
-     * somewhere different on every run, and since the search resumes from wherever it stopped, every counter a
-     * solve reports inherits that. A segment bounded by work pauses at the same point every time, which on one
-     * lane makes a run reproducible. The probe is the exception; see [probeSliceMillis].
+     * A counted segment ends at its work or at its time slice, whichever comes first. A segment bounded by time
+     * pauses somewhere different on every run, and since the search resumes from wherever it stopped, every counter
+     * a solve reports inherits that; a segment bounded by work pauses at the same point every time, which on one
+     * lane makes a run reproducible. Work binds first wherever [lsInstructionsPerWork] prices an arm's steps about
+     * right; the time slice is there for the models where it does not, on which one segment of a few thousand
+     * units can otherwise run for seconds and hold the core past every later choice the policy would make.
      */
     private val baseSliceWork: Long = 5_000,
     /** Cap on a single counted segment's work. */
     private val maxSliceWork: Long = 150_000,
     /**
-     * Wall-clock cap on a counted arm's probe segment. Its work converts to instructions at one rate for every
-     * model ([lsInstructionsPerWork]), and on a model where a step costs far more than that rate assumes, a base
-     * slice of work runs for seconds: before the cap one probe ran to the deadline and the arms after it never
-     * ran. Later segments are sized by the policy, which has seen what the arm costs by then.
+     * Wall-clock cap on a counted arm's probe segment, which every arm runs before the policy has seen any of
+     * them; later counted segments are capped by their growing time slice ([baseSliceMillis]).
      */
     private val probeSliceMillis: Long = 1_000,
     /** Local-search instructions that cost as much as one search node; see `LS_INSTRUCTIONS_PER_WORK`. */
@@ -552,16 +553,14 @@ class Portfolio(
         claim.sliceWork
     }
 
-    /** The cancellation token bounding one non-resumable arm's segment. A counted-work arm
-     *  ([PortfolioWorker.acceptsInstructionBudget]) is paced by its own instruction budget, and past its probe a
-     *  wall-clock cap on top would reintroduce the machine-speed dependence counting exists to remove; its probe
-     *  is capped at [probeSliceMillis]. An arm with neither a counter nor a resumable handle is sliced by the
-     *  claim's millis, a deadline it can size a sub-phase against ([Cancellation.shorten]). */
+    /** The cancellation token bounding one non-resumable arm's segment: its time slice, or [probeSliceMillis] for
+     *  a counted arm's probe. A counted arm ([PortfolioWorker.acceptsInstructionBudget]) usually ends at its
+     *  instruction budget first; see [baseSliceWork]. An arm with neither a counter nor a resumable handle has only
+     *  the slice, a deadline it can size a sub-phase against ([Cancellation.shorten]). A whole segment has no slice. */
     private fun segmentToken(worker: PortfolioWorker, cancellation: Cancellation, claim: Claim): Cancellation = when {
         claim.whole -> cancellation
-        !worker.acceptsInstructionBudget -> until(claim.sliceMillis) or cancellation
-        claim.probing -> until(probeSliceMillis) or cancellation
-        else -> cancellation
+        claim.probing && worker.acceptsInstructionBudget -> until(probeSliceMillis) or cancellation
+        else -> until(claim.sliceMillis) or cancellation
     }
 
     private fun until(millis: Long): Cancellation =

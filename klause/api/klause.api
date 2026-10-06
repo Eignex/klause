@@ -7031,8 +7031,8 @@ public final class com/eignex/klause/portfolio/Portfolio : com/eignex/klause/por
 	public static final field Companion Lcom/eignex/klause/portfolio/Portfolio$Companion;
 	public static final field DEFAULT_HALF_LIFE D
 	public static final field DEFAULT_PHASE_RETENTION D
-	public fun <init> (Ljava/util/List;Lcom/eignex/kumulant/bandit/UnivariateBandit;IJJDJJDIDLcom/eignex/klause/portfolio/WitnessCheck;Lkotlin/jvm/functions/Function1;)V
-	public synthetic fun <init> (Ljava/util/List;Lcom/eignex/kumulant/bandit/UnivariateBandit;IJJDJJDIDLcom/eignex/klause/portfolio/WitnessCheck;Lkotlin/jvm/functions/Function1;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Ljava/util/List;Lcom/eignex/kumulant/bandit/UnivariateBandit;IJJDJJJDIDLcom/eignex/klause/portfolio/WitnessCheck;Lkotlin/jvm/functions/Function1;)V
+	public synthetic fun <init> (Ljava/util/List;Lcom/eignex/kumulant/bandit/UnivariateBandit;IJJDJJJDIDLcom/eignex/klause/portfolio/WitnessCheck;Lkotlin/jvm/functions/Function1;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public fun close ()V
 	public final fun getWorkers ()Ljava/util/List;
 	public fun minimize (Lcom/eignex/klause/util/Cancellation;Lkotlin/jvm/functions/Function1;)Lcom/eignex/klause/solver/result/MinimizeResult;
@@ -7040,8 +7040,8 @@ public final class com/eignex/klause/portfolio/Portfolio : com/eignex/klause/por
 }
 
 public final class com/eignex/klause/portfolio/Portfolio$Companion {
-	public final fun thompson (Ljava/util/List;IJDJJDIJDLcom/eignex/klause/portfolio/WitnessCheck;Lkotlin/jvm/functions/Function1;)Lcom/eignex/klause/portfolio/Portfolio;
-	public static synthetic fun thompson$default (Lcom/eignex/klause/portfolio/Portfolio$Companion;Ljava/util/List;IJDJJDIJDLcom/eignex/klause/portfolio/WitnessCheck;Lkotlin/jvm/functions/Function1;ILjava/lang/Object;)Lcom/eignex/klause/portfolio/Portfolio;
+	public final fun thompson (Ljava/util/List;IJDJJDIJJDLcom/eignex/klause/portfolio/WitnessCheck;Lkotlin/jvm/functions/Function1;)Lcom/eignex/klause/portfolio/Portfolio;
+	public static synthetic fun thompson$default (Lcom/eignex/klause/portfolio/Portfolio$Companion;Ljava/util/List;IJDJJDIJJDLcom/eignex/klause/portfolio/WitnessCheck;Lkotlin/jvm/functions/Function1;ILjava/lang/Object;)Lcom/eignex/klause/portfolio/Portfolio;
 }
 
 public final class com/eignex/klause/portfolio/PortfolioBuilder {
