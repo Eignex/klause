@@ -1,5 +1,6 @@
 package com.eignex.klause.backtrack
 
+import com.eignex.klause.solver.result.SearchStatsSink
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TimeSource
 
@@ -10,7 +11,7 @@ import kotlin.time.TimeSource
  * A work budget makes the pause point a property of the search rather than of machine load, which is what
  * lets two identical invocations report identical counters. A unit is one search node, and LP work is charged
  * against the same budget at [LP_WORK_PER_NODE] per node so an LP-heavy slice pauses about as late in wall time
- * as a CP one.
+ * as a CP one. [nodeCount] is the search's own work in nodes, inprocessing included; see [searchWork].
  */
 internal class SliceBudget(private val nodeCount: () -> Long, private val lpWork: () -> Long) {
     /** The armed slice's wall-clock end; null before the first slice. */
@@ -82,3 +83,14 @@ internal class SliceBudget(private val nodeCount: () -> Long, private val lpWork
 // node: the median ratio of LP work per second with the default LP arm to conflictDriven's nodes per second, over
 // 13 MIPLIB 2017 models with continuous columns, was 519 (spread 58 to 8145, geometric mean 629).
 internal const val LP_WORK_PER_NODE = 600L
+
+/** The search work a slice is charged, in nodes: every node, plus inprocessing at its measured rates. */
+internal val SearchStatsSink.searchWork: Long
+    get() = nodeCount + inprocessProbes / INPROCESS_PROBES_PER_NODE + inprocessVisits / INPROCESS_VISITS_PER_NODE
+
+// Vivification probes, and clause literals subsumption scans, in the time one search node of the satOptimized arm
+// takes: the median ratios over 42 PB and SAT models were 11.9 (spread 0.5 to 57) and 18658 (spread 127 to 1.7M).
+// A probe propagates one literal and undoes it, but a node also analyses conflicts and learns.
+internal const val INPROCESS_PROBES_PER_NODE = 12L
+
+internal const val INPROCESS_VISITS_PER_NODE = 18_000L

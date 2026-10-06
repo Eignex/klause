@@ -154,7 +154,7 @@ internal class ResumableMinimize(
     private val startMark = TimeSource.Monotonic.markNow()
 
     // Where the current slice pauses. Its work bound counts the LP work this search charges per node.
-    private val slice = SliceBudget({ sink.search.nodeCount }, { lpEngine.totalSolveWork() })
+    private val slice = SliceBudget({ sink.search.searchWork }, { lpEngine.totalSolveWork() })
 
     private fun sliceCancelled(): Boolean = solveCancelled() || (pausable && sliceExpired())
 
@@ -263,7 +263,7 @@ internal class ResumableMinimize(
     private var rootExhausted: UnsatCore? = null
     private var rootIsExhausted = false
     private var firstRun = true
-    private val inprocessing = Inprocessing.from(params)
+    private val inprocessing = Inprocessing.from(params, sink.search)
     private val pooledIncumbents = params.pooledIncumbents?.let { IncumbentSubscription(it) }
     private val traversal = OptimizationTraversalPolicy()
 

@@ -6,6 +6,7 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.solver.result.SearchStatsSink
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -44,6 +45,20 @@ class ClauseDbTest {
     @Test
     fun `vivify should strengthen a learned clause in the native-SAT arena store`() {
         assertEquals(setOf(Lit.make(0, false), Lit.make(2, true)), vivifiedLiterals(nativeSat = true))
+    }
+
+    @Test
+    fun `vivify counts every literal it pins and propagates as a probe`() {
+        val session = PropagationSession(chainProblem().bake())
+        session.addLearnedClause(
+            Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false), Lit.make(2, true))),
+            lbd = 3,
+        )
+        val stats = SearchStatsSink()
+
+        vivify(session, BacktrackParams(vivification = true, vivifyBatch = 8), 0, stats)
+
+        assertEquals(1L, stats.inprocessProbes)
     }
 
     @Test
