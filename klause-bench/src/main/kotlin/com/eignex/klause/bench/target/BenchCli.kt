@@ -5,6 +5,7 @@ import com.eignex.klause.bench.catalog.Category
 import com.eignex.klause.bench.catalog.Format
 import com.eignex.klause.bench.catalog.ProblemRef
 import com.eignex.klause.bench.catalog.ProblemSets
+import com.eignex.klause.bench.metric.ArmMining
 import com.eignex.klause.bench.metric.BenchCache
 import com.eignex.klause.bench.metric.ClaspReference
 import com.eignex.klause.bench.metric.InstanceClassifier
@@ -64,6 +65,8 @@ import java.util.concurrent.atomic.AtomicInteger
  *    per-solver tables (see [reference]); the gap-to-optimum reward + a soundness oracle.
  *  - `credit [--by structure|format] <a.csv> <b.csv> …` — win-share + greedy set-cover credit between
  *    per-run result CSVs, keyed by (suite, problem), sliceable by a feature column (see [credit]).
+ *  - `mine [by=config|suite|family|format|category|kind] <cases.json> …` — rank portfolio arms from lab
+ *    case records (`deploy/lab cases <id>`) by wins and by the scheduler's per-arm credit (see [ArmMining]).
  *  - `preview [filters…]` — print the instances a run would cover, without running.
  *  - `select [filters…]` — the same selection as JSON lines naming each instance exactly, for `solve-one`.
  *  - `solve-one suite=<id> problem=<name> [solve args…] [out=<dir>]` — solve one instance and write its record.
@@ -102,13 +105,15 @@ object BenchCli {
 
             "credit" -> credit(args.drop(1))
 
+            "mine" -> mine(args.drop(1))
+
             "corpus" -> corpus(args.drop(1))
 
             else ->
                 error(
                     "unknown command '$cmd' " +
                         "(commands: solve, solve-one, select, preview, reference, classify, credit, " +
-                        "corpus, list)",
+                        "mine, corpus, list)",
                 )
         }
     }
@@ -198,6 +203,19 @@ object BenchCli {
         require(files.size >= 2) { "credit needs >= 2 result CSVs (got ${files.size})" }
         files.firstOrNull { !it.isFile }?.let { error("no such result CSV: $it") }
         print(ResultCredit.credit(files, by))
+    }
+
+    private fun mine(args: List<String>) {
+        val by = args.firstOrNull { it.startsWith("by=") }?.substringAfter('=')
+        val files = args.filterNot { it.startsWith("by=") }.map { File(it) }
+        require(files.isNotEmpty()) { "mine needs >= 1 lab case file" }
+        files.firstOrNull { !it.isFile }?.let { error("no such case file: $it") }
+        val cases = ArmMining.load(files)
+        if (cases.isEmpty()) {
+            println("(no case carries arm telemetry; run the portfolio with -s)")
+            return
+        }
+        print(ArmMining.render(cases, by))
     }
 
     /** Run `solve` over the [filterArgs] selection (or just print it when [preview]). `solve` is the

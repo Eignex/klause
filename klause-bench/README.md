@@ -223,6 +223,8 @@ and a material change takes a new name, so results under one name stay comparabl
 
 A portfolio solve under `-s` prints one `%%%klause-arm:` attribution line per installed incumbent. An attribution line has an exact `objective=<Long>` discrete channel and, only when a continuous column has cost, `continuousObjective=<Double>` for the whole model-oriented objective. Saved records retain the former as decimal-text `exactObjective` (safe past 2^53) and retain the legacy numeric `objective` for old result files; a missing modern continuous channel means there is no continuous contribution, not a zero offset.
 
+To rank portfolio arms for the hand-edited catalogs, mine historic lab solves: save each experiment's `deploy/lab cases <id>` output and run `bench mine [by=config|suite|family|format|category|kind] <cases.json> …`. It ranks arms by win share and set-cover over the best-holders, and lists each arm's work, work-weighted reward and per-signal credit from the `arm.<label>` lines a `-s` portfolio run prints. Any quarantined arm run is listed first.
+
 ## Recipes
 
 ```
