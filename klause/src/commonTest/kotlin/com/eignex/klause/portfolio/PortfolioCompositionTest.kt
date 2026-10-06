@@ -22,9 +22,9 @@ class PortfolioCompositionTest {
     fun `a model with continuous columns gets the default LP arm after the first two backtrack arms`() {
         for (kind in Kind.entries) {
             val scenario = PortfolioScenario.sequential(kind, engine = EngineMix.MIXED, arms = 6)
-                .copy(realColumns = true)
 
-            val backtrack = PortfolioComposition.compose(scenario).filterIsInstance<BacktrackWorkerConfig>()
+            val backtrack = PortfolioComposition.compose(scenario, ProblemFacts.assumed(kind, realColumns = true))
+                .filterIsInstance<BacktrackWorkerConfig>()
 
             assertEquals(
                 listOf("satOptimized", "conflictDriven", "lp-default"),
@@ -41,6 +41,39 @@ class PortfolioCompositionTest {
         val backtrack = PortfolioComposition.compose(scenario).filterIsInstance<BacktrackWorkerConfig>()
 
         assertEquals(listOf("satOptimized", "conflictDriven"), backtrack.map { it.label })
+    }
+
+    @Test
+    fun `a mixed pool on a model local search cannot run is all backtrack`() {
+        val scenario = PortfolioScenario.sequential(Kind.COP, engine = EngineMix.MIXED, arms = 6)
+        val facts = ProblemFacts(optimizing = true, realColumns = false, localSearch = { false }, relaxation = { true })
+
+        val arms = PortfolioComposition.compose(scenario, facts)
+
+        assertEquals(6, arms.size)
+        assertTrue(arms.all { it is BacktrackWorkerConfig }, "arms: ${arms.map { it.label }}")
+    }
+
+    @Test
+    fun `a model with nothing to relax builds no LP arm and keeps the pool full`() {
+        val scenario = PortfolioScenario.sequential(Kind.COP, engine = EngineMix.BACKTRACK, arms = 6)
+        val facts = ProblemFacts(optimizing = true, realColumns = false, localSearch = { true }, relaxation = { false })
+
+        val labels = PortfolioComposition.compose(scenario, facts).map { it.label }
+
+        assertEquals(6, labels.size)
+        assertTrue(labels.none { it.startsWith("lp-") }, "labels: $labels")
+    }
+
+    @Test
+    fun `an injected backtrack pool is built as asked whatever the model offers`() {
+        val scenario = PortfolioScenario.sequential(Kind.COP, engine = EngineMix.BACKTRACK, arms = 2)
+            .copy(btPool = listOf { BacktrackCatalog.byLabel("lp-default") })
+        val facts = ProblemFacts(optimizing = true, realColumns = false, localSearch = { true }, relaxation = { false })
+
+        val labels = PortfolioComposition.compose(scenario, facts).map { it.label }
+
+        assertEquals(listOf("lp-default", "lp-default"), labels)
     }
 
     @Test

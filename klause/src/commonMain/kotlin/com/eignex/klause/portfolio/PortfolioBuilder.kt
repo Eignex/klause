@@ -1,7 +1,6 @@
 package com.eignex.klause.portfolio
 
 import com.eignex.klause.localsearch.DefinitionalSweep
-import com.eignex.klause.localsearch.localSearchSupports
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.incumbent.IncumbentExchange
 import com.eignex.klause.solver.objective.IncrementalObjective
@@ -41,12 +40,8 @@ object PortfolioBuilder {
         definitionalSweep: DefinitionalSweep? = null,
         onEvent: ((worker: String, event: SearchEvent) -> Unit)? = null,
     ): List<PortfolioWorker> {
-        // Local-search arms decline a model they cannot run at once, and being non-resumable they would be
-        // rescheduled every slice, so the run leaves them out; an all-local-search mix keeps them and declines. The
-        // scenario's own arm count is taken first, so leaving them out never lets a later-ranked arm in.
-        val composed = PortfolioComposition.compose(scenario).take(scenario.arms).let { arms ->
-            if (localSearchSupports(problem)) arms else arms.filter { it !is LocalSearchWorkerConfig }.ifEmpty { arms }
-        }
+        val facts = ProblemFacts.of(problem, scenario.kind, scenario.lpCeiling)
+        val composed = PortfolioComposition.compose(scenario, facts).take(scenario.arms)
         // Expand the composed arms to one entry per lane. A lane is a worker slot; a parallel track
         // wants one per core, the sequential track one per arm — so laneCount is maxOf(arms, cores).
         // When arms >= cores (every existing scenario) this is a no-op cycle that returns the composed

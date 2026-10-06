@@ -114,9 +114,6 @@ data class PortfolioScenario(
      *  from outside reaches only the latter, which both leaves the hybrid-ALNS arm's repair unbounded and
      *  substitutes a pool, so the capped run measures a different arm set than the uncapped one. */
     val nodeBudget: NodeBudget? = null,
-    /** Whether the model has continuous columns, which ranks an LP arm third in the curated backtrack pool
-     *  and gives a mixed pool the backtrack slot for it; see [BacktrackCatalog.ranked]. */
-    val realColumns: Boolean = false,
 ) {
     init {
         require(cores >= 1) { "cores must be ≥ 1" }
@@ -198,18 +195,27 @@ internal object PortfolioComposition {
         Kind.CSP -> 1.0 / 3.0
     }
 
-    /** The ordered arm list for [scenario] — exactly [PortfolioScenario.arms] arms. */
-    fun compose(scenario: PortfolioScenario): List<WorkerConfig> {
-        val check = scenario.toleranceCheck ?: return composeArms(scenario)
-        return composeArms(scenario).map { if (it is BacktrackWorkerConfig) it.withToleranceCheck(check) else it }
+    /**
+     * The ordered arm list for [scenario] — at most [PortfolioScenario.arms] arms. The curated pools keep only
+     * the arms the model behind [facts] offers the needs of, and a mixed pool hands the local-search share to
+     * backtrack when the model cannot run local search. A pool the caller chose outright — an injected one, or
+     * a single-engine mix — is built as asked, so a model it cannot run is declined rather than replaced.
+     */
+    fun compose(
+        scenario: PortfolioScenario,
+        facts: ProblemFacts = ProblemFacts.assumed(scenario.kind),
+    ): List<WorkerConfig> {
+        val arms = composeArms(scenario, facts)
+        val check = scenario.toleranceCheck ?: return arms
+        return arms.map { if (it is BacktrackWorkerConfig) it.withToleranceCheck(check) else it }
     }
 
-    private fun composeArms(scenario: PortfolioScenario): List<WorkerConfig> {
+    private fun composeArms(scenario: PortfolioScenario, facts: ProblemFacts): List<WorkerConfig> {
         val count = scenario.arms
         return when (scenario.engine) {
             EngineMix.LOCAL_SEARCH -> lsArms(scenario.kind, count, scenario.lsPool)
-            EngineMix.BACKTRACK -> btArms(scenario, count)
-            EngineMix.MIXED -> mixedArms(scenario)
+            EngineMix.BACKTRACK -> btArms(scenario, count, facts)
+            EngineMix.MIXED -> mixedArms(scenario, facts)
             EngineMix.ALNS -> alnsArms(count, scenario.nodeBudget)
         }
     }
@@ -230,11 +236,11 @@ internal object PortfolioComposition {
         }
 
     /** The [count] backtrack arms for [scenario]. [PortfolioScenario.btPool] (when set) overrides the pool
-     *  with injected templates. Otherwise the curated pool, ordered for [PortfolioScenario.realColumns], with
+     *  with injected templates. Otherwise the curated pool the model behind [facts] offers the needs of, with
      *  the model's [PortfolioScenario.annotationArm] taking the last slot when present and there are ≥ 2 slots
      *  (so the `satOptimized` guard keeps slot 0). Every resulting arm spends [PortfolioScenario.nodeBudget],
      *  which is applied to the composed pool so that capping a run does not also change which pool it composes. */
-    private fun btArms(scenario: PortfolioScenario, count: Int): List<WorkerConfig> {
+    private fun btArms(scenario: PortfolioScenario, count: Int, facts: ProblemFacts): List<WorkerConfig> {
         val lpCeiling = scenario.lpCeiling
         val btPool = scenario.btPool
         val annotationArm = scenario.annotationArm
@@ -256,26 +262,26 @@ internal object PortfolioComposition {
             lpCeiling,
             nodeBudget,
             zeroObjectivePricing,
-            scenario.realColumns,
+            facts,
         )
         if (annotationArm == null || count < 2) return base
         val annotation = BacktrackWorkerConfig.ofParams("annotation", annotationArm.copy(nodeBudget = nodeBudget))
         return base.dropLast(1) + BacktrackWorkerConfig(annotation, zeroObjectivePricing)
     }
 
-    private fun mixedArms(scenario: PortfolioScenario): List<WorkerConfig> {
+    private fun mixedArms(scenario: PortfolioScenario, facts: ProblemFacts): List<WorkerConfig> {
         // At least one of each engine once count ≥ 2; below that the single slot goes to LS (the
-        // fast first-incumbent engine).
+        // fast first-incumbent engine). A model local search cannot run gives every slot to backtrack.
         val count = scenario.arms
-        val share = (count * lsShare(scenario.kind)).roundToInt().coerceIn(if (count >= 2) 1 else count, count)
-        // A model with continuous columns gets one more backtrack arm, so the LP arm ranked third for it runs
-        // alongside the two that precede it rather than in place of one. Local search cannot run such a model
-        // and [PortfolioBuilder] drops its arms, so the slot costs it nothing.
-        val lsCount = if (scenario.realColumns && share > 1) share - 1 else share
+        val lsCount = if (facts.offers(ArmNeed.LocalSearch)) {
+            (count * lsShare(scenario.kind)).roundToInt().coerceIn(if (count >= 2) 1 else count, count)
+        } else {
+            0
+        }
         val btCount = count - lsCount
         val arms = ArrayList<WorkerConfig>(count)
-        val local = lsArms(scenario.kind, lsCount, scenario.lsPool)
-        val backtrack = btArms(scenario, btCount)
+        val local = if (lsCount > 0) lsArms(scenario.kind, lsCount, scenario.lsPool) else emptyList()
+        val backtrack = if (btCount > 0) btArms(scenario, btCount, facts) else emptyList()
         if (scenario.kind == Kind.COP) {
             // Sequential portfolios warm every arm in list order. A complete arm must receive its first
             // slice before the local-search incumbents, which cannot prove an optimum and otherwise delay
@@ -286,8 +292,8 @@ internal object PortfolioComposition {
             arms += local
             arms += backtrack
         }
-        // Hybrid ALNS with CP repair. COP only — it optimises an incumbent, so a CSP has nothing for it.
-        if (scenario.kind == Kind.COP) arms += AlnsWorkerConfig(nodeBudget = scenario.nodeBudget)
+        // Hybrid ALNS with CP repair, where the model offers what it needs.
+        if (facts.offersAll(AlnsWorkerConfig.NEEDS)) arms += AlnsWorkerConfig(nodeBudget = scenario.nodeBudget)
         return arms
     }
 }
