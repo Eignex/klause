@@ -30,8 +30,11 @@ internal object ReferenceSolve {
         else -> backend
     }
 
-    fun run(ref: ProblemRef, backend: String, settings: SolverInvocation.Settings, budget: Budget): Run {
+    fun run(ref: ProblemRef, backend: String, asked: SolverInvocation.Settings, budget: Budget): Run {
         val solver = solverIdFor(ref, backend)
+        // One worker unless asked for more: a MiniZinc backend such as cp-sat otherwise starts one per core, so cases
+        // run side by side oversubscribe the machine and their times say more about the load than the instance.
+        val settings = asked.copy(processors = asked.processors ?: 1)
         val cacheTag = when (ref.format) {
             Format.DIMACS, Format.OPB, Format.WCNF -> "clasp"
 
@@ -41,8 +44,9 @@ internal object ReferenceSolve {
 
             Format.MPS -> "scip"
 
-            // The seed fixes the instance a random-data model compiles to, so results under another seed differ.
-            else -> "$backend-seed$MZN_RANDOM_SEED"
+            // The seed fixes the instance a random-data model compiles to, so results under another seed differ; so do
+            // results with another worker count.
+            else -> "$backend-seed$MZN_RANDOM_SEED-p${settings.processors}"
         }
         val key = BenchCache.keyFor(ref, cacheTag, budget)
         val cached = BenchCache.load(key)
@@ -60,7 +64,7 @@ internal object ReferenceSolve {
             }
 
             Format.XCSP3 -> {
-                val r = cached ?: cache(Xcsp3CpSatReference.run(ref, budget, settings.processors ?: 1))
+                val r = cached ?: cache(Xcsp3CpSatReference.run(ref, budget, checkNotNull(settings.processors)))
                 Run(solver, r, optimize = r.objective != null, maximize = r.stats["maximize"].toBoolean())
             }
 
