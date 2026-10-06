@@ -106,7 +106,7 @@ class LocalSearchStateCompoundProbeTest {
     private fun slotOf(problem: Problem, move: Move): Int = when (move) {
         is Move.BoolFlip -> move.varId
         is Move.IntSet -> problem.numBoolVars + move.varId
-        is Move.Compound -> error("primitive expected")
+        is Move.RealSet, is Move.Compound -> error("primitive discrete move expected")
     }
 
     private fun randomPrimitive(problem: Problem, state: LocalSearchState, rng: Random): Move? {

@@ -68,6 +68,12 @@ interface Invariant {
     /** Apply a committed int-set of [intVar] from [oldValue]; returns the Δ violation-degree. */
     fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Long): Int = 0
 
+    /** Δ violation-degree if real variable [realVar] were set to [newValue], without mutating state. */
+    fun deltaIfRealSet(state: LocalSearchState, factorId: Int, realVar: Int, newValue: Double): Int = 0
+
+    /** Apply a committed real-set of [realVar] from [oldValue]; returns the Δ violation-degree. */
+    fun applyRealSet(state: LocalSearchState, factorId: Int, realVar: Int, oldValue: Double): Int = 0
+
     /**
      * Suggest moves that would (or might) repair this factor when violated. The default lists
      * a Boolean flip per boolVars member plus a step to each in-domain neighbour per intVars member. Factors

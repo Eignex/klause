@@ -81,7 +81,7 @@ class StallKickEquivalenceTest {
                 val slot = when (p) {
                     is Move.BoolFlip -> p.varId
                     is Move.IntSet -> state.problem.numBoolVars + p.varId
-                    is Move.Compound -> return
+                    is Move.RealSet, is Move.Compound -> return
                 }
                 if (seenSlots.add(slot)) parts.add(p)
             }
@@ -101,6 +101,7 @@ class StallKickEquivalenceTest {
             null -> {}
             is Move.BoolFlip -> out.addBoolFlip(move.varId)
             is Move.IntSet -> out.addIntSet(move.varId, move.newValue)
+            is Move.RealSet -> out.addRealSet(move.varId, move.newValue)
             is Move.Compound -> out.addCompound(move.parts)
         }
     }
@@ -148,7 +149,7 @@ class StallKickEquivalenceTest {
         when (move) {
             is Move.IntSet -> onSet(move.varId, move.newValue)
             is Move.Compound -> for (p in move.parts) collectIntSets(p, onSet)
-            is Move.BoolFlip -> {}
+            is Move.BoolFlip, is Move.RealSet -> {}
         }
     }
 }

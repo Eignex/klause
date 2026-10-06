@@ -9,18 +9,22 @@ import com.eignex.klause.util.EmptyDoubleArray
 import kotlin.random.Random
 
 /**
- * Mutable mixed assignment over `numBoolVars` Boolean variables (packed into a [LongArray]) and
- * `numIntVars` integer variables (a plain [IntArray]). Bool and int variables live in separate
- * id spaces; a factor that touches both kinds names them through `boolVars` / `intVars` arrays.
+ * Mutable mixed assignment over `numBoolVars` Boolean variables (packed into a [LongArray]),
+ * `numIntVars` integer variables (a plain [LongArray]) and `numRealVars` continuous variables held
+ * approximately as [Double]s. Each kind lives in its own id space; a factor that touches several names
+ * them through `boolVars` / `intVars` / its real variables.
  */
 class Assignment(
     /** Number of Boolean variables. */
     val numBoolVars: Int,
     /** Number of integer variables. */
     val numIntVars: Int,
+    /** Number of continuous (real) variables. */
+    val numRealVars: Int = 0,
 ) {
     private val bits: Bits = Bits(numBoolVars)
     private val ints: LongArray = LongArray(numIntVars)
+    private val reals: DoubleArray = if (numRealVars == 0) EmptyDoubleArray else DoubleArray(numRealVars)
 
     /** Current value of Boolean variable [varId]. */
     fun boolValue(varId: Int): Boolean = bits.get(varId)
@@ -43,6 +47,14 @@ class Assignment(
         ints[varId] = value
     }
 
+    /** Current approximate value of real variable [varId]. */
+    fun realValue(varId: Int): Double = reals[varId]
+
+    /** Set real variable [varId] to [value]. */
+    fun setReal(varId: Int, value: Double) {
+        reals[varId] = value
+    }
+
     /** Randomize every variable uniformly within its domain. */
     fun randomize(rng: Random, intDomains: Array<IntDomain>) {
         // Direct word fill — much faster than a per-var coin flip via bits.set / clear.
@@ -60,6 +72,7 @@ class Assignment(
     fun snapshot(): Sample = Sample(
         bools = BooleanArray(numBoolVars) { bits.get(it) },
         ints = ints.copyOf(),
+        reals = if (numRealVars == 0) EmptyDoubleArray else reals.copyOf(),
     )
 }
 

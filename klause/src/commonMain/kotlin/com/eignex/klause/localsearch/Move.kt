@@ -19,13 +19,21 @@ sealed interface Move {
         val newValue: Long,
     ) : Move
 
+    /** Set a continuous variable to [newValue]. */
+    data class RealSet(
+        /** Real variable id to set. */
+        val varId: Int,
+        /** New value to assign. */
+        val newValue: Double,
+    ) : Move
+
     /**
      * Two or more single-variable moves applied as one transition. The engine commits
      * each part in `parts` order, but break score / net delta / tabu are evaluated
      * against the full post-state — so a Compound that resolves a conflict via two
      * coupled changes can score better than either part alone.
      *
-     * Parts must be `BoolFlip` or `IntSet` (no Compound-of-Compound); the LS engine
+     * Parts must be `BoolFlip`, `IntSet` or `RealSet` (no Compound-of-Compound); the LS engine
      * uses apply-then-revert to evaluate cost diffs, which only works for invertible
      * primitives. Constructed via [com.eignex.klause.localsearch.MoveSink.addCompound];
      * a Compound is tabu if *any* part is tabu (conservative).

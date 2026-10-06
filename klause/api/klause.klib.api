@@ -635,6 +635,10 @@ abstract fun interface com.eignex.klause.ir/IntConsumer { // com.eignex.klause.i
     abstract fun accept(kotlin/Long) // com.eignex.klause.ir/IntConsumer.accept|accept(kotlin.Long){}[0]
 }
 
+abstract fun interface com.eignex.klause.localsearch/CandidateCompletion { // com.eignex.klause.localsearch/CandidateCompletion|null[0]
+    abstract fun complete(com.eignex.klause.solver/Sample): com.eignex.klause.localsearch/Completion // com.eignex.klause.localsearch/CandidateCompletion.complete|complete(com.eignex.klause.solver.Sample){}[0]
+}
+
 abstract fun interface com.eignex.klause.portfolio/WitnessCheck { // com.eignex.klause.portfolio/WitnessCheck|null[0]
     abstract fun refute(com.eignex.klause.solver/Sample, kotlin/Double?): kotlin/String? // com.eignex.klause.portfolio/WitnessCheck.refute|refute(com.eignex.klause.solver.Sample;kotlin.Double?){}[0]
 }
@@ -951,9 +955,11 @@ abstract interface com.eignex.klause.localsearch/Invariant { // com.eignex.klaus
 
     open fun applyBoolFlip(com.eignex.klause.localsearch/LocalSearchState, kotlin/Int, kotlin/Int): kotlin/Int // com.eignex.klause.localsearch/Invariant.applyBoolFlip|applyBoolFlip(com.eignex.klause.localsearch.LocalSearchState;kotlin.Int;kotlin.Int){}[0]
     open fun applyIntSet(com.eignex.klause.localsearch/LocalSearchState, kotlin/Int, kotlin/Int, kotlin/Long): kotlin/Int // com.eignex.klause.localsearch/Invariant.applyIntSet|applyIntSet(com.eignex.klause.localsearch.LocalSearchState;kotlin.Int;kotlin.Int;kotlin.Long){}[0]
+    open fun applyRealSet(com.eignex.klause.localsearch/LocalSearchState, kotlin/Int, kotlin/Int, kotlin/Double): kotlin/Int // com.eignex.klause.localsearch/Invariant.applyRealSet|applyRealSet(com.eignex.klause.localsearch.LocalSearchState;kotlin.Int;kotlin.Int;kotlin.Double){}[0]
     open fun contributeChanneling(com.eignex.klause.localsearch/LocalSearchState, kotlin/Int, kotlin/Int, kotlin/Long, kotlin/Long, com.eignex.klause.localsearch/ChannelingSink) // com.eignex.klause.localsearch/Invariant.contributeChanneling|contributeChanneling(com.eignex.klause.localsearch.LocalSearchState;kotlin.Int;kotlin.Int;kotlin.Long;kotlin.Long;com.eignex.klause.localsearch.ChannelingSink){}[0]
     open fun deltaIfBoolFlipped(com.eignex.klause.localsearch/LocalSearchState, kotlin/Int, kotlin/Int): kotlin/Int // com.eignex.klause.localsearch/Invariant.deltaIfBoolFlipped|deltaIfBoolFlipped(com.eignex.klause.localsearch.LocalSearchState;kotlin.Int;kotlin.Int){}[0]
     open fun deltaIfIntSet(com.eignex.klause.localsearch/LocalSearchState, kotlin/Int, kotlin/Int, kotlin/Long): kotlin/Int // com.eignex.klause.localsearch/Invariant.deltaIfIntSet|deltaIfIntSet(com.eignex.klause.localsearch.LocalSearchState;kotlin.Int;kotlin.Int;kotlin.Long){}[0]
+    open fun deltaIfRealSet(com.eignex.klause.localsearch/LocalSearchState, kotlin/Int, kotlin/Int, kotlin/Double): kotlin/Int // com.eignex.klause.localsearch/Invariant.deltaIfRealSet|deltaIfRealSet(com.eignex.klause.localsearch.LocalSearchState;kotlin.Int;kotlin.Int;kotlin.Double){}[0]
     open fun initialize(com.eignex.klause.localsearch/LocalSearchState, kotlin/Int) // com.eignex.klause.localsearch/Invariant.initialize|initialize(com.eignex.klause.localsearch.LocalSearchState;kotlin.Int){}[0]
     open fun isViolated(com.eignex.klause.localsearch/LocalSearchState, kotlin/Int): kotlin/Boolean // com.eignex.klause.localsearch/Invariant.isViolated|isViolated(com.eignex.klause.localsearch.LocalSearchState;kotlin.Int){}[0]
     open fun proposeExtendedRepairMoves(com.eignex.klause.localsearch/LocalSearchState, kotlin/Int, com.eignex.klause.localsearch/MoveSink) // com.eignex.klause.localsearch/Invariant.proposeExtendedRepairMoves|proposeExtendedRepairMoves(com.eignex.klause.localsearch.LocalSearchState;kotlin.Int;com.eignex.klause.localsearch.MoveSink){}[0]
@@ -1940,6 +1946,28 @@ sealed interface com.eignex.klause.localsearch/AspirationCriterion { // com.eign
     }
 }
 
+sealed interface com.eignex.klause.localsearch/Completion { // com.eignex.klause.localsearch/Completion|null[0]
+    final class Refuted : com.eignex.klause.localsearch/Completion { // com.eignex.klause.localsearch/Completion.Refuted|null[0]
+        constructor <init>(kotlin/IntArray = ...) // com.eignex.klause.localsearch/Completion.Refuted.<init>|<init>(kotlin.IntArray){}[0]
+
+        final val factors // com.eignex.klause.localsearch/Completion.Refuted.factors|{}factors[0]
+            final fun <get-factors>(): kotlin/IntArray // com.eignex.klause.localsearch/Completion.Refuted.factors.<get-factors>|<get-factors>(){}[0]
+    }
+
+    final class Witness : com.eignex.klause.localsearch/Completion { // com.eignex.klause.localsearch/Completion.Witness|null[0]
+        constructor <init>(com.eignex.klause.solver/Sample) // com.eignex.klause.localsearch/Completion.Witness.<init>|<init>(com.eignex.klause.solver.Sample){}[0]
+
+        final val sample // com.eignex.klause.localsearch/Completion.Witness.sample|{}sample[0]
+            final fun <get-sample>(): com.eignex.klause.solver/Sample // com.eignex.klause.localsearch/Completion.Witness.sample.<get-sample>|<get-sample>(){}[0]
+    }
+
+    final object Undecided : com.eignex.klause.localsearch/Completion { // com.eignex.klause.localsearch/Completion.Undecided|null[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.localsearch/Completion.Undecided.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.eignex.klause.localsearch/Completion.Undecided.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.eignex.klause.localsearch/Completion.Undecided.toString|toString(){}[0]
+    }
+}
+
 sealed interface com.eignex.klause.localsearch/CostShaping { // com.eignex.klause.localsearch/CostShaping|null[0]
     abstract val feasibilityGated // com.eignex.klause.localsearch/CostShaping.feasibilityGated|{}feasibilityGated[0]
         abstract fun <get-feasibilityGated>(): kotlin/Boolean // com.eignex.klause.localsearch/CostShaping.feasibilityGated.<get-feasibilityGated>|<get-feasibilityGated>(){}[0]
@@ -2048,6 +2076,22 @@ sealed interface com.eignex.klause.localsearch/Move { // com.eignex.klause.local
         final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.localsearch/Move.IntSet.equals|equals(kotlin.Any?){}[0]
         final fun hashCode(): kotlin/Int // com.eignex.klause.localsearch/Move.IntSet.hashCode|hashCode(){}[0]
         final fun toString(): kotlin/String // com.eignex.klause.localsearch/Move.IntSet.toString|toString(){}[0]
+    }
+
+    final class RealSet : com.eignex.klause.localsearch/Move { // com.eignex.klause.localsearch/Move.RealSet|null[0]
+        constructor <init>(kotlin/Int, kotlin/Double) // com.eignex.klause.localsearch/Move.RealSet.<init>|<init>(kotlin.Int;kotlin.Double){}[0]
+
+        final val newValue // com.eignex.klause.localsearch/Move.RealSet.newValue|{}newValue[0]
+            final fun <get-newValue>(): kotlin/Double // com.eignex.klause.localsearch/Move.RealSet.newValue.<get-newValue>|<get-newValue>(){}[0]
+        final val varId // com.eignex.klause.localsearch/Move.RealSet.varId|{}varId[0]
+            final fun <get-varId>(): kotlin/Int // com.eignex.klause.localsearch/Move.RealSet.varId.<get-varId>|<get-varId>(){}[0]
+
+        final fun component1(): kotlin/Int // com.eignex.klause.localsearch/Move.RealSet.component1|component1(){}[0]
+        final fun component2(): kotlin/Double // com.eignex.klause.localsearch/Move.RealSet.component2|component2(){}[0]
+        final fun copy(kotlin/Int = ..., kotlin/Double = ...): com.eignex.klause.localsearch/Move.RealSet // com.eignex.klause.localsearch/Move.RealSet.copy|copy(kotlin.Int;kotlin.Double){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.localsearch/Move.RealSet.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.eignex.klause.localsearch/Move.RealSet.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.eignex.klause.localsearch/Move.RealSet.toString|toString(){}[0]
     }
 }
 
@@ -6534,6 +6578,8 @@ final class com.eignex.klause.localsearch/LocalSearchProblem { // com.eignex.kla
         final fun <get-invariants>(): kotlin/Array<out com.eignex.klause.localsearch/Invariant> // com.eignex.klause.localsearch/LocalSearchProblem.invariants.<get-invariants>|<get-invariants>(){}[0]
     final val problem // com.eignex.klause.localsearch/LocalSearchProblem.problem|{}problem[0]
         final fun <get-problem>(): com.eignex.klause.ir/Problem // com.eignex.klause.localsearch/LocalSearchProblem.problem.<get-problem>|<get-problem>(){}[0]
+    final val realOccurrences // com.eignex.klause.localsearch/LocalSearchProblem.realOccurrences|{}realOccurrences[0]
+        final fun <get-realOccurrences>(): kotlin/Array<kotlin/IntArray> // com.eignex.klause.localsearch/LocalSearchProblem.realOccurrences.<get-realOccurrences>|<get-realOccurrences>(){}[0]
 }
 
 final class com.eignex.klause.localsearch/LocalSearchSession : com.eignex.klause.solver/Session<com.eignex.klause.localsearch/LocalSearchParams> { // com.eignex.klause.localsearch/LocalSearchSession|null[0]
@@ -6556,9 +6602,11 @@ final class com.eignex.klause.localsearch/LocalSearchSession : com.eignex.klause
 
 final class com.eignex.klause.localsearch/LocalSearchSolver : com.eignex.klause.solver/Optimizer<com.eignex.klause.localsearch/LocalSearchParams>, com.eignex.klause.solver/Solver<com.eignex.klause.localsearch/LocalSearchParams> { // com.eignex.klause.localsearch/LocalSearchSolver|null[0]
     constructor <init>(com.eignex.klause.compile/CompiledSchema) // com.eignex.klause.localsearch/LocalSearchSolver.<init>|<init>(com.eignex.klause.compile.CompiledSchema){}[0]
-    constructor <init>(com.eignex.klause.propagation/BakedProblem, com.eignex.klause.localsearch.strategy/SourceDrivenStrategy = ..., com.eignex.klause.localsearch.strategy/SourceDrivenStrategy? = ..., com.eignex.klause.localsearch/RestartPolicy = ..., kotlin/Boolean = ..., com.eignex.klause.localsearch/DefinitionalSweep? = ..., kotlin/Boolean = ..., kotlin/Boolean = ...) // com.eignex.klause.localsearch/LocalSearchSolver.<init>|<init>(com.eignex.klause.propagation.BakedProblem;com.eignex.klause.localsearch.strategy.SourceDrivenStrategy;com.eignex.klause.localsearch.strategy.SourceDrivenStrategy?;com.eignex.klause.localsearch.RestartPolicy;kotlin.Boolean;com.eignex.klause.localsearch.DefinitionalSweep?;kotlin.Boolean;kotlin.Boolean){}[0]
+    constructor <init>(com.eignex.klause.propagation/BakedProblem, com.eignex.klause.localsearch.strategy/SourceDrivenStrategy = ..., com.eignex.klause.localsearch.strategy/SourceDrivenStrategy? = ..., com.eignex.klause.localsearch/RestartPolicy = ..., kotlin/Boolean = ..., com.eignex.klause.localsearch/DefinitionalSweep? = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., com.eignex.klause.localsearch/CandidateCompletion? = ...) // com.eignex.klause.localsearch/LocalSearchSolver.<init>|<init>(com.eignex.klause.propagation.BakedProblem;com.eignex.klause.localsearch.strategy.SourceDrivenStrategy;com.eignex.klause.localsearch.strategy.SourceDrivenStrategy?;com.eignex.klause.localsearch.RestartPolicy;kotlin.Boolean;com.eignex.klause.localsearch.DefinitionalSweep?;kotlin.Boolean;kotlin.Boolean;com.eignex.klause.localsearch.CandidateCompletion?){}[0]
     constructor <init>(com.eignex.klause.schema/VariableSchema) // com.eignex.klause.localsearch/LocalSearchSolver.<init>|<init>(com.eignex.klause.schema.VariableSchema){}[0]
 
+    final val completion // com.eignex.klause.localsearch/LocalSearchSolver.completion|{}completion[0]
+        final fun <get-completion>(): com.eignex.klause.localsearch/CandidateCompletion? // com.eignex.klause.localsearch/LocalSearchSolver.completion.<get-completion>|<get-completion>(){}[0]
     final val definitionalSweep // com.eignex.klause.localsearch/LocalSearchSolver.definitionalSweep|{}definitionalSweep[0]
         final fun <get-definitionalSweep>(): com.eignex.klause.localsearch/DefinitionalSweep? // com.eignex.klause.localsearch/LocalSearchSolver.definitionalSweep.<get-definitionalSweep>|<get-definitionalSweep>(){}[0]
     final val greedyRepairOnRestart // com.eignex.klause.localsearch/LocalSearchSolver.greedyRepairOnRestart|{}greedyRepairOnRestart[0]
@@ -6598,6 +6646,8 @@ final class com.eignex.klause.localsearch/LocalSearchState { // com.eignex.klaus
         final fun <get-assignment>(): com.eignex.klause.solver/Assignment // com.eignex.klause.localsearch/LocalSearchState.assignment.<get-assignment>|<get-assignment>(){}[0]
     final val boolConfChange // com.eignex.klause.localsearch/LocalSearchState.boolConfChange|{}boolConfChange[0]
         final fun <get-boolConfChange>(): kotlin/BooleanArray // com.eignex.klause.localsearch/LocalSearchState.boolConfChange.<get-boolConfChange>|<get-boolConfChange>(){}[0]
+    final val doublePayload // com.eignex.klause.localsearch/LocalSearchState.doublePayload|{}doublePayload[0]
+        final fun <get-doublePayload>(): kotlin/DoubleArray // com.eignex.klause.localsearch/LocalSearchState.doublePayload.<get-doublePayload>|<get-doublePayload>(){}[0]
     final val factorDegree // com.eignex.klause.localsearch/LocalSearchState.factorDegree|{}factorDegree[0]
         final fun <get-factorDegree>(): kotlin/IntArray // com.eignex.klause.localsearch/LocalSearchState.factorDegree.<get-factorDegree>|<get-factorDegree>(){}[0]
     final val factors // com.eignex.klause.localsearch/LocalSearchState.factors|{}factors[0]
@@ -6657,6 +6707,7 @@ final class com.eignex.klause.localsearch/LocalSearchState { // com.eignex.klaus
     final fun proposeMovesFromRandomViolated(): kotlin.collections/List<com.eignex.klause.localsearch/Move>? // com.eignex.klause.localsearch/LocalSearchState.proposeMovesFromRandomViolated|proposeMovesFromRandomViolated(){}[0]
     final fun randomIntValue(kotlin/Int): kotlin/Long // com.eignex.klause.localsearch/LocalSearchState.randomIntValue|randomIntValue(kotlin.Int){}[0]
     final fun recompute() // com.eignex.klause.localsearch/LocalSearchState.recompute|recompute(){}[0]
+    final fun refreshRealRows() // com.eignex.klause.localsearch/LocalSearchState.refreshRealRows|refreshRealRows(){}[0]
     final fun resetStepCounters() // com.eignex.klause.localsearch/LocalSearchState.resetStepCounters|resetStepCounters(){}[0]
     final fun restart() // com.eignex.klause.localsearch/LocalSearchState.restart|restart(){}[0]
     final fun seedImplicitFeasible() // com.eignex.klause.localsearch/LocalSearchState.seedImplicitFeasible|seedImplicitFeasible(){}[0]
@@ -6691,6 +6742,7 @@ final class com.eignex.klause.localsearch/MoveSink { // com.eignex.klause.locals
     final fun addChannelingIntSet(com.eignex.klause.localsearch/LocalSearchState, kotlin/Int, kotlin/Long) // com.eignex.klause.localsearch/MoveSink.addChannelingIntSet|addChannelingIntSet(com.eignex.klause.localsearch.LocalSearchState;kotlin.Int;kotlin.Long){}[0]
     final fun addCompound(kotlin.collections/List<com.eignex.klause.localsearch/Move>) // com.eignex.klause.localsearch/MoveSink.addCompound|addCompound(kotlin.collections.List<com.eignex.klause.localsearch.Move>){}[0]
     final fun addIntSet(kotlin/Int, kotlin/Long) // com.eignex.klause.localsearch/MoveSink.addIntSet|addIntSet(kotlin.Int;kotlin.Long){}[0]
+    final fun addRealSet(kotlin/Int, kotlin/Double) // com.eignex.klause.localsearch/MoveSink.addRealSet|addRealSet(kotlin.Int;kotlin.Double){}[0]
     final fun clear() // com.eignex.klause.localsearch/MoveSink.clear|clear(){}[0]
     final fun setAssumptions(com.eignex.klause.propagation/Assumptions) // com.eignex.klause.localsearch/MoveSink.setAssumptions|setAssumptions(com.eignex.klause.propagation.Assumptions){}[0]
     final fun setInvariants(com.eignex.klause.localsearch/InvariantNetwork?) // com.eignex.klause.localsearch/MoveSink.setInvariants|setInvariants(com.eignex.klause.localsearch.InvariantNetwork?){}[0]
@@ -11661,19 +11713,23 @@ final class com.eignex.klause.solver.search/Vsids : com.eignex.klause.solver.sea
 }
 
 final class com.eignex.klause.solver/Assignment { // com.eignex.klause.solver/Assignment|null[0]
-    constructor <init>(kotlin/Int, kotlin/Int) // com.eignex.klause.solver/Assignment.<init>|<init>(kotlin.Int;kotlin.Int){}[0]
+    constructor <init>(kotlin/Int, kotlin/Int, kotlin/Int = ...) // com.eignex.klause.solver/Assignment.<init>|<init>(kotlin.Int;kotlin.Int;kotlin.Int){}[0]
 
     final val numBoolVars // com.eignex.klause.solver/Assignment.numBoolVars|{}numBoolVars[0]
         final fun <get-numBoolVars>(): kotlin/Int // com.eignex.klause.solver/Assignment.numBoolVars.<get-numBoolVars>|<get-numBoolVars>(){}[0]
     final val numIntVars // com.eignex.klause.solver/Assignment.numIntVars|{}numIntVars[0]
         final fun <get-numIntVars>(): kotlin/Int // com.eignex.klause.solver/Assignment.numIntVars.<get-numIntVars>|<get-numIntVars>(){}[0]
+    final val numRealVars // com.eignex.klause.solver/Assignment.numRealVars|{}numRealVars[0]
+        final fun <get-numRealVars>(): kotlin/Int // com.eignex.klause.solver/Assignment.numRealVars.<get-numRealVars>|<get-numRealVars>(){}[0]
 
     final fun boolValue(kotlin/Int): kotlin/Boolean // com.eignex.klause.solver/Assignment.boolValue|boolValue(kotlin.Int){}[0]
     final fun flipBool(kotlin/Int) // com.eignex.klause.solver/Assignment.flipBool|flipBool(kotlin.Int){}[0]
     final fun intValue(kotlin/Int): kotlin/Long // com.eignex.klause.solver/Assignment.intValue|intValue(kotlin.Int){}[0]
     final fun randomize(kotlin.random/Random, kotlin/Array<com.eignex.klause.ir/IntDomain>) // com.eignex.klause.solver/Assignment.randomize|randomize(kotlin.random.Random;kotlin.Array<com.eignex.klause.ir.IntDomain>){}[0]
+    final fun realValue(kotlin/Int): kotlin/Double // com.eignex.klause.solver/Assignment.realValue|realValue(kotlin.Int){}[0]
     final fun setBool(kotlin/Int, kotlin/Boolean) // com.eignex.klause.solver/Assignment.setBool|setBool(kotlin.Int;kotlin.Boolean){}[0]
     final fun setInt(kotlin/Int, kotlin/Long) // com.eignex.klause.solver/Assignment.setInt|setInt(kotlin.Int;kotlin.Long){}[0]
+    final fun setReal(kotlin/Int, kotlin/Double) // com.eignex.klause.solver/Assignment.setReal|setReal(kotlin.Int;kotlin.Double){}[0]
     final fun snapshot(): com.eignex.klause.solver/Sample // com.eignex.klause.solver/Assignment.snapshot|snapshot(){}[0]
 }
 

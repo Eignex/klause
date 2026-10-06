@@ -197,6 +197,8 @@ internal fun LocalSearchState.recordBaseDegrees(p: Move, base: MutableIntIntMap)
             recordConeDegrees(intSeeds = intArrayOf(p.varId), boolSeeds = EMPTY_INTS, base)
         }
 
+        is Move.RealSet -> for (fid in projection.realOccurrences[p.varId]) recordFirstDegree(base, fid)
+
         is Move.Compound -> error("chain parts are primitive by construction")
     }
 }
@@ -268,11 +270,13 @@ internal fun LocalSearchState.pickChainRepair(target: Int, pinnedSlots: IntHashS
 internal fun LocalSearchState.inverseOf(part: Move): Move = when (part) {
     is Move.BoolFlip -> part
     is Move.IntSet -> Move.IntSet(part.varId, assignment.intValue(part.varId))
+    is Move.RealSet -> Move.RealSet(part.varId, assignment.realValue(part.varId))
     is Move.Compound -> error("Compound parts are primitive by construction")
 }
 
 internal fun LocalSearchState.slotOf(part: Move): Int = when (part) {
     is Move.BoolFlip -> part.varId
     is Move.IntSet -> problem.numBoolVars + part.varId
+    is Move.RealSet -> problem.numBoolVars + problem.numIntVars + part.varId
     is Move.Compound -> error("Compound parts are primitive by construction")
 }

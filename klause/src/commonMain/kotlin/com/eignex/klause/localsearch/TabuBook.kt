@@ -11,6 +11,7 @@ import com.eignex.klause.ir.Problem
 class TabuBook(problem: Problem) {
 
     private val numBoolVars: Int = problem.numBoolVars
+    private val numDiscreteVars: Int = problem.numBoolVars + problem.numIntVars
 
     /** Step counter incremented on every accepted move. Together with [lastTouched] it enforces a
      *  tabu list. */
@@ -18,14 +19,15 @@ class TabuBook(problem: Problem) {
         internal set
 
     /** Step at which each variable was last flipped or set. Bool var ids in `[0, numBoolVars)`; int
-     *  var ids offset by `numBoolVars`. Reset to zero on [reset] — used only for tabu / CCA-window
+     *  var ids offset by `numBoolVars`; real var ids offset by `numBoolVars + numIntVars`. Reset to
+     *  zero on [reset] — used only for tabu / CCA-window
      *  decisions within a single restart epoch. For cross-epoch activity, see [touchCount]. */
-    val lastTouched: LongArray = LongArray(problem.numBoolVars + problem.numIntVars)
+    val lastTouched: LongArray = LongArray(problem.numBoolVars + problem.numIntVars + problem.numRealVars)
 
     /** Cumulative count of moves applied to each variable, same indexing as [lastTouched]. Survives
      *  [reset] so it measures activity across the whole search run. Captured by
      *  [com.eignex.klause.localsearch.WarmState] for ALNS's `activityBiased` destroy operator. */
-    val touchCount: IntArray = IntArray(problem.numBoolVars + problem.numIntVars)
+    val touchCount: IntArray = IntArray(problem.numBoolVars + problem.numIntVars + problem.numRealVars)
 
     /** Clear the tabu window: zero [lastTouched] and [step]. [touchCount] is deliberately preserved
      *  so cross-epoch activity survives a restart. */
@@ -41,6 +43,7 @@ class TabuBook(problem: Problem) {
         return when (move) {
             is Move.BoolFlip -> isTabooSlot(move.varId, tenure)
             is Move.IntSet -> isTabooSlot(numBoolVars + move.varId, tenure)
+            is Move.RealSet -> isTabooSlot(numDiscreteVars + move.varId, tenure)
             is Move.Compound -> move.parts.any { isTaboo(it, tenure) }
         }
     }

@@ -75,6 +75,16 @@ internal fun Factor.invariantProjection(domains: Array<IntDomain>? = null): Inva
         } else {
             ExactLinearInvariant(integral, vars, op)
         }
+    } ?: realConstants?.let {
+        RealRowInvariant(
+            vars,
+            it.intCoefficients.toDoubleArray(),
+            realVars,
+            it.realCoefficients.toDoubleArray(),
+            op,
+            it.bound,
+            it.strict,
+        )
     } ?: NoInvariant
 
     is Mdd -> MddInvariant(seq, numStatesPerLayer, layerStarts, transitions, initial, accepting, recordStride, cost)
@@ -87,8 +97,10 @@ internal fun Factor.invariantProjection(domains: Array<IntDomain>? = null): Inva
 
     is PseudoBoolean -> PseudoBooleanInvariant(boolVars, weights, literals, op, bound)
 
-    is RealProduct,
-    is ReifiedRealLinear,
+    is RealProduct -> RealProductInvariant(intOperand, realOperand, result)
+
+    is ReifiedRealLinear -> RealRowInvariant(vars, intCoeffs, realVars, realCoeffs, op, bound, strict, aux)
+
     is GaussianXor,
     is SymmetryHandling,
     -> NoInvariant

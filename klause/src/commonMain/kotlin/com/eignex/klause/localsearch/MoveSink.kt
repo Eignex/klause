@@ -96,6 +96,13 @@ class MoveSink(private var assumptions: Assumptions = Assumptions.None) {
         cachedList = null
     }
 
+    /** Queue a real-set move on `realVar`. Real columns are never pinned, defined or owned. */
+    fun addRealSet(varId: Int, newValue: Double) {
+        lane.add(encodeRealSet(varId))
+        valueLane.add(newValue.toRawBits())
+        cachedList = null
+    }
+
     /** Add a multi-variable atomic transition. Skips the move entirely if any part
      *  would touch a frozen variable — a Compound is all-or-nothing. */
     fun addCompound(parts: List<Move>) {
@@ -103,7 +110,8 @@ class MoveSink(private var assumptions: Assumptions = Assumptions.None) {
             when (p) {
                 is Move.BoolFlip -> if (assumptions.isFrozenBool(p.varId)) return
                 is Move.IntSet -> if (assumptions.isFrozenInt(p.varId)) return
-                is Move.Compound -> error("Compound parts must be primitive (BoolFlip/IntSet)")
+                is Move.RealSet -> {}
+                is Move.Compound -> error("Compound parts must be primitive (BoolFlip/IntSet/RealSet)")
             }
         }
         // Under per-move invariants, parts targeting defined vars are redundant (propagation
@@ -116,7 +124,7 @@ class MoveSink(private var assumptions: Assumptions = Assumptions.None) {
                 when (p) {
                     is Move.BoolFlip -> net?.isDefinedBool(p.varId) != true
                     is Move.IntSet -> net?.isDefinedInt(p.varId) != true && !ownedByOther(p.varId)
-                    is Move.Compound -> true
+                    is Move.RealSet, is Move.Compound -> true
                 }
             }
         }
@@ -127,6 +135,7 @@ class MoveSink(private var assumptions: Assumptions = Assumptions.None) {
             when (val p = kept[0]) {
                 is Move.BoolFlip -> addBoolFlip(p.varId)
                 is Move.IntSet -> addIntSet(p.varId, p.newValue)
+                is Move.RealSet -> addRealSet(p.varId, p.newValue)
                 is Move.Compound -> error("unreachable: parts are primitive")
             }
             return
@@ -161,8 +170,13 @@ class MoveSink(private var assumptions: Assumptions = Assumptions.None) {
         if (assumptions.isFrozenInt(varId)) return
         when (val m = state.synthesizeChannelingMove(varId, newValue)) {
             is Move.IntSet -> addIntSet(varId, newValue)
+
             is Move.Compound -> addCompound(m.parts)
-            is Move.BoolFlip -> addBoolFlip(m.varId) // shouldn't happen but stay total
+
+            is Move.BoolFlip -> addBoolFlip(m.varId)
+
+            // shouldn't happen but stay total
+            is Move.RealSet -> addRealSet(m.varId, m.newValue)
         }
     }
 
@@ -184,6 +198,7 @@ class MoveSink(private var assumptions: Assumptions = Assumptions.None) {
 
         private const val INITIAL_CAPACITY: Int = 16
         private const val KIND_BIT: Long = 1L shl 63
+        private const val REAL_BIT: Long = 1L shl 62
         private const val VAR_MASK: Long = (1L shl 31) - 1L
 
         internal fun encodeBoolFlip(varId: Int): Long = varId.toLong() and VAR_MASK
@@ -192,10 +207,13 @@ class MoveSink(private var assumptions: Assumptions = Assumptions.None) {
          *  the parallel value lane, not this word. */
         internal fun encodeIntSet(varId: Int): Long = KIND_BIT or (varId.toLong() and VAR_MASK)
 
-        internal fun decode(packed: Long, value: Long): Move = if (packed and KIND_BIT == 0L) {
-            Move.BoolFlip((packed and VAR_MASK).toInt())
-        } else {
-            Move.IntSet((packed and VAR_MASK).toInt(), value)
+        /** Layout: bit 62 marks a `RealSet`, whose target rides the value lane as raw `Double` bits. */
+        internal fun encodeRealSet(varId: Int): Long = REAL_BIT or (varId.toLong() and VAR_MASK)
+
+        internal fun decode(packed: Long, value: Long): Move = when {
+            packed and KIND_BIT != 0L -> Move.IntSet((packed and VAR_MASK).toInt(), value)
+            packed and REAL_BIT != 0L -> Move.RealSet((packed and VAR_MASK).toInt(), Double.fromBits(value))
+            else -> Move.BoolFlip((packed and VAR_MASK).toInt())
         }
     }
 }

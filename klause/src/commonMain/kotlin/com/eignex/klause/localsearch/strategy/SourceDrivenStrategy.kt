@@ -207,6 +207,7 @@ class SourceDrivenStrategy(
     private fun confChanged(state: LocalSearchState, move: Move): Boolean = when (move) {
         is Move.BoolFlip -> state.boolConfChange[move.varId]
         is Move.IntSet -> state.intConfChange[move.varId]
+        is Move.RealSet -> true
         is Move.Compound -> move.parts.all { confChanged(state, it) }
     }
 

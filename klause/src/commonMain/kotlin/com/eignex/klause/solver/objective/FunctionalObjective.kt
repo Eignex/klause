@@ -212,6 +212,7 @@ internal class FunctionalObjective internal constructor(
         when (move) {
             is Move.IntSet -> moved.put(move.varId, move.newValue)
             is Move.BoolFlip -> if (!flipped.remove(move.varId)) flipped.add(move.varId)
+            is Move.RealSet -> {}
             is Move.Compound -> for (p in move.parts) collectMoves(p, moved, flipped)
         }
     }

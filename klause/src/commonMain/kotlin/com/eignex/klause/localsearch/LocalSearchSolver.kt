@@ -68,6 +68,10 @@ class LocalSearchSolver(
      *  partial permutation, a circuit a single tour — so the search starts inside those constraints'
      *  feasible region and their structure-preserving moves are productive from the first step. */
     val seedImplicitOnRestart: Boolean = false,
+    /** Decides each candidate of a model with LP-only continuous columns, whose rows local search scores only in
+     *  floating point. Without one such a model is declined; a model without continuous columns never consults
+     *  it. */
+    val completion: CandidateCompletion? = null,
 ) : Solver<LocalSearchParams>,
     Optimizer<LocalSearchParams> {
 
@@ -86,6 +90,7 @@ class LocalSearchSolver(
         definitionalSweep = definitionalSweep,
         perMoveInvariants = perMoveInvariants,
         seedImplicitOnRestart = seedImplicitOnRestart,
+        completion = completion,
     )
 
     /** Objective-as-constraint ratchet handle (opt-in). Set non-null only for an arm whose [problem]

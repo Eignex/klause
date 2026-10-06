@@ -170,6 +170,13 @@ object MoveSetOracle {
                 )
             }
 
+            is Move.RealSet -> {
+                assertTrue(
+                    move.varId in factor.variables.reals,
+                    "$label: proposed RealSet on var ${move.varId} not in reals ${factor.variables.reals.toList()}",
+                )
+            }
+
             is Move.Compound -> {
                 for (part in move.parts) assertLegal(part, state, factor, label)
             }
