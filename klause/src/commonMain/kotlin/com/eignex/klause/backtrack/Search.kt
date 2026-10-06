@@ -343,7 +343,9 @@ internal class BacktrackBrancher(
                 SearchDecision.Bool(Lit.make(variable.varId, value != 0L))
             }.toList()
 
-            is VarRef.IntVar -> splitIntAlternatives(session, variable, ordered.firstOrNull() ?: return null)
+            // A probing selector offers nothing once it has refuted every value, so the node is dead. Null
+            // would claim every column is fixed and surface the open domains' minima as a model.
+            is VarRef.IntVar -> splitIntAlternatives(session, variable, ordered.firstOrNull() ?: return emptyList())
         }
     }
 

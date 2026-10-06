@@ -191,6 +191,23 @@ class ImpactSelectorTest {
     }
 
     @Test
+    fun `a domain too wide to walk still offers a value when every sampled probe is refuted`() {
+        // `v0 = 2e9 * v1` keeps only v0 in {0, 2e9, 4e9}, so the random probes all fail, yet the domain is
+        // not refuted. An empty order would read as a dead node and prune the three solutions.
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 2,
+            intDomains = arrayOf(IntDomain(0, 4_000_000_000L), IntDomain(0, 2)),
+            factors = arrayOf<Factor>(
+                Linear(coeffs = intArrayOf(1, -2_000_000_000), vars = intArrayOf(0, 1), op = LinearOp.EQ, bound = 0),
+            ),
+        )
+        val session = PropagationSession(problem)
+        val values = Impact(maxProbes = 4).values(session, VarRef.IntVar(0), Random(0L)).toList()
+        assertTrue(values.isNotEmpty(), "a sample cannot refute a domain it did not walk")
+    }
+
+    @Test
     fun `impact on bool var probes both polarities`() {
         // Both polarities feasible: returns both, ordering depends on which polarity prunes
         // more. We only assert size and membership.

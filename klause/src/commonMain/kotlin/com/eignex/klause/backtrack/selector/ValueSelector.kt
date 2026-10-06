@@ -171,6 +171,9 @@ internal fun probeAndOrder(
                 }
             }
         }
+        // An empty order tells the engine every value is refuted. A sample of a domain too wide to walk
+        // cannot show that, so it still offers a split point and the bound split covers the rest.
+        if (walkable == null && scored.isEmpty() && unprobed.isEmpty()) return sequenceOf(boundsMidpoint(d))
     }
     return scored.asSequence().map { it.first } + unprobed.toList().asSequence()
 }
