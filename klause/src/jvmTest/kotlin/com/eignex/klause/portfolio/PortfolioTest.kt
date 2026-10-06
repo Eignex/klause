@@ -43,6 +43,36 @@ import kotlin.time.TimeSource
 @OptIn(ExperimentalAtomicApi::class)
 class PortfolioTest {
     @Test
+    fun `a worker's unbounded ray ends the parallel minimize`() {
+        // x in [0,3], r >= 0 with x - r <= 1: minimizing -r descends without limit.
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 1,
+            intDomains = arrayOf(IntDomain(0, 3)),
+            factors = arrayOf<Factor>(
+                Linear(longArrayOf(1L), intArrayOf(0), doubleArrayOf(-1.0), intArrayOf(0), LinearOp.LE, 1L),
+            ),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(Double.POSITIVE_INFINITY),
+        ).bake()
+        val objective = LinearObjective(realCoefficients = doubleArrayOf(-1.0))
+        val workers = List(2) { index ->
+            PortfolioWorker.of(
+                "backtrack#$index",
+                index,
+                BacktrackSolver(problem).session(),
+                BacktrackParams(),
+                objective,
+            )
+        }
+
+        val result = Portfolio(workers).use { it.minimize() }
+
+        assertTrue(assertIs<MinimizeResult.Unbounded>(result).direction.single().signum() > 0)
+    }
+
+    @Test
     fun `parallel workers are handed the run deadline`() {
         val problem = Problem(
             numBoolVars = 0,

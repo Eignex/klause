@@ -338,6 +338,36 @@ class LpEngineInjectionTest {
     }
 
     @Test
+    fun `leaf certification reports unbounded only with a ray the factors keep`() {
+        // r >= 0 with no row above it: minimizing -r descends without limit, minimizing nothing does not.
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 0,
+            intDomains = emptyArray(),
+            factors = arrayOf<Factor>(
+                Linear(longArrayOf(), intArrayOf(), doubleArrayOf(1.0), intArrayOf(0), LinearOp.GE, 1L),
+            ),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(Double.POSITIVE_INFINITY),
+        )
+        val cases = listOf(doubleArrayOf(-1.0) to LpVerdict.UNBOUNDED, doubleArrayOf(0.0) to LpVerdict.ATTAINED_OPTIMUM)
+        for ((costs, verdict) in cases) {
+            val engine = LpEngine(
+                problem,
+                LinearObjective(realCoefficients = costs),
+                LpParams(lpPlan = LpPlan(bounding = true, realResidual = true, componentSplit = false)),
+                SolveStatsSink(backend = "leaf-unbounded"),
+            )
+
+            val leaf = engine.use { it.leafCertify(PropagationSession(problem)) }
+
+            assertEquals(verdict, leaf.verdict)
+            assertEquals(verdict == LpVerdict.UNBOUNDED, leaf.direction != null)
+        }
+    }
+
+    @Test
     fun `leaf certification reports a float optimum its tolerance check accepts as a tolerance optimum`() {
         // 3x = 1 with x in [0, 2], minimizing x; every exact certifier is vetoed, so only float evidence can decide.
         val problem = Problem(

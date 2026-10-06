@@ -41,7 +41,7 @@ import com.eignex.klause.lp.relaxation.LpAssemblyCancelled
 import com.eignex.klause.lp.relaxation.LpAuxiliarySources
 import com.eignex.klause.lp.relaxation.LpExplanation
 import com.eignex.klause.lp.relaxation.LpRelaxation
-import com.eignex.klause.lp.relaxation.exactReals
+import com.eignex.klause.lp.relaxation.exactLeafResult
 import com.eignex.klause.lp.relaxation.floatReals
 import com.eignex.klause.lp.relaxation.gatedEnforcement
 import com.eignex.klause.lp.relaxation.withCpBounds
@@ -670,16 +670,8 @@ internal class LpEngine(
                 relaxation.floatReals(checkNotNull(certified.floatOptimum).primal, problem),
             )
 
-            LpVerdict.FEASIBLE, LpVerdict.ATTAINED_OPTIMUM, LpVerdict.UNBOUNDED -> {
-                val primal = certified.exactPrimal
-                    ?: return LeafRealResult(LpVerdict.INDETERMINATE, EmptyDoubleArray)
-                val exactReals = relaxation.exactReals(primal, problem)
-                LeafRealResult(
-                    certified.verdict,
-                    DoubleArray(exactReals.size) { exactReals[it].toDouble() },
-                    exactReals,
-                )
-            }
+            LpVerdict.FEASIBLE, LpVerdict.ATTAINED_OPTIMUM, LpVerdict.UNBOUNDED ->
+                relaxation.exactLeafResult(certified, problem, objective, leafSample(session, EmptyDoubleArray))
 
             LpVerdict.INFEASIBLE -> {
                 // Pool the theory lemma for restart-time registration: the leaf itself just rejects
