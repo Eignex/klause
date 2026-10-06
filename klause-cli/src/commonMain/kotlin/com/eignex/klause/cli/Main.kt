@@ -5,6 +5,7 @@ import com.eignex.klause.formats.mps.MpsLoweringException
 import com.eignex.klause.formats.opb.OpbLoweringException
 import com.eignex.klause.solver.pipeline.EngineParams
 import com.eignex.klause.solver.pipeline.PipelineConfigException
+import com.eignex.klause.solver.result.UnsoundnessException
 
 /*
  * Unified klause CLI entry point. The CLI is a registry of CliMode front-ends
@@ -32,9 +33,11 @@ fun main(args: Array<String>) {
     if (code != EXIT_OK) exitCli(code)
 }
 
-/** Process exit codes: success returns without touching the exit path; a boundary error uses [EXIT_ERROR]. */
+/** Process exit codes: success returns without touching the exit path; a boundary error uses [EXIT_ERROR], and a
+ *  verdict the solver itself refuted uses [EXIT_UNSOUND] so no harness mistakes it for a bad input. */
 private const val EXIT_OK = 0
 private const val EXIT_ERROR = 2
+private const val EXIT_UNSOUND = 3
 
 /** Run the CLI and map a boundary failure to an exit code, printing its diagnostic to stderr. Split out
  *  from [main] so the error boundary is observable without terminating the process. */
@@ -59,6 +62,10 @@ internal fun runCli(args: Array<String>): Int = try {
 } catch (e: OpbLoweringException) {
     errPrintln("klause ${e.message.orEmpty()}")
     EXIT_ERROR
+} catch (e: UnsoundnessException) {
+    errPrintln("klause-cli: UNSOUND: ${e.message}")
+    errPrintln(e.stackTraceToString())
+    EXIT_UNSOUND
 }
 
 private fun run(args: Array<String>) {
