@@ -4,6 +4,7 @@ import com.eignex.klause.factor.DEFAULT_VIOLATION_SOFT_CAP
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.localsearch.Move
 import com.eignex.klause.localsearch.movesource.ViolatedRepairs
@@ -30,19 +31,28 @@ internal const val IMPLIED_FACTOR_INITIAL_WEIGHT: Double = 0.1
  * per-factor scratch arrays ([intPayload], [refPayload]), and the aggregated hard cost.
  */
 class LocalSearchState(
-    /** The problem being searched. */
-    val problem: BakedProblem,
+    /** The model being searched. */
+    val model: LocalSearchModel,
     /** Search RNG. */
     val rng: Random,
     /** Variables pinned for this search. */
     var assumptions: Assumptions = Assumptions.None,
     /** Local-search projection for this state. */
-    val projection: LocalSearchProblem = LocalSearchProblem(problem),
+    val projection: LocalSearchProblem = LocalSearchProblem(model.problem),
 ) {
-    /** The stable root domains this search was seeded from — read by invariants for a variable's
-     *  original bounds. The projection's own fold, aliased rather than copied: local search reads these
-     *  and never narrows them. */
-    val rootDomains: Array<IntDomain> = problem.rootIntDomainsInPlace
+    /** A search over the finite model [problem]. */
+    constructor(
+        problem: BakedProblem,
+        rng: Random,
+        assumptions: Assumptions = Assumptions.None,
+    ) : this(LocalSearchModel.of(problem), rng, assumptions)
+
+    /** The problem being searched. */
+    val problem: Problem get() = model.problem
+
+    /** The stable domains this search moves over — read by invariants for a variable's bounds. The
+     *  model's own, aliased rather than copied: local search reads these and never narrows them. */
+    val rootDomains: Array<IntDomain> = model.domains
 
     /** The current variable assignment. */
     val assignment: Assignment = Assignment(

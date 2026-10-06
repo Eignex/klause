@@ -3498,6 +3498,19 @@ public final class com/eignex/klause/localsearch/IteratedLocalSearchRestart$Incu
 	public fun toString ()Ljava/lang/String;
 }
 
+public final class com/eignex/klause/localsearch/LocalSearchModel {
+	public static final field Companion Lcom/eignex/klause/localsearch/LocalSearchModel$Companion;
+	public final fun getDomains ()[Lcom/eignex/klause/ir/IntDomain;
+	public final fun getProblem ()Lcom/eignex/klause/ir/Problem;
+	public final fun getRefutesModel ()Z
+	public final fun pinsUnder (Lcom/eignex/klause/propagation/Assumptions;)Lcom/eignex/klause/propagation/Assumptions;
+}
+
+public final class com/eignex/klause/localsearch/LocalSearchModel$Companion {
+	public final fun of (Lcom/eignex/klause/propagation/BakedProblem;)Lcom/eignex/klause/localsearch/LocalSearchModel;
+	public final fun open (Lcom/eignex/klause/ir/Problem;[Lcom/eignex/klause/ir/IntDomain;)Lcom/eignex/klause/localsearch/LocalSearchModel;
+}
+
 public final class com/eignex/klause/localsearch/LocalSearchParams : com/eignex/klause/solver/SolverParams {
 	public fun <init> ()V
 	public fun <init> (JLjava/lang/Long;Ljava/lang/Long;Lcom/eignex/klause/propagation/Assumptions;Lcom/eignex/klause/util/Cancellation;Lkotlin/jvm/functions/Function1;Lcom/eignex/klause/localsearch/CostShaping;Lcom/eignex/klause/solver/objective/IncrementalObjective;Lcom/eignex/klause/solver/Sample;Lcom/eignex/klause/solver/incumbent/IncumbentExchange;IZ)V
@@ -3616,8 +3629,10 @@ public final class com/eignex/klause/localsearch/LocalSearchSolver : com/eignex/
 }
 
 public final class com/eignex/klause/localsearch/LocalSearchState {
-	public fun <init> (Lcom/eignex/klause/propagation/BakedProblem;Lkotlin/random/Random;Lcom/eignex/klause/propagation/Assumptions;Lcom/eignex/klause/localsearch/LocalSearchProblem;)V
-	public synthetic fun <init> (Lcom/eignex/klause/propagation/BakedProblem;Lkotlin/random/Random;Lcom/eignex/klause/propagation/Assumptions;Lcom/eignex/klause/localsearch/LocalSearchProblem;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/eignex/klause/localsearch/LocalSearchModel;Lkotlin/random/Random;Lcom/eignex/klause/propagation/Assumptions;Lcom/eignex/klause/localsearch/LocalSearchProblem;)V
+	public synthetic fun <init> (Lcom/eignex/klause/localsearch/LocalSearchModel;Lkotlin/random/Random;Lcom/eignex/klause/propagation/Assumptions;Lcom/eignex/klause/localsearch/LocalSearchProblem;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/eignex/klause/propagation/BakedProblem;Lkotlin/random/Random;Lcom/eignex/klause/propagation/Assumptions;)V
+	public synthetic fun <init> (Lcom/eignex/klause/propagation/BakedProblem;Lkotlin/random/Random;Lcom/eignex/klause/propagation/Assumptions;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun apply (Lcom/eignex/klause/localsearch/Move;)V
 	public final fun breakScore (Lcom/eignex/klause/localsearch/Move;)I
 	public final fun getAssignment ()Lcom/eignex/klause/solver/Assignment;
@@ -3631,8 +3646,9 @@ public final class com/eignex/klause/localsearch/LocalSearchState {
 	public final fun getIntPayload ()[I
 	public final fun getInvariants ()Lcom/eignex/klause/localsearch/InvariantNetwork;
 	public final fun getLongPayload ()[J
+	public final fun getModel ()Lcom/eignex/klause/localsearch/LocalSearchModel;
 	public final fun getMoveSink ()Lcom/eignex/klause/localsearch/MoveSink;
-	public final fun getProblem ()Lcom/eignex/klause/propagation/BakedProblem;
+	public final fun getProblem ()Lcom/eignex/klause/ir/Problem;
 	public final fun getProjection ()Lcom/eignex/klause/localsearch/LocalSearchProblem;
 	public final fun getRefPayload ()[Ljava/lang/Object;
 	public final fun getRng ()Lkotlin/random/Random;
