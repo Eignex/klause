@@ -284,6 +284,8 @@ internal class ResumableMinimize(
      *  this is meaningful mid-search as well as after one. */
     override val stats: SolveStats get() = sink.snapshot()
 
+    override val work: Long get() = slice.spent()
+
     init {
         try {
             val seeded = session.seed(params.assumptions)

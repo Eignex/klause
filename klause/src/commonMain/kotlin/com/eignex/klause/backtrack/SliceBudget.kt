@@ -51,6 +51,9 @@ internal class SliceBudget(private val nodeCount: () -> Long, private val lpWork
         return false
     }
 
+    /** Work spent so far: every node plus the LP work at [LP_WORK_PER_NODE] per node, charged or not. */
+    fun spent(): Long = nodeCount() + lpWork() / LP_WORK_PER_NODE
+
     /** Whether the armed slice has spent its allowance. */
     fun expired(): Boolean = if (workBounded) nodeCount() >= nodeEnd else deadline?.hasPassedNow() ?: false
 
