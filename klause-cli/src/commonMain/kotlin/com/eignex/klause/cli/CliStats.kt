@@ -282,7 +282,18 @@ internal fun searchStatPairs(stats: SolveStats): List<Pair<String, String>> {
     out += "learned" to "${stats.search.learnedClauses.sum.toLong()}"
     out += "relearned" to "${stats.search.relearned.sum.toLong()}"
     if (stats.search.peakDepth.max.isFinite()) out += "peakDepth" to "${stats.search.peakDepth.max.toLong()}"
+    if (stats.search.rootFixed.max.isFinite()) out += "rootFixed" to "${stats.search.rootFixed.max.toLong()}"
     return out
+}
+
+/**
+ * A sequential portfolio's schedule for `-s`, one `arm.<label>` pair per arm: segments run, work spent, mean
+ * reward, failures, and the credit earned by each kind of contribution. Empty outside a sequential portfolio.
+ */
+internal fun portfolioStatPairs(stats: SolveStats): List<Pair<String, String>> = stats.portfolio.arms.map { arm ->
+    val credit = arm.credit.entries.joinToString("") { (signal, amount) -> " $signal=${round4(amount)}" }
+    "arm.${arm.label}" to
+        "segments=${arm.segments} work=${arm.work} reward=${round4(arm.meanReward)} failures=${arm.failures}$credit"
 }
 
 /** Exact deterministic open-theory accounting pairs for `-s`. */

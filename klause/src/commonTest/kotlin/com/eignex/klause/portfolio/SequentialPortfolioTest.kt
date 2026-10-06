@@ -26,6 +26,7 @@ import com.eignex.klause.solver.ResumableSolve
 import com.eignex.klause.solver.ResumableSolver
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
+import com.eignex.klause.solver.Solver
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SolveStats
@@ -147,6 +148,20 @@ private class ScriptedSearch(
     override val isDone: Boolean get() = false
     override val stats: SolveStats get() = SolveStats.EMPTY
     override val work: Long get() = spent
+}
+
+/** A one-shot arm whose every solve throws. */
+private class ThrowingSolver : Solver<BacktrackParams> {
+    override val problem = Problem(0, 0, emptyArray(), emptyArray()).bake()
+    var solves = 0
+
+    override fun solve(params: BacktrackParams): SolveResult {
+        solves++
+        error("solve failure")
+    }
+
+    override fun samples(params: BacktrackParams): Sequence<Sample> = emptySequence()
+    override fun enumerate(params: BacktrackParams): Sequence<Sample> = emptySequence()
 }
 
 private fun trackingWorker(label: String, armId: Int, handle: ResumableSearch): PortfolioWorker = PortfolioWorker.of(
@@ -584,6 +599,22 @@ class SequentialPortfolioTest {
         assertIs<SolveResult.Sat>(r)
         assertEquals(1, solver.opened.size, "the arm must resume, not reopen")
         assertEquals(4, solver.opened.single().slices)
+    }
+
+    @Test
+    fun `a failing one-shot arm is retired after one segment and reported`() {
+        val failing = ThrowingSolver()
+        val resumable = CountingResumableSolver(slicesToVerdict = 20)
+        val workers = listOf(
+            PortfolioWorker.of("failing", 0, failing.session(), BacktrackParams()),
+            PortfolioWorker.of("bt", 1, resumable.session(), BacktrackParams()),
+        )
+
+        val r = SequentialPortfolio.thompson(workers).use { it.solve() }
+
+        assertIs<SolveResult.Sat>(r)
+        assertEquals(1, failing.solves)
+        assertEquals(listOf(1L, 0L), r.stats.portfolio.arms.map { it.failures })
     }
 
     @Test

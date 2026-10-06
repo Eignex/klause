@@ -76,6 +76,8 @@ data class SolveStats(
      *  backend itself for one that prepares its own (null when it was not run or finite preparation was a no-op).
      *  Surfaced under `-s` as a terse summary — see [PresolveStats]. */
     val presolve: PresolveStats? = null,
+    /** What a sequential portfolio scheduled, arm by arm; empty for any other solve. */
+    val portfolio: PortfolioStats = PortfolioStats(),
 ) {
     /**
      * Combine two run snapshots by delegating to each record's own merge — counters add, maxes max,
@@ -104,6 +106,7 @@ data class SolveStats(
             openTheoryClauses = openTheoryClauses.mergedWith(other.openTheoryClauses),
             openHints = openHints.mergedWith(other.openHints),
             presolve = presolve ?: other.presolve,
+            portfolio = portfolio.mergedWith(other.portfolio),
         )
     }
 
