@@ -249,8 +249,9 @@ internal class RevisedSimplex(
     private var smallPivotBails = 0
     private val work = LpWork()
 
-    // Building a scaling view is work the next solve pays for, so every owner charges it against its own limit.
+    // Building a scaling view is preparation the next solve reports, apart from the iterations its work limit caps.
     private val pendingNumericalWork = LpWork().apply { add(numerical.metrics.work) }
+    private var lastPreparationOps = 0L
 
     // The work counted into [work] is charged to the caller's token at every poll and when a solve ends,
     // so a work-metered token stops the solve at the same pivot however loaded the machine is.
@@ -484,6 +485,7 @@ internal class RevisedSimplex(
         objectiveWarmAttempts = objectiveWarmAttempts,
         objectiveWarmHits = objectiveWarmHits,
         objectiveWarmRepairs = objectiveWarmRepairs,
+        preparationOps = lastPreparationOps,
     )
 
     init {
@@ -1406,7 +1408,7 @@ internal class RevisedSimplex(
         chargeWork()
         work.reset()
         chargedOps = 0L
-        work.add(pendingNumericalWork.ops)
+        lastPreparationOps = pendingNumericalWork.ops
         pendingNumericalWork.reset()
         warmStarted = false
     }

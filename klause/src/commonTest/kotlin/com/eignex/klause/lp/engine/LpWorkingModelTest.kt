@@ -115,6 +115,7 @@ class LpWorkingModelTest {
             assertTrue(invocations > 0 && metered > 0L)
             assertEquals(metered, metrics.certificationWork)
             assertTrue(metrics.measuredWork >= metered)
+            assertTrue(metrics.owners.constructionWork in 1L..metrics.owners.reservedConstructionWork)
         }
     }
 

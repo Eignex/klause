@@ -140,11 +140,9 @@ class RevisedSimplexRecoveryTest {
         val x = b.addVar(0L, 2L)
         b.addRow(mapOf(x to 1024L), Relation.GE, 1024L)
         var solves = 0
-        val model = b.build(Sense.MINIMIZE)
-        val construction = RevisedSimplex(model).use { it.scalingMetrics.work }
         val solver = RevisedSimplex(
-            model,
-            workLimit = construction + 4L,
+            b.build(Sense.MINIMIZE),
+            workLimit = 4L,
             basisSolverFactory = { matrix ->
                 val delegate = KotlinBasisSolver(matrix)
                 object : BasisSolver by delegate {
@@ -159,7 +157,7 @@ class RevisedSimplexRecoveryTest {
         assertNull(solver.solve())
 
         assertEquals(1, solves)
-        assertEquals(construction + 4L, solver.lastWorkOps)
+        assertEquals(4L, solver.lastWorkOps)
         assertEquals(1, solver.lastNumericalMetrics.capExits)
         assertEquals(LpFloatTermination.WORK, solver.lastTermination)
         solver.close()

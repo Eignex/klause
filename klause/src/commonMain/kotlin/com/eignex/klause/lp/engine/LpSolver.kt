@@ -101,6 +101,8 @@ internal data class LpSolveMetrics(
     val objectiveWarmAttempts: Int = 0,
     val objectiveWarmHits: Int = 0,
     val objectiveWarmRepairs: Int = 0,
+    // Scaling-view work the solve reported as preparation; it is outside [workOps] and the solve's work limit.
+    val preparationOps: Long = 0L,
 ) {
     operator fun plus(other: LpSolveMetrics) = LpSolveMetrics(
         pivots + other.pivots, workOps + other.workOps, warmAttempts + other.warmAttempts,
@@ -116,6 +118,7 @@ internal data class LpSolveMetrics(
         objectiveWarmAttempts + other.objectiveWarmAttempts,
         objectiveWarmHits + other.objectiveWarmHits,
         objectiveWarmRepairs + other.objectiveWarmRepairs,
+        preparationOps + minOf(other.preparationOps, Long.MAX_VALUE - preparationOps),
     )
 }
 

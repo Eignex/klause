@@ -130,6 +130,7 @@ class LpScalingTest {
 
         assertTrue(identity.metrics.work > 0L)
         assertTrue(scaled.metrics.work > identity.metrics.work)
+        assertTrue(scaled.metrics.work <= LpScalingView.constructionWorkBound(model))
     }
 
     @Test

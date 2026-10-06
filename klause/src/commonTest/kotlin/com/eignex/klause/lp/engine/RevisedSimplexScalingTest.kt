@@ -18,7 +18,7 @@ import kotlin.test.assertTrue
 class RevisedSimplexScalingTest {
 
     @Test
-    fun `the first solve pays for building the scaling view`() {
+    fun `the first solve reports building its scaling view as preparation`() {
         val zero = ExactLpNumber.of(0L)
         val source = ExactLpModel(
             listOf(
@@ -33,12 +33,14 @@ class RevisedSimplexScalingTest {
         val solver = RevisedSimplex(assertNotNull(LpExactState(source).toWorkingModel()))
 
         assertNotNull(solver.prepareLogicals(Cancellation.Never))
-        val first = solver.lastMetrics.workOps
+        val first = solver.lastMetrics
         assertNotNull(solver.prepareLogicals(Cancellation.Never))
-        val second = solver.lastMetrics.workOps
+        val second = solver.lastMetrics
 
         assertTrue(solver.scalingMetrics.work > 0L)
-        assertEquals(solver.scalingMetrics.work, first - second)
+        assertEquals(solver.scalingMetrics.work, first.preparationOps)
+        assertEquals(0L, second.preparationOps)
+        assertEquals(first.workOps, second.workOps)
     }
 
     @Test

@@ -19,6 +19,10 @@ internal data class LpScopedMetrics(
     val activeRows: Int,
     val appendBasisWork: Long,
     val appendUnknownWork: Long,
+    // [preparationWork] charges each owner's construction at its reserved bound, the allowance preparation spends;
+    // the ledger swaps that bound for the work the owners reported building their scaling views.
+    val reservedConstructionWork: Long = 0L,
+    val constructionWork: Long = 0L,
 ) {
     val editDeclines: Long get() = editAttempts - editSuccesses
     val preparationDeclines: Long get() = preparationAttempts - preparationSuccesses
@@ -57,6 +61,8 @@ internal class LpScopedSolver(
     private var peakOwners = 0L
     private var appendBasisWork = 0L
     private var appendUnknownWork = 0L
+    private var reservedConstructionWork = 0L
+    private var constructionWork = 0L
     private var pendingAppendSolveWork: Long? = null
     private var pendingAppendSolveWorkComplete = false
     private var pendingAppendSolve = false
@@ -73,7 +79,7 @@ internal class LpScopedSolver(
         editAttempts, editSuccesses, preparationAttempts, preparationSuccesses,
         preparationWork, preparationRefactorizations, createdOwners, closedOwners, peakOwners,
         state.rows.size, state.rows.activeCount,
-        appendBasisWork, appendUnknownWork,
+        appendBasisWork, appendUnknownWork, reservedConstructionWork, constructionWork,
     )
 
     init {
@@ -495,17 +501,19 @@ internal class LpScopedSolver(
                 workLimit = if (workLimit > 0L) workLimit else Long.MAX_VALUE,
                 cancellation = token,
             )
+            var constructionBound = 0L
             val working = try {
                 next.toWorkingModel(projection)?.also {
                     // The new numerical owner projects vectors again while adopting this state.
                     projection.reserveVectors(next.model)
+                    // Building it scales the matrix. Preparation caps take precedence, so the bound is reserved from
+                    // this preparation's allowance and charged as spent; the ledger records the reported work.
+                    constructionBound = LpScalingView.constructionWorkBound(it)
+                    projection.reserve(constructionBound, 0L, matrix = true)
                 }
             } finally {
-                preparationWork = if (preparationWork > Long.MAX_VALUE - projection.work) {
-                    Long.MAX_VALUE
-                } else {
-                    preparationWork + projection.work
-                }
+                preparationWork = saturated(preparationWork, projection.work)
+                reservedConstructionWork = saturated(reservedConstructionWork, constructionBound)
             } ?: return null
             val remainingWork = if (workLimit > 0L) workLimit - projection.work else 0L
             if (workLimit > 0L && remainingWork <= 0L) return null
@@ -525,12 +533,8 @@ internal class LpScopedSolver(
             val basis = try {
                 candidate.prepareLogicals(token)
             } finally {
-                preparationWork =
-                    if (preparationWork > Long.MAX_VALUE - candidate.lastMetrics.workOps) {
-                        Long.MAX_VALUE
-                    } else {
-                        preparationWork + candidate.lastMetrics.workOps
-                    }
+                preparationWork = saturated(preparationWork, candidate.lastMetrics.workOps)
+                constructionWork = saturated(constructionWork, candidate.lastMetrics.preparationOps)
                 preparationRefactorizations += candidate.lastRefactorizations
             } ?: return null
             if (basis.basicVars.size != next.model.m || basis.status.size != next.model.numVars ||
@@ -593,3 +597,5 @@ internal class LpScopedSolver(
         if (current != null) closeOwner(current)
     }
 }
+
+private fun saturated(total: Long, add: Long): Long = if (total > Long.MAX_VALUE - add) Long.MAX_VALUE else total + add
