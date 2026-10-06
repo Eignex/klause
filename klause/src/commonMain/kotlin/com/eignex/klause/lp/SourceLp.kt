@@ -14,6 +14,7 @@ import com.eignex.klause.lp.engine.LpBoundAssertion
 import com.eignex.klause.lp.engine.LpBoundBatchResult
 import com.eignex.klause.lp.engine.LpCertificationObserver
 import com.eignex.klause.lp.engine.LpCertifier
+import com.eignex.klause.lp.engine.LpCertifierCost
 import com.eignex.klause.lp.engine.LpExactState
 import com.eignex.klause.lp.engine.LpScopedRow
 import com.eignex.klause.lp.engine.LpScopedSolver
@@ -213,7 +214,7 @@ internal class SourceLp(
     private var witness = 0L
     private var recordedPreparation = 0L
     private val observer = object : LpCertificationObserver {
-        override fun observe(certifier: LpCertifier, success: Boolean) = Unit
+        override fun observe(certifier: LpCertifier, success: Boolean, cost: LpCertifierCost) = Unit
         override fun observeExactInput(accepted: Boolean) = Unit
         override fun observeSolve(metrics: LpSolveMetrics, component: Boolean) = Unit
         override fun observeBasisVerification(metrics: ExactBasisMetrics) {

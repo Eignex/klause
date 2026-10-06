@@ -499,6 +499,8 @@ internal class LpScopedSolver(
                 next.toWorkingModel(projection)?.also {
                     // The new numerical owner projects vectors again while adopting this state.
                     projection.reserveVectors(next.model)
+                    // Building it scales the matrix; the bound keeps that inside this preparation's allowance.
+                    projection.reserve(LpScalingView.constructionWorkBound(it), 0L, matrix = true)
                 }
             } finally {
                 preparationWork = if (preparationWork > Long.MAX_VALUE - projection.work) {

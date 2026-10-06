@@ -3,6 +3,7 @@ package com.eignex.klause.solver.result
 import com.eignex.klause.lp.engine.ExactBasisMetrics
 import com.eignex.klause.lp.engine.LpCertificationObserver
 import com.eignex.klause.lp.engine.LpCertifier
+import com.eignex.klause.lp.engine.LpCertifierCost
 import com.eignex.klause.lp.engine.LpSolveMetrics
 import com.eignex.klause.simplex.exact.ExactContinuationMetrics
 import com.eignex.kumulant.stat.summary.CountStat
@@ -602,7 +603,7 @@ internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
         Array(LpRoute.entries.size) { index ->
             val route = LpRoute.entries[index]
             object : LpCertificationObserver {
-                override fun observe(certifier: LpCertifier, success: Boolean) {
+                override fun observe(certifier: LpCertifier, success: Boolean, cost: LpCertifierCost) {
                     val i = certifier.ordinal
                     certifierAttempts[i]++
                     if (success) certifierSuccesses[i]++ else certifierDeclines[i]++

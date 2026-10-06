@@ -122,6 +122,18 @@ class LpScalingTest {
     }
 
     @Test
+    fun `building a view charges the entries it visits within its construction bound`() {
+        val model = mixedScaleModel()
+
+        val identity = LpScalingView.create(model, LpScalingOptions(enabled = false))
+        val scaled = LpScalingView.create(model, LpScalingOptions(equilibrationPasses = 8))
+
+        assertTrue(identity.metrics.work > 0L)
+        assertTrue(scaled.metrics.work > identity.metrics.work)
+        assertTrue(scaled.metrics.work <= LpScalingView.constructionWorkBound(model))
+    }
+
+    @Test
     fun `nonfinite matrix input falls back atomically`() {
         val builder = LpBuilder()
         val x = builder.addRealVar(0.0, 1.0)

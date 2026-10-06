@@ -962,7 +962,7 @@ class LpScopedSolverTest {
         var cancelled = false
         var observed: ExactContinuationMetrics? = null
         val observer = object : LpCertificationObserver {
-            override fun observe(certifier: LpCertifier, success: Boolean) = Unit
+            override fun observe(certifier: LpCertifier, success: Boolean, cost: LpCertifierCost) = Unit
             override fun observeExactInput(accepted: Boolean) = Unit
             override fun observeSolve(metrics: LpSolveMetrics, component: Boolean) = Unit
             override fun observeContinuation(metrics: ExactContinuationMetrics) {

@@ -202,7 +202,7 @@ internal fun integerCertify(
     scaleBits: Int = DEFAULT_SCALE_BITS,
     observer: LpCertificationObserver? = null,
 ): IntegerCertificate? = integerCertifyUnchecked(model, y, scaleBits).also {
-    observer?.observe(LpCertifier.INTEGER, it != null)
+    observer?.observe(LpCertifier.INTEGER, it != null, LpCertifierCost.Unmetered)
 }
 
 private fun integerCertifyUnchecked(model: LpModel, y: DoubleArray, scaleBits: Int): IntegerCertificate? {
@@ -351,7 +351,7 @@ internal fun integerFarkasRay(
         val checked = verifyExactBasis(model, basis, rayRow = basisRow, cancellation = cancellation)
         observer?.observeBasisVerification(checked.metrics)
         val certified = checked.integerRay
-        observer?.observe(LpCertifier.EXACT_FARKAS, certified != null)
+        observer?.observe(LpCertifier.EXACT_FARKAS, certified != null, LpCertifierCost.Reported)
         if (certified != null) {
             onRoute?.invoke(FarkasRoute.EXACT_BASIS)
             return certified
@@ -559,4 +559,3 @@ private const val MAX_EXACT_INT: Double = 9.007199254740992E15
 
 /** Integers below [MAX_EXACT_INT] in magnitude have at most this many bits. */
 private const val EXACT_INT_BITS = 53
-

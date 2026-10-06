@@ -251,7 +251,7 @@ internal fun certifyLpResult(
     if (state != null) {
         if (cancellation()) return CertifiedLpResult(null, null, null, null, null, false, { null })
         state.conflict?.let {
-            observer?.observe(LpCertifier.EXACT_FARKAS, true)
+            observer?.observe(LpCertifier.EXACT_FARKAS, true, LpCertifierCost.Reported)
             val accepted = policy.acceptNullable(LpCertifier.EXACT_FARKAS, it)?.takeUnless { cancellation() }
             val support = accepted?.let { conflict ->
                 LpExactSupport(
@@ -394,6 +394,7 @@ internal fun certifyLpResult(
             LpCertifier.RATIONAL,
             recovered.witness != null || recovered.bound != null ||
                 recovered.conflict != null || recovered.unboundedness != null,
+            LpCertifierCost.Metered(recovered.metrics.work),
         )
         numericalWitness = numericalWitness ?: recovered.witness
         numericalBound = recovered.bound ?: numericalBound
@@ -436,7 +437,11 @@ internal fun certifyLpResult(
             result.basis,
             cancellation = cancellation,
         )
-        observer?.observe(LpCertifier.RATIONAL, reconstruction.witness != null || reconstruction.bound != null)
+        observer?.observe(
+            LpCertifier.RATIONAL,
+            reconstruction.witness != null || reconstruction.bound != null,
+            LpCertifierCost.Metered(reconstruction.metrics.work),
+        )
         numericalWitness = reconstruction.witness ?: numericalWitness
         numericalBound = reconstruction.bound ?: numericalBound
         val point = policy.acceptNullable(LpCertifier.RATIONAL, reconstruction.witness)
@@ -458,7 +463,7 @@ internal fun certifyLpResult(
             observer.takeUnless { sparsePointRecovery },
         )
         val point = if (ordinary != null || !sparsePointRecovery) {
-            if (sparsePointRecovery) observer?.observe(LpCertifier.EXACT_POINT, true)
+            if (sparsePointRecovery) observer?.observe(LpCertifier.EXACT_POINT, true, LpCertifierCost.Unmetered)
             ordinary
         } else {
             val recovered = recoverExactPointWitness(
@@ -513,7 +518,7 @@ internal fun certifyLpResult(
     if (result == null && numericalWitness == null) {
         if (state != null) {
             conflict = solver.infeasibleRay?.let { exactStateConflict(model, it) }
-            observer?.observe(LpCertifier.EXACT_FARKAS, conflict != null)
+            observer?.observe(LpCertifier.EXACT_FARKAS, conflict != null, LpCertifierCost.Unmetered)
             numericalConflict = conflict
             conflict = policy.acceptNullable(LpCertifier.EXACT_FARKAS, conflict)
         } else {
@@ -534,7 +539,11 @@ internal fun certifyLpResult(
     ) {
         solver.infeasibleRay?.let { candidate ->
             reconstruction = reconstructCertificate(model, ray = candidate, cancellation = cancellation)
-            observer?.observe(LpCertifier.RATIONAL, reconstruction.conflict != null)
+            observer?.observe(
+                LpCertifier.RATIONAL,
+                reconstruction.conflict != null,
+                LpCertifierCost.Metered(reconstruction.metrics.work),
+            )
             numericalConflict = reconstruction.conflict
             conflict = policy.acceptNullable(LpCertifier.RATIONAL, reconstruction.conflict)
         }
@@ -579,7 +588,7 @@ internal fun certifyLpResult(
             targetMetrics = continuationTarget().metrics,
         )
         observer?.observeContinuation(continued.metrics)
-        observer?.observe(LpCertifier.RATIONAL, continued.metrics.success)
+        observer?.observe(LpCertifier.RATIONAL, continued.metrics.success, LpCertifierCost.Reported)
         numericalWitness = continued.witness
         numericalConflict = continued.conflict
         val accepted = policy.acceptNullable(LpCertifier.RATIONAL, continued.takeIf { it.metrics.success })
@@ -693,7 +702,7 @@ internal fun certifyLpBound(
     }
     // The same integer-multiplier Lagrangian, evaluated against exact IEEE input without decimal guessing.
     val bound = rationalLpBound(model, duals)
-    observer?.observe(LpCertifier.INTEGER, bound != null)
+    observer?.observe(LpCertifier.INTEGER, bound != null, LpCertifierCost.Unmetered)
     return policy.acceptNullable(LpCertifier.INTEGER, bound)
 }
 
@@ -790,8 +799,8 @@ internal fun certifyLpFarkas(
     var route = FarkasRoute.NONE
     val mechanismObserver = observer?.let { target ->
         object : LpCertificationObserver by target {
-            override fun observe(certifier: LpCertifier, success: Boolean) {
-                if (certifier != LpCertifier.EXACT_FARKAS) target.observe(certifier, success)
+            override fun observe(certifier: LpCertifier, success: Boolean, cost: LpCertifierCost) {
+                if (certifier != LpCertifier.EXACT_FARKAS) target.observe(certifier, success, cost)
             }
         }
     }
@@ -803,7 +812,7 @@ internal fun certifyLpFarkas(
         onRoute = { route = it },
         observer = mechanismObserver,
     )?.takeIf { sourceFarkasValid(model, it) }
-    observer?.observe(LpCertifier.EXACT_FARKAS, ray != null)
+    observer?.observe(LpCertifier.EXACT_FARKAS, ray != null, LpCertifierCost.Unmetered)
     onRoute?.invoke(if (ray != null) route else FarkasRoute.NONE)
     return ray
 }

@@ -8,9 +8,11 @@ import kotlin.math.roundToInt
 /** Construction policy for the simplex's private numerical scaling view. */
 internal data class LpScalingOptions(val enabled: Boolean = true, val equilibrationPasses: Int = 4) {
     init {
-        require(equilibrationPasses in 1..8)
+        require(equilibrationPasses in 1..MAX_EQUILIBRATION_PASSES)
     }
 }
+
+private const val MAX_EQUILIBRATION_PASSES = 8
 
 internal enum class LpScalingDecline {
     DISABLED,
@@ -37,6 +39,8 @@ internal data class LpScalingMetrics(
     val sourcePrimalResidual: Double = 0.0,
     val sourceBoundViolation: Double = 0.0,
     val sourceBasicDualResidual: Double = 0.0,
+    /** Modeled entries the view's construction visited: conditioning scans, matrix and vector copies, equilibration. */
+    val work: Long = 0L,
 )
 
 /**
@@ -149,9 +153,14 @@ internal class LpScalingView private constructor(
                 return identity(model, conditioning, LpScalingDecline.ALREADY_CONDITIONED, eligible = false)
             }
             val sourceValues = sourceMatrix(model)
-                ?: return identity(model, conditioning, LpScalingDecline.NONFINITE_SOURCE, eligible = true)
+            val entries = sourceValues?.values?.size?.toLong() ?: conditioning.entries.toLong()
+            var work = matrixCopyWork(model, entries)
+            if (sourceValues == null) {
+                return identity(model, conditioning, LpScalingDecline.NONFINITE_SOURCE, eligible = true, work)
+            }
+            work += model.m.toLong() + model.numVars
             if (projectionLostNonzero(model)) {
-                return identity(model, conditioning, LpScalingDecline.PROJECTION_LOSS, eligible = true)
+                return identity(model, conditioning, LpScalingDecline.PROJECTION_LOSS, eligible = true, work)
             }
             val rowExponents = IntArray(model.m)
             val columnExponents = IntArray(model.numVars)
@@ -166,17 +175,24 @@ internal class LpScalingView private constructor(
                 options.equilibrationPasses,
             )
             for (i in 0 until model.m) columnExponents[model.n + i] = -rowExponents[i]
+            work += options.equilibrationPasses * (2L * entries + model.m + model.n) + entries
 
             val scaledValues = DoubleArray(sourceValues.values.size)
             for (j in 0 until model.n) {
                 for (k in sourceValues.colPtr[j] until sourceValues.colPtr[j + 1]) {
                     val exponent = rowExponents[sourceValues.rowIdx[k]] + columnExponents[j]
-                    scaledValues[k] = checkedScale(sourceValues.values[k], exponent)
-                        ?: return identity(model, conditioning, LpScalingDecline.UNSAFE_TRANSFORM, eligible = true)
+                    scaledValues[k] = checkedScale(sourceValues.values[k], exponent) ?: return identity(
+                        model,
+                        conditioning,
+                        LpScalingDecline.UNSAFE_TRANSFORM,
+                        eligible = true,
+                        work,
+                    )
                 }
             }
+            work += vectorWork(model)
             val vectors = scaledVectors(model, rowExponents, columnExponents)
-                ?: return identity(model, conditioning, LpScalingDecline.UNSAFE_TRANSFORM, eligible = true)
+                ?: return identity(model, conditioning, LpScalingDecline.UNSAFE_TRANSFORM, eligible = true, work)
             val after = conditioning(
                 model.n,
                 model.m,
@@ -205,8 +221,21 @@ internal class LpScalingView private constructor(
                     afterMatrixRatio = after.matrixRatio,
                     afterRowRatio = after.rowRatio,
                     afterColumnRatio = after.columnRatio,
+                    work = conditioningWork(model, conditioning) + work + entries + model.m,
                 ),
             )
+        }
+
+        /**
+         * The most [LpScalingMetrics.work] any view [create] builds over [model] can charge: an equilibration that
+         * runs every allowed pass and then falls back to an identity copy.
+         */
+        fun constructionWorkBound(model: LpModel): Long {
+            val entries = (model.doubleView?.colPtr ?: model.csc.colPtr)[model.n].toLong()
+            val conditioning = entries + model.m
+            val equilibration = MAX_EQUILIBRATION_PASSES * (2L * entries + model.m + model.n) + entries
+            return 2L * conditioning + 2L * matrixCopyWork(model, entries) + model.m + model.numVars +
+                equilibration + 2L * vectorWork(model)
         }
 
         fun identityAfterFallback(model: LpModel, previous: LpScalingMetrics): LpScalingView {
@@ -233,9 +262,12 @@ internal class LpScalingView private constructor(
             conditioning: LpConditioning,
             decline: LpScalingDecline,
             eligible: Boolean,
+            priorWork: Long = 0L,
         ): LpScalingView {
             val matrix = sourceMatrixUnchecked(model)
             val vectors = sourceVectors(model)
+            val work = conditioningWork(model, conditioning) + priorWork +
+                matrixCopyWork(model, matrix.values.size.toLong()) + vectorWork(model)
             return LpScalingView(
                 model,
                 IntArray(model.m),
@@ -257,11 +289,22 @@ internal class LpScalingView private constructor(
                     afterMatrixRatio = conditioning.matrixRatio,
                     afterRowRatio = conditioning.rowRatio,
                     afterColumnRatio = conditioning.columnRatio,
+                    work = work,
                 ),
             )
         }
     }
 }
+
+// The scan [lpConditioning] makes over the nonzeros and its per-row extremes.
+private fun conditioningWork(model: LpModel, conditioning: LpConditioning): Long =
+    conditioning.entries.toLong() + model.m
+
+// Counting then filling a column-major copy of [entries] nonzeros.
+private fun matrixCopyWork(model: LpModel, entries: Long): Long = 2L * entries + model.n + 1
+
+// One pass over the right-hand side and the per-column cost and bounds.
+private fun vectorWork(model: LpModel): Long = model.m.toLong() + 3L * model.numVars
 
 private class NumericalMatrix(val colPtr: IntArray, val rowIdx: IntArray, val values: DoubleArray)
 

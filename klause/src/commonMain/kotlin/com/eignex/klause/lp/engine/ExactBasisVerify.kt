@@ -249,8 +249,9 @@ internal fun verifyExactBasis(
     observer?.observe(
         if (rayRow == null) LpCertifier.EXACT_BASIS else LpCertifier.EXACT_FARKAS,
         if (rayRow == null) witness != null else conflict != null,
+        LpCertifierCost.Reported,
     )
-    if (rayRow == null) observer?.observe(LpCertifier.RATIONAL, bound != null)
+    if (rayRow == null) observer?.observe(LpCertifier.RATIONAL, bound != null, LpCertifierCost.Reported)
     return result
 }
 

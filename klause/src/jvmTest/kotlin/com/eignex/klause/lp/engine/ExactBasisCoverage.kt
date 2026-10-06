@@ -80,7 +80,7 @@ internal object ExactBasisCoverage {
                 val row = if (candidate == null) solver.infeasibleRow else null
                 var role = "live"
                 val observer = object : LpCertificationObserver {
-                    override fun observe(certifier: LpCertifier, success: Boolean) = Unit
+                    override fun observe(certifier: LpCertifier, success: Boolean, cost: LpCertifierCost) = Unit
                     override fun observeExactInput(accepted: Boolean) = Unit
                     override fun observeSolve(metrics: LpSolveMetrics, component: Boolean) = Unit
                     override fun observeBasisVerification(metrics: ExactBasisMetrics) {
