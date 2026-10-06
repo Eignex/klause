@@ -1682,6 +1682,37 @@ class CliModeTest {
     }
 
     @Test
+    fun `a continuous column costed downwards past every row reports unbounded from the finite search`() {
+        val mps = File.createTempFile("cliunboundedreal", ".mps").apply {
+            writeText(
+                """
+                NAME          UNBOUNDEDREAL
+                ROWS
+                 N  COST
+                 L  ROW
+                COLUMNS
+                    MK1       'MARKER'                 'INTORG'
+                    X         COST           1.0
+                    X         ROW            1.0
+                    MK2       'MARKER'                 'INTEND'
+                    Y         COST           -1.0
+                    Y         ROW            -1.0
+                RHS
+                    RHS       ROW            9.0
+                BOUNDS
+                 UP BND       X              5
+                ENDATA
+                """.trimIndent(),
+            )
+            deleteOnExit()
+        }
+
+        val out = capture { main(arrayOf(mps.absolutePath)) }
+
+        assertTrue("s UNBOUNDED" in out, out)
+    }
+
+    @Test
     fun `an unbounded model refuted over its true ranges reports unsat, not unknown`() {
         // x - y <= -1 and y - x <= -1 sum to 0 <= -2, with neither variable bounded anywhere. The
         // refutation owes nothing to the finite search box, so softening it to `unknown` would be

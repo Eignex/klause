@@ -7,11 +7,13 @@ import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.backtrack.SearchOutcome
 import com.eignex.klause.backtrack.toBacktrackParams
 import com.eignex.klause.formats.flatzinc.FlatZincSearchHints
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.localsearch.strategy.LocalSearchRecipe
 import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.lp.engine.LpZeroObjectivePricing
+import com.eignex.klause.lp.relaxation.provesUnbounded
 import com.eignex.klause.portfolio.AttributedImprovement
 import com.eignex.klause.portfolio.BacktrackCatalog
 import com.eignex.klause.portfolio.Kind
@@ -19,6 +21,7 @@ import com.eignex.klause.portfolio.LocalSearchCatalog
 import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.propagation.BakedProblem
+import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.objective.IncrementalObjective
@@ -142,6 +145,11 @@ sealed class FiniteSolveOutcome {
         val bestSample: Sample?,
         /** Elapsed engine execution time. */
         val elapsedMs: Long,
+        /**
+         * On [FiniteSolveVerdict.UNBOUNDED], the source-model ray of the continuous variables, indexed by real
+         * variable id, along which [bestSample] stays feasible and the objective strictly decreases.
+         */
+        val unboundedDirection: List<BigFraction>? = null,
     ) : FiniteSolveOutcome()
 }
 
@@ -161,6 +169,9 @@ enum class FiniteSolveVerdict {
 
     /** A feasible incumbent was found without an optimality proof. */
     BEST_FOUND,
+
+    /** A feasible assignment and a ray along which the objective descends without limit were proven. */
+    UNBOUNDED,
 }
 
 /** One finite solve request after a frontend has translated its flags and source-model annotations. */
@@ -247,6 +258,8 @@ private sealed class FiniteExecutionResult {
         val bestSample: Sample?,
         /** Elapsed execution time, excluding route planning and worker construction. */
         val elapsedMs: Long,
+        /** On [FiniteExecutionVerdict.UNBOUNDED], the recession ray of the reals through [bestSample]. */
+        val unboundedDirection: List<BigFraction>? = null,
     ) : FiniteExecutionResult()
 
     /** The route was inspected instead of executed. */
@@ -276,6 +289,9 @@ private enum class FiniteExecutionVerdict {
      * A feasible incumbent was found without an optimality proof.
      */
     BEST_FOUND,
+
+    /** A feasible assignment and a ray along which the objective descends without limit were proven. */
+    UNBOUNDED,
 }
 
 /** Owns finite engine planning, construction, and execution. */
@@ -377,7 +393,8 @@ internal fun FinitePipeline.solve(
     return FiniteSolveResult(
         preparation,
         preparationElapsed,
-        execution.reconstructed(preparation.reconstruct).toSolveOutcome().withPresolve(preparation.presolve),
+        execution.reconstructed(preparation.reconstruct, request.shape.finiteProblem, request.shape.linearObjective)
+            .toSolveOutcome().withPresolve(preparation.presolve),
     )
 }
 
@@ -390,6 +407,7 @@ private fun FiniteExecutionResult.toSolveOutcome(): FiniteSolveOutcome = when (t
         solutions,
         bestSample,
         elapsedMs,
+        unboundedDirection,
     )
 }
 
@@ -400,21 +418,68 @@ private fun FiniteSolveOutcome.withPresolve(presolve: PresolveStats?): FiniteSol
         solutions,
         bestSample,
         elapsedMs,
+        unboundedDirection,
     )
 
     else -> this
 }
 
-private fun FiniteExecutionResult.reconstructed(reconstruct: (Sample) -> Sample): FiniteExecutionResult = when (this) {
+/**
+ * This result over the source [problem]. An unbounded verdict stands only if its witness and ray, lifted through
+ * [reconstruct], still prove [objective] unbounded over [problem]; otherwise the witness remains a feasible
+ * assignment with no optimality proof.
+ */
+private fun FiniteExecutionResult.reconstructed(
+    reconstruct: (Sample) -> Sample,
+    problem: Problem,
+    objective: LinearObjective?,
+): FiniteExecutionResult = when (this) {
     is FiniteExecutionResult.DryRun -> this
 
-    is FiniteExecutionResult.Completed -> FiniteExecutionResult.Completed(
-        verdict,
-        stats,
-        solutions,
-        bestSample?.let(reconstruct),
-        elapsedMs,
+    is FiniteExecutionResult.Completed -> {
+        val point = bestSample?.let(reconstruct)
+        val direction = if (verdict == FiniteExecutionVerdict.UNBOUNDED && point != null && objective != null) {
+            liftedDirection(reconstruct, point)?.takeIf { problem.provesUnbounded(objective, point, it) }
+        } else {
+            null
+        }
+        FiniteExecutionResult.Completed(
+            if (verdict == FiniteExecutionVerdict.UNBOUNDED && direction == null) {
+                FiniteExecutionVerdict.BEST_FOUND
+            } else {
+                verdict
+            },
+            stats,
+            solutions,
+            point,
+            elapsedMs,
+            direction,
+        )
+    }
+}
+
+/**
+ * The ray through the lifted [point] that [reconstruct] maps the prepared ray onto, as the difference of the two
+ * lifted assignments one step apart. The source check, not this lift, is what proves it a ray; a lift that moves
+ * a discrete value or loses the exact reals yields none.
+ */
+private fun FiniteExecutionResult.Completed.liftedDirection(
+    reconstruct: (Sample) -> Sample,
+    point: Sample,
+): List<BigFraction>? {
+    val origin = bestSample ?: return null
+    val reals = origin.exactReals ?: return null
+    val direction = unboundedDirection ?: return null
+    if (direction.size != reals.size) return null
+    val shifted = List(reals.size) { reals[it] + direction[it] }
+    val stepped = reconstruct(
+        origin.copy(reals = DoubleArray(shifted.size) { shifted[it].toDouble() }, exactReals = shifted),
     )
+    val from = point.exactReals ?: return null
+    val to = stepped.exactReals ?: return null
+    if (!stepped.bools.contentEquals(point.bools) || !stepped.ints.contentEquals(point.ints)) return null
+    if (from.size != to.size) return null
+    return List(from.size) { to[it] - from[it] }
 }
 
 private fun executeFixed(request: FiniteExecutionRequest, callbacks: FiniteExecutionCallbacks): FiniteExecutionResult {
@@ -541,6 +606,16 @@ private fun executeFixedOptimize(
                         elapsedMs = start.elapsedNow().inWholeMilliseconds,
                     )
                 }
+                if (step is MinimizeResult.Unbounded) {
+                    return FiniteExecutionResult.Completed(
+                        verdict = FiniteExecutionVerdict.UNBOUNDED,
+                        stats = step.stats,
+                        solutions = solutions,
+                        bestSample = step.sample,
+                        elapsedMs = start.elapsedNow().inWholeMilliseconds,
+                        unboundedDirection = step.direction,
+                    )
+                }
             }
 
             is MinimizeResult.Infeasible -> return FiniteExecutionResult.Completed(
@@ -662,6 +737,7 @@ private fun executePortfolioOptimize(
 ): FiniteExecutionResult.Completed {
     val verdict = when (result) {
         is MinimizeResult.Optimal -> FiniteExecutionVerdict.OPTIMAL
+        is MinimizeResult.Unbounded -> FiniteExecutionVerdict.UNBOUNDED
         is MinimizeResult.BestFound -> FiniteExecutionVerdict.BEST_FOUND
         is MinimizeResult.Infeasible -> if (complete) FiniteExecutionVerdict.UNSAT else FiniteExecutionVerdict.UNKNOWN
         is MinimizeResult.Unknown -> FiniteExecutionVerdict.UNKNOWN
@@ -680,6 +756,7 @@ private fun executePortfolioOptimize(
         },
         bestSample = sample,
         elapsedMs = start.elapsedNow().inWholeMilliseconds,
+        unboundedDirection = (result as? MinimizeResult.Unbounded)?.direction,
     )
 }
 

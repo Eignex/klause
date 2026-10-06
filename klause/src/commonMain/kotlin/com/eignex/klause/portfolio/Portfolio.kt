@@ -127,6 +127,13 @@ class Portfolio(
                                 break
                             }
 
+                            is MinimizeResult.Unbounded -> {
+                                fold(worker, r)
+                                cancelled.store(true)
+                                local = r
+                                break
+                            }
+
                             is MinimizeResult.Infeasible -> local = r
 
                             is MinimizeResult.Unknown -> local = r
@@ -140,6 +147,10 @@ class Portfolio(
         // report is never coming; hand over what waited behind it rather than dropping it.
         if (relay != null && onImprovement != null) relay.flush(onImprovement)
         val stats = PortfolioReduction.foldStats(results) { it.stats }
+
+        // A ray proves the model unbounded whatever bound the worker ran under.
+        val unbounded = results.firstOrNull { it is MinimizeResult.Unbounded }
+        if (unbounded != null) return (unbounded as MinimizeResult.Unbounded).copy(stats = stats)
 
         // A direct Optimal claim is only produced by a worker not running under shared bounds
         // (single-worker / unshared); the engine downgrades to BestFound when a bound is shared.

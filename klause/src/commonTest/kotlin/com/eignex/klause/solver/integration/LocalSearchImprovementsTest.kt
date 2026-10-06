@@ -165,6 +165,7 @@ class LocalSearchImprovementsTest {
 private fun MinimizeResult.withoutStats(): MinimizeResult = when (this) {
     is MinimizeResult.Optimal -> copy(stats = SolveStats.EMPTY)
     is MinimizeResult.BestFound -> copy(stats = SolveStats.EMPTY)
+    is MinimizeResult.Unbounded -> copy(stats = SolveStats.EMPTY)
     is MinimizeResult.Infeasible -> copy(stats = SolveStats.EMPTY)
     is MinimizeResult.Unknown -> copy(stats = SolveStats.EMPTY)
 }

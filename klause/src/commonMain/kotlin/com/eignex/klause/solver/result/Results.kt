@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.result
 
+import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.util.Cancellation
 
@@ -81,13 +82,14 @@ sealed interface SampleResult {
  * Result of [com.eignex.klause.solver.Optimizer.minimize]. Replaces `Sample?` with an explicit verdict so
  * "best-effort feasible at objective o" can't be confused with "proven optimal."
  * Only complete backends (`BacktrackSolver`, `BruteForceSolver`) can
- * ever return [Optimal] or [Infeasible]; the local-search backend returns [BestFound]
- * or [Unknown].
+ * ever return [Optimal] or [Infeasible], and only the backtrack backend [Unbounded];
+ * the local-search backend returns [BestFound] or [Unknown].
  *
  *  - [Optimal] — sample and objective; search exhausted (or the bound is tight enough
  *    to prove optimality without exhausting).
  *  - [BestFound] — feasible but not proven optimal. Carries the [TerminationReason]
  *    that stopped the search before optimality could be proven.
+ *  - [Unbounded] — a feasible sample and a ray along which the objective descends without limit.
  *  - [Infeasible] — proven no feasible assignment exists.
  *  - [Unknown] — neither feasible found nor infeasibility proven (typically budget
  *    exhausted before any feasible reached).
@@ -128,6 +130,21 @@ sealed interface MinimizeResult {
         override val objective: Double,
         /** Why the search stopped before proving optimality. */
         val reason: TerminationReason,
+        override val stats: SolveStats = SolveStats.EMPTY,
+    ) : WithSample
+
+    /**
+     * The objective descends without limit, so there is no optimum.
+     *
+     * [sample] is a feasible assignment and [direction] a ray of the continuous variables, indexed by real
+     * variable id, along which every assignment stays feasible and the objective strictly decreases. The
+     * discrete values stay those of [sample]. [objective] is the value at [sample], not a bound.
+     */
+    data class Unbounded(
+        override val sample: Sample,
+        override val objective: Double,
+        /** Exact recession ray of the continuous variables through [sample]. */
+        val direction: List<BigFraction>,
         override val stats: SolveStats = SolveStats.EMPTY,
     ) : WithSample
 

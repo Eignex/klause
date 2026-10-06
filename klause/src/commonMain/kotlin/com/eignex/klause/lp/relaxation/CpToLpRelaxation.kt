@@ -289,6 +289,9 @@ private class SampleDomains(private val sample: Sample) : RelaxationDomains {
  * continuous columns. [LpVerdict.FEASIBLE] means the reals have an exact feasible completion — the leaf is a
  * genuine solution — and [LpVerdict.ATTAINED_OPTIMUM] that the completion is also exactly optimal;
  * [LpVerdict.TOLERANCE_OPTIMUM] is a float optimum [toleranceCheck] accepted, whose reals are not exact;
+ * [LpVerdict.UNBOUNDED] is an exact completion plus a ray of the reals along which [objective] descends
+ * without limit, checked against the factors by [provesUnbounded]; a ray that check declines leaves the
+ * completion as [LpVerdict.FEASIBLE];
  * [LpVerdict.INFEASIBLE] (exact Farkas) means no completion exists — the leaf must be rejected;
  * [LpVerdict.INDETERMINATE] means neither could be certified within the 128-bit budget, so the leaf's
  * status is unknown and the terminal verdict must degrade to `unknown` rather than claim UNSAT/SAT.
@@ -329,9 +332,35 @@ internal fun leafRealFeasibility(
         return LeafRealResult(LpVerdict.TOLERANCE_OPTIMUM, relaxation.floatReals(float.primal, problem))
     }
     if (certified.verdict == LpVerdict.INFEASIBLE) return LeafRealResult(LpVerdict.INFEASIBLE, EmptyDoubleArray)
-    val primal = certified.exactPrimal ?: return LeafRealResult(LpVerdict.INDETERMINATE, EmptyDoubleArray)
+    val unboundedness = certified.unboundedness
+    val primal = unboundedness?.witness?.primal ?: certified.exactPrimal
+        ?: return LeafRealResult(LpVerdict.INDETERMINATE, EmptyDoubleArray)
     val exactReals = relaxation.exactReals(primal, problem)
-    return LeafRealResult(certified.verdict, DoubleArray(exactReals.size) { exactReals[it].toDouble() }, exactReals)
+    val reals = DoubleArray(exactReals.size) { exactReals[it].toDouble() }
+    if (unboundedness == null) return LeafRealResult(certified.verdict, reals, exactReals)
+    val direction = relaxation.realDirection(unboundedness.direction, problem)
+    val point = sample.copy(reals = reals, exactReals = exactReals)
+    return if (objective != null && direction != null && problem.provesUnbounded(objective, point, direction)) {
+        LeafRealResult(LpVerdict.UNBOUNDED, reals, exactReals, direction)
+    } else {
+        LeafRealResult(LpVerdict.FEASIBLE, reals, exactReals)
+    }
+}
+
+/**
+ * The continuous part of an LP recession [direction], summing each split variable's `x⁺ − x⁻` columns, or null
+ * when it moves a discrete column. A real variable no column carries does not move.
+ */
+private fun LpRelaxation.realDirection(direction: List<BigFraction>, problem: Problem): List<BigFraction>? {
+    val ray = MutableList(problem.numRealVars) { BigFraction.ZERO }
+    for (col in direction.indices) {
+        val r = colRealId.getOrElse(col) { -1 }
+        when {
+            r >= 0 -> ray[r] += BigFraction.ofLong(colRealSign[col].toLong()) * direction[col]
+            col < colVarId.size && colVarId[col] >= 0 && !direction[col].isZero -> return null
+        }
+    }
+    return ray
 }
 
 /**
@@ -371,15 +400,16 @@ internal fun LpRelaxation.exactReals(primal: List<BigFraction>, problem: Problem
  * The point of real variable [r]'s bounds nearest zero. Any point of them completes a leaf for a variable the
  * relaxation leaves out; zero is not one when the bounds exclude it, as for a column fixed away from it.
  */
-private fun restingReal(problem: Problem, r: Int): Double =
-    0.0.coerceIn(problem.realLower[r], problem.realUpper[r])
+private fun restingReal(problem: Problem, r: Int): Double = 0.0.coerceIn(problem.realLower[r], problem.realUpper[r])
 
 /** The residual-LP verdict at a leaf plus, on [LpVerdict.FEASIBLE], the continuous variables' solved
- *  values (indexed by real var id) that complete the discrete assignment into a full solution. */
+ *  values (indexed by real var id) that complete the discrete assignment into a full solution. On
+ *  [LpVerdict.UNBOUNDED], [direction] is the checked ray of the reals through that completion. */
 internal class LeafRealResult(
     val verdict: LpVerdict,
     val reals: DoubleArray,
     val exactReals: List<BigFraction>? = null,
+    val direction: List<BigFraction>? = null,
 )
 
 /**
