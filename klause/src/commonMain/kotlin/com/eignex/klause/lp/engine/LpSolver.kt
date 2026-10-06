@@ -8,6 +8,20 @@ import com.eignex.klause.util.Cancellation
  * adapt it into their own statistics rather than making the kernel depend on solver results. */
 internal enum class LpCertifier { INTEGER, SAFE_OBJECTIVE, EXACT_BASIS, EXACT_FARKAS, EXACT_POINT, RATIONAL }
 
+/** Where one certifier invocation's modeled work is accounted. Each call site states it, so a cost that no counter
+ * covers is reported as such rather than read as zero. */
+internal sealed interface LpCertifierCost {
+    /** Charged through [LpCertificationObserver.observeBasisVerification] or
+     *  [LpCertificationObserver.observeContinuation]. */
+    data object Reported : LpCertifierCost
+
+    /** The invocation's own modeled work, charged with this observation. */
+    data class Metered(val work: Long) : LpCertifierCost
+
+    /** No modeled-work counter covers the invocation. */
+    data object Unmetered : LpCertifierCost
+}
+
 /** Why a simplex solve rebuilt its factors.  The reasons are emitted by the engine, not inferred from
  * aggregate counts by a consumer. */
 internal enum class LpRefactorReason {
@@ -35,7 +49,7 @@ internal enum class LpFloatTermination {
 
 /** Optional, solve-scoped observer for certification and exact-input eligibility. */
 internal interface LpCertificationObserver {
-    fun observe(certifier: LpCertifier, success: Boolean)
+    fun observe(certifier: LpCertifier, success: Boolean, cost: LpCertifierCost)
     fun observeExactInput(accepted: Boolean)
     fun observeSolve(metrics: LpSolveMetrics, component: Boolean)
     fun observeBasisVerification(metrics: ExactBasisMetrics) {}

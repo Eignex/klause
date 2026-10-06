@@ -17,7 +17,7 @@ internal fun safeObjectiveLowerBound(
     y: DoubleArray,
     observer: LpCertificationObserver? = null,
 ): Double? = safeObjectiveLowerBoundUnchecked(model, y).also {
-    observer?.observe(LpCertifier.SAFE_OBJECTIVE, it != null)
+    observer?.observe(LpCertifier.SAFE_OBJECTIVE, it != null, LpCertifierCost.Unmetered)
 }
 
 private fun safeObjectiveLowerBoundUnchecked(model: LpModel, y: DoubleArray): Double? {

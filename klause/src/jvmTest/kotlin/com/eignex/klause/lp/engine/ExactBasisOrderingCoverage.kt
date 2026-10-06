@@ -110,7 +110,7 @@ internal object ExactBasisOrderingCoverage {
                         val eligible = model.exactState != null && basis != null &&
                             floatOwner?.singular == false && floatOwner.updateCount == 0
                         val observer = object : LpCertificationObserver {
-                            override fun observe(certifier: LpCertifier, success: Boolean) = Unit
+                            override fun observe(certifier: LpCertifier, success: Boolean, cost: LpCertifierCost) = Unit
                             override fun observeExactInput(accepted: Boolean) = Unit
                             override fun observeSolve(metrics: LpSolveMetrics, component: Boolean) = Unit
                             override fun observeBasisVerification(metrics: ExactBasisMetrics) {

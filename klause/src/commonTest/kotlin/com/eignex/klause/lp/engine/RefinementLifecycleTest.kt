@@ -66,7 +66,7 @@ class RefinementLifecycleTest {
         }
         var pointChecks = 0
         val observer = object : LpCertificationObserver {
-            override fun observe(certifier: LpCertifier, success: Boolean) {
+            override fun observe(certifier: LpCertifier, success: Boolean, cost: LpCertifierCost) {
                 if (certifier == LpCertifier.EXACT_POINT) pointChecks++
             }
             override fun observeExactInput(accepted: Boolean) = Unit
@@ -112,7 +112,7 @@ class RefinementLifecycleTest {
             }
             var pointChecks = 0
             val observer = object : LpCertificationObserver {
-                override fun observe(certifier: LpCertifier, success: Boolean) {
+                override fun observe(certifier: LpCertifier, success: Boolean, cost: LpCertifierCost) {
                     if (certifier == LpCertifier.EXACT_POINT) pointChecks++
                 }
                 override fun observeExactInput(accepted: Boolean) = Unit

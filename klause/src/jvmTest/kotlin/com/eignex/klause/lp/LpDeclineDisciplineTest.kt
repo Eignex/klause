@@ -762,6 +762,7 @@ class LpDeclineDisciplineTest {
                     "LpVerdict",
                     "LpCertificationObserver",
                     "LpCertifier",
+                    "LpCertifierCost",
                     "LpSolveMetrics",
                 )
 

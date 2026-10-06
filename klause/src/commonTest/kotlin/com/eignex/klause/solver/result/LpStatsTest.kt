@@ -4,6 +4,7 @@ import com.eignex.klause.lp.engine.ExactBasisDecline
 import com.eignex.klause.lp.engine.ExactBasisMetrics
 import com.eignex.klause.lp.engine.ExactBasisPhase
 import com.eignex.klause.lp.engine.LpCertifier
+import com.eignex.klause.lp.engine.LpCertifierCost
 import com.eignex.klause.lp.engine.LpSolveMetrics
 import com.eignex.klause.simplex.exact.ContinuationDecline
 import com.eignex.klause.simplex.exact.ContinuationPhase
@@ -98,8 +99,8 @@ class LpStatsTest {
 
         sink.observeNodePass()
         sink.observeEngineCost(LpRoute.STANDALONE, LpSolveMetrics(pivots = 3, workOps = 11, warmAttempts = 1))
-        observer.observe(LpCertifier.INTEGER, success = false)
-        observer.observe(LpCertifier.RATIONAL, success = true)
+        observer.observe(LpCertifier.INTEGER, success = false, LpCertifierCost.Unmetered)
+        observer.observe(LpCertifier.RATIONAL, success = true, LpCertifierCost.Unmetered)
         observer.observeExactInput(accepted = false)
 
         val stats = sink.snapshot()

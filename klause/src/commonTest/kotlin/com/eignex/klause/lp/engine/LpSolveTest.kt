@@ -154,7 +154,7 @@ class LpSolveTest {
             val observer = object : LpCertificationObserver {
                 override fun observeExactInput(accepted: Boolean) = Unit
                 override fun observeSolve(metrics: LpSolveMetrics, component: Boolean) = Unit
-                override fun observe(certifier: LpCertifier, success: Boolean) {
+                override fun observe(certifier: LpCertifier, success: Boolean, cost: LpCertifierCost) {
                     if (certifier == LpCertifier.INTEGER) {
                         boundObserved = success
                         if (stage == "observer") cancelled = true

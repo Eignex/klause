@@ -152,7 +152,7 @@ class IntegerDualBoundTest {
         var exactInputAttempts = 0
         var exactInputRejections = 0
         val observer = object : LpCertificationObserver {
-            override fun observe(certifier: LpCertifier, success: Boolean) = Unit
+            override fun observe(certifier: LpCertifier, success: Boolean, cost: LpCertifierCost) = Unit
             override fun observeExactInput(accepted: Boolean) {
                 exactInputAttempts++
                 if (!accepted) exactInputRejections++
@@ -177,7 +177,7 @@ class IntegerDualBoundTest {
         var attempts = 0
         var successes = 0
         val observer = object : LpCertificationObserver {
-            override fun observe(certifier: LpCertifier, success: Boolean) {
+            override fun observe(certifier: LpCertifier, success: Boolean, cost: LpCertifierCost) {
                 if (certifier == LpCertifier.EXACT_FARKAS) {
                     attempts++
                     if (success) successes++

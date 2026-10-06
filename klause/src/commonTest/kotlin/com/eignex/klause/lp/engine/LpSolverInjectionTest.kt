@@ -102,7 +102,7 @@ internal class RecordingLpEngineFactory(private val delegate: LpEngineFactory = 
 private class SolveRecordingObserver : LpCertificationObserver {
     val solves = ArrayList<Pair<LpSolveMetrics, Boolean>>()
 
-    override fun observe(certifier: LpCertifier, success: Boolean) = Unit
+    override fun observe(certifier: LpCertifier, success: Boolean, cost: LpCertifierCost) = Unit
 
     override fun observeExactInput(accepted: Boolean) = Unit
 

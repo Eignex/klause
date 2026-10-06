@@ -436,7 +436,11 @@ private class ReplayStrictCertification(
         )
         if (retained == null) {
             lastMetrics = recovered.metrics
-            observer.observe(LpCertifier.RATIONAL, recovered.witness != null || recovered.conflict != null)
+            observer.observe(
+                LpCertifier.RATIONAL,
+                recovered.witness != null || recovered.conflict != null,
+                LpCertifierCost.Metered(recovered.metrics.work),
+            )
         } else {
             reused = true
         }
@@ -658,7 +662,7 @@ private class ReplayObserver(private val budget: ReplayContinuationBudget) : LpC
     var exactInputAccepted: Int = 0
         private set
 
-    override fun observe(certifier: LpCertifier, success: Boolean) {
+    override fun observe(certifier: LpCertifier, success: Boolean, cost: LpCertifierCost) {
         attempts[certifier.ordinal]++
         if (success) successes[certifier.ordinal]++
     }

@@ -44,11 +44,26 @@ internal data class LpWorkingMetrics(
     val continuationWork: Long,
     val continuationAllocation: Long,
     val children: List<LpWorkingMetrics>,
+    // Work of certifiers that meter themselves rather than reporting through basis verification or continuation.
+    val certificationWork: Long = 0L,
+    // Certifier invocations no modeled-work counter covers; their cost is absent from [measuredWork].
+    val unmeteredCertifications: Long = 0L,
 ) {
-    // Cheap certifiers and owner construction expose no complete modeled-work counter.
-    val measuredWork: Long get() = solves.workOps + owners.preparationWork + basisWork + continuationWork +
-        children.sumOf { it.measuredWork }
+    val measuredWork: Long get() = saturatedSum(
+        solves.workOps,
+        owners.preparationWork,
+        basisWork,
+        continuationWork,
+        certificationWork,
+        children.fold(0L) { total, child -> saturatedSum(total, child.measuredWork) },
+    )
+
+    // Whether [measuredWork] covers every certifier invocation here and in the nested scopes.
+    val measuredWorkComplete: Boolean get() = unmeteredCertifications == 0L && children.all { it.measuredWorkComplete }
 }
+
+private fun saturatedSum(vararg parts: Long): Long =
+    parts.fold(0L) { total, part -> if (total > Long.MAX_VALUE - part) Long.MAX_VALUE else total + part }
 
 internal class LpWorkingScope internal constructor(
     model: LpWorkingModel,
@@ -64,6 +79,8 @@ internal class LpWorkingScope internal constructor(
     private var basisWork = 0L
     private var continuationWork = 0L
     private var continuationAllocation = 0L
+    private var certificationWork = 0L
+    private var unmeteredCertifications = 0L
     private val children = ArrayList<LpWorkingMetrics>()
 
     val state: LpExactState get() = model.state
@@ -77,6 +94,8 @@ internal class LpWorkingScope internal constructor(
         continuationWork,
         continuationAllocation,
         children.toList(),
+        certificationWork,
+        unmeteredCertifications,
     )
 
     @Suppress("TooGenericExceptionCaught") // Failed adoption must retire the child for every exception type.
@@ -116,9 +135,14 @@ internal class LpWorkingScope internal constructor(
         owner.requireAvailable()
         attempts++
         val accounting = object : LpCertificationObserver {
-            override fun observe(certifier: LpCertifier, success: Boolean) {
+            override fun observe(certifier: LpCertifier, success: Boolean, cost: LpCertifierCost) {
                 certifications++
-                observer?.observe(certifier, success)
+                when (cost) {
+                    LpCertifierCost.Reported -> Unit
+                    is LpCertifierCost.Metered -> certificationWork = saturatedSum(certificationWork, cost.work)
+                    LpCertifierCost.Unmetered -> unmeteredCertifications++
+                }
+                observer?.observe(certifier, success, cost)
             }
 
             override fun observeExactInput(accepted: Boolean) {

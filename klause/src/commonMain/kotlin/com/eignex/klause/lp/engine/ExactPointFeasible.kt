@@ -26,7 +26,7 @@ internal fun exactPointWitness(
     } else {
         null
     }
-    observer?.observe(LpCertifier.EXACT_POINT, point != null)
+    observer?.observe(LpCertifier.EXACT_POINT, point != null, LpCertifierCost.Unmetered)
     return point
 }
 
@@ -111,7 +111,7 @@ internal fun recoverExactPointWitness(
     } finally {
         metrics = meter.finish(decline)
     }
-    observer?.observe(LpCertifier.EXACT_POINT, witness != null)
+    observer?.observe(LpCertifier.EXACT_POINT, witness != null, LpCertifierCost.Metered(metrics.work))
     return ExactPointRecovery(
         witness,
         checks,

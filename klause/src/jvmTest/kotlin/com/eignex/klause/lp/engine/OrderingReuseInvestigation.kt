@@ -53,7 +53,7 @@ internal object OrderingReuseInvestigation {
         var created = 0
         var closed = 0
         var role = "first"
-        override fun observe(certifier: LpCertifier, success: Boolean) = Unit
+        override fun observe(certifier: LpCertifier, success: Boolean, cost: LpCertifierCost) = Unit
         override fun observeExactInput(accepted: Boolean) = Unit
         override fun observeSolve(metrics: LpSolveMetrics, component: Boolean) = Unit
         override fun observeBasisVerification(metrics: ExactBasisMetrics) = recordBasis(metrics, "direct")

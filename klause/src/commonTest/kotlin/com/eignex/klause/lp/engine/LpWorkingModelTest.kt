@@ -83,6 +83,46 @@ class LpWorkingModelTest {
     }
 
     @Test
+    fun `a scope's ledger charges metered certifier work and counts the unmetered invocations`() {
+        val zero = ExactLpNumber.of(0L)
+        val one = ExactLpNumber.of(1L)
+        val three = ExactLpNumber.of(3L)
+        val source = LpExactState(
+            ExactLpModel(
+                listOf(listOf(ExactLpEntry(0, one))),
+                listOf(three),
+                List(2) { ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(three))) },
+                listOf(ExactLpRow()),
+                ExactLpObjective(listOf(one, zero)),
+            ),
+        )
+        var metered = 0L
+        var unmetered = 0L
+        val declared = object : LpCertificationObserver {
+            override fun observe(certifier: LpCertifier, success: Boolean, cost: LpCertifierCost) {
+                when (cost) {
+                    LpCertifierCost.Reported -> Unit
+                    is LpCertifierCost.Metered -> metered += cost.work
+                    LpCertifierCost.Unmetered -> unmetered++
+                }
+            }
+
+            override fun observeExactInput(accepted: Boolean) = Unit
+
+            override fun observeSolve(metrics: LpSolveMetrics, component: Boolean) = Unit
+        }
+        LpScopedSolver(source).use { owner ->
+            owner.withWorkingModel(LpWorkingModel.overrides(source)) { scope -> scope.solve(observer = declared) }
+
+            val metrics = assertNotNull(owner.lastWorkingMetrics)
+            assertTrue(unmetered > 0L)
+            assertEquals(metered, metrics.certificationWork)
+            assertEquals(unmetered, metrics.unmeteredCertifications)
+            assertFalse(metrics.measuredWorkComplete)
+        }
+    }
+
+    @Test
     fun `auxiliary row cannot become source infeasibility and original factors remain reusable`() {
         val zero = ExactLpNumber.of(0L)
         val one = ExactLpNumber.of(1L)

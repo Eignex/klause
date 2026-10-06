@@ -303,7 +303,7 @@ class LpInstrumentationHarness {
         var events = 0
             private set
 
-        override fun observe(certifier: LpCertifier, success: Boolean) {
+        override fun observe(certifier: LpCertifier, success: Boolean, cost: LpCertifierCost) {
             events++
         }
 

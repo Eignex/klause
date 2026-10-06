@@ -21,6 +21,7 @@ import com.eignex.klause.lp.bounding.LpSearchPolicy
 import com.eignex.klause.lp.closeSourceLpOwners
 import com.eignex.klause.lp.engine.LpCertificationObserver
 import com.eignex.klause.lp.engine.LpCertifier
+import com.eignex.klause.lp.engine.LpCertifierCost
 import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.lp.engine.LpSolveMetrics
 import com.eignex.klause.lp.engine.LpVerdict
@@ -114,7 +115,7 @@ class ExactLiraSearchComponent(
             solveContext = solveContext,
             cancellation = Cancellation { operationStop() || context?.cancelled() == true },
             certificationObserver = object : LpCertificationObserver {
-                override fun observe(certifier: LpCertifier, success: Boolean) = Unit
+                override fun observe(certifier: LpCertifier, success: Boolean, cost: LpCertifierCost) = Unit
                 override fun observeExactInput(accepted: Boolean) = Unit
                 override fun observeSolve(metrics: LpSolveMetrics, component: Boolean) = Unit
                 override fun observeContinuation(metrics: ExactContinuationMetrics) {
