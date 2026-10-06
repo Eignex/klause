@@ -26,40 +26,55 @@ import kotlin.test.assertTrue
 class LocalSearchSolverTest {
 
     @Test
-    fun `declines a problem whose int values exceed the 32-bit safe range`() {
+    fun `searches a linear model whose int values exceed the 32-bit range`() {
         val wide = 1L shl 62
-        val problem = Problem(0, 1, arrayOf(IntDomain(-wide, wide)), arrayOf<Factor>())
-        val result = LocalSearchSolver(problem.bake()).solve(LocalSearchParams(maxFlips = 100, randomSeed = 1))
-        assertTrue(result is SolveResult.Unknown, "expected an unsupported decline, got $result")
+        val target = 1L shl 40
+        val problem = Problem(
+            0,
+            1,
+            arrayOf(IntDomain(-wide, wide)),
+            arrayOf<Factor>(Linear(longArrayOf(3), intArrayOf(0), LinearOp.EQ, 3 * target)),
+        )
+        val result = LocalSearchSolver(problem.bake()).solve(LocalSearchParams(maxFlips = 1_000, randomSeed = 1))
+        assertEquals(target, assertIs<SolveResult.Sat>(result).assignment.ints[0])
     }
 
     @Test
-    fun `minimize declines inputs local search cannot evaluate soundly`() {
-        val wideValue = 1L shl 62
+    fun `minimize keeps a wide-coefficient row exact`() {
+        // 2^65·x ≤ 2^65·3 + 1 caps x at 3; minimizing -x drives x to that cap and no further.
         val wideCoefficient = BigInteger.fromLong(Long.MAX_VALUE) * 4
-        val problems = listOf(
-            "wide domain" to Problem(
-                0,
-                1,
-                arrayOf(IntDomain(-wideValue, wideValue)),
-                emptyArray(),
-            ),
-            "wide factor" to Problem(
-                0,
-                1,
-                arrayOf(IntDomain(0, 1)),
-                arrayOf(Linear(intArrayOf(0), arrayOf(wideCoefficient), LinearOp.LE, wideCoefficient)),
+        val problem = Problem(
+            0,
+            1,
+            arrayOf(IntDomain(0, 10)),
+            arrayOf(
+                Linear(
+                    intArrayOf(0),
+                    arrayOf(wideCoefficient),
+                    LinearOp.LE,
+                    wideCoefficient * BigInteger.fromLong(3) + BigInteger.ONE,
+                ),
             ),
         )
-        val objective = LinearObjective(intCoefficients = longArrayOf(1L))
+        val objective = LinearObjective(intCoefficients = longArrayOf(-1L))
 
-        for ((label, problem) in problems) {
-            val result = LocalSearchSolver(problem.bake())
-                .minimize(objective, LocalSearchParams(maxFlips = 100, randomSeed = 1))
+        val result = LocalSearchSolver(problem.bake())
+            .minimize(objective, LocalSearchParams(maxFlips = 2_000, randomSeed = 1))
 
-            val unknown = assertIs<MinimizeResult.Unknown>(result, label)
-            assertEquals(TerminationReason.Unsupported, unknown.reason, label)
-        }
+        assertEquals(3L, assertIs<MinimizeResult.BestFound>(result).sample.ints[0])
+    }
+
+    @Test
+    fun `declines a non-linear factor over a domain past the 32-bit range`() {
+        val wide = 1L shl 62
+        val problem = Problem(
+            0,
+            3,
+            arrayOf(IntDomain(-wide, wide), IntDomain(0, 1), IntDomain(0, 1)),
+            arrayOf<Factor>(Product(0, 1, 2)),
+        )
+        val result = LocalSearchSolver(problem.bake()).solve(LocalSearchParams(maxFlips = 100, randomSeed = 1))
+        assertEquals(TerminationReason.Unsupported, assertIs<SolveResult.Unknown>(result).reason)
     }
 
     @Test

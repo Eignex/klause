@@ -5,6 +5,7 @@ import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.randomValue
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.localsearch.Move
 import com.eignex.klause.localsearch.movesource.ViolatedRepairs
@@ -26,6 +27,9 @@ import kotlin.random.Random
  *  follows the real feasible region instead of chasing the implied bulk. */
 internal const val IMPLIED_FACTOR_INITIAL_WEIGHT: Double = 0.1
 
+// Bits of the widest anchored draw: values within about a million of the anchor.
+private const val ANCHOR_BITS: Int = 20
+
 /**
  * Mutable state of an ongoing solve. Owns the [Assignment], the violated-factor set, the
  * per-factor scratch arrays ([intPayload], [refPayload]), and the aggregated hard cost.
@@ -38,7 +42,7 @@ class LocalSearchState(
     /** Variables pinned for this search. */
     var assumptions: Assumptions = Assumptions.None,
     /** Local-search projection for this state. */
-    val projection: LocalSearchProblem = LocalSearchProblem(model.problem),
+    val projection: LocalSearchProblem = LocalSearchProblem(model.problem, model.domains),
 ) {
     /** A search over the finite model [problem]. */
     constructor(
@@ -171,6 +175,9 @@ class LocalSearchState(
     /** Reset to a fresh random assignment and reinitialise all factors. */
     fun restart() {
         assignment.randomize(rng, rootDomains)
+        if (model.anchoredSampling) {
+            for (v in rootDomains.indices) assignment.setInt(v, anchoredValue(rootDomains[v], rootDomains[v].clamp(0L)))
+        }
         // Overwrite the assumed slots so the assignment starts consistent with the caller's pins.
         assumptions.forEachBool { id, value ->
             if (assignment.boolValue(id) != value) assignment.flipBool(id)
@@ -178,6 +185,21 @@ class LocalSearchState(
         assumptions.forEachInt { id, value -> assignment.setInt(id, value) }
         resetStepCounters()
         recompute()
+    }
+
+    /** A random value of int var [v]'s domain: uniform, or near its current value under
+     *  [LocalSearchModel.anchoredSampling]. */
+    fun randomIntValue(v: Int): Long {
+        val d = rootDomains[v]
+        return if (model.anchoredSampling) anchoredValue(d, assignment.intValue(v)) else d.randomValue(rng)
+    }
+
+    // A value at a log-uniform distance below 2^ANCHOR_BITS from [near], so small steps and long jumps are both
+    // drawn while the search starts and moves near the values it already holds.
+    private fun anchoredValue(d: IntDomain, near: Long): Long {
+        val magnitude = rng.nextLong(1L shl rng.nextInt(ANCHOR_BITS + 1))
+        val target = if (rng.nextBoolean()) near + magnitude else near - magnitude
+        return d.clamp(target)
     }
 
     /** Clear tabu / CCA bookkeeping without touching the assignment. Used by

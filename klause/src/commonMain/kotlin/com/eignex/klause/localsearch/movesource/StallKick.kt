@@ -1,6 +1,5 @@
 package com.eignex.klause.localsearch.movesource
 
-import com.eignex.klause.ir.randomValue
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
 import com.eignex.klause.localsearch.MoveSink
@@ -62,7 +61,7 @@ class StallKick(
                 val v = scope.intVars[pick]
                 val d = state.rootDomains[v]
                 if (!d.isFixed) {
-                    val nv = d.randomValue(state.rng)
+                    val nv = state.randomIntValue(v)
                     if (nv != state.assignment.intValue(v)) {
                         scratch.addChannelingIntSet(state, v, nv)
                         budget--

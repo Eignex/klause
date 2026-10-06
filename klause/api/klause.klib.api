@@ -6457,6 +6457,8 @@ final class com.eignex.klause.localsearch/IteratedLocalSearchRestart : com.eigne
 }
 
 final class com.eignex.klause.localsearch/LocalSearchModel { // com.eignex.klause.localsearch/LocalSearchModel|null[0]
+    final val anchoredSampling // com.eignex.klause.localsearch/LocalSearchModel.anchoredSampling|{}anchoredSampling[0]
+        final fun <get-anchoredSampling>(): kotlin/Boolean // com.eignex.klause.localsearch/LocalSearchModel.anchoredSampling.<get-anchoredSampling>|<get-anchoredSampling>(){}[0]
     final val domains // com.eignex.klause.localsearch/LocalSearchModel.domains|{}domains[0]
         final fun <get-domains>(): kotlin/Array<com.eignex.klause.ir/IntDomain> // com.eignex.klause.localsearch/LocalSearchModel.domains.<get-domains>|<get-domains>(){}[0]
     final val problem // com.eignex.klause.localsearch/LocalSearchModel.problem|{}problem[0]
@@ -6468,6 +6470,7 @@ final class com.eignex.klause.localsearch/LocalSearchModel { // com.eignex.klaus
 
     final object Companion { // com.eignex.klause.localsearch/LocalSearchModel.Companion|null[0]
         final fun of(com.eignex.klause.propagation/BakedProblem): com.eignex.klause.localsearch/LocalSearchModel // com.eignex.klause.localsearch/LocalSearchModel.Companion.of|of(com.eignex.klause.propagation.BakedProblem){}[0]
+        final fun open(com.eignex.klause.ir/Problem): com.eignex.klause.localsearch/LocalSearchModel // com.eignex.klause.localsearch/LocalSearchModel.Companion.open|open(com.eignex.klause.ir.Problem){}[0]
         final fun open(com.eignex.klause.ir/Problem, kotlin/Array<com.eignex.klause.ir/IntDomain>): com.eignex.klause.localsearch/LocalSearchModel // com.eignex.klause.localsearch/LocalSearchModel.Companion.open|open(com.eignex.klause.ir.Problem;kotlin.Array<com.eignex.klause.ir.IntDomain>){}[0]
     }
 }
@@ -6521,7 +6524,7 @@ final class com.eignex.klause.localsearch/LocalSearchParams : com.eignex.klause.
 }
 
 final class com.eignex.klause.localsearch/LocalSearchProblem { // com.eignex.klause.localsearch/LocalSearchProblem|null[0]
-    constructor <init>(com.eignex.klause.ir/Problem) // com.eignex.klause.localsearch/LocalSearchProblem.<init>|<init>(com.eignex.klause.ir.Problem){}[0]
+    constructor <init>(com.eignex.klause.ir/Problem, kotlin/Array<com.eignex.klause.ir/IntDomain>? = ...) // com.eignex.klause.localsearch/LocalSearchProblem.<init>|<init>(com.eignex.klause.ir.Problem;kotlin.Array<com.eignex.klause.ir.IntDomain>?){}[0]
 
     final val boolOccurrences // com.eignex.klause.localsearch/LocalSearchProblem.boolOccurrences|{}boolOccurrences[0]
         final fun <get-boolOccurrences>(): kotlin/Array<kotlin/IntArray> // com.eignex.klause.localsearch/LocalSearchProblem.boolOccurrences.<get-boolOccurrences>|<get-boolOccurrences>(){}[0]
@@ -6652,6 +6655,7 @@ final class com.eignex.klause.localsearch/LocalSearchState { // com.eignex.klaus
     final fun netDelta(com.eignex.klause.localsearch/Move): kotlin/Long // com.eignex.klause.localsearch/LocalSearchState.netDelta|netDelta(com.eignex.klause.localsearch.Move){}[0]
     final fun objectiveDelta(com.eignex.klause.solver.objective/Objective, com.eignex.klause.localsearch/Move): kotlin/Double? // com.eignex.klause.localsearch/LocalSearchState.objectiveDelta|objectiveDelta(com.eignex.klause.solver.objective.Objective;com.eignex.klause.localsearch.Move){}[0]
     final fun proposeMovesFromRandomViolated(): kotlin.collections/List<com.eignex.klause.localsearch/Move>? // com.eignex.klause.localsearch/LocalSearchState.proposeMovesFromRandomViolated|proposeMovesFromRandomViolated(){}[0]
+    final fun randomIntValue(kotlin/Int): kotlin/Long // com.eignex.klause.localsearch/LocalSearchState.randomIntValue|randomIntValue(kotlin.Int){}[0]
     final fun recompute() // com.eignex.klause.localsearch/LocalSearchState.recompute|recompute(){}[0]
     final fun resetStepCounters() // com.eignex.klause.localsearch/LocalSearchState.resetStepCounters|resetStepCounters(){}[0]
     final fun restart() // com.eignex.klause.localsearch/LocalSearchState.restart|restart(){}[0]

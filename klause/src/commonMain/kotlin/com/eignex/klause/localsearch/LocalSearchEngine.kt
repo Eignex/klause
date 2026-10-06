@@ -3,7 +3,6 @@ package com.eignex.klause.localsearch
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.objective.MutableObjectiveBound
-import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.Move
 import com.eignex.klause.localsearch.movesource.GreedyInit
@@ -750,34 +749,22 @@ internal class LocalSearchEngine(
 }
 
 /**
- * Whether local search can soundly run on [model]: no LP-only continuous variables, no int values past the 32-bit
- * range, and no factor with over-64-bit coefficients. A portfolio leaves its local-search arms out otherwise.
+ * Whether local search can soundly run on [model]: no LP-only continuous variables, and every factor it scores
+ * either a linear row, whose sum is kept exactly however wide its terms, or one whose integer columns all move
+ * over narrow domains ([isNarrow]). Another invariant over a wider domain would wrap its plain `Long` bookkeeping
+ * and slip an unsound "solution" through, or walk the domain value by value. A portfolio leaves its local-search
+ * arms out otherwise.
  */
-internal fun localSearchSupports(model: LocalSearchModel): Boolean =
-    model.problem.numRealVars == 0 && !hasWideIntValues(model.domains) && !hasWideFactor(model.problem)
+internal fun localSearchSupports(model: LocalSearchModel): Boolean {
+    val problem = model.problem
+    if (problem.numRealVars != 0) return false
+    val domains = model.domains
+    if (domains.all(::isNarrow)) return true
+    return problem.factors.all { factor ->
+        factor is Linear || factor is ReifiedLinear || factor.intVars.all { isNarrow(domains[it]) } ||
+            factor.invariantProjection() === NoInvariant
+    }
+}
 
 /** [localSearchSupports] for the finite model [problem]. */
 internal fun localSearchSupports(problem: BakedProblem): Boolean = localSearchSupports(LocalSearchModel.of(problem))
-
-/** True when any int domain holds values past the 32-bit range, or spans more than the enumerable
- *  range (`!enumerable`). The first would wrap local search's incremental violation/objective
- *  bookkeeping (plain `Long` products) and slip an unsound "solution" through; the second would send the
- *  repair-move proposers walking the domain value-by-value (O(span)) — a hang. Either way local search
- *  cannot soundly or feasibly handle the problem, so the caller falls back to the backtrack engine. */
-private fun hasWideIntValues(domains: Array<IntDomain>): Boolean {
-    for (d in domains) {
-        if ((d.spanOrNull() == null) || d.min < Int.MIN_VALUE.toLong() || d.max > Int.MAX_VALUE.toLong()) return true
-    }
-    return false
-}
-
-// A factor whose coefficients or bound exceed the 64-bit range is enforced only by its exact propagator;
-// its local-search invariant is inert (the Long payload is a saturated placeholder), so LS would ignore
-// the constraint. Bail rather than report an assignment that could violate it.
-private fun hasWideFactor(problem: Problem): Boolean {
-    for (factor in problem.factors) {
-        if (factor is Linear && factor.wideConstants != null) return true
-        if (factor is ReifiedLinear && factor.wideConstants != null) return true
-    }
-    return false
-}

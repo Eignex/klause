@@ -1,6 +1,7 @@
 package com.eignex.klause.localsearch
 
 import com.eignex.klause.ir.Factor
+import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.util.EmptyIntArray
 
@@ -8,9 +9,13 @@ import com.eignex.klause.util.EmptyIntArray
 class LocalSearchProblem(
     /** Immutable model data compiled by this projection. */
     val problem: Problem,
+    /** The domains the search moves over, when known: a linear row whose sum can leave the 64-bit range over
+     *  them is kept exactly. */
+    domains: Array<IntDomain>? = null,
 ) {
     /** One local-search invariant per model factor. */
-    val invariants: Array<out Invariant> = Array(problem.numFactors) { problem.factors[it].invariantProjection() }
+    val invariants: Array<out Invariant> =
+        Array(problem.numFactors) { problem.factors[it].invariantProjection(domains) }
 
     /** Invariant occurrences indexed by Boolean variable. */
     val boolOccurrences: Array<IntArray> = invert(problem.numBoolVars) { it.boolVars }

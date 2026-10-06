@@ -1,6 +1,5 @@
 package com.eignex.klause.localsearch.movesource
 
-import com.eignex.klause.ir.randomValue
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.MoveSink
 
@@ -75,7 +74,7 @@ class ArgminJump(
             }
         } else {
             repeat(maxValueTries) {
-                val candidate = d.randomValue(state.rng)
+                val candidate = state.randomIntValue(v)
                 if (candidate == cur) return@repeat
                 val delta = weightedIntSetDelta(state, weights, v, candidate)
                 if (delta < bestDelta) {
