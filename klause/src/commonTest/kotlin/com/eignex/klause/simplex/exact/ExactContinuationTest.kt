@@ -193,6 +193,31 @@ class ExactContinuationTest {
     }
 
     @Test
+    fun `elapsed time stops a continuation only under a time cap it was asked for`() {
+        val input = ExactContinuationInput(
+            listOf(listOf(0 to BigFraction.ONE)),
+            listOf(BigFraction.ONE),
+            List(2) { BigFraction.ZERO },
+            List(2) { null },
+            listOf(0),
+            listOf(ContinuationStatus.BASIC, ContinuationStatus.LOWER),
+        )
+        val hour = 3_600_000_000_000L
+        val cases = listOf(
+            ExactContinuationLimits() to null,
+            ExactContinuationLimits(maxTimeNs = hour) to ContinuationDecline.TIME,
+        )
+        for ((limits, expected) in cases) {
+            val continuation = ExactContinuation(input).also { it.account(0L, 0L, hour) }
+
+            val result = continuation.resume(limits)
+
+            assertEquals(expected, result.metrics.decline)
+            assertEquals(expected == null, result.values != null)
+        }
+    }
+
+    @Test
     fun `resource ceilings decline without certifying a candidate`() {
         val input = ExactContinuationInput(
             listOf(listOf(0 to BigFraction.ONE)),
