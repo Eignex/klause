@@ -39,12 +39,17 @@ internal class OpenPortfolio(
 
     /** Run the portfolio until an arm settles the model or [cancellation] fires. */
     fun solve(cancellation: Cancellation): OpenTheoryResult {
-        val workers = buildList {
-            request?.let { add(theoryWorker(it, armId = size)) }
-            addAll(localSearchWorkers(firstArm = size))
+        val firstLocalArm = if (request != null) 1 else 0
+        val localSearch = localSearchWorkers(firstLocalArm)
+        if (localSearch.isEmpty()) {
+            // With the theory as the only arm there is nothing to schedule, and slicing it would only rerun it
+            // from scratch each segment.
+            return request?.engine()?.solve(theoryParams.copy(cancellation = theoryParams.cancellation or cancellation))
+                ?: OpenTheoryResult.Unknown(TerminationReason.Unsupported, SolveStats.EMPTY)
         }
-        if (workers.isEmpty()) {
-            return OpenTheoryResult.Unknown(TerminationReason.Unsupported, SolveStats.EMPTY)
+        val workers = buildList {
+            request?.let { add(theoryWorker(it, armId = 0)) }
+            addAll(localSearch)
         }
         val portfolio = Portfolio.thompson(workers, lanes = 1, seed = seed, witnessCheck = witnessCheck())
         val result = portfolio.use { it.solve(cancellation) }

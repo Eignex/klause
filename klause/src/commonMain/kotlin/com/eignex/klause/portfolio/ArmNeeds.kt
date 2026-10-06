@@ -1,6 +1,6 @@
 package com.eignex.klause.portfolio
 
-import com.eignex.klause.localsearch.localSearchSupports
+import com.eignex.klause.localsearch.localSearchIsExact
 import com.eignex.klause.lp.bounding.LpAutoConfig
 import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.lp.bounding.LpEmphasis
@@ -15,7 +15,7 @@ internal sealed interface ArmNeed {
     /** An objective: the arm steers by it, so on a satisfaction model it is a copy of its base arm. */
     data object Objective : ArmNeed
 
-    /** A model local search can run; on any other it declines at once. */
+    /** A model local search scores exactly in its plain invariants; see `localSearchIsExact`. */
     data object LocalSearch : ArmNeed
 
     /** An LP relaxation with some technique to enable at [emphasis] under the run's `--lp` ceiling; without
@@ -54,7 +54,7 @@ internal class ProblemFacts(
         fun of(problem: BakedProblem, kind: Kind, lpCeiling: LpConfig): ProblemFacts = ProblemFacts(
             optimizing = kind == Kind.COP,
             realColumns = problem.numRealVars > 0,
-            localSearch = { localSearchSupports(problem) },
+            localSearch = { localSearchIsExact(problem) },
             relaxation = { emphasis ->
                 LpAutoConfig.resolve(problem, LpConfig(emphasis).cappedUnder(lpCeiling)) != LpPlan()
             },
