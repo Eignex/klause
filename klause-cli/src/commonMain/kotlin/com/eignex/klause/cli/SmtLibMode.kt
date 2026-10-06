@@ -75,8 +75,17 @@ internal object SmtLibMode : CliMode {
                     )
                 }
 
-                is SourceProblemRoute.UnsupportedOpen ->
-                    throw UnsupportedSmtException(unsupportedOpenReason(route.unplaceable, ints))
+                is SourceProblemRoute.UnsupportedOpen -> {
+                    if (parsed.objective != null) {
+                        throw UnsupportedSmtException(unsupportedOpenReason(route.unplaceable, ints))
+                    }
+                    openLocalSearchSolvable(
+                        route.problem,
+                        { assignment -> renderOpenTheoryModel(ints, bools, reals, assignment) },
+                        routingLpStats,
+                        routingElapsedMs,
+                    )
+                }
 
                 SourceProblemRoute.Refuted -> refutedSolvable(routingLpStats, routingElapsedMs)
             }

@@ -85,6 +85,10 @@ class OpenTheoryRequest internal constructor(
     )
 }
 
+/** The engine [OpenTheoryPipeline.execute] decides this satisfaction request on. */
+internal fun OpenTheoryRequest.engine(): OpenTheoryEngine =
+    OpenTheoryEngine(model, route, presolveConfig, solutionSetSensitive, presolveCancellation, presolveBudget)
+
 /** The common execution result for a complete open-model request. */
 sealed interface OpenTheoryExecution {
     /** Satisfiability result for a request without an objective. */
@@ -143,6 +147,22 @@ object OpenTheoryPipeline {
                 OpenPreparation(closed.spec, stats, closed.closedSides, infeasible = false)
         }
     }
+
+    /**
+     * Decide the satisfaction [request] on the open portfolio: its theory route as one arm and local-search arms over
+     * the source columns beside it, every local-search witness checked against the source model.
+     */
+    fun executePortfolio(request: OpenTheoryRequest, params: TheoryParams = TheoryParams()): OpenTheoryResult {
+        require(request.objective == null) { "the open portfolio decides satisfaction only" }
+        return OpenPortfolio(request.model, request, params).solve(params.cancellation or params.timeout)
+    }
+
+    /**
+     * Search [model], an open model no theory decides, with local search alone. It can show the model satisfiable and
+     * never shows it unsatisfiable.
+     */
+    fun searchWithoutTheory(model: Problem, params: TheoryParams = TheoryParams()): OpenTheoryResult =
+        OpenPortfolio(model, request = null, params).solve(params.cancellation or params.timeout)
 
     /** Execute [request] through its selected complete theory route. */
     fun execute(request: OpenTheoryRequest, params: TheoryParams = TheoryParams()): OpenTheoryExecution {

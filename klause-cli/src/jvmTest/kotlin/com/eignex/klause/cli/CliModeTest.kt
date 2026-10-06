@@ -326,6 +326,26 @@ class CliModeTest {
     }
 
     @Test
+    fun `an open SMT model is decided on the open portfolio when asked`() {
+        val smt = File.createTempFile("cliopenportfolio", ".smt2").apply {
+            writeText(
+                """
+                (declare-const x Int)
+                (declare-const y Int)
+                (assert (<= (+ (* 2 x) y) 3))
+                (check-sat)
+                """.trimIndent(),
+            )
+            deleteOnExit()
+        }
+        var code = -1
+        val out = capture { code = runCli(arrayOf("--param", "open-portfolio=true", smt.absolutePath)) }
+
+        assertEquals(0, code, out)
+        assertTrue(out.lines().firstOrNull() == "sat", out)
+    }
+
+    @Test
     fun `an open SMT LRA model renders an exact rational witness`() {
         val smt = File.createTempFile("clilra", ".smt2").apply {
             writeText(

@@ -56,6 +56,8 @@ sealed interface SourceProblemRoute {
     data class UnsupportedOpen(
         /** The column and factor that prevented routing, when one specific column caused the refusal. */
         val unplaceable: UnplaceableColumn?,
+        /** The model as routing proved it, which local search can still search for a witness. */
+        val problem: Problem,
     ) : SourceProblemRoute
 
     /**
@@ -129,7 +131,7 @@ private fun Problem.pipelineRouteObserved(
     }
     val request = OpenTheoryRequest(routed, objective, maximize, plan)
     return if (request.route == ProblemPipeline.UNSUPPORTED_OPEN || request.route == ProblemPipeline.FINITE_CP) {
-        SourceProblemRoute.UnsupportedOpen(request.componentPlan.unplaceable)
+        SourceProblemRoute.UnsupportedOpen(request.componentPlan.unplaceable, routed)
     } else {
         SourceProblemRoute.OpenTheory(request)
     }

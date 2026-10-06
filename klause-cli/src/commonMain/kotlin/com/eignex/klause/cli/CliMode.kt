@@ -608,6 +608,27 @@ internal fun openTheorySolvable(
     routingElapsedMs = routingElapsedMs,
 )
 
+/** Build an open model no theory decides, for local search to look for a witness of. */
+internal fun openLocalSearchSolvable(
+    model: Problem,
+    renderOpenTheory: (OpenTheoryAssignment) -> String,
+    routingLpStats: LpStats = LpStats(),
+    routingElapsedMs: Long = 0L,
+): Solvable = Solvable(
+    problem = null,
+    optimize = false,
+    maximize = false,
+    lsObjective = null,
+    linearObjective = null,
+    objVarId = null,
+    definitionalSweep = null,
+    render = { error("open local-search witnesses are rendered without narrowing to Sample") },
+    objectiveValue = null,
+    pipeline = SolvablePipeline.OpenLocalSearch(model, renderOpenTheory),
+    routingLpStats = routingLpStats,
+    routingElapsedMs = routingElapsedMs,
+)
+
 /**
  * Build an instance already decided unsatisfiable by routing, so no engine runs.
  *

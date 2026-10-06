@@ -77,11 +77,43 @@ internal object SolveCore {
         val (deadline, deadlineCancel) = deadlineCancellation(common)
         val (presolveCancel, presolveBudget) = presolveAllowance(common, deadlineCancel)
         when (val pipeline = rawSolvable.pipeline) {
+            is SolvablePipeline.OpenLocalSearch -> {
+                output.begin(optimize = false, maximize = false)
+                val result = OpenTheoryPipeline.searchWithoutTheory(
+                    pipeline.model,
+                    TheoryParams(cancellation = deadlineCancel, timeout = deadlineCancel),
+                )
+                output.onVerdictContext(
+                    VerdictContext(
+                        budgetExhausted = budgetSpent(common, result.stats.run.timedOut),
+                        terminationReason = (result as? OpenTheoryResult.Unknown)?.reason,
+                    ),
+                )
+                when (result) {
+                    is OpenTheoryResult.Sat -> {
+                        output.onSolution(pipeline.render(result.assignment), null)
+                        output.onComplete(Verdict.SATISFIABLE)
+                    }
+
+                    // Local search never refutes; an unsat here would be a bug, not a verdict to print.
+                    is OpenTheoryResult.Unsat, is OpenTheoryResult.Unknown -> output.onComplete(Verdict.UNKNOWN)
+                }
+                if (common.statistics) {
+                    output.onStatistics(
+                        result.stats,
+                        result.stats.run.wallMs + rawSolvable.routingElapsedMs,
+                        if (result is OpenTheoryResult.Sat) 1L else 0L,
+                    )
+                }
+                return
+            }
+
             is SolvablePipeline.OpenTheory -> {
                 val nodeLimit = takeOpenNodeLimit(common)
                 if (solutionSetSensitive) {
                     usageError("all-solution enumeration is unavailable for open theory models")
                 }
+                val openPortfolio = takeOpenBoolParam(common, "open-portfolio") ?: false
                 val theoryParams = TheoryParams(
                     maxLeaves = Long.MAX_VALUE,
                     openWorkLimit = nodeLimit ?: Long.MAX_VALUE,
@@ -137,12 +169,12 @@ internal object SolveCore {
                     return
                 }
                 output.begin(optimize = false, maximize = false)
-                val result = (
-                    OpenTheoryPipeline.execute(
-                        request,
-                        theoryParams,
-                    ) as OpenTheoryExecution.Satisfy
-                    ).result
+                // Local-search arms beside the theory are opt-in until the bench shows what they buy.
+                val result = if (openPortfolio) {
+                    OpenTheoryPipeline.executePortfolio(request, theoryParams)
+                } else {
+                    (OpenTheoryPipeline.execute(request, theoryParams) as OpenTheoryExecution.Satisfy).result
+                }
                 val resultStats = result.stats.copy(lp = result.stats.lp.mergedWith(rawSolvable.routingLpStats))
                 output.onVerdictContext(
                     VerdictContext(
@@ -287,6 +319,16 @@ internal object SolveCore {
             "engine param `open-branching` expects one of ${OpenBranching.entries.joinToString(", ") { it.id }}, " +
                 "got `$raw`",
         )
+    }
+
+    private fun takeOpenBoolParam(common: CommonOptions, key: String): Boolean? {
+        val entry = common.engineParams.firstOrNull { it.startsWith("$key=") } ?: return null
+        common.engineParams.remove(entry)
+        return when (val raw = entry.substringAfter('=').lowercase()) {
+            "true", "1", "on", "yes" -> true
+            "false", "0", "off", "no" -> false
+            else -> usageError("engine param `$key` expects a boolean, got `$raw`")
+        }
     }
 
     private fun takeOpenIntParam(common: CommonOptions, key: String, nonNegative: Boolean): Int? =
