@@ -1,30 +1,25 @@
 # mip: problems with the mip theme, drawn 2026-10-06 by klause-lab deploy/make-sets.py
-# tiers by the reference's time to prove: easy < 1 s, medium < 10 s, hard < 60 s or solved but unproven
-# easy: 10
-miplib2003/manna81
-miplib2003/opt1217
+# tiers by the reference's time to prove: easy < 1 s, medium < 10 s, hard < 60 s
+# easy: 8
+miplib2003/gesa2-o
 miplib2010/enlight14
-miplib2010/neos-1224597
-miplib2017/haprp
-miplib2017/mod008inf
-miplib3/bell5
-miplib3/vpm1
-orlib/gap12-5
-orlib/sppnw20
-# medium: 10
-miplib2003/disctom
-miplib2003/misc07
+miplib2010/enlight9
+miplib2017/misc04inf
+miplib2017/neos-3696678-lyvia
+miplib3/misc06
+orlib/scp41
+orlib/sppnw28
+# medium: 11
+miplib2003/fixnet6
+miplib2003/p2756
 miplib2010/ns1686196
 miplib2010/ns1745726
-miplib2017/neos-4984115-canche
-miplib2017/nh97_tension
-miplib3/air03
-miplib3/l152lav
-orlib/airland4
-orlib/sppnw18
-# hard: 5
-miplib2003/harp2
-miplib2010/berlin_5_8_0
-miplib2017/n3div36
-miplib3/mkc
-orlib/scpnre4
+miplib2017/exp-1-500-5-5
+miplib2017/neos4
+miplib2017/swath1
+miplib3/blend2
+miplib3/misc07
+orlib/mknapcb2-27
+orlib/scpb5
+# hard: 1
+miplib2010/roll3000

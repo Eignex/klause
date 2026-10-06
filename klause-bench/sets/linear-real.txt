@@ -1,30 +1,40 @@
 # linear-real: problems with the linear-real theme, drawn 2026-10-06 by klause-lab deploy/make-sets.py
-# tiers by the reference's time to prove: easy < 1 s, medium < 10 s, hard < 60 s or solved but unproven
-# easy: 10
+# tiers by the reference's time to prove: easy < 1 s, medium < 10 s, hard < 60 s
+# easy: 14
+hakank/contiguity_mip/contiguity_mip2
 hakank/furniture/furniture
 hakank/product_configuration/product_configuration
-miplib2003/fiber
-miplib2010/neos-1225589
-miplib2017/neos-3048764-nadi
-miplib3/egout
-orlib/cap84
-smtlib-qflira/LCTES/cruise-control.nosummaries
-smtlib-qflra/miplib/opt1217--11
-smtlib-qfrdl/skdmxa2/skdmxa-3x3-6.induction.cvc
-# medium: 10
-miplib2003/pp08aCUTS
-miplib2003/vpm2
-miplib2010/neos-1171692
-miplib2010/pigeon-10
-miplib2017/neos-3065804-namu
-miplib3/misc03
-miplib3/misc07
-orlib/cap113
-smtlib-qflra/miplib/pp08a-3000
-smtlib-qfrdl/sal/fischer6-mutex-19
-# hard: 5
-miplib2003/momentum3
-miplib2010/pigeon-13
-miplib2017/icir97_potential
-orlib/airland8
-smtlib-qflra/LassoRanker/CooperatingT2/brp_withassume.t2.c_Iteration1_Loop_4-lexTemplate
+hakank/relief_mission/relief_mission
+smtlib-qflira/LCTES/fly-by-wire.locals
+smtlib-qflra/LassoRanker/Ultimate/CooperatingT2_consts1.bpl_Iteration1_Lasso_7-phaseTemplate
+smtlib-qflra/TM/p-2-bucket_s11
+smtlib-qflra/check/bignum_lra1
+smtlib-qflra/keymaera/bouncing-ball-inv-node1886
+smtlib-qflra/sc/sc-33.induction2.cvc
+smtlib-qfrdl/check/bignum_rdl2
+smtlib-qfrdl/sal/fischer9-mutex-5
+smtlib-qfrdl/skdmxa/skdmxa-3x3-5
+smtlib-qfrdl/skdmxa2/skdmxa-3x3-9.induction.cvc
+# medium: 20
+smtlib-qflra/2017-Heizmann-UltimateInvariantSynthesis/_gj2007.c.i_4_3_3.bpl_7
+smtlib-qflra/2019-ezsmt/Labyrinth/SCC_Strong/0003-labyrinth-11-0
+smtlib-qflra/2019-ezsmt/blending/6
+smtlib-qflra/DTP-Scheduling/constraints-tempo-width-60
+smtlib-qflra/LassoRanker/CooperatingT2/mc91test.t2.c_Iteration6_Loop_4-pieceTemplate
+smtlib-qflra/TM/p6-zenonumeric_s9
+smtlib-qflra/clock_synchro/clocksynchro_6clocks.main_invar.induct
+smtlib-qflra/clock_synchro/clocksynchro_7clocks.main_invar.induct
+smtlib-qflra/miplib/pp08a-11000
+smtlib-qflra/sc/sc-23.base.cvc
+smtlib-qflra/tta_startup/simple_startup_5nodes.abstract.induct
+smtlib-qflra/uart/uart-22.base.cvc
+smtlib-qfrdl/SMT-Temporal-Planning-Benchmarks/tms-2-3-light-60
+smtlib-qfrdl/SMT-Temporal-Planning-Benchmarks/tms-2-3-light-70
+smtlib-qfrdl/sal/fischer6-mutex-17
+smtlib-qfrdl/sal/fischer6-mutex-18
+smtlib-qfrdl/scheduling/orb02_888
+smtlib-qfrdl/scheduling/orb10_944
+smtlib-qfrdl/skdmxa/skdmxa-3x3-15
+smtlib-qfrdl/skdmxa2/skdmxa-3x3-13.base.cvc
+# hard: 1
+smtlib-qflra/sc/sc-29.base.cvc
