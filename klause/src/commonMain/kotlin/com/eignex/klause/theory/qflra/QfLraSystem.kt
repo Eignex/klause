@@ -134,8 +134,8 @@ internal class LiveQfLraSystem(private val source: Problem, private val lp: LpPr
     private val canonicalTerms = HashMap<Map<Int, BigFraction>, Map<Int, BigFraction>>()
     private val normalized = source.factors.flatMap { it.linearRows }.map { row ->
         row.exactComparison(source.numRealVars, true) { false }.terms
-    }.associateWith { intern(it, declaredFixed) }.toMutableMap()
-    private val terms = normalized.values.map { it.coefficients }.filter { it.size != 1 }.distinct()
+    }.associateTo(HashMap()) { SmtTermKey.of(it) to SmtTermSlot(intern(it, declaredFixed)) }
+    private val terms = normalized.values.map { it.term.coefficients }.filter { it.size != 1 }.distinct()
     private val definitions = terms.withIndex().associate { (index, term) -> term to columns + index }.toMutableMap()
 
     fun install(): Boolean {
@@ -169,7 +169,7 @@ internal class LiveQfLraSystem(private val source: Problem, private val lp: LpPr
     }
 
     fun assertRow(row: ExactRationalInequality, premise: SearchAtomPremise): Boolean = assertTerms(
-        row.columns.indices.associate { row.columns[it] to row.coefficients[it] },
+        SmtTermKey(row.columns, row.coefficients.toTypedArray()),
         true,
         row.rhs,
         row.strict,
@@ -178,7 +178,7 @@ internal class LiveQfLraSystem(private val source: Problem, private val lp: LpPr
 
     fun assertAtom(atom: SourceBoundAtom, premise: SearchAtomPremise): Boolean {
         val expression = sourceTerms(atom) ?: return false
-        return assertTerms(expression, atom.upper, atom.threshold, atom.strict, premise)
+        return assertTerms(SmtTermKey.of(expression), atom.upper, atom.threshold, atom.strict, premise)
     }
 
     fun sourceTerms(atom: SourceBoundAtom): Map<Int, BigFraction>? {
@@ -201,21 +201,32 @@ internal class LiveQfLraSystem(private val source: Problem, private val lp: LpPr
     }
 
     private fun assertTerms(
-        expression: Map<Int, BigFraction>,
+        key: SmtTermKey,
         upper: Boolean,
         threshold: BigFraction,
         strict: Boolean,
         premise: SearchAtomPremise,
     ): Boolean {
-        val fixed = rootFixedColumns(expression)
-        val term = if (fixed.isEmpty()) {
-            normalized.getOrPut(expression.toMap()) { intern(expression, declaredFixed) }
+        val fixed = rootFixedColumns(key.columns)
+        val slot = if (fixed.isEmpty()) {
+            normalized.getOrPut(key) { SmtTermSlot(intern(key.expression(), declaredFixed)) }
         } else {
-            intern(expression, declaredFixed + fixed)
+            SmtTermSlot(intern(key.expression(), declaredFixed + fixed))
         }
-        val coefficients = term.coefficients
-        val column = coefficients.keys.singleOrNull() ?: definitions[coefficients] ?: run {
-            val state = lp.state ?: return false
+        val term = slot.term
+        val column = slot.column.takeIf { it >= 0 } ?: (definitionColumn(term.coefficients) ?: return false)
+        slot.column = column
+        return lp.assertBound(
+            column,
+            if (term.scale.signum() < 0) !upper else upper,
+            ExactLpSide(ExactLpNumber.of(term.bound(threshold)), strict),
+            term.premise(premise),
+        )
+    }
+
+    private fun definitionColumn(coefficients: Map<Int, BigFraction>): Int? =
+        coefficients.keys.singleOrNull() ?: definitions[coefficients] ?: run {
+            val state = lp.state ?: return null
             val id = state.rows.lastId + 1L
             val next = state.model.numVars
             if (!lp.append(
@@ -228,28 +239,21 @@ internal class LiveQfLraSystem(private val source: Problem, private val lp: LpPr
                     scoped = false,
                 )
             ) {
-                return false
+                return null
             }
             definitions[coefficients] = next
             next
         }
-        return lp.assertBound(
-            column,
-            if (term.scale.signum() < 0) !upper else upper,
-            ExactLpSide(ExactLpNumber.of(term.bound(threshold)), strict),
-            term.premise(premise),
-        )
-    }
 
     private fun intern(expression: Map<Int, BigFraction>, fixed: Map<Int, FixedSmtColumn>): NormalizedSmtTerm {
         val term = normalizeSmtTerm(expression, fixed)
         return term.copy(coefficients = canonicalTerms.getOrPut(term.coefficients) { term.coefficients })
     }
 
-    private fun rootFixedColumns(expression: Map<Int, BigFraction>): Map<Int, FixedSmtColumn> {
+    private fun rootFixedColumns(columns: IntArray): Map<Int, FixedSmtColumn> {
         val state = lp.state ?: return emptyMap()
         if (state.depth != 0) return emptyMap()
-        val fixed = expression.keys.filter { column ->
+        val fixed = columns.filter { column ->
             if (column in declaredFixed) return@filter false
             val lower = state.activeSide(column, false)?.side ?: return@filter false
             val upper = state.activeSide(column, true)?.side ?: return@filter false
@@ -271,4 +275,28 @@ internal class LiveQfLraSystem(private val source: Problem, private val lp: LpPr
             )
         }
     }
+}
+
+// A term as a lookup key: columns ascending, with the hash taken once, since every theory check reasserts the same
+// rows and a map-keyed lookup pays a hash probe per entry to compare.
+private class SmtTermKey(val columns: IntArray, private val coefficients: Array<BigFraction>) {
+    private val hash = 31 * columns.contentHashCode() + coefficients.contentHashCode()
+
+    fun expression(): Map<Int, BigFraction> = columns.indices.associate { columns[it] to coefficients[it] }
+
+    override fun hashCode(): Int = hash
+
+    override fun equals(other: Any?): Boolean = other is SmtTermKey && hash == other.hash &&
+        columns.contentEquals(other.columns) && coefficients.contentEquals(other.coefficients)
+
+    companion object {
+        fun of(expression: Map<Int, BigFraction>): SmtTermKey {
+            val entries = expression.entries.sortedBy { it.key }
+            return SmtTermKey(IntArray(entries.size) { entries[it].key }, Array(entries.size) { entries[it].value })
+        }
+    }
+}
+
+private class SmtTermSlot(val term: NormalizedSmtTerm) {
+    var column: Int = -1
 }
