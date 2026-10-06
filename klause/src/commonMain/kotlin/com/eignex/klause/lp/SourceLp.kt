@@ -28,7 +28,8 @@ import com.eignex.klause.simplex.exact.ExactDoubleBoundedSplit
 import com.eignex.klause.simplex.exact.ExactRationalInequality
 import com.eignex.klause.solver.result.SourceLpWorkStats
 import com.eignex.klause.util.Cancellation
-import kotlin.time.TimeMark
+import kotlin.time.ComparableTimeMark
+import kotlin.time.Duration.Companion.nanoseconds
 import kotlin.time.TimeSource.Monotonic
 
 internal class SourceLpBudget(
@@ -109,7 +110,7 @@ internal class SourceLpBudget(
         }
     }
 
-    private var activeStart: TimeMark? = null
+    private var activeStart: ComparableTimeMark? = null
 
     fun <T> run(
         rows: List<ExactRationalInequality>,
@@ -142,8 +143,18 @@ internal class SourceLpBudget(
         val outermost = activeStart == null
         if (outermost) activeStart = Monotonic.markNow()
         val start = checkNotNull(activeStart)
-        val token = Cancellation {
-            cancellation() || start.elapsedNow().inWholeNanoseconds >= maxActiveNanos - activeNanos
+        val activeEnd = start + (maxActiveNanos - activeNanos).nanoseconds
+        val callerEnd = cancellation.deadline()
+        // States when it fires, so a phase handed it can budget a share of the time left (Cancellation.shorten).
+        val token = object : Cancellation {
+            override fun isCancelled(): Boolean =
+                cancellation() || start.elapsedNow().inWholeNanoseconds >= maxActiveNanos - activeNanos
+
+            override fun deadline(): ComparableTimeMark = if (callerEnd != null && callerEnd < activeEnd) {
+                callerEnd
+            } else {
+                activeEnd
+            }
         }
         try {
             val groups = listOf(rows) + additional

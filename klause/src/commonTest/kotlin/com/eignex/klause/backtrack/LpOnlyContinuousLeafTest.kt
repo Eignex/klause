@@ -7,6 +7,8 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.LocalSearchSolver
 import com.eignex.klause.lp.bounding.LpPlan
+import com.eignex.klause.lp.engine.LpCertificationPolicy
+import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.lp.engine.LpVerdict
 import com.eignex.klause.lp.relaxation.leafRealFeasibility
 import com.eignex.klause.propagation.bake
@@ -222,6 +224,21 @@ class LpOnlyContinuousLeafTest {
         val unbounded = assertIs<MinimizeResult.Unbounded>(result)
         assertTrue(unbounded.direction.single().signum() > 0)
         assertTrue(unbounded.sample.ints[0] - unbounded.sample.reals[0] <= 1.0)
+    }
+
+    @Test
+    fun `a leaf only tolerance accepts completes the minimize as optimal`() {
+        // 3 r = 1 has the exact optimum r = 1/3, which a vetoing policy keeps every exact certifier from proving.
+        val row = Linear(longArrayOf(), intArrayOf(), doubleArrayOf(3.0), intArrayOf(0), LinearOp.EQ, 1L)
+        val p = problem(0, emptyArray(), 0.0, 2.0, row).bake()
+        val vetoed = LpSolveContext(certificationPolicy = LpCertificationPolicy { _, _ -> false })
+        val objective = LinearObjective(realCoefficients = doubleArrayOf(1.0))
+        val cases = listOf<Pair<((Sample) -> Boolean)?, Boolean>>(null to false, { _: Sample -> true } to true)
+        for ((check, optimal) in cases) {
+            val result = BacktrackSolver(p, vetoed).minimize(objective, BacktrackParams(toleranceCheck = check))
+
+            assertEquals(optimal, result is MinimizeResult.Optimal, "tolerance check present: ${check != null}")
+        }
     }
 
     @Test

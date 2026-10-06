@@ -14,6 +14,7 @@ import com.eignex.kumulant.core.Concurrency
 import com.eignex.kumulant.stream.lock
 import kotlin.concurrent.atomics.AtomicBoolean
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
+import kotlin.time.ComparableTimeMark
 import kotlin.time.TimeSource
 
 /**
@@ -55,7 +56,7 @@ class Portfolio(
      */
     override fun solve(cancellation: Cancellation): SolveResult {
         val winnerFlag = AtomicBoolean(false)
-        val token: Cancellation = { winnerFlag.load() || cancellation() }
+        val token = cancellation.alsoStoppedBy(winnerFlag)
         val cancelToken: Cancellation = when (strategy) {
             PortfolioStrategy.RaceFirstFeasible -> token
             PortfolioStrategy.Exhaustive -> cancellation
@@ -91,7 +92,7 @@ class Portfolio(
     ): MinimizeResult {
         val incumbent = IncumbentExchange.minimizing<Sample>()
         val cancelled = AtomicBoolean(false)
-        val token: Cancellation = { cancelled.load() || cancellation() }
+        val token = cancellation.alsoStoppedBy(cancelled)
         fun readBound(): Double = incumbent.bound()
         // Workers improve concurrently; [relay] serialises the attribution callback and holds it to the
         // order the exchange installed the improvements, so the consumer (e.g. the CLI's `-s` per-arm line)
@@ -176,7 +177,7 @@ class Portfolio(
         val incumbent = IncumbentExchange.minimizing<Sample>()
         val relay = ImprovementRelay(Concurrency.Strict.lock())
         fun readBound(): Double = incumbent.bound()
-        val token: Cancellation = { streamStop.load() || cancellation() }
+        val token = cancellation.alsoStoppedBy(streamStop)
         return parallelStream(
             workers.map { worker ->
                 { emit: (AttributedImprovement) -> Unit ->
@@ -211,7 +212,7 @@ class Portfolio(
      * worker runs to its own budget or until [cancellation]; stop early by flipping [cancellation].
      */
     fun samples(cancellation: Cancellation = Cancellation.Never): Sequence<Sample> {
-        val token: Cancellation = { streamStop.load() || cancellation() }
+        val token = cancellation.alsoStoppedBy(streamStop)
         return parallelStream(
             workers.map { worker -> { emit: (Sample) -> Unit -> for (s in worker.samples(token)) emit(s) } },
         )
@@ -232,4 +233,16 @@ sealed interface PortfolioStrategy {
 
     /** Run every worker to its own budget without cross-worker cancellation, then reduce. */
     data object Exhaustive : PortfolioStrategy
+}
+
+// The caller's token that also stops on [flag]. It keeps the caller's deadline, so a phase a worker hands it can
+// budget a share of the time left (Cancellation.shorten), and like a bare predicate it carries no work meter.
+private fun Cancellation.alsoStoppedBy(flag: AtomicBoolean): Cancellation {
+    val caller = this
+    val deadline = caller.deadline()
+    return object : Cancellation {
+        override fun isCancelled(): Boolean = flag.load() || caller()
+
+        override fun deadline(): ComparableTimeMark? = deadline
+    }
 }
