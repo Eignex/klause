@@ -96,6 +96,7 @@ internal fun vivify(
     val numBool = session.problem.numBoolVars
     val replacements = ArrayList<IntArray>()
     val replacementLbds = IntArrayList()
+    val replacementOrigins = IntArrayList()
     val dropped = IntHashSet()
     var cursor = if (startCursor in 0 until count) startCursor else 0
     repeat(minOf(params.vivifyBatch.coerceAtLeast(1), count)) {
@@ -110,11 +111,14 @@ internal fun vivify(
             dropped.add(index)
             replacements += strengthened
             replacementLbds.add(minOf(session.learnedClauseLbd(index), strengthened.size))
+            replacementOrigins.add(session.learnedClauseOrigin(index))
         }
     }
     if (replacements.isEmpty()) return cursor
     session.forgetLearnedClauses { index, _ -> index !in dropped }
-    for (index in replacements.indices) session.addLearnedClause(Clause(replacements[index]), replacementLbds[index])
+    for (index in replacements.indices) {
+        session.addLearnedClause(Clause(replacements[index]), replacementLbds[index], replacementOrigins[index])
+    }
     return 0
 }
 

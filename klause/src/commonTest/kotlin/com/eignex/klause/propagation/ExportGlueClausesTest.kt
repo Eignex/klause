@@ -27,4 +27,15 @@ class ExportGlueClausesTest {
         assertEquals(2, all.size, "both exported by default")
         assertEquals(1, gated.size, "the permanent search-conditioned clause is withheld")
     }
+
+    @Test
+    fun `a clause another arm originated is left for that arm to publish`() {
+        val session = PropagationSession(Problem(3, 0, emptyArray(), emptyList()))
+        session.addLearnedClause(Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))), lbd = 2)
+        session.addLearnedClause(Clause(intArrayOf(Lit.make(1, true), Lit.make(2, true))), lbd = 2, origin = 1)
+
+        val exported = session.exportGlueClauses(maxLbd = 4, maxLen = 8)
+
+        assertEquals(1, exported.size)
+    }
 }
