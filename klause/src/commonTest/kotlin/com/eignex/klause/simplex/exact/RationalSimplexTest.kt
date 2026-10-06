@@ -5,6 +5,7 @@ import com.eignex.klause.lp.engine.Relation
 import com.eignex.klause.lp.engine.Sense
 import com.eignex.klause.util.Cancellation
 import com.ionspin.kotlin.bignum.integer.BigInteger
+import kotlin.math.sign
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -192,6 +193,15 @@ class RationalSimplexTest {
         for (a in fractionSamples) {
             for (b in fractionSamples) {
                 assertEquals(BigFraction.of(a.num * b.num, a.den * b.den), a * b, "$a * $b")
+            }
+        }
+    }
+
+    @Test
+    fun `fraction comparison matches the cross product`() {
+        for (a in fractionSamples) {
+            for (b in fractionSamples) {
+                assertEquals((a.num * b.den).compareTo(b.num * a.den).sign, a.compareTo(b).sign, "$a vs $b")
             }
         }
     }
