@@ -21,6 +21,7 @@ import com.eignex.kumulant.stream.lock
 import kotlin.concurrent.atomics.AtomicBoolean
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.random.Random
+import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TimeSource
 
@@ -260,15 +261,30 @@ class Portfolio(
             }
         }
 
-        // Offer [claim]'s arm's candidate: refuted, it marks the arm faulty; verified, it goes to [install].
-        fun accept(claim: Claim, r: MinimizeResult.WithSample) {
-            if (claim.fault != null || !r.objective.isFinite() || r.objective >= readBound()) return
-            // Checked outside the lock: re-deriving a whole assignment is the costly part, and peers need not wait.
+        // Check [claim]'s waiting candidate: refuted, it marks the arm faulty; verified, it goes to [install]. Checked
+        // outside the lock: re-deriving a whole assignment is the costly part, and peers need not wait.
+        fun check(claim: Claim) {
+            val r = claim.pending ?: return
+            claim.pending = null
+            if (claim.fault != null || r.objective >= readBound()) return
+            val started = TimeSource.Monotonic.markNow()
             witnessCheck?.refute(r.sample, r.objective)?.let {
                 claim.fault = "claimed an incumbent the problem refutes: $it"
                 return
             }
+            claim.checked(started.elapsedNow())
             run.locked { install(claim, r) }
+        }
+
+        // Offer [claim]'s arm's candidate. Re-deriving a whole assignment can cost far more than the search took to
+        // find it, and on a model whose incumbents come a millisecond apart a check on each one leaves the arm
+        // verifying instead of searching. So the best candidate waits, and is checked once checks have taken no more
+        // than [CHECK_SHARE] of the arm's time; whatever still waits is checked as the segment ends.
+        fun accept(claim: Claim, r: MinimizeResult.WithSample) {
+            if (claim.fault != null || !r.objective.isFinite() || r.objective >= readBound()) return
+            val waiting = claim.pending
+            if (waiting == null || r.objective < waiting.objective) claim.pending = r
+            if (claim.checkDue()) check(claim)
         }
 
         run.execute { claim ->
@@ -308,6 +324,7 @@ class Portfolio(
             val failed = failure != null
             if (failure is UnsoundnessException) claim.fault = failure.message
             (terminal as? MinimizeResult.WithSample)?.let { accept(claim, it) }
+            check(claim)
             if (terminal is MinimizeResult.Infeasible && incumbent.current() != null) {
                 claim.fault = "claimed infeasibility while the pool holds a verified solution"
             }
@@ -368,6 +385,17 @@ class Portfolio(
 
         // Why the segment's claim was refuted, when it was; the arm is quarantined as the segment settles.
         var fault: String? = null
+
+        // The best incumbent the segment found that is not checked yet, and when the next check is due.
+        var pending: MinimizeResult.WithSample? = null
+        private var nextCheck = TimeSource.Monotonic.markNow()
+
+        fun checkDue(): Boolean = nextCheck.hasPassedNow()
+
+        /** A check that took [cost] defers the next until checking has used no more than [CHECK_SHARE] of the time. */
+        fun checked(cost: Duration) {
+            nextCheck = TimeSource.Monotonic.markNow() + cost * ((1.0 - CHECK_SHARE) / CHECK_SHARE)
+        }
     }
 
     /**
@@ -629,6 +657,9 @@ class Portfolio(
         )
     }
 }
+
+// Most of an arm's time incumbent checks may take; see `Portfolio.minimize`.
+private const val CHECK_SHARE = 0.2
 
 /**
  * Local-search instructions that cost as much as one backtrack search node, LP work included: the median ratio of

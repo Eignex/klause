@@ -42,6 +42,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.TimeSource
 
@@ -124,12 +125,13 @@ private class CountingResumableSolver(
 }
 
 /**
- * A resumable arm that spends each slice whole and offers an incumbent on the slices [offers] picks, lowering its
- * objective by one each time.
+ * A resumable arm that spends each slice whole and offers [perSlice] incumbents on the slices [offers] picks, lowering
+ * its objective by one each time.
  */
 private class ScriptedSearch(
     private val offers: (slice: Int) -> Boolean,
     start: Double = 1_000.0,
+    private val perSlice: Int = 1,
     private val onSlice: () -> Unit,
 ) : ResumableSearch {
     private var spent = 0L
@@ -143,11 +145,13 @@ private class ScriptedSearch(
         onIncumbent: (MinimizeResult.WithSample) -> Unit,
     ): MinimizeResult? {
         onSlice()
-        spent += sliceNodes
+        spent += sliceNodes.coerceAtLeast(0L)
         if (offers(slices++)) {
-            objective -= 1.0
-            val empty = Sample(BooleanArray(0), LongArray(0))
-            onIncumbent(MinimizeResult.BestFound(empty, objective, TerminationReason.BudgetExhausted))
+            repeat(perSlice) {
+                objective -= 1.0
+                val empty = Sample(BooleanArray(0), LongArray(0))
+                onIncumbent(MinimizeResult.BestFound(empty, objective, TerminationReason.BudgetExhausted))
+            }
         }
         return null
     }
@@ -775,6 +779,29 @@ class PortfolioTest {
         assertTrue(assertIs<SolveResult.Sat>(r).assignment.bools[0])
         assertEquals(listOf("bogus"), faults.map { it.workerLabel })
         assertEquals(listOf(1L, 0L), r.stats.portfolio.arms.map { it.faults })
+    }
+
+    @Test
+    fun `a slow incumbent check runs far less often than incumbents arrive and the best one still installs`() {
+        var slices = 0
+        val workers = listOf(
+            trackingWorker("fast", 0, ScriptedSearch({ true }, perSlice = 200) { slices++ }),
+            trackingWorker("idle", 1, ScriptedSearch({ false }) {}),
+        )
+        var checks = 0
+        val slowCheck = WitnessCheck { _, _ ->
+            checks++
+            val until = TimeSource.Monotonic.markNow() + 2.milliseconds
+            while (!until.hasPassedNow()) Unit
+            null
+        }
+
+        val r = Portfolio.thompson(workers, witnessCheck = slowCheck).use {
+            it.minimize(Cancellation { slices >= 3 })
+        }
+
+        assertTrue(checks < 20, "$checks checks for ${200 * slices} incumbents")
+        assertEquals(1_000.0 - 200 * slices, assertIs<MinimizeResult.WithSample>(r).objectiveValue)
     }
 
     @Test
