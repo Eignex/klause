@@ -53,6 +53,20 @@ internal class RewardLedger(
     fun settle(arm: Int, work: Long): Double {
         val segmentWork = work.coerceAtLeast(1L)
         spentByArm[arm] += segmentWork
+        return score(arm, segmentWork)
+    }
+
+    /** Whether [arm] holds credit no settle has paid out yet. */
+    fun hasPending(arm: Int): Boolean = pending.any { it[arm] > 0.0 }
+
+    /**
+     * Settle the credit [arm] earned while it was not running, scored as if over [overWork] of its own work. No work
+     * is charged: the credit came from other arms using what this one shared.
+     */
+    fun settleIdle(arm: Int, overWork: Long): Double = score(arm, overWork.coerceAtLeast(1L))
+
+    // Clear [arm]'s pending credit and score it over [segmentWork].
+    private fun score(arm: Int, segmentWork: Long): Double {
         var share = 0.0
         var signals = 0
         for (s in pending.indices) {

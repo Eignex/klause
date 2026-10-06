@@ -514,6 +514,12 @@ class Portfolio(
             val reward = if (failed) 0.0 else earned
             val weight = (if (failed) maxOf(work, claim.sliceWork) else work).toDouble() / claim.sliceWork
             bandit.update(arm, reward, weight)
+            // Credit an arm earns while others run, from peers using what it shared, pays out now as one segment's
+            // evidence: an arm the policy has stopped picking would otherwise hold it forever.
+            for (other in workers.indices) {
+                if (other == arm || busy[other] || retired[other] || !ledger.hasPending(other)) continue
+                bandit.update(other, ledger.settleIdle(other, claim.sliceWork), 1.0)
+            }
             log.record(arm, work, reward, failed)
             // The probe runs at the base slice for every arm, so its cost stays flat in the arm count.
             if (!claim.probing) {
