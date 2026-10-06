@@ -55,9 +55,11 @@ class LocalSearchModelTest {
     }
 
     @Test
-    fun `an open model never refutes`() {
-        val model = LocalSearchModel.open(openProblem(), arrayOf(IntDomain(-3, 3), IntDomain(-3, 3)))
+    fun `an open side is searched through a window around zero`() {
+        val model = LocalSearchModel.open(openProblem())
 
+        assertEquals(-(1L shl 30) + 1, model.domains[0].min)
+        assertEquals((1L shl 30) - 1, model.domains[0].max)
         assertFalse(model.refutesModel)
     }
 
@@ -67,9 +69,9 @@ class LocalSearchModelTest {
             Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.EQ, 7),
             Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 1),
         )
-        val model = LocalSearchModel.open(problem, arrayOf(IntDomain(-20, 20), IntDomain(-20, 20)))
 
-        val result = LocalSearchEngine(model).solve(LocalSearchParams(maxFlips = 20_000, randomSeed = 3), warm = null)
+        val result = LocalSearchEngine(LocalSearchModel.open(problem))
+            .solve(LocalSearchParams(maxFlips = 200_000, randomSeed = 3), warm = null)
 
         val sat = assertIs<SolveResult.Sat>(result)
         assertEquals(4L, sat.assignment.ints[0])

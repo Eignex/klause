@@ -1,6 +1,5 @@
 package com.eignex.klause.localsearch.movesource
 
-import com.eignex.klause.ir.randomValue
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
 
@@ -64,7 +63,7 @@ class GreedyInit {
                     }
                 } else {
                     repeat(maxTries) {
-                        val candidate = d.randomValue(state.rng)
+                        val candidate = state.randomIntValue(intId)
                         if (candidate == cur) return@repeat
                         state.apply(Move.IntSet(intId, candidate))
                         if (state.cost < bestCost) {

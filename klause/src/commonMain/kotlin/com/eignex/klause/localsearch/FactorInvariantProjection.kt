@@ -12,9 +12,14 @@ import com.eignex.klause.factor.scheduling.*
 import com.eignex.klause.factor.symmetry.SymmetryHandling
 import com.eignex.klause.factor.table.*
 import com.eignex.klause.ir.Factor
+import com.eignex.klause.ir.IntDomain
 
-/** Builds the local-search-engine view of immutable factor data. */
-internal fun Factor.invariantProjection(): Invariant = when (this) {
+/**
+ * Builds the local-search-engine view of immutable factor data. [domains], when given, are the domains the search
+ * moves over: a linear row whose running sum can leave the 64-bit range over them takes the exact
+ * [ExactLinearInvariant].
+ */
+internal fun Factor.invariantProjection(domains: Array<IntDomain>? = null): Invariant = when (this) {
     is AllDifferent -> AllDifferentInvariant(
         vars,
         domainMin,
@@ -63,7 +68,14 @@ internal fun Factor.invariantProjection(): Invariant = when (this) {
 
     is LexLess -> LexLessInvariant(xs, ys, strict)
 
-    is Linear -> integerConstants?.let { LinearInvariant(it.coeffs, vars, op, it.bound) } ?: NoInvariant
+    is Linear -> integralConstants?.let { integral ->
+        val integer = integerConstants
+        if (integer != null && (domains == null || !needsExactSum(integer, vars, domains))) {
+            LinearInvariant(integer.coeffs, vars, op, integer.bound)
+        } else {
+            ExactLinearInvariant(integral, vars, op)
+        }
+    } ?: NoInvariant
 
     is Mdd -> MddInvariant(seq, numStatesPerLayer, layerStarts, transitions, initial, accepting, recordStride, cost)
 
@@ -83,9 +95,13 @@ internal fun Factor.invariantProjection(): Invariant = when (this) {
 
     is ReifiedCardinality -> ReifiedCardinalityInvariant(auxBoolVar, literals, min, max, boolVars)
 
-    is ReifiedLinear -> integerConstants?.let {
-        ReifiedLinearInvariant(auxBoolVar, it.coeffs, vars, op, it.bound)
-    } ?: NoInvariant
+    is ReifiedLinear -> integerConstants.let { integer ->
+        if (integer != null && (domains == null || !needsExactSum(integer, vars, domains))) {
+            ReifiedLinearInvariant(auxBoolVar, integer.coeffs, vars, op, integer.bound)
+        } else {
+            ExactLinearInvariant(constants, vars, op, auxBoolVar)
+        }
+    }
 
     is ReifiedPseudoBoolean -> ReifiedPseudoBooleanInvariant(auxBoolVar, weights, literals, op, bound, boolVars)
 

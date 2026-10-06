@@ -3500,6 +3500,7 @@ public final class com/eignex/klause/localsearch/IteratedLocalSearchRestart$Incu
 
 public final class com/eignex/klause/localsearch/LocalSearchModel {
 	public static final field Companion Lcom/eignex/klause/localsearch/LocalSearchModel$Companion;
+	public final fun getAnchoredSampling ()Z
 	public final fun getDomains ()[Lcom/eignex/klause/ir/IntDomain;
 	public final fun getProblem ()Lcom/eignex/klause/ir/Problem;
 	public final fun getRefutesModel ()Z
@@ -3508,6 +3509,7 @@ public final class com/eignex/klause/localsearch/LocalSearchModel {
 
 public final class com/eignex/klause/localsearch/LocalSearchModel$Companion {
 	public final fun of (Lcom/eignex/klause/propagation/BakedProblem;)Lcom/eignex/klause/localsearch/LocalSearchModel;
+	public final fun open (Lcom/eignex/klause/ir/Problem;)Lcom/eignex/klause/localsearch/LocalSearchModel;
 	public final fun open (Lcom/eignex/klause/ir/Problem;[Lcom/eignex/klause/ir/IntDomain;)Lcom/eignex/klause/localsearch/LocalSearchModel;
 }
 
@@ -3551,7 +3553,8 @@ public final class com/eignex/klause/localsearch/LocalSearchParams : com/eignex/
 }
 
 public final class com/eignex/klause/localsearch/LocalSearchProblem {
-	public fun <init> (Lcom/eignex/klause/ir/Problem;)V
+	public fun <init> (Lcom/eignex/klause/ir/Problem;[Lcom/eignex/klause/ir/IntDomain;)V
+	public synthetic fun <init> (Lcom/eignex/klause/ir/Problem;[Lcom/eignex/klause/ir/IntDomain;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun getBoolOccurrences ()[[I
 	public final fun getIntOccurrences ()[[I
 	public final fun getInvariants ()[Lcom/eignex/klause/localsearch/Invariant;
@@ -3665,6 +3668,7 @@ public final class com/eignex/klause/localsearch/LocalSearchState {
 	public final fun netDelta (Lcom/eignex/klause/localsearch/Move;)J
 	public final fun objectiveDelta (Lcom/eignex/klause/solver/objective/Objective;Lcom/eignex/klause/localsearch/Move;)Ljava/lang/Double;
 	public final fun proposeMovesFromRandomViolated ()Ljava/util/List;
+	public final fun randomIntValue (I)J
 	public final fun recompute ()V
 	public final fun resetStepCounters ()V
 	public final fun restart ()V

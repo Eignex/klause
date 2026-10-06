@@ -1,6 +1,5 @@
 package com.eignex.klause.localsearch
 
-import com.eignex.klause.ir.randomValue
 import com.eignex.klause.localsearch.schedule.AdaptivePolicy
 import com.eignex.klause.localsearch.schedule.RoundLog
 import com.eignex.klause.solver.Sample
@@ -94,10 +93,7 @@ internal fun anchorAndPerturb(
                         val fid = state.rng.nextInt(numFactors)
                         val f = state.problem.factors[fid]
                         for (b in f.boolVars) state.assignment.flipBool(b)
-                        for (i in f.intVars) {
-                            val d = state.rootDomains[i]
-                            state.assignment.setInt(i, d.randomValue(state.rng))
-                        }
+                        for (i in f.intVars) state.assignment.setInt(i, state.randomIntValue(i))
                     }
                 }
             }
@@ -114,8 +110,7 @@ private fun kickRandomVar(state: LocalSearchState) {
         state.assignment.flipBool(pick)
     } else {
         val v = pick - problem.numBoolVars
-        val d = state.rootDomains[v]
-        state.assignment.setInt(v, d.randomValue(state.rng))
+        state.assignment.setInt(v, state.randomIntValue(v))
     }
 }
 

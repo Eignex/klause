@@ -14,7 +14,7 @@ import com.eignex.klause.propagation.propagate
  *
  * A finite model reaches local search through [of], which reads the root-propagated domains and deductions of a
  * [BakedProblem]. A model with an open integer side has no finite domain to bake and reaches it through [open]:
- * the columns move over domains the caller chose, nothing is pinned at the root, and nothing local search
+ * the columns move over windows of their declared ranges, nothing is pinned at the root, and nothing local search
  * concludes refutes the model.
  */
 class LocalSearchModel private constructor(
@@ -26,6 +26,9 @@ class LocalSearchModel private constructor(
     /** Whether an assignment refuted by [pinsUnder] refutes the model, so local search may report it
      *  infeasible. False when the domains were not declared by the model. */
     val refutesModel: Boolean,
+    /** Whether random values are drawn near a column's current value rather than uniformly over its domain:
+     *  set for domains whose endpoints a caller chose, where uniform draws land arbitrarily far out. */
+    val anchoredSampling: Boolean,
 ) {
     /**
      * The pins [assumptions] imply together with the root's own, or `null` when root reasoning refutes them. A
@@ -41,20 +44,44 @@ class LocalSearchModel private constructor(
             domains = problem.rootIntDomainsInPlace,
             rootPins = { assumptions -> problem.rootPins(assumptions) },
             refutesModel = true,
+            anchoredSampling = false,
         )
 
         /**
          * A model whose integer columns may be open, searched over [domains]: each column's declared range with
          * every open side replaced by an endpoint the caller chose. Those endpoints bound where local search
-         * looks, not what the model admits, so nothing here refutes it and no root reasoning pins a column.
+         * looks, not what the model admits, so nothing here refutes it and no root reasoning pins a column. A
+         * domain too wide to index is searched through its [searchWindow].
          */
         fun open(problem: Problem, domains: Array<IntDomain>): LocalSearchModel {
             require(domains.size == problem.numIntVars) {
                 "${domains.size} search domains for ${problem.numIntVars} integer columns"
             }
-            return LocalSearchModel(problem, domains, rootPins = { it }, refutesModel = false)
+            return LocalSearchModel(
+                problem,
+                searchWindows(domains),
+                rootPins = { it },
+                refutesModel = false,
+                anchoredSampling = true,
+            )
         }
+
+        /** [open] over [problem]'s declared ranges, every open side replaced by the edge of the 63-bit range. */
+        fun open(problem: Problem): LocalSearchModel =
+            open(problem, Array(problem.numIntVars) { problem.declaredSearchDomain(it) })
     }
+}
+
+// Open sides stand at ±2^62 so a domain's width `max - min` stays inside `Long`.
+private const val OPEN_EDGE: Long = 1L shl 62
+
+/** Column [v]'s declared value set, or its declared range with each open side at [OPEN_EDGE]. */
+private fun Problem.declaredSearchDomain(v: Int): IntDomain {
+    intDomainOrNull(v)?.let { return it }
+    val bounds = intBounds
+    val lo = if (bounds.hasLower(v)) bounds.lower(v) else -OPEN_EDGE
+    val hi = if (bounds.hasUpper(v)) bounds.upper(v) else OPEN_EDGE
+    return IntDomain(lo, hi)
 }
 
 /**

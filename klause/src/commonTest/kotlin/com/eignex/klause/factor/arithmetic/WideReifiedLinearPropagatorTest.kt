@@ -15,6 +15,7 @@ import com.eignex.klause.solver.SolveResult
 import com.ionspin.kotlin.bignum.integer.BigInteger
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
@@ -80,9 +81,9 @@ class WideReifiedLinearPropagatorTest {
     }
 
     @Test
-    fun `local search declines a problem carrying a wide factor`() {
-        // A bare wide Linear with no integer solution (2^64·x = 2·2^64 + 1). Its invariant is inert, so an
-        // ungated local search could ignore it and report a bogus "solution"; the wide-factor gate declines.
+    fun `local search never reports a solution a wide factor refutes`() {
+        // A bare wide Linear with no integer solution (2^64·x = 2·2^64 + 1): its exact invariant never reads as
+        // satisfied, so no assignment is reported.
         val bound = w * BigInteger.fromLong(2) + BigInteger.ONE
         val row = Linear(intArrayOf(0), arrayOf(w), LinearOp.EQ, bound)
         val p = Problem(
@@ -92,6 +93,15 @@ class WideReifiedLinearPropagatorTest {
             factors = arrayOf<Factor>(row),
         )
         val r = LocalSearchSolver(p.bake()).solve(LocalSearchParams(maxFlips = 100, randomSeed = 1))
-        assertIs<SolveResult.Unknown>(r)
+        assertFalse(r is SolveResult.Sat, "got $r")
+    }
+
+    @Test
+    fun `local search satisfies a wide factor exactly`() {
+        // 2^64·x = 3·2^64 holds only at x = 3.
+        val row = Linear(intArrayOf(0), arrayOf(w), LinearOp.EQ, w * BigInteger.fromLong(3))
+        val p = Problem(0, 1, arrayOf(IntDomain(0, 5)), arrayOf<Factor>(row))
+        val r = LocalSearchSolver(p.bake()).solve(LocalSearchParams(maxFlips = 1_000, randomSeed = 1))
+        assertEquals(3L, assertIs<SolveResult.Sat>(r).assignment.ints[0])
     }
 }

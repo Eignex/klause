@@ -1,6 +1,5 @@
 package com.eignex.klause.localsearch.strategy
 
-import com.eignex.klause.ir.randomValue
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
 import com.eignex.klause.localsearch.acceptance.AcceptanceRule
@@ -113,7 +112,7 @@ class StallPerturbation(private val perturbAfter: Int) : (LocalSearchState) -> M
             if (state.assumptions.isFrozenInt(v)) return null
             val d = state.rootDomains[v]
             if (d.isFixed) return null
-            val nv = d.randomValue(state.rng)
+            val nv = state.randomIntValue(v)
             if (nv == state.assignment.intValue(v)) return null
             return state.synthesizeChannelingMove(v, nv)
         }
