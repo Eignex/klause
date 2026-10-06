@@ -1,30 +1,20 @@
 # pb: problems with the pb theme, drawn 2026-10-06 by klause-lab deploy/make-sets.py
-# tiers by the reference's time to prove: easy < 1 s, medium < 10 s, hard < 60 s or solved but unproven
-# easy: 10
+# tiers by the reference's time to prove: easy < 1 s, medium < 10 s, hard < 60 s
+# easy: 6
 pb07-opb/OPT-SMALLINT-LIN/submittedPB07/aksoy/area_delay/normalized-fir02_area_delay
-pb07-opb/OPT-SMALLINT-LIN/submittedPB07/aksoy/area_opers/normalized-fir01_area_opers
-pb07-opb/OPT-SMALLINT-LIN/submittedPB07/aksoy/area_partials/normalized-fir02_area_partials
 pb07-opb/OPT-SMALLINT-LIN/submittedPB07/aksoy/trarea_ac/normalized-fir01_trarea_ac
-pb07-opb/OPT-SMALLINT-LIN/submittedPB07/poldner/PB/testset/normalized-6_12
-pb07-opb/OPT-SMALLINT-NLC/submittedPB07/manquinho/bsg/normalized-bsg_10_4_5
-pb07-opb/OPT-SMALLINT-NLC/submittedPB07/manquinho/mds/normalized-mds_50_25_1
-pb07-opb/OPT-SMALLINT-NLC/submittedPB07/manquinho/mis/normalized-mis_50_10_4
-pb07-opb/OPT-SMALLINT-NLC/submittedPB07/roussel/factor-mod-B/factor-mod-size=7-P0=79-P1=41-B
-pb07-opb/SATUNSAT-SMALLINT-NLC/submittedPB07/manquinho/dbsg/normalized-dbsg_500_25_4_15
-# medium: 10
+pb07-opb/OPT-SMALLINT-NLC/submittedPB07/manquinho/bsg/normalized-bsg_10_4_3
+pb07-opb/OPT-SMALLINT-NLC/submittedPB07/manquinho/mds/normalized-mds_50_25_4
+pb07-opb/OPT-SMALLINT-NLC/submittedPB07/manquinho/mis/normalized-mis_10_4_4
+pb07-opb/OPT-SMALLINT-NLC/submittedPB07/roussel/factor-mod-B/factor-mod-size=7-P0=61-P1=127-P2=131-P3=107-P4=47-B
+# medium: 8
 pb07-opb/OPT-SMALLINT-LIN/submittedPB07/poldner/PB/testset/normalized-10_20
 pb07-opb/OPT-SMALLINT-NLC/submittedPB07/manquinho/mds/normalized-mds_100_25_2
 pb07-opb/OPT-SMALLINT-NLC/submittedPB07/manquinho/mds/normalized-mds_100_25_3
-pb07-opb/OPT-SMALLINT-NLC/submittedPB07/manquinho/mds/normalized-mds_100_25_4
-pb07-opb/OPT-SMALLINT-NLC/submittedPB07/roussel/factor-mod-B/factor-mod-size=8-P0=167-P1=131-P2=83-P3=109-B
-pb07-opb/OPT-SMALLINT-NLC/submittedPB07/roussel/factor-mod-B/factor-mod-size=9-P0=419-P1=479-P2=367-B
-pb07-opb/OPT-SMALLINT-NLC/submittedPB07/roussel/factor-mod-B/factor-mod-size=9-P0=487-P1=163-P2=173-P3=211-B
-pb07-opb/SATUNSAT-SMALLINT-NLC/submittedPB07/manquinho/dbsg/normalized-dbsg_50_25_1_15
+pb07-opb/OPT-SMALLINT-NLC/submittedPB07/roussel/factor-mod-B/factor-mod-size=9-P0=137-P1=127-P2=347-B
+pb07-opb/OPT-SMALLINT-NLC/submittedPB07/roussel/factor-mod-B/factor-mod-size=9-P0=149-P1=191-P2=199-B
+pb07-opb/OPT-SMALLINT-NLC/submittedPB07/roussel/factor-mod-B/factor-mod-size=9-P0=19-P1=337-P2=467-P3=53-B
+pb07-opb/SATUNSAT-SMALLINT-NLC/submittedPB07/manquinho/dbsg/normalized-dbsg_500_60_5_15
 pb07-opb/SATUNSAT-SMALLINT-NLC/submittedPB07/manquinho/dbsg/normalized-dbsg_50_25_2_15
-pb07-opb/SATUNSAT-SMALLINT-NLC/submittedPB07/manquinho/dbsg/normalized-dbsg_50_25_5_15
-# hard: 5
-pb07-opb/OPT-SMALLINT-LIN/submittedPB07/aksoy/area_opers/normalized-fir04_area_opers
-pb07-opb/OPT-SMALLINT-LIN/submittedPB07/aksoy/trarea_ac/normalized-fir02_trarea_ac
-pb07-opb/OPT-SMALLINT-LIN/submittedPB07/poldner/PB/testset/normalized-8_16
-pb07-opb/OPT-SMALLINT-NLC/submittedPB07/manquinho/mds/normalized-mds_1000_25_4
-pb07-opb/OPT-SMALLINT-NLC/submittedPB07/manquinho/mis/normalized-mis_1000_25_3
+# hard: 1
+pb07-opb/SATUNSAT-SMALLINT-NLC/submittedPB07/manquinho/dbsg/normalized-dbsg_500_10_3_80
