@@ -504,6 +504,13 @@ interface SearchContext {
 
     /** True when the solve-wide cancellation token has fired. */
     fun cancelled(): Boolean
+
+    /**
+     * Ask the run to poll its cancellation token before it commits the branch being chosen, rather than at
+     * its next scheduled poll. A brancher that saw the deadline while choosing calls this: a value probe
+     * runs a whole fixpoint, and committing the branch would run another one past the deadline.
+     */
+    fun requestCancellationPoll()
 }
 
 /** Mutable model assembly owned by [SearchSession], not by any individual component. */

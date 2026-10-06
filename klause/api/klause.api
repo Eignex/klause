@@ -10668,6 +10668,7 @@ public abstract interface class com/eignex/klause/solver/search/SearchContext {
 	public abstract fun publish (I)Lcom/eignex/klause/solver/search/ComponentResult;
 	public abstract fun publish (Lcom/eignex/klause/solver/search/SearchDecision;)Lcom/eignex/klause/solver/search/ComponentResult;
 	public fun registerAtom (Lcom/eignex/klause/solver/search/SearchTheoryDecision;Lcom/eignex/klause/solver/search/SearchTheoryDecision;)Lcom/eignex/klause/solver/search/SearchTheoryAtom;
+	public abstract fun requestCancellationPoll ()V
 }
 
 public final class com/eignex/klause/solver/search/SearchContext$DefaultImpls {
@@ -11235,6 +11236,7 @@ public final class com/eignex/klause/solver/search/SearchSession : com/eignex/kl
 	public final fun push (Lcom/eignex/klause/solver/search/SearchDecision;)Lcom/eignex/klause/solver/search/ComponentResult;
 	public final fun reasonFor (I)Lcom/eignex/klause/solver/search/SearchExplanation;
 	public fun registerAtom (Lcom/eignex/klause/solver/search/SearchTheoryDecision;Lcom/eignex/klause/solver/search/SearchTheoryDecision;)Lcom/eignex/klause/solver/search/SearchTheoryAtom;
+	public fun requestCancellationPoll ()V
 	public final fun resetRootFacts ()V
 	public final fun restart ()Lcom/eignex/klause/solver/search/ComponentResult;
 	public final fun solve (ILcom/eignex/klause/solver/search/SearchSolveParams;Lcom/eignex/klause/solver/search/SearchCandidateHints;Lcom/eignex/klause/solver/search/BooleanBranching;Lcom/eignex/klause/solver/search/SearchRunObserver;)Lcom/eignex/klause/solver/search/SearchResult;

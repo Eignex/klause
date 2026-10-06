@@ -637,6 +637,31 @@ class SearchSessionTest {
     }
 
     @Test
+    fun `a brancher that sees the deadline stops the run before its branch is committed`() {
+        var fired = false
+        var asserted = 0
+        val brancher = object : SearchBrancher {
+            override fun nextBranch(context: SearchContext): List<SearchDecision>? {
+                fired = true
+                context.requestCancellationPoll()
+                return listOf(SearchDecision.IntEqual(0, 0))
+            }
+        }
+        val component = object : SearchComponent {
+            override fun assert(decision: SearchDecision, context: SearchContext): ComponentResult {
+                asserted++
+                return ComponentResult.Consistent
+            }
+        }
+        val session = SearchSession(listOf(brancher, component), cancellation = Cancellation { fired })
+
+        val event = session.openRun(numBoolVars = 0).next()
+
+        assertIs<SearchRunEvent.Indeterminate>(event)
+        assertEquals(0, asserted)
+    }
+
+    @Test
     fun `rejected alternatives do not spend the committed decision allowance`() {
         val rejected = object : SearchTheoryDecision {}
         val accepted = object : SearchTheoryDecision {}
