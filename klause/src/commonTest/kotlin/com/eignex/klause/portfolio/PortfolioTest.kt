@@ -42,6 +42,8 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.TimeSource
 
 private class TrackingResumableSearch(
     private val result: MinimizeResult?,
@@ -888,6 +890,43 @@ class PortfolioTest {
         }
 
         assertEquals(List(3) { (7 * LS_INSTRUCTIONS_PER_WORK).toLong() }, allowances)
+    }
+
+    @Test
+    fun `a counted arm whose probe outlasts its time cap hands the core to the next arm`() {
+        val problem = Problem(
+            numBoolVars = 3,
+            numIntVars = 0,
+            intDomains = emptyArray(),
+            factors = arrayOf<Factor>(Cardinality.atLeastOne(IntArray(3) { Lit.make(it, true) })),
+        )
+        val objective = LinearObjective(boolWeights = longArrayOf(1L, 1L, 1L))
+        val reached = ArrayList<Int>()
+        val arms = List(2) { i ->
+            PortfolioWorker.of(
+                "ls$i",
+                i,
+                LocalSearchSolver(problem.bake()).session(),
+                LocalSearchParams(randomSeed = 0L),
+                objective = objective,
+                withInstructionBudget = { p, limit -> p.copy(maxInstructions = limit).also { reached += i } },
+            )
+        }
+        val fallback = TimeSource.Monotonic.markNow() + 10.seconds
+
+        // An allowance no probe gets through: only the time cap can end the first arm's turn.
+        val endless = 1_000_000_000_000L
+        Portfolio(
+            arms,
+            DiscountedThompson(arms.size, Random(0), Portfolio.DEFAULT_HALF_LIFE),
+            baseSliceWork = endless,
+            maxSliceWork = endless,
+            probeSliceMillis = 20L,
+        ).use {
+            it.minimize(Cancellation { reached.size >= 2 || fallback.hasPassedNow() })
+        }
+
+        assertEquals(listOf(0, 1), reached)
     }
 
     @Test

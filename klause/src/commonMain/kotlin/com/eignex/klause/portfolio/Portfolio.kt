@@ -90,14 +90,21 @@ class Portfolio(
      * destroy/repair loop instead of one inner solve (see [com.eignex.klause.meta.alns.Alns]'s class KDoc). A
      * common unit is what lets one schedule give every arm a comparable turn.
      *
-     * Counted arms are never sliced by the clock. A segment bounded by time pauses somewhere different on every
-     * run, and since the search resumes from wherever it stopped, every counter a solve reports inherits that. A
-     * segment bounded by work pauses at the same point every time, which on one lane makes a run reproducible.
-     * The whole-solve deadline still applies, so this cannot overrun it.
+     * Counted arms are sliced by work, not the clock, past their probe. A segment bounded by time pauses
+     * somewhere different on every run, and since the search resumes from wherever it stopped, every counter a
+     * solve reports inherits that. A segment bounded by work pauses at the same point every time, which on one
+     * lane makes a run reproducible. The probe is the exception; see [probeSliceMillis].
      */
     private val baseSliceWork: Long = 5_000,
     /** Cap on a single counted segment's work. */
     private val maxSliceWork: Long = 150_000,
+    /**
+     * Wall-clock cap on a counted arm's probe segment. Its work converts to instructions at one rate for every
+     * model ([lsInstructionsPerWork]), and on a model where a step costs far more than that rate assumes, a base
+     * slice of work runs for seconds: before the cap one probe ran to the deadline and the arms after it never
+     * ran. Later segments are sized by the policy, which has seen what the arm costs by then.
+     */
+    private val probeSliceMillis: Long = 1_000,
     /** Local-search instructions that cost as much as one search node; see `LS_INSTRUCTIONS_PER_WORK`. */
     private val lsInstructionsPerWork: Double = LS_INSTRUCTIONS_PER_WORK,
     /**
@@ -128,6 +135,7 @@ class Portfolio(
         require(reseedStaleThreshold >= 0) { "reseedStaleThreshold must be ≥ 0" }
         require(phaseRetention in 0.0..1.0) { "phaseRetention must be in [0, 1]" }
         require(baseSliceWork > 0 && maxSliceWork >= baseSliceWork) { "invalid work slice bounds" }
+        require(probeSliceMillis > 0) { "probeSliceMillis must be > 0" }
         require(lsInstructionsPerWork > 0.0) { "lsInstructionsPerWork must be > 0" }
     }
 
@@ -157,7 +165,7 @@ class Portfolio(
                 failure = outcome.exceptionOrNull()
                 work = handle.work - workBefore
             } else {
-                val token = segmentToken(worker, run.token, claim.sliceMillis)
+                val token = segmentToken(worker, run.token, claim)
                 val outcome = runCatching { worker.solve(token, instructionsFor(claim.sliceWork)) }
                 r = outcome.getOrNull()
                 failure = outcome.exceptionOrNull()
@@ -280,7 +288,7 @@ class Portfolio(
                 work = handle.work - workBefore
             } else {
                 // Local-search segments restart from the shared incumbent, bounded by their own counted work.
-                val armToken = segmentToken(worker, run.token, claim.sliceMillis)
+                val armToken = segmentToken(worker, run.token, claim)
                 failure = runCatching {
                     for (r in worker.improvements(
                         readBound,
@@ -516,16 +524,18 @@ class Portfolio(
     private fun instructionsFor(work: Long): Long = (work * lsInstructionsPerWork).toLong().coerceAtLeast(1L)
 
     /** The cancellation token bounding one non-resumable arm's segment. A counted-work arm
-     *  ([PortfolioWorker.acceptsInstructionBudget]) runs unclocked: its own instruction budget paces it, and a
-     *  wall-clock cap on top would reintroduce the machine-speed dependence counting exists to remove. Only an arm
-     *  with neither a counter nor a resumable handle is sliced by [sliceMs], a deadline it can size a sub-phase
-     *  against ([Cancellation.shorten]). */
-    private fun segmentToken(worker: PortfolioWorker, cancellation: Cancellation, sliceMs: Long): Cancellation =
-        if (worker.acceptsInstructionBudget) {
-            cancellation
-        } else {
-            Cancellation.until(TimeSource.Monotonic.markNow() + sliceMs.milliseconds) or cancellation
-        }
+     *  ([PortfolioWorker.acceptsInstructionBudget]) is paced by its own instruction budget, and past its probe a
+     *  wall-clock cap on top would reintroduce the machine-speed dependence counting exists to remove; its probe
+     *  is capped at [probeSliceMillis]. An arm with neither a counter nor a resumable handle is sliced by the
+     *  claim's millis, a deadline it can size a sub-phase against ([Cancellation.shorten]). */
+    private fun segmentToken(worker: PortfolioWorker, cancellation: Cancellation, claim: Claim): Cancellation = when {
+        !worker.acceptsInstructionBudget -> until(claim.sliceMillis) or cancellation
+        claim.probing -> until(probeSliceMillis) or cancellation
+        else -> cancellation
+    }
+
+    private fun until(millis: Long): Cancellation =
+        Cancellation.until(TimeSource.Monotonic.markNow() + millis.milliseconds)
 
     /** Geometric growth shared by every slice axis (millis and work): grow by [sliceGrowth], never past [cap]. */
     private fun grow(current: Long, cap: Long): Long = (current * sliceGrowth).toLong().coerceAtMost(cap)
@@ -570,6 +580,7 @@ class Portfolio(
             sliceGrowth: Double = 1.5,
             reseedStaleThreshold: Int = 3,
             baseSliceWork: Long = 5_000,
+            probeSliceMillis: Long = 1_000,
             phaseRetention: Double = DEFAULT_PHASE_RETENTION,
             witnessCheck: WitnessCheck? = null,
             onFault: ((ArmFault) -> Unit)? = null,
@@ -582,6 +593,7 @@ class Portfolio(
             sliceGrowth = sliceGrowth,
             reseedStaleThreshold = reseedStaleThreshold,
             baseSliceWork = baseSliceWork,
+            probeSliceMillis = probeSliceMillis,
             phaseRetention = phaseRetention,
             witnessCheck = witnessCheck,
             onFault = onFault,
