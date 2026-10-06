@@ -30,24 +30,24 @@ import kotlin.time.TimeSource
  * An **arm** is a [PortfolioWorker] — the same heterogeneous unit the concurrent portfolio uses,
  * built by the same [PortfolioBuilder] — so the arm set is exactly one of the named scenarios
  * (`mixed` / `localSearchOnly` / `backtrackOnly`). An arm with a deterministic work counter runs
- * one growing counted segment; across segments the shared incumbent bound prunes backtrack arms (their
+ * one counted segment; across segments the shared incumbent bound prunes backtrack arms (their
  * `objectiveBoundSupplier`) and the incumbent assignment warm-starts LS arms (their
  * `initialAssignment` seam, threaded through [PortfolioWorker.improvements]'s `warmStart`).
  *
- * **Reward** (folded into the bandit, normalised to `[0,1]` as the non-stationary policies expect)
- * is phase-aware so one signal serves both campaign goals:
- *  - before any incumbent exists: `1.0` if the segment found a first feasible solution, else `0.0`
- *    (drives the feasibility hunt);
- *  - once an incumbent exists: the segment's objective improvement, normalised by the largest
- *    improvement seen so far (drives anytime convergence).
+ * **Reward** (folded into the bandit in `[0, 1)`) comes from a [RewardLedger]: each arm is credited for what it
+ * contributed and scored on the rate it earned that at, per unit of work, against the pool's rate. Before any
+ * incumbent exists the credit is a first feasible solution, which drives the feasibility hunt; once one exists it
+ * is the objective improvement, which drives anytime convergence. The ledger starts a new phase at the first
+ * incumbent, since the rates a feasibility hunt earned say nothing about who improves one.
  *
  * **Resumable backtrack arms:** a backtrack arm exposes a [ResumableSearch]
  * ([PortfolioWorker.newResumableSearch]); [minimize] holds one handle per such arm and *resumes* it
  * each time the bandit reschedules it, so the arm continues its exact search — live learned clauses,
  * DFS trail, heuristics, incumbent and LP warm-start caches all intact — instead of cold-restarting
  * and re-deriving its clauses every segment. Local-search arms have no handle (null), so they run a
- * fresh slice warm-started from the shared incumbent. Slices still grow
- * ([sliceGrowth]) so early segments sample the arms cheaply while later segments dig deeper.
+ * fresh slice warm-started from the shared incumbent. A resumable arm runs a constant [baseSliceWork] each
+ * segment: resuming costs nothing, so short segments give the bandit many decisions at no loss of depth. A
+ * restarting arm's segments grow ([sliceGrowth]) so it can dig deeper than one short restart reaches.
  *
  * **Re-seeding plateaued arms ([reseedStaleThreshold]):** pure resume keeps one persistent DFS trail,
  * which converges fast but forgoes the bound-guided re-exploration a per-segment cold restart buys
@@ -68,8 +68,8 @@ class SequentialPortfolio(
     /** Geometric growth applied to the slice after each post-warmup segment. */
     private val sliceGrowth: Double = 1.5,
     /**
-     * Work a counted arm's first segment may spend; later segments grow by [sliceGrowth] up to
-     * [maxSliceWork].
+     * Work each segment of a resumable arm spends, and the first segment of a counted local-search arm; a local-search
+     * arm's later segments grow by [sliceGrowth] up to [maxSliceWork].
      *
      * Work is measured in node-equivalents, one unit for every arm whatever its engine. A resumable
      * backtrack arm spends one per search node plus its LP work at the rate
@@ -85,12 +85,12 @@ class SequentialPortfolio(
      * the same point every time. The whole-solve deadline still applies, so this cannot overrun it.
      */
     private val baseSliceWork: Long = 5_000,
-    /** Cap on a single segment's work. */
+    /** Cap on a single local-search segment's work. */
     private val maxSliceWork: Long = 150_000,
     /** Local-search instructions that cost as much as one search node; see `LS_INSTRUCTIONS_PER_WORK`. */
     private val lsInstructionsPerWork: Double = LS_INSTRUCTIONS_PER_WORK,
-    /** Round-robin warmup slice: each arm is forced once for this long before the bandit takes
-     *  over, so a short deadline can't leave a winning arm at zero budget (EXP3 starvation). */
+    /** Round-robin warmup slice for an arm with neither a work counter nor a resumable handle; every arm is forced
+     *  once before the bandit takes over, so a short deadline can't leave a winning arm at zero budget. */
     private val warmupSliceMillis: Long = 1_000,
     /**
      * Diversification for resumable backtrack arms: after this many consecutive
@@ -125,29 +125,20 @@ class SequentialPortfolio(
     private fun sliceToken(global: Cancellation, sliceMillis: Long): Cancellation =
         Cancellation.until(TimeSource.Monotonic.markNow() + sliceMillis.milliseconds) or global
 
-    /** The cancellation token bounding one arm's segment. A counted-work arm
-     *  ([PortfolioWorker.acceptsInstructionBudget]) runs unclocked once scheduling has settled — its own
-     *  instruction budget paces it, and a wall-clock cap on top would reintroduce the machine-speed
-     *  dependence node/flip counting exists to remove. The forced warmup probe is the one exception: its
-     *  whole point is a short, wall-clock-bounded taste of every arm before the bandit takes over (see
-     *  [warmupSliceMillis]), so it stays clock-sliced even for a counted-work arm — otherwise an
-     *  expensive-per-step LS arm scheduled early could burn most of a tight deadline on its own warmup
-     *  turn before every other arm gets its guaranteed probe. */
-    private fun segmentToken(
-        worker: PortfolioWorker,
-        warming: Boolean,
-        cancellation: Cancellation,
-        sliceMs: Long,
-    ): Cancellation =
-        if (worker.acceptsInstructionBudget && !warming) cancellation else sliceToken(cancellation, sliceMs)
+    /** The cancellation token bounding one non-resumable arm's segment. A counted-work arm
+     *  ([PortfolioWorker.acceptsInstructionBudget]) runs unclocked, warmup included: its own instruction budget
+     *  paces it, and a wall-clock cap on top would reintroduce the machine-speed dependence counting exists to
+     *  remove. Only an arm with neither a counter nor a resumable handle is sliced by [sliceMs]. */
+    private fun segmentToken(worker: PortfolioWorker, cancellation: Cancellation, sliceMs: Long): Cancellation =
+        if (worker.acceptsInstructionBudget) cancellation else sliceToken(cancellation, sliceMs)
 
     /** Geometric post-warmup growth shared by every slice axis (millis and work): grow by
      *  [sliceGrowth], never past [cap]. */
     private fun grow(current: Long, cap: Long): Long = (current * sliceGrowth).toLong().coerceAtMost(cap)
 
     /**
-     * Satisfaction: run arms in bandit-chosen segments until one returns a definitive Sat/Unsat. Reward is
-     * `1.0` for a definitive verdict, `0.0` for an inconclusive slice.
+     * Satisfaction: run arms in bandit-chosen segments until one returns a definitive Sat/Unsat, which ends the
+     * run. Each segment settles the arm's [RewardLedger] account against the work it spent.
      *
      * A backtrack arm exposes a [ResumableSolve] ([PortfolioWorker.newResumableSolve]), held across segments and
      * resumed each time the bandit reschedules it, so the arm keeps its learned clauses and trail rather than
@@ -164,8 +155,9 @@ class SequentialPortfolio(
         // Per-arm counters, folded as in [minimize]: a handle's are cumulative, a fresh segment's are merged.
         val perArm = arrayOfNulls<SolveStats>(workers.size)
         val verdicts = ArrayList<SolveResult>()
+        val ledger = RewardLedger(workers.size)
         var slice = baseSliceMillis
-        var sliceWork = baseSliceWork
+        var lsSliceWork = baseSliceWork
         var segment = 0
         var primaryFailure: Throwable? = null
         try {
@@ -182,23 +174,25 @@ class SequentialPortfolio(
                 val handle = handles[arm] ?: worker.newResumableSolve()?.also { handles[arm] = it }
                 val r: SolveResult?
                 var failed = false
+                val work: Long
                 // A failing arm leaves the others to answer, but an unsound one has answered wrongly.
                 if (handle != null) {
-                    val outcome = runCatching { handle.runSlice(cancellation, Long.MAX_VALUE, sliceWork) }
+                    val workBefore = handle.work
+                    val outcome = runCatching { handle.runSlice(cancellation, Long.MAX_VALUE, baseSliceWork) }
                         .rethrowUnsound()
                     r = outcome.getOrNull()
                     failed = outcome.isFailure
                     perArm[arm] = handle.stats
+                    work = handle.work - workBefore
                 } else {
-                    val sliceMs = if (warming) warmupSliceMillis else slice
-                    val token = segmentToken(worker, warming, cancellation, sliceMs)
-                    r = runCatching { worker.solve(token, instructionsFor(sliceWork)) }
+                    val token = segmentToken(worker, cancellation, if (warming) warmupSliceMillis else slice)
+                    r = runCatching { worker.solve(token, instructionsFor(lsSliceWork)) }
                         .rethrowUnsound()
                         .getOrNull()
                     r?.let { perArm[arm] = (perArm[arm] ?: SolveStats.EMPTY).mergedWith(it.stats) }
+                    work = lsSliceWork
                 }
-                val definitive = r is SolveResult.Sat || r is SolveResult.Unsat
-                bandit.update(arm, if (definitive) 1.0 else 0.0)
+                bandit.update(arm, ledger.settle(arm, work))
                 when (r) {
                     is SolveResult.Sat -> return r.copy(stats = foldArms(perArm))
                     is SolveResult.Unsat -> return r.copy(stats = foldArms(perArm))
@@ -214,7 +208,7 @@ class SequentialPortfolio(
                 }
                 if (!warming) {
                     slice = grow(slice, maxSliceMillis)
-                    sliceWork = grow(sliceWork, maxSliceWork)
+                    lsSliceWork = grow(lsSliceWork, maxSliceWork)
                 }
                 segment++
             }
@@ -246,9 +240,9 @@ class SequentialPortfolio(
         // The same verified-incumbent exchange the parallel executor folds into; here there is one writer,
         // so the strict-improvement gate is all that is being reused, not the concurrency.
         val incumbent = IncumbentExchange.minimizing<Sample>()
-        var rewardScale = 0.0
+        val ledger = RewardLedger(workers.size)
         var slice = baseSliceMillis
-        var sliceWork = baseSliceWork
+        var lsSliceWork = baseSliceWork
         var segment = 0
         val start = TimeSource.Monotonic.markNow()
         // The label of the arm running the current segment — single-threaded, so it is unambiguous
@@ -298,7 +292,6 @@ class SequentialPortfolio(
                 } else {
                     selected
                 }
-                val sliceMs = if (warming) warmupSliceMillis else slice
                 val hadIncumbent = incumbent.current() != null
                 val before = readBound()
                 val worker = workers[arm]
@@ -307,30 +300,33 @@ class SequentialPortfolio(
                 val handle = handles[arm] ?: worker.newResumableSearch(readBound)?.also { handles[arm] = it }
                 var terminal: MinimizeResult? = null
                 var failed = false
+                val work: Long
                 if (handle != null) {
+                    val workBefore = handle.work
                     // Resume the arm's search for this slice; a terminal verdict means it finished, null
                     // means the slice elapsed (search paused, state retained for the next reschedule).
                     val outcome = runCatching {
-                        handle.runSlice(cancellation, Long.MAX_VALUE, sliceWork) { accept(it) }
+                        handle.runSlice(cancellation, Long.MAX_VALUE, baseSliceWork) { accept(it) }
                     }
                     terminal = outcome.getOrNull()
                     failed = outcome.isFailure
+                    work = handle.work - workBefore
                 } else {
                     // Local-search segments restart from the shared incumbent but are bounded by their own
-                    // counted work post-warmup; the whole-solve deadline remains the outer cancellation
-                    // terminator. The forced warmup probe stays clock-sliced (see [segmentToken]).
-                    val armToken = segmentToken(worker, warming, cancellation, sliceMs)
+                    // counted work; the whole-solve deadline remains the outer cancellation terminator.
+                    val armToken = segmentToken(worker, cancellation, if (warming) warmupSliceMillis else slice)
                     runCatching {
                         for (r in worker.improvements(
                             readBound,
                             armToken,
                             warmStart = incumbent.current()?.assignment,
-                            maxInstructions = instructionsFor(sliceWork),
+                            maxInstructions = instructionsFor(lsSliceWork),
                         )) {
                             terminal = r
                             if (r is MinimizeResult.WithSample) accept(r)
                         }
                     }
+                    work = lsSliceWork
                 }
                 callbackFailure?.let { throw it }
                 if (terminal is MinimizeResult.WithSample) accept(terminal)
@@ -341,13 +337,15 @@ class SequentialPortfolio(
                 }
 
                 val improvement = before - readBound()
-                val reward = if (!hadIncumbent) {
-                    if (incumbent.current() != null) 1.0 else 0.0
+                val found = !hadIncumbent && incumbent.current() != null
+                if (found) {
+                    ledger.credit(arm, Signal.FirstSolution, 1.0)
                 } else {
-                    if (improvement > rewardScale) rewardScale = improvement
-                    if (rewardScale > 0.0) (improvement / rewardScale).coerceIn(0.0, 1.0) else 0.0
+                    ledger.credit(arm, Signal.Improvement, improvement)
                 }
-                bandit.update(arm, reward)
+                bandit.update(arm, ledger.settle(arm, work))
+                // The rates a feasibility hunt earned say nothing about who improves an incumbent.
+                if (found) ledger.resetPhase()
 
                 // Re-seed a plateaued resumable arm: after enough consecutive non-improving segments, drop
                 // its handle so the next schedule re-descends from the root under the tighter bound with the
@@ -383,7 +381,7 @@ class SequentialPortfolio(
                 }
                 if (!warming) {
                     slice = grow(slice, maxSliceMillis)
-                    sliceWork = grow(sliceWork, maxSliceWork)
+                    lsSliceWork = grow(lsSliceWork, maxSliceWork)
                 }
                 segment++
             }

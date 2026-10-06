@@ -8235,6 +8235,7 @@ public final class com/eignex/klause/solver/ResumableOptimizer$DefaultImpls {
 public abstract interface class com/eignex/klause/solver/ResumableSearch : java/lang/AutoCloseable {
 	public fun close ()V
 	public abstract fun getStats ()Lcom/eignex/klause/solver/result/SolveStats;
+	public fun getWork ()J
 	public abstract fun isDone ()Z
 	public abstract fun runSlice (Lcom/eignex/klause/util/Cancellation;JJLkotlin/jvm/functions/Function1;)Lcom/eignex/klause/solver/result/MinimizeResult;
 	public fun runSlice (Lcom/eignex/klause/util/Cancellation;JLkotlin/jvm/functions/Function1;)Lcom/eignex/klause/solver/result/MinimizeResult;
@@ -8242,18 +8243,21 @@ public abstract interface class com/eignex/klause/solver/ResumableSearch : java/
 
 public final class com/eignex/klause/solver/ResumableSearch$DefaultImpls {
 	public static fun close (Lcom/eignex/klause/solver/ResumableSearch;)V
+	public static fun getWork (Lcom/eignex/klause/solver/ResumableSearch;)J
 	public static fun runSlice (Lcom/eignex/klause/solver/ResumableSearch;Lcom/eignex/klause/util/Cancellation;JLkotlin/jvm/functions/Function1;)Lcom/eignex/klause/solver/result/MinimizeResult;
 }
 
 public abstract interface class com/eignex/klause/solver/ResumableSolve : java/lang/AutoCloseable {
 	public fun close ()V
 	public abstract fun getStats ()Lcom/eignex/klause/solver/result/SolveStats;
+	public fun getWork ()J
 	public abstract fun isDone ()Z
 	public abstract fun runSlice (Lcom/eignex/klause/util/Cancellation;JJ)Lcom/eignex/klause/solver/SolveResult;
 }
 
 public final class com/eignex/klause/solver/ResumableSolve$DefaultImpls {
 	public static fun close (Lcom/eignex/klause/solver/ResumableSolve;)V
+	public static fun getWork (Lcom/eignex/klause/solver/ResumableSolve;)J
 }
 
 public abstract interface class com/eignex/klause/solver/ResumableSolver : com/eignex/klause/solver/Solver {

@@ -81,6 +81,12 @@ interface ResumableSearch : AutoCloseable {
      */
     val stats: SolveStats
 
+    /**
+     * Work spent so far, in the units [runSlice]'s `sliceNodes` budgets: one per search node, plus LP work at the
+     * rate the search charges it per node. Cumulative for this handle.
+     */
+    val work: Long get() = stats.search.nodes.sum.toLong()
+
     override fun close() {}
 }
 
@@ -116,6 +122,9 @@ interface ResumableSolve : AutoCloseable {
 
     /** Counters accumulated so far, whether or not the search has finished; cumulative for this handle. */
     val stats: SolveStats
+
+    /** Work spent so far, in the units [runSlice]'s `sliceNodes` budgets; cumulative for this handle. */
+    val work: Long get() = stats.search.nodes.sum.toLong()
 
     override fun close() {}
 }
