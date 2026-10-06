@@ -921,7 +921,11 @@ class PortfolioTest {
 
     // Two counted local-search arms recording each segment they start into [reached], under a portfolio whose
     // work allowance no segment gets through, so only a time cap can end a turn.
-    private fun endlessCountedPortfolio(reached: MutableList<Int>, sliceMillis: Long): Portfolio {
+    private fun endlessCountedPortfolio(
+        reached: MutableList<Int>,
+        sliceMillis: Long,
+        probeMillis: Long = 20L,
+    ): Portfolio {
         val problem = Problem(
             numBoolVars = 3,
             numIntVars = 0,
@@ -947,7 +951,7 @@ class PortfolioTest {
             maxSliceMillis = sliceMillis,
             baseSliceWork = endless,
             maxSliceWork = endless,
-            probeSliceMillis = 20L,
+            probeSliceMillis = probeMillis,
         )
     }
 
@@ -970,6 +974,18 @@ class PortfolioTest {
 
         endlessCountedPortfolio(reached, sliceMillis = 20L).use {
             it.minimize(Cancellation { reached.size >= 4 || fallback.hasPassedNow() })
+        }
+
+        assertEquals(4, reached.size)
+    }
+
+    @Test
+    fun `a short budget still splits into segments however long the slices are`() {
+        val reached = ArrayList<Int>()
+        val deadline = Cancellation.until(TimeSource.Monotonic.markNow() + 400.milliseconds)
+
+        endlessCountedPortfolio(reached, sliceMillis = 60_000L, probeMillis = 60_000L).use {
+            it.minimize(deadline or Cancellation { reached.size >= 4 })
         }
 
         assertEquals(4, reached.size)
