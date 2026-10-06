@@ -383,8 +383,7 @@ internal class LpDoubleView(
     fun exactUpper(j: Int): BigFraction = shifts.value.upper(j) ?: exactDouble(upper[j])
 
     /** Whether the exact shifted upper bound of variable [j] is zero, building no fraction for a nonzero one. */
-    fun upperIsZero(j: Int): Boolean =
-        upper[j] == 0.0 && (j >= loShift.size || (shifts.value.upper(j)?.isZero ?: true))
+    fun upperIsZero(j: Int): Boolean = upper[j] == 0.0 && (j >= loShift.size || (shifts.value.upper(j)?.isZero ?: true))
 
     /** The exact shifted upper bound of variable [j] rounded up when [outward], else down; null past [Long]. */
     fun integerUpper(j: Int, outward: Boolean): Long? {
@@ -837,8 +836,10 @@ internal class LpBuilder {
             val j = roundedColumns[it]
             when {
                 j in continuousCols -> exactDouble(contHi.getOrDefault(j, 0.0))
+
                 // The stand-in for +∞ keeps the value the view solves with; no source bound stands behind it.
                 j in clampedHiCols -> exactDouble(hi[j].toDouble())
+
                 else -> BigFraction.ofLong(hi[j])
             }
         }

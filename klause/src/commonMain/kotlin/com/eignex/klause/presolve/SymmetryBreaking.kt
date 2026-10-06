@@ -518,8 +518,10 @@ internal object SymmetryBreaking {
         override fun finite(v: Int): IntDomain? = closed[v]
 
         override fun contains(v: Int, value: Long): Boolean = finite(v)?.contains(value)
-            ?: ((!bounds.hasLower(v) || value >= bounds.lower(v)) &&
-                (!bounds.hasUpper(v) || value <= bounds.upper(v)))
+            ?: (
+                (!bounds.hasLower(v) || value >= bounds.lower(v)) &&
+                    (!bounds.hasUpper(v) || value <= bounds.upper(v))
+                )
 
         override fun seed(v: Int): RefineKey = finite(v)?.let(::domainSeed) ?: RefineKey(
             longArrayOf(

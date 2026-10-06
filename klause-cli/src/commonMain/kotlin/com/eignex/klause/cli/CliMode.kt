@@ -101,12 +101,11 @@ internal fun CommonOptions.sharedPresolveBudget(): PresolveBudget? {
 }
 
 /** The work allowance [budgetMs] milliseconds of presolve buy, saturating rather than wrapping. */
-internal fun presolveWorkFor(budgetMs: Long): Long =
-    if (budgetMs > Long.MAX_VALUE / CliKnobs.PRESOLVE_WORK_PER_MS) {
-        Long.MAX_VALUE
-    } else {
-        budgetMs * CliKnobs.PRESOLVE_WORK_PER_MS
-    }
+internal fun presolveWorkFor(budgetMs: Long): Long = if (budgetMs > Long.MAX_VALUE / CliKnobs.PRESOLVE_WORK_PER_MS) {
+    Long.MAX_VALUE
+} else {
+    budgetMs * CliKnobs.PRESOLVE_WORK_PER_MS
+}
 
 /**
  * Whether the routing bound proof runs, consuming `open-bound-proof` and **removing** it as it reads —
