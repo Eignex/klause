@@ -76,6 +76,9 @@ internal object SolveCore {
         // poll, which burns the whole deadline and overshoots the cap several times over.
         val (deadline, deadlineCancel) = deadlineCancellation(common)
         val (presolveCancel, presolveBudget) = presolveAllowance(common, deadlineCancel)
+        // Taken whatever the route, so one run configuration serves a suite whose models routing sends either way;
+        // only an open satisfaction model has a portfolio to run.
+        val openPortfolio = takeOpenBoolParam(common, "open-portfolio") ?: false
         when (val pipeline = rawSolvable.pipeline) {
             is SolvablePipeline.OpenLocalSearch -> {
                 output.begin(optimize = false, maximize = false)
@@ -113,7 +116,6 @@ internal object SolveCore {
                 if (solutionSetSensitive) {
                     usageError("all-solution enumeration is unavailable for open theory models")
                 }
-                val openPortfolio = takeOpenBoolParam(common, "open-portfolio") ?: false
                 val theoryParams = TheoryParams(
                     maxLeaves = Long.MAX_VALUE,
                     openWorkLimit = nodeLimit ?: Long.MAX_VALUE,
