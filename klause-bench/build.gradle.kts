@@ -2,12 +2,9 @@ import java.io.FileOutputStream
 import java.net.URI
 import org.gradle.process.ExecOperations
 
-import com.google.protobuf.gradle.id
-
 plugins {
     id("com.eignex.jvm") version "1.3.3"
     kotlin("plugin.serialization")
-    id("com.google.protobuf") version "0.9.6"
     application
 }
 
@@ -29,28 +26,6 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
     // runBlocking + Flow.collect bridge for the suspend Portfolio API in the anytime metric.
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
-
-    // gRPC client for the OSS Vizier tuning service (task #23). protobuf-java carries the well-known
-    // types; proto-google-common-protos supplies google.api.* + google.longrunning.* (imported by the
-    // vendored vizier protos) as both compiled classes and .proto sources for protoc import resolution.
-    implementation("com.google.protobuf:protobuf-java:4.35.1")
-    implementation("io.grpc:grpc-protobuf:1.83.1")
-    implementation("io.grpc:grpc-stub:1.83.1")
-    runtimeOnly("io.grpc:grpc-netty-shaded:1.83.1")
-    implementation("com.google.api.grpc:proto-google-common-protos:2.74.0")
-    protobuf("com.google.api.grpc:proto-google-common-protos:2.74.0")
-    compileOnly("javax.annotation:javax.annotation-api:1.3.2")
-}
-
-// Generate the Vizier gRPC stubs + message classes from the vendored protos in src/main/proto.
-protobuf {
-    protoc { artifact = "com.google.protobuf:protoc:4.35.1" }
-    plugins {
-        id("grpc") { artifact = "io.grpc:protoc-gen-grpc-java:1.83.1" }
-    }
-    generateProtoTasks {
-        all().forEach { task -> task.plugins { id("grpc") } }
-    }
 }
 
 application {

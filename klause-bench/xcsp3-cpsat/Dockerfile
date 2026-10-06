@@ -1,4 +1,4 @@
-# XCSP3 cp-sat reference solver. Python lives only inside this container (mirroring the vizier one):
+# XCSP3 cp-sat reference solver. Python lives only inside this container:
 # CPMpy — the OR-Tools cp-sat modelling lib that won the XCSP3 2024 cp-sat track — reads the XCSP3
 # `.xml` and solves it with cp-sat directly, so there is no XCSP3->FlatZinc conversion and nothing is
 # written to disk. The JVM bench runs this per instance and parses the JSON verdict off stdout.

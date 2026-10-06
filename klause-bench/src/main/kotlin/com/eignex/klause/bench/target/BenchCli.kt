@@ -5,7 +5,6 @@ import com.eignex.klause.bench.catalog.Category
 import com.eignex.klause.bench.catalog.Format
 import com.eignex.klause.bench.catalog.ProblemRef
 import com.eignex.klause.bench.catalog.ProblemSets
-import com.eignex.klause.bench.metric.ArmCalibration
 import com.eignex.klause.bench.metric.BenchCache
 import com.eignex.klause.bench.metric.ClaspReference
 import com.eignex.klause.bench.metric.InstanceClassifier
@@ -17,11 +16,9 @@ import com.eignex.klause.bench.metric.ReferenceStore
 import com.eignex.klause.bench.metric.ResultCredit
 import com.eignex.klause.bench.metric.ScipReference
 import com.eignex.klause.bench.metric.SolveMetric
-import com.eignex.klause.bench.metric.SolveRecord
 import com.eignex.klause.bench.metric.SolverInvocation
 import com.eignex.klause.bench.metric.Xcsp3CpSatReference
 import com.eignex.klause.bench.metric.Z3Reference
-import com.eignex.klause.bench.report.Reports
 import com.eignex.klause.bench.runner.Budget
 import com.eignex.klause.bench.source.CorpusCache
 import com.eignex.klause.bench.source.CorpusFetcher
@@ -31,13 +28,6 @@ import com.eignex.klause.bench.source.ProblemKind
 import com.eignex.klause.bench.tools.ProfileConfig
 import com.eignex.klause.bench.tools.ProfileEvent
 import com.eignex.klause.bench.tools.ProfileScope
-import com.eignex.klause.bench.tune.BoTuning
-import com.eignex.klause.bench.tune.RandomTuner
-import com.eignex.klause.bench.tune.StratifiedPool
-import com.eignex.klause.bench.tune.TuneEngine
-import com.eignex.klause.bench.tune.Tuner
-import com.eignex.klause.bench.tune.VizierTuner
-import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.add
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -69,8 +59,6 @@ import java.util.concurrent.atomic.AtomicInteger
  * `profile=cpu|wall|alloc` `profile-scope=solve|all` `profile-top=N`.
  *
  * Other commands:
- *  - `calibrate [filters…]` — the fair arm tester: run the pool once as a live portfolio and rank
- *    arms into a diverse palette by per-problem best-holder wins (see [calibrate]).
  *  - `reference [filters…]` — harvest per-instance reference optima/bounds with a format-native strong
  *    solver (cp-sat for MiniZinc/XCSP3, clasp for DIMACS/OPB, z3 for SMT-LIB) into the committed
  *    per-solver tables (see [reference]); the gap-to-optimum reward + a soundness oracle.
@@ -90,9 +78,6 @@ object BenchCli {
      *  large-instance cp-sat solves can't exhaust memory. Override with `jobs=N`. */
     private const val DEFAULT_REFERENCE_JOBS = 6
 
-    /** Truncate coverage values to three decimals for the `tune` palette console output. */
-    private const val COVERAGE_DECIMALS = 1000.0
-
     private const val MIB = 1024L * 1024
 
     private const val MIB_COLUMN_WIDTH = 14
@@ -111,13 +96,9 @@ object BenchCli {
 
             "solve-one" -> solveOne(args.drop(1))
 
-            "calibrate" -> calibrate(args.drop(1))
-
             "reference" -> reference(args.drop(1))
 
             "classify" -> classify(args.drop(1))
-
-            "tune" -> tune(args.drop(1))
 
             "credit" -> credit(args.drop(1))
 
@@ -126,7 +107,7 @@ object BenchCli {
             else ->
                 error(
                     "unknown command '$cmd' " +
-                        "(commands: solve, solve-one, select, preview, calibrate, reference, classify, tune, credit, " +
+                        "(commands: solve, solve-one, select, preview, reference, classify, credit, " +
                         "corpus, list)",
                 )
         }
@@ -301,173 +282,6 @@ object BenchCli {
             outDir = f["out"]?.let(::File),
         )
         println("${record.problem}: feasible=${record.feasible} objective=${record.objective} proven=${record.proven}")
-    }
-
-    /** The fair arm tester: run the pool **once** as a live portfolio and rank arms by their real
-     *  marginal contribution. Each problem's winner is its **best-holder** — the arm of the final
-     *  incumbent, from the `%%%klause-arm:` attribution — so a greedy set-cover over the per-problem
-     *  winners gives a diverse palette (see [ArmCalibration]). One run measures the arms as they
-     *  actually co-run (with the portfolio's incumbent/bound sharing), so evaluating a new candidate is
-     *  just adding it to the pool; an arm always shadowed by a stronger sibling earns no slot.
-     *
-     *  - `engine=mixed` (default) `| ls | cp`: which pool to run as `-e <engine> -p<p>` (all emit the
-     *    `%%%klause-arm:` attribution under `-s`).
-     *  - `p=<cores>` (default 8): the portfolio core count.
-     *
-     *  Optimize instances only (pass `kind=cop`). */
-    private fun calibrate(filterArgs: List<String>) {
-        val f = filterArgs.filter { "=" in it }.associate { it.substringBefore('=') to it.substringAfter('=') }
-        val refs = select(f)
-        if (refs.isEmpty()) {
-            println("(no problems matched the selection)")
-            return
-        }
-        val engine = f["engine"]?.lowercase() ?: "mixed"
-        if (engine !in setOf("mixed", "ls", "cp", "alns")) {
-            error("calibrate engine must be mixed | ls | cp | alns, got '$engine'")
-        }
-        val cores = f["p"]?.toIntOrNull()?.coerceAtLeast(1) ?: 8
-        val budget = f["timeout"]?.toLongOrNull()?.let { Budget(it) } ?: Budget()
-        // `param=` is repeatable, so it is collected from the raw args rather than the dedup'd map;
-        // `p=1 param=strategy=sweep` is the bandit-scheduled recipe sweep.
-        val params = filterArgs.filter { it.startsWith("param=") }.map { it.substringAfter('=') }
-        println("=== calibrate ($engine, -p$cores): ${refs.size} instance(s), ${budget.timeoutMillis}ms ===")
-        val dir = SolveMetric.run(
-            BenchLoad.resolveLazily(refs),
-            budget,
-            SolverInvocation.KLAUSE,
-            KlauseSearch(engine = engine, processors = cores, params = params),
-        ) ?: return
-        val (arms, won) = portfolioWinners(dir)
-        if (won.isEmpty()) {
-            println(
-                "\n(no optimize instances with attribution — pass kind=cop; klause emits %%%klause-arm: under -s)",
-            )
-            return
-        }
-        println()
-        println(ArmCalibration.render(ArmCalibration.scoreWinnerSets(arms, won)))
-    }
-
-    /** BO config search: greedy residual rounds ([BoTuning]) that ask a [Tuner] for config
-     *  points over an engine's `ConfigSpace`, evaluate each in-process on the selection, and build a
-     *  diverse palette one complement per round. The reward is per instance kind — gap-to-optimum for a
-     *  COP, time-to-first-feasible for a CSP — so `kind=cop` and `kind=csp` both work. Filters:
-     *  `engine=ls|bt` `rounds=N` (palette size) `trials=M` (per-round asks) `batch=B` `sample=K`
-     *  (problems evaluated per trial — mini-batch, so the selection is a *pool* to sample from)
-     *  `timeout=<ms>` `tuner=random|vizier` `warm-start=true|false` `seed=N` (+ the usual `suite=`/`kind=`/…).
-     *  Depends only on the [Tuner] seam, so the optimizer backend is swappable. */
-    private fun tune(filterArgs: List<String>) {
-        val f = filterArgs.filter { "=" in it }.associate { it.substringBefore('=') to it.substringAfter('=') }
-        val engine = when (f["engine"]?.lowercase()) {
-            "bt", "backtrack", "cp" -> TuneEngine.BT
-            "mixed", "pf", "portfolio" -> TuneEngine.MIXED
-            "ls", "localsearch", "local-search", null -> TuneEngine.LS
-            else -> error("tune engine must be ls | bt | mixed, got '${f["engine"]}'")
-        }
-        // COP (objective) → gap-to-optimum reward; CSP (satisfy) → time-to-first-feasible. The `select`
-        // `kind=cop|csp` filter picks which; a mixed selection is scored per-instance by its own kind.
-        // The pool is stratified from the reference tables and resolves lazily — only each round's mini-batch is
-        // built, so a huge selection never materialises.
-        val pool = StratifiedPool(select(f))
-        if (!pool.isNotEmpty()) {
-            println("(no referenced instances matched — a stratified pool needs reference-table rows)")
-            return
-        }
-        val rounds = f["rounds"]?.toIntOrNull()?.coerceAtLeast(1) ?: 8
-        val trials = f["trials"]?.toIntOrNull()?.coerceAtLeast(1) ?: 32
-        val batch = f["batch"]?.toIntOrNull()?.coerceAtLeast(1) ?: 4
-        val budgetMs = f["timeout"]?.toLongOrNull() ?: 2000L
-        val seed = f["seed"]?.toLongOrNull() ?: 0L
-        val warmStart = f["warm-start"]?.toBoolean() ?: true
-        val sample = f["sample"]?.toIntOrNull()?.coerceAtLeast(1) ?: BoTuning.DEFAULT_SAMPLE_SIZE
-        // `engines=ls,bt` restricts which engines the MIXED search explores (drop one to focus the sweep,
-        // e.g. `engines=bt` to nail the best backtrack arm first). Ignored by the single-engine paths.
-        val engines = f["engines"]?.split(",")?.map { it.trim().lowercase() }?.filter { it.isNotEmpty() }?.toSet()
-            ?: setOf("ls", "bt")
-        require(engines.isNotEmpty() && engines.all { it == "ls" || it == "bt" }) {
-            "engines must be a comma-separated subset of ls,bt, got '${f["engines"]}'"
-        }
-        val tunerId = f["tuner"]?.lowercase() ?: "random"
-        val tuner: Tuner = when (tunerId) {
-            "vizier" -> VizierTuner()
-            "random" -> RandomTuner(seed)
-            else -> error("tune tuner must be random | vizier, got '${f["tuner"]}'")
-        }
-        val strata = pool.strata()
-        val engineTag = if (engine == TuneEngine.MIXED) "$engine[${engines.sorted().joinToString(",")}]" else "$engine"
-        println(
-            "=== tune ($engineTag, $tunerId, warm-start=$warmStart): ${strata.values.sum()} instances over " +
-                "${strata.size} strata, $rounds rounds × $trials trials × sample $sample × ${budgetMs}ms ===",
-        )
-        tuner.use {
-            when (engine) {
-                TuneEngine.LS ->
-                    printPalette(BoTuning.tuneLs(pool, tuner, rounds, trials, batch, budgetMs, seed, warmStart, sample))
-
-                TuneEngine.BT ->
-                    printPalette(BoTuning.tuneBt(pool, tuner, rounds, trials, batch, budgetMs, seed, warmStart, sample))
-
-                TuneEngine.MIXED ->
-                    printMixed(
-                        BoTuning.tuneMixed(
-                            pool, tuner, rounds, trials, batch, budgetMs, seed, warmStart, sample, engines = engines,
-                        ),
-                    )
-            }
-        }
-    }
-
-    /** Print an LS/BT single-engine tune's residual-round palette: each round's marginal coverage gain,
-     *  then the cumulative coverage after it — the concave curve flattens where added arms stop paying. */
-    private fun printPalette(result: BoTuning.Result) {
-        println("residual-round palette (round: +marginal coverage → cumulative):")
-        result.palette.forEach { slot ->
-            val gain = (slot.gain * COVERAGE_DECIMALS).toLong() / COVERAGE_DECIMALS
-            val cover = (slot.cumulativeCoverage * COVERAGE_DECIMALS).toLong() / COVERAGE_DECIMALS
-            println("  r${slot.round}. +$gain → $cover   ${slot.assignment}")
-        }
-        if (result.palette.isEmpty()) println("  (no config improved coverage — check the reward / instances)")
-    }
-
-    /** Print the MIXED campaign's three set-cover projections: the mixed order with its emergent LS:BT
-     *  split (the data-derived pool ratio), then the pure per-engine orders — the covering slots of each. */
-    private fun printMixed(result: BoTuning.MixedResult) {
-        fun engineOf(label: String) = result.configs[label]?.get("engine") ?: "?"
-        val mixed = result.mixed.diverse.filter { it.newlyCovered > 0 }
-        val ls = mixed.count { engineOf(it.arm) == "ls" }
-        val bt = mixed.count { engineOf(it.arm) == "bt" }
-        println("mixed palette (${mixed.size} covering arms; emergent LS:BT = $ls:$bt):")
-        mixed.forEach { s ->
-            println(
-                "  ${s.rank}. [${engineOf(
-                    s.arm,
-                )}] +${s.newlyCovered} → ${s.cumulativeCovered}   ${result.configs[s.arm]}",
-            )
-        }
-        if (mixed.isEmpty()) println("  (no config improved coverage — check the reward / instances)")
-        for ((name, report) in listOf("ls order" to result.ls, "bt order" to result.bt)) {
-            val cover = report.diverse.filter { it.newlyCovered > 0 }
-            println("$name (${cover.size} covering of ${report.diverse.size} evaluated):")
-            cover.forEach { s ->
-                println("  ${s.rank}. +${s.newlyCovered} → ${s.cumulativeCovered}   ${result.configs[s.arm]}")
-            }
-        }
-    }
-
-    /** From a portfolio run's per-problem records: every contributing arm label (the ranking pool) and,
-     *  per optimize instance with attribution, the best-holder winner set (the final improvement's arm). */
-    private fun portfolioWinners(dir: File): Pair<List<String>, List<Set<String>>> {
-        val arms = LinkedHashSet<String>()
-        val won = ArrayList<Set<String>>()
-        dir.listFiles { file -> file.extension == "json" }?.sortedBy { it.name }?.forEach { jsonFile ->
-            val rec = runCatching { Reports.json.decodeFromString<SolveRecord>(jsonFile.readText()) }.getOrNull()
-            if (rec != null && rec.kind == "optimize" && rec.attribution.isNotEmpty()) {
-                rec.attribution.forEach { arms += it.label }
-                won += setOf(SolveMetric.best(rec.attribution, rec.maximize).label)
-            }
-        }
-        return arms.toList() to won
     }
 
     /** Harvest per-instance reference optima/bounds into the committed table (see [ReferenceStore]) —
@@ -791,7 +605,6 @@ object BenchCli {
             |
             |Usage:
             |  bench solve [filters…]                solve a selection (the bench's one measurement)
-            |  bench calibrate [filters…]            diverse arm palette from a live pool run (kind=cop; engine=mixed|ls|cp, p=)
             |  bench reference [filters…]            harvest optima/verdicts into per-solver tables (cp-sat/clasp/z3 by format)
             |  bench preview [filters…]              show what a run would cover
             |  bench select [filters…]               the selection as JSON lines (suite, problem, …)

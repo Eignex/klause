@@ -16,7 +16,7 @@ import java.util.concurrent.atomic.AtomicLong
  * XCSP3 frontend, so an XCSP3 instance is solved by the [IMAGE] container: CPMpy (the OR-Tools cp-sat
  * modelling lib that won the XCSP3 2024 cp-sat track) reads the `.xml` and solves it with cp-sat
  * directly — the same engine used for MiniZinc, so the reference table stays a single cp-sat oracle.
- * Python lives only in the container (mirroring the vizier one); this returns a [SolverInvocation.Result]
+ * Python lives only in the container; this returns a [SolverInvocation.Result]
  * so the reference sweep caches and scores XCSP3 exactly like the MiniZinc path.
  */
 internal object Xcsp3CpSatReference {
