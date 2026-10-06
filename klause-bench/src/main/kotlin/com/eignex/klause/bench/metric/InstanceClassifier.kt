@@ -22,6 +22,9 @@ internal data class InstanceFeatures(
      *  Blank where the format has no such single-axis classification (MiniZinc/XCSP3/OPB/DIMACS use
      *  [structure] instead). */
     val logic: String = "",
+    /** What solving the instance asks of klause, as named in [InstanceClassifier.THEMES]; an instance can
+     *  have several. Named problem sets are drawn per theme. */
+    val themes: Set<String> = emptySet(),
 )
 
 /**
@@ -45,6 +48,29 @@ internal object InstanceClassifier {
         "maximum", "minimum", "knapsack",
     )
 
+    /**
+     * The themes [InstanceFeatures.themes] draws from:
+     * - `open-int`: integer variables without a finite domain (SMT-LIB QF_LIA/QF_IDL/QF_LIRA, MiniZinc `var int`).
+     * - `linear-real`: real-valued variables in linear constraints (SMT-LIB QF_LRA/QF_RDL/QF_LIRA, MPS continuous
+     *   columns, MiniZinc `var float`).
+     * - `mip`: an MPS model with integer columns.
+     * - `scheduling`, `routing`, `packing`: a cumulative/disjunctive/no-overlap, circuit, or bin-packing/knapsack/
+     *   diffn global.
+     * - `globals`: any other global constraint.
+     * - `sat`, `maxsat`, `pb`: a CNF, a WCNF, an OPB instance.
+     */
+    val THEMES =
+        listOf("open-int", "linear-real", "mip", "scheduling", "routing", "packing", "globals", "sat", "maxsat", "pb")
+
+    /** The themes a specific global gives; `globals` is for an instance with globals but none of these. */
+    private val STRUCTURED = setOf("scheduling", "routing", "packing")
+    private val MZN_SCHEDULING = listOf("cumulative", "disjunctive", "unary", "no_overlap")
+    private val MZN_ROUTING = listOf("circuit", "subcircuit")
+    private val MZN_PACKING = listOf("bin_packing", "bin_packing_capa", "bin_packing_load", "knapsack", "diffn")
+    private val XCSP_SCHEDULING = listOf("cumulative", "noOverlap")
+    private val XCSP_ROUTING = listOf("circuit")
+    private val XCSP_PACKING = listOf("binPacking", "knapsack")
+
     /** Source-text features for [ref], or null if the source can't be read. */
     fun classify(ref: ProblemRef): InstanceFeatures? =
         runCatching { fromSource(ref.format, CorpusFiles.readText(CorpusFetcher.resolve(ref.source))) }.getOrNull()
@@ -52,15 +78,77 @@ internal object InstanceClassifier {
     /** The format-specific heuristic over the raw source [text] (the testable core of [classify]). */
     fun fromSource(format: Format, text: String): InstanceFeatures {
         val fmt = format.name.lowercase()
-        return when (format) {
+        val features = when (format) {
             Format.MINIZINC -> minizinc(fmt, text)
             Format.XCSP3 -> xcsp3(fmt, text)
             Format.OPB -> pseudoBoolean(fmt, text)
             Format.DIMACS -> sat(fmt, text)
             Format.SMTLIB -> smtlib(fmt, text)
             Format.MPS -> mps(fmt, text)
+            Format.WCNF -> InstanceFeatures(fmt, "sat", 0, 0, boolHeavy = true)
             else -> InstanceFeatures(fmt, "arithmetic", 0, 0, boolHeavy = false)
         }
+        return features.copy(themes = themes(format, text, features))
+    }
+
+    private fun themes(format: Format, text: String, features: InstanceFeatures): Set<String> = buildSet {
+        fun uses(words: List<String>) = words.any { Regex("\\b${Regex.escape(it)}\\b").containsMatchIn(text) }
+        fun usesElement(names: List<String>) = names.any { Regex("<$it\\b").containsMatchIn(text) }
+        when (format) {
+            Format.MINIZINC -> {
+                if (Regex("""\bvar\s+int\b""").containsMatchIn(text)) add("open-int")
+                if (Regex("""\bvar\s+(float\b|-?\d+\.\d+\s*\.\.)""").containsMatchIn(text)) add("linear-real")
+                if (uses(MZN_SCHEDULING)) add("scheduling")
+                if (uses(MZN_ROUTING)) add("routing")
+                if (uses(MZN_PACKING)) add("packing")
+                if (features.numGlobal > 0 && none { it in STRUCTURED }) add("globals")
+            }
+
+            Format.XCSP3 -> {
+                if (usesElement(XCSP_SCHEDULING)) add("scheduling")
+                if (usesElement(XCSP_ROUTING)) add("routing")
+                if (usesElement(XCSP_PACKING)) add("packing")
+                if (features.numGlobal > 0 && none { it in STRUCTURED }) add("globals")
+            }
+
+            Format.SMTLIB -> {
+                if (features.logic in setOf("QF_LIA", "QF_IDL", "QF_LIRA")) add("open-int")
+                if (features.logic in setOf("QF_LRA", "QF_RDL", "QF_LIRA")) add("linear-real")
+            }
+
+            Format.MPS -> {
+                if (features.logic == "MIP") add("mip")
+                if (hasContinuousColumns(text)) add("linear-real")
+            }
+
+            Format.DIMACS -> add("sat")
+
+            Format.WCNF -> add("maxsat")
+
+            Format.OPB -> add("pb")
+
+            else -> Unit
+        }
+    }
+
+    /** Whether an MPS model's COLUMNS section names a column outside every `INTORG`…`INTEND` marker pair. */
+    private fun hasContinuousColumns(text: String): Boolean {
+        var inColumns = false
+        var integer = false
+        for (line in text.lineSequence()) {
+            if (line.isEmpty() || line.startsWith("*")) continue
+            if (!line[0].isWhitespace()) {
+                inColumns = line.startsWith("COLUMNS")
+                continue
+            }
+            if (!inColumns) continue
+            when {
+                "'INTORG'" in line -> integer = true
+                "'INTEND'" in line -> integer = false
+                !integer -> return true
+            }
+        }
+        return false
     }
 
     private fun countWords(text: String, words: List<String>): Int =

@@ -63,4 +63,41 @@ class InstanceClassifierTest {
         val f = InstanceClassifier.fromSource(Format.MPS, "ROWS\n N obj\nCOLUMNS\n")
         assertEquals("LP", f.logic)
     }
+
+    @Test
+    fun `themes name what an instance asks of the solver`() {
+        fun themes(format: Format, text: String) = InstanceClassifier.fromSource(format, text).themes
+
+        assertEquals(
+            setOf("open-int", "scheduling"),
+            themes(Format.MINIZINC, "var int: s;\nconstraint cumulative([s], [1], [1], 1);"),
+        )
+        assertEquals(setOf("globals"), themes(Format.MINIZINC, "var 1..9: x;\nconstraint all_different([x]);"))
+        assertEquals(setOf("linear-real"), themes(Format.MINIZINC, "var 0.0..1.0: x;\nconstraint x >= 0.5;"))
+        assertEquals(
+            setOf("routing"),
+            themes(Format.XCSP3, "<instance><constraints><circuit>x</circuit></constraints></instance>"),
+        )
+        assertEquals(setOf("open-int", "linear-real"), themes(Format.SMTLIB, "(set-logic QF_LIRA)\n(assert true)"))
+        assertEquals(setOf("maxsat"), themes(Format.WCNF, "p wcnf 1 1 2\n1 1 0\n"))
+    }
+
+    @Test
+    fun `an mps model with columns outside its integer markers has linear reals`() {
+        val mixed = """
+            NAME m
+            ROWS
+             N obj
+            COLUMNS
+                MARKER 'MARKER' 'INTORG'
+                x obj 1
+                MARKER 'MARKER' 'INTEND'
+                y obj 1
+            ENDATA
+        """.trimIndent()
+        val integer = mixed.lines().filterNot { it.trim().startsWith("y ") }.joinToString("\n")
+
+        assertEquals(setOf("mip", "linear-real"), InstanceClassifier.fromSource(Format.MPS, mixed).themes)
+        assertEquals(setOf("mip"), InstanceClassifier.fromSource(Format.MPS, integer).themes)
+    }
 }

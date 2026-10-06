@@ -4,6 +4,7 @@ import com.eignex.klause.bench.catalog.Catalog
 import com.eignex.klause.bench.catalog.Category
 import com.eignex.klause.bench.catalog.Format
 import com.eignex.klause.bench.catalog.ProblemRef
+import com.eignex.klause.bench.catalog.ProblemSets
 import com.eignex.klause.bench.metric.ArmCalibration
 import com.eignex.klause.bench.metric.BenchCache
 import com.eignex.klause.bench.metric.ClaspReference
@@ -37,8 +38,10 @@ import com.eignex.klause.bench.tune.TuneEngine
 import com.eignex.klause.bench.tune.Tuner
 import com.eignex.klause.bench.tune.VizierTuner
 import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.json.add
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import kotlinx.serialization.json.putJsonArray
 import java.io.File
 import java.time.Instant
 import java.time.temporal.ChronoUnit
@@ -257,6 +260,7 @@ object BenchCli {
      *  a dynamic suite fetches its collection, so a selection also leaves every instance it names on disk. */
     private fun printSelection(filterArgs: List<String>) {
         val f = filterArgs.filter { "=" in it }.associate { it.substringBefore('=') to it.substringAfter('=') }
+        val features = f["features"] == "true"
         for (selected in selectProblems(f)) {
             val line = buildJsonObject {
                 put("suite", selected.suite)
@@ -265,6 +269,13 @@ object BenchCli {
                 put("family", selected.family.substringAfter(':'))
                 put("format", selected.ref.format.name)
                 put("category", selected.ref.category.name)
+                if (features) {
+                    InstanceClassifier.classify(selected.ref)?.let { feat ->
+                        put("structure", feat.structure)
+                        put("logic", feat.logic)
+                        putJsonArray("themes") { feat.themes.sorted().forEach { add(it) } }
+                    }
+                }
             }
             println(line)
         }
@@ -665,10 +676,16 @@ object BenchCli {
     private fun selectProblems(f: Map<String, String>): List<SelectedProblem> {
         val suiteIds = f["suite"]?.split(",")?.map { it.trim() }?.flatMap { expandSuiteIds(it) }
             ?: Catalog.suites.map { it.id }
-        var candidates = suiteIds.flatMap { id ->
-            val default = Catalog.defaultPerFamily(id)
-            Catalog.uncapped(id).problems.map { SelectedProblem(id, it, default) }
+        var candidates = f["set"]?.let { sets ->
+            setProblems(
+                sets.split(",").map { it.trim() },
+                f["suite"]?.let { suiteIds.toSet() },
+            )
         }
+            ?: suiteIds.flatMap { id ->
+                val default = Catalog.defaultPerFamily(id)
+                Catalog.uncapped(id).problems.map { SelectedProblem(id, it, default) }
+            }
         f["category"]?.split(",")?.map { Category.valueOf(it.trim().uppercase()) }?.toSet()?.let { cats ->
             candidates = candidates.filter { it.ref.category in cats }
         }
@@ -706,6 +723,24 @@ object BenchCli {
         val (idx, n) = shard.split("/").map { it.trim().toInt() }
         require(n > 0 && idx in 0 until n) { "klause.bench.shard must be i/n with 0 <= i < n, got $shard" }
         return selected.filterIndexed { i, _ -> i % n == idx }
+    }
+
+    /** The problems of the named sets, restricted to [suites] when given. A set is selected whole: no suite's
+     *  default per-family cap applies to it, only an explicit `per-family`. */
+    private fun setProblems(names: List<String>, suites: Set<String>?): List<SelectedProblem> {
+        val entries = ProblemSets.load(names).filter { suites == null || it.suite in suites }
+        val bySuite = entries.map { it.suite }.distinct().associateWith { id ->
+            Catalog.uncapped(
+                id,
+            ).problems.associateBy { it.name }
+        }
+        val missing = entries.filter { bySuite.getValue(it.suite)[it.problem] == null }
+        require(missing.isEmpty()) {
+            "${missing.size} set problems are in no suite, first ${missing.take(
+                3,
+            ).joinToString { "${it.suite}/${it.problem}" }}"
+        }
+        return entries.map { SelectedProblem(it.suite, bySuite.getValue(it.suite).getValue(it.problem)) }
     }
 
     /** `kind=cop` keeps optimization problems, `kind=csp` keeps satisfaction problems. */
