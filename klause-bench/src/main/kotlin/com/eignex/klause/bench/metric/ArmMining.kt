@@ -18,13 +18,15 @@ import java.util.Locale
  */
 internal object ArmMining {
 
-    /** One mined case: where it came from, the record's outcome, and each arm's telemetry. */
+    /** One mined case: where it came from, the record's outcome, and each arm's telemetry.
+     *  [quarantined] is the run's own account of every arm it quarantined, when it kept one. */
     data class MinedCase(
         val name: String,
         val config: String,
         val slice: Map<String, String>,
         val arms: List<ArmTelemetry>,
         val winners: Set<String>,
+        val quarantined: String? = null,
     )
 
     /** One arm's `arm.<label>` line: scheduler accounting plus the per-signal credit. */
@@ -97,7 +99,7 @@ internal object ArmMining {
             if (key.startsWith(ARM_PREFIX)) parseArm(armOf(key.removePrefix(ARM_PREFIX)), value) else null
         }
         if (arms.isEmpty()) return null
-        return MinedCase(name, config, slice, arms, winners(record, arms))
+        return MinedCase(name, config, slice, arms, winners(record, arms), record.stats[SolverInvocation.QUARANTINED])
     }
 
     /** Parse one `segments=… work=… reward=… failures=… faults=… <Signal>=…` telemetry value. */
@@ -163,6 +165,7 @@ internal object ArmMining {
             appendLine("!!! ${faulty.size} quarantined arm run(s) — fix these before trusting any ranking below:")
             for ((case, arm) in faulty) {
                 appendLine("!!!   ${arm.label} on ${case.name} [${case.config}] faults=${arm.faults}")
+                case.quarantined?.let { appendLine("!!!     $it") }
             }
             appendLine()
         }

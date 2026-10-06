@@ -414,6 +414,8 @@ internal object SolverInvocation {
             if (refusal != null) stats["unsupported"] = refusal else stats["killed"] = "hard-timeout"
             stats["exit"] = process.exitValue().toString()
         }
+        drain.join(STDERR_DRAIN_WAIT_MS)
+        quarantines(stderr.toString())?.let { stats[QUARANTINED] = it }
         return Result(
             feasible = when {
                 anySolution -> true
@@ -456,6 +458,18 @@ internal object SolverInvocation {
         val line = stderr.lineSequence().firstOrNull { it.startsWith(REFUSAL_PREFIX) } ?: return null
         return line.removePrefix(REFUSAL_PREFIX).trim().takeIf { it.isNotEmpty() }
     }
+
+    /**
+     * The portfolio arms a klause run quarantined, joined into one stat value, or null when none was.
+     * The warning goes to stderr so it is never buried in a solution stream; this keeps it in the record,
+     * where nothing else says why an arm's `faults=` count rose.
+     */
+    internal fun quarantines(stderr: String): String? = stderr.lineSequence()
+        .filter { it.startsWith(QUARANTINE_PREFIX) }
+        .map { it.removePrefix(QUARANTINE_PREFIX).trim() }
+        .toList()
+        .ifEmpty { null }
+        ?.joinToString(" | ")
 
     /** Parse a `%%%klause-arm:` body. `label`, `objective` (the exact discrete `Long` channel), and
      *  `time` are required — a line missing or malformed on any of those is unusable and the whole
@@ -512,6 +526,12 @@ internal object SolverInvocation {
 
     /** How long the exit path waits for the stderr drain before reading what it collected. */
     private const val STDERR_DRAIN_WAIT_MS = 2_000L
+
+    /** How klause-cli announces a quarantined portfolio arm on stderr: `<label> quarantined: <reason>` follows. */
+    private const val QUARANTINE_PREFIX = "% WARNING: portfolio arm "
+
+    /** The stat key a record keeps the run's [quarantines] under. */
+    const val QUARANTINED = "quarantined"
 
     /** Ceiling on the dist's answer to `--version`, so a child that never answers cannot hang a run. */
     private const val PREFLIGHT_TIMEOUT_MS = 30_000L
