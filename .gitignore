@@ -19,6 +19,8 @@ out/
 
 # Generated bench solve/calibrate artifacts (keep the committed *.sh scorers at output/ root)
 klause-bench/output/*/
+# Local reference tables from `bench reference` and `bench classify`; the shared reference results live in klause-lab
+klause-bench/reference/
 
 ### Agent harnesses ###
 # Local state only: transcripts, caches, per-user settings, and the scratch git

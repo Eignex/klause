@@ -50,15 +50,13 @@ internal data class ReferenceEntry(
 )
 
 /**
- * The vendored reference tables under `klause-bench/reference/`, one CSV **per solver** named after the
- * solver that produced it (`cp-sat.csv`, `clasp.csv`, `z3.csv`, …) — so each instance's oracle is
- * traceable to its source and independent solver runs never overwrite one another. [load] unions them
- * into one instance-keyed view. CSV (a header plus one row per instance) rather than JSON: at ~20k
- * entries it is a few times smaller and, being line-oriented, gives clean per-instance VCS diffs (a
- * changed optimum touches one line, not the whole file). Merges are **virtual-best**: a proven optimum
- * always wins, and among unproven bounds the tighter objective (lower for minimize, higher for
- * maximize) wins — so references only ever tighten and unproven bounds stay honest. Regenerable +
- * incremental via `bench reference`.
+ * Local reference tables under `klause-bench/reference/`, gitignored: the shared reference results live in
+ * klause-lab's database. One CSV **per solver**, named after the solver that produced it (`cp-sat.csv`,
+ * `clasp.csv`, `z3.csv`, …), so each instance's oracle is traceable to its source and independent solver runs
+ * never overwrite one another. [load] unions them into one instance-keyed view, empty when no table has been
+ * written. Merges are **virtual-best**: a proven optimum always wins, and among unproven bounds the tighter
+ * objective (lower for minimize, higher for maximize) wins, so references only ever tighten and unproven bounds
+ * stay honest. Regenerable and incremental via `bench reference`.
  */
 internal object ReferenceStore {
     // No `solver` column: each row's solver is the file it lives in (`<solver>.csv` for a reference
