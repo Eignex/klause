@@ -14,6 +14,8 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.localsearch.LocalSearchParams
+import com.eignex.klause.localsearch.LocalSearchSolver
 import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.lp.bounding.LpEmphasis
 import com.eignex.klause.lp.bounding.LpTechnique
@@ -671,5 +673,31 @@ class PortfolioLanesTest {
             }
         }
         return Problem(pigeons * holes, 0, emptyArray(), factors.toTypedArray())
+    }
+
+    @Test
+    fun `with a lane for every arm each arm runs one segment for the whole solve`() {
+        val problem = Problem(
+            numBoolVars = 3,
+            numIntVars = 0,
+            intDomains = emptyArray(),
+            factors = arrayOf<Factor>(Cardinality.atLeastOne(IntArray(3) { Lit.make(it, true) })),
+        )
+        val objective = LinearObjective(boolWeights = longArrayOf(1L, 1L, 1L))
+        val arms = List(2) { i ->
+            PortfolioWorker.of(
+                "ls$i",
+                i,
+                LocalSearchSolver(problem.bake()).session(),
+                LocalSearchParams(randomSeed = i.toLong()),
+                objective = objective,
+                withInstructionBudget = { p, limit -> p.copy(maxInstructions = limit) },
+            )
+        }
+        val stop = TimeSource.Monotonic.markNow() + Duration.parse("100ms")
+
+        val r = Portfolio.thompson(arms, lanes = 2).use { it.minimize(cancellation = { stop.hasPassedNow() }) }
+
+        assertEquals(listOf(1L, 1L), r.stats.portfolio.arms.map { it.segments })
     }
 }

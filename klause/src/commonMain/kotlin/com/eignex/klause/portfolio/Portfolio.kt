@@ -29,7 +29,8 @@ import kotlin.time.TimeSource
  * arm a kumulant [UnivariateBandit] picks, runs it for one segment, and settles what the segment earned; the
  * shared incumbent, bound and pools pass between segments and lanes. One lane is the single-core track, where the
  * policy concentrates the core on whichever arm is making progress; more lanes run that same schedule
- * concurrently, never two at once on one arm.
+ * concurrently, never two at once on one arm. With a lane for every arm there is nothing to share, and each lane
+ * runs its own arm for the whole solve.
  *
  * An **arm** is a [PortfolioWorker], built by [PortfolioBuilder], so a portfolio may mix local search, backtrack
  * and ALNS. Across segments the shared incumbent bound prunes backtrack arms (their `objectiveBoundSupplier`) and
@@ -160,16 +161,16 @@ class Portfolio(
             val work: Long
             if (handle != null) {
                 val workBefore = handle.work
-                val outcome = runCatching { handle.runSlice(run.token, Long.MAX_VALUE, claim.sliceWork) }
+                val outcome = runCatching { handle.runSlice(run.token, Long.MAX_VALUE, claim.handleNodes) }
                 r = outcome.getOrNull()
                 failure = outcome.exceptionOrNull()
                 work = handle.work - workBefore
             } else {
                 val token = segmentToken(worker, run.token, claim)
-                val outcome = runCatching { worker.solve(token, instructionsFor(claim.sliceWork)) }
+                val outcome = runCatching { worker.solve(token, instructionsOf(claim)) }
                 r = outcome.getOrNull()
                 failure = outcome.exceptionOrNull()
-                work = claim.sliceWork
+                work = countedWork(claim, r?.stats)
             }
             val failed = failure != null
             // A failing arm leaves the others to answer; an unsound one answered wrongly, so it is quarantined too.
@@ -281,7 +282,7 @@ class Portfolio(
                 val workBefore = handle.work
                 // A terminal verdict means the arm finished; null means the slice ended with the search paused.
                 val outcome = runCatching {
-                    handle.runSlice(run.token, Long.MAX_VALUE, claim.sliceWork) { accept(claim, it) }
+                    handle.runSlice(run.token, Long.MAX_VALUE, claim.handleNodes) { accept(claim, it) }
                 }
                 terminal = outcome.getOrNull()
                 failure = outcome.exceptionOrNull()
@@ -294,13 +295,13 @@ class Portfolio(
                         readBound,
                         armToken,
                         warmStart = incumbent.current()?.assignment,
-                        maxInstructions = instructionsFor(claim.sliceWork),
+                        maxInstructions = instructionsOf(claim),
                     )) {
                         terminal = r
                         if (r is MinimizeResult.WithSample) accept(claim, r)
                     }
                 }.exceptionOrNull()
-                work = claim.sliceWork
+                work = countedWork(claim, terminal?.stats)
             }
             callbackFailure?.let { throw it }
             val failed = failure != null
@@ -348,8 +349,18 @@ class Portfolio(
         return PortfolioReduction.terminal(incumbent.current(), dirty = !exhausted, stats)
     }
 
-    /** One segment's assignment: the arm a lane claimed and what it may spend, plus what its segment found. */
-    private class Claim(val arm: Int, val probing: Boolean, val sliceMillis: Long, val sliceWork: Long) {
+    /** One segment's assignment: the arm a lane claimed and what it may spend, plus what its segment found. A
+     *  [whole] segment is the arm's share of the entire solve, run on a lane of its own until the run ends. */
+    private class Claim(
+        val arm: Int,
+        val probing: Boolean,
+        val sliceMillis: Long,
+        val sliceWork: Long,
+        val whole: Boolean = false,
+    ) {
+        /** The work a resumable handle's slice may spend; a negative allowance leaves it to the run's token. */
+        val handleNodes: Long get() = if (whole) -1L else sliceWork
+
         var hadIncumbent = false
         var improved = false
         var foundFirst = false
@@ -396,7 +407,7 @@ class Portfolio(
          * still open and rethrow the first failure a lane hit, a close failure suppressed into it.
          */
         fun execute(segment: (Claim) -> Unit) {
-            parallelRun(List(lanes) { { lane(segment) } })
+            parallelRun(List(lanes) { index -> { lane(index, segment) } })
             closeAll(laneFailure)
             laneFailure?.let { throw it }
         }
@@ -406,10 +417,10 @@ class Portfolio(
 
         // Runs segments until the run ends. Never throws: a native lane cannot hand an exception back, so a failure
         // is recorded for [execute] to rethrow.
-        private fun lane(segment: (Claim) -> Unit) {
+        private fun lane(index: Int, segment: (Claim) -> Unit) {
             try {
                 while (!token()) {
-                    val claim = claim() ?: break
+                    val claim = claim(index) ?: break
                     try {
                         segment(claim)
                     } finally {
@@ -423,16 +434,23 @@ class Portfolio(
         }
 
         /**
-         * The next arm for a lane, or null when none is free. Every arm first runs one base slice, in order, so the
-         * policy starts from evidence on each; then the policy picks among arms neither busy nor retired.
+         * The next arm for lane [lane], or null when none is free. With a lane for every arm, each lane keeps its own
+         * arm: there is nothing to share, so neither a probe nor the policy has a choice to make. Otherwise every arm
+         * first runs one base slice, in order, so the policy starts from evidence on each; then the policy picks
+         * among arms neither busy nor retired.
          */
-        private fun claim(): Claim? = locked {
+        private fun claim(lane: Int): Claim? = locked {
             if (remaining == 0) return@locked null
-            val probing = probed < workers.size
-            val arm = if (probing) probed++ else policyPick()
+            val dedicated = lanes == workers.size
+            val probing = !dedicated && probed < workers.size
+            val arm = when {
+                dedicated -> lane
+                probing -> probed++
+                else -> policyPick()
+            }
             if (arm < 0 || retired[arm] || busy[arm]) return@locked null
             busy[arm] = true
-            Claim(arm, probing, slice, sliceWork)
+            Claim(arm, probing, slice, sliceWork, whole = dedicated)
         }
 
         // The policy's pick among free arms, falling back to the first free one if it keeps naming taken arms.
@@ -523,12 +541,24 @@ class Portfolio(
     /** The instruction allowance a counted local-search segment of [work] units receives. */
     private fun instructionsFor(work: Long): Long = (work * lsInstructionsPerWork).toLong().coerceAtLeast(1L)
 
+    // A whole segment runs until the run ends, so it has no allowance of its own.
+    private fun instructionsOf(claim: Claim): Long =
+        if (claim.whole) Long.MAX_VALUE else instructionsFor(claim.sliceWork)
+
+    // A counted segment spends its allowance; a whole one spent what its moves add up to.
+    private fun countedWork(claim: Claim, stats: SolveStats?): Long = if (claim.whole) {
+        ((stats?.ls?.moves?.sum ?: 0.0) / lsInstructionsPerWork).toLong()
+    } else {
+        claim.sliceWork
+    }
+
     /** The cancellation token bounding one non-resumable arm's segment. A counted-work arm
      *  ([PortfolioWorker.acceptsInstructionBudget]) is paced by its own instruction budget, and past its probe a
      *  wall-clock cap on top would reintroduce the machine-speed dependence counting exists to remove; its probe
      *  is capped at [probeSliceMillis]. An arm with neither a counter nor a resumable handle is sliced by the
      *  claim's millis, a deadline it can size a sub-phase against ([Cancellation.shorten]). */
     private fun segmentToken(worker: PortfolioWorker, cancellation: Cancellation, claim: Claim): Cancellation = when {
+        claim.whole -> cancellation
         !worker.acceptsInstructionBudget -> until(claim.sliceMillis) or cancellation
         claim.probing -> until(probeSliceMillis) or cancellation
         else -> cancellation
