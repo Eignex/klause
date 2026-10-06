@@ -26,18 +26,40 @@ internal class SharedVarBounds(numIntVars: Int, private val lock: Mutex = Concur
     private val lo = LongArray(numIntVars) { Long.MIN_VALUE }
     private val hi = LongArray(numIntVars) { Long.MAX_VALUE }
 
-    /** Tighten the shared bounds of [varId] toward `[lower, upper]` (keeps the tightest seen each side). */
-    fun publish(varId: Int, lower: Long, upper: Long) {
+    // The arm that published each side's tightest bound; [NO_ORIGIN] while none did, or when it named none.
+    private val loOrigin = IntArray(numIntVars) { NO_ORIGIN }
+    private val hiOrigin = IntArray(numIntVars) { NO_ORIGIN }
+
+    /** Tighten the shared bounds of [varId] toward `[lower, upper]` (keeps the tightest seen each side), as
+     *  published by arm [origin]. */
+    fun publish(varId: Int, lower: Long, upper: Long, origin: Int = NO_ORIGIN) {
         if (varId !in lo.indices) return
         lock.withLock {
-            if (lower > lo[varId]) lo[varId] = lower
-            if (upper < hi[varId]) hi[varId] = upper
+            if (lower > lo[varId]) {
+                lo[varId] = lower
+                loOrigin[varId] = origin
+            }
+            if (upper < hi[varId]) {
+                hi[varId] = upper
+                hiOrigin[varId] = origin
+            }
         }
     }
+
+    /** The arm that published [varId]'s tightest shared lower bound, or [NO_ORIGIN]. */
+    fun lowerOriginOf(varId: Int): Int = lock.withLock { if (varId in lo.indices) loOrigin[varId] else NO_ORIGIN }
+
+    /** The arm that published [varId]'s tightest shared upper bound, or [NO_ORIGIN]. */
+    fun upperOriginOf(varId: Int): Int = lock.withLock { if (varId in hi.indices) hiOrigin[varId] else NO_ORIGIN }
 
     /** The tightest shared lower bound for [varId] (`Long.MIN_VALUE` if none). */
     fun lowerOf(varId: Int): Long = lock.withLock { if (varId in lo.indices) lo[varId] else Long.MIN_VALUE }
 
     /** The tightest shared upper bound for [varId] (`Long.MAX_VALUE` if none). */
     fun upperOf(varId: Int): Long = lock.withLock { if (varId in hi.indices) hi[varId] else Long.MAX_VALUE }
+
+    internal companion object {
+        /** The origin of a bound whose publisher named no arm. */
+        const val NO_ORIGIN = -1
+    }
 }

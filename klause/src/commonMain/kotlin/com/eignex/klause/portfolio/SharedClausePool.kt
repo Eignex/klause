@@ -3,6 +3,8 @@ package com.eignex.klause.portfolio
 import com.eignex.klause.propagation.ClauseExchange
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.SharedClause
+import com.eignex.klause.util.EmptyIntArray
+import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.LongHashSet
 import com.eignex.kumulant.core.Concurrency
 import com.eignex.kumulant.stream.Mutex
@@ -42,12 +44,16 @@ internal class SharedClausePool(
 ) {
     private val clauses = ArrayList<SharedClause>()
     private val global = ArrayList<Boolean>()
+
+    // The arm that published each clause, parallel to [clauses]; [NO_ORIGIN] when the publisher named none.
+    private val origins = IntArrayList()
     private val keys = LongHashSet()
     private var generation = 0
 
-    /** Append the unseen clauses of [batch] (by key), compacting on overflow. [isGlobal] marks a
-     *  globally-published nogood for retention priority over filtered glue. */
-    fun publish(batch: List<SharedClause>, isGlobal: Boolean = false) {
+    /** Append the unseen clauses of [batch] (by key) as published by arm [origin], compacting on overflow.
+     *  [isGlobal] marks a globally-published nogood for retention priority over filtered glue. A clause
+     *  already pooled keeps the arm that published it first. */
+    fun publish(batch: List<SharedClause>, origin: Int = NO_ORIGIN, isGlobal: Boolean = false) {
         if (batch.isEmpty()) return
         lock.withLock {
             for (c in batch) {
@@ -56,6 +62,7 @@ internal class SharedClausePool(
                 if (keys.add(c.key)) {
                     clauses.add(c)
                     global.add(isGlobal)
+                    origins.add(origin)
                 }
             }
         }
@@ -68,9 +75,9 @@ internal class SharedClausePool(
         val size = clauses.size
         val advanced = cursorOf(generation, size)
         if (from >= size) {
-            Drained(emptyList(), advanced)
+            Drained(emptyList(), EmptyIntArray, advanced)
         } else {
-            Drained(ArrayList(clauses.subList(from, size)), advanced)
+            Drained(ArrayList(clauses.subList(from, size)), IntArray(size - from) { origins[from + it] }, advanced)
         }
     }
 
@@ -85,25 +92,32 @@ internal class SharedClausePool(
         for (k in 0 until minOf(target, order.size)) keep[order[k]] = true
         val keptClauses = ArrayList<SharedClause>(target)
         val keptGlobal = ArrayList<Boolean>(target)
+        val keptOrigins = IntArrayList(target)
         keys.clear()
         for (i in clauses.indices) {
             if (!keep[i]) continue
             keptClauses.add(clauses[i])
             keptGlobal.add(global[i])
+            keptOrigins.add(origins[i])
             keys.add(clauses[i].key)
         }
         clauses.clear()
         clauses.addAll(keptClauses)
         global.clear()
         global.addAll(keptGlobal)
+        origins.clear()
+        for (i in 0 until keptOrigins.size) origins.add(keptOrigins[i])
         generation++
     }
 
-    /** A drained batch + the advanced cursor. */
-    internal class Drained(val clauses: List<SharedClause>, val cursor: Long)
+    /** A drained batch, the arm that published each of its clauses, and the advanced cursor. */
+    internal class Drained(val clauses: List<SharedClause>, val origins: IntArray, val cursor: Long)
 
     internal companion object {
         const val DEFAULT_CAP = 50_000
+
+        /** The origin of a clause whose publisher named no arm. */
+        const val NO_ORIGIN = -1
 
         private fun cursorOf(generation: Int, index: Int): Long = (generation.toLong() shl 32) or index.toLong()
         private fun generationOf(cursor: Long): Int = (cursor ushr 32).toInt()
@@ -120,6 +134,8 @@ internal class SharedClausePool(
  */
 internal class PoolClauseExchange(
     private val pool: SharedClausePool,
+    /** The arm this exchange publishes for; see [SharedClausePool.publish]. */
+    private val origin: Int = SharedClausePool.NO_ORIGIN,
     private val maxLbd: Int = pool.shareMaxLbd,
     private val maxLen: Int = pool.shareMaxLen,
     /** Skip permanent (search-conditioned) clauses on export — the incumbent objective bound and
@@ -158,14 +174,14 @@ internal class PoolClauseExchange(
      *  `seen` set so this arm neither double-publishes it nor re-imports its own. */
     override fun publishGlobal(clause: SharedClause) {
         if (!shareGlobalNogoods) return
-        if (seen.add(clause.key)) pool.publish(listOf(clause), isGlobal = true)
+        if (seen.add(clause.key)) pool.publish(listOf(clause), origin, isGlobal = true)
     }
 
     /** Publish this arm's not-yet-seen glue clauses; safe at any decision level (read-only on the
      *  trail). The `seen` set guards against re-export within a session; the pool de-dups globally. */
     private fun export(session: PropagationSession) {
         val fresh = session.exportGlueClauses(maxLbd, maxLen, skipPermanent).filter { seen.add(it.key) }
-        if (fresh.isNotEmpty()) pool.publish(fresh)
+        if (fresh.isNotEmpty()) pool.publish(fresh, origin)
     }
 
     internal companion object {

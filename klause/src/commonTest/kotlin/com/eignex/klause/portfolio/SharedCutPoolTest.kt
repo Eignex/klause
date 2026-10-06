@@ -15,6 +15,7 @@ import com.eignex.klause.lp.relaxation.LpRelaxation
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.objective.LinearObjective
 import kotlin.test.Test
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
@@ -99,10 +100,12 @@ class SharedCutPoolTest {
         val b = assertNotNull(
             SharedCut.fromCut(Cut(intArrayOf(0, 2), longArrayOf(2, 1), Relation.LE, 3, global = true), r),
         )
-        pool.publish(listOf(a, aGain, b))
+        pool.publish(listOf(a, aGain), origin = 3)
+        pool.publish(listOf(b), origin = 4)
 
         val first = pool.drainSince(0)
         assertEquals(2, first.cuts.size, "duplicate key dropped")
+        assertContentEquals(intArrayOf(3, 4), first.origins, "each cut names the arm that published it")
         assertTrue(pool.drainSince(first.cursor).cuts.isEmpty(), "nothing new past the cursor")
     }
 }

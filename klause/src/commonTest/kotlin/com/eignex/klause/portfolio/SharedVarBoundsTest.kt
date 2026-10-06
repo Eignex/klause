@@ -33,4 +33,14 @@ class SharedVarBoundsTest {
         assertEquals(Long.MIN_VALUE, vb.lowerOf(5))
         assertEquals(Long.MAX_VALUE, vb.upperOf(5))
     }
+
+    @Test
+    fun `each side of a shared bound names the arm that tightened it`() {
+        val bounds = SharedVarBounds(1)
+        bounds.publish(0, lower = 2, upper = 9, origin = 0)
+        bounds.publish(0, lower = 4, upper = 9, origin = 1)
+
+        assertEquals(1, bounds.lowerOriginOf(0))
+        assertEquals(0, bounds.upperOriginOf(0))
+    }
 }

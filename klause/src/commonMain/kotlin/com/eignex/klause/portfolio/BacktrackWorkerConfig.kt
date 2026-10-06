@@ -54,8 +54,8 @@ internal class BacktrackWorkerConfig(
         val workerEvent = onEvent?.let { sink -> { e: SearchEvent -> sink(workerLabel, e) } }
         var params = recipe.build(seed + 1000L + index, workerEvent)
         params = params.copy(zeroObjectivePricing = zeroObjectivePricing, toleranceCheck = toleranceCheck)
-        pools?.clauses?.let { params = params.copy(clauseExchange = PoolClauseExchange(it)) }
-        pools?.cuts?.let { params = params.copy(cutExchange = PoolCutExchange(it)) }
+        pools?.clauses?.let { params = params.copy(clauseExchange = PoolClauseExchange(it, origin = armId)) }
+        pools?.cuts?.let { params = params.copy(cutExchange = PoolCutExchange(it, origin = armId)) }
         // Wire this arm to the shared objective lower-bound manager when optimising: publish
         // the bounds it proves and tighten its objective floor to the cross-arm maximum.
         if (objective != null) {
@@ -67,7 +67,7 @@ internal class BacktrackWorkerConfig(
             }
             pools?.varBounds?.let { vb ->
                 params = params.copy(
-                    globalVarBoundSink = vb::publish,
+                    globalVarBoundSink = { v, lo, hi -> vb.publish(v, lo, hi, origin = armId) },
                     globalVarLowerSupplier = vb::lowerOf,
                     globalVarUpperSupplier = vb::upperOf,
                 )
