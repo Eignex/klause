@@ -13,6 +13,8 @@ import com.eignex.klause.ir.StructuralKey
 import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.ir.values
 import com.eignex.klause.propagation.BakedProblem
+import com.eignex.klause.propagation.PropagationResult
+import com.eignex.klause.propagation.baked
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntDisjointSet
@@ -161,9 +163,7 @@ internal object SymmetryBreaking {
         val seeds = HashSet<RefineKey>()
         val sharedSeed = (0 until nInt).any { v -> v !in heldInts && !seeds.add(seedInt[v]) }
         if (!sharedSeed && freeBools < 2) return emptyList()
-        val seedBool = Array(nBool) { v ->
-            if (v in heldBools) objectiveSeed(SPACE_BOOL, v) else RefineKey(longArrayOf(SPACE_BOOL, SEED_BOOL))
-        }
+        val seedBool = Array(nBool) { v -> if (v in heldBools) objectiveSeed(SPACE_BOOL, v) else columns.boolSeed(v) }
         val budget = intArrayOf(GENERATOR_WORK_BUDGET)
         val (intColour, boolColour) = equitablePartition(problem, seedInt, seedBool, budget, cancellation)
         val intInc = Array(nInt) { IntArrayList() }
@@ -479,6 +479,7 @@ internal object SymmetryBreaking {
     private const val SIG_PORT = 4L
     private const val SEED_DOMAIN_SURVIVORS = 5L
     private const val SEED_OPEN_RANGE = 6L
+    private const val SEED_BOOL_FIXED = 7L
 
     /** The values each integer column admits, as far as the lane running the search knows them. */
     private interface ColumnValues {
@@ -490,15 +491,31 @@ internal object SymmetryBreaking {
 
         /** A colour seed equal for two columns exactly when they admit the same values. */
         fun seed(v: Int): RefineKey
+
+        /** A colour seed equal for two Boolean columns exactly when they admit the same values. */
+        fun boolSeed(v: Int): RefineKey
     }
 
-    /** Root-propagated domains of a finite projection. */
+    /**
+     * Root-propagated domains of a finite projection.
+     *
+     * A Boolean the root fixes is a value no factor need carry: a presolve view's factors may no longer
+     * read it at all, so only its seed keeps it from being swapped with a free or oppositely fixed one.
+     */
     private class FiniteColumns(private val problem: BakedProblem) : ColumnValues {
+        private val root = problem.baked as? PropagationResult.Implied
+
         override fun finite(v: Int): IntDomain = problem.rootIntDomain(v)
 
         override fun contains(v: Int, value: Long): Boolean = value in problem.rootIntDomain(v)
 
         override fun seed(v: Int): RefineKey = domainSeed(problem.rootIntDomain(v))
+
+        override fun boolSeed(v: Int): RefineKey = when (root?.boolValueOrNull(v)) {
+            null -> FREE_BOOL_SEED
+            true -> RefineKey(longArrayOf(SPACE_BOOL, SEED_BOOL_FIXED, 1L))
+            false -> RefineKey(longArrayOf(SPACE_BOOL, SEED_BOOL_FIXED, 0L))
+        }
     }
 
     /**
@@ -523,6 +540,8 @@ internal object SymmetryBreaking {
                     (!bounds.hasUpper(v) || value <= bounds.upper(v))
                 )
 
+        override fun boolSeed(v: Int): RefineKey = FREE_BOOL_SEED
+
         override fun seed(v: Int): RefineKey = finite(v)?.let(::domainSeed) ?: RefineKey(
             longArrayOf(
                 SPACE_INT,
@@ -534,6 +553,8 @@ internal object SymmetryBreaking {
             ),
         )
     }
+
+    private val FREE_BOOL_SEED = RefineKey(longArrayOf(SPACE_BOOL, SEED_BOOL))
 
     /** Domain signature so only variables with the *same* domain (bounds and holes) can group. */
     private fun domainSeed(d: IntDomain): RefineKey {
@@ -601,7 +622,7 @@ internal object SymmetryBreaking {
             if (v in objectiveIntVars) objectiveSeed(SPACE_INT, v) else columns.seed(v)
         }
         val seedBool = Array(problem.numBoolVars) { v ->
-            if (v in objectiveBoolVars) objectiveSeed(SPACE_BOOL, v) else RefineKey(longArrayOf(SPACE_BOOL, SEED_BOOL))
+            if (v in objectiveBoolVars) objectiveSeed(SPACE_BOOL, v) else columns.boolSeed(v)
         }
         return equitablePartition(problem, seedInt, seedBool)
     }
@@ -829,7 +850,7 @@ internal object SymmetryBreaking {
             if (v in objectiveIntVars) objectiveSeed(SPACE_INT, v) else columns.seed(v)
         }
         val seedBoolBase = Array(nBool) { v ->
-            if (v in objectiveBoolVars) objectiveSeed(SPACE_BOOL, v) else RefineKey(longArrayOf(SPACE_BOOL, SEED_BOOL))
+            if (v in objectiveBoolVars) objectiveSeed(SPACE_BOOL, v) else columns.boolSeed(v)
         }
 
         // One deterministic work budget for the whole search; every refinement draws from it and the
@@ -866,6 +887,7 @@ internal object SymmetryBreaking {
                 // A permutation maps solutions to solutions only if it also maps every column's values onto
                 // its image's, which the factor check below does not see; the seeds are those values.
                 if ((0 until nInt).any { seedIntBase[it] != seedIntBase[perm.first[it]] }) continue
+                if ((0 until nBool).any { seedBoolBase[it] != seedBoolBase[perm.second[it]] }) continue
                 cancellation.charge(problem.factors.size.toLong())
                 if (!isAutomorphism(problem, base, perm.second, perm.first)) continue
                 gens.add(perm)

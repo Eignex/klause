@@ -5,6 +5,7 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.StructuralKey
 import com.eignex.klause.propagation.BakedProblem
+import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
@@ -116,6 +117,8 @@ internal object PresolveShared {
         // ([BinaryColumnSubstitution]): ids `[problem.numBoolVars, numBoolVars)` are the fresh ones, so
         // every existing factor still addresses the same variable.
         numBoolVars: Int = problem.numBoolVars,
+        // Root deductions the [factors] alone no longer imply, carried into the rebuild's own bake.
+        seedDeductions: PropagationResult = PropagationResult.Implied.EMPTY,
     ): BakedProblem {
         // Inherit the pass-view mode: a pass fed a cheap already-folded input returns a cheap already-folded
         // output (the session re-folds via incremental propagation); a fresh-path rebuild stays eager.
@@ -124,6 +127,7 @@ internal object PresolveShared {
             numIntVars = problem.numIntVars,
             intDomains = intDomains,
             factors = factors,
+            seedDeductions = seedDeductions,
             alreadyFolded = problem.alreadyFolded,
             // The LP-only continuous columns are a separate namespace presolve never touches (real-bearing
             // rows are guarded out of every pass, and int renumbering leaves real ids alone), so carry it

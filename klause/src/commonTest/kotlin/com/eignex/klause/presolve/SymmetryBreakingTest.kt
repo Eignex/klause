@@ -538,6 +538,15 @@ class SymmetryBreakingTest {
     }
 
     @Test
+    fun `booleans fixed apart by dropped factors are not ordered against each other`() {
+        val units = listOf(Clause(intArrayOf(Lit.make(0, true))), Clause(intArrayOf(Lit.make(1, false))))
+        val session = PresolveSession(Problem(2, 0, emptyArray(), units).bake())
+        assertTrue(session.apply(PresolveDelta(droppedIds = intArrayOf(0, 1))))
+
+        assertTrue(session.applyDelta(Presolve.breakSymmetries(session.passInput())))
+    }
+
+    @Test
     fun `different domains block grouping`() {
         // Same role token but different domains ⇒ not interchangeable.
         val problem = Problem(
