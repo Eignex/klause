@@ -802,10 +802,9 @@ internal class ResumableMinimize(
             // when the probe above seeded none — running it behind a successful probe was measured
             // on MIPLIB as 0.3-1.5s of root time for no objective anywhere.
             if (lpEngine.params.lpPlan.lbTreeSearch && lpEngine.lpRelaxer != null) {
-                lpEngine.lbTreeSearch(objective, rootToken)?.let { seed ->
+                lpEngine.lbTreeSearch(objective, rootToken, params.assumptions)?.let { seed ->
                     val ray = seed.direction
-                    // The dive's own root carries no assumptions, so its ray speaks for the model only without them.
-                    if (ray != null && params.assumptions.isEmpty && verifiedLpProposal(seed.sample) != null) {
+                    if (ray != null && verifiedLpProposal(seed.sample) != null) {
                         unboundedLeaf = seed.sample to ray
                         return null
                     }

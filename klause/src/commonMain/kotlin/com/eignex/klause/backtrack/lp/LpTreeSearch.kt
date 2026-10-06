@@ -16,8 +16,10 @@ import com.eignex.klause.lp.engine.acceptNullable
 import com.eignex.klause.lp.engine.certifiedTightObjectiveLowerBound
 import com.eignex.klause.lp.engine.exactPointWitness
 import com.eignex.klause.lp.engine.triangularCrashBasis
+import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.CpBranching
 import com.eignex.klause.propagation.CpSearchComponent
+import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
@@ -38,9 +40,14 @@ import com.ionspin.kotlin.bignum.integer.BigInteger
  *  descend without limit. */
 internal class LpTreeSeed(val sample: Sample, val direction: List<BigFraction>? = null)
 
-internal fun LpEngine.lbTreeSearch(objective: LinearObjective, cancellation: Cancellation): LpTreeSeed? {
+internal fun LpEngine.lbTreeSearch(
+    objective: LinearObjective,
+    cancellation: Cancellation,
+    assumptions: Assumptions = Assumptions.None,
+): LpTreeSeed? {
     if (lpRelaxer == null) return null
-    // The heuristic has an independent source root; the optimizing caller keeps its own trail.
+    // The heuristic has an independent source root under the caller's assumptions; the optimizing caller keeps its
+    // own trail.
     val stop = cancellation or params.cancellation
     val token = cancelledWhen(stop::deadline) { stop() }
     val dive = forObjective(objective, token)
@@ -48,6 +55,8 @@ internal fun LpEngine.lbTreeSearch(objective: LinearObjective, cancellation: Can
         val relaxer = dive.lpRelaxer ?: return@use null
         val cp = CpSearchComponent(PropagationSession(problem, token), branching = CpBranching.None)
         val native = cp.session
+        if (native.seed(assumptions) is PropagationResult.Unsat || native.isUnsatAtRoot) return@use null
+        cp.rebase()
         var split: LpFractionalBranch? = null
         var targets = emptyMap<Int, Long>()
         var bestExact: BigFraction? = null

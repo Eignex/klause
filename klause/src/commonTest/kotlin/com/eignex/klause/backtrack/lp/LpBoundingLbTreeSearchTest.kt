@@ -15,6 +15,7 @@ import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.lp.engine.LpSolver
 import com.eignex.klause.lp.engine.PersistentLpSolver
 import com.eignex.klause.lp.engine.ProductionLpEngineFactory
+import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.util.Cancellation
@@ -151,6 +152,18 @@ class LpBoundingLbTreeSearchTest {
 
         assertTrue(deadlines.isNotEmpty())
         assertTrue(deadlines.all { it == run.deadline() })
+    }
+
+    @Test
+    fun `the dive keeps to the caller's assumptions`() {
+        val problem = Problem(0, 1, arrayOf(IntDomain(0, 3)), emptyArray())
+        val obj = LinearObjective(intCoefficients = longArrayOf(1L))
+
+        val seed = engine(problem, obj).use {
+            assertNotNull(it.lbTreeSearch(obj, Cancellation.Never, Assumptions(ints = mapOf(0 to 2L))))
+        }
+
+        assertEquals(2L, seed.sample.ints[0])
     }
 
     @Test
