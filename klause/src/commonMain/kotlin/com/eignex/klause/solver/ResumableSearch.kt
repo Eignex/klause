@@ -49,18 +49,18 @@ interface ResumableSearch : AutoCloseable {
     ): MinimizeResult? = runSlice(global, sliceMillis, sliceNodes = -1L, onIncumbent)
 
     /**
-     * As [runSlice], but ending the slice after [sliceNodes] search nodes rather than after
-     * [sliceMillis] when [sliceNodes] is non-negative.
+     * As [runSlice], but ending the slice after [sliceNodes] search nodes when [sliceNodes] is non-negative, or
+     * after [sliceMillis] if that comes first.
      *
      * A slice measured in nodes is reproducible: the same invocation pauses at the same point in the
      * same tree, so the counters a run reports do not depend on how loaded the machine was. A slice
      * measured in milliseconds cannot be: it lands somewhere different every time, and every statistic
      * downstream of the search inherits that.
      *
-     * When a node budget is armed it is the *only* bound on the slice — leaving [sliceMillis] as an outer
-     * bound would defeat the purpose, since the pause point goes back to being a function of machine
-     * speed whenever the clock binds first. [global] still carries the whole-solve deadline, so nothing
-     * can overrun it.
+     * So with a node budget armed, [sliceMillis] is only an outer bound: pass [Long.MAX_VALUE] for a slice that is
+     * reproducible whatever it costs, or a finite time for one that must not run long when its nodes turn out to
+     * be expensive. Either way the pause lands where a node budget would land it. [global] still carries the
+     * whole-solve deadline, so nothing can overrun it.
      */
     fun runSlice(
         global: Cancellation,
@@ -110,10 +110,10 @@ interface ResumableOptimizer<P : SolverParams> : Optimizer<P> {
  */
 interface ResumableSolve : AutoCloseable {
     /**
-     * Advance the search until it reaches a verdict, [global] fires, or the slice ends: after [sliceNodes] work
-     * units when non-negative, else after [sliceMillis] of wall time. Returns the verdict once the search has one,
-     * else null with the search paused for the next call. After a verdict, [isDone] is true and further calls
-     * return that verdict without doing work.
+     * Advance the search until it reaches a verdict, [global] fires, or the slice ends: after [sliceNodes]
+     * work units when non-negative, or after [sliceMillis] of wall time, whichever comes first. Returns the
+     * verdict once the search has one, else null with the search paused for the next call. After a verdict,
+     * [isDone] is true and further calls return that verdict without doing work.
      */
     fun runSlice(global: Cancellation, sliceMillis: Long, sliceNodes: Long): SolveResult?
 

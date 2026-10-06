@@ -163,7 +163,9 @@ class Portfolio(
             val work: Long
             if (handle != null) {
                 val workBefore = handle.work
-                val outcome = runCatching { handle.runSlice(run.token, Long.MAX_VALUE, claim.handleNodes) }
+                val outcome = runCatching {
+                    handle.runSlice(run.token, handleMillis(run.token, claim), claim.handleNodes)
+                }
                 r = outcome.getOrNull()
                 failure = outcome.exceptionOrNull()
                 work = handle.work - workBefore
@@ -299,7 +301,7 @@ class Portfolio(
                 val workBefore = handle.work
                 // A terminal verdict means the arm finished; null means the slice ended with the search paused.
                 val outcome = runCatching {
-                    handle.runSlice(run.token, Long.MAX_VALUE, claim.handleNodes) { accept(claim, it) }
+                    handle.runSlice(run.token, handleMillis(run.token, claim), claim.handleNodes) { accept(claim, it) }
                 }
                 terminal = outcome.getOrNull()
                 failure = outcome.exceptionOrNull()
@@ -599,7 +601,17 @@ class Portfolio(
     private fun segmentToken(worker: PortfolioWorker, cancellation: Cancellation, claim: Claim): Cancellation {
         if (claim.whole) return cancellation
         val slice = if (claim.probing && worker.acceptsInstructionBudget) probeSliceMillis else claim.sliceMillis
-        return until(slice) or cancellation.shorten(1.0 / (2 * workers.size))
+        return until(slice) or cancellation.shorten(REMAINING_SHARE / workers.size)
+    }
+
+    /** The time a resumable arm's slice may run before its work runs out: its time slice, within its half share
+     *  of what the run has left, as a counted segment's ([segmentToken]). A node is priced at one unit whatever
+     *  it costs, so without the bound a slice of a few thousand expensive nodes holds the core for the run. */
+    private fun handleMillis(cancellation: Cancellation, claim: Claim): Long {
+        if (claim.whole) return Long.MAX_VALUE
+        val deadline = cancellation.deadline() ?: return claim.sliceMillis
+        val share = (deadline - TimeSource.Monotonic.markNow()) * (REMAINING_SHARE / workers.size)
+        return minOf(claim.sliceMillis, share.inWholeMilliseconds.coerceAtLeast(1L))
     }
 
     private fun until(millis: Long): Cancellation =
@@ -668,6 +680,9 @@ class Portfolio(
         )
     }
 }
+
+// The share of the time a run has left that its arms' next segments may take together; see `Portfolio.segmentToken`.
+private const val REMAINING_SHARE = 0.5
 
 // Most of an arm's time incumbent checks may take; see `Portfolio.minimize`.
 private const val CHECK_SHARE = 0.2
