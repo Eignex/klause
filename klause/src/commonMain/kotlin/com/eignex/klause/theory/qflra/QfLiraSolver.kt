@@ -56,6 +56,7 @@ import com.eignex.klause.solver.search.TheoryComponent
 import com.eignex.klause.solver.search.explainAtoms
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.MutableIntObjectMap
+import com.eignex.klause.util.cancelledWhen
 import com.ionspin.kotlin.bignum.integer.BigInteger
 
 /** An exact integer/rational witness for an open QF_LIRA or QF_LIA model. */
@@ -113,7 +114,9 @@ class ExactLiraSearchComponent(
                 override fun retract(decisionLevel: Int) = retractSource(decisionLevel)
             },
             solveContext = solveContext,
-            cancellation = Cancellation { operationStop() || context?.cancelled() == true },
+            cancellation = cancelledWhen({ operationStop.deadline() }) {
+                operationStop() || context?.cancelled() == true
+            },
             certificationObserver = object : LpCertificationObserver {
                 override fun observe(certifier: LpCertifier, success: Boolean, cost: LpCertifierCost) = Unit
                 override fun observeExactInput(accepted: Boolean) = Unit
@@ -618,7 +621,7 @@ class ExactLiraSearchComponent(
         ) {
             return null
         }
-        val token = Cancellation { operationStop() || context?.cancelled() == true }
+        val token = cancelledWhen({ operationStop.deadline() }) { operationStop() || context?.cancelled() == true }
         val rows = reduction.sourceRows(bools, node, token) ?: return null
         if (!point.satisfiesSourceRows(rows, token)) return null
         val strict = rows.any { it.strict }

@@ -60,6 +60,7 @@ import com.eignex.klause.solver.search.SearchSolveParams
 import com.eignex.klause.solver.search.SearchTraversalPolicy
 import com.eignex.klause.solver.search.VarRef
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.cancelledWhen
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.time.ComparableTimeMark
 import kotlin.time.Duration.Companion.milliseconds
@@ -124,7 +125,11 @@ internal class ResumableMinimize(
     // pausable mode.
     private val baseCancellation: Cancellation = params0.cancellation
     private val params: BacktrackParams = params0
-        .copy(cancellation = Cancellation { sliceCancelled() }, minHammingDistance = 0, recentWindow = 0)
+        .copy(
+            cancellation = cancelledWhen(::runDeadline) { sliceCancelled() },
+            minHammingDistance = 0,
+            recentWindow = 0,
+        )
         .let { p ->
             // Objective-guided value selection: dive toward the cost-minimising polarity first. Applied on
             // the minimisation path when the objective is non-trivial, kept incumbent-guided on top; a no-op
@@ -179,14 +184,9 @@ internal class ResumableMinimize(
 
     // solveCancelled as a token that also states the run's deadline, so a phase it is handed can budget a share of
     // the time left (Cancellation.shorten) rather than read a bare predicate as having no time limit at all.
-    private fun runEndToken(): Cancellation {
-        val deadline = (if (pausable) globalToken else baseCancellation).deadline()
-        return object : Cancellation {
-            override fun isCancelled(): Boolean = solveCancelled()
+    private fun runEndToken(): Cancellation = cancelledWhen(::runDeadline) { solveCancelled() }
 
-            override fun deadline(): ComparableTimeMark? = deadline
-        }
-    }
+    private fun runDeadline(): ComparableTimeMark? = (if (pausable) globalToken else baseCancellation).deadline()
 
     /**
      * The node budget when one is armed, and *only* the node budget.
@@ -250,7 +250,7 @@ internal class ResumableMinimize(
     private val cp = CpSearchComponent(
         PropagationSession(
             problem,
-            Cancellation { solveCancelled() },
+            cancelledWhen(::runDeadline) { solveCancelled() },
             params.propagationCancelFloor,
             nativeSat = params.nativeSat ?: true,
             pbLearning = params.pbLearning ?: true,

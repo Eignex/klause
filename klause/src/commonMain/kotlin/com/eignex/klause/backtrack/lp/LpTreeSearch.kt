@@ -31,12 +31,14 @@ import com.eignex.klause.solver.search.SearchNodePolicy
 import com.eignex.klause.solver.search.SearchRunEvent
 import com.eignex.klause.solver.search.SearchSolveParams
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.cancelledWhen
 import com.ionspin.kotlin.bignum.integer.BigInteger
 
 internal fun LpEngine.lbTreeSearch(objective: LinearObjective, cancellation: Cancellation): Sample? {
     if (lpRelaxer == null) return null
     // The heuristic has an independent source root; the optimizing caller keeps its own trail.
-    val token = Cancellation { cancellation() || params.cancellation() }
+    val stop = cancellation or params.cancellation
+    val token = cancelledWhen(stop::deadline) { stop() }
     val dive = forObjective(objective, token)
     return dive.use {
         val relaxer = dive.lpRelaxer ?: return@use null
