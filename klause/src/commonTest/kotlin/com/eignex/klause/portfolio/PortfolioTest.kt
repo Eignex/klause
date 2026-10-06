@@ -892,8 +892,9 @@ class PortfolioTest {
         assertEquals(List(3) { (7 * LS_INSTRUCTIONS_PER_WORK).toLong() }, allowances)
     }
 
-    @Test
-    fun `a counted arm whose probe outlasts its time cap hands the core to the next arm`() {
+    // Two counted local-search arms recording each segment they start into [reached], under a portfolio whose
+    // work allowance no segment gets through, so only a time cap can end a turn.
+    private fun endlessCountedPortfolio(reached: MutableList<Int>, sliceMillis: Long): Portfolio {
         val problem = Problem(
             numBoolVars = 3,
             numIntVars = 0,
@@ -901,7 +902,6 @@ class PortfolioTest {
             factors = arrayOf<Factor>(Cardinality.atLeastOne(IntArray(3) { Lit.make(it, true) })),
         )
         val objective = LinearObjective(boolWeights = longArrayOf(1L, 1L, 1L))
-        val reached = ArrayList<Int>()
         val arms = List(2) { i ->
             PortfolioWorker.of(
                 "ls$i",
@@ -912,21 +912,40 @@ class PortfolioTest {
                 withInstructionBudget = { p, limit -> p.copy(maxInstructions = limit).also { reached += i } },
             )
         }
-        val fallback = TimeSource.Monotonic.markNow() + 10.seconds
-
-        // An allowance no probe gets through: only the time cap can end the first arm's turn.
         val endless = 1_000_000_000_000L
-        Portfolio(
+        return Portfolio(
             arms,
             DiscountedThompson(arms.size, Random(0), Portfolio.DEFAULT_HALF_LIFE),
+            baseSliceMillis = sliceMillis,
+            maxSliceMillis = sliceMillis,
             baseSliceWork = endless,
             maxSliceWork = endless,
             probeSliceMillis = 20L,
-        ).use {
+        )
+    }
+
+    @Test
+    fun `a counted arm whose probe outlasts its time cap hands the core to the next arm`() {
+        val reached = ArrayList<Int>()
+        val fallback = TimeSource.Monotonic.markNow() + 10.seconds
+
+        endlessCountedPortfolio(reached, sliceMillis = 60_000L).use {
             it.minimize(Cancellation { reached.size >= 2 || fallback.hasPassedNow() })
         }
 
         assertEquals(listOf(0, 1), reached)
+    }
+
+    @Test
+    fun `a counted segment past the probe ends at its time slice`() {
+        val reached = ArrayList<Int>()
+        val fallback = TimeSource.Monotonic.markNow() + 10.seconds
+
+        endlessCountedPortfolio(reached, sliceMillis = 20L).use {
+            it.minimize(Cancellation { reached.size >= 4 || fallback.hasPassedNow() })
+        }
+
+        assertEquals(4, reached.size)
     }
 
     @Test
