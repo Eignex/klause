@@ -38,8 +38,6 @@ class PortfolioPlanRequest(
     val annotationArm: BacktrackParams?,
     /** Tolerance semantics for every backtrack arm's continuous leaves; see [BacktrackParams.toleranceCheck]. */
     val toleranceCheck: ((Sample) -> Boolean)? = null,
-    /** Whether the model has continuous columns; see [PortfolioScenario.realColumns]. */
-    val realColumns: Boolean = false,
 )
 
 /** A resolved finite portfolio route, before a problem is materialized into workers. */
@@ -162,7 +160,6 @@ fun FinitePipeline.planPortfolio(request: PortfolioPlanRequest): PortfolioPlan {
                 nodeBudget = request.nodeBudget,
                 zeroObjectivePricing = request.zeroObjectivePricing,
             ),
-            realColumns = request.realColumns,
         ).copy(toleranceCheck = request.toleranceCheck),
     )
 }

@@ -26,8 +26,8 @@ import com.eignex.klause.util.ArmCatalog
  *
  * **Per-kind ranking** ([ranked]): SAT-optimized first (the pigeonhole guard), the conflict-driven
  * workhorse, the LP-intensity spread, LinUCB routing, the free engine, the restart-level selector portfolio,
- * and the dom-wdeg / first-fail / activity heuristic arms. On
- * a CSP the LP arms and LinUCB drop out (LP lives on the minimisation path; LinUCB has no bound to exploit).
+ * and the dom-wdeg / first-fail / activity heuristic arms. A CSP ranks fewer LP arms and no LinUCB (it has no
+ * bound to exploit). A pool built for a model keeps only the arms whose needs the model offers.
  */
 object BacktrackCatalog {
 
@@ -100,7 +100,7 @@ object BacktrackCatalog {
     /** An LP arm: the conflict-driven core with the LP-relaxation family resolved at [emphasis].
      *  `AGGRESSIVE` is the whole structurally-applicable family (cuts + hulls + probe); `DEFAULT` is
      *  simplex bounding + objective propagation without the expensive cut machinery; `CONSERVATIVE` is
-     *  the cheap combinatorial bounds only. A no-op on models with no LP-applicable structure. */
+     *  the cheap combinatorial bounds only. Built only where [emphasis] has something to enable. */
     private fun lpArm(emphasis: LpEmphasis) = BacktrackRecipe("lp-${emphasis.name.lowercase()}") { seed, onEvent ->
         BacktrackPresets.conflictDriven(randomSeed = seed, onEvent = onEvent).copy(lpConfig = LpConfig(emphasis))
     }
@@ -133,8 +133,8 @@ object BacktrackCatalog {
     }
 
     /** The conflict-driven workhorse with objective-guided value selection: dive toward each
-     *  variable's cost-minimising polarity first, so the incumbent improves fast. A no-op on a CSP (no
-     *  objective) — a COP-only diversity arm distinct from the cost-agnostic value orders above. */
+     *  variable's cost-minimising polarity first, so the incumbent improves fast. Built only on a model with
+     *  an objective — a diversity arm distinct from the cost-agnostic value orders above. */
     private fun objectiveGuided() = BacktrackRecipe("objective-guided") { seed, onEvent ->
         BacktrackPresets.conflictDriven(randomSeed = seed, onEvent = onEvent).copy(objectiveGuidedValues = true)
     }
@@ -221,6 +221,10 @@ object BacktrackCatalog {
     fun ranked(kind: Kind, realColumns: Boolean = false): List<BacktrackRecipe> =
         catalog.ranked(rankedArms(kind, realColumns))
 
+    /** One fresh recipe for every arm of [kind] the model behind [facts] offers the needs of, in credit order. */
+    internal fun ranked(kind: Kind, facts: ProblemFacts): List<BacktrackRecipe> =
+        catalog.ranked(rankedArms(kind, facts.realColumns).filter { facts.offersAll(it.needs) })
+
     /** Per-arm recipe factories for [kind], in credit order — each builds a fresh recipe (the factory
      *  shape a campaign or the CLI feeds to `PortfolioScenario.btPool`). */
     fun factories(kind: Kind): List<() -> BacktrackRecipe> = catalog.factories(rankedArms(kind))
@@ -230,20 +234,20 @@ object BacktrackCatalog {
  * Typed identity of every backtrack catalog arm — the backtrack counterpart of
  * [LocalSearchArm]. [BacktrackCatalog] orders and instantiates these;
  * [label] is the external name (CLI `bt-arm=` / campaign / telemetry), kept in lockstep with the built
- * recipe's label.
+ * recipe's label. [needs] is what the arm needs from a model to differ from the arm it is built on.
  */
-internal enum class BacktrackArm(val label: String) {
+internal enum class BacktrackArm(val label: String, val needs: Set<ArmNeed> = emptySet()) {
     SatOptimized("satOptimized"),
     ConflictDriven("conflictDriven"),
-    LpAggressive("lp-aggressive"),
-    LpDefault("lp-default"),
-    LpLbTree("lp-lbtree"),
-    LpConservative("lp-conservative"),
+    LpAggressive("lp-aggressive", setOf(ArmNeed.Relaxation(LpEmphasis.AGGRESSIVE))),
+    LpDefault("lp-default", setOf(ArmNeed.Relaxation(LpEmphasis.DEFAULT))),
+    LpLbTree("lp-lbtree", setOf(ArmNeed.Objective, ArmNeed.Relaxation(LpEmphasis.DEFAULT))),
+    LpConservative("lp-conservative", setOf(ArmNeed.Relaxation(LpEmphasis.CONSERVATIVE))),
     LinUcb("linucb"),
     Free("free"),
     SelectorSwitch("selector-switch"),
     DomWdeg("domwdeg"),
     FirstFail("first-fail"),
     Activity("activity"),
-    ObjectiveGuided("objective-guided"),
+    ObjectiveGuided("objective-guided", setOf(ArmNeed.Objective)),
 }
