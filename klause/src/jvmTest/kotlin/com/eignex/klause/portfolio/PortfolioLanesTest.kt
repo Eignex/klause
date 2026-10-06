@@ -501,7 +501,7 @@ class PortfolioLanesTest {
         val incumbents = events.load().filter { it.second is SearchEvent.Incumbent }
         assertTrue(incumbents.isNotEmpty(), "expected labeled incumbent events, got ${events.load()}")
         val labels = incumbents.map { it.first }.toSet()
-        assertTrue(labels.all { it.startsWith("ls/") || it.startsWith("backtrack#") }, "labels: $labels")
+        assertTrue(labels.all { it.startsWith("ls/") || it.startsWith("bt/") }, "labels: $labels")
     }
 
     @Test
@@ -533,7 +533,7 @@ class PortfolioLanesTest {
                 kind = Kind.CSP,
             ),
         ).use { p ->
-            assertTrue(p.workers.any { it.label == "backtrack#0" }, "expected a backtrack worker")
+            assertTrue(p.workers.any { it.label.startsWith("bt/") }, "expected a backtrack worker")
             assertIs<SolveResult.Unsat>(p.solve())
         }
         // With three backtrack workers the pool cycles through all three complete configs.
@@ -546,7 +546,7 @@ class PortfolioLanesTest {
                 kind = Kind.CSP,
             ),
         ).use { p ->
-            assertEquals(3, p.workers.count { it.label.startsWith("backtrack#") })
+            assertEquals(3, p.workers.count { it.label.startsWith("bt/") })
             assertIs<SolveResult.Sat>(p.solve())
         }
     }

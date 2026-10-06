@@ -156,11 +156,10 @@ internal sealed interface WorkerConfig {
     val label: String
 
     /**
-     * Build the runnable worker. [index] is the arm's position in the pool (offsets the seed and,
-     * for backtrack, numbers the label). [armId] is the composed-arm identity (replicas of one arm
-     * share it while their [index] differs); it is pure attribution metadata, never scheduling or
-     * seed input. [objective] is the canonical [LinearObjective] every
-     * optimising worker minimises; [lsObjective] is the optional LS gradient view of the same
+     * Build the runnable worker. [index] is the arm's position in the pool (offsets the seed). [armId]
+     * is the composed-arm identity (replicas of one arm share it while their [index] differs); it is
+     * pure attribution metadata, never scheduling or seed input. [objective] is the canonical
+     * [LinearObjective] every optimising worker minimises; [lsObjective] is the optional LS gradient view of the same
      * objective (backtrack ignores it). [lsLambda]/[definitionalSweep] are LS-only (backtrack
      * ignores them). [onEvent] is the shared [SearchEvent] sink, tagged here with the worker's
      * label. [pools], when non-null, wires the cross-arm clause and cut exchanges (backtrack arms

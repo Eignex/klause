@@ -149,18 +149,25 @@ internal class ScheduleLog(private val workers: List<PortfolioWorker>) {
         faults[arm]++
     }
 
-    /** The schedule so far, with each arm's credit read from [ledger]. */
-    fun stats(ledger: RewardLedger): PortfolioStats = PortfolioStats(
-        workers.indices.map { arm ->
-            ArmSchedule(
-                label = workers[arm].label,
-                segments = segments[arm],
-                work = work[arm],
-                meanReward = if (segments[arm] > 0L) rewards[arm] / segments[arm] else 0.0,
-                failures = failures[arm],
-                faults = faults[arm],
-                credit = ledger.creditOf(arm),
-            )
-        },
-    )
+    /** The schedule so far, with each arm's credit read from [ledger]. Replicas of one arm share a
+     *  worker label, so the second and later ones are numbered to keep each arm's report its own. */
+    fun stats(ledger: RewardLedger): PortfolioStats {
+        val seen = HashMap<String, Int>()
+        return PortfolioStats(
+            workers.indices.map { arm ->
+                val label = workers[arm].label
+                val occurrence = (seen[label] ?: 0) + 1
+                seen[label] = occurrence
+                ArmSchedule(
+                    label = if (occurrence == 1) label else "$label#$occurrence",
+                    segments = segments[arm],
+                    work = work[arm],
+                    meanReward = if (segments[arm] > 0L) rewards[arm] / segments[arm] else 0.0,
+                    failures = failures[arm],
+                    faults = faults[arm],
+                    credit = ledger.creditOf(arm),
+                )
+            },
+        )
+    }
 }
