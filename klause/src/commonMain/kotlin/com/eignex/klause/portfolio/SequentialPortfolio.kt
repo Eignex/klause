@@ -67,27 +67,27 @@ class SequentialPortfolio(
     /** Geometric growth applied to the slice after each post-warmup segment. */
     private val sliceGrowth: Double = 1.5,
     /**
-     * Nodes a resumable arm's first segment may explore; later segments grow by [sliceGrowth] up to
-     * [maxSliceNodes], mirroring the millisecond schedule.
+     * Work a counted arm's first segment may spend; later segments grow by [sliceGrowth] up to
+     * [maxSliceWork].
      *
-     * Resumable arms are sliced by nodes and never by the clock. A segment bounded by time pauses
-     * somewhere different on every run, and since the search resumes from wherever it stopped, every
-     * counter a solve reports inherits that — two identical invocations are not comparable. A segment
-     * bounded by nodes pauses at the same point in the same tree every time. The whole-solve deadline
-     * still applies, so this cannot overrun it.
+     * Work is measured in node-equivalents, one unit for every arm whatever its engine. A resumable
+     * backtrack arm spends one per search node plus its LP work at the rate
+     * [com.eignex.klause.solver.ResumableSearch.runSlice] charges it. A local-search or ALNS arm
+     * ([PortfolioWorker.acceptsInstructionBudget]) spends one per [lsInstructionsPerWork] instructions of
+     * its counted allowance; ALNS spends it across its own outer destroy/repair loop instead of one inner
+     * solve (see [com.eignex.klause.meta.alns.Alns]'s class KDoc). A common unit is what lets one
+     * schedule give every arm a comparable turn.
      *
-     * Local-search and ALNS arms ([PortfolioWorker.acceptsInstructionBudget]) use [baseSliceFlips], a
-     * counted engine step, because they start a fresh search per segment rather than pausing one; ALNS
-     * spends the allowance across its own outer destroy/repair loop instead of one inner solve (see
-     * [com.eignex.klause.meta.alns.Alns]'s class KDoc).
+     * Counted arms are never sliced by the clock. A segment bounded by time pauses somewhere different on
+     * every run, and since the search resumes from wherever it stopped, every counter a solve reports
+     * inherits that — two identical invocations are not comparable. A segment bounded by work pauses at
+     * the same point every time. The whole-solve deadline still applies, so this cannot overrun it.
      */
-    private val baseSliceNodes: Long = 5_000,
-    /** Cap on a single resumable segment's node budget. */
-    private val maxSliceNodes: Long = 150_000,
-    /** First local-search segment's work allowance; later segments grow by [sliceGrowth]. */
-    private val baseSliceFlips: Long = 5_000,
-    /** Cap on a local-search segment's work allowance. */
-    private val maxSliceFlips: Long = 150_000,
+    private val baseSliceWork: Long = 5_000,
+    /** Cap on a single segment's work. */
+    private val maxSliceWork: Long = 150_000,
+    /** Local-search instructions that cost as much as one search node; see `LS_INSTRUCTIONS_PER_WORK`. */
+    private val lsInstructionsPerWork: Double = LS_INSTRUCTIONS_PER_WORK,
     /** Round-robin warmup slice: each arm is forced once for this long before the bandit takes
      *  over, so a short deadline can't leave a winning arm at zero budget (EXP3 starvation). */
     private val warmupSliceMillis: Long = 1_000,
@@ -111,9 +111,12 @@ class SequentialPortfolio(
         require(sliceGrowth >= 1.0) { "sliceGrowth must be ≥ 1.0" }
         require(warmupSliceMillis > 0) { "warmupSliceMillis must be > 0" }
         require(reseedStaleThreshold >= 0) { "reseedStaleThreshold must be ≥ 0" }
-        require(baseSliceNodes > 0 && maxSliceNodes >= baseSliceNodes) { "invalid node slice bounds" }
-        require(baseSliceFlips > 0 && maxSliceFlips >= baseSliceFlips) { "invalid flip slice bounds" }
+        require(baseSliceWork > 0 && maxSliceWork >= baseSliceWork) { "invalid work slice bounds" }
+        require(lsInstructionsPerWork > 0.0) { "lsInstructionsPerWork must be > 0" }
     }
+
+    /** The instruction allowance a counted local-search segment of [work] units receives. */
+    private fun instructionsFor(work: Long): Long = (work * lsInstructionsPerWork).toLong().coerceAtLeast(1L)
 
     /** A per-segment cancellation that fires when the slice elapses or the global token fires. Built from
      *  [Cancellation.until] (not a bare predicate) so it carries the slice deadline — an arm can then size
@@ -137,7 +140,7 @@ class SequentialPortfolio(
     ): Cancellation =
         if (worker.acceptsInstructionBudget && !warming) cancellation else sliceToken(cancellation, sliceMs)
 
-    /** Geometric post-warmup growth shared by every slice axis (millis/nodes/flips): grow by
+    /** Geometric post-warmup growth shared by every slice axis (millis and work): grow by
      *  [sliceGrowth], never past [cap]. */
     private fun grow(current: Long, cap: Long): Long = (current * sliceGrowth).toLong().coerceAtMost(cap)
 
@@ -149,7 +152,7 @@ class SequentialPortfolio(
     override fun solve(cancellation: Cancellation): SolveResult {
         var stats = SolveStats.EMPTY
         var slice = baseSliceMillis
-        var sliceFlips = baseSliceFlips
+        var sliceWork = baseSliceWork
         var segment = 0
         while (!cancellation()) {
             val warming = segment < workers.size
@@ -158,7 +161,7 @@ class SequentialPortfolio(
             val sliceMs = if (warming) warmupSliceMillis else slice
             val token = segmentToken(worker, warming, cancellation, sliceMs)
             // A failing arm leaves the others to answer, but an unsound one has answered wrongly.
-            val r = runCatching { worker.solve(token, sliceFlips) }
+            val r = runCatching { worker.solve(token, instructionsFor(sliceWork)) }
                 .onFailure { if (it is UnsoundnessException) throw it }
                 .getOrNull()
             if (r != null) stats = stats.mergedWith(r.stats)
@@ -171,7 +174,7 @@ class SequentialPortfolio(
             }
             if (!warming) {
                 slice = grow(slice, maxSliceMillis)
-                sliceFlips = grow(sliceFlips, maxSliceFlips)
+                sliceWork = grow(sliceWork, maxSliceWork)
             }
             segment++
         }
@@ -199,8 +202,7 @@ class SequentialPortfolio(
         val incumbent = IncumbentExchange.minimizing<Sample>()
         var rewardScale = 0.0
         var slice = baseSliceMillis
-        var sliceNodes = baseSliceNodes
-        var sliceFlips = baseSliceFlips
+        var sliceWork = baseSliceWork
         var segment = 0
         val start = TimeSource.Monotonic.markNow()
         // The label of the arm running the current segment — single-threaded, so it is unambiguous
@@ -263,7 +265,7 @@ class SequentialPortfolio(
                     // Resume the arm's search for this slice; a terminal verdict means it finished, null
                     // means the slice elapsed (search paused, state retained for the next reschedule).
                     val outcome = runCatching {
-                        handle.runSlice(cancellation, Long.MAX_VALUE, sliceNodes) { accept(it) }
+                        handle.runSlice(cancellation, Long.MAX_VALUE, sliceWork) { accept(it) }
                     }
                     terminal = outcome.getOrNull()
                     failed = outcome.isFailure
@@ -277,7 +279,7 @@ class SequentialPortfolio(
                             readBound,
                             armToken,
                             warmStart = incumbent.current()?.assignment,
-                            maxInstructions = sliceFlips,
+                            maxInstructions = instructionsFor(sliceWork),
                         )) {
                             terminal = r
                             if (r is MinimizeResult.WithSample) accept(r)
@@ -335,8 +337,7 @@ class SequentialPortfolio(
                 }
                 if (!warming) {
                     slice = grow(slice, maxSliceMillis)
-                    sliceNodes = grow(sliceNodes, maxSliceNodes)
-                    sliceFlips = grow(sliceFlips, maxSliceFlips)
+                    sliceWork = grow(sliceWork, maxSliceWork)
                 }
                 segment++
             }
@@ -386,8 +387,7 @@ class SequentialPortfolio(
             sliceGrowth: Double = 1.5,
             warmupSliceMillis: Long = 1_000,
             reseedStaleThreshold: Int = 3,
-            baseSliceNodes: Long = 5_000,
-            baseSliceFlips: Long = 5_000,
+            baseSliceWork: Long = 5_000,
         ): SequentialPortfolio = withBandit(
             workers,
             Exp3Bandit(workers.size, eta, gamma, Random(seed)),
@@ -396,8 +396,7 @@ class SequentialPortfolio(
             sliceGrowth,
             warmupSliceMillis,
             reseedStaleThreshold,
-            baseSliceNodes,
-            baseSliceFlips,
+            baseSliceWork,
         )
 
         /** UCB1 arm selection (stationary, deterministic given the seed) — the alternative to
@@ -411,8 +410,7 @@ class SequentialPortfolio(
             sliceGrowth: Double = 1.5,
             warmupSliceMillis: Long = 1_000,
             reseedStaleThreshold: Int = 3,
-            baseSliceNodes: Long = 5_000,
-            baseSliceFlips: Long = 5_000,
+            baseSliceWork: Long = 5_000,
         ): SequentialPortfolio = withBandit(
             workers,
             MultiArmedBandit(workers.size, UCB1(alpha = alpha), Random(seed)),
@@ -421,8 +419,7 @@ class SequentialPortfolio(
             sliceGrowth,
             warmupSliceMillis,
             reseedStaleThreshold,
-            baseSliceNodes,
-            baseSliceFlips,
+            baseSliceWork,
         )
 
         private fun withBandit(
@@ -433,8 +430,7 @@ class SequentialPortfolio(
             sliceGrowth: Double,
             warmupSliceMillis: Long,
             reseedStaleThreshold: Int,
-            baseSliceNodes: Long = 5_000,
-            baseSliceFlips: Long = 5_000,
+            baseSliceWork: Long = 5_000,
         ): SequentialPortfolio = SequentialPortfolio(
             workers = workers,
             bandit = bandit,
@@ -443,8 +439,14 @@ class SequentialPortfolio(
             sliceGrowth = sliceGrowth,
             warmupSliceMillis = warmupSliceMillis,
             reseedStaleThreshold = reseedStaleThreshold,
-            baseSliceNodes = baseSliceNodes,
-            baseSliceFlips = baseSliceFlips,
+            baseSliceWork = baseSliceWork,
         )
     }
 }
+
+/**
+ * Local-search instructions that cost as much as one backtrack search node, LP work included: the median ratio of
+ * local-search moves per second to backtrack work per second, each engine alone on one core for 10s, over the 28
+ * MiniZinc models where both ran (spread 0.17 to 69, geometric mean 1.9).
+ */
+internal const val LS_INSTRUCTIONS_PER_WORK: Double = 1.5

@@ -30,7 +30,7 @@ fun FinitePipeline.portfolioExecutor(
         onEvent = onEvent,
     )
     return if (scenario.cores == 1) {
-        SequentialPortfolio.exp3(workers, baseSliceNodes = scenario.sliceNodes)
+        SequentialPortfolio.exp3(workers, baseSliceWork = scenario.sliceWork)
     } else {
         Portfolio(workers)
     }

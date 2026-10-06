@@ -576,8 +576,8 @@ fun buildPortfolioScenario(
     val bt = p.int("bt")
     val clauseShareLbd = p.int("clause-share-lbd")
     val clauseShareLen = p.int("clause-share-len")
-    val sliceNodes = p.long("slice-nodes")
-    p.finish("portfolio", "arms, ls, bt, seed, lambda, clause-share-lbd, clause-share-len, slice-nodes")
+    val sliceWork = p.long("slice-work")
+    p.finish("portfolio", "arms, ls, bt, seed, lambda, clause-share-lbd, clause-share-len, slice-work")
     if (armsParam != null && (ls != null || bt != null)) {
         pipelineConfigError("portfolio: set either `arms=N` or `ls=/bt=`, not both")
     }
@@ -612,7 +612,7 @@ fun buildPortfolioScenario(
     )
     clauseShareLbd?.let { scenario = scenario.copy(clauseShareMaxLbd = it) }
     clauseShareLen?.let { scenario = scenario.copy(clauseShareMaxLen = it) }
-    sliceNodes?.let { scenario = scenario.copy(sliceNodes = it) }
+    sliceWork?.let { scenario = scenario.copy(sliceWork = it) }
     return scenario
 }
 

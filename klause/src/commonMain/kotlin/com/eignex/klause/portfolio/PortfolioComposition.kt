@@ -100,14 +100,15 @@ data class PortfolioScenario(
     /** Length bound of the cross-arm glue-clause exchange filter; see [clauseShareMaxLbd]. */
     val clauseShareMaxLen: Int = 12,
     /**
-     * Nodes a sequential-portfolio segment may explore, or `0` to bound segments by the clock.
+     * Work a sequential-portfolio arm's first segment may spend, in the node-equivalents every arm is
+     * charged in.
      *
      * A segment bounded by time pauses somewhere different on every run, so no counter a solve reports
      * is comparable between two invocations of the same model — the search itself diverges. Bounding it
-     * by nodes makes a segment a function of the model and the seed alone. The whole-solve deadline still
+     * by work makes a segment a function of the model and the seed alone. The whole-solve deadline still
      * applies, so this cannot overrun it.
      */
-    val sliceNodes: Long = DEFAULT_SLICE_NODES,
+    val sliceWork: Long = DEFAULT_SLICE_WORK,
     /** Optional solve-spanning decision-node allowance, applied here rather than by the caller so that
      *  every arm that runs a backtrack engine spends the one counter — including the ones that build
      *  their own [BacktrackParams] instead of drawing a [BacktrackRecipe] from a pool. Editing the pools
@@ -130,9 +131,9 @@ data class PortfolioScenario(
          *  sequential free track bandit-schedules a real pool, not one arm. */
         const val DEFAULT_ARMS = 6
 
-        /** Default nodes in a resumable arm's first segment; later segments grow. Mirrors
-         *  [SequentialPortfolio.baseSliceNodes]. */
-        const val DEFAULT_SLICE_NODES = 5_000L
+        /** Default work in an arm's first segment; later segments grow. Mirrors
+         *  [SequentialPortfolio.baseSliceWork]. */
+        const val DEFAULT_SLICE_WORK = 5_000L
 
         /** A parallel portfolio over [cores] cores; [arms] defaults to one arm per core. */
         fun parallel(cores: Int, kind: Kind, engine: EngineMix = EngineMix.MIXED, seed: Long = 0L, arms: Int = cores) =

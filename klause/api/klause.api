@@ -7039,7 +7039,7 @@ public final class com/eignex/klause/portfolio/PortfolioExecutor$DefaultImpls {
 public final class com/eignex/klause/portfolio/PortfolioScenario {
 	public static final field Companion Lcom/eignex/klause/portfolio/PortfolioScenario$Companion;
 	public static final field DEFAULT_ARMS I
-	public static final field DEFAULT_SLICE_NODES J
+	public static final field DEFAULT_SLICE_WORK J
 	public fun <init> (IILcom/eignex/klause/portfolio/Kind;Lcom/eignex/klause/portfolio/EngineMix;JDLcom/eignex/klause/lp/bounding/LpConfig;Lcom/eignex/klause/lp/engine/LpZeroObjectivePricing;Lkotlin/jvm/functions/Function1;Ljava/util/List;Ljava/util/List;Lcom/eignex/klause/backtrack/BacktrackParams;ZIIJLcom/eignex/klause/backtrack/NodeBudget;Z)V
 	public synthetic fun <init> (IILcom/eignex/klause/portfolio/Kind;Lcom/eignex/klause/portfolio/EngineMix;JDLcom/eignex/klause/lp/bounding/LpConfig;Lcom/eignex/klause/lp/engine/LpZeroObjectivePricing;Lkotlin/jvm/functions/Function1;Ljava/util/List;Ljava/util/List;Lcom/eignex/klause/backtrack/BacktrackParams;ZIIJLcom/eignex/klause/backtrack/NodeBudget;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()I
@@ -7078,7 +7078,7 @@ public final class com/eignex/klause/portfolio/PortfolioScenario {
 	public final fun getRealColumns ()Z
 	public final fun getSeed ()J
 	public final fun getShareCuts ()Z
-	public final fun getSliceNodes ()J
+	public final fun getSliceWork ()J
 	public final fun getToleranceCheck ()Lkotlin/jvm/functions/Function1;
 	public final fun getZeroObjectivePricing ()Lcom/eignex/klause/lp/engine/LpZeroObjectivePricing;
 	public fun hashCode ()I
@@ -7130,8 +7130,8 @@ public final class com/eignex/klause/portfolio/PortfolioWorker$Companion {
 
 public final class com/eignex/klause/portfolio/SequentialPortfolio : com/eignex/klause/portfolio/PortfolioExecutor {
 	public static final field Companion Lcom/eignex/klause/portfolio/SequentialPortfolio$Companion;
-	public fun <init> (Ljava/util/List;Lcom/eignex/kumulant/bandit/UnivariateBandit;JJDJJJJJI)V
-	public synthetic fun <init> (Ljava/util/List;Lcom/eignex/kumulant/bandit/UnivariateBandit;JJDJJJJJIILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Ljava/util/List;Lcom/eignex/kumulant/bandit/UnivariateBandit;JJDJJDJI)V
+	public synthetic fun <init> (Ljava/util/List;Lcom/eignex/kumulant/bandit/UnivariateBandit;JJDJJDJIILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public fun close ()V
 	public final fun getWorkers ()Ljava/util/List;
 	public fun minimize (Lcom/eignex/klause/util/Cancellation;Lkotlin/jvm/functions/Function1;)Lcom/eignex/klause/solver/result/MinimizeResult;
@@ -7139,10 +7139,10 @@ public final class com/eignex/klause/portfolio/SequentialPortfolio : com/eignex/
 }
 
 public final class com/eignex/klause/portfolio/SequentialPortfolio$Companion {
-	public final fun exp3 (Ljava/util/List;JDDJJDJIJJ)Lcom/eignex/klause/portfolio/SequentialPortfolio;
-	public static synthetic fun exp3$default (Lcom/eignex/klause/portfolio/SequentialPortfolio$Companion;Ljava/util/List;JDDJJDJIJJILjava/lang/Object;)Lcom/eignex/klause/portfolio/SequentialPortfolio;
-	public final fun ucb1 (Ljava/util/List;JDJJDJIJJ)Lcom/eignex/klause/portfolio/SequentialPortfolio;
-	public static synthetic fun ucb1$default (Lcom/eignex/klause/portfolio/SequentialPortfolio$Companion;Ljava/util/List;JDJJDJIJJILjava/lang/Object;)Lcom/eignex/klause/portfolio/SequentialPortfolio;
+	public final fun exp3 (Ljava/util/List;JDDJJDJIJ)Lcom/eignex/klause/portfolio/SequentialPortfolio;
+	public static synthetic fun exp3$default (Lcom/eignex/klause/portfolio/SequentialPortfolio$Companion;Ljava/util/List;JDDJJDJIJILjava/lang/Object;)Lcom/eignex/klause/portfolio/SequentialPortfolio;
+	public final fun ucb1 (Ljava/util/List;JDJJDJIJ)Lcom/eignex/klause/portfolio/SequentialPortfolio;
+	public static synthetic fun ucb1$default (Lcom/eignex/klause/portfolio/SequentialPortfolio$Companion;Ljava/util/List;JDJJDJIJILjava/lang/Object;)Lcom/eignex/klause/portfolio/SequentialPortfolio;
 }
 
 public final class com/eignex/klause/presolve/AffinePivotOrder : java/lang/Enum {

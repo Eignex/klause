@@ -9161,8 +9161,8 @@ final class com.eignex.klause.portfolio/PortfolioScenario { // com.eignex.klause
         final fun <get-seed>(): kotlin/Long // com.eignex.klause.portfolio/PortfolioScenario.seed.<get-seed>|<get-seed>(){}[0]
     final val shareCuts // com.eignex.klause.portfolio/PortfolioScenario.shareCuts|{}shareCuts[0]
         final fun <get-shareCuts>(): kotlin/Boolean // com.eignex.klause.portfolio/PortfolioScenario.shareCuts.<get-shareCuts>|<get-shareCuts>(){}[0]
-    final val sliceNodes // com.eignex.klause.portfolio/PortfolioScenario.sliceNodes|{}sliceNodes[0]
-        final fun <get-sliceNodes>(): kotlin/Long // com.eignex.klause.portfolio/PortfolioScenario.sliceNodes.<get-sliceNodes>|<get-sliceNodes>(){}[0]
+    final val sliceWork // com.eignex.klause.portfolio/PortfolioScenario.sliceWork|{}sliceWork[0]
+        final fun <get-sliceWork>(): kotlin/Long // com.eignex.klause.portfolio/PortfolioScenario.sliceWork.<get-sliceWork>|<get-sliceWork>(){}[0]
     final val toleranceCheck // com.eignex.klause.portfolio/PortfolioScenario.toleranceCheck|{}toleranceCheck[0]
         final fun <get-toleranceCheck>(): kotlin/Function1<com.eignex.klause.solver/Sample, kotlin/Boolean>? // com.eignex.klause.portfolio/PortfolioScenario.toleranceCheck.<get-toleranceCheck>|<get-toleranceCheck>(){}[0]
     final val zeroObjectivePricing // com.eignex.klause.portfolio/PortfolioScenario.zeroObjectivePricing|{}zeroObjectivePricing[0]
@@ -9194,8 +9194,8 @@ final class com.eignex.klause.portfolio/PortfolioScenario { // com.eignex.klause
     final object Companion { // com.eignex.klause.portfolio/PortfolioScenario.Companion|null[0]
         final const val DEFAULT_ARMS // com.eignex.klause.portfolio/PortfolioScenario.Companion.DEFAULT_ARMS|{}DEFAULT_ARMS[0]
             final fun <get-DEFAULT_ARMS>(): kotlin/Int // com.eignex.klause.portfolio/PortfolioScenario.Companion.DEFAULT_ARMS.<get-DEFAULT_ARMS>|<get-DEFAULT_ARMS>(){}[0]
-        final const val DEFAULT_SLICE_NODES // com.eignex.klause.portfolio/PortfolioScenario.Companion.DEFAULT_SLICE_NODES|{}DEFAULT_SLICE_NODES[0]
-            final fun <get-DEFAULT_SLICE_NODES>(): kotlin/Long // com.eignex.klause.portfolio/PortfolioScenario.Companion.DEFAULT_SLICE_NODES.<get-DEFAULT_SLICE_NODES>|<get-DEFAULT_SLICE_NODES>(){}[0]
+        final const val DEFAULT_SLICE_WORK // com.eignex.klause.portfolio/PortfolioScenario.Companion.DEFAULT_SLICE_WORK|{}DEFAULT_SLICE_WORK[0]
+            final fun <get-DEFAULT_SLICE_WORK>(): kotlin/Long // com.eignex.klause.portfolio/PortfolioScenario.Companion.DEFAULT_SLICE_WORK.<get-DEFAULT_SLICE_WORK>|<get-DEFAULT_SLICE_WORK>(){}[0]
 
         final fun parallel(kotlin/Int, com.eignex.klause.portfolio/Kind, com.eignex.klause.portfolio/EngineMix = ..., kotlin/Long = ..., kotlin/Int = ...): com.eignex.klause.portfolio/PortfolioScenario // com.eignex.klause.portfolio/PortfolioScenario.Companion.parallel|parallel(kotlin.Int;com.eignex.klause.portfolio.Kind;com.eignex.klause.portfolio.EngineMix;kotlin.Long;kotlin.Int){}[0]
         final fun sequential(com.eignex.klause.portfolio/Kind, com.eignex.klause.portfolio/EngineMix = ..., kotlin/Long = ..., kotlin/Int = ...): com.eignex.klause.portfolio/PortfolioScenario // com.eignex.klause.portfolio/PortfolioScenario.Companion.sequential|sequential(com.eignex.klause.portfolio.Kind;com.eignex.klause.portfolio.EngineMix;kotlin.Long;kotlin.Int){}[0]
@@ -9222,7 +9222,7 @@ final class com.eignex.klause.portfolio/PortfolioWorker : kotlin/AutoCloseable {
 }
 
 final class com.eignex.klause.portfolio/SequentialPortfolio : com.eignex.klause.portfolio/PortfolioExecutor { // com.eignex.klause.portfolio/SequentialPortfolio|null[0]
-    constructor <init>(kotlin.collections/List<com.eignex.klause.portfolio/PortfolioWorker>, com.eignex.kumulant.bandit/UnivariateBandit, kotlin/Long = ..., kotlin/Long = ..., kotlin/Double = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Int = ...) // com.eignex.klause.portfolio/SequentialPortfolio.<init>|<init>(kotlin.collections.List<com.eignex.klause.portfolio.PortfolioWorker>;com.eignex.kumulant.bandit.UnivariateBandit;kotlin.Long;kotlin.Long;kotlin.Double;kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Int){}[0]
+    constructor <init>(kotlin.collections/List<com.eignex.klause.portfolio/PortfolioWorker>, com.eignex.kumulant.bandit/UnivariateBandit, kotlin/Long = ..., kotlin/Long = ..., kotlin/Double = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Double = ..., kotlin/Long = ..., kotlin/Int = ...) // com.eignex.klause.portfolio/SequentialPortfolio.<init>|<init>(kotlin.collections.List<com.eignex.klause.portfolio.PortfolioWorker>;com.eignex.kumulant.bandit.UnivariateBandit;kotlin.Long;kotlin.Long;kotlin.Double;kotlin.Long;kotlin.Long;kotlin.Double;kotlin.Long;kotlin.Int){}[0]
 
     final val workers // com.eignex.klause.portfolio/SequentialPortfolio.workers|{}workers[0]
         final fun <get-workers>(): kotlin.collections/List<com.eignex.klause.portfolio/PortfolioWorker> // com.eignex.klause.portfolio/SequentialPortfolio.workers.<get-workers>|<get-workers>(){}[0]
@@ -9232,8 +9232,8 @@ final class com.eignex.klause.portfolio/SequentialPortfolio : com.eignex.klause.
     final fun solve(com.eignex.klause.util/Cancellation): com.eignex.klause.solver/SolveResult // com.eignex.klause.portfolio/SequentialPortfolio.solve|solve(com.eignex.klause.util.Cancellation){}[0]
 
     final object Companion { // com.eignex.klause.portfolio/SequentialPortfolio.Companion|null[0]
-        final fun exp3(kotlin.collections/List<com.eignex.klause.portfolio/PortfolioWorker>, kotlin/Long = ..., kotlin/Double = ..., kotlin/Double = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Double = ..., kotlin/Long = ..., kotlin/Int = ..., kotlin/Long = ..., kotlin/Long = ...): com.eignex.klause.portfolio/SequentialPortfolio // com.eignex.klause.portfolio/SequentialPortfolio.Companion.exp3|exp3(kotlin.collections.List<com.eignex.klause.portfolio.PortfolioWorker>;kotlin.Long;kotlin.Double;kotlin.Double;kotlin.Long;kotlin.Long;kotlin.Double;kotlin.Long;kotlin.Int;kotlin.Long;kotlin.Long){}[0]
-        final fun ucb1(kotlin.collections/List<com.eignex.klause.portfolio/PortfolioWorker>, kotlin/Long = ..., kotlin/Double = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Double = ..., kotlin/Long = ..., kotlin/Int = ..., kotlin/Long = ..., kotlin/Long = ...): com.eignex.klause.portfolio/SequentialPortfolio // com.eignex.klause.portfolio/SequentialPortfolio.Companion.ucb1|ucb1(kotlin.collections.List<com.eignex.klause.portfolio.PortfolioWorker>;kotlin.Long;kotlin.Double;kotlin.Long;kotlin.Long;kotlin.Double;kotlin.Long;kotlin.Int;kotlin.Long;kotlin.Long){}[0]
+        final fun exp3(kotlin.collections/List<com.eignex.klause.portfolio/PortfolioWorker>, kotlin/Long = ..., kotlin/Double = ..., kotlin/Double = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Double = ..., kotlin/Long = ..., kotlin/Int = ..., kotlin/Long = ...): com.eignex.klause.portfolio/SequentialPortfolio // com.eignex.klause.portfolio/SequentialPortfolio.Companion.exp3|exp3(kotlin.collections.List<com.eignex.klause.portfolio.PortfolioWorker>;kotlin.Long;kotlin.Double;kotlin.Double;kotlin.Long;kotlin.Long;kotlin.Double;kotlin.Long;kotlin.Int;kotlin.Long){}[0]
+        final fun ucb1(kotlin.collections/List<com.eignex.klause.portfolio/PortfolioWorker>, kotlin/Long = ..., kotlin/Double = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Double = ..., kotlin/Long = ..., kotlin/Int = ..., kotlin/Long = ...): com.eignex.klause.portfolio/SequentialPortfolio // com.eignex.klause.portfolio/SequentialPortfolio.Companion.ucb1|ucb1(kotlin.collections.List<com.eignex.klause.portfolio.PortfolioWorker>;kotlin.Long;kotlin.Double;kotlin.Long;kotlin.Long;kotlin.Double;kotlin.Long;kotlin.Int;kotlin.Long){}[0]
     }
 }
 
