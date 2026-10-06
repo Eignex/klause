@@ -136,6 +136,8 @@ internal class PoolClauseExchange(
     private val pool: SharedClausePool,
     /** The arm this exchange publishes for; see [SharedClausePool.publish]. */
     private val origin: Int = SharedClausePool.NO_ORIGIN,
+    /** Where uses of imported clauses are counted for the arms that published them; null counts nothing. */
+    private val tally: ContributionTally? = null,
     private val maxLbd: Int = pool.shareMaxLbd,
     private val maxLen: Int = pool.shareMaxLen,
     /** Skip permanent (search-conditioned) clauses on export — the incumbent objective bound and
@@ -152,9 +154,13 @@ internal class PoolClauseExchange(
     override fun onRestart(session: PropagationSession) {
         val drained = pool.drainSince(cursor)
         cursor = drained.cursor
-        for (c in drained.clauses) {
-            if (seen.add(c.key)) session.importClause(c)
+        for (i in drained.clauses.indices) {
+            val c = drained.clauses[i]
+            // An arm's own clause, re-imported into a rebuilt session, earns it nothing.
+            val from = drained.origins[i].takeIf { it != origin } ?: SharedClausePool.NO_ORIGIN
+            if (seen.add(c.key)) session.importClause(c, from)
         }
+        countUses(session)
         export(session)
     }
 
@@ -168,7 +174,15 @@ internal class PoolClauseExchange(
         onRestart(session)
     }
 
-    override fun onSearchEnd(session: PropagationSession) = export(session)
+    override fun onSearchEnd(session: PropagationSession) {
+        countUses(session)
+        export(session)
+    }
+
+    private fun countUses(session: PropagationSession) {
+        val tally = tally ?: return
+        session.drainImportUses { from, uses -> tally.note(Contribution.Clause, from, uses) }
+    }
 
     /** Publish a globally-valid nogood straight to the pool (no LBD/length filter), deduped by the
      *  `seen` set so this arm neither double-publishes it nor re-imports its own. */

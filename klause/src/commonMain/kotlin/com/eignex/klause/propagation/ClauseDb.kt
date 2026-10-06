@@ -55,13 +55,19 @@ internal fun PropagationState.factorAt(fid: Int): Propagator = when {
  * Does NOT eagerly propagate — that's the session-level
  * [PropagationSession.addLearnedClause]'s job. Returns the new factor id.
  */
-internal fun PropagationState.addLearnedClause(clause: ClausePropagator, lbd: Int, permanent: Boolean = false): Int {
+internal fun PropagationState.addLearnedClause(
+    clause: ClausePropagator,
+    lbd: Int,
+    permanent: Boolean = false,
+    origin: Int = OWN_ORIGIN,
+): Int {
     val newFid = totalFactorCount
     learned.store.add(clause)
     learned.lbds.add(lbd)
     learned.permanent.add(if (permanent) 1 else 0)
     learned.tier.add(ClauseTier.UNSET.ordinal)
     learned.usedFlags.add(0)
+    learned.origins.add(origin)
     if (clause.literals.size == 2) learned.binaryClauseCount++ // keep the binary-resolution gate current
     refPayloadStore.add(null)
     val watchers = clause.initialBoolWatchers
@@ -99,6 +105,7 @@ internal fun PropagationState.addLearnedPb(
     learned.permanent.add(if (permanent) 1 else 0)
     learned.tier.add(ClauseTier.UNSET.ordinal)
     learned.usedFlags.add(0)
+    learned.origins.add(OWN_ORIGIN)
     refPayloadStore.add(null)
     // Install only the weighted covering watch set; the constraint wakes when a watched literal goes
     // false, not on every literal change.
@@ -109,11 +116,16 @@ internal fun PropagationState.addLearnedPb(
 }
 
 /** Convenience overload that converts a structural [Clause] to its [ClausePropagator] before registering. */
-internal fun PropagationState.addLearnedClause(clause: Clause, lbd: Int, permanent: Boolean = false): Int {
+internal fun PropagationState.addLearnedClause(
+    clause: Clause,
+    lbd: Int,
+    permanent: Boolean = false,
+    origin: Int = OWN_ORIGIN,
+): Int {
     // The native-SAT lane keeps learned clauses in its own arena-backed store with its own watches
     // and policy columns, not the general learned database.
-    nativeEngine?.let { return it.addLearned(clause.literals, lbd, permanent) }
-    return addLearnedClause(clause.propagatorProjection() as ClausePropagator, lbd, permanent)
+    nativeEngine?.let { return it.addLearned(clause.literals, lbd, permanent, origin) }
+    return addLearnedClause(clause.propagatorProjection() as ClausePropagator, lbd, permanent, origin)
 }
 
 /** Read-only view of LBDs for tests / introspection. Parallel to [PropagationState.learnedClauses]. */
@@ -163,7 +175,9 @@ internal fun PropagationState.noteLearnedUse(fid: Int) {
         return
     }
     val idx = fid - problem.numFactors
-    if (idx in 0 until learned.usedFlags.size) learned.usedFlags[idx] = 1
+    if (idx !in 0 until learned.usedFlags.size) return
+    if (learned.usedFlags[idx] == 0) learned.importUses.note(learned.origins[idx])
+    learned.usedFlags[idx] = 1
 }
 
 /**
@@ -205,6 +219,7 @@ internal fun PropagationState.forgetLearnedClauses(keep: (learnedIndex: Int, lbd
             learned.permanent[w] = learned.permanent[i]
             learned.tier[w] = learned.tier[i]
             learned.usedFlags[w] = learned.usedFlags[i]
+            learned.origins[w] = learned.origins[i]
             w++
         }
     }
@@ -213,6 +228,7 @@ internal fun PropagationState.forgetLearnedClauses(keep: (learnedIndex: Int, lbd
     learned.permanent.truncateTo(newCount)
     learned.tier.truncateTo(newCount)
     learned.usedFlags.truncateTo(newCount)
+    learned.origins.truncateTo(newCount)
 
     // Compact the learned tail of refPayloadStore similarly. Static-factor entries stay
     // at indices [0, problem.numFactors) untouched.

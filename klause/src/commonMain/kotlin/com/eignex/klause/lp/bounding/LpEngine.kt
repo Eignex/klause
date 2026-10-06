@@ -259,9 +259,12 @@ internal class LpEngine(
             object : CutSharing {
                 override fun exportGlobalCuts(): List<SharedCut> = cutPool.exportGlobalCuts()
 
-                override fun importCuts(cuts: List<SharedCut>) {
-                    for (c in cuts) c.toCut(relaxation)?.let { cutPool.add(it, relaxation) }
+                override fun importCuts(cuts: List<SharedCut>, origins: IntArray) {
+                    for (i in cuts.indices) cuts[i].toCut(relaxation)?.let { cutPool.add(it, relaxation, origins[i]) }
                 }
+
+                override fun drainImportUses(action: (origin: Int, uses: Long) -> Unit) =
+                    cutPool.drainImportUses(action)
             },
         )
     }

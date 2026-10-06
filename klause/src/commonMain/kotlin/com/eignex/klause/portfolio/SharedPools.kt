@@ -17,4 +17,6 @@ internal class SharedPools(
     val bounds: SharedObjectiveBound? = null,
     val varBounds: SharedVarBounds? = null,
     val solutions: IncumbentExchange<Sample, Double>? = null,
+    /** How often the arms used each other's shared clauses, cuts and bounds. */
+    val contributions: ContributionTally = ContributionTally(),
 )

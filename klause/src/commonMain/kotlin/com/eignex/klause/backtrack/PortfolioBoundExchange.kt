@@ -55,11 +55,18 @@ internal class PortfolioBoundExchange(
         val lower = params.globalVarLowerSupplier ?: return
         val upper = params.globalVarUpperSupplier ?: return
         if (session.decisionLevel != 0) return
+        val used = params.globalVarImportSink
         for (v in 0 until problem.numIntVars) {
             val lo = lower(v)
-            if (lo != Long.MIN_VALUE) session.implyIntAtLeast(v, lo)
+            if (lo != Long.MIN_VALUE && lo > session.intDomain(v).min) {
+                session.implyIntAtLeast(v, lo)
+                used?.invoke(v, true)
+            }
             val hi = upper(v)
-            if (hi != Long.MAX_VALUE) session.implyIntAtMost(v, hi)
+            if (hi != Long.MAX_VALUE && hi < session.intDomain(v).max) {
+                session.implyIntAtMost(v, hi)
+                used?.invoke(v, false)
+            }
         }
     }
 

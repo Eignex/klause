@@ -286,6 +286,11 @@ data class BacktrackParams(
     /** Companion of [globalVarLowerSupplier] for the shared upper bounds. */
     val globalVarUpperSupplier: ((varId: Int) -> Long)? = null,
     /**
+     * Told each time an imported shared bound actually tightened a domain here — `(varId, lower)`, `lower` naming
+     * the side — so a portfolio can credit the arm that proved it. `null` (default) reports nothing.
+     */
+    val globalVarImportSink: ((varId: Int, lower: Boolean) -> Unit)? = null,
+    /**
      * The emphasis-driven LP-relaxation selector: an [LpEmphasis] cost ceiling + per-technique
      * overrides (see [LpConfig]), resolved against the problem's structure by [LpAutoConfig.resolve]
      * at `minimize`/`improvements`. `null` (the raw default) uses the explicit per-technique flags

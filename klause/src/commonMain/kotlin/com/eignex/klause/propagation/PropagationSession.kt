@@ -619,8 +619,11 @@ class PropagationSession(
      * session's learned DB, translating its int-atom literals into this session's lazily-allocated
      * atom space. Call only at decision level 0 (a restart): the literals are then unassigned, so the
      * clause registers without an immediate unit/conflict and participates from the next fixpoint.
+     *
+     * [origin] names the arm the clause came from, a non-negative id, and is counted each time the clause is used;
+     * see [drainImportUses].
      */
-    fun importClause(shared: SharedClause) {
+    fun importClause(shared: SharedClause, origin: Int = OWN_ORIGIN) {
         val lits = IntArray(shared.boolLits.size + shared.atomQuads.size / SharedClause.QUAD)
         var j = 0
         for (l in shared.boolLits) lits[j++] = l
@@ -638,7 +641,16 @@ class PropagationSession(
             lits[j++] = Lit.make(virtualVar, positive)
             i += SharedClause.QUAD
         }
-        state.addLearnedClause(Clause(lits), shared.lbd, permanent = false)
+        state.addLearnedClause(Clause(lits), shared.lbd, permanent = false, origin = origin)
+    }
+
+    /**
+     * Hand [action] how often clauses imported from each origin were used since the last drain, and reset the
+     * counts: a clause counts once per reduction window in which it detects a conflict or forces a unit.
+     */
+    fun drainImportUses(action: (origin: Int, uses: Long) -> Unit) {
+        state.learned.importUses.drain(action)
+        state.nativeEngine?.importUses?.drain(action)
     }
 
     private fun pushBool(v: Int, value: Boolean): PropagationResult {

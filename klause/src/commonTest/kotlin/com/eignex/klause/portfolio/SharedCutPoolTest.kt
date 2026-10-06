@@ -40,7 +40,7 @@ class SharedCutPoolTest {
         override fun exportGlobalCuts(): List<SharedCut> =
             local.cuts().mapNotNull { if (it.global) SharedCut.fromCut(it, rel) else null }
 
-        override fun importCuts(cuts: List<SharedCut>) {
+        override fun importCuts(cuts: List<SharedCut>, origins: IntArray) {
             for (c in cuts) c.toCut(rel)?.let { local.add(it) }
         }
     }
