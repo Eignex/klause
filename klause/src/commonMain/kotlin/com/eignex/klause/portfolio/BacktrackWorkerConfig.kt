@@ -92,7 +92,7 @@ internal class BacktrackWorkerConfig(
             params,
             objective = objective,
             withBound = withBound,
-        )
+        ).also { it.sharedPools = pools }
     }
 
     companion object {

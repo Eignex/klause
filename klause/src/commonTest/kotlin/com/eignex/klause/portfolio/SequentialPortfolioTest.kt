@@ -664,6 +664,28 @@ class SequentialPortfolioTest {
     }
 
     @Test
+    fun `an arm raising the proven floor takes more of the run than one doing nothing`() {
+        val slices = IntArray(3)
+        val floor = SharedObjectiveBound()
+        floor.publish(0.0)
+        val finder = ScriptedSearch({ it == 0 }) { slices[0]++ }
+        val raiser = ScriptedSearch({ false }) {
+            slices[1]++
+            floor.publish(floor.current() + 1.0)
+        }
+        val idle = ScriptedSearch({ false }) { slices[2]++ }
+        val pools = SharedPools(clauses = null, cuts = null, bounds = floor)
+        val workers = listOf(finder, raiser, idle).mapIndexed { arm, search ->
+            trackingWorker("arm$arm", arm, search).also { it.sharedPools = pools }
+        }
+        var polls = 0
+
+        SequentialPortfolio.thompson(workers).use { it.minimize(Cancellation { ++polls > 300 }) }
+
+        assertTrue(slices[1] > 3 * slices[2], "raiser ${slices[1]} slices, idle ${slices[2]}")
+    }
+
+    @Test
     fun `any kumulant policy also proves the optimum`() {
         val problem = Problem(
             numBoolVars = 0,
