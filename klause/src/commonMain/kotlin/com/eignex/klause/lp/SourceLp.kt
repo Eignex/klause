@@ -28,6 +28,7 @@ import com.eignex.klause.simplex.exact.ExactDoubleBoundedSplit
 import com.eignex.klause.simplex.exact.ExactRationalInequality
 import com.eignex.klause.solver.result.SourceLpWorkStats
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.cancelledWhen
 import kotlin.time.ComparableTimeMark
 import kotlin.time.Duration.Companion.nanoseconds
 import kotlin.time.TimeSource.Monotonic
@@ -270,7 +271,7 @@ internal class SourceLp(
                 }
                 val current = owner ?: LpScopedSolver(
                     LpExactState(model()),
-                    Cancellation { currentToken() },
+                    cancelledWhen({ currentToken.deadline() }) { currentToken() },
                     context = budget.context,
                     iterationLimit = 1024,
                     workLimit = 2_000_000L,

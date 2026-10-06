@@ -10,11 +10,11 @@ import com.eignex.klause.solver.incumbent.bound
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.cancelledWhen
 import com.eignex.kumulant.core.Concurrency
 import com.eignex.kumulant.stream.lock
 import kotlin.concurrent.atomics.AtomicBoolean
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
-import kotlin.time.ComparableTimeMark
 import kotlin.time.TimeSource
 
 /**
@@ -235,14 +235,6 @@ sealed interface PortfolioStrategy {
     data object Exhaustive : PortfolioStrategy
 }
 
-// The caller's token that also stops on [flag]. It keeps the caller's deadline, so a phase a worker hands it can
-// budget a share of the time left (Cancellation.shorten), and like a bare predicate it carries no work meter.
-private fun Cancellation.alsoStoppedBy(flag: AtomicBoolean): Cancellation {
-    val caller = this
-    val deadline = caller.deadline()
-    return object : Cancellation {
-        override fun isCancelled(): Boolean = flag.load() || caller()
-
-        override fun deadline(): ComparableTimeMark? = deadline
-    }
-}
+// The caller's token that also stops on [flag], keeping the caller's deadline.
+private fun Cancellation.alsoStoppedBy(flag: AtomicBoolean): Cancellation =
+    cancelledWhen(this::deadline) { flag.load() || this() }

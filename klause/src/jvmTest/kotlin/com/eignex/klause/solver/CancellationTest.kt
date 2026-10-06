@@ -9,6 +9,7 @@ import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.localsearch.LocalSearchSolver
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.cancelledWhen
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.concurrent.thread
 import kotlin.test.Test
@@ -18,7 +19,10 @@ import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.time.ComparableTimeMark
+import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.seconds
+import kotlin.time.TimeSource
 
 /**
  * JVM-only because we use [Thread] to flip the cancellation flag concurrently. The
@@ -93,6 +97,18 @@ class CancellationTest {
             r is SolveResult.Sat || r is SolveResult.Unknown,
             "expected Sat or Unknown (cancelled), got $r",
         )
+    }
+
+    @Test
+    fun `a predicate token states the deadline it reads when asked`() {
+        val first = TimeSource.Monotonic.markNow() + 1.hours
+        var current: ComparableTimeMark = first
+        val token = cancelledWhen({ current }) { false }
+
+        assertEquals(first, token.deadline())
+        current = first + 1.hours
+        assertEquals(first + 1.hours, token.deadline())
+        assertTrue(assertNotNull(token.shorten(0.5).deadline()) < first + 1.hours)
     }
 
     @Test

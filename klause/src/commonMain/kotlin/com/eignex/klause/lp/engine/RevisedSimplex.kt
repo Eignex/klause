@@ -16,6 +16,7 @@ import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.SparseSlices
 import com.eignex.klause.util.argsortBy
+import com.eignex.klause.util.cancelledWhen
 import com.eignex.koblas.SparseMatrix
 import com.eignex.koblas.koblas
 import kotlin.math.abs
@@ -252,7 +253,7 @@ internal class RevisedSimplex(
     // so a work-metered token stops the solve at the same pivot however loaded the machine is.
     private var stopToken: Cancellation = cancellation
     private var chargedOps = 0L
-    private val cancellation: Cancellation = Cancellation {
+    private val cancellation: Cancellation = cancelledWhen({ stopToken.deadline() }) {
         chargeWork()
         stopToken()
     }

@@ -555,6 +555,48 @@ class ResumableMinimizeTest {
     }
 
     @Test
+    fun `node LPs are handed the run deadline`() {
+        val deadlines = ArrayList<ComparableTimeMark?>()
+        val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+            override fun newPersistentSolver(
+                model: LpModel,
+                cancellation: Cancellation,
+                refactorUpdateLimit: Int,
+                iterationLimit: Int,
+                workLimit: Long,
+                trackDegeneracy: Boolean,
+                pricing: LpPricingOptions,
+            ): PersistentLpSolver {
+                deadlines += cancellation.deadline()
+                return ProductionLpEngineFactory.newPersistentSolver(
+                    model,
+                    cancellation,
+                    refactorUpdateLimit,
+                    iterationLimit,
+                    workLimit,
+                    trackDegeneracy,
+                    pricing,
+                )
+            }
+        }
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 2,
+            intDomains = arrayOf(IntDomain(0L, 9L), IntDomain(0L, 9L)),
+            factors = arrayOf<Factor>(Linear(longArrayOf(2L, 3L), intArrayOf(0, 1), LinearOp.GE, 7L)),
+        ).bake()
+        val run = Cancellation.after(60.seconds)
+        val params = BacktrackParams(lpPlan = LpPlan(bounding = true, componentSplit = false))
+
+        BacktrackSolver(problem, LpSolveContext(factory))
+            .resumable(LinearObjective(intCoefficients = longArrayOf(1L, 1L)), params)
+            .use { it.runSlice(run, 1000L, 256L) {} }
+
+        assertTrue(deadlines.isNotEmpty())
+        assertTrue(deadlines.all { it == run.deadline() }, "every node LP budgets against the run's own deadline")
+    }
+
+    @Test
     fun `a genuine shared cutoff retains exhaustive coverage without a local incumbent`() {
         val problem = Problem(0, 1, arrayOf(IntDomain(0L, 3L)), emptyArray()).bake()
         val objective = LinearObjective(intCoefficients = longArrayOf(1L))

@@ -194,7 +194,13 @@ internal class RefinementMeter(
     private var directWork = 0L
     private var directAllocation = 0L
     var metrics = LpRefinementMetrics()
-    val token = cancellation or Cancellation { elapsedForLimit() >= limits.time }
+
+    // A finite time limit is a deadline, so a phase handed this token can budget a share of what is left of it.
+    val token = if (limits.time.isInfinite()) {
+        cancellation
+    } else {
+        cancellation or Cancellation.until(started + (limits.time - elapsedForLimit()))
+    }
     val spentWork: Long get() = cache.work
     val remainingWork: Long get() = minOf(
         limits.maxWork - if (perAttempt) cache.work - initialWork else cache.work,
