@@ -28,6 +28,7 @@ import com.eignex.klause.lp.engine.LpVerdict
 import com.eignex.klause.lp.exactColumnLower
 import com.eignex.klause.lp.exactColumnUpper
 import com.eignex.klause.lp.exactComparison
+import com.eignex.klause.lp.exactForm
 import com.eignex.klause.lp.exactMixedEchelonHermite
 import com.eignex.klause.lp.exactMixedTriangularBounds
 import com.eignex.klause.lp.satisfiesSourceRows
@@ -81,6 +82,7 @@ class ExactLiraSearchComponent(
     private val boolLevels = IntArray(model.numBoolVars) { -1 }
     private val root = SearchNode()
     private val disjunctionAtoms = HashMap<Int, List<DisjunctAtom>>()
+    private val exactForms = model.factors.map { factor -> factor.linearRows.map { it.exactForm(model.numRealVars) } }
     private var impliedDisjunct = false
     private val reduction = ExactLiraReductionCache(model, disjunctionAtoms, { solveContext }) {
         smtStats?.observeSourceLp(it)
@@ -404,7 +406,7 @@ class ExactLiraSearchComponent(
             for ((index, row) in factor.linearRows.withIndex()) {
                 if (selected != null && selected != index) continue
                 val truth = row.truthUnder(bools) ?: continue
-                val comparison = row.exactComparison(model.numRealVars, truth) { bools[it] == TRUE }
+                val comparison = exactForms[factorIndex][index].comparison(truth) { bools[it] == TRUE }
                 val direction = node.disequalityDirections[RowAddress(factorIndex, index)]
                 if (comparison.op == LinearOp.NE && direction == null) continue
                 val rows = ArrayList<ExactRationalInequality>()

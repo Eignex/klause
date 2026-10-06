@@ -46,6 +46,7 @@ internal class ExactComparison(
     val strict: Boolean,
     /** Whether a continuous column carries a term, which decides how a disequality tightens. */
     val hasReals: Boolean,
+    private val ordered: ExactOrderedTerms = ExactOrderedTerms(terms),
 ) {
 
     /** The weighted sum at [values]. */
@@ -86,20 +87,19 @@ internal class ExactComparison(
             return
         }
         when (op) {
-            LinearOp.LE -> rows += exactRow(terms, bound, strict)
+            LinearOp.LE -> rows += ordered.row(bound, strict)
 
-            LinearOp.GE -> rows += exactRow(terms.negated(), bound.negated(), strict)
+            LinearOp.GE -> rows += ordered.negatedRow(bound.negated(), strict)
 
             LinearOp.EQ -> {
-                rows += exactRow(terms, bound, strict = false)
-                rows += exactRow(terms.negated(), bound.negated(), strict = false)
+                rows += ordered.row(bound, strict = false)
+                rows += ordered.negatedRow(bound.negated(), strict = false)
             }
 
             LinearOp.NE -> when (requireNotNull(direction) { "exact disequality direction is missing" }) {
-                LinearOp.LE -> rows += exactRow(terms, if (hasReals) bound else bound - BigFraction.ONE, hasReals)
+                LinearOp.LE -> rows += ordered.row(if (hasReals) bound else bound - BigFraction.ONE, hasReals)
 
-                LinearOp.GE -> rows += exactRow(
-                    terms.negated(),
+                LinearOp.GE -> rows += ordered.negatedRow(
                     if (hasReals) bound.negated() else bound.negated() - BigFraction.ONE,
                     hasReals,
                 )
@@ -120,10 +120,49 @@ internal fun LinearRow.exactComparison(
     realColumns: Int,
     truth: Boolean,
     booleanValue: (Int) -> Boolean,
-): ExactComparison {
+): ExactComparison = exactForm(realColumns).comparison(truth, booleanValue)
+
+/**
+ * A row's terms in exact rationals, read once, with the Booleans it carries left open: a Boolean term only
+ * moves the right-hand side, and the activator only picks the operator, so a consumer that states the same
+ * row under many assignments keeps one form per row.
+ */
+internal class ExactRowForm(
+    private val terms: Map<Int, BigFraction>,
+    private val rhs: BigFraction,
+    private val booleanLiterals: IntArray,
+    private val booleanCoefficients: List<BigFraction>,
+    private val relation: LinearOp,
+    private val strict: Boolean,
+    private val hasReals: Boolean,
+) {
+    private val ordered = ExactOrderedTerms(terms)
+
+    /** The comparison the row states when its activator holds [truth] under [booleanValue]. */
+    fun comparison(truth: Boolean, booleanValue: (Int) -> Boolean): ExactComparison {
+        var bound = rhs
+        for (k in booleanLiterals.indices) {
+            val literal = booleanLiterals[k]
+            if (booleanValue(Lit.variable(literal)) == Lit.isPositive(literal)) bound -= booleanCoefficients[k]
+        }
+        return ExactComparison(
+            terms,
+            bound,
+            if (truth) relation else relation.complemented(),
+            strict = if (truth) strict else !strict,
+            hasReals = hasReals,
+            ordered = ordered,
+        )
+    }
+}
+
+/** This row's [ExactRowForm] over the mixed columns, the first [realColumns] of them continuous. */
+internal fun LinearRow.exactForm(realColumns: Int): ExactRowForm {
     val terms = HashMap<Int, BigFraction>()
+    val booleanLiterals = ArrayList<Int>()
+    val booleanCoefficients = ArrayList<BigFraction>()
     val c = constants
-    var rhs = when (c) {
+    val rhs = when (c) {
         is IntegralConstants -> c.exactBound.asFraction()
         is RealConstants -> c.bound.asFraction()
     }
@@ -140,8 +179,8 @@ internal fun LinearRow.exactComparison(
         val reference = ref(k)
         when {
             Term.isBool(reference) -> {
-                val literal = Term.lit(reference)
-                if (booleanValue(Lit.variable(literal)) == Lit.isPositive(literal)) rhs -= coefficient
+                booleanLiterals += Term.lit(reference)
+                booleanCoefficients += coefficient
             }
 
             Term.isInt(reference) -> terms.add(realColumns + Term.intVar(reference), coefficient)
@@ -149,13 +188,37 @@ internal fun LinearRow.exactComparison(
             else -> terms.add(Term.realVar(reference), coefficient)
         }
     }
-    return ExactComparison(
+    return ExactRowForm(
         terms,
         rhs,
-        if (truth) relation else relation.complemented(),
-        strict = if (truth) strict else !strict,
+        booleanLiterals.toIntArray(),
+        booleanCoefficients,
+        relation,
+        strict,
         hasReals = c is RealConstants || (0 until size).any { Term.isReal(ref(it)) },
     )
+}
+
+/** Nonzero terms in ascending column order, with their negation, shared by every row stated over them. */
+internal class ExactOrderedTerms(terms: Map<Int, BigFraction>) {
+    private val columns: IntArray
+    private val coefficients: List<BigFraction>
+    private val negated: List<BigFraction>
+
+    init {
+        val ordered = terms.entries.filter { !it.value.isZero }.sortedBy { it.key }
+        columns = IntArray(ordered.size) { ordered[it].key }
+        coefficients = ordered.map { it.value }
+        negated = coefficients.map { it.negated() }
+    }
+
+    /** `Σ terms·x ≤ bound`. */
+    fun row(bound: BigFraction, strict: Boolean): ExactRationalInequality =
+        ExactRationalInequality(columns, coefficients, bound, strict)
+
+    /** `−Σ terms·x ≤ bound`. */
+    fun negatedRow(bound: BigFraction, strict: Boolean): ExactRationalInequality =
+        ExactRationalInequality(columns, negated, bound, strict)
 }
 
 /** One exact `Σ terms·x ≤ bound` row over the columns carrying a nonzero coefficient. */
@@ -187,5 +250,3 @@ internal fun MutableMap<Int, BigFraction>.add(column: Int, value: BigFraction) {
     val sum = (this[column] ?: BigFraction.ZERO) + value
     if (sum.isZero) remove(column) else this[column] = sum
 }
-
-private fun Map<Int, BigFraction>.negated(): Map<Int, BigFraction> = mapValues { (_, value) -> value.negated() }
