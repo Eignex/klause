@@ -129,6 +129,47 @@ class CliModeTest {
     }
 
     @Test
+    fun `an open theory optimum reports its incumbent under all-solutions`() {
+        val mps = File.createTempFile("cliopenall", ".mps").apply {
+            writeText(
+                "NAME          T\nROWS\n N  COST\n G  R1\nCOLUMNS\n" +
+                    "    MARKER                 'MARKER'                 'INTORG'\n" +
+                    "    x  COST  1.0   R1  1.0\n" +
+                    "    MARKER                 'MARKER'                 'INTEND'\n" +
+                    "RHS\n    RHS  R1  2.0\nBOUNDS\n LI BND  x  0\nENDATA\n",
+            )
+            deleteOnExit()
+        }
+
+        var code = -1
+        val out = capture { code = runCli(arrayOf("-a", "-s", "-t", "10000", mps.absolutePath)) }
+
+        assertEquals(0, code, out)
+        assertFalse("openTheoryChecks=0" in out, "expected the open theory, got: $out")
+        assertTrue("v x=2" in out, out)
+    }
+
+    @Test
+    fun `an open theory satisfaction model refuses all-solutions`() {
+        val smt = File.createTempFile("cliopenenum", ".smt2").apply {
+            writeText(
+                """
+                (declare-const x Int)
+                (assert (>= x 5))
+                (check-sat)
+                """.trimIndent(),
+            )
+            deleteOnExit()
+        }
+
+        var code = -1
+        val err = captureErr { code = runCli(arrayOf("-a", smt.absolutePath)) }
+
+        assertEquals(2, code, err)
+        assertTrue("all-solution enumeration is unavailable" in err, err)
+    }
+
+    @Test
     fun `an open theory fixed work limit names the cause and prints counters`() {
         val smt = File.createTempFile("cliopenwork", ".smt2").apply {
             writeText(
