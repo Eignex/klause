@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.objective
 
+import com.eignex.klause.solver.Sample
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -36,5 +37,13 @@ class LinearObjectiveTest {
         )
 
         assertEquals(1, objective.singleIntObjective()?.varId)
+    }
+
+    @Test
+    fun `a value past the 64-bit range is summed without wrapping`() {
+        val objective = LinearObjective(intCoefficients = longArrayOf(8L))
+        val sample = Sample(BooleanArray(0), longArrayOf(1L shl 61))
+
+        assertEquals(1.8446744073709552e19, objective.evaluate(sample))
     }
 }

@@ -65,6 +65,23 @@ class LocalSearchSolverTest {
     }
 
     @Test
+    fun `minimize reports an objective past the 64-bit range without wrapping`() {
+        val wide = 1L shl 62
+        val problem = Problem(
+            0,
+            1,
+            arrayOf(IntDomain(-wide, wide)),
+            arrayOf<Factor>(Linear(longArrayOf(1), intArrayOf(0), LinearOp.EQ, 1L shl 61)),
+        )
+        val objective = LinearObjective(intCoefficients = longArrayOf(8L))
+        val params = LocalSearchParams(maxFlips = 1_000, randomSeed = 1)
+
+        val result = LocalSearchSolver(problem.bake()).minimize(objective, params)
+
+        assertEquals(1.8446744073709552e19, assertIs<MinimizeResult.BestFound>(result).objective)
+    }
+
+    @Test
     fun `declines a non-linear factor over a domain past the 32-bit range`() {
         val wide = 1L shl 62
         val problem = Problem(

@@ -5,6 +5,7 @@ import com.eignex.klause.solver.Assignment
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.util.EmptyDoubleArray
 import com.eignex.klause.util.EmptyLongArray
+import com.ionspin.kotlin.bignum.integer.BigInteger
 
 /**
  * Anything the local-search internals can score an assignment by; "lower is better".
@@ -104,12 +105,40 @@ data class LinearObjective(
 
     override fun evaluate(sample: Sample): Double {
         // The discrete part is exact; the continuous part is the LP-only real terms, present in [sample]
-        // only at a leaf where the residual LP resolved them.
-        var total = evaluateLong(sample).toDouble()
+        // only at a leaf where the residual LP resolved them. A discrete sum past the 64-bit range is summed
+        // exactly and rounded once, rather than wrapping.
+        var total = (discreteSumOrNull(sample) ?: wideDiscreteSum(sample)).toDouble()
         for (r in 0 until minOf(sample.numRealVars, realCoefficients.size)) {
             total += realCoefficients[r] * sample.approximateRealValue(r)
         }
         return total
+    }
+
+    // The discrete part of [sample]'s value, or null when a product or partial sum leaves the 64-bit range.
+    private fun discreteSumOrNull(sample: Sample): Long? {
+        var total = constant
+        for (b in 0 until minOf(sample.bools.size, boolWeights.size)) {
+            if (sample.bools[b]) total = addOrNull(total, boolWeights[b]) ?: return null
+        }
+        for (i in 0 until minOf(sample.ints.size, intCoefficients.size)) {
+            val c = intCoefficients[i]
+            val x = sample.ints[i]
+            if (c == 0L || x == 0L) continue
+            val term = if (fitsHalf(c) && fitsHalf(x)) c * x else multiplyOrNull(c, x) ?: return null
+            total = addOrNull(total, term) ?: return null
+        }
+        return total
+    }
+
+    private fun wideDiscreteSum(sample: Sample): Double {
+        var total = BigInteger.fromLong(constant)
+        for (b in 0 until minOf(sample.bools.size, boolWeights.size)) {
+            if (sample.bools[b]) total += BigInteger.fromLong(boolWeights[b])
+        }
+        for (i in 0 until minOf(sample.ints.size, intCoefficients.size)) {
+            total += BigInteger.fromLong(intCoefficients[i]) * BigInteger.fromLong(sample.ints[i])
+        }
+        return total.doubleValue(exactRequired = false)
     }
 
     /** Exact integer objective value of the live [assignment]; lower is better. Reads variables in
@@ -186,3 +215,22 @@ fun LinearObjectiveSpec.toLinearObjective(): LinearObjective = LinearObjective(
     constant = constant,
     realCoefficients = realCoefficients,
 )
+
+// Whether [v] fits 31 bits, so a product of two such values cannot leave the 64-bit range.
+private fun fitsHalf(v: Long): Boolean = v in -HALF_RANGE..HALF_RANGE
+
+private fun multiplyOrNull(a: Long, b: Long): Long? {
+    val product = a * b
+    return if (product / b == a && !(a == -1L && b == Long.MIN_VALUE) && !(b == -1L && a == Long.MIN_VALUE)) {
+        product
+    } else {
+        null
+    }
+}
+
+private fun addOrNull(a: Long, b: Long): Long? {
+    val sum = a + b
+    return if (((a xor sum) and (b xor sum)) < 0L) null else sum
+}
+
+private const val HALF_RANGE: Long = (1L shl 31) - 1

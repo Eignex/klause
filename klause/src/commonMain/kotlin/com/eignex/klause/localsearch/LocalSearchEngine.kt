@@ -3,6 +3,9 @@ package com.eignex.klause.localsearch
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.objective.MutableObjectiveBound
+import com.eignex.klause.factor.objective.ObjectiveBoundFactor
+import com.eignex.klause.factor.objective.objectiveSumIsWide
+import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.Move
 import com.eignex.klause.localsearch.movesource.GreedyInit
@@ -328,6 +331,9 @@ internal class LocalSearchEngine(
         sink: SolveStatsSink,
     ) {
         val state = newMinimizeState(objective, params, effectiveAssumptions, warm)
+        // An objective whose sum can pass the 64-bit range is scored from snapshots, which sum it exactly; the live
+        // assignment's Long evaluation would wrap.
+        val wideObjective = objective is LinearObjective && objective.isWideOver(state.rootDomains)
 
         var bestObj = Double.POSITIVE_INFINITY
         var bestSample: Sample? = null
@@ -432,7 +438,7 @@ internal class LocalSearchEngine(
                         continue
                     }
                 }
-                val obj = if (completion != null) {
+                val obj = if (completion != null || wideObjective) {
                     objective.evaluate(state.assignment.snapshot())
                 } else {
                     objective.evaluate(state.assignment)
@@ -446,7 +452,7 @@ internal class LocalSearchEngine(
                         totalFlips++
                         continue
                     }
-                    val solved = if (completion != null) objective.evaluate(solution) else obj
+                    val solved = if (completion != null || wideObjective) objective.evaluate(solution) else obj
                     if (solved < bestObj) {
                         bestObj = solved
                         bestSample = solution
@@ -821,9 +827,16 @@ internal fun localSearchSupports(model: LocalSearchModel, completes: Boolean = f
     val domains = model.domains
     if (domains.all(::isNarrow)) return true
     return problem.factors.all { factor ->
-        factor is Linear || factor is ReifiedLinear || factor.intVars.all { isNarrow(domains[it]) } ||
+        factor is Linear || factor is ReifiedLinear || factor is ObjectiveBoundFactor ||
+            factor.intVars.all { isNarrow(domains[it]) } ||
             factor.invariantProjection() === NoInvariant
     }
+}
+
+// Whether this objective's integer sum can pass the 64-bit range over [domains].
+private fun LinearObjective.isWideOver(domains: Array<IntDomain>): Boolean {
+    val n = minOf(intCoefficients.size, domains.size)
+    return objectiveSumIsWide(boolWeights, IntArray(n) { it }, intCoefficients.copyOf(n), domains)
 }
 
 /** [localSearchSupports] for the finite model [problem]. */
