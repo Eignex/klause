@@ -839,5 +839,14 @@ private fun LinearObjective.isWideOver(domains: Array<IntDomain>): Boolean {
     return objectiveSumIsWide(boolWeights, IntArray(n) { it }, intCoefficients.copyOf(n), domains)
 }
 
-/** [localSearchSupports] for the finite model [problem]. */
-internal fun localSearchSupports(problem: BakedProblem): Boolean = localSearchSupports(LocalSearchModel.of(problem))
+/**
+ * Whether local search scores the finite model [problem] entirely in its plain `Long` invariants: no continuous
+ * column, every domain narrow, no over-64-bit row. A mixed pool builds local-search arms only on such a model; on a
+ * wider one they would take slots from arms that search it without that cost.
+ */
+internal fun localSearchIsExact(problem: BakedProblem): Boolean =
+    problem.numRealVars == 0 && problem.rootIntDomainsInPlace.all(::isNarrow) &&
+        problem.factors.none {
+            (it is Linear && it.wideConstants != null) ||
+                (it is ReifiedLinear && it.wideConstants != null)
+        }

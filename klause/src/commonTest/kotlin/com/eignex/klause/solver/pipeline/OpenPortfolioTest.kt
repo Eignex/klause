@@ -11,6 +11,7 @@ import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.seconds
 
 class OpenPortfolioTest {
@@ -50,5 +51,26 @@ class OpenPortfolioTest {
         val result = OpenTheoryPipeline.executePortfolio(request, params())
 
         assertIs<OpenTheoryResult.Unsat>(result)
+    }
+
+    @Test
+    fun `a model with no local-search arm runs the theory without a portfolio`() {
+        // x + y ≥ 3 over open continuous columns and nothing else: no Boolean, no integer, so no local-search arm.
+        val model = Problem(
+            numBoolVars = 0,
+            numIntVars = 0,
+            intDomains = emptyArray(),
+            factors = arrayOf<Factor>(
+                Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0, 1), doubleArrayOf(1.0, 1.0), LinearOp.GE, 3.0),
+            ),
+            numRealVars = 2,
+            realLower = doubleArrayOf(Double.NEGATIVE_INFINITY, Double.NEGATIVE_INFINITY),
+            realUpper = doubleArrayOf(Double.POSITIVE_INFINITY, Double.POSITIVE_INFINITY),
+        )
+        val request = OpenTheoryRequest(model, componentPlan = model.componentPlan())
+
+        val result = assertIs<OpenTheoryResult.Sat>(OpenTheoryPipeline.executePortfolio(request, params()))
+
+        assertTrue(result.stats.portfolio.arms.isEmpty())
     }
 }

@@ -56,4 +56,17 @@ class ArmNeedsTest {
     fun `a satisfaction model offers no objective`() {
         assertFalse(ProblemFacts.assumed(Kind.CSP).offers(ArmNeed.Objective))
     }
+
+    @Test
+    fun `a domain past the 32-bit range offers no local search to a mixed pool`() {
+        val wide = 1L shl 40
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 1,
+            intDomains = arrayOf(IntDomain(0, wide)),
+            factors = arrayOf<Factor>(Linear(longArrayOf(1L), intArrayOf(0), LinearOp.GE, 3L)),
+        ).bake()
+
+        assertFalse(ProblemFacts.of(problem, Kind.CSP, LpConfig.AGGRESSIVE).offers(ArmNeed.LocalSearch))
+    }
 }
