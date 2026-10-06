@@ -168,5 +168,27 @@ class PortfolioWorker private constructor(
                 closeFn = { session.close() },
             )
         }
+
+        /**
+         * A worker over an engine that has no [Session]: [solve] runs one segment under the segment's cancellation
+         * and, when [countsInstructions], its counted allowance. It streams no improvements and no samples and has
+         * no pause handle, so a [Portfolio] reruns it each segment.
+         */
+        internal fun ofSolve(
+            label: String,
+            armId: Int,
+            countsInstructions: Boolean = false,
+            solve: (Cancellation, Long?) -> SolveResult,
+        ): PortfolioWorker = PortfolioWorker(
+            label = label,
+            armId = armId,
+            solveFn = solve,
+            improvementsFn = { _, _, _, _ -> error("PortfolioWorker '$label' cannot stream improvements") },
+            samplesFn = { emptySequence() },
+            resumableFn = null,
+            resumableSolveFn = null,
+            withInstructions = countsInstructions,
+            closeFn = {},
+        )
     }
 }

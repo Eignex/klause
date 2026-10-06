@@ -420,6 +420,10 @@ class OpenTheoryMinimizer internal constructor(
                 total += BigInteger.fromLong(coefficients[i]) * BigInteger.fromLong(assignment.sample.ints[terms[i]])
             }
 
+            is OpenTheoryAssignment.Sampled -> for (i in terms.indices) {
+                total += BigInteger.fromLong(coefficients[i]) * BigInteger.fromLong(assignment.sample.ints[terms[i]])
+            }
+
             // A mixed model carries continuous columns the objective does not weight, so its value is
             // still the integer sum; the reals are decided alongside and contribute nothing to it.
             is OpenTheoryAssignment.ExactLira -> for (i in terms.indices) {
@@ -488,6 +492,13 @@ private fun OpenTheoryAssignment.exactWitness(realColumns: Int): ExactWitness = 
         realColumns,
         { sample.bools[it] },
         { sample.reals.getOrElse(it) { 0.0 }.asFraction() },
+        { BigFraction.ofLong(sample.ints[it]) },
+    )
+
+    is OpenTheoryAssignment.Sampled -> RouteWitness(
+        realColumns,
+        { sample.bools[it] },
+        { requireNotNull(sample.exactReals)[it] },
         { BigFraction.ofLong(sample.ints[it]) },
     )
 

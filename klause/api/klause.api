@@ -9069,6 +9069,20 @@ public final class com/eignex/klause/solver/pipeline/OpenTheoryAssignment$Rebuil
 	public fun realValue (I)Ljava/lang/String;
 }
 
+public final class com/eignex/klause/solver/pipeline/OpenTheoryAssignment$Sampled : com/eignex/klause/solver/pipeline/OpenTheoryAssignment {
+	public fun <init> (Lcom/eignex/klause/solver/Sample;)V
+	public fun boolValue (I)Z
+	public final fun component1 ()Lcom/eignex/klause/solver/Sample;
+	public final fun copy (Lcom/eignex/klause/solver/Sample;)Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment$Sampled;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment$Sampled;Lcom/eignex/klause/solver/Sample;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment$Sampled;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getSample ()Lcom/eignex/klause/solver/Sample;
+	public fun hashCode ()I
+	public fun intValue (I)Ljava/lang/String;
+	public fun realValue (I)Ljava/lang/String;
+	public fun toString ()Ljava/lang/String;
+}
+
 public final class com/eignex/klause/solver/pipeline/OpenTheoryEngine {
 	public fun <init> (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/pipeline/ProblemPipeline;)V
 	public final fun solve (Lcom/eignex/klause/solver/pipeline/TheoryParams;)Lcom/eignex/klause/solver/pipeline/OpenTheoryResult;
@@ -9173,7 +9187,11 @@ public final class com/eignex/klause/solver/pipeline/OpenTheoryPipeline {
 	public static final field INSTANCE Lcom/eignex/klause/solver/pipeline/OpenTheoryPipeline;
 	public final fun execute (Lcom/eignex/klause/solver/pipeline/OpenTheoryRequest;Lcom/eignex/klause/solver/pipeline/TheoryParams;)Lcom/eignex/klause/solver/pipeline/OpenTheoryExecution;
 	public static synthetic fun execute$default (Lcom/eignex/klause/solver/pipeline/OpenTheoryPipeline;Lcom/eignex/klause/solver/pipeline/OpenTheoryRequest;Lcom/eignex/klause/solver/pipeline/TheoryParams;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/OpenTheoryExecution;
+	public final fun executePortfolio (Lcom/eignex/klause/solver/pipeline/OpenTheoryRequest;Lcom/eignex/klause/solver/pipeline/TheoryParams;)Lcom/eignex/klause/solver/pipeline/OpenTheoryResult;
+	public static synthetic fun executePortfolio$default (Lcom/eignex/klause/solver/pipeline/OpenTheoryPipeline;Lcom/eignex/klause/solver/pipeline/OpenTheoryRequest;Lcom/eignex/klause/solver/pipeline/TheoryParams;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/OpenTheoryResult;
 	public final fun prepare (Lcom/eignex/klause/solver/pipeline/OpenTheoryRequest;)Lcom/eignex/klause/solver/pipeline/OpenPreparation;
+	public final fun searchWithoutTheory (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/pipeline/TheoryParams;)Lcom/eignex/klause/solver/pipeline/OpenTheoryResult;
+	public static synthetic fun searchWithoutTheory$default (Lcom/eignex/klause/solver/pipeline/OpenTheoryPipeline;Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/pipeline/TheoryParams;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/OpenTheoryResult;
 }
 
 public final class com/eignex/klause/solver/pipeline/OpenTheoryRequest {
@@ -9344,11 +9362,13 @@ public final class com/eignex/klause/solver/pipeline/SourceProblemRoute$Refuted 
 }
 
 public final class com/eignex/klause/solver/pipeline/SourceProblemRoute$UnsupportedOpen : com/eignex/klause/solver/pipeline/SourceProblemRoute {
-	public fun <init> (Lcom/eignex/klause/solver/pipeline/UnplaceableColumn;)V
+	public fun <init> (Lcom/eignex/klause/solver/pipeline/UnplaceableColumn;Lcom/eignex/klause/ir/Problem;)V
 	public final fun component1 ()Lcom/eignex/klause/solver/pipeline/UnplaceableColumn;
-	public final fun copy (Lcom/eignex/klause/solver/pipeline/UnplaceableColumn;)Lcom/eignex/klause/solver/pipeline/SourceProblemRoute$UnsupportedOpen;
-	public static synthetic fun copy$default (Lcom/eignex/klause/solver/pipeline/SourceProblemRoute$UnsupportedOpen;Lcom/eignex/klause/solver/pipeline/UnplaceableColumn;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/SourceProblemRoute$UnsupportedOpen;
+	public final fun component2 ()Lcom/eignex/klause/ir/Problem;
+	public final fun copy (Lcom/eignex/klause/solver/pipeline/UnplaceableColumn;Lcom/eignex/klause/ir/Problem;)Lcom/eignex/klause/solver/pipeline/SourceProblemRoute$UnsupportedOpen;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/pipeline/SourceProblemRoute$UnsupportedOpen;Lcom/eignex/klause/solver/pipeline/UnplaceableColumn;Lcom/eignex/klause/ir/Problem;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/SourceProblemRoute$UnsupportedOpen;
 	public fun equals (Ljava/lang/Object;)Z
+	public final fun getProblem ()Lcom/eignex/klause/ir/Problem;
 	public final fun getUnplaceable ()Lcom/eignex/klause/solver/pipeline/UnplaceableColumn;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;

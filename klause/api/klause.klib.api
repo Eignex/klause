@@ -2340,6 +2340,22 @@ sealed interface com.eignex.klause.solver.pipeline/OpenTheoryAssignment { // com
         final fun intValue(kotlin/Int): kotlin/String // com.eignex.klause.solver.pipeline/OpenTheoryAssignment.Rebuilt.intValue|intValue(kotlin.Int){}[0]
         final fun realValue(kotlin/Int): kotlin/String // com.eignex.klause.solver.pipeline/OpenTheoryAssignment.Rebuilt.realValue|realValue(kotlin.Int){}[0]
     }
+
+    final class Sampled : com.eignex.klause.solver.pipeline/OpenTheoryAssignment { // com.eignex.klause.solver.pipeline/OpenTheoryAssignment.Sampled|null[0]
+        constructor <init>(com.eignex.klause.solver/Sample) // com.eignex.klause.solver.pipeline/OpenTheoryAssignment.Sampled.<init>|<init>(com.eignex.klause.solver.Sample){}[0]
+
+        final val sample // com.eignex.klause.solver.pipeline/OpenTheoryAssignment.Sampled.sample|{}sample[0]
+            final fun <get-sample>(): com.eignex.klause.solver/Sample // com.eignex.klause.solver.pipeline/OpenTheoryAssignment.Sampled.sample.<get-sample>|<get-sample>(){}[0]
+
+        final fun boolValue(kotlin/Int): kotlin/Boolean // com.eignex.klause.solver.pipeline/OpenTheoryAssignment.Sampled.boolValue|boolValue(kotlin.Int){}[0]
+        final fun component1(): com.eignex.klause.solver/Sample // com.eignex.klause.solver.pipeline/OpenTheoryAssignment.Sampled.component1|component1(){}[0]
+        final fun copy(com.eignex.klause.solver/Sample = ...): com.eignex.klause.solver.pipeline/OpenTheoryAssignment.Sampled // com.eignex.klause.solver.pipeline/OpenTheoryAssignment.Sampled.copy|copy(com.eignex.klause.solver.Sample){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.pipeline/OpenTheoryAssignment.Sampled.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.eignex.klause.solver.pipeline/OpenTheoryAssignment.Sampled.hashCode|hashCode(){}[0]
+        final fun intValue(kotlin/Int): kotlin/String // com.eignex.klause.solver.pipeline/OpenTheoryAssignment.Sampled.intValue|intValue(kotlin.Int){}[0]
+        final fun realValue(kotlin/Int): kotlin/String // com.eignex.klause.solver.pipeline/OpenTheoryAssignment.Sampled.realValue|realValue(kotlin.Int){}[0]
+        final fun toString(): kotlin/String // com.eignex.klause.solver.pipeline/OpenTheoryAssignment.Sampled.toString|toString(){}[0]
+    }
 }
 
 sealed interface com.eignex.klause.solver.pipeline/OpenTheoryExecution { // com.eignex.klause.solver.pipeline/OpenTheoryExecution|null[0]
@@ -2529,13 +2545,16 @@ sealed interface com.eignex.klause.solver.pipeline/SourceProblemRoute { // com.e
     }
 
     final class UnsupportedOpen : com.eignex.klause.solver.pipeline/SourceProblemRoute { // com.eignex.klause.solver.pipeline/SourceProblemRoute.UnsupportedOpen|null[0]
-        constructor <init>(com.eignex.klause.solver.pipeline/UnplaceableColumn?) // com.eignex.klause.solver.pipeline/SourceProblemRoute.UnsupportedOpen.<init>|<init>(com.eignex.klause.solver.pipeline.UnplaceableColumn?){}[0]
+        constructor <init>(com.eignex.klause.solver.pipeline/UnplaceableColumn?, com.eignex.klause.ir/Problem) // com.eignex.klause.solver.pipeline/SourceProblemRoute.UnsupportedOpen.<init>|<init>(com.eignex.klause.solver.pipeline.UnplaceableColumn?;com.eignex.klause.ir.Problem){}[0]
 
+        final val problem // com.eignex.klause.solver.pipeline/SourceProblemRoute.UnsupportedOpen.problem|{}problem[0]
+            final fun <get-problem>(): com.eignex.klause.ir/Problem // com.eignex.klause.solver.pipeline/SourceProblemRoute.UnsupportedOpen.problem.<get-problem>|<get-problem>(){}[0]
         final val unplaceable // com.eignex.klause.solver.pipeline/SourceProblemRoute.UnsupportedOpen.unplaceable|{}unplaceable[0]
             final fun <get-unplaceable>(): com.eignex.klause.solver.pipeline/UnplaceableColumn? // com.eignex.klause.solver.pipeline/SourceProblemRoute.UnsupportedOpen.unplaceable.<get-unplaceable>|<get-unplaceable>(){}[0]
 
         final fun component1(): com.eignex.klause.solver.pipeline/UnplaceableColumn? // com.eignex.klause.solver.pipeline/SourceProblemRoute.UnsupportedOpen.component1|component1(){}[0]
-        final fun copy(com.eignex.klause.solver.pipeline/UnplaceableColumn? = ...): com.eignex.klause.solver.pipeline/SourceProblemRoute.UnsupportedOpen // com.eignex.klause.solver.pipeline/SourceProblemRoute.UnsupportedOpen.copy|copy(com.eignex.klause.solver.pipeline.UnplaceableColumn?){}[0]
+        final fun component2(): com.eignex.klause.ir/Problem // com.eignex.klause.solver.pipeline/SourceProblemRoute.UnsupportedOpen.component2|component2(){}[0]
+        final fun copy(com.eignex.klause.solver.pipeline/UnplaceableColumn? = ..., com.eignex.klause.ir/Problem = ...): com.eignex.klause.solver.pipeline/SourceProblemRoute.UnsupportedOpen // com.eignex.klause.solver.pipeline/SourceProblemRoute.UnsupportedOpen.copy|copy(com.eignex.klause.solver.pipeline.UnplaceableColumn?;com.eignex.klause.ir.Problem){}[0]
         final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.pipeline/SourceProblemRoute.UnsupportedOpen.equals|equals(kotlin.Any?){}[0]
         final fun hashCode(): kotlin/Int // com.eignex.klause.solver.pipeline/SourceProblemRoute.UnsupportedOpen.hashCode|hashCode(){}[0]
         final fun toString(): kotlin/String // com.eignex.klause.solver.pipeline/SourceProblemRoute.UnsupportedOpen.toString|toString(){}[0]
@@ -12430,7 +12449,9 @@ final object com.eignex.klause.solver.pipeline/FinitePipeline { // com.eignex.kl
 
 final object com.eignex.klause.solver.pipeline/OpenTheoryPipeline { // com.eignex.klause.solver.pipeline/OpenTheoryPipeline|null[0]
     final fun execute(com.eignex.klause.solver.pipeline/OpenTheoryRequest, com.eignex.klause.solver.pipeline/TheoryParams = ...): com.eignex.klause.solver.pipeline/OpenTheoryExecution // com.eignex.klause.solver.pipeline/OpenTheoryPipeline.execute|execute(com.eignex.klause.solver.pipeline.OpenTheoryRequest;com.eignex.klause.solver.pipeline.TheoryParams){}[0]
+    final fun executePortfolio(com.eignex.klause.solver.pipeline/OpenTheoryRequest, com.eignex.klause.solver.pipeline/TheoryParams = ...): com.eignex.klause.solver.pipeline/OpenTheoryResult // com.eignex.klause.solver.pipeline/OpenTheoryPipeline.executePortfolio|executePortfolio(com.eignex.klause.solver.pipeline.OpenTheoryRequest;com.eignex.klause.solver.pipeline.TheoryParams){}[0]
     final fun prepare(com.eignex.klause.solver.pipeline/OpenTheoryRequest): com.eignex.klause.solver.pipeline/OpenPreparation // com.eignex.klause.solver.pipeline/OpenTheoryPipeline.prepare|prepare(com.eignex.klause.solver.pipeline.OpenTheoryRequest){}[0]
+    final fun searchWithoutTheory(com.eignex.klause.ir/Problem, com.eignex.klause.solver.pipeline/TheoryParams = ...): com.eignex.klause.solver.pipeline/OpenTheoryResult // com.eignex.klause.solver.pipeline/OpenTheoryPipeline.searchWithoutTheory|searchWithoutTheory(com.eignex.klause.ir.Problem;com.eignex.klause.solver.pipeline.TheoryParams){}[0]
 }
 
 final object com.eignex.klause.util/PermutationGroup { // com.eignex.klause.util/PermutationGroup|null[0]
