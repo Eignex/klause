@@ -1,6 +1,7 @@
 package com.eignex.klause.portfolio
 
 import com.eignex.klause.solver.ResumableSearch
+import com.eignex.klause.solver.ResumableSolve
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.incumbent.IncumbentExchange
@@ -145,40 +146,85 @@ class SequentialPortfolio(
     private fun grow(current: Long, cap: Long): Long = (current * sliceGrowth).toLong().coerceAtMost(cap)
 
     /**
-     * Satisfaction: run arms in bandit-chosen segments until one returns a definitive Sat/Unsat
-     * (a complete backtrack arm proves Unsat; a slice-truncated arm yields Unknown and the loop
-     * moves on). Reward is `1.0` for a definitive verdict, `0.0` for an inconclusive slice.
+     * Satisfaction: run arms in bandit-chosen segments until one returns a definitive Sat/Unsat. Reward is
+     * `1.0` for a definitive verdict, `0.0` for an inconclusive slice.
+     *
+     * A backtrack arm exposes a [ResumableSolve] ([PortfolioWorker.newResumableSolve]), held across segments and
+     * resumed each time the bandit reschedules it, so the arm keeps its learned clauses and trail rather than
+     * starting over every slice; it is sliced by work, so the schedule does not depend on machine speed. An arm
+     * whose handle reaches a verdict that settles nothing, or fails, is retired. Local-search arms run a fresh
+     * counted segment each time.
      */
+    // Cleanup attempts every handle and preserves a primary failure.
+    @Suppress("TooGenericExceptionCaught")
     override fun solve(cancellation: Cancellation): SolveResult {
-        var stats = SolveStats.EMPTY
+        val handles = arrayOfNulls<ResumableSolve>(workers.size)
+        val retired = BooleanArray(workers.size)
+        var remaining = workers.size
+        // Per-arm counters, folded as in [minimize]: a handle's are cumulative, a fresh segment's are merged.
+        val perArm = arrayOfNulls<SolveStats>(workers.size)
+        val verdicts = ArrayList<SolveResult>()
         var slice = baseSliceMillis
         var sliceWork = baseSliceWork
         var segment = 0
-        while (!cancellation()) {
-            val warming = segment < workers.size
-            val arm = if (warming) segment else bandit.choose()
-            val worker = workers[arm]
-            val sliceMs = if (warming) warmupSliceMillis else slice
-            val token = segmentToken(worker, warming, cancellation, sliceMs)
-            // A failing arm leaves the others to answer, but an unsound one has answered wrongly.
-            val r = runCatching { worker.solve(token, instructionsFor(sliceWork)) }
-                .onFailure { if (it is UnsoundnessException) throw it }
-                .getOrNull()
-            if (r != null) stats = stats.mergedWith(r.stats)
-            val definitive = r is SolveResult.Sat || r is SolveResult.Unsat
-            bandit.update(arm, if (definitive) 1.0 else 0.0)
-            when (r) {
-                is SolveResult.Sat -> return r.copy(stats = stats)
-                is SolveResult.Unsat -> return r.copy(stats = stats)
-                else -> Unit
+        var primaryFailure: Throwable? = null
+        try {
+            while (!cancellation()) {
+                val warming = segment < workers.size
+                val selected = if (warming) segment else bandit.choose()
+                val arm = if (retired[selected]) {
+                    bandit.update(selected, 0.0)
+                    retired.indexOfFirst { !it }
+                } else {
+                    selected
+                }
+                val worker = workers[arm]
+                val handle = handles[arm] ?: worker.newResumableSolve()?.also { handles[arm] = it }
+                val r: SolveResult?
+                var failed = false
+                // A failing arm leaves the others to answer, but an unsound one has answered wrongly.
+                if (handle != null) {
+                    val outcome = runCatching { handle.runSlice(cancellation, Long.MAX_VALUE, sliceWork) }
+                        .rethrowUnsound()
+                    r = outcome.getOrNull()
+                    failed = outcome.isFailure
+                    perArm[arm] = handle.stats
+                } else {
+                    val sliceMs = if (warming) warmupSliceMillis else slice
+                    val token = segmentToken(worker, warming, cancellation, sliceMs)
+                    r = runCatching { worker.solve(token, instructionsFor(sliceWork)) }
+                        .rethrowUnsound()
+                        .getOrNull()
+                    r?.let { perArm[arm] = (perArm[arm] ?: SolveStats.EMPTY).mergedWith(it.stats) }
+                }
+                val definitive = r is SolveResult.Sat || r is SolveResult.Unsat
+                bandit.update(arm, if (definitive) 1.0 else 0.0)
+                when (r) {
+                    is SolveResult.Sat -> return r.copy(stats = foldArms(perArm))
+                    is SolveResult.Unsat -> return r.copy(stats = foldArms(perArm))
+                    else -> Unit
+                }
+                if (handle != null && (r != null || failed)) {
+                    r?.let(verdicts::add)
+                    retired[arm] = true
+                    remaining--
+                    handles[arm] = null
+                    handle.close()
+                    if (remaining == 0) return SolveResult.Unknown(unsettledReason(verdicts), foldArms(perArm))
+                }
+                if (!warming) {
+                    slice = grow(slice, maxSliceMillis)
+                    sliceWork = grow(sliceWork, maxSliceWork)
+                }
+                segment++
             }
-            if (!warming) {
-                slice = grow(slice, maxSliceMillis)
-                sliceWork = grow(sliceWork, maxSliceWork)
-            }
-            segment++
+            return SolveResult.Unknown(TerminationReason.Cancelled, foldArms(perArm))
+        } catch (failure: Throwable) {
+            primaryFailure = failure
+            throw failure
+        } finally {
+            closeAll(handles, primaryFailure)
         }
-        return SolveResult.Unknown(TerminationReason.Cancelled, stats)
     }
 
     /**
@@ -347,19 +393,37 @@ class SequentialPortfolio(
             primaryFailure = failure
             throw failure
         } finally {
-            var closeFailure: Throwable? = null
-            for (i in handles.indices) {
-                val handle = handles[i]
-                handles[i] = null
-                try {
-                    handle?.close()
-                } catch (failure: Throwable) {
-                    closeFailure?.addSuppressed(failure) ?: run { closeFailure = failure }
-                }
+            closeAll(handles, primaryFailure)
+        }
+    }
+
+    /**
+     * Close every handle still open, attempting all of them. A close failure is suppressed into [primaryFailure]
+     * when the run already failed, and thrown otherwise.
+     */
+    @Suppress("TooGenericExceptionCaught")
+    private fun closeAll(handles: Array<out AutoCloseable?>, primaryFailure: Throwable?) {
+        var closeFailure: Throwable? = null
+        for (i in handles.indices) {
+            try {
+                handles[i]?.close()
+            } catch (failure: Throwable) {
+                closeFailure?.addSuppressed(failure) ?: run { closeFailure = failure }
             }
-            closeFailure?.let { failure ->
-                primaryFailure?.addSuppressed(failure) ?: throw failure
-            }
+        }
+        closeFailure?.let { failure ->
+            primaryFailure?.addSuppressed(failure) ?: throw failure
+        }
+    }
+
+    /** Why a satisfaction run whose every resumable arm retired undecided settles nothing: an arm that declined a
+     *  feature it cannot decide wins, so a caller can fall back to a backend that can. */
+    private fun unsettledReason(verdicts: List<SolveResult>): TerminationReason {
+        val reasons = verdicts.filterIsInstance<SolveResult.Unknown>().map { it.reason }
+        return if (TerminationReason.Unsupported in reasons) {
+            TerminationReason.Unsupported
+        } else {
+            reasons.firstOrNull() ?: TerminationReason.Cancelled
         }
     }
 
@@ -450,3 +514,6 @@ class SequentialPortfolio(
  * MiniZinc models where both ran (spread 0.17 to 69, geometric mean 1.9).
  */
 internal const val LS_INSTRUCTIONS_PER_WORK: Double = 1.5
+
+// An unsound arm has answered wrongly, so its failure ends the run instead of retiring the arm.
+private fun <T> Result<T>.rethrowUnsound(): Result<T> = onFailure { if (it is UnsoundnessException) throw it }

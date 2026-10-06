@@ -22,6 +22,8 @@ import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.ResumableOptimizer
 import com.eignex.klause.solver.ResumableSearch
+import com.eignex.klause.solver.ResumableSolve
+import com.eignex.klause.solver.ResumableSolver
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.objective.LinearObjective
@@ -86,6 +88,29 @@ private class TrackingResumableOptimizer(private val handle: ResumableSearch) :
     override fun minimize(objective: LinearObjective, params: BacktrackParams): MinimizeResult = error("not used")
 
     override fun resumable(objective: LinearObjective, params: BacktrackParams): ResumableSearch = handle
+}
+
+private class CountingResumableSolve(private val slicesToVerdict: Int) : ResumableSolve {
+    var slices = 0
+
+    override fun runSlice(global: Cancellation, sliceMillis: Long, sliceNodes: Long): SolveResult? =
+        if (++slices < slicesToVerdict) null else SolveResult.Sat(Sample(BooleanArray(0), LongArray(0)))
+
+    override val isDone: Boolean get() = slices >= slicesToVerdict
+    override val stats: SolveStats get() = SolveStats.EMPTY
+}
+
+private class CountingResumableSolver(private val slicesToVerdict: Int) : ResumableSolver<BacktrackParams> {
+    override val problem = Problem(0, 0, emptyArray(), emptyArray()).bake()
+    val opened = ArrayList<CountingResumableSolve>()
+
+    override fun solve(params: BacktrackParams): SolveResult = error("a resumable arm is never solved one-shot")
+
+    override fun samples(params: BacktrackParams): Sequence<Sample> = emptySequence()
+    override fun enumerate(params: BacktrackParams): Sequence<Sample> = emptySequence()
+
+    override fun resumableSolve(params: BacktrackParams): ResumableSolve =
+        CountingResumableSolve(slicesToVerdict).also(opened::add)
 }
 
 private fun trackingWorker(label: String, armId: Int, handle: ResumableSearch): PortfolioWorker = PortfolioWorker.of(
@@ -511,6 +536,18 @@ class SequentialPortfolioTest {
         val workers = listOf(unsound) + btArms(problem, 1)
 
         assertFailsWith<UnsoundnessException> { SequentialPortfolio.exp3(workers).use { it.solve() } }
+    }
+
+    @Test
+    fun `a satisfaction arm resumes one handle across its segments`() {
+        val solver = CountingResumableSolver(slicesToVerdict = 4)
+        val worker = PortfolioWorker.of("bt", 0, solver.session(), BacktrackParams())
+
+        val r = SequentialPortfolio.exp3(listOf(worker)).use { it.solve() }
+
+        assertIs<SolveResult.Sat>(r)
+        assertEquals(1, solver.opened.size, "the arm must resume, not reopen")
+        assertEquals(4, solver.opened.single().slices)
     }
 
     @Test

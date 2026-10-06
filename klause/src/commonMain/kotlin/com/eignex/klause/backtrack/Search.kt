@@ -34,7 +34,9 @@ import com.eignex.klause.solver.search.SearchDecisionBudget
 import com.eignex.klause.solver.search.SearchLearnedDbParams
 import com.eignex.klause.solver.search.SearchModelContinuation
 import com.eignex.klause.solver.search.SearchModelPolicy
+import com.eignex.klause.solver.search.SearchNodeDisposition
 import com.eignex.klause.solver.search.SearchNodePolicy
+import com.eignex.klause.solver.search.SearchRun
 import com.eignex.klause.solver.search.SearchRunDisposition
 import com.eignex.klause.solver.search.SearchRunEvent
 import com.eignex.klause.solver.search.SearchRunLifecycle
@@ -42,6 +44,7 @@ import com.eignex.klause.solver.search.SearchRunObserver
 import com.eignex.klause.solver.search.SearchSolveParams
 import com.eignex.klause.solver.search.SearchTraversalPolicy
 import com.eignex.klause.solver.search.VarRef
+import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntHashSet
 import kotlin.random.Random
@@ -98,50 +101,82 @@ internal sealed interface SearchOutcome {
 }
 
 /** Lazy shared-session outcomes for satisfaction, enumeration, and sampling. */
+@Suppress("TooGenericExceptionCaught") // lazy boundaries must preserve arbitrary primary and cleanup failures
 internal fun BacktrackSolver.driveSearch(
     params: BacktrackParams,
     sink: SolveStatsSink? = null,
-): Sequence<SearchOutcome> = CpSatisfactionTraversal(problem, params, sink, lpSolveContext).outcomes()
+): Sequence<SearchOutcome> = sequence {
+    val traversal = CpSatisfactionTraversal(problem, params, sink, lpSolveContext)
+    while (true) {
+        val outcome = try {
+            checkNotNull(traversal.next()) { "an unsliced traversal never pauses" }
+        } catch (failure: Throwable) {
+            traversal.closeAfter(failure)
+            throw failure
+        }
+        yield(outcome)
+        if (outcome !is SearchOutcome.Found) return@sequence
+    }
+}
 
 /**
- * Satisfaction path for a CP/theory search.
+ * How a pausable [CpSatisfactionTraversal] meets its slice boundary: whether a fired cancellation is the slice
+ * ending rather than the run, and the hook each node runs before it branches.
+ */
+internal class TraversalSlice(val pauses: () -> Boolean, val beforeBranch: () -> Unit)
+
+/**
+ * Satisfaction path for a CP/theory search, advanced one outcome at a time.
  *
  * This has no private DFS trail: [CpSearchComponent] and every supplied theory component are driven by
- * [com.eignex.klause.solver.search.SearchRun].
+ * [com.eignex.klause.solver.search.SearchRun]. With a [slice] the traversal pauses where the slice fires — a
+ * cancellation that [TraversalSlice.pauses] reports as the slice's own makes [next] return null at decision
+ * granularity, and the next [next] resumes mid-tree. Propagation polls [propagationCancellation] alone, since a
+ * fixpoint a slice cut would leave the session under-propagated for the arm that resumes it.
  */
-private class CpSatisfactionTraversal(
+@Suppress("TooGenericExceptionCaught") // ownership boundaries must preserve arbitrary primary and cleanup failures
+internal class CpSatisfactionTraversal(
     private val problem: BakedProblem,
-    private val params: BacktrackParams,
-    private val sink: SolveStatsSink?,
-    private val solveContext: LpSolveContext,
+    params: BacktrackParams,
+    sink: SolveStatsSink?,
+    solveContext: LpSolveContext,
+    propagationCancellation: Cancellation = params.cancellation,
+    private val slice: TraversalSlice? = null,
 ) {
-    @Suppress("TooGenericExceptionCaught") // lazy boundaries must preserve arbitrary primary and cleanup failures
-    fun outcomes(): Sequence<SearchOutcome> = sequence {
-        val lpResources = ArrayList<LpSearchResource>()
-        val cp = CpSearchComponent(
-            PropagationSession(
-                problem,
-                params.cancellation,
-                params.propagationCancelFloor,
-                nativeSat = params.nativeSat ?: true,
-                pbLearning = params.pbLearning ?: true,
-            ),
-            branching = CpBranching.None,
-        )
+    private val lpResources = ArrayList<LpSearchResource>()
+    private val cp = CpSearchComponent(
+        PropagationSession(
+            problem,
+            propagationCancellation,
+            params.propagationCancelFloor,
+            nativeSat = params.nativeSat ?: true,
+            pbLearning = params.pbLearning ?: true,
+        ),
+        branching = CpBranching.None,
+    )
+    private val traversal = CpSatisfactionTraversalPolicy(
+        cp.session,
+        params,
+        sink,
+        seedDecisionLevels = params.assumptions.boolKeys.size + params.assumptions.intKeys.size,
+        slice,
+    )
+    private lateinit var completion: BacktrackCompletion
+    private var run: SearchRun? = null
+
+    // The verdict the root reached before any search, handed out by the first [next].
+    private var rootOutcome: SearchOutcome? = null
+    private var closed = false
+
+    init {
         try {
-            val completion = BacktrackCompletion.of(problem, cp, params, sink, solveContext)
+            completion = BacktrackCompletion.of(problem, cp, params, sink, solveContext)
             completion.lpResource?.let(lpResources::add)
             val lp = if (params.lpConfig != null) {
                 LpFeasibilityComponent(problem, cp, params, sink, solveContext).also(lpResources::add)
             } else {
                 null
             }
-            val traversal = CpSatisfactionTraversalPolicy(
-                cp.session,
-                params,
-                sink,
-                seedDecisionLevels = params.assumptions.boolKeys.size + params.assumptions.intKeys.size,
-            )
             val components = ArrayList<SearchComponent>()
             components += cp
             completion.addTo(components)
@@ -153,79 +188,103 @@ private class CpSatisfactionTraversal(
             )
             val seeded = cp.session.seed(params.assumptions)
             cp.rebase()
-            if (seeded is PropagationResult.Unsat || cp.session.isUnsatAtRoot) {
+            rootOutcome = if (seeded is PropagationResult.Unsat || cp.session.isUnsatAtRoot) {
                 val core = (problem.baked as? PropagationResult.Unsat)?.let(::coreOf)
                 val touched = (seeded as? PropagationResult.Unsat)?.conflictLevels?.let { levels ->
                     touchedToArray(IntHashSet().also { touched -> levels.forEach(touched::add) })
                 } ?: EmptyIntArray
-                closeLpResources(lpResources)
-                yield(SearchOutcome.Exhausted(core, touched))
-                return@sequence
-            }
-            when (session.initialize()) {
-                com.eignex.klause.solver.search.ComponentResult.Consistent -> Unit
-
-                is com.eignex.klause.solver.search.ComponentResult.Conflict -> {
-                    closeLpResources(lpResources)
-                    yield(SearchOutcome.Exhausted())
-                    return@sequence
-                }
-
-                com.eignex.klause.solver.search.ComponentResult.Indeterminate -> {
-                    closeLpResources(lpResources)
-                    yield(SearchOutcome.BudgetCapped)
-                    return@sequence
+                SearchOutcome.Exhausted(core, touched)
+            } else {
+                when (session.initialize()) {
+                    ComponentResult.Consistent -> null
+                    is ComponentResult.Conflict -> SearchOutcome.Exhausted()
+                    ComponentResult.Indeterminate -> SearchOutcome.BudgetCapped
                 }
             }
-            val run = session.openRun(problem.numBoolVars, traversal)
-            while (true) {
-                when (val event = run.next()) {
-                    is SearchRunEvent.Satisfied -> {
-                        val sample = completion.sample(event.model, cp)
-                        traversal.brancher.onSolution(sample)
-                        releaseLpResources(lpResources)
-                        yield(SearchOutcome.Found(sample))
-                    }
-
-                    SearchRunEvent.Exhausted -> {
-                        closeLpResources(lpResources)
-                        yield(
-                            SearchOutcome.Exhausted(
-                                touchedAssumptionLevels = traversal.brancher.touchedAssumptionLevels(),
-                            ),
-                        )
-                        return@sequence
-                    }
-
-                    SearchRunEvent.Indeterminate.Component -> {
-                        closeLpResources(lpResources)
-                        yield(SearchOutcome.Exhausted(indeterminate = true))
-                        return@sequence
-                    }
-
-                    SearchRunEvent.Paused,
-                    SearchRunEvent.Indeterminate.Budget,
-                    SearchRunEvent.Indeterminate.Cancelled,
-                    -> {
-                        closeLpResources(lpResources)
-                        yield(SearchOutcome.BudgetCapped)
-                        return@sequence
-                    }
-                }
-            }
+            if (rootOutcome == null) run = session.openRun(problem.numBoolVars, traversal)
         } catch (failure: Throwable) {
-            try {
-                closeLpResources(lpResources)
-            } catch (closeFailure: Throwable) {
-                failure.addSuppressed(closeFailure)
-            }
+            closeAfter(failure)
             throw failure
+        }
+    }
+
+    /** Poll cancellation on a fixed cadence, so a slice bounded by work pauses on the same node every run. */
+    var fixedCancellationCadence: Boolean
+        get() = run?.fixedCancellationCadence ?: false
+        set(value) {
+            run?.fixedCancellationCadence = value
+        }
+
+    /** LP work the traversal's relaxations have done, for a slice that charges it against its budget. */
+    fun lpWork(): Long = lpResources.sumOf { it.totalSolveWork() }
+
+    /**
+     * Advance to the next outcome, or null when a pausable traversal reached its slice boundary with search still
+     * pending. Every outcome but [SearchOutcome.Found] is terminal and closes the traversal's LP resources; a model
+     * releases their persistent solvers instead, since a lazy caller may abandon the traversal after it.
+     */
+    fun next(): SearchOutcome? {
+        check(!closed) { "traversal is closed" }
+        rootOutcome?.let { outcome ->
+            rootOutcome = null
+            close()
+            return outcome
+        }
+        return when (val event = checkNotNull(run).next()) {
+            is SearchRunEvent.Satisfied -> {
+                val sample = completion.sample(event.model, cp)
+                traversal.brancher.onSolution(sample)
+                releaseLpResources(lpResources)
+                SearchOutcome.Found(sample)
+            }
+
+            SearchRunEvent.Exhausted -> {
+                close()
+                SearchOutcome.Exhausted(touchedAssumptionLevels = traversal.brancher.touchedAssumptionLevels())
+            }
+
+            SearchRunEvent.Indeterminate.Component -> {
+                close()
+                SearchOutcome.Exhausted(indeterminate = true)
+            }
+
+            SearchRunEvent.Paused -> if (slice != null) {
+                null
+            } else {
+                close()
+                SearchOutcome.BudgetCapped
+            }
+
+            SearchRunEvent.Indeterminate.Budget,
+            SearchRunEvent.Indeterminate.Cancelled,
+            -> {
+                close()
+                SearchOutcome.BudgetCapped
+            }
+        }
+    }
+
+    /** Close the LP resources; idempotent. */
+    fun close() {
+        if (closed) return
+        closed = true
+        closeLpResources(lpResources)
+    }
+
+    /** Close after [failure], keeping it primary. */
+    fun closeAfter(failure: Throwable) {
+        try {
+            close()
+        } catch (closeFailure: Throwable) {
+            failure.addSuppressed(closeFailure)
         }
     }
 }
 
 private interface LpSearchResource : AutoCloseable {
     fun releasePersistentSolvers()
+
+    fun totalSolveWork(): Long
 }
 
 @Suppress("TooGenericExceptionCaught") // all owned resources must be attempted even when release fails
@@ -260,6 +319,7 @@ private class CpSatisfactionTraversalPolicy(
     private val params: BacktrackParams,
     sink: SolveStatsSink?,
     seedDecisionLevels: Int,
+    private val slice: TraversalSlice?,
 ) : SearchTraversalPolicy,
     SearchRunLifecycle {
     private val restart = RestartSchedule.from(params)
@@ -280,7 +340,14 @@ private class CpSatisfactionTraversalPolicy(
     override val observer: SearchRunObserver = brancher
     override val modelContinuation = SearchModelContinuation.BlockAtRoot
     override val modelPolicy: SearchModelPolicy = SearchModelPolicy.SurfaceAll
-    override val nodePolicy: SearchNodePolicy = SearchNodePolicy.ExpandAll
+    override val nodePolicy: SearchNodePolicy = slice?.let { s ->
+        object : SearchNodePolicy {
+            override fun beforeBranch(context: SearchContext): SearchNodeDisposition {
+                s.beforeBranch()
+                return SearchNodeDisposition.Expand
+            }
+        }
+    } ?: SearchNodePolicy.ExpandAll
     override val lifecycle: SearchRunLifecycle get() = this
 
     private val inprocessing = Inprocessing.from(params)
@@ -297,7 +364,7 @@ private class CpSatisfactionTraversalPolicy(
 
     override fun onCancellation(context: SearchContext): SearchRunDisposition {
         params.clauseExchange?.onSearchEnd(session)
-        return SearchRunDisposition.Indeterminate
+        return if (slice?.pauses() == true) SearchRunDisposition.Pause else SearchRunDisposition.Indeterminate
     }
 }
 
@@ -528,6 +595,8 @@ private class LpFeasibilityComponent(
 
     override fun releasePersistentSolvers() = engine.releasePersistentSolvers()
 
+    override fun totalSolveWork(): Long = engine.totalSolveWork()
+
     override fun close() = engine.close()
 }
 
@@ -587,6 +656,8 @@ private class ResidualRealComponent(
     fun sample(): Sample = requireNotNull(completed)
 
     override fun releasePersistentSolvers() = engine.releasePersistentSolvers()
+
+    override fun totalSolveWork(): Long = engine.totalSolveWork()
 
     override fun close() = engine.close()
 }

@@ -98,6 +98,35 @@ interface ResumableOptimizer<P : SolverParams> : Optimizer<P> {
 }
 
 /**
+ * A pause/resume handle over a satisfaction search: the [ResumableSearch] of a model with no objective. The
+ * learned clauses, trail and heuristics persist across [runSlice] calls, so an arm scheduled in segments continues
+ * its search rather than starting it over. Single-threaded and stateful; obtain one from a [ResumableSolver].
+ */
+interface ResumableSolve : AutoCloseable {
+    /**
+     * Advance the search until it reaches a verdict, [global] fires, or the slice ends: after [sliceNodes] work
+     * units when non-negative, else after [sliceMillis] of wall time. Returns the verdict once the search has one,
+     * else null with the search paused for the next call. After a verdict, [isDone] is true and further calls
+     * return that verdict without doing work.
+     */
+    fun runSlice(global: Cancellation, sliceMillis: Long, sliceNodes: Long): SolveResult?
+
+    /** True once [runSlice] has returned a verdict. */
+    val isDone: Boolean
+
+    /** Counters accumulated so far, whether or not the search has finished; cumulative for this handle. */
+    val stats: SolveStats
+
+    override fun close() {}
+}
+
+/** A [Solver] that can hand out a [ResumableSolve]. [com.eignex.klause.backtrack.BacktrackSolver] implements this. */
+interface ResumableSolver<P : SolverParams> : Solver<P> {
+    /** Open a fresh [ResumableSolve] under [params]; their cancellation is superseded per slice. */
+    fun resumableSolve(params: P): ResumableSolve
+}
+
+/**
  * A reusable handle for solving a sequence of pinned sub-problems on one persistent search — the LNS
  * destroy/repair loop. Each [repair] re-seeds the same session and LP relaxation on a new
  * assumption set instead of rebuilding, so the learned-clause database and LP warm start carry across

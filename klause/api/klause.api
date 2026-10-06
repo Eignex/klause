@@ -126,7 +126,7 @@ public final class com/eignex/klause/backtrack/BacktrackRecipe {
 	public final fun getLabel ()Ljava/lang/String;
 }
 
-public final class com/eignex/klause/backtrack/BacktrackSolver : com/eignex/klause/solver/Optimizer, com/eignex/klause/solver/ResumableOptimizer, com/eignex/klause/solver/Solver {
+public final class com/eignex/klause/backtrack/BacktrackSolver : com/eignex/klause/solver/Optimizer, com/eignex/klause/solver/ResumableOptimizer, com/eignex/klause/solver/ResumableSolver, com/eignex/klause/solver/Solver {
 	public fun <init> (Lcom/eignex/klause/compile/CompiledSchema;)V
 	public fun <init> (Lcom/eignex/klause/propagation/BakedProblem;)V
 	public fun <init> (Lcom/eignex/klause/schema/VariableSchema;)V
@@ -146,6 +146,8 @@ public final class com/eignex/klause/backtrack/BacktrackSolver : com/eignex/klau
 	public synthetic fun minimize (Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/solver/SolverParams;)Lcom/eignex/klause/solver/result/MinimizeResult;
 	public fun resumable (Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/backtrack/BacktrackParams;)Lcom/eignex/klause/solver/ResumableSearch;
 	public synthetic fun resumable (Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/solver/SolverParams;)Lcom/eignex/klause/solver/ResumableSearch;
+	public fun resumableSolve (Lcom/eignex/klause/backtrack/BacktrackParams;)Lcom/eignex/klause/solver/ResumableSolve;
+	public synthetic fun resumableSolve (Lcom/eignex/klause/solver/SolverParams;)Lcom/eignex/klause/solver/ResumableSolve;
 	public final fun sample ()Lcom/eignex/klause/solver/result/SampleResult;
 	public fun sample (Lcom/eignex/klause/backtrack/BacktrackParams;)Lcom/eignex/klause/solver/result/SampleResult;
 	public synthetic fun sample (Lcom/eignex/klause/solver/SolverParams;)Lcom/eignex/klause/solver/result/SampleResult;
@@ -7118,6 +7120,7 @@ public final class com/eignex/klause/portfolio/PortfolioWorker : java/lang/AutoC
 	public final fun improvements (Lkotlin/jvm/functions/Function0;Lcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/solver/Sample;Ljava/lang/Long;)Lkotlin/sequences/Sequence;
 	public static synthetic fun improvements$default (Lcom/eignex/klause/portfolio/PortfolioWorker;Lkotlin/jvm/functions/Function0;Lcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/solver/Sample;Ljava/lang/Long;ILjava/lang/Object;)Lkotlin/sequences/Sequence;
 	public final fun newResumableSearch (Lkotlin/jvm/functions/Function0;)Lcom/eignex/klause/solver/ResumableSearch;
+	public final fun newResumableSolve ()Lcom/eignex/klause/solver/ResumableSolve;
 	public final fun samples (Lcom/eignex/klause/util/Cancellation;)Lkotlin/sequences/Sequence;
 	public final fun solve (Lcom/eignex/klause/util/Cancellation;Ljava/lang/Long;)Lcom/eignex/klause/solver/SolveResult;
 	public static synthetic fun solve$default (Lcom/eignex/klause/portfolio/PortfolioWorker;Lcom/eignex/klause/util/Cancellation;Ljava/lang/Long;ILjava/lang/Object;)Lcom/eignex/klause/solver/SolveResult;
@@ -8240,6 +8243,31 @@ public abstract interface class com/eignex/klause/solver/ResumableSearch : java/
 public final class com/eignex/klause/solver/ResumableSearch$DefaultImpls {
 	public static fun close (Lcom/eignex/klause/solver/ResumableSearch;)V
 	public static fun runSlice (Lcom/eignex/klause/solver/ResumableSearch;Lcom/eignex/klause/util/Cancellation;JLkotlin/jvm/functions/Function1;)Lcom/eignex/klause/solver/result/MinimizeResult;
+}
+
+public abstract interface class com/eignex/klause/solver/ResumableSolve : java/lang/AutoCloseable {
+	public fun close ()V
+	public abstract fun getStats ()Lcom/eignex/klause/solver/result/SolveStats;
+	public abstract fun isDone ()Z
+	public abstract fun runSlice (Lcom/eignex/klause/util/Cancellation;JJ)Lcom/eignex/klause/solver/SolveResult;
+}
+
+public final class com/eignex/klause/solver/ResumableSolve$DefaultImpls {
+	public static fun close (Lcom/eignex/klause/solver/ResumableSolve;)V
+}
+
+public abstract interface class com/eignex/klause/solver/ResumableSolver : com/eignex/klause/solver/Solver {
+	public abstract fun resumableSolve (Lcom/eignex/klause/solver/SolverParams;)Lcom/eignex/klause/solver/ResumableSolve;
+}
+
+public final class com/eignex/klause/solver/ResumableSolver$DefaultImpls {
+	public static fun approximateCount (Lcom/eignex/klause/solver/ResumableSolver;Lcom/eignex/klause/count/ApproxCountConfig;)Lcom/eignex/klause/count/Count;
+	public static fun count (Lcom/eignex/klause/solver/ResumableSolver;Lcom/eignex/klause/count/CountConfig;)Lcom/eignex/klause/count/Count;
+	public static fun describe (Lcom/eignex/klause/solver/ResumableSolver;Lcom/eignex/klause/solver/SolverParams;)Ljava/lang/String;
+	public static fun exactCount (Lcom/eignex/klause/solver/ResumableSolver;Lcom/eignex/klause/count/ExactCountConfig;)Lkotlin/sequences/Sequence;
+	public static fun sample (Lcom/eignex/klause/solver/ResumableSolver;Lcom/eignex/klause/solver/SolverParams;)Lcom/eignex/klause/solver/result/SampleResult;
+	public static fun samples (Lcom/eignex/klause/solver/ResumableSolver;Lcom/eignex/klause/count/SamplingConfig;Lcom/eignex/klause/solver/SolverParams;)Lkotlin/sequences/Sequence;
+	public static fun session (Lcom/eignex/klause/solver/ResumableSolver;)Lcom/eignex/klause/solver/Session;
 }
 
 public final class com/eignex/klause/solver/Sample {

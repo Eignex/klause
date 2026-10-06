@@ -147,29 +147,14 @@ internal class ResumableMinimize(
 
     // Slice control without a coroutine: a re-armable deadline plus the current global token.
     private var globalToken: Cancellation = Cancellation.Never
-    private var sliceEnd: TimeSource.Monotonic.ValueTimeMark? = null
 
     // Wall-clock anchor for sizing the LP sub-budgets against [BacktrackParams.solveBudgetMillis] on the
     // non-pausable one-shot path, where no slice deadline is armed. Captured at construction,
     // which is the solve start for that path.
     private val startMark = TimeSource.Monotonic.markNow()
 
-    // Node count at which the current slice pauses, when [sliceNodeBounded]. A node budget makes the pause point
-    // a property of the search rather than of machine load, which is what lets two identical invocations report
-    // identical counters.
-    private var sliceNodeEnd: Long = 0L
-
-    // Whether the current slice is bounded by [sliceNodeEnd] rather than the clock. A flag and not the sign of the
-    // end: LP charges can push the end below zero, and a negative end must still read as a spent budget.
-    private var sliceNodeBounded = false
-
-    // LP work already turned into slice nodes; see [chargeSliceLpWork]. It runs across slices, so work done
-    // between two slices, the root LP included, is charged to the next one.
-    private var sliceLpWorkMark = 0L
-
-    // Nodes an earlier slice spent past its budget. One LP solve can cost many slices' worth of nodes, and a
-    // slice cannot stop inside it, so the excess is repaid from the slices that follow.
-    private var sliceNodeDebt = 0L
+    // Where the current slice pauses. Its work bound counts the LP work this search charges per node.
+    private val slice = SliceBudget({ sink.search.nodeCount }, { lpEngine.totalSolveWork() })
 
     private fun sliceCancelled(): Boolean = solveCancelled() || (pausable && sliceExpired())
 
@@ -197,8 +182,7 @@ internal class ResumableMinimize(
      * The whole solve is still bounded — [globalToken] carries the real deadline and is checked
      * alongside this — so dropping the per-slice deadline cannot overrun anything.
      */
-    private fun sliceExpired(): Boolean =
-        if (sliceNodeBounded) sink.search.nodeCount >= sliceNodeEnd else sliceEnd?.hasPassedNow() ?: false
+    private fun sliceExpired(): Boolean = slice.expired()
 
     // The run's single verified incumbent. Every producer offers into it and none of them writes the
     // best directly, so one admission rule and one strict-improvement test decide what stands — and the
@@ -332,23 +316,11 @@ internal class ResumableMinimize(
         done?.let { return it }
         check(!closed) { "search is closed" }
         globalToken = global
-        sliceEnd = TimeSource.Monotonic.markNow() + sliceMillis.milliseconds
-        sliceNodeBounded = sliceNodes >= 0L
-        sliceNodeEnd = sink.search.nodeCount + sliceNodes.coerceAtLeast(0L)
-        chargeSliceLpWork()
-        if (sliceNodeBounded) {
-            val repaid = minOf(sliceNodeDebt, sliceNodes)
-            sliceNodeDebt -= repaid
-            sliceNodeEnd -= repaid
-            if (sliceNodeEnd <= sink.search.nodeCount) {
-                sliceNodeDebt += sink.search.nodeCount - sliceNodeEnd
-                return null
-            }
-        }
+        if (!slice.begin(sliceMillis, sliceNodes)) return null
         // A counted budget only means something if the search polls on a counted cadence: the run stops
         // where it polls, and the default cadence is tuned by elapsed time, so the pause would land on a
         // different node on a faster machine and every counter downstream would follow.
-        run.fixedCancellationCadence = sliceNodeBounded
+        run.fixedCancellationCadence = slice.workBounded
         try {
             if (rebindable) externalCutoff()
             while (true) {
@@ -358,7 +330,7 @@ internal class ResumableMinimize(
                     is StepEvent.Terminal -> return e.result
 
                     StepEvent.Paused -> {
-                        noteSliceOverspend()
+                        slice.noteOverspend()
                         return null
                     }
                 }
@@ -883,7 +855,7 @@ internal class ResumableMinimize(
      *  else [BacktrackParams.solveBudgetMillis] minus the elapsed since [startMark] (the one-shot path),
      *  else null when no budget is known. */
     private fun remainingBudgetMillis(): Long? {
-        sliceEnd?.let { return (it - TimeSource.Monotonic.markNow()).inWholeMilliseconds }
+        slice.deadline?.let { return (it - TimeSource.Monotonic.markNow()).inWholeMilliseconds }
         return params.solveBudgetMillis?.let { it - startMark.elapsedNow().inWholeMilliseconds }
     }
 
@@ -910,30 +882,10 @@ internal class ResumableMinimize(
             lpHints?.order(variable, values) ?: values
     }
 
-    // Spend the LP work done since the last charge from the slice's node budget, at LP_WORK_PER_NODE work per node.
-    // A node-bounded slice otherwise prices an LP node like a CP one, so an LP arm's slice runs many times as long
-    // as another arm's and starves the arms queued behind it. The charge lands at a node boundary and only moves
-    // the slice end, so the slice pauses at its next poll exactly as if it had explored that many nodes; it stays a
-    // function of the search, and runs remain reproducible.
-    private fun chargeSliceLpWork() {
-        if (!sliceNodeBounded) return
-        val nodes = (lpEngine.totalSolveWork() - sliceLpWorkMark) / LP_WORK_PER_NODE
-        if (nodes <= 0L) return
-        sliceNodeEnd -= nodes
-        sliceLpWorkMark += nodes * LP_WORK_PER_NODE
-    }
-
-    // Carry what the slice spent past its budget, the LP work since the last charge included, into the next ones.
-    private fun noteSliceOverspend() {
-        if (!sliceNodeBounded) return
-        chargeSliceLpWork()
-        sliceNodeDebt += (sink.search.nodeCount - sliceNodeEnd).coerceAtLeast(0L)
-    }
-
     /** Refutes LP-dominated partial assignments through the shared frame stack. */
     private inner class LpNodePolicy : SearchNodePolicy {
         override fun beforeBranch(context: SearchContext): SearchNodeDisposition {
-            chargeSliceLpWork()
+            slice.charge()
             val externalBound = externalCutoff()
             val effectiveBound = if (externalBound < bestObj) externalBound else bestObj
             if (rebindable && discreteObjective) {
@@ -1164,8 +1116,3 @@ internal class ResumableMinimize(
         }
     }
 }
-
-// LP work (simplex plus the node-LP overhead the engine charges) that costs about as much time as one CP search
-// node: the median ratio of LP work per second with the default LP arm to conflictDriven's nodes per second, over
-// 13 MIPLIB 2017 models with continuous columns, was 519 (spread 58 to 8145, geometric mean 629).
-private const val LP_WORK_PER_NODE = 600L

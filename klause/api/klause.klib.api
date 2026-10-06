@@ -732,6 +732,10 @@ abstract interface <#A: com.eignex.klause.solver/SolverParams> com.eignex.klause
     abstract fun resumable(com.eignex.klause.solver.objective/LinearObjective, #A): com.eignex.klause.solver/ResumableSearch // com.eignex.klause.solver/ResumableOptimizer.resumable|resumable(com.eignex.klause.solver.objective.LinearObjective;1:0){}[0]
 }
 
+abstract interface <#A: com.eignex.klause.solver/SolverParams> com.eignex.klause.solver/ResumableSolver : com.eignex.klause.solver/Solver<#A> { // com.eignex.klause.solver/ResumableSolver|null[0]
+    abstract fun resumableSolve(#A): com.eignex.klause.solver/ResumableSolve // com.eignex.klause.solver/ResumableSolver.resumableSolve|resumableSolve(1:0){}[0]
+}
+
 abstract interface <#A: com.eignex.klause.solver/SolverParams> com.eignex.klause.solver/Session : kotlin/AutoCloseable { // com.eignex.klause.solver/Session|null[0]
     abstract val depth // com.eignex.klause.solver/Session.depth|{}depth[0]
         abstract fun <get-depth>(): kotlin/Int // com.eignex.klause.solver/Session.depth.<get-depth>|<get-depth>(){}[0]
@@ -1198,6 +1202,16 @@ abstract interface com.eignex.klause.solver/ResumableSearch : kotlin/AutoCloseab
     abstract fun runSlice(com.eignex.klause.util/Cancellation, kotlin/Long, kotlin/Long, kotlin/Function1<com.eignex.klause.solver.result/MinimizeResult.WithSample, kotlin/Unit>): com.eignex.klause.solver.result/MinimizeResult? // com.eignex.klause.solver/ResumableSearch.runSlice|runSlice(com.eignex.klause.util.Cancellation;kotlin.Long;kotlin.Long;kotlin.Function1<com.eignex.klause.solver.result.MinimizeResult.WithSample,kotlin.Unit>){}[0]
     open fun close() // com.eignex.klause.solver/ResumableSearch.close|close(){}[0]
     open fun runSlice(com.eignex.klause.util/Cancellation, kotlin/Long, kotlin/Function1<com.eignex.klause.solver.result/MinimizeResult.WithSample, kotlin/Unit>): com.eignex.klause.solver.result/MinimizeResult? // com.eignex.klause.solver/ResumableSearch.runSlice|runSlice(com.eignex.klause.util.Cancellation;kotlin.Long;kotlin.Function1<com.eignex.klause.solver.result.MinimizeResult.WithSample,kotlin.Unit>){}[0]
+}
+
+abstract interface com.eignex.klause.solver/ResumableSolve : kotlin/AutoCloseable { // com.eignex.klause.solver/ResumableSolve|null[0]
+    abstract val isDone // com.eignex.klause.solver/ResumableSolve.isDone|{}isDone[0]
+        abstract fun <get-isDone>(): kotlin/Boolean // com.eignex.klause.solver/ResumableSolve.isDone.<get-isDone>|<get-isDone>(){}[0]
+    abstract val stats // com.eignex.klause.solver/ResumableSolve.stats|{}stats[0]
+        abstract fun <get-stats>(): com.eignex.klause.solver.result/SolveStats // com.eignex.klause.solver/ResumableSolve.stats.<get-stats>|<get-stats>(){}[0]
+
+    abstract fun runSlice(com.eignex.klause.util/Cancellation, kotlin/Long, kotlin/Long): com.eignex.klause.solver/SolveResult? // com.eignex.klause.solver/ResumableSolve.runSlice|runSlice(com.eignex.klause.util.Cancellation;kotlin.Long;kotlin.Long){}[0]
+    open fun close() // com.eignex.klause.solver/ResumableSolve.close|close(){}[0]
 }
 
 abstract interface com.eignex.klause.solver/SolverParams { // com.eignex.klause.solver/SolverParams|null[0]
@@ -3600,7 +3614,7 @@ final class com.eignex.klause.backtrack/BacktrackRecipe { // com.eignex.klause.b
         final fun <get-label>(): kotlin/String // com.eignex.klause.backtrack/BacktrackRecipe.label.<get-label>|<get-label>(){}[0]
 }
 
-final class com.eignex.klause.backtrack/BacktrackSolver : com.eignex.klause.solver/Optimizer<com.eignex.klause.backtrack/BacktrackParams>, com.eignex.klause.solver/ResumableOptimizer<com.eignex.klause.backtrack/BacktrackParams>, com.eignex.klause.solver/Solver<com.eignex.klause.backtrack/BacktrackParams> { // com.eignex.klause.backtrack/BacktrackSolver|null[0]
+final class com.eignex.klause.backtrack/BacktrackSolver : com.eignex.klause.solver/Optimizer<com.eignex.klause.backtrack/BacktrackParams>, com.eignex.klause.solver/ResumableOptimizer<com.eignex.klause.backtrack/BacktrackParams>, com.eignex.klause.solver/ResumableSolver<com.eignex.klause.backtrack/BacktrackParams>, com.eignex.klause.solver/Solver<com.eignex.klause.backtrack/BacktrackParams> { // com.eignex.klause.backtrack/BacktrackSolver|null[0]
     constructor <init>(com.eignex.klause.compile/CompiledSchema) // com.eignex.klause.backtrack/BacktrackSolver.<init>|<init>(com.eignex.klause.compile.CompiledSchema){}[0]
     constructor <init>(com.eignex.klause.propagation/BakedProblem) // com.eignex.klause.backtrack/BacktrackSolver.<init>|<init>(com.eignex.klause.propagation.BakedProblem){}[0]
     constructor <init>(com.eignex.klause.schema/VariableSchema) // com.eignex.klause.backtrack/BacktrackSolver.<init>|<init>(com.eignex.klause.schema.VariableSchema){}[0]
@@ -3615,6 +3629,7 @@ final class com.eignex.klause.backtrack/BacktrackSolver : com.eignex.klause.solv
     final fun minimize(com.eignex.klause.solver.objective/LinearObjective): com.eignex.klause.solver.result/MinimizeResult // com.eignex.klause.backtrack/BacktrackSolver.minimize|minimize(com.eignex.klause.solver.objective.LinearObjective){}[0]
     final fun minimize(com.eignex.klause.solver.objective/LinearObjective, com.eignex.klause.backtrack/BacktrackParams): com.eignex.klause.solver.result/MinimizeResult // com.eignex.klause.backtrack/BacktrackSolver.minimize|minimize(com.eignex.klause.solver.objective.LinearObjective;com.eignex.klause.backtrack.BacktrackParams){}[0]
     final fun resumable(com.eignex.klause.solver.objective/LinearObjective, com.eignex.klause.backtrack/BacktrackParams): com.eignex.klause.solver/ResumableSearch // com.eignex.klause.backtrack/BacktrackSolver.resumable|resumable(com.eignex.klause.solver.objective.LinearObjective;com.eignex.klause.backtrack.BacktrackParams){}[0]
+    final fun resumableSolve(com.eignex.klause.backtrack/BacktrackParams): com.eignex.klause.solver/ResumableSolve // com.eignex.klause.backtrack/BacktrackSolver.resumableSolve|resumableSolve(com.eignex.klause.backtrack.BacktrackParams){}[0]
     final fun sample(): com.eignex.klause.solver.result/SampleResult // com.eignex.klause.backtrack/BacktrackSolver.sample|sample(){}[0]
     final fun samples(): kotlin.sequences/Sequence<com.eignex.klause.solver/Sample> // com.eignex.klause.backtrack/BacktrackSolver.samples|samples(){}[0]
     final fun samples(com.eignex.klause.backtrack/BacktrackParams): kotlin.sequences/Sequence<com.eignex.klause.solver/Sample> // com.eignex.klause.backtrack/BacktrackSolver.samples|samples(com.eignex.klause.backtrack.BacktrackParams){}[0]
@@ -9213,6 +9228,7 @@ final class com.eignex.klause.portfolio/PortfolioWorker : kotlin/AutoCloseable {
     final fun close() // com.eignex.klause.portfolio/PortfolioWorker.close|close(){}[0]
     final fun improvements(kotlin/Function0<kotlin/Double>, com.eignex.klause.util/Cancellation, com.eignex.klause.solver/Sample? = ..., kotlin/Long? = ...): kotlin.sequences/Sequence<com.eignex.klause.solver.result/MinimizeResult> // com.eignex.klause.portfolio/PortfolioWorker.improvements|improvements(kotlin.Function0<kotlin.Double>;com.eignex.klause.util.Cancellation;com.eignex.klause.solver.Sample?;kotlin.Long?){}[0]
     final fun newResumableSearch(kotlin/Function0<kotlin/Double>): com.eignex.klause.solver/ResumableSearch? // com.eignex.klause.portfolio/PortfolioWorker.newResumableSearch|newResumableSearch(kotlin.Function0<kotlin.Double>){}[0]
+    final fun newResumableSolve(): com.eignex.klause.solver/ResumableSolve? // com.eignex.klause.portfolio/PortfolioWorker.newResumableSolve|newResumableSolve(){}[0]
     final fun samples(com.eignex.klause.util/Cancellation): kotlin.sequences/Sequence<com.eignex.klause.solver/Sample> // com.eignex.klause.portfolio/PortfolioWorker.samples|samples(com.eignex.klause.util.Cancellation){}[0]
     final fun solve(com.eignex.klause.util/Cancellation, kotlin/Long? = ...): com.eignex.klause.solver/SolveResult // com.eignex.klause.portfolio/PortfolioWorker.solve|solve(com.eignex.klause.util.Cancellation;kotlin.Long?){}[0]
 
