@@ -457,13 +457,15 @@ internal fun certifyLpResult(
         model.m > RationalBasisLimits().dimension && policy === ProductionLpCertificationPolicy && !cancellation()
     ) {
         pointAttempted = true
+        val ordinaryScans = LpScanCount()
         val ordinary = exactPointWitness(
             model,
             result.primal,
             observer.takeUnless { sparsePointRecovery },
+            ordinaryScans,
         )
         val point = if (ordinary != null || !sparsePointRecovery) {
-            if (sparsePointRecovery) observer?.observe(LpCertifier.EXACT_POINT, true, LpCertifierCost.Unmetered)
+            if (sparsePointRecovery) observer?.observe(LpCertifier.EXACT_POINT, true, ordinaryScans.cost(model))
             ordinary
         } else {
             val recovered = recoverExactPointWitness(
@@ -517,8 +519,9 @@ internal fun certifyLpResult(
     // An independently checked point refutes infeasibility; rejecting a ray candidate does not.
     if (result == null && numericalWitness == null) {
         if (state != null) {
-            conflict = solver.infeasibleRay?.let { exactStateConflict(model, it) }
-            observer?.observe(LpCertifier.EXACT_FARKAS, conflict != null, LpCertifierCost.Unmetered)
+            val scans = LpScanCount()
+            conflict = solver.infeasibleRay?.let { exactStateConflict(model, it, scans) }
+            observer?.observe(LpCertifier.EXACT_FARKAS, conflict != null, scans.cost(model))
             numericalConflict = conflict
             conflict = policy.acceptNullable(LpCertifier.EXACT_FARKAS, conflict)
         } else {
@@ -702,7 +705,7 @@ internal fun certifyLpBound(
     }
     // The same integer-multiplier Lagrangian, evaluated against exact IEEE input without decimal guessing.
     val bound = rationalLpBound(model, duals)
-    observer?.observe(LpCertifier.INTEGER, bound != null, LpCertifierCost.Unmetered)
+    observer?.observe(LpCertifier.INTEGER, bound != null, LpScanCount().apply { scan() }.cost(model))
     return policy.acceptNullable(LpCertifier.INTEGER, bound)
 }
 
@@ -797,6 +800,7 @@ internal fun certifyLpFarkas(
     observer: LpCertificationObserver? = null,
 ): LongArray? {
     var route = FarkasRoute.NONE
+    val scans = LpScanCount()
     val mechanismObserver = observer?.let { target ->
         object : LpCertificationObserver by target {
             override fun observe(certifier: LpCertifier, success: Boolean, cost: LpCertifierCost) {
@@ -811,18 +815,23 @@ internal fun certifyLpFarkas(
         basisRow = basisRow,
         onRoute = { route = it },
         observer = mechanismObserver,
-    )?.takeIf { sourceFarkasValid(model, it) }
-    observer?.observe(LpCertifier.EXACT_FARKAS, ray != null, LpCertifierCost.Unmetered)
+        scans = scans,
+    )?.takeIf {
+        scans.scan()
+        sourceFarkasValid(model, it)
+    }
+    observer?.observe(LpCertifier.EXACT_FARKAS, ray != null, scans.cost(model))
     onRoute?.invoke(if (ray != null) route else FarkasRoute.NONE)
     return ray
 }
 
-private fun exactStateConflict(model: LpModel, candidate: DoubleArray): BigRationalConflict? {
+private fun exactStateConflict(model: LpModel, candidate: DoubleArray, scans: LpScanCount): BigRationalConflict? {
     if (candidate.size != model.m || candidate.any { !it.isFinite() }) return null
     val candidates = listOfNotNull(reconstructIntegerVector(candidate), roundDuals(model, candidate)?.mult)
     for (integers in candidates) {
         for (sign in listOf(BigFraction.ONE, BigFraction.MINUS_ONE)) {
             val y = integers.map { BigFraction.ofLong(it) * sign }
+            scans.scan()
             val sides = ArrayList<ExactSimplexBound>()
             for (j in 0 until model.numVars) {
                 var coefficient = BigFraction.ZERO
@@ -831,6 +840,7 @@ private fun exactStateConflict(model: LpModel, candidate: DoubleArray): BigRatio
             }
             val rows = y.indices.filter { !y[it].isZero }
             val conflict = BigRationalConflict(rows.toIntArray(), rows.map { y[it] }, sides)
+            scans.scan()
             if (checkedLpConflict(model, conflict)) return conflict
         }
     }

@@ -8,11 +8,9 @@ import kotlin.math.roundToInt
 /** Construction policy for the simplex's private numerical scaling view. */
 internal data class LpScalingOptions(val enabled: Boolean = true, val equilibrationPasses: Int = 4) {
     init {
-        require(equilibrationPasses in 1..MAX_EQUILIBRATION_PASSES)
+        require(equilibrationPasses in 1..8)
     }
 }
-
-private const val MAX_EQUILIBRATION_PASSES = 8
 
 internal enum class LpScalingDecline {
     DISABLED,
@@ -139,7 +137,12 @@ internal class LpScalingView private constructor(
             nextCost,
             nextLower,
             nextUpper,
-            metrics.copy(sourcePrimalResidual = 0.0, sourceBoundViolation = 0.0, sourceBasicDualResidual = 0.0),
+            metrics.copy(
+                sourcePrimalResidual = 0.0,
+                sourceBoundViolation = 0.0,
+                sourceBasicDualResidual = 0.0,
+                work = vectorWork(next) + if (applied) next.m.toLong() + next.numVars else 0L,
+            ),
         )
     }
 
@@ -224,18 +227,6 @@ internal class LpScalingView private constructor(
                     work = conditioningWork(model, conditioning) + work + entries + model.m,
                 ),
             )
-        }
-
-        /**
-         * The most [LpScalingMetrics.work] any view [create] builds over [model] can charge: an equilibration that
-         * runs every allowed pass and then falls back to an identity copy.
-         */
-        fun constructionWorkBound(model: LpModel): Long {
-            val entries = (model.doubleView?.colPtr ?: model.csc.colPtr)[model.n].toLong()
-            val conditioning = entries + model.m
-            val equilibration = MAX_EQUILIBRATION_PASSES * (2L * entries + model.m + model.n) + entries
-            return 2L * conditioning + 2L * matrixCopyWork(model, entries) + model.m + model.numVars +
-                equilibration + 2L * vectorWork(model)
         }
 
         fun identityAfterFallback(model: LpModel, previous: LpScalingMetrics): LpScalingView {

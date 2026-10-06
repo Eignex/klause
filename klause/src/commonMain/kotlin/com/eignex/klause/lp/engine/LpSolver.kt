@@ -8,8 +8,8 @@ import com.eignex.klause.util.Cancellation
  * adapt it into their own statistics rather than making the kernel depend on solver results. */
 internal enum class LpCertifier { INTEGER, SAFE_OBJECTIVE, EXACT_BASIS, EXACT_FARKAS, EXACT_POINT, RATIONAL }
 
-/** Where one certifier invocation's modeled work is accounted. Each call site states it, so a cost that no counter
- * covers is reported as such rather than read as zero. */
+/** Where one certifier invocation's modeled work is accounted. Each call site states it, so no certifier's work is
+ * left out of a ledger that sums both channels. */
 internal sealed interface LpCertifierCost {
     /** Charged through [LpCertificationObserver.observeBasisVerification] or
      *  [LpCertificationObserver.observeContinuation]. */
@@ -17,9 +17,23 @@ internal sealed interface LpCertifierCost {
 
     /** The invocation's own modeled work, charged with this observation. */
     data class Metered(val work: Long) : LpCertifierCost
+}
 
-    /** No modeled-work counter covers the invocation. */
-    data object Unmetered : LpCertifierCost
+/** Passes a certifier makes over a model, each visiting every structural entry, column and row once. */
+internal class LpScanCount {
+    var scans: Int = 0
+        private set
+
+    fun scan() {
+        scans++
+    }
+
+    fun cost(model: LpModel): LpCertifierCost.Metered {
+        val entries = (model.doubleView?.colPtr ?: model.csc.colPtr)[model.n].toLong() + model.numVars + model.m
+        return LpCertifierCost.Metered(
+            if (entries > Long.MAX_VALUE / maxOf(scans, 1)) Long.MAX_VALUE else entries * scans,
+        )
+    }
 }
 
 /** Why a simplex solve rebuilt its factors.  The reasons are emitted by the engine, not inferred from

@@ -18,6 +18,30 @@ import kotlin.test.assertTrue
 class RevisedSimplexScalingTest {
 
     @Test
+    fun `the first solve pays for building the scaling view`() {
+        val zero = ExactLpNumber.of(0L)
+        val source = ExactLpModel(
+            listOf(
+                listOf(ExactLpEntry(0, ExactLpNumber.of(-1L))),
+                listOf(ExactLpEntry(0, ExactLpNumber.of(-1_000_000L))),
+            ),
+            listOf(ExactLpNumber.of(-3_000_000L)),
+            List(3) { ExactLpColumn(ExactLpBounds(ExactLpSide(zero))) },
+            listOf(ExactLpRow()),
+            ExactLpObjective(List(3) { zero }),
+        )
+        val solver = RevisedSimplex(assertNotNull(LpExactState(source).toWorkingModel()))
+
+        assertNotNull(solver.prepareLogicals(Cancellation.Never))
+        val first = solver.lastMetrics.workOps
+        assertNotNull(solver.prepareLogicals(Cancellation.Never))
+        val second = solver.lastMetrics.workOps
+
+        assertTrue(solver.scalingMetrics.work > 0L)
+        assertEquals(solver.scalingMetrics.work, first - second)
+    }
+
+    @Test
     fun `scaled exact state is certified against unscaled authority`() {
         val zero = ExactLpNumber.of(0L)
         val one = ExactLpNumber.of(1L)

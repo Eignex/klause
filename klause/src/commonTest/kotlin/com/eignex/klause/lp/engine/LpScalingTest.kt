@@ -122,7 +122,7 @@ class LpScalingTest {
     }
 
     @Test
-    fun `building a view charges the entries it visits within its construction bound`() {
+    fun `building a view charges the entries it visits and more when it equilibrates`() {
         val model = mixedScaleModel()
 
         val identity = LpScalingView.create(model, LpScalingOptions(enabled = false))
@@ -130,7 +130,6 @@ class LpScalingTest {
 
         assertTrue(identity.metrics.work > 0L)
         assertTrue(scaled.metrics.work > identity.metrics.work)
-        assertTrue(scaled.metrics.work <= LpScalingView.constructionWorkBound(model))
     }
 
     @Test
@@ -291,7 +290,8 @@ class LpScalingTest {
                 assertEquals(view.lowerD(j).toRawBits(), pushed.lowerD(j).toRawBits())
                 assertEquals(view.upperD(j).toRawBits(), pushed.upperD(j).toRawBits())
             }
-            assertEquals(view.metrics, next.metrics)
+            assertEquals(view.metrics.copy(work = next.metrics.work), next.metrics)
+            assertTrue(next.metrics.work < view.metrics.work)
         }
     }
 

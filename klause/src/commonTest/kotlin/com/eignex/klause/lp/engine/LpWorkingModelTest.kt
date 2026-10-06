@@ -83,7 +83,7 @@ class LpWorkingModelTest {
     }
 
     @Test
-    fun `a scope's ledger charges metered certifier work and counts the unmetered invocations`() {
+    fun `a scope's ledger charges the work every certifier invocation declares`() {
         val zero = ExactLpNumber.of(0L)
         val one = ExactLpNumber.of(1L)
         val three = ExactLpNumber.of(3L)
@@ -97,14 +97,11 @@ class LpWorkingModelTest {
             ),
         )
         var metered = 0L
-        var unmetered = 0L
+        var invocations = 0
         val declared = object : LpCertificationObserver {
             override fun observe(certifier: LpCertifier, success: Boolean, cost: LpCertifierCost) {
-                when (cost) {
-                    LpCertifierCost.Reported -> Unit
-                    is LpCertifierCost.Metered -> metered += cost.work
-                    LpCertifierCost.Unmetered -> unmetered++
-                }
+                invocations++
+                if (cost is LpCertifierCost.Metered) metered += cost.work
             }
 
             override fun observeExactInput(accepted: Boolean) = Unit
@@ -115,10 +112,9 @@ class LpWorkingModelTest {
             owner.withWorkingModel(LpWorkingModel.overrides(source)) { scope -> scope.solve(observer = declared) }
 
             val metrics = assertNotNull(owner.lastWorkingMetrics)
-            assertTrue(unmetered > 0L)
+            assertTrue(invocations > 0 && metered > 0L)
             assertEquals(metered, metrics.certificationWork)
-            assertEquals(unmetered, metrics.unmeteredCertifications)
-            assertFalse(metrics.measuredWorkComplete)
+            assertTrue(metrics.measuredWork >= metered)
         }
     }
 

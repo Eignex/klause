@@ -145,6 +145,28 @@ class IntegerDualBoundTest {
     }
 
     @Test
+    fun `an integer certificate charges one pass over the model's entries`() {
+        val builder = LpBuilder()
+        val x = builder.addVar(0L, 4L, cost = 1L)
+        val y = builder.addVar(0L, 4L, cost = 1L)
+        builder.addRow(intArrayOf(x, y), longArrayOf(1L, 1L), Relation.GE, 2L)
+        val model = builder.build(Sense.MINIMIZE)
+        val costs = ArrayList<LpCertifierCost>()
+        val observer = object : LpCertificationObserver {
+            override fun observe(certifier: LpCertifier, success: Boolean, cost: LpCertifierCost) {
+                costs += cost
+            }
+            override fun observeExactInput(accepted: Boolean) = Unit
+            override fun observeSolve(metrics: LpSolveMetrics, component: Boolean) = Unit
+        }
+
+        integerCertify(model, doubleArrayOf(1.0), observer = observer)
+
+        // Two structural entries, three columns with the row's slack, one row.
+        assertEquals(listOf<LpCertifierCost>(LpCertifierCost.Metered(6L)), costs)
+    }
+
+    @Test
     fun `inexact objective constant records one rejected rationalization`() {
         val builder = LpBuilder()
         builder.addRealVar(1e-10, 1.0, cost = 1.0)

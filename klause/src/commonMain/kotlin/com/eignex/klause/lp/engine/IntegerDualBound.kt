@@ -202,7 +202,7 @@ internal fun integerCertify(
     scaleBits: Int = DEFAULT_SCALE_BITS,
     observer: LpCertificationObserver? = null,
 ): IntegerCertificate? = integerCertifyUnchecked(model, y, scaleBits).also {
-    observer?.observe(LpCertifier.INTEGER, it != null, LpCertifierCost.Unmetered)
+    observer?.observe(LpCertifier.INTEGER, it != null, LpScanCount().apply { scan() }.cost(model))
 }
 
 private fun integerCertifyUnchecked(model: LpModel, y: DoubleArray, scaleBits: Int): IntegerCertificate? {
@@ -299,7 +299,12 @@ internal fun integerFarkasRay(
     onRoute: ((FarkasRoute) -> Unit)? = null,
     observer: LpCertificationObserver? = null,
     cancellation: Cancellation = Cancellation.Never,
+    scans: LpScanCount? = null,
 ): LongArray? {
+    fun certifies(rho: LongArray): Boolean {
+        scans?.scan()
+        return farkasCertifies(model, rho)
+    }
     if (model.exactState != null || cancellation()) {
         onRoute?.invoke(FarkasRoute.NONE)
         return null
@@ -311,6 +316,7 @@ internal fun integerFarkasRay(
     if (model.hasContinuous) {
         // A real model is certified over its scaled-integer rationalization (the existing 128-bit Farkas);
         // scaling by a positive 2ᵏ preserves feasibility, so an infeasibility proof carries back exactly.
+        scans?.scan()
         val integral = rationalizeToIntegerModel(
             model,
             outwardRealUppers = true,
@@ -325,8 +331,12 @@ internal fun integerFarkasRay(
                 onRoute = { route = it },
                 observer = observer,
                 cancellation = cancellation,
+                scans = scans,
             )
-                ?.takeIf { sourceFarkasValid(model, it) }
+                ?.takeIf {
+                    scans?.scan()
+                    sourceFarkasValid(model, it)
+                }
             if (certified != null) {
                 onRoute?.invoke(route)
                 return certified
@@ -337,12 +347,12 @@ internal fun integerFarkasRay(
     // recovering them exactly annihilates the open columns the same way a basis solve does — without the
     // basis, and with no bound on the dimension. See [reconstructIntegerVector].
     reconstructIntegerVector(ray)?.let { exact ->
-        if (farkasCertifies(model, exact)) {
+        if (certifies(exact)) {
             onRoute?.invoke(FarkasRoute.RECONSTRUCTED)
             return exact
         }
         val negated = LongArray(exact.size) { if (exact[it] == Long.MIN_VALUE) return@let else -exact[it] }
-        if (farkasCertifies(model, negated)) {
+        if (certifies(negated)) {
             onRoute?.invoke(FarkasRoute.RECONSTRUCTED)
             return negated
         }
@@ -361,12 +371,12 @@ internal fun integerFarkasRay(
         onRoute?.invoke(FarkasRoute.NONE)
         return null
     }
-    if (farkasCertifies(model, rd.mult)) {
+    if (certifies(rd.mult)) {
         onRoute?.invoke(FarkasRoute.ROUNDED)
         return rd.mult
     }
     val neg = LongArray(rd.mult.size) { -rd.mult[it] }
-    if (farkasCertifies(model, neg)) {
+    if (certifies(neg)) {
         onRoute?.invoke(FarkasRoute.ROUNDED)
         return neg
     }
