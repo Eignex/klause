@@ -19,16 +19,16 @@ import kotlin.test.assertNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.hours
-import kotlin.time.Duration.Companion.seconds
 import kotlin.time.TimeSource
 
 class SourceLpTest {
     @Test
-    fun `an operation token states the earlier of the caller's deadline and the active cap`() {
+    fun `an operation token states the caller's deadline unless a requested active cap ends sooner`() {
         val rows = listOf(exactColumnUpper(0, BigFraction.ONE))
-        val now = TimeSource.Monotonic.markNow()
-        for ((caller, callerBinds) in listOf(now + 1.hours to false, now + 1.seconds to true)) {
-            val stated = assertNotNull(SourceLpBudget().run(rows, 1, Cancellation.until(caller)) { it.deadline() })
+        val caller = TimeSource.Monotonic.markNow() + 1.hours
+        val cases = listOf(SourceLpBudget() to true, SourceLpBudget(maxActiveNanos = 1_000_000_000L) to false)
+        for ((budget, callerBinds) in cases) {
+            val stated = assertNotNull(budget.run(rows, 1, Cancellation.until(caller)) { it.deadline() })
 
             assertEquals(callerBinds, stated == caller)
             assertTrue(stated <= caller)

@@ -35,7 +35,9 @@ import kotlin.time.TimeSource.Monotonic
 
 internal class SourceLpBudget(
     private val maxOperations: Int = 256,
-    private val maxActiveNanos: Long = 5_000_000_000L,
+    // Unset by default: operation count and each operation's work and pivot limits bound the work, and only a caller
+    // that asks for one gets a clock cap.
+    private val maxActiveNanos: Long? = null,
     private val solveContext: () -> LpSolveContext = { LpSolveContext.Production },
     private val onWork: (SourceLpWorkStats) -> Unit = {},
     val onBasisVerification: ((ExactBasisMetrics) -> Unit)? = null,
@@ -138,24 +140,19 @@ internal class SourceLpBudget(
         pairing: Boolean,
         block: (Cancellation) -> T?,
     ): T? {
-        if (cancellation() || activeNanos >= maxActiveNanos || operations >= maxOperations) return null
+        val activeCap = maxActiveNanos
+        if (cancellation() || operations >= maxOperations) return null
+        if (activeCap != null && activeNanos >= activeCap) return null
         operations++
         reservedWork += 1024L
         val outermost = activeStart == null
         if (outermost) activeStart = Monotonic.markNow()
         val start = checkNotNull(activeStart)
-        val activeEnd = start + (maxActiveNanos - activeNanos).nanoseconds
-        val callerEnd = cancellation.deadline()
-        // States when it fires, so a phase handed it can budget a share of the time left (Cancellation.shorten).
-        val token = object : Cancellation {
-            override fun isCancelled(): Boolean =
-                cancellation() || start.elapsedNow().inWholeNanoseconds >= maxActiveNanos - activeNanos
-
-            override fun deadline(): ComparableTimeMark = if (callerEnd != null && callerEnd < activeEnd) {
-                callerEnd
-            } else {
-                activeEnd
-            }
+        val token = if (activeCap == null) {
+            cancellation
+        } else {
+            // A requested cap is a deadline, so a phase handed this token can budget a share of the time left.
+            cancellation or Cancellation.until(start + (activeCap - activeNanos).nanoseconds)
         }
         try {
             val groups = listOf(rows) + additional
