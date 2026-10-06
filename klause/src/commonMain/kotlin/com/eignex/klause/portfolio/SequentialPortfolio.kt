@@ -163,6 +163,8 @@ class SequentialPortfolio(
         val verdicts = ArrayList<SolveResult>()
         val ledger = RewardLedger(workers.size)
         val progress = ProgressCredit(workers.size)
+        val log = ScheduleLog(workers)
+        fun folded() = foldArms(perArm).copy(portfolio = log.stats(ledger))
         var slice = baseSliceMillis
         var lsSliceWork = baseSliceWork
         var probed = 0
@@ -195,27 +197,29 @@ class SequentialPortfolio(
                     work = handle.work - workBefore
                 } else {
                     val token = segmentToken(worker, cancellation, slice)
-                    r = runCatching { worker.solve(token, instructionsFor(lsSliceWork)) }
+                    val outcome = runCatching { worker.solve(token, instructionsFor(lsSliceWork)) }
                         .rethrowUnsound()
-                        .getOrNull()
+                    r = outcome.getOrNull()
+                    failed = outcome.isFailure
                     r?.let { perArm[arm] = (perArm[arm] ?: SolveStats.EMPTY).mergedWith(it.stats) }
                     r?.let { progress.observe(ledger, arm, it.stats) }
                     work = lsSliceWork
                 }
                 creditContributions(ledger)
-                bandit.update(arm, ledger.settle(arm, work), work.toDouble() / baseSliceWork)
+                log.record(arm, work, settle(ledger, arm, work, failed), failed)
                 when (r) {
-                    is SolveResult.Sat -> return r.copy(stats = foldArms(perArm))
-                    is SolveResult.Unsat -> return r.copy(stats = foldArms(perArm))
+                    is SolveResult.Sat -> return r.copy(stats = folded())
+                    is SolveResult.Unsat -> return r.copy(stats = folded())
                     else -> Unit
                 }
-                if (handle != null && (r != null || failed)) {
+                // An arm that threw is retired like one that finished: rescheduling it would only fail again.
+                if (failed || (handle != null && r != null)) {
                     r?.let(verdicts::add)
                     retired[arm] = true
                     remaining--
                     handles[arm] = null
-                    handle.close()
-                    if (remaining == 0) return SolveResult.Unknown(unsettledReason(verdicts), foldArms(perArm))
+                    handle?.close()
+                    if (remaining == 0) return SolveResult.Unknown(unsettledReason(verdicts), folded())
                 }
                 // The probe runs at the base slice for every arm, so its cost stays flat in the arm count.
                 if (!probing) {
@@ -223,7 +227,7 @@ class SequentialPortfolio(
                     lsSliceWork = grow(lsSliceWork, maxSliceWork)
                 }
             }
-            return SolveResult.Unknown(TerminationReason.Cancelled, foldArms(perArm))
+            return SolveResult.Unknown(TerminationReason.Cancelled, folded())
         } catch (failure: Throwable) {
             primaryFailure = failure
             throw failure
@@ -281,6 +285,8 @@ class SequentialPortfolio(
         var callbackFailure: Throwable? = null
         // Consecutive non-improving segments per arm; drives re-seeding (see [reseedStaleThreshold]).
         val staleSegments = IntArray(workers.size)
+        val log = ScheduleLog(workers)
+        fun folded() = foldArms(perArm).copy(portfolio = log.stats(ledger))
 
         // Fold a strictly-improving incumbent into the shared bound + fire the telemetry callback,
         // attributing it to the arm of the active segment ([armLabel]).
@@ -330,7 +336,7 @@ class SequentialPortfolio(
                     // Local-search segments restart from the shared incumbent but are bounded by their own
                     // counted work; the whole-solve deadline remains the outer cancellation terminator.
                     val armToken = segmentToken(worker, cancellation, slice)
-                    runCatching {
+                    failed = runCatching {
                         for (r in worker.improvements(
                             readBound,
                             armToken,
@@ -340,7 +346,7 @@ class SequentialPortfolio(
                             terminal = r
                             if (r is MinimizeResult.WithSample) accept(r)
                         }
-                    }
+                    }.isFailure
                     work = lsSliceWork
                 }
                 callbackFailure?.let { throw it }
@@ -362,7 +368,7 @@ class SequentialPortfolio(
                 }
                 if (floorBefore.isFinite()) ledger.credit(arm, Signal.Floor, readFloor() - floorBefore)
                 creditContributions(ledger)
-                bandit.update(arm, ledger.settle(arm, work), work.toDouble() / baseSliceWork)
+                log.record(arm, work, settle(ledger, arm, work, failed), failed)
                 if (found) startImprovementPhase(ledger)
 
                 // Re-seed a plateaued resumable arm: after enough consecutive non-improving segments, drop
@@ -382,19 +388,20 @@ class SequentialPortfolio(
                 }
 
                 // A ray proves the model unbounded whatever bound the arm ran under.
-                (terminal as? MinimizeResult.Unbounded)?.let { return it.copy(stats = foldArms(perArm)) }
+                (terminal as? MinimizeResult.Unbounded)?.let { return it.copy(stats = folded()) }
 
                 // A clean segment exhaustion ends the run: any incumbent is optimal, else infeasible.
                 if (PortfolioReduction.isExhausted(terminal)) {
-                    return PortfolioReduction.terminal(incumbent.current(), dirty = false, foldArms(perArm))
+                    return PortfolioReduction.terminal(incumbent.current(), dirty = false, folded())
                 }
-                if (handle != null && (terminal != null || failed)) {
+                // An arm that threw is retired like one that finished: rescheduling it would only fail again.
+                if (failed || (handle != null && terminal != null)) {
                     retired[arm] = true
                     remaining--
                     handles[arm] = null
-                    handle.close()
+                    handle?.close()
                     if (remaining == 0) {
-                        return PortfolioReduction.terminal(incumbent.current(), dirty = true, foldArms(perArm))
+                        return PortfolioReduction.terminal(incumbent.current(), dirty = true, folded())
                     }
                 }
                 // The probe runs at the base slice for every arm, so its cost stays flat in the arm count.
@@ -404,13 +411,26 @@ class SequentialPortfolio(
                 }
             }
             // Cancellation stopped a still-open search: keep the incumbent (BestFound) or report Unknown.
-            return PortfolioReduction.terminal(incumbent.current(), dirty = true, foldArms(perArm))
+            return PortfolioReduction.terminal(incumbent.current(), dirty = true, folded())
         } catch (failure: Throwable) {
             primaryFailure = failure
             throw failure
         } finally {
             closeAll(handles, primaryFailure)
         }
+    }
+
+    /**
+     * Settle [arm]'s account over the [work] its segment spent and fold the reward into the bandit. A segment
+     * that [failed] earns nothing whatever it was credited, and weighs at least a base slice, so a failing arm
+     * loses ground even when it failed before spending anything.
+     */
+    private fun settle(ledger: RewardLedger, arm: Int, work: Long, failed: Boolean): Double {
+        val earned = ledger.settle(arm, work)
+        val reward = if (failed) 0.0 else earned
+        val weight = (if (failed) maxOf(work, baseSliceWork) else work).toDouble() / baseSliceWork
+        bandit.update(arm, reward, weight)
+        return reward
     }
 
     /** The first incumbent ends the feasibility hunt: the ledger's rates restart and the bandit keeps

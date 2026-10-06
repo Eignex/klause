@@ -1,5 +1,6 @@
 package com.eignex.klause.cli
 
+import com.eignex.klause.solver.result.ArmSchedule
 import com.eignex.klause.solver.result.LocalSearchStats
 import com.eignex.klause.solver.result.LpBasisVerificationStats
 import com.eignex.klause.solver.result.LpCertifierRouteStats
@@ -9,6 +10,7 @@ import com.eignex.klause.solver.result.LpRouteSolveStats
 import com.eignex.klause.solver.result.LpStats
 import com.eignex.klause.solver.result.OpenHintStats
 import com.eignex.klause.solver.result.OpenTheoryWorkStats
+import com.eignex.klause.solver.result.PortfolioStats
 import com.eignex.klause.solver.result.PresolveStats
 import com.eignex.klause.solver.result.RunStats
 import com.eignex.klause.solver.result.SchedulingStats
@@ -443,5 +445,16 @@ class CliStatsTest {
         val m = lpStatPairs(stats).toMap()
 
         assertTrue("lpRootMatrixMin" !in m)
+    }
+
+    @Test
+    fun `portfolio pairs report each arm with its schedule and credit`() {
+        val credit = mapOf("ClauseUses" to 4.0)
+        val arm = ArmSchedule("bt-0", segments = 3, work = 15_000, meanReward = 0.5, failures = 0, credit = credit)
+        val stats = SolveStats(portfolio = PortfolioStats(listOf(arm)))
+
+        val pairs = portfolioStatPairs(stats).toMap()
+
+        assertEquals("segments=3 work=15000 reward=0.5 failures=0 ClauseUses=4", pairs["arm.bt-0"])
     }
 }

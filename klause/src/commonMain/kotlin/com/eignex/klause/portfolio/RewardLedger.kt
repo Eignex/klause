@@ -1,5 +1,7 @@
 package com.eignex.klause.portfolio
 
+import com.eignex.klause.solver.result.ArmSchedule
+import com.eignex.klause.solver.result.PortfolioStats
 import com.eignex.klause.solver.result.SolveStats
 
 /**
@@ -18,11 +20,14 @@ internal class RewardLedger(private val arms: Int) {
     private val earnedByArm = Array(Signal.entries.size) { DoubleArray(arms) }
     private val earned = DoubleArray(Signal.entries.size)
     private val spentByArm = LongArray(arms)
+    private val total = Array(Signal.entries.size) { DoubleArray(arms) }
     private var spent = 0L
 
     /** Post [amount] of [signal] to [arm]'s account. Non-positive and non-finite amounts are ignored. */
     fun credit(arm: Int, signal: Signal, amount: Double) {
-        if (amount > 0.0 && amount.isFinite()) pending[signal.ordinal][arm] += amount
+        if (amount <= 0.0 || !amount.isFinite()) return
+        pending[signal.ordinal][arm] += amount
+        total[signal.ordinal][arm] += amount
     }
 
     /**
@@ -52,6 +57,10 @@ internal class RewardLedger(private val arms: Int) {
         }
         return if (signals == 0) 0.0 else share / signals
     }
+
+    /** Everything credited to [arm] over the whole run, by signal name, leaving out signals it never earned. */
+    fun creditOf(arm: Int): Map<String, Double> =
+        Signal.entries.filter { total[it.ordinal][arm] > 0.0 }.associate { it.name to total[it.ordinal][arm] }
 
     /** Start a new phase: pooled rates and unsettled credit both clear. */
     fun resetPhase() {
@@ -117,4 +126,34 @@ internal class ProgressCredit(arms: Int) {
         }
         recordViolation = violation
     }
+}
+
+/** What the scheduler did with each arm over a run, reported as [SolveStats.portfolio]. */
+internal class ScheduleLog(private val workers: List<PortfolioWorker>) {
+    private val segments = LongArray(workers.size)
+    private val work = LongArray(workers.size)
+    private val rewards = DoubleArray(workers.size)
+    private val failures = LongArray(workers.size)
+
+    /** One segment of [arm]: the [spent] work, the [reward] it settled for, and whether it [failed]. */
+    fun record(arm: Int, spent: Long, reward: Double, failed: Boolean) {
+        segments[arm]++
+        work[arm] += spent
+        rewards[arm] += reward
+        if (failed) failures[arm]++
+    }
+
+    /** The schedule so far, with each arm's credit read from [ledger]. */
+    fun stats(ledger: RewardLedger): PortfolioStats = PortfolioStats(
+        workers.indices.map { arm ->
+            ArmSchedule(
+                label = workers[arm].label,
+                segments = segments[arm],
+                work = work[arm],
+                meanReward = if (segments[arm] > 0L) rewards[arm] / segments[arm] else 0.0,
+                failures = failures[arm],
+                credit = ledger.creditOf(arm),
+            )
+        },
+    )
 }
