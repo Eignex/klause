@@ -7133,8 +7133,9 @@ public final class com/eignex/klause/portfolio/PortfolioWorker$Companion {
 
 public final class com/eignex/klause/portfolio/SequentialPortfolio : com/eignex/klause/portfolio/PortfolioExecutor {
 	public static final field Companion Lcom/eignex/klause/portfolio/SequentialPortfolio$Companion;
-	public fun <init> (Ljava/util/List;Lcom/eignex/kumulant/bandit/UnivariateBandit;JJDJJDJI)V
-	public synthetic fun <init> (Ljava/util/List;Lcom/eignex/kumulant/bandit/UnivariateBandit;JJDJJDJIILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public static final field DEFAULT_HALF_LIFE D
+	public fun <init> (Ljava/util/List;Lcom/eignex/kumulant/bandit/UnivariateBandit;JJDJJDI)V
+	public synthetic fun <init> (Ljava/util/List;Lcom/eignex/kumulant/bandit/UnivariateBandit;JJDJJDIILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public fun close ()V
 	public final fun getWorkers ()Ljava/util/List;
 	public fun minimize (Lcom/eignex/klause/util/Cancellation;Lkotlin/jvm/functions/Function1;)Lcom/eignex/klause/solver/result/MinimizeResult;
@@ -7142,10 +7143,8 @@ public final class com/eignex/klause/portfolio/SequentialPortfolio : com/eignex/
 }
 
 public final class com/eignex/klause/portfolio/SequentialPortfolio$Companion {
-	public final fun exp3 (Ljava/util/List;JDDJJDJIJ)Lcom/eignex/klause/portfolio/SequentialPortfolio;
-	public static synthetic fun exp3$default (Lcom/eignex/klause/portfolio/SequentialPortfolio$Companion;Ljava/util/List;JDDJJDJIJILjava/lang/Object;)Lcom/eignex/klause/portfolio/SequentialPortfolio;
-	public final fun ucb1 (Ljava/util/List;JDJJDJIJ)Lcom/eignex/klause/portfolio/SequentialPortfolio;
-	public static synthetic fun ucb1$default (Lcom/eignex/klause/portfolio/SequentialPortfolio$Companion;Ljava/util/List;JDJJDJIJILjava/lang/Object;)Lcom/eignex/klause/portfolio/SequentialPortfolio;
+	public final fun thompson (Ljava/util/List;JDJJDIJ)Lcom/eignex/klause/portfolio/SequentialPortfolio;
+	public static synthetic fun thompson$default (Lcom/eignex/klause/portfolio/SequentialPortfolio$Companion;Ljava/util/List;JDJJDIJILjava/lang/Object;)Lcom/eignex/klause/portfolio/SequentialPortfolio;
 }
 
 public final class com/eignex/klause/presolve/AffinePivotOrder : java/lang/Enum {

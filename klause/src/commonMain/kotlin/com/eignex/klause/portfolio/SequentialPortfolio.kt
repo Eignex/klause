@@ -12,9 +12,6 @@ import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.result.UnsoundnessException
 import com.eignex.klause.util.Cancellation
 import com.eignex.kumulant.bandit.UnivariateBandit
-import com.eignex.kumulant.bandit.univariate.Exp3Bandit
-import com.eignex.kumulant.bandit.univariate.MultiArmedBandit
-import com.eignex.kumulant.bandit.univariate.UCB1
 import kotlin.random.Random
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TimeSource
@@ -59,13 +56,13 @@ import kotlin.time.TimeSource
 class SequentialPortfolio(
     /** The arms raced one-at-a-time; each carries its own engine, params, and objective form. */
     val workers: List<PortfolioWorker>,
-    /** kumulant arm-selection policy; see [exp3] for the default non-stationary choice. */
+    /** kumulant arm-selection policy over rewards in `[0, 1]`; see [thompson] for the default. */
     private val bandit: UnivariateBandit,
-    /** First post-warmup time slice for arms without a counted segment budget. */
+    /** First time slice for an arm with neither a work counter nor a resumable handle. */
     private val baseSliceMillis: Long = 2_000,
     /** Cap on a single segment's time slice. */
     private val maxSliceMillis: Long = 60_000,
-    /** Geometric growth applied to the slice after each post-warmup segment. */
+    /** Geometric growth applied to a restarting arm's slice after each segment. */
     private val sliceGrowth: Double = 1.5,
     /**
      * Work each segment of a resumable arm spends, and the first segment of a counted local-search arm; a local-search
@@ -89,9 +86,6 @@ class SequentialPortfolio(
     private val maxSliceWork: Long = 150_000,
     /** Local-search instructions that cost as much as one search node; see `LS_INSTRUCTIONS_PER_WORK`. */
     private val lsInstructionsPerWork: Double = LS_INSTRUCTIONS_PER_WORK,
-    /** Round-robin warmup slice for an arm with neither a work counter nor a resumable handle; every arm is forced
-     *  once before the bandit takes over, so a short deadline can't leave a winning arm at zero budget. */
-    private val warmupSliceMillis: Long = 1_000,
     /**
      * Diversification for resumable backtrack arms: after this many consecutive
      * scheduled segments in which a resumable arm fails to improve the shared incumbent, its search
@@ -110,7 +104,6 @@ class SequentialPortfolio(
         require(workers.isNotEmpty()) { "SequentialPortfolio must have at least one worker" }
         require(baseSliceMillis > 0 && maxSliceMillis >= baseSliceMillis) { "invalid slice bounds" }
         require(sliceGrowth >= 1.0) { "sliceGrowth must be ≥ 1.0" }
-        require(warmupSliceMillis > 0) { "warmupSliceMillis must be > 0" }
         require(reseedStaleThreshold >= 0) { "reseedStaleThreshold must be ≥ 0" }
         require(baseSliceWork > 0 && maxSliceWork >= baseSliceWork) { "invalid work slice bounds" }
         require(lsInstructionsPerWork > 0.0) { "lsInstructionsPerWork must be > 0" }
@@ -126,13 +119,13 @@ class SequentialPortfolio(
         Cancellation.until(TimeSource.Monotonic.markNow() + sliceMillis.milliseconds) or global
 
     /** The cancellation token bounding one non-resumable arm's segment. A counted-work arm
-     *  ([PortfolioWorker.acceptsInstructionBudget]) runs unclocked, warmup included: its own instruction budget
+     *  ([PortfolioWorker.acceptsInstructionBudget]) runs unclocked: its own instruction budget
      *  paces it, and a wall-clock cap on top would reintroduce the machine-speed dependence counting exists to
      *  remove. Only an arm with neither a counter nor a resumable handle is sliced by [sliceMs]. */
     private fun segmentToken(worker: PortfolioWorker, cancellation: Cancellation, sliceMs: Long): Cancellation =
         if (worker.acceptsInstructionBudget) cancellation else sliceToken(cancellation, sliceMs)
 
-    /** Geometric post-warmup growth shared by every slice axis (millis and work): grow by
+    /** Geometric growth shared by every slice axis (millis and work): grow by
      *  [sliceGrowth], never past [cap]. */
     private fun grow(current: Long, cap: Long): Long = (current * sliceGrowth).toLong().coerceAtMost(cap)
 
@@ -158,12 +151,13 @@ class SequentialPortfolio(
         val ledger = RewardLedger(workers.size)
         var slice = baseSliceMillis
         var lsSliceWork = baseSliceWork
-        var segment = 0
+        var probed = 0
         var primaryFailure: Throwable? = null
         try {
             while (!cancellation()) {
-                val warming = segment < workers.size
-                val selected = if (warming) segment else bandit.choose()
+                // Every arm first runs one base slice, in order, so each has evidence before the policy chooses.
+                val probing = probed < workers.size
+                val selected = if (probing) probed++ else bandit.choose()
                 val arm = if (retired[selected]) {
                     bandit.update(selected, 0.0)
                     retired.indexOfFirst { !it }
@@ -185,14 +179,14 @@ class SequentialPortfolio(
                     perArm[arm] = handle.stats
                     work = handle.work - workBefore
                 } else {
-                    val token = segmentToken(worker, cancellation, if (warming) warmupSliceMillis else slice)
+                    val token = segmentToken(worker, cancellation, slice)
                     r = runCatching { worker.solve(token, instructionsFor(lsSliceWork)) }
                         .rethrowUnsound()
                         .getOrNull()
                     r?.let { perArm[arm] = (perArm[arm] ?: SolveStats.EMPTY).mergedWith(it.stats) }
                     work = lsSliceWork
                 }
-                bandit.update(arm, ledger.settle(arm, work))
+                bandit.update(arm, ledger.settle(arm, work), work.toDouble() / baseSliceWork)
                 when (r) {
                     is SolveResult.Sat -> return r.copy(stats = foldArms(perArm))
                     is SolveResult.Unsat -> return r.copy(stats = foldArms(perArm))
@@ -206,11 +200,11 @@ class SequentialPortfolio(
                     handle.close()
                     if (remaining == 0) return SolveResult.Unknown(unsettledReason(verdicts), foldArms(perArm))
                 }
-                if (!warming) {
+                // The probe runs at the base slice for every arm, so its cost stays flat in the arm count.
+                if (!probing) {
                     slice = grow(slice, maxSliceMillis)
                     lsSliceWork = grow(lsSliceWork, maxSliceWork)
                 }
-                segment++
             }
             return SolveResult.Unknown(TerminationReason.Cancelled, foldArms(perArm))
         } catch (failure: Throwable) {
@@ -243,7 +237,7 @@ class SequentialPortfolio(
         val ledger = RewardLedger(workers.size)
         var slice = baseSliceMillis
         var lsSliceWork = baseSliceWork
-        var segment = 0
+        var probed = 0
         val start = TimeSource.Monotonic.markNow()
         // The label of the arm running the current segment — single-threaded, so it is unambiguous
         // for every improvement [accept] folds while that segment is active.
@@ -282,10 +276,9 @@ class SequentialPortfolio(
 
         try {
             while (!cancellation()) {
-                // Round-robin warmup: force every arm once (at the short warmup slice) before the
-                // bandit free-selects, so a backtrack arm a COP needs can't be starved to zero budget.
-                val warming = segment < workers.size
-                val selected = if (warming) segment else bandit.choose()
+                // Every arm first runs one base slice, in order, so each has evidence before the policy chooses.
+                val probing = probed < workers.size
+                val selected = if (probing) probed++ else bandit.choose()
                 val arm = if (retired[selected]) {
                     bandit.update(selected, 0.0)
                     retired.indexOfFirst { !it }
@@ -314,7 +307,7 @@ class SequentialPortfolio(
                 } else {
                     // Local-search segments restart from the shared incumbent but are bounded by their own
                     // counted work; the whole-solve deadline remains the outer cancellation terminator.
-                    val armToken = segmentToken(worker, cancellation, if (warming) warmupSliceMillis else slice)
+                    val armToken = segmentToken(worker, cancellation, slice)
                     runCatching {
                         for (r in worker.improvements(
                             readBound,
@@ -343,7 +336,7 @@ class SequentialPortfolio(
                 } else {
                     ledger.credit(arm, Signal.Improvement, improvement)
                 }
-                bandit.update(arm, ledger.settle(arm, work))
+                bandit.update(arm, ledger.settle(arm, work), work.toDouble() / baseSliceWork)
                 // The rates a feasibility hunt earned say nothing about who improves an incumbent.
                 if (found) ledger.resetPhase()
 
@@ -379,11 +372,11 @@ class SequentialPortfolio(
                         return PortfolioReduction.terminal(incumbent.current(), dirty = true, foldArms(perArm))
                     }
                 }
-                if (!warming) {
+                // The probe runs at the base slice for every arm, so its cost stays flat in the arm count.
+                if (!probing) {
                     slice = grow(slice, maxSliceMillis)
                     lsSliceWork = grow(lsSliceWork, maxSliceWork)
                 }
-                segment++
             }
             // Cancellation stopped a still-open search: keep the incumbent (BestFound) or report Unknown.
             return PortfolioReduction.terminal(incumbent.current(), dirty = true, foldArms(perArm))
@@ -433,73 +426,33 @@ class SequentialPortfolio(
         workers.forEach { runCatching { it.close() } }
     }
 
-    /** Named-policy convenience factories. The primary constructor takes any kumulant
-     *  [UnivariateBandit], so these are just conveniences for the common policies — add more (or
-     *  call the constructor directly) for `KlUcb`, `Boltzmann`, `RouletteWheel`, etc. */
+    /** Policy factories. The primary constructor takes any kumulant [UnivariateBandit] reading rewards in `[0, 1]`. */
     companion object {
-        /** [Exp3Bandit] arm selection (non-stationary — the right fit for a reward that shifts as
-         *  the search moves from feasibility-finding to bound-improving). */
-        fun exp3(
+        /** Base slices of work after which an observation counts half as much; see [thompson]. */
+        const val DEFAULT_HALF_LIFE: Double = 200.0
+
+        /**
+         * Discounted Thompson sampling, the default policy. An arm that keeps earning nothing is tried less and
+         * less, with no fixed exploration share to tax the run, and evidence fades over [halfLife] base slices of
+         * work so the schedule follows whichever arm is paying now.
+         * Every arm first runs one base slice, in order, so the policy starts from evidence on each; at one base
+         * slice apiece the probe costs little however many arms there are.
+         */
+        fun thompson(
             workers: List<PortfolioWorker>,
             seed: Long = 0L,
-            gamma: Double = 0.1,
-            eta: Double = 0.1,
+            halfLife: Double = DEFAULT_HALF_LIFE,
             baseSliceMillis: Long = 2_000,
             maxSliceMillis: Long = 60_000,
             sliceGrowth: Double = 1.5,
-            warmupSliceMillis: Long = 1_000,
             reseedStaleThreshold: Int = 3,
-            baseSliceWork: Long = 5_000,
-        ): SequentialPortfolio = withBandit(
-            workers,
-            Exp3Bandit(workers.size, eta, gamma, Random(seed)),
-            baseSliceMillis,
-            maxSliceMillis,
-            sliceGrowth,
-            warmupSliceMillis,
-            reseedStaleThreshold,
-            baseSliceWork,
-        )
-
-        /** UCB1 arm selection (stationary, deterministic given the seed) — the alternative to
-         *  [exp3] when arm utility is roughly fixed over the run. */
-        fun ucb1(
-            workers: List<PortfolioWorker>,
-            seed: Long = 0L,
-            alpha: Double = 1.0,
-            baseSliceMillis: Long = 2_000,
-            maxSliceMillis: Long = 60_000,
-            sliceGrowth: Double = 1.5,
-            warmupSliceMillis: Long = 1_000,
-            reseedStaleThreshold: Int = 3,
-            baseSliceWork: Long = 5_000,
-        ): SequentialPortfolio = withBandit(
-            workers,
-            MultiArmedBandit(workers.size, UCB1(alpha = alpha), Random(seed)),
-            baseSliceMillis,
-            maxSliceMillis,
-            sliceGrowth,
-            warmupSliceMillis,
-            reseedStaleThreshold,
-            baseSliceWork,
-        )
-
-        private fun withBandit(
-            workers: List<PortfolioWorker>,
-            bandit: UnivariateBandit,
-            baseSliceMillis: Long,
-            maxSliceMillis: Long,
-            sliceGrowth: Double,
-            warmupSliceMillis: Long,
-            reseedStaleThreshold: Int,
             baseSliceWork: Long = 5_000,
         ): SequentialPortfolio = SequentialPortfolio(
             workers = workers,
-            bandit = bandit,
+            bandit = DiscountedThompson(workers.size, Random(seed), halfLife),
             baseSliceMillis = baseSliceMillis,
             maxSliceMillis = maxSliceMillis,
             sliceGrowth = sliceGrowth,
-            warmupSliceMillis = warmupSliceMillis,
             reseedStaleThreshold = reseedStaleThreshold,
             baseSliceWork = baseSliceWork,
         )

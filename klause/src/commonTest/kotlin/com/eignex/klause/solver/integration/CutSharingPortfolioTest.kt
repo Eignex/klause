@@ -45,7 +45,7 @@ class CutSharingPortfolioTest {
                 shareCuts = shareCuts,
             )
             val workers = PortfolioBuilder.build(problem.bake(), scenario, objective = obj)
-            val result = SequentialPortfolio.exp3(workers).use { it.minimize() }
+            val result = SequentialPortfolio.thompson(workers).use { it.minimize() }
             return assertIs<MinimizeResult.Optimal>(result).objectiveValue
         }
 
