@@ -27,6 +27,7 @@ import com.eignex.klause.lp.RelaxationBuilder
 import com.eignex.klause.lp.cut.CircuitArcModel
 import com.eignex.klause.lp.cut.CircuitSeparator
 import com.eignex.klause.lp.emitLpRelaxation
+import com.eignex.klause.lp.engine.CertifiedLpResult
 import com.eignex.klause.lp.engine.Cut
 import com.eignex.klause.lp.engine.CutAuxiliaryDefinition
 import com.eignex.klause.lp.engine.CutProvenance
@@ -332,13 +333,27 @@ internal fun leafRealFeasibility(
         return LeafRealResult(LpVerdict.TOLERANCE_OPTIMUM, relaxation.floatReals(float.primal, problem))
     }
     if (certified.verdict == LpVerdict.INFEASIBLE) return LeafRealResult(LpVerdict.INFEASIBLE, EmptyDoubleArray)
+    return relaxation.exactLeafResult(certified, problem, objective, sample)
+}
+
+/**
+ * The exact completion a certified leaf LP gives [sample]'s discrete values, or INDETERMINATE without one. On
+ * [LpVerdict.UNBOUNDED] it carries the ray of the reals only when [provesUnbounded] accepts the pair, and otherwise
+ * stands as a [LpVerdict.FEASIBLE] completion.
+ */
+internal fun LpRelaxation.exactLeafResult(
+    certified: CertifiedLpResult,
+    problem: Problem,
+    objective: LinearObjective?,
+    sample: Sample,
+): LeafRealResult {
     val unboundedness = certified.unboundedness
     val primal = unboundedness?.witness?.primal ?: certified.exactPrimal
         ?: return LeafRealResult(LpVerdict.INDETERMINATE, EmptyDoubleArray)
-    val exactReals = relaxation.exactReals(primal, problem)
+    val exactReals = exactReals(primal, problem)
     val reals = DoubleArray(exactReals.size) { exactReals[it].toDouble() }
     if (unboundedness == null) return LeafRealResult(certified.verdict, reals, exactReals)
-    val direction = relaxation.realDirection(unboundedness.direction, problem)
+    val direction = realDirection(unboundedness.direction, problem)
     val point = sample.copy(reals = reals, exactReals = exactReals)
     return if (objective != null && direction != null && problem.provesUnbounded(objective, point, direction)) {
         LeafRealResult(LpVerdict.UNBOUNDED, reals, exactReals, direction)

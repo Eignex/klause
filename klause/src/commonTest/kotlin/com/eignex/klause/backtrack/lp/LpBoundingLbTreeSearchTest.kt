@@ -56,7 +56,7 @@ class LpBoundingLbTreeSearchTest {
             }
             val p = Problem(0, n, domains, factors.toTypedArray())
             val obj = LinearObjective(intCoefficients = LongArray(n) { rng.nextLong(-2, 3) })
-            val sample = engine(p, obj).lbTreeSearch(obj, Cancellation.Never) ?: return@repeat
+            val sample = engine(p, obj).lbTreeSearch(obj, Cancellation.Never)?.sample ?: return@repeat
             produced++
             for (f in p.factors.filterIsInstance<Linear>()) {
                 assertTrue(satisfies(f, sample.ints), "subsolver returned infeasible ${sample.ints.toList()}")
@@ -66,14 +66,35 @@ class LpBoundingLbTreeSearchTest {
     }
 
     @Test
+    fun `a dive leaf whose reals descend without limit returns its checked ray`() {
+        // x in [0,3], r >= 0 with x - r <= 1: minimizing -r grows r without limit from every leaf.
+        val p = Problem(
+            numBoolVars = 0,
+            numIntVars = 1,
+            intDomains = arrayOf(IntDomain(0, 3)),
+            factors = arrayOf<Factor>(
+                Linear(longArrayOf(1L), intArrayOf(0), doubleArrayOf(-1.0), intArrayOf(0), LinearOp.LE, 1L),
+            ),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(Double.POSITIVE_INFINITY),
+        )
+        val obj = LinearObjective(realCoefficients = doubleArrayOf(-1.0))
+
+        val seed = engine(p, obj).use { assertNotNull(it.lbTreeSearch(obj, Cancellation.Never)) }
+
+        assertTrue(assertNotNull(seed.direction).single().signum() > 0)
+    }
+
+    @Test
     fun `tree objective uses its own relaxation after the parent found a different optimum`() {
         val problem = Problem(0, 1, arrayOf(IntDomain(0, 3)), emptyArray())
         val positive = LinearObjective(intCoefficients = longArrayOf(1L))
         val negative = LinearObjective(intCoefficients = longArrayOf(-1L))
         engine(problem, positive).use { parent ->
-            assertEquals(0L, assertNotNull(parent.lbTreeSearch(positive, Cancellation.Never)).ints[0])
-            assertEquals(3L, assertNotNull(parent.lbTreeSearch(negative, Cancellation.Never)).ints[0])
-            assertEquals(0L, assertNotNull(parent.lbTreeSearch(positive, Cancellation.Never)).ints[0])
+            assertEquals(0L, assertNotNull(parent.lbTreeSearch(positive, Cancellation.Never)).sample.ints[0])
+            assertEquals(3L, assertNotNull(parent.lbTreeSearch(negative, Cancellation.Never)).sample.ints[0])
+            assertEquals(0L, assertNotNull(parent.lbTreeSearch(positive, Cancellation.Never)).sample.ints[0])
         }
     }
 
@@ -94,7 +115,7 @@ class LpBoundingLbTreeSearchTest {
         val obj = LinearObjective(intCoefficients = longArrayOf(0, 0, 0, 1))
         val sink = SolveStatsSink(backend = "lbtree")
         val lp = LpEngine(p, obj, LpParams(lpPlan = LpPlan(bounding = true)), sink)
-        val sample = lp.lbTreeSearch(obj, Cancellation.Never)
+        val sample = lp.lbTreeSearch(obj, Cancellation.Never)?.sample
         assertTrue(sample != null, "shared search should find a feasible incumbent")
         assertEquals(2.0, obj.evaluate(sample), "shared search should dive to the optimal cost 2")
         assertTrue(sink.snapshot().lp.rootPasses.sum > 0.0, "every tree-search LP must be attributed to root work")
@@ -122,7 +143,9 @@ class LpBoundingLbTreeSearchTest {
         )
         val objective = LinearObjective(intCoefficients = longArrayOf(1), realCoefficients = doubleArrayOf(2.0))
 
-        val sample = engine(problem, objective).use { assertNotNull(it.lbTreeSearch(objective, Cancellation.Never)) }
+        val sample = engine(problem, objective).use {
+            assertNotNull(it.lbTreeSearch(objective, Cancellation.Never)).sample
+        }
 
         assertEquals(1L, sample.ints[0])
         assertEquals(0.5, sample.reals[0])

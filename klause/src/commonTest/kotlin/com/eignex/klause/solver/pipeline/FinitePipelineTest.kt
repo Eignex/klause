@@ -6,6 +6,8 @@ import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.lp.bounding.LpConfig
+import com.eignex.klause.lp.engine.LpZeroObjectivePricing
 import com.eignex.klause.portfolio.EngineMix
 import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.presolve.PresolveConfig
@@ -19,11 +21,64 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class FinitePipelineTest {
+
+    @Test
+    fun `an unbounded leaf ray survives presolve as a source-model verdict`() {
+        // y = x + 1 is eliminated by presolve; x in [0,3], r >= 0 with x - r <= 1 lets minimizing -r descend for ever.
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 2,
+            intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 5)),
+            factors = arrayOf<Factor>(
+                Linear(longArrayOf(1L, -1L), intArrayOf(1, 0), LinearOp.EQ, 1L),
+                Linear(longArrayOf(1L), intArrayOf(0), doubleArrayOf(-1.0), intArrayOf(0), LinearOp.LE, 1L),
+            ),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(Double.POSITIVE_INFINITY),
+        )
+        val objective = LinearObjective(realCoefficients = doubleArrayOf(-1.0))
+        for (engine in listOf(FiniteEngine.FIXED, FiniteEngine.BACKTRACK)) {
+            val result = FinitePipeline.solve(
+                FiniteSolveRequest(
+                    shape = FiniteSolveShape(problem, true, false, null, objective, null, null),
+                    engine = engine,
+                    presolveConfig = PresolveConfig.DEFAULT,
+                    explicitPresolveConfig = true,
+                    solutionSetSensitive = false,
+                    cancellation = Cancellation.Never,
+                    presolveBudget = null,
+                    cores = 1,
+                    engineParams = emptyList(),
+                    randomSeed = 1L,
+                    defaultArms = 1,
+                    lpConfig = LpConfig(),
+                    zeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT,
+                    nodeBudget = null,
+                    solveBudgetMillis = null,
+                    allSolutions = false,
+                    solutionCap = null,
+                    deadlineExceeded = { false },
+                    onEvent = null,
+                    onPortfolioEvent = null,
+                ),
+                FiniteSolveCallbacks(onSample = {}, onImprovement = {}),
+            )
+
+            val outcome = assertIs<FiniteSolveOutcome.Completed>(result.outcome)
+            assertTrue(assertNotNull(result.preparation.presolve).constraintsRemoved > 0, "presolve eliminated y")
+            assertEquals(FiniteSolveVerdict.UNBOUNDED, outcome.verdict, "$engine")
+            assertTrue(assertNotNull(outcome.unboundedDirection).single().signum() > 0)
+            val sample = assertNotNull(outcome.bestSample)
+            assertEquals(sample.ints[0] + 1L, sample.ints[1])
+        }
+    }
 
     @Test
     fun `selects the portfolio composition for a finite route`() {

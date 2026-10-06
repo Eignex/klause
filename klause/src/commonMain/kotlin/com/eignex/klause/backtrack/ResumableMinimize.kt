@@ -680,11 +680,15 @@ internal class ResumableMinimize(
      * slice boundary stops it where it stops the rest of the engine.
      */
     private fun publishLpProposal(proposal: Sample): MinimizeResult.WithSample? {
+        val accepted = verifiedLpProposal(proposal) ?: return null
+        return recordIfImproving(accepted.assignment, accepted.objective)
+    }
+
+    private fun verifiedLpProposal(proposal: Sample): Candidate<Sample, Double>? {
         val budget = params.cancellation or Cancellation.after(LP_VERIFY_BUDGET)
         val verifier = ComposedSampleVerifier(problem, objective, budget)
         val verdict = verifier.verify(Candidate(proposal, objective.evaluate(proposal)))
-        val accepted = (verdict as? Verification.Accepted)?.candidate ?: return null
-        return recordIfImproving(accepted.assignment, accepted.objective)
+        return (verdict as? Verification.Accepted)?.candidate
     }
 
     /**
@@ -798,7 +802,15 @@ internal class ResumableMinimize(
             // when the probe above seeded none — running it behind a successful probe was measured
             // on MIPLIB as 0.3-1.5s of root time for no objective anywhere.
             if (lpEngine.params.lpPlan.lbTreeSearch && lpEngine.lpRelaxer != null) {
-                lpEngine.lbTreeSearch(objective, rootToken)?.let { seed -> publishLpProposal(seed)?.let { return it } }
+                lpEngine.lbTreeSearch(objective, rootToken)?.let { seed ->
+                    val ray = seed.direction
+                    // The dive's own root carries no assumptions, so its ray speaks for the model only without them.
+                    if (ray != null && params.assumptions.isEmpty && verifiedLpProposal(seed.sample) != null) {
+                        unboundedLeaf = seed.sample to ray
+                        return null
+                    }
+                    publishLpProposal(seed.sample)?.let { return it }
+                }
             }
         }
         return null

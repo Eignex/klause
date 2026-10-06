@@ -34,7 +34,11 @@ import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.cancelledWhen
 import com.ionspin.kotlin.bignum.integer.BigInteger
 
-internal fun LpEngine.lbTreeSearch(objective: LinearObjective, cancellation: Cancellation): Sample? {
+/** A leaf the best-bound dive found: its completed [sample], and the checked [direction] when the reals there
+ *  descend without limit. */
+internal class LpTreeSeed(val sample: Sample, val direction: List<BigFraction>? = null)
+
+internal fun LpEngine.lbTreeSearch(objective: LinearObjective, cancellation: Cancellation): LpTreeSeed? {
     if (lpRelaxer == null) return null
     // The heuristic has an independent source root; the optimizing caller keeps its own trail.
     val stop = cancellation or params.cancellation
@@ -126,6 +130,8 @@ internal fun LpEngine.lbTreeSearch(objective: LinearObjective, cancellation: Can
                 }
                 val exact = leaf.exactReals ?: continue
                 sample = Sample(sample.bools, sample.ints, leaf.reals, exact)
+                // No better leaf matters once one descends without limit.
+                leaf.direction?.let { return@use LpTreeSeed(sample, it) }
                 exact
             } else {
                 emptyList()
@@ -149,7 +155,7 @@ internal fun LpEngine.lbTreeSearch(objective: LinearObjective, cancellation: Can
                 best = sample
             }
         }
-        best
+        best?.let(::LpTreeSeed)
     }
 }
 
