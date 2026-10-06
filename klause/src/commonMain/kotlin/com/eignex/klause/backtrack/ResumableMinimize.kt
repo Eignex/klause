@@ -40,6 +40,7 @@ import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.result.UnsatCore
+import com.eignex.klause.solver.result.UnsoundnessException
 import com.eignex.klause.solver.search.BooleanBranching
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchComponentSet
@@ -1020,6 +1021,15 @@ internal class ResumableMinimize(
             context: SearchContext,
         ): SearchModelDisposition {
             val sample = checkNotNull(model.valueOf<Sample>(cp))
+            // The leaf is the engine's own claim, re-derived here from every factor before it can become an
+            // incumbent: an assignment the composed fixpoint refutes is an engine defect, never a solution. A check
+            // the deadline cut short refutes nothing, so the leaf stands.
+            val verdict = composedFixpoint(problem, Candidate(sample, Unit), params.cancellation, params.assumptions)
+            if (verdict is Verification.Rejected) {
+                throw UnsoundnessException(
+                    "backtrack reached an optimization leaf its constraints refute: ${verdict.reason}",
+                )
+            }
             brancher.onSolution(sample)
             // What this leaf left open, apart from the run-wide record in sawIndeterminateLeaf.
             var unresolved = false
