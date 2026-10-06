@@ -54,29 +54,32 @@ internal class BacktrackWorkerConfig(
         val workerEvent = onEvent?.let { sink -> { e: SearchEvent -> sink(workerLabel, e) } }
         var params = recipe.build(seed + 1000L + index, workerEvent)
         params = params.copy(zeroObjectivePricing = zeroObjectivePricing, toleranceCheck = toleranceCheck)
+        // Shared entries name the worker's position as their origin, so replicas of one arm are credited apart.
         pools?.clauses?.let {
-            params = params.copy(clauseExchange = PoolClauseExchange(it, origin = armId, tally = pools.contributions))
+            params = params.copy(clauseExchange = PoolClauseExchange(it, origin = index, tally = pools.contributions))
         }
         pools?.cuts?.let {
-            params = params.copy(cutExchange = PoolCutExchange(it, origin = armId, tally = pools.contributions))
+            params = params.copy(cutExchange = PoolCutExchange(it, origin = index, tally = pools.contributions))
         }
         // Wire this arm to the shared objective lower-bound manager when optimising: publish
         // the bounds it proves and tighten its objective floor to the cross-arm maximum.
         if (objective != null) {
             pools?.bounds?.let { bounds ->
                 params = params.copy(
-                    objectiveLowerBoundSink = bounds::publish,
+                    objectiveLowerBoundSink = { v ->
+                        pools.contributions.note(Contribution.Floor, index, bounds.publish(v))
+                    },
                     objectiveLowerBoundSupplier = bounds::current,
                 )
             }
             pools?.varBounds?.let { vb ->
                 params = params.copy(
-                    globalVarBoundSink = { v, lo, hi -> vb.publish(v, lo, hi, origin = armId) },
+                    globalVarBoundSink = { v, lo, hi -> vb.publish(v, lo, hi, origin = index) },
                     globalVarLowerSupplier = vb::lowerOf,
                     globalVarUpperSupplier = vb::upperOf,
                     globalVarImportSink = { v, lower ->
                         val from = if (lower) vb.lowerOriginOf(v) else vb.upperOriginOf(v)
-                        if (from != armId) pools.contributions.note(Contribution.Bound, from)
+                        if (from != index) pools.contributions.note(Contribution.Bound, from)
                     },
                 )
             }

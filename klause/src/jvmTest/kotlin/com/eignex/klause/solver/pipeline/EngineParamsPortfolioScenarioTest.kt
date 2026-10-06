@@ -47,7 +47,7 @@ class EngineParamsPortfolioScenarioTest {
     @Test
     fun `single core selects the sequential executor over a multi-arm pool`() {
         val s = scenario(cores = 1)
-        assertEquals(1, s.cores, "cores == 1 ⇒ SequentialPortfolio (the free track)")
+        assertEquals(1, s.cores, "cores == 1 ⇒ one lane (the free track)")
         assertEquals(PortfolioScenario.DEFAULT_ARMS, s.arms, "the single core still bandit-schedules a real pool")
     }
 

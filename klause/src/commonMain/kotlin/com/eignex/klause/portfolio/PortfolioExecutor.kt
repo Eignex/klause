@@ -6,10 +6,8 @@ import com.eignex.klause.util.Cancellation
 import kotlin.time.Duration
 
 /**
- * The common, **blocking** interface of the two portfolio executors — the parallel `Portfolio`
- * (jvm+native, real threads) and the single-core [SequentialPortfolio] (bandit-scheduled segments).
- * A caller selects one by [PortfolioScenario.cores] and then invokes `solve`/`minimize`
- * identically, regardless of which it got. Coroutine-free: both are plain blocking calls.
+ * The **blocking** interface of a portfolio executor, implemented by [Portfolio] on as many lanes as
+ * [PortfolioScenario.cores] gives it. Coroutine-free: `solve` and `minimize` are plain blocking calls.
  */
 interface PortfolioExecutor : AutoCloseable {
     /** Solve (satisfaction), honouring [cancellation]. */
@@ -18,11 +16,10 @@ interface PortfolioExecutor : AutoCloseable {
     /**
      * Branch-and-bound minimisation, honouring [cancellation]. When [onImprovement] is set it fires
      * once per **strict global improvement**, tagged with the producing worker — the attribution
-     * entry point for anytime telemetry / per-arm credit. The callback is serialised: the parallel
-     * executor holds a lock across it, the single-core one is inherently sequential, so the consumer
-     * never sees concurrent invocations. It also fires in the order the shared incumbent installed the
-     * improvements rather than the order the producing threads reached the callback, so the objectives a
-     * consumer scores against the one before them never regress. [AttributedImprovement.elapsed] carries no
+     * entry point for anytime telemetry / per-arm credit. The callback is serialised under the
+     * same lock as the install, so the consumer never sees concurrent invocations and receives the improvements
+     * in the order the shared incumbent installed them: the objectives a consumer scores against the one before
+     * them never regress. [AttributedImprovement.elapsed] carries no
      * such ordering; see it.
      */
     fun minimize(
@@ -32,8 +29,7 @@ interface PortfolioExecutor : AutoCloseable {
 }
 
 /** One strict global improvement, tagged with the producing worker's label and the elapsed time
- *  since the minimisation started. Emitted by [PortfolioExecutor.minimize]'s `onImprovement` and by
- *  the parallel `Portfolio.improvementsAttributed` stream. */
+ *  since the minimisation started. Emitted by [PortfolioExecutor.minimize]'s `onImprovement`. */
 data class AttributedImprovement(
     /** [PortfolioWorker.label] of the worker that produced this incumbent. */
     val workerLabel: String,

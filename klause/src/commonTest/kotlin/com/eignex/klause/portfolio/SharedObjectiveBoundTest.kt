@@ -33,4 +33,15 @@ class SharedObjectiveBoundTest {
         bounds.publish(Double.POSITIVE_INFINITY)
         assertEquals(4.0, bounds.current(), "only finite bounds update the maximum")
     }
+
+    @Test
+    fun `publishing returns how far it raised a finite bound`() {
+        val bounds = SharedObjectiveBound()
+
+        val first = bounds.publish(3.0)
+        val raise = bounds.publish(7.5)
+        val weaker = bounds.publish(5.0)
+
+        assertEquals(listOf(0.0, 4.5, 0.0), listOf(first, raise, weaker))
+    }
 }

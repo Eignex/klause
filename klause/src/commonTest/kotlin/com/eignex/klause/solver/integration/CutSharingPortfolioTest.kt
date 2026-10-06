@@ -7,9 +7,9 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.portfolio.EngineMix
 import com.eignex.klause.portfolio.Kind
+import com.eignex.klause.portfolio.Portfolio
 import com.eignex.klause.portfolio.PortfolioBuilder
 import com.eignex.klause.portfolio.PortfolioScenario
-import com.eignex.klause.portfolio.SequentialPortfolio
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
@@ -45,7 +45,7 @@ class CutSharingPortfolioTest {
                 shareCuts = shareCuts,
             )
             val workers = PortfolioBuilder.build(problem.bake(), scenario, objective = obj)
-            val result = SequentialPortfolio.thompson(workers).use { it.minimize() }
+            val result = Portfolio.thompson(workers).use { it.minimize() }
             return assertIs<MinimizeResult.Optimal>(result).objectiveValue
         }
 

@@ -24,7 +24,7 @@ internal class LocalSearchWorkerConfig(val recipe: LocalSearchRecipe) : WorkerCo
 
     /** Build an LS worker: its [LocalSearchSolver] session (with the per-move invariant network when
      *  a [definitionalSweep] is present and the recipe enables it) + λ-shaped params, exposing the
-     *  warm-start seam so a [SequentialPortfolio] can resume a segment from the shared incumbent. The
+     *  warm-start seam so a [Portfolio] can resume a segment from the shared incumbent. The
      *  restart cadence rides on the recipe's `strategy.schedule.restart`. Label is `ls/<label>`. */
     override fun materialize(
         problem: BakedProblem,

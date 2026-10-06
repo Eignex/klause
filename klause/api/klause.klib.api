@@ -2120,20 +2120,6 @@ sealed interface com.eignex.klause.model/VarSpec : com.eignex.klause.model/Schem
     }
 }
 
-sealed interface com.eignex.klause.portfolio/PortfolioStrategy { // com.eignex.klause.portfolio/PortfolioStrategy|null[0]
-    final object Exhaustive : com.eignex.klause.portfolio/PortfolioStrategy { // com.eignex.klause.portfolio/PortfolioStrategy.Exhaustive|null[0]
-        final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.portfolio/PortfolioStrategy.Exhaustive.equals|equals(kotlin.Any?){}[0]
-        final fun hashCode(): kotlin/Int // com.eignex.klause.portfolio/PortfolioStrategy.Exhaustive.hashCode|hashCode(){}[0]
-        final fun toString(): kotlin/String // com.eignex.klause.portfolio/PortfolioStrategy.Exhaustive.toString|toString(){}[0]
-    }
-
-    final object RaceFirstFeasible : com.eignex.klause.portfolio/PortfolioStrategy { // com.eignex.klause.portfolio/PortfolioStrategy.RaceFirstFeasible|null[0]
-        final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.portfolio/PortfolioStrategy.RaceFirstFeasible.equals|equals(kotlin.Any?){}[0]
-        final fun hashCode(): kotlin/Int // com.eignex.klause.portfolio/PortfolioStrategy.RaceFirstFeasible.hashCode|hashCode(){}[0]
-        final fun toString(): kotlin/String // com.eignex.klause.portfolio/PortfolioStrategy.RaceFirstFeasible.toString|toString(){}[0]
-    }
-}
-
 sealed interface com.eignex.klause.presolve/OpenPresolveResult { // com.eignex.klause.presolve/OpenPresolveResult|null[0]
     final class Tightened : com.eignex.klause.presolve/OpenPresolveResult { // com.eignex.klause.presolve/OpenPresolveResult.Tightened|null[0]
         constructor <init>(com.eignex.klause.ir/Problem, kotlin/Int) // com.eignex.klause.presolve/OpenPresolveResult.Tightened.<init>|<init>(com.eignex.klause.ir.Problem;kotlin.Int){}[0]
@@ -9138,17 +9124,23 @@ final class com.eignex.klause.portfolio/AttributedImprovement { // com.eignex.kl
 }
 
 final class com.eignex.klause.portfolio/Portfolio : com.eignex.klause.portfolio/PortfolioExecutor { // com.eignex.klause.portfolio/Portfolio|null[0]
-    constructor <init>(kotlin.collections/List<com.eignex.klause.portfolio/PortfolioWorker>, com.eignex.klause.portfolio/PortfolioStrategy = ...) // com.eignex.klause.portfolio/Portfolio.<init>|<init>(kotlin.collections.List<com.eignex.klause.portfolio.PortfolioWorker>;com.eignex.klause.portfolio.PortfolioStrategy){}[0]
+    constructor <init>(kotlin.collections/List<com.eignex.klause.portfolio/PortfolioWorker>, com.eignex.kumulant.bandit/UnivariateBandit, kotlin/Int = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Double = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Double = ..., kotlin/Int = ..., kotlin/Double = ...) // com.eignex.klause.portfolio/Portfolio.<init>|<init>(kotlin.collections.List<com.eignex.klause.portfolio.PortfolioWorker>;com.eignex.kumulant.bandit.UnivariateBandit;kotlin.Int;kotlin.Long;kotlin.Long;kotlin.Double;kotlin.Long;kotlin.Long;kotlin.Double;kotlin.Int;kotlin.Double){}[0]
 
     final val workers // com.eignex.klause.portfolio/Portfolio.workers|{}workers[0]
         final fun <get-workers>(): kotlin.collections/List<com.eignex.klause.portfolio/PortfolioWorker> // com.eignex.klause.portfolio/Portfolio.workers.<get-workers>|<get-workers>(){}[0]
 
     final fun close() // com.eignex.klause.portfolio/Portfolio.close|close(){}[0]
-    final fun improvements(com.eignex.klause.util/Cancellation = ...): kotlin.sequences/Sequence<com.eignex.klause.solver.result/MinimizeResult> // com.eignex.klause.portfolio/Portfolio.improvements|improvements(com.eignex.klause.util.Cancellation){}[0]
-    final fun improvementsAttributed(com.eignex.klause.util/Cancellation = ...): kotlin.sequences/Sequence<com.eignex.klause.portfolio/AttributedImprovement> // com.eignex.klause.portfolio/Portfolio.improvementsAttributed|improvementsAttributed(com.eignex.klause.util.Cancellation){}[0]
     final fun minimize(com.eignex.klause.util/Cancellation, kotlin/Function1<com.eignex.klause.portfolio/AttributedImprovement, kotlin/Unit>?): com.eignex.klause.solver.result/MinimizeResult // com.eignex.klause.portfolio/Portfolio.minimize|minimize(com.eignex.klause.util.Cancellation;kotlin.Function1<com.eignex.klause.portfolio.AttributedImprovement,kotlin.Unit>?){}[0]
-    final fun samples(com.eignex.klause.util/Cancellation = ...): kotlin.sequences/Sequence<com.eignex.klause.solver/Sample> // com.eignex.klause.portfolio/Portfolio.samples|samples(com.eignex.klause.util.Cancellation){}[0]
     final fun solve(com.eignex.klause.util/Cancellation): com.eignex.klause.solver/SolveResult // com.eignex.klause.portfolio/Portfolio.solve|solve(com.eignex.klause.util.Cancellation){}[0]
+
+    final object Companion { // com.eignex.klause.portfolio/Portfolio.Companion|null[0]
+        final const val DEFAULT_HALF_LIFE // com.eignex.klause.portfolio/Portfolio.Companion.DEFAULT_HALF_LIFE|{}DEFAULT_HALF_LIFE[0]
+            final fun <get-DEFAULT_HALF_LIFE>(): kotlin/Double // com.eignex.klause.portfolio/Portfolio.Companion.DEFAULT_HALF_LIFE.<get-DEFAULT_HALF_LIFE>|<get-DEFAULT_HALF_LIFE>(){}[0]
+        final const val DEFAULT_PHASE_RETENTION // com.eignex.klause.portfolio/Portfolio.Companion.DEFAULT_PHASE_RETENTION|{}DEFAULT_PHASE_RETENTION[0]
+            final fun <get-DEFAULT_PHASE_RETENTION>(): kotlin/Double // com.eignex.klause.portfolio/Portfolio.Companion.DEFAULT_PHASE_RETENTION.<get-DEFAULT_PHASE_RETENTION>|<get-DEFAULT_PHASE_RETENTION>(){}[0]
+
+        final fun thompson(kotlin.collections/List<com.eignex.klause.portfolio/PortfolioWorker>, kotlin/Int = ..., kotlin/Long = ..., kotlin/Double = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Double = ..., kotlin/Int = ..., kotlin/Long = ..., kotlin/Double = ...): com.eignex.klause.portfolio/Portfolio // com.eignex.klause.portfolio/Portfolio.Companion.thompson|thompson(kotlin.collections.List<com.eignex.klause.portfolio.PortfolioWorker>;kotlin.Int;kotlin.Long;kotlin.Double;kotlin.Long;kotlin.Long;kotlin.Double;kotlin.Int;kotlin.Long;kotlin.Double){}[0]
+    }
 }
 
 final class com.eignex.klause.portfolio/PortfolioScenario { // com.eignex.klause.portfolio/PortfolioScenario|null[0]
@@ -9242,26 +9234,6 @@ final class com.eignex.klause.portfolio/PortfolioWorker : kotlin/AutoCloseable {
 
     final object Companion { // com.eignex.klause.portfolio/PortfolioWorker.Companion|null[0]
         final fun <#A2: com.eignex.klause.solver/SolverParams> of(kotlin/String, kotlin/Int, com.eignex.klause.solver/Session<#A2>, #A2, com.eignex.klause.solver.objective/LinearObjective? = ..., kotlin/Function2<#A2, com.eignex.klause.solver/Sample, #A2>? = ..., kotlin/Function2<#A2, kotlin/Long, #A2>? = ..., kotlin/Function2<#A2, kotlin/Function0<kotlin/Double>, #A2>? = ...): com.eignex.klause.portfolio/PortfolioWorker // com.eignex.klause.portfolio/PortfolioWorker.Companion.of|of(kotlin.String;kotlin.Int;com.eignex.klause.solver.Session<0:0>;0:0;com.eignex.klause.solver.objective.LinearObjective?;kotlin.Function2<0:0,com.eignex.klause.solver.Sample,0:0>?;kotlin.Function2<0:0,kotlin.Long,0:0>?;kotlin.Function2<0:0,kotlin.Function0<kotlin.Double>,0:0>?){0§<com.eignex.klause.solver.SolverParams>}[0]
-    }
-}
-
-final class com.eignex.klause.portfolio/SequentialPortfolio : com.eignex.klause.portfolio/PortfolioExecutor { // com.eignex.klause.portfolio/SequentialPortfolio|null[0]
-    constructor <init>(kotlin.collections/List<com.eignex.klause.portfolio/PortfolioWorker>, com.eignex.kumulant.bandit/UnivariateBandit, kotlin/Long = ..., kotlin/Long = ..., kotlin/Double = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Double = ..., kotlin/Int = ..., kotlin/Double = ...) // com.eignex.klause.portfolio/SequentialPortfolio.<init>|<init>(kotlin.collections.List<com.eignex.klause.portfolio.PortfolioWorker>;com.eignex.kumulant.bandit.UnivariateBandit;kotlin.Long;kotlin.Long;kotlin.Double;kotlin.Long;kotlin.Long;kotlin.Double;kotlin.Int;kotlin.Double){}[0]
-
-    final val workers // com.eignex.klause.portfolio/SequentialPortfolio.workers|{}workers[0]
-        final fun <get-workers>(): kotlin.collections/List<com.eignex.klause.portfolio/PortfolioWorker> // com.eignex.klause.portfolio/SequentialPortfolio.workers.<get-workers>|<get-workers>(){}[0]
-
-    final fun close() // com.eignex.klause.portfolio/SequentialPortfolio.close|close(){}[0]
-    final fun minimize(com.eignex.klause.util/Cancellation, kotlin/Function1<com.eignex.klause.portfolio/AttributedImprovement, kotlin/Unit>?): com.eignex.klause.solver.result/MinimizeResult // com.eignex.klause.portfolio/SequentialPortfolio.minimize|minimize(com.eignex.klause.util.Cancellation;kotlin.Function1<com.eignex.klause.portfolio.AttributedImprovement,kotlin.Unit>?){}[0]
-    final fun solve(com.eignex.klause.util/Cancellation): com.eignex.klause.solver/SolveResult // com.eignex.klause.portfolio/SequentialPortfolio.solve|solve(com.eignex.klause.util.Cancellation){}[0]
-
-    final object Companion { // com.eignex.klause.portfolio/SequentialPortfolio.Companion|null[0]
-        final const val DEFAULT_HALF_LIFE // com.eignex.klause.portfolio/SequentialPortfolio.Companion.DEFAULT_HALF_LIFE|{}DEFAULT_HALF_LIFE[0]
-            final fun <get-DEFAULT_HALF_LIFE>(): kotlin/Double // com.eignex.klause.portfolio/SequentialPortfolio.Companion.DEFAULT_HALF_LIFE.<get-DEFAULT_HALF_LIFE>|<get-DEFAULT_HALF_LIFE>(){}[0]
-        final const val DEFAULT_PHASE_RETENTION // com.eignex.klause.portfolio/SequentialPortfolio.Companion.DEFAULT_PHASE_RETENTION|{}DEFAULT_PHASE_RETENTION[0]
-            final fun <get-DEFAULT_PHASE_RETENTION>(): kotlin/Double // com.eignex.klause.portfolio/SequentialPortfolio.Companion.DEFAULT_PHASE_RETENTION.<get-DEFAULT_PHASE_RETENTION>|<get-DEFAULT_PHASE_RETENTION>(){}[0]
-
-        final fun thompson(kotlin.collections/List<com.eignex.klause.portfolio/PortfolioWorker>, kotlin/Long = ..., kotlin/Double = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Double = ..., kotlin/Int = ..., kotlin/Long = ..., kotlin/Double = ...): com.eignex.klause.portfolio/SequentialPortfolio // com.eignex.klause.portfolio/SequentialPortfolio.Companion.thompson|thompson(kotlin.collections.List<com.eignex.klause.portfolio.PortfolioWorker>;kotlin.Long;kotlin.Double;kotlin.Long;kotlin.Long;kotlin.Double;kotlin.Int;kotlin.Long;kotlin.Double){}[0]
     }
 }
 

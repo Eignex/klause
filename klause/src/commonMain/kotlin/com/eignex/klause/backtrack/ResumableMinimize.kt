@@ -94,7 +94,7 @@ private val LP_VERIFY_BUDGET = 100.milliseconds
  * Two callers drive it, differing only in [pausable]:
  *  - [BacktrackSolver.improvements] streams it lazily — one [StepEvent.Incumbent] yielded per call, then the terminal;
  *    a fired cancellation is a hard stop.
- *  - [runSlice] runs it one time slice at a time for [com.eignex.klause.portfolio.SequentialPortfolio]:
+ *  - [runSlice] runs it one time slice at a time for [com.eignex.klause.portfolio.Portfolio]:
  *    a fired slice deadline pauses ([StepEvent.Paused]); a later call resumes mid-tree so the
  *    arm never cold-restarts.
  */

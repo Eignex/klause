@@ -24,11 +24,15 @@ import com.eignex.kumulant.stream.lock
 internal class SharedObjectiveBound(private val lock: Mutex = Concurrency.None.lock()) {
     private var lb = Double.NEGATIVE_INFINITY
 
-    /** Fold a proven global lower bound on the optimum into the shared maximum. Ignores a non-finite or
-     *  `−∞` value (no information). */
-    fun publish(value: Double) {
-        if (!value.isFinite()) return
-        lock.withLock { if (value > lb) lb = value }
+    /** Fold a proven global lower bound on the optimum into the shared maximum, returning how far it raised a
+     *  finite bound: `0` when it raised nothing or set the first one. Ignores a non-finite value (no information). */
+    fun publish(value: Double): Double {
+        if (!value.isFinite()) return 0.0
+        return lock.withLock {
+            val raise = if (value > lb && lb.isFinite()) value - lb else 0.0
+            if (value > lb) lb = value
+            raise
+        }
     }
 
     /** The tightest lower bound any arm has published, or `−∞` if none. */

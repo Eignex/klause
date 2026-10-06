@@ -5,20 +5,20 @@ import kotlin.test.assertEquals
 
 class ContributionTallyTest {
 
-    private fun drained(tally: ContributionTally): Map<Pair<Contribution, Int>, Long> {
-        val out = HashMap<Pair<Contribution, Int>, Long>()
-        tally.drain { kind, origin, uses -> out[kind to origin] = uses }
+    private fun drained(tally: ContributionTally): Map<Pair<Contribution, Int>, Double> {
+        val out = HashMap<Pair<Contribution, Int>, Double>()
+        tally.drain { kind, origin, amount -> out[kind to origin] = amount }
         return out
     }
 
     @Test
     fun `uses add up per kind and origin`() {
         val tally = ContributionTally()
-        tally.note(Contribution.Clause, 2, 3)
-        tally.note(Contribution.Clause, 2, 1)
+        tally.note(Contribution.Clause, 2, 3.0)
+        tally.note(Contribution.Clause, 2, 1.0)
         tally.note(Contribution.Cut, 0)
 
-        assertEquals(mapOf((Contribution.Clause to 2) to 4L, (Contribution.Cut to 0) to 1L), drained(tally))
+        assertEquals(mapOf((Contribution.Clause to 2) to 4.0, (Contribution.Cut to 0) to 1.0), drained(tally))
     }
 
     @Test

@@ -91,7 +91,7 @@ without widening runtime dependencies.
 `80bau3b`'s INDETERMINATE → shared SearchExhausted → UNSAT promotion and the correction to
 Unsupported → UNKNOWN under unchanged limits. The exact saved witness satisfies 2,262 source rows
 and 9,799 column bounds. Producer, stop-before-block and sequential/parallel portfolio regressions
-remain in [ResumableMinimizeTest][resumable-test], [SequentialPortfolioTest][sequential-test] and
+remain in [ResumableMinimizeTest][resumable-test], [PortfolioTest][sequential-test] and
 [PortfolioTest][portfolio-test]. The source replay predates the final failed-handle guard/formatting;
 complete launch-diff bytes were not archived, while production patches/JAR/input/runtime hashes remain.
 It is not an exact-final-head replay, an explanation of the inner certification decline, or recovered
@@ -169,7 +169,7 @@ central-plan correction proposals are in the [E handoff][handoff].
 [tree-test]: ../klause/src/commonTest/kotlin/com/eignex/klause/backtrack/lp/LpTreeSearchWarmStartTest.kt
 [components-test]: ../klause/src/commonTest/kotlin/com/eignex/klause/lp/engine/LpComponentsTest.kt
 [resumable-test]: ../klause/src/commonTest/kotlin/com/eignex/klause/backtrack/ResumableMinimizeTest.kt
-[sequential-test]: ../klause/src/commonTest/kotlin/com/eignex/klause/portfolio/SequentialPortfolioTest.kt
+[sequential-test]: ../klause/src/commonTest/kotlin/com/eignex/klause/portfolio/PortfolioTest.kt
 [boundary-test]: ../klause/src/jvmTest/kotlin/com/eignex/klause/lp/LpDeclineDisciplineTest.kt
 [reference-test]: ../klause/src/jvmTest/kotlin/com/eignex/klause/lp/engine/LpReferenceAdapterTest.kt
 [portfolio-test]: ../klause/src/jvmTest/kotlin/com/eignex/klause/portfolio/PortfolioTest.kt

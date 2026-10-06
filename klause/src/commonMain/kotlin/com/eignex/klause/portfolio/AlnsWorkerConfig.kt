@@ -38,7 +38,7 @@ import kotlin.math.ln
  *
  * Like a plain LS arm ([LocalSearchWorkerConfig]) and unlike a resumable backtrack arm, this worker has
  * no pause/resume handle — [PortfolioWorker.newResumableSearch] is null — and accepts a counted
- * [PortfolioWorker.acceptsInstructionBudget] segment instead: [SequentialPortfolio] maps its per-segment
+ * [PortfolioWorker.acceptsInstructionBudget] segment instead: [Portfolio] maps its per-segment
  * flip allowance onto [com.eignex.klause.localsearch.LocalSearchParams.maxInstructions], which
  * [com.eignex.klause.meta.alns.Alns] spends against its own outer destroy/repair loop (see
  * [com.eignex.klause.meta.alns.Alns]'s class KDoc for how one iteration is costed).

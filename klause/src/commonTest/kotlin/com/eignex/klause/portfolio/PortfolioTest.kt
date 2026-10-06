@@ -172,7 +172,7 @@ private fun trackingWorker(label: String, armId: Int, handle: ResumableSearch): 
     objective = LinearObjective(),
 )
 
-class SequentialPortfolioTest {
+class PortfolioTest {
     @Test
     fun `real unresolved arms terminate without claiming complete coverage`() {
         for (withIncumbent in listOf(false, true)) {
@@ -188,7 +188,7 @@ class SequentialPortfolioTest {
                 )
             }
             var polls = 0
-            SequentialPortfolio.thompson(workers).use { portfolio ->
+            Portfolio.thompson(workers).use { portfolio ->
                 val offered = ArrayList<Double>()
                 val result = portfolio.minimize(
                     Cancellation { ++polls > 100_000 },
@@ -220,7 +220,7 @@ class SequentialPortfolioTest {
                 withBound = { p, bound -> p.copy(objectiveBoundSupplier = bound) },
             )
         }
-        SequentialPortfolio.thompson(workers).use { portfolio ->
+        Portfolio.thompson(workers).use { portfolio ->
             val result = assertIs<MinimizeResult.Optimal>(portfolio.minimize())
             assertEquals(0.5, result.sample.reals.single())
             fixtures.forEach { it.assertVisitedLeaves() }
@@ -239,7 +239,7 @@ class SequentialPortfolioTest {
             objective = fixture.objective,
             withBound = { p, bound -> p.copy(objectiveBoundSupplier = bound) },
         )
-        SequentialPortfolio.thompson(listOf(worker)).use { portfolio ->
+        Portfolio.thompson(listOf(worker)).use { portfolio ->
             var offers = 0
             val result = assertIs<MinimizeResult.BestFound>(portfolio.minimize { offers++ })
             assertEquals(0.5, result.sample.reals.single())
@@ -281,7 +281,7 @@ class SequentialPortfolioTest {
             override fun update(armIndex: Int, value: Double, weight: Double) = Unit
             override fun reset() = Unit
         }
-        val portfolio = SequentialPortfolio(
+        val portfolio = Portfolio(
             listOf(trackingWorker("dirty", 0, dirty), trackingWorker("active", 1, active)),
             bandit,
         )
@@ -304,7 +304,7 @@ class SequentialPortfolioTest {
             },
         )
         var polls = 0
-        val portfolio = SequentialPortfolio.thompson(listOf(trackingWorker("failed", 0, failed)))
+        val portfolio = Portfolio.thompson(listOf(trackingWorker("failed", 0, failed)))
         assertIs<MinimizeResult.Unknown>(portfolio.minimize(Cancellation { ++polls > 20 }))
         assertEquals(1, runs)
         assertEquals(1, failed.closes)
@@ -325,7 +325,7 @@ class SequentialPortfolioTest {
         )
         val third = TrackingResumableSearch(MinimizeResult.Optimal(later, 7.0))
         val seen = mutableListOf<Long>()
-        val portfolio = SequentialPortfolio.thompson(
+        val portfolio = Portfolio.thompson(
             listOf(
                 trackingWorker("valid", 0, first),
                 trackingWorker("rejected", 1, second),
@@ -355,7 +355,7 @@ class SequentialPortfolioTest {
             MinimizeResult.Optimal(sample, 5.0),
             MinimizeResult.BestFound(sample, 5.0, TerminationReason.BudgetExhausted),
         )
-        val portfolio = SequentialPortfolio.thompson(listOf(trackingWorker("rejected", 0, handle)))
+        val portfolio = Portfolio.thompson(listOf(trackingWorker("rejected", 0, handle)))
 
         val failure = assertFailsWith<IllegalArgumentException> {
             portfolio.minimize { throw IllegalArgumentException("source witness violates row 'R'") }
@@ -377,7 +377,7 @@ class SequentialPortfolioTest {
             MinimizeResult.Unknown(TerminationReason.Unsupported),
             MinimizeResult.BestFound(worse, 11.0, TerminationReason.BudgetExhausted),
         )
-        val portfolio = SequentialPortfolio.thompson(
+        val portfolio = Portfolio.thompson(
             listOf(trackingWorker("valid", 0, first), trackingWorker("worse", 1, second)),
         )
         val seen = mutableListOf<Long>()
@@ -400,7 +400,7 @@ class SequentialPortfolioTest {
             MinimizeResult.BestFound(sample, 1.0, TerminationReason.BudgetExhausted),
             closeFailure = "close failure",
         )
-        val portfolio = SequentialPortfolio.thompson(listOf(trackingWorker("failing", 0, handle)))
+        val portfolio = Portfolio.thompson(listOf(trackingWorker("failing", 0, handle)))
 
         val failure = assertFailsWith<IllegalStateException> {
             portfolio.minimize { error("output failure") }
@@ -462,7 +462,7 @@ class SequentialPortfolioTest {
             objective = fixture.objective,
             withBound = { p, bound -> p.copy(objectiveBoundSupplier = bound) },
         )
-        SequentialPortfolio.thompson(listOf(worker)).use { portfolio ->
+        Portfolio.thompson(listOf(worker)).use { portfolio ->
             val result = assertIs<MinimizeResult.Optimal>(portfolio.minimize())
             assertEquals(0.5, result.objectiveValue)
             assertEquals(2L, result.sample.ints.single())
@@ -478,7 +478,7 @@ class SequentialPortfolioTest {
             result = MinimizeResult.Optimal(sample, 0.0),
             incumbent = MinimizeResult.BestFound(sample, 0.0, TerminationReason.BudgetExhausted),
         )
-        val portfolio = SequentialPortfolio.thompson(
+        val portfolio = Portfolio.thompson(
             listOf(trackingWorker("paused", 0, paused), trackingWorker("terminal", 1, terminal)),
         )
 
@@ -492,7 +492,7 @@ class SequentialPortfolioTest {
     fun `global cancellation closes a paused handle`() {
         var cancelled = false
         val paused = TrackingResumableSearch(null, onRun = { cancelled = true })
-        val portfolio = SequentialPortfolio.thompson(listOf(trackingWorker("paused", 0, paused)))
+        val portfolio = Portfolio.thompson(listOf(trackingWorker("paused", 0, paused)))
 
         assertIs<MinimizeResult.Unknown>(portfolio.minimize(Cancellation { cancelled }))
 
@@ -506,7 +506,7 @@ class SequentialPortfolioTest {
             statsFailure = "stats failure",
             closeFailure = "close failure",
         )
-        val portfolio = SequentialPortfolio.thompson(listOf(trackingWorker("failing", 0, handle)))
+        val portfolio = Portfolio.thompson(listOf(trackingWorker("failing", 0, handle)))
 
         val failure = assertFailsWith<IllegalStateException> { portfolio.minimize() }
 
@@ -522,7 +522,7 @@ class SequentialPortfolioTest {
             result = MinimizeResult.Optimal(sample, 0.0),
             incumbent = MinimizeResult.BestFound(sample, 0.0, TerminationReason.BudgetExhausted),
         )
-        val portfolio = SequentialPortfolio.thompson(
+        val portfolio = Portfolio.thompson(
             listOf(trackingWorker("failing", 0, failing), trackingWorker("terminal", 1, terminal)),
         )
 
@@ -565,7 +565,7 @@ class SequentialPortfolioTest {
 
     @Test
     fun `sequential solve on a satisfiable problem returns sat`() {
-        val r = SequentialPortfolio.thompson(btArms(exactlyOneOver(4), 3)).use { it.solve() }
+        val r = Portfolio.thompson(btArms(exactlyOneOver(4), 3)).use { it.solve() }
         val sat = assertIs<SolveResult.Sat>(r)
         assertEquals(1, sat.assignment.bools.count { it }, "exactly-one violated")
     }
@@ -586,7 +586,7 @@ class SequentialPortfolioTest {
         )
         val workers = listOf(unsound) + btArms(problem, 1)
 
-        assertFailsWith<UnsoundnessException> { SequentialPortfolio.thompson(workers).use { it.solve() } }
+        assertFailsWith<UnsoundnessException> { Portfolio.thompson(workers).use { it.solve() } }
     }
 
     @Test
@@ -594,7 +594,7 @@ class SequentialPortfolioTest {
         val solver = CountingResumableSolver(slicesToVerdict = 4)
         val worker = PortfolioWorker.of("bt", 0, solver.session(), BacktrackParams())
 
-        val r = SequentialPortfolio.thompson(listOf(worker)).use { it.solve() }
+        val r = Portfolio.thompson(listOf(worker)).use { it.solve() }
 
         assertIs<SolveResult.Sat>(r)
         assertEquals(1, solver.opened.size, "the arm must resume, not reopen")
@@ -610,7 +610,7 @@ class SequentialPortfolioTest {
             PortfolioWorker.of("bt", 1, resumable.session(), BacktrackParams()),
         )
 
-        val r = SequentialPortfolio.thompson(workers).use { it.solve() }
+        val r = Portfolio.thompson(workers).use { it.solve() }
 
         assertIs<SolveResult.Sat>(r)
         assertEquals(1, failing.solves)
@@ -628,7 +628,7 @@ class SequentialPortfolioTest {
                 Clause(intArrayOf(Lit.make(0, false))),
             ),
         )
-        assertIs<SolveResult.Unsat>(SequentialPortfolio.thompson(btArms(problem, 2)).use { it.solve() })
+        assertIs<SolveResult.Unsat>(Portfolio.thompson(btArms(problem, 2)).use { it.solve() })
     }
 
     @Test
@@ -643,7 +643,7 @@ class SequentialPortfolioTest {
             ),
         )
         val obj = LinearObjective(intCoefficients = longArrayOf(1L, 2L))
-        val r = SequentialPortfolio.thompson(btArms(problem, 3, obj)).use { it.minimize() }
+        val r = Portfolio.thompson(btArms(problem, 3, obj)).use { it.minimize() }
         assertEquals(3.0, assertIs<MinimizeResult.Optimal>(r).objectiveValue)
     }
 
@@ -661,7 +661,7 @@ class SequentialPortfolioTest {
             ),
         )
         val obj = LinearObjective(intCoefficients = longArrayOf(1L, 2L))
-        val r = SequentialPortfolio.thompson(btArms(problem, 3, obj), reseedStaleThreshold = 1).use { it.minimize() }
+        val r = Portfolio.thompson(btArms(problem, 3, obj), reseedStaleThreshold = 1).use { it.minimize() }
         assertEquals(3.0, assertIs<MinimizeResult.Optimal>(r).objectiveValue)
     }
 
@@ -674,7 +674,7 @@ class SequentialPortfolioTest {
             }
             var polls = 0
 
-            SequentialPortfolio.thompson(workers).use { it.minimize(Cancellation { ++polls > 2_000 }) }
+            Portfolio.thompson(workers).use { it.minimize(Cancellation { ++polls > 2_000 }) }
 
             val share = slices.drop(1).sum().toDouble() / slices.sum()
             assertTrue(share < 0.05, "$useless useless arms took $share of the slices")
@@ -689,7 +689,7 @@ class SequentialPortfolioTest {
         val workers = listOf(trackingWorker("finder", 0, finder), trackingWorker("improver", 1, improver))
         var polls = 0
 
-        SequentialPortfolio.thompson(workers, seed = 3L).use { it.minimize(Cancellation { ++polls > 100 }) }
+        Portfolio.thompson(workers, seed = 3L).use { it.minimize(Cancellation { ++polls > 100 }) }
 
         assertTrue(slices[1] > 3 * slices[0], "finder ${slices[0]} slices, improver ${slices[1]}")
     }
@@ -699,19 +699,19 @@ class SequentialPortfolioTest {
         val slices = IntArray(3)
         val floor = SharedObjectiveBound()
         floor.publish(0.0)
+        val pools = SharedPools(clauses = null, cuts = null, bounds = floor)
         val finder = ScriptedSearch({ it == 0 }) { slices[0]++ }
         val raiser = ScriptedSearch({ false }) {
             slices[1]++
-            floor.publish(floor.current() + 1.0)
+            pools.contributions.note(Contribution.Floor, 1, floor.publish(floor.current() + 1.0))
         }
         val idle = ScriptedSearch({ false }) { slices[2]++ }
-        val pools = SharedPools(clauses = null, cuts = null, bounds = floor)
         val workers = listOf(finder, raiser, idle).mapIndexed { arm, search ->
             trackingWorker("arm$arm", arm, search).also { it.sharedPools = pools }
         }
         var polls = 0
 
-        SequentialPortfolio.thompson(workers).use { it.minimize(Cancellation { ++polls > 300 }) }
+        Portfolio.thompson(workers).use { it.minimize(Cancellation { ++polls > 300 }) }
 
         assertTrue(slices[1] > 3 * slices[2], "raiser ${slices[1]} slices, idle ${slices[2]}")
     }
@@ -722,7 +722,7 @@ class SequentialPortfolioTest {
         val pools = SharedPools(clauses = null, cuts = null)
         val finder = ScriptedSearch({ true }) {
             slices[0]++
-            pools.contributions.note(Contribution.Clause, origin = 1, uses = 5)
+            pools.contributions.note(Contribution.Clause, origin = 1, amount = 5.0)
         }
         val sharer = ScriptedSearch({ false }) { slices[1]++ }
         val idle = ScriptedSearch({ false }) { slices[2]++ }
@@ -731,7 +731,7 @@ class SequentialPortfolioTest {
         }
         var polls = 0
 
-        SequentialPortfolio.thompson(workers).use { it.minimize(Cancellation { ++polls > 300 }) }
+        Portfolio.thompson(workers).use { it.minimize(Cancellation { ++polls > 300 }) }
 
         assertTrue(slices[1] > 3 * slices[2], "sharer ${slices[1]} slices, idle ${slices[2]}")
     }
@@ -748,7 +748,7 @@ class SequentialPortfolioTest {
         )
         val obj = LinearObjective(intCoefficients = longArrayOf(1L, 2L))
         val arms = btArms(problem, 3, obj)
-        val r = SequentialPortfolio(arms, MultiArmedBandit(arms.size, UCB1(), Random(0))).use { it.minimize() }
+        val r = Portfolio(arms, MultiArmedBandit(arms.size, UCB1(), Random(0))).use { it.minimize() }
         assertEquals(3.0, assertIs<MinimizeResult.Optimal>(r).objectiveValue)
     }
 
@@ -770,7 +770,7 @@ class SequentialPortfolioTest {
     fun `mixed sequential run bounds LS work to its counted segment allowance`() {
         val problem = Problem(0, 0, emptyArray(), emptyArray())
         val objective = LinearObjective()
-        val r = SequentialPortfolio.thompson(
+        val r = Portfolio.thompson(
             mixedWorkers(problem, objective),
             baseSliceWork = 7L,
         ).use { it.minimize() }
@@ -804,7 +804,7 @@ class SequentialPortfolioTest {
             )
         }
 
-        SequentialPortfolio.thompson(arms, baseSliceWork = 7L).use {
+        Portfolio.thompson(arms, baseSliceWork = 7L).use {
             it.minimize(Cancellation { allowances.size >= arms.size })
         }
 
@@ -815,7 +815,7 @@ class SequentialPortfolioTest {
     fun `mixed sequential runs reproduce their counted work`() {
         val problem = Problem(0, 0, emptyArray(), emptyArray())
         val objective = LinearObjective()
-        fun run() = SequentialPortfolio.thompson(
+        fun run() = Portfolio.thompson(
             mixedWorkers(problem, objective),
             baseSliceWork = 7L,
         ).use { it.minimize() }
