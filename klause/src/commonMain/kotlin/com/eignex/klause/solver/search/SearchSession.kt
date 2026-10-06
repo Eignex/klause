@@ -213,6 +213,16 @@ class SearchSession(
 
     override fun cancelled(): Boolean = cancellation()
 
+    private var cancellationPollRequested = false
+
+    override fun requestCancellationPoll() {
+        cancellationPollRequested = true
+    }
+
+    internal fun consumeCancellationPollRequest(): Boolean = cancellationPollRequested.also {
+        cancellationPollRequested = false
+    }
+
     internal fun stopToken(): Cancellation = cancellation
 
     /** Initialize all components at the shared root. */
@@ -1096,6 +1106,10 @@ class SearchRun internal constructor(
                 }
 
                 is Alternatives.Branch -> {
+                    if (session.consumeCancellationPollRequest() && session.cancelled()) {
+                        return lifecycle.onCancellation(session).toEvent()
+                            ?: finish(SearchRunEvent.Indeterminate.Cancelled)
+                    }
                     if (alternatives.decisions.isEmpty()) {
                         if (!backtrack()) return stopAfterBacktrack()
                         continue

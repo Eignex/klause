@@ -337,7 +337,7 @@ internal class BacktrackBrancher(
             variable,
             phase.applyPhase(variable, values.values(session, variable, rng), rng),
         )
-        return when (variable) {
+        val alternatives = when (variable) {
             is VarRef.Bool -> ordered.map { value ->
                 require(value == 0L || value == 1L) { "Boolean selector produced $value" }
                 SearchDecision.Bool(Lit.make(variable.varId, value != 0L))
@@ -345,8 +345,14 @@ internal class BacktrackBrancher(
 
             // A probing selector offers nothing once it has refuted every value, so the node is dead. Null
             // would claim every column is fixed and surface the open domains' minima as a model.
-            is VarRef.IntVar -> splitIntAlternatives(session, variable, ordered.firstOrNull() ?: return emptyList())
+            is VarRef.IntVar -> ordered.firstOrNull()?.let { splitIntAlternatives(session, variable, it) }
+                ?: emptyList()
         }
+        if (session.probeCancelled) {
+            session.probeCancelled = false
+            context.requestCancellationPoll()
+        }
+        return alternatives
     }
 
     private fun isOpen(variable: VarRef): Boolean = when (variable) {

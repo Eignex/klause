@@ -11,7 +11,9 @@ import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.search.SearchDecision
+import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.solver.search.VarRef
+import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -60,6 +62,20 @@ class SearchIntNodeTest {
             BacktrackParams(variableSelector = SmallestDomain, valueSelector = Impact(), randomSeed = 0L),
         )
         assertIs<SolveResult.Unsat>(result, "an odd cycle of disequalities over two values is infeasible")
+    }
+
+    @Test
+    fun `a value probe that sees the deadline asks the run to poll before it commits`() {
+        val session = PropagationSession(problemOf(IntDomain(0, 3)), Cancellation { true })
+        val params = BacktrackParams(variableSelector = SmallestDomain, valueSelector = Impact(), randomSeed = 0L)
+        val brancher = BacktrackBrancher(session, params, sink = null, restart = RestartSchedule.from(params))
+        val context = SearchSession(emptyList())
+
+        val alternatives = brancher.nextBranch(context)
+
+        assertTrue(!alternatives.isNullOrEmpty(), "every value stays offered when probing stops early")
+        assertTrue(context.consumeCancellationPollRequest(), "the deadline sighting must reach the run")
+        assertTrue(!session.probeCancelled, "a consumed sighting must not stop a resumed run again")
     }
 
     @Test
