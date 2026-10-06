@@ -1,6 +1,7 @@
 package com.eignex.klause.localsearch
 import com.eignex.klause.compile.compile
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.arithmetic.Product
 import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Factor
@@ -19,6 +20,7 @@ import com.ionspin.kotlin.bignum.integer.BigInteger
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class LocalSearchSolverTest {
@@ -58,6 +60,29 @@ class LocalSearchSolverTest {
             val unknown = assertIs<MinimizeResult.Unknown>(result, label)
             assertEquals(TerminationReason.Unsupported, unknown.reason, label)
         }
+    }
+
+    @Test
+    fun `without per-move invariants every incumbent is scored by the linear objective`() {
+        // p = x0·x1 is the definition the gradient view reads, but the model only bounds p, so p is free to
+        // sit off it unless invariants keep it on the definition.
+        val problem = Problem(
+            0,
+            3,
+            arrayOf(IntDomain(1, 3), IntDomain(1, 3), IntDomain(0, 20)),
+            arrayOf<Factor>(Linear(intArrayOf(1), intArrayOf(2), LinearOp.GE, 1)),
+        )
+        val sweep = assertNotNull(DefinitionalSweep.infer(arrayOf(Product(a = 0, b = 1, result = 2)), numIntVars = 3))
+        val gradient = sweep.functionalObjective(intArrayOf(2), longArrayOf(1L), constant = 0L, minimize = true)
+        val objective = LinearObjective(intCoefficients = longArrayOf(0L, 0L, 1L))
+
+        val incumbents = LocalSearchSolver(problem.bake())
+            .improvements(objective, LocalSearchParams(maxFlips = 2_000, randomSeed = 3, lsObjective = gradient))
+            .filterIsInstance<MinimizeResult.WithSample>()
+            .toList()
+
+        assertTrue(incumbents.isNotEmpty())
+        for (r in incumbents) assertEquals(objective.evaluate(r.sample), r.objectiveValue, "sample ${r.sample}")
     }
 
     @Test

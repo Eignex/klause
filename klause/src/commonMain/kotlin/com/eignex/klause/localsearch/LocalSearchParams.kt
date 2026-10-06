@@ -56,9 +56,10 @@ data class LocalSearchParams(
      * passed to `minimize`. The canonical use is a functionally-defined objective whose linear form
      * has zero gradient on decision moves; this view recomputes the defined var from the leaves,
      * giving CBLS the gradient that matters (see
-     * [com.eignex.klause.solver.objective.FunctionalObjective]). Must agree with the linear objective
-     * on every *feasible* assignment so incumbents stay comparable across engines. `null` (default)
-     * descends the linear objective directly. Ignored by `solve` / `samples` / `enumerate`.
+     * [com.eignex.klause.solver.objective.FunctionalObjective]). It agrees with the linear objective only where
+     * the defined variables sit on their definitions, so it is used only by a solver whose per-move invariants
+     * keep them there; any other descends the linear objective. `null` (default) descends the linear objective
+     * directly. Ignored by `solve` / `samples` / `enumerate`.
      */
     val lsObjective: IncrementalObjective? = null,
     /**

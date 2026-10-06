@@ -292,9 +292,12 @@ class LocalSearchSolver(
             yield(MinimizeResult.Infeasible(stats = sink.snapshot()))
             return@sequence
         }
-        // Descend the caller's gradient view when one is supplied (it agrees with the linear
-        // objective at every feasible point, see [LocalSearchParams.lsObjective]).
-        runMinimizeStream(params.lsObjective ?: objective, params, eff, warm, sink)
+        // The caller's gradient view reads the objective's defined variables off their definitions, so it
+        // agrees with the linear objective only while per-move invariants hold them there. Without them a
+        // defined variable is searched like any other and can sit wherever the model lets it, and the view
+        // would score an incumbent better than its own assignment.
+        val gradient = params.lsObjective?.takeIf { perMoveInvariants && definitionalSweep != null }
+        runMinimizeStream(gradient ?: objective, params, eff, warm, sink)
     }
 
     /** Solve once and return a [SolveResult]. */
