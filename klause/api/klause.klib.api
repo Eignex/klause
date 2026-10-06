@@ -11314,6 +11314,10 @@ final class com.eignex.klause.solver.result/UnsatCore { // com.eignex.klause.sol
     }
 }
 
+final class com.eignex.klause.solver.result/UnsoundnessException : kotlin/IllegalStateException { // com.eignex.klause.solver.result/UnsoundnessException|null[0]
+    constructor <init>(kotlin/String) // com.eignex.klause.solver.result/UnsoundnessException.<init>|<init>(kotlin.String){}[0]
+}
+
 final class com.eignex.klause.solver.search/AssembledSearchModel { // com.eignex.klause.solver.search/AssembledSearchModel|null[0]
     final fun <#A1: kotlin/Any> valueOf(kotlin/Any): #A1? // com.eignex.klause.solver.search/AssembledSearchModel.valueOf|valueOf(kotlin.Any){0§<kotlin.Any>}[0]
 }

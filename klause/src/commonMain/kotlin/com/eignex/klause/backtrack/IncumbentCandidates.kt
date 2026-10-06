@@ -1,6 +1,7 @@
 package com.eignex.klause.backtrack
 
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.simplex.exact.BigFraction
@@ -176,27 +177,38 @@ internal class ComposedSampleVerifier(
         if (evaluated != candidate.objective) {
             return Verification.Rejected("objective is $evaluated, not the claimed ${candidate.objective}")
         }
-        return composedFixpoint(candidate)
+        return composedFixpoint(problem, candidate, cancellation)
     }
+}
 
-    /** Pin the whole assignment into a fresh session and read the composed verdict off the fixpoint. */
-    private fun composedFixpoint(candidate: Candidate<Sample, Double>): Verification<Sample, Double> {
-        val sample = candidate.assignment
-        val session = PropagationSession(problem, cancellation)
-        if (session.isUnsatAtRoot) return Verification.Rejected("root propagation refutes the assignment")
-        for (b in 0 until problem.numBoolVars) {
-            if (session.pinBool(b, sample.bools[b]) is PropagationResult.Unsat) {
-                return Verification.Rejected("bool $b = ${sample.bools[b]} conflicts")
-            }
-        }
-        for (v in 0 until problem.numIntVars) {
-            if (session.pinInt(v, sample.ints[v]) is PropagationResult.Unsat) {
-                return Verification.Rejected("int $v = ${sample.ints[v]} conflicts")
-            }
-        }
-        // Sticky across every fixpoint above: a cut one leaves the state under-propagated, so a
-        // surviving assignment proves nothing.
-        if (session.fixpointCancelled) return Verification.Indeterminate("propagation cancelled")
-        return Verification.Accepted(candidate)
+/**
+ * Pin the whole assignment into a fresh session, under [assumptions], and read the composed verdict off
+ * the fixpoint. A wipeout refutes the assignment; a fixpoint cut short by [cancellation] decides nothing.
+ */
+internal fun <V> composedFixpoint(
+    problem: Problem,
+    candidate: Candidate<Sample, V>,
+    cancellation: Cancellation,
+    assumptions: Assumptions = Assumptions.None,
+): Verification<Sample, V> {
+    val sample = candidate.assignment
+    val session = PropagationSession(problem, cancellation)
+    if (session.isUnsatAtRoot) return Verification.Rejected("root propagation refutes the assignment")
+    if (!assumptions.isEmpty && session.seed(assumptions) is PropagationResult.Unsat) {
+        return Verification.Rejected("the assumptions refute the assignment")
     }
+    for (b in 0 until problem.numBoolVars) {
+        if (session.pinBool(b, sample.bools[b]) is PropagationResult.Unsat) {
+            return Verification.Rejected("bool $b = ${sample.bools[b]} conflicts")
+        }
+    }
+    for (v in 0 until problem.numIntVars) {
+        if (session.pinInt(v, sample.ints[v]) is PropagationResult.Unsat) {
+            return Verification.Rejected("int $v = ${sample.ints[v]} conflicts")
+        }
+    }
+    // Sticky across every fixpoint above: a cut one leaves the state under-propagated, so a
+    // surviving assignment proves nothing.
+    if (session.fixpointCancelled) return Verification.Indeterminate("propagation cancelled")
+    return Verification.Accepted(candidate)
 }

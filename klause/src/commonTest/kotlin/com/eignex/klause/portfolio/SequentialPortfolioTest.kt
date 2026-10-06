@@ -4,6 +4,7 @@ import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.backtrack.UnresolvedRealLeafFixture
 import com.eignex.klause.backtrack.selector.IndomainMax
+import com.eignex.klause.backtrack.selector.VariableSelector
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.bool.Clause
@@ -17,6 +18,7 @@ import com.eignex.klause.localsearch.LocalSearchSolver
 import com.eignex.klause.lp.engine.LpCertificationPolicy
 import com.eignex.klause.lp.engine.LpCertifier
 import com.eignex.klause.lp.engine.LpSolveContext
+import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.ResumableOptimizer
 import com.eignex.klause.solver.ResumableSearch
@@ -26,6 +28,8 @@ import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
+import com.eignex.klause.solver.result.UnsoundnessException
+import com.eignex.klause.solver.search.VarRef
 import com.eignex.klause.util.Cancellation
 import com.eignex.kumulant.bandit.UnivariateBandit
 import kotlin.random.Random
@@ -488,6 +492,25 @@ class SequentialPortfolioTest {
         val r = SequentialPortfolio.exp3(btArms(exactlyOneOver(4), 3)).use { it.solve() }
         val sat = assertIs<SolveResult.Sat>(r)
         assertEquals(1, sat.assignment.bools.count { it }, "exactly-one violated")
+    }
+
+    @Test
+    fun `an unsound arm fails the solve instead of yielding to a sound arm`() {
+        val stopsEarly = object : VariableSelector {
+            override fun pick(session: PropagationSession, rng: Random): VarRef? = null
+
+            override fun fresh(): VariableSelector = this
+        }
+        val problem = exactlyOneOver(2)
+        val unsound = PortfolioWorker.of(
+            "unsound",
+            0,
+            BacktrackSolver(problem.bake()).session(),
+            BacktrackParams(variableSelector = stopsEarly),
+        )
+        val workers = listOf(unsound) + btArms(problem, 1)
+
+        assertFailsWith<UnsoundnessException> { SequentialPortfolio.exp3(workers).use { it.solve() } }
     }
 
     @Test

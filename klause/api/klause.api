@@ -10304,6 +10304,10 @@ public final class com/eignex/klause/solver/result/UnsatCore$Companion {
 	public final fun of ([I)Lcom/eignex/klause/solver/result/UnsatCore;
 }
 
+public final class com/eignex/klause/solver/result/UnsoundnessException : java/lang/IllegalStateException {
+	public fun <init> (Ljava/lang/String;)V
+}
+
 public final class com/eignex/klause/solver/search/AssembledSearchModel {
 	public final fun valueOf (Ljava/lang/Object;)Ljava/lang/Object;
 }

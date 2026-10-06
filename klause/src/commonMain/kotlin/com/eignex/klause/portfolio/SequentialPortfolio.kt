@@ -8,6 +8,7 @@ import com.eignex.klause.solver.incumbent.bound
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
+import com.eignex.klause.solver.result.UnsoundnessException
 import com.eignex.klause.util.Cancellation
 import com.eignex.kumulant.bandit.UnivariateBandit
 import com.eignex.kumulant.bandit.univariate.Exp3Bandit
@@ -156,7 +157,10 @@ class SequentialPortfolio(
             val worker = workers[arm]
             val sliceMs = if (warming) warmupSliceMillis else slice
             val token = segmentToken(worker, warming, cancellation, sliceMs)
-            val r = runCatching { worker.solve(token, sliceFlips) }.getOrNull()
+            // A failing arm leaves the others to answer, but an unsound one has answered wrongly.
+            val r = runCatching { worker.solve(token, sliceFlips) }
+                .onFailure { if (it is UnsoundnessException) throw it }
+                .getOrNull()
             if (r != null) stats = stats.mergedWith(r.stats)
             val definitive = r is SolveResult.Sat || r is SolveResult.Unsat
             bandit.update(arm, if (definitive) 1.0 else 0.0)

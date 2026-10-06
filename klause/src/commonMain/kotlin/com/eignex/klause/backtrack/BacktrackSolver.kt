@@ -16,11 +16,14 @@ import com.eignex.klause.solver.ResumableSearch
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.Solver
+import com.eignex.klause.solver.incumbent.Candidate
+import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SampleResult
 import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.solver.result.TerminationReason
+import com.eignex.klause.solver.result.UnsoundnessException
 import com.eignex.klause.util.Cancellation
 import kotlin.random.Random
 import kotlin.time.ComparableTimeMark
@@ -159,7 +162,20 @@ class BacktrackSolver internal constructor(
             sink.stop()
             val stats = sink.snapshot()
             return when (outcome) {
-                is SearchOutcome.Found -> SolveResult.Sat(outcome.sample, stats)
+                // The leaf is the engine's own claim, re-derived here from every factor: an assignment the composed
+                // fixpoint refutes is an engine defect and must surface as one, never as a model. A check the deadline
+                // cut short refutes nothing, so the leaf stands rather than losing a model found in time.
+                is SearchOutcome.Found -> {
+                    val candidate = Candidate(outcome.sample, Unit)
+                    when (val verdict = composedFixpoint(problem, candidate, params.cancellation, params.assumptions)) {
+                        is Verification.Rejected -> throw UnsoundnessException(
+                            "backtrack reported a model its constraints refute: ${verdict.reason}",
+                        )
+
+                        is Verification.Accepted, is Verification.Indeterminate ->
+                            SolveResult.Sat(outcome.sample, stats)
+                    }
+                }
 
                 is SearchOutcome.Exhausted ->
                     if (outcome.indeterminate) {
