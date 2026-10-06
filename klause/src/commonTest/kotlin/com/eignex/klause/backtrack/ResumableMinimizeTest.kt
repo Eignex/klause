@@ -2,7 +2,9 @@ package com.eignex.klause.backtrack
 
 import com.eignex.klause.backtrack.selector.IndomainMax
 import com.eignex.klause.backtrack.selector.IndomainMin
+import com.eignex.klause.backtrack.selector.VariableSelector
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
@@ -32,8 +34,11 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.TerminationReason
+import com.eignex.klause.solver.result.UnsoundnessException
+import com.eignex.klause.solver.search.VarRef
 import com.eignex.klause.util.Cancellation
 import kotlin.coroutines.cancellation.CancellationException
+import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -350,6 +355,29 @@ class ResumableMinimizeTest {
                     search.runSlice(Cancellation.Never, 1000L, 100000L) {}
                 }
             }
+        }
+    }
+
+    @Test
+    fun `an optimization leaf whose assignment violates a factor fails as unsound`() {
+        // A selector that stops before any column is fixed stands in for an engine defect that reads an open
+        // node as a solved leaf: the minima it reports put both columns of the AllDifferent at 0.
+        val stopsEarly = object : VariableSelector {
+            override fun pick(session: PropagationSession, rng: Random): VarRef? = null
+
+            override fun fresh(): VariableSelector = this
+        }
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 2,
+            intDomains = Array(2) { IntDomain(0, 1) },
+            factors = arrayOf<Factor>(AllDifferent(intArrayOf(0, 1), domainMin = 0, domainSize = 2)),
+        )
+        val objective = LinearObjective(intCoefficients = longArrayOf(1L, 1L))
+        val solver = BacktrackSolver(problem.bake())
+
+        assertFailsWith<UnsoundnessException> {
+            solver.minimize(objective, BacktrackParams(variableSelector = stopsEarly))
         }
     }
 
