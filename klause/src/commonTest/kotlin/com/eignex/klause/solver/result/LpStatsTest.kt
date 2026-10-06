@@ -99,8 +99,8 @@ class LpStatsTest {
 
         sink.observeNodePass()
         sink.observeEngineCost(LpRoute.STANDALONE, LpSolveMetrics(pivots = 3, workOps = 11, warmAttempts = 1))
-        observer.observe(LpCertifier.INTEGER, success = false, LpCertifierCost.Unmetered)
-        observer.observe(LpCertifier.RATIONAL, success = true, LpCertifierCost.Unmetered)
+        observer.observe(LpCertifier.INTEGER, success = false, LpCertifierCost.Metered(0L))
+        observer.observe(LpCertifier.RATIONAL, success = true, LpCertifierCost.Metered(0L))
         observer.observeExactInput(accepted = false)
 
         val stats = sink.snapshot()

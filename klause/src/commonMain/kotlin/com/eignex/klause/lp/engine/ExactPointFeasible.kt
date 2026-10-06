@@ -9,8 +9,10 @@ internal fun exactPointWitness(
     model: LpModel,
     primal: DoubleArray,
     observer: LpCertificationObserver? = null,
+    scans: LpScanCount = LpScanCount(),
 ): ExactLpWitness? {
     val point = if (primal.size == model.n && primal.all { it.isFinite() } && model.finiteExactInput()) {
+        scans.scan()
         checkedLpWitness(model, primal.map { checkNotNull(BigFraction.ofDouble(it)) }) ?: run {
             var common = BigInteger.ONE
             val limit = BigInteger.fromLong(MAX_POINT_DENOMINATOR)
@@ -21,12 +23,13 @@ internal fun exactPointWitness(
                 if (common > limit) return@run null
                 BigFraction.of(BigInteger.fromLong(part.numerator), denominator)
             }
+            scans.scan()
             checkedLpWitness(model, candidate)
         }
     } else {
         null
     }
-    observer?.observe(LpCertifier.EXACT_POINT, point != null, LpCertifierCost.Unmetered)
+    observer?.observe(LpCertifier.EXACT_POINT, point != null, scans.cost(model))
     return point
 }
 

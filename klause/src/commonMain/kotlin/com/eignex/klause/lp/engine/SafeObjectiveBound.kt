@@ -16,13 +16,17 @@ internal fun safeObjectiveLowerBound(
     model: LpModel,
     y: DoubleArray,
     observer: LpCertificationObserver? = null,
-): Double? = safeObjectiveLowerBoundUnchecked(model, y).also {
-    observer?.observe(LpCertifier.SAFE_OBJECTIVE, it != null, LpCertifierCost.Unmetered)
+): Double? {
+    val scans = LpScanCount()
+    return safeObjectiveLowerBoundUnchecked(model, y, scans).also {
+        observer?.observe(LpCertifier.SAFE_OBJECTIVE, it != null, scans.cost(model))
+    }
 }
 
-private fun safeObjectiveLowerBoundUnchecked(model: LpModel, y: DoubleArray): Double? {
+private fun safeObjectiveLowerBoundUnchecked(model: LpModel, y: DoubleArray, scans: LpScanCount): Double? {
     if (y.size != model.m || y.any { !it.isFinite() }) return null
     if (!model.hasContinuous) {
+        scans.scan()
         val certificate = integerCertify(model, y)
         val numerator = certificate?.objectiveNumerator()
         if (numerator != null && numerator.fitsLong()) {
@@ -30,8 +34,13 @@ private fun safeObjectiveLowerBoundUnchecked(model: LpModel, y: DoubleArray): Do
         }
     }
     val exact = if (!model.hasContinuous) {
-        certifyLpBound(model, y)?.value ?: exactLagrangian(model, y.map { checkNotNull(BigFraction.ofDouble(it)) })
+        scans.scan()
+        certifyLpBound(model, y)?.value ?: run {
+            scans.scan()
+            exactLagrangian(model, y.map { checkNotNull(BigFraction.ofDouble(it)) })
+        }
     } else {
+        scans.scan()
         exactLagrangian(model, y.map { checkNotNull(BigFraction.ofDouble(it)) })
     } ?: return null
     return exact.lowerBoundDouble()

@@ -249,6 +249,9 @@ internal class RevisedSimplex(
     private var smallPivotBails = 0
     private val work = LpWork()
 
+    // Building a scaling view is work the next solve pays for, so every owner charges it against its own limit.
+    private val pendingNumericalWork = LpWork().apply { add(numerical.metrics.work) }
+
     // The work counted into [work] is charged to the caller's token at every poll and when a solve ends,
     // so a work-metered token stops the solve at the same pivot however loaded the machine is.
     private var stopToken: Cancellation = cancellation
@@ -1059,6 +1062,7 @@ internal class RevisedSimplex(
         if (refreshed != null) {
             model = next
             numerical = refreshed
+            pendingNumericalWork.add(refreshed.metrics.work)
             return
         }
         installUnscaledFallback(next)
@@ -1088,6 +1092,7 @@ internal class RevisedSimplex(
         ownerUnitRows = IntArray(0)
         model = next
         numerical = fallback
+        pendingNumericalWork.add(fallback.metrics.work)
         columns = lpColumns(numerical)
         colPtr = columns.copyColumnPointers()
         rowIdx = columns.copyRowIndices()
@@ -1401,6 +1406,8 @@ internal class RevisedSimplex(
         chargeWork()
         work.reset()
         chargedOps = 0L
+        work.add(pendingNumericalWork.ops)
+        pendingNumericalWork.reset()
         warmStarted = false
     }
 
