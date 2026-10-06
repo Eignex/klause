@@ -23,7 +23,7 @@ import com.eignex.klause.util.Cancellation
  * already-idiomatic `withCancellation` covariant-return one.
  */
 class PortfolioWorker private constructor(
-    /** Human-readable id for progress / telemetry (e.g. "cbls/fixed", "backtrack#2"). */
+    /** Human-readable id for progress / telemetry (e.g. "ls/cbls/fixed", "bt/domwdeg"). */
     val label: String,
     /** Index of this worker's arm in the composed pool; replicas of the same arm — extra lanes when
      *  arms < cores — share it, so per-arm credit pools across them. Distinct from [label], which a

@@ -37,7 +37,7 @@ internal class BacktrackWorkerConfig(
      *  [PoolCutExchange] when [pools] supplies them (cross-arm learned-clause sharing — the lp arm's
      *  globally valid Farkas nogoods travel through it like any other glue clause — and global-cut
      *  sharing). LS-only knobs ([lsLambda], [lsObjective], [definitionalSweep]) are ignored. The label
-     *  is `backtrack#<index>`. */
+     *  is `bt/<recipe label>`. */
     override fun materialize(
         problem: BakedProblem,
         index: Int,
@@ -50,7 +50,7 @@ internal class BacktrackWorkerConfig(
         onEvent: ((worker: String, event: SearchEvent) -> Unit)?,
         pools: SharedPools?,
     ): PortfolioWorker {
-        val workerLabel = "backtrack#$index"
+        val workerLabel = "bt/${recipe.label}"
         val workerEvent = onEvent?.let { sink -> { e: SearchEvent -> sink(workerLabel, e) } }
         var params = recipe.build(seed + 1000L + index, workerEvent)
         params = params.copy(zeroObjectivePricing = zeroObjectivePricing, toleranceCheck = toleranceCheck)

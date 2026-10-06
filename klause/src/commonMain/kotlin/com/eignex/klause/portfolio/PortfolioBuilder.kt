@@ -110,7 +110,7 @@ object PortfolioBuilder {
     }
 
     /** Materialise each composed arm via its own [WorkerConfig.materialize] — the shared body of
-     *  [build] and [buildExplicit]. The arm index offsets the seed (and numbers backtrack labels);
+     *  [build] and [buildExplicit]. The arm index offsets the seed;
      *  [armIds] carries each lane's composed-arm identity (replicas share one, see [build]) purely as
      *  attribution metadata; [pools], when non-null, is shared by every backtrack arm for clause and
      *  cut exchange. */

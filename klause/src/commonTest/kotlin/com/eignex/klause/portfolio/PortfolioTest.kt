@@ -612,6 +612,17 @@ class PortfolioTest {
     }
 
     @Test
+    fun `replicas of one arm are reported under numbered labels`() {
+        val workers = List(3) { index ->
+            PortfolioWorker.of("bt", index, CountingResumableSolver(slicesToVerdict = 20).session(), BacktrackParams())
+        }
+
+        val r = Portfolio.thompson(workers).use { it.solve() }
+
+        assertEquals(listOf("bt", "bt#2", "bt#3"), r.stats.portfolio.arms.map { it.label })
+    }
+
+    @Test
     fun `a failing one-shot arm is retired after one segment and reported`() {
         val failing = ThrowingSolver()
         val resumable = CountingResumableSolver(slicesToVerdict = 20)
