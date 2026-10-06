@@ -180,7 +180,7 @@ object MoveSetOracle {
      *  copy of [state]. Does not mutate [state]. */
     private fun applyAndReport(state: LocalSearchState, move: Move): Int {
         val before = if (state.factors[0].isViolated(state, 0)) 1 else 0
-        val sibling = LocalSearchState(state.problem, Random(0))
+        val sibling = LocalSearchState(state.model, Random(0))
         copyAssignment(state, sibling)
         sibling.recompute()
         sibling.apply(move)

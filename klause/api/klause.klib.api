@@ -6456,6 +6456,22 @@ final class com.eignex.klause.localsearch/IteratedLocalSearchRestart : com.eigne
     }
 }
 
+final class com.eignex.klause.localsearch/LocalSearchModel { // com.eignex.klause.localsearch/LocalSearchModel|null[0]
+    final val domains // com.eignex.klause.localsearch/LocalSearchModel.domains|{}domains[0]
+        final fun <get-domains>(): kotlin/Array<com.eignex.klause.ir/IntDomain> // com.eignex.klause.localsearch/LocalSearchModel.domains.<get-domains>|<get-domains>(){}[0]
+    final val problem // com.eignex.klause.localsearch/LocalSearchModel.problem|{}problem[0]
+        final fun <get-problem>(): com.eignex.klause.ir/Problem // com.eignex.klause.localsearch/LocalSearchModel.problem.<get-problem>|<get-problem>(){}[0]
+    final val refutesModel // com.eignex.klause.localsearch/LocalSearchModel.refutesModel|{}refutesModel[0]
+        final fun <get-refutesModel>(): kotlin/Boolean // com.eignex.klause.localsearch/LocalSearchModel.refutesModel.<get-refutesModel>|<get-refutesModel>(){}[0]
+
+    final fun pinsUnder(com.eignex.klause.propagation/Assumptions): com.eignex.klause.propagation/Assumptions? // com.eignex.klause.localsearch/LocalSearchModel.pinsUnder|pinsUnder(com.eignex.klause.propagation.Assumptions){}[0]
+
+    final object Companion { // com.eignex.klause.localsearch/LocalSearchModel.Companion|null[0]
+        final fun of(com.eignex.klause.propagation/BakedProblem): com.eignex.klause.localsearch/LocalSearchModel // com.eignex.klause.localsearch/LocalSearchModel.Companion.of|of(com.eignex.klause.propagation.BakedProblem){}[0]
+        final fun open(com.eignex.klause.ir/Problem, kotlin/Array<com.eignex.klause.ir/IntDomain>): com.eignex.klause.localsearch/LocalSearchModel // com.eignex.klause.localsearch/LocalSearchModel.Companion.open|open(com.eignex.klause.ir.Problem;kotlin.Array<com.eignex.klause.ir.IntDomain>){}[0]
+    }
+}
+
 final class com.eignex.klause.localsearch/LocalSearchParams : com.eignex.klause.solver/SolverParams { // com.eignex.klause.localsearch/LocalSearchParams|null[0]
     constructor <init>(kotlin/Long = ..., kotlin/Long? = ..., kotlin/Long? = ..., com.eignex.klause.propagation/Assumptions = ..., com.eignex.klause.util/Cancellation = ..., kotlin/Function1<com.eignex.klause.solver.result/SearchEvent, kotlin/Unit>? = ..., com.eignex.klause.localsearch/CostShaping = ..., com.eignex.klause.solver.objective/IncrementalObjective? = ..., com.eignex.klause.solver/Sample? = ..., com.eignex.klause.solver.incumbent/IncumbentExchange<com.eignex.klause.solver/Sample, kotlin/Double>? = ..., kotlin/Int = ..., kotlin/Boolean = ...) // com.eignex.klause.localsearch/LocalSearchParams.<init>|<init>(kotlin.Long;kotlin.Long?;kotlin.Long?;com.eignex.klause.propagation.Assumptions;com.eignex.klause.util.Cancellation;kotlin.Function1<com.eignex.klause.solver.result.SearchEvent,kotlin.Unit>?;com.eignex.klause.localsearch.CostShaping;com.eignex.klause.solver.objective.IncrementalObjective?;com.eignex.klause.solver.Sample?;com.eignex.klause.solver.incumbent.IncumbentExchange<com.eignex.klause.solver.Sample,kotlin.Double>?;kotlin.Int;kotlin.Boolean){}[0]
 
@@ -6572,7 +6588,8 @@ final class com.eignex.klause.localsearch/LocalSearchSolver : com.eignex.klause.
 }
 
 final class com.eignex.klause.localsearch/LocalSearchState { // com.eignex.klause.localsearch/LocalSearchState|null[0]
-    constructor <init>(com.eignex.klause.propagation/BakedProblem, kotlin.random/Random, com.eignex.klause.propagation/Assumptions = ..., com.eignex.klause.localsearch/LocalSearchProblem = ...) // com.eignex.klause.localsearch/LocalSearchState.<init>|<init>(com.eignex.klause.propagation.BakedProblem;kotlin.random.Random;com.eignex.klause.propagation.Assumptions;com.eignex.klause.localsearch.LocalSearchProblem){}[0]
+    constructor <init>(com.eignex.klause.localsearch/LocalSearchModel, kotlin.random/Random, com.eignex.klause.propagation/Assumptions = ..., com.eignex.klause.localsearch/LocalSearchProblem = ...) // com.eignex.klause.localsearch/LocalSearchState.<init>|<init>(com.eignex.klause.localsearch.LocalSearchModel;kotlin.random.Random;com.eignex.klause.propagation.Assumptions;com.eignex.klause.localsearch.LocalSearchProblem){}[0]
+    constructor <init>(com.eignex.klause.propagation/BakedProblem, kotlin.random/Random, com.eignex.klause.propagation/Assumptions = ...) // com.eignex.klause.localsearch/LocalSearchState.<init>|<init>(com.eignex.klause.propagation.BakedProblem;kotlin.random.Random;com.eignex.klause.propagation.Assumptions){}[0]
 
     final val assignment // com.eignex.klause.localsearch/LocalSearchState.assignment|{}assignment[0]
         final fun <get-assignment>(): com.eignex.klause.solver/Assignment // com.eignex.klause.localsearch/LocalSearchState.assignment.<get-assignment>|<get-assignment>(){}[0]
@@ -6588,10 +6605,12 @@ final class com.eignex.klause.localsearch/LocalSearchState { // com.eignex.klaus
         final fun <get-intPayload>(): kotlin/IntArray // com.eignex.klause.localsearch/LocalSearchState.intPayload.<get-intPayload>|<get-intPayload>(){}[0]
     final val longPayload // com.eignex.klause.localsearch/LocalSearchState.longPayload|{}longPayload[0]
         final fun <get-longPayload>(): kotlin/LongArray // com.eignex.klause.localsearch/LocalSearchState.longPayload.<get-longPayload>|<get-longPayload>(){}[0]
+    final val model // com.eignex.klause.localsearch/LocalSearchState.model|{}model[0]
+        final fun <get-model>(): com.eignex.klause.localsearch/LocalSearchModel // com.eignex.klause.localsearch/LocalSearchState.model.<get-model>|<get-model>(){}[0]
     final val moveSink // com.eignex.klause.localsearch/LocalSearchState.moveSink|{}moveSink[0]
         final fun <get-moveSink>(): com.eignex.klause.localsearch/MoveSink // com.eignex.klause.localsearch/LocalSearchState.moveSink.<get-moveSink>|<get-moveSink>(){}[0]
     final val problem // com.eignex.klause.localsearch/LocalSearchState.problem|{}problem[0]
-        final fun <get-problem>(): com.eignex.klause.propagation/BakedProblem // com.eignex.klause.localsearch/LocalSearchState.problem.<get-problem>|<get-problem>(){}[0]
+        final fun <get-problem>(): com.eignex.klause.ir/Problem // com.eignex.klause.localsearch/LocalSearchState.problem.<get-problem>|<get-problem>(){}[0]
     final val projection // com.eignex.klause.localsearch/LocalSearchState.projection|{}projection[0]
         final fun <get-projection>(): com.eignex.klause.localsearch/LocalSearchProblem // com.eignex.klause.localsearch/LocalSearchState.projection.<get-projection>|<get-projection>(){}[0]
     final val refPayload // com.eignex.klause.localsearch/LocalSearchState.refPayload|{}refPayload[0]

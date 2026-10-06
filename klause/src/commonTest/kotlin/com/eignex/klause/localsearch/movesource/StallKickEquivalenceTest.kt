@@ -56,7 +56,7 @@ class StallKickEquivalenceTest {
                 val occ: IntArray
                 if (pick < nInts) {
                     val v = scope.intVars[pick]
-                    val d = problem.rootIntDomain(v)
+                    val d = state.rootDomains[v]
                     val span = (d.max - d.min).toInt()
                     if (span > 0) {
                         val nv = d.min + state.rng.nextInt(span + 1)
