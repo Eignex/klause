@@ -173,22 +173,50 @@ class BigFraction private constructor(
     fun toDouble(): Double = num.doubleValue(exactRequired = false) / den.doubleValue(exactRequired = false)
 
     /** Returns the sum of this fraction and [other]. */
-    operator fun plus(other: BigFraction): BigFraction = of(num * other.den + other.num * den, den * other.den)
+    operator fun plus(other: BigFraction): BigFraction = sum(other.num, other.den)
 
     /** Returns this fraction minus [other]. */
-    operator fun minus(other: BigFraction): BigFraction = of(num * other.den - other.num * den, den * other.den)
+    operator fun minus(other: BigFraction): BigFraction = sum(-other.num, other.den)
 
-    /** Returns the product of this fraction and [other]. */
-    operator fun times(other: BigFraction): BigFraction = of(num * other.num, den * other.den)
+    // `num/den + n/d` for a reduced `n/d`, normalized by Knuth's method (TAOCP 4.5.1): the gcds run on the
+    // denominators and their quotient instead of on the full cross products, and vanish when a denominator is 1
+    // or the denominators are coprime, since a reduced sum over coprime denominators is already reduced.
+    private fun sum(n: BigInteger, d: BigInteger): BigFraction {
+        if (n.isZero()) return this
+        if (isZero) return BigFraction(n, d)
+        if (d == BigInteger.ONE) return BigFraction(num + n * den, den)
+        if (den == BigInteger.ONE) return BigFraction(num * d + n, d)
+        val g = den.gcd(d)
+        if (g == BigInteger.ONE) return BigFraction(num * d + n * den, den * d)
+        val dg = d / g
+        val t = num * dg + n * (den / g)
+        if (t.isZero()) return ZERO
+        val h = t.gcd(g)
+        return if (h == BigInteger.ONE) BigFraction(t, den * dg) else BigFraction(t / h, den / h * dg)
+    }
+
+    /** Returns the product of this fraction and [other], reducing each numerator against the other denominator. */
+    operator fun times(other: BigFraction): BigFraction {
+        if (isZero || other.isZero) return ZERO
+        val g1 = if (den == BigInteger.ONE || other.num.isUnit) BigInteger.ONE else other.num.gcd(den)
+        val g2 = if (other.den == BigInteger.ONE || num.isUnit) BigInteger.ONE else num.gcd(other.den)
+        val n1 = if (g2 == BigInteger.ONE) num else num / g2
+        val d2 = if (g2 == BigInteger.ONE) other.den else other.den / g2
+        val n2 = if (g1 == BigInteger.ONE) other.num else other.num / g1
+        val d1 = if (g1 == BigInteger.ONE) den else den / g1
+        return BigFraction(n1 * n2, d1 * d2)
+    }
 
     /** Returns the multiplicative inverse of this non-zero fraction. */
     fun reciprocal(): BigFraction {
         require(!isZero) { "reciprocal of zero" }
-        return of(den, num)
+        return if (num.signum() < 0) BigFraction(-den, -num) else BigFraction(den, num)
     }
 
     /** Compares this fraction with [other]. */
     operator fun compareTo(other: BigFraction): Int = (num * other.den).compareTo(other.num * den)
+
+    private val BigInteger.isUnit: Boolean get() = this == BigInteger.ONE || this == MINUS_ONE.num
 
     override fun equals(other: Any?): Boolean = other is BigFraction && num == other.num && den == other.den
 
