@@ -34,7 +34,9 @@ import kotlin.time.TimeSource
  * **Reward** (folded into the bandit in `[0, 1)`) comes from a [RewardLedger]: each arm is credited for what it
  * contributed and scored on the rate it earned that at, per unit of work, against the pool's rate. Before any
  * incumbent exists the credit is a first feasible solution, which drives the feasibility hunt; once one exists it
- * is the objective improvement, which drives anytime convergence. The ledger starts a new phase at the first
+ * is the objective improvement, which drives anytime convergence. Progress short of a solution earns credit in
+ * both: variables a backtrack arm fixes at its root, and a local-search arm lowering the record violation
+ * ([ProgressCredit]). The ledger starts a new phase at the first
  * incumbent, since the rates a feasibility hunt earned say nothing about who improves one.
  *
  * **Resumable backtrack arms:** a backtrack arm exposes a [ResumableSearch]
@@ -157,6 +159,7 @@ class SequentialPortfolio(
         val perArm = arrayOfNulls<SolveStats>(workers.size)
         val verdicts = ArrayList<SolveResult>()
         val ledger = RewardLedger(workers.size)
+        val progress = ProgressCredit(workers.size)
         var slice = baseSliceMillis
         var lsSliceWork = baseSliceWork
         var probed = 0
@@ -185,6 +188,7 @@ class SequentialPortfolio(
                     r = outcome.getOrNull()
                     failed = outcome.isFailure
                     perArm[arm] = handle.stats
+                    progress.observe(ledger, arm, handle.stats)
                     work = handle.work - workBefore
                 } else {
                     val token = segmentToken(worker, cancellation, slice)
@@ -192,6 +196,7 @@ class SequentialPortfolio(
                         .rethrowUnsound()
                         .getOrNull()
                     r?.let { perArm[arm] = (perArm[arm] ?: SolveStats.EMPTY).mergedWith(it.stats) }
+                    r?.let { progress.observe(ledger, arm, it.stats) }
                     work = lsSliceWork
                 }
                 bandit.update(arm, ledger.settle(arm, work), work.toDouble() / baseSliceWork)
@@ -243,6 +248,7 @@ class SequentialPortfolio(
         // so the strict-improvement gate is all that is being reused, not the concurrency.
         val incumbent = IncumbentExchange.minimizing<Sample>()
         val ledger = RewardLedger(workers.size)
+        val progress = ProgressCredit(workers.size)
         var slice = baseSliceMillis
         var lsSliceWork = baseSliceWork
         var probed = 0
@@ -333,8 +339,10 @@ class SequentialPortfolio(
                 if (terminal is MinimizeResult.WithSample) accept(terminal)
                 if (handle != null) {
                     perArm[arm] = handle.stats
+                    progress.observe(ledger, arm, handle.stats)
                 } else {
                     terminal?.let { perArm[arm] = (perArm[arm] ?: SolveStats.EMPTY).mergedWith(it.stats) }
+                    terminal?.let { progress.observe(ledger, arm, it.stats) }
                 }
 
                 val improvement = before - readBound()

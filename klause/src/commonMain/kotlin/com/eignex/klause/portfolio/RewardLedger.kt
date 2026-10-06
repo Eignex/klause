@@ -1,5 +1,7 @@
 package com.eignex.klause.portfolio
 
+import com.eignex.klause.solver.result.SolveStats
+
 /**
  * Per-arm reward accounts for the sequential portfolio: what each arm earned, settled against what it spent.
  *
@@ -68,4 +70,39 @@ internal enum class Signal {
 
     /** Objective improvement of the shared incumbent. */
     Improvement,
+
+    /** Variables a backtrack arm newly fixed at its root. */
+    RootFixings,
+
+    /** Share of the pool's record constraint violation a local-search arm removed. */
+    Violation,
+}
+
+/**
+ * Turns the counters a segment reports into progress credit, the graded signal a search earns before it has
+ * anything to show for itself.
+ *
+ * A backtrack arm is credited for variables newly fixed at its root, the one kind of progress no later search
+ * undoes; its count is the most the arm has shown, so a re-seeded handle does not earn the same fixings twice. A
+ * local-search arm is credited for lowering the pool's record violation, by the share of the record it removed,
+ * so getting close to a solution pays and merely matching the best so far does not.
+ */
+internal class ProgressCredit(arms: Int) {
+    private val rootFixedSeen = DoubleArray(arms)
+    private var recordViolation = Double.POSITIVE_INFINITY
+
+    /** Credit [arm] in [ledger] for the progress in [stats], cumulative for a resumable handle or one segment's. */
+    fun observe(ledger: RewardLedger, arm: Int, stats: SolveStats) {
+        val fixed = stats.search.rootFixed.max
+        if (fixed > rootFixedSeen[arm]) {
+            ledger.credit(arm, Signal.RootFixings, fixed - rootFixedSeen[arm])
+            rootFixedSeen[arm] = fixed
+        }
+        val violation = stats.ls.incumbentViolation
+        if (violation.isNaN() || violation >= recordViolation) return
+        if (recordViolation.isFinite()) {
+            ledger.credit(arm, Signal.Violation, (recordViolation - violation) / recordViolation)
+        }
+        recordViolation = violation
+    }
 }

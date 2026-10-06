@@ -1,5 +1,9 @@
 package com.eignex.klause.portfolio
 
+import com.eignex.klause.solver.result.LocalSearchStats
+import com.eignex.klause.solver.result.SearchStats
+import com.eignex.klause.solver.result.SolveStats
+import com.eignex.kumulant.stat.summary.MaxResult
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -84,5 +88,36 @@ class RewardLedgerTest {
         ledger.credit(1, Signal.Improvement, 1.0)
 
         assertEquals(1.0, ledger.settle(1, 100), 1e-9)
+    }
+
+    private fun stats(rootFixed: Double = Double.NEGATIVE_INFINITY, violation: Double = Double.NaN) = SolveStats(
+        search = SearchStats(rootFixed = MaxResult(rootFixed)),
+        ls = LocalSearchStats(incumbentViolation = violation),
+    )
+
+    @Test
+    fun `root fixings an arm already showed earn nothing again`() {
+        val ledger = RewardLedger(1)
+        val progress = ProgressCredit(1)
+        progress.observe(ledger, 0, stats(rootFixed = 5.0))
+        ledger.settle(0, 100)
+
+        progress.observe(ledger, 0, stats(rootFixed = 5.0))
+
+        assertEquals(0.0, ledger.settle(0, 100))
+    }
+
+    @Test
+    fun `only lowering the record violation earns credit`() {
+        val ledger = RewardLedger(3)
+        val progress = ProgressCredit(3)
+        progress.observe(ledger, 0, stats(violation = 8.0))
+        ledger.settle(0, 100)
+
+        progress.observe(ledger, 1, stats(violation = 8.0))
+        progress.observe(ledger, 2, stats(violation = 2.0))
+
+        assertEquals(0.0, ledger.settle(1, 100))
+        assertEquals(1.0, ledger.settle(2, 100))
     }
 }
