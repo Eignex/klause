@@ -7001,11 +7001,6 @@ public final class com/eignex/klause/portfolio/LocalSearchCatalog {
 	public final fun ranked (Lcom/eignex/klause/portfolio/Kind;)Ljava/util/List;
 }
 
-public final class com/eignex/klause/portfolio/LsRecipeSweep {
-	public static final field INSTANCE Lcom/eignex/klause/portfolio/LsRecipeSweep;
-	public final fun pool ()Ljava/util/List;
-}
-
 public final class com/eignex/klause/portfolio/Portfolio : com/eignex/klause/portfolio/PortfolioExecutor {
 	public fun <init> (Ljava/util/List;Lcom/eignex/klause/portfolio/PortfolioStrategy;)V
 	public synthetic fun <init> (Ljava/util/List;Lcom/eignex/klause/portfolio/PortfolioStrategy;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
@@ -8885,10 +8880,8 @@ public final class com/eignex/klause/solver/pipeline/IntVariableOwner : java/lan
 }
 
 public final class com/eignex/klause/solver/pipeline/LsResolution {
-	public fun <init> (Ljava/util/List;ZLjava/lang/Integer;)V
-	public synthetic fun <init> (Ljava/util/List;ZLjava/lang/Integer;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Ljava/util/List;Z)V
 	public final fun getDryRunSolver ()Z
-	public final fun getForceArms ()Ljava/lang/Integer;
 	public final fun getPool ()Ljava/util/List;
 }
 

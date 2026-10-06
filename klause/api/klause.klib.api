@@ -10250,12 +10250,10 @@ final class com.eignex.klause.solver.pipeline/FlatZincExecutionProgram { // com.
 }
 
 final class com.eignex.klause.solver.pipeline/LsResolution { // com.eignex.klause.solver.pipeline/LsResolution|null[0]
-    constructor <init>(kotlin.collections/List<kotlin/Function0<com.eignex.klause.localsearch.strategy/LocalSearchRecipe>>?, kotlin/Boolean, kotlin/Int? = ...) // com.eignex.klause.solver.pipeline/LsResolution.<init>|<init>(kotlin.collections.List<kotlin.Function0<com.eignex.klause.localsearch.strategy.LocalSearchRecipe>>?;kotlin.Boolean;kotlin.Int?){}[0]
+    constructor <init>(kotlin.collections/List<kotlin/Function0<com.eignex.klause.localsearch.strategy/LocalSearchRecipe>>?, kotlin/Boolean) // com.eignex.klause.solver.pipeline/LsResolution.<init>|<init>(kotlin.collections.List<kotlin.Function0<com.eignex.klause.localsearch.strategy.LocalSearchRecipe>>?;kotlin.Boolean){}[0]
 
     final val dryRunSolver // com.eignex.klause.solver.pipeline/LsResolution.dryRunSolver|{}dryRunSolver[0]
         final fun <get-dryRunSolver>(): kotlin/Boolean // com.eignex.klause.solver.pipeline/LsResolution.dryRunSolver.<get-dryRunSolver>|<get-dryRunSolver>(){}[0]
-    final val forceArms // com.eignex.klause.solver.pipeline/LsResolution.forceArms|{}forceArms[0]
-        final fun <get-forceArms>(): kotlin/Int? // com.eignex.klause.solver.pipeline/LsResolution.forceArms.<get-forceArms>|<get-forceArms>(){}[0]
     final val pool // com.eignex.klause.solver.pipeline/LsResolution.pool|{}pool[0]
         final fun <get-pool>(): kotlin.collections/List<kotlin/Function0<com.eignex.klause.localsearch.strategy/LocalSearchRecipe>>? // com.eignex.klause.solver.pipeline/LsResolution.pool.<get-pool>|<get-pool>(){}[0]
 }
@@ -12219,10 +12217,6 @@ final object com.eignex.klause.portfolio/LocalSearchCatalog { // com.eignex.klau
     final fun labels(): kotlin.collections/List<kotlin/String> // com.eignex.klause.portfolio/LocalSearchCatalog.labels|labels(){}[0]
     final fun labels(com.eignex.klause.portfolio/Kind): kotlin.collections/List<kotlin/String> // com.eignex.klause.portfolio/LocalSearchCatalog.labels|labels(com.eignex.klause.portfolio.Kind){}[0]
     final fun ranked(com.eignex.klause.portfolio/Kind): kotlin.collections/List<com.eignex.klause.localsearch.strategy/LocalSearchRecipe> // com.eignex.klause.portfolio/LocalSearchCatalog.ranked|ranked(com.eignex.klause.portfolio.Kind){}[0]
-}
-
-final object com.eignex.klause.portfolio/LsRecipeSweep { // com.eignex.klause.portfolio/LsRecipeSweep|null[0]
-    final fun pool(): kotlin.collections/List<kotlin/Function0<com.eignex.klause.localsearch.strategy/LocalSearchRecipe>> // com.eignex.klause.portfolio/LsRecipeSweep.pool|pool(){}[0]
 }
 
 final object com.eignex.klause.portfolio/PortfolioBuilder { // com.eignex.klause.portfolio/PortfolioBuilder|null[0]
