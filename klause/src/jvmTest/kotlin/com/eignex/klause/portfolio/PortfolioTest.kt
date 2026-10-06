@@ -21,12 +21,14 @@ import com.eignex.klause.lp.bounding.LpEmphasis
 import com.eignex.klause.lp.bounding.LpTechnique
 import com.eignex.klause.lp.engine.LpCertifier
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.solver.Session
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.MinimizeResult.Optimal
 import com.eignex.klause.solver.result.MinimizeResult.WithSample
 import com.eignex.klause.solver.result.SearchEvent
+import com.eignex.klause.util.Cancellation
 import kotlin.concurrent.atomics.AtomicBoolean
 import kotlin.concurrent.atomics.AtomicReference
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
@@ -34,11 +36,44 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
+import kotlin.time.ComparableTimeMark
 import kotlin.time.Duration
 import kotlin.time.TimeSource
 
 @OptIn(ExperimentalAtomicApi::class)
 class PortfolioTest {
+    @Test
+    fun `parallel workers are handed the run deadline`() {
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 1,
+            intDomains = arrayOf(IntDomain(0, 3)),
+            factors = emptyArray(),
+        ).bake()
+        val objective = LinearObjective(intCoefficients = longArrayOf(1L))
+        val deadline = TimeSource.Monotonic.markNow() + Duration.parse("1h")
+        val runs = listOf<(Portfolio) -> Unit>(
+            { it.solve(Cancellation.until(deadline)) },
+            { it.minimize(Cancellation.until(deadline)) },
+        )
+        for (run in runs) {
+            val seen = ArrayList<ComparableTimeMark?>()
+            val base = BacktrackSolver(problem).session()
+            val recording = object : Session<BacktrackParams> by base {
+                override fun solve(params: BacktrackParams): SolveResult =
+                    base.solve(params).also { seen += params.cancellation.deadline() }
+
+                override fun improvements(objective: LinearObjective, params: BacktrackParams) =
+                    base.improvements(objective, params).also { seen += params.cancellation.deadline() }
+            }
+            val worker = PortfolioWorker.of("recording", 0, recording, BacktrackParams(), objective = objective)
+
+            Portfolio(listOf(worker)).use(run)
+
+            assertEquals(listOf<ComparableTimeMark?>(deadline), seen)
+        }
+    }
+
     @Test
     fun `parallel real unresolved arms cannot prove infeasibility or optimality`() {
         for (withIncumbent in listOf(false, true)) {
