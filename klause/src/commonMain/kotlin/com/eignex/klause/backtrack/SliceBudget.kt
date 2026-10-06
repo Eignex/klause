@@ -5,8 +5,8 @@ import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TimeSource
 
 /**
- * Where a pausable search's current slice ends: after a number of work units, or, when none is given, at a
- * wall-clock deadline.
+ * Where a pausable search's current slice ends: after a number of work units or at a wall-clock deadline,
+ * whichever comes first.
  *
  * A work budget makes the pause point a property of the search rather than of machine load, which is what
  * lets two identical invocations report identical counters. A unit is one search node, and LP work is charged
@@ -35,8 +35,8 @@ internal class SliceBudget(private val nodeCount: () -> Long, private val lpWork
     private var nodeDebt = 0L
 
     /**
-     * Arm the next slice: [sliceNodes] work units when non-negative, else [sliceMillis] of wall time. False when
-     * debt from earlier slices consumes the whole allowance, so the caller pauses without searching.
+     * Arm the next slice: [sliceNodes] work units when non-negative, and at most [sliceMillis] of wall time. False
+     * when debt from earlier slices consumes the whole allowance, so the caller pauses without searching.
      */
     fun begin(sliceMillis: Long, sliceNodes: Long): Boolean {
         deadline = TimeSource.Monotonic.markNow() + sliceMillis.milliseconds
@@ -56,7 +56,7 @@ internal class SliceBudget(private val nodeCount: () -> Long, private val lpWork
     fun spent(): Long = nodeCount() + lpWork() / LP_WORK_PER_NODE
 
     /** Whether the armed slice has spent its allowance. */
-    fun expired(): Boolean = if (workBounded) nodeCount() >= nodeEnd else deadline?.hasPassedNow() ?: false
+    fun expired(): Boolean = (workBounded && nodeCount() >= nodeEnd) || deadline?.hasPassedNow() == true
 
     /**
      * Spend the LP work done since the last charge from the slice's budget. The charge lands at a node boundary

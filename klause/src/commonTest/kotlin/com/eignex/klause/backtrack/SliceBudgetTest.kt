@@ -32,4 +32,14 @@ class SliceBudgetTest {
 
         assertTrue(slice.expired())
     }
+
+    @Test
+    fun `a work-bounded slice also ends at its time`() {
+        val search = SearchStatsSink()
+        val slice = SliceBudget({ search.searchWork }) { 0L }
+
+        slice.begin(sliceMillis = 0L, sliceNodes = 10L)
+
+        assertTrue(slice.expired())
+    }
 }
