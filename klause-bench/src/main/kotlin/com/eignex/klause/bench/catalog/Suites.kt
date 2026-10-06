@@ -143,35 +143,6 @@ internal object Suites {
                     format = Format.SMTLIB,
                 )
             },
-            // The logics below are outside klause's theory set (QF_IDL/QF_RDL/QF_LIA/QF_LRA/QF_LIRA
-            // are the klause-solvable set above) — z3-only reference coverage; see
-            // ExternalCollections.smtlibQfNia's KDoc for why `bench solve` on these is still safe.
-            DynamicSuite(
-                "smtlib-qfnia",
-                "SMT-LIB QF_NIA non-incremental set (fetched; z3-only, klause has no nonlinear-int theory)",
-                defaultPerFamily = 1,
-            ) { sel ->
-                CorpusSelection.select(
-                    ExternalCollections.smtlibQfNia,
-                    CorpusSelection.Layout.Flat("non-incremental/QF_NIA", "smt2"),
-                    sel,
-                    Category.CSP,
-                    format = Format.SMTLIB,
-                )
-            },
-            DynamicSuite(
-                "smtlib-qfnra",
-                "SMT-LIB QF_NRA non-incremental set (fetched; z3-only, klause has no nonlinear-real theory)",
-                defaultPerFamily = 1,
-            ) { sel ->
-                CorpusSelection.select(
-                    ExternalCollections.smtlibQfNra,
-                    CorpusSelection.Layout.Flat("non-incremental/QF_NRA", "smt2"),
-                    sel,
-                    Category.CSP,
-                    format = Format.SMTLIB,
-                )
-            },
             DynamicSuite(
                 "miplib2017",
                 "MIPLIB 2017 collection (fetched per-instance, ~1065 .mps; 1/family by default)",
@@ -944,28 +915,6 @@ internal object ExternalCollections {
         url = smtlibLogic("QF_RDL"),
         license = "SMT-LIB (per-family licenses)",
         reason = "real difference-logic benchmark set (9.5MB compressed); fetched rather than vendored",
-        fetch = FetchMethod.TarballZst,
-    )
-
-    /** SMT-LIB logics outside klause's theory set (`theory.difference`/`theory.lia`/`theory.qflra`
-     *  decide only QF_IDL/QF_RDL/QF_LIA/QF_LRA/QF_LIRA above). klause's SMT-LIB compiler cleanly
-     *  refuses what it can't lower (`UnsupportedSmtException` on a non-0-arity function symbol,
-     *  a bitvector sort, or a nonlinear term), so pointing `bench solve` at these is safe — it
-     *  reports a refusal per instance rather than crashing. They exist for z3-only reference coverage
-     *  and to track klause's refusal rate as its theory set grows, not for klause to attempt and win.
-     *  Same Zenodo release and archive shape as [smtlibQfLia]. */
-    val smtlibQfNia = ExternalCollection(
-        id = "smtlib-qf_nia",
-        url = smtlibLogic("QF_NIA"),
-        license = "SMT-LIB (per-family licenses)",
-        reason = "nonlinear integer arithmetic (182MB compressed); z3-only, klause has no QF_NIA theory",
-        fetch = FetchMethod.TarballZst,
-    )
-    val smtlibQfNra = ExternalCollection(
-        id = "smtlib-qf_nra",
-        url = smtlibLogic("QF_NRA"),
-        license = "SMT-LIB (per-family licenses)",
-        reason = "nonlinear real arithmetic (201MB compressed); z3-only, klause has no QF_NRA theory",
         fetch = FetchMethod.TarballZst,
     )
 
