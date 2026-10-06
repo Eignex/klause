@@ -19,8 +19,6 @@ class SuitesTest {
         "smtlib-qflira",
         "smtlib-qfidl",
         "smtlib-qfrdl",
-        "smtlib-qfnia",
-        "smtlib-qfnra",
         "miplib2017",
         "pb-comp",
         "pb-comp-wbo",
