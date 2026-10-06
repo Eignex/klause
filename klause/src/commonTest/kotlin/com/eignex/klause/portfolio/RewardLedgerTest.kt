@@ -75,6 +75,17 @@ class RewardLedgerTest {
     }
 
     @Test
+    fun `an arm is not scored on a signal it cannot earn`() {
+        // Arm 0 is backtrack, arm 1 local search: only arm 1 can lower violation.
+        val ledger = RewardLedger(2) { arm, signal -> signal != Signal.Violation || arm == 1 }
+        ledger.credit(1, Signal.Violation, 0.5)
+        ledger.settle(1, 100)
+        ledger.credit(0, Signal.RootFixings, 3.0)
+
+        assertEquals(1.0, ledger.settle(0, 100), 1e-9)
+    }
+
+    @Test
     fun `scaling a signal does not change the reward`() {
         fun rewardAt(scale: Double): Double {
             val ledger = RewardLedger(2)

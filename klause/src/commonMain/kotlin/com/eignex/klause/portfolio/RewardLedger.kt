@@ -17,15 +17,22 @@ import com.eignex.klause.solver.result.SolveStats
  * been scheduled to collect still earned it, and leaving it out would score every other arm as the only one earning
  * nothing on that signal, a full reward for half the work.
  *
+ * An arm is scored only on the signals it [earns]: a signal its engine cannot produce says nothing about it, and
+ * scoring it there would count every arm of the other engine against it. The pool's rate for a signal is likewise
+ * taken over the work of the arms that can earn it.
+ *
  * Rates pool over the current phase only; [resetPhase] starts a new one.
  */
-internal class RewardLedger(private val arms: Int) {
+internal class RewardLedger(
+    private val arms: Int,
+    /** Whether an arm can earn a signal at all; every arm earns every signal by default. */
+    private val earns: (arm: Int, signal: Signal) -> Boolean = { _, _ -> true },
+) {
     private val pending = Array(Signal.entries.size) { DoubleArray(arms) }
     private val earnedByArm = Array(Signal.entries.size) { DoubleArray(arms) }
     private val earned = DoubleArray(Signal.entries.size)
     private val spentByArm = LongArray(arms)
     private val total = Array(Signal.entries.size) { DoubleArray(arms) }
-    private var spent = 0L
 
     /** Post [amount] of [signal] to [arm]'s account. Non-positive and non-finite amounts are ignored. */
     fun credit(arm: Int, signal: Signal, amount: Double) {
@@ -39,22 +46,22 @@ internal class RewardLedger(private val arms: Int) {
     /**
      * Settle [arm]'s account over the [work] its segment spent, returning a reward in `[0, 1]`.
      *
-     * Each signal the pool has earned this phase scores `own / (own + others)` on rates: one for an arm the only
-     * one earning it, a half for one earning it as fast as the rest of the pool does, zero for one earning
-     * nothing. The reward is the mean over those signals.
+     * Each signal the arm [earns] and the pool has earned this phase scores `own / (own + others)` on rates: one
+     * for an arm the only one earning it, a half for one earning it as fast as the rest of the pool does, zero for
+     * one earning nothing. The reward is the mean over those signals.
      */
     fun settle(arm: Int, work: Long): Double {
         val segmentWork = work.coerceAtLeast(1L)
         spentByArm[arm] += segmentWork
-        spent += segmentWork
-        val othersWork = spent - spentByArm[arm]
         var share = 0.0
         var signals = 0
         for (s in pending.indices) {
             val own = pending[s][arm]
             pending[s][arm] = 0.0
-            if (earned[s] <= 0.0) continue
+            val signal = Signal.entries[s]
+            if (earned[s] <= 0.0 || !earns(arm, signal)) continue
             signals++
+            val othersWork = (0 until arms).sumOf { if (it != arm && earns(it, signal)) spentByArm[it] else 0L }
             val ownRate = own / segmentWork
             val othersRate = if (othersWork > 0L) (earned[s] - earnedByArm[s][arm]) / othersWork else 0.0
             if (ownRate > 0.0) share += ownRate / (ownRate + othersRate)
@@ -72,7 +79,6 @@ internal class RewardLedger(private val arms: Int) {
         for (row in earnedByArm) row.fill(0.0)
         earned.fill(0.0)
         spentByArm.fill(0L)
-        spent = 0L
     }
 }
 
@@ -101,6 +107,20 @@ internal enum class Signal {
 
     /** Uses other arms made of this arm's shared root bounds. */
     BoundUses,
+}
+
+/**
+ * Whether [worker]'s engine can earn this signal. A counted arm is local search or ALNS: it lowers violation and
+ * shares nothing. Any other arm runs backtrack search: it fixes variables at its root, proves bounds and shares
+ * clauses, cuts and bounds, and has no violation to lower. Both find and improve solutions.
+ */
+internal fun Signal.earnableBy(worker: PortfolioWorker): Boolean = when (this) {
+    Signal.FirstSolution, Signal.Improvement -> true
+
+    Signal.Violation -> worker.acceptsInstructionBudget
+
+    Signal.Floor, Signal.RootFixings, Signal.ClauseUses, Signal.CutUses, Signal.BoundUses ->
+        !worker.acceptsInstructionBudget
 }
 
 /**
