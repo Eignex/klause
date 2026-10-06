@@ -66,6 +66,15 @@ class RewardLedgerTest {
     }
 
     @Test
+    fun `credit owed to an idle arm counts against the arm being scored`() {
+        val ledger = RewardLedger(2)
+        ledger.credit(1, Signal.ClauseUses, 5.0)
+        ledger.credit(0, Signal.Improvement, 4.0)
+
+        assertEquals(0.5, ledger.settle(0, 100), 1e-9)
+    }
+
+    @Test
     fun `scaling a signal does not change the reward`() {
         fun rewardAt(scale: Double): Double {
             val ledger = RewardLedger(2)

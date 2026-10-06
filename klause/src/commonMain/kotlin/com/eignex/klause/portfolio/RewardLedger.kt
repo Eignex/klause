@@ -13,6 +13,10 @@ import com.eignex.klause.solver.result.SolveStats
  * rate rather than a total keeps a long segment from scoring higher for being long, and comparing each signal
  * only with itself puts signals in unrelated units on one scale without a hand-set weight between them.
  *
+ * The pool's rate counts credit as earned when it is posted, not when it settles: an arm owed credit it has not yet
+ * been scheduled to collect still earned it, and leaving it out would score every other arm as the only one earning
+ * nothing on that signal, a full reward for half the work.
+ *
  * Rates pool over the current phase only; [resetPhase] starts a new one.
  */
 internal class RewardLedger(private val arms: Int) {
@@ -27,6 +31,8 @@ internal class RewardLedger(private val arms: Int) {
     fun credit(arm: Int, signal: Signal, amount: Double) {
         if (amount <= 0.0 || !amount.isFinite()) return
         pending[signal.ordinal][arm] += amount
+        earnedByArm[signal.ordinal][arm] += amount
+        earned[signal.ordinal] += amount
         total[signal.ordinal][arm] += amount
     }
 
@@ -47,8 +53,6 @@ internal class RewardLedger(private val arms: Int) {
         for (s in pending.indices) {
             val own = pending[s][arm]
             pending[s][arm] = 0.0
-            earnedByArm[s][arm] += own
-            earned[s] += own
             if (earned[s] <= 0.0) continue
             signals++
             val ownRate = own / segmentWork
