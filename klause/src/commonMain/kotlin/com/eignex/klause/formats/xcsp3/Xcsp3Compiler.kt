@@ -205,13 +205,7 @@ internal object Compiler {
         }
 
         /** The row-major flat index of every cell [specs] selects within [dims]. */
-        private fun forEachCell(
-            specs: List<IntArray>,
-            dims: IntArray,
-            dim: Int,
-            flat: Int,
-            action: (Int) -> Unit,
-        ) {
+        private fun forEachCell(specs: List<IntArray>, dims: IntArray, dim: Int, flat: Int, action: (Int) -> Unit) {
             if (dim == dims.size) return action(flat)
             val spec = specs[dim]
             val lo = if (spec[0] == Int.MIN_VALUE) 0 else spec[0]

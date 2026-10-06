@@ -117,22 +117,18 @@ class DuplicateColumnsTest {
     }
 
     /** `x + y >= 7` and `x + y + w <= 40` over `x` (0), `y` (1), `w` (2), with `x` and `y` duplicate columns. */
-    private fun sourceModel(
-        x: IntDomain,
-        y: IntDomain,
-        openLo: BooleanArray? = null,
-        openHi: BooleanArray? = null,
-    ) = Problem(
-        numBoolVars = 0,
-        numIntVars = 3,
-        intDomains = arrayOf(x, y, IntDomain(0, 3)),
-        factors = listOf(
-            Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 7),
-            Linear(intArrayOf(1, 1, 1), intArrayOf(0, 1, 2), LinearOp.LE, 40),
-        ),
-        openIntLo = openLo,
-        openIntHi = openHi,
-    )
+    private fun sourceModel(x: IntDomain, y: IntDomain, openLo: BooleanArray? = null, openHi: BooleanArray? = null) =
+        Problem(
+            numBoolVars = 0,
+            numIntVars = 3,
+            intDomains = arrayOf(x, y, IntDomain(0, 3)),
+            factors = listOf(
+                Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 7),
+                Linear(intArrayOf(1, 1, 1), intArrayOf(0, 1, 2), LinearOp.LE, 40),
+            ),
+            openIntLo = openLo,
+            openIntHi = openHi,
+        )
 
     @Test
     fun `the source form folds a column closed at zero into a representative open above`() {

@@ -503,20 +503,19 @@ internal fun propagateRow(coeffs: LongArray, vars: IntArray, bound: Long, sign: 
  * bits, leaves the row possible.
  */
 @Suppress("ReturnCount")
-internal fun rowRefuted(coeffs: LongArray, vars: IntArray, bound: Long, sign: Long, b: IntervalBounds): Boolean =
-    try {
-        var minActivity = 0L
-        for (idx in coeffs.indices) {
-            val a = mulExact(sign, coeffs[idx])
-            if (a == 0L) continue
-            val v = vars[idx]
-            if (if (a > 0L) b.loOpen(v) else b.hiOpen(v)) return false
-            minActivity = addExact(minActivity, mulExact(a, if (a > 0L) b.loVal(v) else b.hiVal(v)))
-        }
-        minActivity > mulExact(sign, bound)
-    } catch (_: CheckedLongOverflowException) {
-        false
+internal fun rowRefuted(coeffs: LongArray, vars: IntArray, bound: Long, sign: Long, b: IntervalBounds): Boolean = try {
+    var minActivity = 0L
+    for (idx in coeffs.indices) {
+        val a = mulExact(sign, coeffs[idx])
+        if (a == 0L) continue
+        val v = vars[idx]
+        if (if (a > 0L) b.loOpen(v) else b.hiOpen(v)) return false
+        minActivity = addExact(minActivity, mulExact(a, if (a > 0L) b.loVal(v) else b.hiVal(v)))
     }
+    minActivity > mulExact(sign, bound)
+} catch (_: CheckedLongOverflowException) {
+    false
+}
 
 /** Conservative per-term relative rounding bound for the real-row interval arithmetic; generous next to
  *  the `2⁻⁵³` unit roundoff so it also covers the `Long`→`Double` conversion of wide integer bounds. */

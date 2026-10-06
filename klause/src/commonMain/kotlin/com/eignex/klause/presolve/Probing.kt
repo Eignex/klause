@@ -279,11 +279,14 @@ private class OpenRangeProbe(private val problem: Problem, private val cancellat
         // The complement of an integer `≤ b` is `≥ b + 1`, and of `≥ b` is `≤ b − 1`.
         when (relation) {
             LinearOp.LE -> half(addExact(bound, 1L), -1L, 0L)
+
             LinearOp.GE -> half(subExact(bound, 1L), 1L, 0L)
+
             LinearOp.NE -> {
                 half(bound, 1L, 0L)
                 half(bound, -1L, 0L)
             }
+
             LinearOp.EQ -> Unit
         }
     }

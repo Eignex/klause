@@ -249,7 +249,9 @@ class LpBoundTrailTest {
             repeat(150) {
                 when (random.nextInt(10)) {
                     in 0..2 -> trail.push()
+
                     in 3..4 -> trail.pop(random.nextInt(trail.state.depth + 1))
+
                     else -> trail.assertBound(
                         random.nextInt(model.numVars),
                         random.nextBoolean(),

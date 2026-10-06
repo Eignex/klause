@@ -254,7 +254,9 @@ internal object DuplicateColumns {
             roundDown = true,
             clamp = if (bounds.hasUpper(y)) bounds.upper(y) else null,
         )
+
         bounds.hasUpper(y) -> RebuildStep.AffineValue(y, bounds.upper(y), IntArray(0), LongArray(0), 1L)
+
         else -> {
             val atLower = if (bounds.hasLower(y)) bounds.lower(y) else 0L
             RebuildStep.AffineValue(y, atLower, IntArray(0), LongArray(0), 1L)

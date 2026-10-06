@@ -209,11 +209,8 @@ internal object PortfolioComposition {
         val count = scenario.arms
         return when (scenario.engine) {
             EngineMix.LOCAL_SEARCH -> lsArms(scenario.kind, count, scenario.lsPool)
-
             EngineMix.BACKTRACK -> btArms(scenario, count)
-
             EngineMix.MIXED -> mixedArms(scenario)
-
             EngineMix.ALNS -> alnsArms(count, scenario.nodeBudget)
         }
     }
