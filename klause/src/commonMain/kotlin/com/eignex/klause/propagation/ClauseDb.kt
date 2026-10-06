@@ -136,6 +136,10 @@ internal fun PropagationState.learnedClauseLbd(learnedIndex: Int): Int =
 internal fun PropagationState.learnedClausePermanent(learnedIndex: Int): Boolean =
     nativeEngine?.permanentOf(learnedIndex) ?: (learned.permanent[learnedIndex] == 1)
 
+/** The arm learned clause [learnedIndex] was imported from, or [OWN_ORIGIN] for one learned here. */
+internal fun PropagationState.learnedClauseOrigin(learnedIndex: Int): Int =
+    nativeEngine?.originOf(learnedIndex) ?: learned.origins[learnedIndex]
+
 /** Three-tier DB tier of learned clause [learnedIndex] ([ClauseTier.UNSET] until the
  *  reduction policy classifies it). */
 internal fun PropagationState.learnedClauseTier(learnedIndex: Int): ClauseTier =

@@ -388,6 +388,10 @@ class PropagationSession(
     fun addLearnedClause(clause: Clause, lbd: Int, permanent: Boolean = false): PropagationResult =
         registerAndPropagate(base = state.undoTop) { state.addLearnedClause(clause, lbd, permanent) }
 
+    /** [addLearnedClause] for a clause derived from one imported from [origin], which keeps the credit. */
+    internal fun addLearnedClause(clause: Clause, lbd: Int, origin: Int): PropagationResult =
+        registerAndPropagate(base = state.undoTop) { state.addLearnedClause(clause, lbd, permanent = false, origin) }
+
     /**
      * Register a learned pseudo-Boolean constraint `Σ weightsᵢ·literalsᵢ ≥ degree` and
      * immediately propagate it, exactly as [addLearnedClause] does for a clause. Used by the engine's
@@ -527,6 +531,9 @@ class PropagationSession(
     /** True iff learned clause [learnedIndex] survives every forgetting pass. */
     fun learnedClausePermanent(learnedIndex: Int): Boolean = state.learnedClausePermanent(learnedIndex)
 
+    /** The arm learned clause [learnedIndex] was imported from, or [OWN_ORIGIN] for one learned here. */
+    internal fun learnedClauseOrigin(learnedIndex: Int): Int = state.learnedClauseOrigin(learnedIndex)
+
     /** The learned clause at [learnedIndex]. Read by the engine's vivification pass and the
      *  glue-clause export, both clause-only. Fails loudly on a non-clause learned constraint rather than
      *  through a bare cast, so a pseudo-Boolean nogood reaching a clause-only pass names the site that
@@ -576,6 +583,8 @@ class PropagationSession(
             // learning under assumptions/incumbent (LNS repair) must skip them or it poisons peers.
             if (skipPermanent && learnedClausePermanent(i)) continue
             if (!isLearnedClause(i)) continue // pseudo-Boolean nogoods aren't clause-portable
+            // Another arm's clause, or one inprocessing derived from it, is that arm's to publish.
+            if (learnedClauseOrigin(i) != OWN_ORIGIN) continue
             val lbd = learnedClauseLbd(i)
             if (lbd > maxLbd) continue
             val lits = learnedClauseLiterals(i)

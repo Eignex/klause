@@ -218,6 +218,7 @@ internal class NativeSatState(private val state: PropagationState) {
     val count: Int get() = learnedCount
     fun lbdOf(i: Int): Int = learnedLbd[i]
     fun permanentOf(i: Int): Boolean = learnedPermanent[i] == 1
+    fun originOf(i: Int): Int = learnedOrigin[i]
     fun tierOf(i: Int): ClauseTier = ClauseTier.entries[learnedTier[i]]
     fun setTierOf(i: Int, tier: ClauseTier) {
         learnedTier[i] = tier.ordinal

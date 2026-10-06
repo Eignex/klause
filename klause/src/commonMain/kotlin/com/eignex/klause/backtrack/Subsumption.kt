@@ -60,6 +60,7 @@ internal fun subsume(
     val dropIdx = IntHashSet()
     val replacements = ArrayList<IntArray>()
     val replacementLbds = IntArrayList()
+    val replacementOrigins = IntArrayList()
     val batch = params.subsumeBatch.coerceAtLeast(1)
     var cursor = if (startCursor in 0 until count) startCursor else 0
     var examined = 0
@@ -98,12 +99,16 @@ internal fun subsume(
             // The resolvent is at least as strong as the clause it replaces: inherit the parent's LBD
             // (capped by the new size) so the derived clause keeps its tier and glue-export standing.
             replacementLbds.add(minOf(session.learnedClauseLbd(idx), strengthened.size))
+            // A resolvent of a peer's clause stays that peer's, so its uses keep crediting the arm that found it.
+            replacementOrigins.add(session.learnedClauseOrigin(idx))
         }
     }
     stats?.observeInprocessing(probes = 0L, visits = visits)
     if (dropIdx.isEmpty()) return cursor
     session.forgetLearnedClauses { i, _ -> i !in dropIdx }
-    for (r in replacements.indices) session.addLearnedClause(Clause(replacements[r]), lbd = replacementLbds[r])
+    for (r in replacements.indices) {
+        session.addLearnedClause(Clause(replacements[r]), replacementLbds[r], replacementOrigins[r])
+    }
     // The forget renumbered the database, so resume the round-robin from the start.
     return 0
 }
