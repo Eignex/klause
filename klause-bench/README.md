@@ -168,7 +168,8 @@ Gradle itself builds fine. See `klause-cli/README.md` for the `JAVA_HOME` fix. N
 ```
 bench solve [filters…]               solve a selection (the bench's one measurement)
 bench preview [filters…]             print what a run would cover, without running
-bench select [filters…]              the same selection as JSON lines: suite, problem, collection, family, format, category
+bench select [filters…]              the same selection as JSON lines: suite, problem, collection, family, format, category;
+                                     with features=true also each instance's structure, logic and themes
 bench solve-one suite=<id> problem=<name> [solve args…] [out=<dir>]
                                      solve exactly one instance as `select` names it; writes its record to out=<dir>
                                      (default output/<config>/) and no per-run table, for drivers that run one
@@ -180,11 +181,22 @@ bench solve-one suite=<id> problem=<name> [solve args…] [out=<dir>]
 bench list [<suite>]                 list suites, or the problems in one suite
 ```
 
+## Named sets
+
+`klause-bench/sets/<name>.txt` lists a fixed set of problems, one `<suite>/<problem>` per line as `select` prints
+them; `@<set>` includes another set and `#` starts a comment. `set=<name>` selects it, so every bench that names a set
+runs the same problems however the corpus or the reference results change. Each focused set covers one theme, what
+solving the problem asks of klause, as `select features=true` classifies it (`InstanceClassifier.THEMES`): open-domain
+integers, linear reals, scheduling, routing or packing globals, other globals, MIP, SAT, MaxSAT, PB. A set mixes
+difficulties by how long the reference solver took. `sweep` includes every focused set. A set changes only on purpose,
+and a material change takes a new name, so results under one name stay comparable.
+
 ## Filters
 
 | filter | meaning |
 |---|---|
 | `suite=a,b` | restrict to named suites; `suite=core` expands to the in-process core |
+| `set=a,b` | the problems of named sets in `klause-bench/sets/` (see Named sets), whole: no suite default cap applies; with `suite=`, only the set problems in those suites |
 | `kind=cop\|csp` | keep optimization (COP) or satisfaction (CSP) problems — classified from the source's objective directive (MiniZinc `solve minimize/maximize`, OPB `min:`, SMT-LIB `(minimize`, XCSP3 `<objective>`); checked as each family's cap is filled, so a capped `kind` selection fills its cap without reading every source |
 | `category=SAT,UNSAT,CSP,OPTIMIZATION,…` | keep only these categories |
 | `tag=…` / `name=<glob>[,…]` | tag membership / comma-separated OR of substring-or-`*`-glob patterns on the instance name (e.g. `name=cvrp,nfc,mario`) |
