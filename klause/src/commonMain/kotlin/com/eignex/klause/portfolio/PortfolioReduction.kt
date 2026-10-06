@@ -8,11 +8,8 @@ import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
 
 /**
- * Pure result reductions shared by both [PortfolioExecutor] implementations — the parallel
- * `Portfolio` (jvm+native) and the single-core [SequentialPortfolio]. These are the parts of the
- * verdict/terminal/stats logic that are identical across the two executors regardless of how each
- * one gathers its workers' results (raced threads vs bandit-scheduled segments). Keeping them here
- * means a change to, say, the four-way optimisation terminal shape lands in one place.
+ * Pure result reductions for the [Portfolio]: the verdict, terminal and stats logic, kept apart from how
+ * the scheduler gathers its arms' results.
  */
 internal object PortfolioReduction {
 

@@ -47,10 +47,9 @@ enum class EngineMix {
  * arm list of size [arms], and [PortfolioBuilder.build] materialises it into runnable
  * [PortfolioWorker]s — so every scenario flows through one construction path.
  *
- * [cores] selects the executor: `cores == 1` ⇒ a single-core [SequentialPortfolio] that bandit-
- * schedules the [arms] arms one time-slice at a time; `cores > 1` ⇒ a parallel `Portfolio` running the
- * composed arms on real threads. [arms] and [cores] are fully independent: the single-core sequential
- * track still draws on a multi-arm pool, a parallel track may carry more arms than cores, and — when
+ * [cores] is the number of lanes a [Portfolio] schedules the [arms] arms on, one segment at a time per lane.
+ * [arms] and [cores] are fully independent: a single core still draws on a multi-arm pool, a parallel run may
+ * carry more arms than cores, and — when
  * `arms < cores` — [PortfolioBuilder.build] replicates the composed arms across the extra lanes with
  * distinct seeds, so a parallel run can be wider than its pool of distinct configs.
  */
@@ -132,7 +131,7 @@ data class PortfolioScenario(
         const val DEFAULT_ARMS = 6
 
         /** Default work in an arm's first segment; later segments grow. Mirrors
-         *  [SequentialPortfolio.baseSliceWork]. */
+         *  [Portfolio.baseSliceWork]. */
         const val DEFAULT_SLICE_WORK = 5_000L
 
         /** A parallel portfolio over [cores] cores; [arms] defaults to one arm per core. */

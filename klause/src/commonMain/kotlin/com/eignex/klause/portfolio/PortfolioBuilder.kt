@@ -18,9 +18,7 @@ import com.eignex.kumulant.stream.lock
  * [WorkerConfig.materialize]. This builder is the thin glue: `compose` → `map { it.materialize(…) }`,
  * with no engine-specific switch.
  *
- * The returned [PortfolioWorker] list is the shared, executor-agnostic unit: wrap it in a parallel
- * `Portfolio` (`scenario.cores > 1`) or a single-core bandit-scheduled [SequentialPortfolio]
- * (`scenario.cores == 1`). The list is identical either way — only the executor differs.
+ * The returned [PortfolioWorker] list is what a [Portfolio] schedules, on one lane per core of the scenario.
  */
 object PortfolioBuilder {
     /**
@@ -140,10 +138,9 @@ object PortfolioBuilder {
     /**
      * The shared pools for [scenario], or null when sharing doesn't apply (an LS-only portfolio
      * ignores both). Created once per build and handed to every backtrack arm. The lock is derived
-     * from the executor's concurrency: a no-op under the single-threaded [SequentialPortfolio]
-     * (`Concurrency.None`, zero overhead — the clause pool is just cross-segment memory there) and a
-     * platform mutex under the parallel `Portfolio`'s concurrent writers. The clause pool is always
-     * present; the cut pool only when [PortfolioScenario.shareCuts] opts in.
+     * from the executor's concurrency: a no-op on one lane (`Concurrency.None`, zero overhead — the clause pool
+     * is just cross-segment memory there) and a platform mutex for several lanes' concurrent writers. The clause
+     * pool is always present; the cut pool only when [PortfolioScenario.shareCuts] opts in.
      */
     private fun poolsFor(scenario: PortfolioScenario, problem: BakedProblem): SharedPools? {
         if (scenario.engine == EngineMix.LOCAL_SEARCH) return null

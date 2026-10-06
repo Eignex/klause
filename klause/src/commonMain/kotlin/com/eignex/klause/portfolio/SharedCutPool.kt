@@ -89,7 +89,7 @@ internal class PoolCutExchange(
             drained.origins[fresh[it]].takeIf { o -> o != origin } ?: SharedCutPool.NO_ORIGIN
         }
         sharing.importCuts(fresh.map { drained.cuts[it] }, origins)
-        tally?.let { t -> sharing.drainImportUses { from, uses -> t.note(Contribution.Cut, from, uses) } }
+        tally?.let { t -> sharing.drainImportUses { from, uses -> t.note(Contribution.Cut, from, uses.toDouble()) } }
         val exported = sharing.exportGlobalCuts().filter { seen.add(it.key) }
         pool.publish(exported, origin)
     }

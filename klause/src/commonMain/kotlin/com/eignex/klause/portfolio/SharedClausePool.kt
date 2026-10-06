@@ -16,10 +16,9 @@ import com.eignex.kumulant.stream.lock
  * clauses and pull others' via a per-arm cursor ([PoolClauseExchange]); every arm benefits from
  * every arm's learning.
  *
- * Used by both portfolio executors: the parallel `Portfolio` (many arms publishing concurrently —
- * needs a real lock) and the single-threaded [SequentialPortfolio] (arms run in time-sliced
- * segments, so the pool is also the *persistent memory* that survives a backtrack arm's session
- * rebuild between segments — it has no resume otherwise). The [lock] comes from the executor's
+ * Used by the [Portfolio] on any number of lanes: several lanes publish concurrently and need a real lock,
+ * and across segments the pool is also the *persistent memory* that survives a backtrack arm's handle being
+ * rebuilt. The [lock] comes from the executor's
  * [Concurrency] via [com.eignex.kumulant.stream.lock]: a no-op under `Concurrency.None` (the single
  * core pays nothing), a platform mutex under the parallel executor's concurrent writers.
  *
@@ -181,7 +180,7 @@ internal class PoolClauseExchange(
 
     private fun countUses(session: PropagationSession) {
         val tally = tally ?: return
-        session.drainImportUses { from, uses -> tally.note(Contribution.Clause, from, uses) }
+        session.drainImportUses { from, uses -> tally.note(Contribution.Clause, from, uses.toDouble()) }
     }
 
     /** Publish a globally-valid nogood straight to the pool (no LBD/length filter), deduped by the

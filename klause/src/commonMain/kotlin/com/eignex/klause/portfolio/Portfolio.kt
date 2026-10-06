@@ -2,238 +2,543 @@
 
 package com.eignex.klause.portfolio
 
+import com.eignex.klause.solver.ResumableSearch
+import com.eignex.klause.solver.ResumableSolve
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.incumbent.IncumbentExchange
 import com.eignex.klause.solver.incumbent.Publication
 import com.eignex.klause.solver.incumbent.bound
 import com.eignex.klause.solver.result.MinimizeResult
+import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
+import com.eignex.klause.solver.result.UnsoundnessException
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.cancelledWhen
+import com.eignex.kumulant.bandit.UnivariateBandit
 import com.eignex.kumulant.core.Concurrency
 import com.eignex.kumulant.stream.lock
 import kotlin.concurrent.atomics.AtomicBoolean
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
+import kotlin.random.Random
+import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TimeSource
 
 /**
- * Parallel portfolio of klause solver workers, **coroutine-free**: every worker runs on its own
- * real thread ([parallelRun]) and the public API is blocking. Each [PortfolioWorker] is a
- * single-threaded engine carrying its *own* params, so a portfolio may be **heterogeneous** —
- * local search and backtrack workers in the same race.
+ * A bandit-scheduled portfolio of klause solver arms running on `lanes` threads. Each lane repeatedly claims an
+ * arm a kumulant [UnivariateBandit] picks, runs it for one segment, and settles what the segment earned; the
+ * shared incumbent, bound and pools pass between segments and lanes. One lane is the single-core track, where the
+ * policy concentrates the core on whichever arm is making progress; more lanes run that same schedule
+ * concurrently, never two at once on one arm.
  *
- * Needs real threads, so a one-core scenario takes [SequentialPortfolio] instead.
+ * An **arm** is a [PortfolioWorker], built by [PortfolioBuilder], so a portfolio may mix local search, backtrack
+ * and ALNS. Across segments the shared incumbent bound prunes backtrack arms (their `objectiveBoundSupplier`) and
+ * the incumbent assignment warm-starts local-search arms (their `initialAssignment` seam, threaded through
+ * [PortfolioWorker.improvements]'s `warmStart`).
  *
- * Cancellation is wired through each worker's params:
- *  - `solve`: once any worker reports Sat/Unsat the flag is set and the others stop at their next poll;
- *  - `minimize`: a worker proving Optimal cancels the rest; else the global incumbent is BestFound;
- *  - `samples`/`improvements`: each worker runs to its budget, fanning into a callback.
+ * **Reward** (folded into the bandit in `[0, 1]`) comes from a [RewardLedger]: each arm is credited for what it
+ * contributed and scored on the rate it earned that at, per unit of work, against the rest of the pool's rate.
+ * Before any incumbent exists the credit is a first feasible solution, which drives the feasibility hunt; once
+ * one exists it is the objective improvement, which drives anytime convergence. A rise in the pool's proven
+ * lower bound is credited to the arm that proved it, so an arm closing the gap from below earns as one closing it
+ * from above does. Progress short of a solution earns credit in both: variables a backtrack arm fixes at its root,
+ * and a local-search arm lowering the record violation ([ProgressCredit]). The ledger starts a new phase at the
+ * first incumbent, since the rates a feasibility hunt earned say nothing about who improves one. An arm is also
+ * credited when another arm uses what it shared: an imported clause in a conflict or unit, an imported cut
+ * selected into a relaxation, an imported bound tightening a domain ([ContributionTally]).
+ *
+ * **Resumable backtrack arms:** a backtrack arm exposes a [ResumableSearch] ([PortfolioWorker.newResumableSearch])
+ * or, for satisfaction, a [ResumableSolve] ([PortfolioWorker.newResumableSolve]). The portfolio holds one handle
+ * per such arm and *resumes* it each time the arm is scheduled, on whichever lane, so the arm continues its exact
+ * search — learned clauses, trail, heuristics and LP warm-start caches intact. Local-search arms have no handle and
+ * run a fresh segment warm-started from the shared incumbent. A resumable arm runs a constant [baseSliceWork]
+ * each segment: resuming costs nothing, so short segments give the policy many decisions at no loss of depth. A
+ * restarting arm's segments grow ([sliceGrowth]) so it can dig deeper than one short restart reaches.
+ *
+ * **Re-seeding plateaued arms ([reseedStaleThreshold]):** pure resume keeps one persistent trail, which converges
+ * fast but forgoes the bound-guided re-exploration a cold restart buys. A resumable arm that fails to improve the
+ * incumbent for several consecutive segments has its handle discarded and rebuilt on its next schedule,
+ * re-descending from the root under the tighter bound with the pool's learned clauses re-imported.
  */
 class Portfolio(
-    /** The configured engine instances raced in parallel; each carries its own params and (for
-     *  optimisation) its own objective representation. */
+    /** The arms; each carries its own engine, params, and objective form. */
     val workers: List<PortfolioWorker>,
-    private val strategy: PortfolioStrategy = PortfolioStrategy.RaceFirstFeasible,
+    /** kumulant arm-selection policy over rewards in `[0, 1]`; see [thompson] for the default. */
+    private val bandit: UnivariateBandit,
+    /** Threads running segments at once; capped at the number of arms, since an arm runs on one lane at a time. */
+    lanes: Int = 1,
+    /** First time slice for an arm with neither a work counter nor a resumable handle. */
+    private val baseSliceMillis: Long = 2_000,
+    /** Cap on a single segment's time slice. */
+    private val maxSliceMillis: Long = 60_000,
+    /** Geometric growth applied to a restarting arm's slice after each segment. */
+    private val sliceGrowth: Double = 1.5,
+    /**
+     * Work each segment of a resumable arm spends, and the first segment of a counted local-search arm; a
+     * local-search arm's later segments grow by [sliceGrowth] up to [maxSliceWork].
+     *
+     * Work is measured in node-equivalents, one unit for every arm whatever its engine. A resumable backtrack arm
+     * spends one per search node plus its LP work at the rate [com.eignex.klause.solver.ResumableSearch.runSlice]
+     * charges it. A local-search or ALNS arm ([PortfolioWorker.acceptsInstructionBudget]) spends one per
+     * [lsInstructionsPerWork] instructions of its counted allowance; ALNS spends it across its own outer
+     * destroy/repair loop instead of one inner solve (see [com.eignex.klause.meta.alns.Alns]'s class KDoc). A
+     * common unit is what lets one schedule give every arm a comparable turn.
+     *
+     * Counted arms are never sliced by the clock. A segment bounded by time pauses somewhere different on every
+     * run, and since the search resumes from wherever it stopped, every counter a solve reports inherits that. A
+     * segment bounded by work pauses at the same point every time, which on one lane makes a run reproducible.
+     * The whole-solve deadline still applies, so this cannot overrun it.
+     */
+    private val baseSliceWork: Long = 5_000,
+    /** Cap on a single local-search segment's work. */
+    private val maxSliceWork: Long = 150_000,
+    /** Local-search instructions that cost as much as one search node; see `LS_INSTRUCTIONS_PER_WORK`. */
+    private val lsInstructionsPerWork: Double = LS_INSTRUCTIONS_PER_WORK,
+    /**
+     * Consecutive non-improving segments after which a resumable arm's handle is discarded so its next schedule
+     * opens a fresh one under the tighter bound; `0` disables re-seeding. Local-search and ALNS arms already run
+     * a fresh warm-started segment each time.
+     */
+    private val reseedStaleThreshold: Int = 3,
+    /**
+     * Share of the bandit's evidence that survives the first incumbent. Finding a solution and improving one are
+     * different jobs, so the scheduler starts the second with only a weak memory of who did well at the first:
+     * enough that it need not re-explore every arm, little enough that a few segments overturn it. The search
+     * itself carries over whole. Applies to [thompson]'s policy; another policy keeps its evidence.
+     */
+    private val phaseRetention: Double = DEFAULT_PHASE_RETENTION,
 ) : PortfolioExecutor {
+    private val lanes = minOf(lanes, workers.size)
 
     init {
         require(workers.isNotEmpty()) { "Portfolio must have at least one worker" }
+        require(lanes >= 1) { "lanes must be ≥ 1" }
+        require(baseSliceMillis > 0 && maxSliceMillis >= baseSliceMillis) { "invalid slice bounds" }
+        require(sliceGrowth >= 1.0) { "sliceGrowth must be ≥ 1.0" }
+        require(reseedStaleThreshold >= 0) { "reseedStaleThreshold must be ≥ 0" }
+        require(phaseRetention in 0.0..1.0) { "phaseRetention must be in [0, 1]" }
+        require(baseSliceWork > 0 && maxSliceWork >= baseSliceWork) { "invalid work slice bounds" }
+        require(lsInstructionsPerWork > 0.0) { "lsInstructionsPerWork must be > 0" }
     }
 
-    // Streaming (samples/improvements) hands each worker loop to a daemon producer thread, fanned in
-    // through a lazy Sequence. A Sequence gives no close hook, so abandoning the iterator (e.g.
-    // `.take(20)`) cannot by itself signal the producers — left unbounded they would spin to their
-    // budget (forever, for an unbudgeted LS worker) and leak across calls. `close()` flips this flag;
-    // it is OR-ed into the cancellation each streaming worker polls, so the use-block boundary stops
-    // every producer promptly. Solve/minimize don't need it (they join their workers before returning).
-    private val streamStop = AtomicBoolean(false)
+    // The pool every arm shares, when it shares one; the same object reached through any worker.
+    private val contributions = workers.firstNotNullOfOrNull { it.sharedPools?.contributions }
 
     /**
-     * Solve in parallel (blocking). [PortfolioStrategy.RaceFirstFeasible] (default) cancels siblings
-     * once any worker produces a definitive Sat/Unsat; [PortfolioStrategy.Exhaustive] runs every
-     * worker to its own budget and reduces afterwards (prefer Sat, then Unsat, then Unknown).
+     * Satisfaction: run arms in scheduled segments until one returns a definitive Sat/Unsat, which ends the run.
+     * A backtrack arm's [ResumableSolve] is resumed each time it is scheduled; an arm whose handle reaches a verdict
+     * that settles nothing, or fails, is retired. Local-search arms run a fresh counted segment each time.
      */
     override fun solve(cancellation: Cancellation): SolveResult {
-        val winnerFlag = AtomicBoolean(false)
-        val token = cancellation.alsoStoppedBy(winnerFlag)
-        val cancelToken: Cancellation = when (strategy) {
-            PortfolioStrategy.RaceFirstFeasible -> token
-            PortfolioStrategy.Exhaustive -> cancellation
-        }
-
-        val results = parallelRun(
-            workers.map { worker ->
-                {
-                    val r = worker.solve(cancelToken)
-                    if (strategy is PortfolioStrategy.RaceFirstFeasible &&
-                        (r is SolveResult.Sat || r is SolveResult.Unsat)
-                    ) {
-                        winnerFlag.store(true)
-                    }
-                    r
+        val run = Schedule(cancellation, arrayOfNulls<ResumableSolve>(workers.size))
+        val verdicts = ArrayList<SolveResult>()
+        var decided: SolveResult? = null
+        run.execute { claim ->
+            val arm = claim.arm
+            val worker = workers[arm]
+            val handle = run.handles[arm] ?: worker.newResumableSolve()?.also { run.handles[arm] = it }
+            val r: SolveResult?
+            val failed: Boolean
+            val work: Long
+            // A failing arm leaves the others to answer, but an unsound one has answered wrongly.
+            if (handle != null) {
+                val workBefore = handle.work
+                val outcome = runCatching { handle.runSlice(run.token, Long.MAX_VALUE, baseSliceWork) }
+                    .onFailure { if (it is UnsoundnessException) throw it }
+                r = outcome.getOrNull()
+                failed = outcome.isFailure
+                work = handle.work - workBefore
+            } else {
+                val token = segmentToken(worker, run.token, claim.sliceMillis)
+                val outcome = runCatching { worker.solve(token, instructionsFor(claim.sliceWork)) }
+                    .onFailure { if (it is UnsoundnessException) throw it }
+                r = outcome.getOrNull()
+                failed = outcome.isFailure
+                work = claim.sliceWork
+            }
+            run.locked {
+                run.record(claim, handle?.stats ?: r?.stats, cumulative = handle != null, work = work, failed = failed)
+                if ((r is SolveResult.Sat || r is SolveResult.Unsat) && decided == null) {
+                    decided = r
+                    run.finish()
                 }
-            },
-        )
+                // An arm that threw is retired like one that finished: rescheduling it would only fail again.
+                if (failed || (handle != null && r != null)) {
+                    r?.let(verdicts::add)
+                    run.retire(arm)
+                }
+            }
+        }
+        val stats = run.folded()
+        return when (val r = decided) {
+            is SolveResult.Sat -> r.copy(stats = stats)
 
-        return PortfolioReduction.verdict(results)
+            is SolveResult.Unsat -> r.copy(stats = stats)
+
+            else -> if (run.allRetired) {
+                SolveResult.Unknown(unsettledReason(verdicts), stats)
+            } else {
+                SolveResult.Unknown(TerminationReason.Cancelled, stats)
+            }
+        }
     }
 
     /**
-     * Parallel branch-and-bound minimisation (blocking) with a shared best bound. Each worker
-     * streams its own improvements **against the objective representation it was built with**;
-     * new incumbents fold into a shared bound exposed back to every worker through its bound supplier
-     * (backtrack prunes on it; LS ignores it). A worker proving Optimal cancels the rest; otherwise
-     * the global incumbent is returned as BestFound, or Optimal if every worker terminated cleanly.
+     * Branch-and-bound: run arms in scheduled segments, carrying one shared incumbent. Each segment streams
+     * against its arm's own objective representation, sees the shared bound (backtrack prunes on it) and the
+     * incumbent assignment (local search warm-starts from it). Returns [MinimizeResult.Optimal] /
+     * [MinimizeResult.Infeasible] only when an arm exhausts its search, otherwise the best incumbent as
+     * [MinimizeResult.BestFound]. `onImprovement` fires once per strict global improvement, tagged with the arm
+     * that produced it, in the order the incumbent installed them.
      */
+    // A callback failure stays the primary failure.
+    @Suppress("TooGenericExceptionCaught")
     override fun minimize(
         cancellation: Cancellation,
         onImprovement: ((AttributedImprovement) -> Unit)?,
     ): MinimizeResult {
+        val run = Schedule(cancellation, arrayOfNulls<ResumableSearch>(workers.size))
         val incumbent = IncumbentExchange.minimizing<Sample>()
-        val cancelled = AtomicBoolean(false)
-        val token = cancellation.alsoStoppedBy(cancelled)
-        fun readBound(): Double = incumbent.bound()
-        // Workers improve concurrently; [relay] serialises the attribution callback and holds it to the
-        // order the exchange installed the improvements, so the consumer (e.g. the CLI's `-s` per-arm line)
-        // sees neither interleaved invocations nor a regression the installs never made. It is non-null
-        // exactly when [onImprovement] is, so the no-callback path takes neither the relay nor the callback.
-        // Only the publisher the exchange told it installed the new global best reports — a loser never does.
         val start = TimeSource.Monotonic.markNow()
-        val relay = if (onImprovement != null) ImprovementRelay(Concurrency.Strict.lock()) else null
-        fun fold(worker: PortfolioWorker, r: MinimizeResult.WithSample) {
-            val publication = incumbent.offer(r.sample, r.objectiveValue)
-            if (publication !is Publication.Installed) return
-            val cb = onImprovement ?: return
-            val ordered = relay ?: return
-            val improvement = AttributedImprovement(worker.label, worker.armId, start.elapsedNow(), r)
-            ordered.deliver(publication.incumbent.version, improvement, cb)
+        val readBound = { incumbent.bound() }
+        // Consecutive non-improving segments per arm; drives re-seeding (see [reseedStaleThreshold]).
+        val staleSegments = IntArray(workers.size)
+        var callbackFailure: Throwable? = null
+        var unbounded: MinimizeResult.Unbounded? = null
+        var exhausted = false
+
+        // Install a strictly-improving incumbent and credit it to [claim]'s arm. The check, the callback and the
+        // install happen under one lock, so concurrent lanes report improvements in the order they installed and
+        // never report one a peer already beat.
+        fun accept(claim: Claim, r: MinimizeResult.WithSample) = run.locked {
+            val before = readBound()
+            if (!r.objective.isFinite() || r.objective >= before) return@locked
+            val worker = workers[claim.arm]
+            try {
+                onImprovement?.invoke(AttributedImprovement(worker.label, worker.armId, start.elapsedNow(), r))
+            } catch (failure: Throwable) {
+                callbackFailure = failure
+                run.finish()
+                throw failure
+            }
+            if (incumbent.offer(r.sample, r.objective) !is Publication.Installed) return@locked
+            claim.improved = true
+            if (before.isFinite()) {
+                if (claim.hadIncumbent) run.ledger.credit(claim.arm, Signal.Improvement, before - r.objective)
+            } else if (!claim.foundFirst) {
+                claim.foundFirst = true
+                run.ledger.credit(claim.arm, Signal.FirstSolution, 1.0)
+            }
         }
 
-        val results = parallelRun(
-            workers.map { worker ->
-                {
-                    var local: MinimizeResult = MinimizeResult.Unknown(TerminationReason.BudgetExhausted)
-                    for (r in worker.improvements(::readBound, token)) {
-                        when (r) {
-                            is MinimizeResult.BestFound -> {
-                                fold(worker, r)
-                                local = r
-                            }
-
-                            is MinimizeResult.Optimal -> {
-                                fold(worker, r)
-                                cancelled.store(true)
-                                local = r
-                                break
-                            }
-
-                            is MinimizeResult.Unbounded -> {
-                                fold(worker, r)
-                                cancelled.store(true)
-                                local = r
-                                break
-                            }
-
-                            is MinimizeResult.Infeasible -> local = r
-
-                            is MinimizeResult.Unknown -> local = r
-                        }
-                    }
-                    local
+        run.execute { claim ->
+            val arm = claim.arm
+            val worker = workers[arm]
+            claim.hadIncumbent = incumbent.current() != null
+            val handle = run.handles[arm] ?: worker.newResumableSearch(readBound)?.also { run.handles[arm] = it }
+            var terminal: MinimizeResult? = null
+            val failed: Boolean
+            val work: Long
+            if (handle != null) {
+                val workBefore = handle.work
+                // A terminal verdict means the arm finished; null means the slice ended with the search paused.
+                val outcome = runCatching {
+                    handle.runSlice(run.token, Long.MAX_VALUE, baseSliceWork) { accept(claim, it) }
                 }
-            },
-        )
-        // Every worker has joined, so a version still waiting on one that died between its install and its
-        // report is never coming; hand over what waited behind it rather than dropping it.
-        if (relay != null && onImprovement != null) relay.flush(onImprovement)
-        val stats = PortfolioReduction.foldStats(results) { it.stats }
+                terminal = outcome.getOrNull()
+                failed = outcome.isFailure
+                work = handle.work - workBefore
+            } else {
+                // Local-search segments restart from the shared incumbent, bounded by their own counted work.
+                val armToken = segmentToken(worker, run.token, claim.sliceMillis)
+                failed = runCatching {
+                    for (r in worker.improvements(
+                        readBound,
+                        armToken,
+                        warmStart = incumbent.current()?.assignment,
+                        maxInstructions = instructionsFor(claim.sliceWork),
+                    )) {
+                        terminal = r
+                        if (r is MinimizeResult.WithSample) accept(claim, r)
+                    }
+                }.isFailure
+                work = claim.sliceWork
+            }
+            callbackFailure?.let { throw it }
+            (terminal as? MinimizeResult.WithSample)?.let { accept(claim, it) }
+            run.locked {
+                val stats = handle?.stats ?: terminal?.stats
+                run.record(claim, stats, cumulative = handle != null, work = work, failed = failed)
+                if (claim.foundFirst) startImprovementPhase(run.ledger)
+                // Re-seed a plateaued resumable arm: only once an incumbent exists (the feasibility hunt is never
+                // reset), and never on a segment that already returned a terminal verdict.
+                if (handle != null && terminal == null && !failed && incumbent.current() != null) {
+                    if (claim.improved) {
+                        staleSegments[arm] = 0
+                    } else if (reseedStaleThreshold > 0 && ++staleSegments[arm] >= reseedStaleThreshold) {
+                        runCatching { handle.close() }
+                        run.handles[arm] = null
+                        staleSegments[arm] = 0
+                    }
+                }
+                // A ray proves the model unbounded whatever bound the arm ran under.
+                (terminal as? MinimizeResult.Unbounded)?.let {
+                    if (unbounded == null) unbounded = it
+                    run.finish()
+                }
+                // A clean segment exhaustion ends the run: any incumbent is optimal, else infeasible.
+                if (PortfolioReduction.isExhausted(terminal)) {
+                    exhausted = true
+                    run.finish()
+                }
+                // An arm that threw is retired like one that finished: rescheduling it would only fail again.
+                if (failed || (handle != null && terminal != null)) run.retire(arm)
+            }
+        }
+        val stats = run.folded()
+        unbounded?.let { return it.copy(stats = stats) }
+        // Cancellation or retirement stopped a still-open search: keep the incumbent (BestFound) or report Unknown.
+        return PortfolioReduction.terminal(incumbent.current(), dirty = !exhausted, stats)
+    }
 
-        // A ray proves the model unbounded whatever bound the worker ran under.
-        val unbounded = results.firstOrNull { it is MinimizeResult.Unbounded }
-        if (unbounded != null) return (unbounded as MinimizeResult.Unbounded).copy(stats = stats)
-
-        // A direct Optimal claim is only produced by a worker not running under shared bounds
-        // (single-worker / unshared); the engine downgrades to BestFound when a bound is shared.
-        val directOptimal = results.firstOrNull { it is MinimizeResult.Optimal }
-        if (directOptimal != null) return (directOptimal as MinimizeResult.Optimal).copy(stats = stats)
-
-        // The pool proves optimality only when EVERY worker exhausted its space; a worker that timed
-        // out or was cancelled mid-search is dirty regardless of verdict shape.
-        val anyDirty = results.any { !PortfolioReduction.isExhausted(it) }
-        return PortfolioReduction.terminal(incumbent.current(), anyDirty, stats)
+    /** One segment's assignment: the arm a lane claimed and what it may spend, plus what its segment found. */
+    private class Claim(val arm: Int, val probing: Boolean, val sliceMillis: Long, val sliceWork: Long) {
+        var hadIncumbent = false
+        var improved = false
+        var foundFirst = false
     }
 
     /**
-     * Streaming branch-and-bound: a lazy [Sequence] of every *strict* global improvement, in the order the
-     * shared incumbent installed them, so the consumer sees a monotonically-improving sequence (the anytime/
-     * credit entry point). Iterating drives the workers in parallel; the shared bound is exposed to
-     * bound-pruning workers exactly as in [minimize]. Each element carries the producing worker and the
-     * elapsed time at the moment it was found. Stop early by flipping [cancellation] (then abandoning the
-     * iterator).
+     * The state one `solve` or `minimize` call shares across its lanes: the ledger, the arms' [handles] and stats,
+     * which arms are busy or retired, and the slice sizes. Everything but the handles is touched under [locked]; a
+     * handle is touched only by the lane holding its arm.
      */
-    fun improvementsAttributed(cancellation: Cancellation = Cancellation.Never): Sequence<AttributedImprovement> {
-        val start = TimeSource.Monotonic.markNow()
-        val incumbent = IncumbentExchange.minimizing<Sample>()
-        val relay = ImprovementRelay(Concurrency.Strict.lock())
-        fun readBound(): Double = incumbent.bound()
-        val token = cancellation.alsoStoppedBy(streamStop)
-        return parallelStream(
-            workers.map { worker ->
-                { emit: (AttributedImprovement) -> Unit ->
-                    for (r in worker.improvements(::readBound, token)) {
-                        // Stream the install, not the offer: two workers can each beat the bound they read,
-                        // and only one of them installs. Streaming the loser too would break the stream's
-                        // monotonicity — its result is already stale when it arrives. The winner's own emit
-                        // cannot carry that monotonicity to the consumer either, since it runs after the CAS
-                        // rather than with it; the relay puts the installs on the wire in install order.
-                        if (r !is MinimizeResult.WithSample) continue
-                        val publication = incumbent.offer(r.sample, r.objectiveValue)
-                        if (publication !is Publication.Installed) continue
-                        val improvement = AttributedImprovement(worker.label, worker.armId, start.elapsedNow(), r)
-                        relay.deliver(publication.incumbent.version, improvement, emit)
+    @Suppress("TooGenericExceptionCaught")
+    private inner class Schedule<H : AutoCloseable>(cancellation: Cancellation, val handles: Array<H?>) {
+        private val lock = (if (lanes > 1) Concurrency.Strict else Concurrency.None).lock()
+        private val stopped = AtomicBoolean(false)
+
+        /** The run's token: the caller's, stopped early once any lane settles the run. */
+        val token: Cancellation = cancellation.alsoStoppedBy(stopped)
+        val ledger = RewardLedger(workers.size)
+        private val progress = ProgressCredit(workers.size)
+        private val log = ScheduleLog(workers)
+
+        // A handle's counters are cumulative, so its entry is replaced; a fresh segment's are merged.
+        private val perArm = arrayOfNulls<SolveStats>(workers.size)
+        private val busy = BooleanArray(workers.size)
+        private val retired = BooleanArray(workers.size)
+        private var remaining = workers.size
+        private var probed = 0
+        private var slice = baseSliceMillis
+        private var lsSliceWork = baseSliceWork
+
+        /** Whether every arm has retired. */
+        val allRetired: Boolean get() = remaining == 0
+
+        fun <T> locked(action: () -> T): T = lock.withLock { action() }
+
+        /** End the run: every lane stops at its next poll and claims nothing more. */
+        fun finish() = stopped.store(true)
+
+        /**
+         * Run [segment] on the lanes until the run is finished, cancelled, or out of arms, then close every handle
+         * still open and rethrow the first failure a lane hit, a close failure suppressed into it.
+         */
+        fun execute(segment: (Claim) -> Unit) {
+            parallelRun(List(lanes) { { lane(segment) } })
+            closeAll(laneFailure)
+            laneFailure?.let { throw it }
+        }
+
+        // The first failure any lane hit; it ends the run and is rethrown once every lane has joined.
+        private var laneFailure: Throwable? = null
+
+        // Runs segments until the run ends. Never throws: a native lane cannot hand an exception back, so a failure
+        // is recorded for [execute] to rethrow.
+        private fun lane(segment: (Claim) -> Unit) {
+            try {
+                while (!token()) {
+                    val claim = claim() ?: break
+                    try {
+                        segment(claim)
+                    } finally {
+                        locked { busy[claim.arm] = false }
                     }
                 }
-            },
-            // A producer that died between its install and its report leaves a version nothing will fill,
-            // and everything installed after it is waiting on that version. Once the producers are done the
-            // gap is permanent, so the tail goes out rather than being silently withheld; the installs are
-            // monotone in the objective, so what survives a gap still improves strictly.
-            onProducersFinished = { emit -> relay.flush(emit) },
-        )
+            } catch (failure: Throwable) {
+                locked { if (laneFailure == null) laneFailure = failure }
+                finish()
+            }
+        }
+
+        /**
+         * The next arm for a lane, or null when none is free. Every arm first runs one base slice, in order, so the
+         * policy starts from evidence on each; then the policy picks among arms neither busy nor retired.
+         */
+        private fun claim(): Claim? = locked {
+            if (remaining == 0) return@locked null
+            val probing = probed < workers.size
+            val arm = if (probing) probed++ else policyPick()
+            if (arm < 0 || retired[arm] || busy[arm]) return@locked null
+            busy[arm] = true
+            Claim(arm, probing, slice, lsSliceWork)
+        }
+
+        // The policy's pick among free arms, falling back to the first free one if it keeps naming taken arms.
+        private fun policyPick(): Int {
+            repeat(workers.size) {
+                val chosen = bandit.choose()
+                if (retired[chosen]) {
+                    bandit.update(chosen, 0.0)
+                } else if (!busy[chosen]) {
+                    return chosen
+                }
+            }
+            return workers.indices.firstOrNull { !busy[it] && !retired[it] } ?: -1
+        }
+
+        /**
+         * Settle [claim]'s segment: fold its [stats], credit its progress and every contribution used since the
+         * last settle, and score the arm. A segment that [failed] earns nothing and weighs at least a base slice.
+         * Call under [locked].
+         */
+        fun record(claim: Claim, stats: SolveStats?, cumulative: Boolean, work: Long, failed: Boolean) {
+            val arm = claim.arm
+            if (stats != null) {
+                perArm[arm] = if (cumulative) stats else (perArm[arm] ?: SolveStats.EMPTY).mergedWith(stats)
+                progress.observe(ledger, arm, stats)
+            }
+            contributions?.drain { kind, origin, amount ->
+                if (origin in workers.indices) ledger.credit(origin, kind.signal, amount)
+            }
+            val earned = ledger.settle(arm, work)
+            val reward = if (failed) 0.0 else earned
+            val weight = (if (failed) maxOf(work, baseSliceWork) else work).toDouble() / baseSliceWork
+            bandit.update(arm, reward, weight)
+            log.record(arm, work, reward, failed)
+            // The probe runs at the base slice for every arm, so its cost stays flat in the arm count.
+            if (!claim.probing) {
+                slice = grow(slice, maxSliceMillis)
+                lsSliceWork = grow(lsSliceWork, maxSliceWork)
+            }
+        }
+
+        /** Retire [arm]: close its handle and never schedule it again; the run ends once none remain. Call under
+         *  [locked]. */
+        fun retire(arm: Int) {
+            if (retired[arm]) return
+            retired[arm] = true
+            remaining--
+            handles[arm]?.close()
+            handles[arm] = null
+            if (remaining == 0) finish()
+        }
+
+        /** The pool's total counters, every arm that did work included, with the schedule attached. */
+        fun folded(): SolveStats = perArm.filterNotNull().fold(SolveStats.EMPTY) { acc, s -> acc.mergedWith(s) }
+            .copy(portfolio = log.stats(ledger))
+
+        private fun closeAll(primaryFailure: Throwable?) {
+            var closeFailure: Throwable? = null
+            for (i in handles.indices) {
+                try {
+                    handles[i]?.close()
+                } catch (failure: Throwable) {
+                    closeFailure?.addSuppressed(failure) ?: run { closeFailure = failure }
+                }
+                handles[i] = null
+            }
+            closeFailure?.let { failure -> primaryFailure?.addSuppressed(failure) ?: throw failure }
+        }
     }
 
-    /** [improvementsAttributed] without the per-worker attribution — just the improving results. */
-    fun improvements(cancellation: Cancellation = Cancellation.Never): Sequence<MinimizeResult> =
-        improvementsAttributed(cancellation).map { it.result }
+    /** The first incumbent ends the feasibility hunt: the ledger's rates restart and the bandit keeps
+     *  [phaseRetention] of its evidence. */
+    private fun startImprovementPhase(ledger: RewardLedger) {
+        ledger.resetPhase()
+        (bandit as? DiscountedThompson)?.fade(phaseRetention)
+    }
 
-    /**
-     * Stream samples across all workers as a lazy [Sequence], fanning in as they are produced. Each
-     * worker runs to its own budget or until [cancellation]; stop early by flipping [cancellation].
-     */
-    fun samples(cancellation: Cancellation = Cancellation.Never): Sequence<Sample> {
-        val token = cancellation.alsoStoppedBy(streamStop)
-        return parallelStream(
-            workers.map { worker -> { emit: (Sample) -> Unit -> for (s in worker.samples(token)) emit(s) } },
-        )
+    /** The instruction allowance a counted local-search segment of [work] units receives. */
+    private fun instructionsFor(work: Long): Long = (work * lsInstructionsPerWork).toLong().coerceAtLeast(1L)
+
+    /** The cancellation token bounding one non-resumable arm's segment. A counted-work arm
+     *  ([PortfolioWorker.acceptsInstructionBudget]) runs unclocked: its own instruction budget paces it, and a
+     *  wall-clock cap on top would reintroduce the machine-speed dependence counting exists to remove. Only an arm
+     *  with neither a counter nor a resumable handle is sliced by [sliceMs], a deadline it can size a sub-phase
+     *  against ([Cancellation.shorten]). */
+    private fun segmentToken(worker: PortfolioWorker, cancellation: Cancellation, sliceMs: Long): Cancellation =
+        if (worker.acceptsInstructionBudget) {
+            cancellation
+        } else {
+            Cancellation.until(TimeSource.Monotonic.markNow() + sliceMs.milliseconds) or cancellation
+        }
+
+    /** Geometric growth shared by every slice axis (millis and work): grow by [sliceGrowth], never past [cap]. */
+    private fun grow(current: Long, cap: Long): Long = (current * sliceGrowth).toLong().coerceAtMost(cap)
+
+    /** Why a satisfaction run whose every arm retired undecided settles nothing: an arm that declined a feature it
+     *  cannot decide wins, so a caller can fall back to a backend that can. */
+    private fun unsettledReason(verdicts: List<SolveResult>): TerminationReason {
+        val reasons = verdicts.filterIsInstance<SolveResult.Unknown>().map { it.reason }
+        return if (TerminationReason.Unsupported in reasons) {
+            TerminationReason.Unsupported
+        } else {
+            reasons.firstOrNull() ?: TerminationReason.Cancelled
+        }
     }
 
     override fun close() {
-        // Stop any in-flight streaming producers before tearing down their sessions.
-        streamStop.store(true)
         workers.forEach { runCatching { it.close() } }
+    }
+
+    /** Policy factories. The primary constructor takes any kumulant [UnivariateBandit] reading rewards in `[0, 1]`. */
+    companion object {
+        /** Base slices of work after which an observation counts half as much; see [thompson]. */
+        const val DEFAULT_HALF_LIFE: Double = 200.0
+
+        /** Default share of the bandit's evidence kept across the first incumbent. */
+        const val DEFAULT_PHASE_RETENTION: Double = 0.25
+
+        /**
+         * Discounted Thompson sampling, the default policy, on [lanes] threads. An arm that keeps earning nothing
+         * is tried less and less, with no fixed exploration share to tax the run, and evidence fades over
+         * [halfLife] base slices of work so the schedule follows whichever arm is paying now. Every arm first runs
+         * one base slice, in order, so the policy starts from evidence on each; at one base slice apiece the probe
+         * costs little however many arms there are.
+         */
+        fun thompson(
+            workers: List<PortfolioWorker>,
+            lanes: Int = 1,
+            seed: Long = 0L,
+            halfLife: Double = DEFAULT_HALF_LIFE,
+            baseSliceMillis: Long = 2_000,
+            maxSliceMillis: Long = 60_000,
+            sliceGrowth: Double = 1.5,
+            reseedStaleThreshold: Int = 3,
+            baseSliceWork: Long = 5_000,
+            phaseRetention: Double = DEFAULT_PHASE_RETENTION,
+        ): Portfolio = Portfolio(
+            workers = workers,
+            bandit = DiscountedThompson(workers.size, Random(seed), halfLife),
+            lanes = lanes,
+            baseSliceMillis = baseSliceMillis,
+            maxSliceMillis = maxSliceMillis,
+            sliceGrowth = sliceGrowth,
+            reseedStaleThreshold = reseedStaleThreshold,
+            baseSliceWork = baseSliceWork,
+            phaseRetention = phaseRetention,
+        )
     }
 }
 
-/** Strategy knobs for [Portfolio]. Affects `solve` only; `samples` always fans in from every worker
- *  and `minimize` always shares the global bound (race honoured via cancellation on Optimal). */
-sealed interface PortfolioStrategy {
-    /** First worker to produce a definitive answer wins; others are cancelled. Default. */
-    data object RaceFirstFeasible : PortfolioStrategy
-
-    /** Run every worker to its own budget without cross-worker cancellation, then reduce. */
-    data object Exhaustive : PortfolioStrategy
-}
+/**
+ * Local-search instructions that cost as much as one backtrack search node, LP work included: the median ratio of
+ * local-search moves per second to backtrack work per second, each engine alone on one core for 10s, over the 28
+ * MiniZinc models where both ran (spread 0.17 to 69, geometric mean 1.9).
+ */
+internal const val LS_INSTRUCTIONS_PER_WORK: Double = 1.5
 
 // The caller's token that also stops on [flag], keeping the caller's deadline.
 private fun Cancellation.alsoStoppedBy(flag: AtomicBoolean): Cancellation =

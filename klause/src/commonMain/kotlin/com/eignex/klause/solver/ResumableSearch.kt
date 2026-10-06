@@ -15,7 +15,7 @@ import com.eignex.klause.util.Cancellation
  * slice and returns; a later [runSlice] **continues the exact search mid-tree**, with everything
  * intact, instead of starting over.
  *
- * This is the engine seam a single-threaded portfolio ([com.eignex.klause.portfolio.SequentialPortfolio])
+ * This is the engine seam a scheduled portfolio ([com.eignex.klause.portfolio.Portfolio])
  * needs to schedule an arm in segments without the cold-restart re-learning that dominated its
  * time-to-best: each scheduled segment resumes the arm where the previous one paused.
  *

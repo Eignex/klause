@@ -51,15 +51,15 @@ class PortfolioWorker private constructor(
      * Open a fresh pause/resume handle over this worker's optimisation, or `null` when the engine
      * can't be paused/resumed (local search — it restarts cheaply from a warm-started incumbent
      * instead). [readBound] exposes the portfolio's shared best objective so the resumable backtrack
-     * search prunes on it, exactly like [improvements]'s `withBound` seam. The single-threaded
-     * [SequentialPortfolio] holds one handle per backtrack arm and resumes it each segment, so the arm
-     * never cold-restarts between slices. */
+     * search prunes on it, exactly like [improvements]'s `withBound` seam. A [Portfolio]
+     * holds one handle per backtrack arm and resumes it each segment, so the arm never cold-restarts between
+     * slices. */
     fun newResumableSearch(readBound: () -> Double): ResumableSearch? = resumableFn?.invoke(readBound)
 
     /**
      * Open a fresh pause/resume handle over this worker's satisfaction search, or `null` when the engine can't be
      * paused (local search, which restarts each segment instead). The satisfaction counterpart of
-     * [newResumableSearch]: [SequentialPortfolio.solve] resumes it each segment rather than restarting the arm.
+     * [newResumableSearch]: [Portfolio.solve] resumes it each segment rather than restarting the arm.
      */
     fun newResumableSolve(): ResumableSolve? = resumableSolveFn?.invoke()
 
@@ -72,9 +72,8 @@ class PortfolioWorker private constructor(
      *
      *  [warmStart] is the portfolio's current incumbent assignment, handed to workers that can
      *  resume from it (local search via its `initialAssignment` seam; see [of]'s `withWarmStart`).
-     *  Workers without that seam ignore it. The concurrent `Portfolio` passes null (workers share
-     *  the live bound, not a snapshot); the single-threaded [SequentialPortfolio] passes the
-     *  incumbent so a fresh LS segment descends from it rather than a random restart. */
+     *  Workers without that seam ignore it. A [Portfolio] passes the incumbent so a fresh LS
+     *  segment descends from it rather than a random restart. */
     fun improvements(
         readBound: () -> Double,
         cancel: Cancellation,

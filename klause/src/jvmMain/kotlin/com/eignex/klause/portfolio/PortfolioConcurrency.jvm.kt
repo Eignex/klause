@@ -1,37 +1,5 @@
 package com.eignex.klause.portfolio
 
-import java.util.concurrent.LinkedBlockingQueue
-import java.util.concurrent.atomic.AtomicInteger
-
-internal actual fun <T> parallelStream(
-    tasks: List<(emit: (T) -> Unit) -> Unit>,
-    onProducersFinished: ((emit: (T) -> Unit) -> Unit)?,
-): Sequence<T> = sequence {
-    val done = Any()
-    val queue = LinkedBlockingQueue<Any>()
-    val remaining = AtomicInteger(tasks.size)
-    val threads = tasks.map { task ->
-        Thread {
-            try {
-                task { item -> queue.put(item as Any) }
-            } finally {
-                if (remaining.decrementAndGet() == 0) queue.put(done)
-            }
-        }.apply {
-            isDaemon = true
-            start()
-        }
-    }
-    while (true) {
-        val next = queue.take()
-        if (next === done) break
-        @Suppress("UNCHECKED_CAST")
-        yield(next as T)
-    }
-    threads.forEach { it.join() }
-    yieldTail(onProducersFinished)
-}
-
 internal actual fun <T> parallelRun(tasks: List<() -> T>): List<T> {
     if (tasks.size == 1) return listOf(tasks[0]())
     val results = arrayOfNulls<Any?>(tasks.size)
