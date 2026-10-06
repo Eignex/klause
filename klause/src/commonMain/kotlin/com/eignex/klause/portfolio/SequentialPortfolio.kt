@@ -98,6 +98,13 @@ class SequentialPortfolio(
      * arms already run a fresh warm-started slice (or destroy/repair loop) each segment.
      */
     private val reseedStaleThreshold: Int = 3,
+    /**
+     * Share of the bandit's evidence that survives the first incumbent. Finding a solution and improving one
+     * are different jobs, so the scheduler starts the second with only a weak memory of who did well at the
+     * first: enough that it need not re-explore every arm, little enough that a few segments overturn it. The
+     * search itself carries over whole. Applies to [thompson]'s policy; another policy keeps its evidence.
+     */
+    private val phaseRetention: Double = DEFAULT_PHASE_RETENTION,
 ) : PortfolioExecutor {
 
     init {
@@ -105,6 +112,7 @@ class SequentialPortfolio(
         require(baseSliceMillis > 0 && maxSliceMillis >= baseSliceMillis) { "invalid slice bounds" }
         require(sliceGrowth >= 1.0) { "sliceGrowth must be ≥ 1.0" }
         require(reseedStaleThreshold >= 0) { "reseedStaleThreshold must be ≥ 0" }
+        require(phaseRetention in 0.0..1.0) { "phaseRetention must be in [0, 1]" }
         require(baseSliceWork > 0 && maxSliceWork >= baseSliceWork) { "invalid work slice bounds" }
         require(lsInstructionsPerWork > 0.0) { "lsInstructionsPerWork must be > 0" }
     }
@@ -337,8 +345,7 @@ class SequentialPortfolio(
                     ledger.credit(arm, Signal.Improvement, improvement)
                 }
                 bandit.update(arm, ledger.settle(arm, work), work.toDouble() / baseSliceWork)
-                // The rates a feasibility hunt earned say nothing about who improves an incumbent.
-                if (found) ledger.resetPhase()
+                if (found) startImprovementPhase(ledger)
 
                 // Re-seed a plateaued resumable arm: after enough consecutive non-improving segments, drop
                 // its handle so the next schedule re-descends from the root under the tighter bound with the
@@ -388,6 +395,13 @@ class SequentialPortfolio(
         }
     }
 
+    /** The first incumbent ends the feasibility hunt: the ledger's rates restart and the bandit keeps
+     *  [phaseRetention] of its evidence. */
+    private fun startImprovementPhase(ledger: RewardLedger) {
+        ledger.resetPhase()
+        (bandit as? DiscountedThompson)?.fade(phaseRetention)
+    }
+
     /**
      * Close every handle still open, attempting all of them. A close failure is suppressed into [primaryFailure]
      * when the run already failed, and thrown otherwise.
@@ -431,6 +445,9 @@ class SequentialPortfolio(
         /** Base slices of work after which an observation counts half as much; see [thompson]. */
         const val DEFAULT_HALF_LIFE: Double = 200.0
 
+        /** Default share of the bandit's evidence kept across the first incumbent. */
+        const val DEFAULT_PHASE_RETENTION: Double = 0.25
+
         /**
          * Discounted Thompson sampling, the default policy. An arm that keeps earning nothing is tried less and
          * less, with no fixed exploration share to tax the run, and evidence fades over [halfLife] base slices of
@@ -447,6 +464,7 @@ class SequentialPortfolio(
             sliceGrowth: Double = 1.5,
             reseedStaleThreshold: Int = 3,
             baseSliceWork: Long = 5_000,
+            phaseRetention: Double = DEFAULT_PHASE_RETENTION,
         ): SequentialPortfolio = SequentialPortfolio(
             workers = workers,
             bandit = DiscountedThompson(workers.size, Random(seed), halfLife),
@@ -455,6 +473,7 @@ class SequentialPortfolio(
             sliceGrowth = sliceGrowth,
             reseedStaleThreshold = reseedStaleThreshold,
             baseSliceWork = baseSliceWork,
+            phaseRetention = phaseRetention,
         )
     }
 }

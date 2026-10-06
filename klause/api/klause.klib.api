@@ -9242,7 +9242,7 @@ final class com.eignex.klause.portfolio/PortfolioWorker : kotlin/AutoCloseable {
 }
 
 final class com.eignex.klause.portfolio/SequentialPortfolio : com.eignex.klause.portfolio/PortfolioExecutor { // com.eignex.klause.portfolio/SequentialPortfolio|null[0]
-    constructor <init>(kotlin.collections/List<com.eignex.klause.portfolio/PortfolioWorker>, com.eignex.kumulant.bandit/UnivariateBandit, kotlin/Long = ..., kotlin/Long = ..., kotlin/Double = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Double = ..., kotlin/Int = ...) // com.eignex.klause.portfolio/SequentialPortfolio.<init>|<init>(kotlin.collections.List<com.eignex.klause.portfolio.PortfolioWorker>;com.eignex.kumulant.bandit.UnivariateBandit;kotlin.Long;kotlin.Long;kotlin.Double;kotlin.Long;kotlin.Long;kotlin.Double;kotlin.Int){}[0]
+    constructor <init>(kotlin.collections/List<com.eignex.klause.portfolio/PortfolioWorker>, com.eignex.kumulant.bandit/UnivariateBandit, kotlin/Long = ..., kotlin/Long = ..., kotlin/Double = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Double = ..., kotlin/Int = ..., kotlin/Double = ...) // com.eignex.klause.portfolio/SequentialPortfolio.<init>|<init>(kotlin.collections.List<com.eignex.klause.portfolio.PortfolioWorker>;com.eignex.kumulant.bandit.UnivariateBandit;kotlin.Long;kotlin.Long;kotlin.Double;kotlin.Long;kotlin.Long;kotlin.Double;kotlin.Int;kotlin.Double){}[0]
 
     final val workers // com.eignex.klause.portfolio/SequentialPortfolio.workers|{}workers[0]
         final fun <get-workers>(): kotlin.collections/List<com.eignex.klause.portfolio/PortfolioWorker> // com.eignex.klause.portfolio/SequentialPortfolio.workers.<get-workers>|<get-workers>(){}[0]
@@ -9254,8 +9254,10 @@ final class com.eignex.klause.portfolio/SequentialPortfolio : com.eignex.klause.
     final object Companion { // com.eignex.klause.portfolio/SequentialPortfolio.Companion|null[0]
         final const val DEFAULT_HALF_LIFE // com.eignex.klause.portfolio/SequentialPortfolio.Companion.DEFAULT_HALF_LIFE|{}DEFAULT_HALF_LIFE[0]
             final fun <get-DEFAULT_HALF_LIFE>(): kotlin/Double // com.eignex.klause.portfolio/SequentialPortfolio.Companion.DEFAULT_HALF_LIFE.<get-DEFAULT_HALF_LIFE>|<get-DEFAULT_HALF_LIFE>(){}[0]
+        final const val DEFAULT_PHASE_RETENTION // com.eignex.klause.portfolio/SequentialPortfolio.Companion.DEFAULT_PHASE_RETENTION|{}DEFAULT_PHASE_RETENTION[0]
+            final fun <get-DEFAULT_PHASE_RETENTION>(): kotlin/Double // com.eignex.klause.portfolio/SequentialPortfolio.Companion.DEFAULT_PHASE_RETENTION.<get-DEFAULT_PHASE_RETENTION>|<get-DEFAULT_PHASE_RETENTION>(){}[0]
 
-        final fun thompson(kotlin.collections/List<com.eignex.klause.portfolio/PortfolioWorker>, kotlin/Long = ..., kotlin/Double = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Double = ..., kotlin/Int = ..., kotlin/Long = ...): com.eignex.klause.portfolio/SequentialPortfolio // com.eignex.klause.portfolio/SequentialPortfolio.Companion.thompson|thompson(kotlin.collections.List<com.eignex.klause.portfolio.PortfolioWorker>;kotlin.Long;kotlin.Double;kotlin.Long;kotlin.Long;kotlin.Double;kotlin.Int;kotlin.Long){}[0]
+        final fun thompson(kotlin.collections/List<com.eignex.klause.portfolio/PortfolioWorker>, kotlin/Long = ..., kotlin/Double = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Double = ..., kotlin/Int = ..., kotlin/Long = ..., kotlin/Double = ...): com.eignex.klause.portfolio/SequentialPortfolio // com.eignex.klause.portfolio/SequentialPortfolio.Companion.thompson|thompson(kotlin.collections.List<com.eignex.klause.portfolio.PortfolioWorker>;kotlin.Long;kotlin.Double;kotlin.Long;kotlin.Long;kotlin.Double;kotlin.Int;kotlin.Long;kotlin.Double){}[0]
     }
 }
 
