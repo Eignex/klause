@@ -78,7 +78,7 @@ internal object SolveCore {
         when (val pipeline = rawSolvable.pipeline) {
             is SolvablePipeline.OpenTheory -> {
                 val nodeLimit = takeOpenNodeLimit(common)
-                if (common.allSolutions || (common.solutionCap ?: 1L) > 1L) {
+                if (solutionSetSensitive) {
                     usageError("all-solution enumeration is unavailable for open theory models")
                 }
                 val theoryParams = TheoryParams(

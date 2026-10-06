@@ -100,8 +100,9 @@ internal class Solvable(
 
     /** Finite CP problem. */
     val problem: Problem? get() = finite?.problem
-    val optimize: Boolean get() = finite?.optimize ?: false
-    val maximize: Boolean get() = finite?.maximize ?: false
+    val optimize: Boolean get() = finite?.optimize ?: (openRequest?.objective != null)
+    val maximize: Boolean get() = finite?.maximize ?: (openRequest?.maximize ?: false)
+    private val openRequest: OpenTheoryRequest? get() = (pipeline as? SolvablePipeline.OpenTheory)?.request
     val lsObjective: IncrementalObjective? get() = finite?.localSearchObjective
     val linearObjective: LinearObjective? get() = finite?.linearObjective
     val objVarId: Int? get() = finite?.objectiveIntVar
