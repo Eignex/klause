@@ -3,6 +3,8 @@ package com.eignex.klause.portfolio
 import com.eignex.klause.lp.cut.CutExchange
 import com.eignex.klause.lp.cut.CutSharing
 import com.eignex.klause.lp.cut.SharedCut
+import com.eignex.klause.util.EmptyIntArray
+import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.LongHashSet
 import com.eignex.kumulant.core.Concurrency
 import com.eignex.kumulant.stream.Mutex
@@ -23,13 +25,20 @@ internal class SharedCutPool(private val lock: Mutex = Concurrency.None.lock(), 
     private val cuts = ArrayList<SharedCut>()
     private val keys = LongHashSet()
 
-    /** Append the unseen cuts of [batch] (by key), up to [cap]. */
-    fun publish(batch: List<SharedCut>) {
+    // The arm that published each cut, parallel to [cuts]; [NO_ORIGIN] when the publisher named none.
+    private val origins = IntArrayList()
+
+    /** Append the unseen cuts of [batch] (by key) as published by arm [origin], up to [cap]. A cut already
+     *  pooled keeps the arm that published it first. */
+    fun publish(batch: List<SharedCut>, origin: Int = NO_ORIGIN) {
         if (batch.isEmpty()) return
         lock.withLock {
             for (c in batch) {
                 if (cuts.size >= cap) break
-                if (keys.add(c.key)) cuts.add(c)
+                if (keys.add(c.key)) {
+                    cuts.add(c)
+                    origins.add(origin)
+                }
             }
         }
     }
@@ -37,14 +46,21 @@ internal class SharedCutPool(private val lock: Mutex = Concurrency.None.lock(), 
     /** The cuts appended at index ≥ [cursor], paired with the new cursor (the current size). */
     fun drainSince(cursor: Int): Drained = lock.withLock {
         val size = cuts.size
-        if (cursor >= size) Drained(emptyList(), size) else Drained(ArrayList(cuts.subList(cursor, size)), size)
+        if (cursor >= size) {
+            Drained(emptyList(), EmptyIntArray, size)
+        } else {
+            Drained(ArrayList(cuts.subList(cursor, size)), IntArray(size - cursor) { origins[cursor + it] }, size)
+        }
     }
 
-    /** A drained batch + the advanced cursor. */
-    internal class Drained(val cuts: List<SharedCut>, val cursor: Int)
+    /** A drained batch, the arm that published each of its cuts, and the advanced cursor. */
+    internal class Drained(val cuts: List<SharedCut>, val origins: IntArray, val cursor: Int)
 
     internal companion object {
         const val DEFAULT_CAP = 4096
+
+        /** The origin of a cut whose publisher named no arm. */
+        const val NO_ORIGIN = -1
     }
 }
 
@@ -55,7 +71,11 @@ internal class SharedCutPool(private val lock: Mutex = Concurrency.None.lock(), 
  * holds every key this arm has already imported or exported, so it never re-imports a cut it published
  * nor re-exports one twice; the pool de-dups globally on top.
  */
-internal class PoolCutExchange(private val pool: SharedCutPool) : CutExchange {
+internal class PoolCutExchange(
+    private val pool: SharedCutPool,
+    /** The arm this exchange publishes for; see [SharedCutPool.publish]. */
+    private val origin: Int = SharedCutPool.NO_ORIGIN,
+) : CutExchange {
     private var cursor = 0
     private val seen = LongHashSet()
 
@@ -64,6 +84,6 @@ internal class PoolCutExchange(private val pool: SharedCutPool) : CutExchange {
         cursor = drained.cursor
         sharing.importCuts(drained.cuts.filter { seen.add(it.key) })
         val fresh = sharing.exportGlobalCuts().filter { seen.add(it.key) }
-        pool.publish(fresh)
+        pool.publish(fresh, origin)
     }
 }

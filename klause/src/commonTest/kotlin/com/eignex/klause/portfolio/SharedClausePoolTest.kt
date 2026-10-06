@@ -7,6 +7,7 @@ import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.SharedClause
 import com.eignex.klause.propagation.addLearnedClause
 import kotlin.test.Test
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
@@ -253,5 +254,30 @@ class SharedClausePoolTest {
         pool.publish(listOf(evictee))
         kept = pool.drainSince(0).clauses.map { it.key }.toSet()
         assertTrue(evictee.key in kept, "eviction releases the key for re-publication")
+    }
+
+    @Test
+    fun `a drained clause names the arm that first published it`() {
+        val pool = SharedClausePool()
+        val shared = boolClause(0, lbd = 1)
+        pool.publish(listOf(shared), origin = 2)
+        pool.publish(listOf(shared, boolClause(10, lbd = 1)), origin = 5)
+
+        assertContentEquals(intArrayOf(2, 5), pool.drainSince(0).origins)
+    }
+
+    @Test
+    fun `compaction keeps each surviving clause with its origin`() {
+        val pool = SharedClausePool(cap = 4)
+        pool.publish(listOf(boolClause(0, lbd = 9)), origin = 0)
+        pool.publish(listOf(boolClause(10, lbd = 1)), origin = 1)
+        pool.publish(listOf(boolClause(20, lbd = 8)), origin = 2)
+        pool.publish(listOf(boolClause(30, lbd = 2)), origin = 3)
+        pool.publish(listOf(boolClause(40, lbd = 9)), origin = 4)
+
+        val drained = pool.drainSince(0)
+
+        val lbdByOrigin = drained.clauses.indices.associate { drained.origins[it] to drained.clauses[it].lbd }
+        assertEquals(mapOf(1 to 1, 3 to 2, 4 to 9), lbdByOrigin)
     }
 }
