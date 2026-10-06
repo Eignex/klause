@@ -596,11 +596,15 @@ class SequentialPortfolioTest {
         val objective = LinearObjective()
         val r = SequentialPortfolio.exp3(
             mixedWorkers(problem, objective),
-            baseSliceFlips = 7L,
+            baseSliceWork = 7L,
         ).use { it.minimize() }
 
         val best = assertIs<MinimizeResult.Optimal>(r)
-        assertEquals(7.0, best.stats.ls.moves.sum, "LS work must stop at its counted segment allowance")
+        assertEquals(
+            (7 * LS_INSTRUCTIONS_PER_WORK).toLong().toDouble(),
+            best.stats.ls.moves.sum,
+            "LS work must stop at its counted segment allowance",
+        )
     }
 
     @Test
@@ -609,7 +613,7 @@ class SequentialPortfolioTest {
         val objective = LinearObjective()
         fun run() = SequentialPortfolio.exp3(
             mixedWorkers(problem, objective),
-            baseSliceFlips = 7L,
+            baseSliceWork = 7L,
         ).use { it.minimize() }
 
         val first = run()
