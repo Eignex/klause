@@ -15,6 +15,8 @@ import com.eignex.klause.util.mulExact
 import com.eignex.klause.util.subExact
 import com.eignex.klause.util.toSortedIntArray
 import com.ionspin.kotlin.bignum.integer.BigInteger
+import kotlin.math.ceil
+import kotlin.math.floor
 
 /** Constraint relation for a row added to the builder, before normalization to `<=` form. */
 internal enum class Relation { LE, GE, EQ }
@@ -173,7 +175,7 @@ internal class LpModel(
     fun lowerD(j: Int): Double = exactState?.model?.column(j)?.bounds?.lower?.number?.approximation ?: 0.0
 
     fun fixed(j: Int): Boolean = exactState?.model?.column(j)?.bounds?.fixed
-        ?: (hasFiniteLower(j) && hasFiniteUpper(j) && exactUpper(j).isZero)
+        ?: (hasFiniteLower(j) && hasFiniteUpper(j) && (doubleView?.upperIsZero(j) ?: (upper[j] == 0L)))
 
     fun objectiveD(value: Double): Double = exactState?.model?.objective?.let {
         val scale = it.scale.approximation
@@ -379,6 +381,20 @@ internal class LpDoubleView(
 
     /** The exact shifted upper bound of variable [j]. */
     fun exactUpper(j: Int): BigFraction = shifts.value.upper(j) ?: exactDouble(upper[j])
+
+    /** Whether the exact shifted upper bound of variable [j] is zero, building no fraction for a nonzero one. */
+    fun upperIsZero(j: Int): Boolean =
+        upper[j] == 0.0 && (j >= loShift.size || (shifts.value.upper(j)?.isZero ?: true))
+
+    /** The exact shifted upper bound of variable [j] rounded up when [outward], else down; null past [Long]. */
+    fun integerUpper(j: Int, outward: Boolean): Long? {
+        shifts.value.upper(j)?.let { exact ->
+            return if (outward) exact.ceilLong() else exact.negated().ceilLong()?.let { -it }
+        }
+        val rounded = if (outward) ceil(upper[j]) else floor(upper[j])
+        val inLong = rounded >= Long.MIN_VALUE.toDouble() && rounded < Long.MAX_VALUE.toDouble()
+        return if (inLong) rounded.toLong() else null
+    }
 
     /** The exact objective constant `Σ cost_j·loShift_j`, of which [objConstant] is the binary64 rounding. */
     fun exactObjConstant(): BigFraction {

@@ -464,6 +464,42 @@ class LpModelTest {
     }
 
     @Test
+    fun `a double view column is fixed only when its exact width is zero`() {
+        val lo = 1L shl 60
+        for ((hi, fixed) in listOf(lo to true, lo + 1L to false)) {
+            val model = LpBuilder().apply {
+                addRealVar(0.0, 1.0)
+                addVar(lo, hi)
+            }.build(Sense.MINIMIZE)
+
+            assertEquals(fixed, model.fixed(1), "[$lo, $hi]")
+        }
+    }
+
+    @Test
+    fun `a double view rounds a column's exact upper bound to an integer in the asked direction`() {
+        val lo = 1L shl 60
+        val real = LpBuilder().apply {
+            addVar(0L, 1L)
+            addRealVar(0.0, 2.5)
+        }.build(Sense.MINIMIZE)
+        val roundedInteger = LpBuilder().apply {
+            addRealVar(0.0, 1.0)
+            addVar(lo, lo + 1L)
+        }.build(Sense.MINIMIZE)
+        val cases = listOf(
+            Triple(real, true, 3L),
+            Triple(real, false, 2L),
+            Triple(roundedInteger, true, 1L),
+            Triple(roundedInteger, false, 1L),
+        )
+
+        for ((model, outward, expected) in cases) {
+            assertEquals(expected, checkNotNull(model.doubleView).integerUpper(1, outward), "outward=$outward")
+        }
+    }
+
+    @Test
     fun `integer model data past binary64 integers keeps the model from exact certification`() {
         val variants = mapOf<String, LpBuilder.() -> Unit>(
             "coefficient" to { addRow(intArrayOf(addVar(0L, 1L)), longArrayOf(PAST_BINARY64), Relation.LE, 1L) },

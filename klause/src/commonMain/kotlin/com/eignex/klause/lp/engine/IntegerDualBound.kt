@@ -460,8 +460,7 @@ private fun rationalizeToIntegerModelUnchecked(model: LpModel, outwardRealUppers
         if (j >= n) {
             upper[j] = scaledInteger(logicalUppers[j - n], bits) ?: return null
         } else {
-            val exact = dv.exactUpper(j)
-            val u = if (outwardRealUppers) exact.ceilLong() else exact.negated().ceilLong()?.let { -it }
+            val u = dv.integerUpper(j, outwardRealUppers)
             if (u == null || u < 0L) return null
             upper[j] = u
         }

@@ -261,17 +261,6 @@ internal class RevisedSimplex(
         val ops = work.ops
         if (ops > chargedOps) stopToken.charge(ops - chargedOps)
         chargedOps = ops
-        if (exactBoundChecks > 0L) stopToken.charge(EXACT_BOUND_CHECK_WORK * exactBoundChecks)
-        exactBoundChecks = 0L
-    }
-
-    // A fixed-column test on a double-view model reads the column's exact bound, which costs far more than the
-    // ops [work] counts for it; counted apart so the token sees it without it moving the solve's own work limit.
-    private var exactBoundChecks = 0L
-
-    private fun fixedColumn(j: Int): Boolean {
-        if (model.exactState == null && model.doubleView != null) exactBoundChecks++
-        return model.fixed(j)
     }
 
     private var maxLuFill = 0.0 // max (nnz of the held factors) / nnz(B) over this solve's factorizations
@@ -1679,7 +1668,7 @@ internal class RevisedSimplex(
             elig.clear()
             for (t in 0 until touchedCount) {
                 val j = touched[t]
-                if (status[j] == VarStatus.BASIC || fixedColumn(j)) continue
+                if (status[j] == VarStatus.BASIC || model.fixed(j)) continue
                 // An unenforced row's slack never enters — it is conceptually basic forever (and the
                 // reconciliation above seats it, so a nonbasic one cannot appear mid-loop).
                 if (enforced != null && j >= n && !enforced[j - n]) continue
@@ -1854,7 +1843,7 @@ internal class RevisedSimplex(
     }
 
     private fun sideStatus(column: Int, upper: Boolean): VarStatus =
-        if (model.exactState != null && fixedColumn(column)) {
+        if (model.exactState != null && model.fixed(column)) {
             VarStatus.FIXED
         } else if (upper) {
             VarStatus.AT_UPPER
@@ -1880,7 +1869,7 @@ internal class RevisedSimplex(
     }
 
     private fun defaultStatus(column: Int): VarStatus = when {
-        model.exactState != null && fixedColumn(column) -> VarStatus.FIXED
+        model.exactState != null && model.fixed(column) -> VarStatus.FIXED
 
         model.hasFiniteLower(
             column,
@@ -1895,7 +1884,7 @@ internal class RevisedSimplex(
         for (j in 0 until numVars) {
             if (status[j] == VarStatus.BASIC) continue
             status[j] = when {
-                fixedColumn(j) -> VarStatus.FIXED
+                model.fixed(j) -> VarStatus.FIXED
                 status[j] == VarStatus.AT_LOWER && finiteLowerAt(j) -> VarStatus.AT_LOWER
                 status[j] == VarStatus.AT_UPPER && finiteUpperAt(j) -> VarStatus.AT_UPPER
                 else -> defaultStatus(j)
@@ -1906,7 +1895,7 @@ internal class RevisedSimplex(
     private fun dualFeasible(): Boolean {
         val y = duals()
         for (j in 0 until numVars) {
-            if (status[j] == VarStatus.BASIC || fixedColumn(j)) continue
+            if (status[j] == VarStatus.BASIC || model.fixed(j)) continue
             val reduced = cost(j) - dotColumn(y, j)
             if (!reduced.isFinite()) return false
             when (status[j]) {
@@ -1960,7 +1949,7 @@ internal class RevisedSimplex(
         val upper = DoubleArray(numVars) { Double.NaN }
         var boxed = 0
         for (j in 0 until numVars) {
-            if (status[j] == VarStatus.BASIC || fixedColumn(j)) continue
+            if (status[j] == VarStatus.BASIC || model.fixed(j)) continue
             val reduced = cost(j) - dotColumn(y, j)
             if (!reduced.isFinite()) return false
             val hasLower = model.hasFiniteLower(j)
@@ -2596,7 +2585,7 @@ internal class RevisedSimplex(
                     VarStatus.BASIC -> false
                     VarStatus.AT_LOWER -> !model.hasFiniteLower(j)
                     VarStatus.AT_UPPER -> !model.hasFiniteUpper(j)
-                    VarStatus.FIXED -> !fixedColumn(j)
+                    VarStatus.FIXED -> !model.fixed(j)
                     VarStatus.FREE -> model.hasFiniteLower(j) || model.hasFiniteUpper(j)
                 }
             }
@@ -2722,7 +2711,7 @@ internal class RevisedSimplex(
             var qAtLower = true
             var best = tolerance
             for (j in 0 until numVars) {
-                if (status[j] == VarStatus.BASIC || fixedColumn(j)) continue
+                if (status[j] == VarStatus.BASIC || model.fixed(j)) continue
                 val pj = dotColumn(pi, j)
                 val atLower = status[j] == VarStatus.AT_LOWER || (status[j] == VarStatus.FREE && pj > 0.0)
                 val gain = if (atLower) pj else -pj
@@ -2900,7 +2889,7 @@ internal class RevisedSimplex(
             var qAtLower = true
             var best = primalPricingTolerance
             for (j in 0 until numVars) {
-                if (status[j] == VarStatus.BASIC || fixedColumn(j)) continue
+                if (status[j] == VarStatus.BASIC || model.fixed(j)) continue
                 val dj = cost(j) - dotColumn(y, j)
                 val atLower = status[j] == VarStatus.AT_LOWER || (status[j] == VarStatus.FREE && dj < 0.0)
                 // From lower, increasing improves iff d_j < 0; from upper, decreasing improves iff d_j > 0.
@@ -3012,10 +3001,6 @@ internal class RevisedSimplex(
         /** Degenerate-pivot count (beyond `2·(m+numVars)`) after which [solvePrimal] switches to Bland's
          *  ordering. The iteration allowance still bounds floating-point cycling. */
         const val BLAND_STALL_BASE: Int = 50
-
-        // Work charged to the caller's token per exact-bound fixed-column test on a double-view model, against
-        // one counted op: routing time per test over the calibration sample's models, ~1.25e-3 ms against 2.7e-6.
-        private const val EXACT_BOUND_CHECK_WORK = 467L
 
         /** Iterations between cooperative cancellation polls. */
         const val CANCEL_POLL: Int = 32
