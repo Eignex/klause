@@ -65,6 +65,16 @@ class ClaspReferenceTest {
     }
 
     @Test
+    fun `opb drops the problem-line fields clasp does not read`() {
+        val opb = "* #variable= 2 #constraint= 1 #equal= 0 intsize= 5 #soft= 1 mincost= 1 maxcost= 1 sumcost= 1\n" +
+            "+1 x1 +1 x2 >= 1 ;\n"
+        assertEquals(
+            "* #variable= 2 #constraint= 1 #soft= 1 mincost= 1 maxcost= 1 sumcost= 1",
+            ClaspReference.opbWithProblemLine(opb).lineSequence().first(),
+        )
+    }
+
+    @Test
     fun `a new-format wcnf gets a problem line and hard clauses at the top weight`() {
         val wcnf = "c two soft, one hard\nh 1 2 0\n3 -1 0\n4 -2 0\n"
 

@@ -218,7 +218,11 @@ internal object ClaspReference {
 
         companion object {
             fun of(format: Format, open: () -> BufferedReader): ClaspInput = when (format) {
-                Format.OPB -> ClaspInput(open, opbHeader(open)) { it }
+                // The PB24/PB25 normalizer adds `#equal=` and `intsize=` to the problem line, which clasp 3.3
+                // refuses as a parse error on line 1; it reads the line without them.
+                Format.OPB -> ClaspInput(open, opbHeader(open)) { line ->
+                    if (PROBLEM_LINE.containsMatchIn(line)) line.replace(UNREAD_FIELDS, "") else line
+                }
 
                 Format.WCNF -> wcnf(open)
 
@@ -275,6 +279,9 @@ internal object ClaspReference {
     private val WCNF_PROBLEM_LINE = Regex("""(?m)^\s*p\s+wcnf\b""")
 
     private val PROBLEM_LINE = Regex("""(?m)^\s*\*\s*#variable=""")
+
+    /** Problem-line fields the PB competition normalizer writes and clasp does not read. */
+    private val UNREAD_FIELDS = Regex("""\s+(#equal|intsize)=\s*\d+""")
     private val VARIABLE = Regex("""x(\d+)""")
     private val WHITESPACE = Regex("""\s+""")
 }
