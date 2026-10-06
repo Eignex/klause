@@ -381,7 +381,7 @@ class Portfolio(
 
         /** The run's token: the caller's, stopped early once any lane settles the run. */
         val token: Cancellation = cancellation.alsoStoppedBy(stopped)
-        val ledger = RewardLedger(workers.size)
+        val ledger = RewardLedger(workers.size) { arm, signal -> signal.earnableBy(workers[arm]) }
         private val progress = ProgressCredit(workers.size)
         private val log = ScheduleLog(workers)
 
