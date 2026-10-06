@@ -71,6 +71,9 @@ internal enum class Signal {
     /** Objective improvement of the shared incumbent. */
     Improvement,
 
+    /** Rise of the pool's proven lower bound on the objective: the dual side of the gap. */
+    Floor,
+
     /** Variables a backtrack arm newly fixed at its root. */
     RootFixings,
 

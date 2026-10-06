@@ -31,13 +31,14 @@ import kotlin.time.TimeSource
  * `objectiveBoundSupplier`) and the incumbent assignment warm-starts LS arms (their
  * `initialAssignment` seam, threaded through [PortfolioWorker.improvements]'s `warmStart`).
  *
- * **Reward** (folded into the bandit in `[0, 1)`) comes from a [RewardLedger]: each arm is credited for what it
- * contributed and scored on the rate it earned that at, per unit of work, against the pool's rate. Before any
- * incumbent exists the credit is a first feasible solution, which drives the feasibility hunt; once one exists it
- * is the objective improvement, which drives anytime convergence. Progress short of a solution earns credit in
- * both: variables a backtrack arm fixes at its root, and a local-search arm lowering the record violation
- * ([ProgressCredit]). The ledger starts a new phase at the first
- * incumbent, since the rates a feasibility hunt earned say nothing about who improves one.
+ * **Reward** (folded into the bandit in `[0, 1]`) comes from a [RewardLedger]: each arm is credited for what it
+ * contributed and scored on the rate it earned that at, per unit of work, against the rest of the pool's rate.
+ * Before any incumbent exists the credit is a first feasible solution, which drives the feasibility hunt; once
+ * one exists it is the objective improvement, which drives anytime convergence. A rise in the pool's proven
+ * lower bound is credited to the arm that ran, so an arm closing the gap from below earns as one closing it from
+ * above does. Progress short of a solution earns credit in both: variables a backtrack arm fixes at its root,
+ * and a local-search arm lowering the record violation ([ProgressCredit]). The ledger starts a new phase at the
+ * first incumbent, since the rates a feasibility hunt earned say nothing about who improves one.
  *
  * **Resumable backtrack arms:** a backtrack arm exposes a [ResumableSearch]
  * ([PortfolioWorker.newResumableSearch]); [minimize] holds one handle per such arm and *resumes* it
@@ -248,6 +249,9 @@ class SequentialPortfolio(
         // so the strict-improvement gate is all that is being reused, not the concurrency.
         val incumbent = IncumbentExchange.minimizing<Sample>()
         val ledger = RewardLedger(workers.size)
+        // A bound only the running arm can raise: a sequential pool runs one arm at a time.
+        val floor = workers.firstNotNullOfOrNull { it.sharedPools?.bounds }
+        val readFloor = { floor?.current() ?: Double.NEGATIVE_INFINITY }
         val progress = ProgressCredit(workers.size)
         var slice = baseSliceMillis
         var lsSliceWork = baseSliceWork
@@ -301,6 +305,7 @@ class SequentialPortfolio(
                 }
                 val hadIncumbent = incumbent.current() != null
                 val before = readBound()
+                val floorBefore = readFloor()
                 val worker = workers[arm]
                 armLabel = worker.label
                 armId = worker.armId
@@ -352,6 +357,7 @@ class SequentialPortfolio(
                 } else {
                     ledger.credit(arm, Signal.Improvement, improvement)
                 }
+                if (floorBefore.isFinite()) ledger.credit(arm, Signal.Floor, readFloor() - floorBefore)
                 bandit.update(arm, ledger.settle(arm, work), work.toDouble() / baseSliceWork)
                 if (found) startImprovementPhase(ledger)
 

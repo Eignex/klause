@@ -41,6 +41,9 @@ class PortfolioWorker private constructor(
     /** Solve once, honouring [cancel] (set when a sibling wins the race). */
     fun solve(cancel: Cancellation, maxInstructions: Long? = null): SolveResult = solveFn(cancel, maxInstructions)
 
+    /** The cross-arm channels this worker shares with the rest of its pool, or null when it shares none. */
+    internal var sharedPools: SharedPools? = null
+
     /** Whether this worker accepts the counted instruction budget used to schedule LS segments. */
     val acceptsInstructionBudget: Boolean get() = withInstructions
 
