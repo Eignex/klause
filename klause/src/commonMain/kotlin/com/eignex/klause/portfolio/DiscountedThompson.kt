@@ -8,12 +8,12 @@ import kotlin.math.pow
 import kotlin.random.Random
 
 /**
- * Beta-Bernoulli Thompson sampling whose evidence fades with the work the pool spends.
+ * Beta-Bernoulli Thompson sampling whose evidence fades with the segments the pool runs.
  *
  * Thompson sampling explores in proportion to how plausible it still is that an arm is the best one, so an arm
  * that keeps earning nothing is tried less and less; there is no fixed exploration share for a bad arm to tax the
- * run with. Each update carries a weight, the work the segment spent in base slices, so a long segment counts as
- * more evidence than a short one. Before every update all evidence decays by `2^(-weight / halfLife)`: the
+ * run with. Each update carries a weight, the share of its slice the segment spent, so a segment cut short counts
+ * as less evidence than a full one. Before every update all evidence decays by `2^(-weight / halfLife)`: the
  * schedule keeps following an arm that stops paying, and an arm written off early gets a fresh look once its
  * evidence has faded.
  *
@@ -22,7 +22,7 @@ import kotlin.random.Random
 internal class DiscountedThompson(
     override val nbrArms: Int,
     override val random: Random,
-    /** Base slices of work after which an observation counts half as much. */
+    /** Full segments after which an observation counts half as much. */
     private val halfLife: Double,
 ) : UnivariateBandit {
     init {
