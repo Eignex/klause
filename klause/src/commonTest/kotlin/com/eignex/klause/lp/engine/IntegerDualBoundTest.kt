@@ -167,6 +167,21 @@ class IntegerDualBoundTest {
     }
 
     @Test
+    fun `a pass over wider operands costs the square of its word length`() {
+        val builder = LpBuilder()
+        val x = builder.addVar(0L, 4L, cost = 1L)
+        val y = builder.addVar(0L, 4L, cost = 1L)
+        builder.addRow(intArrayOf(x, y), longArrayOf(1L, 1L), Relation.GE, 2L)
+        val model = builder.build(Sense.MINIMIZE)
+        val cases = listOf(Long.SIZE_BITS to 6L, 2 * Long.SIZE_BITS to 6L * 4L, 3 * Long.SIZE_BITS to 6L * 9L)
+        for ((bits, expected) in cases) {
+            val scans = LpScanCount(model).apply { scan(bits) }
+
+            assertEquals(LpCertifierCost.Metered(expected), scans.cost(), "$bits-bit operands")
+        }
+    }
+
+    @Test
     fun `inexact objective constant records one rejected rationalization`() {
         val builder = LpBuilder()
         builder.addRealVar(1e-10, 1.0, cost = 1.0)

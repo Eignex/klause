@@ -202,7 +202,7 @@ internal fun integerCertify(
     scaleBits: Int = DEFAULT_SCALE_BITS,
     observer: LpCertificationObserver? = null,
 ): IntegerCertificate? = integerCertifyUnchecked(model, y, scaleBits).also {
-    observer?.observe(LpCertifier.INTEGER, it != null, LpScanCount().apply { scan() }.cost(model))
+    observer?.observe(LpCertifier.INTEGER, it != null, LpScanCount(model).apply { scan() }.cost())
 }
 
 private fun integerCertifyUnchecked(model: LpModel, y: DoubleArray, scaleBits: Int): IntegerCertificate? {

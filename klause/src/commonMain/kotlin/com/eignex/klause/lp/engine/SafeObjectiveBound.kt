@@ -17,9 +17,9 @@ internal fun safeObjectiveLowerBound(
     y: DoubleArray,
     observer: LpCertificationObserver? = null,
 ): Double? {
-    val scans = LpScanCount()
+    val scans = LpScanCount(model)
     return safeObjectiveLowerBoundUnchecked(model, y, scans).also {
-        observer?.observe(LpCertifier.SAFE_OBJECTIVE, it != null, scans.cost(model))
+        observer?.observe(LpCertifier.SAFE_OBJECTIVE, it != null, scans.cost())
     }
 }
 
@@ -36,12 +36,14 @@ private fun safeObjectiveLowerBoundUnchecked(model: LpModel, y: DoubleArray, sca
     val exact = if (!model.hasContinuous) {
         scans.scan()
         certifyLpBound(model, y)?.value ?: run {
-            scans.scan()
-            exactLagrangian(model, y.map { checkNotNull(BigFraction.ofDouble(it)) })
+            val multipliers = y.map { checkNotNull(BigFraction.ofDouble(it)) }
+            scans.scan(exactBits(multipliers))
+            exactLagrangian(model, multipliers)
         }
     } else {
-        scans.scan()
-        exactLagrangian(model, y.map { checkNotNull(BigFraction.ofDouble(it)) })
+        val multipliers = y.map { checkNotNull(BigFraction.ofDouble(it)) }
+        scans.scan(exactBits(multipliers))
+        exactLagrangian(model, multipliers)
     } ?: return null
     return exact.lowerBoundDouble()
 }
