@@ -6,8 +6,12 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.solver.SolveResult
+import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertIs
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class PortfolioBuilderTest {
@@ -50,5 +54,15 @@ class PortfolioBuilderTest {
         val workers = PortfolioBuilder.build(continuous, scenario)
 
         assertEquals(2, workers.size)
+    }
+
+    @Test
+    fun `a local-search arm over continuous columns reports certified real values`() {
+        val scenario = PortfolioScenario(cores = 1, arms = 1, kind = Kind.CSP, engine = EngineMix.LOCAL_SEARCH)
+        val worker = PortfolioBuilder.build(continuous, scenario).single()
+
+        val result = worker.solve(Cancellation.Never, maxInstructions = 10_000)
+
+        assertNotNull(assertIs<SolveResult.Sat>(result).assignment.exactReals)
     }
 }

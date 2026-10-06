@@ -56,6 +56,8 @@ internal class LocalSearchWorkerConfig(val recipe: LocalSearchRecipe) : WorkerCo
             definitionalSweep = definitionalSweep,
             perMoveInvariants = definitionalSweep != null && recipe.perMoveInvariants,
             seedImplicitOnRestart = recipe.seedImplicitOnRestart,
+            // Continuous columns are scored in floating point; the exact residual LP decides each candidate.
+            completion = if (problem.numRealVars > 0) LeafRealCompletion(problem, objective) else null,
         ).apply { objectiveBound = boundHandle }.session()
         val workerLabel = "ls/$label"
         val params = LocalSearchParams(
