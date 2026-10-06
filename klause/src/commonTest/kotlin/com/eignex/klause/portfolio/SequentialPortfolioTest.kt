@@ -115,10 +115,18 @@ private class CountingResumableSolver(private val slicesToVerdict: Int) : Resuma
         CountingResumableSolve(slicesToVerdict).also(opened::add)
 }
 
-/** A resumable arm that spends each slice whole and, when [improves], lowers the incumbent by one per slice. */
-private class ScriptedSearch(private val improves: Boolean, private val onSlice: () -> Unit) : ResumableSearch {
+/**
+ * A resumable arm that spends each slice whole and offers an incumbent on the slices [offers] picks, lowering its
+ * objective by one each time.
+ */
+private class ScriptedSearch(
+    private val offers: (slice: Int) -> Boolean,
+    start: Double = 1_000.0,
+    private val onSlice: () -> Unit,
+) : ResumableSearch {
     private var spent = 0L
-    private var objective = 1_000.0
+    private var slices = 0
+    private var objective = start
 
     override fun runSlice(
         global: Cancellation,
@@ -128,7 +136,7 @@ private class ScriptedSearch(private val improves: Boolean, private val onSlice:
     ): MinimizeResult? {
         onSlice()
         spent += sliceNodes
-        if (improves) {
+        if (offers(slices++)) {
             objective -= 1.0
             val empty = Sample(BooleanArray(0), LongArray(0))
             onIncumbent(MinimizeResult.BestFound(empty, objective, TerminationReason.BudgetExhausted))
@@ -631,7 +639,7 @@ class SequentialPortfolioTest {
         for (useless in listOf(1, 4, 12)) {
             val slices = IntArray(useless + 1)
             val workers = List(useless + 1) { arm ->
-                trackingWorker("arm$arm", arm, ScriptedSearch(improves = arm == 0) { slices[arm]++ })
+                trackingWorker("arm$arm", arm, ScriptedSearch({ arm == 0 }) { slices[arm]++ })
             }
             var polls = 0
 
@@ -640,6 +648,19 @@ class SequentialPortfolioTest {
             val share = slices.drop(1).sum().toDouble() / slices.sum()
             assertTrue(share < 0.05, "$useless useless arms took $share of the slices")
         }
+    }
+
+    @Test
+    fun `the arm that found the first solution loses its lead to the arm improving it`() {
+        val slices = IntArray(2)
+        val finder = ScriptedSearch({ it == 0 }, start = 1_000.0) { slices[0]++ }
+        val improver = ScriptedSearch({ it > 0 }, start = 500.0) { slices[1]++ }
+        val workers = listOf(trackingWorker("finder", 0, finder), trackingWorker("improver", 1, improver))
+        var polls = 0
+
+        SequentialPortfolio.thompson(workers, seed = 3L).use { it.minimize(Cancellation { ++polls > 100 }) }
+
+        assertTrue(slices[1] > 3 * slices[0], "finder ${slices[0]} slices, improver ${slices[1]}")
     }
 
     @Test
