@@ -184,26 +184,28 @@ class BigFraction private constructor(
     private fun sum(n: BigInteger, d: BigInteger): BigFraction {
         if (n.isZero()) return this
         if (isZero) return BigFraction(n, d)
-        if (d == BigInteger.ONE) return BigFraction(num + n * den, den)
-        if (den == BigInteger.ONE) return BigFraction(num * d + n, d)
+        if (d.isOne) return BigFraction(num + n * den, den)
+        if (den.isOne) return BigFraction(num * d + n, d)
         val g = den.gcd(d)
-        if (g == BigInteger.ONE) return BigFraction(num * d + n * den, den * d)
+        if (g.isOne) return BigFraction(num * d + n * den, den * d)
         val dg = d / g
         val t = num * dg + n * (den / g)
         if (t.isZero()) return ZERO
         val h = t.gcd(g)
-        return if (h == BigInteger.ONE) BigFraction(t, den * dg) else BigFraction(t / h, den / h * dg)
+        return if (h.isOne) BigFraction(t, den * dg) else BigFraction(t / h, den / h * dg)
     }
 
     /** Returns the product of this fraction and [other], reducing each numerator against the other denominator. */
     operator fun times(other: BigFraction): BigFraction {
         if (isZero || other.isZero) return ZERO
-        val g1 = if (den == BigInteger.ONE || other.num.isUnit) BigInteger.ONE else other.num.gcd(den)
-        val g2 = if (other.den == BigInteger.ONE || num.isUnit) BigInteger.ONE else num.gcd(other.den)
-        val n1 = if (g2 == BigInteger.ONE) num else num / g2
-        val d2 = if (g2 == BigInteger.ONE) other.den else other.den / g2
-        val n2 = if (g1 == BigInteger.ONE) other.num else other.num / g1
-        val d1 = if (g1 == BigInteger.ONE) den else den / g1
+        if (den.isOne && num.isUnit) return if (num.isOne) other else other.negated()
+        if (other.den.isOne && other.num.isUnit) return if (other.num.isOne) this else negated()
+        val g1 = if (den.isOne || other.num.isUnit) BigInteger.ONE else other.num.gcd(den)
+        val g2 = if (other.den.isOne || num.isUnit) BigInteger.ONE else num.gcd(other.den)
+        val n1 = if (g2.isOne) num else num / g2
+        val d2 = if (g2.isOne) other.den else other.den / g2
+        val n2 = if (g1.isOne) other.num else other.num / g1
+        val d1 = if (g1.isOne) den else den / g1
         return BigFraction(n1 * n2, d1 * d2)
     }
 
@@ -222,7 +224,10 @@ class BigFraction private constructor(
         return (num * other.den).compareTo(other.num * den)
     }
 
-    private val BigInteger.isUnit: Boolean get() = this == BigInteger.ONE || this == MINUS_ONE.num
+    // ionspin's equals goes through a generic comparison, which costs more than the arithmetic it would skip.
+    private val BigInteger.isUnit: Boolean get() = bitLength() == 1
+
+    private val BigInteger.isOne: Boolean get() = signum() > 0 && bitLength() == 1
 
     override fun equals(other: Any?): Boolean = other is BigFraction && num == other.num && den == other.den
 
