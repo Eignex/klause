@@ -9,6 +9,7 @@ import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.baked
 import com.eignex.klause.util.EmptyIntArray
+import com.eignex.klause.util.EmptyLongArray
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 
@@ -210,6 +211,27 @@ internal class PresolveSession(private val base: BakedProblem, private val bakeC
     fun boolValueOf(v: Int): Boolean? = state.boolValues[v]
 
     /**
+     * The Booleans the state has fixed, as deductions for a problem built over the live factors.
+     *
+     * A fixing outlives the factors that derived it: a pass can drop every factor that reads a fixed
+     * Boolean while the state keeps its value, and a bake over the live factors alone would read it as
+     * free. Every problem the session builds carries these, as it carries the state's int domains, so a
+     * pass reasons over the same model its delta is propagated against.
+     */
+    private fun boolFixings(): PropagationResult {
+        if (infeasible) return PropagationResult.Implied.EMPTY
+        val keys = IntArrayList()
+        for (v in 0 until base.numBoolVars) if (state.boolValues[v] != null) keys.add(v)
+        if (keys.isEmpty()) return PropagationResult.Implied.EMPTY
+        return PropagationResult.Implied(
+            boolKeys = keys.toIntArray(),
+            boolValues = BooleanArray(keys.size) { state.boolValues[keys[it]] == true },
+            intKeys = EmptyIntArray,
+            intValues = EmptyLongArray,
+        )
+    }
+
+    /**
      * Apply [delta] incrementally: tombstone dropped ids, append added factors, push the pass's domain
      * narrowings, then re-propagate from just the delta. Returns `false` iff this proved infeasibility
      * (a conflict on a pushed narrowing or during re-propagation); the session latches [infeasible].
@@ -300,6 +322,7 @@ internal class PresolveSession(private val base: BakedProblem, private val bakeC
             // firing (the next delta rebuilds this view), so the per-firing O(numIntVars) copy is avoided.
             intDomains = if (infeasible) lastFeasibleDomains else state.intDomains,
             factors = live,
+            seedDeductions = boolFixings(),
             alreadyFolded = true,
             numRealVars = base.numRealVars,
             realLower = base.realLower,
@@ -403,7 +426,14 @@ internal class PresolveSession(private val base: BakedProblem, private val bakeC
             if (dropped == null || id !in dropped) out.add(f)
         }
         out.addAll(added)
-        val eager = PresolveShared.rebuildProblem(base, out, Array(base.numIntVars) { domains[it] }, bakeConfig)
+        val fixings = boolFixings()
+        val eager = PresolveShared.rebuildProblem(
+            base,
+            out,
+            Array(base.numIntVars) { domains[it] },
+            bakeConfig,
+            seedDeductions = fixings,
+        )
         stateProblem = eager
         factors.clear()
         factors.addAll(eager.factors)
@@ -415,7 +445,11 @@ internal class PresolveSession(private val base: BakedProblem, private val bakeC
         droppedFactorLog.clear()
         reseedEpoch++
         occDirty = true
-        state = PropagationState(PropagationProblem(eager), Assumptions.None, incremental = true)
+        state = PropagationState(
+            PropagationProblem(eager),
+            (fixings as? PropagationResult.Implied)?.toAssumptions() ?: Assumptions.None,
+            incremental = true,
+        )
         if (state.runToFixpoint(allFactors = true) != null) {
             infeasible = true
             return false
@@ -442,13 +476,20 @@ internal class PresolveSession(private val base: BakedProblem, private val bakeC
     fun materialize(): BakedProblem {
         val domains = if (infeasible) lastFeasibleDomains else Array(base.numIntVars) { state.intDomains[it] }
         if (bakeConfig.anyEnabled) {
-            return PresolveShared.rebuildProblem(stateProblem, liveFactors(), domains, bakeConfig)
+            return PresolveShared.rebuildProblem(
+                stateProblem,
+                liveFactors(),
+                domains,
+                bakeConfig,
+                seedDeductions = boolFixings(),
+            )
         }
         return BakedProblem(
             numBoolVars = base.numBoolVars,
             numIntVars = base.numIntVars,
             intDomains = domains,
             factors = liveFactors(),
+            seedDeductions = boolFixings(),
             alreadyFolded = true,
             numRealVars = base.numRealVars,
             realLower = base.realLower,
