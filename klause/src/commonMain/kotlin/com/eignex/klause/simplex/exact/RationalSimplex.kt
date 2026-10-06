@@ -214,7 +214,13 @@ class BigFraction private constructor(
     }
 
     /** Compares this fraction with [other]. */
-    operator fun compareTo(other: BigFraction): Int = (num * other.den).compareTo(other.num * den)
+    operator fun compareTo(other: BigFraction): Int {
+        val sign = num.signum()
+        val otherSign = other.num.signum()
+        if (sign != otherSign || sign == 0) return sign.compareTo(otherSign)
+        if (den == other.den) return num.compareTo(other.num)
+        return (num * other.den).compareTo(other.num * den)
+    }
 
     private val BigInteger.isUnit: Boolean get() = this == BigInteger.ONE || this == MINUS_ONE.num
 
