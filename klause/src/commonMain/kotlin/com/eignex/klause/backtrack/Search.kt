@@ -377,6 +377,9 @@ internal class BacktrackBrancher(
     private val seedDecisionLevels: Int = 0,
 ) : SearchBrancher,
     SearchRunObserver {
+    // Node count from which the next restart may count root fixings. The count visits every variable, so it runs
+    // at most once per that many nodes: one visit per node, amortized.
+    private var nextRootCount = 0L
     private val variables = params.variableSelector.fresh()
     private val values = params.valueSelector.fresh()
     private val phase = PhaseSaving(session.problem.numBoolVars, session.problem.numIntVars, params)
@@ -458,6 +461,12 @@ internal class BacktrackBrancher(
         variables.onRestart()
         values.onRestart()
         sink?.search?.observeRestart()
+        sink?.search?.let { search ->
+            if (search.nodeCount >= nextRootCount) {
+                search.observeRootFixed(session.fixedVariableCount())
+                nextRootCount = search.nodeCount + session.problem.numBoolVars + session.problem.numIntVars
+            }
+        }
         onEvent?.invoke(SearchEvent.Restart(++restartCount, decisions))
     }
 

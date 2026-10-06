@@ -29,6 +29,8 @@ data class SearchStats(
     val peakDepth: MaxResult = NO_MAX,
     /** Mean decision depth over visited nodes: deep-and-thin vs shallow-and-wide. */
     val depthMean: WeightedMeanResult = WeightedMeanResult(totalWeights = 0.0, mean = Double.NaN),
+    /** Most variables found fixed at a restart, back at the root: progress no later search undoes. */
+    val rootFixed: MaxResult = NO_MAX,
 ) {
     /** Combine two workers' search stats: counters add, peak depth maxes, depth means weight-combine. */
     fun mergedWith(o: SearchStats): SearchStats = SearchStats(
@@ -40,6 +42,7 @@ data class SearchStats(
         relearned = SumResult(relearned.sum + o.relearned.sum),
         peakDepth = MaxResult(maxOf(peakDepth.max, o.peakDepth.max)),
         depthMean = mergeDepthMean(depthMean, o.depthMean),
+        rootFixed = MaxResult(maxOf(rootFixed.max, o.rootFixed.max)),
     )
 }
 
@@ -53,6 +56,7 @@ internal class SearchStatsSink {
     val relearned: CountStat = CountStat()
     val peakDepth: MaxStat = MaxStat()
     val depthMean: MeanStat = MeanStat()
+    val rootFixed: MaxStat = MaxStat()
 
     /**
      * Nodes visited so far, as a plain counter.
@@ -75,6 +79,7 @@ internal class SearchStatsSink {
     fun observePropagation(count: Long = 1L) = repeat(count.toInt()) { propagations.update(1.0) }
     fun observeLearn(count: Long = 1L) = repeat(count.toInt()) { learnedClauses.update(1.0) }
     fun observeRelearn() = relearned.update(1.0)
+    fun observeRootFixed(count: Int) = rootFixed.update(count.toDouble())
 
     fun snapshot(): SearchStats = SearchStats(
         nodes = nodes.read(),
@@ -85,5 +90,6 @@ internal class SearchStatsSink {
         relearned = relearned.read(),
         peakDepth = peakDepth.read(),
         depthMean = depthMean.read(),
+        rootFixed = rootFixed.read(),
     )
 }

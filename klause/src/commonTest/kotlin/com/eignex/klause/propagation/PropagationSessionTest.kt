@@ -53,6 +53,24 @@ class PropagationSessionTest {
     }
 
     @Test
+    fun `the fixed variable count covers assigned bools and singleton ints`() {
+        val p = Problem(
+            numBoolVars = 2,
+            numIntVars = 2,
+            intDomains = arrayOf(IntDomain(0, 9), IntDomain(0, 9)),
+            factors = arrayOf<Factor>(Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true)))),
+        )
+        val s = PropagationSession(p)
+        s.seed(Assumptions.None)
+
+        s.pinBool(0, true)
+        s.pinIntAtLeast(0, 9L)
+        s.pinIntAtLeast(1, 4L)
+
+        assertEquals(3, s.fixedVariableCount())
+    }
+
+    @Test
     fun `pop restores feasibility`() {
         // (x0 ∨ x1). After pinning x0=false x1=false → Unsat. Pop one → feasible again.
         val p = Problem(

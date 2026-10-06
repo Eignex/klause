@@ -183,6 +183,17 @@ class PropagationSession(
     /** Current int domain after propagation. Always non-empty unless the session is Unsat. */
     fun intDomain(v: Int): IntDomain = state.intDomains[v]
 
+    /** Variables fixed right now: bools with a value and ints down to one. Visits every variable. */
+    fun fixedVariableCount(): Int {
+        var fixed = 0
+        for (v in 0 until problem.numBoolVars) if (state.boolValues[v] != null) fixed++
+        for (v in 0 until problem.numIntVars) {
+            val d = state.intDomains[v]
+            if (d.min == d.max) fixed++
+        }
+        return fixed
+    }
+
     /**
      * Domain integer column [v] was seeded with, before any decision on this trail.
      *
