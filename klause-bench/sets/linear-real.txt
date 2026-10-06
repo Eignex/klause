@@ -1,0 +1,30 @@
+# linear-real: problems with the linear-real theme, drawn 2026-10-06 by klause-lab deploy/make-sets.py
+# tiers by the reference's time to prove: easy < 1 s, medium < 10 s, hard < 60 s or solved but unproven
+# easy: 10
+hakank/furniture/furniture
+hakank/product_configuration/product_configuration
+miplib2003/fiber
+miplib2010/neos-1225589
+miplib2017/neos-3048764-nadi
+miplib3/egout
+orlib/cap84
+smtlib-qflira/LCTES/cruise-control.nosummaries
+smtlib-qflra/miplib/opt1217--11
+smtlib-qfrdl/skdmxa2/skdmxa-3x3-6.induction.cvc
+# medium: 10
+miplib2003/pp08aCUTS
+miplib2003/vpm2
+miplib2010/neos-1171692
+miplib2010/pigeon-10
+miplib2017/neos-3065804-namu
+miplib3/misc03
+miplib3/misc07
+orlib/cap113
+smtlib-qflra/miplib/pp08a-3000
+smtlib-qfrdl/sal/fischer6-mutex-19
+# hard: 5
+miplib2003/momentum3
+miplib2010/pigeon-13
+miplib2017/icir97_potential
+orlib/airland8
+smtlib-qflra/LassoRanker/CooperatingT2/brp_withassume.t2.c_Iteration1_Loop_4-lexTemplate

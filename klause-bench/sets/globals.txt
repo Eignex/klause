@@ -1,0 +1,30 @@
+# globals: problems with the globals theme, drawn 2026-10-06 by klause-lab deploy/make-sets.py
+# tiers by the reference's time to prove: easy < 1 s, medium < 10 s, hard < 60 s or solved but unproven
+# easy: 10
+hakank/rotation/rotation
+hakank/twelve_statements/twelve_statements
+mzn-bench/2015/open_stacks/wbp_20_20_1
+mzn-bench/2016/java-auto-gen
+mzn-bench/2023/roster-shifts-bool/s50_e50_c3
+xcsp3-cop/ChampionsLeague-strict-2024-09_c25
+xcsp3-cop/NursingWorkload-6zones_c22
+xcsp3-cop/Sonet-s2ring02_c23
+xcsp3-csp/NumberPartitioning-290_c22
+xcsp3-csp/Subisomorphism-g34-g36_c24
+# medium: 10
+hakank/or_matching/or_matching
+hakank/rotation/rotation2
+mzn-bench/2012/amaze/2012-03-15
+mzn-bench/2025/mondoku/10-10-6
+xcsp3-cop/ChampionsLeague-strict-2024-35_c25
+xcsp3-cop/MultiAgentPathFinding-table-g16-p10-a05_c22
+xcsp3-cop/Wordpress-04-07-500_c24
+xcsp3-csp/Molnar-3-08_c22
+xcsp3-csp/NonTransitiveDice-08-08-3_c23
+xcsp3-csp/PoolBallTriangle-07_c24
+# hard: 5
+hakank/two_cube_calendar/two_cube_calendar
+mzn-bench/2018/opt-cryptanalysis/r6
+mzn-bench/2025/black-hole/layout_27
+xcsp3-cop/RoadefPlaning2-2023-13_c25
+xcsp3-csp/AntimagicSquare-05_c23

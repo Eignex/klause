@@ -1,0 +1,11 @@
+# sweep: open-int, linear-real, mip, scheduling, routing, packing, globals, sat, maxsat, pb
+@open-int
+@linear-real
+@mip
+@scheduling
+@routing
+@packing
+@globals
+@sat
+@maxsat
+@pb

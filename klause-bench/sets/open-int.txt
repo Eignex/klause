@@ -1,0 +1,30 @@
+# open-int: problems with the open-int theme, drawn 2026-10-06 by klause-lab deploy/make-sets.py
+# tiers by the reference's time to prove: easy < 1 s, medium < 10 s, hard < 60 s or solved but unproven
+# easy: 10
+hakank/freight_transfer/freight_transfer
+hakank/maximum_subarray/maximum_subarray
+hakank/tsp_circuit/tsp_circuit
+mzn-bench/2015/gfd-schedule/n30f3d30m7k4
+mzn-bench/2020/radiation/i8-9
+smtlib-qfidl/Averest/insertion_sort/InsertionSort_live_blmc010
+smtlib-qfidl/asp/GeneralizedSlitherlink/penrose.50.asp
+smtlib-qflia/20210219-Dartagnan/ReachSafety-Loops/benchmark33_linear-O0
+smtlib-qflia/calypto/problem-004353.cvc.1
+smtlib-qflira/LCTES/cruise-control
+# medium: 10
+hakank/coins/coins3b
+hakank/euler/euler_52
+hakank/n_puzzle/n_puzzle
+mzn-bench/2021/flowshop-workers/ex4
+mzn-bench/2022/vaccine/v857
+smtlib-qfidl/20220214-jobshop-BohanLi/jobshop24-2-12-12-4-4-16
+smtlib-qfidl/asp/GraphColouring/graph-colouring-nodes=125-density=0.1-instance=4
+smtlib-qfidl/parity/07.600.graph
+smtlib-qflia/2019-ezsmt/incrementalScheduling/140-incremental_scheduling-18576-0
+smtlib-qflia/rings_preprocessed/ring_2exp12_9vars_5ite_unsat
+# hard: 5
+hakank/subsets/subsets_100
+hakank/three_digit/three_digit
+mzn-bench/2018/steiner-tree/es20fst08.stp
+smtlib-qfidl/job_shop/jobshop54-2-27-27-4-4-12
+smtlib-qflia/slacks/25-22.slack

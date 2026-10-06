@@ -1,0 +1,30 @@
+# maxsat: problems with the maxsat theme, drawn 2026-10-06 by klause-lab deploy/make-sets.py
+# tiers by the reference's time to prove: easy < 1 s, medium < 10 s, hard < 60 s or solved but unproven
+# easy: 10
+maxsat-unweighted/gen-hyper-tw-GenHyperTW_b02
+maxsat-unweighted/planning-bnn-navigation_3x3_4
+maxsat-unweighted/pseudoBoolean-normalized-g9x3.opb.msat
+maxsat-unweighted/ramsey-ram_k4_n12.ra0
+maxsat-unweighted/wqueens-wqueens12_10.wcsp.dir
+maxsat-weighted/frb_wt-frb10-6-1
+maxsat-weighted/max-realizability_wt-power-distribution_3_8
+maxsat-weighted/preference_planning_wt-WCNF_storage_p01
+maxsat-weighted/protein_ins_wt-1vii_.1cph_.g.wcnf.t
+maxsat-weighted/quantum-circuit-graphstate_6_6_rigetti-agave_8
+# medium: 10
+maxsat-unweighted/gen-hyper-tw-GenHyperTW_grid5
+maxsat-unweighted/logic-synthesis-normalized-9sym.b.opb.msat
+maxsat-unweighted/ramsey-ram_k5_n20.ra0
+maxsat-unweighted/rna-alignment-random-same-7.rna.pre
+maxsat-unweighted/treewidth-computation-TWComp_barley2_N48
+maxsat-weighted/IMLIB-pima_44_4_16_1_6_5
+maxsat-weighted/auctions_wt-cat_sched_60_160_0004.txt
+maxsat-weighted/dalculus_wt-f49-DC_TotalLoss.seq-B-3-combined-irEDCBA
+maxsat-weighted/max-realizability_wt-power-distribution_9_5
+maxsat-weighted/synplicate-TheoremProver-run2-ms_0_35_0.8962025316455696_erm
+# hard: 5
+maxsat-unweighted/close_solutions-teams16_l6a.cnf
+maxsat-unweighted/treewidth-computation-TWComp_ship-ship-pp_N30
+maxsat-weighted/protein_ins_wt-3ebx_.6ebx_.g.wcnf.t
+maxsat-weighted/pseudoBoolean_wt-normalized-mps-v2-20-10-mod010.opb.msat
+maxsat-weighted/setcover_wt-rail516

@@ -1,0 +1,30 @@
+# scheduling: problems with the scheduling theme, drawn 2026-10-06 by klause-lab deploy/make-sets.py
+# tiers by the reference's time to prove: easy < 1 s, medium < 10 s, hard < 60 s or solved but unproven
+# easy: 10
+hakank/newspaper/newspaper
+hakank/scheduling_chip/scheduling_chip
+hakank/scheduling_with_multiple_workers/scheduling_with_multiple_workers
+hakank/tsptw/tsptw
+mzn-bench/2012/mspsp/medium_02
+mzn-bench/2013/fjsp/easy02
+mzn-bench/2022/gfd-schedule/n55f2d50m30k3_10124
+xcsp3-cop/AircraftLanding-table-airland06_c22
+xcsp3-cop/SchedulingOS-gp-04-05_c25
+xcsp3-cop/TestScheduling-t020m10r03-1_c24
+# medium: 10
+hakank/jobshop/jobshop2
+mzn-bench/2013/ghoulomb/3-9-16
+mzn-bench/2016/gfd-schedule/n180f7d50m30k18
+mzn-bench/2016/rcpsp-wet/j90_10_10-wet
+mzn-bench/2020/racp/j60_13_4_1.0
+mzn-bench/2022/gfd-schedule/n85f3d50m8k20_10124
+xcsp3-cop/CarpetCutting-test04_c23
+xcsp3-cop/FlexibleJobshopScen-dh-6-18-020_c25
+xcsp3-cop/HSP-table-10405_c23
+xcsp3-cop/TestScheduling-t030m20r10-1_c24
+# hard: 5
+hakank/disjunctive/disjunctive
+hakank/nine_to_one_equals/nine_to_one_equals_100
+mzn-bench/2025/proteindesign12/1HZ5.12p.19aa.usingEref_self
+xcsp3-cop/RIP-25-1-j120-10-01_c23
+xcsp3-csp/SquarePackingSuite-24_c23
