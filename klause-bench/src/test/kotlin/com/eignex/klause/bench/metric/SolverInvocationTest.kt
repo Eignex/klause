@@ -194,4 +194,17 @@ class SolverInvocationTest {
 
         assertEquals(10L to 30L, SolveMetric.timings(r, maximize = false))
     }
+
+    @Test
+    fun `every quarantine warning on stderr is kept and nothing else is`() {
+        val stderr = "WARNING: Using incubator modules\n" +
+            "% WARNING: portfolio arm ls/a quarantined: int 3 = 7 conflicts\n" +
+            "% WARNING: portfolio arm bt/b quarantined: claimed infeasible against a verified incumbent\n"
+
+        assertEquals(
+            "ls/a quarantined: int 3 = 7 conflicts | bt/b quarantined: claimed infeasible against a verified incumbent",
+            SolverInvocation.quarantines(stderr),
+        )
+        assertNull(SolverInvocation.quarantines("WARNING: Using incubator modules\n"))
+    }
 }

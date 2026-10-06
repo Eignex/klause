@@ -115,6 +115,18 @@ class ArmMiningTest {
     }
 
     @Test
+    fun `a quarantine the run recorded is printed under its fault`() {
+        val stats = mapOf(
+            "arm.broken" to "work=10 reward=0.0 faults=1",
+            SolverInvocation.QUARANTINED to "broken quarantined: int 3 = 7 conflicts",
+        )
+
+        val report = ArmMining.render(listOf(mined(rec(stats))))
+
+        assertTrue("!!!     broken quarantined: int 3 = 7 conflicts" in report, report)
+    }
+
+    @Test
     fun `lab case files load only the cases whose record ran a portfolio`() {
         val file = File.createTempFile("cases", ".json").apply { deleteOnExit() }
         file.writeText(
