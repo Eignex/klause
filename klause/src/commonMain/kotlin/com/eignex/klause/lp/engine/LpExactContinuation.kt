@@ -12,6 +12,8 @@ import com.eignex.klause.simplex.exact.ExactContinuationInput
 import com.eignex.klause.simplex.exact.ExactContinuationLimits
 import com.eignex.klause.simplex.exact.ExactContinuationMetrics
 import com.eignex.klause.util.Cancellation
+import kotlin.time.Duration.Companion.nanoseconds
+import kotlin.time.TimeSource
 
 internal class LpExactContinuationCache {
     internal var state: LpExactState? = null
@@ -177,7 +179,10 @@ internal fun continueExactLp(
                         )
                     },
                     cancellation = remaining.maxTimeNs?.let { cap ->
-                        cancellation or Cancellation { verification.elapsedNs >= cap }
+                        // The cap's remainder is a deadline, so a phase handed this token can budget a share of it.
+                        cancellation or Cancellation.until(
+                            TimeSource.Monotonic.markNow() + (cap - verification.elapsedNs).nanoseconds,
+                        )
                     } ?: cancellation,
                     limits = defaults.copy(
                         maxWork = minOf(defaults.maxWork, (remaining.maxWork - verification.work).coerceAtLeast(0)),

@@ -8,6 +8,13 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.bounding.LpEngine
 import com.eignex.klause.lp.bounding.LpParams
 import com.eignex.klause.lp.bounding.LpPlan
+import com.eignex.klause.lp.engine.LpEngineFactory
+import com.eignex.klause.lp.engine.LpModel
+import com.eignex.klause.lp.engine.LpPricingOptions
+import com.eignex.klause.lp.engine.LpSolveContext
+import com.eignex.klause.lp.engine.LpSolver
+import com.eignex.klause.lp.engine.PersistentLpSolver
+import com.eignex.klause.lp.engine.ProductionLpEngineFactory
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.util.Cancellation
@@ -16,6 +23,9 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
+import kotlin.time.ComparableTimeMark
+import kotlin.time.Duration.Companion.hours
+import kotlin.time.TimeSource
 
 /**
  * The shared tree-search heuristic [lbTreeSearch] proposes propagation-feasible assignments.
@@ -84,6 +94,63 @@ class LpBoundingLbTreeSearchTest {
         val seed = engine(p, obj).use { assertNotNull(it.lbTreeSearch(obj, Cancellation.Never)) }
 
         assertTrue(assertNotNull(seed.direction).single().signum() > 0)
+    }
+
+    @Test
+    fun `the dive's LP solves are handed the caller's deadline`() {
+        val deadlines = ArrayList<ComparableTimeMark?>()
+        val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+            override fun newGeneralSolver(
+                model: LpModel,
+                cancellation: Cancellation,
+                workLimit: Long,
+                pricing: LpPricingOptions,
+            ): LpSolver {
+                deadlines += cancellation.deadline()
+                return ProductionLpEngineFactory.newGeneralSolver(model, cancellation, workLimit, pricing)
+            }
+
+            override fun newPersistentSolver(
+                model: LpModel,
+                cancellation: Cancellation,
+                refactorUpdateLimit: Int,
+                iterationLimit: Int,
+                workLimit: Long,
+                trackDegeneracy: Boolean,
+                pricing: LpPricingOptions,
+            ): PersistentLpSolver {
+                deadlines += cancellation.deadline()
+                return ProductionLpEngineFactory.newPersistentSolver(
+                    model,
+                    cancellation,
+                    refactorUpdateLimit,
+                    iterationLimit,
+                    workLimit,
+                    trackDegeneracy,
+                    pricing,
+                )
+            }
+        }
+        val problem = Problem(
+            0,
+            2,
+            arrayOf(IntDomain(0, 3), IntDomain(0, 3)),
+            arrayOf<Factor>(Linear(intArrayOf(2, 3), intArrayOf(0, 1), LinearOp.GE, 5)),
+        )
+        val obj = LinearObjective(intCoefficients = longArrayOf(1L, 1L))
+        val run = Cancellation.until(TimeSource.Monotonic.markNow() + 1.hours)
+        val engine = LpEngine(
+            problem,
+            obj,
+            LpParams(lpPlan = LpPlan(bounding = true)),
+            SolveStatsSink(backend = "lbtree"),
+            LpSolveContext(factory),
+        )
+
+        engine.use { assertNotNull(it.lbTreeSearch(obj, run)) }
+
+        assertTrue(deadlines.isNotEmpty())
+        assertTrue(deadlines.all { it == run.deadline() })
     }
 
     @Test
