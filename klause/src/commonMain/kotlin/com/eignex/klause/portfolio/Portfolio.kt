@@ -442,8 +442,9 @@ class Portfolio(
 
         /**
          * Settle [claim]'s segment: fold its [stats], credit its progress and every contribution used since the
-         * last settle, and score the arm. A segment that [failed] earns nothing and weighs at least a base slice.
-         * Call under [locked].
+         * last settle, and score the arm. A segment weighs the share of its slice it spent, so one cut short by a
+         * verdict counts as less evidence; every arm runs the same slice, so a full segment of any arm weighs one. A
+         * segment that [failed] earns nothing and weighs a full one. Call under [locked].
          */
         fun record(claim: Claim, stats: SolveStats?, cumulative: Boolean, work: Long, failed: Boolean) {
             val arm = claim.arm
@@ -456,7 +457,7 @@ class Portfolio(
             }
             val earned = ledger.settle(arm, work)
             val reward = if (failed) 0.0 else earned
-            val weight = (if (failed) maxOf(work, baseSliceWork) else work).toDouble() / baseSliceWork
+            val weight = (if (failed) maxOf(work, claim.sliceWork) else work).toDouble() / claim.sliceWork
             bandit.update(arm, reward, weight)
             log.record(arm, work, reward, failed)
             // The probe runs at the base slice for every arm, so its cost stays flat in the arm count.
@@ -546,7 +547,7 @@ class Portfolio(
 
     /** Policy factories. The primary constructor takes any kumulant [UnivariateBandit] reading rewards in `[0, 1]`. */
     companion object {
-        /** Base slices of work after which an observation counts half as much; see [thompson]. */
+        /** Full segments after which an observation counts half as much; see [thompson]. */
         const val DEFAULT_HALF_LIFE: Double = 200.0
 
         /** Default share of the bandit's evidence kept across the first incumbent. */
@@ -555,7 +556,7 @@ class Portfolio(
         /**
          * Discounted Thompson sampling, the default policy, on [lanes] threads. An arm that keeps earning nothing
          * is tried less and less, with no fixed exploration share to tax the run, and evidence fades over
-         * [halfLife] base slices of work so the schedule follows whichever arm is paying now. Every arm first runs
+         * [halfLife] full segments so the schedule follows whichever arm is paying now. Every arm first runs
          * one base slice, in order, so the policy starts from evidence on each; at one base slice apiece the probe
          * costs little however many arms there are.
          */
