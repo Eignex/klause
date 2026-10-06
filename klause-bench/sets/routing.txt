@@ -1,0 +1,30 @@
+# routing: problems with the routing theme, drawn 2026-10-06 by klause-lab deploy/make-sets.py
+# tiers by the reference's time to prove: easy < 1 s, medium < 10 s, hard < 60 s or solved but unproven
+# easy: 10
+hakank/kidney_exchange_model/kidney_exchange_model
+hakank/or_seating/or_seating
+mzn-bench/2012/tpp/tpp_3_3_30_1
+mzn-bench/2013/mario/mario_n_medium_4
+mzn-bench/2014/mario/mario_n_medium_5
+mzn-bench/2015/is/1YHXeG1xYs
+mzn-bench/2023/multi-agent-graph-coverage/rnd_n10_p2000_c15_s1
+mzn-bench/2025/is/1vERFuvviS
+mzn-bench/2025/tsptw/n20w160.001
+xcsp3-cop/TSPTW2-n040w020-1_c23
+# medium: 10
+mzn-bench/2012/tpp/tpp_7_5_30_1
+mzn-bench/2013/mario/mario_t_hard_1
+mzn-bench/2014/mario/mario_t_hard_5
+mzn-bench/2014/stochastic-vrp
+mzn-bench/2017/mario/mario_medium_4
+mzn-bench/2018/vrplc/vrplc9_5_10_s1
+mzn-bench/2020/p1f-pjs/10
+mzn-bench/2023/multi-agent-graph-coverage/rnd_n10_p1500_c15_s1
+xcsp3-cop/TSPTW2-n040w040-1_c23
+xcsp3-cop/VRP_LC-09-05-10-s2_c24
+# hard: 5
+hakank/circuit_test/circuit_test
+hakank/symmetric_alldifferent/symmetric_alldifferent
+mzn-bench/2024/yumi-dynamic/p_4_GG_GG_yumi_grid_setup_5_5_zones
+xcsp3-cop/VRP_LC-09-05-15-s3_c24
+xcsp3-csp/KnightTour2-010_c22

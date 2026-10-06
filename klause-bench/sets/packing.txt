@@ -1,0 +1,30 @@
+# packing: problems with the packing theme, drawn 2026-10-06 by klause-lab deploy/make-sets.py
+# tiers by the reference's time to prove: easy < 1 s, medium < 10 s, hard < 60 s or solved but unproven
+# easy: 10
+hakank/buckets/buckets
+hakank/knapsack_rosetta_code/knapsack_rosetta_code_01
+hakank/knapsack_rosetta_code_bounded/knapsack_rosetta_code_bounded
+hakank/number_of_days/number_of_days
+mzn-bench/2013/filters/dfq_1_1
+mzn-bench/2016/carpet-cutting/mzn_rnd_test.11
+mzn-bench/2022/team-assignment/data1_4_6
+mzn-bench/2023/travelling-thief/data/n10_k3_c5000_l10000_u10100_r46
+xcsp3-cop/BinPacking2-n1c1w1a_c24
+xcsp3-cop/IHTC-i18_c25
+# medium: 10
+mzn-bench/2013/cargo/challenge07_1s_133
+mzn-bench/2016/mapping/mesh4x4_1
+mzn-bench/2017/cargo/challenge02_0s_1139
+mzn-bench/2017/gbac/UD4-gbac
+mzn-bench/2020/pillars-and-planks/p-d12
+mzn-bench/2021/mapping/mesh3x3_4
+mzn-bench/2022/accap/accap_a4_f30_t15
+mzn-bench/2023/travelling-thief/data/n10_k15_c5000_l10000_u11000_r49
+xcsp3-cop/GeneralizedMKP-0-OR05x100-75-1_c23
+xcsp3-cop/KidneyExchange-4-051_c23
+# hard: 5
+hakank/bin_packing/bin_packing2
+hakank/investment_problem/investment_problem
+mzn-bench/2013/cargo/challenge08_222f_3475
+mzn-bench/2017/cargo/challenge16_10720f_4243
+xcsp3-cop/GeneralizedMKP-0-OR30x500-25-1_c23
