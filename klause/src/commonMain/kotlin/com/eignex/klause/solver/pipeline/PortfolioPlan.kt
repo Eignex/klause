@@ -153,7 +153,7 @@ fun FinitePipeline.planPortfolio(request: PortfolioPlanRequest): PortfolioPlan {
             cores = request.cores,
             kind = kind,
             defaultEngine = mix,
-            defaultArms = lsResolution.forceArms ?: request.defaultArms,
+            defaultArms = request.defaultArms,
             lpCeiling = request.lpCeiling,
             zeroObjectivePricing = request.zeroObjectivePricing,
             lsPool = lsResolution.pool,

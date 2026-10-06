@@ -54,7 +54,6 @@ import com.eignex.klause.portfolio.BacktrackCatalog
 import com.eignex.klause.portfolio.EngineMix
 import com.eignex.klause.portfolio.Kind
 import com.eignex.klause.portfolio.LocalSearchCatalog
-import com.eignex.klause.portfolio.LsRecipeSweep
 import com.eignex.klause.portfolio.PortfolioScenario
 
 /** Invalid solver-policy configuration. */
@@ -271,10 +270,8 @@ internal fun applyFixedBacktrackParams(
 /** Resolved local-search arm pool for the `ls` engine: per-arm factories (a *fresh* recipe per slot,
  *  so parallel workers never share mutable strategy state). A null [pool] means the default curated
  *  pool — the portfolio builds it unchanged. [dryRunSolver] short-circuits the solve to print the
- *  resolved arm pool (the solver configuration) instead of solving. [forceArms], when set, pins the
- *  worker count to the pool size so **every** resolved recipe runs as its own arm — the `strategy=sweep`
- *  campaign, where the bandit must schedule the whole cross-product rather than an `autoArms` prefix. */
-class LsResolution(val pool: List<() -> LocalSearchRecipe>?, val dryRunSolver: Boolean, val forceArms: Int? = null)
+ *  resolved arm pool (the solver configuration) instead of solving. */
+class LsResolution(val pool: List<() -> LocalSearchRecipe>?, val dryRunSolver: Boolean)
 
 private fun parseScoring(s: String): MoveScoring = when (s.lowercase()) {
     "weighted" -> MoveScoring.Weighted
@@ -445,18 +442,6 @@ fun resolveLocalSearchRecipes(p: EngineParams): LsResolution {
         pipelineConfigError(
             "ls: arm=`$armLabel` is not a catalog arm (have ${LocalSearchCatalog.labels().joinToString()})",
         )
-    }
-    // `strategy=sweep` is the exploration campaign: the entire cross-product as the arm pool, with
-    // forceArms pinning the worker count to it so the bandit schedules every recipe rather than an
-    // autoArms prefix. It *is* the whole space, so an arm= or an axis edit would contradict it.
-    if (strategyRaw == "sweep") {
-        if (armLabel != null || hasEdits || sourcesSpec != null) {
-            pipelineConfigError(
-                "ls: strategy=sweep runs the full recipe cross-product and takes no arm=/sources=/axis edits",
-            )
-        }
-        val sweep = LsRecipeSweep.pool()
-        return LsResolution(sweep, dryRunSolver, forceArms = sweep.size)
     }
     val strategyName = strategyRaw ?: if (sourcesSpec != null) "bare" else "auto"
 
