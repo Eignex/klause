@@ -75,6 +75,8 @@ internal class PoolCutExchange(
     private val pool: SharedCutPool,
     /** The arm this exchange publishes for; see [SharedCutPool.publish]. */
     private val origin: Int = SharedCutPool.NO_ORIGIN,
+    /** Where selections of imported cuts are counted for the arms that published them; null counts nothing. */
+    private val tally: ContributionTally? = null,
 ) : CutExchange {
     private var cursor = 0
     private val seen = LongHashSet()
@@ -82,8 +84,13 @@ internal class PoolCutExchange(
     override fun exchange(sharing: CutSharing) {
         val drained = pool.drainSince(cursor)
         cursor = drained.cursor
-        sharing.importCuts(drained.cuts.filter { seen.add(it.key) })
-        val fresh = sharing.exportGlobalCuts().filter { seen.add(it.key) }
-        pool.publish(fresh, origin)
+        val fresh = drained.cuts.indices.filter { seen.add(drained.cuts[it].key) }
+        val origins = IntArray(fresh.size) {
+            drained.origins[fresh[it]].takeIf { o -> o != origin } ?: SharedCutPool.NO_ORIGIN
+        }
+        sharing.importCuts(fresh.map { drained.cuts[it] }, origins)
+        tally?.let { t -> sharing.drainImportUses { from, uses -> t.note(Contribution.Cut, from, uses) } }
+        val exported = sharing.exportGlobalCuts().filter { seen.add(it.key) }
+        pool.publish(exported, origin)
     }
 }

@@ -71,6 +71,23 @@ class PropagationSessionTest {
     }
 
     @Test
+    fun `an imported clause that forces a unit counts a use for its origin`() {
+        for (native in listOf(false, true)) {
+            val p = Problem(numBoolVars = 3, numIntVars = 0, intDomains = emptyArray(), factors = arrayOf<Factor>())
+            val s = PropagationSession(p, nativeSat = native)
+            s.seed(Assumptions.None)
+            s.importClause(SharedClause(intArrayOf(Lit.make(0, false), Lit.make(1, true)), LongArray(0), lbd = 2), 4)
+            s.importClause(SharedClause(intArrayOf(Lit.make(2, true), Lit.make(1, false)), LongArray(0), lbd = 2))
+
+            s.pinBool(0, true)
+            val uses = HashMap<Int, Long>()
+            s.drainImportUses { origin, n -> uses[origin] = n }
+
+            assertEquals(mapOf(4 to 1L), uses, "native lane: $native")
+        }
+    }
+
+    @Test
     fun `pop restores feasibility`() {
         // (x0 ∨ x1). After pinning x0=false x1=false → Unsat. Pop one → feasible again.
         val p = Problem(

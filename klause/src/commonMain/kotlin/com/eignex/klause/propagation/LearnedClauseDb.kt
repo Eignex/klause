@@ -1,6 +1,7 @@
 package com.eignex.klause.propagation
 
 import com.eignex.klause.util.IntArrayList
+import com.eignex.klause.util.OriginCounts
 
 /**
  * Learned-constraint database for [PropagationState]: the constraints learned during search plus the
@@ -44,6 +45,15 @@ internal class LearnedClauseDb(
      *  and demote idle ones, then clears it for survivors. */
     val usedFlags = IntArrayList()
 
+    /** The origin an imported clause came from, parallel to [store]; [OWN_ORIGIN] for one learned here. */
+    val origins = IntArrayList()
+
+    /** Uses of imported clauses, by origin. */
+    val importUses = OriginCounts()
+
     /** Number of learned clauses. */
     val size: Int get() = store.size
 }
+
+/** The origin of a learned clause the session derived itself rather than imported. */
+internal const val OWN_ORIGIN = -1

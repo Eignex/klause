@@ -5,6 +5,7 @@ import com.eignex.klause.lp.engine.Relation
 import com.eignex.klause.lp.relaxation.CutSourceMap
 import com.eignex.klause.lp.relaxation.LpRelaxation
 import com.eignex.klause.util.MutableIntLongMap
+import com.eignex.klause.util.OriginCounts
 import kotlin.math.abs
 import kotlin.math.sqrt
 
@@ -26,17 +27,22 @@ internal class CutPool(
         var cut: Cut?,
         var key: Any,
         var source: SourceCut? = null,
+        // The source a shared cut was imported from, or [NO_ORIGIN] for one derived here.
+        val origin: Int = NO_ORIGIN,
         var activity: Double = 0.0,
         var inactiveCount: Int = 0,
     )
 
-    private data class ScoredCut(val cut: Cut, val norm: Double, val score: Double)
+    private data class ScoredCut(val cut: Cut, val norm: Double, val score: Double, val origin: Int)
+
+    // Selections of imported cuts, by the source each came from.
+    private val importUses = OriginCounts()
 
     /** Number of pooled cuts. */
     val size: Int get() = entries.size
 
     /** Add [cut] unless an equal one (by [Cut.key]) is already pooled; returns true if newly added. */
-    fun add(cut: Cut): Boolean {
+    fun add(cut: Cut, origin: Int = NO_ORIGIN): Boolean {
         val proof = cut.provenance
         val row = proof?.conclusion
         val source = if (row != null && cut.global == proof.global) {
@@ -44,24 +50,26 @@ internal class CutPool(
         } else {
             null
         }
-        return store(cut, source)
+        return store(cut, source, origin)
     }
 
-    fun add(cut: Cut, relaxation: LpRelaxation): Boolean = when (val mapped = SourceCut.fromCut(cut, relaxation)) {
-        is CutMapping.Mapped -> add(mapped.value, checkNotNull(relaxation.sourceMap))
+    /** Add [cut] mapped onto [relaxation]; [origin] names the source a shared cut was imported from. */
+    fun add(cut: Cut, relaxation: LpRelaxation, origin: Int = NO_ORIGIN): Boolean =
+        when (val mapped = SourceCut.fromCut(cut, relaxation)) {
+            is CutMapping.Mapped -> add(mapped.value, checkNotNull(relaxation.sourceMap), origin)
 
-        is CutMapping.Declined -> {
-            val unscoped = cut.provenance == null && cut.tableau == null && cut.global
-            if (unscoped && mapped.reason == CutMappingDecline.MISSING_SOURCE) add(cut) else false
+            is CutMapping.Declined -> {
+                val unscoped = cut.provenance == null && cut.tableau == null && cut.global
+                if (unscoped && mapped.reason == CutMappingDecline.MISSING_SOURCE) add(cut, origin) else false
+            }
         }
-    }
 
-    fun add(cut: SourceCut, map: CutSourceMap): Boolean {
+    fun add(cut: SourceCut, map: CutSourceMap, origin: Int = NO_ORIGIN): Boolean {
         if (cut.provenance.model !== map.model) return false
-        return store(cut.toCut(map).orNull(), cut)
+        return store(cut.toCut(map).orNull(), cut, origin)
     }
 
-    private fun store(cut: Cut?, source: SourceCut?): Boolean {
+    private fun store(cut: Cut?, source: SourceCut?, origin: Int): Boolean {
         val key: Any = if (source == null) {
             checkNotNull(cut).key()
         } else {
@@ -91,7 +99,7 @@ internal class CutPool(
             return false
         }
         seen.add(key)
-        entries.add(Entry(cut, key, source))
+        entries.add(Entry(cut, key, source, origin))
         return true
     }
 
@@ -192,7 +200,8 @@ internal class CutPool(
             if (efficacy < minEfficacy) {
                 null
             } else {
-                ScoredCut(cut, norm, efficacy + objectiveParallelism(cut, objective, norm, objectiveNorm))
+                val score = efficacy + objectiveParallelism(cut, objective, norm, objectiveNorm)
+                ScoredCut(cut, norm, score, entry.origin)
             }
         }.sortedByDescending { it.score }
         val selected = ArrayList<ScoredCut>()
@@ -201,6 +210,7 @@ internal class CutPool(
             if (selected.size >= max) break
             if (selected.none { cosine(it, candidate) > maxCos }) selected.add(candidate)
         }
+        for (s in selected) importUses.note(s.origin)
         return selected.map { it.cut }
     }
 
@@ -272,7 +282,13 @@ internal class CutPool(
         return abs(dot) / (na * nb)
     }
 
+    /** Hand [action] how often imported cuts from each source were selected since the last drain, and reset. */
+    fun drainImportUses(action: (origin: Int, uses: Long) -> Unit) = importUses.drain(action)
+
     internal companion object {
+        /** The origin of a cut derived in this pool rather than imported. */
+        const val NO_ORIGIN: Int = -1
+
         /**
          * Default cap on the pooled cuts. Bounds the per-node LP solve a large root harvest would
          * otherwise impose, while sitting well above a normal harvest's output so it only bites on a

@@ -38,7 +38,9 @@ import kotlin.time.TimeSource
  * lower bound is credited to the arm that ran, so an arm closing the gap from below earns as one closing it from
  * above does. Progress short of a solution earns credit in both: variables a backtrack arm fixes at its root,
  * and a local-search arm lowering the record violation ([ProgressCredit]). The ledger starts a new phase at the
- * first incumbent, since the rates a feasibility hunt earned say nothing about who improves one.
+ * first incumbent, since the rates a feasibility hunt earned say nothing about who improves one. An arm is also
+ * credited when another arm uses what it shared: an imported clause in a conflict or unit, an imported cut
+ * selected into a relaxation, an imported bound tightening a domain ([ContributionTally]).
  *
  * **Resumable backtrack arms:** a backtrack arm exposes a [ResumableSearch]
  * ([PortfolioWorker.newResumableSearch]); [minimize] holds one handle per such arm and *resumes* it
@@ -200,6 +202,7 @@ class SequentialPortfolio(
                     r?.let { progress.observe(ledger, arm, it.stats) }
                     work = lsSliceWork
                 }
+                creditContributions(ledger)
                 bandit.update(arm, ledger.settle(arm, work), work.toDouble() / baseSliceWork)
                 when (r) {
                     is SolveResult.Sat -> return r.copy(stats = foldArms(perArm))
@@ -358,6 +361,7 @@ class SequentialPortfolio(
                     ledger.credit(arm, Signal.Improvement, improvement)
                 }
                 if (floorBefore.isFinite()) ledger.credit(arm, Signal.Floor, readFloor() - floorBefore)
+                creditContributions(ledger)
                 bandit.update(arm, ledger.settle(arm, work), work.toDouble() / baseSliceWork)
                 if (found) startImprovementPhase(ledger)
 
@@ -414,6 +418,19 @@ class SequentialPortfolio(
     private fun startImprovementPhase(ledger: RewardLedger) {
         ledger.resetPhase()
         (bandit as? DiscountedThompson)?.fade(phaseRetention)
+    }
+
+    // The pool every arm shares, when it shares one; the same object reached through any worker.
+    private val contributions = workers.firstNotNullOfOrNull { it.sharedPools?.contributions }
+
+    // Pools name an arm by its armId; a sequential pool never replicates an arm, so each id is one worker.
+    private val workerOfArm = workers.indices.associateBy { workers[it].armId }
+
+    /** Credit each arm for the uses other arms made of its shared clauses, cuts and bounds since the last call. */
+    private fun creditContributions(ledger: RewardLedger) {
+        contributions?.drain { kind, origin, uses ->
+            workerOfArm[origin]?.let { ledger.credit(it, kind.signal, uses.toDouble()) }
+        }
     }
 
     /**

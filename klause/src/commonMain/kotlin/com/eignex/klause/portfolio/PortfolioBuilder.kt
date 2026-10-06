@@ -161,6 +161,7 @@ object PortfolioBuilder {
             SharedObjectiveBound(concurrency.lock()),
             SharedVarBounds(problem.numIntVars, concurrency.lock()),
             IncumbentExchange.minimizing(),
+            ContributionTally(concurrency.lock()),
         )
     }
 }

@@ -4,6 +4,7 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
+import com.eignex.klause.util.OriginCounts
 
 /**
  * Two-watched-literal BCP over the arena-packed clauses of a pure-Boolean problem.
@@ -44,6 +45,12 @@ internal class NativeSatState(private val state: PropagationState) {
     private val learnedPermanent = IntArrayList()
     private val learnedTier = IntArrayList()
     private val learnedUsed = IntArrayList()
+
+    // The origin an imported learned clause came from, parallel to the learned columns; see [OriginCounts].
+    private val learnedOrigin = IntArrayList()
+
+    /** Uses of imported learned clauses, by origin. */
+    val importUses = OriginCounts()
 
     // Within-clause indices of the two watched literals per clause handle: watchPos[2h], watchPos[2h+1].
     // A single-literal clause watches nothing (its unit is pinned at root and never unassigned).
@@ -141,8 +148,8 @@ internal class NativeSatState(private val state: PropagationState) {
      * already false, or just install watches when two or more literals are still open. The trailing
      * [propagate] call continues BCP from any pin this makes.
      */
-    fun addLearned(lits: IntArray, lbd: Int, permanent: Boolean): Int {
-        val h = appendLearned(lits, lbd, permanent)
+    fun addLearned(lits: IntArray, lbd: Int, permanent: Boolean, origin: Int = OWN_ORIGIN): Int {
+        val h = appendLearned(lits, lbd, permanent, origin)
         val len = lits.size
         if (len == 1) {
             if (state.litFalse(lits[0])) {
@@ -191,7 +198,7 @@ internal class NativeSatState(private val state: PropagationState) {
         return h
     }
 
-    private fun appendLearned(lits: IntArray, lbd: Int, permanent: Boolean): Int {
+    private fun appendLearned(lits: IntArray, lbd: Int, permanent: Boolean, origin: Int): Int {
         val i = learnedCount
         learnedStarts.add(learnedLits.size)
         for (l in lits) learnedLits.add(l)
@@ -199,6 +206,7 @@ internal class NativeSatState(private val state: PropagationState) {
         learnedPermanent.add(if (permanent) 1 else 0)
         learnedTier.add(ClauseTier.UNSET.ordinal)
         learnedUsed.add(0)
+        learnedOrigin.add(origin)
         learnedCount++
         watchPos.add(0)
         watchPos.add(0)
@@ -226,7 +234,9 @@ internal class NativeSatState(private val state: PropagationState) {
      *  reduction — drives three-tier promotion, mirroring `PropagationState.noteLearnedUse`. */
     fun markUsed(fid: Int) {
         val i = fid - baseCount
-        if (i in 0 until learnedCount) learnedUsed[i] = 1
+        if (i !in 0 until learnedCount) return
+        if (learnedUsed[i] == 0) importUses.note(learnedOrigin[i])
+        learnedUsed[i] = 1
     }
 
     /**
@@ -268,6 +278,7 @@ internal class NativeSatState(private val state: PropagationState) {
         val newPermanent = IntArrayList()
         val newTier = IntArrayList()
         val newUsed = IntArrayList()
+        val newOrigin = IntArrayList()
         val newWatchPos = IntArrayList()
         newWatchPos.growTo(2 * baseCount)
         for (h in 0 until baseCount) {
@@ -284,6 +295,7 @@ internal class NativeSatState(private val state: PropagationState) {
             newPermanent.add(learnedPermanent[i])
             newTier.add(learnedTier[i])
             newUsed.add(learnedUsed[i])
+            newOrigin.add(learnedOrigin[i])
             newWatchPos.add(watchPos[2 * h])
             newWatchPos.add(watchPos[2 * h + 1])
         }
@@ -293,6 +305,7 @@ internal class NativeSatState(private val state: PropagationState) {
         learnedPermanent.replaceWith(newPermanent)
         learnedTier.replaceWith(newTier)
         learnedUsed.replaceWith(newUsed)
+        learnedOrigin.replaceWith(newOrigin)
         watchPos.replaceWith(newWatchPos)
         learnedCount = survivors
     }

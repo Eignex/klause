@@ -686,6 +686,26 @@ class SequentialPortfolioTest {
     }
 
     @Test
+    fun `an arm whose shared clauses others use takes more of the run than one sharing nothing`() {
+        val slices = IntArray(3)
+        val pools = SharedPools(clauses = null, cuts = null)
+        val finder = ScriptedSearch({ true }) {
+            slices[0]++
+            pools.contributions.note(Contribution.Clause, origin = 1, uses = 5)
+        }
+        val sharer = ScriptedSearch({ false }) { slices[1]++ }
+        val idle = ScriptedSearch({ false }) { slices[2]++ }
+        val workers = listOf(finder, sharer, idle).mapIndexed { arm, search ->
+            trackingWorker("arm$arm", arm, search).also { it.sharedPools = pools }
+        }
+        var polls = 0
+
+        SequentialPortfolio.thompson(workers).use { it.minimize(Cancellation { ++polls > 300 }) }
+
+        assertTrue(slices[1] > 3 * slices[2], "sharer ${slices[1]} slices, idle ${slices[2]}")
+    }
+
+    @Test
     fun `any kumulant policy also proves the optimum`() {
         val problem = Problem(
             numBoolVars = 0,

@@ -38,8 +38,13 @@ interface CutSharing {
     fun exportGlobalCuts(): List<SharedCut>
 
     /** Fold [cuts] published by other workers into this worker's local pool (skipping any whose
-     *  variables it has no column for). */
-    fun importCuts(cuts: List<SharedCut>)
+     *  variables it has no column for). [origins], parallel to [cuts], names the worker each came from, a
+     *  negative entry naming none. */
+    fun importCuts(cuts: List<SharedCut>, origins: IntArray = IntArray(cuts.size) { -1 })
+
+    /** Hand [action] how often imported cuts from each origin were selected into this worker's relaxation since
+     *  the last drain, and reset the counts. */
+    fun drainImportUses(action: (origin: Int, uses: Long) -> Unit) {}
 }
 
 /**

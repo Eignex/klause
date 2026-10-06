@@ -79,6 +79,15 @@ internal enum class Signal {
 
     /** Share of the pool's record constraint violation a local-search arm removed. */
     Violation,
+
+    /** Uses other arms made of this arm's shared clauses. */
+    ClauseUses,
+
+    /** Uses other arms made of this arm's shared cuts. */
+    CutUses,
+
+    /** Uses other arms made of this arm's shared root bounds. */
+    BoundUses,
 }
 
 /**
