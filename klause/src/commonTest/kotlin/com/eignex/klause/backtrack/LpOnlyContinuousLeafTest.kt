@@ -12,12 +12,15 @@ import com.eignex.klause.lp.relaxation.leafRealFeasibility
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
+import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.LpStatsSink
+import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertTrue
 
 /**
  * The hybrid MIP/CP leaf verdict (issue #1232): a Linear row with an LP-only continuous term does not
@@ -206,6 +209,19 @@ class LpOnlyContinuousLeafTest {
                 BacktrackSolver(problem(0, emptyArray(), 0.0, 1.0, infeasible).bake()).solve(params),
             )
         }
+    }
+
+    @Test
+    fun `a continuous objective no row bounds below ends the minimize unbounded with its ray`() {
+        // x in [0,3], r >= 0 with x - r <= 1: minimizing -r lets r grow without limit from any leaf.
+        val row = Linear(longArrayOf(1L), intArrayOf(0), doubleArrayOf(-1.0), intArrayOf(0), LinearOp.LE, 1L)
+        val p = problem(1, arrayOf(IntDomain(0, 3)), 0.0, Double.POSITIVE_INFINITY, row)
+
+        val result = BacktrackSolver(p.bake()).minimize(LinearObjective(realCoefficients = doubleArrayOf(-1.0)))
+
+        val unbounded = assertIs<MinimizeResult.Unbounded>(result)
+        assertTrue(unbounded.direction.single().signum() > 0)
+        assertTrue(unbounded.sample.ints[0] - unbounded.sample.reals[0] <= 1.0)
     }
 
     @Test

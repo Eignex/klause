@@ -33,7 +33,8 @@ interface ResumableSearch : AutoCloseable {
      * call left off. Every **new** incumbent discovered during this slice is passed to [onIncumbent]
      * as it lands (objective strictly improving on the best seen so far).
      *
-     * Returns the **terminal verdict** ([MinimizeResult.Optimal] / [MinimizeResult.Infeasible], or a
+     * Returns the **terminal verdict** ([MinimizeResult.Optimal] / [MinimizeResult.Unbounded] /
+     * [MinimizeResult.Infeasible], or a
      * [MinimizeResult.BestFound] / [MinimizeResult.Unknown] with
      * [com.eignex.klause.solver.result.TerminationReason.SearchExhausted] when an external bound
      * supplier makes the absolute proof unsound from this arm's vantage) if the search **completed**

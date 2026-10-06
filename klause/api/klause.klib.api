@@ -436,6 +436,7 @@ final enum class com.eignex.klause.solver.pipeline/FiniteSolveVerdict : kotlin/E
     enum entry BEST_FOUND // com.eignex.klause.solver.pipeline/FiniteSolveVerdict.BEST_FOUND|null[0]
     enum entry OPTIMAL // com.eignex.klause.solver.pipeline/FiniteSolveVerdict.OPTIMAL|null[0]
     enum entry SAT // com.eignex.klause.solver.pipeline/FiniteSolveVerdict.SAT|null[0]
+    enum entry UNBOUNDED // com.eignex.klause.solver.pipeline/FiniteSolveVerdict.UNBOUNDED|null[0]
     enum entry UNKNOWN // com.eignex.klause.solver.pipeline/FiniteSolveVerdict.UNKNOWN|null[0]
     enum entry UNSAT // com.eignex.klause.solver.pipeline/FiniteSolveVerdict.UNSAT|null[0]
 
@@ -2571,6 +2572,28 @@ sealed interface com.eignex.klause.solver.result/MinimizeResult { // com.eignex.
         final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.result/MinimizeResult.Optimal.equals|equals(kotlin.Any?){}[0]
         final fun hashCode(): kotlin/Int // com.eignex.klause.solver.result/MinimizeResult.Optimal.hashCode|hashCode(){}[0]
         final fun toString(): kotlin/String // com.eignex.klause.solver.result/MinimizeResult.Optimal.toString|toString(){}[0]
+    }
+
+    final class Unbounded : com.eignex.klause.solver.result/MinimizeResult.WithSample { // com.eignex.klause.solver.result/MinimizeResult.Unbounded|null[0]
+        constructor <init>(com.eignex.klause.solver/Sample, kotlin/Double, kotlin.collections/List<com.eignex.klause.simplex.exact/BigFraction>, com.eignex.klause.solver.result/SolveStats = ...) // com.eignex.klause.solver.result/MinimizeResult.Unbounded.<init>|<init>(com.eignex.klause.solver.Sample;kotlin.Double;kotlin.collections.List<com.eignex.klause.simplex.exact.BigFraction>;com.eignex.klause.solver.result.SolveStats){}[0]
+
+        final val direction // com.eignex.klause.solver.result/MinimizeResult.Unbounded.direction|{}direction[0]
+            final fun <get-direction>(): kotlin.collections/List<com.eignex.klause.simplex.exact/BigFraction> // com.eignex.klause.solver.result/MinimizeResult.Unbounded.direction.<get-direction>|<get-direction>(){}[0]
+        final val objective // com.eignex.klause.solver.result/MinimizeResult.Unbounded.objective|{}objective[0]
+            final fun <get-objective>(): kotlin/Double // com.eignex.klause.solver.result/MinimizeResult.Unbounded.objective.<get-objective>|<get-objective>(){}[0]
+        final val sample // com.eignex.klause.solver.result/MinimizeResult.Unbounded.sample|{}sample[0]
+            final fun <get-sample>(): com.eignex.klause.solver/Sample // com.eignex.klause.solver.result/MinimizeResult.Unbounded.sample.<get-sample>|<get-sample>(){}[0]
+        final val stats // com.eignex.klause.solver.result/MinimizeResult.Unbounded.stats|{}stats[0]
+            final fun <get-stats>(): com.eignex.klause.solver.result/SolveStats // com.eignex.klause.solver.result/MinimizeResult.Unbounded.stats.<get-stats>|<get-stats>(){}[0]
+
+        final fun component1(): com.eignex.klause.solver/Sample // com.eignex.klause.solver.result/MinimizeResult.Unbounded.component1|component1(){}[0]
+        final fun component2(): kotlin/Double // com.eignex.klause.solver.result/MinimizeResult.Unbounded.component2|component2(){}[0]
+        final fun component3(): kotlin.collections/List<com.eignex.klause.simplex.exact/BigFraction> // com.eignex.klause.solver.result/MinimizeResult.Unbounded.component3|component3(){}[0]
+        final fun component4(): com.eignex.klause.solver.result/SolveStats // com.eignex.klause.solver.result/MinimizeResult.Unbounded.component4|component4(){}[0]
+        final fun copy(com.eignex.klause.solver/Sample = ..., kotlin/Double = ..., kotlin.collections/List<com.eignex.klause.simplex.exact/BigFraction> = ..., com.eignex.klause.solver.result/SolveStats = ...): com.eignex.klause.solver.result/MinimizeResult.Unbounded // com.eignex.klause.solver.result/MinimizeResult.Unbounded.copy|copy(com.eignex.klause.solver.Sample;kotlin.Double;kotlin.collections.List<com.eignex.klause.simplex.exact.BigFraction>;com.eignex.klause.solver.result.SolveStats){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.result/MinimizeResult.Unbounded.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.eignex.klause.solver.result/MinimizeResult.Unbounded.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.eignex.klause.solver.result/MinimizeResult.Unbounded.toString|toString(){}[0]
     }
 
     final class Unknown : com.eignex.klause.solver.result/MinimizeResult { // com.eignex.klause.solver.result/MinimizeResult.Unknown|null[0]
@@ -11905,7 +11928,7 @@ sealed class com.eignex.klause.ir/LinearForm { // com.eignex.klause.ir/LinearFor
 
 sealed class com.eignex.klause.solver.pipeline/FiniteSolveOutcome { // com.eignex.klause.solver.pipeline/FiniteSolveOutcome|null[0]
     final class Completed : com.eignex.klause.solver.pipeline/FiniteSolveOutcome { // com.eignex.klause.solver.pipeline/FiniteSolveOutcome.Completed|null[0]
-        constructor <init>(com.eignex.klause.solver.pipeline/FiniteSolveVerdict, com.eignex.klause.solver.result/SolveStats, kotlin/Long, com.eignex.klause.solver/Sample?, kotlin/Long) // com.eignex.klause.solver.pipeline/FiniteSolveOutcome.Completed.<init>|<init>(com.eignex.klause.solver.pipeline.FiniteSolveVerdict;com.eignex.klause.solver.result.SolveStats;kotlin.Long;com.eignex.klause.solver.Sample?;kotlin.Long){}[0]
+        constructor <init>(com.eignex.klause.solver.pipeline/FiniteSolveVerdict, com.eignex.klause.solver.result/SolveStats, kotlin/Long, com.eignex.klause.solver/Sample?, kotlin/Long, kotlin.collections/List<com.eignex.klause.simplex.exact/BigFraction>? = ...) // com.eignex.klause.solver.pipeline/FiniteSolveOutcome.Completed.<init>|<init>(com.eignex.klause.solver.pipeline.FiniteSolveVerdict;com.eignex.klause.solver.result.SolveStats;kotlin.Long;com.eignex.klause.solver.Sample?;kotlin.Long;kotlin.collections.List<com.eignex.klause.simplex.exact.BigFraction>?){}[0]
 
         final val bestSample // com.eignex.klause.solver.pipeline/FiniteSolveOutcome.Completed.bestSample|{}bestSample[0]
             final fun <get-bestSample>(): com.eignex.klause.solver/Sample? // com.eignex.klause.solver.pipeline/FiniteSolveOutcome.Completed.bestSample.<get-bestSample>|<get-bestSample>(){}[0]
@@ -11915,6 +11938,8 @@ sealed class com.eignex.klause.solver.pipeline/FiniteSolveOutcome { // com.eigne
             final fun <get-solutions>(): kotlin/Long // com.eignex.klause.solver.pipeline/FiniteSolveOutcome.Completed.solutions.<get-solutions>|<get-solutions>(){}[0]
         final val stats // com.eignex.klause.solver.pipeline/FiniteSolveOutcome.Completed.stats|{}stats[0]
             final fun <get-stats>(): com.eignex.klause.solver.result/SolveStats // com.eignex.klause.solver.pipeline/FiniteSolveOutcome.Completed.stats.<get-stats>|<get-stats>(){}[0]
+        final val unboundedDirection // com.eignex.klause.solver.pipeline/FiniteSolveOutcome.Completed.unboundedDirection|{}unboundedDirection[0]
+            final fun <get-unboundedDirection>(): kotlin.collections/List<com.eignex.klause.simplex.exact/BigFraction>? // com.eignex.klause.solver.pipeline/FiniteSolveOutcome.Completed.unboundedDirection.<get-unboundedDirection>|<get-unboundedDirection>(){}[0]
         final val verdict // com.eignex.klause.solver.pipeline/FiniteSolveOutcome.Completed.verdict|{}verdict[0]
             final fun <get-verdict>(): com.eignex.klause.solver.pipeline/FiniteSolveVerdict // com.eignex.klause.solver.pipeline/FiniteSolveOutcome.Completed.verdict.<get-verdict>|<get-verdict>(){}[0]
     }

@@ -416,10 +416,9 @@ internal object SolveCore {
      * standing — the figures that relate the work unit to time, so the work-per-millisecond rate can be
      * measured on any corpus. Empty when presolve ran without a budget.
      */
-    private fun presolveWorkText(budget: PresolveBudget?, before: Long, elapsed: Duration): String =
-        budget?.let {
-            ", work ${it.spent() - before} in ${elapsed.inWholeMilliseconds}ms (${it.spent()} of ${it.allowance})"
-        }.orEmpty()
+    private fun presolveWorkText(budget: PresolveBudget?, before: Long, elapsed: Duration): String = budget?.let {
+        ", work ${it.spent() - before} in ${elapsed.inWholeMilliseconds}ms (${it.spent()} of ${it.allowance})"
+    }.orEmpty()
 
     /** Print what presolve did (`dry-run-presolve`) to stderr: the presolve-phase wall time,
      *  variable/constraint counts, total integer-domain span, the per-factor-kind histogram delta, the LP
@@ -728,6 +727,7 @@ internal object SolveCore {
         FiniteSolveVerdict.UNKNOWN -> Verdict.UNKNOWN
         FiniteSolveVerdict.OPTIMAL -> Verdict.OPTIMAL
         FiniteSolveVerdict.BEST_FOUND -> Verdict.BEST_FOUND
+        FiniteSolveVerdict.UNBOUNDED -> Verdict.UNBOUNDED
     }
 
     /** Renders [sample] and returns its (objective, continuousObjective) pair so a caller that also

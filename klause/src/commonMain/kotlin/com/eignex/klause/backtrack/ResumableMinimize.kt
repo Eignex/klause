@@ -289,6 +289,9 @@ internal class ResumableMinimize(
     /** Terminal verdict once the search completes; null while still pending. */
     private var done: MinimizeResult? = null
     private var pendingIncumbent: MinimizeResult.WithSample? = null
+
+    // A leaf whose reals descend without limit, as its completion and checked ray; it ends the run.
+    private var unboundedLeaf: Pair<Sample, List<BigFraction>>? = null
     private var closed = false
     override val isDone: Boolean get() = done != null
 
@@ -350,7 +353,9 @@ internal class ResumableMinimize(
             while (true) {
                 when (val e = runUntilEvent()) {
                     is StepEvent.Incumbent -> onIncumbent(e.result)
+
                     is StepEvent.Terminal -> return e.result
+
                     StepEvent.Paused -> {
                         noteSliceOverspend()
                         return null
@@ -454,6 +459,7 @@ internal class ResumableMinimize(
         lastOpenCutoff = null
         done = null
         pendingIncumbent = null
+        unboundedLeaf = null
         sawIndeterminateLeaf = false
     }
 
@@ -470,8 +476,10 @@ internal class ResumableMinimize(
                 firstRun = false
                 firstRunWork()?.let { return StepEvent.Incumbent(it) }
             }
+            unboundedLeaf?.let { return terminal(terminalUnbounded(it)) }
             return when (val e = run.next()) {
                 is SearchRunEvent.Satisfied -> {
+                    unboundedLeaf?.let { return terminal(terminalUnbounded(it)) }
                     val incumbent = checkNotNull(pendingIncumbent)
                     pendingIncumbent = null
                     StepEvent.Incumbent(incumbent)
@@ -527,6 +535,12 @@ internal class ResumableMinimize(
 
             else -> MinimizeResult.Infeasible(core, stats)
         }
+    }
+
+    private fun terminalUnbounded(leaf: Pair<Sample, List<BigFraction>>): MinimizeResult {
+        sink.stop()
+        val (sample, direction) = leaf
+        return MinimizeResult.Unbounded(sample, objective.evaluate(sample), direction, sink.snapshot())
     }
 
     private fun terminalUndecided(): MinimizeResult {
@@ -722,7 +736,12 @@ internal class ResumableMinimize(
             ) {
                 return null
             }
-            sample.copy(reals = real.reals, exactReals = real.exactReals)
+            val completed = sample.copy(reals = real.reals, exactReals = real.exactReals)
+            if (real.verdict == LpVerdict.UNBOUNDED) {
+                if (!token()) unboundedLeaf = completed to checkNotNull(real.direction)
+                return null
+            }
+            completed
         }
         if (token()) return null
         return recordIfImproving(accepted, objective.evaluate(accepted))
@@ -730,6 +749,7 @@ internal class ResumableMinimize(
 
     private fun firstRunWorkBody(): MinimizeResult.WithSample? {
         revalidateInitialCandidate()?.let { return it }
+        if (unboundedLeaf != null) return null
         val rootToken = rootLpBudget()
         if (rootLpDutyCycle.allows(lpEngine.totalSolveWork())) {
             val before = lpEngine.totalSolveWork()
@@ -1018,10 +1038,16 @@ internal class ResumableMinimize(
                         null
                     }
 
+                    // A checked ray ends the run whatever the incumbent: no objective value bounds the model.
+                    LpVerdict.UNBOUNDED -> {
+                        unboundedLeaf = sample.copy(reals = real.reals, exactReals = real.exactReals) to
+                            checkNotNull(real.direction)
+                        null
+                    }
+
                     LpVerdict.FEASIBLE,
                     LpVerdict.ATTAINED_OPTIMUM,
                     LpVerdict.TOLERANCE_OPTIMUM,
-                    LpVerdict.UNBOUNDED,
                     -> {
                         // A tolerance optimum completes the leaf on purpose: the source's own semantics accept it.
                         if (real.verdict !in setOf(LpVerdict.ATTAINED_OPTIMUM, LpVerdict.TOLERANCE_OPTIMUM)) {
@@ -1035,6 +1061,8 @@ internal class ResumableMinimize(
             }
             pendingIncumbent = incumbent
             return when {
+                unboundedLeaf != null -> SearchModelDisposition.Surface
+
                 // A leaf the LP could not decide is passed over rather than ending the arm: the search goes on to
                 // other leaves, and the sticky flag keeps the terminal from claiming exhaustion or an optimum.
                 unresolved -> SearchModelDisposition.Skip

@@ -217,6 +217,8 @@ interface Optimizer<P : SolverParams> : Solver<P> {
      *    or bound proves no better exists).
      *  - [MinimizeResult.BestFound] — feasible found but optimality not proven; carries
      *    the [TerminationReason] that stopped the search.
+     *  - [MinimizeResult.Unbounded] — feasible found with a ray along which the objective
+     *    descends without limit.
      *  - [MinimizeResult.Infeasible] — no feasible exists.
      *  - [MinimizeResult.Unknown] — no feasible found, no infeasibility proven.
      *
@@ -233,7 +235,8 @@ interface Optimizer<P : SolverParams> : Solver<P> {
      *  - Each non-terminal yield is a [MinimizeResult.BestFound] carrying the new best
      *    sample and objective seen so far.
      *  - The terminal yield is one of: [MinimizeResult.Optimal] (search proved
-     *    optimality), [MinimizeResult.Infeasible] (no feasible exists),
+     *    optimality), [MinimizeResult.Unbounded] (no optimum exists),
+     *    [MinimizeResult.Infeasible] (no feasible exists),
      *    [MinimizeResult.BestFound] with the final reason (budget / timeout /
      *    cancellation hit while holding a feasible), or [MinimizeResult.Unknown]
      *    (search ended without proving anything, no feasible found).

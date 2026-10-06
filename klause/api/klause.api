@@ -8745,11 +8745,13 @@ public abstract class com/eignex/klause/solver/pipeline/FiniteSolveOutcome {
 }
 
 public final class com/eignex/klause/solver/pipeline/FiniteSolveOutcome$Completed : com/eignex/klause/solver/pipeline/FiniteSolveOutcome {
-	public fun <init> (Lcom/eignex/klause/solver/pipeline/FiniteSolveVerdict;Lcom/eignex/klause/solver/result/SolveStats;JLcom/eignex/klause/solver/Sample;J)V
+	public fun <init> (Lcom/eignex/klause/solver/pipeline/FiniteSolveVerdict;Lcom/eignex/klause/solver/result/SolveStats;JLcom/eignex/klause/solver/Sample;JLjava/util/List;)V
+	public synthetic fun <init> (Lcom/eignex/klause/solver/pipeline/FiniteSolveVerdict;Lcom/eignex/klause/solver/result/SolveStats;JLcom/eignex/klause/solver/Sample;JLjava/util/List;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun getBestSample ()Lcom/eignex/klause/solver/Sample;
 	public final fun getElapsedMs ()J
 	public final fun getSolutions ()J
 	public final fun getStats ()Lcom/eignex/klause/solver/result/SolveStats;
+	public final fun getUnboundedDirection ()Ljava/util/List;
 	public final fun getVerdict ()Lcom/eignex/klause/solver/pipeline/FiniteSolveVerdict;
 }
 
@@ -8820,6 +8822,7 @@ public final class com/eignex/klause/solver/pipeline/FiniteSolveVerdict : java/l
 	public static final field BEST_FOUND Lcom/eignex/klause/solver/pipeline/FiniteSolveVerdict;
 	public static final field OPTIMAL Lcom/eignex/klause/solver/pipeline/FiniteSolveVerdict;
 	public static final field SAT Lcom/eignex/klause/solver/pipeline/FiniteSolveVerdict;
+	public static final field UNBOUNDED Lcom/eignex/klause/solver/pipeline/FiniteSolveVerdict;
 	public static final field UNKNOWN Lcom/eignex/klause/solver/pipeline/FiniteSolveVerdict;
 	public static final field UNSAT Lcom/eignex/klause/solver/pipeline/FiniteSolveVerdict;
 	public static fun getEntries ()Lkotlin/enums/EnumEntries;
@@ -9795,6 +9798,26 @@ public final class com/eignex/klause/solver/result/MinimizeResult$Optimal : com/
 	public static synthetic fun copy$default (Lcom/eignex/klause/solver/result/MinimizeResult$Optimal;Lcom/eignex/klause/solver/Sample;DLcom/eignex/klause/solver/result/SolveStats;ILjava/lang/Object;)Lcom/eignex/klause/solver/result/MinimizeResult$Optimal;
 	public fun equals (Ljava/lang/Object;)Z
 	public fun getAssignment ()Lcom/eignex/klause/solver/Sample;
+	public fun getObjective ()D
+	public fun getObjectiveValue ()Ljava/lang/Double;
+	public fun getSample ()Lcom/eignex/klause/solver/Sample;
+	public fun getStats ()Lcom/eignex/klause/solver/result/SolveStats;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/solver/result/MinimizeResult$Unbounded : com/eignex/klause/solver/result/MinimizeResult$WithSample {
+	public fun <init> (Lcom/eignex/klause/solver/Sample;DLjava/util/List;Lcom/eignex/klause/solver/result/SolveStats;)V
+	public synthetic fun <init> (Lcom/eignex/klause/solver/Sample;DLjava/util/List;Lcom/eignex/klause/solver/result/SolveStats;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Lcom/eignex/klause/solver/Sample;
+	public final fun component2 ()D
+	public final fun component3 ()Ljava/util/List;
+	public final fun component4 ()Lcom/eignex/klause/solver/result/SolveStats;
+	public final fun copy (Lcom/eignex/klause/solver/Sample;DLjava/util/List;Lcom/eignex/klause/solver/result/SolveStats;)Lcom/eignex/klause/solver/result/MinimizeResult$Unbounded;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/result/MinimizeResult$Unbounded;Lcom/eignex/klause/solver/Sample;DLjava/util/List;Lcom/eignex/klause/solver/result/SolveStats;ILjava/lang/Object;)Lcom/eignex/klause/solver/result/MinimizeResult$Unbounded;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun getAssignment ()Lcom/eignex/klause/solver/Sample;
+	public final fun getDirection ()Ljava/util/List;
 	public fun getObjective ()D
 	public fun getObjectiveValue ()Ljava/lang/Double;
 	public fun getSample ()Lcom/eignex/klause/solver/Sample;

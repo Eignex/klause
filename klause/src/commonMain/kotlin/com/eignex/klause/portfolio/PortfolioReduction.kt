@@ -41,9 +41,16 @@ internal object PortfolioReduction {
      *  from a timed-out run. `null` (no terminal produced) is not exhausted. */
     fun isExhausted(result: MinimizeResult?): Boolean = when (result) {
         is MinimizeResult.Optimal -> true
+
         is MinimizeResult.Infeasible -> true
+
+        // Unboundedness ends a run without covering the space, and no incumbent it leaves is optimal.
+        is MinimizeResult.Unbounded -> false
+
         is MinimizeResult.BestFound -> result.reason == TerminationReason.SearchExhausted
+
         is MinimizeResult.Unknown -> result.reason == TerminationReason.SearchExhausted
+
         null -> false
     }
 

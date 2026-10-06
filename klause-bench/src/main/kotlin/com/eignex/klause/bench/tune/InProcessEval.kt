@@ -70,6 +70,7 @@ internal object InProcessEval {
     private fun MinimizeResult.toEval(): EvalResult = when (this) {
         is MinimizeResult.Optimal -> EvalResult(feasible = true, objective = objective, proven = true)
         is MinimizeResult.BestFound -> EvalResult(feasible = true, objective = objective, proven = false)
+        is MinimizeResult.Unbounded -> EvalResult(feasible = true, objective = objective, proven = true)
         is MinimizeResult.Infeasible -> EvalResult(feasible = false, objective = null, proven = true)
         is MinimizeResult.Unknown -> EvalResult(feasible = false, objective = null, proven = false)
     }

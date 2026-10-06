@@ -313,6 +313,9 @@ class SequentialPortfolio(
                     }
                 }
 
+                // A ray proves the model unbounded whatever bound the arm ran under.
+                (terminal as? MinimizeResult.Unbounded)?.let { return it.copy(stats = foldArms(perArm)) }
+
                 // A clean segment exhaustion ends the run: any incumbent is optimal, else infeasible.
                 if (PortfolioReduction.isExhausted(terminal)) {
                     return PortfolioReduction.terminal(incumbent.current(), dirty = false, foldArms(perArm))
