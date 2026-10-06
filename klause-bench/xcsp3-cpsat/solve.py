@@ -1,6 +1,6 @@
 """Solve one XCSP3 instance with OR-Tools cp-sat via CPMpy and print a one-line JSON verdict.
 
-Python lives only inside this container (mirroring the vizier one); the JVM bench runs it per instance
+Python lives only inside this container; the JVM bench runs it per instance
 and parses the JSON off stdout. CPMpy reads the XCSP3 `.xml` and solves it with cp-sat directly — the
 same OR-Tools engine used for MiniZinc — so no XCSP3->FlatZinc conversion and nothing is written to
 disk. Usage: solve.py <instance.xml> <time_limit_seconds>.

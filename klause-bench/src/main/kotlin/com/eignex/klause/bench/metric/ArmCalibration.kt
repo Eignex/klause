@@ -1,17 +1,11 @@
 package com.eignex.klause.bench.metric
 
 /**
- * Per-arm credit from **one live portfolio run**, aimed at a **complementary, diverse** arm set rather
- * than the single best arm. Each problem's winner is its **best-holder** — the arm that produced the
- * final (best) incumbent, read from the `%%%klause-arm:` attribution of a co-running `-e mixed|ls|cp`
- * `-p<N>` optimize. An arm's score is its summed **win share** (`1/co-winners` per problem won), and the
- * **diverse palette** is a greedy set-cover over the per-problem best-holders — keep arms that win where
- * others don't; an arm always shadowed by a stronger sibling earns no slot.
- *
- * This measures each arm's *real marginal contribution* in the pool as it actually runs (with the
- * portfolio's incumbent/bound sharing), from a single run — so the ranking reflects production, and
- * evaluating a new candidate is just adding it to the pool. A problem no arm holds a strict incumbent
- * on contributes nothing and is dropped.
+ * Scores per-problem winner sets, aimed at a **complementary, diverse** arm set rather than the single
+ * best arm. An arm's score is its summed **win share** (`1/co-winners` per problem won), and the
+ * **diverse palette** is a greedy set-cover over the winners — keep arms that win where others don't;
+ * an arm always shadowed by a stronger sibling earns no slot. A problem nobody wins contributes nothing
+ * and is dropped.
  */
 internal object ArmCalibration {
 
