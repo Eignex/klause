@@ -3,6 +3,7 @@ package com.eignex.klause.backtrack
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.propagation.PropagationSession
+import com.eignex.klause.solver.result.SearchStatsSink
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 
@@ -25,12 +26,18 @@ import com.eignex.klause.util.IntHashSet
  * lists actually touched. The index is rebuilt per run from a snapshot; like [vivify], any mutation
  * renumbers the database, so the cursor restarts after a mutating pass.
  */
-internal fun subsume(session: PropagationSession, params: BacktrackParams, startCursor: Int): Int {
+internal fun subsume(
+    session: PropagationSession,
+    params: BacktrackParams,
+    startCursor: Int,
+    stats: SearchStatsSink? = null,
+): Int {
     val count = session.learnedClauseCount
     if (count < 2) return 0
     val native = session.usesNativeSat
     val numBool = session.problem.numBoolVars
     // Snapshot: sorted literal arrays + 64-bit literal signatures for the participating clauses.
+    var visits = 0L
     val lits = arrayOfNulls<IntArray>(count)
     val sigs = LongArray(count)
     for (i in 0 until count) {
@@ -40,6 +47,7 @@ internal fun subsume(session: PropagationSession, params: BacktrackParams, start
         val l = session.learnedClauseLiterals(i).copyOf()
         if (l.size < 2) continue
         l.sort()
+        visits += l.size
         lits[i] = l
         sigs[i] = signatureOf(l)
     }
@@ -68,9 +76,11 @@ internal fun subsume(session: PropagationSession, params: BacktrackParams, start
                 val list = occ[key] ?: continue
                 for (k in 0 until list.size) {
                     val j = list[k]
+                    visits++
                     if (j == idx || j in dropIdx) continue
                     val d = lits[j] ?: continue
                     if (d.size > c.size || (sigs[j] and sigs[idx].inv()) != 0L) continue
+                    visits += d.size
                     val flipped = subsetWithOneFlip(d, c) ?: continue
                     if (flipped == NO_FLIP) {
                         dropIdx.add(idx)
@@ -90,6 +100,7 @@ internal fun subsume(session: PropagationSession, params: BacktrackParams, start
             replacementLbds.add(minOf(session.learnedClauseLbd(idx), strengthened.size))
         }
     }
+    stats?.observeInprocessing(probes = 0L, visits = visits)
     if (dropIdx.isEmpty()) return cursor
     session.forgetLearnedClauses { i, _ -> i !in dropIdx }
     for (r in replacements.indices) session.addLearnedClause(Clause(replacements[r]), lbd = replacementLbds[r])

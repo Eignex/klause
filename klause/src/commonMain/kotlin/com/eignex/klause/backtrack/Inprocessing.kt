@@ -1,6 +1,7 @@
 package com.eignex.klause.backtrack
 
 import com.eignex.klause.propagation.PropagationSession
+import com.eignex.klause.solver.result.SearchStatsSink
 
 /**
  * One scheduled in-search simplification pass over the live constraint database. Passes run
@@ -17,8 +18,9 @@ internal interface InprocessingPass {
     /** True when the pass never adds, removes, or renames variables — the portfolio-safe category. */
     val preservesVariables: Boolean
 
-    /** Run one bounded slice with [session] at the post-seed root, leaving it there. */
-    fun run(session: PropagationSession, params: BacktrackParams)
+    /** Run one bounded slice with [session] at the post-seed root, leaving it there, and count the work it
+     *  does into [stats] so a work-sliced search is charged for it. */
+    fun run(session: PropagationSession, params: BacktrackParams, stats: SearchStatsSink?)
 
     /** Drop per-search cursors; the engine was reseeded onto a new fragment. */
     fun reset()
@@ -30,8 +32,8 @@ internal class VivificationPass : InprocessingPass {
     override val preservesVariables: Boolean get() = true
     private var cursor = 0
 
-    override fun run(session: PropagationSession, params: BacktrackParams) {
-        cursor = vivify(session, params, cursor)
+    override fun run(session: PropagationSession, params: BacktrackParams, stats: SearchStatsSink?) {
+        cursor = vivify(session, params, cursor, stats)
     }
 
     override fun reset() {
@@ -46,8 +48,8 @@ internal class SubsumptionPass : InprocessingPass {
     override val preservesVariables: Boolean get() = true
     private var cursor = 0
 
-    override fun run(session: PropagationSession, params: BacktrackParams) {
-        cursor = subsume(session, params, cursor)
+    override fun run(session: PropagationSession, params: BacktrackParams, stats: SearchStatsSink?) {
+        cursor = subsume(session, params, cursor, stats)
     }
 
     override fun reset() {
@@ -61,7 +63,11 @@ internal class SubsumptionPass : InprocessingPass {
  * cost competes with conflict throughput — restart-heavy configurations pay it often — so it is the
  * portfolio's per-arm tuning lever for how much simplification an arm buys.
  */
-internal class Inprocessing(private val passes: List<InprocessingPass>, private val cadence: Int) {
+internal class Inprocessing(
+    private val passes: List<InprocessingPass>,
+    private val cadence: Int,
+    private val stats: SearchStatsSink? = null,
+) {
     init {
         require(cadence >= 1) { "inprocessing cadence must be >= 1, got $cadence" }
         val eliminating = passes.filter { !it.preservesVariables }
@@ -75,7 +81,7 @@ internal class Inprocessing(private val passes: List<InprocessingPass>, private 
     fun onRestart(session: PropagationSession, params: BacktrackParams) {
         if (--restartsUntilRun > 0) return
         restartsUntilRun = cadence
-        for (pass in passes) pass.run(session, params)
+        for (pass in passes) pass.run(session, params, stats)
     }
 
     fun reset() {
@@ -90,7 +96,7 @@ internal class Inprocessing(private val passes: List<InprocessingPass>, private 
          * and with assumption pins standing those derivations would hold only under the pins yet be
          * stored as unconditional learned clauses.
          */
-        fun from(params: BacktrackParams): Inprocessing? {
+        fun from(params: BacktrackParams, stats: SearchStatsSink? = null): Inprocessing? {
             if (!params.assumptions.isEmpty) return null
             val passes = buildList {
                 // Subsumption first: it only shrinks the database, so vivification's probing works
@@ -99,7 +105,7 @@ internal class Inprocessing(private val passes: List<InprocessingPass>, private 
                 if (params.vivification) add(VivificationPass())
             }
             if (passes.isEmpty()) return null
-            return Inprocessing(passes, params.inprocessingCadence)
+            return Inprocessing(passes, params.inprocessingCadence, stats)
         }
     }
 }

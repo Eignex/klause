@@ -31,6 +31,10 @@ data class SearchStats(
     val depthMean: WeightedMeanResult = WeightedMeanResult(totalWeights = 0.0, mean = Double.NaN),
     /** Most variables found fixed at a restart, back at the root: progress no later search undoes. */
     val rootFixed: MaxResult = NO_MAX,
+    /** Literals inprocessing pinned and propagated to a fixpoint to strengthen a clause. */
+    val inprocessProbes: SumResult = ZERO_COUNT,
+    /** Clause literals inprocessing scanned looking for subsumed or strengthenable clauses. */
+    val inprocessVisits: SumResult = ZERO_COUNT,
 ) {
     /** Combine two workers' search stats: counters add, peak depth maxes, depth means weight-combine. */
     fun mergedWith(o: SearchStats): SearchStats = SearchStats(
@@ -43,6 +47,8 @@ data class SearchStats(
         peakDepth = MaxResult(maxOf(peakDepth.max, o.peakDepth.max)),
         depthMean = mergeDepthMean(depthMean, o.depthMean),
         rootFixed = MaxResult(maxOf(rootFixed.max, o.rootFixed.max)),
+        inprocessProbes = SumResult(inprocessProbes.sum + o.inprocessProbes.sum),
+        inprocessVisits = SumResult(inprocessVisits.sum + o.inprocessVisits.sum),
     )
 }
 
@@ -67,6 +73,14 @@ internal class SearchStatsSink {
     var nodeCount: Long = 0L
         private set
 
+    /** [SearchStats.inprocessProbes] as a plain counter, read on the same pause check as [nodeCount]. */
+    var inprocessProbes: Long = 0L
+        private set
+
+    /** [SearchStats.inprocessVisits] as a plain counter, read on the same pause check as [nodeCount]. */
+    var inprocessVisits: Long = 0L
+        private set
+
     /** Call on every visited decision node so [nodes] increments and the depth stats see the observation. */
     fun observeNode(depth: Int) {
         nodeCount++
@@ -81,6 +95,12 @@ internal class SearchStatsSink {
     fun observeRelearn() = relearned.update(1.0)
     fun observeRootFixed(count: Int) = rootFixed.update(count.toDouble())
 
+    /** Count an inprocessing slice's [probes] and clause-literal [visits]. */
+    fun observeInprocessing(probes: Long, visits: Long) {
+        inprocessProbes += probes
+        inprocessVisits += visits
+    }
+
     fun snapshot(): SearchStats = SearchStats(
         nodes = nodes.read(),
         fails = fails.read(),
@@ -91,5 +111,7 @@ internal class SearchStatsSink {
         peakDepth = peakDepth.read(),
         depthMean = depthMean.read(),
         rootFixed = rootFixed.read(),
+        inprocessProbes = SumResult(inprocessProbes.toDouble()),
+        inprocessVisits = SumResult(inprocessVisits.toDouble()),
     )
 }

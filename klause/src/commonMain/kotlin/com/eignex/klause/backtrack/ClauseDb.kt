@@ -7,6 +7,7 @@ import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.result.SearchEvent
+import com.eignex.klause.solver.result.SearchStatsSink
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 
@@ -83,7 +84,12 @@ private fun forgetTiered(session: PropagationSession, params: BacktrackParams, c
 }
 
 /** Strengthen a bounded round-robin slice of learned Boolean clauses at a root restart. */
-internal fun vivify(session: PropagationSession, params: BacktrackParams, startCursor: Int): Int {
+internal fun vivify(
+    session: PropagationSession,
+    params: BacktrackParams,
+    startCursor: Int,
+    stats: SearchStatsSink? = null,
+): Int {
     val count = session.learnedClauseCount
     if (count == 0) return 0
     val native = session.usesNativeSat
@@ -99,7 +105,7 @@ internal fun vivify(session: PropagationSession, params: BacktrackParams, startC
         if (!native && !session.learnedClauseAt(index).allLiteralsBool(numBool)) return@repeat
         val literals = session.learnedClauseLiterals(index)
         if (literals.size < 3) return@repeat
-        val strengthened = vivifyClause(session, literals) ?: return@repeat
+        val strengthened = vivifyClause(session, literals, stats) ?: return@repeat
         if (strengthened.size in 2 until literals.size) {
             dropped.add(index)
             replacements += strengthened
@@ -112,7 +118,7 @@ internal fun vivify(session: PropagationSession, params: BacktrackParams, startC
     return 0
 }
 
-private fun vivifyClause(session: PropagationSession, literals: IntArray): IntArray? {
+private fun vivifyClause(session: PropagationSession, literals: IntArray, stats: SearchStatsSink?): IntArray? {
     val kept = IntArrayList(literals.size)
     var pushes = 0
     var result: IntArray? = null
@@ -128,6 +134,7 @@ private fun vivifyClause(session: PropagationSession, literals: IntArray): IntAr
 
             null -> {
                 kept.add(literal)
+                stats?.observeInprocessing(probes = 1L, visits = 0L)
                 if (session.pinBool(Lit.variable(literal), !Lit.isPositive(literal)) is PropagationResult.Unsat) {
                     result = kept.toIntArray()
                     break

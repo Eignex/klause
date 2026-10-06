@@ -350,7 +350,7 @@ private class CpSatisfactionTraversalPolicy(
     } ?: SearchNodePolicy.ExpandAll
     override val lifecycle: SearchRunLifecycle get() = this
 
-    private val inprocessing = Inprocessing.from(params)
+    private val inprocessing = Inprocessing.from(params, sink?.search)
 
     private val pooledIncumbents = params.pooledIncumbents?.let { IncumbentSubscription(it) }
 

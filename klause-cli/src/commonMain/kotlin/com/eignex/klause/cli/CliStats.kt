@@ -283,6 +283,8 @@ internal fun searchStatPairs(stats: SolveStats): List<Pair<String, String>> {
     out += "relearned" to "${stats.search.relearned.sum.toLong()}"
     if (stats.search.peakDepth.max.isFinite()) out += "peakDepth" to "${stats.search.peakDepth.max.toLong()}"
     if (stats.search.rootFixed.max.isFinite()) out += "rootFixed" to "${stats.search.rootFixed.max.toLong()}"
+    stats.search.inprocessProbes.sum.toLong().takeIf { it > 0L }?.let { out += "inprocessProbes" to "$it" }
+    stats.search.inprocessVisits.sum.toLong().takeIf { it > 0L }?.let { out += "inprocessVisits" to "$it" }
     return out
 }
 
