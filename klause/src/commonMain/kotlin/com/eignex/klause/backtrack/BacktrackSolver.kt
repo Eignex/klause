@@ -13,6 +13,8 @@ import com.eignex.klause.solver.Optimizer
 import com.eignex.klause.solver.RepairSearch
 import com.eignex.klause.solver.ResumableOptimizer
 import com.eignex.klause.solver.ResumableSearch
+import com.eignex.klause.solver.ResumableSolve
+import com.eignex.klause.solver.ResumableSolver
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.Solver
@@ -48,7 +50,8 @@ class BacktrackSolver internal constructor(
     internal val lpSolveContext: LpSolveContext,
 ) : Solver<BacktrackParams>,
     Optimizer<BacktrackParams>,
-    ResumableOptimizer<BacktrackParams> {
+    ResumableOptimizer<BacktrackParams>,
+    ResumableSolver<BacktrackParams> {
 
     /** Solve a baked problem with production LP dependencies. */
     constructor(problem: BakedProblem) : this(problem, LpSolveContext.Production)
@@ -159,46 +162,61 @@ class BacktrackSolver internal constructor(
         val sink = SolveStatsSink(backend = "backtrack")
         sink.start()
         for (outcome in driveSearch(params, sink = sink)) {
-            sink.stop()
-            val stats = sink.snapshot()
-            return when (outcome) {
-                // The leaf is the engine's own claim, re-derived here from every factor: an assignment the composed
-                // fixpoint refutes is an engine defect and must surface as one, never as a model. A check the deadline
-                // cut short refutes nothing, so the leaf stands rather than losing a model found in time.
-                is SearchOutcome.Found -> {
-                    val candidate = Candidate(outcome.sample, Unit)
-                    when (val verdict = composedFixpoint(problem, candidate, params.cancellation, params.assumptions)) {
-                        is Verification.Rejected -> throw UnsoundnessException(
-                            "backtrack reported a model its constraints refute: ${verdict.reason}",
-                        )
-
-                        is Verification.Accepted, is Verification.Indeterminate ->
-                            SolveResult.Sat(outcome.sample, stats)
-                    }
-                }
-
-                is SearchOutcome.Exhausted ->
-                    if (outcome.indeterminate) {
-                        // A leaf's continuous LP could not be certified either way, so the tree is not
-                        // provably all-infeasible — report `unknown` rather than an unsound UNSAT.
-                        SolveResult.Unknown(TerminationReason.Unsupported, stats)
-                    } else {
-                        SolveResult.Unsat(
-                            core = outcome.core,
-                            stats = stats,
-                            assumptionCore =
-                            projectTouchedToAssumptions(params.assumptions, outcome.touchedAssumptionLevels),
-                        )
-                    }
-
-                SearchOutcome.BudgetCapped -> {
-                    sink.timedOut = true
-                    SolveResult.Unknown(TerminationReason.BudgetExhausted, sink.snapshot())
-                }
-            }
+            return verdictOf(outcome, params.assumptions, params.cancellation, sink)
         }
         sink.stop()
         return SolveResult.Unsat(stats = sink.snapshot())
+    }
+
+    /** Open a satisfaction search that pauses and resumes across slices. See [ResumableSolve]. */
+    override fun resumableSolve(params: BacktrackParams): ResumableSolve = ResumableSatisfaction(this, params)
+
+    /**
+     * The verdict a satisfaction [outcome] stands for, stopping [sink] for its counters. A model is re-derived from
+     * every factor first, the check stopping on [cancellation]; see [UnsoundnessException].
+     */
+    internal fun verdictOf(
+        outcome: SearchOutcome,
+        assumptions: Assumptions,
+        cancellation: Cancellation,
+        sink: SolveStatsSink,
+    ): SolveResult {
+        sink.stop()
+        val stats = sink.snapshot()
+        return when (outcome) {
+            // The leaf is the engine's own claim, re-derived here from every factor: an assignment the composed
+            // fixpoint refutes is an engine defect and must surface as one, never as a model. A check the deadline
+            // cut short refutes nothing, so the leaf stands rather than losing a model found in time.
+            is SearchOutcome.Found -> {
+                val candidate = Candidate(outcome.sample, Unit)
+                when (val verdict = composedFixpoint(problem, candidate, cancellation, assumptions)) {
+                    is Verification.Rejected -> throw UnsoundnessException(
+                        "backtrack reported a model its constraints refute: ${verdict.reason}",
+                    )
+
+                    is Verification.Accepted, is Verification.Indeterminate -> SolveResult.Sat(outcome.sample, stats)
+                }
+            }
+
+            is SearchOutcome.Exhausted ->
+                if (outcome.indeterminate) {
+                    // A leaf's continuous LP could not be certified either way, so the tree is not
+                    // provably all-infeasible — report `unknown` rather than an unsound UNSAT.
+                    SolveResult.Unknown(TerminationReason.Unsupported, stats)
+                } else {
+                    SolveResult.Unsat(
+                        core = outcome.core,
+                        stats = stats,
+                        assumptionCore =
+                        projectTouchedToAssumptions(assumptions, outcome.touchedAssumptionLevels),
+                    )
+                }
+
+            SearchOutcome.BudgetCapped -> {
+                sink.timedOut = true
+                SolveResult.Unknown(TerminationReason.BudgetExhausted, sink.snapshot())
+            }
+        }
     }
 
     /**
