@@ -41,8 +41,13 @@ internal class LocalSearchEngine(
     val definitionalSweep: DefinitionalSweep? = null,
     val perMoveInvariants: Boolean = false,
     val seedImplicitOnRestart: Boolean = false,
+    completion: CandidateCompletion? = null,
 ) {
     private val problem: Problem = model.problem
+
+    // Decides each candidate of a model with continuous columns, whose rows are only scored within a tolerance.
+    // Null on a model without them, which scores every row exactly and needs no decision.
+    private val completion: CandidateCompletion? = completion.takeIf { problem.numRealVars > 0 }
 
     /** Objective-as-constraint ratchet handle (opt-in). Set non-null only for an arm whose [problem]
      *  carries an [com.eignex.klause.factor.objective.ObjectiveBoundFactor] sharing this bound: on each
@@ -107,7 +112,7 @@ internal class LocalSearchEngine(
     fun solve(params: LocalSearchParams, warm: WarmState?): SolveResult {
         val sink = SolveStatsSink(backend = "ls")
         sink.start()
-        if (!localSearchSupports(model)) {
+        if (!localSearchSupports(model, completion != null)) {
             // LP-only continuous variables are resolved by the LP relaxation, which local search does not
             // run; their linear rows carry no invariant, so LS would ignore them and could report a
             // solution that violates them. Domain values past the 32-bit range make the incremental
@@ -141,7 +146,7 @@ internal class LocalSearchEngine(
         // LP-only continuous variables, wide int domains, and wide-coefficient factors are not soundly
         // evaluated by local search (see [solve]); stream nothing rather than assignments that
         // may violate factors.
-        if (!localSearchSupports(model)) return emptySequence()
+        if (!localSearchSupports(model, completion != null)) return emptySequence()
         val eff = model.pinsUnder(params.assumptions) ?: return emptySequence()
         return streamImpl(params, eff, warm)
     }
@@ -169,7 +174,7 @@ internal class LocalSearchEngine(
     ): Sequence<MinimizeResult> = sequence {
         val sink = SolveStatsSink(backend = "ls")
         sink.start()
-        if (!localSearchSupports(model)) {
+        if (!localSearchSupports(model, completion != null)) {
             // Same soundness boundary as [solve]: LP-only continuous variables, wide int
             // domains, and wide-coefficient factors are not evaluated by local search, so it could
             // optimize an incumbent that ignores — and may violate — them. Decline.
@@ -239,6 +244,13 @@ internal class LocalSearchEngine(
                         cancelCountdown = CANCEL_CHECK_INTERVAL
                     }
                     if (state.cost == 0L && state.intValuesInDomain()) {
+                        if (completion != null) state.refreshRealRows()
+                        if (state.cost != 0L) continue
+                        val solution = decide(state, state.assignment.snapshot())
+                        if (solution == null) {
+                            countedRestart(bestSnap)
+                            continue
+                        }
                         if (!everFeasible) {
                             everFeasible = true
                             // Record at first feasibility, not in `finally`: the `firstOrNull` consumer
@@ -251,11 +263,10 @@ internal class LocalSearchEngine(
                                 foundAtMs = sink.elapsedMs(),
                             )
                         }
-                        val snap = state.assignment.snapshot()
                         // Sync warm state on every yield so streaming consumers that never drain the
                         // sequence still see captured weights.
                         warm?.captureFrom(state)
-                        yield(snap)
+                        yield(solution)
                         flipsSinceYield = 0
                         countedRestart(null)
                         bestCost = state.cost
@@ -414,15 +425,36 @@ internal class LocalSearchEngine(
                 }
                 // Score the live assignment without copying it; the snapshot is taken only on a strict
                 // improvement, so the steady state allocates nothing per iteration.
-                val obj = objective.evaluate(state.assignment)
+                if (completion != null) {
+                    state.refreshRealRows()
+                    if (state.cost != 0L) {
+                        totalFlips++
+                        continue
+                    }
+                }
+                val obj = if (completion != null) {
+                    objective.evaluate(state.assignment.snapshot())
+                } else {
+                    objective.evaluate(state.assignment)
+                }
                 if (obj < bestObj && state.intValuesInDomain()) {
-                    bestObj = obj
-                    val snap = state.assignment.snapshot()
-                    bestSample = snap
-                    bestFoundAtMs = sink.elapsedMs()
-                    params.onEvent?.invoke(SearchEvent.Incumbent(obj))
-                    pooled.publish(snap, obj)
-                    yield(MinimizeResult.BestFound(snap, obj, TerminationReason.BudgetExhausted))
+                    val solution = decide(state, state.assignment.snapshot())
+                    if (solution == null) {
+                        restartAndRepair(state, restartAnchor(null))
+                        restartCount++
+                        flipsSinceRestart = 0
+                        totalFlips++
+                        continue
+                    }
+                    val solved = if (completion != null) objective.evaluate(solution) else obj
+                    if (solved < bestObj) {
+                        bestObj = solved
+                        bestSample = solution
+                        bestFoundAtMs = sink.elapsedMs()
+                        params.onEvent?.invoke(SearchEvent.Incumbent(solved))
+                        pooled.publish(solution, solved)
+                        yield(MinimizeResult.BestFound(solution, solved, TerminationReason.BudgetExhausted))
+                    }
                 }
                 // Explicit feasible-phase dispatch — exhaustive, no else: every strategy declares its
                 // [FeasibleDescent], so nothing falls into a default descent by accident.
@@ -619,6 +651,26 @@ internal class LocalSearchEngine(
         return state
     }
 
+    /**
+     * The solution [candidate] stands for, or null when it is none. A model without continuous columns scores every
+     * row exactly, so its candidate is its own solution; otherwise the [completion] decides it, and the rows a
+     * refutation names gain weight so the search steers away from the same failure.
+     */
+    private fun decide(state: LocalSearchState, candidate: Sample): Sample? {
+        val completion = completion ?: return candidate
+        return when (val decided = completion.complete(candidate)) {
+            is Completion.Witness -> decided.sample
+
+            is Completion.Refuted -> {
+                val weights = state.weights.factorWeights
+                for (f in decided.factors) weights[f] += 1.0
+                null
+            }
+
+            Completion.Undecided -> null
+        }
+    }
+
     /** Restart [state] from [anchor] and re-run the greedy repair sweep under the same size gate as
      *  the initial restart — the pairing every minimize restart site must preserve. */
     private fun restartAndRepair(state: LocalSearchState, anchor: Sample?) {
@@ -669,6 +721,13 @@ internal class LocalSearchEngine(
             is Move.IntSet -> {
                 val old = baselineSnap.ints[move.varId]
                 if (old != state.assignment.intValue(move.varId)) state.apply(Move.IntSet(move.varId, old))
+            }
+
+            is Move.RealSet -> {
+                val old = baselineSnap.approximateRealValue(move.varId)
+                if (old.toRawBits() != state.assignment.realValue(move.varId).toRawBits()) {
+                    state.apply(Move.RealSet(move.varId, old))
+                }
             }
 
             is Move.Compound -> {
@@ -749,15 +808,16 @@ internal class LocalSearchEngine(
 }
 
 /**
- * Whether local search can soundly run on [model]: no LP-only continuous variables, and every factor it scores
- * either a linear row, whose sum is kept exactly however wide its terms, or one whose integer columns all move
- * over narrow domains ([isNarrow]). Another invariant over a wider domain would wrap its plain `Long` bookkeeping
- * and slip an unsound "solution" through, or walk the domain value by value. A portfolio leaves its local-search
- * arms out otherwise.
+ * Whether local search can soundly run on [model]: every factor it scores either a linear row, whose sum is kept
+ * exactly however wide its terms, or one whose integer columns all move over narrow domains ([isNarrow]). Another
+ * invariant over a wider domain would wrap its plain `Long` bookkeeping and slip an unsound "solution" through, or
+ * walk the domain value by value. A model with continuous columns also needs [completes]: its rows are scored in
+ * floating point, so a candidate is a solution only once a [CandidateCompletion] decides it. A portfolio leaves its
+ * local-search arms out otherwise.
  */
-internal fun localSearchSupports(model: LocalSearchModel): Boolean {
+internal fun localSearchSupports(model: LocalSearchModel, completes: Boolean = false): Boolean {
     val problem = model.problem
-    if (problem.numRealVars != 0) return false
+    if (problem.numRealVars != 0 && !completes) return false
     val domains = model.domains
     if (domains.all(::isNarrow)) return true
     return problem.factors.all { factor ->

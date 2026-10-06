@@ -194,7 +194,7 @@ sealed interface AcceptanceRule {
     companion object {
         /** Move "size" for skewed acceptance: part-count for compounds, 1 for primitives. */
         private fun moveSize(move: Move): Int = when (move) {
-            is Move.BoolFlip, is Move.IntSet -> 1
+            is Move.BoolFlip, is Move.IntSet, is Move.RealSet -> 1
             is Move.Compound -> move.parts.size
         }
 

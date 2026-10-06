@@ -23,6 +23,9 @@ class LocalSearchProblem(
     /** Invariant occurrences indexed by integer variable. */
     val intOccurrences: Array<IntArray> = invert(problem.numIntVars) { it.intVars }
 
+    /** Invariant occurrences indexed by real variable; empty for a model with no continuous column. */
+    val realOccurrences: Array<IntArray> = invert(problem.numRealVars) { it.variables.reals }
+
     private inline fun invert(slots: Int, vars: (Factor) -> IntArray): Array<IntArray> {
         val counts = IntArray(slots)
         problem.factors.forEachIndexed { fid, factor ->

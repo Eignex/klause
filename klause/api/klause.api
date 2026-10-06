@@ -3215,10 +3215,36 @@ public final class com/eignex/klause/localsearch/AspirationCriterion$Probabilist
 	public fun toString ()Ljava/lang/String;
 }
 
+public abstract interface class com/eignex/klause/localsearch/CandidateCompletion {
+	public abstract fun complete (Lcom/eignex/klause/solver/Sample;)Lcom/eignex/klause/localsearch/Completion;
+}
+
 public final class com/eignex/klause/localsearch/ChannelingSink {
 	public final fun add (Lcom/eignex/klause/localsearch/Move;)V
 	public final fun isPinned (I)Z
 	public final fun pin (I)V
+}
+
+public abstract interface class com/eignex/klause/localsearch/Completion {
+}
+
+public final class com/eignex/klause/localsearch/Completion$Refuted : com/eignex/klause/localsearch/Completion {
+	public fun <init> ()V
+	public fun <init> ([I)V
+	public synthetic fun <init> ([IILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getFactors ()[I
+}
+
+public final class com/eignex/klause/localsearch/Completion$Undecided : com/eignex/klause/localsearch/Completion {
+	public static final field INSTANCE Lcom/eignex/klause/localsearch/Completion$Undecided;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/localsearch/Completion$Witness : com/eignex/klause/localsearch/Completion {
+	public fun <init> (Lcom/eignex/klause/solver/Sample;)V
+	public final fun getSample ()Lcom/eignex/klause/solver/Sample;
 }
 
 public abstract interface class com/eignex/klause/localsearch/CostShaping {
@@ -3409,9 +3435,11 @@ public final class com/eignex/klause/localsearch/ImplicitSeeding {
 public abstract interface class com/eignex/klause/localsearch/Invariant {
 	public fun applyBoolFlip (Lcom/eignex/klause/localsearch/LocalSearchState;II)I
 	public fun applyIntSet (Lcom/eignex/klause/localsearch/LocalSearchState;IIJ)I
+	public fun applyRealSet (Lcom/eignex/klause/localsearch/LocalSearchState;IID)I
 	public fun contributeChanneling (Lcom/eignex/klause/localsearch/LocalSearchState;IIJJLcom/eignex/klause/localsearch/ChannelingSink;)V
 	public fun deltaIfBoolFlipped (Lcom/eignex/klause/localsearch/LocalSearchState;II)I
 	public fun deltaIfIntSet (Lcom/eignex/klause/localsearch/LocalSearchState;IIJ)I
+	public fun deltaIfRealSet (Lcom/eignex/klause/localsearch/LocalSearchState;IID)I
 	public fun getMaintainsBreakMakeIncrementally ()Z
 	public fun getMaintainsIntBreakMakeIncrementallyForIntSet ()Z
 	public fun getProvidesImplicitNeighbourhood ()Z
@@ -3430,9 +3458,11 @@ public abstract interface class com/eignex/klause/localsearch/Invariant {
 public final class com/eignex/klause/localsearch/Invariant$DefaultImpls {
 	public static fun applyBoolFlip (Lcom/eignex/klause/localsearch/Invariant;Lcom/eignex/klause/localsearch/LocalSearchState;II)I
 	public static fun applyIntSet (Lcom/eignex/klause/localsearch/Invariant;Lcom/eignex/klause/localsearch/LocalSearchState;IIJ)I
+	public static fun applyRealSet (Lcom/eignex/klause/localsearch/Invariant;Lcom/eignex/klause/localsearch/LocalSearchState;IID)I
 	public static fun contributeChanneling (Lcom/eignex/klause/localsearch/Invariant;Lcom/eignex/klause/localsearch/LocalSearchState;IIJJLcom/eignex/klause/localsearch/ChannelingSink;)V
 	public static fun deltaIfBoolFlipped (Lcom/eignex/klause/localsearch/Invariant;Lcom/eignex/klause/localsearch/LocalSearchState;II)I
 	public static fun deltaIfIntSet (Lcom/eignex/klause/localsearch/Invariant;Lcom/eignex/klause/localsearch/LocalSearchState;IIJ)I
+	public static fun deltaIfRealSet (Lcom/eignex/klause/localsearch/Invariant;Lcom/eignex/klause/localsearch/LocalSearchState;IID)I
 	public static fun getMaintainsBreakMakeIncrementally (Lcom/eignex/klause/localsearch/Invariant;)Z
 	public static fun getMaintainsIntBreakMakeIncrementallyForIntSet (Lcom/eignex/klause/localsearch/Invariant;)Z
 	public static fun getProvidesImplicitNeighbourhood (Lcom/eignex/klause/localsearch/Invariant;)Z
@@ -3559,6 +3589,7 @@ public final class com/eignex/klause/localsearch/LocalSearchProblem {
 	public final fun getIntOccurrences ()[[I
 	public final fun getInvariants ()[Lcom/eignex/klause/localsearch/Invariant;
 	public final fun getProblem ()Lcom/eignex/klause/ir/Problem;
+	public final fun getRealOccurrences ()[[I
 }
 
 public final class com/eignex/klause/localsearch/LocalSearchSession : com/eignex/klause/solver/Session {
@@ -3592,8 +3623,8 @@ public final class com/eignex/klause/localsearch/LocalSearchSession : com/eignex
 
 public final class com/eignex/klause/localsearch/LocalSearchSolver : com/eignex/klause/solver/Optimizer, com/eignex/klause/solver/Solver {
 	public fun <init> (Lcom/eignex/klause/compile/CompiledSchema;)V
-	public fun <init> (Lcom/eignex/klause/propagation/BakedProblem;Lcom/eignex/klause/localsearch/strategy/SourceDrivenStrategy;Lcom/eignex/klause/localsearch/strategy/SourceDrivenStrategy;Lcom/eignex/klause/localsearch/RestartPolicy;ZLcom/eignex/klause/localsearch/DefinitionalSweep;ZZ)V
-	public synthetic fun <init> (Lcom/eignex/klause/propagation/BakedProblem;Lcom/eignex/klause/localsearch/strategy/SourceDrivenStrategy;Lcom/eignex/klause/localsearch/strategy/SourceDrivenStrategy;Lcom/eignex/klause/localsearch/RestartPolicy;ZLcom/eignex/klause/localsearch/DefinitionalSweep;ZZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/eignex/klause/propagation/BakedProblem;Lcom/eignex/klause/localsearch/strategy/SourceDrivenStrategy;Lcom/eignex/klause/localsearch/strategy/SourceDrivenStrategy;Lcom/eignex/klause/localsearch/RestartPolicy;ZLcom/eignex/klause/localsearch/DefinitionalSweep;ZZLcom/eignex/klause/localsearch/CandidateCompletion;)V
+	public synthetic fun <init> (Lcom/eignex/klause/propagation/BakedProblem;Lcom/eignex/klause/localsearch/strategy/SourceDrivenStrategy;Lcom/eignex/klause/localsearch/strategy/SourceDrivenStrategy;Lcom/eignex/klause/localsearch/RestartPolicy;ZLcom/eignex/klause/localsearch/DefinitionalSweep;ZZLcom/eignex/klause/localsearch/CandidateCompletion;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public fun <init> (Lcom/eignex/klause/schema/VariableSchema;)V
 	public fun approximateCount (Lcom/eignex/klause/count/ApproxCountConfig;)Lcom/eignex/klause/count/Count;
 	public fun count (Lcom/eignex/klause/count/CountConfig;)Lcom/eignex/klause/count/Count;
@@ -3603,6 +3634,7 @@ public final class com/eignex/klause/localsearch/LocalSearchSolver : com/eignex/
 	public fun enumerate (Lcom/eignex/klause/localsearch/LocalSearchParams;)Lkotlin/sequences/Sequence;
 	public synthetic fun enumerate (Lcom/eignex/klause/solver/SolverParams;)Lkotlin/sequences/Sequence;
 	public fun exactCount (Lcom/eignex/klause/count/ExactCountConfig;)Lkotlin/sequences/Sequence;
+	public final fun getCompletion ()Lcom/eignex/klause/localsearch/CandidateCompletion;
 	public final fun getDefinitionalSweep ()Lcom/eignex/klause/localsearch/DefinitionalSweep;
 	public final fun getGreedyRepairOnRestart ()Z
 	public final fun getOptimizeStrategy ()Lcom/eignex/klause/localsearch/strategy/SourceDrivenStrategy;
@@ -3643,6 +3675,7 @@ public final class com/eignex/klause/localsearch/LocalSearchState {
 	public final fun getBestCostSeen ()J
 	public final fun getBoolConfChange ()[Z
 	public final fun getCost ()J
+	public final fun getDoublePayload ()[D
 	public final fun getFactorDegree ()[I
 	public final fun getFactors ()[Lcom/eignex/klause/localsearch/Invariant;
 	public final fun getIntConfChange ()[Z
@@ -3670,6 +3703,7 @@ public final class com/eignex/klause/localsearch/LocalSearchState {
 	public final fun proposeMovesFromRandomViolated ()Ljava/util/List;
 	public final fun randomIntValue (I)J
 	public final fun recompute ()V
+	public final fun refreshRealRows ()V
 	public final fun resetStepCounters ()V
 	public final fun restart ()V
 	public final fun seedImplicitFeasible ()V
@@ -3730,6 +3764,19 @@ public final class com/eignex/klause/localsearch/Move$IntSet : com/eignex/klause
 	public fun toString ()Ljava/lang/String;
 }
 
+public final class com/eignex/klause/localsearch/Move$RealSet : com/eignex/klause/localsearch/Move {
+	public fun <init> (ID)V
+	public final fun component1 ()I
+	public final fun component2 ()D
+	public final fun copy (ID)Lcom/eignex/klause/localsearch/Move$RealSet;
+	public static synthetic fun copy$default (Lcom/eignex/klause/localsearch/Move$RealSet;IDILjava/lang/Object;)Lcom/eignex/klause/localsearch/Move$RealSet;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getNewValue ()D
+	public final fun getVarId ()I
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
 public final class com/eignex/klause/localsearch/MoveSink {
 	public static final field Companion Lcom/eignex/klause/localsearch/MoveSink$Companion;
 	public static final field NO_PROPOSER I
@@ -3740,6 +3787,7 @@ public final class com/eignex/klause/localsearch/MoveSink {
 	public final fun addChannelingIntSet (Lcom/eignex/klause/localsearch/LocalSearchState;IJ)V
 	public final fun addCompound (Ljava/util/List;)V
 	public final fun addIntSet (IJ)V
+	public final fun addRealSet (ID)V
 	public final fun clear ()V
 	public final fun getList ()Ljava/util/List;
 	public final fun getProposer ()I
@@ -3762,9 +3810,11 @@ public final class com/eignex/klause/localsearch/NoInvariant : com/eignex/klause
 	public static final field INSTANCE Lcom/eignex/klause/localsearch/NoInvariant;
 	public fun applyBoolFlip (Lcom/eignex/klause/localsearch/LocalSearchState;II)I
 	public fun applyIntSet (Lcom/eignex/klause/localsearch/LocalSearchState;IIJ)I
+	public fun applyRealSet (Lcom/eignex/klause/localsearch/LocalSearchState;IID)I
 	public fun contributeChanneling (Lcom/eignex/klause/localsearch/LocalSearchState;IIJJLcom/eignex/klause/localsearch/ChannelingSink;)V
 	public fun deltaIfBoolFlipped (Lcom/eignex/klause/localsearch/LocalSearchState;II)I
 	public fun deltaIfIntSet (Lcom/eignex/klause/localsearch/LocalSearchState;IIJ)I
+	public fun deltaIfRealSet (Lcom/eignex/klause/localsearch/LocalSearchState;IID)I
 	public fun getMaintainsBreakMakeIncrementally ()Z
 	public fun getMaintainsIntBreakMakeIncrementallyForIntSet ()Z
 	public fun getProvidesImplicitNeighbourhood ()Z
@@ -8206,15 +8256,19 @@ public final class com/eignex/klause/simplex/exact/BigFraction$Companion {
 }
 
 public final class com/eignex/klause/solver/Assignment {
-	public fun <init> (II)V
+	public fun <init> (III)V
+	public synthetic fun <init> (IIIILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun boolValue (I)Z
 	public final fun flipBool (I)V
 	public final fun getNumBoolVars ()I
 	public final fun getNumIntVars ()I
+	public final fun getNumRealVars ()I
 	public final fun intValue (I)J
 	public final fun randomize (Lkotlin/random/Random;[Lcom/eignex/klause/ir/IntDomain;)V
+	public final fun realValue (I)D
 	public final fun setBool (IZ)V
 	public final fun setInt (IJ)V
+	public final fun setReal (ID)V
 	public final fun snapshot ()Lcom/eignex/klause/solver/Sample;
 }
 

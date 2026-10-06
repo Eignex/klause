@@ -15,6 +15,7 @@ import com.eignex.klause.solver.Assignment
 import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.objective.Objective
+import com.eignex.klause.util.EmptyDoubleArray
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.EmptyLongArray
 import com.eignex.klause.util.IntArrayList
@@ -26,6 +27,9 @@ import kotlin.random.Random
  *  rows then aggregates to roughly the weight of a handful of structural ones, so the early descent
  *  follows the real feasible region instead of chasing the implied bulk. */
 internal const val IMPLIED_FACTOR_INITIAL_WEIGHT: Double = 0.1
+
+// Real-set moves between scheduled re-summations of the rows over continuous columns.
+private const val REAL_REFRESH_INTERVAL: Int = 4096
 
 // Bits of the widest anchored draw: values within about a million of the anchor.
 private const val ANCHOR_BITS: Int = 20
@@ -62,6 +66,7 @@ class LocalSearchState(
     val assignment: Assignment = Assignment(
         numBoolVars = problem.numBoolVars,
         numIntVars = problem.numIntVars,
+        numRealVars = problem.numRealVars,
     )
 
     /** Invariant ids currently violated (degree > 0). */
@@ -81,6 +86,18 @@ class LocalSearchState(
      *  accumulator and silently corrupt `isViolated` / `violationDegree`. */
     val longPayload: LongArray = LongArray(problem.numFactors)
     val refPayload: Array<Any?> = arrayOfNulls(problem.numFactors)
+
+    /** Per-factor `Double` scratch for rows over continuous columns, which keep their running sum in
+     *  floating point; empty for a model with no continuous column. */
+    val doublePayload: DoubleArray = if (problem.numRealVars == 0) EmptyDoubleArray else DoubleArray(problem.numFactors)
+
+    // Factors that read a continuous column; their floating-point sums drift and are refreshed from scratch.
+    private val realFactors: IntArray by lazy(LazyThreadSafetyMode.NONE) {
+        if (problem.numRealVars == 0) EmptyIntArray else realFactorIds()
+    }
+
+    // Real-set moves applied since the real rows were last re-summed from scratch.
+    private var realMovesSinceRefresh = 0
 
     /** Buffer that strategies push candidate moves into. */
     val moveSink: MoveSink = MoveSink(assumptions)
@@ -183,8 +200,36 @@ class LocalSearchState(
             if (assignment.boolValue(id) != value) assignment.flipBool(id)
         }
         assumptions.forEachInt { id, value -> assignment.setInt(id, value) }
+        for (r in 0 until problem.numRealVars) assignment.setReal(r, startingReal(r))
         resetStepCounters()
         recompute()
+    }
+
+    // The value of real column [r] nearest zero within its bounds.
+    private fun startingReal(r: Int): Double = 0.0.coerceIn(problem.realLower[r], problem.realUpper[r])
+
+    private fun realFactorIds(): IntArray {
+        val ids = IntArrayList()
+        for (fid in 0 until problem.numFactors) {
+            if (factors[fid] !== NoInvariant && problem.factors[fid].variables.reals.isNotEmpty()) ids.add(fid)
+        }
+        return ids.toIntArray()
+    }
+
+    /**
+     * Re-sum every row over a continuous column from scratch and reconcile its degree. Their sums are kept
+     * incrementally in floating point, so each move adds rounding; a scheduled refresh bounds that drift, and a
+     * refresh before a candidate is reported keeps a row the drift had pushed inside its tolerance from reading
+     * as satisfied.
+     */
+    fun refreshRealRows() {
+        realMovesSinceRefresh = 0
+        for (fid in realFactors) {
+            adjustBoolBreakMake(fid, -1)
+            factors[fid].initialize(this, fid)
+            updateViolation(fid)
+            adjustBoolBreakMake(fid, +1)
+        }
     }
 
     /** A random value of int var [v]'s domain: uniform, or near its current value under
@@ -258,6 +303,8 @@ class LocalSearchState(
 
         is Move.IntSet -> applyIntSet(move.varId, move.newValue)
 
+        is Move.RealSet -> applyRealSet(move.varId, move.newValue)
+
         is Move.Compound -> {
             for (p in move.parts) applyCore(p)
         }
@@ -272,6 +319,7 @@ class LocalSearchState(
             when (m) {
                 is Move.BoolFlip -> bools.add(m.varId)
                 is Move.IntSet -> ints.add(m.varId)
+                is Move.RealSet -> {}
                 is Move.Compound -> for (p in m.parts) collect(p)
             }
         }
@@ -304,6 +352,12 @@ class LocalSearchState(
             count
         }
 
+        is Move.RealSet -> {
+            var count = 0
+            forEachRealFactorDelta(move.varId, move.newValue) { _, d -> if (d > 0) count++ }
+            count
+        }
+
         is Move.Compound -> evaluateCompound(move).breakScore
     }
 
@@ -316,6 +370,12 @@ class LocalSearchState(
         is Move.IntSet -> {
             var count = 0
             forEachIntFactorDelta(move.varId, move.newValue) { _, d -> if (d < 0) count++ }
+            count
+        }
+
+        is Move.RealSet -> {
+            var count = 0
+            forEachRealFactorDelta(move.varId, move.newValue) { _, d -> if (d < 0) count++ }
             count
         }
 
@@ -387,6 +447,19 @@ class LocalSearchState(
             }
         }
 
+        is Move.RealSet -> {
+            val v = move.varId
+            if (v < obj.realCoefficients.size) {
+                obj.realCoefficients[v] * (
+                    move.newValue - assignment.realValue(
+                        v,
+                    )
+                    )
+            } else {
+                0.0
+            }
+        }
+
         is Move.Compound -> {
             // Linear deltas are additive over parts evaluated against the initial assignment.
             var sum = 0.0
@@ -433,6 +506,12 @@ class LocalSearchState(
             sum
         }
 
+        is Move.RealSet -> {
+            var sum = 0L
+            forEachRealFactorDelta(move.varId, move.newValue) { _, d -> sum += d }
+            sum
+        }
+
         is Move.Compound -> evaluateCompound(move).netDelta
     }
 
@@ -456,6 +535,14 @@ class LocalSearchState(
             is Move.IntSet -> {
                 var sum = 0.0
                 forEachIntFactorDelta(move.varId, move.newValue) { fid, d ->
+                    if (d != 0) sum += w[fid] * d
+                }
+                sum
+            }
+
+            is Move.RealSet -> {
+                var sum = 0.0
+                forEachRealFactorDelta(move.varId, move.newValue) { fid, d ->
                     if (d != 0) sum += w[fid] * d
                 }
                 sum
@@ -557,6 +644,21 @@ class LocalSearchState(
         )
     }
 
+    private fun applyRealSet(realVar: Int, newValue: Double) {
+        val old = assignment.realValue(realVar)
+        if (old.toRawBits() == newValue.toRawBits()) return
+        applyMove(
+            touchedFactors = projection.realOccurrences[realVar],
+            slot = problem.numBoolVars + problem.numIntVars + realVar,
+            maintainsIncrementally = { false },
+            commit = { assignment.setReal(realVar, newValue) },
+            applyToFactor = { factors[it].applyRealSet(this, it, realVar, old) },
+            updateIncremental = {},
+            markMovedVar = {},
+        )
+        if (++realMovesSinceRefresh >= REAL_REFRESH_INTERVAL && !probeActive) refreshRealRows()
+    }
+
     private fun markNeighborConfChange(factorIds: IntArray) {
         for (factorId in factorIds) {
             for (v in problem.factors[factorId].boolVars) boolConfChange[v] = true
@@ -577,6 +679,13 @@ class LocalSearchState(
     internal inline fun forEachIntFactorDelta(v: Int, newValue: Long, action: (factorId: Int, delta: Int) -> Unit) {
         for (factorId in projection.intOccurrences[v]) {
             action(factorId, factors[factorId].deltaIfIntSet(this, factorId, v, newValue))
+        }
+    }
+
+    /** Same as [forEachBoolFactorDelta] but for a `RealSet` move on real var `v` with target [newValue]. */
+    internal inline fun forEachRealFactorDelta(v: Int, newValue: Double, action: (factorId: Int, delta: Int) -> Unit) {
+        for (factorId in projection.realOccurrences[v]) {
+            action(factorId, factors[factorId].deltaIfRealSet(this, factorId, v, newValue))
         }
     }
 

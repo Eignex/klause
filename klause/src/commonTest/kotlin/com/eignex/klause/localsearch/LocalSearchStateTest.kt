@@ -147,4 +147,27 @@ class LocalSearchStateTest {
 
         assertTrue(state.rootDomains === problem.rootIntDomainsInPlace, "the fold is aliased, not copied")
     }
+
+    @Test
+    fun `re-summing the real rows reconciles a drifted sum`() {
+        val row = Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0), LinearOp.LE, 1.0)
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 0,
+            intDomains = emptyArray(),
+            factors = arrayOf<Factor>(row),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(10.0),
+        )
+        val state = LocalSearchState(problem.bake(), Random(0))
+        state.restart()
+        state.doublePayload[0] = 5.0
+        state.apply(Move.RealSet(0, 0.5))
+        assertTrue(state.cost > 0L, "the drifted sum reads as violated")
+
+        state.refreshRealRows()
+
+        assertEquals(0L, state.cost)
+    }
 }

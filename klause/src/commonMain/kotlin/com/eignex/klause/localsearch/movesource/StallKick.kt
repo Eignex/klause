@@ -85,6 +85,7 @@ class StallKick(
             val slot = when (p) {
                 is Move.BoolFlip -> p.varId
                 is Move.IntSet -> problem.numBoolVars + p.varId
+                is Move.RealSet -> problem.numBoolVars + problem.numIntVars + p.varId
                 is Move.Compound -> return
             }
             if (seenSlots.add(slot)) parts.add(p)
@@ -101,6 +102,7 @@ class StallKick(
             1 -> when (val p = parts[0]) {
                 is Move.BoolFlip -> sink.addBoolFlip(p.varId)
                 is Move.IntSet -> sink.addIntSet(p.varId, p.newValue)
+                is Move.RealSet -> sink.addRealSet(p.varId, p.newValue)
                 is Move.Compound -> { /* unreachable: parts are primitive */ }
             }
 

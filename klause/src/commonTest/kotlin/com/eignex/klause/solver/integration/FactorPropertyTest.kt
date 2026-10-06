@@ -348,6 +348,8 @@ class FactorPropertyTest {
                         )
                     }
 
+                    is Move.RealSet -> {}
+
                     is Move.Compound -> { /* no factor proposes Compound; covered by CompoundMoveTest */ }
                 }
 
@@ -383,7 +385,7 @@ class FactorPropertyTest {
             val predicted = when (move) {
                 is Move.BoolFlip -> state.factors[0].deltaIfBoolFlipped(state, 0, move.varId)
                 is Move.IntSet -> state.factors[0].deltaIfIntSet(state, 0, move.varId, move.newValue)
-                is Move.Compound -> error("pickRandomMove never returns Compound")
+                is Move.RealSet, is Move.Compound -> error("pickRandomMove returns a Boolean or integer move")
             }
             val degreeBefore = state.factors[0].violationDegree(state, 0)
             val costBefore = state.cost
