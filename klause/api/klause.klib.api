@@ -635,6 +635,10 @@ abstract fun interface com.eignex.klause.ir/IntConsumer { // com.eignex.klause.i
     abstract fun accept(kotlin/Long) // com.eignex.klause.ir/IntConsumer.accept|accept(kotlin.Long){}[0]
 }
 
+abstract fun interface com.eignex.klause.portfolio/WitnessCheck { // com.eignex.klause.portfolio/WitnessCheck|null[0]
+    abstract fun refute(com.eignex.klause.solver/Sample, kotlin/Double?): kotlin/String? // com.eignex.klause.portfolio/WitnessCheck.refute|refute(com.eignex.klause.solver.Sample;kotlin.Double?){}[0]
+}
+
 abstract fun interface com.eignex.klause.propagation/CpBranching { // com.eignex.klause.propagation/CpBranching|null[0]
     abstract fun alternatives(com.eignex.klause.propagation/PropagationSession, kotlin/Function1<kotlin/Int, kotlin/Int>): kotlin.collections/List<com.eignex.klause.solver.search/SearchDecision>? // com.eignex.klause.propagation/CpBranching.alternatives|alternatives(com.eignex.klause.propagation.PropagationSession;kotlin.Function1<kotlin.Int,kotlin.Int>){}[0]
 
@@ -9101,6 +9105,25 @@ final class com.eignex.klause.model/XorExpr : com.eignex.klause.model/BoolExpr {
     }
 }
 
+final class com.eignex.klause.portfolio/ArmFault { // com.eignex.klause.portfolio/ArmFault|null[0]
+    constructor <init>(kotlin/String, kotlin/Int, kotlin/String) // com.eignex.klause.portfolio/ArmFault.<init>|<init>(kotlin.String;kotlin.Int;kotlin.String){}[0]
+
+    final val armId // com.eignex.klause.portfolio/ArmFault.armId|{}armId[0]
+        final fun <get-armId>(): kotlin/Int // com.eignex.klause.portfolio/ArmFault.armId.<get-armId>|<get-armId>(){}[0]
+    final val reason // com.eignex.klause.portfolio/ArmFault.reason|{}reason[0]
+        final fun <get-reason>(): kotlin/String // com.eignex.klause.portfolio/ArmFault.reason.<get-reason>|<get-reason>(){}[0]
+    final val workerLabel // com.eignex.klause.portfolio/ArmFault.workerLabel|{}workerLabel[0]
+        final fun <get-workerLabel>(): kotlin/String // com.eignex.klause.portfolio/ArmFault.workerLabel.<get-workerLabel>|<get-workerLabel>(){}[0]
+
+    final fun component1(): kotlin/String // com.eignex.klause.portfolio/ArmFault.component1|component1(){}[0]
+    final fun component2(): kotlin/Int // com.eignex.klause.portfolio/ArmFault.component2|component2(){}[0]
+    final fun component3(): kotlin/String // com.eignex.klause.portfolio/ArmFault.component3|component3(){}[0]
+    final fun copy(kotlin/String = ..., kotlin/Int = ..., kotlin/String = ...): com.eignex.klause.portfolio/ArmFault // com.eignex.klause.portfolio/ArmFault.copy|copy(kotlin.String;kotlin.Int;kotlin.String){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.portfolio/ArmFault.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.eignex.klause.portfolio/ArmFault.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.eignex.klause.portfolio/ArmFault.toString|toString(){}[0]
+}
+
 final class com.eignex.klause.portfolio/AttributedImprovement { // com.eignex.klause.portfolio/AttributedImprovement|null[0]
     constructor <init>(kotlin/String, kotlin/Int, kotlin.time/Duration, com.eignex.klause.solver.result/MinimizeResult) // com.eignex.klause.portfolio/AttributedImprovement.<init>|<init>(kotlin.String;kotlin.Int;kotlin.time.Duration;com.eignex.klause.solver.result.MinimizeResult){}[0]
 
@@ -9124,7 +9147,7 @@ final class com.eignex.klause.portfolio/AttributedImprovement { // com.eignex.kl
 }
 
 final class com.eignex.klause.portfolio/Portfolio : com.eignex.klause.portfolio/PortfolioExecutor { // com.eignex.klause.portfolio/Portfolio|null[0]
-    constructor <init>(kotlin.collections/List<com.eignex.klause.portfolio/PortfolioWorker>, com.eignex.kumulant.bandit/UnivariateBandit, kotlin/Int = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Double = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Double = ..., kotlin/Int = ..., kotlin/Double = ...) // com.eignex.klause.portfolio/Portfolio.<init>|<init>(kotlin.collections.List<com.eignex.klause.portfolio.PortfolioWorker>;com.eignex.kumulant.bandit.UnivariateBandit;kotlin.Int;kotlin.Long;kotlin.Long;kotlin.Double;kotlin.Long;kotlin.Long;kotlin.Double;kotlin.Int;kotlin.Double){}[0]
+    constructor <init>(kotlin.collections/List<com.eignex.klause.portfolio/PortfolioWorker>, com.eignex.kumulant.bandit/UnivariateBandit, kotlin/Int = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Double = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Double = ..., kotlin/Int = ..., kotlin/Double = ..., com.eignex.klause.portfolio/WitnessCheck? = ..., kotlin/Function1<com.eignex.klause.portfolio/ArmFault, kotlin/Unit>? = ...) // com.eignex.klause.portfolio/Portfolio.<init>|<init>(kotlin.collections.List<com.eignex.klause.portfolio.PortfolioWorker>;com.eignex.kumulant.bandit.UnivariateBandit;kotlin.Int;kotlin.Long;kotlin.Long;kotlin.Double;kotlin.Long;kotlin.Long;kotlin.Double;kotlin.Int;kotlin.Double;com.eignex.klause.portfolio.WitnessCheck?;kotlin.Function1<com.eignex.klause.portfolio.ArmFault,kotlin.Unit>?){}[0]
 
     final val workers // com.eignex.klause.portfolio/Portfolio.workers|{}workers[0]
         final fun <get-workers>(): kotlin.collections/List<com.eignex.klause.portfolio/PortfolioWorker> // com.eignex.klause.portfolio/Portfolio.workers.<get-workers>|<get-workers>(){}[0]
@@ -9139,7 +9162,7 @@ final class com.eignex.klause.portfolio/Portfolio : com.eignex.klause.portfolio/
         final const val DEFAULT_PHASE_RETENTION // com.eignex.klause.portfolio/Portfolio.Companion.DEFAULT_PHASE_RETENTION|{}DEFAULT_PHASE_RETENTION[0]
             final fun <get-DEFAULT_PHASE_RETENTION>(): kotlin/Double // com.eignex.klause.portfolio/Portfolio.Companion.DEFAULT_PHASE_RETENTION.<get-DEFAULT_PHASE_RETENTION>|<get-DEFAULT_PHASE_RETENTION>(){}[0]
 
-        final fun thompson(kotlin.collections/List<com.eignex.klause.portfolio/PortfolioWorker>, kotlin/Int = ..., kotlin/Long = ..., kotlin/Double = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Double = ..., kotlin/Int = ..., kotlin/Long = ..., kotlin/Double = ...): com.eignex.klause.portfolio/Portfolio // com.eignex.klause.portfolio/Portfolio.Companion.thompson|thompson(kotlin.collections.List<com.eignex.klause.portfolio.PortfolioWorker>;kotlin.Int;kotlin.Long;kotlin.Double;kotlin.Long;kotlin.Long;kotlin.Double;kotlin.Int;kotlin.Long;kotlin.Double){}[0]
+        final fun thompson(kotlin.collections/List<com.eignex.klause.portfolio/PortfolioWorker>, kotlin/Int = ..., kotlin/Long = ..., kotlin/Double = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Double = ..., kotlin/Int = ..., kotlin/Long = ..., kotlin/Double = ..., com.eignex.klause.portfolio/WitnessCheck? = ..., kotlin/Function1<com.eignex.klause.portfolio/ArmFault, kotlin/Unit>? = ...): com.eignex.klause.portfolio/Portfolio // com.eignex.klause.portfolio/Portfolio.Companion.thompson|thompson(kotlin.collections.List<com.eignex.klause.portfolio.PortfolioWorker>;kotlin.Int;kotlin.Long;kotlin.Double;kotlin.Long;kotlin.Long;kotlin.Double;kotlin.Int;kotlin.Long;kotlin.Double;com.eignex.klause.portfolio.WitnessCheck?;kotlin.Function1<com.eignex.klause.portfolio.ArmFault,kotlin.Unit>?){}[0]
     }
 }
 
@@ -10114,7 +10137,7 @@ final class com.eignex.klause.solver.pipeline/FiniteSolveImprovement { // com.ei
 }
 
 final class com.eignex.klause.solver.pipeline/FiniteSolveRequest { // com.eignex.klause.solver.pipeline/FiniteSolveRequest|null[0]
-    constructor <init>(com.eignex.klause.solver.pipeline/FiniteSolveShape, com.eignex.klause.solver.pipeline/FiniteEngine, com.eignex.klause.presolve/PresolveConfig, kotlin/Boolean, kotlin/Boolean, com.eignex.klause.util/Cancellation, com.eignex.klause.util/Cancellation = ..., com.eignex.klause.presolve/PresolveBudget?, kotlin/Int, kotlin.collections/List<kotlin/String>, kotlin/Long?, kotlin/Int, com.eignex.klause.lp.bounding/LpConfig, com.eignex.klause.lp.engine/LpZeroObjectivePricing, com.eignex.klause.backtrack/NodeBudget?, kotlin/Long?, kotlin/Boolean, kotlin/Long?, kotlin/Function0<kotlin/Boolean>, kotlin/Function1<com.eignex.klause.solver.result/SearchEvent, kotlin/Unit>?, kotlin/Function2<kotlin/String, com.eignex.klause.solver.result/SearchEvent, kotlin/Unit>?, kotlin/Boolean = ..., kotlin/Function1<com.eignex.klause.solver/Sample, kotlin/Boolean>? = ...) // com.eignex.klause.solver.pipeline/FiniteSolveRequest.<init>|<init>(com.eignex.klause.solver.pipeline.FiniteSolveShape;com.eignex.klause.solver.pipeline.FiniteEngine;com.eignex.klause.presolve.PresolveConfig;kotlin.Boolean;kotlin.Boolean;com.eignex.klause.util.Cancellation;com.eignex.klause.util.Cancellation;com.eignex.klause.presolve.PresolveBudget?;kotlin.Int;kotlin.collections.List<kotlin.String>;kotlin.Long?;kotlin.Int;com.eignex.klause.lp.bounding.LpConfig;com.eignex.klause.lp.engine.LpZeroObjectivePricing;com.eignex.klause.backtrack.NodeBudget?;kotlin.Long?;kotlin.Boolean;kotlin.Long?;kotlin.Function0<kotlin.Boolean>;kotlin.Function1<com.eignex.klause.solver.result.SearchEvent,kotlin.Unit>?;kotlin.Function2<kotlin.String,com.eignex.klause.solver.result.SearchEvent,kotlin.Unit>?;kotlin.Boolean;kotlin.Function1<com.eignex.klause.solver.Sample,kotlin.Boolean>?){}[0]
+    constructor <init>(com.eignex.klause.solver.pipeline/FiniteSolveShape, com.eignex.klause.solver.pipeline/FiniteEngine, com.eignex.klause.presolve/PresolveConfig, kotlin/Boolean, kotlin/Boolean, com.eignex.klause.util/Cancellation, com.eignex.klause.util/Cancellation = ..., com.eignex.klause.presolve/PresolveBudget?, kotlin/Int, kotlin.collections/List<kotlin/String>, kotlin/Long?, kotlin/Int, com.eignex.klause.lp.bounding/LpConfig, com.eignex.klause.lp.engine/LpZeroObjectivePricing, com.eignex.klause.backtrack/NodeBudget?, kotlin/Long?, kotlin/Boolean, kotlin/Long?, kotlin/Function0<kotlin/Boolean>, kotlin/Function1<com.eignex.klause.solver.result/SearchEvent, kotlin/Unit>?, kotlin/Function2<kotlin/String, com.eignex.klause.solver.result/SearchEvent, kotlin/Unit>?, kotlin/Function1<com.eignex.klause.portfolio/ArmFault, kotlin/Unit>? = ..., kotlin/Boolean = ..., kotlin/Function1<com.eignex.klause.solver/Sample, kotlin/Boolean>? = ...) // com.eignex.klause.solver.pipeline/FiniteSolveRequest.<init>|<init>(com.eignex.klause.solver.pipeline.FiniteSolveShape;com.eignex.klause.solver.pipeline.FiniteEngine;com.eignex.klause.presolve.PresolveConfig;kotlin.Boolean;kotlin.Boolean;com.eignex.klause.util.Cancellation;com.eignex.klause.util.Cancellation;com.eignex.klause.presolve.PresolveBudget?;kotlin.Int;kotlin.collections.List<kotlin.String>;kotlin.Long?;kotlin.Int;com.eignex.klause.lp.bounding.LpConfig;com.eignex.klause.lp.engine.LpZeroObjectivePricing;com.eignex.klause.backtrack.NodeBudget?;kotlin.Long?;kotlin.Boolean;kotlin.Long?;kotlin.Function0<kotlin.Boolean>;kotlin.Function1<com.eignex.klause.solver.result.SearchEvent,kotlin.Unit>?;kotlin.Function2<kotlin.String,com.eignex.klause.solver.result.SearchEvent,kotlin.Unit>?;kotlin.Function1<com.eignex.klause.portfolio.ArmFault,kotlin.Unit>?;kotlin.Boolean;kotlin.Function1<com.eignex.klause.solver.Sample,kotlin.Boolean>?){}[0]
 
     final val allSolutions // com.eignex.klause.solver.pipeline/FiniteSolveRequest.allSolutions|{}allSolutions[0]
         final fun <get-allSolutions>(): kotlin/Boolean // com.eignex.klause.solver.pipeline/FiniteSolveRequest.allSolutions.<get-allSolutions>|<get-allSolutions>(){}[0]
@@ -10140,6 +10163,8 @@ final class com.eignex.klause.solver.pipeline/FiniteSolveRequest { // com.eignex
         final fun <get-onEvent>(): kotlin/Function1<com.eignex.klause.solver.result/SearchEvent, kotlin/Unit>? // com.eignex.klause.solver.pipeline/FiniteSolveRequest.onEvent.<get-onEvent>|<get-onEvent>(){}[0]
     final val onPortfolioEvent // com.eignex.klause.solver.pipeline/FiniteSolveRequest.onPortfolioEvent|{}onPortfolioEvent[0]
         final fun <get-onPortfolioEvent>(): kotlin/Function2<kotlin/String, com.eignex.klause.solver.result/SearchEvent, kotlin/Unit>? // com.eignex.klause.solver.pipeline/FiniteSolveRequest.onPortfolioEvent.<get-onPortfolioEvent>|<get-onPortfolioEvent>(){}[0]
+    final val onPortfolioFault // com.eignex.klause.solver.pipeline/FiniteSolveRequest.onPortfolioFault|{}onPortfolioFault[0]
+        final fun <get-onPortfolioFault>(): kotlin/Function1<com.eignex.klause.portfolio/ArmFault, kotlin/Unit>? // com.eignex.klause.solver.pipeline/FiniteSolveRequest.onPortfolioFault.<get-onPortfolioFault>|<get-onPortfolioFault>(){}[0]
     final val prepareOnly // com.eignex.klause.solver.pipeline/FiniteSolveRequest.prepareOnly|{}prepareOnly[0]
         final fun <get-prepareOnly>(): kotlin/Boolean // com.eignex.klause.solver.pipeline/FiniteSolveRequest.prepareOnly.<get-prepareOnly>|<get-prepareOnly>(){}[0]
     final val presolveBudget // com.eignex.klause.solver.pipeline/FiniteSolveRequest.presolveBudget|{}presolveBudget[0]
@@ -10418,12 +10443,14 @@ final class com.eignex.klause.solver.pipeline/VariablePartition { // com.eignex.
 }
 
 final class com.eignex.klause.solver.result/ArmSchedule { // com.eignex.klause.solver.result/ArmSchedule|null[0]
-    constructor <init>(kotlin/String, kotlin/Long, kotlin/Long, kotlin/Double, kotlin/Long, kotlin.collections/Map<kotlin/String, kotlin/Double>) // com.eignex.klause.solver.result/ArmSchedule.<init>|<init>(kotlin.String;kotlin.Long;kotlin.Long;kotlin.Double;kotlin.Long;kotlin.collections.Map<kotlin.String,kotlin.Double>){}[0]
+    constructor <init>(kotlin/String, kotlin/Long, kotlin/Long, kotlin/Double, kotlin/Long, kotlin/Long = ..., kotlin.collections/Map<kotlin/String, kotlin/Double>) // com.eignex.klause.solver.result/ArmSchedule.<init>|<init>(kotlin.String;kotlin.Long;kotlin.Long;kotlin.Double;kotlin.Long;kotlin.Long;kotlin.collections.Map<kotlin.String,kotlin.Double>){}[0]
 
     final val credit // com.eignex.klause.solver.result/ArmSchedule.credit|{}credit[0]
         final fun <get-credit>(): kotlin.collections/Map<kotlin/String, kotlin/Double> // com.eignex.klause.solver.result/ArmSchedule.credit.<get-credit>|<get-credit>(){}[0]
     final val failures // com.eignex.klause.solver.result/ArmSchedule.failures|{}failures[0]
         final fun <get-failures>(): kotlin/Long // com.eignex.klause.solver.result/ArmSchedule.failures.<get-failures>|<get-failures>(){}[0]
+    final val faults // com.eignex.klause.solver.result/ArmSchedule.faults|{}faults[0]
+        final fun <get-faults>(): kotlin/Long // com.eignex.klause.solver.result/ArmSchedule.faults.<get-faults>|<get-faults>(){}[0]
     final val label // com.eignex.klause.solver.result/ArmSchedule.label|{}label[0]
         final fun <get-label>(): kotlin/String // com.eignex.klause.solver.result/ArmSchedule.label.<get-label>|<get-label>(){}[0]
     final val meanReward // com.eignex.klause.solver.result/ArmSchedule.meanReward|{}meanReward[0]
@@ -10438,8 +10465,9 @@ final class com.eignex.klause.solver.result/ArmSchedule { // com.eignex.klause.s
     final fun component3(): kotlin/Long // com.eignex.klause.solver.result/ArmSchedule.component3|component3(){}[0]
     final fun component4(): kotlin/Double // com.eignex.klause.solver.result/ArmSchedule.component4|component4(){}[0]
     final fun component5(): kotlin/Long // com.eignex.klause.solver.result/ArmSchedule.component5|component5(){}[0]
-    final fun component6(): kotlin.collections/Map<kotlin/String, kotlin/Double> // com.eignex.klause.solver.result/ArmSchedule.component6|component6(){}[0]
-    final fun copy(kotlin/String = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Double = ..., kotlin/Long = ..., kotlin.collections/Map<kotlin/String, kotlin/Double> = ...): com.eignex.klause.solver.result/ArmSchedule // com.eignex.klause.solver.result/ArmSchedule.copy|copy(kotlin.String;kotlin.Long;kotlin.Long;kotlin.Double;kotlin.Long;kotlin.collections.Map<kotlin.String,kotlin.Double>){}[0]
+    final fun component6(): kotlin/Long // com.eignex.klause.solver.result/ArmSchedule.component6|component6(){}[0]
+    final fun component7(): kotlin.collections/Map<kotlin/String, kotlin/Double> // com.eignex.klause.solver.result/ArmSchedule.component7|component7(){}[0]
+    final fun copy(kotlin/String = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Double = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin.collections/Map<kotlin/String, kotlin/Double> = ...): com.eignex.klause.solver.result/ArmSchedule // com.eignex.klause.solver.result/ArmSchedule.copy|copy(kotlin.String;kotlin.Long;kotlin.Long;kotlin.Double;kotlin.Long;kotlin.Long;kotlin.collections.Map<kotlin.String,kotlin.Double>){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.result/ArmSchedule.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.eignex.klause.solver.result/ArmSchedule.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.eignex.klause.solver.result/ArmSchedule.toString|toString(){}[0]
@@ -12450,7 +12478,7 @@ final fun (com.eignex.klause.solver.pipeline/ComponentPlan).com.eignex.klause.so
 final fun (com.eignex.klause.solver.pipeline/FinitePipeline).com.eignex.klause.solver.pipeline/backtrackSolver(com.eignex.klause.propagation/BakedProblem): com.eignex.klause.backtrack/BacktrackSolver // com.eignex.klause.solver.pipeline/backtrackSolver|backtrackSolver@com.eignex.klause.solver.pipeline.FinitePipeline(com.eignex.klause.propagation.BakedProblem){}[0]
 final fun (com.eignex.klause.solver.pipeline/FinitePipeline).com.eignex.klause.solver.pipeline/planFixedBacktrack(com.eignex.klause.solver.pipeline/FixedBacktrackPlanRequest): com.eignex.klause.solver.pipeline/FixedBacktrackPlan // com.eignex.klause.solver.pipeline/planFixedBacktrack|planFixedBacktrack@com.eignex.klause.solver.pipeline.FinitePipeline(com.eignex.klause.solver.pipeline.FixedBacktrackPlanRequest){}[0]
 final fun (com.eignex.klause.solver.pipeline/FinitePipeline).com.eignex.klause.solver.pipeline/planPortfolio(com.eignex.klause.solver.pipeline/PortfolioPlanRequest): com.eignex.klause.solver.pipeline/PortfolioPlan // com.eignex.klause.solver.pipeline/planPortfolio|planPortfolio@com.eignex.klause.solver.pipeline.FinitePipeline(com.eignex.klause.solver.pipeline.PortfolioPlanRequest){}[0]
-final fun (com.eignex.klause.solver.pipeline/FinitePipeline).com.eignex.klause.solver.pipeline/portfolioExecutor(com.eignex.klause.propagation/BakedProblem, com.eignex.klause.portfolio/PortfolioScenario, com.eignex.klause.solver.objective/LinearObjective?, com.eignex.klause.solver.objective/IncrementalObjective?, com.eignex.klause.localsearch/DefinitionalSweep?, kotlin/Function2<kotlin/String, com.eignex.klause.solver.result/SearchEvent, kotlin/Unit>?): com.eignex.klause.portfolio/PortfolioExecutor // com.eignex.klause.solver.pipeline/portfolioExecutor|portfolioExecutor@com.eignex.klause.solver.pipeline.FinitePipeline(com.eignex.klause.propagation.BakedProblem;com.eignex.klause.portfolio.PortfolioScenario;com.eignex.klause.solver.objective.LinearObjective?;com.eignex.klause.solver.objective.IncrementalObjective?;com.eignex.klause.localsearch.DefinitionalSweep?;kotlin.Function2<kotlin.String,com.eignex.klause.solver.result.SearchEvent,kotlin.Unit>?){}[0]
+final fun (com.eignex.klause.solver.pipeline/FinitePipeline).com.eignex.klause.solver.pipeline/portfolioExecutor(com.eignex.klause.propagation/BakedProblem, com.eignex.klause.portfolio/PortfolioScenario, com.eignex.klause.solver.objective/LinearObjective?, com.eignex.klause.solver.objective/IncrementalObjective?, com.eignex.klause.localsearch/DefinitionalSweep?, kotlin/Function2<kotlin/String, com.eignex.klause.solver.result/SearchEvent, kotlin/Unit>?, kotlin/Function1<com.eignex.klause.portfolio/ArmFault, kotlin/Unit>? = ...): com.eignex.klause.portfolio/PortfolioExecutor // com.eignex.klause.solver.pipeline/portfolioExecutor|portfolioExecutor@com.eignex.klause.solver.pipeline.FinitePipeline(com.eignex.klause.propagation.BakedProblem;com.eignex.klause.portfolio.PortfolioScenario;com.eignex.klause.solver.objective.LinearObjective?;com.eignex.klause.solver.objective.IncrementalObjective?;com.eignex.klause.localsearch.DefinitionalSweep?;kotlin.Function2<kotlin.String,com.eignex.klause.solver.result.SearchEvent,kotlin.Unit>?;kotlin.Function1<com.eignex.klause.portfolio.ArmFault,kotlin.Unit>?){}[0]
 final fun (com.eignex.klause.solver.pipeline/FinitePipeline).com.eignex.klause.solver.pipeline/solve(com.eignex.klause.solver.pipeline/FiniteSolveRequest, com.eignex.klause.solver.pipeline/FiniteSolveCallbacks): com.eignex.klause.solver.pipeline/FiniteSolveResult // com.eignex.klause.solver.pipeline/solve|solve@com.eignex.klause.solver.pipeline.FinitePipeline(com.eignex.klause.solver.pipeline.FiniteSolveRequest;com.eignex.klause.solver.pipeline.FiniteSolveCallbacks){}[0]
 final fun (com.eignex.klause.solver.search/SearchContext).com.eignex.klause.solver.search/explainAtoms(com.eignex.klause.solver.search/SearchAtomPremise, com.eignex.klause.solver.search/SearchDecision? = ..., kotlin/Int = ...): com.eignex.klause.solver.search/SearchExplanation? // com.eignex.klause.solver.search/explainAtoms|explainAtoms@com.eignex.klause.solver.search.SearchContext(com.eignex.klause.solver.search.SearchAtomPremise;com.eignex.klause.solver.search.SearchDecision?;kotlin.Int){}[0]
 final fun (com.eignex.klause.solver.search/VariableBranching<com.eignex.klause.solver.search/BranchingState>).com.eignex.klause.backtrack.selector/asSelector(): com.eignex.klause.backtrack.selector/VariableSelector // com.eignex.klause.backtrack.selector/asSelector|asSelector@com.eignex.klause.solver.search.VariableBranching<com.eignex.klause.solver.search.BranchingState>(){}[0]

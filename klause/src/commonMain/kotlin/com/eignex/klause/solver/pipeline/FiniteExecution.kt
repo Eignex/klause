@@ -14,6 +14,7 @@ import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.lp.engine.LpZeroObjectivePricing
 import com.eignex.klause.lp.relaxation.provesUnbounded
+import com.eignex.klause.portfolio.ArmFault
 import com.eignex.klause.portfolio.AttributedImprovement
 import com.eignex.klause.portfolio.BacktrackCatalog
 import com.eignex.klause.portfolio.Kind
@@ -80,6 +81,8 @@ class FiniteSolveRequest(
     val onEvent: ((SearchEvent) -> Unit)?,
     /** Optional per-worker portfolio engine event sink. */
     val onPortfolioEvent: ((worker: String, event: SearchEvent) -> Unit)?,
+    /** Told about each portfolio arm quarantined for a result the model refutes. */
+    val onPortfolioFault: ((ArmFault) -> Unit)? = null,
     /** Whether to stop after preparation. */
     val prepareOnly: Boolean = false,
     /**
@@ -218,6 +221,8 @@ internal class FiniteExecutionRequest(
     val onEvent: ((SearchEvent) -> Unit)?,
     /** Optional per-worker portfolio engine event sink. */
     val onPortfolioEvent: ((worker: String, event: SearchEvent) -> Unit)?,
+    /** Told about each portfolio arm quarantined for a result the model refutes. */
+    val onPortfolioFault: ((ArmFault) -> Unit)? = null,
     /** LP dependencies for the fixed complete route. */
     val lpSolveContext: LpSolveContext,
     /** Tolerance semantics for continuous leaves; see [BacktrackParams.toleranceCheck]. */
@@ -373,6 +378,7 @@ internal fun FinitePipeline.solve(
             deadlineExceeded = request.deadlineExceeded,
             onEvent = request.onEvent,
             onPortfolioEvent = request.onPortfolioEvent,
+            onPortfolioFault = request.onPortfolioFault,
             lpSolveContext = lpSolveContext,
             toleranceCheck = request.toleranceCheck?.let { check -> { check(preparation.reconstruct(it)) } },
         ),
@@ -687,6 +693,7 @@ private fun executePortfolio(
         lsObjective = request.localSearchObjective,
         definitionalSweep = request.definitionalSweep,
         onEvent = request.onPortfolioEvent,
+        onFault = request.onPortfolioFault,
     )
     val start = TimeSource.Monotonic.markNow()
     executor.use {

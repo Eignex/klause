@@ -6,6 +6,7 @@ import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.lp.bounding.LpEmphasis
+import com.eignex.klause.portfolio.ArmFault
 import com.eignex.klause.presolve.AffinePivotOrder
 import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.presolve.PresolveConfig
@@ -641,6 +642,7 @@ internal object SolveCore {
                 deadlineExceeded = { false },
                 onEvent = null,
                 onPortfolioEvent = portfolioVerboseListener(common.verbose),
+                onPortfolioFault = ::warnPortfolioFault,
                 prepareOnly = EngineParams(common.engineParams).bool("dry-run-presolve") == true,
                 toleranceCheck = solvable.toleranceCheck,
             ),
@@ -778,6 +780,14 @@ internal fun verboseListener(verbose: Boolean): ((SearchEvent) -> Unit)? {
     val log = cliLogger(verbose = true)
     val start = nowMillis()
     return { e -> log.v { describeEvent(e, nowMillis() - start) } }
+}
+
+/**
+ * Print a quarantined portfolio arm to stderr whatever the verbosity: an arm claiming a result the model refutes is a
+ * bug in that arm's configuration, which the run survives but nobody should miss.
+ */
+internal fun warnPortfolioFault(fault: ArmFault) {
+    errPrintln("% WARNING: portfolio arm ${fault.workerLabel} quarantined: ${fault.reason}")
 }
 
 /** Per-worker `-v` listener for the portfolio paths. Workers run concurrently; the logger

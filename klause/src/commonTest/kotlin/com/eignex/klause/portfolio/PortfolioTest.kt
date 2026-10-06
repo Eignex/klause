@@ -31,7 +31,6 @@ import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
-import com.eignex.klause.solver.result.UnsoundnessException
 import com.eignex.klause.solver.search.VarRef
 import com.eignex.klause.util.Cancellation
 import com.eignex.kumulant.bandit.UnivariateBandit
@@ -93,17 +92,23 @@ private class TrackingResumableOptimizer(private val handle: ResumableSearch) :
     override fun resumable(objective: LinearObjective, params: BacktrackParams): ResumableSearch = handle
 }
 
-private class CountingResumableSolve(private val slicesToVerdict: Int) : ResumableSolve {
+private class CountingResumableSolve(
+    private val slicesToVerdict: Int,
+    private val model: Sample = Sample(BooleanArray(0), LongArray(0)),
+) : ResumableSolve {
     var slices = 0
 
     override fun runSlice(global: Cancellation, sliceMillis: Long, sliceNodes: Long): SolveResult? =
-        if (++slices < slicesToVerdict) null else SolveResult.Sat(Sample(BooleanArray(0), LongArray(0)))
+        if (++slices < slicesToVerdict) null else SolveResult.Sat(model)
 
     override val isDone: Boolean get() = slices >= slicesToVerdict
     override val stats: SolveStats get() = SolveStats.EMPTY
 }
 
-private class CountingResumableSolver(private val slicesToVerdict: Int) : ResumableSolver<BacktrackParams> {
+private class CountingResumableSolver(
+    private val slicesToVerdict: Int,
+    private val model: Sample = Sample(BooleanArray(0), LongArray(0)),
+) : ResumableSolver<BacktrackParams> {
     override val problem = Problem(0, 0, emptyArray(), emptyArray()).bake()
     val opened = ArrayList<CountingResumableSolve>()
 
@@ -113,7 +118,7 @@ private class CountingResumableSolver(private val slicesToVerdict: Int) : Resuma
     override fun enumerate(params: BacktrackParams): Sequence<Sample> = emptySequence()
 
     override fun resumableSolve(params: BacktrackParams): ResumableSolve =
-        CountingResumableSolve(slicesToVerdict).also(opened::add)
+        CountingResumableSolve(slicesToVerdict, model).also(opened::add)
 }
 
 /**
@@ -571,7 +576,7 @@ class PortfolioTest {
     }
 
     @Test
-    fun `an unsound arm fails the solve instead of yielding to a sound arm`() {
+    fun `an unsound arm is quarantined while a sound arm answers`() {
         val stopsEarly = object : VariableSelector {
             override fun pick(session: PropagationSession, rng: Random): VarRef? = null
 
@@ -586,7 +591,12 @@ class PortfolioTest {
         )
         val workers = listOf(unsound) + btArms(problem, 1)
 
-        assertFailsWith<UnsoundnessException> { Portfolio.thompson(workers).use { it.solve() } }
+        val faults = ArrayList<ArmFault>()
+
+        val r = Portfolio.thompson(workers, onFault = { faults += it }).use { it.solve() }
+
+        assertEquals(1, assertIs<SolveResult.Sat>(r).assignment.bools.count { it }, "exactly-one violated")
+        assertEquals(listOf("unsound"), faults.map { it.workerLabel })
     }
 
     @Test
@@ -734,6 +744,64 @@ class PortfolioTest {
         Portfolio.thompson(workers).use { it.minimize(Cancellation { ++polls > 300 }) }
 
         assertTrue(slices[1] > 3 * slices[2], "sharer ${slices[1]} slices, idle ${slices[2]}")
+    }
+
+    @Test
+    fun `an arm claiming a model the problem refutes is quarantined and the run carries on`() {
+        val bogus = CountingResumableSolver(slicesToVerdict = 1, model = Sample(booleanArrayOf(false), LongArray(0)))
+        val honest = CountingResumableSolver(slicesToVerdict = 3, model = Sample(booleanArrayOf(true), LongArray(0)))
+        val workers = listOf(
+            PortfolioWorker.of("bogus", 0, bogus.session(), BacktrackParams()),
+            PortfolioWorker.of("honest", 1, honest.session(), BacktrackParams()),
+        )
+        val check = WitnessCheck { sample, _ -> if (sample.bools[0]) null else "x0 must be true" }
+        val faults = ArrayList<ArmFault>()
+
+        val r = Portfolio.thompson(workers, witnessCheck = check, onFault = { faults += it }).use { it.solve() }
+
+        assertTrue(assertIs<SolveResult.Sat>(r).assignment.bools[0])
+        assertEquals(listOf("bogus"), faults.map { it.workerLabel })
+        assertEquals(listOf(1L, 0L), r.stats.portfolio.arms.map { it.faults })
+    }
+
+    @Test
+    fun `a refuted incumbent never reaches the improvement callback`() {
+        val liar = ScriptedSearch({ true }, start = 10.0) {}
+        val honest = ScriptedSearch({ true }, start = 1_000.0) {}
+        val workers = listOf(trackingWorker("liar", 0, liar), trackingWorker("honest", 1, honest))
+        val check = WitnessCheck { _, objective -> if (objective != null && objective < 100.0) "too good" else null }
+        val reported = ArrayList<Double>()
+        val faults = ArrayList<ArmFault>()
+        var polls = 0
+
+        Portfolio.thompson(workers, witnessCheck = check, onFault = { faults += it }).use {
+            it.minimize(Cancellation { ++polls > 50 }) { improvement ->
+                reported += checkNotNull(improvement.result.objectiveValue)
+            }
+        }
+
+        assertTrue(reported.isNotEmpty() && reported.all { it >= 100.0 }, "reported $reported")
+        assertEquals(listOf("liar"), faults.map { it.workerLabel })
+    }
+
+    @Test
+    fun `claiming infeasibility against a verified incumbent quarantines the arm`() {
+        val empty = Sample(BooleanArray(0), LongArray(0))
+        val found = TrackingResumableSearch(
+            null,
+            incumbent = MinimizeResult.BestFound(empty, 5.0, TerminationReason.BudgetExhausted),
+        )
+        val denier = TrackingResumableSearch(MinimizeResult.Infeasible())
+        val workers = listOf(trackingWorker("found", 0, found), trackingWorker("denier", 1, denier))
+        val faults = ArrayList<ArmFault>()
+        var polls = 0
+
+        val r = Portfolio.thompson(workers, witnessCheck = { _, _ -> null }, onFault = { faults += it }).use {
+            it.minimize(Cancellation { ++polls > 10 })
+        }
+
+        assertIs<MinimizeResult.WithSample>(r)
+        assertEquals(listOf("denier"), faults.map { it.workerLabel })
     }
 
     @Test

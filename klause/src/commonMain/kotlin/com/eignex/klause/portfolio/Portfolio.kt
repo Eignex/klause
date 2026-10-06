@@ -59,6 +59,11 @@ import kotlin.time.TimeSource
  * fast but forgoes the bound-guided re-exploration a cold restart buys. A resumable arm that fails to improve the
  * incumbent for several consecutive segments has its handle discarded and rebuilt on its next schedule,
  * re-descending from the root under the tighter bound with the pool's learned clauses re-imported.
+ *
+ * **Quarantine ([witnessCheck]):** every model and incumbent an arm reports is checked against the model before it
+ * counts, and an arm that claims infeasibility while the pool holds a verified solution is caught too. An arm
+ * caught claiming a result the model refutes is retired, its claim discarded and [onFault] told, so one faulty
+ * configuration cannot hand the run a wrong answer while the other arms carry on.
  */
 class Portfolio(
     /** The arms; each carries its own engine, params, and objective form. */
@@ -107,6 +112,10 @@ class Portfolio(
      * itself carries over whole. Applies to [thompson]'s policy; another policy keeps its evidence.
      */
     private val phaseRetention: Double = DEFAULT_PHASE_RETENTION,
+    /** Checks every result an arm claims before it is accepted; null trusts the arms. See [WitnessCheck]. */
+    private val witnessCheck: WitnessCheck? = null,
+    /** Told about each arm the run quarantines for a refuted claim; see [ArmFault]. */
+    private val onFault: ((ArmFault) -> Unit)? = null,
 ) : PortfolioExecutor {
     private val lanes = minOf(lanes, workers.size)
 
@@ -138,26 +147,35 @@ class Portfolio(
             val worker = workers[arm]
             val handle = run.handles[arm] ?: worker.newResumableSolve()?.also { run.handles[arm] = it }
             val r: SolveResult?
-            val failed: Boolean
+            val failure: Throwable?
             val work: Long
-            // A failing arm leaves the others to answer, but an unsound one has answered wrongly.
             if (handle != null) {
                 val workBefore = handle.work
                 val outcome = runCatching { handle.runSlice(run.token, Long.MAX_VALUE, baseSliceWork) }
-                    .onFailure { if (it is UnsoundnessException) throw it }
                 r = outcome.getOrNull()
-                failed = outcome.isFailure
+                failure = outcome.exceptionOrNull()
                 work = handle.work - workBefore
             } else {
                 val token = segmentToken(worker, run.token, claim.sliceMillis)
                 val outcome = runCatching { worker.solve(token, instructionsFor(claim.sliceWork)) }
-                    .onFailure { if (it is UnsoundnessException) throw it }
                 r = outcome.getOrNull()
-                failed = outcome.isFailure
+                failure = outcome.exceptionOrNull()
                 work = claim.sliceWork
+            }
+            val failed = failure != null
+            // A failing arm leaves the others to answer; an unsound one answered wrongly, so it is quarantined too.
+            if (failure is UnsoundnessException) claim.fault = failure.message
+            if (r is SolveResult.Sat) {
+                witnessCheck?.refute(r.assignment, null)?.let {
+                    claim.fault = "claimed a model the problem refutes: $it"
+                }
             }
             run.locked {
                 run.record(claim, handle?.stats ?: r?.stats, cumulative = handle != null, work = work, failed = failed)
+                if (claim.fault != null) {
+                    run.quarantine(claim)
+                    return@locked
+                }
                 if ((r is SolveResult.Sat || r is SolveResult.Unsat) && decided == null) {
                     decided = r
                     run.finish()
@@ -207,12 +225,12 @@ class Portfolio(
         var unbounded: MinimizeResult.Unbounded? = null
         var exhausted = false
 
-        // Install a strictly-improving incumbent and credit it to [claim]'s arm. The check, the callback and the
-        // install happen under one lock, so concurrent lanes report improvements in the order they installed and
-        // never report one a peer already beat.
-        fun accept(claim: Claim, r: MinimizeResult.WithSample) = run.locked {
+        // Install a strictly-improving incumbent and credit it to [claim]'s arm. Called under the run's lock, so the
+        // check, the callback and the install are one step: concurrent lanes report improvements in the order they
+        // installed and never report one a peer already beat.
+        fun install(claim: Claim, r: MinimizeResult.WithSample) {
             val before = readBound()
-            if (!r.objective.isFinite() || r.objective >= before) return@locked
+            if (r.objective >= before) return
             val worker = workers[claim.arm]
             try {
                 onImprovement?.invoke(AttributedImprovement(worker.label, worker.armId, start.elapsedNow(), r))
@@ -221,7 +239,7 @@ class Portfolio(
                 run.finish()
                 throw failure
             }
-            if (incumbent.offer(r.sample, r.objective) !is Publication.Installed) return@locked
+            if (incumbent.offer(r.sample, r.objective) !is Publication.Installed) return
             claim.improved = true
             if (before.isFinite()) {
                 if (claim.hadIncumbent) run.ledger.credit(claim.arm, Signal.Improvement, before - r.objective)
@@ -231,13 +249,24 @@ class Portfolio(
             }
         }
 
+        // Offer [claim]'s arm's candidate: refuted, it marks the arm faulty; verified, it goes to [install].
+        fun accept(claim: Claim, r: MinimizeResult.WithSample) {
+            if (claim.fault != null || !r.objective.isFinite() || r.objective >= readBound()) return
+            // Checked outside the lock: re-deriving a whole assignment is the costly part, and peers need not wait.
+            witnessCheck?.refute(r.sample, r.objective)?.let {
+                claim.fault = "claimed an incumbent the problem refutes: $it"
+                return
+            }
+            run.locked { install(claim, r) }
+        }
+
         run.execute { claim ->
             val arm = claim.arm
             val worker = workers[arm]
             claim.hadIncumbent = incumbent.current() != null
             val handle = run.handles[arm] ?: worker.newResumableSearch(readBound)?.also { run.handles[arm] = it }
             var terminal: MinimizeResult? = null
-            val failed: Boolean
+            val failure: Throwable?
             val work: Long
             if (handle != null) {
                 val workBefore = handle.work
@@ -246,12 +275,12 @@ class Portfolio(
                     handle.runSlice(run.token, Long.MAX_VALUE, baseSliceWork) { accept(claim, it) }
                 }
                 terminal = outcome.getOrNull()
-                failed = outcome.isFailure
+                failure = outcome.exceptionOrNull()
                 work = handle.work - workBefore
             } else {
                 // Local-search segments restart from the shared incumbent, bounded by their own counted work.
                 val armToken = segmentToken(worker, run.token, claim.sliceMillis)
-                failed = runCatching {
+                failure = runCatching {
                     for (r in worker.improvements(
                         readBound,
                         armToken,
@@ -261,14 +290,23 @@ class Portfolio(
                         terminal = r
                         if (r is MinimizeResult.WithSample) accept(claim, r)
                     }
-                }.isFailure
+                }.exceptionOrNull()
                 work = claim.sliceWork
             }
             callbackFailure?.let { throw it }
+            val failed = failure != null
+            if (failure is UnsoundnessException) claim.fault = failure.message
             (terminal as? MinimizeResult.WithSample)?.let { accept(claim, it) }
+            if (terminal is MinimizeResult.Infeasible && incumbent.current() != null) {
+                claim.fault = "claimed infeasibility while the pool holds a verified solution"
+            }
             run.locked {
                 val stats = handle?.stats ?: terminal?.stats
                 run.record(claim, stats, cumulative = handle != null, work = work, failed = failed)
+                if (claim.fault != null) {
+                    run.quarantine(claim)
+                    return@locked
+                }
                 if (claim.foundFirst) startImprovementPhase(run.ledger)
                 // Re-seed a plateaued resumable arm: only once an incumbent exists (the feasibility hunt is never
                 // reset), and never on a segment that already returned a terminal verdict.
@@ -306,6 +344,9 @@ class Portfolio(
         var hadIncumbent = false
         var improved = false
         var foundFirst = false
+
+        // Why the segment's claim was refuted, when it was; the arm is quarantined as the segment settles.
+        var fault: String? = null
     }
 
     /**
@@ -424,6 +465,15 @@ class Portfolio(
             }
         }
 
+        /** Quarantine [claim]'s arm for its refuted claim: retire it, count the fault, and report it. Call under
+         *  [locked]. */
+        fun quarantine(claim: Claim) {
+            val worker = workers[claim.arm]
+            log.fault(claim.arm)
+            retire(claim.arm)
+            onFault?.invoke(ArmFault(worker.label, worker.armId, checkNotNull(claim.fault)))
+        }
+
         /** Retire [arm]: close its handle and never schedule it again; the run ends once none remain. Call under
          *  [locked]. */
         fun retire(arm: Int) {
@@ -519,6 +569,8 @@ class Portfolio(
             reseedStaleThreshold: Int = 3,
             baseSliceWork: Long = 5_000,
             phaseRetention: Double = DEFAULT_PHASE_RETENTION,
+            witnessCheck: WitnessCheck? = null,
+            onFault: ((ArmFault) -> Unit)? = null,
         ): Portfolio = Portfolio(
             workers = workers,
             bandit = DiscountedThompson(workers.size, Random(seed), halfLife),
@@ -529,6 +581,8 @@ class Portfolio(
             reseedStaleThreshold = reseedStaleThreshold,
             baseSliceWork = baseSliceWork,
             phaseRetention = phaseRetention,
+            witnessCheck = witnessCheck,
+            onFault = onFault,
         )
     }
 }
