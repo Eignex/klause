@@ -587,14 +587,19 @@ class Portfolio(
         claim.sliceWork
     }
 
-    /** The cancellation token bounding one non-resumable arm's segment: its time slice, or [probeSliceMillis] for
-     *  a counted arm's probe. A counted arm ([PortfolioWorker.acceptsInstructionBudget]) usually ends at its
-     *  instruction budget first; see [baseSliceWork]. An arm with neither a counter nor a resumable handle has only
-     *  the slice, a deadline it can size a sub-phase against ([Cancellation.shorten]). A whole segment has no slice. */
-    private fun segmentToken(worker: PortfolioWorker, cancellation: Cancellation, claim: Claim): Cancellation = when {
-        claim.whole -> cancellation
-        claim.probing && worker.acceptsInstructionBudget -> until(probeSliceMillis) or cancellation
-        else -> until(claim.sliceMillis) or cancellation
+    /**
+     * The cancellation token bounding one non-resumable arm's segment: its time slice, or [probeSliceMillis] for a
+     * counted arm's probe, and never more than an arm's half share of the time the run has left. The share keeps a
+     * short budget from going to a few long segments: with the probes and a couple of grown slices spending it, the
+     * policy would get almost no choices to make. A counted arm ([PortfolioWorker.acceptsInstructionBudget]) usually
+     * ends at its instruction budget first; see [baseSliceWork]. An arm with neither a counter nor a resumable handle
+     * has only the time bounds, a deadline it can size a sub-phase against ([Cancellation.shorten]). A whole segment
+     * has none.
+     */
+    private fun segmentToken(worker: PortfolioWorker, cancellation: Cancellation, claim: Claim): Cancellation {
+        if (claim.whole) return cancellation
+        val slice = if (claim.probing && worker.acceptsInstructionBudget) probeSliceMillis else claim.sliceMillis
+        return until(slice) or cancellation.shorten(1.0 / (2 * workers.size))
     }
 
     private fun until(millis: Long): Cancellation =
