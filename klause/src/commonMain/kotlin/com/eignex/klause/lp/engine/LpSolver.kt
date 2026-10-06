@@ -2,6 +2,7 @@ package com.eignex.klause.lp.engine
 
 import com.eignex.klause.lp.engine.Cut
 import com.eignex.klause.simplex.basis.BasisOperationWork
+import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.Cancellation
 
 /** Exact checks that may decline a float candidate.  This is deliberately engine-local: consumers
@@ -19,22 +20,32 @@ internal sealed interface LpCertifierCost {
     data class Metered(val work: Long) : LpCertifierCost
 }
 
-/** Passes a certifier makes over a model, each visiting every structural entry, column and row once. */
-internal class LpScanCount {
-    var scans: Int = 0
-        private set
+/**
+ * Passes a certifier makes over [model], each visiting every structural entry, column and row once. A pass whose
+ * products run [Long.SIZE_BITS] wide costs one unit per entry, and a wider one the square of its word length, as an
+ * exact continuation multiplication does, so a wide model or operand is not undercharged.
+ */
+internal class LpScanCount(private val model: LpModel) {
+    private var units = 0L
 
-    fun scan() {
-        scans++
+    /** One pass whose operand values are at most [operandBits] wide. */
+    fun scan(operandBits: Int = Long.SIZE_BITS) {
+        val words = (maxOf(model.coefficientBits, Long.SIZE_BITS) + operandBits - 1L) / Long.SIZE_BITS
+        val square = words * words
+        units = if (units > Long.MAX_VALUE - square) Long.MAX_VALUE else units + square
     }
 
-    fun cost(model: LpModel): LpCertifierCost.Metered {
+    fun cost(): LpCertifierCost.Metered {
         val entries = (model.doubleView?.colPtr ?: model.csc.colPtr)[model.n].toLong() + model.numVars + model.m
         return LpCertifierCost.Metered(
-            if (entries > Long.MAX_VALUE / maxOf(scans, 1)) Long.MAX_VALUE else entries * scans,
+            if (units > 0 && entries > Long.MAX_VALUE / units) Long.MAX_VALUE else entries * units,
         )
     }
 }
+
+/** Bit length of the widest numerator or denominator in [values], the operand width of a pass over them. */
+internal fun exactBits(values: Iterable<BigFraction>): Int =
+    values.fold(1) { widest, value -> maxOf(widest, value.num.bitLength(), value.den.bitLength()) }
 
 /** Why a simplex solve rebuilt its factors.  The reasons are emitted by the engine, not inferred from
  * aggregate counts by a consumer. */

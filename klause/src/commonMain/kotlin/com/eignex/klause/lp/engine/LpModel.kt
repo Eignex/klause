@@ -157,6 +157,17 @@ internal class LpModel(
      *  128-bit integer certification declines (a real coefficient is not integrally certifiable here). */
     val hasContinuous: Boolean get() = exactState != null || doubleView != null
 
+    /** Bit length of the widest exact structural coefficient: what one exact pass over the matrix multiplies by. */
+    val coefficientBits: Int by lazy {
+        var widest = 1
+        for (j in 0 until n) {
+            forEachRationalColumn(j) { _, value ->
+                widest = maxOf(widest, value.num.bitLength(), value.den.bitLength())
+            }
+        }
+        widest
+    }
+
     /** Objective coefficient of variable [j] as a double (from [doubleView] when present). */
     fun costD(j: Int): Double = doubleView?.cost?.get(j) ?: cost[j].toDouble()
 

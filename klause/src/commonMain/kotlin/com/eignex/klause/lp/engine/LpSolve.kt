@@ -457,7 +457,7 @@ internal fun certifyLpResult(
         model.m > RationalBasisLimits().dimension && policy === ProductionLpCertificationPolicy && !cancellation()
     ) {
         pointAttempted = true
-        val ordinaryScans = LpScanCount()
+        val ordinaryScans = LpScanCount(model)
         val ordinary = exactPointWitness(
             model,
             result.primal,
@@ -465,7 +465,7 @@ internal fun certifyLpResult(
             ordinaryScans,
         )
         val point = if (ordinary != null || !sparsePointRecovery) {
-            if (sparsePointRecovery) observer?.observe(LpCertifier.EXACT_POINT, true, ordinaryScans.cost(model))
+            if (sparsePointRecovery) observer?.observe(LpCertifier.EXACT_POINT, true, ordinaryScans.cost())
             ordinary
         } else {
             val recovered = recoverExactPointWitness(
@@ -519,9 +519,9 @@ internal fun certifyLpResult(
     // An independently checked point refutes infeasibility; rejecting a ray candidate does not.
     if (result == null && numericalWitness == null) {
         if (state != null) {
-            val scans = LpScanCount()
+            val scans = LpScanCount(model)
             conflict = solver.infeasibleRay?.let { exactStateConflict(model, it, scans) }
-            observer?.observe(LpCertifier.EXACT_FARKAS, conflict != null, scans.cost(model))
+            observer?.observe(LpCertifier.EXACT_FARKAS, conflict != null, scans.cost())
             numericalConflict = conflict
             conflict = policy.acceptNullable(LpCertifier.EXACT_FARKAS, conflict)
         } else {
@@ -705,7 +705,7 @@ internal fun certifyLpBound(
     }
     // The same integer-multiplier Lagrangian, evaluated against exact IEEE input without decimal guessing.
     val bound = rationalLpBound(model, duals)
-    observer?.observe(LpCertifier.INTEGER, bound != null, LpScanCount().apply { scan() }.cost(model))
+    observer?.observe(LpCertifier.INTEGER, bound != null, LpScanCount(model).apply { scan() }.cost())
     return policy.acceptNullable(LpCertifier.INTEGER, bound)
 }
 
@@ -800,7 +800,7 @@ internal fun certifyLpFarkas(
     observer: LpCertificationObserver? = null,
 ): LongArray? {
     var route = FarkasRoute.NONE
-    val scans = LpScanCount()
+    val scans = LpScanCount(model)
     val mechanismObserver = observer?.let { target ->
         object : LpCertificationObserver by target {
             override fun observe(certifier: LpCertifier, success: Boolean, cost: LpCertifierCost) {
@@ -820,7 +820,7 @@ internal fun certifyLpFarkas(
         scans.scan()
         sourceFarkasValid(model, it)
     }
-    observer?.observe(LpCertifier.EXACT_FARKAS, ray != null, scans.cost(model))
+    observer?.observe(LpCertifier.EXACT_FARKAS, ray != null, scans.cost())
     onRoute?.invoke(if (ray != null) route else FarkasRoute.NONE)
     return ray
 }
