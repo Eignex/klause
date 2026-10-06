@@ -148,4 +148,40 @@ class ObjectiveBoundFactorTest {
         val xTargets = sink.list.filterIsInstance<Move.IntSet>().filter { it.varId == 0 }.map { it.newValue }
         assertEquals(listOf(4L), xTargets, "raising x from 2 must skip the hole at 3")
     }
+
+    private fun realObjectiveState(bound: MutableObjectiveBound): LocalSearchState {
+        val factor = assertNotNullFactor(
+            ObjectiveBoundFactor.of(LinearObjective(realCoefficients = doubleArrayOf(1.0)), bound),
+        )
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 0,
+            intDomains = emptyArray(),
+            factors = arrayOf(factor),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(10.0),
+        )
+        return LocalSearchState(problem.bake(), Random(0)).also { it.restart() }
+    }
+
+    private fun assertNotNullFactor(factor: ObjectiveBoundFactor?): ObjectiveBoundFactor =
+        kotlin.test.assertNotNull(factor, "an objective with a continuous term has something to bound")
+
+    @Test
+    fun `a ratchet over a continuous term keeps its sum in floating point`() {
+        assertIs<FloatObjectiveBoundInvariant>(realObjectiveState(MutableObjectiveBound(0L)).factors[0])
+    }
+
+    @Test
+    fun `a tightened floating-point ratchet reads an unbeaten sum as violated`() {
+        val bound = MutableObjectiveBound(0L)
+        val state = realObjectiveState(bound)
+        state.apply(Move.RealSet(0, 2.5))
+
+        bound.tightenBelow(2.5)
+        state.reevaluateFactor(0)
+
+        assertTrue(state.cost > 0L)
+    }
 }

@@ -6,8 +6,10 @@ import com.eignex.klause.factor.circuit.Circuit
 import com.eignex.klause.factor.circuit.CircuitInvariant
 import com.eignex.klause.factor.circuit.SubcircuitInvariant
 import com.eignex.klause.factor.global.*
+import com.eignex.klause.factor.objective.FloatObjectiveBoundInvariant
 import com.eignex.klause.factor.objective.ObjectiveBoundFactor
 import com.eignex.klause.factor.objective.ObjectiveBoundInvariant
+import com.eignex.klause.factor.objective.objectiveSumIsWide
 import com.eignex.klause.factor.scheduling.*
 import com.eignex.klause.factor.symmetry.SymmetryHandling
 import com.eignex.klause.factor.table.*
@@ -91,7 +93,12 @@ internal fun Factor.invariantProjection(domains: Array<IntDomain>? = null): Inva
 
     is NValue -> NValueInvariant(n, xs, mode, presents, { state, idx -> present(state, idx) })
 
-    is ObjectiveBoundFactor -> ObjectiveBoundInvariant(boolVars, boolWeights, intVars, intCoeffs, bound)
+    is ObjectiveBoundFactor ->
+        if (realVars.isEmpty() && (domains == null || !objectiveSumIsWide(boolWeights, intVars, intCoeffs, domains))) {
+            ObjectiveBoundInvariant(boolVars, boolWeights, intVars, intCoeffs, bound)
+        } else {
+            FloatObjectiveBoundInvariant(boolVars, boolWeights, intVars, intCoeffs, realVars, realCoeffs, bound)
+        }
 
     is Product -> ProductInvariant(a, b, result)
 
