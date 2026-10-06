@@ -134,6 +134,7 @@ internal class ScheduleLog(private val workers: List<PortfolioWorker>) {
     private val work = LongArray(workers.size)
     private val rewards = DoubleArray(workers.size)
     private val failures = LongArray(workers.size)
+    private val faults = LongArray(workers.size)
 
     /** One segment of [arm]: the [spent] work, the [reward] it settled for, and whether it [failed]. */
     fun record(arm: Int, spent: Long, reward: Double, failed: Boolean) {
@@ -141,6 +142,11 @@ internal class ScheduleLog(private val workers: List<PortfolioWorker>) {
         work[arm] += spent
         rewards[arm] += reward
         if (failed) failures[arm]++
+    }
+
+    /** Count a refuted claim against [arm]. */
+    fun fault(arm: Int) {
+        faults[arm]++
     }
 
     /** The schedule so far, with each arm's credit read from [ledger]. */
@@ -152,6 +158,7 @@ internal class ScheduleLog(private val workers: List<PortfolioWorker>) {
                 work = work[arm],
                 meanReward = if (segments[arm] > 0L) rewards[arm] / segments[arm] else 0.0,
                 failures = failures[arm],
+                faults = faults[arm],
                 credit = ledger.creditOf(arm),
             )
         },

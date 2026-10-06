@@ -293,7 +293,8 @@ internal fun searchStatPairs(stats: SolveStats): List<Pair<String, String>> {
 internal fun portfolioStatPairs(stats: SolveStats): List<Pair<String, String>> = stats.portfolio.arms.map { arm ->
     val credit = arm.credit.entries.joinToString("") { (signal, amount) -> " $signal=${round4(amount)}" }
     "arm.${arm.label}" to
-        "segments=${arm.segments} work=${arm.work} reward=${round4(arm.meanReward)} failures=${arm.failures}$credit"
+        "segments=${arm.segments} work=${arm.work} reward=${round4(arm.meanReward)} failures=${arm.failures} " +
+        "faults=${arm.faults}$credit"
 }
 
 /** Exact deterministic open-theory accounting pairs for `-s`. */

@@ -1,5 +1,6 @@
 package com.eignex.klause.portfolio
 
+import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.util.Cancellation
@@ -42,4 +43,26 @@ data class AttributedImprovement(
     val elapsed: Duration,
     /** The strict global improvement itself (always a [MinimizeResult.WithSample]). */
     val result: MinimizeResult,
+)
+
+/**
+ * Checks a result an arm claims against the model before a [Portfolio] accepts it, so one faulty arm configuration
+ * cannot hand the run a wrong answer.
+ */
+fun interface WitnessCheck {
+    /**
+     * Null when [sample] satisfies the model and, when [objective] is given, scores exactly that; otherwise the
+     * reason it does not.
+     */
+    fun refute(sample: Sample, objective: Double?): String?
+}
+
+/** An arm a [Portfolio] quarantined: it claimed a result the model refutes, so the run stopped scheduling it. */
+data class ArmFault(
+    /** [PortfolioWorker.label] of the faulty arm. */
+    val workerLabel: String,
+    /** [PortfolioWorker.armId] of the faulty arm. */
+    val armId: Int,
+    /** What the arm claimed and why the model refutes it. */
+    val reason: String,
 )

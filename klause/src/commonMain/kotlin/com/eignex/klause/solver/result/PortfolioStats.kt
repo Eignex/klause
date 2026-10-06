@@ -24,6 +24,8 @@ data class ArmSchedule(
     val meanReward: Double,
     /** Segments that failed with an exception. */
     val failures: Long,
+    /** Claims the model refuted; one quarantines the arm. */
+    val faults: Long = 0L,
     /** Credit the arm earned, by the kind of contribution that earned it. */
     val credit: Map<String, Double>,
 )
