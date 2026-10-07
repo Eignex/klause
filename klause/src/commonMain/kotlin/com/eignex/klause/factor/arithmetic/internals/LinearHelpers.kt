@@ -3,11 +3,12 @@ package com.eignex.klause.factor.arithmetic.internals
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.localsearch.LocalSearchState
+import com.eignex.klause.propagation.LAZY_PAYLOAD
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.boundEstablishment
 import com.eignex.klause.propagation.boundEstablishmentLevel
 import com.eignex.klause.propagation.domainAt
-import com.eignex.klause.propagation.lazyReason
+import com.eignex.klause.propagation.lazyReasonSlots
 import com.eignex.klause.util.Int128
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
@@ -225,7 +226,7 @@ internal fun collectLinearLiftedAntecedents(
 /**
  * The reason [collectLinearLiftedAntecedents] would have built for a deduction made at undo-log position
  * [atTrail] and level [atLevel], from the bounds as they stood then. A deduction on a sum records
- * [linearLazyPayload] instead of building it, and its propagator's [com.eignex.klause.propagation.Propagator.explain]
+ * [linearLazyReason] instead of building it, and its propagator's [com.eignex.klause.propagation.Propagator.explain]
  * lands here. Each term's bound then and the move that established it are read once.
  */
 internal fun explainLinearBound(
@@ -279,16 +280,28 @@ internal fun explainLinearBound(
     )
 }
 
-/** Payload for a lazily recorded linear bound; [explainLinearBound] decodes it. */
-internal fun linearLazyPayload(excludeIdx: Int, useLo: Boolean, slack: Long, extraLit: Int, includeExtraLit: Boolean) =
-    intArrayOf(
-        excludeIdx,
-        if (useLo) 1 else 0,
-        (slack ushr 32).toInt(),
-        slack.toInt(),
-        extraLit,
-        if (includeExtraLit) 1 else 0,
-    )
+/** A lazily recorded linear bound, whose payload [explainLinearBound] decodes. */
+@Suppress("LongParameterList")
+internal fun linearLazyReason(
+    state: PropagationState,
+    factorId: Int,
+    excludeIdx: Int,
+    useLo: Boolean,
+    slack: Long,
+    extraLit: Int,
+    includeExtraLit: Boolean,
+): IntArray {
+    val out = state.lazyReasonSlots(LINEAR_PAYLOAD_SIZE, factorId)
+    out[LAZY_PAYLOAD] = excludeIdx
+    out[LAZY_PAYLOAD + 1] = if (useLo) 1 else 0
+    out[LAZY_PAYLOAD + 2] = (slack ushr 32).toInt()
+    out[LAZY_PAYLOAD + 3] = slack.toInt()
+    out[LAZY_PAYLOAD + 4] = extraLit
+    out[LAZY_PAYLOAD + 5] = if (includeExtraLit) 1 else 0
+    return out
+}
+
+private const val LINEAR_PAYLOAD_SIZE = 6
 
 // Spend [slack] loosening the cited side of each term, latest-established first, given per term its [bound], the
 // [level] that bound was established at, whether it may be cited weaker ([lift]), and whether the variable sits
@@ -577,7 +590,7 @@ internal fun propagateLinearBounds(
     val lazy = state.undoLogging && factorId >= 0
     fun reason(i: Int, useLo: Boolean, budget: Long): IntArray? = when {
         rootFact -> null
-        lazy -> state.lazyReason(linearLazyPayload(i, useLo, budget, extraLit, includeExtraLit), factorId)
+        lazy -> linearLazyReason(state, factorId, i, useLo, budget, extraLit, includeExtraLit)
         else -> collectLinearLiftedAntecedents(
             state,
             coeffs,
