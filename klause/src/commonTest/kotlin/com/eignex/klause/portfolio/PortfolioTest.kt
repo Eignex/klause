@@ -29,6 +29,7 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.Solver
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.result.LocalSearchStats
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
@@ -37,6 +38,7 @@ import com.eignex.klause.util.Cancellation
 import com.eignex.kumulant.bandit.UnivariateBandit
 import com.eignex.kumulant.bandit.univariate.MultiArmedBandit
 import com.eignex.kumulant.bandit.univariate.UCB1
+import com.eignex.kumulant.stat.summary.SumResult
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -888,6 +890,42 @@ class PortfolioTest {
             withBound = { p, supplier -> p.copy(objectiveBoundSupplier = supplier) },
         ),
     )
+
+    @Test
+    fun `a counted local search segment reports the work it spent`() {
+        for ((allowance, moves, expected) in listOf(Triple(100L, 0L, 0L), Triple(100L, 75L, 50L), Triple(7L, 10L, 7L))) {
+            val arms = listOf(
+                PortfolioWorker.ofSolve("ls", 0, countsInstructions = true) { _, _ ->
+                    SolveResult.Unknown(
+                        TerminationReason.BudgetExhausted,
+                        SolveStats(ls = LocalSearchStats(moves = SumResult(moves.toDouble()))),
+                    )
+                },
+                PortfolioWorker.ofSolve("done", 1) { _, _ -> SolveResult.Unsat() },
+            )
+
+            val result = Portfolio.thompson(arms, baseSliceWork = allowance).use { it.solve() }
+
+            assertEquals(expected, result.stats.portfolio.arms[0].work)
+        }
+    }
+
+    @Test
+    fun `an ALNS segment charges its outer allowance rather than inner moves`() {
+        val arms = listOf(
+            PortfolioWorker.ofSolve("lns", 0, countsInstructions = true) { _, _ ->
+                SolveResult.Unknown(
+                    TerminationReason.BudgetExhausted,
+                    SolveStats(ls = LocalSearchStats(moves = SumResult(75.0))),
+                )
+            }.also { it.family = ArmFamily.Lns },
+            PortfolioWorker.ofSolve("done", 1) { _, _ -> SolveResult.Unsat() },
+        )
+
+        val result = Portfolio.thompson(arms, baseSliceWork = 100L).use { it.solve() }
+
+        assertEquals(100L, result.stats.portfolio.arms[0].work)
+    }
 
     @Test
     fun `mixed sequential run bounds LS work to its counted segment allowance`() {

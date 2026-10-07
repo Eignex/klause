@@ -636,11 +636,18 @@ class Portfolio(
     private fun instructionsOf(claim: Claim): Long =
         if (claim.whole) Long.MAX_VALUE else instructionsFor(claim.sliceWork)
 
-    // A counted segment spends its allowance; a whole one spent what its moves add up to.
-    private fun countedWork(claim: Claim, stats: SolveStats?): Long = if (claim.whole) {
-        ((stats?.ls?.moves?.sum ?: 0.0) / lsInstructionsPerWork).toLong()
-    } else {
-        claim.sliceWork
+    private fun countedWork(claim: Claim, stats: SolveStats?): Long {
+        val worker = workers[claim.arm]
+        val instructions = stats?.ls?.moves?.sum ?: 0.0
+        val moves = (instructions / lsInstructionsPerWork).toLong()
+        return when {
+            claim.whole -> moves
+            worker.acceptsInstructionBudget && worker.family == ArmFamily.LocalSearch -> {
+                if (instructions >= instructionsOf(claim)) claim.sliceWork else minOf(moves, claim.sliceWork)
+            }
+            // ALNS charges its outer repair allowances independently of the inner solver's move count.
+            else -> claim.sliceWork
+        }
     }
 
     /**
