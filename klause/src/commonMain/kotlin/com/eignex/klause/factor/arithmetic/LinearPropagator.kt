@@ -1,6 +1,7 @@
 package com.eignex.klause.factor.arithmetic
 
 import com.eignex.klause.factor.arithmetic.internals.collectLinearDirAntecedents
+import com.eignex.klause.factor.arithmetic.internals.collectLinearLiftedAntecedents
 import com.eignex.klause.factor.arithmetic.internals.collectLinearTightenAntecedents
 import com.eignex.klause.factor.arithmetic.internals.linearSumRange
 import com.eignex.klause.factor.arithmetic.internals.propagateLinearBounds
@@ -57,6 +58,8 @@ internal class LinearPropagator(
             LinearOp.GE -> false
             else -> range[0] > bound // EQ: lo side (mins too big) vs hi side
         }
-        return collectLinearDirAntecedents(state, coeffs, vars, excludeIdx = -1, extraLit = 0, useLo = useLo)
+        val slack = if (useLo) range[0] - bound - 1 else bound - range[1] - 1
+        if (slack < 0) return collectLinearDirAntecedents(state, coeffs, vars, excludeIdx = -1, extraLit = 0, useLo = useLo)
+        return collectLinearLiftedAntecedents(state, coeffs, vars, useLo, slack)
     }
 }
