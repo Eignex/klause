@@ -56,6 +56,7 @@ import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.EmptyDoubleArray
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntArrayList
+import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.LongArrayList
 import com.eignex.klause.util.MutableIntIntMap
 import com.eignex.klause.util.MutableIntLongMap
@@ -128,6 +129,8 @@ internal class LpRelaxation(
     val gatedWhenTrue: BooleanArray = BooleanArray(0),
     val sourceMap: CutSourceMap? = null,
     val colPresence: List<CutAuxiliaryDefinition?> = List(model.n) { null },
+    /** The factor each row of [model] was emitted for, or -1 for a cut or a row spanning several factors. */
+    val rowFactorIds: IntArray = EmptyIntArray,
 )
 
 /**
@@ -332,8 +335,24 @@ internal fun leafRealFeasibility(
     certified.floatOptimum?.let { float ->
         return LeafRealResult(LpVerdict.TOLERANCE_OPTIMUM, relaxation.floatReals(float.primal, problem))
     }
-    if (certified.verdict == LpVerdict.INFEASIBLE) return LeafRealResult(LpVerdict.INFEASIBLE, EmptyDoubleArray)
+    if (certified.verdict == LpVerdict.INFEASIBLE) {
+        return LeafRealResult(LpVerdict.INFEASIBLE, EmptyDoubleArray, refutingFactors = relaxation.factorsOf(certified))
+    }
     return relaxation.exactLeafResult(certified, problem, objective, sample)
+}
+
+/** The factors behind the rows [certified]'s infeasibility proof combines: its exact conflict, else its Farkas ray. */
+internal fun LpRelaxation.factorsOf(certified: CertifiedLpResult): IntArray {
+    val rows = certified.infeasibleRows
+        ?: certified.farkasRay?.let { ray -> ray.indices.filter { ray[it] != 0L }.toIntArray() }
+        ?: return EmptyIntArray
+    val factors = IntArrayList()
+    val seen = IntHashSet()
+    for (row in rows) {
+        val factor = rowFactorIds.getOrElse(row) { -1 }
+        if (factor >= 0 && seen.add(factor)) factors.add(factor)
+    }
+    return factors.toIntArray()
 }
 
 /**
@@ -425,6 +444,9 @@ internal class LeafRealResult(
     val reals: DoubleArray,
     val exactReals: List<BigFraction>? = null,
     val direction: List<BigFraction>? = null,
+    /** On [LpVerdict.INFEASIBLE], the factors whose rows the exact infeasibility proof combines; empty when the proof
+     *  names no rows. */
+    val refutingFactors: IntArray = EmptyIntArray,
 )
 
 /**
@@ -717,6 +739,14 @@ internal class CpToLpRelaxation(
         /** The factor currently emitting, for attributing HULL rows to it. */
         private var currentFactorId = -1
         private var currentEmissionRoute = 0L
+
+        // The factor behind each row emitted so far; see [LpRelaxation.rowFactorIds].
+        private val rowFactor = IntArrayList()
+
+        /** Attribute every row emitted since the last call to [factorId]. */
+        private fun attributeRows(factorId: Int) {
+            while (rowFactor.size < builder.rowCount) rowFactor.add(factorId)
+        }
 
         /** Factors that emitted at least one HULL row, in factor order (the root pruner's candidates). */
         private val hullFactorIds = LinkedHashSet<Int>()
@@ -1047,12 +1077,14 @@ internal class CpToLpRelaxation(
                         if (factor is Circuit) {
                             if (factor.subcircuit) buildSubcircuitArcs(factor) else buildCircuitArcs(factor)
                         }
+                        attributeRows(factorId)
                     }
                 }
                 cumulativeRelaxation?.let { cumulativeRows(it) }
                 if (cumulativeTimeIndexed) {
                     for (view in schedulingViews(problem)) buildCumulativeTimeIndexed(view)
                 }
+                attributeRows(-1)
             }
 
             val coneL = cone
@@ -1066,6 +1098,7 @@ internal class CpToLpRelaxation(
                 currentEmissionRoute = 0L
                 if (gated && factor is ReifiedRealLinear) {
                     emitGatedReified(factor)
+                    attributeRows(factorId)
                     continue
                 }
                 // Each factor emits its own rows; factors with no linear relaxation (hard globals,
@@ -1074,9 +1107,11 @@ internal class CpToLpRelaxation(
                 currentHullEnabled = factorId !in suppressedHullFactors && !objectiveCone &&
                     factor.lpHullEnabled(hullFlags)
                 factor.emitLpRelaxation(this, linearProjection)
+                attributeRows(factorId)
             }
 
             if (booleanRlt) buildBooleanRlt()
+            attributeRows(-1)
 
             // Separator-produced cuts, over already-created columns. A cut referencing an absent
             // column is dropped (defensive — separators should only emit over existing columns).
@@ -1095,6 +1130,7 @@ internal class CpToLpRelaxation(
                 }
             }
 
+            attributeRows(-1)
             val model = builder.build(Sense.MINIMIZE)
             val kinds = BooleanArray(colIsBool.size) { colIsBool[it] == 1 }
             val colVarIds = IntArray(colVarId.size) { colVarId[it] }
@@ -1119,6 +1155,7 @@ internal class CpToLpRelaxation(
                 colPresence = colPresence.toList(),
                 colPresentUpper = presentUpper,
                 hullFactorIds = hullFactorIds.toIntArray(),
+                rowFactorIds = rowFactor.toIntArray(),
                 colRealId = IntArray(colRealId.size) { colRealId[it] },
                 colRealSign = IntArray(colRealSign.size) { colRealSign[it] },
                 sourceMap = cpCutSources(
