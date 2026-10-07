@@ -3,6 +3,7 @@ package com.eignex.klause.factor.table
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.backtrack.selector.Vsids
+import com.eignex.klause.factor.PropagationReasonOracle
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
@@ -23,6 +24,32 @@ class RegularPropagatorTest {
      * path. Under the full CDCL backtracker (VSIDS + clause forgetting) enumeration must equal
      * the brute-force accepted set; an unsound prefix reason would drop a feasible suffix.
      */
+    @Test
+    fun `regular deductions are implied by their reasons under carved holes`() {
+        val rng = Random(0x7E61)
+        repeat(300) { iter ->
+            val n = 5
+            val problem = Problem(
+                numBoolVars = 0,
+                numIntVars = n,
+                intDomains = Array(n) { IntDomain(1, 3) },
+                factors = arrayOf<Factor>(
+                    Regular(
+                        seq = IntArray(n) { it },
+                        numStates = 3,
+                        alphabetSize = 3,
+                        transitions = LongArray(9) { rng.nextInt(4).toLong() },
+                        q0 = 1,
+                        accepting = intArrayOf(1 + rng.nextInt(3)),
+                    ),
+                ),
+            )
+            PropagationReasonOracle.assertReasonsImply(problem, "regular#$iter") { state ->
+                (0 until 4).all { state.excludeIntValue(rng.nextInt(n), 1L + rng.nextInt(3)) }
+            }
+        }
+    }
+
     @Test
     fun `backtrack learning enumerates exactly the brute-force solution set`() {
         // alphabet {1,2}; states {1,2}; q0=1; F={1,2}. δ: (1,1)→2 (1,2)→1 (2,1)→0(dead) (2,2)→1.

@@ -3,6 +3,7 @@ package com.eignex.klause.factor.circuit
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.factor.ConflictReasonOracle
+import com.eignex.klause.factor.PropagationReasonOracle
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Lit
@@ -40,6 +41,26 @@ class SubcircuitPropagatorTest {
             cur = next[cur]
         }
         return cur == included[0] && visited.size == included.size
+    }
+
+    @Test
+    fun `subcircuit deductions are implied by their reasons under carved holes`() {
+        val rng = Random(0x5EA5)
+        repeat(300) { iter ->
+            val n = 5
+            val problem = Problem(
+                numBoolVars = 0,
+                numIntVars = n,
+                intDomains = Array(n) { IntDomain(0, n - 1L) },
+                factors = arrayOf<Factor>(Circuit(succ = IntArray(n) { it }, subcircuit = true)),
+            )
+            PropagationReasonOracle.assertReasonsImply(problem, "subcircuit#$iter") { state ->
+                (0 until 6).all {
+                    val v = rng.nextInt(n)
+                    state.excludeIntValue(v, rng.nextInt(n).toLong())
+                }
+            }
+        }
     }
 
     @Test
