@@ -3,15 +3,15 @@ package com.eignex.klause.factor.arithmetic.internals
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.localsearch.LocalSearchState
-import com.eignex.klause.propagation.BoundEstablishment
 import com.eignex.klause.propagation.PropagationState
-import com.eignex.klause.propagation.boundAt
 import com.eignex.klause.propagation.boundEstablishment
+import com.eignex.klause.propagation.domainAt
 import com.eignex.klause.propagation.lazyReason
 import com.eignex.klause.util.Int128
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.IntIntMap
+import com.eignex.klause.util.argsortByIntKey
 import kotlin.math.abs
 
 internal fun initLinearSum(state: LocalSearchState, factorId: Int, coeffs: LongArray, vars: IntArray) {
@@ -189,26 +189,29 @@ internal fun collectLinearLiftedAntecedents(
     excludeIdx: Int = -1,
     extraLit: Int = 0,
     includeExtraLit: Boolean = false,
-): IntArray? = liftedAntecedents(
-    state,
-    coeffs,
-    vars,
-    useLo,
-    slack,
-    excludeIdx,
-    extraLit,
-    includeExtraLit,
-    boundOf = { v, citeMin -> if (citeMin) state.intDomains[v].min else state.intDomains[v].max },
-    levelOf = { v, citeMin -> if (citeMin) state.intMinLevel[v] else state.intMaxLevel[v] },
-    aboveRoot = { v -> state.intLevel[v] > 0 },
-    liftable = { v, citeMin, level -> liftable(state, v, citeMin, level) },
-)
+): IntArray? {
+    val n = vars.size
+    val bound = LongArray(n)
+    val level = IntArray(n)
+    val lift = BooleanArray(n)
+    val aboveRoot = BooleanArray(n)
+    for (j in 0 until n) {
+        val v = vars[j]
+        val citeMin = if (useLo) coeffs[j] > 0 else coeffs[j] < 0
+        val d = state.intDomains[v]
+        bound[j] = if (citeMin) d.min else d.max
+        level[j] = if (citeMin) state.intMinLevel[v] else state.intMaxLevel[v]
+        aboveRoot[j] = state.intLevel[v] > 0
+        lift[j] = liftable(state, v, citeMin, level[j])
+    }
+    return liftedAntecedents(state, coeffs, vars, useLo, slack, excludeIdx, extraLit, includeExtraLit, bound, level, lift, aboveRoot)
+}
 
 /**
  * The reason [collectLinearLiftedAntecedents] would have built for a deduction made at undo-log position
  * [atTrail] and level [atLevel], from the bounds as they stood then. A deduction on a wide sum records
  * [linearLazyPayload] instead of building it, and its propagator's [com.eignex.klause.propagation.Propagator.explain]
- * lands here.
+ * lands here. Each term's bound then and the move that established it are read once.
  */
 internal fun explainLinearBound(
     state: PropagationState,
@@ -218,31 +221,44 @@ internal fun explainLinearBound(
     atTrail: Int,
     atLevel: Int,
 ): IntArray? {
+    val useLo = payload[1] != 0
+    val excludeIdx = payload[0]
+    val n = vars.size
+    val bound = LongArray(n)
+    val level = IntArray(n)
+    val lift = BooleanArray(n)
+    val aboveRoot = BooleanArray(n)
     val decisions = state.levelToDecisionVar
     val numBools = state.problem.numBoolVars
-    fun establishment(v: Int, citeMin: Boolean): BoundEstablishment? =
-        state.boundEstablishment(v, state.boundAt(v, citeMin, atTrail), citeMin)
+    for (j in 0 until n) {
+        if (j == excludeIdx || coeffs[j] == 0L) continue
+        val v = vars[j]
+        val citeMin = if (useLo) coeffs[j] > 0 else coeffs[j] < 0
+        val d = state.domainAt(v, atTrail)
+        val root = state.rootDomains[v]
+        val b = if (citeMin) d.min else d.max
+        bound[j] = b
+        if (if (citeMin) b <= root.min else b >= root.max) continue
+        val est = state.boundEstablishment(v, b, citeMin)
+        val l = est?.level ?: 0
+        level[j] = l
+        aboveRoot[j] = l > 0
+        // As [liftable], against the deduction's level: below it any weaker atom serves; at it, only a decision.
+        lift[j] = l > 0 && (l < atLevel || est?.reason == null && l <= decisions.size && decisions[l - 1] == numBools + v)
+    }
     return liftedAntecedents(
         state,
         coeffs,
         vars,
-        useLo = payload[1] != 0,
+        useLo,
         slack = (payload[2].toLong() shl 32) or (payload[3].toLong() and 0xFFFFFFFFL),
-        excludeIdx = payload[0],
+        excludeIdx = excludeIdx,
         extraLit = payload[4],
         includeExtraLit = payload[5] != 0,
-        boundOf = { v, citeMin -> state.boundAt(v, citeMin, atTrail) },
-        levelOf = { v, citeMin -> establishment(v, citeMin)?.level ?: 0 },
-        aboveRoot = { v ->
-            (establishment(v, true)?.level ?: 0) > 0 || (establishment(v, false)?.level ?: 0) > 0
-        },
-        // As [liftable], against the deduction's level: below it any weaker atom serves; at it, only a decision.
-        liftable = { v, citeMin, level ->
-            level > 0 && (
-                level < atLevel ||
-                    establishment(v, citeMin)?.reason == null && decisions[level - 1] == numBools + v
-                )
-        },
+        bound = bound,
+        level = level,
+        lift = lift,
+        aboveRoot = aboveRoot,
     )
 }
 
@@ -257,8 +273,11 @@ internal fun linearLazyPayload(excludeIdx: Int, useLo: Boolean, slack: Long, ext
         if (includeExtraLit) 1 else 0,
     )
 
+// Spend [slack] loosening the cited side of each term, latest-established first, given per term its [bound], the
+// [level] that bound was established at, whether it may be cited weaker ([lift]), and whether the variable sits
+// above the root at all ([aboveRoot]).
 @Suppress("LongParameterList")
-private inline fun liftedAntecedents(
+private fun liftedAntecedents(
     state: PropagationState,
     coeffs: LongArray,
     vars: IntArray,
@@ -267,14 +286,14 @@ private inline fun liftedAntecedents(
     excludeIdx: Int,
     extraLit: Int,
     includeExtraLit: Boolean,
-    boundOf: (v: Int, citeMin: Boolean) -> Long,
-    levelOf: (v: Int, citeMin: Boolean) -> Int,
-    aboveRoot: (v: Int) -> Boolean,
-    liftable: (v: Int, citeMin: Boolean, level: Int) -> Boolean,
+    bound: LongArray,
+    level: IntArray,
+    lift: BooleanArray,
+    aboveRoot: BooleanArray,
 ): IntArray? {
     var anyAboveRoot = false
     for (j in vars.indices) {
-        if (j != excludeIdx && aboveRoot(vars[j])) {
+        if (j != excludeIdx && aboveRoot[j]) {
             anyAboveRoot = true
             break
         }
@@ -285,18 +304,13 @@ private inline fun liftedAntecedents(
         val c = coeffs[j]
         if (c == 0L) continue
         val v = vars[j]
-        if (anyAboveRoot && !aboveRoot(v)) continue
+        if (anyAboveRoot && !aboveRoot[j]) continue
         val citeMin = if (useLo) c > 0 else c < 0
-        val b = boundOf(v, citeMin)
         val orig = state.rootDomains[v]
-        if (if (citeMin) b > orig.min else b < orig.max) cited.add(j)
+        if (if (citeMin) bound[j] > orig.min else bound[j] < orig.max) cited.add(j)
     }
-    val levels = IntArray(cited.size)
-    for (k in 0 until cited.size) {
-        val j = cited[k]
-        levels[k] = levelOf(vars[j], if (useLo) coeffs[j] > 0 else coeffs[j] < 0)
-    }
-    val order = (0 until cited.size).sortedByDescending { levels[it] }
+    // Latest level first: those are the bounds worth loosening, since only they could be resolved.
+    val order = argsortByIntKey(cited.size) { -level[cited[it]] }
     val seen = IntHashSet(order.size * 2)
     val out = IntArrayList()
     if (includeExtraLit) {
@@ -309,10 +323,10 @@ private inline fun liftedAntecedents(
         val c = coeffs[j]
         val v = vars[j]
         val citeMin = if (useLo) c > 0 else c < 0
-        val b = boundOf(v, citeMin)
+        val b = bound[j]
         val orig = state.rootDomains[v]
         val room = if (citeMin) b - orig.min else orig.max - b
-        val step = if (remaining > 0 && liftable(v, citeMin, levels[k])) minOf(remaining / abs(c), room) else 0L
+        val step = if (remaining > 0 && lift[j]) minOf(remaining / abs(c), room) else 0L
         remaining -= step * abs(c)
         if (step == room) continue
         val lit = if (citeMin) {
