@@ -3,6 +3,7 @@ package com.eignex.klause.factor.table
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.backtrack.selector.Vsids
+import com.eignex.klause.factor.PropagationReasonOracle
 import com.eignex.klause.factor.table.internals.MddIncrementalState
 import com.eignex.klause.factor.table.internals.MddTransitionIndex
 import com.eignex.klause.ir.Factor
@@ -13,6 +14,7 @@ import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.propagation.propagate
+import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -234,5 +236,45 @@ class MddPropagatorTest {
 
         val built = (0 until 3).count { (state.refPayload[it] as? MddIncrementalState)?.layersBuilt == true }
         assertEquals(1, built, "only the factor that computed the snapshot may hold its own bitsets")
+    }
+
+    @Test
+    fun `mdd deductions are implied by their reasons under carved holes`() {
+        val rng = Random(0x3DD0)
+        repeat(300) { iter ->
+            val n = 4
+            val numStatesPerLayer = IntArray(n + 1) { if (it == 0 || it == n) 1 else 3 }
+            val records = ArrayList<Long>()
+            val layerStarts = IntArray(n + 1)
+            for (layer in 0 until n) {
+                layerStarts[layer] = records.size
+                for (src in 0 until numStatesPerLayer[layer]) {
+                    for (symbol in 0L..2L) {
+                        if (rng.nextInt(3) == 0) continue
+                        records += listOf(src.toLong(), symbol, rng.nextInt(numStatesPerLayer[layer + 1]).toLong())
+                    }
+                }
+            }
+            layerStarts[n] = records.size
+            val problem = Problem(
+                numBoolVars = 0,
+                numIntVars = n,
+                intDomains = Array(n) { IntDomain(0, 2) },
+                factors = arrayOf<Factor>(
+                    Mdd(
+                        seq = IntArray(n) { it },
+                        numStatesPerLayer = numStatesPerLayer,
+                        layerStarts = layerStarts,
+                        transitions = records.toLongArray(),
+                        initial = 0,
+                        accepting = intArrayOf(0),
+                        recordStride = 3,
+                    ),
+                ),
+            )
+            PropagationReasonOracle.assertReasonsImply(problem, "mdd#$iter") { state ->
+                (0 until 4).all { state.excludeIntValue(rng.nextInt(n), rng.nextInt(3).toLong()) }
+            }
+        }
     }
 }

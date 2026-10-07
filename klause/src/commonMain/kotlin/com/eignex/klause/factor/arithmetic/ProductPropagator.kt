@@ -44,13 +44,16 @@ internal class ProductPropagator(
 
         val drFinal = state.intDomains[result]
         if (0L !in drFinal.min..drFinal.max) {
-            val antR = state.composeIntVarAtomAntecedents(intArrayOf(result))
+            // A zero result is ruled out, so an operand bound sitting on zero steps past it: the step rests on
+            // the result's bounds and on that operand bound.
             val daFinal = state.intDomains[a]
-            if (daFinal.min == 0L && !state.tightenIntMin(a, 1L, antR)) return false
-            if (daFinal.max == 0L && !state.tightenIntMax(a, -1L, antR)) return false
+            val antA = state.composeIntVarAtomAntecedents(intArrayOf(result, a))
+            if (daFinal.min == 0L && !state.tightenIntMin(a, 1L, antA)) return false
+            if (daFinal.max == 0L && !state.tightenIntMax(a, -1L, antA)) return false
             val dbFinal = state.intDomains[b]
-            if (dbFinal.min == 0L && !state.tightenIntMin(b, 1L, antR)) return false
-            if (dbFinal.max == 0L && !state.tightenIntMax(b, -1L, antR)) return false
+            val antB = state.composeIntVarAtomAntecedents(intArrayOf(result, b))
+            if (dbFinal.min == 0L && !state.tightenIntMin(b, 1L, antB)) return false
+            if (dbFinal.max == 0L && !state.tightenIntMax(b, -1L, antB)) return false
         }
         return true
     }

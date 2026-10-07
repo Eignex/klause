@@ -2,6 +2,7 @@ package com.eignex.klause.factor.global
 
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
+import com.eignex.klause.factor.PropagationReasonOracle
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
@@ -14,6 +15,7 @@ import com.eignex.klause.propagation.addLearnedClause
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.propagation.propagate
 import com.eignex.klause.solver.SolveResult
+import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -189,5 +191,31 @@ class LexLessPropagatorTest {
             "learned clause must cite the prefix vars x0(0) and y0(3) — omitting them is the " +
                 "#75 too-weak reason; got int vars $intVarsInClause from ${learned.literals.toList()}",
         )
+    }
+
+    @Test
+    fun `lex less deductions are implied by their reasons under carved holes`() {
+        val rng = Random(0x1E70)
+        repeat(300) { iter ->
+            val n = 3
+            val problem = Problem(
+                numBoolVars = 0,
+                numIntVars = 2 * n,
+                intDomains = Array(2 * n) { IntDomain(0, 2) },
+                factors = arrayOf<Factor>(
+                    LexLess(IntArray(n) { it }, IntArray(n) { n + it }, strict = rng.nextBoolean()),
+                ),
+            )
+            PropagationReasonOracle.assertReasonsImply(problem, "lex#$iter") { state ->
+                (0 until 5).all {
+                    val v = rng.nextInt(2 * n)
+                    when (rng.nextInt(3)) {
+                        0 -> state.excludeIntValue(v, rng.nextInt(3).toLong())
+                        1 -> state.tightenIntMin(v, 1L + rng.nextInt(2))
+                        else -> state.tightenIntMax(v, rng.nextInt(2).toLong())
+                    }
+                }
+            }
+        }
     }
 }

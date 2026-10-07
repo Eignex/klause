@@ -20,8 +20,8 @@ import kotlin.test.assertTrue
  * premise lets a learned clause prune solutions once that premise is undone.
  *
  * [narrow] tightens the state at decision level 1 the way a search would, holes included; factor 0 then
- * propagates, and every bound move and hole it made is checked against its recorded reason; a propagation that
- * fails has its conflict reason checked instead.
+ * propagates, and every Boolean it pinned and every bound move and hole it made is checked against its recorded
+ * reason; a propagation that fails has its conflict reason checked instead.
  */
 object PropagationReasonOracle {
 
@@ -31,12 +31,27 @@ object PropagationReasonOracle {
         state.currentLevel = 1
         if (!narrow(state)) return
         val before = Array(problem.numIntVars) { state.intDomains[it] }
+        val boolsBefore = Array(problem.numBoolVars) { state.boolValues[it] }
         state.currentFactor = 0
         if (!state.factorAt(0).propagate(state, 0)) {
             ConflictReasonOracle.assertEntailed(problem, state, 0, label)
             return
         }
         val solutions = BruteForceSolver(problem.bake()).enumerate(BruteForceParams(randomSeed = 0L)).toList()
+        for (b in 0 until problem.numBoolVars) {
+            val value = state.boolValues[b] ?: continue
+            if (boolsBefore[b] != null) continue
+            val reason = state.boolAntecedents[b]
+            for (s in solutions) {
+                val implied = s.bools[b] == value ||
+                    (reason ?: IntArray(0)).any { lit -> litTrueUnder(problem, state, lit, s) }
+                assertTrue(
+                    implied,
+                    "$label: pinning b$b=$value rests on ${reason?.map { describe(state, problem, it) }}, " +
+                        "which a solution ${s.bools.toList()} ${s.ints.toList()} satisfies with b$b=${s.bools[b]}",
+                )
+            }
+        }
         for (v in 0 until problem.numIntVars) {
             val after = state.intDomains[v]
             for (k in values(before[v])) {
@@ -47,7 +62,8 @@ object PropagationReasonOracle {
                     else -> state.holeReasonFor(v, k) to { s: Sample -> s.ints[v] != k }
                 }
                 for (s in solutions) {
-                    val implied = holds(s) || (reason ?: IntArray(0)).any { lit -> litTrueUnder(problem, state, lit, s) }
+                    val implied = holds(s) ||
+                        (reason ?: IntArray(0)).any { lit -> litTrueUnder(problem, state, lit, s) }
                     assertTrue(
                         implied,
                         "$label: removing $k from x$v rests on ${reason?.map { describe(state, problem, it) }}, " +

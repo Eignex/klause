@@ -1,6 +1,7 @@
 package com.eignex.klause.factor.global
 
 import com.eignex.klause.config.DEFAULT_DOMAIN_WALK_CAP
+import com.eignex.klause.factor.OptPresence
 import com.eignex.klause.factor.arithmetic.internals.collectHoleAndBoundAntecedents
 import com.eignex.klause.factor.circuit.internals.cpGateShouldSkip
 import com.eignex.klause.factor.global.internals.reginTarjanScc
@@ -31,7 +32,7 @@ internal class NValuePropagator(
     override val consumesIntEventDelta: Boolean get() = consumesIntEventDeltaVal
 
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
-        collectHoleAndBoundAntecedents(state, intVars)
+        OptPresence.withPresencePremises(presents, state, collectHoleAndBoundAntecedents(state, intVars))
 
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
         // The optional-presence variant keeps the order-insensitive greedy bounds: a presence flip
@@ -77,7 +78,7 @@ internal class NValuePropagator(
         // (sound, just weaker) — the AtMost mode, which only tightens the minimum, is a no-op.
         val nonAbsent = xs.indices.filter { !definitelyAbsentNvFn(it, state) }
         if (nonAbsent.any { state.intDomains[xs[it]].spanOrNull(DEFAULT_DOMAIN_WALK_CAP) == null }) {
-            val boundsAnt = collectHoleAndBoundAntecedents(state, xs)
+            val boundsAnt = OptPresence.withPresencePremises(presents, state, collectHoleAndBoundAntecedents(state, xs))
             return when (mode) {
                 NValue.Mode.Eq, NValue.Mode.AtLeast -> state.tightenIntMax(n, nonAbsent.size.toLong(), boundsAnt)
                 NValue.Mode.AtMost -> true
@@ -103,7 +104,7 @@ internal class NValuePropagator(
                 d.values.forEach { covered.add(it) }
             }
         }
-        val ant = collectHoleAndBoundAntecedents(state, xs)
+        val ant = OptPresence.withPresencePremises(presents, state, collectHoleAndBoundAntecedents(state, xs))
         when (mode) {
             NValue.Mode.Eq -> {
                 if (!state.tightenIntMin(n, minDistinct.toLong(), ant)) return false

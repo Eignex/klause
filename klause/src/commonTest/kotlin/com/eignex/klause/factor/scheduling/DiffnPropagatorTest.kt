@@ -4,6 +4,7 @@ import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.factor.ConflictReasonOracle
 import com.eignex.klause.factor.FactorPropagationOracle
+import com.eignex.klause.factor.PropagationReasonOracle
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Lit
@@ -14,6 +15,7 @@ import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.propagation.propagate
 import com.eignex.klause.solver.SolveResult
+import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -205,5 +207,36 @@ class DiffnPropagatorTest {
             ),
         )
         assertIs<SolveResult.Unsat>(BacktrackSolver(problem.bake()).solve(BacktrackParams(randomSeed = 0L)))
+    }
+
+    @Test
+    fun `diffn deductions are implied by their reasons under carved holes`() {
+        val rng = Random(0xD1FF)
+        repeat(300) { iter ->
+            val rects = 3
+            val problem = Problem(
+                numBoolVars = 0,
+                numIntVars = 2 * rects,
+                intDomains = Array(2 * rects) { IntDomain(0, 3) },
+                factors = arrayOf<Factor>(
+                    Diffn(
+                        xs = IntArray(rects) { 2 * it },
+                        ys = IntArray(rects) { 2 * it + 1 },
+                        widths = LongArray(rects) { 1L + rng.nextInt(2) },
+                        heights = LongArray(rects) { 1L + rng.nextInt(2) },
+                    ),
+                ),
+            )
+            PropagationReasonOracle.assertReasonsImply(problem, "diffn#$iter") { state ->
+                (0 until 6).all {
+                    val v = rng.nextInt(2 * rects)
+                    when (rng.nextInt(3)) {
+                        0 -> state.excludeIntValue(v, rng.nextInt(4).toLong())
+                        1 -> state.tightenIntMin(v, 1L + rng.nextInt(2))
+                        else -> state.tightenIntMax(v, rng.nextInt(2).toLong())
+                    }
+                }
+            }
+        }
     }
 }

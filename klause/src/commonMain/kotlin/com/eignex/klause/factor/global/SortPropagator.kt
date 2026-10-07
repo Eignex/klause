@@ -1,5 +1,6 @@
 package com.eignex.klause.factor.global
 
+import com.eignex.klause.factor.arithmetic.internals.collectHoleAndBoundAntecedents
 import com.eignex.klause.factor.arithmetic.internals.collectLinearTightenAntecedents
 import com.eignex.klause.propagation.IntEvent
 import com.eignex.klause.propagation.PropagationState
@@ -96,9 +97,10 @@ internal class SortWork(private val xs: IntArray, private val ys: IntArray, priv
     fun propagate(state: PropagationState): Boolean {
         this.state = state
         // A single coarse-but-sound antecedent for every narrowing this pass emits: the whole pass
-        // is a deterministic consequence of the pre-pass domains, so citing their tightened bounds
-        // justifies each deduction. Reason minimization is a separate concern.
-        val ant = state.composeIntVarAtomAntecedents(intVars)
+        // is a deterministic consequence of the pre-pass domains, holes included (a bound that snaps
+        // over a hole mid-pass rests on it), so citing their bounds and holes justifies each
+        // deduction. Reason minimization is a separate concern.
+        val ant = collectHoleAndBoundAntecedents(state, intVars)
 
         for (i in 0 until n) {
             xyGraph[i].fill(-1)
