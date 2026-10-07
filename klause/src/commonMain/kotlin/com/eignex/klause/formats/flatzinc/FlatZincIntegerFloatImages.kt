@@ -48,9 +48,10 @@ internal fun FlatZincCompiler.needsRoundedFloatBounds(variable: Int, image: Inte
         declaration.isVar && when (val type = declaration.type) {
             is FznType.FloatRange -> floatVars[declaration.name]?.varId == variable
 
-            is FznType.Array ->
-                type.element is FznType.FloatRange &&
-                (arrays[declaration.name] as? FlatZincArray.Vars)?.floatBucketings?.any { it.varId == variable } == true
+            is FznType.Array -> {
+                val variables = (arrays[declaration.name] as? FlatZincArray.Vars)?.floatBucketings
+                type.element is FznType.FloatRange && variables?.any { it.varId == variable } == true
+            }
 
             else -> false
         }
@@ -86,11 +87,11 @@ internal fun FlatZincCompiler.emitIntegerFloatProduct(
         result.bk.varId
     } else {
         allocFloat(
-        "__integer_float_product_${realLo.size}",
-        Double.NEGATIVE_INFINITY,
-        Double.POSITIVE_INFINITY,
-        lpOnly = true,
-    )
+            "__integer_float_product_${realLo.size}",
+            Double.NEGATIVE_INFINITY,
+            Double.POSITIVE_INFINITY,
+            lpOnly = true,
+        )
     }
     factors.add(
         RealProduct(
