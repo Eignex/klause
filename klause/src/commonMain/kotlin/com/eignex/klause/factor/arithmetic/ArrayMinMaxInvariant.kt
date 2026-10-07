@@ -1,6 +1,7 @@
 package com.eignex.klause.factor.arithmetic
 
 import com.eignex.klause.factor.compressViolation
+import com.eignex.klause.factor.distance
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.MoveSink
@@ -27,8 +28,7 @@ internal class ArrayMinMaxInvariant(private val result: Int, private val xs: Int
     }
 
     private fun degreeFor(resultValue: Long, best: Long, softCap: Int): Int {
-        val d = resultValue - best
-        return compressViolation(if (d < 0) -d else d, softCap)
+        return compressViolation(distance(resultValue, best), softCap)
     }
 
     private fun simulateBest(state: LocalSearchState, intVar: Int, newValue: Long): Long {

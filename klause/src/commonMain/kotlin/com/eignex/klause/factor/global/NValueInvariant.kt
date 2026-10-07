@@ -4,10 +4,12 @@ import com.eignex.klause.factor.compressViolation
 import com.eignex.klause.factor.global.internals.countPresentOccurrences
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Lit
-import com.eignex.klause.ir.values
+import com.eignex.klause.ir.ceilingOrNull
+import com.eignex.klause.ir.floorOrNull
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.MoveSink
+import com.eignex.klause.localsearch.forEachCandidate
 import com.eignex.klause.util.LongHashSet
 import com.eignex.klause.util.MutableLongIntMap
 
@@ -156,7 +158,7 @@ internal class NValueInvariant(
                 if (s.counts.getOrDefault(cur, 0) <= 1) continue
                 val d = state.rootDomains[xs[i]]
                 var pick: Long? = null
-                d.values.forEach { if (pick == null && it != cur && s.counts.getOrDefault(it, 0) == 0) pick = it }
+                d.forEachCandidate(state.rng) { if (pick == null && it != cur && s.counts.getOrDefault(it, 0) == 0) pick = it }
                 val p = pick
                 if (p != null) sink.addChannelingIntSet(state, xs[i], p)
             }
@@ -168,7 +170,7 @@ internal class NValueInvariant(
                 if (s.counts.getOrDefault(cur, 0) > 1) continue
                 val d = state.rootDomains[xs[i]]
                 var pick: Long? = null
-                d.values.forEach { if (pick == null && it != cur && s.counts.getOrDefault(it, 0) > 0) pick = it }
+                d.forEachCandidate(state.rng) { if (pick == null && it != cur && s.counts.getOrDefault(it, 0) > 0) pick = it }
                 val p = pick
                 if (p != null) sink.addChannelingIntSet(state, xs[i], p)
             }
@@ -189,9 +191,9 @@ internal class NValueInvariant(
             val cv = s.counts.getOrDefault(v, 0)
             val vDies = cv - occ == 0
             val d = state.rootDomains[xs[i]]
-            var pick = -1L
+            var pick: Long? = null
             var seen = 0
-            d.values.forEach { w ->
+            d.forEachCandidate(state.rng) { w ->
                 if (w != v) {
                     val wBorn = s.counts.getOrDefault(w, 0) == 0
                     if (vDies == wBorn) {
@@ -200,8 +202,7 @@ internal class NValueInvariant(
                     }
                 }
             }
-            if (pick < 0) continue
-            sink.addChannelingIntSet(state, xs[i], pick)
+            sink.addChannelingIntSet(state, xs[i], pick ?: continue)
             emitted++
         }
     }
@@ -246,19 +247,9 @@ internal class NValueInvariant(
         return distinct
     }
 
-    private fun largestInDomainAtMost(d: IntDomain, bound: Int): Long? {
-        if (d.min > bound) return null
-        var pick = -1L
-        d.values.forEach { if (it <= bound) pick = it }
-        return if (pick < 0) null else pick
-    }
+    private fun largestInDomainAtMost(d: IntDomain, bound: Int): Long? = d.floorOrNull(bound.toLong())
 
-    private fun smallestInDomainAtLeast(d: IntDomain, bound: Int): Long? {
-        if (d.max < bound) return null
-        var pick = -1L
-        d.values.forEach { if (pick < 0 && it >= bound) pick = it }
-        return if (pick < 0) null else pick
-    }
+    private fun smallestInDomainAtLeast(d: IntDomain, bound: Int): Long? = d.ceilingOrNull(bound.toLong())
 
     companion object {
         const val STRUCTURED_MOVE_CAP: Int = 4

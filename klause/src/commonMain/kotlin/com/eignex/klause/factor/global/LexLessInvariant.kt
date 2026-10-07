@@ -1,11 +1,12 @@
 package com.eignex.klause.factor.global
 
 import com.eignex.klause.factor.compressViolation
-import com.eignex.klause.ir.values
+import com.eignex.klause.factor.saturatedSub
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
 import com.eignex.klause.localsearch.MoveSink
+import com.eignex.klause.localsearch.forEachCandidate
 import com.eignex.klause.util.IntHashSet
 
 /** LS invariant logic for `lex_less` / `lex_lesseq`. */
@@ -112,16 +113,15 @@ internal class LexLessInvariant(private val xs: IntArray, private val ys: IntArr
             if (prefix.contains(vId)) continue
             val cur = state.assignment.intValue(vId)
             val d = state.rootDomains[vId]
-            var pick = -1L
+            var pick: Long? = null
             var seen = 0
-            d.values.forEach { w ->
+            d.forEachCandidate(state.rng) { w ->
                 if (w != cur) {
                     seen++
                     if (state.rng.nextInt(seen) == 0) pick = w
                 }
             }
-            if (pick < 0) continue
-            sink.addChannelingIntSet(state, vId, pick)
+            sink.addChannelingIntSet(state, vId, pick ?: continue)
             emitted++
         }
     }
@@ -184,7 +184,7 @@ internal class LexLessInvariant(private val xs: IntArray, private val ys: IntArr
             val a = getX(i)
             val b = getY(i)
             if (a < b) return 0
-            if (a > b) return compressViolation(a - b, softCap)
+            if (a > b) return compressViolation(saturatedSub(a, b), softCap)
         }
         return when {
             xs.size == ys.size -> if (strict) 1 else 0

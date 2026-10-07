@@ -1,5 +1,7 @@
 package com.eignex.klause.factor.arithmetic
 
+import com.eignex.klause.factor.distance
+import com.eignex.klause.factor.saturatedSub
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.localsearch.LocalSearchState
@@ -36,17 +38,11 @@ internal class ComparisonClauseInvariant(
         val x = state.assignment.intValue(vars[i])
         val c = consts[i]
         return when (ops[i]) {
-            LinearOp.LE -> if (x <= c) 0L else x - c
+            LinearOp.LE -> if (x <= c) 0L else saturatedSub(x, c)
 
-            LinearOp.GE -> if (x >= c) 0L else c - x
+            LinearOp.GE -> if (x >= c) 0L else saturatedSub(c, x)
 
-            LinearOp.EQ -> if (x == c) {
-                0L
-            } else if (x > c) {
-                x - c
-            } else {
-                c - x
-            }
+            LinearOp.EQ -> distance(x, c)
 
             LinearOp.NE -> if (x != c) 0L else 1L
         }

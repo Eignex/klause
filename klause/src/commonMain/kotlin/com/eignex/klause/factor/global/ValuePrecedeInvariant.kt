@@ -1,10 +1,10 @@
 package com.eignex.klause.factor.global
 
 import com.eignex.klause.factor.compressViolation
-import com.eignex.klause.ir.values
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.MoveSink
+import com.eignex.klause.localsearch.forEachCandidate
 
 /** LS invariant logic for `value_precede`. */
 internal class ValuePrecedeInvariant(private val s: Long, private val t: Long, private val xs: IntArray) : Invariant {
@@ -66,16 +66,15 @@ internal class ValuePrecedeInvariant(private val s: Long, private val t: Long, p
             val i = state.rng.nextInt(xs.size)
             val v = state.assignment.intValue(xs[i])
             val d = state.rootDomains[xs[i]]
-            var pick = -1L
+            var pick: Long? = null
             var seen = 0
-            d.values.forEach { w ->
+            d.forEachCandidate(state.rng) { w ->
                 if (w != v && (w == s || (w != t && v != s))) {
                     seen++
                     if (state.rng.nextInt(seen) == 0) pick = w
                 }
             }
-            if (pick < 0) continue
-            sink.addChannelingIntSet(state, xs[i], pick)
+            sink.addChannelingIntSet(state, xs[i], pick ?: continue)
             emitted++
         }
     }
@@ -88,10 +87,9 @@ internal class ValuePrecedeInvariant(private val s: Long, private val t: Long, p
                 continue
             }
             val d = state.rootDomains[v]
-            var pick = -1L
-            d.values.forEach { if (pick < 0 && it != t) pick = it }
-            if (pick < 0) return false
-            state.assignment.setInt(v, pick)
+            var pick: Long? = null
+            d.forEachCandidate(state.rng) { if (pick == null && it != t) pick = it }
+            state.assignment.setInt(v, pick ?: return false)
         }
         return true
     }
