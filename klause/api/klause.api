@@ -3216,7 +3216,7 @@ public final class com/eignex/klause/localsearch/AspirationCriterion$Probabilist
 }
 
 public abstract interface class com/eignex/klause/localsearch/CandidateCompletion {
-	public abstract fun complete (Lcom/eignex/klause/solver/Sample;)Lcom/eignex/klause/localsearch/Completion;
+	public abstract fun complete (Lcom/eignex/klause/solver/Sample;Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/localsearch/Completion;
 }
 
 public final class com/eignex/klause/localsearch/ChannelingSink {

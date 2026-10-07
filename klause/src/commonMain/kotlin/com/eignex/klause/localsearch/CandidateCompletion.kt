@@ -1,6 +1,7 @@
 package com.eignex.klause.localsearch
 
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.EmptyIntArray
 
 /**
@@ -13,8 +14,9 @@ import com.eignex.klause.util.EmptyIntArray
  * proof, and this is what decides it. It is consulted only at a candidate, never per move.
  */
 fun interface CandidateCompletion {
-    /** Decide [candidate]: a [Completion.Witness] is a solution of the model, anything else is not. */
-    fun complete(candidate: Sample): Completion
+    /** Decide [candidate] under the search's [cancellation]: a [Completion.Witness] is a solution of the model,
+     *  anything else is not. */
+    fun complete(candidate: Sample, cancellation: Cancellation): Completion
 }
 
 /**

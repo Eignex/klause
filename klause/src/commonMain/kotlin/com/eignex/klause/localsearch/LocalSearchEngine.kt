@@ -25,6 +25,7 @@ import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SearchEvent
 import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.solver.result.TerminationReason
+import com.eignex.klause.util.Cancellation
 import kotlin.random.Random
 
 /**
@@ -250,7 +251,12 @@ internal class LocalSearchEngine(
                     if (state.cost == 0L && state.intValuesInDomain()) {
                         if (completion != null) state.refreshRealRows()
                         if (state.cost != 0L) continue
-                        val solution = decide(state, state.assignment.snapshot(), sink?.ls) { work ->
+                        val solution = decide(
+                            state,
+                            state.assignment.snapshot(),
+                            params.cancellation,
+                            sink?.ls,
+                        ) { work ->
                             moves += work
                             flipsSinceYield += work
                         }
@@ -448,7 +454,12 @@ internal class LocalSearchEngine(
                     objective.evaluate(state.assignment)
                 }
                 if (obj < bestObj && state.intValuesInDomain()) {
-                    val solution = decide(state, state.assignment.snapshot(), sink.ls) { work -> totalFlips += work }
+                    val solution = decide(
+                        state,
+                        state.assignment.snapshot(),
+                        params.cancellation,
+                        sink.ls,
+                    ) { work -> totalFlips += work }
                     if (solution == null) {
                         restartAndRepair(state, restartAnchor(null))
                         restartCount++
@@ -672,11 +683,12 @@ internal class LocalSearchEngine(
     private fun decide(
         state: LocalSearchState,
         candidate: Sample,
+        cancellation: Cancellation,
         stats: LocalSearchStatsSink?,
         charge: (Long) -> Unit,
     ): Sample? {
         val completion = completion ?: return candidate
-        val decided = completion.complete(candidate)
+        val decided = completion.complete(candidate, cancellation)
         charge(decided.work)
         stats?.recordCompletion(refuted = decided is Completion.Refuted, undecided = decided is Completion.Undecided)
         return when (decided) {

@@ -7,7 +7,6 @@ import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.localsearch.localSearchSupports
 import com.eignex.klause.lp.relaxation.lpSeed
 import com.eignex.klause.portfolio.Kind
-import com.eignex.klause.portfolio.LeafRealCompletion
 import com.eignex.klause.portfolio.LocalSearchCatalog
 import com.eignex.klause.portfolio.Portfolio
 import com.eignex.klause.portfolio.PortfolioWorker
@@ -96,7 +95,8 @@ internal class OpenPortfolio(
         // whole LP: local search would only hand the theory the problem it already solves.
         if (model.numIntVars == 0 && model.numBoolVars == 0) return emptyList()
         val searchModel = LocalSearchModel.open(model)
-        val completion = if (model.numRealVars > 0) LeafRealCompletion(model, objective = null) else null
+        // An open model's rows can be strict, which only the theory certifies; it decides each candidate's residual.
+        val completion = if (model.numRealVars > 0) TheoryCompletion(model, theoryParams) else null
         if (!localSearchSupports(searchModel, completes = completion != null)) return emptyList()
         // Every arm starts from the relaxation's optimum inside the search windows rather than near zero; an LP
         // that finds no point in its slice of the budget leaves the arms to their own random starts.

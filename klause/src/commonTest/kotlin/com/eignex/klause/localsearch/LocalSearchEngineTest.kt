@@ -42,7 +42,11 @@ class LocalSearchEngineTest {
 
     @Test
     fun `a candidate over continuous columns satisfies its rows within tolerance`() {
-        val result = engine { Completion.Witness(it) }.solve(LocalSearchParams(maxFlips = 5_000, randomSeed = 2), null)
+        val result = engine { candidate, _ ->
+            Completion.Witness(
+                candidate,
+            )
+        }.solve(LocalSearchParams(maxFlips = 5_000, randomSeed = 2), null)
 
         val sample = assertIs<SolveResult.Sat>(result).assignment
         val x = sample.approximateRealValue(0)
@@ -53,7 +57,7 @@ class LocalSearchEngineTest {
     @Test
     fun `search goes on past a refuted candidate`() {
         var calls = 0
-        val result = engine { candidate ->
+        val result = engine { candidate, _ ->
             calls++
             if (calls == 1) Completion.Refuted(intArrayOf(0)) else Completion.Witness(candidate)
         }.solve(LocalSearchParams(maxFlips = 5_000, randomSeed = 2), null)
@@ -65,7 +69,7 @@ class LocalSearchEngineTest {
     @Test
     fun `the work a completion reports is charged to the search budget`() {
         var calls = 0
-        val result = engine { _ ->
+        val result = engine { _, _ ->
             calls++
             Completion.Refuted(work = 2_000L)
         }.solve(LocalSearchParams(maxFlips = 5_000, randomSeed = 2), null)
@@ -77,7 +81,7 @@ class LocalSearchEngineTest {
     @Test
     fun `decided candidates are counted in the stats`() {
         var calls = 0
-        val result = engine { candidate ->
+        val result = engine { candidate, _ ->
             calls++
             if (calls == 1) Completion.Refuted() else Completion.Witness(candidate)
         }.solve(LocalSearchParams(maxFlips = 5_000, randomSeed = 2), null)
