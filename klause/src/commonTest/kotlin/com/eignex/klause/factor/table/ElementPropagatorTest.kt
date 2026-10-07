@@ -19,8 +19,10 @@ import com.eignex.klause.propagation.IntEvent
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.propagation.factorAt
 import com.eignex.klause.propagation.propagate
 import com.eignex.klause.propagation.propagatorProjection
+import com.eignex.klause.propagation.reasonOf
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -412,6 +414,32 @@ class ElementPropagatorTest {
                 }
             }
         }
+    }
+
+    @Test
+    fun `a constant-array element prunes a result value citing only the positions that held it`() {
+        // arr = [5, 6, 6, 5]: with positions 0, 1 and 3 gone, 5 has lost every holder while 6 keeps one.
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 2,
+            intDomains = arrayOf(IntDomain(0, 3), IntDomain(5, 6)),
+            factors = arrayOf<Factor>(
+                Element(idx = 0, result = 1, arr = longArrayOf(5, 6, 6, 5), arrIsVars = false, indexOffset = 0),
+            ),
+        )
+        val state = PropagationState(problem, Assumptions.None)
+        state.undoLogging = true
+        state.currentLevel = 1
+        check(state.excludeIntValue(0, 0L) && state.excludeIntValue(0, 1L) && state.excludeIntValue(0, 3L))
+        state.currentFactor = 0
+
+        check(state.factorAt(0).propagate(state, 0))
+
+        val cited = state.reasonOf(state.intMinAntecedents[1])!!.map { lit ->
+            val atom = Lit.variable(lit) - problem.numBoolVars
+            state.atoms.intVar[atom] to state.atoms.threshold[atom]
+        }
+        assertEquals(setOf(0 to 0L, 0 to 3L), cited.toSet())
     }
 
     @Test
