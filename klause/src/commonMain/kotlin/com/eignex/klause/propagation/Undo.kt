@@ -132,6 +132,7 @@ internal fun PropagationState.undoTo(mark: PropagationState.LevelMark) {
                 holeHistVal[v]?.truncateTo(undo.holeHistLen[i])
                 holeHistLvl[v]?.truncateTo(undo.holeHistLen[i])
                 holeHistAnt[v]?.let { a -> while (a.size > undo.holeHistLen[i]) a.removeAt(a.size - 1) }
+                holeHistPos[v]?.truncateTo(undo.holeHistLen[i])
             }
 
             2 -> { // interior carve — re-insert the carved value
@@ -144,6 +145,7 @@ internal fun PropagationState.undoTo(mark: PropagationState.LevelMark) {
                 holeHistVal[v]?.truncateTo(undo.maxReason[i])
                 holeHistLvl[v]?.truncateTo(undo.maxReason[i])
                 holeHistAnt[v]?.let { a -> while (a.size > undo.maxReason[i]) a.removeAt(a.size - 1) }
+                holeHistPos[v]?.truncateTo(undo.maxReason[i])
             }
 
             else -> error("unknown undo tag")
