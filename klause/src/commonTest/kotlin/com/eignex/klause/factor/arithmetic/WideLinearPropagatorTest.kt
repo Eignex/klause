@@ -2,6 +2,7 @@ package com.eignex.klause.factor.arithmetic
 
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
+import com.eignex.klause.factor.PropagationReasonOracle
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
@@ -12,6 +13,7 @@ import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.SolveResult
 import com.ionspin.kotlin.bignum.integer.BigInteger
+import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -112,5 +114,38 @@ class WideLinearPropagatorTest {
             factors = arrayOf<Factor>(row),
         )
         assertIs<SolveResult.Unsat>(BacktrackSolver(p.bake()).solve(BacktrackParams(randomSeed = 0L)))
+    }
+
+    @Test
+    fun `wide linear deductions are implied by their reasons under carved holes`() {
+        val rng = Random(0x1DE0)
+        for (op in LinearOp.entries) {
+            repeat(75) { iter ->
+                val n = 3
+                val problem = Problem(
+                    numBoolVars = 0,
+                    numIntVars = n,
+                    intDomains = Array(n) { IntDomain(0, 3) },
+                    factors = arrayOf<Factor>(
+                        Linear(
+                            IntArray(n) { it },
+                            Array(n) { w * BigInteger.fromInt(listOf(-3, -2, -1, 1, 2, 3).random(rng)) },
+                            op,
+                            w * BigInteger.fromInt(rng.nextInt(-3, 7)),
+                        ),
+                    ),
+                )
+                PropagationReasonOracle.assertReasonsImply(problem, "wide-linear-$op#$iter") { state ->
+                    (0 until 4).all {
+                        val v = rng.nextInt(n)
+                        when (rng.nextInt(3)) {
+                            0 -> state.excludeIntValue(v, rng.nextInt(4).toLong())
+                            1 -> state.tightenIntMin(v, 1L + rng.nextInt(2))
+                            else -> state.tightenIntMax(v, 1L + rng.nextInt(2))
+                        }
+                    }
+                }
+            }
+        }
     }
 }

@@ -3,6 +3,7 @@ package com.eignex.klause.solver.integration
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.backtrack.selector.Vsids
+import com.eignex.klause.factor.PropagationReasonOracle
 import com.eignex.klause.factor.arithmetic.ArrayMinMax
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.Product
@@ -24,6 +25,7 @@ import com.eignex.klause.propagation.bake
 import com.eignex.klause.propagation.propagate
 import com.eignex.klause.propagation.propagatorProjection
 import com.eignex.klause.solver.SolveResult
+import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -533,5 +535,54 @@ class ArithmeticPropagatorTest {
             factors = arrayOf<Factor>(Product(a = 0, b = 1, result = 2)),
         )
         assertIs<PropagationResult.Unsat>(pUnsat.propagate())
+    }
+
+    @Test
+    fun `array minmax deductions are implied by their reasons under carved holes`() {
+        val rng = Random(0xA4A0)
+        for (max in listOf(false, true)) {
+            repeat(150) { iter ->
+                val problem = Problem(
+                    numBoolVars = 0,
+                    numIntVars = 4,
+                    intDomains = Array(4) { IntDomain(0, 3) },
+                    factors = arrayOf<Factor>(ArrayMinMax(result = 0, xs = intArrayOf(1, 2, 3), max = max)),
+                )
+                PropagationReasonOracle.assertReasonsImply(problem, "array-minmax-$max#$iter") { state ->
+                    (0 until 5).all {
+                        val v = rng.nextInt(4)
+                        when (rng.nextInt(3)) {
+                            0 -> state.excludeIntValue(v, rng.nextInt(4).toLong())
+                            1 -> state.tightenIntMin(v, 1L + rng.nextInt(2))
+                            else -> state.tightenIntMax(v, 1L + rng.nextInt(2))
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `product deductions are implied by their reasons under carved holes`() {
+        val rng = Random(0x940D)
+        repeat(300) { iter ->
+            val problem = Problem(
+                numBoolVars = 0,
+                numIntVars = 3,
+                intDomains = arrayOf(IntDomain(-2, 2), IntDomain(-2, 2), IntDomain(-4, 4)),
+                factors = arrayOf<Factor>(Product(a = 0, b = 1, result = 2)),
+            )
+            PropagationReasonOracle.assertReasonsImply(problem, "product#$iter") { state ->
+                (0 until 4).all {
+                    val v = rng.nextInt(3)
+                    val span = if (v == 2) 4 else 2
+                    when (rng.nextInt(3)) {
+                        0 -> state.excludeIntValue(v, rng.nextInt(-span, span + 1).toLong())
+                        1 -> state.tightenIntMin(v, rng.nextInt(-span + 1, 1).toLong())
+                        else -> state.tightenIntMax(v, rng.nextInt(0, span).toLong())
+                    }
+                }
+            }
+        }
     }
 }

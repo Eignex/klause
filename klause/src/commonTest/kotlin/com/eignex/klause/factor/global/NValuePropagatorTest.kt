@@ -3,8 +3,10 @@ package com.eignex.klause.factor.global
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.factor.FactorPropagationOracle
+import com.eignex.klause.factor.PropagationReasonOracle
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.PropagationState
@@ -247,6 +249,59 @@ class NValuePropagatorTest {
             val found = BacktrackSolver(problem.bake()).enumerate(BacktrackParams(randomSeed = 1L)).take(100_000)
                 .map { s -> s.ints.map { it.toInt() } }.toHashSet()
             assertEquals(brute, found, "mode=$mode: enumerated (xs, n) set must equal brute force")
+        }
+    }
+
+    @Test
+    fun `nvalue deductions are implied by their reasons under carved holes`() {
+        val rng = Random(0x57A2)
+        for (mode in NValue.Mode.entries) {
+            repeat(100) { iter ->
+                val k = 4
+                val problem = nvalueProblem(Array(k) { IntDomain(0, 3) }, IntDomain(0, k.toLong()), mode)
+                PropagationReasonOracle.assertReasonsImply(problem, "nvalue-$mode#$iter") { state ->
+                    (0 until 5).all {
+                        val v = rng.nextInt(k + 1)
+                        when (rng.nextInt(3)) {
+                            0 -> state.excludeIntValue(v, rng.nextInt(4).toLong())
+                            1 -> state.tightenIntMin(v, 1L + rng.nextInt(2))
+                            else -> state.tightenIntMax(v, 1L + rng.nextInt(3))
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `nvalue deductions over optional positions are implied by their reasons`() {
+        val rng = Random(0x57A3)
+        repeat(300) { iter ->
+            val k = 3
+            val problem = Problem(
+                numBoolVars = k,
+                numIntVars = k + 1,
+                intDomains = Array(k + 1) { IntDomain(0, 3) },
+                factors = arrayOf<Factor>(
+                    NValue(
+                        n = k,
+                        xs = IntArray(k) { it },
+                        mode = NValue.Mode.entries[rng.nextInt(3)],
+                        presents = IntArray(k) { Lit.make(it, true) },
+                    ),
+                ),
+            )
+            PropagationReasonOracle.assertReasonsImply(problem, "nvalue-opt#$iter") { state ->
+                (0 until k).all { b -> rng.nextInt(3) != 0 || state.pinBool(b, rng.nextBoolean()) } &&
+                    (0 until 4).all {
+                        val v = rng.nextInt(k + 1)
+                        when (rng.nextInt(3)) {
+                            0 -> state.excludeIntValue(v, rng.nextInt(4).toLong())
+                            1 -> state.tightenIntMin(v, 1L + rng.nextInt(2))
+                            else -> state.tightenIntMax(v, 1L + rng.nextInt(2))
+                        }
+                    }
+            }
         }
     }
 }

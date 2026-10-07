@@ -3,6 +3,7 @@ package com.eignex.klause.factor.global
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.factor.FactorPropagationOracle
+import com.eignex.klause.factor.PropagationReasonOracle
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
@@ -150,5 +151,24 @@ class SortPropagatorTest {
         val workA = assertNotNull(a.refPayload[0], "search a must hold its sort working state in refPayload")
         val workB = assertNotNull(b.refPayload[0], "search b must hold its sort working state in refPayload")
         assertTrue(workA !== workB, "each search must own a distinct SortWork; a shared instance is the race")
+    }
+
+    @Test
+    fun `sort deductions are implied by their reasons under carved holes`() {
+        val rng = Random(0x5022)
+        repeat(300) { iter ->
+            val n = 3
+            val problem = sortProblem(Array(2 * n) { IntDomain(0, 3) })
+            PropagationReasonOracle.assertReasonsImply(problem, "sort#$iter") { state ->
+                (0 until 5).all {
+                    val v = rng.nextInt(2 * n)
+                    when (rng.nextInt(3)) {
+                        0 -> state.excludeIntValue(v, rng.nextInt(4).toLong())
+                        1 -> state.tightenIntMin(v, 1L + rng.nextInt(2))
+                        else -> state.tightenIntMax(v, 1L + rng.nextInt(2))
+                    }
+                }
+            }
+        }
     }
 }

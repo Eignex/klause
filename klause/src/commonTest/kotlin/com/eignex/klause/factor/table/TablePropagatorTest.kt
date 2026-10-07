@@ -2,6 +2,7 @@ package com.eignex.klause.factor.table
 
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
+import com.eignex.klause.factor.PropagationReasonOracle
 import com.eignex.klause.factor.table.internals.TableGroupCache
 import com.eignex.klause.factor.table.internals.TableStr2State
 import com.eignex.klause.ir.Factor
@@ -297,5 +298,31 @@ class TablePropagatorTest {
 
         val withLiveSet = (0 until 3).count { state.refPayload[it] is TableStr2State }
         assertEquals(1, withLiveSet, "only the row that actually swept may hold a live set")
+    }
+
+    @Test
+    fun `table deductions are implied by their reasons under carved holes`() {
+        val rng = Random(0x7AB2)
+        repeat(300) { iter ->
+            val arity = 3
+            val problem = Problem(
+                numBoolVars = 0,
+                numIntVars = arity,
+                intDomains = Array(arity) { IntDomain(0, 3) },
+                factors = arrayOf<Factor>(
+                    Table(xs = IntArray(arity) { it }, tuples = LongArray(6 * arity) { rng.nextInt(4).toLong() }),
+                ),
+            )
+            PropagationReasonOracle.assertReasonsImply(problem, "table#$iter") { state ->
+                (0 until 4).all {
+                    val v = rng.nextInt(arity)
+                    when (rng.nextInt(3)) {
+                        0 -> state.excludeIntValue(v, rng.nextInt(4).toLong())
+                        1 -> state.tightenIntMin(v, rng.nextInt(2).toLong())
+                        else -> state.tightenIntMax(v, 2L + rng.nextInt(2))
+                    }
+                }
+            }
+        }
     }
 }

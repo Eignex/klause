@@ -27,7 +27,6 @@ internal class ArrayMinMaxPropagator(
         collectLinearTightenAntecedents(state, intVars, excludeIdx = -1, extraLit = 0)
 
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
-        val antResult = state.composeIntVarAtomAntecedents(intArrayOf(result))
         if (max) {
             var hiBound = Long.MIN_VALUE
             var loBound = Long.MIN_VALUE
@@ -50,6 +49,8 @@ internal class ArrayMinMaxPropagator(
                 return false
             }
             val rMax = state.intDomains[result].max
+            // The result's bound as it stands now, after this pass may have tightened it.
+            val antResult = state.composeIntVarAtomAntecedents(intArrayOf(result))
             for (i in xs) if (!state.tightenIntMax(i, rMax, antResult)) return false
         } else {
             var loBound = Long.MAX_VALUE
@@ -73,6 +74,7 @@ internal class ArrayMinMaxPropagator(
                 return false
             }
             val rMin = state.intDomains[result].min
+            val antResult = state.composeIntVarAtomAntecedents(intArrayOf(result))
             for (i in xs) if (!state.tightenIntMin(i, rMin, antResult)) return false
         }
         return true

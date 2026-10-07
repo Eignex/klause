@@ -2,6 +2,7 @@ package com.eignex.klause.factor.global
 
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
+import com.eignex.klause.factor.PropagationReasonOracle
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.bake
@@ -90,6 +91,30 @@ class ValuePrecedePropagatorTest {
             var t = rng.nextInt(4)
             if (t == s) t = (t + 1) % 4
             assertExact(s, t, domains)
+        }
+    }
+
+    @Test
+    fun `value precede deductions are implied by their reasons under carved holes`() {
+        val rng = Random(0x7A1E)
+        repeat(300) { iter ->
+            val n = 5
+            val problem = Problem(
+                numBoolVars = 0,
+                numIntVars = n,
+                intDomains = Array(n) { IntDomain(0, 3) },
+                factors = listOf(ValuePrecede(1L, 2L + rng.nextInt(2), IntArray(n) { it })),
+            )
+            PropagationReasonOracle.assertReasonsImply(problem, "value-precede#$iter") { state ->
+                (0 until 5).all {
+                    val v = rng.nextInt(n)
+                    when (rng.nextInt(3)) {
+                        0 -> state.excludeIntValue(v, rng.nextInt(4).toLong())
+                        1 -> state.tightenIntMin(v, 1L + rng.nextInt(2))
+                        else -> state.tightenIntMax(v, 1L + rng.nextInt(3))
+                    }
+                }
+            }
         }
     }
 }
