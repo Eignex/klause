@@ -661,22 +661,39 @@ internal fun PropagationState.boundAtomEstablishment(atomId: Int, truth: Boolean
  */
 internal fun PropagationState.boundEstablishment(v: Int, k: Long, lower: Boolean): BoundEstablishment? {
     if (!undoLogging) return null
-    var postLevel = if (lower) intMinLevel[v] else intMaxLevel[v]
-    var postReason = if (lower) intMinAntecedents[v] else intMaxAntecedents[v]
-    var postBound = if (lower) intDomains[v].min else intDomains[v].max
-    var i = undo.size - 1
-    while (i >= 0) {
-        if (undo.tag[i] == 1 && undo.varId[i] == v) {
-            val prior = requireNotNull(undo.domain[i])
-            val reached = if (lower) prior.min >= k else prior.max <= k
-            if (!reached) return established(v, k, lower, postLevel.coerceAtLeast(0), postReason, postBound)
-            postLevel = if (lower) undo.minLvl[i] else undo.maxLvl[i]
-            postReason = if (lower) undo.minAnt[i] else undo.maxAnt[i]
-            postBound = if (lower) prior.min else prior.max
-        }
-        i--
+    // The bound only tightens along the path, so the records whose prior bound already reached k form a
+    // prefix; the first record past it is the move that reached k, and its post-move state is the next
+    // record's prior state, or the live one.
+    val moves = boundMoves[v]
+    val count = moves?.size ?: 0
+    fun reachedBefore(j: Int): Boolean {
+        val prior = requireNotNull(undo.domain[requireNotNull(moves)[j]])
+        return if (lower) prior.min >= k else prior.max <= k
     }
-    return BoundEstablishment(0, null)
+    var lo = 0
+    var hi = count
+    while (lo < hi) {
+        val mid = (lo + hi) ushr 1
+        if (reachedBefore(mid)) hi = mid else lo = mid + 1
+    }
+    // Moves [lo, count) start already at k; lo == 0 means k held before any logged move, a root fact.
+    if (lo == 0) return BoundEstablishment(0, null)
+    val next = lo
+    val postLevel: Int
+    val postReason: IntArray?
+    val postBound: Long
+    if (next < count) {
+        val i = requireNotNull(moves)[next]
+        postLevel = if (lower) undo.minLvl[i] else undo.maxLvl[i]
+        postReason = if (lower) undo.minAnt[i] else undo.maxAnt[i]
+        val prior = requireNotNull(undo.domain[i])
+        postBound = if (lower) prior.min else prior.max
+    } else {
+        postLevel = if (lower) intMinLevel[v] else intMaxLevel[v]
+        postReason = if (lower) intMinAntecedents[v] else intMaxAntecedents[v]
+        postBound = if (lower) intDomains[v].min else intDomains[v].max
+    }
+    return established(v, k, lower, postLevel.coerceAtLeast(0), postReason, postBound)
 }
 
 // A move with no reason is a decision. The decided bound itself has none either, but a weaker one follows from
