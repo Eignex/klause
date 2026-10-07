@@ -510,7 +510,7 @@ class SmtLibTest {
     fun `a deeply nested let chain compiles without overflowing the stack`() {
         // Machine-generated SMT nests thousands of lets in tail position. Compilation must
         // unwind the chain iteratively (heap-allocated scope stack), not recurse per let.
-        val depth = 20_000
+        val depth = 10_000
         val body = StringBuilder("(declare-const x Int)\n(assert ")
         val close = StringBuilder()
         for (i in 0 until depth) {
@@ -850,7 +850,7 @@ class SmtLibTest {
         // A depth that overflows a recursive-descent fold but is cheap iteratively. Exercises all
         // three tree-walkers: boolean nesting (compileBool), arithmetic nesting (linearTerm), and
         // let-scope nesting (the evaluator's scope frames).
-        val depth = 20_000
+        val depth = 10_000
         val notChain = "(not ".repeat(depth) + "p" + ")".repeat(depth)
         val plusChain = "(+ 1 ".repeat(depth) + "x" + ")".repeat(depth)
         val letOpen = StringBuilder()

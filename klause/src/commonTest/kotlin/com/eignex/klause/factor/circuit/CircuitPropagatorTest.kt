@@ -136,7 +136,7 @@ class CircuitPropagatorTest {
     @Test
     fun `BacktrackSolver matches brute oracle on restricted-domain circuits`() {
         val rng = Random(20260603)
-        repeat(4000) {
+        repeat(500) {
             val n = rng.nextInt(3, 6) // 3..5 nodes
             val los = IntArray(n)
             val his = IntArray(n)

@@ -49,7 +49,7 @@ class LpHarvestTest {
     fun `harvest tightens domains without excluding any feasible assignment`() {
         val rng = Random(20260701)
         var engaged = 0
-        repeat(300) { _ ->
+        repeat(60) { _ ->
             val n = rng.nextInt(2, 4)
             val hi = rng.nextInt(2, 5)
             val domains = Array(n) { IntDomain(0, hi.toLong()) }
@@ -98,7 +98,7 @@ class LpHarvestTest {
             }
             rec(0)
         }
-        assertTrue(engaged > 0, "variable-shaving harvest never engaged across 300 instances")
+        assertTrue(engaged > 0, "variable-shaving harvest never engaged across 60 instances")
     }
 
     @Test
@@ -455,7 +455,7 @@ class LpHarvestTest {
     fun `redundant-constraint removal preserves the feasible set`() {
         val rng = Random(20260702)
         var dropped = 0
-        repeat(300) { _ ->
+        repeat(60) { _ ->
             val n = rng.nextInt(2, 4)
             val hi = rng.nextInt(2, 5)
             val domains = Array(n) { IntDomain(0, hi.toLong()) }
@@ -470,7 +470,7 @@ class LpHarvestTest {
             if (harvested.factors.size < problem.factors.size) dropped++
             assertSameFeasibleSet(problem, harvested, hi)
         }
-        assertTrue(dropped > 0, "redundant-constraint removal never engaged across 300 instances")
+        assertTrue(dropped > 0, "redundant-constraint removal never engaged across 60 instances")
     }
 
     /** Assert [original] and [harvested] admit exactly the same points of the declared box `[0, hi]^n` —

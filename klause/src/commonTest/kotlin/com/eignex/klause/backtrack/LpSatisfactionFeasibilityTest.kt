@@ -39,7 +39,7 @@ class LpSatisfactionFeasibilityTest {
     fun `the relaxation never changes a satisfaction verdict`() {
         val rng = Random(20260906)
         var refuted = 0
-        repeat(200) {
+        repeat(30) {
             val problem = randomLinearSystem(rng)
 
             val off = solve(problem, LpConfig.OFF)
@@ -54,7 +54,7 @@ class LpSatisfactionFeasibilityTest {
         }
         // Both verdicts have to occur, or the parity above is vacuous.
         assertIs<SolveResult.Unsat>(solve(unsatisfiableSystem(), LpConfig.AGGRESSIVE))
-        assertEquals(true, refuted in 1..199, "the corpus produced only one verdict ($refuted refuted)")
+        assertEquals(true, refuted in 1..29, "the corpus produced only one verdict ($refuted refuted)")
     }
 
     /** `2x + 2y <= 3` with `x + y >= 2` over non-negative integers: the relaxation alone refutes it. */

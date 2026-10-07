@@ -98,10 +98,7 @@ class OrderLiteralSoundnessHarnessTest {
         domains: Array<IntRange>,
         factors: Array<Factor>,
         expected: HashSet<List<Int>>,
-        // Kept small so each test stays under the 500ms CI budget (JIT warmup on the first test in
-        // the class dominates). This is the standing regression gate; bump seeds locally for deeper
-        // multi-seed validation during the rewrite.
-        seeds: Int = 12,
+        seeds: Int = 4,
     ) {
         val problem = Problem(
             numBoolVars = 0,

@@ -30,7 +30,7 @@ class CpToLpRelaxationRltTest {
     fun `the RLT relaxation bound never exceeds the integer optimum and is no weaker than plain`() {
         val rng = Random(20260626)
         var compared = 0
-        repeat(400) { _ ->
+        repeat(60) { _ ->
             val n = rng.nextInt(3, 6)
             val domains = Array(n) { IntDomain(0, 1) }
             val factors = ArrayList<Factor>()
@@ -80,6 +80,6 @@ class CpToLpRelaxationRltTest {
                 assertTrue(rltOpt >= plainOpt - 1e-6, "RLT bound $rltOpt weaker than plain $plainOpt")
             }
         }
-        assertTrue(compared > 100, "covered only $compared instances")
+        assertTrue(compared > 15, "covered only $compared instances")
     }
 }

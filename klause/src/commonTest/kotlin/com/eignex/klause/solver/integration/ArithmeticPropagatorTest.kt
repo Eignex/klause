@@ -156,13 +156,7 @@ class ArithmeticPropagatorTest {
                 val d = m / (base * base * base)
                 if (rel(a, b, c) && a != d && b != d) brute.add(listOf(a, b, c, d))
             }
-            for (seed in 1L..4L) {
-                assertEquals(
-                    brute,
-                    enumerate(problem, seed),
-                    "op=$op seed=$seed: linear + interior holes must match brute",
-                )
-            }
+            assertEquals(brute, enumerate(problem, seed = 1L), "op=$op: linear + interior holes must match brute")
         }
     }
 

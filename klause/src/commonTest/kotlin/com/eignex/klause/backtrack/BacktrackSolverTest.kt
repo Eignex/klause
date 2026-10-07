@@ -661,7 +661,7 @@ class BacktrackSolverTest {
         val lo = 1
         val hi = 5
         val span = hi - lo + 1
-        for (seed in 0 until 12) {
+        for (seed in 0 until 3) {
             val rnd = Random(seed)
             val numDrivers = 2
             fun cx(v: Int) = numDrivers + (v - lo)

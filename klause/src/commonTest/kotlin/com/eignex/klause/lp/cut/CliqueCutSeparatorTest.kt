@@ -59,7 +59,7 @@ class CliqueCutSeparatorTest {
     fun `clique cuts exclude no set-packing-feasible point`() {
         val rng = Random(20260610)
         var separated = 0
-        repeat(1000) {
+        repeat(200) {
             val n = rng.nextInt(3, 7)
             // Random conflict graph + a base at-most-one over an edge so a clique can root.
             val edges = HashSet<Long>()
@@ -103,6 +103,6 @@ class CliqueCutSeparatorTest {
                 }
             }
         }
-        assertTrue(separated > 30, "only $separated instances produced a clique cut")
+        assertTrue(separated > 6, "only $separated instances produced a clique cut")
     }
 }

@@ -29,9 +29,9 @@ class ApproxMCTest {
     @Test
     fun `large free instance is within the epsilon band of the exact count`() {
         // Cheapest config that still hashes: a smoke of the hashed pipeline, not the (ε, δ)
-        // guarantee. ε=2 shrinks the cell threshold to ≈38 (128 models exceed it), δ=0.99 floors
+        // guarantee. ε=2 shrinks the cell threshold to ≈38 (64 models exceed it), δ=0.99 floors
         // the iteration count; band is correspondingly loose, seed pinned for determinism.
-        val p = unconstrained(7)
+        val p = unconstrained(6)
         val exact = exactCount(p)
         val eps = 2.0
         val r = BacktrackSolver(p.bake()).approximateCount(
@@ -43,9 +43,9 @@ class ApproxMCTest {
 
     @Test
     fun `constrained instance is within the epsilon band`() {
-        // (x0 v x1) removes the 2^5 assignments with x0=x1=false: 96 models, above the ε=2 cell
+        // (x0 v x1) removes the 2^4 assignments with x0=x1=false: 48 models, above the ε=2 cell
         // threshold (≈38) so the constrained hashed path runs (cheapest smoke config, as above).
-        val n = 7
+        val n = 6
         val p = Problem(
             numBoolVars = n,
             numIntVars = 0,
