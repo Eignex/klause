@@ -11,6 +11,28 @@ import kotlin.test.assertTrue
 class FlatZincConstructionTest {
 
     @Test
+    fun `explicit integer sets preserve their distinct values across wide gaps`() {
+        val cases = listOf(
+            "32461759, 8, 0, 8" to listOf(0L, 8L, 32461759L),
+            "8, -1000000000000, 0, 8" to listOf(-1000000000000L, 0L, 8L),
+            "9223372036854775807" to listOf(Long.MAX_VALUE),
+        )
+        for ((entries, expected) in cases) {
+            for (declaration in listOf("var {$entries}: x;", "array[1..2] of var {$entries}: x;")) {
+                val program = parseFlatZinc("$declaration solve satisfy;")
+
+                for (id in 0 until program.problem.numIntVars) {
+                    val domain = program.problem.declaredIntDomains.finiteDomain(id)
+                    val values = domain.span()
+                    assertEquals(expected, List(values.size) { values.valueAt(it) })
+                    assertEquals(expected.first(), domain.min)
+                    assertEquals(expected.last(), domain.max)
+                }
+            }
+        }
+    }
+
+    @Test
     fun `a fixed set variable pins exactly its declared membership indicators`() {
         val program = parseFlatZinc("var set of {1, 2, 3}: s = {1, 3}; solve satisfy;")
 

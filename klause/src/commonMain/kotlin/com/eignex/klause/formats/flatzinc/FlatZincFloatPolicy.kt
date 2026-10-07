@@ -24,6 +24,7 @@ internal fun FlatZincCompiler.selectFloatNames(): Set<String> {
         forLocalSearch,
         unboundedIntLo,
         unboundedIntHi,
+        floatChoiceLimit = floatChoiceLimit,
     )
     declarations.processDeclarations()
     return FloatChoicePlanner(declarations, exactFloats, floatChoiceLimit).select()
@@ -42,7 +43,10 @@ private class FloatChoicePlanner(
 ) {
     private val model = declarations.model
     private val components = IntDisjointSet(declarations.intDomains.size)
-    private val references = model.constraints.map { c -> c.args.flatMap(::variables) }
+    private val domains = declarations.collectFiniteFloatDomains().associateBy { it.constraintIndex }
+    private val references = model.constraints.mapIndexed { index, c ->
+        (c.args.flatMap(::variables) + listOfNotNull(domains[index]?.variable?.varId)).distinct()
+    }
     private val singletons = declarations.floatVars.values.filter { it.lo == it.hi }
         .associate { it.varId to doubleArrayOf(it.lo) }
     private val choices = HashMap(singletons)
@@ -53,7 +57,7 @@ private class FloatChoicePlanner(
 
     fun select(): Set<String> {
         for (ids in references) for (id in ids.drop(1)) components.union(ids.first(), id)
-        for (c in model.constraints) recordChoices(c)
+        for (domain in domains.values) recordChoices(domain)
         for ((i, c) in model.constraints.withIndex()) {
             val ids = references[i]
             if (ids.isEmpty()) {
@@ -67,7 +71,7 @@ private class FloatChoicePlanner(
             }
             val root = components.find(ids.first())
             declarations.locateConstraint(c)
-            val alternatives = alternatives(c)
+            val alternatives = domains[i]?.values?.size ?: alternatives(c)
             if (alternatives == null) {
                 decline(root, c, "`${c.name}` is unsupported by exact float lowering")
             } else {
@@ -93,20 +97,25 @@ private class FloatChoicePlanner(
         blocked.add(root)
     }
 
-    private fun recordChoices(c: FznConstraint) {
-        if (c.name != "array_float_element" || c.args.size != 3) return
-        val id = variables(c.args[2]).singleOrNull() ?: return
+    private fun recordChoices(domain: FiniteFloatDomain) {
+        val id = domain.variable.varId
         if (id in singletons) return
-        declarations.locateConstraint(c)
-        val values = declarations.evalFloatConstArray(c.args[1]).distinct().toDoubleArray()
+        val values = domain.values.distinct().toDoubleArray()
         choices[id] = choices[id]?.filter { candidate -> values.any { it == candidate } }?.toDoubleArray() ?: values
     }
 
     private fun alternatives(c: FznConstraint): Int? = when {
         c.name == "array_float_element" && c.args.size == 3 -> declarations.evalFloatConstArray(c.args[1]).size
+
         c.name in FLOAT_LINEAR_NAMES -> 0
-        c.name == "float_div" && c.args.size == 3 && variables(c.args[1]).isEmpty() -> 0
+
+        c.name == "float_div" && c.args.size == 3 -> {
+            val denominator = variables(c.args[1]).singleOrNull()
+            if (denominator == null) 0 else choices[denominator]?.size
+        }
+
         c.name == "float_times" && c.args.size == 3 -> productAlternatives(c)
+
         else -> null
     }
 

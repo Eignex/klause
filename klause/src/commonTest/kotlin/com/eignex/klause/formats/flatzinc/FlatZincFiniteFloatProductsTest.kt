@@ -15,21 +15,115 @@ import kotlin.test.assertTrue
 
 class FlatZincFiniteFloatProductsTest {
     @Test
+    fun `finite integer denominators keep quotients continuous`() {
+        for (exact in listOf(false, true)) {
+            val program = parseFlatZinc(
+                """
+                var {0, 2, 3}: n :: output_var;
+                var float: denominator;
+                var 0.0..1.0: quotient :: output_var;
+                constraint float_div(0.75, denominator, quotient);
+                constraint int2float(n, denominator);
+                constraint int_eq(n, 2);
+                solve satisfy;
+                """.trimIndent(),
+                floatBuckets = 2,
+                exactFloats = exact,
+            )
+
+            assertTrue(program.floatVarsByName.getValue("quotient").lpOnly)
+            assertTrue(program.floatVarsByName.getValue("denominator").lpOnly)
+        }
+    }
+
+    @Test
+    fun `a variable zero denominator cannot divide zero`() {
+        val program = parseFlatZinc(
+            """
+            var 1..1: i;
+            var float: denominator;
+            var float: quotient;
+            constraint float_div(0.0, denominator, quotient);
+            constraint array_float_element(i, [0.0], denominator);
+            solve satisfy;
+            """.trimIndent(),
+            exactFloats = true,
+        )
+
+        val result = BacktrackSolver(program.problem.bake()).solve(BacktrackParams(randomSeed = 0L))
+
+        assertIs<SolveResult.Unsat>(result)
+    }
+
+    @Test
+    fun `disjunctions preserve finite products through float and boolean aliases`() {
+        for ((cover, exact) in listOf("bool_clause(guards, [])" to false, "array_bool_or(guards, true)" to true)) {
+            val program = parseFlatZinc(
+                """
+                var 0.0..1.0: x;
+                var 0.0..1.0: y;
+                var 0.0..1.0: z :: output_var;
+                array[1..1] of var float: values = [x];
+                var bool: a;
+                var bool: b;
+                var bool: alias = b;
+                array[1..2] of var bool: guards = [a, b];
+                constraint $cover;
+                constraint float_times(y, values[1], z);
+                constraint float_eq(y, 0.5);
+                constraint bool_eq(b, true);
+                constraint float_eq_reif(0.125, x, guards[1]);
+                constraint float_eq_reif(values[1], 0.375, alias);
+                solve satisfy;
+                """.trimIndent(),
+                floatBuckets = 2,
+                exactFloats = exact,
+            )
+
+            val result = BacktrackSolver(program.problem.bake()).solve(BacktrackParams(randomSeed = 0L))
+
+            val assignment = assertIs<SolveResult.Sat>(result).assignment
+            assertTrue("z = 0.1875;" in writeFlatZincSolution(program, assignment))
+        }
+    }
+
+    @Test
+    fun `disjoint disjunction and array choices are unsatisfiable`() {
+        val program = parseFlatZinc(
+            """
+            var float: x;
+            var bool: a;
+            var bool: b;
+            var 1..1: i;
+            constraint bool_clause([a, b], []);
+            constraint array_float_element(i, [0.5], x);
+            constraint float_eq_reif(x, 0.125, a);
+            constraint float_eq_reif(x, 0.375, b);
+            solve satisfy;
+            """.trimIndent(),
+        )
+
+        assertIs<PropagationResult.Unsat>(program.problem.baked)
+    }
+
+    @Test
     fun `selecting a finite float value excludes the other choices during propagation`() {
         for (count in listOf(3, 6)) {
             val entries = (1..count).joinToString(", ") { "$it.0" }
-            val model = FlatZincParser(
-                FlatZincLexer(
-                    "var 1..1: i; var float: x; constraint array_float_element(i, [$entries], x); solve satisfy;",
-                ),
-            ).parse()
-            val compiler = FlatZincCompiler(model)
-            val program = compiler.compile()
+            val sources = listOf(
+                "var 1..1: i; var float: x; constraint array_float_element(i, [$entries], x); solve satisfy;",
+                "var 1..$count: n; var float: x; constraint int2float(n, x); constraint int_eq(n, 1); solve satisfy;",
+            )
+            for (source in sources) {
+                val model = FlatZincParser(FlatZincLexer(source)).parse()
+                val compiler = FlatZincCompiler(model)
+                val program = compiler.compile()
 
-            val deductions = assertIs<PropagationResult.Implied>(program.problem.baked)
-            for ((key, literal) in compiler.floatValueLiterals) {
-                val pinned = deductions.boolValueOrNull(Lit.variable(literal))
-                assertEquals(key.second == 1.0, pinned?.let { Lit.evaluate(literal, it) })
+                val deductions = assertIs<PropagationResult.Implied>(program.problem.baked)
+                for ((key, literal) in compiler.floatValueLiterals) {
+                    val pinned = deductions.boolValueOrNull(Lit.variable(literal))
+                    assertEquals(key.second == 1.0, pinned?.let { Lit.evaluate(literal, it) })
+                }
             }
         }
     }

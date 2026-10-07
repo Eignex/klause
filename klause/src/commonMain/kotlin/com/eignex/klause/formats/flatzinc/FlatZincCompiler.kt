@@ -12,6 +12,7 @@ import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.intdomain.intDomainFromSurvivors
 import com.eignex.klause.lowering.CnfLowering
 import com.eignex.klause.lowering.FloatBucketing
 import com.eignex.klause.util.CharReader
@@ -65,6 +66,7 @@ internal class FlatZincCompiler(
     internal val realHi = ArrayList<Double>()
     internal val finiteFloatChoices = HashMap<Int, DoubleArray>()
     internal val floatValueLiterals = HashMap<Pair<Int, Double>, Int>()
+    internal val integerFloatSources = HashMap<Int, Int>()
 
     // Float var name -> the integer argument of the `int2float` that defines it (the float is that int's
     // continuous image). Lets a `float_times` with one such operand lower as an exact int·real product
@@ -84,9 +86,8 @@ internal class FlatZincCompiler(
         lpOnlyFloats = selectFloatNames()
         processDeclarations()
         if (lpOnlyFloats.isNotEmpty()) {
-            for (c in model.constraints) {
-                locateConstraint(c)
-                recordFiniteFloatChoices(c)
+            for (domain in collectFiniteFloatDomains()) {
+                recordFiniteFloatChoices(domain)
             }
             emitFiniteFloatDomains()
         }
@@ -396,16 +397,10 @@ internal class FlatZincCompiler(
 
     /** Allocate int var with an explicit sparse domain. */
     internal fun allocIntSet(name: String, t: FznType.IntSet): Int {
-        val sorted = t.values.distinct().sorted()
+        val sorted = t.values.distinct().sorted().toLongArray()
         if (sorted.isEmpty()) failHere("int variable `$name` has an empty domain")
         val id = allocInt(name, sorted.first(), sorted.last())
-        var dom = intDomains[id]
-        var prev = sorted.first()
-        for (v in sorted) {
-            for (gap in prev + 1 until v) dom = dom.excludeValue(gap)
-            prev = v
-        }
-        intDomains[id] = dom
+        intDomains[id] = intDomainFromSurvivors(sorted)
         return id
     }
 

@@ -14,6 +14,83 @@ import kotlin.test.assertTrue
 
 class FlatZincFloatPolicyTest {
     @Test
+    fun `integer images do not enumerate oversized or rounded domains`() {
+        for (domain in listOf("0..1000000000000", "{9007199254740993}")) {
+            val source = """
+                var $domain: n;
+                var 0.0..1.0: y;
+                var float: denominator;
+                constraint int2float(n, denominator);
+                constraint float_div(0.75, denominator, y);
+                solve satisfy;
+            """.trimIndent()
+
+            assertFailsWith<UnsupportedFlatZincException> { parseFlatZinc(source, exactFloats = true) }
+        }
+    }
+
+    @Test
+    fun `conditional and mixed disjunctions do not provide finite float domains`() {
+        val covers = listOf(
+            "bool_clause([a, b], [other])",
+            "bool_clause([a, b, other], [])",
+            "bool_clause([a, other], [])",
+            "bool_clause([a, b, true], [])",
+            "array_bool_or([a, b], other)",
+        )
+        for (cover in covers) {
+            val source = """
+                var 0.0..1.0: x;
+                var 0.0..1.0: y;
+                var 0.0..1.0: z;
+                var bool: a;
+                var bool: b;
+                var bool: other;
+                constraint $cover;
+                constraint float_eq_reif(x, 0.125, a);
+                constraint float_eq_reif(x, 0.375, b);
+                constraint float_eq_reif(y, 0.5, other);
+                constraint float_times(x, y, z);
+                solve satisfy;
+            """.trimIndent()
+
+            val program = parseFlatZinc(source, floatBuckets = 2)
+
+            assertFalse(program.floatVarsByName.getValue("x").lpOnly)
+            assertFailsWith<UnsupportedFlatZincException> { parseFlatZinc(source, exactFloats = true) }
+        }
+    }
+
+    @Test
+    fun `disjunctive choices count toward the finite expansion limit`() {
+        val source = """
+            var 0.0..1.0: x;
+            var 0.0..1.0: y;
+            var 0.0..1.0: z;
+            var bool: a;
+            var bool: b;
+            var bool: duplicate;
+            constraint bool_clause([a, b, duplicate], []);
+            constraint float_eq_reif(x, 0.125, a);
+            constraint float_eq_reif(x, 0.375, b);
+            constraint float_eq_reif(x, 0.125, duplicate);
+            constraint float_times(x, y, z);
+            solve satisfy;
+        """.trimIndent()
+        for (limit in listOf(4, 5)) {
+            val model = FlatZincParser(FlatZincLexer(source)).parse()
+
+            val program = FlatZincCompiler(model, floatBuckets = 2, floatChoiceLimit = limit).compile()
+
+            assertEquals(limit == 5, program.floatVarsByName.getValue("x").lpOnly)
+        }
+        val model = FlatZincParser(FlatZincLexer(source)).parse()
+        assertFailsWith<UnsupportedFlatZincException> {
+            FlatZincCompiler(model, exactFloats = true, floatChoiceLimit = 4).compile()
+        }
+    }
+
+    @Test
     fun `default products preserve finite choices and intermediate values`() {
         val program = parseFlatZinc(
             """

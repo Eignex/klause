@@ -276,8 +276,17 @@ internal fun FlatZincCompiler.emitFloatMinMax(c: FznConstraint, max: Boolean) {
  *  arity is checked before the args are reordered so a truncated call fails with a located error. */
 internal fun FlatZincCompiler.emitFloatDiv(c: FznConstraint) {
     expectArity(c, 3)
-    if ((resolveFloatVarOrConst(c.args[1]) as? FloatRef.Const)?.value == 0.0) {
+    val denominator = resolveFloatVarOrConst(c.args[1])
+    if ((denominator as? FloatRef.Const)?.value == 0.0) {
         failHere("float_div: division by zero")
+    }
+    if (denominator is FloatRef.Var) {
+        emitFloatBinaryCmp(
+            FznConstraint("float_ne", listOf(c.args[1], FznExpr.FloatLit(0.0)), emptyList()),
+            LinearOp.NE,
+            strict = false,
+            reified = false,
+        )
     }
     emitFloatTimes(
         FznConstraint(
