@@ -89,7 +89,7 @@ internal class BacktrackWorkerConfig(
                 params = params.copy(
                     improvedSolutionSink = { sample, objective -> sols.offer(sample, objective) },
                     pooledIncumbents = sols,
-                    solutionPhasing = true,
+                    solutionPhasing = false,
                 )
             }
         }
