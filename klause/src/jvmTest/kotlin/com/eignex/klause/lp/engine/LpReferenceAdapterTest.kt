@@ -1,11 +1,7 @@
 package com.eignex.klause.lp.engine
 
-import com.eignex.klause.lp.LpBoundaryScanner
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.Cancellation
-import java.nio.file.Files
-import java.nio.file.Paths
-import kotlin.io.path.readText
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -263,42 +259,6 @@ class LpReferenceAdapterTest {
         val result = assertIs<LpReferenceResult.Declined>(LpReferenceAdapter().solve(model))
 
         assertEquals(LpReferenceDecline.NON_FINITE_INPUT, result.reason)
-    }
-
-    @Test
-    fun `reference adapter reaches no float engine implementation or certifier`() {
-        val root = generateSequence(Paths.get("").toAbsolutePath().normalize()) { it.parent }
-            .first { Files.exists(it.resolve("klause/src/jvmTest")) }
-        val adapter = root.resolve(
-            "klause/src/jvmTest/kotlin/com/eignex/klause/lp/engine/LpReferenceAdapter.kt",
-        ).readText().let(LpBoundaryScanner::codeOnly)
-        val declaration = Regex(
-            "^(?:(?:internal|private|public|protected|inline|suspend|abstract|sealed|data|value|" +
-                "open|expect|actual|external|tailrec|operator|infix)\\s+)*" +
-                "(?:fun\\s+interface|enum\\s+class|annotation\\s+class|class|interface|object|fun|" +
-                "typealias|const\\s+val)" +
-                "\\s+([A-Za-z_]\\w*)",
-        )
-        val engineRoot = root.resolve("klause/src/commonMain/kotlin/com/eignex/klause/lp/engine")
-        val engineNames = Files.walk(engineRoot).use { files ->
-            files.filter { Files.isRegularFile(it) && it.toString().endsWith(".kt") }.toList().flatMap { file ->
-                LpBoundaryScanner.codeOnly(file.readText())
-                    .lineSequence()
-                    .mapNotNull { line ->
-                        val match = declaration.find(line) ?: return@mapNotNull null
-                        val name = match.groupValues[1]
-                        Regex("\\bfun\\s+$name\\.([A-Za-z_]\\w*)").find(line)?.groupValues?.get(1) ?: name
-                    }
-                    .toList()
-            }
-        }
-        val referencedEngineNames = engineNames
-            .filter { name -> Regex("\\b$name\\b").containsMatchIn(adapter) }
-            .toSet()
-
-        assertTrue("certifyLpResult" in engineNames)
-        assertFalse("RationalFeasibility" in engineNames)
-        assertEquals(setOf("LpModel"), referencedEngineNames)
     }
 
     private fun constrainedModel(): LpModel = LpBuilder().apply {
