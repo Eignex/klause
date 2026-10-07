@@ -333,6 +333,8 @@ internal class ResumableMinimize(
 
                     StepEvent.Paused -> {
                         slice.noteOverspend()
+                        // Restarts sample root fixings too, but an arm that restarts rarely would show none of its own.
+                        sink.search.observeRootFixed(session.rootFixedVariableCount())
                         return null
                     }
                 }

@@ -52,6 +52,8 @@ internal class ResumableSatisfaction(private val solver: BacktrackSolver, params
             val outcome = traversal.next()
             if (outcome == null) {
                 slice.noteOverspend()
+                // Restarts sample root fixings too, but an arm that restarts rarely would show none of its own.
+                sink.search.observeRootFixed(traversal.rootFixedVariableCount())
                 return null
             }
             return solver.verdictOf(outcome, assumptions, Cancellation { globalToken() }, sink).also {
