@@ -191,5 +191,29 @@ class PortfolioWorker private constructor(
             withInstructions = countsInstructions,
             closeFn = {},
         )
+
+        /**
+         * An optimizing worker over an engine that has no [Session]: [improvements] streams one segment's incumbents
+         * given the shared bound, the portfolio's incumbent, the segment's cancellation and, when [countsInstructions],
+         * its counted allowance. With [resumable] a [Portfolio] resumes one handle each segment instead. It neither
+         * solves nor samples.
+         */
+        internal fun ofMinimize(
+            label: String,
+            armId: Int,
+            countsInstructions: Boolean = false,
+            resumable: ((readBound: () -> Double) -> ResumableSearch)? = null,
+            improvements: (() -> Double, Sample?, Cancellation, Long?) -> Sequence<MinimizeResult>,
+        ): PortfolioWorker = PortfolioWorker(
+            label = label,
+            armId = armId,
+            solveFn = { _, _ -> error("PortfolioWorker '$label' only minimizes") },
+            improvementsFn = improvements,
+            samplesFn = { emptySequence() },
+            resumableFn = resumable,
+            resumableSolveFn = null,
+            withInstructions = countsInstructions,
+            closeFn = {},
+        )
     }
 }

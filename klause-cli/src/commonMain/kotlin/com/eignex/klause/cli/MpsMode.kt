@@ -92,14 +92,7 @@ internal object MpsMode : CliMode {
                     if (compiled.model.numIntVars == 0 && compiled.model.numRealVars != 0) {
                         unsupportedOpenMpsModel()
                     }
-                    if (!compiled.sourceExact) {
-                        throw MpsLoweringException(
-                            "open MPS source differs from the lowered model at ${compiled.sourceDifference}",
-                        )
-                    }
-                    if (compiled.objective?.realCoefficients?.any { it != 0.0 } == true) {
-                        throw MpsLoweringException("open MPS optimization over a continuous objective is unsupported")
-                    }
+                    requireOpenMpsSource(compiled)
                     openTheorySolvable(
                         route.request,
                         { assignment -> renderMpsOpenModel(compiled, assignment) },
@@ -108,7 +101,19 @@ internal object MpsMode : CliMode {
                     )
                 }
 
-                is SourceProblemRoute.UnsupportedOpen -> unsupportedOpenMpsModel()
+                // No theory decides it, so local search looks for incumbents alone.
+                is SourceProblemRoute.UnsupportedOpen -> {
+                    if (compiled.model.numIntVars == 0 && compiled.model.numBoolVars == 0) unsupportedOpenMpsModel()
+                    requireOpenMpsSource(compiled)
+                    openLocalSearchSolvable(
+                        route.problem,
+                        { assignment -> renderMpsOpenModel(compiled, assignment) },
+                        routingLpStats,
+                        routingElapsedMs,
+                        objective = if (compiled.maximize) objective?.negated() else objective,
+                        maximize = compiled.maximize,
+                    )
+                }
 
                 SourceProblemRoute.Refuted -> refutedSolvable(routingLpStats, routingElapsedMs)
             }
@@ -126,6 +131,16 @@ internal object MpsMode : CliMode {
 
 private fun unsupportedOpenMpsModel(): Nothing =
     throw MpsLoweringException("open MPS models require a supported theory pipeline")
+
+// An open route reads the lowered model exactly and optimizes an integral objective, so both must hold.
+private fun requireOpenMpsSource(compiled: MpsCompiled) {
+    if (!compiled.sourceExact) {
+        throw MpsLoweringException("open MPS source differs from the lowered model at ${compiled.sourceDifference}")
+    }
+    if (compiled.objective?.realCoefficients?.any { it != 0.0 } == true) {
+        throw MpsLoweringException("open MPS optimization over a continuous objective is unsupported")
+    }
+}
 
 // MPS results use tolerance semantics: a float leaf stands when the source rows hold within MPS_TOLERANCE.
 private fun mpsLinearSolvable(compiled: MpsCompiled, exact: Boolean, solvable: Solvable): Solvable = if (exact) {
