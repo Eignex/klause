@@ -156,6 +156,7 @@ fun FinitePipeline.planPortfolio(request: PortfolioPlanRequest): PortfolioPlan {
             zeroObjectivePricing = request.zeroObjectivePricing,
             lsPool = lsResolution.pool,
             btPool = btPool,
+            nodeBudget = request.nodeBudget,
             annotationArm = request.annotationArm?.copy(
                 nodeBudget = request.nodeBudget,
                 zeroObjectivePricing = request.zeroObjectivePricing,

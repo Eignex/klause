@@ -21,6 +21,10 @@ package com.eignex.klause.backtrack
  * four times gave one number. That is what a comparison needs, and what a wall-clock budget cannot give —
  * the same pair of builds measured 622 against 2371 nodes on a loaded box and neutral in a lull.
  *
+ * Local search has no nodes, so it charges its moves at the rate a portfolio prices them against a node
+ * ([LS_INSTRUCTIONS_PER_WORK]), and stops its run at the move that would pass the allowance. A local-search run
+ * under the cap is therefore as reproducible as a backtrack one.
+ *
  * Deliberately **not** synchronised. Under a parallel pool the arms race on the counter, so the cap stays
  * a bound but stops being reproducible; single-worker runs are what it is for.
  */
@@ -33,15 +37,32 @@ class NodeBudget(
     }
 
     private var used: Long = 0L
+    private var moves: Long = 0L
 
-    /** Nodes visited against this allowance. */
-    val spent: Long get() = used
+    /** Node equivalents spent against this allowance: nodes visited, and local-search moves at their price. */
+    val spent: Long get() = used + (moves / LS_INSTRUCTIONS_PER_WORK).toLong()
 
     /** Record one visited decision node against the allowance. */
     internal fun spend() {
         used++
     }
 
+    /** Record [count] local-search moves against the allowance. */
+    internal fun spendMoves(count: Long) {
+        moves += count
+    }
+
+    /** Local-search moves the allowance still covers. */
+    internal fun movesLeft(): Long =
+        ((limit - used) * LS_INSTRUCTIONS_PER_WORK).toLong().minus(moves).coerceAtLeast(0L)
+
     /** Whether the allowance is gone. A driver's cancellation token reads this to stop re-entering. */
-    fun exhausted(): Boolean = used >= limit
+    fun exhausted(): Boolean = spent >= limit
 }
+
+/**
+ * Local-search instructions that cost as much as one backtrack search node, LP work included: the median ratio of
+ * local-search moves per second to backtrack work per second, each engine alone on one core for 10s, over the 28
+ * MiniZinc models where both ran (spread 0.17 to 69, geometric mean 1.9).
+ */
+internal const val LS_INSTRUCTIONS_PER_WORK: Double = 1.5

@@ -8,7 +8,7 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.CandidateCompletion
 import com.eignex.klause.localsearch.Completion
-import com.eignex.klause.portfolio.LS_INSTRUCTIONS_PER_WORK
+import com.eignex.klause.backtrack.LS_INSTRUCTIONS_PER_WORK
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.util.Cancellation

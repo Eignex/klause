@@ -184,28 +184,32 @@ internal class Alns(
             // only by [maxIterations] and cancellation, as before this seam existed.
             val instructionBudget = params.maxInstructions
             var instructionsUsed = 0L
+            val nodeBudget = params.nodeBudget
 
             var iter = 0
             while (iter < maxIterations && (instructionBudget == null || instructionsUsed < instructionBudget)) {
-                if (params.cancellation()) break
+                if (params.cancellation() || nodeBudget?.movesLeft() == 0L) break
                 // This iteration's repair allowance: flipsPerIteration, clipped to whatever budget remains
                 // so the last counted iteration can't overshoot by a whole flipsPerIteration.
-                val iterFlips = if (instructionBudget != null) {
-                    minOf(flipsPerIteration, instructionBudget - instructionsUsed)
-                } else {
-                    flipsPerIteration
-                }
+                val iterFlips = minOf(
+                    flipsPerIteration,
+                    instructionBudget?.let { it - instructionsUsed } ?: Long.MAX_VALUE,
+                    nodeBudget?.movesLeft() ?: Long.MAX_VALUE,
+                )
                 val perIterParams = params.copy(
                     maxFlips = iterFlips,
                     // Each iteration's RNG seed varies via the bandit's RNG; explicit null lets the
                     // inner solver draw its own per-call seed.
                     randomSeed = null,
+                    // The iteration's allowance is charged below, whatever its repair spends.
+                    nodeBudget = null,
                 )
                 // Charge the iteration's allowance up front — a destroy that frees nothing, or a repair
                 // that rejects, still consumed the bandit picks and (for a repair op that ran) whatever
                 // portion of iterFlips it used; charging the declared unit keeps counting deterministic
                 // and independent of what happened inside, same as LocalSearchSolver's counted restart.
                 instructionsUsed += iterFlips
+                nodeBudget?.spendMoves(iterFlips)
                 pooled.poll(bestObj)?.let { (sample, obj) ->
                     bestSample = sample
                     bestObj = obj

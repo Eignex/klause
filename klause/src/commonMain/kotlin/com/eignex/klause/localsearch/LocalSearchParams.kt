@@ -1,5 +1,6 @@
 package com.eignex.klause.localsearch
 
+import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.factor.DEFAULT_VIOLATION_SOFT_CAP
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.solver.Sample
@@ -30,6 +31,11 @@ data class LocalSearchParams(
      * `null` = no cap. Exists so callers can use one budget name across the backends' param objects.
      */
     val maxInstructions: Long? = null,
+    /**
+     * The solve-wide node allowance this run also spends, at [com.eignex.klause.backtrack.LS_INSTRUCTIONS_PER_WORK]
+     * moves per node; the run stops at the move that would pass it. `null` = none.
+     */
+    val nodeBudget: NodeBudget? = null,
     /** Seed for the search RNG; null picks a nondeterministic seed. */
     val randomSeed: Long? = null,
     /** Variables to pin for the duration of this call. The solver initialises them to
