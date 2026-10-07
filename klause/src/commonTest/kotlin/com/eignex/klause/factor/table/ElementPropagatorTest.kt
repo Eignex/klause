@@ -21,6 +21,7 @@ import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.propagation.factorAt
+import com.eignex.klause.propagation.holeReasonFor
 import com.eignex.klause.propagation.propagate
 import com.eignex.klause.propagation.propagatorProjection
 import com.eignex.klause.propagation.reasonOf
@@ -442,6 +443,32 @@ class ElementPropagatorTest {
             Triple(state.atoms.intVar[atom], state.atoms.kind[atom], state.atoms.threshold[atom])
         }
         assertEquals(setOf(Triple(0, AtomKind.EQ, 1L), Triple(0, AtomKind.EQ, 3L)), cited.toSet())
+    }
+
+    @Test
+    fun `a variable-array element drops a position citing only how its cell misses the result`() {
+        // The result is at most 3 and cell 1 at least 5, so position 1 goes; cell 2's hole and cell 0's bound play
+        // no part.
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 5,
+            intDomains = arrayOf(IntDomain(0, 2), IntDomain(0, 9), IntDomain(0, 9), IntDomain(0, 9), IntDomain(0, 9)),
+            factors = arrayOf<Factor>(Element(idx = 0, result = 1, arr = longArrayOf(2, 3, 4), arrIsVars = true, indexOffset = 0)),
+        )
+        val state = PropagationState(problem, Assumptions.None)
+        state.undoLogging = true
+        state.currentLevel = 1
+        check(state.tightenIntMax(1, 3) && state.tightenIntMin(3, 5) && state.excludeIntValue(4, 7))
+        check(state.tightenIntMin(2, 1))
+        state.currentFactor = 0
+
+        check(state.factorAt(0).propagate(state, 0))
+
+        val cited = state.reasonOf(state.holeReasonFor(0, 1L))!!.map { lit ->
+            val atom = Lit.variable(lit) - problem.numBoolVars
+            Triple(state.atoms.intVar[atom], state.atoms.kind[atom], state.atoms.threshold[atom])
+        }
+        assertEquals(setOf(Triple(1, AtomKind.LE, 3L), Triple(3, AtomKind.GE, 5L)), cited.toSet())
     }
 
     @Test
