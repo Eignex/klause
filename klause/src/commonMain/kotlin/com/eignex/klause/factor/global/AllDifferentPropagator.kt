@@ -1,13 +1,15 @@
 package com.eignex.klause.factor.global
 
 import com.eignex.klause.factor.global.internals.ReginCache
-import com.eignex.klause.factor.global.internals.antecedentsWithPremises
+import com.eignex.klause.factor.global.internals.explainBoundsHall
+import com.eignex.klause.factor.global.internals.hallReason
 import com.eignex.klause.factor.global.internals.boundsAllDifferentFilter
 import com.eignex.klause.factor.global.internals.reginFilter
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.propagation.IntEvent
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.Propagator
+import com.eignex.klause.propagation.boolPinnedAt
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.LongHashSet
@@ -40,11 +42,18 @@ internal class AllDifferentPropagator(
             null
         }
 
-    override fun conflictReason(state: PropagationState, factorId: Int): IntArray? = antecedentsWithPremises(
-        state,
-        (state.refPayload[factorId] as? ReginCache)?.conflictVars ?: vars,
-        presencePremises(state),
-    )
+    // The Hall violators behind the last failure: their domains' union holds fewer values than they need.
+    override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
+        hallReason(state, (state.refPayload[factorId] as? ReginCache)?.conflictVars ?: vars, presencePremises(state))
+
+    override fun explain(state: PropagationState, factorId: Int, payload: IntArray, atTrail: Int, atLevel: Int) =
+        explainBoundsHall(state, vars, { presentAt(state, it, atTrail) }, payload, atTrail, atLevel)
+
+    private fun presentAt(state: PropagationState, i: Int, atTrail: Int): Boolean {
+        if (presents.isEmpty()) return true
+        val v = Lit.variable(presents[i])
+        return state.boolPinnedAt(v, atTrail) && state.boolValues[v] == Lit.isPositive(presents[i])
+    }
 
     /**
      * The literals falsified by "every filtered position is present" — one per definitely-present
