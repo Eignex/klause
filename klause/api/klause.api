@@ -9517,23 +9517,25 @@ public final class com/eignex/klause/solver/pipeline/VariablePartitionKt {
 }
 
 public final class com/eignex/klause/solver/result/ArmSchedule {
-	public fun <init> (Ljava/lang/String;JJDJJLjava/util/Map;)V
-	public synthetic fun <init> (Ljava/lang/String;JJDJJLjava/util/Map;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Ljava/lang/String;JJJDJJLjava/util/Map;)V
+	public synthetic fun <init> (Ljava/lang/String;JJJDJJLjava/util/Map;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Ljava/lang/String;
 	public final fun component2 ()J
 	public final fun component3 ()J
-	public final fun component4 ()D
-	public final fun component5 ()J
+	public final fun component4 ()J
+	public final fun component5 ()D
 	public final fun component6 ()J
-	public final fun component7 ()Ljava/util/Map;
-	public final fun copy (Ljava/lang/String;JJDJJLjava/util/Map;)Lcom/eignex/klause/solver/result/ArmSchedule;
-	public static synthetic fun copy$default (Lcom/eignex/klause/solver/result/ArmSchedule;Ljava/lang/String;JJDJJLjava/util/Map;ILjava/lang/Object;)Lcom/eignex/klause/solver/result/ArmSchedule;
+	public final fun component7 ()J
+	public final fun component8 ()Ljava/util/Map;
+	public final fun copy (Ljava/lang/String;JJJDJJLjava/util/Map;)Lcom/eignex/klause/solver/result/ArmSchedule;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/result/ArmSchedule;Ljava/lang/String;JJJDJJLjava/util/Map;ILjava/lang/Object;)Lcom/eignex/klause/solver/result/ArmSchedule;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getCredit ()Ljava/util/Map;
 	public final fun getFailures ()J
 	public final fun getFaults ()J
 	public final fun getLabel ()Ljava/lang/String;
 	public final fun getMeanReward ()D
+	public final fun getMillis ()J
 	public final fun getSegments ()J
 	public final fun getWork ()J
 	public fun hashCode ()I
