@@ -1,10 +1,12 @@
 package com.eignex.klause.factor.arithmetic.internals
 
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.BIG_ZERO
 import com.eignex.klause.util.BigInt
+import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.bigIntOf
 import com.eignex.klause.util.compareTo
 import com.eignex.klause.util.div
@@ -25,6 +27,38 @@ import com.eignex.klause.util.toLongExact
 
 private val LONG_MAX = bigIntOf(Long.MAX_VALUE)
 private val LONG_MIN = bigIntOf(Long.MIN_VALUE)
+
+/**
+ * The bounds behind one side of the activity range, excluding term [excludeIdx]: each other term's least
+ * contribution ([useLo]) or greatest, its lower bound for a positive coefficient and its upper bound for a
+ * negative one (the reverse for the greatest), with the reifying [auxLit] when given. Root bounds are facts and
+ * drop out.
+ */
+internal fun wideSideReason(
+    state: PropagationState,
+    vars: IntArray,
+    coeffs: Array<BigInt>,
+    useLo: Boolean,
+    excludeIdx: Int,
+    auxLit: Int?,
+): IntArray? {
+    val out = IntArrayList()
+    if (auxLit != null) out.add(auxLit)
+    for (j in vars.indices) {
+        if (j == excludeIdx || coeffs[j] == BIG_ZERO) continue
+        val v = vars[j]
+        val d = state.intDomains[v]
+        val root = state.rootDomains[v]
+        val citeMin = useLo == (coeffs[j] > BIG_ZERO)
+        val lit = when {
+            citeMin && d.min > root.min -> Lit.make(state.atomVarGe(v, d.min), false)
+            !citeMin && d.max < root.max -> Lit.make(state.atomVarLe(v, d.max), false)
+            else -> Lit.NONE
+        }
+        if (lit != Lit.NONE && !out.contains(lit)) out.add(lit)
+    }
+    return if (out.size == 0) null else out.toIntArray()
+}
 
 /** `[sumLo, sumHi]`, the exact activity range of `Σ coeffs·vars` over the current domains. */
 internal fun wideSumRange(state: PropagationState, vars: IntArray, coeffs: Array<BigInt>): Pair<BigInt, BigInt> {
@@ -91,8 +125,12 @@ internal fun wideEnforceRow(
     if (wideNeverHolds(op, sumLo, sumHi, bound)) return false
     val rootFact = state.currentLevel == 0
     val includeAux = auxLit != null
+    // An NE deduction reads every other term pinned, so both bounds.
     fun ant(i: Int): IntArray? =
         if (rootFact && !includeAux) null else collectLinearTightenAntecedents(state, vars, i, auxLit ?: 0, includeAux)
+    // A bound from the `≤` side reads the other terms' least contributions, from the `≥` side their greatest.
+    fun sideAnt(i: Int, useLo: Boolean): IntArray? =
+        if (rootFact && !includeAux) null else wideSideReason(state, vars, coeffs, useLo, i, auxLit)
     if (op == LinearOp.NE) {
         for (i in 0 until n) {
             val c = coeffs[i]
@@ -111,8 +149,8 @@ internal fun wideEnforceRow(
         val c = coeffs[i]
         if (c == BIG_ZERO) continue
         val v = vars[i]
-        val a = ant(i)
         if (op == LinearOp.LE || op == LinearOp.EQ) {
+            val a = sideAnt(i, useLo = true)
             val slack = bound - (sumLo - termLo[i]) // c·x ≤ bound − (Σ_lo without x)
             val ok = if (c > BIG_ZERO) {
                 tightenMaxIfFits(state, v, floorDiv(slack, c), a)
@@ -122,6 +160,7 @@ internal fun wideEnforceRow(
             if (!ok) return false
         }
         if (op == LinearOp.GE || op == LinearOp.EQ) {
+            val a = sideAnt(i, useLo = false)
             val needed = bound - (sumHi - termHi[i]) // c·x ≥ bound − (Σ_hi without x)
             val ok = if (c > BIG_ZERO) {
                 tightenMinIfFits(state, v, ceilDiv(needed, c), a)
