@@ -11,6 +11,7 @@ import com.eignex.klause.bench.metric.ClaspReference
 import com.eignex.klause.bench.metric.InstanceClassifier
 import com.eignex.klause.bench.metric.InstanceFeatures
 import com.eignex.klause.bench.metric.KlauseSearch
+import com.eignex.klause.bench.metric.MiniZincSourceValidation
 import com.eignex.klause.bench.metric.ReferenceEntry
 import com.eignex.klause.bench.metric.ReferenceSolve
 import com.eignex.klause.bench.metric.ReferenceStore
@@ -20,6 +21,7 @@ import com.eignex.klause.bench.metric.SolveMetric
 import com.eignex.klause.bench.metric.SolverInvocation
 import com.eignex.klause.bench.metric.Xcsp3CpSatReference
 import com.eignex.klause.bench.metric.Z3Reference
+import com.eignex.klause.bench.report.Reports
 import com.eignex.klause.bench.runner.Budget
 import com.eignex.klause.bench.source.CorpusCache
 import com.eignex.klause.bench.source.CorpusFetcher
@@ -99,6 +101,8 @@ object BenchCli {
 
             "solve-one" -> solveOne(args.drop(1))
 
+            "validate-solution" -> validateSolution(args.drop(1))
+
             "reference" -> reference(args.drop(1))
 
             "classify" -> classify(args.drop(1))
@@ -112,8 +116,8 @@ object BenchCli {
             else ->
                 error(
                     "unknown command '$cmd' " +
-                        "(commands: solve, solve-one, select, preview, reference, classify, credit, " +
-                        "mine, corpus, list)",
+                        "(commands: solve, solve-one, validate-solution, select, preview, reference, " +
+                        "classify, credit, mine, corpus, list)",
                 )
         }
     }
@@ -278,6 +282,20 @@ object BenchCli {
             }
             println(line)
         }
+    }
+
+    private fun validateSolution(args: List<String>) {
+        val fields = args.filter { "=" in it }.associate { it.substringBefore('=') to it.substringAfter('=') }
+        val suite = requireNotNull(fields["suite"]) { "validate-solution needs suite=<id>" }
+        val name = requireNotNull(fields["problem"]) { "validate-solution needs problem=<name>" }
+        val output = File(requireNotNull(fields["output"]) { "validate-solution needs output=<file>" }).readText()
+        val ref = Catalog.uncapped(suite).problems.singleOrNull { it.name == name }
+            ?: error("no problem '$name' in suite '$suite'")
+        require(ref.format == Format.MINIZINC) { "source validation requires a MiniZinc model" }
+        val candidate = MiniZincSourceValidation.candidate(output).orEmpty()
+        val objective = Regex("(?m)^\\s*_objective\\s*=\\s*([^;]+);").find(candidate)
+            ?.groupValues?.get(1)?.trim()?.toDoubleOrNull()
+        println(Reports.json.encodeToString(MiniZincSourceValidation.validate(ref, output, objective)))
     }
 
     /** Solve exactly one problem, `suite=<id> problem=<name>` as `select` prints it, with `solve`'s solver

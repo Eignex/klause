@@ -58,7 +58,8 @@ every bound and infeasibility verdict is certified exactly, so floating
 point never decides an answer. FlatZinc tries finite float choices first,
 lowering their supported operations to conditional linear rows. Components
 requiring approximation or excessive finite expansion use integer buckets
-at a configurable resolution; `--exact` declines those cases.
+at a configurable resolution; `--exact` declines those cases. Unconstrained
+floats outside the objective stay continuous and add no grid search.
 
 The SMT-LIB frontend decides QF_LIRA, quantifier-free linear integer and
 real arithmetic, optionally with a minimize or maximize objective.

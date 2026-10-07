@@ -96,7 +96,11 @@ class FlatZincCompilerFloatTest {
     fun `open scalar and array floats use the configured search range`() {
         for (declaration in listOf("var float: x;", "array[1..2] of var float: x;")) {
             val program = parseFlatZinc(
-                "$declaration\nsolve satisfy;",
+                "$declaration\n" + if (declaration.startsWith("array")) {
+                    "constraint float_le(x[1], 0.0); constraint float_le(x[2], 0.0); solve satisfy;"
+                } else {
+                    "constraint float_le(x, 0.0); solve satisfy;"
+                },
                 unboundedFloatLo = -3.0,
                 unboundedFloatHi = 7.0,
                 floatBuckets = 5,

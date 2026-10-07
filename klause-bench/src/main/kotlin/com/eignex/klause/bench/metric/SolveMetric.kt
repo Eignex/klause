@@ -311,7 +311,18 @@ internal object SolveMetric {
             val key = BenchCache.keyFor(entry.ref, tag, budget)
             val r = BenchCache.load(key)
                 ?: SolverInvocation.run(entry, solverId, settings, budget, optimize).also { BenchCache.store(key, it) }
-            record(entry, solverId, settings, budget, kind, timestamp, sha, r) to r.rawOutput
+            val reported = record(entry, solverId, settings, budget, kind, timestamp, sha, r)
+            val checked = if (solverId == SolverInvocation.KLAUSE && entry.hasFloats) {
+                val validation = if (r.feasible == true) {
+                    MiniZincSourceValidation.validate(entry.ref, r.rawOutput, r.objective)
+                } else {
+                    SourceValidation("unknown", "no feasible candidate to check")
+                }
+                reported.sourceChecked(validation, entry.floatApproximation)
+            } else {
+                reported
+            }
+            checked to r.rawOutput
         }.getOrElse {
             println("?? [${entry.name}] $kind ERROR: ${it.message ?: it::class.simpleName}")
             errorRecord(entry, solverId, settings, budget, kind, timestamp, sha) to null
