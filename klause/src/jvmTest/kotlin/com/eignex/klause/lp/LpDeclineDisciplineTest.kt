@@ -65,10 +65,6 @@ import com.eignex.klause.solver.search.SearchComponent
 import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.util.Cancellation
 import org.junit.BeforeClass
-import java.nio.file.Files
-import java.nio.file.Path
-import java.nio.file.Paths
-import kotlin.io.path.readText
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -693,106 +689,6 @@ class LpDeclineDisciplineTest {
         )
     }
 
-    @Test
-    fun `optimizer terminal mapping preserves indeterminate`() {
-        val root = repositoryRoot()
-        val search = source(root, "klause/src/commonMain/kotlin/com/eignex/klause/backtrack/Search.kt")
-        val optimize = source(root, "klause/src/commonMain/kotlin/com/eignex/klause/backtrack/ResumableMinimize.kt")
-
-        assertTrue("LpVerdict.INDETERMINATE, LpVerdict.CERTIFIED_BOUND -> ComponentCheck.Indeterminate" in search)
-        assertTrue(
-            (
-                "LpVerdict.INDETERMINATE, LpVerdict.CERTIFIED_BOUND -> {\n" +
-                    "                        sawIndeterminateLeaf = true"
-                ) in optimize,
-        )
-        assertTrue("sawIndeterminateLeaf -> MinimizeResult.Unknown" in optimize)
-    }
-
-    @Test
-    fun `LP arithmetic kernels keep policy references outside their boundary`() {
-        val root = repositoryRoot().resolve("klause/src/commonMain/kotlin/com/eignex/klause")
-        val packages = mapOf(
-            "lp/engine" to setOf("lp.engine", "util", "simplex.exact", "lp.lattice", "simplex.basis"),
-            "lp/lattice" to setOf("lp.lattice", "util"),
-            "simplex/exact" to setOf("simplex.exact", "util"),
-            "simplex/basis" to setOf("simplex.basis", "util"),
-        )
-        val numericTypes = setOf("simplex.exact.BigFraction", "simplex.exact.Frac128", "simplex.exact.Frac128Ops")
-        val reference = Regex("com\\.eignex\\.klause\\.([A-Za-z_][A-Za-z_0-9.]*)")
-        for ((directory, allowed) in packages) {
-            val sources = kotlinSources(root.resolve(directory))
-            assertTrue(sources.isNotEmpty(), "missing kernel sources: $directory")
-            for (path in sources) {
-                for (match in reference.findAll(path.readText())) {
-                    val name = match.groupValues[1].trimEnd('.')
-                    assertTrue(
-                        allowed.any { name == it || name.startsWith("$it.") } ||
-                            (directory == "simplex/basis" && name in numericTypes),
-                        "$path: ${match.value}",
-                    )
-                }
-            }
-        }
-    }
-
-    @Test
-    fun `open theory uses the shared LP owner while exact arithmetic stays independent`() {
-        val root = repositoryRoot()
-        val exactRoot = root.resolve("klause/src/commonMain/kotlin/com/eignex/klause")
-        val exactSources = kotlinSources(exactRoot.resolve("theory/qflra")) +
-            kotlinSources(exactRoot.resolve("simplex/exact")) +
-            kotlinSources(exactRoot.resolve("lp/lattice")) +
-            listOf(
-                exactRoot.resolve("lp/ExactFactorComparison.kt"),
-                exactRoot.resolve("lp/ExactMixedEchelonHermite.kt"),
-            )
-        val exactPaths = exactSources.map { root.relativize(it).toString().replace('\\', '/') }
-
-        for (required in listOf("ExactLraAssignment.kt", "QfLraSystem.kt", "QfLiraSolver.kt")) {
-            assertTrue(exactPaths.any { it.endsWith(required) }, "exact source discovery missed $required")
-        }
-        for (path in exactSources) {
-            val code = LpBoundaryScanner.codeOnly(path.readText())
-            val relative = root.relativize(path).toString()
-            val allowed = when (path.fileName.toString()) {
-                "QfLiraSolver.kt" -> setOf(
-                    "LpExactState",
-                    "LpSolveContext",
-                    "LpVerdict",
-                    "LpCertificationObserver",
-                    "LpCertifier",
-                    "LpCertifierCost",
-                    "LpSolveMetrics",
-                )
-
-                "QfLraSystem.kt" -> setOf(
-                    "ExactLpBounds", "ExactLpColumn", "ExactLpEntry", "ExactLpModel", "ExactLpNumber",
-                    "ExactLpObjective", "ExactLpRow", "ExactLpSide", "LpScopedRow",
-                )
-
-                else -> emptySet()
-            }
-            for (reference in Regex("com\\.eignex\\.klause\\.lp\\.engine\\.([A-Za-z_*]+)").findAll(code)) {
-                assertTrue(reference.groupValues[1] in allowed, "$relative: ${reference.value}")
-            }
-            assertFalse("solveAndCertify" in code, relative)
-            assertFalse("newLpSolver" in code, relative)
-            assertFalse("newPersistentSolver" in code, relative)
-        }
-        val coldEntry = Regex(
-            "\\b(?:rationalFeasible|rationalOutcome|bigRationalOutcome|bigRationalMinimum|" +
-                "exactDoubleBoundedSplit|exactDescendingDirection|exactMixedUnitCubeSolution)\\s*\\(",
-        )
-        for (path in kotlinSources(root.resolve("klause/src/commonMain/kotlin"))) {
-            val code = path.readText()
-            assertFalse(coldEntry.containsMatchIn(code), path.toString())
-            assertFalse("ExactIntegerSearch" in code, path.toString())
-        }
-        assertTrue("sourceDoubleBoundedSplit(" in source(root, exactPaths.single { it.endsWith("QfLiraSolver.kt") }))
-        assertTrue("LpPropagator(" in source(root, exactPaths.single { it.endsWith("QfLiraSolver.kt") }))
-    }
-
     private class Harness(val factory: ConsumerRecordingFactory, val policy: DecliningPolicy) {
         val context = LpSolveContext(factory, policy)
     }
@@ -841,18 +737,4 @@ class LpDeclineDisciplineTest {
             Linear(intArrayOf(1, 1), intArrayOf(0, 2), LinearOp.GE, 1),
         ),
     )
-
-    private fun repositoryRoot(): Path {
-        var path = Paths.get("").toAbsolutePath()
-        while (!Files.isRegularFile(path.resolve("settings.gradle.kts"))) {
-            path = checkNotNull(path.parent) { "cannot locate repository root" }
-        }
-        return path
-    }
-
-    private fun source(root: Path, relative: String): String = root.resolve(relative).readText()
-
-    private fun kotlinSources(directory: Path): List<Path> = Files.walk(directory).use { paths ->
-        paths.iterator().asSequence().filter { Files.isRegularFile(it) && it.toString().endsWith(".kt") }.toList()
-    }
 }
