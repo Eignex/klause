@@ -1,5 +1,6 @@
 package com.eignex.klause.portfolio
 
+import com.eignex.klause.backtrack.LP_WORK_PER_NODE
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.CandidateCompletion
 import com.eignex.klause.localsearch.Completion
@@ -7,7 +8,10 @@ import com.eignex.klause.lp.engine.LpVerdict
 import com.eignex.klause.lp.relaxation.leafRealFeasibility
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.result.LpRoute
+import com.eignex.klause.solver.result.LpStatsSink
 import com.eignex.klause.util.Cancellation
+import kotlin.math.ceil
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
@@ -26,19 +30,26 @@ internal class LeafRealCompletion(
     private val budget: Duration = DEFAULT_BUDGET,
 ) : CandidateCompletion {
     override fun complete(candidate: Sample): Completion {
-        val real = leafRealFeasibility(problem, objective, candidate, Cancellation.after(budget))
+        val sink = LpStatsSink(LpRoute.STANDALONE)
+        val real = leafRealFeasibility(problem, objective, candidate, Cancellation.after(budget), sink = sink)
+        val work = movesFor(sink.snapshot().standaloneWorkOps.sum)
         return when (real.verdict) {
             LpVerdict.FEASIBLE, LpVerdict.ATTAINED_OPTIMUM, LpVerdict.UNBOUNDED ->
-                Completion.Witness(candidate.copy(reals = real.reals, exactReals = real.exactReals))
+                Completion.Witness(candidate.copy(reals = real.reals, exactReals = real.exactReals), work)
 
             // The rows the proof combines are what the candidate's discrete part cannot satisfy together.
-            LpVerdict.INFEASIBLE -> Completion.Refuted(real.refutingFactors)
+            LpVerdict.INFEASIBLE -> Completion.Refuted(real.refutingFactors, work)
 
-            else -> Completion.Undecided
+            else -> Completion.Undecided(work)
         }
     }
 
     private companion object {
         val DEFAULT_BUDGET: Duration = 1.seconds
+
+        // LP work in local-search moves, at the rates a portfolio weighs a node by: LP work per node, and moves per
+        // node. Rounded up, so a completion is never free.
+        fun movesFor(lpWork: Double): Long =
+            ceil(lpWork / LP_WORK_PER_NODE * LS_INSTRUCTIONS_PER_WORK).toLong().coerceAtLeast(1L)
     }
 }

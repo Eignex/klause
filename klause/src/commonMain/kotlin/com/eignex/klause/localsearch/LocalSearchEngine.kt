@@ -249,7 +249,10 @@ internal class LocalSearchEngine(
                     if (state.cost == 0L && state.intValuesInDomain()) {
                         if (completion != null) state.refreshRealRows()
                         if (state.cost != 0L) continue
-                        val solution = decide(state, state.assignment.snapshot())
+                        val solution = decide(state, state.assignment.snapshot()) { work ->
+                            moves += work
+                            flipsSinceYield += work
+                        }
                         if (solution == null) {
                             countedRestart(bestSnap)
                             continue
@@ -444,7 +447,7 @@ internal class LocalSearchEngine(
                     objective.evaluate(state.assignment)
                 }
                 if (obj < bestObj && state.intValuesInDomain()) {
-                    val solution = decide(state, state.assignment.snapshot())
+                    val solution = decide(state, state.assignment.snapshot()) { work -> totalFlips += work }
                     if (solution == null) {
                         restartAndRepair(state, restartAnchor(null))
                         restartCount++
@@ -452,6 +455,7 @@ internal class LocalSearchEngine(
                         totalFlips++
                         continue
                     }
+                    if (completion != null) adoptReals(state, solution)
                     val solved = if (completion != null || wideObjective) objective.evaluate(solution) else obj
                     if (solved < bestObj) {
                         bestObj = solved
@@ -659,12 +663,14 @@ internal class LocalSearchEngine(
 
     /**
      * The solution [candidate] stands for, or null when it is none. A model without continuous columns scores every
-     * row exactly, so its candidate is its own solution; otherwise the [completion] decides it, and the rows a
-     * refutation names gain weight so the search steers away from the same failure.
+     * row exactly, so its candidate is its own solution; otherwise the [completion] decides it, the work that took
+     * goes to [charge], and the rows a refutation names gain weight so the search steers away from the same failure.
      */
-    private fun decide(state: LocalSearchState, candidate: Sample): Sample? {
+    private fun decide(state: LocalSearchState, candidate: Sample, charge: (Long) -> Unit): Sample? {
         val completion = completion ?: return candidate
-        return when (val decided = completion.complete(candidate)) {
+        val decided = completion.complete(candidate)
+        charge(decided.work)
+        return when (decided) {
             is Completion.Witness -> decided.sample
 
             is Completion.Refuted -> {
@@ -673,7 +679,16 @@ internal class LocalSearchEngine(
                 null
             }
 
-            Completion.Undecided -> null
+            is Completion.Undecided -> null
+        }
+    }
+
+    /** Move [state]'s continuous columns onto [solution]'s completed values, so the search goes on from the exact
+     *  point the completion found rather than its own floating-point guess. */
+    private fun adoptReals(state: LocalSearchState, solution: Sample) {
+        for (r in 0 until problem.numRealVars) {
+            val value = solution.approximateRealValue(r)
+            if (value.toRawBits() != state.assignment.realValue(r).toRawBits()) state.apply(Move.RealSet(r, value))
         }
     }
 

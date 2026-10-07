@@ -1947,24 +1947,32 @@ sealed interface com.eignex.klause.localsearch/AspirationCriterion { // com.eign
 }
 
 sealed interface com.eignex.klause.localsearch/Completion { // com.eignex.klause.localsearch/Completion|null[0]
+    abstract val work // com.eignex.klause.localsearch/Completion.work|{}work[0]
+        abstract fun <get-work>(): kotlin/Long // com.eignex.klause.localsearch/Completion.work.<get-work>|<get-work>(){}[0]
+
     final class Refuted : com.eignex.klause.localsearch/Completion { // com.eignex.klause.localsearch/Completion.Refuted|null[0]
-        constructor <init>(kotlin/IntArray = ...) // com.eignex.klause.localsearch/Completion.Refuted.<init>|<init>(kotlin.IntArray){}[0]
+        constructor <init>(kotlin/IntArray = ..., kotlin/Long = ...) // com.eignex.klause.localsearch/Completion.Refuted.<init>|<init>(kotlin.IntArray;kotlin.Long){}[0]
 
         final val factors // com.eignex.klause.localsearch/Completion.Refuted.factors|{}factors[0]
             final fun <get-factors>(): kotlin/IntArray // com.eignex.klause.localsearch/Completion.Refuted.factors.<get-factors>|<get-factors>(){}[0]
+        final val work // com.eignex.klause.localsearch/Completion.Refuted.work|{}work[0]
+            final fun <get-work>(): kotlin/Long // com.eignex.klause.localsearch/Completion.Refuted.work.<get-work>|<get-work>(){}[0]
+    }
+
+    final class Undecided : com.eignex.klause.localsearch/Completion { // com.eignex.klause.localsearch/Completion.Undecided|null[0]
+        constructor <init>(kotlin/Long = ...) // com.eignex.klause.localsearch/Completion.Undecided.<init>|<init>(kotlin.Long){}[0]
+
+        final val work // com.eignex.klause.localsearch/Completion.Undecided.work|{}work[0]
+            final fun <get-work>(): kotlin/Long // com.eignex.klause.localsearch/Completion.Undecided.work.<get-work>|<get-work>(){}[0]
     }
 
     final class Witness : com.eignex.klause.localsearch/Completion { // com.eignex.klause.localsearch/Completion.Witness|null[0]
-        constructor <init>(com.eignex.klause.solver/Sample) // com.eignex.klause.localsearch/Completion.Witness.<init>|<init>(com.eignex.klause.solver.Sample){}[0]
+        constructor <init>(com.eignex.klause.solver/Sample, kotlin/Long = ...) // com.eignex.klause.localsearch/Completion.Witness.<init>|<init>(com.eignex.klause.solver.Sample;kotlin.Long){}[0]
 
         final val sample // com.eignex.klause.localsearch/Completion.Witness.sample|{}sample[0]
             final fun <get-sample>(): com.eignex.klause.solver/Sample // com.eignex.klause.localsearch/Completion.Witness.sample.<get-sample>|<get-sample>(){}[0]
-    }
-
-    final object Undecided : com.eignex.klause.localsearch/Completion { // com.eignex.klause.localsearch/Completion.Undecided|null[0]
-        final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.localsearch/Completion.Undecided.equals|equals(kotlin.Any?){}[0]
-        final fun hashCode(): kotlin/Int // com.eignex.klause.localsearch/Completion.Undecided.hashCode|hashCode(){}[0]
-        final fun toString(): kotlin/String // com.eignex.klause.localsearch/Completion.Undecided.toString|toString(){}[0]
+        final val work // com.eignex.klause.localsearch/Completion.Witness.work|{}work[0]
+            final fun <get-work>(): kotlin/Long // com.eignex.klause.localsearch/Completion.Witness.work.<get-work>|<get-work>(){}[0]
     }
 }
 
