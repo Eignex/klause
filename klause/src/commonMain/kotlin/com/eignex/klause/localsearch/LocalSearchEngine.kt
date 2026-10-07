@@ -209,6 +209,14 @@ internal class LocalSearchEngine(
         runMinimizeStream(gradient ?: objective, params, eff, warm, sink)
     }
 
+    // The moves one run may make: its own caps, and what is left of the solve's node budget.
+    private fun moveCap(params: LocalSearchParams): Long =
+        minOf(
+            params.maxFlips,
+            params.maxInstructions ?: Long.MAX_VALUE,
+            params.nodeBudget?.movesLeft() ?: Long.MAX_VALUE,
+        )
+
     private fun streamImpl(
         params: LocalSearchParams,
         effectiveAssumptions: Assumptions,
@@ -216,7 +224,7 @@ internal class LocalSearchEngine(
         sink: SolveStatsSink? = null,
     ): Sequence<Sample> {
         val seed = params.randomSeed ?: Random.Default.nextLong()
-        val maxFlips = minOf(params.maxFlips, params.maxInstructions ?: Long.MAX_VALUE)
+        val maxFlips = moveCap(params)
         return sequence {
             val state = newSatisfyState(params, effectiveAssumptions, warm, seed)
             var flipsSinceRestart = 0
@@ -229,6 +237,7 @@ internal class LocalSearchEngine(
             var flipsSinceYield = 0L
             var cancelCountdown = 0
             var moves = 0L
+            var charged = 0L
             var restartCount = 0L
             var everFeasible = false
             // Use the unwrapped restart policy so an adaptive one is detected past a sweep wrapper.
@@ -281,6 +290,8 @@ internal class LocalSearchEngine(
                         // Sync warm state on every yield so streaming consumers that never drain the
                         // sequence still see captured weights.
                         warm?.captureFrom(state)
+                        params.nodeBudget?.spendMoves(moves - charged)
+                        charged = moves
                         yield(solution)
                         flipsSinceYield = 0
                         countedRestart(null)
@@ -314,6 +325,7 @@ internal class LocalSearchEngine(
                 // Sync learned weights back into warm state on natural exit or consumer cancel.
                 // Abandoned sequences may not fire this; accepted loss.
                 warm?.captureFrom(state)
+                params.nodeBudget?.spendMoves(moves - charged)
                 // Reached only when the search never hit feasibility (the feasible path records at the
                 // yield above and suspends there). Report the lowest residual cost as the incumbent
                 // violation so an UNKNOWN run still shows how close it got.
@@ -359,7 +371,8 @@ internal class LocalSearchEngine(
         var restartCount = 0L
         var stallCount = 0L
         var bestFoundAtMs = -1L
-        val maxFlips = minOf(params.maxFlips, params.maxInstructions ?: Long.MAX_VALUE)
+        val maxFlips = moveCap(params)
+        var charged = 0L
         var cancelled = false
 
         // Cross-engine solution flow: publish each improvement into the shared exchange, and before a
@@ -477,6 +490,8 @@ internal class LocalSearchEngine(
                         bestFoundAtMs = sink.elapsedMs()
                         params.onEvent?.invoke(SearchEvent.Incumbent(solved))
                         pooled.publish(solution, solved)
+                        params.nodeBudget?.spendMoves(totalFlips - charged)
+                        charged = totalFlips
                         yield(MinimizeResult.BestFound(solution, solved, TerminationReason.BudgetExhausted))
                     }
                 }
@@ -576,6 +591,7 @@ internal class LocalSearchEngine(
         sink.stop()
         sink.timedOut = reason == TerminationReason.BudgetExhausted
         sink.ls.recordWork(moves = totalFlips, restarts = restartCount, stalls = stallCount)
+        params.nodeBudget?.spendMoves(totalFlips - charged)
         // Feasible incumbent → violation 0 at bestObj; else carry the lowest residual cost reached.
         // Long.MAX_VALUE means we never improved on the initial assignment, so leave violation NaN.
         if (bestSample != null) {

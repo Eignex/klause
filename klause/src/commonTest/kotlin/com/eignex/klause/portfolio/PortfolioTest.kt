@@ -2,6 +2,7 @@ package com.eignex.klause.portfolio
 
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
+import com.eignex.klause.backtrack.LS_INSTRUCTIONS_PER_WORK
 import com.eignex.klause.backtrack.UnresolvedRealLeafFixture
 import com.eignex.klause.backtrack.selector.IndomainMax
 import com.eignex.klause.backtrack.selector.VariableSelector

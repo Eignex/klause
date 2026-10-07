@@ -1145,7 +1145,9 @@ class CliModeTest {
             writeText(fzn)
             deleteOnExit()
         }
-        val out = capture { main(arrayOf("-e", "ls", "-a", "-s", "-t", "200", file.absolutePath)) }
+        val out = capture {
+            main(arrayOf("-e", "ls", "-a", "-s", "--param", "node-limit=1000", "-t", "10000", file.absolutePath))
+        }
         val separators = out.lines().count { it == "----------" }
         val solutionsStat = Regex("solutions=(\\d+)").find(out)?.groupValues?.get(1)?.toInt()
         assertTrue(separators >= 2, "expected multiple streamed incumbents, got $separators:\n$out")
@@ -1564,7 +1566,9 @@ class CliModeTest {
             writeText("var 1..3: x;\nconstraint int_lt(x, 3);\nsolve minimize x;\n")
             deleteOnExit()
         }
-        val out = capture { main(arrayOf("-e", "alns", "-p", "2", "-t", "100", fzn.absolutePath)) }
+        val out = capture {
+            main(arrayOf("-e", "alns", "-p", "2", "--param", "node-limit=1000", "-t", "10000", fzn.absolutePath))
+        }
         assertTrue("x = 1" in out, out)
     }
 
@@ -1649,8 +1653,10 @@ class CliModeTest {
 
         // The LS incumbent objective is reported in the model's orientation, not the engine's internal
         // minimise frame: a maximize incumbent reads as a positive value, never negated. LS optimize is
-        // incomplete (it never proves the optimum), so the run is bounded by a short deadline.
-        val maxOut = capture { main(arrayOf("-s", "-e", "ls", "-t", "100", opt.absolutePath)) }
+        // incomplete (it never proves the optimum), so the run is bounded by a node allowance.
+        val maxOut = capture {
+            main(arrayOf("-s", "-e", "ls", "--param", "node-limit=1000", "-t", "10000", opt.absolutePath))
+        }
         assertTrue("%%%mzn-stat: lsIncumbentObjective=" in maxOut, maxOut)
         assertTrue("%%%mzn-stat: lsIncumbentObjective=-" !in maxOut, maxOut)
     }

@@ -4,11 +4,14 @@ import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.localsearch.LocalSearchParams
+import com.eignex.klause.localsearch.LocalSearchSolver
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
@@ -54,6 +57,18 @@ class NodeBudgetTest {
             budget.spent - afterFirst < budget.limit,
             "a re-entered search must not get a fresh allowance; it spent ${budget.spent - afterFirst} more",
         )
+    }
+
+    @Test
+    fun `a local-search run stops at the move its allowance covers`() {
+        val budget = NodeBudget(limit = 100)
+        val objective = LinearObjective(boolWeights = LongArray(8 * 7) { 1L })
+
+        val result = LocalSearchSolver(php(pigeons = 8, holes = 7).bake())
+            .minimize(objective, LocalSearchParams(randomSeed = 1L, nodeBudget = budget))
+
+        assertEquals((100 * LS_INSTRUCTIONS_PER_WORK).toLong().toDouble(), result.stats.ls.moves.sum)
+        assertTrue(budget.exhausted(), "spent=${budget.spent}")
     }
 
     @Test

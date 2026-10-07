@@ -2,6 +2,7 @@
 
 package com.eignex.klause.portfolio
 
+import com.eignex.klause.backtrack.LS_INSTRUCTIONS_PER_WORK
 import com.eignex.klause.solver.ResumableSearch
 import com.eignex.klause.solver.ResumableSolve
 import com.eignex.klause.solver.Sample
@@ -753,12 +754,6 @@ private const val REMAINING_SHARE = 0.5
 // Most of an arm's time incumbent checks may take; see `Portfolio.minimize`.
 private const val CHECK_SHARE = 0.2
 
-/**
- * Local-search instructions that cost as much as one backtrack search node, LP work included: the median ratio of
- * local-search moves per second to backtrack work per second, each engine alone on one core for 10s, over the 28
- * MiniZinc models where both ran (spread 0.17 to 69, geometric mean 1.9).
- */
-internal const val LS_INSTRUCTIONS_PER_WORK: Double = 1.5
 
 // The caller's token that also stops on [flag], keeping the caller's deadline.
 private fun Cancellation.alsoStoppedBy(flag: AtomicBoolean): Cancellation =

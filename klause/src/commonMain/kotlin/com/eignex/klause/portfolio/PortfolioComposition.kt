@@ -214,7 +214,7 @@ internal object PortfolioComposition {
     private fun composeArms(scenario: PortfolioScenario, facts: ProblemFacts): List<WorkerConfig> {
         val count = scenario.arms
         return when (scenario.engine) {
-            EngineMix.LOCAL_SEARCH -> lsArms(scenario.kind, count, scenario.lsPool)
+            EngineMix.LOCAL_SEARCH -> lsArms(scenario.kind, count, scenario.lsPool, scenario.nodeBudget)
             EngineMix.BACKTRACK -> btArms(scenario, count, facts)
             EngineMix.MIXED -> mixedArms(scenario, facts)
             EngineMix.ALNS -> alnsArms(count, scenario.nodeBudget)
@@ -228,13 +228,17 @@ internal object PortfolioComposition {
         AlnsWorkerConfig.diverse(count, nodeBudget)
 
     /** The [count] LS arms — the curated pool ([pool] == null), else the CLI's resolved pool, each
-     *  slot a fresh recipe (wrapping past the pool size). */
-    private fun lsArms(kind: Kind, count: Int, pool: List<() -> LocalSearchRecipe>?): List<WorkerConfig> =
-        if (pool == null) {
-            LocalSearchWorkerConfig.diverse(kind, count)
-        } else {
-            List(count) { LocalSearchWorkerConfig(pool[it % pool.size]()) }
-        }
+     *  slot a fresh recipe (wrapping past the pool size) — every one spending [nodeBudget]. */
+    private fun lsArms(
+        kind: Kind,
+        count: Int,
+        pool: List<() -> LocalSearchRecipe>?,
+        nodeBudget: NodeBudget?,
+    ): List<WorkerConfig> = if (pool == null) {
+        LocalSearchWorkerConfig.diverse(kind, count, nodeBudget)
+    } else {
+        List(count) { LocalSearchWorkerConfig(pool[it % pool.size](), nodeBudget) }
+    }
 
     /** The [count] backtrack arms for [scenario]. [PortfolioScenario.btPool] (when set) overrides the pool
      *  with injected templates. Otherwise the curated pool the model behind [facts] offers the needs of, with
@@ -286,7 +290,8 @@ internal object PortfolioComposition {
         // its cores.
         val alns = scenario.kind == Kind.COP && scenario.cores < count && facts.offersAll(AlnsWorkerConfig.NEEDS)
         val arms = ArrayList<WorkerConfig>(count + 1)
-        val local = if (lsCount > 0) lsArms(scenario.kind, lsCount, scenario.lsPool) else emptyList()
+        val local =
+            if (lsCount > 0) lsArms(scenario.kind, lsCount, scenario.lsPool, scenario.nodeBudget) else emptyList()
         val backtrack = if (btCount > 0) btArms(scenario, btCount, facts) else emptyList()
         if (scenario.kind == Kind.COP) {
             // Sequential portfolios warm every arm in list order. A complete arm must receive its first

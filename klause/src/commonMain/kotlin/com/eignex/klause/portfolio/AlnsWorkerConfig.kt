@@ -34,7 +34,8 @@ import kotlin.math.ln
  * [nodeBudget] is the solve-spanning node allowance. This arm builds its repair [BacktrackParams] itself
  * rather than drawing a [com.eignex.klause.backtrack.BacktrackRecipe] from the pool, so it has to be
  * handed the allowance explicitly; without it the bootstrap and every repair search nodes that neither
- * count against the cap nor stop at it.
+ * count against the cap nor stop at it. The outer destroy/repair loop also charges each iteration's flip
+ * allowance as local-search moves, so a run whose repairs never search still stops at the cap.
  *
  * Like a plain LS arm ([LocalSearchWorkerConfig]) and unlike a resumable backtrack arm, this worker has
  * no pause/resume handle — [PortfolioWorker.newResumableSearch] is null — and accepts a counted
@@ -87,6 +88,7 @@ internal class AlnsWorkerConfig(val profile: AlnsProfile = AlnsProfile.Default, 
             costShaping = CostShaping.Linear(lambda = lsLambda),
             lsObjective = lsObjective,
             onEvent = onEvent?.let { sink -> { e -> sink(workerLabel, e) } },
+            nodeBudget = nodeBudget,
         )
         return PortfolioWorker.of(
             workerLabel,

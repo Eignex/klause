@@ -1,6 +1,7 @@
 package com.eignex.klause.portfolio
 
 import com.eignex.klause.backtrack.LP_WORK_PER_NODE
+import com.eignex.klause.backtrack.LS_INSTRUCTIONS_PER_WORK
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.CandidateCompletion
 import com.eignex.klause.localsearch.Completion

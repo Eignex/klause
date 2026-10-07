@@ -1,5 +1,6 @@
 package com.eignex.klause.portfolio
 
+import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.factor.objective.objectiveBoundOverlay
 import com.eignex.klause.localsearch.CostShaping
 import com.eignex.klause.localsearch.DefinitionalSweep
@@ -16,9 +17,11 @@ import com.eignex.klause.solver.result.SearchEvent
 /**
  * A portfolio arm wrapping a curated [LocalSearchRecipe] for execution: it materialises the recipe into a
  * runnable [LocalSearchSession] worker. The recipe owns the four axes (restart included, in its
- * schedule); this adapter owns only the run-time wiring (λ-shaping, warm-start, event sink).
+ * schedule); this adapter owns only the run-time wiring (λ-shaping, warm-start, event sink, and the solve-wide
+ * [nodeBudget] every segment spends).
  */
-internal class LocalSearchWorkerConfig(val recipe: LocalSearchRecipe) : WorkerConfig {
+internal class LocalSearchWorkerConfig(val recipe: LocalSearchRecipe, val nodeBudget: NodeBudget? = null) :
+    WorkerConfig {
 
     override val label: String get() = recipe.label
 
@@ -72,6 +75,7 @@ internal class LocalSearchWorkerConfig(val recipe: LocalSearchRecipe) : WorkerCo
             // Bidirectional cross-engine flow: publish incumbents this arm finds and, on restart, anchor
             // on the verified global best — so LS and backtrack incumbents circulate both ways.
             pooledIncumbents = pools?.solutions,
+            nodeBudget = nodeBudget,
         )
         return PortfolioWorker.of(
             workerLabel,
@@ -96,7 +100,7 @@ internal class LocalSearchWorkerConfig(val recipe: LocalSearchRecipe) : WorkerCo
 
         /** The top-[count] prefix of [kind]'s credit-ordered pool (wrapping past the pool size) —
          *  `-p <n>` maps straight onto this. Every slot is a fresh instance even when arms repeat. */
-        fun diverse(kind: Kind, count: Int): List<LocalSearchWorkerConfig> =
-            LocalSearchCatalog.diverse(kind, count).map { LocalSearchWorkerConfig(it) }
+        fun diverse(kind: Kind, count: Int, nodeBudget: NodeBudget? = null): List<LocalSearchWorkerConfig> =
+            LocalSearchCatalog.diverse(kind, count).map { LocalSearchWorkerConfig(it, nodeBudget) }
     }
 }
