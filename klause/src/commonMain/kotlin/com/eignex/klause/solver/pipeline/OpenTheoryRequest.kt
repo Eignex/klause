@@ -209,6 +209,7 @@ object OpenTheoryPipeline {
         engine: FiniteEngine,
     ): OpenTheoryExecution = when (engine) {
         FiniteEngine.MIXED, FiniteEngine.LOCAL_SEARCH -> searchWithoutTheory(model, params, objective)
+
         FiniteEngine.BACKTRACK, FiniteEngine.FIXED -> {
             val stats = SolveStats.EMPTY
             if (objective == null) {
