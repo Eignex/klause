@@ -45,6 +45,8 @@ internal class ResumableSatisfaction(private val solver: BacktrackSolver, params
 
     override val work: Long get() = slice.spent()
 
+    override val initialWork: Long = slice.spent()
+
     override fun runSlice(global: Cancellation, sliceMillis: Long, sliceNodes: Long): SolveResult? {
         done?.let { return it }
         check(!closed) { "search is closed" }

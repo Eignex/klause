@@ -292,6 +292,8 @@ internal class ResumableMinimize(
 
     override val work: Long get() = slice.spent()
 
+    override val initialWork: Long
+
     init {
         try {
             val seeded = session.seed(params.assumptions)
@@ -309,6 +311,7 @@ internal class ResumableMinimize(
                 }
             }
             run = searchSession.openRun(problem.numBoolVars, traversal)
+            initialWork = slice.spent()
         } catch (primary: Throwable) {
             closeAfter(primary)
             throw primary
