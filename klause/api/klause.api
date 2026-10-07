@@ -1597,7 +1597,6 @@ public final class com/eignex/klause/factor/scheduling/Cumulative : com/eignex/k
 	public fun getBoolVars ()[I
 	public final fun getCapacity ()J
 	public final fun getCapacityVar ()I
-	public final fun getConstantEnergyAndCap ()Z
 	public final fun getDurationVars ()[I
 	public final fun getDurations ()[J
 	public fun getIntVars ()[I
@@ -1606,7 +1605,6 @@ public final class com/eignex/klause/factor/scheduling/Cumulative : com/eignex/k
 	public fun getPresents ()[I
 	public final fun getResourceVars ()[I
 	public final fun getResources ()[J
-	public final fun getSharpReasonEligible ()Z
 	public final fun getStarts ()[I
 	public fun getStructuralKeyWeight ()I
 	public final fun getUnary ()Z
