@@ -448,6 +448,19 @@ class CliStatsTest {
     }
 
     @Test
+    fun `search pairs report the mean learned clause size and literal block distance`() {
+        val search = SearchStats(
+            learnedClauses = SumResult(4.0),
+            learnedLiterals = SumResult(10.0),
+            learnedLbd = SumResult(6.0),
+        )
+
+        val pairs = searchStatPairs(SolveStats(search = search)).toMap()
+
+        assertEquals("2.5" to "1.5", pairs["learnedMeanSize"] to pairs["learnedMeanLbd"])
+    }
+
+    @Test
     fun `portfolio pairs report each arm with its schedule and credit`() {
         val credit = mapOf("ClauseUses" to 4.0)
         val arm = ArmSchedule(

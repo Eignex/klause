@@ -153,7 +153,7 @@ internal class CpSatisfactionTraversal(
             pbLearning = params.pbLearning ?: true,
         ),
         branching = CpBranching.None,
-    )
+    ).also { it.conflictStats = sink?.ca }
     private val traversal = CpSatisfactionTraversalPolicy(
         cp.session,
         params,
@@ -451,8 +451,7 @@ internal class BacktrackBrancher(
     }
 
     override fun onLearnedConflict(conflict: com.eignex.klause.solver.search.SearchLearnedConflict) {
-        sink?.search?.observeLearn()
-        sink?.search?.observeLearnedLbd(conflict.lbd)
+        sink?.search?.observeLearned(conflict.guardLiterals, conflict.lbd)
         for (level in conflict.decisionLevels) {
             if (level in 1..seedDecisionLevels) touchedSeedLevels.add(level)
         }

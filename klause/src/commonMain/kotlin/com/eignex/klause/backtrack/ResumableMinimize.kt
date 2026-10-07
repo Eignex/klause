@@ -241,7 +241,7 @@ internal class ResumableMinimize(
             pbLearning = params.pbLearning ?: true,
         ),
         branching = CpBranching.None,
-    )
+    ).also { it.conflictStats = sink.ca }
     private val session: PropagationSession get() = cp.session
     private val restart = RestartSchedule.from(params)
     private var decisionLimit = minOf(params.maxDecisions, params.maxInstructions ?: Long.MAX_VALUE)
