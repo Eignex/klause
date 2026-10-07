@@ -50,8 +50,10 @@ private class FloatChoicePlanner(
     private val singletons = declarations.floatVars.values.filter { it.lo == it.hi }
         .associate { it.varId to doubleArrayOf(it.lo) }
     private val choices = HashMap(singletons)
-    private val integerImages = model.constraints.filter { it.name == "int2float" && it.args.size == 2 }
-        .mapTo(HashSet()) { it.args[1] }
+    private val integerImages = declarations.collectIntegerFloatImages(onlyRealColumns = false)
+    private val roundedBounds = integerImages.filter { (variable, image) ->
+        declarations.needsRoundedFloatBounds(variable, image, limit)
+    }.keys
     private val costs = HashMap<Int, Long>()
     private val blocked = HashSet<Int>()
 
@@ -71,6 +73,10 @@ private class FloatChoicePlanner(
             }
             val root = components.find(ids.first())
             declarations.locateConstraint(c)
+            if (ids.any { it in roundedBounds }) {
+                decline(root, c, "finite float bounds require rounded arithmetic")
+                continue
+            }
             val alternatives = domains[i]?.values?.size ?: alternatives(c)
             if (alternatives == null) {
                 decline(root, c, "`${c.name}` is unsupported by exact float lowering")
@@ -125,9 +131,7 @@ private class FloatChoicePlanner(
         val aSize = choices[a]?.size
         val bSize = choices[b]?.size
         if (aSize != null || bSize != null) return minOf(aSize ?: Int.MAX_VALUE, bSize ?: Int.MAX_VALUE)
-        val aInt = c.args[0] in integerImages
-        val bInt = c.args[1] in integerImages
-        return if (aInt != bInt && variables(c.args[2]).isNotEmpty()) 0 else null
+        return if ((a in integerImages || b in integerImages) && variables(c.args[2]).isNotEmpty()) 0 else null
     }
 
     private fun variables(e: FznExpr): List<Int> = when (e) {
