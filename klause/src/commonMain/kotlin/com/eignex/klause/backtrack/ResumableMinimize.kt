@@ -331,8 +331,7 @@ internal class ResumableMinimize(
         done?.let { return it }
         check(!closed) { "search is closed" }
         globalToken = global
-        if (rootIsExhausted) return terminal(terminalExhausted(rootExhausted)).result
-        if (!slice.begin(sliceMillis, sliceNodes)) return null
+        if (!rootIsExhausted && !slice.begin(sliceMillis, sliceNodes)) return null
         // A counted budget only means something if the search polls on a counted cadence: the run stops
         // where it polls, and the default cadence is tuned by elapsed time, so the pause would land on a
         // different node on a faster machine and every counter downstream would follow.
@@ -501,7 +500,7 @@ internal class ResumableMinimize(
         }
     }
 
-    private fun terminal(result: MinimizeResult): StepEvent.Terminal {
+    private fun terminal(result: MinimizeResult): StepEvent {
         done = result
         if (!rebindable) close()
         return StepEvent.Terminal(result)
