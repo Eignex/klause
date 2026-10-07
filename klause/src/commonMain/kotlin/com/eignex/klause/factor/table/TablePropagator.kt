@@ -150,8 +150,9 @@ internal class TablePropagator(
             val span = domHi[col] - domLo[col] + 1
             supportBits[col] = LongArray(((span + 63) ushr 6).toInt())
         }
+        var numValid = s.numValid
         var i = 0
-        while (i < s.numValid) {
+        while (i < numValid) {
             val row = s.validTuples[i]
             var feasible = true
             for (col in 0 until arity) {
@@ -161,14 +162,15 @@ internal class TablePropagator(
                 }
             }
             if (!feasible) {
-                val last = s.numValid - 1
+                val last = numValid - 1
                 if (i != last) {
                     s.validTuples[i] = s.validTuples[last]
                     s.validTuples[last] = row
                 }
-                s.numValid = last
+                numValid = last
             } else {
                 for (col in 0 until arity) {
+                    if (fullySupported[col]) continue
                     val lo = cellLo(row, col)
                     val hiC = cellHi(row, col)
                     if (lo <= domLo[col] && hiC >= domHi[col]) {
@@ -178,17 +180,16 @@ internal class TablePropagator(
                     // Every domain value the interval covers is supported; setting bits over the
                     // (in-range) offsets is safe — the prune only ever consults in-domain positions.
                     val bits = requireNotNull(supportBits[col])
-                    var off = (maxOf(lo, domLo[col]) - domLo[col]).toInt()
-                    val offEnd = (minOf(hiC, domHi[col]) - domLo[col]).toInt()
-                    while (off <= offEnd) {
-                        bits[off ushr 6] = bits[off ushr 6] or (1L shl (off and 63))
-                        off++
-                    }
+                    val first = (maxOf(lo, domLo[col]) - domLo[col]).toInt()
+                    val last = (minOf(hiC, domHi[col]) - domLo[col]).toInt()
+                    setSupportRange(bits, first, last)
                 }
                 i++
             }
         }
-        if (s.numValid == 0) return false
+        // The sparse-set permutation restores every removed row when the prefix size is undone.
+        s.numValid = numValid
+        if (numValid == 0) return false
         val ant = collectHoleAndBoundAntecedents(state, xs)
         for (col in 0 until arity) {
             if (fullySupported[col]) continue
@@ -242,8 +243,9 @@ internal class TablePropagator(
         val minSup = LongArray(arity) { Long.MAX_VALUE }
         val maxSup = LongArray(arity) { Long.MIN_VALUE }
         val fullySupported = BooleanArray(arity)
+        var numValid = s.numValid
         var i = 0
-        while (i < s.numValid) {
+        while (i < numValid) {
             val row = s.validTuples[i]
             var feasible = true
             for (col in 0 until arity) {
@@ -253,12 +255,12 @@ internal class TablePropagator(
                 }
             }
             if (!feasible) {
-                val last = s.numValid - 1
+                val last = numValid - 1
                 if (i != last) {
                     s.validTuples[i] = s.validTuples[last]
                     s.validTuples[last] = row
                 }
-                s.numValid = last
+                numValid = last
             } else {
                 for (col in 0 until arity) {
                     val d = state.intDomains[xs[col]]
@@ -280,7 +282,9 @@ internal class TablePropagator(
                 i++
             }
         }
-        if (s.numValid == 0) return false
+        // The sparse-set permutation restores every removed row when the prefix size is undone.
+        s.numValid = numValid
+        if (numValid == 0) return false
         val ant = collectHoleAndBoundAntecedents(state, xs)
         for (col in 0 until arity) {
             if (fullySupported[col]) continue
@@ -309,6 +313,20 @@ internal class TablePropagator(
         /** Columns whose domain is within Int range and narrower than this take the span-sized bitset
          *  support path; wider columns take the value-keyed set path (sound for any magnitude). */
         const val MAX_BITSET_SPAN: Long = 1L shl 24
+
+        private fun setSupportRange(bits: LongArray, first: Int, last: Int) {
+            val firstWord = first ushr 6
+            val lastWord = last ushr 6
+            val firstMask = -1L shl (first and 63)
+            val lastMask = -1L ushr (63 - (last and 63))
+            if (firstWord == lastWord) {
+                bits[firstWord] = bits[firstWord] or (firstMask and lastMask)
+            } else {
+                bits[firstWord] = bits[firstWord] or firstMask
+                for (word in firstWord + 1 until lastWord) bits[word] = -1L
+                bits[lastWord] = bits[lastWord] or lastMask
+            }
+        }
 
         /** Whether domain [d] holds a value in `[lo, hi]` (hole-aware): the clamped range is non-empty
          *  and, when the domain has holes, not entirely holes. */
