@@ -43,4 +43,13 @@ class LeafRealCompletionTest {
     fun `a candidate whose discrete part admits no completion is refuted`() {
         assertIs<Completion.Refuted>(LeafRealCompletion(problem, objective = null).complete(candidate(0, 1.0)))
     }
+
+    @Test
+    fun `a refutation names the rows its proof combines`() {
+        // k = 0 forces x = 2.5 through the first row, which the second row's x ≤ 1 forbids.
+        val completion = LeafRealCompletion(problem, objective = null).complete(candidate(0, 1.0))
+
+        val refuted = assertIs<Completion.Refuted>(completion)
+        assertEquals(setOf(0, 1), refuted.factors.toSet())
+    }
 }

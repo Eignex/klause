@@ -31,7 +31,8 @@ internal class LeafRealCompletion(
             LpVerdict.FEASIBLE, LpVerdict.ATTAINED_OPTIMUM, LpVerdict.UNBOUNDED ->
                 Completion.Witness(candidate.copy(reals = real.reals, exactReals = real.exactReals))
 
-            LpVerdict.INFEASIBLE -> Completion.Refuted()
+            // The rows the proof combines are what the candidate's discrete part cannot satisfy together.
+            LpVerdict.INFEASIBLE -> Completion.Refuted(real.refutingFactors)
 
             else -> Completion.Undecided
         }
