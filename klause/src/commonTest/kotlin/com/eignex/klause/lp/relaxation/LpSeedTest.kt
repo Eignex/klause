@@ -14,6 +14,7 @@ import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class LpSeedTest {
@@ -57,5 +58,20 @@ class LpSeedTest {
         val seed = assertNotNull(model.lpSeed(arrayOf(IntDomain(-100, 100)), Cancellation.Never))
 
         assertTrue(seed.ints[0] in -100L..100L)
+    }
+
+    @Test
+    fun `no seed is drawn where shifting a row to its box leaves 64 bits`() {
+        // 27300000000·x0 ≤ 0 with x0's box starting at −2^30: the shifted constant is past Long.
+        val open = Bits(1).also { it.set(0) }
+        val model = Problem(
+            numBoolVars = 0,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(0), open, open),
+            factors = arrayOf<Factor>(Linear(longArrayOf(27_300_000_000L), intArrayOf(0), LinearOp.LE, 0L)),
+        )
+
+        val seed = model.lpSeed(arrayOf(IntDomain(-(1L shl 30), 1L shl 30)), Cancellation.Never)
+
+        assertNull(seed)
     }
 }
