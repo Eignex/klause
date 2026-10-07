@@ -1,6 +1,6 @@
 {
-  "name": "table-throughput-nodes",
-  "description": "Paired baseline versus completed ground-column supports, word-wise interval supports, and batched STR2 live-prefix writes. Three HSP tables and three file-based XCSP3 fast controls, pinned backtrack arms, 100-node caps, and three repeats on one lab host.",
+  "name": "table-throughput-lazy-nodes",
+  "description": "Compare table support gathering and explanation caches against the integrated main baseline. Three HSP models and three file controls, a single pinned backtrack recipe, seed 3 and three alternating repeats on the lab Mac. 100-node satOptimized caps isolate matching search prefixes; conflictDriven is covered by the timed experiment because conflict handling can dominate a decision node.",
   "problems": [
     {
       "suite": "xcsp3-cop",
@@ -19,32 +19,20 @@
   "base": {
     "engine": "cp",
     "processors": "1",
-    "timeout": "30000",
+    "timeout": "120000",
     "param.arms": "1"
   },
   "configs": [
     {
-      "ref": "da388ebcd1c20580bfe061c7a9811829e8cb2efc",
+      "ref": "e4dc3458d8f8cae1e3321987132bab43b155c68c",
       "label": "baseline-satOptimized",
       "param.bt-arm": "satOptimized",
       "param.node-limit": "100"
     },
     {
-      "ref": "234a97c76acec97e2fa7b89972ddcddc284f20e9",
+      "ref": "84800b5124888eb4c878d9b5658dafae82487b9f",
       "label": "complete-supports-satOptimized",
       "param.bt-arm": "satOptimized",
-      "param.node-limit": "100"
-    },
-    {
-      "ref": "da388ebcd1c20580bfe061c7a9811829e8cb2efc",
-      "label": "baseline-conflictDriven",
-      "param.bt-arm": "conflictDriven",
-      "param.node-limit": "100"
-    },
-    {
-      "ref": "234a97c76acec97e2fa7b89972ddcddc284f20e9",
-      "label": "complete-supports-conflictDriven",
-      "param.bt-arm": "conflictDriven",
       "param.node-limit": "100"
     }
   ],

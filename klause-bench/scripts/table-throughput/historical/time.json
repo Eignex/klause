@@ -1,6 +1,6 @@
 {
-  "name": "table-throughput-lazy-time",
-  "description": "Compare table support gathering and explanation caches against the integrated main baseline. Three HSP models and three file controls, a single pinned backtrack recipe, seed 3 and three alternating repeats on the lab Mac. 10-second budgets compare completed nodes and handled conflicts for both recipes. Charged work is not a candidate-evaluation count.",
+  "name": "table-throughput-time",
+  "description": "Paired baseline versus completed ground-column support gathering, word-wise interval supports, and batched STR2 live-prefix writes on three HSP tables and three fast XCSP3 file controls. Pinned individual backtrack arms, identical seed and 10-second budgets measure wall-time search progress; work denotes charged nodes, not candidate evaluations.",
   "problems": [
     {
       "suite": "xcsp3-cop",
@@ -24,22 +24,22 @@
   },
   "configs": [
     {
-      "ref": "e4dc3458d8f8cae1e3321987132bab43b155c68c",
+      "ref": "da388ebcd1c20580bfe061c7a9811829e8cb2efc",
       "label": "baseline-satOptimized",
       "param.bt-arm": "satOptimized"
     },
     {
-      "ref": "84800b5124888eb4c878d9b5658dafae82487b9f",
+      "ref": "234a97c76acec97e2fa7b89972ddcddc284f20e9",
       "label": "complete-supports-satOptimized",
       "param.bt-arm": "satOptimized"
     },
     {
-      "ref": "e4dc3458d8f8cae1e3321987132bab43b155c68c",
+      "ref": "da388ebcd1c20580bfe061c7a9811829e8cb2efc",
       "label": "baseline-conflictDriven",
       "param.bt-arm": "conflictDriven"
     },
     {
-      "ref": "84800b5124888eb4c878d9b5658dafae82487b9f",
+      "ref": "234a97c76acec97e2fa7b89972ddcddc284f20e9",
       "label": "complete-supports-conflictDriven",
       "param.bt-arm": "conflictDriven"
     }

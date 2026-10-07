@@ -1,78 +1,64 @@
 # Table search throughput
 
-The klause-lab experiments pin one satOptimized or conflictDriven arm, one processor, seed 3,
-and three alternating repeats on the same lab Mac. `nodes.json` allows 100 nodes and 30 seconds;
-`time.json` allows 10 seconds. Both select HSP-table-12407_c23, HSP-table-13408_c23, and
-HSP-table-14409_c23, plus magic-series-tiny, sum-opt-tiny, and graph-coloring-tiny as fast XCSP3
-file controls. Submit with klause-lab's `deploy/lab run <file>`.
+The integrated comparison uses main baseline e4dc3458d8f8cae1e3321987132bab43b155c68c and
+candidate 84800b5124888eb4c878d9b5658dafae82487b9f. Later documentation commits preserve the
+candidate's table code. Main's lazy per-column explanations are present in both revisions.
+The [historical comparison](historical/README.md) predates those explanations and is kept separately.
 
-- Baseline: da388ebcd1c20580bfe061c7a9811829e8cb2efc.
-- Candidate: 234a97c76acec97e2fa7b89972ddcddc284f20e9.
-- [100-node HSP cases](http://192.168.50.104:8420/jobs/549).
-- [10-second HSP cases and file controls](http://192.168.50.104:8420/jobs/554).
-- [100-node file controls](http://192.168.50.104:8420/jobs/555), reproduced by `controls.json`.
+## Paired experiments
 
-The candidate's table implementation matches the PR; subsequent commits add tests, evidence, and
-formatting. Job 549's original in-code controls cannot load in subprocess solves: its 36 control
-records are harness errors and excluded. Job 555 replaces them with file-based controls; the saved
-`nodes.json` combines the valid selections. Every HSP record and replacement control loaded successfully.
+Submit with klause-lab's `deploy/lab run <file>`. Both specifications pin one backtrack arm,
+one processor, seed 3, and three alternating repeats on the same lab Mac, with JDK 25,
+Serial GC, and a 3 GB heap. They select HSP-table-12407_c23, HSP-table-13408_c23, and
+HSP-table-14409_c23, plus magic-series-tiny, sum-opt-tiny, and graph-coloring-tiny as fast
+XCSP3 file controls.
 
-## Results
+- [100-node satOptimized cases](http://192.168.50.104:8420/jobs/574), reproduced by `nodes.json`,
+  allow 120 seconds so the baseline can complete the same search prefix.
+- [10-second cases for both recipes](http://192.168.50.104:8420/jobs/575), reproduced by `time.json`,
+  measure completed nodes and handled conflicts for satOptimized and conflictDriven.
 
-Median solve seconds at exactly 100 nodes:
+Compare solve time only for fixed-node pairs that complete the cap and match nodes, failures,
+restarts, root fixings, and peak depth. Solve time includes root setup. Timed runs measure search
+progress; conflictDriven can spend substantial time resolving conflicts between decision nodes,
+so its failure count matters alongside completed nodes. Longer trajectories may diverge and
+are not an isolated per-node speed ratio. The tiny controls check verdicts, objectives, and search
+counters; their millisecond timing differences do not demonstrate a general speedup.
 
-| HSP instance | Arm | Baseline | Candidate | Reduction |
-| --- | --- | ---: | ---: | ---: |
-| 12407_c23 | satOptimized | 0.980 | 0.749 | 23.6% |
-| 12407_c23 | conflictDriven | 1.277 | 0.846 | 33.8% |
-| 13408_c23 | satOptimized | 0.699 | 0.492 | 29.6% |
-| 13408_c23 | conflictDriven | 6.721 | 4.951 | 26.3% |
-| 14409_c23 | satOptimized | 1.850 | 1.390 | 24.9% |
-| 14409_c23 | conflictDriven | 5.040 | 3.704 | 26.5% |
+The abandoned integration jobs 564 and 565 were cancelled after profiling identified the
+explanation bottleneck; they are not evidence for this candidate. Portfolio work is charged work,
+not a candidate-evaluation count. The reference baseline is incomplete; these experiments compare
+klause with itself and claim neither reference parity nor an oracle-confirmed failure.
 
-All 18 paired HSP runs were faster (geometric mean time ratio 0.734). Nodes, failures, restarts,
-root fixings, and peak depth match within every pair. These runs remain unknown at the node cap.
-The three file controls preserve their nodes, verdicts, and objectives; their median times are
-15–39 ms, so their small timing differences are not evidence of a general speedup.
+## Profile and implementation
 
-Median completed nodes at 10 seconds:
+Before editing the integrated table path, local JFR profiles pinned each recipe on
+HSP-table-14409_c23 with a 100-node cap and 30-second budget. TablePropagator.supportLoss
+appeared in 1857/2936 execution samples for satOptimized and 1786/2876 for conflictDriven.
+Root PropagationSession construction accounted for 63 and 66 samples respectively. The
+remaining stacks include propagation and unattributed frames. Leaf samples concentrated on
+historical domain reads, carve-history scans, and cell checks. These capped diagnostic recordings
+have different completed search prefixes; use the alternating lab cases for timings.
 
-| HSP instance | Arm | Baseline | Candidate |
-| --- | --- | ---: | ---: |
-| 12407_c23 | satOptimized | 1360 | 10659 |
-| 12407_c23 | conflictDriven | 368 | 458 |
-| 13408_c23 | satOptimized | 979 | 1698 |
-| 13408_c23 | conflictDriven | 242 | 362 |
-| 14409_c23 | satOptimized | 666 | 1453 |
-| 14409_c23 | conflictDriven | 433 | 569 |
+Explanation-local caches reuse historical domains, carve positions, and materialized literals.
+Point cells use membership checks; ground supports use a value set rather than sorting repeated
+single-value intervals. Sparse root members are walked when fewer than the domain's holes,
+which avoids span-sized walks through unconditional root holes. The caches live for one synchronous
+explanation build and never cross propagation or undo. Historical carve positions still determine
+whether a hole existed when the deduction was recorded, and premise selection retains its order.
 
-All six pairs make more search progress. The candidate's satOptimized arm finds objective 356 on
-12407_c23 in every repeat (first witness at 8.30–8.41 seconds); its baseline finds no witness.
-Other HSP arms remain unknown. Longer runs follow different trajectories, so these node ratios
-measure search progress rather than isolating a per-node cost ratio. The time-budget file controls
-also preserve their verdicts and objectives. No reference parity or oracle-confirmed failure is claimed.
+Support gathering stops for a ground column after all live values are covered. Short-support
+intervals fill bitsets by words. All tuples are still checked for feasibility, and the reversible
+live prefix is written once per completed sweep, including empty-prefix conflicts. Per-fire scratch
+state is rebuilt, so sibling branches restore support filtering without a persistent support cache.
+Tests cover duplicate supports, sparse word boundaries, nested and conflict rollback on both
+value paths, implication of explanations, and delayed materialization across later carves and
+sibling branches. An existing enumeration test over the sparse domain {0, 5e9} also checks the
+span-independent explanation path.
 
-## Profile and reproduction
-
-Before changing the propagator, local JFR CPU profiles pinned each arm at 100 nodes on
-HSP-table-14409_c23 using JDK 25, Serial GC, a 3 GB heap, and ActiveProcessorCount=1.
-Of samples with a PropagationSession pin or learned-clause stack, TablePropagator.propagateBitset
-appeared in 165/182 for satOptimized and 528/590 for conflictDriven. Root session construction
-accounted for 24 samples in each recording (310 and 797 samples total). Leaf samples concentrated
-on support gathering; reversible tuple removals also appeared. The HSP relations use ground cells,
-so stopping completed columns matters separately from filling short-support intervals by words.
-The live sparse-set prefix is trailed once per completed sweep.
-
-First rebuild with `./gradlew :klause-cli:installJvmDist`, then invoke the installed CLI with
+Rebuild with `./gradlew :klause-cli:installJvmDist`, then invoke the installed CLI with
 `-e cp --param arms=1 --param bt-arm=conflictDriven --param node-limit=100 -r 3 -s -t 30000`
 and the corpus XML path. Set `KLAUSE_CLI_OPTS` to
 `-Xmx3g -XX:+UseSerialGC -XX:ActiveProcessorCount=1 -XX:StartFlightRecording=filename=table.jfr,settings=profile`.
-Use `jfr print --json --events jdk.ExecutionSample table.jfr` to inspect stacks. Root construction
-samples are separated from pin/learned-clause propagation; other stacks are not attributed to either
-phase. Profiling is diagnostic; use the alternating lab runs for timings.
-
-Portfolio work is charged work, not a candidate-evaluation count. The reference baseline is incomplete;
-these measurements compare klause with itself. The table tests cover sparse support boundaries,
-duplicate supports, nested rollback and empty-prefix conflict rollback on bitset and wide-value paths,
-and the implications of recorded explanations. The support-completion scratch state is recomputed on
-every fire, and tuple feasibility and deduction antecedents retain their existing semantics.
+Use JDK 25's `jfr print --json --events jdk.ExecutionSample table.jfr` to inspect stacks and
+separate root construction, table explanations, and propagation before interpreting the profile.
