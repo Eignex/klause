@@ -245,7 +245,7 @@ internal fun PropagationState.atomAntecedentsDerived(atomId: Int): IntArray? {
             if (truth) {
                 composeIntVarAtomAntecedents(intArrayOf(v))
             } else {
-                if (holeHistHas(v, k) || k in d.min..d.max) holeReasonFor(v, k) else null
+                if (holeHistHas(v, k) || k in d.min..d.max) reasonOf(holeReasonFor(v, k)) else null
             }
     }
 }
