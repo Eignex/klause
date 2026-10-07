@@ -1,5 +1,6 @@
 package com.eignex.klause.factor.table.internals
 
+import com.eignex.klause.factor.arithmetic.internals.collectHoleAndBoundAntecedents
 import com.eignex.klause.ir.values
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.RevInt
@@ -124,7 +125,8 @@ internal class RegularIncrementalState(
     /** Prune every position in `[lo, hi]`: a symbol survives iff some forward-reachable state at i
      *  transitions on it into a backward-co-reachable state at i+1. Returns false on a wipeout. */
     private fun prune(state: PropagationState, lo: Int, hi: Int): Boolean {
-        val ant = state.composeIntVarAtomAntecedents(seq)
+        // Reachability reads every symbol each position still holds, so the reason cites holes as well as bounds.
+        val ant = collectHoleAndBoundAntecedents(state, seq)
         for (i in lo..hi) {
             val d = state.intDomains[seq[i]]
             var toRemove: LongArrayList? = null

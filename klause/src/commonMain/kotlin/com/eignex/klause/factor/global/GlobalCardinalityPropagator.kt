@@ -209,7 +209,8 @@ internal class GlobalCardinalityPropagator(
         }
         val gccAntecedents = withPresencePremises(
             state,
-            state.composeIntVarAtomAntecedents(effectiveXs + maybeXs + (countVars ?: EmptyIntArray)),
+            // The count bounds and SCC prunes read domain membership, so the reason cites holes as well as bounds.
+            collectHoleAndBoundAntecedents(state, effectiveXs + maybeXs + (countVars ?: EmptyIntArray)),
         )
         if (closed) {
             for (x in effectiveXs) {

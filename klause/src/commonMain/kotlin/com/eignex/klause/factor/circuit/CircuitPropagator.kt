@@ -1,5 +1,6 @@
 package com.eignex.klause.factor.circuit
 
+import com.eignex.klause.factor.arithmetic.internals.collectHoleAndBoundAntecedents
 import com.eignex.klause.factor.arithmetic.internals.collectLinearTightenAntecedents
 import com.eignex.klause.factor.circuit.internals.buildSuccWatches
 import com.eignex.klause.factor.circuit.internals.circuitReachesAll
@@ -21,10 +22,11 @@ internal class CircuitPropagator(private val succ: IntArray, private val n: Int)
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? {
         // Sharp reason for a premature subtour: the fixed edges forming a cycle shorter than n are
         // a complete, self-contained cause, so cite only those successor variables. Any other
-        // failure (e.g. strong-connectivity) falls back to the sound whole-scope reason.
+        // failure (strong connectivity, reachability) reads the domains' holes as well as their
+        // bounds, so it falls back to a whole-scope reason that cites both.
         val cycle = fixedSubtour(state)
         if (cycle != null) return collectLinearTightenAntecedents(state, cycle, excludeIdx = -1, extraLit = 0)
-        return collectLinearTightenAntecedents(state, succ, excludeIdx = -1, extraLit = 0)
+        return collectHoleAndBoundAntecedents(state, succ)
     }
 
     /** The successor variables on a fixed-edge cycle of length < n, or null if none exists. */
@@ -64,7 +66,8 @@ internal class CircuitPropagator(private val succ: IntArray, private val n: Int)
 
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
         if (state.cpGateShouldSkip(factorId)) return true
-        val ant = state.composeIntVarAtomAntecedents(succ)
+        // The filters below read every successor's domain, holes included, so the reason cites both.
+        val ant = collectHoleAndBoundAntecedents(state, succ)
         if (!tightenSuccToRange(state, succ, n)) return false
         if (n == 1) {
             val v = succ[0]
