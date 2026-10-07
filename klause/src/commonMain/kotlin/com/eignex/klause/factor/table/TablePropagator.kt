@@ -142,7 +142,11 @@ internal class TablePropagator(
         var carvedLater = false
         d.forEachHoleInRange(a, b) { k ->
             val pos = state.carvedAt(v, k)
-            if (pos > atTrail) carvedLater = true else if (pos >= 0 && into != null) into.add(Lit.make(state.atomVarEq(v, k), true))
+            if (pos > atTrail) {
+                carvedLater = true
+            } else if (pos >= 0 && into != null) {
+                into.add(Lit.make(state.atomVarEq(v, k), true))
+            }
         }
         if (carvedLater) return Cell.LIVE
         if (into != null) {

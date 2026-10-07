@@ -115,7 +115,8 @@ internal class ElementPropagator(
         }
     }
 
-    private fun ownDomain(state: PropagationState, v: Int): IntArray? = collectHoleAndBoundAntecedents(state, intArrayOf(v))
+    private fun ownDomain(state: PropagationState, v: Int): IntArray? =
+        collectHoleAndBoundAntecedents(state, intArrayOf(v))
 
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
         (if (arrIsVars) failure else constantConflictReason(state)) ?: collectHoleAndBoundAntecedents(state, intVars)
@@ -135,7 +136,11 @@ internal class ElementPropagator(
         }
         // A hole the path never carved (a root or survivor restriction) is unconditional and needs no literal.
         fun hole(v: Int, k: Long): Int =
-            if (state.undoLogging) state.exclusionLiteral(v, k, state.undo.size) else Lit.make(state.atomVarEq(v, k), true)
+            if (state.undoLogging) {
+                state.exclusionLiteral(v, k, state.undo.size)
+            } else {
+                Lit.make(state.atomVarEq(v, k), true)
+            }
         for (pos in arr.indices) {
             val iv = indexOffset + pos.toLong()
             when {

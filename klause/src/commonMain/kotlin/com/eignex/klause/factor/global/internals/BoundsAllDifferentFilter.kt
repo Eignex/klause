@@ -35,11 +35,13 @@ internal fun boundsAllDifferentFilter(
     if (!computeBoundsAllDifferent(lo, hi, newLo, newHi)) return overfullInterval(lo, hi, vars) ?: vars
 
     for (i in 0 until n) {
-        if (newLo[i] > lo[i] && !state.tightenIntMin(vars[i], newLo[i], boundsReason(state, tag, vars[i], true, newLo[i], premises))) {
-            return vars
+        if (newLo[i] > lo[i]) {
+            val ant = boundsReason(state, tag, vars[i], true, newLo[i], premises)
+            if (!state.tightenIntMin(vars[i], newLo[i], ant)) return vars
         }
-        if (newHi[i] < hi[i] && !state.tightenIntMax(vars[i], newHi[i], boundsReason(state, tag, vars[i], false, newHi[i], premises))) {
-            return vars
+        if (newHi[i] < hi[i]) {
+            val ant = boundsReason(state, tag, vars[i], false, newHi[i], premises)
+            if (!state.tightenIntMax(vars[i], newHi[i], ant)) return vars
         }
     }
     return null
@@ -105,7 +107,7 @@ internal fun explainBoundsHall(
             add(state.boundLiteral(others[k], true, a, atTrail, atLevel))
             add(state.boundLiteral(others[k], false, b, atTrail, atLevel))
         }
-        if (lower) add(state.boundLiteral(x, true, a, atTrail, atLevel)) else add(state.boundLiteral(x, false, b, atTrail, atLevel))
+        add(state.boundLiteral(x, lower, if (lower) a else b, atTrail, atLevel))
         premises.forEach { add(it) }
         return out.toIntArray()
     }

@@ -453,7 +453,9 @@ class ElementPropagatorTest {
             numBoolVars = 0,
             numIntVars = 5,
             intDomains = arrayOf(IntDomain(0, 2), IntDomain(0, 9), IntDomain(0, 9), IntDomain(0, 9), IntDomain(0, 9)),
-            factors = arrayOf<Factor>(Element(idx = 0, result = 1, arr = longArrayOf(2, 3, 4), arrIsVars = true, indexOffset = 0)),
+            factors = arrayOf<Factor>(
+                Element(idx = 0, result = 1, arr = longArrayOf(2, 3, 4), arrIsVars = true, indexOffset = 0),
+            ),
         )
         val state = PropagationState(problem, Assumptions.None)
         state.undoLogging = true

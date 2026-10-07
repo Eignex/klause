@@ -171,7 +171,8 @@ internal fun collectLinearDirAntecedents(
 /**
  * The reason [collectLinearDirAntecedents] builds, with each cited bound weakened as far as the deduction
  * allows: [slack] is how far the driving side may loosen before the conflict, or the bound on the variable at
- * [excludeIdx], no longer follows, and it is spent loosening the cited bounds, latest decision level first. A reason citing exact bounds refutes one value per conflict, so a
+ * [excludeIdx], no longer follows, and it is spent loosening the cited bounds, latest decision level first. A
+ * reason citing exact bounds refutes one value per conflict, so a
  * search that tries `x ≤ min` refutes `min`, then `min + 1`, and so on across the domain; the lifted reason
  * refutes every value the conflict rules out at once. A bound loosened to its root value is a global fact and
  * drops out.
@@ -204,7 +205,20 @@ internal fun collectLinearLiftedAntecedents(
         aboveRoot[j] = state.intLevel[v] > 0
         lift[j] = liftable(state, v, citeMin, level[j])
     }
-    return liftedAntecedents(state, coeffs, vars, useLo, slack, excludeIdx, extraLit, includeExtraLit, bound, level, lift, aboveRoot)
+    return liftedAntecedents(
+        state,
+        coeffs,
+        vars,
+        useLo,
+        slack,
+        excludeIdx,
+        extraLit,
+        includeExtraLit,
+        bound,
+        level,
+        lift,
+        aboveRoot,
+    )
 }
 
 /**
@@ -244,7 +258,8 @@ internal fun explainLinearBound(
         level[j] = l
         aboveRoot[j] = l > 0
         // As [liftable], against the deduction's level: below it any weaker atom serves; at it, only a decision.
-        lift[j] = l > 0 && (l < atLevel || est?.reason == null && l <= decisions.size && decisions[l - 1] == numBools + v)
+        val decided = est?.reason == null && l <= decisions.size && decisions[l - 1] == numBools + v
+        lift[j] = l > 0 && (l < atLevel || decided)
     }
     return liftedAntecedents(
         state,

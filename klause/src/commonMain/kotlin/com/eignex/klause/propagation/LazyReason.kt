@@ -18,7 +18,8 @@ private const val HEADER = 4
 private const val EXTENDED = -1
 
 /** Whether [reason] is a lazy marker rather than literals. */
-internal fun isLazyReason(reason: IntArray?): Boolean = reason != null && reason.isNotEmpty() && reason[0] == LAZY_MARKER
+internal fun isLazyReason(reason: IntArray?): Boolean =
+    reason != null && reason.isNotEmpty() && reason[0] == LAZY_MARKER
 
 /** A lazy reason for a deduction the current factor makes now, carrying [payload] for its [Propagator.explain]. */
 internal fun PropagationState.lazyReason(payload: IntArray): IntArray {

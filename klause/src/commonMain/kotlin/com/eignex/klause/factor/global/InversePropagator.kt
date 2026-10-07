@@ -48,7 +48,10 @@ internal class InversePropagator(
 
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
         hallFailure?.let { hallReason(state, it, EmptyIntArray) }
-            ?: collectHoleAndBoundAntecedents(state, (state.refPayload[factorId] as? InverseCache)?.conflictVars ?: intVars)
+            ?: collectHoleAndBoundAntecedents(
+                state,
+                (state.refPayload[factorId] as? InverseCache)?.conflictVars ?: intVars,
+            )
 
     // The matchings' bounds fallback tags each side: 0 for [f], 1 for [g].
     override fun explain(state: PropagationState, factorId: Int, payload: IntArray, atTrail: Int, atLevel: Int) =

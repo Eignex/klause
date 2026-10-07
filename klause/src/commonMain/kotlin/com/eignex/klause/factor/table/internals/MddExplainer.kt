@@ -124,7 +124,8 @@ internal class MddExplainer(
                 for (k in head[src] until head[src + 1]) {
                     val p = ptr[k]
                     val dst = transitions[p + 2].toInt()
-                    if (dst in 0 until numN) action(src, transitions[p + 1], dst, if (cost >= 0) transitions[p + 3] else 0L)
+                    val weight = if (cost >= 0) transitions[p + 3] else 0L
+                    if (dst in 0 until numN) action(src, transitions[p + 1], dst, weight)
                 }
             }
         }
