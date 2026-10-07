@@ -88,6 +88,7 @@ internal class FlatZincCompiler(
                 locateConstraint(c)
                 recordFiniteFloatChoices(c)
             }
+            emitFiniteFloatDomains()
         }
         return compileConstraints(onLowered)
     }

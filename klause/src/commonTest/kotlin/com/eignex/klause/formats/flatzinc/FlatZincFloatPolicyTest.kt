@@ -6,6 +6,7 @@ import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.pipeline.writeFlatZincSolution
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
@@ -144,6 +145,32 @@ class FlatZincFloatPolicyTest {
         val program = parseFlatZinc("var 0.0..1.0: x; constraint float_le(x, 0.5); solve satisfy;", floatBuckets = 2)
 
         assertFalse(program.floatVarsByName.getValue("x").lpOnly)
+    }
+
+    @Test
+    fun `unconstrained non-objective floats do not add grid search variables`() {
+        val program = parseFlatZinc(
+            """
+            var float: unused;
+            array[1..2] of var float: values;
+            solve satisfy;
+            """.trimIndent(),
+            floatBuckets = 1024,
+        )
+
+        assertEquals(0, program.problem.numIntVars)
+        assertEquals(3, program.problem.numRealVars)
+        assertTrue(program.floatVarsByName.values.all { it.lpOnly })
+    }
+
+    @Test
+    fun `an unconstrained float objective keeps the default grid policy`() {
+        for (goal in listOf("minimize", "maximize")) {
+            val program = parseFlatZinc("var 0.0..1.0: x; solve $goal x;", floatBuckets = 2)
+
+            assertFalse(program.floatVarsByName.getValue("x").lpOnly)
+            assertEquals(1, program.problem.numIntVars)
+        }
     }
 
     @Test

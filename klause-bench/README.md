@@ -10,6 +10,22 @@ bench solve [filters…]      e.g.  bench solve suite=mzn-bench backend=choco
 
 `solve` runs **one** solver per invocation, **as a subprocess**: klause via `klause-cli`, and reference solvers (`choco`/`gecode`/`yuck`/…) via `minizinc --solver <id>` — each emitting MiniZinc-format output. Output is saved **one file per problem** under `output/<config>/` (`<config>` = solver+settings+budget, e.g. `choco-p8-free-t300s`): a `<problem>.out` (raw solver stream = the log) and a self-describing `<problem>.json` (solver/settings/budget + parsed result). There is no in-session comparison and no in-process reference adapter: run `solve` once per config and diff two config dirs offline with `output/compare.sh` — so one solver's crash or warmup never contaminates another's baseline. The same offline diff doubles as a **regression check**: keep a baseline config's dir and compare a fresh run's dir against it (verdict counts catch quality regressions, the time aggregate catches slowdowns). Results are also content-addressed in `build/bench-cache/`, so re-running an identical instance replays instantly.
 
+MiniZinc float runs validate their final candidate by recompiling the original model with
+its DZN assignments pinned, using MiniZinc's standard library and the same data seed.
+No reference solver runs. Records include `sourceValidation` (`valid`, `invalid`, or `unknown`)
+and `floatApproximation` in `stats`. Residual variables or constraints, a compiler failure,
+or the 10-second checking timeout leave validation unknown. Checking time is outside the solve budget.
+Rejected candidates and unchecked grid witnesses receive no solution credit. A checked grid witness
+can establish feasibility, but a grid optimum or refutation cannot prove the source result.
+Raw output and `reportedFeasible`, `reportedObjective`, and `reportedProven` preserve solver claims.
+Earlier incumbents are not independently source checked; arm attribution is restricted to the final objective.
+
+An existing output can be checked without solving again:
+
+```
+./gradlew :klause-bench:bench --args="validate-solution suite=hakank problem=arbitrage_loops/arbitrage_loops output=/path/to/solver.out"
+```
+
 ## Quick start
 
 ```

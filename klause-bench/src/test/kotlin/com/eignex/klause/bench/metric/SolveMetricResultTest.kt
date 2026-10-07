@@ -24,6 +24,55 @@ class SolveMetricResultTest {
     )
 
     @Test
+    fun `a source rejected result receives no solution or proof credit`() {
+        val record = rec(true, 1.001466, 100, true)
+
+        val checked = record.sourceChecked(SourceValidation("invalid", "source contradiction"), approximation = false)
+        val row = SolveMetric.resultRow("s", checked, "cfg", null)
+
+        assertEquals(null, row.feasible)
+        assertEquals(null, row.objective)
+        assertEquals(false, row.proven)
+        assertEquals(10_000, row.elapsedMs)
+        assertEquals("1.001466", checked.stats["reportedObjective"])
+    }
+
+    @Test
+    fun `source valid grid witnesses keep feasibility but not optimality credit`() {
+        val record = rec(true, 1.0, 100, true)
+
+        val checked = record.sourceChecked(SourceValidation("valid", "grounded"), approximation = true)
+
+        assertEquals(true, checked.feasible)
+        assertEquals(1.0, checked.objective)
+        assertEquals(false, checked.proven)
+        assertEquals(100, checked.timeToBestMs)
+    }
+
+    @Test
+    fun `unchecked grid witnesses and grid refutations remain undecided`() {
+        for (feasible in listOf(true, false)) {
+            val record = rec(feasible, if (feasible) 1.0 else null, 100, true)
+
+            val checked = record.sourceChecked(SourceValidation("unknown", "residual"), approximation = true)
+
+            assertEquals(null, checked.feasible)
+            assertEquals(null, checked.objective)
+            assertEquals(false, checked.proven)
+            assertEquals(null, checked.timeToBestMs)
+        }
+    }
+
+    @Test
+    fun `a source valid exact result retains its proof`() {
+        val checked = rec(true, 1.0, 100, true)
+            .sourceChecked(SourceValidation("valid", "grounded"), approximation = false)
+
+        assertEquals(true, checked.proven)
+        assertEquals(true, checked.feasible)
+    }
+
+    @Test
     fun `a solved row's elapsed is time-to-best, tagged with the config, features joined`() {
         val ref = ReferenceEntry(
             "s", "fam/inst", false, null, null, false, 0, "cp-sat", 300_000,

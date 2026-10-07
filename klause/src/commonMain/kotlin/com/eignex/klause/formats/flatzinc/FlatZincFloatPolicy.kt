@@ -77,9 +77,14 @@ private class FloatChoicePlanner(
             }
         }
         val finite = choices.keys.mapTo(HashSet()) { components.find(it) }
+        val objective = when (val solve = model.solve) {
+            is FznSolve.Minimize -> variables(solve.obj)
+            is FznSolve.Maximize -> variables(solve.obj)
+            else -> emptyList()
+        }.mapTo(HashSet()) { components.find(it) }
         return declarations.floatVars.filterValues {
             val root = components.find(it.varId)
-            root !in blocked && (exact || root in finite)
+            root !in blocked && (exact || root in finite || (root !in costs && root !in objective))
         }.keys
     }
 

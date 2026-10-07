@@ -2,14 +2,69 @@ package com.eignex.klause.formats.flatzinc
 
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
+import com.eignex.klause.ir.Lit
+import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.propagation.baked
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.pipeline.writeFlatZincSolution
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class FlatZincFiniteFloatProductsTest {
+    @Test
+    fun `selecting a finite float value excludes the other choices during propagation`() {
+        for (count in listOf(3, 6)) {
+            val entries = (1..count).joinToString(", ") { "$it.0" }
+            val model = FlatZincParser(
+                FlatZincLexer(
+                    "var 1..1: i; var float: x; constraint array_float_element(i, [$entries], x); solve satisfy;",
+                ),
+            ).parse()
+            val compiler = FlatZincCompiler(model)
+            val program = compiler.compile()
+
+            val deductions = assertIs<PropagationResult.Implied>(program.problem.baked)
+            for ((key, literal) in compiler.floatValueLiterals) {
+                val pinned = deductions.boolValueOrNull(Lit.variable(literal))
+                assertEquals(key.second == 1.0, pinned?.let { Lit.evaluate(literal, it) })
+            }
+        }
+    }
+
+    @Test
+    fun `signed zeros share a finite choice`() {
+        val program = parseFlatZinc(
+            """
+            var 1..2: i;
+            var float: x;
+            constraint array_float_element(i, [0.0, -0.0], x);
+            solve satisfy;
+            """.trimIndent(),
+        )
+
+        val result = BacktrackSolver(program.problem.bake()).solve(BacktrackParams(randomSeed = 0L))
+
+        assertIs<SolveResult.Sat>(result)
+    }
+
+    @Test
+    fun `disjoint constant arrays have no common finite float choice`() {
+        val program = parseFlatZinc(
+            """
+            var 1..1: i;
+            var float: x;
+            constraint array_float_element(i, [1.0], x);
+            constraint array_float_element(i, [2.0], x);
+            solve satisfy;
+            """.trimIndent(),
+        )
+
+        assertIs<PropagationResult.Unsat>(program.problem.baked)
+    }
+
     @Test
     fun `products preserve selected float values through array aliases in either operand`() {
         for (operands in listOf("values[1], y", "y, values[1]")) {
