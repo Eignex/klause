@@ -265,6 +265,12 @@ internal fun lsStatPairs(stats: SolveStats, solveTimeMs: Long): List<Pair<String
     if (stats.ls.timeToBestMs >= 0L) out += "lsTimeToBest" to round4(stats.ls.timeToBestMs / 1000.0)
     if (stats.ls.incumbentObjective.isFinite()) out += "lsIncumbentObjective" to round4(stats.ls.incumbentObjective)
     if (stats.ls.incumbentViolation.isFinite()) out += "lsIncumbentViolation" to round4(stats.ls.incumbentViolation)
+    val completions = stats.ls.completions.sum.toLong()
+    if (completions > 0L) {
+        out += "lsCompletions" to "$completions"
+        out += "lsCompletionsRefuted" to "${stats.ls.completionsRefuted.sum.toLong()}"
+        out += "lsCompletionsUndecided" to "${stats.ls.completionsUndecided.sum.toLong()}"
+    }
     return out
 }
 

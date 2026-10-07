@@ -19,6 +19,12 @@ data class LocalSearchStats(
     val incumbentObjective: Double = Double.NaN,
     /** Total constraint violation at the best incumbent: 0 once feasible, else the lowest residual. NaN unset. */
     val incumbentViolation: Double = Double.NaN,
+    /** Candidates a completion decided, over continuous columns; 0 on a model without them. */
+    val completions: SumResult = ZERO_COUNT,
+    /** Of [completions], those it refuted — the floating-point search reached a point no exact completion holds. */
+    val completionsRefuted: SumResult = ZERO_COUNT,
+    /** Of [completions], those it could not decide within its budget. */
+    val completionsUndecided: SumResult = ZERO_COUNT,
 ) {
     /** Combine two workers: moves/stalls add, earliest time-to-best wins, incumbent from the lower violation. */
     fun mergedWith(o: LocalSearchStats): LocalSearchStats = LocalSearchStats(
@@ -38,6 +44,9 @@ data class LocalSearchStats(
             o.incumbentObjective,
         ),
         incumbentViolation = naNDeferring(incumbentViolation, o.incumbentViolation, ::minOf),
+        completions = SumResult(completions.sum + o.completions.sum),
+        completionsRefuted = SumResult(completionsRefuted.sum + o.completionsRefuted.sum),
+        completionsUndecided = SumResult(completionsUndecided.sum + o.completionsUndecided.sum),
     )
 }
 
@@ -54,6 +63,16 @@ internal class LocalSearchStatsSink {
     private var timeToBestMs: Long = -1L
     private var incumbentObjective: Double = Double.NaN
     private var incumbentViolation: Double = Double.NaN
+    private var completions: Long = 0L
+    private var completionsRefuted: Long = 0L
+    private var completionsUndecided: Long = 0L
+
+    /** Count one decided candidate: [refuted] or [undecided] when it was not accepted. */
+    fun recordCompletion(refuted: Boolean, undecided: Boolean) {
+        completions++
+        if (refuted) completionsRefuted++
+        if (undecided) completionsUndecided++
+    }
 
     /** Record the LS move / restart / stall totals in one call at loop exit. */
     fun recordWork(moves: Long, restarts: Long, stalls: Long) {
@@ -76,5 +95,8 @@ internal class LocalSearchStatsSink {
         timeToBestMs = timeToBestMs,
         incumbentObjective = incumbentObjective,
         incumbentViolation = incumbentViolation,
+        completions = SumResult(completions.toDouble()),
+        completionsRefuted = SumResult(completionsRefuted.toDouble()),
+        completionsUndecided = SumResult(completionsUndecided.toDouble()),
     )
 }
