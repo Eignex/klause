@@ -10,9 +10,12 @@ import com.eignex.klause.ir.values
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.propagation.RevIntArray
+import com.eignex.klause.propagation.boundLiteral
+import com.eignex.klause.propagation.exclusionLiteral
 import com.eignex.klause.propagation.restrictIntToSurvivors
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntArrayList
+import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.LongArrayList
 import com.eignex.klause.util.MutableIntIntMap
 import com.eignex.klause.util.MutableLongIntMap
@@ -57,18 +60,90 @@ internal class GlobalCardinalityPropagator(
         dup
     }
 
-    override fun conflictReason(state: PropagationState, factorId: Int): IntArray? = withPresencePremises(
-        state,
-        collectHoleAndBoundAntecedents(state, (state.refPayload[factorId] as? GccPropCache)?.conflictVars ?: intVars),
-    )
+    // The reason of the failure the last [propagate] hit, read by [conflictReason] before the engine backtracks.
+    private var failure: IntArray? = null
 
-    private fun pinnedTo(state: PropagationState, scope: IntArray, value: Long): IntArrayList {
-        val out = IntArrayList()
+    override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
+        failure ?: withPresencePremises(state, collectHoleAndBoundAntecedents(state, intVars))
+
+    // Literals false now: the clause form of a reason over the conditions it is given.
+    private inner class Reason(private val state: PropagationState) {
+        private val seen = IntHashSet()
+        private val out = IntArrayList()
+
+        fun add(lit: Int) {
+            if (lit != Lit.NONE && seen.add(lit)) out.add(lit)
+        }
+
+        /** [x] took [value]. */
+        fun pinned(x: Int, value: Long) = add(Lit.make(state.atomVarEq(x, value), false))
+
+        /** [value] had left [x]'s domain. */
+        fun lacks(x: Int, value: Long) = add(
+            if (state.undoLogging) {
+                state.exclusionLiteral(x, value, state.undo.size)
+            } else if (value in state.rootDomains[x]) {
+                Lit.make(state.atomVarEq(x, value), true)
+            } else {
+                Lit.NONE
+            },
+        )
+
+        /** Every value outside the cover had left [x]'s domain. */
+        fun lacksOthers(x: Int) {
+            collectHoleAndBoundAntecedents(state, intArrayOf(x))?.forEach { add(it) }
+        }
+
+        fun countBounds(k: Int) {
+            val cv = countVars ?: return
+            val d = state.intDomains[cv[k]]
+            add(state.boundLiteral(cv[k], true, d.min, state.undo.size, state.currentLevel))
+            add(state.boundLiteral(cv[k], false, d.max, state.undo.size, state.currentLevel))
+        }
+
+        fun presence() {
+            presencePremiseLits(state).forEach { add(it) }
+        }
+
+        fun build(): IntArray? = if (state.currentLevel == 0) null else out.toIntArray()
+    }
+
+    // Count of cover[k] at least the variables pinned to it.
+    private fun pinnedReason(state: PropagationState, scope: IntArray, k: Int): Reason = Reason(state).apply {
         for (x in scope) {
             val d = state.intDomains[x]
-            if (d.min == d.max && d.min == value) out.add(x)
+            if (d.min == d.max && d.min == cover[k]) pinned(x, cover[k])
         }
-        return out
+        presence()
+    }
+
+    // Count of cover[k] at most the variables that still hold it.
+    private fun possibleReason(state: PropagationState, scope: IntArray, k: Int): Reason = Reason(state).apply {
+        for (x in scope) if (cover[k] !in state.intDomains[x]) lacks(x, cover[k])
+        presence()
+    }
+
+    /**
+     * No flow reaches from the nodes [reach] marks back to the far side: only an edge leaving one of its variables
+     * could open a path, so the reason is every var→value edge they lack (the values that had left their domains),
+     * with the count bounds the network's capacities read.
+     */
+    private fun cutReason(
+        state: PropagationState,
+        xs: IntArray,
+        reach: BooleanArray,
+        otherNode: Int,
+        xToOther: IntArray,
+    ): Reason = Reason(state).apply {
+        val n = xs.size
+        for (i in 0 until n) {
+            if (!reach[2 + i]) continue
+            val d = state.intDomains[xs[i]]
+            for (k in cover.indices) if (cover[k] !in d) lacks(xs[i], cover[k])
+            if (otherNode >= 0 && xToOther[i] < 0) lacksOthers(xs[i])
+        }
+        for (k in cover.indices) countBounds(k)
+        presence()
     }
 
     private fun presencePremiseLits(state: PropagationState): IntArray {
@@ -181,7 +256,7 @@ internal class GlobalCardinalityPropagator(
         if (presents.isEmpty() && intVars.isNotEmpty() && cache.cachedDoms[0] != null && dirty.isEmpty()) {
             return true
         }
-        cache.conflictVars = null
+        failure = null
         val origIdx: IntArray = if (presents.isEmpty()) {
             IntArray(xs.size) { it }
         } else {
@@ -207,19 +282,20 @@ internal class GlobalCardinalityPropagator(
             }
             acc.toIntArray()
         }
-        val gccAntecedents = withPresencePremises(
-            state,
-            // The count bounds and SCC prunes read domain membership, so the reason cites holes as well as bounds.
-            collectHoleAndBoundAntecedents(state, effectiveXs + maybeXs + (countVars ?: EmptyIntArray)),
-        )
+        val counted = effectiveXs + maybeXs
         if (closed) {
-            for (x in effectiveXs) {
+            for ((j, x) in effectiveXs.withIndex()) {
                 val d = state.intDomains[x]
                 if (d.spanOrNull(DEFAULT_DOMAIN_WALK_CAP) != null) {
                     val toRemove = LongArrayList()
                     d.values.forEach { if (!coverIndexByValue.containsKey(it)) toRemove.add(it) }
+                    // A closed cardinality admits no value outside the cover to a variable that takes part.
+                    val ant = Reason(state).apply { if (presents.isNotEmpty()) add(Lit.negate(presents[origIdx[j]])) }.build()
                     for (k in 0 until toRemove.size) {
-                        if (!state.excludeIntValue(x, toRemove[k], gccAntecedents)) return false
+                        if (!state.excludeIntValue(x, toRemove[k], ant)) {
+                            failure = Reason(state).apply { lacksOthers(x) }.build()
+                            return false
+                        }
                     }
                 } else if (!state.restrictIntToSurvivors(x, cover)) {
                     // A domain too large to walk: restrict to the (small) cover set directly rather than
@@ -266,16 +342,26 @@ internal class GlobalCardinalityPropagator(
         for (k in cover.indices) {
             val target = cover[k]
             if (cvArr != null) {
-                if (!state.tightenIntMin(cvArr[k], definite[k].toLong(), gccAntecedents)) {
-                    cache.conflictVars = pinnedTo(state, effectiveXs, target)
-                        .also { it.add(cvArr[k]) }.toIntArray()
+                val cv = cvArr[k]
+                if (definite[k] > state.intDomains[cv].min &&
+                    !state.tightenIntMin(cv, definite[k].toLong(), pinnedReason(state, effectiveXs, k).build())
+                ) {
+                    failure = pinnedReason(state, effectiveXs, k).apply { countBounds(k) }.build()
                     return false
                 }
-                if (!state.tightenIntMax(cvArr[k], possible[k].toLong(), gccAntecedents)) return false
+                if (possible[k] < state.intDomains[cv].max &&
+                    !state.tightenIntMax(cv, possible[k].toLong(), possibleReason(state, counted, k).build())
+                ) {
+                    failure = possibleReason(state, counted, k).apply { countBounds(k) }.build()
+                    return false
+                }
             } else {
-                if (requireNotNull(countLow)[k] > possible[k]) return false
+                if (requireNotNull(countLow)[k] > possible[k]) {
+                    failure = possibleReason(state, counted, k).build()
+                    return false
+                }
                 if (requireNotNull(countHigh)[k] < definite[k]) {
-                    cache.conflictVars = pinnedTo(state, effectiveXs, target).toIntArray()
+                    failure = pinnedReason(state, effectiveXs, k).build()
                     return false
                 }
             }
@@ -464,10 +550,7 @@ internal class GlobalCardinalityPropagator(
             val obtained = flow.maxFlow(superSource, superSink)
             if (obtained < requiredSSFlow) {
                 val reach = flow.residualReachable(superSource)
-                val resp = IntArrayList()
-                for (i in 0 until n) if (reach[2 + i]) resp.add(effectiveXs[i])
-                if (cvArr != null) for (k in 0 until m) resp.add(cvArr[k])
-                if (resp.size > 0) cache.conflictVars = resp.toIntArray()
+                failure = cutReason(state, effectiveXs, reach, otherNode, xToOtherEdgeIdx).build()
                 return false
             }
             // Persist the just-established flow so later fires reuse it without a rebuild or replay.
@@ -494,13 +577,26 @@ internal class GlobalCardinalityPropagator(
         }
         val sccId = cache.sccId(baseNodes)
         flow.computeSccResidual(baseNodes, sccId)
+        // A prune of x(i) = cover(k) holds because nothing the value's node reaches leads back to x(i); the cut
+        // around what it reaches is shared by every value of its component.
+        val cutBySource = HashMap<Int, IntArray?>()
+        fun cutFrom(node: Int): IntArray? = cutBySource.getOrPut(sccId[node]) {
+            cutReason(state, effectiveXs, flow.residualReachable(node), otherNode, xToOtherEdgeIdx).build()
+        }
         for (i in 0 until n) {
             for (k in 0 until m) {
                 val eIdx = xToCovEdgeIdx[i * m + k]
                 if (eIdx < 0) continue
                 if (flow.flowOf(eIdx) > 0) continue
                 if (sccId[2 + i] == sccId[2 + n + k]) continue
-                if (!state.excludeIntValue(effectiveXs[i], cover[k], gccAntecedents)) return false
+                val ant = cutFrom(2 + n + k)
+                if (!state.excludeIntValue(effectiveXs[i], cover[k], ant)) {
+                    failure = Reason(state).apply {
+                        ant?.forEach { add(it) }
+                        lacksOthers(effectiveXs[i])
+                    }.build()
+                    return false
+                }
             }
             val oIdx = xToOtherEdgeIdx[i]
             if (oIdx >= 0 && flow.flowOf(oIdx) == 0 && sccId[2 + i] != sccId[otherNode]) {
@@ -508,8 +604,15 @@ internal class GlobalCardinalityPropagator(
                 if (d.spanOrNull(DEFAULT_DOMAIN_WALK_CAP) != null) {
                     val toRemove = LongArrayList()
                     d.values.forEach { if (!coverIndexByValue.containsKey(it)) toRemove.add(it) }
+                    val ant = cutFrom(otherNode)
                     for (k in 0 until toRemove.size) {
-                        if (!state.excludeIntValue(effectiveXs[i], toRemove[k], gccAntecedents)) return false
+                        if (!state.excludeIntValue(effectiveXs[i], toRemove[k], ant)) {
+                            failure = Reason(state).apply {
+                                ant?.forEach { add(it) }
+                                lacksOthers(effectiveXs[i])
+                            }.build()
+                            return false
+                        }
                     }
                 }
                 // A domain too large to walk is skipped here (sound: it is never a full assignment, and the
