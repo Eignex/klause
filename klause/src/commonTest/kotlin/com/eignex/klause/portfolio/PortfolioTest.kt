@@ -925,6 +925,7 @@ class PortfolioTest {
         reached: MutableList<Int>,
         sliceMillis: Long,
         probeMillis: Long = 20L,
+        minShares: DoubleArray = DoubleArray(0),
     ): Portfolio {
         val problem = Problem(
             numBoolVars = 3,
@@ -952,6 +953,7 @@ class PortfolioTest {
             baseSliceWork = endless,
             maxSliceWork = endless,
             probeSliceMillis = probeMillis,
+            minShares = minShares,
         )
     }
 
@@ -977,6 +979,18 @@ class PortfolioTest {
         }
 
         assertEquals(4, reached.size)
+    }
+
+    @Test
+    fun `an arm below its owed share is scheduled before the policy chooses`() {
+        val reached = ArrayList<Int>()
+        val fallback = TimeSource.Monotonic.markNow() + 10.seconds
+
+        endlessCountedPortfolio(reached, sliceMillis = 20L, minShares = doubleArrayOf(1.0, 0.0)).use {
+            it.minimize(Cancellation { reached.size >= 5 || fallback.hasPassedNow() })
+        }
+
+        assertEquals(listOf(0, 1, 0, 0, 0), reached)
     }
 
     @Test
