@@ -1,6 +1,12 @@
 package com.eignex.klause.factor.global.internals
 
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.propagation.PropagationState
+import com.eignex.klause.propagation.boundLiteral
+import com.eignex.klause.propagation.domainAt
+import com.eignex.klause.propagation.lazyReason
+import com.eignex.klause.util.IntArrayList
+import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.EmptyIntArray
 
 /**
@@ -16,6 +22,7 @@ internal fun boundsAllDifferentFilter(
     state: PropagationState,
     vars: IntArray,
     premises: IntArray = EmptyIntArray,
+    tag: Int = 0,
 ): IntArray? {
     val n = vars.size
     if (n < 2) return null
@@ -25,15 +32,108 @@ internal fun boundsAllDifferentFilter(
     val newLo = lo.copyOf()
     val newHi = hi.copyOf()
 
-    if (!computeBoundsAllDifferent(lo, hi, newLo, newHi)) return vars
+    if (!computeBoundsAllDifferent(lo, hi, newLo, newHi)) return overfullInterval(lo, hi, vars) ?: vars
 
-    var changed = false
-    for (i in 0 until n) if (newLo[i] != lo[i] || newHi[i] != hi[i]) changed = true
-    if (!changed) return null
-    val ant = antecedentsWithPremises(state, vars, premises)
     for (i in 0 until n) {
-        if (newLo[i] > lo[i] && !state.tightenIntMin(vars[i], newLo[i], ant)) return vars
-        if (newHi[i] < hi[i] && !state.tightenIntMax(vars[i], newHi[i], ant)) return vars
+        if (newLo[i] > lo[i]) {
+            val ant = boundsReason(state, tag, vars[i], true, newLo[i], premises)
+            if (!state.tightenIntMin(vars[i], newLo[i], ant)) return vars
+        }
+        if (newHi[i] < hi[i]) {
+            val ant = boundsReason(state, tag, vars[i], false, newHi[i], premises)
+            if (!state.tightenIntMax(vars[i], newHi[i], ant)) return vars
+        }
+    }
+    return null
+}
+
+// The reason for [x]'s new bound, recorded for [explainBoundsHall] (via the filtering factor's explain) to build
+// from the Hall interval it crossed; without the undo log nothing reads reasons and the presence premises stand in.
+private fun boundsReason(
+    state: PropagationState,
+    tag: Int,
+    x: Int,
+    lower: Boolean,
+    bound: Long,
+    premises: IntArray,
+): IntArray? = when {
+    state.currentLevel == 0 -> null
+    state.undoLogging -> state.lazyReason(
+        intArrayOf(BOUNDS_HALL, tag, x, if (lower) 1 else 0, (bound ushr 32).toInt(), bound.toInt()) + premises,
+    )
+    else -> premises
+}
+
+/** Marks a lazy reason [boundsAllDifferentFilter] recorded; its second entry tags the variable array it filtered. */
+internal const val BOUNDS_HALL = -10
+
+/**
+ * The reason for a bound [boundsAllDifferentFilter] moved, from its lazy [payload] over the variables [vars] (those
+ * present at [atTrail], per [present]): a Hall interval the bound crossed, as it stood then. Every other variable
+ * confined to the interval fills it, so the moved variable, which started inside it, lies past it.
+ */
+internal fun explainBoundsHall(
+    state: PropagationState,
+    vars: IntArray,
+    present: (Int) -> Boolean,
+    payload: IntArray,
+    atTrail: Int,
+    atLevel: Int,
+): IntArray {
+    val x = payload[2]
+    val lower = payload[3] == 1
+    val bound = (payload[4].toLong() shl 32) or (payload[5].toLong() and 0xFFFFFFFFL)
+    val premises = payload.copyOfRange(6, payload.size)
+    val others = vars.indices.filter { vars[it] != x && present(it) }.map { vars[it] }
+    val lo = others.map { state.domainAt(it, atTrail).min }
+    val hi = others.map { state.domainAt(it, atTrail).max }
+    val own = state.domainAt(x, atTrail)
+    // A lower bound moved to `bound` crossed an interval ending at bound - 1 that began at or below the old one;
+    // an upper bound mirrors it. Take the narrowest interval whose confined variables fill it.
+    val ends = if (lower) lo.filter { it <= own.min } else hi.filter { it >= own.max }
+    val candidates = ends.distinct().sortedBy { if (lower) -it else it }
+    for (edge in candidates) {
+        val a = if (lower) edge else bound + 1
+        val b = if (lower) bound - 1 else edge
+        if (a > b) continue
+        val inside = others.indices.filter { lo[it] >= a && hi[it] <= b }
+        if (inside.size.toLong() < b - a + 1) continue
+        val seen = IntHashSet()
+        val out = IntArrayList()
+        fun add(lit: Int) {
+            if (lit != Lit.NONE && seen.add(lit)) out.add(lit)
+        }
+        for (k in inside) {
+            add(state.boundLiteral(others[k], true, a, atTrail, atLevel))
+            add(state.boundLiteral(others[k], false, b, atTrail, atLevel))
+        }
+        add(state.boundLiteral(x, lower, if (lower) a else b, atTrail, atLevel))
+        premises.forEach { add(it) }
+        return out.toIntArray()
+    }
+    // The bound came from a Hall interval when it was moved, so one is always found above; every variable's
+    // bounds then still imply it.
+    val out = IntArrayList()
+    for (v in vars) {
+        val d = state.domainAt(v, atTrail)
+        val bl = state.boundLiteral(v, true, d.min, atTrail, atLevel)
+        if (bl != Lit.NONE) out.add(bl)
+        val bu = state.boundLiteral(v, false, d.max, atTrail, atLevel)
+        if (bu != Lit.NONE) out.add(bu)
+    }
+    premises.forEach { out.add(it) }
+    return out.toIntArray()
+}
+
+// An interval with more variables confined to it than values: the bounds conflict's Hall violators.
+private fun overfullInterval(lo: LongArray, hi: LongArray, vars: IntArray): IntArray? {
+    val n = vars.size
+    for (a in lo.distinct()) {
+        for (b in hi.distinct()) {
+            if (b < a) continue
+            val inside = (0 until n).filter { lo[it] >= a && hi[it] <= b }
+            if (inside.size.toLong() > b - a + 1) return IntArray(inside.size) { vars[inside[it]] }
+        }
     }
     return null
 }

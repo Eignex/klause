@@ -21,13 +21,10 @@ internal class ClauseResolvent(private val state: PropagationState, private val 
     private var universe = 0
     private var seen = EmptyBooleanArray
 
-    // Variables already resolved out as a pivot this analysis. Every frontier variable at the conflict
-    // level carries a pin trail position and the driver resolves them in reverse-assignment order, so a
-    // resolved variable's own premises all sit below it and it can never recur as a genuine premise. An
-    // order literal with no trail position never joins the frontier at the conflict level: it is either
-    // resolved through where it is cited ([substituteOffTrail]) or kept as a leaf. Re-ingesting a resolved
-    // variable would let the 1UIP loop ping-pong forever (and grow [bumpIntVars] until OOM), so the
-    // guard stays.
+    // Variables already resolved out as a pivot this analysis. The driver resolves the frontier in
+    // reverse-assignment order, so a resolved variable recurs only when a reason cites a literal the trail
+    // recorded late; [resolve] then skips it. Re-ingesting a resolved variable would let the 1UIP loop
+    // ping-pong forever (and grow [bumpIntVars] until OOM), so the guard stays.
     private var resolved = EmptyBooleanArray
 
     // Variables encountered (resolved through or kept) during the most recent analysis —
@@ -157,17 +154,12 @@ internal class ClauseResolvent(private val state: PropagationState, private val 
                 continue
             }
             if (seen[v]) continue // already in the frontier
-            if (resolved[v]) {
-                // Reverse establishment order means a resolved variable's premises all sit below it, so it
-                // cannot recur as a genuine premise and this branch is unreachable. Keep the literal
-                // rather than rely on that: dropping one silently strengthens the nogood past what was
-                // derived, which prunes feasible solutions and over-proves optimality, whereas adding one
-                // only weakens the clause. Re-resolving would risk the ping-pong [resolved] prevents. A
-                // second conflict-level literal leaves the clause non-asserting, which [finalizeResult]
-                // flags so the engine backtracks chronologically.
-                if (!litsInLearned.contains(lit)) addLearned(lit)
-                continue
-            }
+            // A variable resolved earlier can recur when a reason cites a literal the trail recorded after it,
+            // as an atom materialised by the citing reason is. Resolving it out folded its whole reason into
+            // the resolvent, so meeting it again is one more resolution against that same reason, which adds
+            // nothing: dropping it derives the same clause. Keeping it instead would put a second literal at
+            // the conflict level and leave the clause non-asserting; re-resolving would ping-pong.
+            if (resolved[v]) continue
             val lvl = graph.levelOf(v)
             if (lvl <= 0) continue
             seen[v] = true
@@ -205,9 +197,8 @@ internal class ClauseResolvent(private val state: PropagationState, private val 
      * where it is cited instead puts its premises in the frontier below the citing literal's position,
      * since they all precede the bound move that established it.
      *
-     * Only a literal whose threshold is exactly its variable's live endpoint qualifies: that move *is* its
-     * establishment, so both [ReasonGraph.levelOf] and the reason are the real ones. For any looser
-     * threshold [PropagationState.atomAntecedentsDerived] yields no reason and the literal stays a leaf.
+     * Its level and reason come from the bound move that first reached its threshold
+     * ([PropagationState.boundAtomEstablishment]); a decision move gives none, and the literal stays a leaf.
      * Below the conflict level nothing is ever resolved out, so those literals stay leaves too.
      */
     private fun substituteOffTrail(v: Int, currentLevel: Int): Boolean {
@@ -247,21 +238,23 @@ internal class ClauseResolvent(private val state: PropagationState, private val 
     override fun finalizeResult(currentLevel: Int): ConflictAnalyzer.AnalysisResult {
         val minimized = minimizer.reduce(learned, currentLevel)
         val levels = distinctLevelsOf(minimized)
-        // A proper 1UIP clause carries exactly one literal at the conflict level; that lone
-        // literal becomes the unit-asserting literal after the backjump. A conflict that genuinely
-        // rests on several literals at the conflict level (rare while order literals are
-        // trail-resident) leaves more than one — such a clause is not unit after any
+        // A proper 1UIP clause carries exactly one literal at the conflict level; that lone literal becomes the
+        // unit-asserting literal after the backjump. A clause whose literals all sit below the conflict level
+        // was already false lower down, where propagation missed it; it asserts in the same way from its own
+        // highest level. A clause that rests on several literals at its highest level is not unit after any
         // backjump, so the engine must not try to assert it.
-        var atConflictLevel = 0
+        var top = 0
+        for (i in 0 until minimized.size) top = maxOf(top, graph.levelOf(Lit.variable(minimized[i])))
+        var atTop = 0
         for (i in 0 until minimized.size) {
-            if (graph.levelOf(Lit.variable(minimized[i])) == currentLevel) atConflictLevel++
+            if (graph.levelOf(Lit.variable(minimized[i])) == top) atTop++
         }
         return ConflictAnalyzer.AnalysisResult.Learned(
             minimized.toIntArray(),
-            backjumpLevelOf(minimized, currentLevel),
+            backjumpLevelOf(minimized, top),
             levels.size,
             levels,
-            asserting = atConflictLevel == 1,
+            asserting = top > 0 && atTop == 1,
         )
     }
 
@@ -278,9 +271,9 @@ internal class ClauseResolvent(private val state: PropagationState, private val 
 
     /**
      * Backjump target: the second-highest decision level among the learned literals' variables. The
-     * asserting literal (UIP) sits at [currentLevel]; we want to pop back to the level just past the
-     * next-highest, so the learned clause becomes unit (only the UIP literal remains undetermined) and
-     * propagation can re-fire it as a forced pin.
+     * asserting literal (UIP) sits at [currentLevel], the clause's highest level; we want to pop back to the
+     * level just past the next-highest, so the learned clause becomes unit (only the UIP literal remains
+     * undetermined) and propagation can re-fire it as a forced pin.
      */
     private fun backjumpLevelOf(learned: IntArrayList, currentLevel: Int): Int {
         var best = 0

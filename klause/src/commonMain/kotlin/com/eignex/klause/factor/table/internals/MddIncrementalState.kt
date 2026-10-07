@@ -3,6 +3,7 @@ package com.eignex.klause.factor.table.internals
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.RevInt
 import com.eignex.klause.propagation.RevLongArray
+import com.eignex.klause.propagation.lazyReason
 
 /*
  * Reversible, delta-driven layered-MDD GAC — the incremental counterpart to the full forward+backward
@@ -219,7 +220,7 @@ internal class MddIncrementalState(
             val off = s - minSym
             val alive = off in 0 until symSpan &&
                 ((survives[(off ushr 6).toInt()] ushr (off and 63L).toInt()) and 1L) != 0L
-            if (!alive && !state.excludeIntValue(seq[i], s, ant)) return false
+            if (!alive && !state.excludeIntValue(seq[i], s, reason(state, PRUNE, i, ant))) return false
         }
         return true
     }
@@ -269,7 +270,7 @@ internal class MddIncrementalState(
             for (s in d.min..d.max) {
                 val off = s - d.min
                 if (((survives[(off ushr 6).toInt()] ushr (off and 63L).toInt()) and 1L) == 0L) {
-                    if (!state.excludeIntValue(seq[i], s, ant)) return false
+                    if (!state.excludeIntValue(seq[i], s, reason(state, PRUNE, i, ant))) return false
                 }
             }
         }
@@ -320,16 +321,29 @@ internal class MddIncrementalState(
             }
         }
         if (bestLo == inf) return false
-        if (!state.tightenIntMin(cost, bestLo, ant)) return false
-        if (!state.tightenIntMax(cost, bestHi, ant)) return false
+        if (!state.tightenIntMin(cost, bestLo, reason(state, COST, 1, ant))) return false
+        if (!state.tightenIntMax(cost, bestHi, reason(state, COST, 0, ant))) return false
         return true
+    }
+
+    // A pruned position's reason, or the cost bound's (argument 1 for the lower bound), recorded lazily.
+    private fun reason(state: PropagationState, kind: Int, arg: Int, coarse: IntArray?): IntArray? = when {
+        state.currentLevel == 0 -> null
+        state.undoLogging -> state.lazyReason(intArrayOf(kind, arg))
+        else -> coarse
     }
 
     fun propagate(state: PropagationState, factorId: Int): Boolean {
         if (initial < 0 || initial >= numStatesPerLayer[0]) return false
         val dirty = state.drainIntEventDirtyVars(factorId)
         if (valid.value == 1 && dirty.isEmpty()) return true
-        val ant = state.composeIntVarAtomAntecedents(if (cost >= 0) seq + intArrayOf(cost) else seq)
+        // With the undo log each deduction's reason is built only if analysis reads it ([MddExplainer]); without
+        // one nothing reads reasons, and every variable's bounds stand in.
+        val ant = if (state.undoLogging) {
+            null
+        } else {
+            state.composeIntVarAtomAntecedents(if (cost >= 0) seq + intArrayOf(cost) else seq)
+        }
         if (valid.value == 0) return rebuild(state, ant)
         // Standing on the shared snapshot: take a private copy of it first, since the incremental step
         // reads and rewrites the bitsets. A vanished snapshot leaves nothing to step from, so recompute.
@@ -463,5 +477,10 @@ internal class MddIncrementalState(
         // anything changed — cheap relative to the reachability cascade and only for cost MDDs.
         if (cost >= 0 && !tightenCost(state, ant)) return false
         return true
+    }
+
+    internal companion object {
+        const val PRUNE = 0
+        const val COST = 1
     }
 }

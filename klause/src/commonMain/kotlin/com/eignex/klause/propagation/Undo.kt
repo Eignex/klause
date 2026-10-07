@@ -1,8 +1,10 @@
 package com.eignex.klause.propagation
 
+import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.MutableIntObjectMap
 
 internal fun PropagationState.logBoolPin(v: Int) {
+    boolPinPos[v] = undo.size
     undo.tag.add(0)
     undo.varId.add(v)
     undo.level.add(0)
@@ -19,6 +21,7 @@ internal fun PropagationState.logBoolPin(v: Int) {
 
 /** Capture int var `v`'s full prior state. Must be called *before* the mutation. */
 internal fun PropagationState.logIntChange(v: Int) {
+    (boundMoves[v] ?: IntArrayList(initialCapacity = 4).also { boundMoves[v] = it }).add(undo.size)
     undo.tag.add(1)
     undo.varId.add(v)
     undo.level.add(intLevel[v])
@@ -115,6 +118,7 @@ internal fun PropagationState.undoTo(mark: PropagationState.LevelMark) {
 
             1 -> { // int change — restore the full recorded prior int-var state
                 val v = undo.varId[i]
+                boundMoves[v]?.let { it.truncateTo(it.size - 1) }
                 unassigned?.invoke(numBool + v)
                 intDomains[v] = requireNotNull(undo.domain[i])
                 intLevel[v] = undo.level[i]
@@ -129,6 +133,7 @@ internal fun PropagationState.undoTo(mark: PropagationState.LevelMark) {
                 holeHistVal[v]?.truncateTo(undo.holeHistLen[i])
                 holeHistLvl[v]?.truncateTo(undo.holeHistLen[i])
                 holeHistAnt[v]?.let { a -> while (a.size > undo.holeHistLen[i]) a.removeAt(a.size - 1) }
+                holeHistPos[v]?.truncateTo(undo.holeHistLen[i])
             }
 
             2 -> { // interior carve — re-insert the carved value
@@ -141,6 +146,7 @@ internal fun PropagationState.undoTo(mark: PropagationState.LevelMark) {
                 holeHistVal[v]?.truncateTo(undo.maxReason[i])
                 holeHistLvl[v]?.truncateTo(undo.maxReason[i])
                 holeHistAnt[v]?.let { a -> while (a.size > undo.maxReason[i]) a.removeAt(a.size - 1) }
+                holeHistPos[v]?.truncateTo(undo.maxReason[i])
             }
 
             else -> error("unknown undo tag")

@@ -13,6 +13,7 @@ import com.eignex.klause.propagation.ConflictAnalyzer
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.addLearnedClause
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.propagation.factorAt
 import com.eignex.klause.propagation.propagate
 import com.eignex.klause.solver.SolveResult
 import kotlin.random.Random
@@ -34,6 +35,32 @@ class LexLessPropagatorTest {
             xs.size < ys.size -> true
             else -> false
         }
+    }
+
+    @Test
+    fun `a lex conflict cites only the prefix and the pair that decides it`() {
+        // xs = (x0, x1, x2) <lex ys = (y0, y1, y2): x0 = y0 = 1 and x1 > y1 settle it at position 1; the
+        // tightened position 2 plays no part.
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 6,
+            intDomains = Array(6) { IntDomain(0, 3) },
+            factors = arrayOf<Factor>(LexLess(intArrayOf(0, 1, 2), intArrayOf(3, 4, 5), strict = true)),
+        )
+        val state = PropagationState(problem, Assumptions.None)
+        state.undoLogging = true
+        state.currentLevel = 1
+        check(state.tightenIntMin(0, 1) && state.tightenIntMax(0, 1))
+        check(state.tightenIntMin(3, 1) && state.tightenIntMax(3, 1))
+        check(state.tightenIntMin(1, 2) && state.tightenIntMax(4, 1))
+        check(state.tightenIntMax(2, 2) && state.tightenIntMin(5, 1))
+        state.currentFactor = 0
+
+        check(!state.factorAt(0).propagate(state, 0))
+
+        val cited = state.factorAt(0).conflictReason(state, 0)!!
+            .map { state.atoms.intVar[Lit.variable(it) - problem.numBoolVars] }.toSet()
+        assertEquals(setOf(0, 1, 3, 4), cited)
     }
 
     @Test

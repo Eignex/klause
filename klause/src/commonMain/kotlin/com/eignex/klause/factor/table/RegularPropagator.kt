@@ -1,6 +1,7 @@
 package com.eignex.klause.factor.table
 
 import com.eignex.klause.factor.arithmetic.internals.collectHoleAndBoundAntecedents
+import com.eignex.klause.factor.table.internals.RegularExplainer
 import com.eignex.klause.factor.table.internals.RegularIncrementalState
 import com.eignex.klause.factor.table.internals.allEventWatches
 import com.eignex.klause.propagation.PropagationState
@@ -27,10 +28,16 @@ internal class RegularPropagator(
 
     override val consumesIntEventDelta: Boolean = true
 
+    private val explainer = RegularExplainer(seq, numStates, alphabetSize, transitions, q0, accepting)
+
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? {
+        if (state.undoLogging) return explainer.conflict(state, state.undo.size)
         val prefix = (state.refPayload[factorId] as? RegularIncrementalState)?.conflictPrefix ?: seq
         return collectHoleAndBoundAntecedents(state, prefix)
     }
+
+    override fun explain(state: PropagationState, factorId: Int, payload: IntArray, atTrail: Int, atLevel: Int) =
+        explainer.prune(state, payload[0], atTrail)
 
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
         val inc = (state.refPayload[factorId] as? RegularIncrementalState) ?: run {

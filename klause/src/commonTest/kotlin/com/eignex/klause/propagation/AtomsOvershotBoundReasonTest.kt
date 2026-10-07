@@ -7,15 +7,13 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.Assumptions
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertNull
 
 /**
  * The reason-graph ordering contract 1UIP resolution rests on: a reason may cite only facts established
  * before the fact it explains. An order literal materialised after its bound had already crossed carries no
- * trail slot, so its reason is derived from the *live* endpoint — which is the establishing move only while
- * the endpoint still sits on the literal's threshold. Once a later move overshoots the threshold, the live
- * endpoint postdates the literal and explaining it that way puts a back edge in the reason graph, letting a
- * premise resolved out earlier recur and lose its literal from the nogood.
+ * trail slot, so its reason is derived from the bound move that first reached its threshold. Once a later move
+ * overshoots the threshold, the live endpoint postdates the literal, and explaining it by that move would put a
+ * back edge in the reason graph.
  */
 class AtomsOvershotBoundReasonTest {
 
@@ -50,11 +48,12 @@ class AtomsOvershotBoundReasonTest {
     }
 
     @Test
-    fun `a bound literal the endpoint has overshot gets no reason`() {
+    fun `a bound literal the endpoint has overshot cites the move that first reached it`() {
         val s = freshState(numVars = 2, hi = 9)
+        val premise = intArrayOf(Lit.make(0, false))
 
         s.beginLevel(0, fid = 0)
-        s.tightenIntMin(0, 2, intArrayOf(Lit.make(0, false)))
+        s.tightenIntMin(0, 2, premise)
         val atomId = s.atomVarGe(0, 2) - s.problem.numBoolVars
 
         // A second move raises the min past the threshold. It never crosses 2, so the literal keeps no
@@ -63,6 +62,6 @@ class AtomsOvershotBoundReasonTest {
         s.tightenIntMin(0, 5, intArrayOf(Lit.make(s.atomVarLe(1, 4), false)))
 
         assertEquals(true, s.atomCurrentTruth(atomId))
-        assertNull(s.atomAntecedentsDerived(atomId))
+        assertEquals(premise.toList(), s.atomAntecedentsDerived(atomId)?.toList())
     }
 }

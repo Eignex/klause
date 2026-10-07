@@ -11,7 +11,8 @@ import com.eignex.klause.util.LongArrayList
 // [pushHoleHist], truncated on backtrack alongside the carve, read by [holeReasonFor] /
 // [holeLevelFor] / [holeHistHas].
 
-/** Reason for the interior carve of `k` from `v`'s domain; null = bake-time fact. */
+/** Reason for the interior carve of `k` from `v`'s domain, as recorded (possibly lazy, see [reasonOf]); null =
+ *  bake-time fact. */
 internal fun PropagationState.holeReasonFor(v: Int, k: Long): IntArray? {
     val vals = holeHistVal[v] ?: return null
     for (i in 0 until vals.size) if (vals[i] == k) return requireNotNull(holeHistAnt[v])[i]
@@ -33,9 +34,23 @@ internal fun PropagationState.pushHoleHist(v: Int, value: Long, level: Int, ant:
     val vals = holeHistVal[v] ?: LongArrayList(initialCapacity = 4).also { holeHistVal[v] = it }
     val lvls = holeHistLvl[v] ?: IntArrayList(initialCapacity = 4).also { holeHistLvl[v] = it }
     val ants = holeHistAnt[v] ?: ArrayList<IntArray?>(4).also { holeHistAnt[v] = it }
+    val poss = holeHistPos[v] ?: IntArrayList(initialCapacity = 4).also { holeHistPos[v] = it }
     vals.add(value)
     lvls.add(level)
     ants.add(ant)
+    poss.add(undo.size)
+}
+
+/**
+ * The undo-log size when interior value `k` was carved out of `v`'s domain on the current path, or -1 when no
+ * carve of it is on record: a root hole, a value past a bound, or one a survivor restriction dropped as an
+ * unconditional fact.
+ */
+internal fun PropagationState.carvedAt(v: Int, k: Long): Int {
+    val vals = holeHistVal[v] ?: return -1
+    val poss = requireNotNull(holeHistPos[v])
+    for (i in 0 until vals.size) if (vals[i] == k) return poss[i]
+    return -1
 }
 
 /** Level at which interior value `k` was carved out of `v`'s domain. `0` when no

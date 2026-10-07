@@ -11,6 +11,7 @@ import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.propagation.factorAt
 import com.eignex.klause.propagation.holeReasonFor
+import com.eignex.klause.propagation.reasonOf
 import com.eignex.klause.solver.Sample
 import kotlin.test.assertTrue
 
@@ -41,7 +42,7 @@ object PropagationReasonOracle {
         for (b in 0 until problem.numBoolVars) {
             val value = state.boolValues[b] ?: continue
             if (boolsBefore[b] != null) continue
-            val reason = state.boolAntecedents[b]
+            val reason = state.reasonOf(state.boolAntecedents[b])
             for (s in solutions) {
                 val implied = s.bools[b] == value ||
                     (reason ?: IntArray(0)).any { lit -> litTrueUnder(problem, state, lit, s) }
@@ -56,11 +57,12 @@ object PropagationReasonOracle {
             val after = state.intDomains[v]
             for (k in values(before[v])) {
                 if (k in after) continue
-                val (reason, holds) = when {
+                val (recorded, holds) = when {
                     k < after.min -> state.intMinAntecedents[v] to { s: Sample -> s.ints[v] >= after.min }
                     k > after.max -> state.intMaxAntecedents[v] to { s: Sample -> s.ints[v] <= after.max }
                     else -> state.holeReasonFor(v, k) to { s: Sample -> s.ints[v] != k }
                 }
+                val reason = state.reasonOf(recorded)
                 for (s in solutions) {
                     val implied = holds(s) ||
                         (reason ?: IntArray(0)).any { lit -> litTrueUnder(problem, state, lit, s) }

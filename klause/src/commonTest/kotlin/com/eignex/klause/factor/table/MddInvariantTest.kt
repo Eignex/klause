@@ -126,6 +126,33 @@ class MddInvariantTest {
     }
 
     @Test
+    fun `a cost mdd word is violated until its cost equals the path weight`() {
+        // Symbol 1 weighs 2 and symbol 2 weighs 4.
+        val factor = Mdd(
+            seq = intArrayOf(0),
+            numStatesPerLayer = intArrayOf(1, 1),
+            layerStarts = intArrayOf(0, 8),
+            transitions = longArrayOf(0, 1, 0, 2, 0, 2, 0, 4),
+            initial = 0,
+            accepting = intArrayOf(0),
+            recordStride = 4,
+            cost = 1,
+        )
+        val problem = Problem(0, 2, arrayOf(IntDomain(1, 2), IntDomain(0, 5)), arrayOf(factor))
+        val state = LocalSearchState(problem.bake(), Random(0))
+        state.assignment.setInt(0, 1)
+        state.assignment.setInt(1, 4)
+        state.recompute()
+        val invariant = state.factors[0]
+
+        val offBefore = invariant.isViolated(state, 0)
+        val delta = invariant.deltaIfIntSet(state, 0, 1, 2L)
+
+        assertTrue(offBefore)
+        assertEquals(-invariant.violationDegree(state, 0), delta)
+    }
+
+    @Test
     fun `violated when assignment follows a rejected path`() {
         val problem = Problem(
             numBoolVars = 0,

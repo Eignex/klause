@@ -194,6 +194,51 @@ class ConflictAnalyzerFactorConflictReasonTest {
     }
 
     @Test
+    fun `a linear bound cites the weakest bound that still forces it`() {
+        // x0 + 2 * x1 <= 10: deciding x0 >= 4 forces x1 <= 3, which x0 >= 3 already does.
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 2,
+            intDomains = arrayOf(IntDomain(0, 10), IntDomain(0, 10)),
+            factors = arrayOf<Factor>(Linear(intArrayOf(1, 2), intArrayOf(0, 1), LinearOp.LE, 10)),
+        )
+        val state = PropagationState(problem, Assumptions.None)
+        state.undoLogging = true
+        check(state.setIntMinAsDecision(0, 4))
+        state.currentFactor = 0
+
+        check(state.factorAt(0).propagate(state, 0))
+
+        val atom = Lit.variable(state.reasonOf(state.intMaxAntecedents[1])!!.single()) - problem.numBoolVars
+        assertEquals(0 to 3L, state.atoms.intVar[atom] to state.atoms.threshold[atom])
+    }
+
+    @Test
+    fun `a wide linear bound cites the bounds as they stood when it was deduced`() {
+        // x0 + 2 * x1 + x2 + ... + x32 <= 10: deciding x0 >= 4 forces x1 <= 3, which x0 >= 3 already does,
+        // and a later x0 >= 6 must not change what that deduction rested on.
+        val n = 33
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = n,
+            intDomains = Array(n) { IntDomain(0, 10) },
+            factors = arrayOf<Factor>(
+                Linear(IntArray(n) { if (it == 1) 2 else 1 }, IntArray(n) { it }, LinearOp.LE, 10),
+            ),
+        )
+        val state = PropagationState(problem, Assumptions.None)
+        state.undoLogging = true
+        check(state.setIntMinAsDecision(0, 4))
+        state.currentFactor = 0
+        check(state.factorAt(0).propagate(state, 0))
+        check(state.setIntMinAsDecision(0, 6))
+
+        val atom = Lit.variable(state.reasonOf(state.intMaxAntecedents[1])!!.single()) - problem.numBoolVars
+
+        assertEquals(0 to 3L, state.atoms.intVar[atom] to state.atoms.threshold[atom])
+    }
+
+    @Test
     fun `a linear conflict cites the weakest bound that still forces it`() {
         // x0 + x1 <= 5 with x1 >= 3 at the root: deciding x0 >= 4 overshoots by two, so x0 >= 3 already
         // forces the conflict and the reason cites that rather than the decision's own bound.
@@ -387,19 +432,14 @@ class ConflictAnalyzerFactorConflictReasonTest {
             xLit in ant.intMinAntecedents[0]!!.toSet(),
             "v0.min antecedents should contain ¬x, got ${ant.intMinAntecedents[0]!!.toList()}",
         )
-        // z (bool var 1) implied true; its boolAntecedents contain the *atom-lit*
-        // form ¬[v0≥5] and ¬[v0≤5] — the per-bound premise atoms — rather than the
-        // coarser ¬x union. Resolution through these atoms still traces back to ¬x via
-        // their own antecedents = intMin/MaxAntecedents[v0] = [¬x].
+        // z (bool var 1) implied true; its boolAntecedents hold the *atom-lit* ¬[v0≥5] —
+        // `v0 ≥ 4` always holding needs only v0's lower bound — rather than the coarser ¬x
+        // union. Resolution through that atom still traces back to ¬x via its own
+        // antecedents = intMinAntecedents[v0] = [¬x].
         val zAnt = ant.boolAntecedents[1]
         assertTrue(zAnt != null, "z's antecedents should be set by ReifiedLinear C's aux pin")
         val ge5 = Lit.make(ant.atomVarGe(0, 5), false)
-        val le5 = Lit.make(ant.atomVarLe(0, 5), false)
-        val zAntSet = requireNotNull(zAnt).toSet()
-        assertTrue(
-            ge5 in zAntSet && le5 in zAntSet,
-            "z's antecedents should contain ¬[v0≥5] and ¬[v0≤5], got ${zAnt.toList()}",
-        )
+        assertEquals(listOf(ge5), requireNotNull(zAnt).toList(), "z's antecedents should be just ¬[v0≥5]")
     }
 
     @Test

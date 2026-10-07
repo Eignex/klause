@@ -1,17 +1,18 @@
 package com.eignex.klause.factor.circuit
 
 import com.eignex.klause.factor.arithmetic.internals.collectHoleAndBoundAntecedents
-import com.eignex.klause.factor.arithmetic.internals.collectLinearTightenAntecedents
 import com.eignex.klause.factor.circuit.internals.buildSuccWatches
 import com.eignex.klause.factor.circuit.internals.circuitReachesAll
 import com.eignex.klause.factor.circuit.internals.cpGateShouldSkip
-import com.eignex.klause.factor.circuit.internals.shaveClaimedFromEndpoints
 import com.eignex.klause.factor.circuit.internals.tightenSuccToRange
 import com.eignex.klause.factor.circuit.internals.walkPredChain
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.values
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.Propagator
+import com.eignex.klause.propagation.exclusionLiteral
 import com.eignex.klause.util.IntArrayList
+import com.eignex.klause.util.IntHashSet
 
 /** CP implementation for [Circuit]: propagation of the Hamiltonian-cycle constraint over successor vars. */
 internal class CircuitPropagator(private val succ: IntArray, private val n: Int) : Propagator {
@@ -19,14 +20,82 @@ internal class CircuitPropagator(private val succ: IntArray, private val n: Int)
     override val initialIntEventWatches: IntArray = buildSuccWatches(succ)
     override val consumesIntEventDelta: Boolean = true
 
-    override fun conflictReason(state: PropagationState, factorId: Int): IntArray? {
-        // Sharp reason for a premature subtour: the fixed edges forming a cycle shorter than n are
-        // a complete, self-contained cause, so cite only those successor variables. Any other
-        // failure (strong connectivity, reachability) reads the domains' holes as well as their
-        // bounds, so it falls back to a whole-scope reason that cites both.
-        val cycle = fixedSubtour(state)
-        if (cycle != null) return collectLinearTightenAntecedents(state, cycle, excludeIdx = -1, extraLit = 0)
-        return collectHoleAndBoundAntecedents(state, succ)
+    // The reason of the failure the last [propagate] hit, read by [conflictReason] before the engine backtracks.
+    private var failure: IntArray? = null
+
+    override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
+        failure ?: fixedSubtour(state)?.let { cycle -> Reason(state).apply { for (v in cycle) fixedVar(v) }.build() }
+            ?: collectHoleAndBoundAntecedents(state, succ)
+
+    private fun fail(reason: Reason): Boolean {
+        failure = reason.build() ?: IntArray(0)
+        return false
+    }
+
+    /** Clause-form literals, each false in the current state, that together justify a deduction over [succ]. */
+    private inner class Reason(private val state: PropagationState) {
+        private val seen = IntHashSet()
+        private val literals = IntArrayList()
+
+        fun add(lit: Int): Reason {
+            if (lit != Lit.NONE && seen.add(lit)) literals.add(lit)
+            return this
+        }
+
+        fun addAll(ant: IntArray?): Reason {
+            ant?.forEach { add(it) }
+            return this
+        }
+
+        /** The edge node [i] is fixed to. */
+        fun fixed(i: Int): Reason = fixedVar(succ[i])
+
+        fun fixedVar(v: Int): Reason = add(Lit.make(state.atomVarEq(v, state.intDomains[v].min), false))
+
+        fun lower(v: Int): Reason {
+            val d = state.intDomains[v]
+            if (d.min > state.rootDomains[v].min) add(Lit.make(state.atomVarGe(v, d.min), false))
+            return this
+        }
+
+        fun upper(v: Int): Reason {
+            val d = state.intDomains[v]
+            if (d.max < state.rootDomains[v].max) add(Lit.make(state.atomVarLe(v, d.max), false))
+            return this
+        }
+
+        /** Node [u] can no longer move to [target]. */
+        fun lacks(u: Int, target: Int): Reason = add(
+            if (state.undoLogging) {
+                state.exclusionLiteral(succ[u], target.toLong(), state.undo.size)
+            } else if (target.toLong() in state.rootDomains[succ[u]]) {
+                Lit.make(state.atomVarEq(succ[u], target.toLong()), true)
+            } else {
+                Lit.NONE
+            },
+        )
+
+        /** Every node of [inside] lacks every target outside it (and outside [also]): no arc leaves the set. */
+        fun closed(inside: BooleanArray, also: Int = -1): Reason {
+            for (u in 0 until n) {
+                if (!inside[u]) continue
+                for (t in 0 until n) {
+                    if (!inside[t] && t != also && t.toLong() !in state.intDomains[succ[u]]) lacks(u, t)
+                }
+            }
+            return this
+        }
+
+        /** Every node outside [inside] lacks every target in it: no arc enters the set. */
+        fun unentered(inside: BooleanArray): Reason {
+            for (u in 0 until n) {
+                if (inside[u]) continue
+                for (t in 0 until n) if (inside[t] && t.toLong() !in state.intDomains[succ[u]]) lacks(u, t)
+            }
+            return this
+        }
+
+        fun build(): IntArray? = if (state.currentLevel == 0) null else literals.toIntArray()
     }
 
     /** The successor variables on a fixed-edge cycle of length < n, or null if none exists. */
@@ -65,9 +134,8 @@ internal class CircuitPropagator(private val succ: IntArray, private val n: Int)
     }
 
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
+        failure = null
         if (state.cpGateShouldSkip(factorId)) return true
-        // The filters below read every successor's domain, holes included, so the reason cites both.
-        val ant = collectHoleAndBoundAntecedents(state, succ)
         if (!tightenSuccToRange(state, succ, n)) return false
         if (n == 1) {
             val v = succ[0]
@@ -77,15 +145,18 @@ internal class CircuitPropagator(private val succ: IntArray, private val n: Int)
             if (d.max != 0L && !state.tightenIntMax(v, 0L)) return false
             return true
         }
+        // No node succeeds itself in a full circuit: a fact, so a self-loop bound move cites only the bound it left.
         for (i in succ.indices) {
             val v = succ[i]
             val d = state.intDomains[v]
             if (d.min == i.toLong() && d.min < d.max) {
-                if (!state.tightenIntMin(v, d.min + 1, ant)) return false
+                val ant = Reason(state).lower(v).build()
+                if (!state.tightenIntMin(v, d.min + 1, ant)) return fail(Reason(state).addAll(ant).upper(v))
             } else if (d.max == i.toLong() && d.min < d.max) {
-                if (!state.tightenIntMax(v, d.max - 1, ant)) return false
+                val ant = Reason(state).upper(v).build()
+                if (!state.tightenIntMax(v, d.max - 1, ant)) return fail(Reason(state).addAll(ant).lower(v))
             } else if (d.min == d.max && d.min == i.toLong()) {
-                return false
+                return fail(Reason(state).fixed(i))
             }
         }
         val pred = IntArray(n) { -1 }
@@ -94,11 +165,11 @@ internal class CircuitPropagator(private val succ: IntArray, private val n: Int)
             val d = state.intDomains[v]
             if (d.min == d.max) {
                 val target = d.min.toInt()
-                if (pred[target] != -1) return false
+                if (pred[target] != -1) return fail(Reason(state).fixed(i).fixed(pred[target]))
                 pred[target] = i
             }
         }
-        if (!shaveClaimedFromEndpoints(state, succ, pred, ant)) return false
+        if (!shaveClaimed(state, pred)) return false
         val visited = BooleanArray(n)
         val posOnPath = IntArray(n) { -1 }
         val path = IntArrayList()
@@ -119,7 +190,11 @@ internal class CircuitPropagator(private val succ: IntArray, private val n: Int)
             }
             if (cur in 0 until n && posOnPath[cur] >= 0) {
                 val cycleLen = path.size - posOnPath[cur]
-                if (cycleLen < n) return false
+                if (cycleLen < n) {
+                    val r = Reason(state)
+                    for (k in posOnPath[cur] until path.size) r.fixed(path[k])
+                    return fail(r)
+                }
             }
             for (k in 0 until path.size) {
                 visited[path[k]] = true
@@ -131,25 +206,69 @@ internal class CircuitPropagator(private val succ: IntArray, private val n: Int)
             val d = state.intDomains[v]
             if (d.min == d.max) continue
             val c = walkPredChain(pred, i, n)
-            if (c.cycleDetected) return false
+            // The fixed edges of the chain ending at i: they claim every node on it but its head.
+            val chain = Reason(state)
+            var k = pred[i]
+            var steps = 0
+            while (k != -1 && steps < n) {
+                chain.fixed(k)
+                k = pred[k]
+                steps++
+            }
+            if (c.cycleDetected) return fail(chain)
             val start = c.head
             val chainNodes = c.length
+            val ant = chain.build()
             if (chainNodes == n) {
-                if (start.toLong() !in d) return false
-                if (!state.tightenIntMin(v, start.toLong(), ant)) return false
-                if (!state.tightenIntMax(v, start.toLong(), ant)) return false
+                // Every other node is claimed, so i closes the circuit at its head.
+                if (start.toLong() !in d) return fail(Reason(state).addAll(ant).lacks(i, start))
+                if (!state.tightenIntMin(v, start.toLong(), ant)) return fail(Reason(state).addAll(ant).lacks(i, start))
+                if (!state.tightenIntMax(v, start.toLong(), ant)) return fail(Reason(state).addAll(ant).lacks(i, start))
             } else {
+                // Moving to the chain's head would close a cycle short of n.
                 if (start.toLong() == d.min && d.min < d.max) {
-                    if (!state.tightenIntMin(v, d.min + 1, ant)) return false
+                    val own = Reason(state).addAll(ant).lower(v).build()
+                    if (!state.tightenIntMin(v, d.min + 1, own)) return fail(Reason(state).addAll(own).upper(v))
                 } else if (start.toLong() == d.max && d.min < d.max) {
-                    if (!state.tightenIntMax(v, d.max - 1, ant)) return false
+                    val own = Reason(state).addAll(ant).upper(v).build()
+                    if (!state.tightenIntMax(v, d.max - 1, own)) return fail(Reason(state).addAll(own).lower(v))
                 } else if (d.min == d.max && d.min == start.toLong()) {
-                    return false
+                    return fail(Reason(state).addAll(ant).fixed(i))
                 }
             }
         }
         if (n >= 2 && !stronglyConnected(state)) return false
-        if (n >= 2 && !dominatorFilter(state, ant)) return false
+        if (n >= 2 && !dominatorFilter(state)) return false
+        return true
+    }
+
+    // Shave the values other successors have claimed off each open successor's endpoints, citing those claims.
+    private fun shaveClaimed(state: PropagationState, claimed: IntArray): Boolean {
+        for (i in succ.indices) {
+            val v = succ[i]
+            val d = state.intDomains[v]
+            if (d.min == d.max) continue
+            var newMin = d.min
+            val lowReason = Reason(state)
+            while (newMin < d.max && claimed[newMin.toInt()] != -1 && claimed[newMin.toInt()] != i) {
+                lowReason.fixed(claimed[newMin.toInt()])
+                newMin++
+            }
+            var newMax = d.max
+            val highReason = Reason(state)
+            while (newMax > newMin && claimed[newMax.toInt()] != -1 && claimed[newMax.toInt()] != i) {
+                highReason.fixed(claimed[newMax.toInt()])
+                newMax--
+            }
+            if (newMin != d.min) {
+                val ant = lowReason.lower(v).build()
+                if (!state.tightenIntMin(v, newMin, ant)) return fail(Reason(state).addAll(ant).upper(v))
+            }
+            if (newMax != d.max) {
+                val ant = highReason.upper(v).build()
+                if (!state.tightenIntMax(v, newMax, ant)) return fail(Reason(state).addAll(ant).lower(v))
+            }
+        }
         return true
     }
 
@@ -161,7 +280,7 @@ internal class CircuitPropagator(private val succ: IntArray, private val n: Int)
      * the source, a premature subtour; so `y` is removed from `succ(x)`. Dominators via the
      * Cooper–Harvey–Kennedy iterative algorithm (same tree as Lengauer–Tarjan, simpler to verify).
      */
-    private fun dominatorFilter(state: PropagationState, ant: IntArray?): Boolean {
+    private fun dominatorFilter(state: PropagationState): Boolean {
         val total = n + 1
         val source = n
         val succAdj = Array(total) { IntArrayList() }
@@ -177,18 +296,46 @@ internal class CircuitPropagator(private val succ: IntArray, private val n: Int)
             }
         }
         val idom = computeDominators(succAdj, predAdj, total, source)
-        for (v in 0 until n) if (idom[v] == -1) return false // source cannot reach every node
+        // Source cannot reach every node: no arc leaves what it reaches.
+        for (v in 0 until n) if (idom[v] == -1) return fail(Reason(state).closed(reachedAvoiding(succAdj, source, -1)))
+        // y dominates x when, without y, the source reaches nothing past the arcs it lacks: those are the reason.
+        val cut = HashMap<Int, IntArray?>()
         for (x in 1 until n) {
             val dvals = IntArrayList()
             state.intDomains[succ[x]].values.forEach { y -> if (y in 0 until n) dvals.add(y.toInt()) }
             for (k in 0 until dvals.size) {
                 val y = dvals[k]
                 if (y != x && dominates(idom, source, y, x)) {
-                    if (!state.excludeIntValue(succ[x], y.toLong(), ant)) return false
+                    val ant = cut.getOrPut(y) {
+                        Reason(state).closed(reachedAvoiding(succAdj, source, y), also = y).build()
+                    }
+                    if (!state.excludeIntValue(succ[x], y.toLong(), ant)) {
+                        return fail(Reason(state).addAll(ant).lower(succ[x]).upper(succ[x]))
+                    }
                 }
             }
         }
         return true
+    }
+
+    // The nodes the source's arcs reach without passing [avoid], node 0 standing in for the source; -1 avoids none.
+    private fun reachedAvoiding(succAdj: Array<IntArrayList>, source: Int, avoid: Int): BooleanArray {
+        val seen = BooleanArray(n)
+        val stack = IntArrayList()
+        seen[0] = true
+        stack.add(source)
+        while (!stack.isEmpty()) {
+            val u = stack[stack.size - 1]
+            stack.removeAt(stack.size - 1)
+            val a = succAdj[u]
+            for (j in 0 until a.size) {
+                val w = a[j]
+                if (w == avoid || seen[w]) continue
+                seen[w] = true
+                stack.add(w)
+            }
+        }
+        return seen
     }
 
     /** Cooper–Harvey–Kennedy iterative dominators from [source]; `idom[source]=source`, `-1` for
@@ -293,6 +440,37 @@ internal class CircuitPropagator(private val succ: IntArray, private val n: Int)
             arcAllowed = arc,
             counts = counts,
         )
-        return reaches(forward = true) && reaches(forward = false)
+        if (!reaches(forward = true)) return fail(Reason(state).closed(reach(state, rev, forward = true)))
+        if (!reaches(forward = false)) return fail(Reason(state).unentered(reach(state, rev, forward = false)))
+        return true
+    }
+
+    // The nodes node 0 reaches over candidate arcs ([forward]), or that reach it.
+    private fun reach(state: PropagationState, rev: Array<IntArrayList>, forward: Boolean): BooleanArray {
+        val seen = BooleanArray(n)
+        val stack = IntArrayList()
+        seen[0] = true
+        stack.add(0)
+        while (!stack.isEmpty()) {
+            val u = stack[stack.size - 1]
+            stack.removeAt(stack.size - 1)
+            if (forward) {
+                state.intDomains[succ[u]].values.forEach { t ->
+                    if (t in 0 until n && !seen[t.toInt()]) {
+                        seen[t.toInt()] = true
+                        stack.add(t.toInt())
+                    }
+                }
+            } else {
+                val p = rev[u]
+                for (j in 0 until p.size) {
+                    if (!seen[p[j]]) {
+                        seen[p[j]] = true
+                        stack.add(p[j])
+                    }
+                }
+            }
+        }
+        return seen
     }
 }

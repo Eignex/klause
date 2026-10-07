@@ -199,22 +199,6 @@ class Cumulative(
     val unary: Boolean =
         capacityVar < 0 && capacity == 1L && resourceVars.isEmpty() && resources.all { it == 1L }
 
-    /** The sharp pointwise time-tabling explanation covers every task as mandatory. Variable durations /
-     *  resources / capacity are handled by additionally citing their (fixed-at-propagation) bounds, but
-     *  separate presence literals are not, so optional tasks fall back to the sound constraint-wide
-     *  reason. RCPSP / mspsp-style instances (mandatory tasks, the multi-skill "presence" carried by a
-     *  0/1 resource var rather than a presence literal) are sharp. */
-    val sharpReasonEligible: Boolean = presents.isEmpty()
-
-    /** Whether every task's energy (`duration · resource`) and the capacity are compile-time
-     *  constants, i.e. the only citable variables this factor reads are the start times. Lets
-     *  edge-finding emit a reason scoped to the active set Θ_τ (which depends only on the in-window
-     *  tasks' start bounds) instead of the
-     *  constraint-wide all-starts reason; the energy / capacity premises a variable-arg instance
-     *  would also need are vacuous here. The common RCPSP shape (`cumulative(starts, d, r, C)`). */
-    val constantEnergyAndCap: Boolean =
-        durationVars.isEmpty() && resourceVars.isEmpty() && capacityVar < 0
-
     // Var id → its position in the corresponding array (-1 when the var is not in that role).
     // IntIntMap keeps the lookup unboxed and array-backed for the dense var ids these hold.
     private val startPos: IntIntMap = IntIntMap.build(starts, IntArray(starts.size) { it }, absent = -1)

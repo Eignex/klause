@@ -3,12 +3,17 @@ package com.eignex.klause.factor.arithmetic.internals
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.localsearch.LocalSearchState
+import com.eignex.klause.propagation.LAZY_PAYLOAD
 import com.eignex.klause.propagation.PropagationState
-import com.eignex.klause.util.EmptyLongArray
+import com.eignex.klause.propagation.boundEstablishment
+import com.eignex.klause.propagation.boundEstablishmentLevel
+import com.eignex.klause.propagation.domainAt
+import com.eignex.klause.propagation.lazyReasonSlots
 import com.eignex.klause.util.Int128
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.IntIntMap
+import com.eignex.klause.util.argsortByIntKey
 import kotlin.math.abs
 
 internal fun initLinearSum(state: LocalSearchState, factorId: Int, coeffs: LongArray, vars: IntArray) {
@@ -166,9 +171,10 @@ internal fun collectLinearDirAntecedents(
 }
 
 /**
- * The conflict reason [collectLinearDirAntecedents] builds, with each cited bound weakened as far as the
- * conflict allows: the driving side exceeds the bound by [slack] + 1, and that slack is spent loosening the
- * cited bounds, latest decision level first. A reason citing exact bounds refutes one value per conflict, so a
+ * The reason [collectLinearDirAntecedents] builds, with each cited bound weakened as far as the deduction
+ * allows: [slack] is how far the driving side may loosen before the conflict, or the bound on the variable at
+ * [excludeIdx], no longer follows, and it is spent loosening the cited bounds, latest decision level first. A
+ * reason citing exact bounds refutes one value per conflict, so a
  * search that tries `x ≤ min` refutes `min`, then `min + 1`, and so on across the domain; the lifted reason
  * refutes every value the conflict rules out at once. A bound loosened to its root value is a global fact and
  * drops out.
@@ -183,52 +189,181 @@ internal fun collectLinearLiftedAntecedents(
     vars: IntArray,
     useLo: Boolean,
     slack: Long,
+    excludeIdx: Int = -1,
+    extraLit: Int = 0,
+    includeExtraLit: Boolean = false,
+): IntArray? {
+    val n = vars.size
+    val bound = LongArray(n)
+    val level = IntArray(n)
+    val lift = BooleanArray(n)
+    val aboveRoot = BooleanArray(n)
+    for (j in 0 until n) {
+        val v = vars[j]
+        val citeMin = if (useLo) coeffs[j] > 0 else coeffs[j] < 0
+        val d = state.intDomains[v]
+        bound[j] = if (citeMin) d.min else d.max
+        level[j] = if (citeMin) state.intMinLevel[v] else state.intMaxLevel[v]
+        aboveRoot[j] = state.intLevel[v] > 0
+        lift[j] = liftable(state, v, citeMin, level[j])
+    }
+    return liftedAntecedents(
+        state,
+        coeffs,
+        vars,
+        useLo,
+        slack,
+        excludeIdx,
+        extraLit,
+        includeExtraLit,
+        bound,
+        level,
+        lift,
+        aboveRoot,
+    )
+}
+
+/**
+ * The reason [collectLinearLiftedAntecedents] would have built for a deduction made at undo-log position
+ * [atTrail] and level [atLevel], from the bounds as they stood then. A deduction on a sum records
+ * [linearLazyReason] instead of building it, and its propagator's [com.eignex.klause.propagation.Propagator.explain]
+ * lands here. Each term's bound then and the move that established it are read once.
+ */
+internal fun explainLinearBound(
+    state: PropagationState,
+    coeffs: LongArray,
+    vars: IntArray,
+    payload: IntArray,
+    atTrail: Int,
+    atLevel: Int,
+): IntArray? {
+    val useLo = payload[1] != 0
+    val excludeIdx = payload[0]
+    val n = vars.size
+    val bound = LongArray(n)
+    val level = IntArray(n)
+    val lift = BooleanArray(n)
+    val aboveRoot = BooleanArray(n)
+    val decisions = state.levelToDecisionVar
+    val numBools = state.problem.numBoolVars
+    for (j in 0 until n) {
+        if (j == excludeIdx || coeffs[j] == 0L) continue
+        val v = vars[j]
+        val citeMin = if (useLo) coeffs[j] > 0 else coeffs[j] < 0
+        val d = state.domainAt(v, atTrail)
+        val root = state.rootDomains[v]
+        val b = if (citeMin) d.min else d.max
+        bound[j] = b
+        if (if (citeMin) b <= root.min else b >= root.max) continue
+        val l = state.boundEstablishmentLevel(v, b, citeMin) ?: 0
+        level[j] = l
+        aboveRoot[j] = l > 0
+        // As [liftable], against the deduction's level: below it any weaker atom serves; at it, only a decision.
+        // Only a level decided on this very variable can be one, so only then is the move's reason built.
+        val decided = l in 1..decisions.size && decisions[l - 1] == numBools + v &&
+            state.boundEstablishment(v, b, citeMin)?.reason == null
+        lift[j] = l > 0 && (l < atLevel || decided)
+    }
+    return liftedAntecedents(
+        state,
+        coeffs,
+        vars,
+        useLo,
+        slack = (payload[2].toLong() shl 32) or (payload[3].toLong() and 0xFFFFFFFFL),
+        excludeIdx = excludeIdx,
+        extraLit = payload[4],
+        includeExtraLit = payload[5] != 0,
+        bound = bound,
+        level = level,
+        lift = lift,
+        aboveRoot = aboveRoot,
+    )
+}
+
+/** A lazily recorded linear bound, whose payload [explainLinearBound] decodes. */
+@Suppress("LongParameterList")
+internal fun linearLazyReason(
+    state: PropagationState,
+    factorId: Int,
+    excludeIdx: Int,
+    useLo: Boolean,
+    slack: Long,
+    extraLit: Int,
+    includeExtraLit: Boolean,
+): IntArray {
+    val out = state.lazyReasonSlots(LINEAR_PAYLOAD_SIZE, factorId)
+    out[LAZY_PAYLOAD] = excludeIdx
+    out[LAZY_PAYLOAD + 1] = if (useLo) 1 else 0
+    out[LAZY_PAYLOAD + 2] = (slack ushr 32).toInt()
+    out[LAZY_PAYLOAD + 3] = slack.toInt()
+    out[LAZY_PAYLOAD + 4] = extraLit
+    out[LAZY_PAYLOAD + 5] = if (includeExtraLit) 1 else 0
+    return out
+}
+
+private const val LINEAR_PAYLOAD_SIZE = 6
+
+// Spend [slack] loosening the cited side of each term, latest-established first, given per term its [bound], the
+// [level] that bound was established at, whether it may be cited weaker ([lift]), and whether the variable sits
+// above the root at all ([aboveRoot]).
+@Suppress("LongParameterList")
+private fun liftedAntecedents(
+    state: PropagationState,
+    coeffs: LongArray,
+    vars: IntArray,
+    useLo: Boolean,
+    slack: Long,
+    excludeIdx: Int,
+    extraLit: Int,
+    includeExtraLit: Boolean,
+    bound: LongArray,
+    level: IntArray,
+    lift: BooleanArray,
+    aboveRoot: BooleanArray,
 ): IntArray? {
     var anyAboveRoot = false
-    for (v in vars) {
-        if (state.intLevel[v] > 0) {
+    for (j in vars.indices) {
+        if (j != excludeIdx && aboveRoot[j]) {
             anyAboveRoot = true
             break
         }
     }
     val cited = IntArrayList()
     for (j in vars.indices) {
+        if (j == excludeIdx) continue
         val c = coeffs[j]
         if (c == 0L) continue
         val v = vars[j]
-        if (anyAboveRoot && state.intLevel[v] <= 0) continue
+        if (anyAboveRoot && !aboveRoot[j]) continue
         val citeMin = if (useLo) c > 0 else c < 0
-        val d = state.intDomains[v]
         val orig = state.rootDomains[v]
-        if (if (citeMin) d.min > orig.min else d.max < orig.max) cited.add(j)
+        if (if (citeMin) bound[j] > orig.min else bound[j] < orig.max) cited.add(j)
     }
-    fun sideLevel(j: Int): Int {
-        val v = vars[j]
-        val citeMin = if (useLo) coeffs[j] > 0 else coeffs[j] < 0
-        return if (citeMin) state.intMinLevel[v] else state.intMaxLevel[v]
-    }
-    val order = cited.toIntArray().sortedByDescending(::sideLevel)
+    // Latest level first: those are the bounds worth loosening, since only they could be resolved. Without slack
+    // nothing loosens, so the order is moot.
+    val order = if (slack > 0) argsortByIntKey(cited.size) { -level[cited[it]] } else IntArray(cited.size) { it }
     val seen = IntHashSet(order.size * 2)
     val out = IntArrayList()
+    if (includeExtraLit) {
+        out.add(extraLit)
+        seen.add(extraLit)
+    }
     var remaining = slack
-    for (j in order) {
+    for (k in order) {
+        val j = cited[k]
         val c = coeffs[j]
         val v = vars[j]
         val citeMin = if (useLo) c > 0 else c < 0
-        val d = state.intDomains[v]
+        val b = bound[j]
         val orig = state.rootDomains[v]
-        val room = if (citeMin) d.min - orig.min else orig.max - d.max
-        val step = if (remaining > 0 && liftable(state, v, citeMin, sideLevel(j))) {
-            minOf(remaining / abs(c), room)
-        } else {
-            0L
-        }
+        val room = if (citeMin) b - orig.min else orig.max - b
+        val step = if (remaining > 0 && lift[j]) minOf(remaining / abs(c), room) else 0L
         remaining -= step * abs(c)
         if (step == room) continue
         val lit = if (citeMin) {
-            Lit.make(state.atomVarGe(v, d.min - step), false)
+            Lit.make(state.atomVarGe(v, b - step), false)
         } else {
-            Lit.make(state.atomVarLe(v, d.max + step), false)
+            Lit.make(state.atomVarLe(v, b + step), false)
         }
         if (seen.add(lit)) out.add(lit)
     }
@@ -285,43 +420,6 @@ internal fun collectLinearTightenAntecedents(
     return out.toIntArray()
 }
 
-private const val LINEAR_SHARED_REASON_ARITY = 32
-
-/**
- * A single O(arity) reason citing every variable's **start-of-call** driving bound on [useLo]'s
- * sum-side, reconstructed from the pre-tighten contributions [rLo]/[rHi].
- */
-internal fun collectLinearStartBoundAntecedents(
-    state: PropagationState,
-    coeffs: LongArray,
-    vars: IntArray,
-    rLo: LongArray,
-    rHi: LongArray,
-    useLo: Boolean,
-    extraLit: Int,
-    includeExtraLit: Boolean = false,
-): IntArray? {
-    val out = IntArrayList()
-    if (includeExtraLit) out.add(extraLit)
-    for (j in vars.indices) {
-        val c = coeffs[j]
-        if (c == 0L) continue
-        val v = vars[j]
-        val startMin = if (c > 0) rLo[j] / c else rHi[j] / c
-        val startMax = if (c > 0) rHi[j] / c else rLo[j] / c
-        val citeMin = if (useLo) c > 0 else c < 0
-        if (citeMin) {
-            if (startMin <= state.rootDomains[v].min) continue
-            out.add(Lit.make(state.atomVarGe(v, startMin), false))
-        } else {
-            if (startMax >= state.rootDomains[v].max) continue
-            out.add(Lit.make(state.atomVarLe(v, startMax), false))
-        }
-    }
-    if (out.size == 0) return null
-    return out.toIntArray()
-}
-
 /**
  * Exact 128-bit feasibility check for a linear row whose 64-bit bound arithmetic overflowed.
  * Detects definite violation only — no tightening — so wide-domain (and fully pinned) states are
@@ -368,6 +466,21 @@ private fun int128Sign(v: Int128): Int = when {
     else -> 1
 }
 
+/**
+ * How far the other terms' cited side may loosen while `c·x ⟨op⟩ s` still yields the bound [t] on x, in sum
+ * units: `c·t + |c| − 1 + offset`, where [offset] is `−s` for a `≤` row and `s` for a `≥` row (with [c] negated,
+ * the same algebra). Zero when the arithmetic would overflow, which lifts nothing.
+ */
+private fun liftBudget(c: Long, t: Long, offset: Long): Long {
+    if (mulOverflows(c, t)) return 0L
+    val ct = c * t
+    val ac = abs(c) - 1
+    if (addOverflows(ct, ac)) return 0L
+    val head = ct + ac
+    if (addOverflows(head, offset)) return 0L
+    return (head + offset).coerceAtLeast(0L)
+}
+
 /** True iff `a * b` wraps 64-bit range. Both-magnitudes-below-2^31 short-circuits before the
  *  division so the propagation hot loop pays two xors, not an idiv, on ordinary domains. */
 private fun mulOverflows(a: Long, b: Long): Boolean {
@@ -402,11 +515,9 @@ internal fun propagateLinearBounds(
     bound: Long,
     extraLit: Int = 0,
     includeExtraLit: Boolean = false,
+    factorId: Int = -1,
 ): Boolean {
     val n = vars.size
-    val wide = n > LINEAR_SHARED_REASON_ARITY
-    val rLo = if (wide) LongArray(n) else EmptyLongArray
-    val rHi = if (wide) LongArray(n) else EmptyLongArray
     var sumLo = 0L
     var sumHi = 0L
     var loOverflow = false
@@ -425,10 +536,6 @@ internal fun propagateLinearBounds(
         hiOverflow = hiOverflow || addOverflows(sumHi, hi)
         sumLo += lo
         sumHi += hi
-        if (wide) {
-            rLo[i] = lo
-            rHi[i] = hi
-        }
     }
     if (loOverflow || hiOverflow) {
         // The wrapped side's infeasibility test is meaningless in 64-bit; re-check exactly so a
@@ -477,66 +584,26 @@ internal fun propagateLinearBounds(
         }
         return true
     }
-    var loBase: IntArray? = null
-    var loBaseBuilt = false
-    var hiBase: IntArray? = null
-    var hiBaseBuilt = false
-    fun loReason(i: Int): IntArray? {
-        if (rootFact) return null
-        if (!wide) {
-            return collectLinearDirAntecedents(
-                state,
-                coeffs,
-                vars,
-                i,
-                extraLit,
-                includeExtraLit = includeExtraLit,
-                useLo = true,
-            )
-        }
-        if (!loBaseBuilt) {
-            loBase = collectLinearStartBoundAntecedents(
-                state,
-                coeffs,
-                vars,
-                rLo,
-                rHi,
-                useLo = true,
-                extraLit = extraLit,
-                includeExtraLit = includeExtraLit,
-            )
-            loBaseBuilt = true
-        }
-        return loBase
+    // A sum's reason costs O(arity) to build, and lifting it materializes order atoms that every later bound move
+    // must wake; most are never read, so it is recorded lazily and built only if conflict analysis reaches it,
+    // from the bounds the undo log recovers.
+    val lazy = state.undoLogging && factorId >= 0
+    fun reason(i: Int, useLo: Boolean, budget: Long): IntArray? = when {
+        rootFact -> null
+        lazy -> linearLazyReason(state, factorId, i, useLo, budget, extraLit, includeExtraLit)
+        else -> collectLinearLiftedAntecedents(
+            state,
+            coeffs,
+            vars,
+            useLo = useLo,
+            slack = budget,
+            excludeIdx = i,
+            extraLit = extraLit,
+            includeExtraLit = includeExtraLit,
+        )
     }
-    fun hiReason(i: Int): IntArray? {
-        if (rootFact) return null
-        if (!wide) {
-            return collectLinearDirAntecedents(
-                state,
-                coeffs,
-                vars,
-                i,
-                extraLit,
-                includeExtraLit = includeExtraLit,
-                useLo = false,
-            )
-        }
-        if (!hiBaseBuilt) {
-            hiBase = collectLinearStartBoundAntecedents(
-                state,
-                coeffs,
-                vars,
-                rLo,
-                rHi,
-                useLo = false,
-                extraLit = extraLit,
-                includeExtraLit = includeExtraLit,
-            )
-            hiBaseBuilt = true
-        }
-        return hiBase
-    }
+    fun loReason(i: Int, budget: Long) = reason(i, useLo = true, budget)
+    fun hiReason(i: Int, budget: Long) = reason(i, useLo = false, budget)
     for (i in 0 until n) {
         val c = coeffs[i]
         if (c == 0L) continue
@@ -552,9 +619,10 @@ internal fun propagateLinearBounds(
             val slack0 = bound - (sumLo - loTerm)
             if (c > 0) {
                 val t = floorDivLong(slack0, c)
-                if (!tightenMaxClamped(state, v, t, loReason(i))) return false
+                if (!tightenMaxClamped(state, v, t, loReason(i, liftBudget(c, t, -slack0)))) return false
             } else {
-                if (!tightenMinClamped(state, v, ceilDivLong(slack0, c), loReason(i))) return false
+                val t = ceilDivLong(slack0, c)
+                if (!tightenMinClamped(state, v, t, loReason(i, liftBudget(c, t, -slack0)))) return false
             }
         }
         if ((op == LinearOp.GE || op == LinearOp.EQ) &&
@@ -563,9 +631,10 @@ internal fun propagateLinearBounds(
             val needed = bound - (sumHi - hiTerm)
             if (c > 0) {
                 val t = ceilDivLong(needed, c)
-                if (!tightenMinClamped(state, v, t, hiReason(i))) return false
+                if (!tightenMinClamped(state, v, t, hiReason(i, liftBudget(-c, t, needed)))) return false
             } else {
-                if (!tightenMaxClamped(state, v, floorDivLong(needed, c), hiReason(i))) return false
+                val t = floorDivLong(needed, c)
+                if (!tightenMaxClamped(state, v, t, hiReason(i, liftBudget(-c, t, needed)))) return false
             }
         }
     }

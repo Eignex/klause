@@ -220,6 +220,7 @@ private fun reginSccReachPrune(
 
     // Prune unsupported unmatched edges: different SCC and not reachable from a free value.
     val sccHallVars = MutableIntObjectMap<IntArray>()
+    val hallReasons = HashMap<Int, IntArray?>()
     for (i in 0 until n) {
         for (vid in valuesPerVar[i]) {
             if (inc.matchVar[i] == vid) continue
@@ -227,7 +228,7 @@ private fun reginSccReachPrune(
             if (inc.sccId[i] == inc.sccId[vNode]) continue
             if (reached[vNode]) continue
             val hall = sccHallVars.getOrPut(inc.sccId[vNode]) { hallVarsFrom(vNode, adj, n, vars) }
-            val ant = antecedentsWithPremises(state, hall, premises)
+            val ant = hallReasons.getOrPut(inc.sccId[vNode]) { hallReason(state, hall, premises) }
             if (!state.excludeIntValue(vars[i], cache.valueOfId[vid], ant)) {
                 val withI = hall.copyOf(hall.size + 1)
                 withI[hall.size] = vars[i]

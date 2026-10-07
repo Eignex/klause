@@ -70,12 +70,34 @@ internal fun PropagationState.pinBoolAsDecision(v: Int, value: Boolean): Boolean
     return pinBoolImpl(v, value, antecedents = null)
 }
 
-/** Push an int var as a new decision. */
+/**
+ * Push an int var as a new decision. With the undo log on, the decision is the literal `[v = value]`: it is
+ * stamped first, with no reason, and both bound moves cite it, so the level carries one unexplained literal for
+ * 1UIP to stop at instead of two bound atoms it cannot collapse.
+ */
 internal fun PropagationState.setIntAsDecision(v: Int, value: Long): Boolean {
     levelToDecisionVar.add(problem.numBoolVars + v)
     currentLevel = levelToDecisionVar.size
     currentFactor = -1
-    return setIntImpl(v, value, null)
+    val d = intDomains[v]
+    if (!undoLogging || value !in d || d.min == d.max) return setIntImpl(v, value, null)
+    val reason = stampDecision(atomVarEq(v, value))
+    return tightenIntMinImpl(v, value, reason) && tightenIntMaxImpl(v, value, reason)
+}
+
+/**
+ * Stamp atom variable [atom] true as the current level's decision, with no reason, and return that literal as a
+ * reason for the moves it causes. Stamped ahead of those moves, it precedes everything they establish, and their
+ * own wakes find it already true and leave it unexplained.
+ */
+private fun PropagationState.stampDecision(atom: Int): IntArray {
+    val atomId = atom - problem.numBoolVars
+    recordAtomTruthChange(atomId)
+    boolPinOrder.add(atom)
+    atoms.truth[atomId] = 1
+    atoms.lvl[atomId] = currentLevel
+    atoms.ant[atomId] = null
+    return intArrayOf(Lit.make(atom, false))
 }
 
 /**
@@ -84,11 +106,18 @@ internal fun PropagationState.setIntAsDecision(v: Int, value: Long): Boolean {
  * conflicts seeded by it have a single 1UIP literal there (an equality pin contributes
  * two same-level bound atoms that 1UIP cannot collapse). The caller must ensure `hi`
  * strictly narrows the domain (`hi in d.min until d.max`) so the level is non-empty.
+ *
+ * With the undo log on, `[v ≤ hi]` is stamped as the decision before the move. A move that snaps past a hole below
+ * `hi` lands on a tighter bound, which cites `[v ≤ hi]`; woken after it, `[v ≤ hi]` would otherwise take that bound
+ * as its channeling reason, and the two would explain each other with no unexplained literal left at the level.
+ * The move itself keeps no reason, which is how a decided bound is told apart when a reason lifts it.
  */
 internal fun PropagationState.setIntMaxAsDecision(v: Int, hi: Long): Boolean {
     levelToDecisionVar.add(problem.numBoolVars + v)
     currentLevel = levelToDecisionVar.size
     currentFactor = -1
+    val d = intDomains[v]
+    if (undoLogging && hi in d.min until d.max) stampDecision(atomVarLe(v, hi))
     return tightenIntMaxImpl(v, hi, null)
 }
 
@@ -97,6 +126,8 @@ internal fun PropagationState.setIntMinAsDecision(v: Int, lo: Long): Boolean {
     levelToDecisionVar.add(problem.numBoolVars + v)
     currentLevel = levelToDecisionVar.size
     currentFactor = -1
+    val d = intDomains[v]
+    if (undoLogging && lo in (d.min + 1)..d.max) stampDecision(atomVarGe(v, lo))
     return tightenIntMinImpl(v, lo, null)
 }
 
@@ -137,11 +168,8 @@ internal fun PropagationState.pinBoolImpl(v: Int, value: Boolean, antecedents: I
  *  itself search-derived ([cite]); a root-level bound is a global fact and needs none. */
 internal fun PropagationState.appendPriorBound(priorLit: Int, cite: Boolean, base: IntArray?): IntArray? {
     if (!cite) return base
-    if (base != null && base.contains(priorLit)) return base
-    val out = IntArray((base?.size ?: 0) + 1)
-    base?.copyInto(out)
-    out[out.size - 1] = priorLit
-    return out
+    if (!isLazyReason(base) && base != null && base.contains(priorLit)) return base
+    return extendReason(base, intArrayOf(priorLit))
 }
 
 /** Citation cap for a snapped bound's crossed holes; a wider block takes the decision-cut reason. */
@@ -151,7 +179,7 @@ private const val MAX_HOLE_CITATIONS = 4096
  *  bound atoms, negated. See [antecedentsAcrossHoles]'s over-wide fallback. */
 private fun PropagationState.decisionCutAntecedents(base: IntArray?): IntArray {
     val lits = IntArrayList()
-    base?.forEach { lits.add(it) }
+    reasonOf(base)?.forEach { lits.add(it) }
     val numBools = problem.numBoolVars
     for (i in 0 until levelToDecisionVar.size) {
         val dv = levelToDecisionVar[i]
@@ -182,10 +210,7 @@ internal fun PropagationState.antecedentsAcrossHoles(v: Int, crossed: LongRange,
     var out: IntArrayList? = null
     val orig = rootDomains[v]
     fun cite(value: Long) {
-        val o = out ?: IntArrayList().also { fresh ->
-            out = fresh
-            base?.forEach { fresh.add(it) }
-        }
+        val o = out ?: IntArrayList().also { out = it }
         o.add(Lit.make(atomVarEq(v, value), true))
     }
     // Cite the search-carved values the bound snapped past — those in [crossed] still in the root
@@ -219,7 +244,7 @@ internal fun PropagationState.antecedentsAcrossHoles(v: Int, crossed: LongRange,
             value = orig.higher(value)
         }
     }
-    return out?.toIntArray() ?: base
+    return out?.let { extendReason(base, it.toIntArray()) } ?: base
 }
 
 internal fun PropagationState.tightenIntMinImpl(v: Int, lo: Long, antecedents: IntArray?): Boolean =
@@ -419,10 +444,7 @@ internal fun PropagationState.citeCrossedSearchHoles(
     var out: IntArrayList? = null
     val root = rootDomains[v]
     fun cite(value: Long) {
-        val o = out ?: IntArrayList().also { fresh ->
-            out = fresh
-            base?.forEach { fresh.add(it) }
-        }
+        val o = out ?: IntArrayList().also { out = it }
         o.add(Lit.make(atomVarEq(v, value), true))
     }
     // Cite the search-carved holes crossed in the range: values absent from [prior] but inside the
@@ -441,7 +463,7 @@ internal fun PropagationState.citeCrossedSearchHoles(
             if (value in root) cite(value)
         }
     }
-    return out?.toIntArray() ?: base
+    return out?.let { extendReason(base, it.toIntArray()) } ?: base
 }
 
 /**

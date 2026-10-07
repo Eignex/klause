@@ -1,24 +1,47 @@
 package com.eignex.klause.factor.global.internals
 
-import com.eignex.klause.factor.arithmetic.internals.collectHoleAndBoundAntecedents
 import com.eignex.klause.localsearch.LocalSearchState
+import com.eignex.klause.ir.Lit
+import com.eignex.klause.ir.values
 import com.eignex.klause.propagation.PropagationState
+import com.eignex.klause.propagation.boundLiteral
+import com.eignex.klause.propagation.exclusionLiteral
+import com.eignex.klause.util.IntArrayList
+import com.eignex.klause.util.IntHashSet
+import com.eignex.klause.util.LongHashSet
 
 /**
- * Domain antecedents over [vars] extended with the presence [premises] the filtering assumed — the
- * literals falsified by "these positions are present". A filtered position's absence would lift the
- * constraint entirely, so a reason that omits them is a nogood asserted unconditionally: the clause
- * store then carries it into states where the constraint does not apply. That also rules out the
- * `null` (root-only) answer, which would let the deduction be recorded as an unconditional root fact.
+ * Reason that the variables of [hall] take values only among the union of their own domains, a set no larger
+ * than the variables (a Hall set), with the presence [premises]: per variable, its bound lifted to the nearest
+ * value outside the union, and each hole inside its bounds that the union lacks. Holes inside the union, and every
+ * variable outside [hall], play no part.
  */
-internal fun antecedentsWithPremises(state: PropagationState, vars: IntArray, premises: IntArray): IntArray? {
-    val base = collectHoleAndBoundAntecedents(state, vars)
-    if (premises.isEmpty()) return base
-    if (base == null) return premises
-    val out = IntArray(base.size + premises.size)
-    base.copyInto(out)
-    premises.copyInto(out, base.size)
-    return out
+internal fun hallReason(state: PropagationState, hall: IntArray, premises: IntArray): IntArray? {
+    val values = LongHashSet()
+    for (x in hall) state.intDomains[x].values.forEach { values.add(it) }
+    val seen = IntHashSet()
+    val out = IntArrayList()
+    fun add(lit: Int) {
+        if (lit != Lit.NONE && seen.add(lit)) out.add(lit)
+    }
+    val now = state.undo.size
+    for (x in hall) {
+        val d = state.intDomains[x]
+        val root = state.rootDomains[x]
+        var lo = d.min
+        while (lo > root.min && root.lower(lo) in values) lo = root.lower(lo)
+        if (lo > root.min) add(state.boundLiteral(x, true, lo, now, state.currentLevel))
+        var hi = d.max
+        while (hi < root.max && root.higher(hi) in values) hi = root.higher(hi)
+        if (hi < root.max) add(state.boundLiteral(x, false, hi, now, state.currentLevel))
+        d.forEachHole { k ->
+            if (k !in values && k in root) {
+                add(if (state.undoLogging) state.exclusionLiteral(x, k, now) else Lit.make(state.atomVarEq(x, k), true))
+            }
+        }
+    }
+    premises.forEach { add(it) }
+    return if (out.size == 0 && state.currentLevel == 0) null else out.toIntArray()
 }
 
 /** Counts how many present occurrences of [intVar] exist in [vars]. */
