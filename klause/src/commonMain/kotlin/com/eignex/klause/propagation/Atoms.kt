@@ -199,7 +199,7 @@ internal fun PropagationState.flushPendingChanneling() {
     if (pendingChanneling.isEmpty()) return
     val batch = pendingChanneling.toTypedArray()
     pendingChanneling.clear()
-    for (lits in batch) addLearnedClause(Clause(lits), lbd = lits.size, permanent = true)
+    for (lits in batch) addLearnedClause(Clause(lits), lbd = lits.size, permanent = true, origin = CHANNELING_ORIGIN)
 }
 
 /**
