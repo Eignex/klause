@@ -9,9 +9,12 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.Assumptions
+import com.eignex.klause.propagation.AtomKind
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.propagation.factorAt
 import com.eignex.klause.propagation.propagate
+import com.eignex.klause.propagation.reasonOf
 import com.eignex.klause.solver.SolveResult
 import kotlin.random.Random
 import kotlin.test.Test
@@ -250,6 +253,25 @@ class NValuePropagatorTest {
                 .map { s -> s.ints.map { it.toInt() } }.toHashSet()
             assertEquals(brute, found, "mode=$mode: enumerated (xs, n) set must equal brute force")
         }
+    }
+
+    @Test
+    fun `a kernel count cites only the bounds that keep its windows apart`() {
+        // x0 <= 1 and x1 >= 3 need two values between them; x2's hole at 2 plays no part.
+        val problem = nvalueProblem(Array(3) { IntDomain(0, 4) }, IntDomain(0, 3), NValue.Mode.AtMost)
+        val state = PropagationState(problem, Assumptions.None)
+        state.undoLogging = true
+        state.currentLevel = 1
+        check(state.tightenIntMax(0, 1) && state.tightenIntMin(1, 3) && state.excludeIntValue(2, 2))
+        state.currentFactor = 0
+
+        check(state.factorAt(0).propagate(state, 0))
+
+        val cited = state.reasonOf(state.intMinAntecedents[3])!!.map { lit ->
+            val atom = Lit.variable(lit) - problem.numBoolVars
+            Triple(state.atoms.intVar[atom], state.atoms.kind[atom], state.atoms.threshold[atom])
+        }
+        assertEquals(setOf(Triple(0, AtomKind.LE, 1L), Triple(1, AtomKind.GE, 3L)), cited.toSet())
     }
 
     @Test
