@@ -47,6 +47,7 @@ internal fun reginFilter(
     exceptSet: LongHashSet,
     cache: ReginCache? = null,
     premises: IntArray = EmptyIntArray,
+    tag: Int = 0,
 ): IntArray? {
     val n = filteredVars.size
     if (n < 2) return null
@@ -55,7 +56,7 @@ internal fun reginFilter(
     // the span-safe bounds-consistency filter for plain alldifferent; for the except variant (excepted
     // values may repeat, which bounds consistency cannot model) skip filtering — sound, just no prune.
     if (filteredVars.any { state.intDomains[it].spanOrNull(DEFAULT_DOMAIN_WALK_CAP) == null }) {
-        return if (exceptSet.isEmpty()) boundsAllDifferentFilter(state, filteredVars, premises) else null
+        return if (exceptSet.isEmpty()) boundsAllDifferentFilter(state, filteredVars, premises, tag) else null
     }
 
     // Unchanged-domains fast path: if the previous fire on this var set succeeded (returned null,
@@ -204,6 +205,7 @@ internal fun reginFilter(
     // (their copies always leave slack). Antecedents cite the sharp Hall set forward-reachable
     // from the value-node (memoised per value-SCC), hole-aware.
     val sccHallVars = MutableIntObjectMap<IntArray>()
+    val hallReasons = HashMap<Int, IntArray?>()
     fun hallVarsFor(valNode: Int): IntArray = sccHallVars.getOrPut(sccId[valNode]) {
         val vis = BooleanArray(total)
         val bfs = IntArray(total)
@@ -235,7 +237,7 @@ internal fun reginFilter(
             if (sccId[i] == sccId[valNode]) continue
             if (reachedFromFree[valNode]) continue
             val hall = hallVarsFor(valNode)
-            val ant = antecedentsWithPremises(state, hall, premises)
+            val ant = hallReasons.getOrPut(sccId[valNode]) { hallReason(state, hall, premises) }
             if (!state.excludeIntValue(filteredVars[i], value, ant)) {
                 // Excluding the value emptied var i's domain: the Hall set forced out i's last
                 // feasible value. Reason = the Hall set plus i.
