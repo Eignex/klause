@@ -208,6 +208,19 @@ class RationalSimplexTest {
     }
 
     @Test
+    fun `fraction equality and hashing agree with normalized values`() {
+        for (a in fractionSamples) {
+            val copy = BigFraction.of(a.num * bigIntOf(7), a.den * bigIntOf(7))
+            assertEquals(a, copy)
+            assertEquals(a.hashCode(), copy.hashCode())
+            for (b in fractionSamples) {
+                val equal = (a.num * b.den).compareTo(b.num * a.den) == 0
+                assertEquals(equal, a == b, "$a vs $b")
+            }
+        }
+    }
+
+    @Test
     fun `fraction reciprocals match the normalized swap`() {
         for (a in fractionSamples.filterNot { it.isZero }) {
             assertEquals(BigFraction.of(a.den, a.num), a.reciprocal(), "1 / $a")

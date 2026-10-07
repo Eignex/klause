@@ -12,6 +12,7 @@ import com.eignex.klause.ir.linearRows
 import com.eignex.klause.lp.ExactMixedBoundedRow
 import com.eignex.klause.lp.ExactMixedEchelonHermite
 import com.eignex.klause.lp.ExactMixedTriangularBounds
+import com.eignex.klause.lp.ExactRowForm
 import com.eignex.klause.lp.SourceLp
 import com.eignex.klause.lp.SourceLpBudget
 import com.eignex.klause.lp.admittedSourcePoint
@@ -97,7 +98,7 @@ class ExactLiraSearchComponent(
     private val disjunctionAtoms = HashMap<Int, List<DisjunctAtom>>()
     private val exactForms = model.factors.map { factor -> factor.linearRows.map { it.exactForm(model.numRealVars) } }
     private var impliedDisjunct = false
-    private val reduction = ExactLiraReductionCache(model, disjunctionAtoms, { solveContext }) {
+    private val reduction = ExactLiraReductionCache(model, exactForms, disjunctionAtoms, { solveContext }) {
         smtStats?.observeSourceLp(it)
     }
     private val nodesByLevel = MutableIntObjectMap<SearchNode>()
@@ -143,7 +144,7 @@ class ExactLiraSearchComponent(
         )
     }
     private val lp: LpPropagator by lpDelegate
-    private val system by lazy { LiveQfLraSystem(model, lp) }
+    private val system by lazy { LiveQfLraSystem(model, lp, exactForms) }
 
     internal fun solveWith(context: LpSolveContext) {
         check(this.context == null)
@@ -422,14 +423,12 @@ class ExactLiraSearchComponent(
                 val comparison = exactForms[factorIndex][index].comparison(truth) { bools[it] == TRUE }
                 val direction = node.disequalityDirections[RowAddress(factorIndex, index)]
                 if (comparison.op == LinearOp.NE && direction == null) continue
-                val rows = ArrayList<ExactRationalInequality>()
-                comparison.rowsInto(rows, direction)
                 val leaves = row.booleanVariables().map { variable ->
                     SearchAtomPremise.Asserted(SearchDecision.Bool(Lit.make(variable, bools[variable] == TRUE)))
                 }.toMutableList<SearchAtomPremise>()
                 if (selected != null || direction != null) leaves += SearchAtomPremise.Unavailable
                 val premise = SearchAtomPremise.All(leaves)
-                for (inequality in rows) if (!system.assertRow(inequality, premise)) return false
+                if (!system.assertComparison(comparison, direction, premise)) return false
             }
         }
         for (atom in node.sourceBranches) {
@@ -733,6 +732,7 @@ private sealed interface ExactLiraReduction {
  */
 private class ExactLiraReductionCache(
     private val model: Problem,
+    private val exactForms: List<List<ExactRowForm>>,
     private val disjunctionAtoms: Map<Int, List<DisjunctAtom>>,
     solveContext: () -> LpSolveContext,
     onWork: (SourceLpWorkStats) -> Unit,
@@ -925,7 +925,7 @@ private class ExactLiraReductionCache(
         val complete = node.forEachSelectedRow(model, disjunctionAtoms) { factor, index, row ->
             if (cancellation()) return null
             val truth = row.truthUnder(bools) ?: return@forEachSelectedRow
-            val comparison = row.exactComparison(model.numRealVars, truth) { bools[it] == TRUE }
+            val comparison = exactForms[factor][index].comparison(truth) { bools[it] == TRUE }
             val direction = if (comparison.op == LinearOp.NE) {
                 node.disequalityDirections[RowAddress(factor, index)]
             } else {

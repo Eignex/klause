@@ -195,7 +195,9 @@ internal class LpExactState internal constructor(
     private fun tighten(assertion: LpBoundAssertion) {
         val sides = if (assertion.upper) upper else lower
         val previous = sides[assertion.column]
-        if (previous == null || assertion.strongerThan(previous)) sides[assertion.column] = assertion
+        if (previous == null || assertion.side.strongerThan(previous.side, assertion.upper)) {
+            sides[assertion.column] = assertion
+        }
     }
 
     private fun column(j: Int): ExactLpColumn {
@@ -396,10 +398,10 @@ internal class LpExactState internal constructor(
     }
 }
 
-private fun LpBoundAssertion.strongerThan(other: LpBoundAssertion): Boolean {
-    val comparison = side.number.value.compareTo(other.side.number.value)
+internal fun ExactLpSide.strongerThan(other: ExactLpSide, upper: Boolean): Boolean {
+    val comparison = number.value.compareTo(other.number.value)
     return (if (upper) comparison < 0 else comparison > 0) ||
-        (comparison == 0 && side.strict && !other.side.strict)
+        (comparison == 0 && strict && !other.strict)
 }
 
 private fun ExactLpNumber.project(nonzeroRequired: Boolean = false): Double? {

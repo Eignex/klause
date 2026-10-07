@@ -47,7 +47,7 @@ internal class ExactComparison(
     val strict: Boolean,
     /** Whether a continuous column carries a term, which decides how a disequality tightens. */
     val hasReals: Boolean,
-    private val ordered: ExactOrderedTerms = ExactOrderedTerms(terms),
+    val ordered: ExactOrderedTerms = ExactOrderedTerms(terms),
 ) {
 
     /** The weighted sum at [values]. */

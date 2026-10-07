@@ -235,7 +235,7 @@ class BigFraction private constructor(
         val sign = num.signum()
         val otherSign = other.num.signum()
         if (sign != otherSign || sign == 0) return sign.compareTo(otherSign)
-        if (den == other.den) return num.compareTo(other.num)
+        if (den === other.den || den.compareTo(other.den) == 0) return num.compareTo(other.num)
         return (num * other.den).compareTo(other.num * den)
     }
 
@@ -244,7 +244,11 @@ class BigFraction private constructor(
 
     private val BigInt.isOne: Boolean get() = signum() > 0 && magnitudeBitLength() == 1
 
-    override fun equals(other: Any?): Boolean = other is BigFraction && num == other.num && den == other.den
+    override fun equals(other: Any?): Boolean = this === other || (
+        other is BigFraction &&
+        (num === other.num || num.compareTo(other.num) == 0) &&
+        (den === other.den || den.compareTo(other.den) == 0)
+    )
 
     override fun hashCode(): Int = num.hashCode() * 31 + den.hashCode()
 

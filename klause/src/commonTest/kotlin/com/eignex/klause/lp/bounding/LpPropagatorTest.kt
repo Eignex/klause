@@ -15,6 +15,7 @@ import com.eignex.klause.lp.engine.ExactLpPremises
 import com.eignex.klause.lp.engine.ExactLpRow
 import com.eignex.klause.lp.engine.ExactLpSide
 import com.eignex.klause.lp.engine.FloatLpResult
+import com.eignex.klause.lp.engine.LpBoundBatchResult
 import com.eignex.klause.lp.engine.LpBuilder
 import com.eignex.klause.lp.engine.LpEngineFactory
 import com.eignex.klause.lp.engine.LpExactState
@@ -58,6 +59,38 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class LpPropagatorTest {
+    @Test
+    fun `a redundant bound batch spends no edit work`() {
+        val zero = ExactLpNumber.of(0L)
+        val source = ExactLpModel(
+            listOf(emptyList()),
+            emptyList(),
+            listOf(ExactLpColumn(ExactLpBounds())),
+            emptyList(),
+            ExactLpObjective(listOf(zero)),
+        )
+        var work = 0L
+        LpPropagator(object : LpSearchPolicy {}, onEdit = { work += it }).use { lp ->
+            assertTrue(lp.install(Any(), source))
+            val lower = listOf(ExactLpSide(zero))
+            val upper = listOf(ExactLpSide(ExactLpNumber.of(3L)))
+            assertEquals(LpBoundBatchResult.Applied(2), lp.assertBounds(lower, upper))
+            val spent = work
+            val edits = assertNotNull(lp.metrics).editAttempts
+
+            assertEquals(LpBoundBatchResult.Applied(0), lp.assertBounds(lower, upper))
+            assertEquals(
+                LpBoundBatchResult.Applied(0),
+                lp.assertBounds(listOf(ExactLpSide(ExactLpNumber.of(-1L))), listOf(ExactLpSide(ExactLpNumber.of(4L)))),
+            )
+
+            assertEquals(spent, work)
+            assertEquals(edits, assertNotNull(lp.metrics).editAttempts)
+            assertEquals(BigFraction.ZERO, lp.state?.activeSide(0, false)?.side?.number?.value)
+            assertEquals(BigFraction.ofLong(3), lp.state?.activeSide(0, true)?.side?.number?.value)
+        }
+    }
+
     @Test
     fun `continuous CP rows decline the legacy bound adapter without changing domains`() {
         val problem = Problem(

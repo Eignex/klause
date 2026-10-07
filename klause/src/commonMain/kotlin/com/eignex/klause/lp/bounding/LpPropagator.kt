@@ -22,6 +22,7 @@ import com.eignex.klause.lp.engine.LpScopedSolver
 import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.lp.engine.LpSolveMetrics
 import com.eignex.klause.lp.engine.LpSolver
+import com.eignex.klause.lp.engine.strongerThan
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ExactContinuationLimits
 import com.eignex.klause.solver.search.ComponentCheck
@@ -203,7 +204,7 @@ internal class LpPropagator(
         val current = owner ?: return false
         if (column !in 0 until current.state.model.numVars) return invalidate()
         val previous = current.state.activeSide(column, upper)?.side
-        if (previous == side) return true
+        if (previous != null && !side.strongerThan(previous, upper)) return true
         val witness = nextWitness++
         onEdit(current.state.model.numVars.toLong())
         if (witness == Long.MAX_VALUE || !current.assertBound(column, upper, side, witness)) {
@@ -228,22 +229,18 @@ internal class LpPropagator(
                 if (cancellation()) return LpBoundBatchResult.Declined(assertions.size)
                 val side = if (upperSide) upper[column] else lower[column]
                 val previous = if (upperSide) activeUpper else activeLower
-                if (previous == side) continue
+                if (previous != null && !side.strongerThan(previous, upperSide)) continue
                 if (nextWitness > Long.MAX_VALUE - assertions.size - 1L) {
                     return LpBoundBatchResult.Declined(assertions.size + 1)
                 }
                 assertions.add(
                     LpBoundAssertion(column, upperSide, side, nextWitness + assertions.size, current.state.depth),
                 )
-                val comparison = previous?.let { side.number.value.compareTo(it.number.value) }
-                if (comparison == null || (if (upperSide) comparison < 0 else comparison > 0) ||
-                    (comparison == 0 && side.strict && !previous.strict)
-                ) {
-                    if (upperSide) activeUpper = side else activeLower = side
-                }
+                if (upperSide) activeUpper = side else activeLower = side
                 if (!ExactLpBounds(activeLower, activeUpper).consistent) break@columns
             }
         }
+        if (assertions.isEmpty()) return LpBoundBatchResult.Applied(0)
         onEdit(current.state.model.numVars.toLong())
         val result = current.assertBounds(assertions)
         if (result !is LpBoundBatchResult.Declined) {
