@@ -10,15 +10,19 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.intdomain.SurvivorsDomain
 import com.eignex.klause.propagation.Assumptions
-import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.PropagationResult
+import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.propagation.mark
+import com.eignex.klause.propagation.undoTo
 import com.eignex.klause.solver.SolveResult
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class TablePropagatorTest {
@@ -142,6 +146,34 @@ class TablePropagatorTest {
         val results = BacktrackSolver(problem.bake()).enumerate(BacktrackParams(randomSeed = 0L))
             .map { it.ints.map { v -> v.toInt() } }.toList().toSet()
         assertEquals(setOf(listOf(0, 2), listOf(0, 3)), results)
+    }
+
+    @Test
+    fun `an empty live tuple prefix restores after conflict rollback`() {
+        for (base in listOf(0L, 5_000_000_000L)) {
+            val problem = Problem(
+                numBoolVars = 0,
+                numIntVars = 2,
+                intDomains = arrayOf(IntDomain(0, 1), IntDomain(base, base + 1)),
+                factors = arrayOf<Factor>(Table(xs = intArrayOf(0, 1), tuples = longArrayOf(0, base, 1, base + 1))),
+            )
+            val state = PropagationState(problem, Assumptions.None)
+            state.runToFixpoint(allFactors = true)
+            state.undoLogging = true
+            val mark = state.mark()
+            state.currentLevel = 1
+            assertTrue(state.tightenIntMax(0, 0))
+            assertTrue(state.tightenIntMin(1, base + 1))
+            assertNotNull(state.runToFixpoint(allFactors = false))
+            state.undoTo(mark)
+
+            state.currentLevel = 1
+            assertTrue(state.tightenIntMin(0, 1))
+            assertNull(state.runToFixpoint(allFactors = false))
+
+            assertEquals(base + 1, state.intDomains[1].min)
+            assertEquals(base + 1, state.intDomains[1].max)
+        }
     }
 
     @Test
