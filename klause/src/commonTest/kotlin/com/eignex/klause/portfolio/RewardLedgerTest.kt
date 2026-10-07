@@ -4,6 +4,7 @@ import com.eignex.klause.solver.result.LocalSearchStats
 import com.eignex.klause.solver.result.SearchStats
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.kumulant.stat.summary.MaxResult
+import com.eignex.kumulant.stat.summary.SumResult
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -125,6 +126,19 @@ class RewardLedgerTest {
         progress.observe(ledger, 0, stats(rootFixed = 5.0))
 
         assertEquals(0.0, ledger.settle(0, 100))
+    }
+
+    @Test
+    fun `glue clauses earn only their growth`() {
+        val ledger = RewardLedger(1)
+        val progress = ProgressCredit(1)
+        val search = SearchStats(glueClauses = SumResult(3.0))
+        progress.observe(ledger, 0, SolveStats(search = search))
+        ledger.settle(0, 100)
+
+        progress.observe(ledger, 0, SolveStats(search = search))
+
+        assertEquals(mapOf("Glue" to 3.0), ledger.creditOf(0))
     }
 
     @Test
