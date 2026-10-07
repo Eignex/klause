@@ -69,7 +69,9 @@ internal fun PropagationState.reasonOf(reason: IntArray?): IntArray? {
         val base = reasonOf(marker.copyOfRange(HEADER + 1 + count, marker.size))
         if (base == null) extra else base + extra
     } else {
-        factorAt(fid).explain(this, fid, marker.copyOfRange(HEADER, marker.size), marker[2], marker[3])
+        // A lazily recorded deduction is never a decision, so a reason with no literals (every premise a root
+        // fact) is an empty clause body, not the null that marks a decision.
+        factorAt(fid).explain(this, fid, marker.copyOfRange(HEADER, marker.size), marker[2], marker[3]) ?: IntArray(0)
     }
     check(!isLazyReason(built)) { "a lazy reason must explain itself in literals" }
     lazyReasonMemo[marker] = built
