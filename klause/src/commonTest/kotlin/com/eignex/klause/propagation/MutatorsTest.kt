@@ -37,6 +37,28 @@ class MutatorsTest {
     }
 
     @Test
+    fun `a bound decision that snaps past a hole is the only unexplained literal at its level`() {
+        // 3 is carved at level 1, so deciding v >= 3 at level 2 lands the bound on 4. The landed bound must rest on
+        // the decision and the hole, and the decision on nothing; were they to cite each other, no literal at the
+        // level would be left for 1UIP to stop at.
+        val s = freshState(hi = 5)
+        s.levelToDecisionVar.add(s.problem.numBoolVars)
+        s.currentLevel = s.levelToDecisionVar.size
+        check(s.excludeIntValue(0, 3, null))
+
+        check(s.setIntMinAsDecision(0, 3))
+
+        val decided = s.atomVarGe(0, 3)
+        val landed = s.atomVarGe(0, 4)
+        assertEquals(4L, s.intDomains[0].min)
+        assertNull(s.atomAntecedentsDerived(decided - s.problem.numBoolVars))
+        assertEquals(
+            setOf(Lit.make(decided, false), Lit.make(s.atomVarEq(0, 3), true)),
+            s.atomAntecedentsDerived(landed - s.problem.numBoolVars)?.toSet(),
+        )
+    }
+
+    @Test
     fun `a value a bound decision sweeps past cites the decided bound`() {
         val s = freshState(hi = 5)
         val eq = s.atomVarEq(0, 2)
