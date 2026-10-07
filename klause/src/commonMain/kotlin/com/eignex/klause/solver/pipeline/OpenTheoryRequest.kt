@@ -9,6 +9,8 @@ import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.LpRoute
 import com.eignex.klause.solver.result.LpStatsSink
 import com.eignex.klause.solver.result.PresolveStats
+import com.eignex.klause.solver.result.SolveStats
+import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.result.hasActivity
 import com.eignex.klause.util.Cancellation
 
@@ -180,6 +182,45 @@ object OpenTheoryPipeline {
         request.presolveCancellation,
         request.presolveBudget,
     )
+
+    /**
+     * Execute [request] the way [engine] asks: [FiniteEngine.MIXED] on the open portfolio, the theory beside local
+     * search; [FiniteEngine.BACKTRACK] and [FiniteEngine.FIXED] through the theory alone; [FiniteEngine.LOCAL_SEARCH]
+     * with local search alone, which never refutes the model or proves an optimum. [FiniteEngine.ALNS] has no open
+     * route.
+     */
+    fun execute(request: OpenTheoryRequest, params: TheoryParams, engine: FiniteEngine): OpenTheoryExecution =
+        when (engine) {
+            FiniteEngine.MIXED -> executePortfolio(request, params)
+            FiniteEngine.BACKTRACK, FiniteEngine.FIXED -> execute(request, params)
+            FiniteEngine.LOCAL_SEARCH -> searchWithoutTheory(request.model, params, request.minimizedObjective)
+            FiniteEngine.ALNS -> throw IllegalArgumentException("engine `${engine.id}` has no open-model route")
+        }
+
+    /**
+     * Search [model], an open model no theory decides, the way [engine] asks: local search under
+     * [FiniteEngine.MIXED] and [FiniteEngine.LOCAL_SEARCH]. A complete engine has nothing to run on it, so the
+     * answer is unknown.
+     */
+    fun searchWithoutTheory(
+        model: Problem,
+        params: TheoryParams,
+        objective: LinearObjective?,
+        engine: FiniteEngine,
+    ): OpenTheoryExecution = when (engine) {
+        FiniteEngine.MIXED, FiniteEngine.LOCAL_SEARCH -> searchWithoutTheory(model, params, objective)
+        FiniteEngine.BACKTRACK, FiniteEngine.FIXED -> {
+            val stats = SolveStats.EMPTY
+            if (objective == null) {
+                OpenTheoryExecution.Satisfy(OpenTheoryResult.Unknown(TerminationReason.Unsupported, stats))
+            } else {
+                val unsearched = OpenTheoryOptimum.Bounded(null, null, TerminationReason.Unsupported, stats)
+                OpenTheoryExecution.Optimize(unsearched)
+            }
+        }
+
+        FiniteEngine.ALNS -> throw IllegalArgumentException("engine `${engine.id}` has no open-model route")
+    }
 
     /** Execute [request] through its selected complete theory route. */
     fun execute(request: OpenTheoryRequest, params: TheoryParams = TheoryParams()): OpenTheoryExecution {

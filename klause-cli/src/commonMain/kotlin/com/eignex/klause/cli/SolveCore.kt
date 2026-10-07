@@ -77,16 +77,18 @@ internal object SolveCore {
         // poll, which burns the whole deadline and overshoots the cap several times over.
         val (deadline, deadlineCancel) = deadlineCancellation(common)
         val (presolveCancel, presolveBudget) = presolveAllowance(common, deadlineCancel)
-        // Taken whatever the route, so one run configuration serves a suite whose models routing sends either way;
-        // only an open theory model has a portfolio to run.
-        val openPortfolio = takeOpenBoolParam(common, "open-portfolio") ?: false
+        // The open routes run what `-e` asks for, and ALNS has no open counterpart.
+        val open = rawSolvable.pipeline.let {
+            it is SolvablePipeline.OpenTheory || it is SolvablePipeline.OpenLocalSearch
+        }
+        if (open && engine == FiniteEngine.ALNS) usageError("engine `${engine.id}` has no open-model route")
         when (val pipeline = rawSolvable.pipeline) {
             is SolvablePipeline.OpenLocalSearch -> {
                 val params = TheoryParams(cancellation = deadlineCancel, timeout = deadlineCancel)
                 val objective = pipeline.objective
                 if (objective != null) {
                     output.begin(optimize = true, maximize = pipeline.maximize)
-                    val execution = OpenTheoryPipeline.searchWithoutTheory(pipeline.model, params, objective)
+                    val execution = OpenTheoryPipeline.searchWithoutTheory(pipeline.model, params, objective, engine)
                     reportOpenTheoryOptimum(
                         (execution as OpenTheoryExecution.Optimize).result,
                         pipeline.maximize,
@@ -101,7 +103,7 @@ internal object SolveCore {
                     return
                 }
                 output.begin(optimize = false, maximize = false)
-                val execution = OpenTheoryPipeline.searchWithoutTheory(pipeline.model, params)
+                val execution = OpenTheoryPipeline.searchWithoutTheory(pipeline.model, params, null, engine)
                 val result = (execution as OpenTheoryExecution.Satisfy).result
                 output.onVerdictContext(
                     VerdictContext(
@@ -173,11 +175,7 @@ internal object SolveCore {
                 val objective = request.objective
                 if (objective != null) {
                     output.begin(optimize = true, maximize = request.maximize)
-                    val execution = if (openPortfolio) {
-                        OpenTheoryPipeline.executePortfolio(request, theoryParams)
-                    } else {
-                        OpenTheoryPipeline.execute(request, theoryParams)
-                    }
+                    val execution = OpenTheoryPipeline.execute(request, theoryParams, engine)
                     reportOpenTheoryOptimum(
                         (execution as OpenTheoryExecution.Optimize).result,
                         request.maximize,
@@ -193,12 +191,7 @@ internal object SolveCore {
                     return
                 }
                 output.begin(optimize = false, maximize = false)
-                // Local-search arms beside the theory are opt-in until the bench shows what they buy.
-                val execution = if (openPortfolio) {
-                    OpenTheoryPipeline.executePortfolio(request, theoryParams)
-                } else {
-                    OpenTheoryPipeline.execute(request, theoryParams)
-                }
+                val execution = OpenTheoryPipeline.execute(request, theoryParams, engine)
                 val result = (execution as OpenTheoryExecution.Satisfy).result
                 val resultStats = result.stats.copy(lp = result.stats.lp.mergedWith(rawSolvable.routingLpStats))
                 output.onVerdictContext(
