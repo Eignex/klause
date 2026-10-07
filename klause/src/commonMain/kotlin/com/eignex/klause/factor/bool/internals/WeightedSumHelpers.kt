@@ -300,14 +300,14 @@ internal fun pbFalseFormAntecedents(
     state: PropagationState,
     literals: IntArray,
     excludeVar: Int,
-    extraLit: Int, // 0 == no extra literal
+    extraLit: Int, // Lit.NONE == no extra literal
 ): IntArray? {
     val seen = state.pbAntecedentSeen
     val buf = state.pbAntecedentBuf
     seen.clear()
     buf.clear()
-    if (extraLit != 0) buf.add(extraLit)
-    val extraVar = if (extraLit != 0) Lit.variable(extraLit) else -1
+    if (extraLit != Lit.NONE) buf.add(extraLit)
+    val extraVar = if (extraLit != Lit.NONE) Lit.variable(extraLit) else -1
     for (lit in literals) {
         val v = Lit.variable(lit)
         if (v == excludeVar || v == extraVar) continue
@@ -359,14 +359,14 @@ internal fun pbLitRanges(state: PropagationState, weights: LongArray, literals: 
     return PbRanges(litLo, litHi, sumLo, sumHi)
 }
 
-// extraLit threads a reif-var pin into each implied propagation's antecedents (0 = none).
+// extraLit threads a reif-var pin into each implied propagation's antecedents (Lit.NONE = none).
 internal fun propagatePbBounds(
     state: PropagationState,
     weights: LongArray,
     literals: IntArray,
     op: PbOp,
     bound: Long,
-    extraLit: Int = 0,
+    extraLit: Int = Lit.NONE,
 ): Boolean {
     val r = pbLitRanges(state, weights, literals)
     val sumLo = r.sumLo

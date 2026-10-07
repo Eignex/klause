@@ -17,7 +17,7 @@ internal class ReifiedCardinalityPropagator(
 ) : Propagator {
 
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? {
-        val auxLit = state.boolValues[auxBoolVar]?.let { Lit.make(auxBoolVar, !it) } ?: 0
+        val auxLit = state.boolValues[auxBoolVar]?.let { Lit.make(auxBoolVar, !it) } ?: Lit.NONE
         return pbFalseFormAntecedents(state, literals, excludeVar = -1, extraLit = auxLit)
     }
 
@@ -39,7 +39,7 @@ internal class ReifiedCardinalityPropagator(
             auxBoolVar,
             alwaysHolds = definitelyIn,
             neverHolds = definitelyOut,
-            pinAntecedent = { pbFalseFormAntecedents(state, literals, excludeVar = auxBoolVar, extraLit = 0) },
+            pinAntecedent = { pbFalseFormAntecedents(state, literals, excludeVar = auxBoolVar, extraLit = Lit.NONE) },
             propagateTrue = { a ->
                 if (trueCount == max && unassigned > 0) {
                     val ant = pbFalseFormAntecedents(state, literals, excludeVar = -1, extraLit = a)

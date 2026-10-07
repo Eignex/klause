@@ -99,7 +99,7 @@ internal class PbConflictResolvent(private val state: PropagationState, private 
      *  clause-form seed the driver supplied. A seed has no forced literal, so cardinality/EQ reasons
      *  (whose direction is ambiguous without one) fall back to the clause form. */
     private fun loadSeed(reasonLits: IntArray): Boolean {
-        if (seedFactorId >= 0 && loadFactor(seedFactorId, acc, forcedLit = 0)) return true
+        if (seedFactorId >= 0 && loadFactor(seedFactorId, acc, forcedLit = Lit.NONE)) return true
         return acc.loadClause(reasonLits)
     }
 
@@ -157,7 +157,7 @@ internal class PbConflictResolvent(private val state: PropagationState, private 
     }
 
     /** Load factor [fid]'s constraint into [target] as a `≥` constraint; false when not a loadable kind.
-     *  [forcedLit] (the pivot's now-true literal, or 0 for a seed) selects the propagating half of a
+     *  [forcedLit] (the pivot's now-true literal, or [Lit.NONE] for a seed) selects the propagating half of a
      *  cardinality or equality reason. A `boolReason` can name a since-forgotten learned constraint (the
      *  clause path avoids this by reading `boolAntecedents`), so an out-of-range id falls back to the
      *  clause-form reason rather than indexing a compacted store. */
