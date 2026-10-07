@@ -4,7 +4,6 @@ import com.eignex.klause.factor.arithmetic.internals.collectLinearTightenAnteced
 import com.eignex.klause.propagation.IntEvent
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.Propagator
-import com.eignex.klause.util.LongHashSet
 
 /** CP propagation logic for `symmetric_all_different`. */
 internal class SymmetricAllDifferentPropagator(
@@ -32,21 +31,33 @@ internal class SymmetricAllDifferentPropagator(
         out
     }
 
+    // The variables the last failed [propagate] rests on: two fixed to one value, or a fixed one and the mirror
+    // it could not pin.
+    private var failureVars: IntArray? = null
+
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
-        collectLinearTightenAntecedents(state, xs, excludeIdx = -1, extraLit = 0)
+        failureVars?.let { state.composeIntVarAtomAntecedents(it) }
+            ?: collectLinearTightenAntecedents(state, xs, excludeIdx = -1, extraLit = 0)
 
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
+        failureVars = null
         val lo = indexOffset
         val hi = indexOffset + xs.size - 1
         for (v in xs) {
             if (!state.tightenIntMin(v, lo.toLong())) return false
             if (!state.tightenIntMax(v, hi.toLong())) return false
         }
-        val taken = LongHashSet()
+        // Every domain now lies in [lo, hi], so a fixed value indexes its claimant directly.
+        val claimedBy = IntArray(xs.size) { -1 }
         for (v in xs) {
             val d = state.intDomains[v]
             if (d.min != d.max) continue
-            if (!taken.add(d.min)) return false
+            val slot = (d.min - indexOffset).toInt()
+            if (claimedBy[slot] != -1) {
+                failureVars = intArrayOf(claimedBy[slot], v)
+                return false
+            }
+            claimedBy[slot] = v
         }
         for (i in xs.indices) {
             val d = state.intDomains[xs[i]]
@@ -55,8 +66,10 @@ internal class SymmetricAllDifferentPropagator(
             if (target < 0 || target >= xs.size) return false
             val mirror = i + indexOffset
             val ant = state.composeIntVarAtomAntecedents(intArrayOf(xs[i]))
+            failureVars = intArrayOf(xs[i], xs[target.toInt()])
             if (!state.tightenIntMin(xs[target.toInt()], mirror.toLong(), ant)) return false
             if (!state.tightenIntMax(xs[target.toInt()], mirror.toLong(), ant)) return false
+            failureVars = null
         }
         return true
     }
