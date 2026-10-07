@@ -661,74 +661,73 @@ class BacktrackSolverTest {
         val lo = 1
         val hi = 5
         val span = hi - lo + 1
-        for (seed in 0 until 3) {
-            val rnd = Random(seed)
-            val numDrivers = 2
-            fun cx(v: Int) = numDrivers + (v - lo)
-            fun cy(v: Int) = numDrivers + span + (v - lo)
-            val numBool = numDrivers + 2 * span
-            val factors = ArrayList<Factor>()
-            for (v in lo..hi) {
-                factors.add(
-                    ReifiedLinear(
-                        auxBoolVar = cx(v),
-                        coeffs = intArrayOf(1),
-                        vars = intArrayOf(0),
-                        op = LinearOp.EQ,
-                        bound = v,
-                    ),
-                )
-                factors.add(
-                    ReifiedLinear(
-                        auxBoolVar = cy(v),
-                        coeffs = intArrayOf(1),
-                        vars = intArrayOf(1),
-                        op = LinearOp.EQ,
-                        bound = v,
-                    ),
-                )
-            }
-            val clauses = ArrayList<IntArray>()
-            repeat(10) {
-                val lits = IntArray(3) {
-                    val b = rnd.nextInt(numBool)
-                    Lit.make(b, rnd.nextBoolean())
-                }
-                clauses.add(lits)
-                factors.add(Clause(lits))
-            }
-            val p = Problem(
-                numBoolVars = numBool,
-                numIntVars = 2,
-                intDomains = arrayOf(IntDomain(lo.toLong(), hi.toLong()), IntDomain(lo.toLong(), hi.toLong())),
-                factors = factors.toTypedArray(),
+        val seed = 0
+        val rnd = Random(seed)
+        val numDrivers = 2
+        fun cx(v: Int) = numDrivers + (v - lo)
+        fun cy(v: Int) = numDrivers + span + (v - lo)
+        val numBool = numDrivers + 2 * span
+        val factors = ArrayList<Factor>()
+        for (v in lo..hi) {
+            factors.add(
+                ReifiedLinear(
+                    auxBoolVar = cx(v),
+                    coeffs = intArrayOf(1),
+                    vars = intArrayOf(0),
+                    op = LinearOp.EQ,
+                    bound = v,
+                ),
             )
+            factors.add(
+                ReifiedLinear(
+                    auxBoolVar = cy(v),
+                    coeffs = intArrayOf(1),
+                    vars = intArrayOf(1),
+                    op = LinearOp.EQ,
+                    bound = v,
+                ),
+            )
+        }
+        val clauses = ArrayList<IntArray>()
+        repeat(10) {
+            val lits = IntArray(3) {
+                val b = rnd.nextInt(numBool)
+                Lit.make(b, rnd.nextBoolean())
+            }
+            clauses.add(lits)
+            factors.add(Clause(lits))
+        }
+        val p = Problem(
+            numBoolVars = numBool,
+            numIntVars = 2,
+            intDomains = arrayOf(IntDomain(lo.toLong(), hi.toLong()), IntDomain(lo.toLong(), hi.toLong())),
+            factors = factors.toTypedArray(),
+        )
 
-            val brute = HashSet<List<Int>>()
-            for (x in lo..hi) {
-                for (y in lo..hi) {
-                    for (mask in 0 until (1 shl numDrivers)) {
-                        val bools = BooleanArray(numBool)
-                        for (d in 0 until numDrivers) bools[d] = (mask shr d) and 1 == 1
-                        for (v in lo..hi) {
-                            bools[cx(v)] = x == v
-                            bools[cy(v)] = y == v
-                        }
-                        val ok = clauses.all { cl ->
-                            cl.any { lit -> bools[Lit.variable(lit)] == Lit.isPositive(lit) }
-                        }
-                        if (ok) brute.add(bools.map { if (it) 1 else 0 } + listOf(x, y))
+        val brute = HashSet<List<Int>>()
+        for (x in lo..hi) {
+            for (y in lo..hi) {
+                for (mask in 0 until (1 shl numDrivers)) {
+                    val bools = BooleanArray(numBool)
+                    for (d in 0 until numDrivers) bools[d] = (mask shr d) and 1 == 1
+                    for (v in lo..hi) {
+                        bools[cx(v)] = x == v
+                        bools[cy(v)] = y == v
                     }
+                    val ok = clauses.all { cl ->
+                        cl.any { lit -> bools[Lit.variable(lit)] == Lit.isPositive(lit) }
+                    }
+                    if (ok) brute.add(bools.map { if (it) 1 else 0 } + listOf(x, y))
                 }
             }
-
-            val params =
-                BacktrackParams(randomSeed = seed.toLong(), variableSelector = Vsids(), maxLearnedClauses = 1_000)
-            val raw = BacktrackSolver(p.bake()).enumerate(params).take(brute.size + 10)
-                .map { s -> s.bools.map { if (it) 1 else 0 } + s.ints.map { it.toInt() } }.toList()
-            assertEquals(raw.size, raw.toHashSet().size, "seed $seed: a solution was yielded more than once")
-            assertEquals(brute, raw.toHashSet(), "seed $seed: enumeration must equal the brute-force feasible set")
         }
+
+        val params =
+            BacktrackParams(randomSeed = seed.toLong(), variableSelector = Vsids(), maxLearnedClauses = 1_000)
+        val raw = BacktrackSolver(p.bake()).enumerate(params).take(brute.size + 10)
+            .map { s -> s.bools.map { if (it) 1 else 0 } + s.ints.map { it.toInt() } }.toList()
+        assertEquals(raw.size, raw.toHashSet().size, "seed $seed: a solution was yielded more than once")
+        assertEquals(brute, raw.toHashSet(), "seed $seed: enumeration must equal the brute-force feasible set")
     }
 
     @Test

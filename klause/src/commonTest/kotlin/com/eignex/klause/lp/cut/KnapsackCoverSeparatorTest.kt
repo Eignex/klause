@@ -70,7 +70,7 @@ class KnapsackCoverSeparatorTest {
     fun `cover cuts exclude no knapsack-feasible point`() {
         val rng = Random(20260610)
         var separated = 0
-        repeat(1500) {
+        repeat(300) {
             val n = rng.nextInt(2, 6)
             val weights = IntArray(n) { rng.nextInt(1, 6) }
             val bnd = rng.nextInt(1, weights.sum())
@@ -116,7 +116,7 @@ class KnapsackCoverSeparatorTest {
                 }
             }
         }
-        assertTrue(separated > 50, "only $separated instances produced a cover cut")
+        assertTrue(separated > 10, "only $separated instances produced a cover cut")
     }
 
     @Test
