@@ -345,7 +345,7 @@ class Portfolio(
                     run.quarantine(claim)
                     return@locked
                 }
-                if (claim.foundFirst) startImprovementPhase(run.ledger)
+                if (claim.foundFirst) run.startImprovementPhase()
                 // Re-seed a plateaued resumable arm: only once an incumbent exists (the feasibility hunt is never
                 // reset), and never on a segment that already returned a terminal verdict.
                 if (handle != null && terminal == null && !failed && incumbent.current() != null) {
@@ -436,6 +436,8 @@ class Portfolio(
         private var totalNanos = 0L
         private var slice = baseSliceMillis
         private var sliceWork = baseSliceWork
+        private val families = FamilyPolicy(bandit.random)
+        private var improving = false
 
         /** Whether every arm has retired. */
         val allRetired: Boolean get() = remaining == 0
@@ -502,19 +504,35 @@ class Portfolio(
             Claim(arm, probing, slice, sliceWork, whole = dedicated)
         }
 
-        // The free arm furthest below its owed share, else the policy's pick among free arms, falling back to the first
-        // free one if the policy keeps naming taken arms.
+        // The free arm furthest below its owed share, else the policy's pick among free arms: a family first, so a
+        // family's share does not grow with its arm count, then an arm of that family. LNS works on an incumbent, so it
+        // waits for one unless it is all that is left.
         private fun policyPick(): Int {
             owedArm()?.let { return it }
+            val free = workers.indices.filter { !busy[it] && !retired[it] }
+            if (free.isEmpty()) return -1
+            val present = free.mapTo(LinkedHashSet()) { workers[it].family }
+            val eligible = if (improving) present else present.filter { it != ArmFamily.Lns }.ifEmpty { present }
+            val family = families.choose(eligible)
+            return armAmong(free.filter { workers[it].family == family })
+        }
+
+        // A policy that cannot be restricted to [candidates] is asked until it names one of them.
+        private fun armAmong(candidates: List<Int>): Int {
+            (bandit as? DiscountedThompson)?.let { return it.chooseAmong(candidates) }
             repeat(workers.size) {
                 val chosen = bandit.choose()
-                if (retired[chosen]) {
-                    bandit.update(chosen, 0.0)
-                } else if (!busy[chosen]) {
-                    return chosen
-                }
+                if (chosen in candidates) return chosen
             }
-            return workers.indices.firstOrNull { !busy[it] && !retired[it] } ?: -1
+            return candidates.first()
+        }
+
+        /** The first incumbent ends the feasibility hunt: the ledger's rates restart, the bandit keeps
+         *  [phaseRetention] of its evidence, and LNS arms become eligible. Call under [locked]. */
+        fun startImprovementPhase() {
+            improving = true
+            ledger.resetPhase()
+            (bandit as? DiscountedThompson)?.fade(phaseRetention)
         }
 
         private fun owedArm(): Int? {
@@ -551,6 +569,7 @@ class Portfolio(
             val reward = if (failed) 0.0 else earned
             val weight = (if (failed) maxOf(work, claim.sliceWork) else work).toDouble() / claim.sliceWork
             bandit.update(arm, reward, weight)
+            families.record(workers[arm].family, progressed = reward > 0.0, plateau = improving)
             // Credit an arm earns while others run, from peers using what it shared, pays out now as one segment's
             // evidence: an arm the policy has stopped picking would otherwise hold it forever.
             for (other in workers.indices) {
@@ -601,13 +620,6 @@ class Portfolio(
             }
             closeFailure?.let { failure -> primaryFailure?.addSuppressed(failure) ?: throw failure }
         }
-    }
-
-    /** The first incumbent ends the feasibility hunt: the ledger's rates restart and the bandit keeps
-     *  [phaseRetention] of its evidence. */
-    private fun startImprovementPhase(ledger: RewardLedger) {
-        ledger.resetPhase()
-        (bandit as? DiscountedThompson)?.fade(phaseRetention)
     }
 
     /** The instruction allowance a counted local-search segment of [work] units receives. */

@@ -40,6 +40,13 @@ internal class DiscountedThompson(
 
     override fun reset() = inner.reset()
 
+    /** The arm among [arms], which must not be empty, that a Thompson draw over their evidence favours. */
+    fun chooseAmong(arms: Collection<Int>): Int {
+        require(arms.isNotEmpty()) { "no arm to choose among" }
+        val evidence = inner.snapshot()
+        return arms.maxBy { random.nextBeta(evidence[it].successes, evidence[it].trials - evidence[it].successes) }
+    }
+
     /**
      * Keep [retained] of every arm's evidence, the prior untouched: `0` forgets everything, `1` changes nothing.
      */

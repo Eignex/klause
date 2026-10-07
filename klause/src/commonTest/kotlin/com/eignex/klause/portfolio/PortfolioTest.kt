@@ -709,6 +709,20 @@ class PortfolioTest {
     }
 
     @Test
+    fun `plateaued local search cedes the run to backtrack however many local search arms there are`() {
+        val slices = IntArray(5)
+        val workers = List(5) { arm ->
+            trackingWorker("arm$arm", arm, ScriptedSearch({ arm == 0 && it == 0 }) { slices[arm]++ })
+                .also { if (arm > 0) it.family = ArmFamily.LocalSearch }
+        }
+        var polls = 0
+
+        Portfolio.thompson(workers).use { it.minimize(Cancellation { ++polls > 2_000 }) }
+
+        assertTrue(slices[0] > slices.sum() / 2, "backtrack ran ${slices[0]} of ${slices.sum()} slices")
+    }
+
+    @Test
     fun `the arm that found the first solution loses its lead to the arm improving it`() {
         val slices = IntArray(2)
         val finder = ScriptedSearch({ it == 0 }, start = 1_000.0) { slices[0]++ }
