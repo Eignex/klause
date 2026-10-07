@@ -343,6 +343,10 @@ internal fun FlatZincCompiler.emitFloatTimes(c: FznConstraint) {
         factors.add(RealProduct(resolveIntVar(intExpr), y.varId, cRef.bk.varId, y.lo, y.hi))
         return
     }
+    if (exactFloats) {
+        emitFiniteFloatProduct(aRef, bRef, cRef)
+        return
+    }
     if (aRef !is FloatRef.Var || bRef !is FloatRef.Var || cRef !is FloatRef.Var) {
         failHere("float_times with constant operand not yet handled (only var·var=var)")
     }
@@ -470,7 +474,7 @@ internal fun FlatZincCompiler.emitArrayFloatElement(c: FznConstraint) {
         factors.add(Linear(longArrayOf(1L), intArrayOf(idx), LinearOp.LE, arr.size.toLong()))
         for (i in arr.indices) {
             val selected = reifyLinear(longArrayOf(1L), intArrayOf(idx), LinearOp.EQ, (i + 1).toLong())
-            val value = reifyRealLinear(doubleArrayOf(1.0), intArrayOf(x.varId), LinearOp.EQ, arr[i])
+            val value = exactFloatValueLiteral(x.varId, arr[i])
             factors.add(Clause(intArrayOf(Lit.negate(selected), value)))
         }
         return

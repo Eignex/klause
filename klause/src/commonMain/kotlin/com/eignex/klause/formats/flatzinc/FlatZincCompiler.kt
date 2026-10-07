@@ -61,6 +61,8 @@ internal class FlatZincCompiler(
     internal var lpOnlyFloats: Set<String> = emptySet()
     internal val realLo = ArrayList<Double>()
     internal val realHi = ArrayList<Double>()
+    internal val finiteFloatChoices = HashMap<Int, DoubleArray>()
+    internal val floatValueLiterals = HashMap<Pair<Int, Double>, Int>()
 
     // Float var name -> the integer argument of the `int2float` that defines it (the float is that int's
     // continuous image). Lets a `float_times` with one such operand lower as an exact int·real product
@@ -82,6 +84,13 @@ internal class FlatZincCompiler(
             currentLine = decl.line
             currentCol = decl.col
             processDecl(decl)
+        }
+        if (exactFloats) {
+            for (c in model.constraints) {
+                currentLine = c.line
+                currentCol = c.col
+                recordFiniteFloatChoices(c)
+            }
         }
         val impliedFactorIds = IntArrayList()
         var hasSymmetryBreaking = false

@@ -5,7 +5,7 @@ private val FLOAT_LP_ONLY_NAMES = setOf(
     "float_lin_le_reif", "float_lin_eq_reif", "float_lin_ne_reif", "float_lin_lt_reif",
     "int2float", "float_eq", "float_le", "float_lt", "float_ne",
     "float_eq_reif", "float_le_reif", "float_lt_reif", "float_ne_reif",
-    "float_abs", "float_min", "float_max", "array_float_element",
+    "float_abs", "float_min", "float_max", "array_float_element", "float_times",
 )
 
 internal fun FlatZincCompiler.exactFloatNames(): Set<String> {
@@ -46,10 +46,8 @@ internal fun FlatZincCompiler.exactFloatNames(): Set<String> {
     for (c in model.constraints) {
         val here = c.args.flatMap(::names)
         if (here.isEmpty()) continue
-        val constantProduct = c.name == "float_times" && c.args.size == 3 &&
-            (names(c.args[0]).isEmpty() || names(c.args[1]).isEmpty())
         val constantDivision = c.name == "float_div" && c.args.size == 3 && names(c.args[1]).isEmpty()
-        if (c.name !in FLOAT_LP_ONLY_NAMES && !isIntFloatProduct(c, floats) && !constantProduct && !constantDivision) {
+        if (c.name !in FLOAT_LP_ONLY_NAMES && !constantDivision) {
             throw UnsupportedFlatZincException(
                 "`${c.name}` is unsupported by exact float lowering",
                 c.line,
@@ -58,16 +56,4 @@ internal fun FlatZincCompiler.exactFloatNames(): Set<String> {
         }
     }
     return floats
-}
-
-private fun FlatZincCompiler.isIntFloatProduct(c: FznConstraint, floats: Set<String>): Boolean {
-    if (c.name != "float_times" || c.args.size != 3) return false
-    val a = (c.args[0] as? FznExpr.Ident)?.name ?: return false
-    val b = (c.args[1] as? FznExpr.Ident)?.name ?: return false
-    val result = (c.args[2] as? FznExpr.Ident)?.name ?: return false
-    if (result !in floats) return false
-    val aInt = a in int2floatSource
-    val bInt = b in int2floatSource
-    if (aInt == bInt) return false
-    return (if (aInt) b else a) in floats
 }

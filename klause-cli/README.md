@@ -174,8 +174,10 @@ lowering is declined with a diagnostic suggesting `--exact` or smaller bounds or
 
 Exact float lowering supports linear comparisons (including strict and reified comparisons),
 absolute values, minimum/maximum, constant-array selection, and multiplication or division by
-constants. These become linear rows with Boolean structure where needed. Products of two
-continuous variables are outside LRA/LIRA and are declined.
+constants. These become linear rows with Boolean structure where needed. Products with an operand
+selected from a constant float array also become conditional linear rows, preserving the selected
+values and intermediate products without bucketing. Products of two unrestricted continuous
+variables are outside LRA/LIRA and are declined.
 
 ## Environment knobs
 
