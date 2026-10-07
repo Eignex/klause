@@ -214,4 +214,22 @@ class ResumableNodeSliceTest {
         assertTrue(leafWork > 0L)
         assertTrue(search.work >= search.stats.search.nodes.sum.toLong() + leafWork)
     }
+
+    @Test
+    fun `a constructor refutation returns when root work consumes the slice`() {
+        val variables = 5_000
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = variables,
+            intDomains = Array(variables) { IntDomain(0, 1) },
+            factors = arrayOf<Factor>(
+                Linear(LongArray(variables) { 1L }, IntArray(variables) { it }, LinearOp.GE, variables + 1L),
+            ),
+        ).bake()
+        val search = BacktrackSolver(problem).resumable(LinearObjective(), BacktrackParams(randomSeed = 0L))
+
+        val verdict = search.runSlice(Cancellation.Never, sliceMillis = 60_000, sliceNodes = 1L) { }
+
+        assertIs<MinimizeResult.Infeasible>(verdict)
+    }
 }

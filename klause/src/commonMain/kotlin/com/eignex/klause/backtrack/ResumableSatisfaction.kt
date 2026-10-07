@@ -55,7 +55,7 @@ internal class ResumableSatisfaction(private val solver: BacktrackSolver, params
         done?.let { return it }
         check(!closed) { "search is closed" }
         globalToken = global
-        if (!slice.begin(sliceMillis, sliceNodes)) return null
+        if (!traversal.hasRootOutcome && !slice.begin(sliceMillis, sliceNodes)) return null
         traversal.fixedCancellationCadence = slice.workBounded
         try {
             val outcome = traversal.next()

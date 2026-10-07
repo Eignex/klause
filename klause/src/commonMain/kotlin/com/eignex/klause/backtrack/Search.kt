@@ -174,6 +174,7 @@ internal class CpSatisfactionTraversal(
 
     // The verdict the root reached before any search, handed out by the first [next].
     private var rootOutcome: SearchOutcome? = null
+    val hasRootOutcome: Boolean get() = rootOutcome != null
     private var closed = false
 
     init {

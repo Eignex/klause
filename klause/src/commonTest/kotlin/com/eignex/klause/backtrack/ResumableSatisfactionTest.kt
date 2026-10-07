@@ -86,4 +86,13 @@ class ResumableSatisfactionTest {
         assertIs<SolveResult.Unknown>(verdict)
         assertTrue(search.isDone)
     }
+
+    @Test
+    fun `a constructor refutation returns even with no slice work allowance`() {
+        val search = handle(pigeonhole(2, 1))
+
+        val verdict = search.runSlice(Cancellation.Never, Long.MAX_VALUE, sliceNodes = 0L)
+
+        assertIs<SolveResult.Unsat>(verdict)
+    }
 }
