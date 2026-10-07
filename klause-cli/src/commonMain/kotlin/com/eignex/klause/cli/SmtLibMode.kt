@@ -4,11 +4,13 @@ import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.formats.smtlib.SmtLib
 import com.eignex.klause.formats.smtlib.UnsupportedSmtException
 import com.eignex.klause.ir.ObjectiveSense
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.objective.toLinearObjective
 import com.eignex.klause.solver.pipeline.OpenTheoryAssignment
+import com.eignex.klause.solver.pipeline.OpenTheoryPipeline
 import com.eignex.klause.solver.pipeline.SourceProblemRoute
-import com.eignex.klause.solver.pipeline.UnplaceableColumn
 import com.eignex.klause.solver.pipeline.pipelineRoute
 import com.eignex.klause.solver.result.LpStats
 import kotlin.time.TimeSource
@@ -63,29 +65,39 @@ internal object SmtLibMode : CliMode {
                     routingElapsedMs = routingElapsedMs,
                 )
 
-                is SourceProblemRoute.OpenTheory -> {
-                    if (parsed.objective != null) {
-                        throw UnsupportedSmtException("open theory optimization is unsupported")
+                // An objective the descent can minimize goes to it; any other leaves the theory to local search.
+                is SourceProblemRoute.OpenTheory ->
+                    if (route.request.objective == null || OpenTheoryPipeline.canMinimize(route.request)) {
+                        openTheorySolvable(
+                            route.request,
+                            { assignment -> renderOpenTheoryModel(ints, bools, reals, assignment) },
+                            routingLpStats,
+                            routingElapsedMs,
+                        )
+                    } else {
+                        openLocalSearchSmt(
+                            route.request.model,
+                            objective,
+                            parsed.sense,
+                            ints,
+                            bools,
+                            reals,
+                            routingLpStats,
+                            routingElapsedMs,
+                        )
                     }
-                    openTheorySolvable(
-                        route.request,
-                        { assignment -> renderOpenTheoryModel(ints, bools, reals, assignment) },
-                        routingLpStats,
-                        routingElapsedMs,
-                    )
-                }
 
-                is SourceProblemRoute.UnsupportedOpen -> {
-                    if (parsed.objective != null) {
-                        throw UnsupportedSmtException(unsupportedOpenReason(route.unplaceable, ints))
-                    }
-                    openLocalSearchSolvable(
+                is SourceProblemRoute.UnsupportedOpen ->
+                    openLocalSearchSmt(
                         route.problem,
-                        { assignment -> renderOpenTheoryModel(ints, bools, reals, assignment) },
+                        objective,
+                        parsed.sense,
+                        ints,
+                        bools,
+                        reals,
                         routingLpStats,
                         routingElapsedMs,
                     )
-                }
 
                 SourceProblemRoute.Refuted -> refutedSolvable(routingLpStats, routingElapsedMs)
             }
@@ -93,6 +105,33 @@ internal object SmtLibMode : CliMode {
 
         override fun output(common: CommonOptions): OutputProtocol = SmtLibOutput()
     }
+}
+
+// An open model searched by local search alone, minimizing [objective] when there is one. An open optimum is
+// integral, so an objective weighting a continuous column is refused.
+@Suppress("LongParameterList")
+private fun openLocalSearchSmt(
+    model: Problem,
+    objective: LinearObjective?,
+    sense: ObjectiveSense,
+    ints: Map<String, Int>,
+    bools: Map<String, Int>,
+    reals: Map<String, Int>,
+    routingLpStats: LpStats,
+    routingElapsedMs: Long,
+): Solvable {
+    if (objective?.realCoefficients?.any { it != 0.0 } == true) {
+        throw UnsupportedSmtException("open optimization over a continuous objective is unsupported")
+    }
+    val maximize = sense == ObjectiveSense.MAXIMIZE
+    return openLocalSearchSolvable(
+        model,
+        { assignment -> renderOpenTheoryModel(ints, bools, reals, assignment) },
+        routingLpStats,
+        routingElapsedMs,
+        objective = if (maximize) objective?.negated() else objective,
+        maximize = maximize,
+    )
 }
 
 /** Render an SMT-LIB `(get-model)`-style model: one `(define-fun name () Sort value)` per
@@ -166,22 +205,4 @@ internal class SmtLibOutput : BufferedBestOutput() {
             "openHintDraws", "openHintProduced", "openHintVars", "openHintSteered", "openHintMoves",
         )
     }
-}
-
-/**
- * Why an open model has no route, naming the column and the constraint that demanded it be finite.
- *
- * A model is declined whole, but the cause is one column and one factor: the column carries no bound CP
- * can index, and the factor is one no theory holds. Naming both says what to change — bound that column,
- * or state a decomposition for that constraint the theories can take — where naming neither leaves a
- * user to guess which of their constraints is the unsupported one.
- */
-internal fun unsupportedOpenReason(unplaceable: UnplaceableColumn?, names: Map<String, Int>): String {
-    val detail = unplaceable
-        ?: return "open integer bounds require supported difference or exact linear arithmetic coverage"
-    val column = names.entries.firstOrNull { it.value == detail.column }?.key
-        ?: "integer column ${detail.column}"
-    val kind = detail.factorKind ?: "a constraint"
-    return "$column has no bound to search over and $kind needs one; " +
-        "bound it, or state this constraint as rows a theory can hold"
 }

@@ -142,16 +142,20 @@ class OpenTheoryMinimizer internal constructor(
     private val terms: IntArray
     private val coefficients: LongArray
     private val source: Problem
+    // The route the descent plans under, which the objective row may leave outside every complete open theory.
+    private val plannedRoute: ProblemPipeline by lazy { source.boundedForPlanning().componentPlan().theoryPipeline }
+
     private val route: ProblemPipeline by lazy {
-        val selected = source.boundedForPlanning().componentPlan().theoryPipeline
         // A row at PLANNING_RHS carries no potential, so a model whose rows were all differences leaves
         // that fragment by being optimized at all — the row's weight, not its shape, is what moves it.
         // Say so here rather than at the first round's engine build.
-        require(selected != ProblemPipeline.UNSUPPORTED_OPEN && selected != ProblemPipeline.FINITE_CP) {
-            "objective row leaves the model outside every complete open theory"
-        }
-        selected
+        require(decidesEveryRound) { "objective row leaves the model outside every complete open theory" }
+        plannedRoute
     }
+
+    /** Whether a complete open theory decides the model with the descent's bound row, and so every round. */
+    internal val decidesEveryRound: Boolean
+        get() = plannedRoute != ProblemPipeline.UNSUPPORTED_OPEN && plannedRoute != ProblemPipeline.FINITE_CP
 
     // Set once the certificate has refused a ray over a model that puts every witness in one branch, so
     // the rounds after it read the refusal rather than rebuilding the same cone system.
