@@ -70,12 +70,26 @@ internal fun PropagationState.pinBoolAsDecision(v: Int, value: Boolean): Boolean
     return pinBoolImpl(v, value, antecedents = null)
 }
 
-/** Push an int var as a new decision. */
+/**
+ * Push an int var as a new decision. With the undo log on, the decision is the literal `[v = value]`: it is
+ * stamped first, with no reason, and both bound moves cite it, so the level carries one unexplained literal for
+ * 1UIP to stop at instead of two bound atoms it cannot collapse.
+ */
 internal fun PropagationState.setIntAsDecision(v: Int, value: Long): Boolean {
     levelToDecisionVar.add(problem.numBoolVars + v)
     currentLevel = levelToDecisionVar.size
     currentFactor = -1
-    return setIntImpl(v, value, null)
+    val d = intDomains[v]
+    if (!undoLogging || value !in d || d.min == d.max) return setIntImpl(v, value, null)
+    val eq = atomVarEq(v, value)
+    val atomId = eq - problem.numBoolVars
+    recordAtomTruthChange(atomId)
+    boolPinOrder.add(eq)
+    atoms.truth[atomId] = 1
+    atoms.lvl[atomId] = currentLevel
+    atoms.ant[atomId] = null
+    val reason = intArrayOf(Lit.make(eq, false))
+    return tightenIntMinImpl(v, value, reason) && tightenIntMaxImpl(v, value, reason)
 }
 
 /**

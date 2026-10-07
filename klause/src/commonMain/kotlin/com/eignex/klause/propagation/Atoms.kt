@@ -400,14 +400,16 @@ internal fun PropagationState.propagateAtomsForVar(
     if (newMin > oldMin) atomVarGe(v, newMin)
     if (newMax < oldMax) atomVarLe(v, newMax)
     if (newMin > oldMin) {
+        val near = antNear ?: decidedFrontier(idx.find(AtomKind.GE, newMin))
         wakeMinCrossing(idx, oldMin, newMin, antFar) { id ->
-            recordEqDeath(v, atoms.threshold[id], near = atoms.threshold[id] < reqMin, antNear, antFar)
+            recordEqDeath(v, atoms.threshold[id], near = atoms.threshold[id] < reqMin, near, antFar)
             wakeAtom(id, false)
         }
     }
     if (newMax < oldMax) {
+        val near = antNear ?: decidedFrontier(idx.find(AtomKind.LE, newMax))
         wakeMaxCrossing(idx, newMax, oldMax, antFar) { id ->
-            recordEqDeath(v, atoms.threshold[id], near = atoms.threshold[id] > reqMax, antNear, antFar)
+            recordEqDeath(v, atoms.threshold[id], near = atoms.threshold[id] > reqMax, near, antFar)
             wakeAtom(id, false)
         }
     }
@@ -492,6 +494,11 @@ internal fun PropagationState.propagateAtomsForSetRestriction(
         idx.eq.visitRange(newMin, newMin) { id -> wakeAtom(id, true) }
     }
 }
+
+// A decision moves its bound with no reason, yet each value it sweeps past is still ruled out by the decided
+// frontier bound, which the crossing stamps first; citing it keeps the decision the level's one unexplained literal.
+private fun PropagationState.decidedFrontier(frontier: Int): IntArray? =
+    if (frontier >= 0 && currentLevel > 0) intArrayOf(Lit.make(problem.numBoolVars + frontier, false)) else null
 
 /** Record an eq atom's carve reason at its first death during a bound move. A value killed in
  *  the move's NEAR region — below the raised min / above the lowered max *requested* bound — is ruled
@@ -613,7 +620,9 @@ private fun PropagationState.channelingReasonAtWake(atomId: Int, newT: Boolean):
                 if (k + 1 >= d.min) atoms.pendingMoveAnt else frontier(AtomKind.GE, d.min)
             }
 
-        AtomKind.EQ -> atoms.pendingMoveAnt // eq truth/hole handled by the caller; unreachable
+        // A value the move swept past without a carve is excluded by the bound it now lies beyond, a reason
+        // even when the move itself is a decision with none.
+        AtomKind.EQ -> if (k < d.min) frontier(AtomKind.GE, d.min) else frontier(AtomKind.LE, d.max)
     }
 }
 
