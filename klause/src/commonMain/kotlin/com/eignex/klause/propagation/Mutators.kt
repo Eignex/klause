@@ -422,7 +422,7 @@ internal fun PropagationState.citeCrossedSearchHoles(
     fun cite(value: Long) {
         val o = out ?: IntArrayList().also { fresh ->
             out = fresh
-            base?.forEach { fresh.add(it) }
+            reasonOf(base)?.forEach { fresh.add(it) }
         }
         o.add(Lit.make(atomVarEq(v, value), true))
     }
