@@ -3,6 +3,7 @@ package com.eignex.klause.factor.global
 import com.eignex.klause.factor.arithmetic.internals.collectHoleAndBoundAntecedents
 import com.eignex.klause.factor.global.internals.InverseCache
 import com.eignex.klause.factor.global.internals.reginFilter
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.propagation.IntEvent
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.Propagator
@@ -131,14 +132,15 @@ internal class InversePropagator(
             val iVal = i + fOffset
             val fHas = jVal.toLong() in state.intDomains[f[i]]
             val gHas = iVal.toLong() in state.intDomains[g[gIdx]]
+            // Each direction rests on the one membership the other side lacks.
             if (fHas && !gHas) {
-                val ant = state.composeIntVarAtomAntecedents(intArrayOf(g[gIdx]))
+                val ant = intArrayOf(Lit.make(state.atomVarEq(g[gIdx], iVal.toLong()), true))
                 if (!state.excludeIntValue(f[i], jVal.toLong(), ant)) {
                     cache.conflictVars = intArrayOf(f[i], g[gIdx])
                     return false
                 }
             } else if (!fHas && gHas) {
-                val ant = state.composeIntVarAtomAntecedents(intArrayOf(f[i]))
+                val ant = intArrayOf(Lit.make(state.atomVarEq(f[i], jVal.toLong()), true))
                 if (!state.excludeIntValue(g[gIdx], iVal.toLong(), ant)) {
                     cache.conflictVars = intArrayOf(f[i], g[gIdx])
                     return false

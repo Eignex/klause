@@ -3,6 +3,7 @@ package com.eignex.klause.factor.global
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.backtrack.selector.Vsids
+import com.eignex.klause.factor.PropagationReasonOracle
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
@@ -24,6 +25,23 @@ class InversePropagatorTest {
      * by learning) enumeration must equal the brute-force mutual-inverse solution set. An
      * unsound reason — citing too small a pair — would drop a feasible assignment.
      */
+    @Test
+    fun `inverse deductions are implied by their reasons under carved holes`() {
+        val rng = Random(0x1DE5)
+        repeat(300) { iter ->
+            val n = 4
+            val problem = Problem(
+                numBoolVars = 0,
+                numIntVars = 2 * n,
+                intDomains = Array(2 * n) { IntDomain(0, n - 1L) },
+                factors = arrayOf<Factor>(Inverse(f = IntArray(n) { it }, g = IntArray(n) { n + it })),
+            )
+            PropagationReasonOracle.assertReasonsImply(problem, "inverse#$iter") { state ->
+                (0 until 5).all { state.excludeIntValue(rng.nextInt(2 * n), rng.nextInt(n).toLong()) }
+            }
+        }
+    }
+
     @Test
     fun `backtrack learning enumerates exactly the brute-force solution set`() {
         // var ids: f = 0..n-1, g = n..2n-1; per-var [min,max] over 0..n-1 (0-based offsets).

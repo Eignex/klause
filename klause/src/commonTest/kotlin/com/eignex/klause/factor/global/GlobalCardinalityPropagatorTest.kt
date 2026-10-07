@@ -3,6 +3,7 @@ package com.eignex.klause.factor.global
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.backtrack.selector.Vsids
+import com.eignex.klause.factor.PropagationReasonOracle
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
@@ -14,6 +15,7 @@ import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.propagation.propagate
 import com.eignex.klause.solver.SolveResult
+import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -37,6 +39,31 @@ class GlobalCardinalityPropagatorTest {
      * count-pigeonhole and Régin-flow failure paths fire. Under the full CDCL backtracker
      * enumeration must equal brute force; an unsound reason drops a feasible assignment.
      */
+    @Test
+    fun `global cardinality deductions are implied by their reasons under carved holes`() {
+        val rng = Random(0x6CC0)
+        repeat(300) { iter ->
+            val n = 5
+            val problem = Problem(
+                numBoolVars = 0,
+                numIntVars = n,
+                intDomains = Array(n) { IntDomain(0, 3) },
+                factors = arrayOf<Factor>(
+                    GlobalCardinality(
+                        xs = IntArray(n) { it },
+                        cover = longArrayOf(0, 1, 2, 3),
+                        countLow = intArrayOf(0, 1, 0, 1),
+                        countHigh = intArrayOf(2, 2, 2, 2),
+                        closed = rng.nextBoolean(),
+                    ),
+                ),
+            )
+            PropagationReasonOracle.assertReasonsImply(problem, "gcc#$iter") { state ->
+                (0 until 6).all { state.excludeIntValue(rng.nextInt(n), rng.nextInt(4).toLong()) }
+            }
+        }
+    }
+
     @Test
     fun `backtrack learning enumerates exactly the brute-force solution set with low-up bounds`() {
         val instances = listOf(

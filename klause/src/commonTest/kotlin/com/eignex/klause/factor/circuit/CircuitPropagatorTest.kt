@@ -5,6 +5,7 @@ import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.backtrack.selector.Vsids
 import com.eignex.klause.factor.ConflictReasonOracle
 import com.eignex.klause.factor.FactorPropagationOracle
+import com.eignex.klause.factor.PropagationReasonOracle
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Lit
@@ -71,6 +72,26 @@ class CircuitPropagatorTest {
         assertTrue(citedVars.all { it == 0 || it == 1 }, "reason must cite only the subtour edges, got $citedVars")
         assertTrue(2 !in citedVars, "idle successor var 2 must not appear in the sharp reason")
         ConflictReasonOracle.assertEntailed(problem, state, 0, "circuit-subtour")
+    }
+
+    @Test
+    fun `circuit deductions are implied by their reasons under carved holes`() {
+        val rng = Random(0x5EA5)
+        repeat(300) { iter ->
+            val n = 5
+            val problem = Problem(
+                numBoolVars = 0,
+                numIntVars = n,
+                intDomains = Array(n) { IntDomain(0, n - 1L) },
+                factors = arrayOf<Factor>(Circuit(succ = IntArray(n) { it })),
+            )
+            PropagationReasonOracle.assertReasonsImply(problem, "circuit#$iter") { state ->
+                (0 until 6).all {
+                    val v = rng.nextInt(n)
+                    state.excludeIntValue(v, rng.nextInt(n).toLong())
+                }
+            }
+        }
     }
 
     @Test

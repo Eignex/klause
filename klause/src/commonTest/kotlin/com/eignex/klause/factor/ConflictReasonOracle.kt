@@ -36,7 +36,7 @@ object ConflictReasonOracle {
         }
     }
 
-    private fun litTrueUnder(problem: Problem, state: PropagationState, lit: Int, s: Sample): Boolean {
+    internal fun litTrueUnder(problem: Problem, state: PropagationState, lit: Int, s: Sample): Boolean {
         val v = Lit.variable(lit)
         val pos = Lit.isPositive(lit)
         if (v < problem.numBoolVars) return if (pos) s.bools[v] else !s.bools[v]
