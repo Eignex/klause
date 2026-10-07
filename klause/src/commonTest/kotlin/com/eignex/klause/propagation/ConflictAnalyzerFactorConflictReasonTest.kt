@@ -588,4 +588,40 @@ class ConflictAnalyzerFactorConflictReasonTest {
             "Xor learned should contain ¬x, got ${learned.literals.toList()}",
         )
     }
+
+    @Test
+    fun `a conflict takes its level from its own path, not the previous analysis`() {
+        // x1 >= 1 with x2 >= 1 forces x3 >= 3 (x3 >= x1 + x2 + 1), which with x0 >= 3 breaks x0 + x1 + x3 <= 6. The
+        // first conflict has x0 >= 3 and x1 >= 1 at levels 1 and 2; the second at levels 2 and 3, where x3 >= 3 must
+        // be resolved back to x1's decision for the clause to assert.
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 4,
+            intDomains = Array(4) { IntDomain(0, 5) },
+            factors = arrayOf<Factor>(
+                Linear(intArrayOf(1, 1, 1), intArrayOf(0, 1, 3), LinearOp.LE, 6),
+                Linear(intArrayOf(1, -1, -1), intArrayOf(3, 1, 2), LinearOp.GE, 1),
+            ),
+        )
+        val state = PropagationState(problem, Assumptions.None)
+        state.undoLogging = true
+        val root = state.mark()
+        fun propagateToConflict() {
+            state.currentFactor = 1
+            check(state.factorAt(1).propagate(state, 1))
+            state.currentFactor = 0
+            check(!state.factorAt(0).propagate(state, 0))
+        }
+        check(state.setIntMinAsDecision(2, 1) && state.tightenIntMin(0, 3) && state.setIntMinAsDecision(1, 1))
+        propagateToConflict()
+        state.conflictAnalyzer.analyze(0)
+        state.undoTo(root)
+        check(state.setIntMinAsDecision(2, 1) && state.setIntMinAsDecision(0, 3) && state.setIntMinAsDecision(1, 1))
+        propagateToConflict()
+
+        val learned = assertIs<ConflictAnalyzer.AnalysisResult.Learned>(state.conflictAnalyzer.analyze(0))
+
+        assertTrue(learned.asserting)
+        assertEquals(2, learned.backjumpLevel)
+    }
 }
