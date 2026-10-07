@@ -291,6 +291,7 @@ internal fun searchStatPairs(stats: SolveStats): List<Pair<String, String>> {
     if (stats.search.rootFixed.max.isFinite()) out += "rootFixed" to "${stats.search.rootFixed.max.toLong()}"
     stats.search.inprocessProbes.sum.toLong().takeIf { it > 0L }?.let { out += "inprocessProbes" to "$it" }
     stats.search.inprocessVisits.sum.toLong().takeIf { it > 0L }?.let { out += "inprocessVisits" to "$it" }
+    stats.search.glueClauses.sum.toLong().takeIf { it > 0L }?.let { out += "glueClauses" to "$it" }
     return out
 }
 

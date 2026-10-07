@@ -35,6 +35,8 @@ data class SearchStats(
     val inprocessProbes: SumResult = ZERO_COUNT,
     /** Clause literals inprocessing scanned looking for subsumed or strengthenable clauses. */
     val inprocessVisits: SumResult = ZERO_COUNT,
+    /** Learned clauses with a literal block distance of at most two: the short, reusable ones. */
+    val glueClauses: SumResult = ZERO_COUNT,
 ) {
     /** Combine two workers' search stats: counters add, peak depth maxes, depth means weight-combine. */
     fun mergedWith(o: SearchStats): SearchStats = SearchStats(
@@ -49,6 +51,7 @@ data class SearchStats(
         rootFixed = MaxResult(maxOf(rootFixed.max, o.rootFixed.max)),
         inprocessProbes = SumResult(inprocessProbes.sum + o.inprocessProbes.sum),
         inprocessVisits = SumResult(inprocessVisits.sum + o.inprocessVisits.sum),
+        glueClauses = SumResult(glueClauses.sum + o.glueClauses.sum),
     )
 }
 
@@ -95,6 +98,13 @@ internal class SearchStatsSink {
     fun observeRelearn() = relearned.update(1.0)
     fun observeRootFixed(count: Int) = rootFixed.update(count.toDouble())
 
+    private var glueClauses = 0L
+
+    /** Count a learned clause of literal block distance [lbd] toward [SearchStats.glueClauses]. */
+    fun observeLearnedLbd(lbd: Int) {
+        if (lbd <= GLUE_LBD) glueClauses++
+    }
+
     /** Count an inprocessing slice's [probes] and clause-literal [visits]. */
     fun observeInprocessing(probes: Long, visits: Long) {
         inprocessProbes += probes
@@ -113,5 +123,9 @@ internal class SearchStatsSink {
         rootFixed = rootFixed.read(),
         inprocessProbes = SumResult(inprocessProbes.toDouble()),
         inprocessVisits = SumResult(inprocessVisits.toDouble()),
+        glueClauses = SumResult(glueClauses.toDouble()),
     )
 }
+
+// The largest literal block distance a learned clause can have and still count as glue.
+private const val GLUE_LBD = 2

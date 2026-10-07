@@ -113,6 +113,9 @@ internal enum class Signal {
     /** Share of the pool's record constraint violation a local-search arm removed. */
     Violation,
 
+    /** Short learned clauses a backtrack arm derived: the conflicts that teach it most. */
+    Glue,
+
     /** Uses other arms made of this arm's shared clauses. */
     ClauseUses,
 
@@ -133,7 +136,7 @@ internal fun Signal.earnableBy(worker: PortfolioWorker): Boolean = when (this) {
 
     Signal.Violation -> worker.acceptsInstructionBudget
 
-    Signal.Floor, Signal.RootFixings, Signal.ClauseUses, Signal.CutUses, Signal.BoundUses ->
+    Signal.Floor, Signal.RootFixings, Signal.Glue, Signal.ClauseUses, Signal.CutUses, Signal.BoundUses ->
         !worker.acceptsInstructionBudget
 }
 
@@ -142,12 +145,15 @@ internal fun Signal.earnableBy(worker: PortfolioWorker): Boolean = when (this) {
  * anything to show for itself.
  *
  * A backtrack arm is credited for variables newly fixed at its root, the one kind of progress no later search
- * undoes; its count is the most the arm has shown, so a re-seeded handle does not earn the same fixings twice. A
+ * undoes; its count is the most the arm has shown, so a re-seeded handle does not earn the same fixings twice. It
+ * is credited too for the short clauses it learns, the conflicts that teach it most, though it has fixed nothing
+ * yet. A
  * local-search arm is credited for lowering the pool's record violation, by the share of the record it removed,
  * so getting close to a solution pays and merely matching the best so far does not.
  */
 internal class ProgressCredit(arms: Int) {
     private val rootFixedSeen = DoubleArray(arms)
+    private val glueSeen = DoubleArray(arms)
     private var recordViolation = Double.POSITIVE_INFINITY
 
     /** Credit [arm] in [ledger] for the progress in [stats], cumulative for a resumable handle or one segment's. */
@@ -157,12 +163,21 @@ internal class ProgressCredit(arms: Int) {
             ledger.credit(arm, Signal.RootFixings, fixed - rootFixedSeen[arm])
             rootFixedSeen[arm] = fixed
         }
+        creditGrowth(ledger, arm, Signal.Glue, stats.search.glueClauses.sum, glueSeen)
         val violation = stats.ls.incumbentViolation
         if (violation.isNaN() || violation >= recordViolation) return
         if (recordViolation.isFinite()) {
             ledger.credit(arm, Signal.Violation, (recordViolation - violation) / recordViolation)
         }
         recordViolation = violation
+    }
+
+    // Credit what [total] grew by since [arm] last showed it. A re-seeded handle starts its counters over, so a
+    // total below the last one seen is a new search: it is credited whole and becomes the new mark.
+    private fun creditGrowth(ledger: RewardLedger, arm: Int, signal: Signal, total: Double, seen: DoubleArray) {
+        val grown = if (total < seen[arm]) total else total - seen[arm]
+        if (grown > 0.0) ledger.credit(arm, signal, grown)
+        seen[arm] = total
     }
 }
 

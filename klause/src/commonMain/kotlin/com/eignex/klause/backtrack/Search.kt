@@ -452,6 +452,7 @@ internal class BacktrackBrancher(
 
     override fun onLearnedConflict(conflict: com.eignex.klause.solver.search.SearchLearnedConflict) {
         sink?.search?.observeLearn()
+        sink?.search?.observeLearnedLbd(conflict.lbd)
         for (level in conflict.decisionLevels) {
             if (level in 1..seedDecisionLevels) touchedSeedLevels.add(level)
         }
